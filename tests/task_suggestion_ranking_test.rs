@@ -23,20 +23,12 @@ fn fixture() -> tempfile::TempDir {
 fn suggest(query: &str, project: Option<&str>, limit: usize) -> Vec<String> {
     let mut api = ApiServer::new();
     lotar::routes::initialize(&mut api);
-    let mut params = HashMap::from([
-        ("q".into(), query.into()),
-        ("limit".into(), limit.to_string()),
-    ]);
+    let mut params = HashMap::from([("q".into(), query.into()), ("limit".into(), limit.to_string())]);
     if let Some(project) = project {
         params.insert("project".into(), project.into());
     }
-    let response = api.handle_request(&HttpRequest {
-        method: "GET".into(),
-        path: "/api/tasks/suggest".into(),
-        query: params,
-        headers: HashMap::new(),
-        body: Vec::new(),
-    });
+    let response =
+        api.handle_request(&HttpRequest { method: "GET".into(), path: "/api/tasks/suggest".into(), query: params, headers: HashMap::new(), body: Vec::new() });
     assert_eq!(response.status, 200);
     let body: Value = serde_json::from_slice(&response.body).unwrap();
     body["data"]
@@ -72,10 +64,7 @@ fn suggestion_identity_case_unicode_and_u64_are_preserved() {
     let tmp = fixture();
     let _env = EnvVarGuard::set("LOTAR_TASKS_DIR", tmp.path().to_str().unwrap());
     for project in ["abc-team", "ABC-OPS", "Équipe"] {
-        assert_eq!(
-            suggest(&format!("{project}-00054"), None, 1),
-            [format!("{project}-54")]
-        );
+        assert_eq!(suggest(&format!("{project}-00054"), None, 1), [format!("{project}-54")]);
     }
     assert!(suggest("abc-ops-00054", None, 1).is_empty());
     assert!(suggest("ABC-OPS-54", Some("abc-team"), 1).is_empty());
@@ -90,14 +79,8 @@ fn suggestion_empty_and_text_are_stable_without_mutating_list_order_or_files() {
     let tmp = fixture();
     let _env = EnvVarGuard::set("LOTAR_TASKS_DIR", tmp.path().to_str().unwrap());
     let storage = Storage::new(tmp.path());
-    let filter = lotar::api_types::TaskListFilter {
-        project: Some("ZZ".into()),
-        ..Default::default()
-    };
-    let before = TaskService::list(&storage, &filter)
-        .into_iter()
-        .map(|(id, _)| id)
-        .collect::<Vec<_>>();
+    let filter = lotar::api_types::TaskListFilter { project: Some("ZZ".into()), ..Default::default() };
+    let before = TaskService::list(&storage, &filter).into_iter().map(|(id, _)| id).collect::<Vec<_>>();
     let path = tmp.path().join("ZZ/54.yml");
     let bytes = std::fs::read(&path).unwrap();
     assert_eq!(suggest("", Some("ZZ"), 2), ["ZZ-9", "ZZ-10"]);
@@ -105,13 +88,7 @@ fn suggestion_empty_and_text_are_stable_without_mutating_list_order_or_files() {
         assert_eq!(suggest(query, Some("ZZ"), 2), ["ZZ-9", "ZZ-10"]);
     }
     assert_eq!(suggest("", Some("ZZ"), 2), suggest("", Some("ZZ"), 2));
-    assert_eq!(
-        before,
-        TaskService::list(&storage, &filter)
-            .into_iter()
-            .map(|(id, _)| id)
-            .collect::<Vec<_>>()
-    );
+    assert_eq!(before, TaskService::list(&storage, &filter).into_iter().map(|(id, _)| id).collect::<Vec<_>>());
     assert_eq!(bytes, std::fs::read(path).unwrap());
 }
 
@@ -128,20 +105,13 @@ fn suggestion_text_relevance_and_rest_service_order_agree() {
         (5, "title: Repair this"),
         (6, "title: Repair"),
     ] {
-        std::fs::write(dir.join(format!("{number}.yml")), format!(
-            "{fields}\nstatus: Todo\npriority: Medium\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\n"
-        )).unwrap();
+        std::fs::write(dir.join(format!("{number}.yml")), format!("{fields}\nstatus: Todo\npriority: Medium\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\n"))
+            .unwrap();
     }
     let _env = EnvVarGuard::set("LOTAR_TASKS_DIR", tmp.path().to_str().unwrap());
     let expected = ["TP-6", "TP-5", "TP-4", "TP-3", "TP-2", "TP-1"];
     assert_eq!(suggest("REPAIR", None, 20), expected);
-    assert_eq!(
-        TaskService::suggest(&Storage::new(tmp.path()), "REPAIR", None, 20)
-            .into_iter()
-            .map(|(id, _)| id)
-            .collect::<Vec<_>>(),
-        expected
-    );
+    assert_eq!(TaskService::suggest(&Storage::new(tmp.path()), "REPAIR", None, 20).into_iter().map(|(id, _)| id).collect::<Vec<_>>(), expected);
     assert!(suggest("repair", None, 0).is_empty());
 
     let mut api = ApiServer::new();
@@ -161,12 +131,7 @@ fn suggestion_text_relevance_and_rest_service_order_agree() {
         });
         assert_eq!(response.status, 200);
         let body: Value = serde_json::from_slice(&response.body).unwrap();
-        body["data"]["tasks"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|task| task["id"].as_str().unwrap().to_owned())
-            .collect::<Vec<_>>()
+        body["data"]["tasks"].as_array().unwrap().iter().map(|task| task["id"].as_str().unwrap().to_owned()).collect::<Vec<_>>()
     };
     let before = list();
     assert_eq!(before, ["TP-1", "TP-2", "TP-3", "TP-4", "TP-6", "TP-5"]);

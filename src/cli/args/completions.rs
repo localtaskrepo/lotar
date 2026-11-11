@@ -23,13 +23,7 @@ impl CompletionShell {
     }
 
     pub fn supported_shells() -> &'static [CompletionShell] {
-        &[
-            CompletionShell::Bash,
-            CompletionShell::Zsh,
-            CompletionShell::Fish,
-            CompletionShell::Powershell,
-            CompletionShell::Elvish,
-        ]
+        &[CompletionShell::Bash, CompletionShell::Zsh, CompletionShell::Fish, CompletionShell::Powershell, CompletionShell::Elvish]
     }
 }
 

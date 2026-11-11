@@ -48,13 +48,7 @@ fn test_assignee_get_set_json() {
     let output = cmd
         .current_dir(temp_dir)
         .env("LOTAR_TEST_SILENT", "1")
-        .args([
-            "assignee",
-            "1",
-            "john.doe@example.com",
-            "--project=test-project",
-            "--format=json",
-        ])
+        .args(["assignee", "1", "john.doe@example.com", "--project=test-project", "--format=json"])
         .assert()
         .success()
         .get_output()
@@ -103,13 +97,7 @@ fn test_duedate_get_set_json() {
     let output = cmd
         .current_dir(temp_dir)
         .env("LOTAR_TEST_SILENT", "1")
-        .args([
-            "due-date",
-            "1",
-            "2025-12-31",
-            "--project=test-project",
-            "--format=json",
-        ])
+        .args(["due-date", "1", "2025-12-31", "--project=test-project", "--format=json"])
         .assert()
         .success()
         .get_output()
@@ -142,13 +130,7 @@ fn test_priority_unchanged_json() {
     let out = cmd
         .current_dir(temp_dir)
         .env("LOTAR_TEST_SILENT", "1")
-        .args([
-            "priority",
-            "1",
-            "medium",
-            "--project=test-project",
-            "--format=json",
-        ])
+        .args(["priority", "1", "medium", "--project=test-project", "--format=json"])
         .assert()
         .success()
         .get_output()
@@ -156,13 +138,7 @@ fn test_priority_unchanged_json() {
         .clone();
     let json: Value = serde_json::from_slice(&out).expect("valid JSON from priority unchanged");
     assert_eq!(json["status"], "success");
-    assert!(
-        json["message"]
-            .as_str()
-            .unwrap_or("")
-            .to_lowercase()
-            .contains("unchanged")
-    );
+    assert!(json["message"].as_str().unwrap_or("").to_lowercase().contains("unchanged"));
     assert!(json["task_id"].is_string());
     // Priority value should be present; compare case-insensitive with the requested value
     let p = json["priority"].as_str().unwrap_or("").to_lowercase();
@@ -188,14 +164,7 @@ fn test_task_delete_success_json() {
     let out = cmd
         .current_dir(temp_dir)
         .env("LOTAR_TEST_SILENT", "1")
-        .args([
-            "task",
-            "delete",
-            "1",
-            "--project=test-project",
-            "--yes",
-            "--format=json",
-        ])
+        .args(["task", "delete", "1", "--project=test-project", "--yes", "--format=json"])
         .assert()
         .success()
         .get_output()
@@ -203,13 +172,7 @@ fn test_task_delete_success_json() {
         .clone();
     let json: Value = serde_json::from_slice(&out).expect("valid JSON from delete");
     assert_eq!(json["status"], "success");
-    assert!(
-        json["message"]
-            .as_str()
-            .unwrap_or("")
-            .to_lowercase()
-            .contains("deleted")
-    );
+    assert!(json["message"].as_str().unwrap_or("").to_lowercase().contains("deleted"));
     // Canonical ID, like every other command (DEV-283).
     assert_eq!(json["task_id"], "TP-1");
 

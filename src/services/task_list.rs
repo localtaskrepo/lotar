@@ -52,10 +52,7 @@ pub const KNOWN_QUERY_KEYS: &[&str] = &[
 const UNSUPPORTED_QUERY_KEYS: &[(&str, &str)] = &[
     ("page", "use offset and limit"),
     ("sort", "use sort_by and order"),
-    (
-        "format",
-        "only /api/tasks/export takes format, and only csv",
-    ),
+    ("format", "only /api/tasks/export takes format, and only csv"),
     ("cursor", "use offset and limit"),
 ];
 
@@ -133,9 +130,7 @@ impl fmt::Display for TaskQueryError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             TaskQueryError::InvalidEnum { message, .. } => f.write_str(message),
-            TaskQueryError::UnresolvedMe => f.write_str(
-                "Could not resolve @me: no identity configured (default_reporter, git user.name, or USER env)",
-            ),
+            TaskQueryError::UnresolvedMe => f.write_str("Could not resolve @me: no identity configured (default_reporter, git user.name, or USER env)"),
             TaskQueryError::Invalid(message) => f.write_str(message),
         }
     }
@@ -171,16 +166,7 @@ impl TaskQueryInput {
     /// [`KNOWN_QUERY_KEYS`] as a field filter.
     pub fn from_params(query: &HashMap<String, String>) -> Result<Self, TaskQueryError> {
         let list = |key: &str| -> Vec<String> {
-            query
-                .get(key)
-                .map(|raw| {
-                    raw.split(',')
-                        .map(str::trim)
-                        .filter(|part| !part.is_empty())
-                        .map(str::to_string)
-                        .collect()
-                })
-                .unwrap_or_default()
+            query.get(key).map(|raw| raw.split(',').map(str::trim).filter(|part| !part.is_empty()).map(str::to_string).collect()).unwrap_or_default()
         };
         let mut fields = Vec::new();
         for (key, value) in query {
@@ -189,14 +175,8 @@ impl TaskQueryInput {
             }
             // Transport-style names a client may expect; never custom-field
             // filters, which would silently match nothing (DEV-275).
-            if let Some(hint) = UNSUPPORTED_QUERY_KEYS
-                .iter()
-                .find(|(name, _)| *name == key.as_str())
-                .map(|(_, hint)| hint)
-            {
-                return Err(TaskQueryError::Invalid(format!(
-                    "Unknown parameter '{key}': {hint}"
-                )));
+            if let Some(hint) = UNSUPPORTED_QUERY_KEYS.iter().find(|(name, _)| *name == key.as_str()).map(|(_, hint)| hint) {
+                return Err(TaskQueryError::Invalid(format!("Unknown parameter '{key}': {hint}")));
             }
             for part in value.split(',').map(str::trim).filter(|p| !p.is_empty()) {
                 fields.push((key.clone(), part.to_string()));
@@ -215,11 +195,7 @@ impl TaskQueryInput {
             assignee: query.get("assignee").cloned(),
             fields,
             deletion: parse_deletion(query.get("deletion").map(String::as_str))?,
-            archived: query
-                .get("archived")
-                .map(|raw| ArchiveFilter::parse(raw))
-                .transpose()?
-                .unwrap_or_default(),
+            archived: query.get("archived").map(|raw| ArchiveFilter::parse(raw)).transpose()?.unwrap_or_default(),
             due: query.get("due").cloned(),
             due_within: query.get("due_within").cloned(),
             recent: query.get("recent").cloned(),
@@ -241,21 +217,11 @@ impl TaskQueryInput {
     /// `status:todo,done has:tag owner:alice "login redirect"`. List filters
     /// add to what is already set; single-value filters replace it; the
     /// remaining words become the search text.
-    pub fn add_search(
-        &mut self,
-        search: &crate::utils::search_syntax::ParsedSearch,
-    ) -> Result<(), TaskQueryError> {
+    pub fn add_search(&mut self, search: &crate::utils::search_syntax::ParsedSearch) -> Result<(), TaskQueryError> {
         if !search.errors.is_empty() {
             return Err(TaskQueryError::Invalid(search.errors.join("; ")));
         }
-        let csv = |value: &str| -> Vec<String> {
-            value
-                .split(',')
-                .map(str::trim)
-                .filter(|part| !part.is_empty())
-                .map(str::to_string)
-                .collect()
-        };
+        let csv = |value: &str| -> Vec<String> { value.split(',').map(str::trim).filter(|part| !part.is_empty()).map(str::to_string).collect() };
         let merge = |current: &Option<String>, value: &str| match current {
             Some(existing) if !existing.trim().is_empty() => format!("{existing},{value}"),
             _ => value.to_string(),
@@ -296,9 +262,7 @@ impl TaskQueryInput {
                 "archived" => self.archived = ArchiveFilter::parse(value)?,
                 // `q=` sets the search text outright, as in the web UI.
                 "q" => text = Some(value.clone()),
-                _ => self
-                    .fields
-                    .extend(csv(value).into_iter().map(|v| (key.clone(), v))),
+                _ => self.fields.extend(csv(value).into_iter().map(|v| (key.clone(), v))),
             }
         }
         if let Some(text) = text {
@@ -314,24 +278,14 @@ impl TaskQueryInput {
     /// against the requested project's configuration (else `base`), so
     /// project-only values work. Explicit invalid values are errors; nothing
     /// is silently dropped.
-    pub fn resolve(
-        self,
-        base: &ResolvedConfig,
-        tasks_root: &Path,
-    ) -> Result<TaskQuery, TaskQueryError> {
+    pub fn resolve(self, base: &ResolvedConfig, tasks_root: &Path) -> Result<TaskQuery, TaskQueryError> {
         if let Some(text) = self.text.as_deref() {
             crate::utils::text_search::SearchQuery::validate(text)?;
         }
 
-        let project = self
-            .project
-            .as_deref()
-            .map(str::trim)
-            .filter(|p| !p.is_empty())
-            .map(str::to_string);
+        let project = self.project.as_deref().map(str::trim).filter(|p| !p.is_empty()).map(str::to_string);
         let config = match project.as_deref() {
-            Some(prefix) => crate::config::resolution::config_for_project(tasks_root, Some(prefix))
-                .unwrap_or_else(|_| base.clone()),
+            Some(prefix) => crate::config::resolution::config_for_project(tasks_root, Some(prefix)).unwrap_or_else(|_| base.clone()),
             None => base.clone(),
         };
 
@@ -349,22 +303,15 @@ impl TaskQueryInput {
                 Ok(status) => status,
                 // A status removed from the configuration still finds the
                 // tasks that hold it, so they can be migrated (DEV-271).
-                Err(message) => stored_status(tasks_root, filter.project.as_deref(), raw)
-                    .ok_or_else(|| invalid_enum("status", raw, message))?,
+                Err(message) => stored_status(tasks_root, filter.project.as_deref(), raw).ok_or_else(|| invalid_enum("status", raw, message))?,
             };
             filter.status.push(status);
         }
         for raw in &self.priority {
-            filter.priority.push(
-                crate::types::Priority::parse_with_config(raw, &config)
-                    .map_err(|message| invalid_enum("priority", raw, message))?,
-            );
+            filter.priority.push(crate::types::Priority::parse_with_config(raw, &config).map_err(|message| invalid_enum("priority", raw, message))?);
         }
         for raw in &self.task_type {
-            filter.task_type.push(
-                crate::types::TaskType::parse_with_config(raw, &config)
-                    .map_err(|message| invalid_enum("type", raw, message))?,
-            );
+            filter.task_type.push(crate::types::TaskType::parse_with_config(raw, &config).map_err(|message| invalid_enum("type", raw, message))?);
         }
 
         if let Some(raw) = self.assignee.as_deref().map(str::trim) {
@@ -372,19 +319,11 @@ impl TaskQueryInput {
                 filter.assignee_none = true;
             } else if !raw.is_empty() {
                 let name = if raw.eq_ignore_ascii_case("@me") {
-                    crate::utils::identity::resolve_current_user_for_project(
-                        Some(tasks_root),
-                        filter.project.as_deref(),
-                    )
-                    .ok_or(TaskQueryError::UnresolvedMe)?
+                    crate::utils::identity::resolve_current_user_for_project(Some(tasks_root), filter.project.as_deref()).ok_or(TaskQueryError::UnresolvedMe)?
                 } else {
                     raw.to_string()
                 };
-                filter
-                    .assignee
-                    .push(crate::utils::member::normalize_member_value(&name, |n| {
-                        config.agent_profiles.contains_key(n)
-                    }));
+                filter.assignee.push(crate::utils::member::normalize_member_value(&name, |n| config.agent_profiles.contains_key(n)));
             }
         }
 
@@ -395,34 +334,17 @@ impl TaskQueryInput {
         let mut field_filters: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
         for (key, value) in self.fields {
             if let Some(builtin) = crate::utils::fields::is_reserved_field(&key) {
-                field_filters
-                    .entry(builtin.to_string())
-                    .or_default()
-                    .insert(value);
-            } else if let Some(name) =
-                crate::utils::custom_fields::resolve_filter_name(&key, &config)
-            {
-                filter
-                    .custom_fields
-                    .entry(crate::utils::custom_fields::canonicalize(&name))
-                    .or_default()
-                    .push(value);
+                field_filters.entry(builtin.to_string()).or_default().insert(value);
+            } else if let Some(name) = crate::utils::custom_fields::resolve_filter_name(&key, &config) {
+                filter.custom_fields.entry(crate::utils::custom_fields::canonicalize(&name)).or_default().push(value);
             } else {
                 // Not a builtin field and not a declared custom field: it
                 // can never match, so say so instead of returning nothing.
-                return Err(TaskQueryError::Invalid(format!(
-                    "Unknown filter '{key}': not a query parameter, a built-in field or a declared custom field"
-                )));
+                return Err(TaskQueryError::Invalid(format!("Unknown filter '{key}': not a query parameter, a built-in field or a declared custom field")));
             }
         }
 
-        let mut options = TaskQueryOptions {
-            search: self
-                .text
-                .as_deref()
-                .map(crate::utils::text_search::SearchQuery::parse),
-            ..TaskQueryOptions::default()
-        };
+        let mut options = TaskQueryOptions { search: self.text.as_deref().map(crate::utils::text_search::SearchQuery::parse), ..TaskQueryOptions::default() };
         if let Some(raw) = self.sort_by.as_deref() {
             options.sort = task_query::parse_sort_by(raw)?;
         }
@@ -454,18 +376,8 @@ impl TaskQueryInput {
         }
 
         options.ranks = task_query::SortRanks {
-            priority: config
-                .issue_priorities
-                .values
-                .iter()
-                .map(ToString::to_string)
-                .collect(),
-            status: config
-                .issue_states
-                .values
-                .iter()
-                .map(ToString::to_string)
-                .collect(),
+            priority: config.issue_priorities.values.iter().map(ToString::to_string).collect(),
+            status: config.issue_states.values.iter().map(ToString::to_string).collect(),
         };
 
         // Exclusions look at every task, deleted ones included, so they can
@@ -480,13 +392,7 @@ impl TaskQueryInput {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        Ok(TaskQuery {
-            filter,
-            field_filters,
-            options,
-            config,
-            exclude,
-        })
+        Ok(TaskQuery { filter, field_filters, options, config, exclude })
     }
 }
 
@@ -501,11 +407,7 @@ impl TaskQuery {
 /// no longer configured anywhere but tasks still hold it. A status another
 /// project still defines is not "removed": query that project instead
 /// (DEV-57 keeps project-only values out of the base scope).
-fn stored_status(
-    tasks_root: &Path,
-    project: Option<&str>,
-    raw: &str,
-) -> Option<crate::types::TaskStatus> {
+fn stored_status(tasks_root: &Path, project: Option<&str>, raw: &str) -> Option<crate::types::TaskStatus> {
     let wanted = raw.trim();
     if wanted.is_empty() {
         return None;
@@ -516,35 +418,19 @@ fn stored_status(
         archived: crate::storage::layout::ArchiveFilter::All,
         ..Default::default()
     };
-    let configured_somewhere = crate::utils::filesystem::list_visible_subdirs(tasks_root)
-        .into_iter()
-        .any(|(prefix, _)| {
-            crate::config::resolution::config_for_project(tasks_root, Some(&prefix)).is_ok_and(
-                |config| {
-                    config
-                        .issue_states
-                        .values
-                        .iter()
-                        .any(|status| status.eq_ignore_case(wanted))
-                },
-            )
-        });
+    let configured_somewhere = crate::utils::filesystem::list_visible_subdirs(tasks_root).into_iter().any(|(prefix, _)| {
+        crate::config::resolution::config_for_project(tasks_root, Some(&prefix))
+            .is_ok_and(|config| config.issue_states.values.iter().any(|status| status.eq_ignore_case(wanted)))
+    });
     if configured_somewhere {
         return None;
     }
-    crate::storage::search::StorageSearch::search(tasks_root, &filter)
-        .into_iter()
-        .map(|(_, task)| task.status)
-        .find(|status| status.eq_ignore_case(wanted))
+    crate::storage::search::StorageSearch::search(tasks_root, &filter).into_iter().map(|(_, task)| task.status).find(|status| status.eq_ignore_case(wanted))
 }
 
 /// Load, filter and order the tasks a query selects. Pagination is left to
 /// the caller.
-pub fn run(
-    storage: &Storage,
-    query: &TaskQuery,
-    now: chrono::DateTime<chrono::Utc>,
-) -> Vec<(String, TaskDTO)> {
+pub fn run(storage: &Storage, query: &TaskQuery, now: chrono::DateTime<chrono::Utc>) -> Vec<(String, TaskDTO)> {
     let mut tasks = crate::services::task_service::TaskService::list(storage, &query.filter);
     apply_field_filters(&mut tasks, &query.field_filters, &query.config);
     task_query::apply(&mut tasks, &query.options, now);
@@ -553,41 +439,22 @@ pub fn run(
 }
 
 /// Leave out tasks matching any of the query's exclusions (DEV-5).
-pub fn remove_excluded(
-    storage: &Storage,
-    query: &TaskQuery,
-    tasks: &mut Vec<(String, TaskDTO)>,
-    now: chrono::DateTime<chrono::Utc>,
-) {
+pub fn remove_excluded(storage: &Storage, query: &TaskQuery, tasks: &mut Vec<(String, TaskDTO)>, now: chrono::DateTime<chrono::Utc>) {
     remove_matching(storage, &query.exclude, tasks, now);
 }
 
 /// Leave out tasks matching any of `exclusions`. Each exclusion is checked
 /// against the given tasks in memory, with the same filters [`run`] applies,
 /// rather than as its own workspace query (DEV-292).
-pub fn remove_matching(
-    storage: &Storage,
-    exclusions: &[TaskQuery],
-    tasks: &mut Vec<(String, TaskDTO)>,
-    now: chrono::DateTime<chrono::Utc>,
-) {
+pub fn remove_matching(storage: &Storage, exclusions: &[TaskQuery], tasks: &mut Vec<(String, TaskDTO)>, now: chrono::DateTime<chrono::Utc>) {
     if exclusions.is_empty() || tasks.is_empty() {
         return;
     }
     let mut excluded: std::collections::HashSet<String> = std::collections::HashSet::new();
     for exclusion in exclusions {
-        let mut matching: Vec<(String, TaskDTO)> = tasks
-            .iter()
-            .filter(|(id, task)| {
-                !excluded.contains(id)
-                    && dto_matches_list_filter(storage, id, task, &exclusion.filter)
-            })
-            .cloned()
-            .collect();
-        crate::services::task_service::TaskService::filter_assignees(
-            &mut matching,
-            &exclusion.filter,
-        );
+        let mut matching: Vec<(String, TaskDTO)> =
+            tasks.iter().filter(|(id, task)| !excluded.contains(id) && dto_matches_list_filter(storage, id, task, &exclusion.filter)).cloned().collect();
+        crate::services::task_service::TaskService::filter_assignees(&mut matching, &exclusion.filter);
         apply_field_filters(&mut matching, &exclusion.field_filters, &exclusion.config);
         task_query::apply_smart_filters(&mut matching, &exclusion.options, now);
         remove_matching(storage, &exclusion.exclude, &mut matching, now);
@@ -598,12 +465,7 @@ pub fn remove_matching(
 
 /// The storage-level part of a list filter, evaluated on a task object
 /// (mirrors `TaskService::list` and `StorageSearch::task_matches_filter`).
-fn dto_matches_list_filter(
-    storage: &Storage,
-    id: &str,
-    task: &TaskDTO,
-    filter: &TaskListFilter,
-) -> bool {
+fn dto_matches_list_filter(storage: &Storage, id: &str, task: &TaskDTO, filter: &TaskListFilter) -> bool {
     use crate::storage::layout::ArchiveFilter;
     match filter.deletion {
         DeletionFilter::Active if task.deleted_at.is_some() => return false,
@@ -617,9 +479,7 @@ fn dto_matches_list_filter(
     }
     if let Some(project) = filter.project.as_deref() {
         let wanted = crate::utils::project::resolve_project_input(project, &storage.root_path);
-        let prefix = crate::storage::TaskId::parse(id)
-            .map(|parsed| parsed.project)
-            .unwrap_or_default();
+        let prefix = crate::storage::TaskId::parse(id).map(|parsed| parsed.project).unwrap_or_default();
         if !prefix.eq_ignore_ascii_case(&wanted) {
             return false;
         }
@@ -639,19 +499,11 @@ fn dto_matches_list_filter(
             return false;
         }
     }
-    if !filter.tags.is_empty()
-        && !filter.tags.iter().any(|wanted| {
-            task.tags
-                .iter()
-                .any(|tag| crate::utils::fuzzy_match::fuzzy_contains(tag, wanted))
-        })
-    {
+    if !filter.tags.is_empty() && !filter.tags.iter().any(|wanted| task.tags.iter().any(|tag| crate::utils::fuzzy_match::fuzzy_contains(tag, wanted))) {
         return false;
     }
     for (name, allowed) in &filter.custom_fields {
-        let Some(values) =
-            crate::utils::custom_fields::extract_value_strings(&task.custom_fields, name)
-        else {
+        let Some(values) = crate::utils::custom_fields::extract_value_strings(&task.custom_fields, name) else {
             return false;
         };
         if values.is_empty() || !crate::utils::fuzzy_match::fuzzy_set_match(&values, allowed) {
@@ -666,38 +518,25 @@ fn dto_matches_list_filter(
 
 /// IDs of the tasks a search in the web syntax selects, for commands that
 /// act on a selection (sprint add/remove over REST and MCP, DEV-236).
-pub fn select_ids(
-    storage: &Storage,
-    base: &ResolvedConfig,
-    tasks_root: &Path,
-    search: &str,
-) -> Result<Vec<String>, TaskQueryError> {
+pub fn select_ids(storage: &Storage, base: &ResolvedConfig, tasks_root: &Path, search: &str) -> Result<Vec<String>, TaskQueryError> {
     let mut input = TaskQueryInput::default();
     input.add_search(&crate::utils::search_syntax::parse(search))?;
     let query = input.resolve(base, tasks_root)?;
-    Ok(run(storage, &query, chrono::Utc::now())
-        .into_iter()
-        .map(|(id, _)| id)
-        .collect())
+    Ok(run(storage, &query, chrono::Utc::now()).into_iter().map(|(id, _)| id).collect())
 }
 
 /// Keep tasks whose field values loosely match every field filter.
-pub fn apply_field_filters(
-    tasks: &mut Vec<(String, TaskDTO)>,
-    filters: &BTreeMap<String, BTreeSet<String>>,
-    config: &ResolvedConfig,
-) {
+pub fn apply_field_filters(tasks: &mut Vec<(String, TaskDTO)>, filters: &BTreeMap<String, BTreeSet<String>>, config: &ResolvedConfig) {
     if filters.is_empty() {
         return;
     }
     tasks.retain(|(id, task)| {
         filters.iter().all(|(key, allowed)| {
-            let values: Vec<String> =
-                crate::utils::custom_fields::resolve_task_filter_values(id, task, key, config)
-                    .unwrap_or_default()
-                    .into_iter()
-                    .filter(|value| !value.is_empty())
-                    .collect();
+            let values: Vec<String> = crate::utils::custom_fields::resolve_task_filter_values(id, task, key, config)
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|value| !value.is_empty())
+                .collect();
             let allowed: Vec<String> = allowed.iter().cloned().collect();
             !values.is_empty() && crate::utils::fuzzy_match::fuzzy_set_match(&values, &allowed)
         })
@@ -705,11 +544,7 @@ pub fn apply_field_filters(
 }
 
 fn invalid_enum(field: &'static str, value: &str, message: String) -> TaskQueryError {
-    TaskQueryError::InvalidEnum {
-        field,
-        value: value.trim().to_string(),
-        message,
-    }
+    TaskQueryError::InvalidEnum { field, value: value.trim().to_string(), message }
 }
 
 /// Strict `deletion` value (DEV-92): blank or absent means `active`;
@@ -721,9 +556,7 @@ pub fn parse_deletion(raw: Option<&str>) -> Result<DeletionFilter, String> {
         Some("active") => Ok(DeletionFilter::Active),
         Some("deleted") => Ok(DeletionFilter::Deleted),
         Some("all") => Ok(DeletionFilter::All),
-        Some(other) => Err(format!(
-            "Invalid deletion filter: '{other}' (expected active, deleted, or all)"
-        )),
+        Some(other) => Err(format!("Invalid deletion filter: '{other}' (expected active, deleted, or all)")),
     }
 }
 
@@ -739,9 +572,7 @@ pub fn parse_sprints_csv(raw: Option<&str>) -> Result<Vec<u32>, String> {
             let part = part.trim();
             match part.parse::<u32>() {
                 Ok(id) if id > 0 => Ok(id),
-                _ => Err(format!(
-                    "Invalid sprints entry: '{part}' (expected CSV of positive sprint ids)"
-                )),
+                _ => Err(format!("Invalid sprints entry: '{part}' (expected CSV of positive sprint ids)")),
             }
         })
         .collect()
@@ -772,29 +603,12 @@ pub struct FieldSum {
 
 /// Sum `field` (`effort`, or a custom field by name or `field:<name>`) over
 /// `tasks`. Other builtin fields are not numbers and are rejected.
-pub fn sum_field(
-    tasks: &[(String, TaskDTO)],
-    field: &str,
-    config: &ResolvedConfig,
-) -> Result<FieldSum, String> {
+pub fn sum_field(tasks: &[(String, TaskDTO)], field: &str, config: &ResolvedConfig) -> Result<FieldSum, String> {
     let field = field.trim();
     if field.eq_ignore_ascii_case("effort") {
-        let mut sum = FieldSum {
-            field: "effort".to_string(),
-            total: None,
-            hours: Some(0.0),
-            points: Some(0.0),
-            counted: 0,
-            missing: 0,
-            invalid: 0,
-        };
+        let mut sum = FieldSum { field: "effort".to_string(), total: None, hours: Some(0.0), points: Some(0.0), counted: 0, missing: 0, invalid: 0 };
         for (_, task) in tasks {
-            match task
-                .effort
-                .as_deref()
-                .map(str::trim)
-                .filter(|e| !e.is_empty())
-            {
+            match task.effort.as_deref().map(str::trim).filter(|e| !e.is_empty()) {
                 None => sum.missing += 1,
                 Some(raw) => match crate::utils::effort::parse_effort(raw).map(|e| e.kind) {
                     Ok(crate::utils::effort::EffortKind::TimeHours(h)) => {
@@ -811,23 +625,9 @@ pub fn sum_field(
         }
         return Ok(sum);
     }
-    let name = if crate::utils::fields::is_reserved_field(field).is_some() {
-        None
-    } else {
-        crate::utils::custom_fields::resolve_filter_name(field, config)
-    }
-    .ok_or_else(|| {
-        format!("Cannot sum '{field}': use effort or a numeric custom field (field:<name>)")
-    })?;
-    let mut sum = FieldSum {
-        field: format!("field:{name}"),
-        total: Some(0.0),
-        hours: None,
-        points: None,
-        counted: 0,
-        missing: 0,
-        invalid: 0,
-    };
+    let name = if crate::utils::fields::is_reserved_field(field).is_some() { None } else { crate::utils::custom_fields::resolve_filter_name(field, config) }
+        .ok_or_else(|| format!("Cannot sum '{field}': use effort or a numeric custom field (field:<name>)"))?;
+    let mut sum = FieldSum { field: format!("field:{name}"), total: Some(0.0), hours: None, points: None, counted: 0, missing: 0, invalid: 0 };
     for (_, task) in tasks {
         let value = crate::utils::custom_fields::extract_value_strings(&task.custom_fields, &name)
             .and_then(|values| values.into_iter().next())
@@ -849,11 +649,7 @@ impl FieldSum {
     pub fn describe(&self) -> String {
         let number = |n: f64| {
             let rounded = (n * 100.0).round() / 100.0;
-            if rounded.fract() == 0.0 {
-                format!("{rounded:.0}")
-            } else {
-                format!("{rounded}")
-            }
+            if rounded.fract() == 0.0 { format!("{rounded:.0}") } else { format!("{rounded}") }
         };
         let total = match (self.total, self.hours, self.points) {
             (Some(total), _, _) => number(total),
@@ -872,14 +668,7 @@ impl FieldSum {
             notes.push(format!("{} not a number", self.invalid));
         }
         let field = self.field.strip_prefix("field:").unwrap_or(&self.field);
-        let notes = if notes.is_empty() {
-            String::new()
-        } else {
-            format!(" ({})", notes.join(", "))
-        };
-        format!(
-            "Sum of {field}: {total} over {} task(s){notes}",
-            self.counted
-        )
+        let notes = if notes.is_empty() { String::new() } else { format!(" ({})", notes.join(", ")) };
+        format!("Sum of {field}: {total} over {} task(s){notes}", self.counted)
     }
 }

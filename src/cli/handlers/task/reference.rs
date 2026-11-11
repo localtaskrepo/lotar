@@ -1,6 +1,4 @@
-use crate::cli::args::{
-    TaskReferenceAction, TaskReferenceArgs, TaskReferenceKindAdd, TaskReferenceKindRemove,
-};
+use crate::cli::args::{TaskReferenceAction, TaskReferenceArgs, TaskReferenceKindAdd, TaskReferenceKindRemove};
 use crate::cli::handlers::task::context::TaskCommandContext;
 use crate::cli::handlers::task::errors::TaskStorageAction;
 use crate::cli::handlers::task::mutation::load_task;
@@ -11,238 +9,100 @@ use crate::utils::git::find_repo_root;
 use crate::workspace::TasksDirectoryResolver;
 use serde_json::json;
 
-pub fn handle_reference(
-    args: TaskReferenceArgs,
-    project: Option<&str>,
-    resolver: &TasksDirectoryResolver,
-    renderer: &OutputRenderer,
-) -> Result<(), String> {
+pub fn handle_reference(args: TaskReferenceArgs, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
     match args.action {
         TaskReferenceAction::Add(add_args) => match add_args.kind {
-            TaskReferenceKindAdd::Link { id, url } => {
-                handle_add_link(&id, &url, project, resolver, renderer)
-            }
-            TaskReferenceKindAdd::File { id, path } => {
-                handle_add_file(&id, &path, project, resolver, renderer)
-            }
-            TaskReferenceKindAdd::Attachment { id, name } => {
-                handle_add_attachment(&id, &name, project, resolver, renderer)
-            }
-            TaskReferenceKindAdd::Upload { id, path } => {
-                handle_upload_attachment(&id, &path, project, resolver, renderer)
-            }
-            TaskReferenceKindAdd::Code { id, code } => {
-                handle_add_code(&id, &code, project, resolver, renderer)
-            }
+            TaskReferenceKindAdd::Link { id, url } => handle_add_link(&id, &url, project, resolver, renderer),
+            TaskReferenceKindAdd::File { id, path } => handle_add_file(&id, &path, project, resolver, renderer),
+            TaskReferenceKindAdd::Attachment { id, name } => handle_add_attachment(&id, &name, project, resolver, renderer),
+            TaskReferenceKindAdd::Upload { id, path } => handle_upload_attachment(&id, &path, project, resolver, renderer),
+            TaskReferenceKindAdd::Code { id, code } => handle_add_code(&id, &code, project, resolver, renderer),
         },
         TaskReferenceAction::Remove(remove_args) => match remove_args.kind {
-            TaskReferenceKindRemove::Link { id, url } => {
-                handle_remove_link(&id, &url, project, resolver, renderer)
-            }
-            TaskReferenceKindRemove::File { id, path } => {
-                handle_remove_file(&id, &path, project, resolver, renderer)
-            }
-            TaskReferenceKindRemove::Attachment { id, name } => {
-                handle_remove_attachment(&id, &name, project, resolver, renderer)
-            }
-            TaskReferenceKindRemove::Code { id, code } => {
-                handle_remove_code(&id, &code, project, resolver, renderer)
-            }
+            TaskReferenceKindRemove::Link { id, url } => handle_remove_link(&id, &url, project, resolver, renderer),
+            TaskReferenceKindRemove::File { id, path } => handle_remove_file(&id, &path, project, resolver, renderer),
+            TaskReferenceKindRemove::Attachment { id, name } => handle_remove_attachment(&id, &name, project, resolver, renderer),
+            TaskReferenceKindRemove::Code { id, code } => handle_remove_code(&id, &code, project, resolver, renderer),
         },
     }
 }
 
-fn handle_add_link(
-    task_id: &str,
-    url: &str,
-    project: Option<&str>,
-    resolver: &TasksDirectoryResolver,
-    renderer: &OutputRenderer,
-) -> Result<(), String> {
+fn handle_add_link(task_id: &str, url: &str, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
     let mut ctx = TaskCommandContext::new(resolver, project, Some(task_id))?;
     let loaded = load_task(&mut ctx, task_id, project)?;
 
-    let outcome = ReferenceService::attach_link_reference(&mut ctx.storage, &loaded.full_id, url)
-        .map_err(|e| e.to_string())?;
+    let outcome = ReferenceService::attach_link_reference(&mut ctx.storage, &loaded.full_id, url).map_err(|e| e.to_string())?;
     ReferenceService::dispatch_post_commit(&mut ctx.storage, &outcome);
 
-    emit_reference_result(
-        renderer,
-        "add",
-        "link",
-        &loaded.full_id,
-        url,
-        outcome.changed,
-        &outcome.task,
-    )
+    emit_reference_result(renderer, "add", "link", &loaded.full_id, url, outcome.changed, &outcome.task)
 }
 
-fn handle_remove_link(
-    task_id: &str,
-    url: &str,
-    project: Option<&str>,
-    resolver: &TasksDirectoryResolver,
-    renderer: &OutputRenderer,
-) -> Result<(), String> {
+fn handle_remove_link(task_id: &str, url: &str, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
     let mut ctx = TaskCommandContext::new(resolver, project, Some(task_id))?;
     let loaded = load_task(&mut ctx, task_id, project)?;
 
-    let outcome = ReferenceService::detach_link_reference(&mut ctx.storage, &loaded.full_id, url)
-        .map_err(|e| e.to_string())?;
+    let outcome = ReferenceService::detach_link_reference(&mut ctx.storage, &loaded.full_id, url).map_err(|e| e.to_string())?;
     ReferenceService::dispatch_post_commit(&mut ctx.storage, &outcome);
 
-    emit_reference_result(
-        renderer,
-        "remove",
-        "link",
-        &loaded.full_id,
-        url,
-        outcome.changed,
-        &outcome.task,
-    )
+    emit_reference_result(renderer, "remove", "link", &loaded.full_id, url, outcome.changed, &outcome.task)
 }
 
-fn handle_add_code(
-    task_id: &str,
-    code: &str,
-    project: Option<&str>,
-    resolver: &TasksDirectoryResolver,
-    renderer: &OutputRenderer,
-) -> Result<(), String> {
+fn handle_add_code(task_id: &str, code: &str, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
     let mut ctx = TaskCommandContext::new(resolver, project, Some(task_id))?;
     let loaded = load_task(&mut ctx, task_id, project)?;
 
-    let repo_root = find_repo_root(ctx.storage_root())
-        .ok_or_else(|| "Unable to locate git repository".to_string())?;
+    let repo_root = find_repo_root(ctx.storage_root()).ok_or_else(|| "Unable to locate git repository".to_string())?;
 
-    let outcome = ReferenceService::attach_code_reference(
-        &mut ctx.storage,
-        &repo_root,
-        &loaded.full_id,
-        code,
-    )
-    .map_err(|e| e.to_string())?;
+    let outcome = ReferenceService::attach_code_reference(&mut ctx.storage, &repo_root, &loaded.full_id, code).map_err(|e| e.to_string())?;
     ReferenceService::dispatch_post_commit(&mut ctx.storage, &outcome);
 
-    emit_reference_result(
-        renderer,
-        "add",
-        "code",
-        &loaded.full_id,
-        code,
-        outcome.changed,
-        &outcome.task,
-    )
+    emit_reference_result(renderer, "add", "code", &loaded.full_id, code, outcome.changed, &outcome.task)
 }
 
-fn handle_remove_code(
-    task_id: &str,
-    code: &str,
-    project: Option<&str>,
-    resolver: &TasksDirectoryResolver,
-    renderer: &OutputRenderer,
-) -> Result<(), String> {
+fn handle_remove_code(task_id: &str, code: &str, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
     let mut ctx = TaskCommandContext::new(resolver, project, Some(task_id))?;
     let loaded = load_task(&mut ctx, task_id, project)?;
 
-    let outcome = ReferenceService::detach_code_reference(&mut ctx.storage, &loaded.full_id, code)
-        .map_err(|e| e.to_string())?;
+    let outcome = ReferenceService::detach_code_reference(&mut ctx.storage, &loaded.full_id, code).map_err(|e| e.to_string())?;
     ReferenceService::dispatch_post_commit(&mut ctx.storage, &outcome);
 
-    emit_reference_result(
-        renderer,
-        "remove",
-        "code",
-        &loaded.full_id,
-        code,
-        outcome.changed,
-        &outcome.task,
-    )
+    emit_reference_result(renderer, "remove", "code", &loaded.full_id, code, outcome.changed, &outcome.task)
 }
 
 /// Resolve the attachments store root configured for the task's project.
 fn attachments_root_for(storage_root: &std::path::Path, task_id: &str) -> std::path::PathBuf {
-    let project = crate::storage::TaskId::parse(task_id)
-        .ok()
-        .map(|parsed| parsed.project);
+    let project = crate::storage::TaskId::parse(task_id).ok().map(|parsed| parsed.project);
     let config = crate::config::resolution::config_for_project(storage_root, project.as_deref())
-        .unwrap_or_else(|_| {
-            crate::config::types::ResolvedConfig::from_global(
-                crate::config::types::GlobalConfig::default(),
-            )
-        });
-    AttachmentService::resolve_attachments_root(storage_root, &config)
-        .unwrap_or_else(|_| storage_root.join("@attachments"))
+        .unwrap_or_else(|_| crate::config::types::ResolvedConfig::from_global(crate::config::types::GlobalConfig::default()));
+    AttachmentService::resolve_attachments_root(storage_root, &config).unwrap_or_else(|_| storage_root.join("@attachments"))
 }
 
-fn handle_add_file(
-    task_id: &str,
-    path: &str,
-    project: Option<&str>,
-    resolver: &TasksDirectoryResolver,
-    renderer: &OutputRenderer,
-) -> Result<(), String> {
+fn handle_add_file(task_id: &str, path: &str, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
     let mut ctx = TaskCommandContext::new(resolver, project, Some(task_id))?;
     let loaded = load_task(&mut ctx, task_id, project)?;
 
-    let repo_root = find_repo_root(ctx.storage_root())
-        .ok_or_else(|| "Unable to locate git repository".to_string())?;
+    let repo_root = find_repo_root(ctx.storage_root()).ok_or_else(|| "Unable to locate git repository".to_string())?;
 
     // Repository file references can never target the attachments store
     // (the service guard rejects store paths), so no store lock is taken.
-    let outcome = ReferenceService::attach_file_reference(
-        &mut ctx.storage,
-        &repo_root,
-        &loaded.full_id,
-        path,
-    )
-    .map_err(|e| e.to_string())?;
+    let outcome = ReferenceService::attach_file_reference(&mut ctx.storage, &repo_root, &loaded.full_id, path).map_err(|e| e.to_string())?;
     ReferenceService::dispatch_post_commit(&mut ctx.storage, &outcome);
 
-    emit_reference_result(
-        renderer,
-        "add",
-        "file",
-        &loaded.full_id,
-        path,
-        outcome.changed,
-        &outcome.task,
-    )
+    emit_reference_result(renderer, "add", "file", &loaded.full_id, path, outcome.changed, &outcome.task)
 }
 
-fn handle_remove_file(
-    task_id: &str,
-    path: &str,
-    project: Option<&str>,
-    resolver: &TasksDirectoryResolver,
-    renderer: &OutputRenderer,
-) -> Result<(), String> {
+fn handle_remove_file(task_id: &str, path: &str, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
     let mut ctx = TaskCommandContext::new(resolver, project, Some(task_id))?;
     let loaded = load_task(&mut ctx, task_id, project)?;
 
-    let repo_root = find_repo_root(ctx.storage_root())
-        .ok_or_else(|| "Unable to locate git repository".to_string())?;
+    let repo_root = find_repo_root(ctx.storage_root()).ok_or_else(|| "Unable to locate git repository".to_string())?;
 
     // Repository file references can never target the attachments store
     // (the service guard rejects store paths), so no store lock is taken.
-    let outcome = ReferenceService::detach_file_reference(
-        &mut ctx.storage,
-        &repo_root,
-        &loaded.full_id,
-        path,
-    )
-    .map_err(|e| e.to_string())?;
+    let outcome = ReferenceService::detach_file_reference(&mut ctx.storage, &repo_root, &loaded.full_id, path).map_err(|e| e.to_string())?;
     ReferenceService::dispatch_post_commit(&mut ctx.storage, &outcome);
 
-    emit_reference_result(
-        renderer,
-        "remove",
-        "file",
-        &loaded.full_id,
-        path,
-        outcome.changed,
-        &outcome.task,
-    )
+    emit_reference_result(renderer, "remove", "file", &loaded.full_id, path, outcome.changed, &outcome.task)
 }
 
 /// Managed attachment references serialize with upload/remove reclamation
@@ -271,17 +131,9 @@ fn handle_upload_attachment(
     let storage_root = ctx.storage_root().to_path_buf();
     let parsed = crate::storage::TaskId::parse(&loaded.full_id).map_err(|e| e.to_string())?;
     let config =
-        crate::config::resolution::config_for_project(&storage_root, Some(&parsed.project))
-            .map_err(|e| format!("Failed to load project config: {e}"))?;
+        crate::config::resolution::config_for_project(&storage_root, Some(&parsed.project)).map_err(|e| format!("Failed to load project config: {e}"))?;
 
-    let upload = AttachmentService::upload_and_attach(
-        &storage_root,
-        &config,
-        &loaded.full_id,
-        &filename,
-        bytes,
-    )
-    .map_err(|e| e.to_string())?;
+    let upload = AttachmentService::upload_and_attach(&storage_root, &config, &loaded.full_id, &filename, bytes).map_err(|e| e.to_string())?;
     // The store guard has dropped: post-commit hooks are safe to run.
     ReferenceService::dispatch_post_commit(&mut ctx.storage, &upload.attach);
     for warning in &upload.warnings {
@@ -292,24 +144,10 @@ fn handle_upload_attachment(
         // ![caption](attachment:<name>).
         renderer.emit_info(format_args!("Stored as {}", upload.stored));
     }
-    emit_reference_result(
-        renderer,
-        "add",
-        "attachment",
-        &loaded.full_id,
-        &upload.stored,
-        upload.attach.changed,
-        &upload.attach.task,
-    )
+    emit_reference_result(renderer, "add", "attachment", &loaded.full_id, &upload.stored, upload.attach.changed, &upload.attach.task)
 }
 
-fn handle_add_attachment(
-    task_id: &str,
-    name: &str,
-    project: Option<&str>,
-    resolver: &TasksDirectoryResolver,
-    renderer: &OutputRenderer,
-) -> Result<(), String> {
+fn handle_add_attachment(task_id: &str, name: &str, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
     let mut ctx = TaskCommandContext::new(resolver, project, Some(task_id))?;
     let loaded = load_task(&mut ctx, task_id, project)?;
 
@@ -319,21 +157,12 @@ fn handle_add_attachment(
         // Fail closed when the named blob is not present in the store.
         AttachmentService::resolve_attachment_path(&root, name).map_err(|e| e.to_string())?;
 
-        AttachmentService::attach_managed_reference(&mut ctx.storage, &loaded.full_id, name)
-            .map_err(|e| e.to_string())?
+        AttachmentService::attach_managed_reference(&mut ctx.storage, &loaded.full_id, name).map_err(|e| e.to_string())?
     };
     // The store guard has dropped: post-commit hooks are safe to run.
     ReferenceService::dispatch_post_commit(&mut ctx.storage, &outcome);
 
-    emit_reference_result(
-        renderer,
-        "add",
-        "attachment",
-        &loaded.full_id,
-        name,
-        outcome.changed,
-        &outcome.task,
-    )
+    emit_reference_result(renderer, "add", "attachment", &loaded.full_id, name, outcome.changed, &outcome.task)
 }
 
 /// Managed attachment reference detach; store lock held for parity with
@@ -352,21 +181,12 @@ fn handle_remove_attachment(
     let outcome = {
         let _store_guard = AttachmentService::lock_store(&root).map_err(|e| e.to_string())?;
 
-        AttachmentService::detach_managed_reference(&mut ctx.storage, &loaded.full_id, name)
-            .map_err(|e| e.to_string())?
+        AttachmentService::detach_managed_reference(&mut ctx.storage, &loaded.full_id, name).map_err(|e| e.to_string())?
     };
     // The store guard has dropped: post-commit hooks are safe to run.
     ReferenceService::dispatch_post_commit(&mut ctx.storage, &outcome);
 
-    emit_reference_result(
-        renderer,
-        "remove",
-        "attachment",
-        &loaded.full_id,
-        name,
-        outcome.changed,
-        &outcome.task,
-    )
+    emit_reference_result(renderer, "remove", "attachment", &loaded.full_id, name, outcome.changed, &outcome.task)
 }
 
 fn emit_reference_result(
@@ -392,23 +212,14 @@ fn emit_reference_result(
         }
         _ => {
             if changed {
-                renderer.emit_success(format_args!(
-                    "{}: {} reference updated for {}",
-                    action, kind, task_id
-                ));
+                renderer.emit_success(format_args!("{}: {} reference updated for {}", action, kind, task_id));
             } else {
-                renderer.emit_info(format_args!(
-                    "{}: {} reference already in desired state for {}",
-                    action, kind, task_id
-                ));
+                renderer.emit_info(format_args!("{}: {} reference already in desired state for {}", action, kind, task_id));
             }
         }
     }
 
-    renderer.log_info(format_args!(
-        "task.reference: action={} kind={} task_id={} changed={}",
-        action, kind, task_id, changed
-    ));
+    renderer.log_info(format_args!("task.reference: action={} kind={} task_id={} changed={}", action, kind, task_id, changed));
 
     // Ensure storage changes are flushed via drop; no explicit action required.
     // Keep a no-op reference to TaskStorageAction to satisfy consistency with other mutation handlers.

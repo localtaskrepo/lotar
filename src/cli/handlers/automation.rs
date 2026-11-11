@@ -6,12 +6,7 @@ use crate::workspace::TasksDirectoryResolver;
 pub struct AutomationHandler;
 
 impl AutomationHandler {
-    pub fn execute(
-        action: AutomationAction,
-        project: Option<&str>,
-        resolver: &TasksDirectoryResolver,
-        renderer: &OutputRenderer,
-    ) -> Result<(), String> {
+    pub fn execute(action: AutomationAction, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
         match action {
             AutomationAction::Simulate(args) => Self::simulate(&args, resolver, renderer),
             AutomationAction::Run(args) => Self::run(&args, project, resolver, renderer),
@@ -20,34 +15,19 @@ impl AutomationHandler {
 
     /// `lotar automation run` (DEV-241): the way to run automations on a
     /// schedule is to call this from cron or CI.
-    fn run(
-        args: &AutomationRunArgs,
-        project: Option<&str>,
-        resolver: &TasksDirectoryResolver,
-        renderer: &OutputRenderer,
-    ) -> Result<(), String> {
+    fn run(args: &AutomationRunArgs, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
         let mut storage = crate::storage::manager::Storage::new(&resolver.path);
         // The global -p scopes the run to one project (DEV-283), as it does
         // for `task archive --select`.
         let scoped = project.map(|p| {
             let prefix = crate::utils::project::resolve_project_input(p, &resolver.path);
-            match args
-                .select
-                .as_deref()
-                .map(str::trim)
-                .filter(|q| !q.is_empty())
-            {
+            match args.select.as_deref().map(str::trim).filter(|q| !q.is_empty()) {
                 Some(query) => format!("project={prefix} {query}"),
                 None => format!("project={prefix}"),
             }
         });
-        let report = AutomationService::run_manual(
-            &mut storage,
-            &args.rules,
-            scoped.as_deref().or(args.select.as_deref()),
-            args.dry_run,
-        )
-        .map_err(|e| e.to_string())?;
+        let report =
+            AutomationService::run_manual(&mut storage, &args.rules, scoped.as_deref().or(args.select.as_deref()), args.dry_run).map_err(|e| e.to_string())?;
         let failed = report.entries.iter().filter(|e| e.error.is_some()).count();
         if matches!(renderer.format, OutputFormat::Json) {
             renderer.emit_json(&serde_json::json!({
@@ -57,25 +37,15 @@ impl AutomationHandler {
             }));
         } else {
             if report.rules.is_empty() {
-                renderer.emit_info(format_args!(
-                    "No enabled rule has a manual action (on.manual); nothing to run."
-                ));
+                renderer.emit_info(format_args!("No enabled rule has a manual action (on.manual); nothing to run."));
             } else if report.entries.is_empty() {
-                renderer.emit_info(format_args!(
-                    "Checked {} task(s) against {}: none match.",
-                    report.checked,
-                    report.rules.join(", ")
-                ));
+                renderer.emit_info(format_args!("Checked {} task(s) against {}: none match.", report.checked, report.rules.join(", ")));
             }
             for entry in &report.entries {
                 let verb = if report.dry_run { "Would run" } else { "Ran" };
                 match &entry.error {
-                    Some(error) => renderer.emit_error(format_args!(
-                        "{} on {} failed: {error}",
-                        entry.rule, entry.task
-                    )),
-                    None => renderer
-                        .emit_success(format_args!("{verb} '{}' on {}", entry.rule, entry.task)),
+                    Some(error) => renderer.emit_error(format_args!("{} on {} failed: {error}", entry.rule, entry.task)),
+                    None => renderer.emit_success(format_args!("{verb} '{}' on {}", entry.rule, entry.task)),
                 }
                 for action in &entry.actions {
                     renderer.emit_info(format_args!("  {}", action.description));
@@ -91,15 +61,10 @@ impl AutomationHandler {
         Ok(())
     }
 
-    fn simulate(
-        args: &AutomationSimulateArgs,
-        resolver: &TasksDirectoryResolver,
-        renderer: &OutputRenderer,
-    ) -> Result<(), String> {
+    fn simulate(args: &AutomationSimulateArgs, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
         let event: AutomationEvent = args.event.parse()?;
 
-        let result = AutomationService::simulate(resolver.path.as_path(), &args.ticket, event)
-            .map_err(|e| e.to_string())?;
+        let result = AutomationService::simulate(resolver.path.as_path(), &args.ticket, event).map_err(|e| e.to_string())?;
 
         if matches!(renderer.format, OutputFormat::Json) {
             renderer.emit_json(&serde_json::json!({
@@ -116,10 +81,7 @@ impl AutomationHandler {
         }
 
         if !result.matched {
-            renderer.emit_info(format_args!(
-                "No automation rules matched ticket {} for event '{}'.",
-                args.ticket, args.event
-            ));
+            renderer.emit_info(format_args!("No automation rules matched ticket {} for event '{}'.", args.ticket, args.event));
             return Ok(());
         }
 
@@ -128,9 +90,7 @@ impl AutomationHandler {
         }
 
         if result.actions.is_empty() {
-            renderer.emit_info(format_args!(
-                "Rule matched but no actions defined for this event."
-            ));
+            renderer.emit_info(format_args!("Rule matched but no actions defined for this event."));
         } else {
             renderer.emit_info(format_args!("Actions that would be performed:"));
             for action in &result.actions {

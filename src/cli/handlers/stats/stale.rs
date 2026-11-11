@@ -20,24 +20,16 @@ pub(crate) fn run(
     let exclude_recent = if matches!(threshold.trim(), "0" | "0d" | "0w") {
         String::new()
     } else {
-        let recent = crate::services::task_query::parse_recent(threshold)
-            .map_err(|_| format!("Invalid threshold '{threshold}'. Use Nd or Nw, e.g., 21d, 8w"))?;
+        let recent =
+            crate::services::task_query::parse_recent(threshold).map_err(|_| format!("Invalid threshold '{threshold}'. Use Nd or Nw, e.g., 21d, 8w"))?;
         format!("-recent:{}d", recent.days)
     };
     let query = format!("{filter} {exclude_recent} sort_by=modified order=asc");
     let tasks = super::common::list_tasks(scope_project.as_deref(), resolver, &query)?;
 
     let now = chrono::Utc::now();
-    let modified = |task: &crate::api_types::TaskDTO| {
-        chrono::DateTime::parse_from_rfc3339(&task.modified)
-            .map(|at| at.with_timezone(&chrono::Utc))
-            .ok()
-    };
-    let age_days = |task: &crate::api_types::TaskDTO| {
-        modified(task)
-            .map(|at| (now - at).num_days())
-            .unwrap_or_default()
-    };
+    let modified = |task: &crate::api_types::TaskDTO| chrono::DateTime::parse_from_rfc3339(&task.modified).map(|at| at.with_timezone(&chrono::Utc)).ok();
+    let age_days = |task: &crate::api_types::TaskDTO| modified(task).map(|at| (now - at).num_days()).unwrap_or_default();
     let limited: Vec<_> = tasks.into_iter().take(limit).collect();
 
     super::common::emit_items(
@@ -54,15 +46,7 @@ pub(crate) fn run(
                 "age_days": age_days(task),
             })
         },
-        |(id, task)| {
-            format!(
-                "{:>6}d  {}  {}  {}",
-                age_days(task),
-                id,
-                task.modified,
-                task.title
-            )
-        },
+        |(id, task)| format!("{:>6}d  {}  {}  {}", age_days(task), id, task.modified, task.title),
         "No stale tickets over the threshold.",
     );
     Ok(())

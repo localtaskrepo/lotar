@@ -5,17 +5,8 @@ use crate::common;
 use common::TestFixtures;
 
 fn lotar(fixtures: &TestFixtures, args: &[&str]) {
-    let output = common::lotar_cmd()
-        .unwrap()
-        .current_dir(fixtures.get_temp_path())
-        .args(args)
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "{}",
-        String::from_utf8_lossy(&output.stderr)
-    );
+    let output = common::lotar_cmd().unwrap().current_dir(fixtures.get_temp_path()).args(args).output().unwrap();
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
 }
 
 fn keys_under(yaml: &str, section: &str) -> Vec<String> {
@@ -24,32 +15,15 @@ fn keys_under(yaml: &str, section: &str) -> Vec<String> {
     for part in section.split('.') {
         node = &node[part];
     }
-    node.as_mapping()
-        .map(|m| {
-            m.keys()
-                .filter_map(|k| k.as_str().map(str::to_string))
-                .collect()
-        })
-        .unwrap_or_default()
+    node.as_mapping().map(|m| m.keys().filter_map(|k| k.as_str().map(str::to_string)).collect()).unwrap_or_default()
 }
 
 #[test]
 fn custom_fields_keep_a_sorted_order_across_edits() {
     let fixtures = TestFixtures::new();
-    std::fs::write(
-        fixtures.tasks_root.join("config.yml"),
-        "default:\n  project: CF\ncustom:\n  fields: ['*']\n",
-    )
-    .unwrap();
+    std::fs::write(fixtures.tasks_root.join("config.yml"), "default:\n  project: CF\ncustom:\n  fields: ['*']\n").unwrap();
     let mut args = vec!["add", "CF"];
-    let fields = [
-        "zeta=6",
-        "alpha=1",
-        "gamma=3",
-        "beta=2",
-        "epsilon=5",
-        "delta=4",
-    ];
+    let fields = ["zeta=6", "alpha=1", "gamma=3", "beta=2", "epsilon=5", "delta=4"];
     for field in &fields {
         args.push("--field");
         args.push(field);
@@ -76,10 +50,7 @@ fn config_alias_maps_keep_a_sorted_order_across_writes() {
     .unwrap();
     let mut seen = Vec::new();
     for priority in ["High", "Low", "Medium", "High"] {
-        lotar(
-            &fixtures,
-            &["config", "set", "default_priority", priority, "--global"],
-        );
+        lotar(&fixtures, &["config", "set", "default_priority", priority, "--global"]);
         let text = std::fs::read_to_string(fixtures.tasks_root.join("config.yml")).unwrap();
         seen.push(keys_under(&text, "branch.type_aliases"));
     }

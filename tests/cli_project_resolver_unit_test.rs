@@ -3,10 +3,7 @@ use lotar::cli::project::test_support::resolver_from_config;
 use lotar::config::StringConfigField;
 use lotar::config::types::{ConfigurableField, ResolvedConfig};
 use lotar::types::{Priority, TaskStatus, TaskType};
-use lotar::utils::project::{
-    generate_project_prefix, generate_unique_project_prefix, resolve_project_input,
-    validate_explicit_prefix,
-};
+use lotar::utils::project::{generate_project_prefix, generate_unique_project_prefix, resolve_project_input, validate_explicit_prefix};
 use tempfile::TempDir;
 
 fn make_resolver() -> ProjectResolver {
@@ -14,16 +11,10 @@ fn make_resolver() -> ProjectResolver {
         review_reviewers: vec![],
         server_port: 8080,
         default_project: "TEST".to_string(),
-        issue_states: ConfigurableField {
-            values: vec![TaskStatus::from("Todo"), TaskStatus::from("Done")],
-        },
+        issue_states: ConfigurableField { values: vec![TaskStatus::from("Todo"), TaskStatus::from("Done")] },
         issue_done_states: None,
-        issue_types: ConfigurableField {
-            values: vec![TaskType::from("Feature"), TaskType::from("Bug")],
-        },
-        issue_priorities: ConfigurableField {
-            values: vec![Priority::from("Low"), Priority::from("High")],
-        },
+        issue_types: ConfigurableField { values: vec![TaskType::from("Feature"), TaskType::from("Bug")] },
+        issue_priorities: ConfigurableField { values: vec![Priority::from("Low"), Priority::from("High")] },
         tags: StringConfigField::new_wildcard(),
         tag_properties: Default::default(),
         default_assignee: None,
@@ -40,13 +31,7 @@ fn make_resolver() -> ProjectResolver {
         default_priority: Priority::from("Medium"),
         default_status: None,
         custom_fields: StringConfigField::new_wildcard(),
-        scan_signal_words: vec![
-            "TODO".to_string(),
-            "FIXME".to_string(),
-            "HACK".to_string(),
-            "BUG".to_string(),
-            "NOTE".to_string(),
-        ],
+        scan_signal_words: vec!["TODO".to_string(), "FIXME".to_string(), "HACK".to_string(), "BUG".to_string(), "NOTE".to_string()],
         scan_strip_attributes: true,
         scan_ticket_patterns: None,
         scan_enable_ticket_words: false,
@@ -81,34 +66,16 @@ fn make_resolver() -> ProjectResolver {
 #[test]
 fn extract_project_from_task_id() {
     let resolver = make_resolver();
-    assert_eq!(
-        resolver.extract_project_from_task_id("AUTH-123"),
-        Some("AUTH".to_string())
-    );
-    assert_eq!(
-        resolver.extract_project_from_task_id("TI-456"),
-        Some("TI".to_string())
-    );
-    assert_eq!(
-        resolver.extract_project_from_task_id("MOBILE-789"),
-        Some("MOBILE".to_string())
-    );
+    assert_eq!(resolver.extract_project_from_task_id("AUTH-123"), Some("AUTH".to_string()));
+    assert_eq!(resolver.extract_project_from_task_id("TI-456"), Some("TI".to_string()));
+    assert_eq!(resolver.extract_project_from_task_id("MOBILE-789"), Some("MOBILE".to_string()));
     assert_eq!(resolver.extract_project_from_task_id("123"), None);
     // DEV-56: the shared ID grammar supports lower-case, digit-leading, and
     // hyphenated prefixes; extraction reuses it instead of an
     // uppercase-ASCII-only rule and preserves exact case.
-    assert_eq!(
-        resolver.extract_project_from_task_id("auth-123"),
-        Some("auth".to_string())
-    );
-    assert_eq!(
-        resolver.extract_project_from_task_id("ABC-OPS-12"),
-        Some("ABC-OPS".to_string())
-    );
-    assert_eq!(
-        resolver.extract_project_from_task_id("42-7"),
-        Some("42".to_string())
-    );
+    assert_eq!(resolver.extract_project_from_task_id("auth-123"), Some("auth".to_string()));
+    assert_eq!(resolver.extract_project_from_task_id("ABC-OPS-12"), Some("ABC-OPS".to_string()));
+    assert_eq!(resolver.extract_project_from_task_id("42-7"), Some("42".to_string()));
     assert_eq!(resolver.extract_project_from_task_id("AUTH123"), None);
     assert_eq!(resolver.extract_project_from_task_id("-123"), None);
 }
@@ -116,21 +83,12 @@ fn extract_project_from_task_id() {
 #[test]
 fn resolve_project_scenarios() {
     let mut resolver = make_resolver();
-    assert_eq!(
-        resolver.resolve_project("AUTH-123", Some("AUTH")).unwrap(),
-        "AUTH"
-    );
-    assert_eq!(
-        resolver.resolve_project("AUTH-123", Some("auth")).unwrap(),
-        "AUTH"
-    );
+    assert_eq!(resolver.resolve_project("AUTH-123", Some("AUTH")).unwrap(), "AUTH");
+    assert_eq!(resolver.resolve_project("AUTH-123", Some("auth")).unwrap(), "AUTH");
     let result = resolver.resolve_project("AUTH-123", Some("FRONTEND"));
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("Project mismatch"));
-    assert_eq!(
-        resolver.resolve_project("123", Some("MOBILE")).unwrap(),
-        "MOBI"
-    );
+    assert_eq!(resolver.resolve_project("123", Some("MOBILE")).unwrap(), "MOBI");
     assert_eq!(resolver.resolve_project("AUTH-123", None).unwrap(), "AUTH");
     assert_eq!(resolver.resolve_project("123", None).unwrap(), "TEST");
     assert_eq!(resolver.resolve_project("", None).unwrap(), "TEST");
@@ -148,15 +106,9 @@ fn resolve_project_original_behavior() {
 #[test]
 fn get_full_task_id_works() {
     let mut resolver = make_resolver();
-    assert_eq!(
-        resolver.get_full_task_id("AUTH-123", None).unwrap(),
-        "AUTH-123"
-    );
+    assert_eq!(resolver.get_full_task_id("AUTH-123", None).unwrap(), "AUTH-123");
     assert_eq!(resolver.get_full_task_id("123", None).unwrap(), "TEST-123");
-    assert_eq!(
-        resolver.get_full_task_id("123", Some("MOBILE")).unwrap(),
-        "MOBI-123"
-    );
+    assert_eq!(resolver.get_full_task_id("123", Some("MOBILE")).unwrap(), "MOBI-123");
 }
 
 // Merged from utils_project_unit_test.rs
@@ -213,21 +165,12 @@ fn unique_prefix_generation_and_validation() {
     let temp_dir = TempDir::new().unwrap();
     let tasks_dir = temp_dir.path().join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();
-    assert_eq!(
-        generate_unique_project_prefix("frontend", &tasks_dir).unwrap(),
-        "FRON"
-    );
-    assert_eq!(
-        generate_unique_project_prefix("api-backend", &tasks_dir).unwrap(),
-        "AB"
-    );
+    assert_eq!(generate_unique_project_prefix("frontend", &tasks_dir).unwrap(), "FRON");
+    assert_eq!(generate_unique_project_prefix("api-backend", &tasks_dir).unwrap(), "AB");
     let existing_project_dir = tasks_dir.join("BACK");
     std::fs::create_dir_all(&existing_project_dir).unwrap();
     std::fs::write(
-        lotar::utils::paths::project_config_path(
-            temp_dir.path().join(".tasks").as_path(),
-            existing_project_dir.file_name().unwrap().to_str().unwrap(),
-        ),
+        lotar::utils::paths::project_config_path(temp_dir.path().join(".tasks").as_path(), existing_project_dir.file_name().unwrap().to_str().unwrap()),
         "project_name: backend\n",
     )
     .unwrap();
@@ -242,10 +185,7 @@ fn unique_prefix_generation_and_validation() {
     let existing_project_dir2 = tasks_dir.join("FRON");
     std::fs::create_dir_all(&existing_project_dir2).unwrap();
     std::fs::write(
-        lotar::utils::paths::project_config_path(
-            temp_dir.path().join(".tasks").as_path(),
-            existing_project_dir2.file_name().unwrap().to_str().unwrap(),
-        ),
+        lotar::utils::paths::project_config_path(temp_dir.path().join(".tasks").as_path(), existing_project_dir2.file_name().unwrap().to_str().unwrap()),
         "project_name: frontend\n",
     )
     .unwrap();
@@ -267,7 +207,6 @@ fn reserved_prefixes_are_rejected() {
     assert!(err.contains("@"));
     assert!(err.contains("reserved"));
 
-    let cfg_err =
-        lotar::config::operations::validate_field_value("default_project", "@team").unwrap_err();
+    let cfg_err = lotar::config::operations::validate_field_value("default_project", "@team").unwrap_err();
     assert!(cfg_err.to_string().contains("prefixes starting with '@'"));
 }

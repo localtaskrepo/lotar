@@ -25,20 +25,8 @@ fn sprint_assignment_requires_force_to_replace_membership() {
 
     let mut storage = Storage::new(&tasks_dir);
 
-    let sprint_one = Sprint {
-        plan: Some(SprintPlan {
-            label: Some("Alpha".to_string()),
-            ..SprintPlan::default()
-        }),
-        ..Sprint::default()
-    };
-    let sprint_two = Sprint {
-        plan: Some(SprintPlan {
-            label: Some("Beta".to_string()),
-            ..SprintPlan::default()
-        }),
-        ..Sprint::default()
-    };
+    let sprint_one = Sprint { plan: Some(SprintPlan { label: Some("Alpha".to_string()), ..SprintPlan::default() }), ..Sprint::default() };
+    let sprint_two = Sprint { plan: Some(SprintPlan { label: Some("Beta".to_string()), ..SprintPlan::default() }), ..Sprint::default() };
 
     SprintService::create(&mut storage, sprint_one, None).expect("create sprint #1");
     SprintService::create(&mut storage, sprint_two, None).expect("create sprint #2");
@@ -58,28 +46,14 @@ fn sprint_assignment_requires_force_to_replace_membership() {
 
     let mut records = SprintService::list(&storage).expect("list sprints");
 
-    let outcome = sprint_assignment::assign_tasks(
-        &mut storage,
-        &mut records,
-        std::slice::from_ref(&task.id),
-        Some("1"),
-        false,
-        false,
-    )
-    .expect("initial assignment succeeds");
+    let outcome = sprint_assignment::assign_tasks(&mut storage, &mut records, std::slice::from_ref(&task.id), Some("1"), false, false)
+        .expect("initial assignment succeeds");
     assert_eq!(outcome.modified, vec![task.id.clone()]);
 
     records = SprintService::list(&storage).expect("refresh sprints after first assignment");
 
-    let second = sprint_assignment::assign_tasks(
-        &mut storage,
-        &mut records,
-        std::slice::from_ref(&task.id),
-        Some("2"),
-        false,
-        false,
-    )
-    .expect("reassignment without force should add membership");
+    let second = sprint_assignment::assign_tasks(&mut storage, &mut records, std::slice::from_ref(&task.id), Some("2"), false, false)
+        .expect("reassignment without force should add membership");
     assert_eq!(second.modified, vec![task.id.clone()]);
     assert!(second.replaced.is_empty());
 
@@ -88,15 +62,8 @@ fn sprint_assignment_requires_force_to_replace_membership() {
 
     records = SprintService::list(&storage).expect("refresh sprints before force");
 
-    let forced = sprint_assignment::assign_tasks(
-        &mut storage,
-        &mut records,
-        std::slice::from_ref(&task.id),
-        Some("2"),
-        false,
-        true,
-    )
-    .expect("forced reassignment succeeds");
+    let forced = sprint_assignment::assign_tasks(&mut storage, &mut records, std::slice::from_ref(&task.id), Some("2"), false, true)
+        .expect("forced reassignment succeeds");
     assert_eq!(forced.modified, vec![task.id.clone()]);
     assert_eq!(forced.replaced.len(), 1);
     assert_eq!(forced.replaced[0].task_id, task.id);

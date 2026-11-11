@@ -52,14 +52,9 @@ impl AnchorPassReport {
     /// Human-readable summary lines for CLI output and REST `info`.
     pub fn messages(&self, dry_run: bool) -> Vec<String> {
         let mut out = Vec::new();
-        let (relocate_verb, prune_verb) = if dry_run {
-            ("Would re-anchor", "Would remove dead anchor")
-        } else {
-            ("Re-anchored", "Removed dead anchor")
-        };
+        let (relocate_verb, prune_verb) = if dry_run { ("Would re-anchor", "Would remove dead anchor") } else { ("Re-anchored", "Removed dead anchor") };
         if !self.relocated.is_empty() {
-            let tasks: std::collections::BTreeSet<_> =
-                self.relocated.iter().map(|(task, _, _)| task).collect();
+            let tasks: std::collections::BTreeSet<_> = self.relocated.iter().map(|(task, _, _)| task).collect();
             out.push(format!("{} {} task(s).", relocate_verb, tasks.len()));
         }
         for (task, anchor) in &self.pruned {
@@ -89,11 +84,7 @@ pub fn run_anchor_pass(
         return Ok(report);
     }
     let rename_map = repo_root.map(git_rename_map).unwrap_or_default();
-    let scope: Vec<PathBuf> = options
-        .scope
-        .iter()
-        .map(|root| std::fs::canonicalize(root).unwrap_or_else(|_| root.clone()))
-        .collect();
+    let scope: Vec<PathBuf> = options.scope.iter().map(|root| std::fs::canonicalize(root).unwrap_or_else(|_| root.clone())).collect();
 
     for (task_id, task) in tasks {
         // Plan from the snapshot; all source I/O happens here. The plan is
@@ -124,10 +115,7 @@ pub fn run_anchor_pass(
             let resolved = if original.exists() {
                 Some(original.clone())
             } else {
-                rename_map
-                    .get(&path_str)
-                    .and_then(|new_rel| repo_root.map(|root| root.join(new_rel)))
-                    .filter(|candidate| candidate.exists())
+                rename_map.get(&path_str).and_then(|new_rel| repo_root.map(|root| root.join(new_rel))).filter(|candidate| candidate.exists())
             };
             let in_scope = |path: &Path| scope.is_empty() || is_under_any(path, &scope);
 
@@ -175,12 +163,7 @@ pub fn run_anchor_pass(
                     .copied()
                     .filter(|candidate| candidate.abs_diff(line) <= options.window)
                     .min_by_key(|candidate| candidate.abs_diff(line))
-                    .or_else(|| {
-                        candidates
-                            .iter()
-                            .copied()
-                            .min_by_key(|candidate| candidate.abs_diff(line))
-                    }),
+                    .or_else(|| candidates.iter().copied().min_by_key(|candidate| candidate.abs_diff(line))),
                 None => candidates.first().copied(),
             };
             if let Some(line) = best {
@@ -197,9 +180,7 @@ pub fn run_anchor_pass(
         for (old, change) in &plan {
             match change {
                 AnchorChange::Move(new) => {
-                    report
-                        .relocated
-                        .push((task_id.clone(), old.clone(), new.clone()));
+                    report.relocated.push((task_id.clone(), old.clone(), new.clone()));
                 }
                 AnchorChange::Remove => report.pruned.push((task_id.clone(), old.clone())),
             }
@@ -231,11 +212,7 @@ fn apply_plan(references: &mut Vec<ReferenceEntry>, plan: &[(String, AnchorChang
     let mut changed = false;
     let mut kept = Vec::with_capacity(references.len());
     for mut reference in references.drain(..) {
-        let change = reference
-            .code
-            .as_deref()
-            .and_then(|code| plan.iter().find(|(old, _)| old == code))
-            .map(|(_, change)| change);
+        let change = reference.code.as_deref().and_then(|code| plan.iter().find(|(old, _)| old == code)).map(|(_, change)| change);
         match change {
             Some(AnchorChange::Move(new)) => {
                 reference.code = Some(new.clone());
@@ -267,12 +244,7 @@ fn apply_plan(references: &mut Vec<ReferenceEntry>, plan: &[(String, AnchorChang
 /// plain anchor that shares its line with such an entry. Returns whether
 /// anything was removed.
 pub(crate) fn dedupe_code_references(references: &mut Vec<ReferenceEntry>) -> bool {
-    let bare = |r: &ReferenceEntry| {
-        ReferenceEntry {
-            code: None,
-            ..r.clone()
-        } == ReferenceEntry::default()
-    };
+    let bare = |r: &ReferenceEntry| ReferenceEntry { code: None, ..r.clone() } == ReferenceEntry::default();
     let mut seen = std::collections::HashSet::new();
     let before = references.len();
     references.retain(|r| match r.code.as_deref() {
@@ -287,10 +259,7 @@ pub(crate) fn dedupe_code_references(references: &mut Vec<ReferenceEntry>) -> bo
 /// for them, while explicit attachments (CLI, REST, MCP, UI) record a
 /// `reference_added` entry. Path-only and ranged references (`path#A-B`)
 /// therefore always count as user-attached.
-pub(crate) fn is_user_attached(
-    history: &[crate::types::TaskChangeLogEntry],
-    code_ref: &str,
-) -> bool {
+pub(crate) fn is_user_attached(history: &[crate::types::TaskChangeLogEntry], code_ref: &str) -> bool {
     let Some((_, anchor)) = code_ref.rsplit_once('#') else {
         return true;
     };
@@ -298,11 +267,7 @@ pub(crate) fn is_user_attached(
         return true;
     }
     let recorded = format!("code:{code_ref}");
-    history.iter().any(|entry| {
-        entry.changes.iter().any(|change| {
-            change.field == "reference_added" && change.new.as_deref() == Some(recorded.as_str())
-        })
-    })
+    history.iter().any(|entry| entry.changes.iter().any(|change| change.field == "reference_added" && change.new.as_deref() == Some(recorded.as_str())))
 }
 
 fn is_under_any(path: &Path, roots: &[PathBuf]) -> bool {
@@ -320,11 +285,7 @@ pub(crate) fn parse_code_ref(code: &str) -> (String, Option<usize>) {
     let Some((path, anchor)) = code.split_once('#') else {
         return (code.to_string(), None);
     };
-    let digits: String = anchor
-        .chars()
-        .skip_while(|ch| !ch.is_ascii_digit())
-        .take_while(|ch| ch.is_ascii_digit())
-        .collect();
+    let digits: String = anchor.chars().skip_while(|ch| !ch.is_ascii_digit()).take_while(|ch| ch.is_ascii_digit()).collect();
     (path.to_string(), digits.parse::<usize>().ok())
 }
 
@@ -332,10 +293,7 @@ pub(crate) fn parse_code_ref(code: &str) -> (String, Option<usize>) {
 fn git_rename_map(repo_root: &Path) -> HashMap<String, String> {
     // NUL-separated, so paths with spaces or non-ASCII names match (DEV-285).
     let mut map = HashMap::new();
-    let Ok(output) = crate::utils::git::git_command(repo_root)
-        .args(["status", "--porcelain", "-z"])
-        .output()
-    else {
+    let Ok(output) = crate::utils::git::git_command(repo_root).args(["status", "--porcelain", "-z"]).output() else {
         return map;
     };
     if !output.status.success() {

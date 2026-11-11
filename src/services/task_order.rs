@@ -13,9 +13,7 @@ use crate::storage::{TaskFilter, TaskId};
 use crate::types::TaskChange;
 
 fn canonical_id(raw: &str) -> LoTaRResult<String> {
-    TaskId::parse(raw.trim())
-        .map(|id| id.canonical())
-        .map_err(|error| LoTaRError::ValidationError(format!("Invalid task ID '{raw}': {error}")))
+    TaskId::parse(raw.trim()).map(|id| id.canonical()).map_err(|error| LoTaRError::ValidationError(format!("Invalid task ID '{raw}': {error}")))
 }
 
 /// The ID a stored or requested reference means today: canonical, and
@@ -24,19 +22,14 @@ fn current_id(moves: &MoveResolver, raw: &str) -> LoTaRResult<String> {
     canonical_id(raw).map(|id| moves.current(&id))
 }
 
-fn canonical_sequence(
-    moves: &MoveResolver,
-    ids: impl IntoIterator<Item = String>,
-) -> LoTaRResult<Vec<String>> {
+fn canonical_sequence(moves: &MoveResolver, ids: impl IntoIterator<Item = String>) -> LoTaRResult<Vec<String>> {
     let mut seen = HashSet::new();
     let mut spelled = HashSet::new();
     let mut result = Vec::new();
     for raw in ids {
         let stored = canonical_id(&raw)?;
         if !spelled.insert(stored.clone()) {
-            return Err(LoTaRError::ValidationError(format!(
-                "Duplicate task '{stored}' in stored order"
-            )));
+            return Err(LoTaRError::ValidationError(format!("Duplicate task '{stored}' in stored order")));
         }
         // An old and a new ID of one moved task can both be listed: the task
         // keeps its first place.
@@ -60,10 +53,7 @@ fn project_order(stored: &[String], eligible: impl IntoIterator<Item = String>) 
     ordered
 }
 
-pub fn backlog_order_for_ids(
-    storage: &Storage,
-    ids: impl IntoIterator<Item = String>,
-) -> LoTaRResult<Vec<String>> {
+pub fn backlog_order_for_ids(storage: &Storage, ids: impl IntoIterator<Item = String>) -> LoTaRResult<Vec<String>> {
     let metadata = BacklogOrder::load(&storage.root_path)?;
     let moves = MoveResolver::new(&storage.root_path);
     let stored = canonical_sequence(&moves, metadata.tasks)?;
@@ -78,55 +68,31 @@ fn eligible_backlog_ids(storage: &Storage) -> LoTaRResult<Vec<String>> {
         for entry in std::fs::read_dir(directory)? {
             let path = entry?.path();
             if path.is_file()
-                && matches!(
-                    path.extension().and_then(|value| value.to_str()),
-                    Some("yml" | "yaml")
-                )
-                && path
-                    .file_stem()
-                    .and_then(|value| value.to_str())
-                    .is_some_and(|value| value.parse::<u32>().is_ok())
+                && matches!(path.extension().and_then(|value| value.to_str()), Some("yml" | "yaml"))
+                && path.file_stem().and_then(|value| value.to_str()).is_some_and(|value| value.parse::<u32>().is_ok())
             {
                 let sprint: Sprint = serde_yaml_ng::from_str(&std::fs::read_to_string(path)?)?;
-                canonical_sequence(
-                    &MoveResolver::new(&storage.root_path),
-                    sprint.tasks.into_iter().map(|entry| entry.id),
-                )?;
+                canonical_sequence(&MoveResolver::new(&storage.root_path), sprint.tasks.into_iter().map(|entry| entry.id))?;
             }
         }
     }
     let membership = TaskService::load_sprint_lookup(storage);
-    Ok(storage
-        .search(&TaskFilter::default())
-        .into_iter()
-        .filter(|(id, _)| !membership.contains_key(id))
-        .map(|(id, _)| id)
-        .collect())
+    Ok(storage.search(&TaskFilter::default()).into_iter().filter(|(id, _)| !membership.contains_key(id)).map(|(id, _)| id).collect())
 }
 
 pub fn get_order(storage: &Storage, sprint_id: Option<u32>) -> LoTaRResult<TaskOrderResponse> {
     let tasks = match sprint_id {
         Some(0) => {
-            return Err(LoTaRError::ValidationError(
-                "sprint must be positive".into(),
-            ));
+            return Err(LoTaRError::ValidationError("sprint must be positive".into()));
         }
         Some(id) => {
             let contents = std::fs::read_to_string(Sprint::path_for_id(&storage.root_path, id))?;
             let sprint: Sprint = serde_yaml_ng::from_str(&contents)?;
-            canonical_sequence(
-                &MoveResolver::new(&storage.root_path),
-                sprint.tasks.into_iter().map(|entry| entry.id),
-            )?
+            canonical_sequence(&MoveResolver::new(&storage.root_path), sprint.tasks.into_iter().map(|entry| entry.id))?
         }
         None => backlog_order_for_ids(storage, eligible_backlog_ids(storage)?)?,
     };
-    Ok(TaskOrderResponse {
-        status: "ok".into(),
-        tasks,
-        changed: false,
-        sprint_id,
-    })
+    Ok(TaskOrderResponse { status: "ok".into(), tasks, changed: false, sprint_id })
 }
 
 /// A raw sprint entry (a bare ID or a mapping with `id`) naming `current`
@@ -138,10 +104,7 @@ fn with_entry_id(raw: serde_yaml_ng::Value, stored: &str, current: &str) -> serd
     match raw {
         serde_yaml_ng::Value::String(_) => serde_yaml_ng::Value::String(current.to_string()),
         serde_yaml_ng::Value::Mapping(mut mapping) => {
-            mapping.insert(
-                serde_yaml_ng::Value::String("id".into()),
-                serde_yaml_ng::Value::String(current.to_string()),
-            );
+            mapping.insert(serde_yaml_ng::Value::String("id".into()), serde_yaml_ng::Value::String(current.to_string()));
             serde_yaml_ng::Value::Mapping(mapping)
         }
         other => other,
@@ -149,24 +112,14 @@ fn with_entry_id(raw: serde_yaml_ng::Value, stored: &str, current: &str) -> serd
 }
 
 fn ensure_local_active(storage: &Storage, id: &str) -> LoTaRResult<()> {
-    let location = storage
-        .resolve_task_location(id)
-        .map_err(|error| LoTaRError::ValidationError(error.to_string()))?;
+    let location = storage.resolve_task_location(id).map_err(|error| LoTaRError::ValidationError(error.to_string()))?;
     if !location.is_in_root(&storage.root_path) {
-        return Err(LoTaRError::ValidationError(format!(
-            "Task '{id}' belongs to another tasks root"
-        )));
+        return Err(LoTaRError::ValidationError(format!("Task '{id}' belongs to another tasks root")));
     }
-    let project = TaskId::parse(id)
-        .map_err(|error| LoTaRError::InvalidTaskId(error.to_string()))?
-        .project;
-    let task = storage
-        .get(id, &project)
-        .ok_or_else(|| LoTaRError::TaskNotFound(id.into()))?;
+    let project = TaskId::parse(id).map_err(|error| LoTaRError::InvalidTaskId(error.to_string()))?.project;
+    let task = storage.get(id, &project).ok_or_else(|| LoTaRError::TaskNotFound(id.into()))?;
     if task.deleted_at.is_some() {
-        return Err(LoTaRError::ValidationError(format!(
-            "Task '{id}' is deleted"
-        )));
+        return Err(LoTaRError::ValidationError(format!("Task '{id}' is deleted")));
     }
     Ok(())
 }
@@ -175,15 +128,9 @@ fn move_relative(tasks: &mut Vec<String>, task: &str, anchor: &str, before: bool
     if task == anchor {
         return;
     }
-    let origin = tasks
-        .iter()
-        .position(|id| id == task)
-        .expect("validated origin");
+    let origin = tasks.iter().position(|id| id == task).expect("validated origin");
     let value = tasks.remove(origin);
-    let target = tasks
-        .iter()
-        .position(|id| id == anchor)
-        .expect("validated anchor");
+    let target = tasks.iter().position(|id| id == anchor).expect("validated anchor");
     tasks.insert(target + usize::from(!before), value);
 }
 
@@ -191,33 +138,18 @@ fn move_relative(tasks: &mut Vec<String>, task: &str, anchor: &str, before: bool
 /// Only the target order file is staged; task content and membership never change.
 pub fn reorder(storage: &Storage, request: &TaskOrderRequest) -> LoTaRResult<TaskOrderResponse> {
     if request.sprint == Some(0) || request.before.is_some() == request.after.is_some() {
-        return Err(LoTaRError::ValidationError(
-            "Provide exactly one of before/after and a positive sprint ID when present".into(),
-        ));
+        return Err(LoTaRError::ValidationError("Provide exactly one of before/after and a positive sprint ID when present".into()));
     }
     let moves = MoveResolver::new(&storage.root_path);
     let task = current_id(&moves, &request.task)?;
-    let anchor = current_id(
-        &moves,
-        request
-            .before
-            .as_deref()
-            .or(request.after.as_deref())
-            .expect("validated anchor"),
-    )?;
+    let anchor = current_id(&moves, request.before.as_deref().or(request.after.as_deref()).expect("validated anchor"))?;
     // Refuse absent/foreign roots before lock acquisition can create directories.
     ensure_local_active(storage, &task)?;
     ensure_local_active(storage, &anchor)?;
-    let projects = [
-        TaskId::parse(&task).expect("canonical task").project,
-        TaskId::parse(&anchor).expect("canonical anchor").project,
-    ];
+    let projects = [TaskId::parse(&task).expect("canonical task").project, TaskId::parse(&anchor).expect("canonical anchor").project];
     // Identity/config resolution precedes project lock acquisition, matching
     // other mutation services' lock ordering.
-    let actor = crate::utils::identity::resolve_current_user_for_project(
-        Some(&storage.root_path),
-        Some(&projects[0]),
-    );
+    let actor = crate::utils::identity::resolve_current_user_for_project(Some(&storage.root_path), Some(&projects[0]));
     let mut transaction = MultiFileTransaction::begin(&storage.root_path, &projects)?;
     ensure_local_active(storage, &task)?;
     ensure_local_active(storage, &anchor)?;
@@ -228,22 +160,12 @@ pub fn reorder(storage: &Storage, request: &TaskOrderRequest) -> LoTaRResult<Tas
                 return Err(LoTaRError::SprintNotFound(id));
             }
             let contents = std::fs::read_to_string(path)?;
-            let record = SprintRecord {
-                id,
-                sprint: serde_yaml_ng::from_str::<Sprint>(&contents)?,
-            };
+            let record = SprintRecord { id, sprint: serde_yaml_ng::from_str::<Sprint>(&contents)? };
             if !request.allow_closed {
                 ensure_sprint_is_open(&record).map_err(LoTaRError::ValidationError)?;
             }
-            let order = canonical_sequence(
-                &moves,
-                record.sprint.tasks.iter().map(|entry| entry.id.clone()),
-            )?;
-            (
-                order,
-                Some(serde_yaml_ng::from_str::<serde_yaml_ng::Value>(&contents)?),
-                None,
-            )
+            let order = canonical_sequence(&moves, record.sprint.tasks.iter().map(|entry| entry.id.clone()))?;
+            (order, Some(serde_yaml_ng::from_str::<serde_yaml_ng::Value>(&contents)?), None)
         }
         None => {
             let metadata = BacklogOrder::load(&storage.root_path)?;
@@ -251,19 +173,12 @@ pub fn reorder(storage: &Storage, request: &TaskOrderRequest) -> LoTaRResult<Tas
             let eligible = eligible_backlog_ids(storage)?;
             let visible = project_order(&order, eligible);
             if !visible.contains(&task) || !visible.contains(&anchor) {
-                return Err(LoTaRError::ValidationError(
-                    "Task and anchor must still belong to the backlog".into(),
-                ));
+                return Err(LoTaRError::ValidationError("Task and anchor must still belong to the backlog".into()));
             }
             let mut moved = visible.clone();
             move_relative(&mut moved, &task, &anchor, request.before.is_some());
             if moved == visible {
-                return Ok(TaskOrderResponse {
-                    status: "ok".into(),
-                    tasks: visible,
-                    changed: false,
-                    sprint_id: None,
-                });
+                return Ok(TaskOrderResponse { status: "ok".into(), tasks: visible, changed: false, sprint_id: None });
             }
             let known: HashSet<_> = order.iter().cloned().collect();
             order.extend(visible.into_iter().filter(|id| !known.contains(id)));
@@ -271,36 +186,17 @@ pub fn reorder(storage: &Storage, request: &TaskOrderRequest) -> LoTaRResult<Tas
         }
     };
     if !full_order.contains(&task) || !full_order.contains(&anchor) {
-        return Err(LoTaRError::ValidationError(
-            "Task and anchor must still belong to the target sprint".into(),
-        ));
+        return Err(LoTaRError::ValidationError("Task and anchor must still belong to the target sprint".into()));
     }
     let previous = full_order.clone();
     move_relative(&mut full_order, &task, &anchor, request.before.is_some());
     if full_order == previous {
-        return Ok(TaskOrderResponse {
-            status: "ok".into(),
-            tasks: previous,
-            changed: false,
-            sprint_id: request.sprint,
-        });
+        return Ok(TaskOrderResponse { status: "ok".into(), tasks: previous, changed: false, sprint_id: request.sprint });
     }
     let now = chrono::Utc::now().to_rfc3339();
-    let old_position = previous
-        .iter()
-        .position(|id| id == &task)
-        .expect("validated origin")
-        + 1;
-    let new_position = full_order
-        .iter()
-        .position(|id| id == &task)
-        .expect("validated origin")
-        + 1;
-    let placement = if request.before.is_some() {
-        "before"
-    } else {
-        "after"
-    };
+    let old_position = previous.iter().position(|id| id == &task).expect("validated origin") + 1;
+    let new_position = full_order.iter().position(|id| id == &task).expect("validated origin") + 1;
+    let placement = if request.before.is_some() { "before" } else { "after" };
     let history = SprintHistoryEntry {
         extra: Default::default(),
         at: now.clone(),
@@ -314,16 +210,12 @@ pub fn reorder(storage: &Storage, request: &TaskOrderRequest) -> LoTaRResult<Tas
     if let Some(ref mut sprint) = sprint {
         // Typed parsing above validates metadata and membership. Mutate raw
         // values here so unknown nested fields and legacy entry maps survive.
-        let mapping = sprint.as_mapping_mut().ok_or_else(|| {
-            LoTaRError::SerializationError("Sprint must be a YAML mapping".into())
-        })?;
+        let mapping = sprint.as_mapping_mut().ok_or_else(|| LoTaRError::SerializationError("Sprint must be a YAML mapping".into()))?;
         let tasks_key = serde_yaml_ng::Value::String("tasks".into());
         let raw_entries = match mapping.remove(&tasks_key) {
             Some(serde_yaml_ng::Value::Sequence(entries)) => entries,
             _ => {
-                return Err(LoTaRError::SerializationError(
-                    "Sprint tasks must be a sequence".into(),
-                ));
+                return Err(LoTaRError::SerializationError("Sprint tasks must be a sequence".into()));
             }
         };
         // Rewritten entries store the current ID of a moved task (DEV-183);
@@ -332,57 +224,25 @@ pub fn reorder(storage: &Storage, request: &TaskOrderRequest) -> LoTaRResult<Tas
         for raw in raw_entries {
             let entry: SprintTaskEntry = serde_yaml_ng::from_value(raw.clone())?;
             let id = current_id(&moves, &entry.id)?;
-            entries
-                .entry(id.clone())
-                .or_insert_with(|| with_entry_id(raw, &entry.id, &id));
+            entries.entry(id.clone()).or_insert_with(|| with_entry_id(raw, &entry.id, &id));
         }
-        mapping.insert(
-            tasks_key,
-            serde_yaml_ng::Value::Sequence(
-                full_order
-                    .iter()
-                    .map(|id| entries.remove(id).expect("validated member"))
-                    .collect(),
-            ),
-        );
-        mapping.insert(
-            serde_yaml_ng::Value::String("modified".into()),
-            serde_yaml_ng::Value::String(now),
-        );
-        let existing_history = mapping
-            .entry(serde_yaml_ng::Value::String("history".into()))
-            .or_insert_with(|| serde_yaml_ng::Value::Sequence(Vec::new()));
+        mapping.insert(tasks_key, serde_yaml_ng::Value::Sequence(full_order.iter().map(|id| entries.remove(id).expect("validated member")).collect()));
+        mapping.insert(serde_yaml_ng::Value::String("modified".into()), serde_yaml_ng::Value::String(now));
+        let existing_history = mapping.entry(serde_yaml_ng::Value::String("history".into())).or_insert_with(|| serde_yaml_ng::Value::Sequence(Vec::new()));
         existing_history
             .as_sequence_mut()
-            .ok_or_else(|| {
-                LoTaRError::SerializationError("Sprint history must be a sequence".into())
-            })?
+            .ok_or_else(|| LoTaRError::SerializationError("Sprint history must be a sequence".into()))?
             .push(serde_yaml_ng::to_value(history)?);
-        transaction.stage(
-            &Sprint::path_for_id(&storage.root_path, request.sprint.expect("sprint")),
-            serde_yaml_ng::to_string(sprint)?,
-        )?;
+        transaction.stage(&Sprint::path_for_id(&storage.root_path, request.sprint.expect("sprint")), serde_yaml_ng::to_string(sprint)?)?;
     } else if let Some(ref mut metadata) = backlog {
         metadata.tasks = full_order.clone();
         metadata.modified = Some(now);
         metadata.history.push(history);
-        transaction.stage(
-            &BacklogOrder::path(&storage.root_path),
-            serde_yaml_ng::to_string(metadata)?,
-        )?;
+        transaction.stage(&BacklogOrder::path(&storage.root_path), serde_yaml_ng::to_string(metadata)?)?;
     }
-    let tasks = if request.sprint.is_some() {
-        full_order
-    } else {
-        project_order(&full_order, eligible_backlog_ids(storage)?)
-    };
+    let tasks = if request.sprint.is_some() { full_order } else { project_order(&full_order, eligible_backlog_ids(storage)?) };
     transaction.commit()?;
-    let response = TaskOrderResponse {
-        status: "ok".into(),
-        tasks,
-        changed: true,
-        sprint_id: request.sprint,
-    };
+    let response = TaskOrderResponse { status: "ok".into(), tasks, changed: true, sprint_id: request.sprint };
     crate::api_events::emit(&crate::api_events::ApiEvent {
         kind: "task_order_changed".into(),
         data: serde_json::json!({"sprint_id": response.sprint_id, "tasks": response.tasks}),

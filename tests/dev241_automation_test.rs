@@ -19,11 +19,7 @@ fn workspace(rules: &str) -> Workspace {
     let tmp = tempfile::tempdir().unwrap();
     let tasks = tmp.path().join(".tasks");
     std::fs::create_dir_all(tasks.join("AM")).unwrap();
-    std::fs::write(
-        tasks.join("config.yml"),
-        "default:\n  project: AM\nissue:\n  states: [Todo, InProgress, Done]\n",
-    )
-    .unwrap();
+    std::fs::write(tasks.join("config.yml"), "default:\n  project: AM\nissue:\n  states: [Todo, InProgress, Done]\n").unwrap();
     // AM-1 has been Done since August, AM-2 just became Done, AM-3 is open.
     let task = |title: &str, status: &str, changed: &str| {
         format!(
@@ -31,11 +27,7 @@ fn workspace(rules: &str) -> Workspace {
         )
     };
     let now = chrono::Utc::now().to_rfc3339();
-    std::fs::write(
-        tasks.join("AM/1.yml"),
-        task("Done long ago", "Done", "2026-08-01T00:00:00Z"),
-    )
-    .unwrap();
+    std::fs::write(tasks.join("AM/1.yml"), task("Done long ago", "Done", "2026-08-01T00:00:00Z")).unwrap();
     std::fs::write(tasks.join("AM/2.yml"), task("Done today", "Done", &now)).unwrap();
     std::fs::write(tasks.join("AM/3.yml"), task("Still open", "Todo", &now)).unwrap();
     std::fs::write(tasks.join("automation.yml"), rules).unwrap();
@@ -74,14 +66,7 @@ fn run(ws: &Workspace, args: &[&str]) -> (bool, String) {
     cmd.env("LOTAR_IGNORE_HOME_CONFIG", "1");
     cmd.current_dir(ws.tasks.parent().unwrap());
     let out = cmd.args(args).output().unwrap();
-    (
-        out.status.success(),
-        format!(
-            "{}{}",
-            String::from_utf8_lossy(&out.stdout),
-            String::from_utf8_lossy(&out.stderr)
-        ),
-    )
+    (out.status.success(), format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr)))
 }
 
 fn file(ws: &Workspace, rel: &str) -> String {
@@ -91,28 +76,16 @@ fn file(ws: &Workspace, rel: &str) -> String {
 #[test]
 fn manual_rules_run_from_the_command_line_on_matching_tasks() {
     let ws = workspace(RULES);
-    let (ok, out) = run(
-        &ws,
-        &["automation", "run", "Archive finished work", "--dry-run"],
-    );
+    let (ok, out) = run(&ws, &["automation", "run", "Archive finished work", "--dry-run"]);
     assert!(ok, "{out}");
-    assert!(
-        out.contains("Would run 'Archive finished work' on AM-1"),
-        "{out}"
-    );
+    assert!(out.contains("Would run 'Archive finished work' on AM-1"), "{out}");
     assert!(!out.contains("AM-2") && !out.contains("AM-3"), "{out}");
-    assert!(
-        ws.tasks.join("AM/1.yml").exists(),
-        "a dry run changes nothing"
-    );
+    assert!(ws.tasks.join("AM/1.yml").exists(), "a dry run changes nothing");
 
     let (ok, out) = run(&ws, &["automation", "run", "Archive finished work"]);
     assert!(ok, "{out}");
     let archived = file(&ws, "AM/@archive/1.yml");
-    assert!(
-        archived.contains("Done for a month; archiving."),
-        "{archived}"
-    );
+    assert!(archived.contains("Done for a month; archiving."), "{archived}");
 
     // Without names every enabled rule with a manual action runs; the
     // switched-off rule does not, and --select narrows the tasks.
@@ -157,19 +130,13 @@ fn time_conditions_are_validated_when_saving() {
 "#;
     let path = ws.tasks.parent().unwrap().join("bad.yml");
     std::fs::write(&path, bad).unwrap();
-    let _env = [
-        EnvVarGuard::set("LOTAR_TASKS_DIR", ws.tasks.to_str().unwrap()),
-        EnvVarGuard::set("LOTAR_IGNORE_HOME_CONFIG", "1"),
-    ];
+    let _env = [EnvVarGuard::set("LOTAR_TASKS_DIR", ws.tasks.to_str().unwrap()), EnvVarGuard::set("LOTAR_IGNORE_HOME_CONFIG", "1")];
     let api = server();
     let (status, body) = request(&api, "/api/automation/set", json!({"yaml": bad}));
     let text = body.to_string();
     assert!(status == 400 || text.contains("errors"), "{status}: {text}");
     assert!(text.contains("unreadable older_than 'soon'"), "{text}");
-    assert!(
-        text.contains("needs older_than, within or before"),
-        "{text}"
-    );
+    assert!(text.contains("needs older_than, within or before"), "{text}");
 }
 
 fn server() -> ApiServer {
@@ -186,10 +153,7 @@ fn request(api: &ApiServer, path: &str, body: Value) -> (u16, Value) {
         headers: HashMap::new(),
         body: serde_json::to_vec(&body).unwrap(),
     });
-    (
-        response.status,
-        serde_json::from_slice(&response.body).unwrap_or(Value::Null),
-    )
+    (response.status, serde_json::from_slice(&response.body).unwrap_or(Value::Null))
 }
 
 #[test]
@@ -202,11 +166,7 @@ fn rest_runs_manual_rules_and_simulates_unsaved_ones() {
     ];
     let api = server();
 
-    let (status, body) = request(
-        &api,
-        "/api/automation/run",
-        json!({"rules": ["Archive finished work"], "dry_run": true}),
-    );
+    let (status, body) = request(&api, "/api/automation/run", json!({"rules": ["Archive finished work"], "dry_run": true}));
     assert_eq!(status, 200, "{body}");
     assert_eq!(body["data"]["dry_run"], true);
     assert_eq!(body["data"]["entries"][0]["task"], "AM-1");
@@ -214,12 +174,7 @@ fn rest_runs_manual_rules_and_simulates_unsaved_ones() {
 
     let (status, body) = request(&api, "/api/automation/run", json!({"query": "status:done"}));
     assert_eq!(status, 200, "{body}");
-    let tasks: Vec<&str> = body["data"]["entries"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|entry| entry["task"].as_str().unwrap())
-        .collect();
+    let tasks: Vec<&str> = body["data"]["entries"].as_array().unwrap().iter().map(|entry| entry["task"].as_str().unwrap()).collect();
     assert!(tasks.contains(&"AM-1") && tasks.contains(&"AM-2"), "{body}");
     assert!(ws.tasks.join("AM/@archive/1.yml").exists());
 
@@ -229,20 +184,12 @@ fn rest_runs_manual_rules_and_simulates_unsaved_ones() {
         "when": {"status": "Todo"},
         "on": {"updated": {"set": {"status": "InProgress"}, "comment": "Picked up ${{ticket.title}}"}}
     });
-    let (status, body) = request(
-        &api,
-        "/api/automation/simulate",
-        json!({"ticket_id": "AM-3", "event": "updated", "rule": draft}),
-    );
+    let (status, body) = request(&api, "/api/automation/simulate", json!({"ticket_id": "AM-3", "event": "updated", "rule": draft}));
     assert_eq!(status, 200, "{body}");
     assert_eq!(body["data"]["matched"], true, "{body}");
     assert_eq!(body["data"]["task_after"]["status"], "InProgress");
     assert!(body.to_string().contains("Picked up Still open"), "{body}");
-    let (status, body) = request(
-        &api,
-        "/api/automation/simulate",
-        json!({"ticket_id": "AM-2", "event": "updated", "rule": draft}),
-    );
+    let (status, body) = request(&api, "/api/automation/simulate", json!({"ticket_id": "AM-2", "event": "updated", "rule": draft}));
     assert_eq!(status, 200);
     assert_eq!(body["data"]["matched"], false, "{body}");
 }

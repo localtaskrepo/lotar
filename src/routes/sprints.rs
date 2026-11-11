@@ -3,9 +3,7 @@ use super::*;
 pub(super) fn register(api_server: &mut ApiServer) {
     api_server.register_handler("GET", "/api/sprints/backlog/order", |_req: &HttpRequest| {
         let resolver = try_response!(resolve_tasks_dir());
-        let storage = crate::storage::manager::Storage {
-            root_path: resolver.path,
-        };
+        let storage = crate::storage::manager::Storage { root_path: resolver.path };
         match crate::services::task_order::get_order(&storage, None) {
             Ok(response) => ok_json(200, json!({"data": response})),
             Err(error) => map_lotar_error(error),
@@ -14,9 +12,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
     api_server.register_handler("POST", "/api/sprints/order", |req: &HttpRequest| {
         let body: crate::api_types::TaskOrderRequest = try_response!(parse_body(req));
         let resolver = try_response!(resolve_tasks_dir());
-        let storage = crate::storage::manager::Storage {
-            root_path: resolver.path,
-        };
+        let storage = crate::storage::manager::Storage { root_path: resolver.path };
         match crate::services::task_order::reorder(&storage, &body) {
             Ok(response) => ok_json(200, json!({"data": response})),
             Err(error) => map_lotar_error(error),
@@ -54,19 +50,14 @@ pub(super) fn register(api_server: &mut ApiServer) {
         };
 
         let now = Utc::now();
-        let mut sprints: Vec<SprintListItem> = records
-            .iter()
-            .map(|record| sprint_record_to_list_item(record, now))
-            .collect();
+        let mut sprints: Vec<SprintListItem> = records.iter().map(|record| sprint_record_to_list_item(record, now)).collect();
 
         sprints.sort_by_key(|a| a.id);
         let total = sprints.len();
         let (start, end) = crate::utils::pagination::slice_bounds(total, page.offset, page.limit);
         let page_sprints = sprints[start..end].to_vec();
 
-        let integrity = sprint_integrity::IntegrityCheck::unchanged(
-            sprint_integrity::detect_missing_sprints(&storage, &records),
-        );
+        let integrity = sprint_integrity::IntegrityCheck::unchanged(sprint_integrity::detect_missing_sprints(&storage, &records));
         let payload = SprintListResponse {
             status: "ok".to_string(),
             total,
@@ -93,11 +84,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
         let resolved_config = try_response!(load_merged_config(&resolver));
 
         let sprint = sprint_from_create_request(&body);
-        let defaults = if body.skip_defaults {
-            None
-        } else {
-            Some(&resolved_config.sprint_defaults)
-        };
+        let defaults = if body.skip_defaults { None } else { Some(&resolved_config.sprint_defaults) };
 
         let outcome = match SprintService::create(&mut storage, sprint, defaults) {
             Ok(outcome) => outcome,
@@ -108,11 +95,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
         let response = SprintCreateResponse {
             status: "ok".to_string(),
             sprint: sprint_record_to_list_item(&outcome.record, Utc::now()),
-            warnings: outcome
-                .warnings
-                .iter()
-                .map(|warning| warning.message().to_string())
-                .collect(),
+            warnings: outcome.warnings.iter().map(|warning| warning.message().to_string()).collect(),
             applied_defaults: outcome.applied_defaults.clone(),
         };
 
@@ -133,39 +116,21 @@ pub(super) fn register(api_server: &mut ApiServer) {
 
         let body: SprintAssignmentRequest = try_response!(parse_body(req));
 
-        let integrity = try_response!(sprint_integrity_check(
-            &mut storage,
-            &mut records,
-            body.cleanup_missing,
-            None
-        ));
+        let integrity = try_response!(sprint_integrity_check(&mut storage, &mut records, body.cleanup_missing, None));
 
         let sprint_reference = body.sprint.as_ref().map(|selector| selector.as_reference());
         let tasks = try_response!(assignment_tasks(&body, &storage, &resolver));
-        let outcome = match sprint_assignment::assign_tasks(
-            &mut storage,
-            &mut records,
-            &tasks,
-            sprint_reference.as_deref(),
-            body.allow_closed,
-            body.force_single,
-        ) {
-            Ok(outcome) => outcome,
-            Err(msg) => return bad_request(msg),
-        };
+        let outcome =
+            match sprint_assignment::assign_tasks(&mut storage, &mut records, &tasks, sprint_reference.as_deref(), body.allow_closed, body.force_single) {
+                Ok(outcome) => outcome,
+                Err(msg) => return bad_request(msg),
+            };
 
-        let messages: Vec<String> = outcome
-            .replaced
-            .iter()
-            .filter_map(|info| info.describe())
-            .collect();
+        let messages: Vec<String> = outcome.replaced.iter().filter_map(|info| info.describe()).collect();
         let replaced_payload: Vec<crate::api_types::SprintReassignment> = outcome
             .replaced
             .iter()
-            .map(|info| crate::api_types::SprintReassignment {
-                task_id: info.task_id.clone(),
-                previous: info.previous.clone(),
-            })
+            .map(|info| crate::api_types::SprintReassignment { task_id: info.task_id.clone(), previous: info.previous.clone() })
             .collect();
 
         let response = SprintAssignmentResponse {
@@ -196,37 +161,20 @@ pub(super) fn register(api_server: &mut ApiServer) {
 
         let body: SprintAssignmentRequest = try_response!(parse_body(req));
 
-        let integrity = try_response!(sprint_integrity_check(
-            &mut storage,
-            &mut records,
-            body.cleanup_missing,
-            None
-        ));
+        let integrity = try_response!(sprint_integrity_check(&mut storage, &mut records, body.cleanup_missing, None));
 
         let sprint_reference = body.sprint.as_ref().map(|selector| selector.as_reference());
         let tasks = try_response!(assignment_tasks(&body, &storage, &resolver));
-        let outcome = match sprint_assignment::remove_tasks(
-            &mut storage,
-            &mut records,
-            &tasks,
-            sprint_reference.as_deref(),
-        ) {
+        let outcome = match sprint_assignment::remove_tasks(&mut storage, &mut records, &tasks, sprint_reference.as_deref()) {
             Ok(outcome) => outcome,
             Err(msg) => return bad_request(msg),
         };
 
-        let messages: Vec<String> = outcome
-            .replaced
-            .iter()
-            .filter_map(|info| info.describe())
-            .collect();
+        let messages: Vec<String> = outcome.replaced.iter().filter_map(|info| info.describe()).collect();
         let replaced_payload: Vec<crate::api_types::SprintReassignment> = outcome
             .replaced
             .iter()
-            .map(|info| crate::api_types::SprintReassignment {
-                task_id: info.task_id.clone(),
-                previous: info.previous.clone(),
-            })
+            .map(|info| crate::api_types::SprintReassignment { task_id: info.task_id.clone(), previous: info.previous.clone() })
             .collect();
 
         let response = SprintAssignmentResponse {
@@ -272,32 +220,15 @@ pub(super) fn register(api_server: &mut ApiServer) {
             }
         };
 
-        let integrity = try_response!(sprint_integrity_check(
-            &mut storage,
-            &mut records,
-            body.cleanup_missing,
-            Some(sprint_id)
-        ));
+        let integrity = try_response!(sprint_integrity_check(&mut storage, &mut records, body.cleanup_missing, Some(sprint_id)));
 
         let response = SprintDeleteResponse {
             status: "ok".to_string(),
             deleted: true,
             sprint_id,
-            sprint_label: existing
-                .sprint
-                .plan
-                .as_ref()
-                .and_then(|plan| plan.label.clone()),
-            removed_references: integrity
-                .cleanup
-                .as_ref()
-                .map(|outcome| outcome.removed_references)
-                .unwrap_or(0),
-            updated_tasks: integrity
-                .cleanup
-                .as_ref()
-                .map(|outcome| outcome.updated_tasks)
-                .unwrap_or(0),
+            sprint_label: existing.sprint.plan.as_ref().and_then(|plan| plan.label.clone()),
+            removed_references: integrity.cleanup.as_ref().map(|outcome| outcome.removed_references).unwrap_or(0),
+            updated_tasks: integrity.cleanup.as_ref().map(|outcome| outcome.updated_tasks).unwrap_or(0),
             integrity: integrity.diagnostics(),
         };
         ok_json(200, json!({"data": response}))
@@ -323,11 +254,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             }
         };
 
-        let limit = req
-            .query
-            .get("limit")
-            .and_then(|value| value.parse::<usize>().ok())
-            .unwrap_or(20);
+        let limit = req.query.get("limit").and_then(|value| value.parse::<usize>().ok()).unwrap_or(20);
         if limit == 0 {
             return bad_request("--limit must be greater than zero".to_string());
         }
@@ -344,12 +271,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             }
         };
 
-        let integrity = try_response!(sprint_integrity_check(
-            &mut storage,
-            &mut records,
-            cleanup_missing,
-            None
-        ));
+        let integrity = try_response!(sprint_integrity_check(&mut storage, &mut records, cleanup_missing, None));
 
         // The shared task query (DEV-236): the /api/tasks/list parameters
         // (including query); `tag` is accepted for `tags`.
@@ -409,16 +331,10 @@ pub(super) fn register(api_server: &mut ApiServer) {
     // GET /api/sprints/summary
 
     api_server.register_handler("GET", "/api/sprints/summary", |req: &HttpRequest| {
-        let sprint_id = match req
-            .query
-            .get("sprint")
-            .and_then(|value| value.parse::<u32>().ok())
-        {
+        let sprint_id = match req.query.get("sprint").and_then(|value| value.parse::<u32>().ok()) {
             Some(id) if id > 0 => id,
             _ => {
-                return bad_request(
-                    "Query parameter 'sprint' must be a positive integer".to_string(),
-                );
+                return bad_request("Query parameter 'sprint' must be a positive integer".to_string());
             }
         };
 
@@ -442,16 +358,10 @@ pub(super) fn register(api_server: &mut ApiServer) {
     // GET /api/sprints/burndown
 
     api_server.register_handler("GET", "/api/sprints/burndown", |req: &HttpRequest| {
-        let sprint_id = match req
-            .query
-            .get("sprint")
-            .and_then(|value| value.parse::<u32>().ok())
-        {
+        let sprint_id = match req.query.get("sprint").and_then(|value| value.parse::<u32>().ok()) {
             Some(id) if id > 0 => id,
             _ => {
-                return bad_request(
-                    "Query parameter 'sprint' must be a positive integer".to_string(),
-                );
+                return bad_request("Query parameter 'sprint' must be a positive integer".to_string());
             }
         };
 
@@ -468,8 +378,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
 
         let resolved_config = try_response!(load_merged_config(&resolver));
 
-        let context = match compute_sprint_burndown(&storage, &record, &resolved_config, Utc::now())
-        {
+        let context = match compute_sprint_burndown(&storage, &record, &resolved_config, Utc::now()) {
             Ok(ctx) => ctx,
             Err(msg) => return bad_request(msg),
         };
@@ -502,11 +411,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
         let payload = SprintUpdateResponse {
             status: "ok".to_string(),
             sprint: sprint_record_to_list_item(&outcome.record, Utc::now()),
-            warnings: outcome
-                .warnings
-                .iter()
-                .map(|warning| warning.message().to_string())
-                .collect(),
+            warnings: outcome.warnings.iter().map(|warning| warning.message().to_string()).collect(),
         };
 
         ok_json(200, json!({"data": payload}))
@@ -526,11 +431,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             })
             .unwrap_or(false);
 
-        let limit = req
-            .query
-            .get("limit")
-            .and_then(|value| value.parse::<usize>().ok())
-            .unwrap_or(DEFAULT_VELOCITY_WINDOW);
+        let limit = req.query.get("limit").and_then(|value| value.parse::<usize>().ok()).unwrap_or(DEFAULT_VELOCITY_WINDOW);
         if limit == 0 {
             return bad_request("--limit must be greater than zero".to_string());
         }
@@ -543,10 +444,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                     "points" => SprintBurndownMetric::Points,
                     "hours" => SprintBurndownMetric::Hours,
                     _ => {
-                        return bad_request(format!(
-                            "Unsupported metric '{}'. Use tasks, points, or hours.",
-                            value
-                        ));
+                        return bad_request(format!("Unsupported metric '{}'. Use tasks, points, or hours.", value));
                     }
                 }
             }
@@ -593,14 +491,9 @@ pub(super) fn register(api_server: &mut ApiServer) {
 
         let resolved_config = try_response!(load_merged_config(&resolver));
 
-        let options = VelocityOptions {
-            limit,
-            include_active,
-            metric,
-        };
+        let options = VelocityOptions { limit, include_active, metric };
 
-        let computation =
-            compute_velocity(&storage, &records, &resolved_config, &options, Utc::now());
+        let computation = compute_velocity(&storage, &records, &resolved_config, &options, Utc::now());
         let payload = computation.to_payload(include_active);
 
         ok_json(200, json!({"data": payload}))
@@ -619,9 +512,7 @@ fn assignment_tasks(
     let mut tasks = body.tasks.clone();
     if let Some(search) = body.query.as_deref().filter(|q| !q.trim().is_empty()) {
         let cfg = load_merged_config(resolver)?;
-        let selected =
-            crate::services::task_list::select_ids(storage, &cfg, resolver.path.as_path(), search)
-                .map_err(|e| bad_request(e.to_string()))?;
+        let selected = crate::services::task_list::select_ids(storage, &cfg, resolver.path.as_path(), search).map_err(|e| bad_request(e.to_string()))?;
         tasks.extend(selected);
         tasks.sort();
         tasks.dedup();

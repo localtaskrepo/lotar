@@ -29,11 +29,7 @@ pub enum DoneStatesMode {
 }
 
 pub fn done_states_mode(config: &ResolvedConfig) -> DoneStatesMode {
-    if config.issue_done_states.is_some() {
-        DoneStatesMode::Explicit
-    } else {
-        DoneStatesMode::Inferred
-    }
+    if config.issue_done_states.is_some() { DoneStatesMode::Explicit } else { DoneStatesMode::Inferred }
 }
 
 impl DoneStatesMode {
@@ -50,11 +46,7 @@ impl DoneStatesMode {
 /// legacy inference over the resolved `issue_states`.
 pub fn effective_done_statuses(config: &ResolvedConfig) -> HashSet<String> {
     if let Some(explicit) = &config.issue_done_states {
-        return explicit
-            .values
-            .iter()
-            .map(|status| status.as_str().to_ascii_lowercase())
-            .collect();
+        return explicit.values.iter().map(|status| status.as_str().to_ascii_lowercase()).collect();
     }
     infer_done_statuses(config)
 }
@@ -71,10 +63,7 @@ pub fn infer_done_statuses(config: &ResolvedConfig) -> HashSet<String> {
     }
 
     for status in &config.issue_states.values {
-        if status.eq_ignore_case("done")
-            || status.eq_ignore_case("completed")
-            || status.eq_ignore_case("closed")
-        {
+        if status.eq_ignore_case("done") || status.eq_ignore_case("completed") || status.eq_ignore_case("closed") {
             done.insert(status.as_str().to_ascii_lowercase());
         }
     }
@@ -99,19 +88,12 @@ pub fn infer_done_statuses(config: &ResolvedConfig) -> HashSet<String> {
 /// lists follow the inference steps deterministically.
 pub fn effective_done_status_values(config: &ResolvedConfig) -> Vec<String> {
     if let Some(explicit) = &config.issue_done_states {
-        return explicit
-            .values
-            .iter()
-            .map(|status| status.as_str().to_string())
-            .collect();
+        return explicit.values.iter().map(|status| status.as_str().to_string()).collect();
     }
 
     let mut values: Vec<String> = Vec::new();
     let mut push = |value: String| {
-        if !values
-            .iter()
-            .any(|existing| existing.eq_ignore_ascii_case(&value))
-        {
+        if !values.iter().any(|existing| existing.eq_ignore_ascii_case(&value)) {
             values.push(value);
         }
     };
@@ -120,10 +102,7 @@ pub fn effective_done_status_values(config: &ResolvedConfig) -> Vec<String> {
         push(last.as_str().to_string());
     }
     for status in &config.issue_states.values {
-        if status.eq_ignore_case("done")
-            || status.eq_ignore_case("completed")
-            || status.eq_ignore_case("closed")
-        {
+        if status.eq_ignore_case("done") || status.eq_ignore_case("completed") || status.eq_ignore_case("closed") {
             push(status.as_str().to_string());
         }
     }
@@ -133,11 +112,7 @@ pub fn effective_done_status_values(config: &ResolvedConfig) -> Vec<String> {
         }
     }
     if values.is_empty() {
-        values.extend(
-            ["done", "completed", "closed"]
-                .iter()
-                .map(|value| value.to_string()),
-        );
+        values.extend(["done", "completed", "closed"].iter().map(|value| value.to_string()));
     }
     values
 }
@@ -145,9 +120,7 @@ pub fn effective_done_status_values(config: &ResolvedConfig) -> Vec<String> {
 /// Server-local calendar day (`YYYY-MM-DD`) for a point in time. Derived
 /// from the injected clock, never from a cached resolved snapshot.
 pub fn local_calendar_day(now: DateTime<Utc>) -> String {
-    crate::services::task_query::today_local(now)
-        .format("%Y-%m-%d")
-        .to_string()
+    crate::services::task_query::today_local(now).format("%Y-%m-%d").to_string()
 }
 
 /// Compute the runtime task-state projection: `is_done` from the task's own
@@ -155,39 +128,23 @@ pub fn local_calendar_day(now: DateTime<Utc>) -> String {
 /// clock, and the server-local calendar day at build time. Terminal past-due
 /// tasks have no bucket (only the Overdue bucket excludes terminal tasks);
 /// tasks due today stay `today` even when done.
-pub fn compute_task_state(
-    status: &TaskStatus,
-    due_raw: Option<&str>,
-    config: &ResolvedConfig,
-    now: DateTime<Utc>,
-) -> TaskStateDTO {
+pub fn compute_task_state(status: &TaskStatus, due_raw: Option<&str>, config: &ResolvedConfig, now: DateTime<Utc>) -> TaskStateDTO {
     let done = effective_done_statuses(config);
     let is_done = done.contains(&status.as_str().to_ascii_lowercase());
     let today = crate::services::task_query::today_local(now);
-    let due_bucket = due_raw
-        .and_then(crate::services::task_query::parse_stored_due)
-        .and_then(|due| {
-            let due = due.local_date();
-            if due < today {
-                if is_done {
-                    None
-                } else {
-                    Some(TaskDueBucketDTO::Overdue)
-                }
-            } else if due == today {
-                Some(TaskDueBucketDTO::Today)
-            } else if due <= today + chrono::Duration::days(7) {
-                Some(TaskDueBucketDTO::Soon)
-            } else {
-                Some(TaskDueBucketDTO::Later)
-            }
-        });
-    TaskStateDTO {
-        is_done,
-        done_states: effective_done_status_values(config),
-        due_bucket,
-        calendar_day: today.format("%Y-%m-%d").to_string(),
-    }
+    let due_bucket = due_raw.and_then(crate::services::task_query::parse_stored_due).and_then(|due| {
+        let due = due.local_date();
+        if due < today {
+            if is_done { None } else { Some(TaskDueBucketDTO::Overdue) }
+        } else if due == today {
+            Some(TaskDueBucketDTO::Today)
+        } else if due <= today + chrono::Duration::days(7) {
+            Some(TaskDueBucketDTO::Soon)
+        } else {
+            Some(TaskDueBucketDTO::Later)
+        }
+    });
+    TaskStateDTO { is_done, done_states: effective_done_status_values(config), due_bucket, calendar_day: today.format("%Y-%m-%d").to_string() }
 }
 
 /// Per-task done sets for mixed-project collections: each task resolves
@@ -200,9 +157,7 @@ pub struct TaskDoneSets {
 
 impl TaskDoneSets {
     pub fn is_done(&self, task_id: &str, status: &TaskStatus) -> bool {
-        self.by_task
-            .get(task_id)
-            .is_some_and(|done| done.contains(&status.as_str().to_ascii_lowercase()))
+        self.by_task.get(task_id).is_some_and(|done| done.contains(&status.as_str().to_ascii_lowercase()))
     }
 
     pub fn done_set(&self, task_id: &str) -> Option<&HashSet<String>> {
@@ -235,20 +190,14 @@ where
     let mut by_task: HashMap<String, HashSet<String>> = HashMap::new();
     for task_id in task_ids {
         let task_id = task_id.as_ref();
-        let prefix = crate::storage::TaskId::parse(task_id)
-            .map(|parsed| parsed.project)
-            .unwrap_or_default();
+        let prefix = crate::storage::TaskId::parse(task_id).map(|parsed| parsed.project).unwrap_or_default();
         // Per-ID actual root FIRST; only the (root, prefix) pair is cached.
-        let root = storage
-            .resolve_task_location(task_id)
-            .map(|location| location.root)
-            .unwrap_or_else(|_| storage.root_path.clone());
+        let root = storage.resolve_task_location(task_id).map(|location| location.root).unwrap_or_else(|_| storage.root_path.clone());
         let done = if let Some(done) = by_root_prefix.get(&(root.clone(), prefix.clone())) {
             done.clone()
         } else {
-            let done = crate::config::resolution::config_for_project(root.as_path(), Some(&prefix))
-                .map(|config| effective_done_statuses(&config))
-                .unwrap_or_default();
+            let done =
+                crate::config::resolution::config_for_project(root.as_path(), Some(&prefix)).map(|config| effective_done_statuses(&config)).unwrap_or_default();
             by_root_prefix.insert((root, prefix), done.clone());
             done
         };
@@ -258,9 +207,7 @@ where
 }
 
 fn parse_history_timestamp(raw: &str) -> Option<DateTime<Utc>> {
-    DateTime::parse_from_rfc3339(raw.trim())
-        .ok()
-        .map(|parsed| parsed.with_timezone(&Utc))
+    DateTime::parse_from_rfc3339(raw.trim()).ok().map(|parsed| parsed.with_timezone(&Utc))
 }
 
 /// Legacy best-effort completion estimate for tasks without usable status
@@ -282,10 +229,7 @@ fn legacy_completion_estimate(task: &StoredTask) -> Option<DateTime<Utc>> {
 /// restart the interval. Tasks without usable status history fall back to
 /// the legacy modified/created estimate. `None` when the task is not
 /// currently terminal.
-pub fn current_completion_started_at(
-    task: &StoredTask,
-    done: &HashSet<String>,
-) -> Option<DateTime<Utc>> {
+pub fn current_completion_started_at(task: &StoredTask, done: &HashSet<String>) -> Option<DateTime<Utc>> {
     if !done.contains(&task.status.as_str().to_ascii_lowercase()) {
         return None;
     }
@@ -348,10 +292,7 @@ pub fn task_done_at_cut(task: &StoredTask, done: &HashSet<String>, cut: DateTime
             // pre-history status is the first transition's `old` value.
             Some(initial) => done.contains(&initial.to_ascii_lowercase()),
             // No status history at all: legacy estimate.
-            None => {
-                done.contains(&task.status.as_str().to_ascii_lowercase())
-                    && legacy_completion_estimate(task).is_some_and(|at| at < cut)
-            }
+            None => done.contains(&task.status.as_str().to_ascii_lowercase()) && legacy_completion_estimate(task).is_some_and(|at| at < cut),
         },
     }
 }
@@ -366,16 +307,9 @@ mod tests {
     fn explicit_done_states_are_authoritative() {
         let config = ResolvedConfig::from_global(crate::config::types::GlobalConfig {
             issue_states: ConfigurableField {
-                values: vec![
-                    TaskStatus::from("Todo"),
-                    TaskStatus::from("InProgress"),
-                    TaskStatus::from("Done"),
-                    TaskStatus::from("Archived"),
-                ],
+                values: vec![TaskStatus::from("Todo"), TaskStatus::from("InProgress"), TaskStatus::from("Done"), TaskStatus::from("Archived")],
             },
-            issue_done_states: Some(ConfigurableField {
-                values: vec![TaskStatus::from("Done")],
-            }),
+            issue_done_states: Some(ConfigurableField { values: vec![TaskStatus::from("Done")] }),
             ..Default::default()
         });
         let effective = effective_done_statuses(&config);
@@ -383,10 +317,7 @@ mod tests {
         assert!(!effective.contains("archived"));
         assert!(effective.contains("done"));
         assert_eq!(done_states_mode(&config), DoneStatesMode::Explicit);
-        assert_eq!(
-            effective_done_status_values(&config),
-            vec!["Done".to_string()]
-        );
+        assert_eq!(effective_done_status_values(&config), vec!["Done".to_string()]);
     }
 
     #[test]
@@ -396,37 +327,25 @@ mod tests {
         // Default states end in Done: the ordered view dedupes
         // case-insensitively and never appends the conventional fallback
         // when an inferred match already exists.
-        assert_eq!(
-            effective_done_status_values(&config),
-            vec!["Done".to_string()]
-        );
+        assert_eq!(effective_done_status_values(&config), vec!["Done".to_string()]);
     }
 
     #[test]
     fn terminal_past_due_has_no_bucket() {
         let config = ResolvedConfig::from_global(crate::config::types::GlobalConfig::default());
-        let now = DateTime::parse_from_rfc3339("2026-10-03T12:00:00Z")
-            .unwrap()
-            .with_timezone(&Utc);
-        let open_overdue =
-            compute_task_state(&TaskStatus::from("Todo"), Some("2026-10-01"), &config, now);
+        let now = DateTime::parse_from_rfc3339("2026-10-03T12:00:00Z").unwrap().with_timezone(&Utc);
+        let open_overdue = compute_task_state(&TaskStatus::from("Todo"), Some("2026-10-01"), &config, now);
         assert!(!open_overdue.is_done);
         // The embedded policy is the ordered effective list actually used
         // (default states end in Done: inferred = ["Done"]).
         assert_eq!(open_overdue.done_states, vec!["Done".to_string()]);
         assert_eq!(open_overdue.due_bucket, Some(TaskDueBucketDTO::Overdue));
 
-        let done_overdue =
-            compute_task_state(&TaskStatus::from("Done"), Some("2026-10-01"), &config, now);
+        let done_overdue = compute_task_state(&TaskStatus::from("Done"), Some("2026-10-01"), &config, now);
         assert!(done_overdue.is_done);
         assert_eq!(done_overdue.due_bucket, None);
 
-        let done_today = compute_task_state(
-            &TaskStatus::from("Done"),
-            Some("2026-10-03T08:00:00+00:00"),
-            &config,
-            now,
-        );
+        let done_today = compute_task_state(&TaskStatus::from("Done"), Some("2026-10-03T08:00:00+00:00"), &config, now);
         // Due today stays `today` even when done; only Overdue excludes
         // terminal tasks.
         assert_eq!(done_today.due_bucket, Some(TaskDueBucketDTO::Today));

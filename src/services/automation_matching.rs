@@ -1,7 +1,5 @@
 use crate::api_types::TaskDTO;
-use crate::automation::types::{
-    AutomationConditionGroup, AutomationFieldCondition, AutomationRule,
-};
+use crate::automation::types::{AutomationConditionGroup, AutomationFieldCondition, AutomationRule};
 use crate::config::types::ResolvedConfig;
 use crate::utils::tags::normalize_tags;
 use regex::Regex;
@@ -41,74 +39,23 @@ impl ChangeSet {
         let mut custom_fields = HashMap::new();
 
         let prev = previous;
-        capture_change(
-            "status",
-            prev.map(|t| t.status.to_string()),
-            Some(current.status.to_string()),
-            &mut fields,
-        );
-        capture_change(
-            "assignee",
-            prev.and_then(|t| t.assignee.clone()),
-            current.assignee.clone(),
-            &mut fields,
-        );
-        capture_change(
-            "reporter",
-            prev.and_then(|t| t.reporter.clone()),
-            current.reporter.clone(),
-            &mut fields,
-        );
-        capture_change(
-            "priority",
-            prev.map(|t| t.priority.to_string()),
-            Some(current.priority.to_string()),
-            &mut fields,
-        );
-        capture_change(
-            "type",
-            prev.map(|t| t.task_type.to_string()),
-            Some(current.task_type.to_string()),
-            &mut fields,
-        );
-        capture_change(
-            "title",
-            prev.map(|t| t.title.clone()),
-            Some(current.title.clone()),
-            &mut fields,
-        );
-        capture_change(
-            "description",
-            prev.and_then(|t| t.description.clone()),
-            current.description.clone(),
-            &mut fields,
-        );
-        capture_change(
-            "due_date",
-            prev.and_then(|t| t.due_date.clone()),
-            current.due_date.clone(),
-            &mut fields,
-        );
-        capture_change(
-            "effort",
-            prev.and_then(|t| t.effort.clone()),
-            current.effort.clone(),
-            &mut fields,
-        );
+        capture_change("status", prev.map(|t| t.status.to_string()), Some(current.status.to_string()), &mut fields);
+        capture_change("assignee", prev.and_then(|t| t.assignee.clone()), current.assignee.clone(), &mut fields);
+        capture_change("reporter", prev.and_then(|t| t.reporter.clone()), current.reporter.clone(), &mut fields);
+        capture_change("priority", prev.map(|t| t.priority.to_string()), Some(current.priority.to_string()), &mut fields);
+        capture_change("type", prev.map(|t| t.task_type.to_string()), Some(current.task_type.to_string()), &mut fields);
+        capture_change("title", prev.map(|t| t.title.clone()), Some(current.title.clone()), &mut fields);
+        capture_change("description", prev.and_then(|t| t.description.clone()), current.description.clone(), &mut fields);
+        capture_change("due_date", prev.and_then(|t| t.due_date.clone()), current.due_date.clone(), &mut fields);
+        capture_change("effort", prev.and_then(|t| t.effort.clone()), current.effort.clone(), &mut fields);
 
-        let prev_tags = prev
-            .map(|t| normalize_tags(t.tags.clone()))
-            .unwrap_or_default();
+        let prev_tags = prev.map(|t| normalize_tags(t.tags.clone())).unwrap_or_default();
         let next_tags = normalize_tags(current.tags.clone());
         if prev.is_none() || prev_tags != next_tags {
             fields.insert(
                 "tags".to_string(),
                 FieldChange {
-                    before: if prev.is_none() {
-                        None
-                    } else {
-                        Some(AutomationValue::List(prev_tags))
-                    },
+                    before: if prev.is_none() { None } else { Some(AutomationValue::List(prev_tags)) },
                     after: Some(AutomationValue::List(next_tags)),
                 },
             );
@@ -126,10 +73,7 @@ impl ChangeSet {
             }
         }
 
-        Self {
-            fields,
-            custom_fields,
-        }
+        Self { fields, custom_fields }
     }
 
     pub(crate) fn empty(current: &TaskDTO) -> Self {
@@ -145,25 +89,14 @@ impl ChangeSet {
     }
 }
 
-fn capture_change(
-    field: &str,
-    before: Option<String>,
-    after: Option<String>,
-    out: &mut HashMap<String, FieldChange>,
-) {
+fn capture_change(field: &str, before: Option<String>, after: Option<String>, out: &mut HashMap<String, FieldChange>) {
     if before.is_none() && after.is_none() {
         return;
     }
     if before.as_ref().map(|v| v.trim()) == after.as_ref().map(|v| v.trim()) {
         return;
     }
-    out.insert(
-        field.to_lowercase(),
-        FieldChange {
-            before: before.map(AutomationValue::String),
-            after: after.map(AutomationValue::String),
-        },
-    );
+    out.insert(field.to_lowercase(), FieldChange { before: before.map(AutomationValue::String), after: after.map(AutomationValue::String) });
 }
 
 // ── Rule matching ───────────────────────────────────────────────────────────
@@ -194,16 +127,12 @@ fn matches_group(
     active_sprint_ids: &[u32],
 ) -> bool {
     if let Some(all) = group.all.as_ref()
-        && !all
-            .iter()
-            .all(|entry| matches_group(entry, current, changes, mode, config, active_sprint_ids))
+        && !all.iter().all(|entry| matches_group(entry, current, changes, mode, config, active_sprint_ids))
     {
         return false;
     }
     if let Some(any) = group.any.as_ref()
-        && !any
-            .iter()
-            .any(|entry| matches_group(entry, current, changes, mode, config, active_sprint_ids))
+        && !any.iter().any(|entry| matches_group(entry, current, changes, mode, config, active_sprint_ids))
     {
         return false;
     }
@@ -219,14 +148,7 @@ fn matches_group(
         return false;
     }
 
-    if !matches_field_map(
-        &group.fields,
-        current,
-        changes,
-        mode,
-        config,
-        active_sprint_ids,
-    ) {
+    if !matches_field_map(&group.fields, current, changes, mode, config, active_sprint_ids) {
         return false;
     }
 
@@ -237,11 +159,7 @@ fn matches_group(
     true
 }
 
-fn matches_changes(
-    group: &HashMap<String, crate::automation::types::AutomationChangeCondition>,
-    changes: &ChangeSet,
-    mode: MatchMode,
-) -> bool {
+fn matches_changes(group: &HashMap<String, crate::automation::types::AutomationChangeCondition>, changes: &ChangeSet, mode: MatchMode) -> bool {
     if matches!(mode, MatchMode::Current) {
         return false;
     }
@@ -333,16 +251,11 @@ fn matches_field_map(
             // Date conditions (before/within/older_than) evaluate the current value
             // against "now", so they don't require the field itself to have changed.
             let map = condition.as_map();
-            let is_date_only =
-                map.before.is_some() || map.within.is_some() || map.older_than.is_some();
+            let is_date_only = map.before.is_some() || map.within.is_some() || map.older_than.is_some();
             if change.is_none() && !is_date_only {
                 return false;
             }
-            let target = if is_date_only {
-                value.as_ref()
-            } else {
-                change.and_then(|c| c.after.as_ref())
-            };
+            let target = if is_date_only { value.as_ref() } else { change.and_then(|c| c.after.as_ref()) };
             if !matches_value_condition(condition, target) {
                 return false;
             }
@@ -353,17 +266,10 @@ fn matches_field_map(
     true
 }
 
-fn matches_custom_fields(
-    fields: &HashMap<String, AutomationFieldCondition>,
-    current: &TaskDTO,
-    changes: &ChangeSet,
-    mode: MatchMode,
-) -> bool {
+fn matches_custom_fields(fields: &HashMap<String, AutomationFieldCondition>, current: &TaskDTO, changes: &ChangeSet, mode: MatchMode) -> bool {
     for (key, condition) in fields {
         let current_value = current.custom_fields.get(key).map(custom_value_to_value);
-        let change_value = changes
-            .changed_custom_field(key)
-            .and_then(|c| c.after.clone());
+        let change_value = changes.changed_custom_field(key).and_then(|c| c.after.clone());
 
         let target = if matches!(mode, MatchMode::OnChange) {
             if change_value.is_none() {
@@ -380,11 +286,7 @@ fn matches_custom_fields(
     true
 }
 
-fn matches_sprint_condition(
-    condition: &AutomationFieldCondition,
-    current: &TaskDTO,
-    active_sprint_ids: &[u32],
-) -> bool {
+fn matches_sprint_condition(condition: &AutomationFieldCondition, current: &TaskDTO, active_sprint_ids: &[u32]) -> bool {
     let map = condition.as_map();
 
     // exists check
@@ -399,10 +301,7 @@ fn matches_sprint_condition(
     if let AutomationFieldCondition::Scalar(raw) = condition {
         let trimmed = raw.trim().to_ascii_lowercase();
         if trimmed == "@active" {
-            return current
-                .sprints
-                .iter()
-                .any(|id| active_sprint_ids.contains(id));
+            return current.sprints.iter().any(|id| active_sprint_ids.contains(id));
         }
         if let Ok(id) = trimmed.parse::<u32>() {
             return current.sprints.contains(&id);
@@ -414,11 +313,7 @@ fn matches_sprint_condition(
     if let Some(eq) = map.equals.as_ref() {
         let trimmed = eq.trim().to_ascii_lowercase();
         if trimmed == "@active" {
-            if !current
-                .sprints
-                .iter()
-                .any(|id| active_sprint_ids.contains(id))
-            {
+            if !current.sprints.iter().any(|id| active_sprint_ids.contains(id)) {
                 return false;
             }
         } else if let Ok(id) = trimmed.parse::<u32>() {
@@ -434,10 +329,7 @@ fn matches_sprint_condition(
         let matched = options.iter().any(|opt| {
             let trimmed = opt.trim().to_ascii_lowercase();
             if trimmed == "@active" {
-                return current
-                    .sprints
-                    .iter()
-                    .any(|id| active_sprint_ids.contains(id));
+                return current.sprints.iter().any(|id| active_sprint_ids.contains(id));
             }
             if let Ok(id) = trimmed.parse::<u32>() {
                 return current.sprints.contains(&id);
@@ -452,11 +344,7 @@ fn matches_sprint_condition(
     true
 }
 
-fn matches_assignee_placeholder_str(
-    condition: &AutomationFieldCondition,
-    assignee: Option<&str>,
-    config: &ResolvedConfig,
-) -> bool {
+fn matches_assignee_placeholder_str(condition: &AutomationFieldCondition, assignee: Option<&str>, config: &ResolvedConfig) -> bool {
     let Some(assignee) = assignee else {
         return false;
     };
@@ -465,25 +353,16 @@ fn matches_assignee_placeholder_str(
         _ => return false,
     };
     match raw.to_ascii_lowercase().as_str() {
-        "@agent" => config
-            .agent_profiles
-            .keys()
-            .any(|name| assignee.eq_ignore_ascii_case(&format!("@{}", name))),
+        "@agent" => config.agent_profiles.keys().any(|name| assignee.eq_ignore_ascii_case(&format!("@{}", name))),
         "@any" => !assignee.trim().is_empty(),
-        "@user" => !config
-            .agent_profiles
-            .keys()
-            .any(|name| assignee.eq_ignore_ascii_case(&format!("@{}", name))),
+        "@user" => !config.agent_profiles.keys().any(|name| assignee.eq_ignore_ascii_case(&format!("@{}", name))),
         _ => assignee.eq_ignore_ascii_case(raw),
     }
 }
 
 // ── Value matching ──────────────────────────────────────────────────────────
 
-fn matches_value_condition(
-    condition: &AutomationFieldCondition,
-    value: Option<&AutomationValue>,
-) -> bool {
+fn matches_value_condition(condition: &AutomationFieldCondition, value: Option<&AutomationValue>) -> bool {
     let map = condition.as_map();
     let Some(value) = value else {
         return map.exists == Some(false);
@@ -542,9 +421,7 @@ fn matches_value_condition(
             return false;
         }
     }
-    if (map.before.is_some() || map.within.is_some() || map.older_than.is_some())
-        && !matches_date_conditions(value, &map)
-    {
+    if (map.before.is_some() || map.within.is_some() || map.older_than.is_some()) && !matches_date_conditions(value, &map) {
         return false;
     }
     true
@@ -553,33 +430,21 @@ fn matches_value_condition(
 fn value_equals(value: &AutomationValue, expected: &str) -> bool {
     match value {
         AutomationValue::String(v) => v.eq_ignore_ascii_case(expected.trim()),
-        AutomationValue::List(values) => values
-            .iter()
-            .any(|entry| entry.eq_ignore_ascii_case(expected.trim())),
+        AutomationValue::List(values) => values.iter().any(|entry| entry.eq_ignore_ascii_case(expected.trim())),
     }
 }
 
 fn value_contains(value: &AutomationValue, expected: &str) -> bool {
     match value {
-        AutomationValue::String(v) => v
-            .to_ascii_lowercase()
-            .contains(&expected.to_ascii_lowercase()),
-        AutomationValue::List(values) => values
-            .iter()
-            .any(|entry| entry.eq_ignore_ascii_case(expected.trim())),
+        AutomationValue::String(v) => v.to_ascii_lowercase().contains(&expected.to_ascii_lowercase()),
+        AutomationValue::List(values) => values.iter().any(|entry| entry.eq_ignore_ascii_case(expected.trim())),
     }
 }
 
 fn value_starts_with(value: &AutomationValue, prefix: &str) -> bool {
     match value {
-        AutomationValue::String(v) => v
-            .to_ascii_lowercase()
-            .starts_with(&prefix.to_ascii_lowercase()),
-        AutomationValue::List(values) => values.iter().any(|entry| {
-            entry
-                .to_ascii_lowercase()
-                .starts_with(&prefix.to_ascii_lowercase())
-        }),
+        AutomationValue::String(v) => v.to_ascii_lowercase().starts_with(&prefix.to_ascii_lowercase()),
+        AutomationValue::List(values) => values.iter().any(|entry| entry.to_ascii_lowercase().starts_with(&prefix.to_ascii_lowercase())),
     }
 }
 
@@ -596,9 +461,7 @@ fn value_matches_regex(value: &AutomationValue, regex: &Regex) -> bool {
 /// Supports keywords ("today", "tomorrow", …), "YYYY-MM-DD", RFC 3339 datetimes,
 /// and offset expressions via the shared human date grammar.
 fn resolve_date_reference(s: &str) -> Option<chrono::NaiveDate> {
-    crate::utils::time::parse_human_datetime_to_utc(s)
-        .ok()
-        .map(|dt| dt.with_timezone(&chrono::Local).date_naive())
+    crate::utils::time::parse_human_datetime_to_utc(s).ok().map(|dt| dt.with_timezone(&chrono::Local).date_naive())
 }
 
 /// Fields that name a moment in the task's past: when it was created, last
@@ -624,27 +487,17 @@ fn past_moment(field: &str, task: &TaskDTO) -> Option<Option<String>> {
 /// `older_than` and `within` count back from now (`within: 7d` means in the
 /// last seven days); `before` compares with a date; `exists` checks presence.
 /// Other operators never match a moment.
-fn matches_past_moment(
-    value: Option<&str>,
-    map: &crate::automation::types::AutomationFieldConditionMap,
-) -> bool {
-    let has_time_operator =
-        map.before.is_some() || map.within.is_some() || map.older_than.is_some();
+fn matches_past_moment(value: Option<&str>, map: &crate::automation::types::AutomationFieldConditionMap) -> bool {
+    let has_time_operator = map.before.is_some() || map.within.is_some() || map.older_than.is_some();
     if let Some(exists) = map.exists
         && value.is_some() != exists
     {
         return false;
     }
     if !has_time_operator {
-        return map.exists.is_some()
-            && map.equals.is_none()
-            && map.r#in.is_none()
-            && map.contains.is_none()
-            && map.matches.is_none();
+        return map.exists.is_some() && map.equals.is_none() && map.r#in.is_none() && map.contains.is_none() && map.matches.is_none();
     }
-    let Some(moment) =
-        value.and_then(|raw| crate::utils::time::parse_human_datetime_to_utc(raw).ok())
-    else {
+    let Some(moment) = value.and_then(|raw| crate::utils::time::parse_human_datetime_to_utc(raw).ok()) else {
         return false;
     };
     let now = chrono::Utc::now();
@@ -681,10 +534,7 @@ fn parse_date_offset(s: &str) -> Option<chrono::Duration> {
 }
 
 /// Evaluate date-specific conditions (before, within, older_than) against a value.
-fn matches_date_conditions(
-    value: &AutomationValue,
-    map: &crate::automation::types::AutomationFieldConditionMap,
-) -> bool {
+fn matches_date_conditions(value: &AutomationValue, map: &crate::automation::types::AutomationFieldConditionMap) -> bool {
     let date_str = match value {
         AutomationValue::String(v) => v.as_str(),
         AutomationValue::List(_) => return false,
@@ -733,9 +583,7 @@ fn matches_date_conditions(
 fn custom_value_to_value(value: &crate::types::CustomFieldValue) -> AutomationValue {
     match value {
         serde_yaml_ng::Value::String(v) => AutomationValue::String(v.clone()),
-        serde_yaml_ng::Value::Sequence(list) => {
-            AutomationValue::List(list.iter().map(yaml_value_to_string).collect())
-        }
+        serde_yaml_ng::Value::Sequence(list) => AutomationValue::List(list.iter().map(yaml_value_to_string).collect()),
         _ => AutomationValue::String(yaml_value_to_string(value)),
     }
 }
@@ -747,10 +595,7 @@ fn yaml_value_to_string(value: &serde_yaml_ng::Value) -> String {
         serde_yaml_ng::Value::Bool(v) => v.to_string(),
         serde_yaml_ng::Value::Number(v) => v.to_string(),
         serde_yaml_ng::Value::Null => "null".to_string(),
-        other => serde_yaml_ng::to_string(other)
-            .unwrap_or_else(|_| format!("{other:?}"))
-            .trim()
-            .to_string(),
+        other => serde_yaml_ng::to_string(other).unwrap_or_else(|_| format!("{other:?}")).trim().to_string(),
     }
 }
 
@@ -758,11 +603,7 @@ fn yaml_value_to_string(value: &serde_yaml_ng::Value) -> String {
 fn custom_value_to_value(value: &crate::types::CustomFieldValue) -> AutomationValue {
     match value {
         serde_json::Value::String(v) => AutomationValue::String(v.clone()),
-        serde_json::Value::Array(list) => AutomationValue::List(
-            list.iter()
-                .map(|v| v.as_str().unwrap_or(&v.to_string()).to_string())
-                .collect(),
-        ),
+        serde_json::Value::Array(list) => AutomationValue::List(list.iter().map(|v| v.as_str().unwrap_or(&v.to_string()).to_string()).collect()),
         _ => AutomationValue::String(value.to_string()),
     }
 }

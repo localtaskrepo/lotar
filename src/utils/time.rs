@@ -24,9 +24,7 @@ pub fn parse_human_datetime_to_utc(s: &str) -> Result<DateTime<Utc>, String> {
 
     // Date only YYYY-MM-DD (local midnight)
     if let Ok(d) = NaiveDate::parse_from_str(&lower, "%Y-%m-%d") {
-        let dt_local = Local
-            .with_ymd_and_hms(d.year(), d.month(), d.day(), 0, 0, 0)
-            .single();
+        let dt_local = Local.with_ymd_and_hms(d.year(), d.month(), d.day(), 0, 0, 0).single();
         if let Some(dt_local) = dt_local {
             return Ok(dt_local.with_timezone(&Utc));
         }
@@ -37,36 +35,28 @@ pub fn parse_human_datetime_to_utc(s: &str) -> Result<DateTime<Utc>, String> {
         "now" => return Ok(Utc::now()),
         "today" => {
             let d = Local::now().date_naive();
-            let dt = Local
-                .with_ymd_and_hms(d.year(), d.month(), d.day(), 0, 0, 0)
-                .single();
+            let dt = Local.with_ymd_and_hms(d.year(), d.month(), d.day(), 0, 0, 0).single();
             if let Some(dt) = dt {
                 return Ok(dt.with_timezone(&Utc));
             }
         }
         "tomorrow" => {
             let d = Local::now().date_naive() + Duration::days(1);
-            let dt = Local
-                .with_ymd_and_hms(d.year(), d.month(), d.day(), 0, 0, 0)
-                .single();
+            let dt = Local.with_ymd_and_hms(d.year(), d.month(), d.day(), 0, 0, 0).single();
             if let Some(dt) = dt {
                 return Ok(dt.with_timezone(&Utc));
             }
         }
         "yesterday" => {
             let d = Local::now().date_naive() - Duration::days(1);
-            let dt = Local
-                .with_ymd_and_hms(d.year(), d.month(), d.day(), 0, 0, 0)
-                .single();
+            let dt = Local.with_ymd_and_hms(d.year(), d.month(), d.day(), 0, 0, 0).single();
             if let Some(dt) = dt {
                 return Ok(dt.with_timezone(&Utc));
             }
         }
         "next week" | "nextweek" => {
             let d = Local::now().date_naive() + Duration::weeks(1);
-            let dt = Local
-                .with_ymd_and_hms(d.year(), d.month(), d.day(), 0, 0, 0)
-                .single();
+            let dt = Local.with_ymd_and_hms(d.year(), d.month(), d.day(), 0, 0, 0).single();
             if let Some(dt) = dt {
                 return Ok(dt.with_timezone(&Utc));
             }
@@ -76,17 +66,13 @@ pub fn parse_human_datetime_to_utc(s: &str) -> Result<DateTime<Utc>, String> {
 
     // Weekday phrases
     if let Some(d) = parse_weekday_phrases(&lower) {
-        let dt = Local
-            .with_ymd_and_hms(d.year(), d.month(), d.day(), 0, 0, 0)
-            .single();
+        let dt = Local.with_ymd_and_hms(d.year(), d.month(), d.day(), 0, 0, 0).single();
         if let Some(dt) = dt {
             return Ok(dt.with_timezone(&Utc));
         }
     }
     if let Some(d) = parse_next_week_named(&lower) {
-        let dt = Local
-            .with_ymd_and_hms(d.year(), d.month(), d.day(), 0, 0, 0)
-            .single();
+        let dt = Local.with_ymd_and_hms(d.year(), d.month(), d.day(), 0, 0, 0).single();
         if let Some(dt) = dt {
             return Ok(dt.with_timezone(&Utc));
         }
@@ -107,18 +93,13 @@ pub fn parse_human_datetime_to_utc(s: &str) -> Result<DateTime<Utc>, String> {
     if let Some(days) = parse_business_days_offset(&lower) {
         let base = Local::now().date_naive();
         let d = add_business_days(base, days);
-        let dt = Local
-            .with_ymd_and_hms(d.year(), d.month(), d.day(), 0, 0, 0)
-            .single();
+        let dt = Local.with_ymd_and_hms(d.year(), d.month(), d.day(), 0, 0, 0).single();
         if let Some(dt) = dt {
             return Ok(dt.with_timezone(&Utc));
         }
     }
 
-    Err(format!(
-        "Invalid date/time: '{}'. Try YYYY-MM-DD, RFC3339, 'now', 'today', 'in 3 days', '3 days ago', '+2w', '-1d', 'next monday'.",
-        s
-    ))
+    Err(format!("Invalid date/time: '{}'. Try YYYY-MM-DD, RFC3339, 'now', 'today', 'in 3 days', '3 days ago', '+2w', '-1d', 'next monday'.", s))
 }
 
 /// Whole-day offset from today, computed in local date arithmetic and snapped
@@ -126,10 +107,7 @@ pub fn parse_human_datetime_to_utc(s: &str) -> Result<DateTime<Utc>, String> {
 /// resulting local midnight is ambiguous or nonexistent.
 fn offset_from_local_today(days: i64) -> DateTime<Utc> {
     let date = Local::now().date_naive() + chrono::Duration::days(days);
-    match Local
-        .with_ymd_and_hms(date.year(), date.month(), date.day(), 0, 0, 0)
-        .single()
-    {
+    match Local.with_ymd_and_hms(date.year(), date.month(), date.day(), 0, 0, 0).single() {
         Some(dt) => dt.with_timezone(&Utc),
         None => Utc::now() + chrono::Duration::days(days),
     }
@@ -137,10 +115,7 @@ fn offset_from_local_today(days: i64) -> DateTime<Utc> {
 
 /// Parse since/until window. Defaults: since=now-30d, until=now.
 /// For since, a bare like "14d" is interpreted as "14 days ago".
-pub fn parse_since_until(
-    since: Option<&str>,
-    until: Option<&str>,
-) -> Result<(DateTime<Utc>, DateTime<Utc>), String> {
+pub fn parse_since_until(since: Option<&str>, until: Option<&str>) -> Result<(DateTime<Utc>, DateTime<Utc>), String> {
     let now = Utc::now();
 
     let start = match since {
@@ -153,10 +128,7 @@ pub fn parse_since_until(
                 if let Some(off) = parse_unsigned_days_or_weeks(&lower) {
                     let base = now - off;
                     // Snap bare offsets to the start of the resulting UTC day so whole-day ranges include early activity
-                    base.date_naive()
-                        .and_hms_opt(0, 0, 0)
-                        .map(|naive| chrono::DateTime::<Utc>::from_naive_utc_and_offset(naive, Utc))
-                        .unwrap_or(base)
+                    base.date_naive().and_hms_opt(0, 0, 0).map(|naive| chrono::DateTime::<Utc>::from_naive_utc_and_offset(naive, Utc)).unwrap_or(base)
                 } else {
                     return Err(format!("Invalid --since offset: '{}'", s));
                 }
@@ -197,10 +169,7 @@ fn is_bare_offset(s: &str) -> bool {
     let parts: Vec<&str> = s.split_whitespace().collect();
     if parts.len() == 2 && parts[0].parse::<i64>().is_ok() {
         let unit = parts[1];
-        return unit.starts_with('d')
-            || unit.starts_with("day")
-            || unit.starts_with('w')
-            || unit.starts_with("week");
+        return unit.starts_with('d') || unit.starts_with("day") || unit.starts_with('w') || unit.starts_with("week");
     }
     false
 }
@@ -243,27 +212,11 @@ enum SprintDurationUnit {
 
 /// Strict `<count><unit>` / `<count> <unit>` grammar shared by sprint
 /// durations. Units: h/hour(s) (only when `allow_hours`), d/day(s), w/week(s).
-fn parse_sprint_duration(
-    input: &str,
-    allow_hours: bool,
-    allow_zero: bool,
-) -> Result<Duration, String> {
+fn parse_sprint_duration(input: &str, allow_hours: bool, allow_zero: bool) -> Result<Duration, String> {
     let raw = input.trim().to_lowercase();
-    let units = if allow_hours {
-        "h (hours), d (days) or w (weeks), e.g. 12h, 3d or 2w"
-    } else {
-        "d (days) or w (weeks), e.g. 14d or 2w"
-    };
-    let invalid = || {
-        format!(
-            "'{}' is not a duration; use a whole number with {}",
-            input.trim(),
-            units
-        )
-    };
-    let split = raw
-        .find(|c: char| !c.is_ascii_digit())
-        .ok_or_else(invalid)?;
+    let units = if allow_hours { "h (hours), d (days) or w (weeks), e.g. 12h, 3d or 2w" } else { "d (days) or w (weeks), e.g. 14d or 2w" };
+    let invalid = || format!("'{}' is not a duration; use a whole number with {}", input.trim(), units);
+    let split = raw.find(|c: char| !c.is_ascii_digit()).ok_or_else(invalid)?;
     let (digits, unit) = raw.split_at(split);
     if digits.is_empty() {
         return Err(invalid());
@@ -275,13 +228,7 @@ fn parse_sprint_duration(
         _ => return Err(invalid()),
     };
     let max_hours = MAX_SPRINT_DURATION_DAYS * 24;
-    let count: i64 = digits.parse().map_err(|_| {
-        format!(
-            "'{}' is longer than the {} day maximum",
-            input.trim(),
-            MAX_SPRINT_DURATION_DAYS
-        )
-    })?;
+    let count: i64 = digits.parse().map_err(|_| format!("'{}' is longer than the {} day maximum", input.trim(), MAX_SPRINT_DURATION_DAYS))?;
     let hours = match unit {
         SprintDurationUnit::Hours => Some(count),
         SprintDurationUnit::Days => count.checked_mul(24),
@@ -290,11 +237,7 @@ fn parse_sprint_duration(
     match hours {
         Some(0) if !allow_zero => Err(format!("'{}' must be longer than zero", input.trim())),
         Some(hours) if hours <= max_hours => Ok(Duration::hours(hours)),
-        _ => Err(format!(
-            "'{}' is longer than the {} day maximum",
-            input.trim(),
-            MAX_SPRINT_DURATION_DAYS
-        )),
+        _ => Err(format!("'{}' is longer than the {} day maximum", input.trim(), MAX_SPRINT_DURATION_DAYS)),
     }
 }
 
@@ -376,12 +319,7 @@ pub fn parse_naive_local_datetime_to_utc(s: &str) -> Option<DateTime<Utc>> {
 
 fn parse_local_naive_datetime_to_utc(s: &str) -> Option<DateTime<Utc>> {
     use chrono::NaiveDateTime;
-    let fmts = [
-        "%Y-%m-%d %H:%M:%S",
-        "%Y-%m-%d %H:%M",
-        "%Y-%m-%dT%H:%M:%S",
-        "%Y-%m-%dT%H:%M",
-    ];
+    let fmts = ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M"];
     for fmt in &fmts {
         if let Ok(ndt) = NaiveDateTime::parse_from_str(s, fmt)
             && let Some(dt) = Local.from_local_datetime(&ndt).single()
@@ -405,11 +343,7 @@ fn parse_signed_simple_offset(s: &str) -> Option<Duration> {
     {
         let num_part = &rest[..rest.len() - 1];
         if let Ok(n) = num_part.parse::<i64>() {
-            return Some(if unit == 'd' {
-                Duration::days(sign * n)
-            } else {
-                Duration::weeks(sign * n)
-            });
+            return Some(if unit == 'd' { Duration::days(sign * n) } else { Duration::weeks(sign * n) });
         }
     }
     // spaced: +/-10 day(s), +/-2 week(s)
@@ -504,13 +438,8 @@ mod sprint_duration_tests {
         assert_eq!(parse_sprint_length("3 weeks"), Ok(Duration::weeks(3)));
         assert_eq!(parse_sprint_length("1 day"), Ok(Duration::days(1)));
         assert_eq!(parse_sprint_length("520w"), Ok(Duration::weeks(520)));
-        for invalid in [
-            "", "12h", "0d", "-2w", "+2w", "2", "w", "2 dogs", "2.5w", "1y", "3651d",
-        ] {
-            assert!(
-                parse_sprint_length(invalid).is_err(),
-                "{invalid:?} should be rejected"
-            );
+        for invalid in ["", "12h", "0d", "-2w", "+2w", "2", "w", "2 dogs", "2.5w", "1y", "3651d"] {
+            assert!(parse_sprint_length(invalid).is_err(), "{invalid:?} should be rejected");
         }
     }
 
@@ -518,19 +447,10 @@ mod sprint_duration_tests {
     fn sprint_overdue_after_accepts_hours_and_zero() {
         assert_eq!(parse_sprint_overdue_after("12h"), Ok(Duration::hours(12)));
         assert_eq!(parse_sprint_overdue_after("0d"), Ok(Duration::zero()));
-        assert_eq!(
-            parse_sprint_overdue_after("2 hours"),
-            Ok(Duration::hours(2))
-        );
-        assert_eq!(
-            parse_sprint_overdue_after("87600h"),
-            Ok(Duration::days(3650))
-        );
+        assert_eq!(parse_sprint_overdue_after("2 hours"), Ok(Duration::hours(2)));
+        assert_eq!(parse_sprint_overdue_after("87600h"), Ok(Duration::days(3650)));
         for invalid in ["87601h", "soon", "-1d", "99999999999999999999h"] {
-            assert!(
-                parse_sprint_overdue_after(invalid).is_err(),
-                "{invalid:?} should be rejected"
-            );
+            assert!(parse_sprint_overdue_after(invalid).is_err(), "{invalid:?} should be rejected");
         }
     }
 

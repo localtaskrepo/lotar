@@ -40,38 +40,25 @@ impl std::fmt::Display for UploadFailure {
 }
 
 impl AttachmentService {
-    pub fn compute_attachments_root(
-        tasks_dir: &Path,
-        config: &crate::config::types::ResolvedConfig,
-    ) -> LoTaRResult<PathBuf> {
+    pub fn compute_attachments_root(tasks_dir: &Path, config: &crate::config::types::ResolvedConfig) -> LoTaRResult<PathBuf> {
         let raw = config.attachments_dir.trim();
         if raw.is_empty() {
-            return Err(LoTaRError::ValidationError(
-                "attachments_dir cannot be empty".to_string(),
-            ));
+            return Err(LoTaRError::ValidationError("attachments_dir cannot be empty".to_string()));
         }
 
         let configured = Path::new(raw);
         let root = if configured.is_absolute() {
             configured.to_path_buf()
         } else {
-            if configured
-                .components()
-                .any(|c| matches!(c, Component::ParentDir))
-            {
-                return Err(LoTaRError::ValidationError(
-                    "attachments_dir cannot contain '..'".to_string(),
-                ));
+            if configured.components().any(|c| matches!(c, Component::ParentDir)) {
+                return Err(LoTaRError::ValidationError("attachments_dir cannot contain '..'".to_string()));
             }
             tasks_dir.join(configured)
         };
         Ok(root)
     }
 
-    pub fn resolve_attachments_root(
-        tasks_dir: &Path,
-        config: &crate::config::types::ResolvedConfig,
-    ) -> LoTaRResult<PathBuf> {
+    pub fn resolve_attachments_root(tasks_dir: &Path, config: &crate::config::types::ResolvedConfig) -> LoTaRResult<PathBuf> {
         let root = Self::compute_attachments_root(tasks_dir, config)?;
         fs::create_dir_all(&root)?;
         Ok(root)
@@ -81,11 +68,7 @@ impl AttachmentService {
     /// stored filename and whether this call created the file (false when an
     /// identical file already existed), so callers can clean up orphaned
     /// writes without deleting content other tasks still reference.
-    pub fn store_bytes(
-        root: &Path,
-        original_filename: &str,
-        bytes: &[u8],
-    ) -> LoTaRResult<(String, bool)> {
+    pub fn store_bytes(root: &Path, original_filename: &str, bytes: &[u8]) -> LoTaRResult<(String, bool)> {
         fs::create_dir_all(root)?;
 
         let safe_original = sanitize_original_filename(original_filename);
@@ -133,11 +116,7 @@ impl AttachmentService {
             return Ok((name, false));
         }
 
-        let base_stem = if stem.is_empty() {
-            "file"
-        } else {
-            stem.as_str()
-        };
+        let base_stem = if stem.is_empty() { "file" } else { stem.as_str() };
         let base_stem = truncate_component(base_stem, 80);
 
         let mut filename = format!("{}.{}", base_stem, hash_tag);
@@ -184,8 +163,7 @@ impl AttachmentService {
     /// itself is never removed.
     pub fn lock_store(root: &Path) -> LoTaRResult<AttachmentStoreGuard> {
         fs::create_dir_all(root)?;
-        let file = crate::storage::safety::acquire_storage_lock(root, "attachments-store")
-            .map_err(|err| LoTaRError::ValidationError(err.to_string()))?;
+        let file = crate::storage::safety::acquire_storage_lock(root, "attachments-store").map_err(|err| LoTaRError::ValidationError(err.to_string()))?;
         #[cfg(test)]
         STORE_LOCKS_HELD.with(|cell| cell.set(cell.get() + 1));
         Ok(AttachmentStoreGuard { _file: file })
@@ -207,10 +185,7 @@ impl AttachmentService {
     /// (DEV-61 keeps store blobs reachable only through the typed
     /// `attachment` kind), unlike repository `file` references which can
     /// never resolve inside the store.
-    pub fn lock_store_for_attachments(
-        tasks_root: &Path,
-        config: &crate::config::types::ResolvedConfig,
-    ) -> LoTaRResult<AttachmentStoreGuard> {
+    pub fn lock_store_for_attachments(tasks_root: &Path, config: &crate::config::types::ResolvedConfig) -> LoTaRResult<AttachmentStoreGuard> {
         let store_root = Self::resolve_attachments_root(tasks_root, config)?;
         Self::lock_store(&store_root)
     }
@@ -221,33 +196,22 @@ impl AttachmentService {
     /// the managed reference (or only holds a same-named repository `file`
     /// entry) must never trigger store reclamation. Repository `file`
     /// entries are never touched by this call.
-    pub fn detach_managed_reference(
-        storage: &mut Storage,
-        task_id: &str,
-        stored_name: &str,
-    ) -> LoTaRResult<ReferenceMutationOutcome> {
+    pub fn detach_managed_reference(storage: &mut Storage, task_id: &str, stored_name: &str) -> LoTaRResult<ReferenceMutationOutcome> {
         ReferenceService::parse_task_id(task_id)?;
         let name = Self::validate_managed_name(stored_name)?.to_string();
 
         // Reference-only detach: works for missing/stale blobs (idempotent
         // changed=false); blob cleanup stays with the caller, gated on the
         // typed-membership signal in the returned outcome.
-        ReferenceService::commit_reference_change(
-            storage,
-            task_id,
-            "attachment",
-            false,
-            move |task, changed_values| {
-                let before_len = task.references.len();
-                task.references
-                    .retain(|r| r.attachment.as_deref() != Some(name.as_str()));
-                if task.references.len() == before_len {
-                    return false;
-                }
-                changed_values.push(name.clone());
-                true
-            },
-        )
+        ReferenceService::commit_reference_change(storage, task_id, "attachment", false, move |task, changed_values| {
+            let before_len = task.references.len();
+            task.references.retain(|r| r.attachment.as_deref() != Some(name.as_str()));
+            if task.references.len() == before_len {
+                return false;
+            }
+            changed_values.push(name.clone());
+            true
+        })
     }
 
     /// Managed attachment values are bare store leaf names. Reject path
@@ -256,34 +220,20 @@ impl AttachmentService {
     pub fn validate_managed_name(stored: &str) -> LoTaRResult<&str> {
         let trimmed = stored.trim();
         if trimmed.is_empty() {
-            return Err(LoTaRError::ValidationError(
-                "Missing attachment name".to_string(),
-            ));
+            return Err(LoTaRError::ValidationError("Missing attachment name".to_string()));
         }
         if trimmed.len() > 4096 {
-            return Err(LoTaRError::ValidationError(
-                "Attachment name is too long (max 4096 characters)".to_string(),
-            ));
+            return Err(LoTaRError::ValidationError("Attachment name is too long (max 4096 characters)".to_string()));
         }
         let path = Path::new(trimmed);
-        if trimmed.contains(['/', '\\'])
-            || path
-                .components()
-                .any(|c| !matches!(c, Component::Normal(_)))
-        {
-            return Err(LoTaRError::ValidationError(
-                "Attachment reference must be a stored file name, not a path".to_string(),
-            ));
+        if trimmed.contains(['/', '\\']) || path.components().any(|c| !matches!(c, Component::Normal(_))) {
+            return Err(LoTaRError::ValidationError("Attachment reference must be a stored file name, not a path".to_string()));
         }
         Ok(trimmed)
     }
 
     pub fn extract_hash_tag(file_rel: &str) -> Option<String> {
-        let leaf = Path::new(file_rel)
-            .file_name()
-            .and_then(OsStr::to_str)
-            .unwrap_or("")
-            .trim();
+        let leaf = Path::new(file_rel).file_name().and_then(OsStr::to_str).unwrap_or("").trim();
         if leaf.is_empty() {
             return None;
         }
@@ -333,21 +283,11 @@ impl AttachmentService {
             return false;
         }
         let target = target.to_ascii_lowercase();
-        let store_canonical = store_root
-            .canonicalize()
-            .unwrap_or_else(|_| store_root.to_path_buf());
-        let all = storage.search(&TaskFilter {
-            deletion: crate::storage::DeletionFilter::All,
-            ..Default::default()
-        });
+        let store_canonical = store_root.canonicalize().unwrap_or_else(|_| store_root.to_path_buf());
+        let all = storage.search(&TaskFilter { deletion: crate::storage::DeletionFilter::All, ..Default::default() });
         for (id, task) in all {
-            let has_match = task.references.iter().any(|reference| {
-                reference
-                    .attachment
-                    .as_deref()
-                    .and_then(Self::extract_hash_tag)
-                    .is_some_and(|hash| hash == target)
-            });
+            let has_match =
+                task.references.iter().any(|reference| reference.attachment.as_deref().and_then(Self::extract_hash_tag).is_some_and(|hash| hash == target));
             if !has_match {
                 continue;
             }
@@ -359,10 +299,7 @@ impl AttachmentService {
             let Ok(location) = storage.resolve_task_location(&id) else {
                 return true;
             };
-            let Ok(cfg) = crate::config::resolution::config_for_project(
-                &location.root,
-                Some(&parsed.project),
-            ) else {
+            let Ok(cfg) = crate::config::resolution::config_for_project(&location.root, Some(&parsed.project)) else {
                 return true;
             };
             let Ok(root) = Self::resolve_attachments_root(&location.root, &cfg) else {
@@ -390,9 +327,7 @@ impl AttachmentService {
                     continue;
                 }
                 let file_stem = path.file_stem().and_then(OsStr::to_str).unwrap_or("");
-                if (file_stem.ends_with(&dot_suffix) || file_stem.ends_with(&dash_suffix))
-                    && std::fs::remove_file(&path).is_ok()
-                {
+                if (file_stem.ends_with(&dot_suffix) || file_stem.ends_with(&dash_suffix)) && std::fs::remove_file(&path).is_ok() {
                     deleted += 1;
                 }
             }
@@ -438,8 +373,7 @@ impl AttachmentService {
 
         let (stem, ext) = match raw.rsplit_once('.') {
             Some((left, right)) if !left.is_empty() && !right.is_empty() => {
-                let looks_like_hash =
-                    right.len() == 32 && right.bytes().all(|b: u8| b.is_ascii_hexdigit());
+                let looks_like_hash = right.len() == 32 && right.bytes().all(|b: u8| b.is_ascii_hexdigit());
                 if looks_like_hash {
                     // `name.<hash>` (no extension)
                     (raw, None)
@@ -452,11 +386,7 @@ impl AttachmentService {
         };
 
         let display_stem = strip_hash_suffix(stem).unwrap_or(stem);
-        let display_stem = if display_stem.trim().is_empty() {
-            "attachment"
-        } else {
-            display_stem
-        };
+        let display_stem = if display_stem.trim().is_empty() { "attachment" } else { display_stem };
 
         match ext {
             Some(ext) => format!("{}.{}", display_stem, ext),
@@ -480,18 +410,12 @@ impl AttachmentService {
     ) -> Result<UploadOutcome, UploadFailure> {
         match config.attachments_max_upload_mb {
             0 => {
-                return Err(UploadFailure::Rejected(
-                    "Attachment uploads are disabled by configuration".to_string(),
-                ));
+                return Err(UploadFailure::Rejected("Attachment uploads are disabled by configuration".to_string()));
             }
             n if n > 0 => {
                 let max_bytes = i128::from(n).checked_mul(1024 * 1024).unwrap_or(i128::MAX);
                 if (bytes.len() as i128) > max_bytes {
-                    return Err(UploadFailure::Rejected(format!(
-                        "Attachment too large: {} bytes (max {} MiB)",
-                        bytes.len(),
-                        n
-                    )));
+                    return Err(UploadFailure::Rejected(format!("Attachment too large: {} bytes (max {} MiB)", bytes.len(), n)));
                 }
             }
             _ => {}
@@ -502,17 +426,11 @@ impl AttachmentService {
         // Only container bytes change; pixels are never re-encoded.
         let mut bytes = bytes;
         let mut warnings = Vec::new();
-        let extension = filename
-            .rsplit_once('.')
-            .map(|(_, ext)| ext.trim().to_ascii_lowercase())
-            .unwrap_or_default();
+        let extension = filename.rsplit_once('.').map(|(_, ext)| ext.trim().to_ascii_lowercase()).unwrap_or_default();
         if crate::services::task_query::IMAGE_EXTENSIONS.contains(&extension.as_str())
             && crate::services::attachment_metadata::sniff_image_format(&bytes).is_none()
         {
-            warnings.push(format!(
-                "{} is named like an image but does not contain one; it was attached as is and will have no preview",
-                filename.trim()
-            ));
+            warnings.push(format!("{} is named like an image but does not contain one; it was attached as is and will have no preview", filename.trim()));
         }
         let metadata_removed = match crate::services::attachment_metadata::strip_metadata(&bytes) {
             Some(clean) => {
@@ -522,8 +440,7 @@ impl AttachmentService {
             None => false,
         };
 
-        let root =
-            Self::resolve_attachments_root(tasks_root, config).map_err(UploadFailure::Failed)?;
+        let root = Self::resolve_attachments_root(tasks_root, config).map_err(UploadFailure::Failed)?;
 
         // Serialize blob create/dedup + attach + failure cleanup for this
         // store ACROSS PROCESSES: a concurrent upload of identical content
@@ -532,8 +449,7 @@ impl AttachmentService {
         // guard drops with this block, before any post-commit hook runs.
         let (outcome, stored) = {
             let _store_guard = Self::lock_store(&root).map_err(UploadFailure::Failed)?;
-            let (stored, created) = Self::store_bytes(&root, filename, &bytes)
-                .map_err(|e| UploadFailure::Store(e.to_string()))?;
+            let (stored, created) = Self::store_bytes(&root, filename, &bytes).map_err(|e| UploadFailure::Store(e.to_string()))?;
 
             #[cfg(test)]
             upload_fault::park_after_store_if_armed();
@@ -541,9 +457,7 @@ impl AttachmentService {
             let mut storage = Storage::new(tasks_root);
             #[cfg(test)]
             let outcome = if upload_fault::take_fail_next_attach() {
-                Err(LoTaRError::ValidationError(
-                    "injected attach failure".to_string(),
-                ))
+                Err(LoTaRError::ValidationError("injected attach failure".to_string()))
             } else {
                 Self::attach_managed_reference(&mut storage, task_id, &stored)
             };
@@ -560,58 +474,33 @@ impl AttachmentService {
             (outcome, stored)
         };
 
-        Ok(UploadOutcome {
-            stored,
-            attach: outcome.map_err(UploadFailure::Failed)?,
-            metadata_removed,
-            warnings,
-        })
+        Ok(UploadOutcome { stored, attach: outcome.map_err(UploadFailure::Failed)?, metadata_removed, warnings })
     }
 
     /// Attach a MANAGED attachment reference (typed `attachment` entry
     /// holding the stored blob name). Dedup is exact-string over the typed
     /// key: a repository `file` entry with the same text never counts as
     /// membership and is never conflated with the managed reference.
-    pub fn attach_managed_reference(
-        storage: &mut Storage,
-        task_id: &str,
-        stored_name: &str,
-    ) -> LoTaRResult<ReferenceMutationOutcome> {
+    pub fn attach_managed_reference(storage: &mut Storage, task_id: &str, stored_name: &str) -> LoTaRResult<ReferenceMutationOutcome> {
         ReferenceService::parse_task_id(task_id)?;
         let name = Self::validate_managed_name(stored_name)?.to_string();
 
-        ReferenceService::commit_reference_change(
-            storage,
-            task_id,
-            "attachment",
-            true,
-            move |task, changed_values| {
-                let already = task
-                    .references
-                    .iter()
-                    .any(|r| r.attachment.as_deref() == Some(name.as_str()));
-                if already {
-                    return false;
-                }
-                task.references.push(ReferenceEntry {
-                    attachment: Some(name.clone()),
-                    ..Default::default()
-                });
-                changed_values.push(name.clone());
-                true
-            },
-        )
+        ReferenceService::commit_reference_change(storage, task_id, "attachment", true, move |task, changed_values| {
+            let already = task.references.iter().any(|r| r.attachment.as_deref() == Some(name.as_str()));
+            if already {
+                return false;
+            }
+            task.references.push(ReferenceEntry { attachment: Some(name.clone()), ..Default::default() });
+            changed_values.push(name.clone());
+            true
+        })
     }
 
     /// Put a task's managed attachments in a new order (the first image is
     /// the card cover). `order` must list every attachment of the task
     /// exactly once; links and other references keep their positions, and
     /// attachments fill the slots attachments held before.
-    pub fn reorder_attachments(
-        storage: &mut Storage,
-        task_id: &str,
-        order: &[String],
-    ) -> LoTaRResult<ReferenceMutationOutcome> {
+    pub fn reorder_attachments(storage: &mut Storage, task_id: &str, order: &[String]) -> LoTaRResult<ReferenceMutationOutcome> {
         let canonical = ReferenceService::parse_task_id(task_id)?.canonical();
         crate::services::task_service::TaskService::ensure_local_task(storage, task_id)?;
         let root_path = storage.root_path.clone();
@@ -619,20 +508,13 @@ impl AttachmentService {
         let guard_id = canonical.clone();
         let outcome = storage.mutate_task(&canonical, move |task| {
             crate::services::task_service::TaskService::ensure_not_deleted(task, &guard_id)?;
-            let current: Vec<String> = task
-                .references
-                .iter()
-                .filter_map(|r| r.attachment.clone())
-                .collect();
+            let current: Vec<String> = task.references.iter().filter_map(|r| r.attachment.clone()).collect();
             let mut expected = current.clone();
             expected.sort();
             let mut requested = order.clone();
             requested.sort();
             if expected != requested {
-                return Err(LoTaRError::ValidationError(
-                    "Attachment order must list each of the task's attachments exactly once"
-                        .to_string(),
-                ));
+                return Err(LoTaRError::ValidationError("Attachment order must list each of the task's attachments exactly once".to_string()));
             }
             if current == order {
                 return Ok(false);
@@ -648,32 +530,14 @@ impl AttachmentService {
                 extra: Default::default(),
                 at: now.clone(),
                 actor: crate::utils::identity::resolve_current_user(Some(root_path.as_path())),
-                changes: vec![crate::types::TaskChange {
-                    field: "attachments_reordered".into(),
-                    old: Some(current.join(", ")),
-                    new: Some(order.join(", ")),
-                }],
+                changes: vec![crate::types::TaskChange { field: "attachments_reordered".into(), old: Some(current.join(", ")), new: Some(order.join(", ")) }],
             });
             task.modified = now;
             Ok(true)
         })?;
-        let previous = outcome.previous().map(|before| {
-            crate::services::task_service::TaskService::dto_from_task(
-                storage,
-                &canonical,
-                before.clone(),
-            )
-        });
-        let task = crate::services::task_service::TaskService::dto_from_task(
-            storage,
-            &canonical,
-            outcome.after.clone(),
-        );
-        Ok(ReferenceMutationOutcome {
-            task,
-            changed: outcome.changed,
-            previous,
-        })
+        let previous = outcome.previous().map(|before| crate::services::task_service::TaskService::dto_from_task(storage, &canonical, before.clone()));
+        let task = crate::services::task_service::TaskService::dto_from_task(storage, &canonical, outcome.after.clone());
+        Ok(ReferenceMutationOutcome { task, changed: outcome.changed, previous })
     }
 
     pub fn resolve_attachment_path(root: &Path, rel_path: &str) -> Result<PathBuf, String> {
@@ -687,10 +551,7 @@ impl AttachmentService {
     /// and `RootUnavailable` is a server-side store-resolution failure.
     /// The string-returning wrapper above stays for CLI/MCP callers and
     /// produces identical messages.
-    pub fn resolve_attachment_path_typed(
-        root: &Path,
-        rel_path: &str,
-    ) -> Result<PathBuf, AttachmentPathError> {
+    pub fn resolve_attachment_path_typed(root: &Path, rel_path: &str) -> Result<PathBuf, AttachmentPathError> {
         let rel = Path::new(rel_path);
         if rel_path.trim().is_empty() {
             return Err(AttachmentPathError::Invalid("Missing path"));
@@ -702,8 +563,7 @@ impl AttachmentService {
             return Err(AttachmentPathError::Invalid("Invalid attachment path"));
         }
 
-        let root_canon = fs::canonicalize(root)
-            .map_err(|e| AttachmentPathError::RootUnavailable(e.to_string()))?;
+        let root_canon = fs::canonicalize(root).map_err(|e| AttachmentPathError::RootUnavailable(e.to_string()))?;
         let joined = root.join(rel);
         let joined_canon = fs::canonicalize(&joined).map_err(|_| AttachmentPathError::Missing)?;
         if !joined_canon.starts_with(&root_canon) {
@@ -755,10 +615,7 @@ fn strip_hash_suffix(stem: &str) -> Option<&str> {
 }
 
 fn sanitize_original_filename(input: &str) -> String {
-    let leaf = Path::new(input)
-        .file_name()
-        .and_then(OsStr::to_str)
-        .unwrap_or("");
+    let leaf = Path::new(input).file_name().and_then(OsStr::to_str).unwrap_or("");
     let trimmed = leaf.trim();
     if trimmed.is_empty() {
         return "file".to_string();
@@ -774,24 +631,13 @@ fn sanitize_original_filename(input: &str) -> String {
     }
 
     let out = out.trim_matches('-').trim_matches('.').to_string();
-    if out.is_empty() {
-        "file".to_string()
-    } else {
-        out
-    }
+    if out.is_empty() { "file".to_string() } else { out }
 }
 
 fn split_stem_ext(filename: &str) -> (String, Option<String>) {
     let path = Path::new(filename);
-    let stem = path
-        .file_stem()
-        .and_then(OsStr::to_str)
-        .unwrap_or("")
-        .to_string();
-    let ext = path
-        .extension()
-        .and_then(OsStr::to_str)
-        .map(|s| s.to_ascii_lowercase());
+    let stem = path.file_stem().and_then(OsStr::to_str).unwrap_or("").to_string();
+    let ext = path.extension().and_then(OsStr::to_str).map(|s| s.to_ascii_lowercase());
     (stem, ext)
 }
 

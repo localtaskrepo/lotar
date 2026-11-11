@@ -25,17 +25,9 @@ mod basic_scanning {
 
         // Create a basic project structure with TODO comments
         fs::write(temp_dir.join("README.md"), "# Test Project").unwrap();
-        fs::write(
-            temp_dir.join("main.py"),
-            "# TODO: implement main logic\nprint('Hello World')",
-        )
-        .unwrap();
+        fs::write(temp_dir.join("main.py"), "# TODO: implement main logic\nprint('Hello World')").unwrap();
         fs::create_dir_all(temp_dir.join("src")).unwrap();
-        fs::write(
-            temp_dir.join("src/lib.py"),
-            "# TODO: add library code\n# Library code",
-        )
-        .unwrap();
+        fs::write(temp_dir.join("src/lib.py"), "# TODO: add library code\n# Library code").unwrap();
 
         // Test basic scan command
         let _cmd = cargo_bin_in(&test_fixtures)
@@ -52,25 +44,13 @@ mod basic_scanning {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create mixed file types with TODO comments
-        fs::write(
-            temp_dir.join("script.py"),
-            "# TODO: Python script improvement",
-        )
-        .unwrap();
-        fs::write(
-            temp_dir.join("script.js"),
-            "// TODO: JavaScript enhancement",
-        )
-        .unwrap();
+        fs::write(temp_dir.join("script.py"), "# TODO: Python script improvement").unwrap();
+        fs::write(temp_dir.join("script.js"), "// TODO: JavaScript enhancement").unwrap();
         fs::write(temp_dir.join("style.css"), "/* CSS file */").unwrap();
         fs::write(temp_dir.join("data.json"), r#"{"key": "value"}"#).unwrap();
 
         // Test basic scan
-        let _cmd = cargo_bin_in(&test_fixtures)
-            .arg("scan")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("Found 2 TODO comment(s):"));
+        let _cmd = cargo_bin_in(&test_fixtures).arg("scan").assert().success().stdout(predicate::str::contains("Found 2 TODO comment(s):"));
     }
 
     #[test]
@@ -82,23 +62,11 @@ mod basic_scanning {
         fs::create_dir_all(temp_dir.join("level1/level2/level3")).unwrap();
         fs::write(temp_dir.join("root.rs"), "// TODO: Root level task").unwrap();
         fs::write(temp_dir.join("level1/level1.rs"), "// TODO: Level 1 task").unwrap();
-        fs::write(
-            temp_dir.join("level1/level2/level2.rs"),
-            "// TODO: Level 2 task",
-        )
-        .unwrap();
-        fs::write(
-            temp_dir.join("level1/level2/level3/level3.rs"),
-            "// TODO: Level 3 task",
-        )
-        .unwrap();
+        fs::write(temp_dir.join("level1/level2/level2.rs"), "// TODO: Level 2 task").unwrap();
+        fs::write(temp_dir.join("level1/level2/level3/level3.rs"), "// TODO: Level 3 task").unwrap();
 
         // Test recursive scan
-        let _cmd = cargo_bin_in(&test_fixtures)
-            .arg("scan")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("Found 4 TODO comment(s):"));
+        let _cmd = cargo_bin_in(&test_fixtures).arg("scan").assert().success().stdout(predicate::str::contains("Found 4 TODO comment(s):"));
     }
 
     #[test]
@@ -107,19 +75,11 @@ mod basic_scanning {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create files without TODO comments
-        fs::write(
-            temp_dir.join("clean.rs"),
-            "fn main() { println!(\"Hello\"); }",
-        )
-        .unwrap();
+        fs::write(temp_dir.join("clean.rs"), "fn main() { println!(\"Hello\"); }").unwrap();
         fs::write(temp_dir.join("clean.py"), "print('Hello World')").unwrap();
 
         // Test scan with no TODOs
-        let _cmd = cargo_bin_in(&test_fixtures)
-            .arg("scan")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("✅ No TODO comments found."));
+        let _cmd = cargo_bin_in(&test_fixtures).arg("scan").assert().success().stdout(predicate::str::contains("✅ No TODO comments found."));
     }
 
     #[test]
@@ -128,11 +88,7 @@ mod basic_scanning {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create file with TODO
-        fs::write(
-            temp_dir.join("test.rs"),
-            "// TODO: implement feature\nfn main() {}",
-        )
-        .unwrap();
+        fs::write(temp_dir.join("test.rs"), "// TODO: implement feature\nfn main() {}").unwrap();
 
         // Test scan with detailed output
         let _cmd = cargo_bin_in(&test_fixtures)
@@ -158,25 +114,13 @@ mod project_discovery {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create Rust project structure
-        fs::write(
-            temp_dir.join("Cargo.toml"),
-            "[package]\nname = \"test\"\nversion = \"0.1.0\"",
-        )
-        .unwrap();
+        fs::write(temp_dir.join("Cargo.toml"), "[package]\nname = \"test\"\nversion = \"0.1.0\"").unwrap();
         fs::create_dir_all(temp_dir.join("src")).unwrap();
-        fs::write(
-            temp_dir.join("src/main.rs"),
-            "// TODO: implement main\nfn main() {}",
-        )
-        .unwrap();
+        fs::write(temp_dir.join("src/main.rs"), "// TODO: implement main\nfn main() {}").unwrap();
 
         // Test scan
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("scan")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("Found 1 TODO comment(s):"));
+        cmd.current_dir(temp_dir).arg("scan").assert().success().stdout(predicate::str::contains("Found 1 TODO comment(s):"));
     }
 
     #[test]
@@ -186,19 +130,11 @@ mod project_discovery {
 
         // Create Python project structure
         fs::write(temp_dir.join("setup.py"), "from setuptools import setup").unwrap();
-        fs::write(
-            temp_dir.join("main.py"),
-            "# TODO: implement main\nprint('hello')",
-        )
-        .unwrap();
+        fs::write(temp_dir.join("main.py"), "# TODO: implement main\nprint('hello')").unwrap();
 
         // Test scan
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("scan")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("Found 1 TODO comment(s):"));
+        cmd.current_dir(temp_dir).arg("scan").assert().success().stdout(predicate::str::contains("Found 1 TODO comment(s):"));
     }
 
     #[test]
@@ -207,24 +143,12 @@ mod project_discovery {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create JavaScript project structure
-        fs::write(
-            temp_dir.join("package.json"),
-            r#"{"name": "test", "version": "1.0.0"}"#,
-        )
-        .unwrap();
-        fs::write(
-            temp_dir.join("index.js"),
-            "// TODO: implement main\nconsole.log('hello');",
-        )
-        .unwrap();
+        fs::write(temp_dir.join("package.json"), r#"{"name": "test", "version": "1.0.0"}"#).unwrap();
+        fs::write(temp_dir.join("index.js"), "// TODO: implement main\nconsole.log('hello');").unwrap();
 
         // Test scan
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("scan")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("Found 1 TODO comment(s):"));
+        cmd.current_dir(temp_dir).arg("scan").assert().success().stdout(predicate::str::contains("Found 1 TODO comment(s):"));
     }
 
     #[test]
@@ -233,16 +157,8 @@ mod project_discovery {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create mixed project structure
-        fs::write(
-            temp_dir.join("Cargo.toml"),
-            "[package]\nname = \"test\"\nversion = \"0.1.0\"",
-        )
-        .unwrap();
-        fs::write(
-            temp_dir.join("package.json"),
-            r#"{"name": "test", "version": "1.0.0"}"#,
-        )
-        .unwrap();
+        fs::write(temp_dir.join("Cargo.toml"), "[package]\nname = \"test\"\nversion = \"0.1.0\"").unwrap();
+        fs::write(temp_dir.join("package.json"), r#"{"name": "test", "version": "1.0.0"}"#).unwrap();
         fs::write(temp_dir.join("setup.py"), "from setuptools import setup").unwrap();
 
         fs::write(temp_dir.join("main.rs"), "// TODO: Rust TODO").unwrap();
@@ -251,11 +167,7 @@ mod project_discovery {
 
         // Test scan
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("scan")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("Found 3 TODO comment(s):"));
+        cmd.current_dir(temp_dir).arg("scan").assert().success().stdout(predicate::str::contains("Found 3 TODO comment(s):"));
     }
 }
 
@@ -279,12 +191,7 @@ mod system_integration {
 
         // Test scan with custom tasks directory
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("--tasks-dir=custom-tasks")
-            .arg("scan")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("Found 1 TODO comment(s):"));
+        cmd.current_dir(temp_dir).arg("--tasks-dir=custom-tasks").arg("scan").assert().success().stdout(predicate::str::contains("Found 1 TODO comment(s):"));
     }
 
     #[test]
@@ -296,26 +203,13 @@ mod system_integration {
         fs::create_dir_all(temp_dir.join("src")).unwrap();
         fs::create_dir_all(temp_dir.join("tests")).unwrap();
 
-        fs::write(
-            temp_dir.join("src/main.rs"),
-            "// TODO: implement main logic",
-        )
-        .unwrap();
-        fs::write(
-            temp_dir.join("src/lib.rs"),
-            "// TODO: add library functionality",
-        )
-        .unwrap();
+        fs::write(temp_dir.join("src/main.rs"), "// TODO: implement main logic").unwrap();
+        fs::write(temp_dir.join("src/lib.rs"), "// TODO: add library functionality").unwrap();
         fs::write(temp_dir.join("tests/test.rs"), "// TODO: add more tests").unwrap();
 
         // Test verbose scan
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("scan")
-            .arg("--detailed")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("Found 3 TODO comment(s):"));
+        cmd.current_dir(temp_dir).arg("scan").arg("--detailed").assert().success().stdout(predicate::str::contains("Found 3 TODO comment(s):"));
     }
 
     #[test]
@@ -324,19 +218,11 @@ mod system_integration {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create source files with TODOs
-        fs::write(
-            temp_dir.join("main.rs"),
-            "// TODO: integrate with task system",
-        )
-        .unwrap();
+        fs::write(temp_dir.join("main.rs"), "// TODO: integrate with task system").unwrap();
 
         // Test scan
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("scan")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("Found 1 TODO comment(s):"));
+        cmd.current_dir(temp_dir).arg("scan").assert().success().stdout(predicate::str::contains("Found 1 TODO comment(s):"));
     }
 }
 
@@ -362,16 +248,7 @@ mod ignore_and_filters {
     }
 
     fn filenames(results: &[lotar::scanner::Reference]) -> Vec<String> {
-        let mut v: Vec<String> = results
-            .iter()
-            .map(|r| {
-                r.file_path
-                    .file_name()
-                    .unwrap()
-                    .to_string_lossy()
-                    .to_string()
-            })
-            .collect();
+        let mut v: Vec<String> = results.iter().map(|r| r.file_path.file_name().unwrap().to_string_lossy().to_string()).collect();
         v.sort();
         v
     }
@@ -399,9 +276,7 @@ mod ignore_and_filters {
         write(&root.join("a.rs"), "// TODO: rust");
         write(&root.join("b.py"), "# TODO: py");
 
-        let mut scanner = Scanner::new(PathBuf::from(root))
-            .with_include_ext(&["rs".into(), "py".into()])
-            .with_exclude_ext(&["py".into()]);
+        let mut scanner = Scanner::new(PathBuf::from(root)).with_include_ext(&["rs".into(), "py".into()]).with_exclude_ext(&["py".into()]);
         let results = scanner.scan();
 
         assert_eq!(results.len(), 1, "py should be excluded");
@@ -414,10 +289,7 @@ mod ignore_and_filters {
         let root = dir.path();
 
         write(&root.join(".gitignore"), "nested/\n*.log\n");
-        write(
-            &root.join("nested/ignored.js"),
-            "// TODO: hidden by gitignore",
-        );
+        write(&root.join("nested/ignored.js"), "// TODO: hidden by gitignore");
         write(&root.join("visible.rs"), "// TODO: visible");
 
         let mut scanner = Scanner::new(PathBuf::from(root));
@@ -425,10 +297,7 @@ mod ignore_and_filters {
 
         let names = filenames(&results);
         assert!(names.contains(&"visible.rs".to_string()));
-        assert!(
-            !names.contains(&"ignored.js".to_string()),
-            ".gitignore should hide nested/"
-        );
+        assert!(!names.contains(&"ignored.js".to_string()), ".gitignore should hide nested/");
     }
 
     #[test]
@@ -438,19 +307,13 @@ mod ignore_and_filters {
 
         write(&root.join(".gitignore"), "nested/\n");
         write(&root.join(".lotarignore"), "# custom rules (none)\n");
-        write(
-            &root.join("nested/scan.js"),
-            "// TODO: should be scanned when .lotarignore present",
-        );
+        write(&root.join("nested/scan.js"), "// TODO: should be scanned when .lotarignore present");
 
         let mut scanner = Scanner::new(PathBuf::from(root));
         let results = scanner.scan();
 
         let names = filenames(&results);
-        assert!(
-            names.contains(&"scan.js".to_string()),
-            ".lotarignore present => fallback to gitignore disabled"
-        );
+        assert!(names.contains(&"scan.js".to_string()), ".lotarignore present => fallback to gitignore disabled");
     }
 
     #[test]
@@ -459,10 +322,7 @@ mod ignore_and_filters {
         let root = dir.path();
 
         write(&root.join(".lotarignore"), "nested/\n");
-        write(
-            &root.join("nested/skip.ts"),
-            "// TODO: should be excluded by .lotarignore",
-        );
+        write(&root.join("nested/skip.ts"), "// TODO: should be excluded by .lotarignore");
         write(&root.join("keep.rs"), "// TODO: keep");
 
         let mut scanner = Scanner::new(PathBuf::from(root));

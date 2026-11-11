@@ -18,11 +18,7 @@ fn workspace() -> Workspace {
     let tmp = tempfile::tempdir().unwrap();
     let tasks = tmp.path().join(".tasks");
     std::fs::create_dir_all(tasks.join("RS")).unwrap();
-    std::fs::write(
-        tasks.join("config.yml"),
-        "default:\n  project: RS\nissue:\n  states: [Todo, InProgress, Done]\n",
-    )
-    .unwrap();
+    std::fs::write(tasks.join("config.yml"), "default:\n  project: RS\nissue:\n  states: [Todo, InProgress, Done]\n").unwrap();
     for (num, status) in [(1, "Done"), (2, "Todo"), (3, "Todo")] {
         write_task(&tasks.join("RS").join(format!("{num}.yml")), num, status);
     }
@@ -33,9 +29,7 @@ fn write_task(path: &Path, num: u64, status: &str) {
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     std::fs::write(
         path,
-        format!(
-            "title: Task {num}\nstatus: {status}\npriority: Medium\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-01-01T00:00:00Z\n"
-        ),
+        format!("title: Task {num}\nstatus: {status}\npriority: Medium\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-01-01T00:00:00Z\n"),
     )
     .unwrap();
 }
@@ -51,12 +45,7 @@ fn json_ok(ws: &Workspace, args: &[&str]) -> Value {
     let mut all = vec!["--format", "json"];
     all.extend_from_slice(args);
     let out = run(ws, &all);
-    assert!(
-        out.status.success(),
-        "{args:?}: {}{}",
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr)
-    );
+    assert!(out.status.success(), "{args:?}: {}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
     serde_json::from_slice(&out.stdout).unwrap()
 }
 
@@ -77,12 +66,7 @@ fn files(ws: &Workspace) -> Vec<String> {
     let mut found: Vec<String> = walk(&ws.tasks.join("RS"))
         .into_iter()
         .filter(|p| p.extension().is_some_and(|e| e == "yml") && !p.ends_with("config.yml"))
-        .map(|p| {
-            p.strip_prefix(ws.tasks.join("RS"))
-                .unwrap()
-                .to_string_lossy()
-                .into_owned()
-        })
+        .map(|p| p.strip_prefix(ws.tasks.join("RS")).unwrap().to_string_lossy().into_owned())
         .collect();
     found.sort();
     found
@@ -123,11 +107,7 @@ fn nested_folders_are_found_and_numbers_are_never_reused() {
     assert!(!rs.join("2.yml").exists());
 
     let added = json_ok(&ws, &["add", "Four", "-p", "RS"]);
-    let added_id = added["task"]["id"]
-        .as_str()
-        .or_else(|| added["id"].as_str())
-        .unwrap()
-        .to_string();
+    let added_id = added["task"]["id"].as_str().or_else(|| added["id"].as_str()).unwrap().to_string();
     assert_eq!(added_id, "RS-10");
     assert!(rs.join("10.yml").exists());
 }
@@ -144,32 +124,16 @@ fn a_number_stored_twice_is_listed_once_and_refused() {
     cmd.current_dir(ws.tasks.parent().unwrap());
     let out = cmd.args(["--format", "json", "list"]).output().unwrap();
     assert!(out.status.success());
-    let ids: Vec<String> = serde_json::from_slice::<Value>(&out.stdout).unwrap()["tasks"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|t| t["id"].as_str().unwrap().to_string())
-        .collect();
+    let ids: Vec<String> =
+        serde_json::from_slice::<Value>(&out.stdout).unwrap()["tasks"].as_array().unwrap().iter().map(|t| t["id"].as_str().unwrap().to_string()).collect();
     assert_eq!(ids.iter().filter(|id| *id == "RS-3").count(), 1, "{ids:?}");
-    assert!(
-        String::from_utf8_lossy(&out.stderr).contains("RS-3 is stored in more than one file"),
-        "{}",
-        String::from_utf8_lossy(&out.stderr)
-    );
+    assert!(String::from_utf8_lossy(&out.stderr).contains("RS-3 is stored in more than one file"), "{}", String::from_utf8_lossy(&out.stderr));
 
     let out = run(&ws, &["status", "RS-3", "Done"]);
     assert!(!out.status.success());
-    let message = format!(
-        "{}{}",
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr)
-    );
+    let message = format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
     assert!(message.contains("copy"), "{message}");
-    assert!(
-        !std::fs::read_to_string(rs.join("3.yml"))
-            .unwrap()
-            .contains("Done")
-    );
+    assert!(!std::fs::read_to_string(rs.join("3.yml")).unwrap().contains("Done"));
 }
 
 #[test]
@@ -188,25 +152,13 @@ fn archive_and_unarchive_from_the_cli() {
     let by_id = json_ok(&ws, &["task", "archive", "RS-3", "RS-1"]);
     assert_eq!(by_id["changed"], json!(["RS-3"]));
     assert_eq!(by_id["unchanged"], json!(["RS-1"]));
-    assert_eq!(
-        files(&ws),
-        ["2.yml", "@archive/1.yml", "@archive/web/3.yml"]
-    );
+    assert_eq!(files(&ws), ["2.yml", "@archive/1.yml", "@archive/web/3.yml"]);
 
     assert_eq!(listed(&ws, &[]), ["RS-2"]);
     assert_eq!(listed(&ws, &["archived=yes"]), ["RS-1", "RS-3"]);
     let all = json_ok(&ws, &["list", "archived=all"]);
-    let flags: HashMap<String, bool> = all["tasks"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|t| {
-            (
-                t["id"].as_str().unwrap().to_string(),
-                t["archived"].as_bool().unwrap_or(false),
-            )
-        })
-        .collect();
+    let flags: HashMap<String, bool> =
+        all["tasks"].as_array().unwrap().iter().map(|t| (t["id"].as_str().unwrap().to_string(), t["archived"].as_bool().unwrap_or(false))).collect();
     assert!(flags["RS-1"]);
     assert!(!flags["RS-2"]);
 
@@ -216,19 +168,11 @@ fn archive_and_unarchive_from_the_cli() {
     assert!(String::from_utf8_lossy(&out.stderr).contains("archived and read-only"));
     let out = run(&ws, &["task", "delete", "RS-1", "-y"]);
     assert!(!out.status.success());
-    json_ok(
-        &ws,
-        &["--force-archived", "comment", "RS-1", "-m", "forced note"],
-    );
+    json_ok(&ws, &["--force-archived", "comment", "RS-1", "-m", "forced note"]);
     let stored = std::fs::read_to_string(rs.join("@archive/1.yml")).unwrap();
     assert!(stored.contains("forced note"), "{stored}");
     assert!(stored.contains("field: archived"), "{stored}");
-    let modified_line = |text: &str| {
-        text.lines()
-            .find(|line| line.starts_with("modified:"))
-            .unwrap()
-            .to_string()
-    };
+    let modified_line = |text: &str| text.lines().find(|line| line.starts_with("modified:")).unwrap().to_string();
     let before_unarchive = modified_line(&stored);
 
     // Unarchive brings files back to where they came from.
@@ -237,16 +181,9 @@ fn archive_and_unarchive_from_the_cli() {
     assert_eq!(files(&ws), ["1.yml", "2.yml", "web/3.yml"]);
     let stored = std::fs::read_to_string(rs.join("1.yml")).unwrap();
     assert!(stored.contains("field: unarchived"), "{stored}");
-    assert_eq!(
-        modified_line(&stored),
-        before_unarchive,
-        "unarchive must not change modified"
-    );
+    assert_eq!(modified_line(&stored), before_unarchive, "unarchive must not change modified");
     let untouched = std::fs::read_to_string(rs.join("web/3.yml")).unwrap();
-    assert!(
-        untouched.contains("modified: 2026-01-01"),
-        "archive must not change modified: {untouched}"
-    );
+    assert!(untouched.contains("modified: 2026-01-01"), "archive must not change modified: {untouched}");
     json_ok(&ws, &["status", "RS-1", "Todo"]);
 
     let out = run(&ws, &["task", "archive"]);
@@ -259,20 +196,13 @@ fn unarchive_checks_the_current_config() {
     let ws = workspace();
     json_ok(&ws, &["task", "archive", "RS-1"]);
     // Retiring "Done" is not blocked by the archived task...
-    std::fs::write(
-        ws.tasks.join("config.yml"),
-        "default:\n  project: RS\nissue:\n  states: [Todo, InProgress, Closed]\n",
-    )
-    .unwrap();
+    std::fs::write(ws.tasks.join("config.yml"), "default:\n  project: RS\nissue:\n  states: [Todo, InProgress, Closed]\n").unwrap();
     // ...but bringing it back with a retired status is refused.
     let out = run(&ws, &["task", "unarchive", "RS-1"]);
     assert!(!out.status.success());
     let stdout = String::from_utf8_lossy(&out.stdout);
     let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(
-        format!("{stdout}{stderr}").contains("cannot unarchive"),
-        "{stdout}{stderr}"
-    );
+    assert!(format!("{stdout}{stderr}").contains("cannot unarchive"), "{stdout}{stderr}");
     assert!(ws.tasks.join("RS/@archive/1.yml").exists());
 }
 
@@ -287,27 +217,14 @@ fn automation_action_archives_the_task() {
     json_ok(&ws, &["status", "RS-2", "Done"]);
     let archived = ws.tasks.join("RS/@archive/2.yml");
     assert!(archived.exists(), "{:?}", files(&ws));
-    assert!(
-        std::fs::read_to_string(archived)
-            .unwrap()
-            .contains("archiving")
-    );
+    assert!(std::fs::read_to_string(archived).unwrap().contains("archiving"));
 }
 
-fn request(
-    api: &ApiServer,
-    method: &str,
-    path: &str,
-    query: &[(&str, &str)],
-    body: Value,
-) -> (u16, Value) {
+fn request(api: &ApiServer, method: &str, path: &str, query: &[(&str, &str)], body: Value) -> (u16, Value) {
     let response = api.handle_request(&HttpRequest {
         method: method.into(),
         path: path.into(),
-        query: query
-            .iter()
-            .map(|(k, v)| (k.to_string(), v.to_string()))
-            .collect(),
+        query: query.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
         headers: HashMap::new(),
         body: serde_json::to_vec(&body).unwrap(),
     });
@@ -326,13 +243,7 @@ fn rest_and_mcp_archive_with_force() {
     let mut api = ApiServer::new();
     lotar::routes::initialize(&mut api);
 
-    let (status, body) = request(
-        &api,
-        "POST",
-        "/api/tasks/archive",
-        &[],
-        json!({"id": "RS-2"}),
-    );
+    let (status, body) = request(&api, "POST", "/api/tasks/archive", &[], json!({"id": "RS-2"}));
     assert_eq!(status, 200, "{body}");
     assert_eq!(body["data"]["archived"], true);
     assert!(ws.tasks.join("RS/@archive/2.yml").exists());
@@ -340,13 +251,8 @@ fn rest_and_mcp_archive_with_force() {
     let ids = |query: &[(&str, &str)]| {
         let (status, body) = request(&api, "GET", "/api/tasks/list", query, Value::Null);
         assert_eq!(status, 200, "{body}");
-        let mut ids: Vec<String> = body["data"]
-            .as_array()
-            .or_else(|| body["data"]["tasks"].as_array())
-            .unwrap()
-            .iter()
-            .map(|t| t["id"].as_str().unwrap().to_string())
-            .collect();
+        let mut ids: Vec<String> =
+            body["data"].as_array().or_else(|| body["data"]["tasks"].as_array()).unwrap().iter().map(|t| t["id"].as_str().unwrap().to_string()).collect();
         ids.sort();
         ids
     };
@@ -354,30 +260,15 @@ fn rest_and_mcp_archive_with_force() {
     assert_eq!(ids(&[("archived", "yes")]), ["RS-2"]);
     assert_eq!(ids(&[("query", "archived=all")]), ["RS-1", "RS-2", "RS-3"]);
 
-    let (status, body) = request(
-        &api,
-        "GET",
-        "/api/tasks/get",
-        &[("id", "RS-2")],
-        Value::Null,
-    );
+    let (status, body) = request(&api, "GET", "/api/tasks/get", &[("id", "RS-2")], Value::Null);
     assert_eq!(status, 200, "{body}");
     assert_eq!(body["data"]["archived"], true);
 
     let update = json!({"id": "RS-2", "title": "Renamed"});
     let (status, body) = request(&api, "POST", "/api/tasks/update", &[], update.clone());
     assert_eq!(status, 400, "{body}");
-    assert!(
-        body.to_string().contains("archived and read-only"),
-        "{body}"
-    );
-    let (status, body) = request(
-        &api,
-        "POST",
-        "/api/tasks/update",
-        &[("force_archived", "true")],
-        update,
-    );
+    assert!(body.to_string().contains("archived and read-only"), "{body}");
+    let (status, body) = request(&api, "POST", "/api/tasks/update", &[("force_archived", "true")], update);
     assert_eq!(status, 200, "{body}");
     assert_eq!(body["data"]["title"], "Renamed");
 
@@ -392,9 +283,7 @@ fn rest_and_mcp_archive_with_force() {
         .to_string();
         serde_json::from_str(&lotar::mcp::server::handle_json_line(&line)).unwrap()
     };
-    let is_error = |resp: &Value| {
-        resp.get("error").is_some() || resp["result"]["isError"].as_bool() == Some(true)
-    };
+    let is_error = |resp: &Value| resp.get("error").is_some() || resp["result"]["isError"].as_bool() == Some(true);
     let resp = call("task_archive", json!({"id": "RS-3"}));
     assert!(!is_error(&resp), "{resp}");
     assert!(ws.tasks.join("RS/@archive/3.yml").exists());
@@ -402,32 +291,21 @@ fn rest_and_mcp_archive_with_force() {
     let patch = json!({"id": "RS-3", "patch": {"title": "Via MCP"}});
     let resp = call("task_update", patch.clone());
     assert!(is_error(&resp), "{resp}");
-    assert!(
-        resp.to_string().contains("archived and read-only"),
-        "{resp}"
-    );
+    assert!(resp.to_string().contains("archived and read-only"), "{resp}");
     let mut forced = patch;
     forced["force_archived"] = json!(true);
     let resp = call("task_update", forced);
     assert!(!is_error(&resp), "{resp}");
 
     let resp = call("task_list", json!({"archived": "yes"}));
-    let text = resp["result"]["content"][0]["text"]
-        .as_str()
-        .unwrap_or_default();
+    let text = resp["result"]["content"][0]["text"].as_str().unwrap_or_default();
     assert!(text.contains("RS-2") && text.contains("RS-3"), "{resp}");
     assert!(!text.contains("\"RS-1\""), "{resp}");
 
     let resp = call("task_unarchive", json!({"id": "RS-3"}));
     assert!(!is_error(&resp), "{resp}");
     assert!(ws.tasks.join("RS/3.yml").exists());
-    let (status, _) = request(
-        &api,
-        "POST",
-        "/api/tasks/unarchive",
-        &[],
-        json!({"id": "RS-2"}),
-    );
+    let (status, _) = request(&api, "POST", "/api/tasks/unarchive", &[], json!({"id": "RS-2"}));
     assert_eq!(status, 200);
     assert!(ws.tasks.join("RS/2.yml").exists());
 }

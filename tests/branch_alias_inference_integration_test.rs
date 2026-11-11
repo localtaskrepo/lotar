@@ -47,20 +47,11 @@ branch:
             .env("LOTAR_TASKS_DIR", tasks.to_string_lossy().to_string())
             .env("LOTAR_TEST_SILENT", "1")
             .env("HOME", root.to_string_lossy().to_string())
-            .args([
-                "add",
-                "Test",
-                "--project=TEST",
-                "--dry-run",
-                "--format=json",
-            ])
+            .args(["add", "Test", "--project=TEST", "--dry-run", "--format=json"])
             .assert()
             .success();
         let out = String::from_utf8_lossy(&assert.get_output().stdout);
-        assert!(
-            out.contains("\"status_value\":\"InProgress\""),
-            "Output: {out}"
-        );
+        assert!(out.contains("\"status_value\":\"InProgress\""), "Output: {out}");
     }
 
     #[test]
@@ -88,13 +79,7 @@ branch:
             .env("LOTAR_TASKS_DIR", tasks.to_string_lossy().to_string())
             .env("LOTAR_TEST_SILENT", "1")
             .env("HOME", root.to_string_lossy().to_string())
-            .args([
-                "add",
-                "Test",
-                "--project=TEST",
-                "--dry-run",
-                "--format=json",
-            ])
+            .args(["add", "Test", "--project=TEST", "--dry-run", "--format=json"])
             .assert()
             .success();
         let out = String::from_utf8_lossy(&assert.get_output().stdout);
@@ -130,13 +115,7 @@ branch:
             .env("LOTAR_TASKS_DIR", tasks.to_string_lossy().to_string())
             .env("LOTAR_TEST_SILENT", "1")
             .env("HOME", root.to_string_lossy().to_string())
-            .args([
-                "add",
-                "Test",
-                "--project=TEST",
-                "--dry-run",
-                "--format=json",
-            ])
+            .args(["add", "Test", "--project=TEST", "--dry-run", "--format=json"])
             .assert()
             .success();
         let out = String::from_utf8_lossy(&assert.get_output().stdout);
@@ -176,13 +155,7 @@ branch:
             .env("LOTAR_TASKS_DIR", tasks.to_string_lossy().to_string())
             .env("LOTAR_TEST_SILENT", "1")
             .env("HOME", root.to_string_lossy().to_string())
-            .args([
-                "add",
-                "Test",
-                "--project=TEST",
-                "--dry-run",
-                "--format=json",
-            ])
+            .args(["add", "Test", "--project=TEST", "--dry-run", "--format=json"])
             .assert()
             .success();
         let out = String::from_utf8_lossy(&assert.get_output().stdout);

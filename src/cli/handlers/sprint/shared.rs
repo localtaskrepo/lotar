@@ -28,86 +28,49 @@ pub(crate) struct SprintAssignmentIntegrityPayload {
     pub(crate) auto_cleanup: Option<SprintCleanupSummaryPayload>,
 }
 
-pub(crate) fn cleanup_summary_payload(
-    outcome: &SprintCleanupOutcome,
-) -> SprintCleanupSummaryPayload {
+pub(crate) fn cleanup_summary_payload(outcome: &SprintCleanupOutcome) -> SprintCleanupSummaryPayload {
     SprintCleanupSummaryPayload {
         removed_references: outcome.removed_references,
         updated_tasks: outcome.updated_tasks,
-        removed_by_sprint: outcome
-            .removed_by_sprint
-            .iter()
-            .map(|entry| SprintCleanupRefsRemoved {
-                sprint_id: entry.sprint_id,
-                count: entry.count,
-            })
-            .collect(),
+        removed_by_sprint: outcome.removed_by_sprint.iter().map(|entry| SprintCleanupRefsRemoved { sprint_id: entry.sprint_id, count: entry.count }).collect(),
         remaining_missing: outcome.remaining_missing.clone(),
     }
 }
 
-pub(crate) fn emit_cleanup_summary(
-    renderer: &OutputRenderer,
-    outcome: &SprintCleanupOutcome,
-    context: &str,
-) {
+pub(crate) fn emit_cleanup_summary(renderer: &OutputRenderer, outcome: &SprintCleanupOutcome, context: &str) {
     if outcome.removed_references == 0 {
-        renderer.emit_info(format_args!(
-            "No missing sprint references were removed while {}.",
-            context
-        ));
+        renderer.emit_info(format_args!("No missing sprint references were removed while {}.", context));
         return;
     }
 
-    renderer.emit_info(format_args!(
-        "Removed {} missing sprint reference(s) while {}.",
-        outcome.removed_references, context
-    ));
+    renderer.emit_info(format_args!("Removed {} missing sprint reference(s) while {}.", outcome.removed_references, context));
 
     if !outcome.removed_by_sprint.is_empty() {
         renderer.emit_info("Removed references by sprint:");
         for entry in &outcome.removed_by_sprint {
-            renderer.emit_info(format_args!(
-                "  - Sprint #{}: {}",
-                entry.sprint_id, entry.count
-            ));
+            renderer.emit_info(format_args!("  - Sprint #{}: {}", entry.sprint_id, entry.count));
         }
     }
 
     if !outcome.remaining_missing.is_empty() {
         let formatted = format_missing_ids(&outcome.remaining_missing);
-        renderer.emit_warning(format_args!(
-            "Remaining missing sprint references detected: {}.",
-            formatted
-        ));
+        renderer.emit_warning(format_args!("Remaining missing sprint references detected: {}.", formatted));
     }
 }
 
-pub(crate) fn emit_missing_report(
-    renderer: &OutputRenderer,
-    report: &MissingSprintReport,
-    context: &str,
-) {
+pub(crate) fn emit_missing_report(renderer: &OutputRenderer, report: &MissingSprintReport, context: &str) {
     if report.missing_sprints.is_empty() {
         return;
     }
 
     let formatted = format_missing_ids(&report.missing_sprints);
-    renderer.emit_warning(format_args!(
-        "Missing sprint references detected while {}: {}.",
-        context, formatted
-    ));
+    renderer.emit_warning(format_args!("Missing sprint references detected while {}: {}.", context, formatted));
 
     if report.tasks_with_missing > 0 {
-        renderer.emit_info(format_args!(
-            "{} task(s) currently reference missing sprints.",
-            report.tasks_with_missing
-        ));
+        renderer.emit_info(format_args!("{} task(s) currently reference missing sprints.", report.tasks_with_missing));
     }
 
-    renderer.emit_info(
-        "Re-run with --cleanup-missing to remove stale sprint memberships automatically.",
-    );
+    renderer.emit_info("Re-run with --cleanup-missing to remove stale sprint memberships automatically.");
 }
 
 pub(crate) fn build_assignment_integrity(
@@ -122,26 +85,16 @@ pub(crate) fn build_assignment_integrity(
 
     if missing_sprints.is_empty()
         && tasks_with_missing == 0
-        && auto_cleanup
-            .as_ref()
-            .map(|summary| summary.removed_references == 0 && summary.remaining_missing.is_empty())
-            .unwrap_or(true)
+        && auto_cleanup.as_ref().map(|summary| summary.removed_references == 0 && summary.remaining_missing.is_empty()).unwrap_or(true)
     {
         return None;
     }
 
-    Some(SprintAssignmentIntegrityPayload {
-        missing_sprints,
-        tasks_with_missing: (tasks_with_missing > 0).then_some(tasks_with_missing),
-        auto_cleanup,
-    })
+    Some(SprintAssignmentIntegrityPayload { missing_sprints, tasks_with_missing: (tasks_with_missing > 0).then_some(tasks_with_missing), auto_cleanup })
 }
 
 pub(crate) fn format_missing_ids(ids: &[u32]) -> String {
-    ids.iter()
-        .map(|id| format!("#{}", id))
-        .collect::<Vec<_>>()
-        .join(", ")
+    ids.iter().map(|id| format!("#{}", id)).collect::<Vec<_>>().join(", ")
 }
 
 pub(crate) fn truncate(value: &str, max: usize) -> String {
@@ -157,10 +110,7 @@ pub(crate) fn truncate(value: &str, max: usize) -> String {
         return "...".chars().take(max).collect();
     }
 
-    let mut truncated = value
-        .chars()
-        .take(max.saturating_sub(3))
-        .collect::<String>();
+    let mut truncated = value.chars().take(max.saturating_sub(3)).collect::<String>();
     truncated.push_str("...");
     truncated
 }

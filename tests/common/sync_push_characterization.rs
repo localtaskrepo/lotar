@@ -14,14 +14,7 @@ use super::*;
 fn scripted_remote(provider: SyncProvider, failures: Vec<(&'static str, &'static str)>) -> MockApi {
     MockApi::start(move |request| {
         let (method, path) = (request.method.as_str(), request.path.as_str());
-        if failures
-            .iter()
-            .any(|(m, p)| *m == method && path.contains(p))
-        {
-            (500, json!({"message": "boom"}))
-        } else {
-            (200, respond(provider, method, path))
-        }
+        if failures.iter().any(|(m, p)| *m == method && path.contains(p)) { (500, json!({"message": "boom"})) } else { (200, respond(provider, method, path)) }
     })
 }
 
@@ -50,19 +43,10 @@ fn respond(provider: SyncProvider, method: &str, path: &str) -> JsonValue {
     }
 }
 
-fn fixture(
-    provider: SyncProvider,
-) -> (tempfile::TempDir, TasksDirectoryResolver, SyncRemoteConfig) {
+fn fixture(provider: SyncProvider) -> (tempfile::TempDir, TasksDirectoryResolver, SyncRemoteConfig) {
     let temp = tempfile::tempdir().unwrap();
-    let resolver = TasksDirectoryResolver {
-        path: temp.path().to_path_buf(),
-        source: crate::workspace::TasksDirectorySource::CommandLineFlag,
-    };
-    fs::write(
-        crate::utils::paths::global_config_path(temp.path()),
-        "default.project: TEST\nauto.set_reporter: false\nauto.assign_on_status: false\n",
-    )
-    .unwrap();
+    let resolver = TasksDirectoryResolver { path: temp.path().to_path_buf(), source: crate::workspace::TasksDirectorySource::CommandLineFlag };
+    fs::write(crate::utils::paths::global_config_path(temp.path()), "default.project: TEST\nauto.set_reporter: false\nauto.assign_on_status: false\n").unwrap();
     let remote = SyncRemoteConfig {
         provider,
         project: (provider == SyncProvider::Jira).then(|| "ENG".into()),
@@ -71,19 +55,10 @@ fn fixture(
         auth_profile: None,
         mapping: match provider {
             SyncProvider::Jira => std::collections::BTreeMap::from([
-                (
-                    "title".to_string(),
-                    SyncFieldMapping::Simple("summary".into()),
-                ),
-                (
-                    "status".to_string(),
-                    SyncFieldMapping::Simple("status".into()),
-                ),
+                ("title".to_string(), SyncFieldMapping::Simple("summary".into())),
+                ("status".to_string(), SyncFieldMapping::Simple("status".into())),
             ]),
-            SyncProvider::Github => std::collections::BTreeMap::from([(
-                "title".to_string(),
-                SyncFieldMapping::Simple("title".into()),
-            )]),
+            SyncProvider::Github => std::collections::BTreeMap::from([("title".to_string(), SyncFieldMapping::Simple("title".into()))]),
         },
     };
     (temp, resolver, remote)
@@ -101,22 +76,9 @@ fn new_recorder(dry_run: bool) -> SyncReportRecorder {
     })
 }
 
-fn task_with_reference(
-    resolver: &TasksDirectoryResolver,
-    title: &str,
-    kind: &str,
-    reference: Option<&str>,
-) -> String {
+fn task_with_reference(resolver: &TasksDirectoryResolver, title: &str, kind: &str, reference: Option<&str>) -> String {
     let mut storage = Storage::new(&resolver.path);
-    let task = TaskService::create(
-        &mut storage,
-        TaskCreate {
-            title: title.into(),
-            project: Some("TEST".into()),
-            ..Default::default()
-        },
-    )
-    .unwrap();
+    let task = TaskService::create(&mut storage, TaskCreate { title: title.into(), project: Some("TEST".into()), ..Default::default() }).unwrap();
     if let Some(reference) = reference {
         attach_sync_reference(&mut storage, &task.id, kind, reference).unwrap();
     }
@@ -130,42 +92,23 @@ struct Outcome {
     journal: String,
 }
 
-fn run_push(
-    resolver: &TasksDirectoryResolver,
-    remote: &SyncRemoteConfig,
-    server: Option<&MockApi>,
-    task_id: Option<&str>,
-    dry_run: bool,
-) -> Outcome {
+fn run_push(resolver: &TasksDirectoryResolver, remote: &SyncRemoteConfig, server: Option<&MockApi>, task_id: Option<&str>, dry_run: bool) -> Outcome {
     let client = server.map(|s| s.client(remote.provider));
     let mut journal = SyncJournal::open(&resolver.path, dry_run).unwrap();
     let mut recorder = new_recorder(dry_run);
     let mut warnings = Vec::new();
     perform_push(
-        SyncTarget {
-            resolver,
-            remote,
-            task_id,
-            dry_run,
-        },
+        SyncTarget { resolver, remote, task_id, dry_run },
         Some("TEST"),
         client.as_ref(),
-        SyncSinks {
-            recorder: &mut recorder,
-            warnings: &mut warnings,
-            journal: &mut journal,
-        },
+        SyncSinks { recorder: &mut recorder, warnings: &mut warnings, journal: &mut journal },
     )
     .unwrap();
     let host = server.map(|s| s.address().to_string()).unwrap_or_default();
     let root = resolver.path.display().to_string();
     let scrub = |text: &str| {
         let text = text.replace(&root, "ROOT");
-        if host.is_empty() {
-            text
-        } else {
-            text.replace(&host, "HOST")
-        }
+        if host.is_empty() { text } else { text.replace(&host, "HOST") }
     };
     let entries = recorder
         .entries
@@ -184,12 +127,7 @@ fn run_push(
     let journal_state = format!(
         "pending={} refs=[{}]",
         journal.links.len(),
-        journal
-            .links
-            .iter()
-            .map(|link| link.reference.clone().unwrap_or_else(|| "-".into()))
-            .collect::<Vec<_>>()
-            .join(",")
+        journal.links.iter().map(|link| link.reference.clone().unwrap_or_else(|| "-".into())).collect::<Vec<_>>().join(",")
     );
     Outcome {
         entries,
@@ -207,12 +145,7 @@ fn reference_for(provider: SyncProvider, number: u32) -> (&'static str, String) 
 }
 
 fn stored_references(resolver: &TasksDirectoryResolver, id: &str) -> Vec<String> {
-    TaskService::get(&Storage::new(&resolver.path), id, None)
-        .unwrap()
-        .references
-        .iter()
-        .filter_map(|r| r.jira.clone().or_else(|| r.github.clone()))
-        .collect()
+    TaskService::get(&Storage::new(&resolver.path), id, None).unwrap().references.iter().filter_map(|r| r.jira.clone().or_else(|| r.github.clone())).collect()
 }
 
 #[test]

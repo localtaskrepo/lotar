@@ -15,44 +15,25 @@ impl CommandHandler for SearchHandler {
     type Args = TaskSearchArgs;
     type Result = Result<(), String>;
 
-    fn execute(
-        args: Self::Args,
-        project: Option<&str>,
-        resolver: &TasksDirectoryResolver,
-        renderer: &crate::output::OutputRenderer,
-    ) -> Self::Result {
+    fn execute(args: Self::Args, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &crate::output::OutputRenderer) -> Self::Result {
         renderer.log_info("list: begin");
         let ctx = TaskCommandContext::for_reading(resolver, project, None)?;
         let project_prefix = project.map(|p| ctx.project_prefix_for(Some(p)));
         let input = Self::query_input(&args, project_prefix, &ctx.config)?;
         // Enums and fields validate against the context's configuration (the
         // detected project's when there is one), as the CLI always has.
-        let query = input
-            .resolve(&ctx.config, resolver.path.as_path())
-            .map_err(|e| e.cli_message())?;
+        let query = input.resolve(&ctx.config, resolver.path.as_path()).map_err(|e| e.cli_message())?;
 
         renderer.log_debug("list: executing search");
         let tasks = crate::services::task_list::run(&ctx.storage, &query, chrono::Utc::now());
         let total_matching = tasks.len();
         // Totals over every matching task, not just this page (DEV-13).
-        let sums = args
-            .sum
-            .iter()
-            .map(|field| crate::services::task_list::sum_field(&tasks, field, &query.config))
-            .collect::<Result<Vec<_>, _>>()?;
+        let sums = args.sum.iter().map(|field| crate::services::task_list::sum_field(&tasks, field, &query.config)).collect::<Result<Vec<_>, _>>()?;
         let (offset, limit) = Self::resolve_pagination(&args)?;
         let (start, end) = crate::utils::pagination::slice_bounds(total_matching, offset, limit);
         let page = tasks.into_iter().skip(start).take(end - start).collect();
 
-        Self::render_results(
-            renderer,
-            page,
-            total_matching,
-            offset,
-            limit,
-            args.details,
-            &sums,
-        );
+        Self::render_results(renderer, page, total_matching, offset, limit, args.details, &sums);
 
         Ok(())
     }
@@ -62,11 +43,7 @@ impl SearchHandler {
     /// The shared query input: the value flags, then the search text in the
     /// web search-box syntax (DEV-231), which adds to list filters and wins
     /// for single values.
-    fn query_input(
-        args: &TaskSearchArgs,
-        project: Option<String>,
-        config: &ResolvedConfig,
-    ) -> Result<TaskQueryInput, String> {
+    fn query_input(args: &TaskSearchArgs, project: Option<String>, config: &ResolvedConfig) -> Result<TaskQueryInput, String> {
         let csv = |values: &[String]| (!values.is_empty()).then(|| values.join(","));
         let mut input = TaskQueryInput {
             project,
@@ -90,19 +67,10 @@ impl SearchHandler {
             has: csv(&args.has),
             effort_min: args.effort_min.clone(),
             effort_max: args.effort_max.clone(),
-            sort_by: args
-                .sort_by
-                .as_deref()
-                .map(|key| Self::sort_key(key, config))
-                .transpose()?,
+            sort_by: args.sort_by.as_deref().map(|key| Self::sort_key(key, config)).transpose()?,
             ..TaskQueryInput::default()
         };
-        let terms: Vec<&str> = args
-            .query
-            .iter()
-            .chain(&args.query_terms)
-            .map(String::as_str)
-            .collect();
+        let terms: Vec<&str> = args.query.iter().chain(&args.query_terms).map(String::as_str).collect();
         let search = crate::utils::search_syntax::parse(&terms.join(" "));
         input.add_search(&search).map_err(|e| e.to_string())?;
         if input.order.is_none() {
@@ -121,18 +89,10 @@ impl SearchHandler {
         // wildcard alone would turn every typo into an unsorted list
         // (DEV-282). `field:<name>` reaches any custom field.
         let key = sort_key.trim();
-        if !key.is_empty()
-            && config
-                .custom_fields
-                .values
-                .iter()
-                .any(|v| v != "*" && v.eq_ignore_ascii_case(key))
-        {
+        if !key.is_empty() && config.custom_fields.values.iter().any(|v| v != "*" && v.eq_ignore_ascii_case(key)) {
             return Ok(format!("field:{key}"));
         }
-        Err(format!(
-            "Invalid --sort-by '{key}': not a builtin key or declared custom field (use field:{key} for any custom field)"
-        ))
+        Err(format!("Invalid --sort-by '{key}': not a builtin key or declared custom field (use field:{key} for any custom field)"))
     }
 
     /// Order when `order=` is not given: descending (newest first, best
@@ -145,12 +105,8 @@ impl SearchHandler {
     fn resolve_pagination(args: &TaskSearchArgs) -> Result<(usize, usize), String> {
         let page_size = args.page_size;
         let offset = if let Some(page) = args.page {
-            let page_index = page
-                .checked_sub(1)
-                .ok_or_else(|| "--page must be >= 1".to_string())?;
-            page_index
-                .checked_mul(page_size)
-                .ok_or_else(|| "--page is too large".to_string())?
+            let page_index = page.checked_sub(1).ok_or_else(|| "--page must be >= 1".to_string())?;
+            page_index.checked_mul(page_size).ok_or_else(|| "--page is too large".to_string())?
         } else {
             args.offset.unwrap_or(0)
         };
@@ -181,11 +137,7 @@ impl SearchHandler {
         if tasks.is_empty() {
             renderer.log_info("list: no results");
             let current_page = offset.checked_div(limit).map(|q| q + 1).unwrap_or(1);
-            let total_pages = if limit == 0 {
-                1
-            } else {
-                total_matching.div_ceil(limit).max(1)
-            };
+            let total_pages = if limit == 0 { 1 } else { total_matching.div_ceil(limit).max(1) };
             match renderer.format {
                 crate::output::OutputFormat::Json => {
                     renderer.emit_raw_stdout(with_sums(serde_json::json!({
@@ -214,14 +166,8 @@ impl SearchHandler {
                     if total_matching == 0 {
                         renderer.emit_warning("No tasks found matching the search criteria.");
                     } else {
-                        renderer.emit_warning(format_args!(
-                            "No tasks on this page (offset {}, limit {}, total {}).",
-                            offset, limit, total_matching
-                        ));
-                        renderer.emit_raw_stdout(
-                            "  Try --page 1 or --offset 0 to return to the first page, or increase --page-size."
-                                .to_string(),
-                        );
+                        renderer.emit_warning(format_args!("No tasks on this page (offset {}, limit {}, total {}).", offset, limit, total_matching));
+                        renderer.emit_raw_stdout("  Try --page 1 or --offset 0 to return to the first page, or increase --page-size.".to_string());
                     }
                     print_sums();
                 }
@@ -234,9 +180,7 @@ impl SearchHandler {
         let display_tasks: Vec<crate::output::TaskDisplayInfo> = tasks
             .into_iter()
             .map(|(task_id, task)| {
-                let project = crate::storage::TaskId::parse(&task_id)
-                    .ok()
-                    .map(|parsed| parsed.project);
+                let project = crate::storage::TaskId::parse(&task_id).ok().map(|parsed| parsed.project);
 
                 crate::output::TaskDisplayInfo {
                     id: task_id,
@@ -265,17 +209,9 @@ impl SearchHandler {
         let has_more = end < total_matching;
         let has_previous = offset > 0;
         let current_page = offset.checked_div(limit).map(|q| q + 1).unwrap_or(1);
-        let total_pages = if limit == 0 {
-            1
-        } else {
-            total_matching.div_ceil(limit).max(1)
-        };
+        let total_pages = if limit == 0 { 1 } else { total_matching.div_ceil(limit).max(1) };
         let next_offset = if has_more { Some(end) } else { None };
-        let next_page = if has_more {
-            Some(current_page + 1)
-        } else {
-            None
-        };
+        let next_page = if has_more { Some(current_page + 1) } else { None };
 
         match renderer.format {
             crate::output::OutputFormat::Json => {
@@ -302,10 +238,8 @@ impl SearchHandler {
                 ));
                 for task in display_tasks {
                     let assignee = task.assignee.as_deref().unwrap_or("unassigned");
-                    let mut line = format!(
-                        "  {} - {} [{}] ({}) | type: {} | assignee: {}",
-                        task.id, task.title, task.status, task.priority, task.task_type, assignee
-                    );
+                    let mut line =
+                        format!("  {} - {} [{}] ({}) | type: {} | assignee: {}", task.id, task.title, task.status, task.priority, task.task_type, assignee);
 
                     if let Some(due_date) = task.due_date.as_deref() {
                         line.push_str(&format!(" | due: {}", due_date));
@@ -343,10 +277,7 @@ impl SearchHandler {
                         end
                     ));
                 } else if has_previous {
-                    renderer.emit_raw_stdout(
-                        "  (end of results — use --page 1 or --offset 0 to return to the first page)"
-                            .to_string(),
-                    );
+                    renderer.emit_raw_stdout("  (end of results — use --page 1 or --offset 0 to return to the first page)".to_string());
                 }
                 print_sums();
             }

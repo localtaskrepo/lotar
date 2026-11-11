@@ -5,9 +5,7 @@ use std::path::Path;
 use crate::config::types::SprintDefaultsConfig;
 use crate::errors::{LoTaRError, LoTaRResult};
 use crate::storage::manager::Storage;
-use crate::storage::sprint::{
-    Sprint, SprintActual, SprintCanonicalizationWarning, SprintCapacity, SprintPlan,
-};
+use crate::storage::sprint::{Sprint, SprintActual, SprintCanonicalizationWarning, SprintCapacity, SprintPlan};
 use crate::storage::task::Task;
 use chrono::Utc;
 
@@ -51,11 +49,7 @@ pub struct SprintMetadataPatch {
 fn clean_patch_text(value: Option<String>) -> Option<String> {
     value.and_then(|text| {
         let trimmed = text.trim();
-        if trimmed.is_empty() {
-            None
-        } else {
-            Some(trimmed.to_string())
-        }
+        if trimmed.is_empty() { None } else { Some(trimmed.to_string()) }
     })
 }
 
@@ -119,9 +113,7 @@ impl SprintMetadataPatch {
             match value {
                 Some(points) => {
                     let plan = target.plan.get_or_insert_with(SprintPlan::default);
-                    plan.capacity
-                        .get_or_insert_with(SprintCapacity::default)
-                        .points = Some(points);
+                    plan.capacity.get_or_insert_with(SprintCapacity::default).points = Some(points);
                 }
                 None => {
                     if let Some(plan) = target.plan.as_mut()
@@ -139,9 +131,7 @@ impl SprintMetadataPatch {
             match value {
                 Some(hours) => {
                     let plan = target.plan.get_or_insert_with(SprintPlan::default);
-                    plan.capacity
-                        .get_or_insert_with(SprintCapacity::default)
-                        .hours = Some(hours);
+                    plan.capacity.get_or_insert_with(SprintCapacity::default).hours = Some(hours);
                 }
                 None => {
                     if let Some(plan) = target.plan.as_mut()
@@ -212,16 +202,8 @@ impl SprintService {
         for entry in fs::read_dir(&dir)? {
             let entry = entry?;
             if !entry.path().is_file()
-                || entry
-                    .path()
-                    .file_stem()
-                    .and_then(|stem| stem.to_str())
-                    .and_then(|stem| stem.parse::<u32>().ok())
-                    .is_none()
-                || !matches!(
-                    entry.path().extension().and_then(|ext| ext.to_str()),
-                    Some("yml" | "yaml")
-                )
+                || entry.path().file_stem().and_then(|stem| stem.to_str()).and_then(|stem| stem.parse::<u32>().ok()).is_none()
+                || !matches!(entry.path().extension().and_then(|ext| ext.to_str()), Some("yml" | "yaml"))
             {
                 continue;
             }
@@ -247,20 +229,11 @@ impl SprintService {
         }
         let (loaded_id, mut sprint) = Self::load_entry(&path)?;
         let _ = sprint.canonicalize();
-        Ok(SprintRecord {
-            id: loaded_id,
-            sprint,
-        })
+        Ok(SprintRecord { id: loaded_id, sprint })
     }
 
-    pub fn create(
-        storage: &mut Storage,
-        mut sprint: Sprint,
-        defaults: Option<&SprintDefaultsConfig>,
-    ) -> LoTaRResult<SprintOperationOutcome> {
-        let applied_defaults = defaults
-            .map(|defaults| apply_sprint_defaults(&mut sprint, defaults))
-            .unwrap_or_default();
+    pub fn create(storage: &mut Storage, mut sprint: Sprint, defaults: Option<&SprintDefaultsConfig>) -> LoTaRResult<SprintOperationOutcome> {
+        let applied_defaults = defaults.map(|defaults| apply_sprint_defaults(&mut sprint, defaults)).unwrap_or_default();
         let warnings = sprint.canonicalize();
         let now = Utc::now().to_rfc3339();
         if sprint.created.is_none() {
@@ -269,131 +242,73 @@ impl SprintService {
         sprint.modified = Some(now);
         let dir = Sprint::dir(&storage.root_path);
         fs::create_dir_all(&dir)?;
-        let next_id = crate::storage::safety::with_storage_lock(
-            &dir,
-            crate::storage::safety::sprint_lock_name(),
-            || -> LoTaRResult<u32> {
-                let id = Self::next_identifier(&dir)?;
-                Self::write_sprint(&dir, id, &sprint)?;
-                Ok(id)
-            },
-        )?;
-        Ok(SprintOperationOutcome {
-            record: SprintRecord {
-                id: next_id,
-                sprint,
-            },
-            warnings,
-            applied_defaults,
-            changed: true,
-        })
+        let next_id = crate::storage::safety::with_storage_lock(&dir, crate::storage::safety::sprint_lock_name(), || -> LoTaRResult<u32> {
+            let id = Self::next_identifier(&dir)?;
+            Self::write_sprint(&dir, id, &sprint)?;
+            Ok(id)
+        })?;
+        Ok(SprintOperationOutcome { record: SprintRecord { id: next_id, sprint }, warnings, applied_defaults, changed: true })
     }
 
-    pub fn update(
-        storage: &mut Storage,
-        id: u32,
-        sprint: Sprint,
-    ) -> LoTaRResult<SprintOperationOutcome> {
+    pub fn update(storage: &mut Storage, id: u32, sprint: Sprint) -> LoTaRResult<SprintOperationOutcome> {
         let dir = Sprint::dir(&storage.root_path);
         if !dir.exists() {
             return Err(LoTaRError::SprintNotFound(id));
         }
-        crate::storage::safety::with_storage_lock(
-            &dir,
-            crate::storage::safety::sprint_lock_name(),
-            || {
-                let path = dir.join(format!("{}.yml", id));
-                if !path.exists() {
-                    return Err(LoTaRError::SprintNotFound(id));
-                }
-                let (_, current) = Self::load_entry(&path)?;
-                let mut baseline = current;
-                let _ = baseline.canonicalize();
-                let mut candidate = sprint;
-                let warnings = candidate.canonicalize();
-                if candidate == baseline {
-                    return Ok(SprintOperationOutcome {
-                        record: SprintRecord {
-                            id,
-                            sprint: candidate,
-                        },
-                        warnings,
-                        applied_defaults: Vec::new(),
-                        changed: false,
-                    });
-                }
-                let (sprint, serialized) = Self::stamp_for_write(candidate)?;
-                crate::storage::safety::atomic_write_file(&path, &serialized)
-                    .map_err(LoTaRError::from)?;
-                Ok(SprintOperationOutcome {
-                    record: SprintRecord { id, sprint },
-                    warnings,
-                    applied_defaults: Vec::new(),
-                    changed: true,
-                })
-            },
-        )
+        crate::storage::safety::with_storage_lock(&dir, crate::storage::safety::sprint_lock_name(), || {
+            let path = dir.join(format!("{}.yml", id));
+            if !path.exists() {
+                return Err(LoTaRError::SprintNotFound(id));
+            }
+            let (_, current) = Self::load_entry(&path)?;
+            let mut baseline = current;
+            let _ = baseline.canonicalize();
+            let mut candidate = sprint;
+            let warnings = candidate.canonicalize();
+            if candidate == baseline {
+                return Ok(SprintOperationOutcome { record: SprintRecord { id, sprint: candidate }, warnings, applied_defaults: Vec::new(), changed: false });
+            }
+            let (sprint, serialized) = Self::stamp_for_write(candidate)?;
+            crate::storage::safety::atomic_write_file(&path, &serialized).map_err(LoTaRError::from)?;
+            Ok(SprintOperationOutcome { record: SprintRecord { id, sprint }, warnings, applied_defaults: Vec::new(), changed: true })
+        })
     }
 
     /// Apply a metadata patch to the sprint loaded fresh under the sprints
     /// lock and persist it only when the effective record changes. A no-op
     /// patch leaves the stored bytes, mtime, and `modified` stamp exactly as
     /// they were and does not canonicalize legacy on-disk spellings.
-    pub fn update_with_patch(
-        storage: &mut Storage,
-        id: u32,
-        patch: &SprintMetadataPatch,
-    ) -> LoTaRResult<SprintOperationOutcome> {
+    pub fn update_with_patch(storage: &mut Storage, id: u32, patch: &SprintMetadataPatch) -> LoTaRResult<SprintOperationOutcome> {
         let dir = Sprint::dir(&storage.root_path);
         if !dir.exists() {
             return Err(LoTaRError::SprintNotFound(id));
         }
-        crate::storage::safety::with_storage_lock(
-            &dir,
-            crate::storage::safety::sprint_lock_name(),
-            || {
-                let path = dir.join(format!("{}.yml", id));
-                if !path.exists() {
-                    return Err(LoTaRError::SprintNotFound(id));
-                }
-                let (_, current) = Self::load_entry(&path)?;
-                // Mirror read canonicalization first so only conflicts the
-                // patch itself introduces surface as warnings, matching the
-                // previous get-then-update flow.
-                let mut baseline = current;
-                let _ = baseline.canonicalize();
-                let mut candidate = baseline.clone();
-                patch.apply_to(&mut candidate);
-                let warnings = candidate.canonicalize();
-                if candidate == baseline {
-                    return Ok(SprintOperationOutcome {
-                        record: SprintRecord {
-                            id,
-                            sprint: baseline,
-                        },
-                        warnings,
-                        applied_defaults: Vec::new(),
-                        changed: false,
-                    });
-                }
-                let (sprint, serialized) = Self::stamp_for_write(candidate)?;
-                crate::storage::safety::atomic_write_file(&path, &serialized)
-                    .map_err(LoTaRError::from)?;
-                Ok(SprintOperationOutcome {
-                    record: SprintRecord { id, sprint },
-                    warnings,
-                    applied_defaults: Vec::new(),
-                    changed: true,
-                })
-            },
-        )
+        crate::storage::safety::with_storage_lock(&dir, crate::storage::safety::sprint_lock_name(), || {
+            let path = dir.join(format!("{}.yml", id));
+            if !path.exists() {
+                return Err(LoTaRError::SprintNotFound(id));
+            }
+            let (_, current) = Self::load_entry(&path)?;
+            // Mirror read canonicalization first so only conflicts the
+            // patch itself introduces surface as warnings, matching the
+            // previous get-then-update flow.
+            let mut baseline = current;
+            let _ = baseline.canonicalize();
+            let mut candidate = baseline.clone();
+            patch.apply_to(&mut candidate);
+            let warnings = candidate.canonicalize();
+            if candidate == baseline {
+                return Ok(SprintOperationOutcome { record: SprintRecord { id, sprint: baseline }, warnings, applied_defaults: Vec::new(), changed: false });
+            }
+            let (sprint, serialized) = Self::stamp_for_write(candidate)?;
+            crate::storage::safety::atomic_write_file(&path, &serialized).map_err(LoTaRError::from)?;
+            Ok(SprintOperationOutcome { record: SprintRecord { id, sprint }, warnings, applied_defaults: Vec::new(), changed: true })
+        })
     }
 
     /// Canonicalize and serialize a sprint for an update without writing it,
     /// so coordinated transactions can stage the exact bytes (DEV-55).
-    fn prepare_update(
-        mut sprint: Sprint,
-    ) -> LoTaRResult<(Sprint, Vec<SprintCanonicalizationWarning>, String)> {
+    fn prepare_update(mut sprint: Sprint) -> LoTaRResult<(Sprint, Vec<SprintCanonicalizationWarning>, String)> {
         let warnings = sprint.canonicalize();
         let now = Utc::now().to_rfc3339();
         sprint.modified = Some(now.clone());
@@ -451,51 +366,40 @@ impl SprintService {
         if !dir.exists() {
             return Ok(Vec::new());
         }
-        crate::storage::safety::with_storage_lock(
-            &dir,
-            crate::storage::safety::sprint_lock_name(),
-            || -> LoTaRResult<Vec<u32>> {
-                let mut changed = Vec::new();
-                for entry in fs::read_dir(&dir)? {
-                    let path = entry?.path();
-                    if !path.is_file() || path.extension().and_then(|e| e.to_str()) != Some("yml") {
-                        continue;
-                    }
-                    let Ok((id, mut sprint)) = Self::load_entry(&path) else {
-                        continue;
-                    };
-                    let before = sprint.tasks.len();
-                    sprint.tasks.retain(|item| {
-                        !crate::storage::identity::aliases_match(item.id.trim(), task_id)
-                    });
-                    if sprint.tasks.len() == before {
-                        continue;
-                    }
-                    let (_, serialized) = Self::stamp_for_write(sprint)?;
-                    crate::storage::safety::atomic_write_file(&path, &serialized)
-                        .map_err(LoTaRError::from)?;
-                    changed.push(id);
+        crate::storage::safety::with_storage_lock(&dir, crate::storage::safety::sprint_lock_name(), || -> LoTaRResult<Vec<u32>> {
+            let mut changed = Vec::new();
+            for entry in fs::read_dir(&dir)? {
+                let path = entry?.path();
+                if !path.is_file() || path.extension().and_then(|e| e.to_str()) != Some("yml") {
+                    continue;
                 }
-                changed.sort_unstable();
-                Ok(changed)
-            },
-        )
+                let Ok((id, mut sprint)) = Self::load_entry(&path) else {
+                    continue;
+                };
+                let before = sprint.tasks.len();
+                sprint.tasks.retain(|item| !crate::storage::identity::aliases_match(item.id.trim(), task_id));
+                if sprint.tasks.len() == before {
+                    continue;
+                }
+                let (_, serialized) = Self::stamp_for_write(sprint)?;
+                crate::storage::safety::atomic_write_file(&path, &serialized).map_err(LoTaRError::from)?;
+                changed.push(id);
+            }
+            changed.sort_unstable();
+            Ok(changed)
+        })
     }
 
     pub fn delete(storage: &mut Storage, id: u32) -> LoTaRResult<bool> {
         let dir = Sprint::dir(&storage.root_path);
-        crate::storage::safety::with_storage_lock(
-            &dir,
-            crate::storage::safety::sprint_lock_name(),
-            || -> LoTaRResult<bool> {
-                let path = dir.join(format!("{}.yml", id));
-                if !path.exists() {
-                    return Ok(false);
-                }
-                fs::remove_file(path)?;
-                Ok(true)
-            },
-        )
+        crate::storage::safety::with_storage_lock(&dir, crate::storage::safety::sprint_lock_name(), || -> LoTaRResult<bool> {
+            let path = dir.join(format!("{}.yml", id));
+            if !path.exists() {
+                return Ok(false);
+            }
+            fs::remove_file(path)?;
+            Ok(true)
+        })
     }
 
     pub fn load_tasks_for_record(storage: &Storage, record: &SprintRecord) -> Vec<(String, Task)> {
@@ -513,9 +417,7 @@ impl SprintService {
                 continue;
             }
             let task_id = current.as_str();
-            let project = crate::storage::TaskId::parse(task_id)
-                .map(|parsed| parsed.project)
-                .unwrap_or_default();
+            let project = crate::storage::TaskId::parse(task_id).map(|parsed| parsed.project).unwrap_or_default();
             if project.is_empty() {
                 continue;
             }
@@ -548,13 +450,8 @@ impl SprintService {
     }
 
     fn load_entry(path: &Path) -> LoTaRResult<(u32, Sprint)> {
-        let stem = path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .ok_or_else(|| LoTaRError::SerializationError("Invalid sprint filename".into()))?;
-        let id: u32 = stem
-            .parse()
-            .map_err(|_| LoTaRError::SerializationError("Invalid sprint identifier".into()))?;
+        let stem = path.file_stem().and_then(|s| s.to_str()).ok_or_else(|| LoTaRError::SerializationError("Invalid sprint filename".into()))?;
+        let id: u32 = stem.parse().map_err(|_| LoTaRError::SerializationError("Invalid sprint identifier".into()))?;
         let contents = fs::read_to_string(path)?;
         let sprint: Sprint = serde_yaml_ng::from_str(&contents)?;
         Ok((id, sprint))
@@ -630,23 +527,15 @@ pub fn sprint_from_create_request(payload: &crate::api_types::SprintCreateReques
         plan.starts_at = Some(starts_at);
     }
     if let Some(points) = payload.capacity_points {
-        plan.capacity
-            .get_or_insert_with(SprintCapacity::default)
-            .points = Some(points);
+        plan.capacity.get_or_insert_with(SprintCapacity::default).points = Some(points);
     }
     if let Some(hours) = payload.capacity_hours {
-        plan.capacity
-            .get_or_insert_with(SprintCapacity::default)
-            .hours = Some(hours);
+        plan.capacity.get_or_insert_with(SprintCapacity::default).hours = Some(hours);
     }
     if let Some(overdue_after) = clean_opt_string(payload.overdue_after.clone()) {
         plan.overdue_after = Some(overdue_after);
     }
-    if let Some(notes) = payload
-        .notes
-        .clone()
-        .filter(|value| !value.trim().is_empty())
-    {
+    if let Some(notes) = payload.notes.clone().filter(|value| !value.trim().is_empty()) {
         plan.notes = Some(notes);
     }
 
@@ -658,20 +547,13 @@ pub fn sprint_from_create_request(payload: &crate::api_types::SprintCreateReques
 }
 
 /// List view of a stored sprint, with its lifecycle derived at `reference`.
-pub fn sprint_record_to_list_item(
-    record: &SprintRecord,
-    reference: chrono::DateTime<Utc>,
-) -> crate::api_types::SprintListItem {
+pub fn sprint_record_to_list_item(record: &SprintRecord, reference: chrono::DateTime<Utc>) -> crate::api_types::SprintListItem {
     let lifecycle = crate::services::sprint_status::derive_status(&record.sprint, reference);
     let plan = record.sprint.plan.as_ref();
     let capacity = plan.and_then(|plan| plan.capacity.as_ref());
     crate::api_types::SprintListItem {
         id: record.id,
-        label: record
-            .sprint
-            .plan
-            .as_ref()
-            .and_then(|plan| plan.label.clone()),
+        label: record.sprint.plan.as_ref().and_then(|plan| plan.label.clone()),
         display_name: crate::services::sprint_assignment::sprint_display_name(record),
         created: record.sprint.created.clone(),
         modified: record.sprint.modified.clone(),
@@ -687,11 +569,7 @@ pub fn sprint_record_to_list_item(
         notes: plan.and_then(|plan| plan.notes.clone()),
         capacity_points: capacity.and_then(|capacity| capacity.points),
         capacity_hours: capacity.and_then(|capacity| capacity.hours),
-        warnings: lifecycle
-            .warnings
-            .iter()
-            .map(|warning| warning.message())
-            .collect(),
+        warnings: lifecycle.warnings.iter().map(|warning| warning.message()).collect(),
     }
 }
 
@@ -709,11 +587,7 @@ fn plan_has_values(plan: &SprintPlan) -> bool {
 fn clean_opt_string(input: Option<String>) -> Option<String> {
     input.and_then(|value| {
         let trimmed = value.trim();
-        if trimmed.is_empty() {
-            None
-        } else {
-            Some(trimmed.to_string())
-        }
+        if trimmed.is_empty() { None } else { Some(trimmed.to_string()) }
     })
 }
 
@@ -738,10 +612,7 @@ mod request_mapping_tests {
         let capacity = plan.capacity.expect("capacity");
         assert_eq!((capacity.points, capacity.hours), (None, Some(30)));
 
-        let blank = sprint_from_create_request(&SprintCreateRequest {
-            notes: Some(" \n".into()),
-            ..SprintCreateRequest::default()
-        });
+        let blank = sprint_from_create_request(&SprintCreateRequest { notes: Some(" \n".into()), ..SprintCreateRequest::default() });
         assert!(blank.plan.is_none());
     }
 }

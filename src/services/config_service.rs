@@ -1,8 +1,7 @@
 use crate::api_types::ProjectDTO;
 use crate::config::manager::ConfigManager;
 use crate::config::source_labels::{
-    build_global_source_labels_with_port, build_project_source_labels_with_port,
-    collapse_label_to_scope, config_source_entries,
+    build_global_source_labels_with_port, build_project_source_labels_with_port, collapse_label_to_scope, config_source_entries,
 };
 use crate::config::validation::errors::ValidationResult;
 use crate::errors::{LoTaRError, LoTaRResult};
@@ -18,35 +17,24 @@ pub struct ConfigSetOutcome {
 pub struct ConfigService;
 
 impl ConfigService {
-    pub fn show(
-        resolver: &TasksDirectoryResolver,
-        project_prefix: Option<&str>,
-    ) -> LoTaRResult<serde_json::Value> {
+    pub fn show(resolver: &TasksDirectoryResolver, project_prefix: Option<&str>) -> LoTaRResult<serde_json::Value> {
         let mgr = ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path)
             .map_err(|e| LoTaRError::ValidationError(format!("Failed to load config: {}", e)))?;
 
         if let Some(prefix) = project_prefix {
-            let project_cfg = mgr.get_project_config(prefix).map_err(|e| {
-                LoTaRError::ValidationError(format!(
-                    "Failed to load project config for '{}': {}",
-                    prefix, e
-                ))
-            })?;
-            let mut value = serde_json::to_value(project_cfg)
-                .map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
+            let project_cfg =
+                mgr.get_project_config(prefix).map_err(|e| LoTaRError::ValidationError(format!("Failed to load project config for '{}': {}", prefix, e)))?;
+            let mut value = serde_json::to_value(project_cfg).map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
             // Computed completion-policy fields (DEV-21) alongside the raw
             // override: the effective done set for THIS project and the
             // live server-local calendar day.
-            if let Ok(resolved) =
-                crate::config::resolution::config_for_project(resolver.path.as_path(), Some(prefix))
-            {
+            if let Ok(resolved) = crate::config::resolution::config_for_project(resolver.path.as_path(), Some(prefix)) {
                 insert_computed_completion_fields(&mut value, &resolved);
             }
             redact_config(&mut value);
             Ok(value)
         } else {
-            let mut value = serde_json::to_value(mgr.get_resolved_config())
-                .map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
+            let mut value = serde_json::to_value(mgr.get_resolved_config()).map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
             insert_computed_completion_fields(&mut value, mgr.get_resolved_config());
             redact_config(&mut value);
             Ok(value)
@@ -54,10 +42,7 @@ impl ConfigService {
     }
 
     /// Inspect effective config and field provenance
-    pub fn inspect(
-        resolver: &TasksDirectoryResolver,
-        project_prefix: Option<&str>,
-    ) -> LoTaRResult<serde_json::Value> {
+    pub fn inspect(resolver: &TasksDirectoryResolver, project_prefix: Option<&str>) -> LoTaRResult<serde_json::Value> {
         use crate::config::persistence;
         use crate::config::types::GlobalConfig;
         use crate::utils::paths;
@@ -79,14 +64,9 @@ impl ConfigService {
         let mut project_cfg = None;
 
         let (mut effective_val, sources_by_path) = if let Some(prefix) = project_prefix {
-            let resolved_project = mgr.get_project_config(prefix).map_err(|e| {
-                LoTaRError::ValidationError(format!(
-                    "Failed to load project config for '{}': {}",
-                    prefix, e
-                ))
-            })?;
-            let effective_val = serde_json::to_value(&resolved_project)
-                .map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
+            let resolved_project =
+                mgr.get_project_config(prefix).map_err(|e| LoTaRError::ValidationError(format!("Failed to load project config for '{}': {}", prefix, e)))?;
+            let effective_val = serde_json::to_value(&resolved_project).map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
 
             project_cfg = persistence::load_project_config_from_dir(prefix, &resolver.path).ok();
             if let Some(cfg) = project_cfg.as_ref() {
@@ -94,25 +74,13 @@ impl ConfigService {
                 project_raw_val = serde_json::to_value(cfg).unwrap_or(serde_json::json!({}));
             }
 
-            let sources = build_project_source_labels_with_port(
-                &resolved_project,
-                &resolved_global,
-                project_cfg.as_ref(),
-                &global_cfg,
-                &home_cfg,
-                global_port_explicit,
-            );
+            let sources =
+                build_project_source_labels_with_port(&resolved_project, &resolved_global, project_cfg.as_ref(), &global_cfg, &home_cfg, global_port_explicit);
 
             (effective_val, sources)
         } else {
-            let effective_val = serde_json::to_value(&resolved_global)
-                .map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
-            let sources = build_global_source_labels_with_port(
-                &resolved_global,
-                &global_cfg,
-                &home_cfg,
-                global_port_explicit,
-            );
+            let effective_val = serde_json::to_value(&resolved_global).map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
+            let sources = build_global_source_labels_with_port(&resolved_global, &global_cfg, &home_cfg, global_port_explicit);
             (effective_val, sources)
         };
 
@@ -121,43 +89,24 @@ impl ConfigService {
 
         for entry in config_source_entries() {
             if is_project_scope && entry.inspect_key == "default_project" {
-                let scope = if has_global_file {
-                    "global"
-                } else {
-                    "built_in"
-                };
-                sources.insert(
-                    entry.inspect_key.to_string(),
-                    serde_json::Value::String(scope.to_string()),
-                );
+                let scope = if has_global_file { "global" } else { "built_in" };
+                sources.insert(entry.inspect_key.to_string(), serde_json::Value::String(scope.to_string()));
                 continue;
             }
 
             if let Some(label) = sources_by_path.get(entry.path) {
                 let collapsed = collapse_label_to_scope(label);
-                sources.insert(
-                    entry.inspect_key.to_string(),
-                    serde_json::Value::String(collapsed.to_string()),
-                );
+                sources.insert(entry.inspect_key.to_string(), serde_json::Value::String(collapsed.to_string()));
             }
         }
 
-        let mut global_effective_val =
-            serde_json::to_value(&resolved_global).unwrap_or(serde_json::json!({}));
+        let mut global_effective_val = serde_json::to_value(&resolved_global).unwrap_or(serde_json::json!({}));
         let mut global_raw_val = serde_json::to_value(&global_raw).unwrap_or(serde_json::json!({}));
         // Computed completion-policy fields (DEV-21) on the effective and
         // global-effective views; raw views stay raw.
-        insert_computed_completion_fields(
-            &mut effective_val,
-            &resolved_for_computed(project_prefix, &resolved_global, &mgr),
-        );
+        insert_computed_completion_fields(&mut effective_val, &resolved_for_computed(project_prefix, &resolved_global, &mgr));
         insert_computed_completion_fields(&mut global_effective_val, &resolved_global);
-        for value in [
-            &mut effective_val,
-            &mut global_effective_val,
-            &mut global_raw_val,
-            &mut project_raw_val,
-        ] {
+        for value in [&mut effective_val, &mut global_effective_val, &mut global_raw_val, &mut project_raw_val] {
             redact_config(value);
         }
 
@@ -172,8 +121,7 @@ impl ConfigService {
                 auth_profiles.insert(key.clone(), profile.clone());
             }
         }
-        let mut auth_profiles_val =
-            serde_json::to_value(&auth_profiles).unwrap_or(serde_json::json!({}));
+        let mut auth_profiles_val = serde_json::to_value(&auth_profiles).unwrap_or(serde_json::json!({}));
         strip_auth_profiles(&mut auth_profiles_val);
 
         Ok(serde_json::json!({
@@ -197,9 +145,7 @@ impl ConfigService {
     ) -> LoTaRResult<ProjectDTO> {
         let trimmed = name.trim();
         if trimmed.is_empty() {
-            return Err(LoTaRError::ValidationError(
-                "Project name is required".to_string(),
-            ));
+            return Err(LoTaRError::ValidationError("Project name is required".to_string()));
         }
 
         let tasks_dir = &resolver.path;
@@ -213,44 +159,28 @@ impl ConfigService {
                 )));
             }
 
-            if let Ok(cfg) =
-                crate::config::persistence::load_project_config_from_dir(&prefix, tasks_dir)
+            if let Ok(cfg) = crate::config::persistence::load_project_config_from_dir(&prefix, tasks_dir)
                 && cfg.project_name.eq_ignore_ascii_case(trimmed)
             {
-                return Err(LoTaRError::ValidationError(format!(
-                    "Project '{}' already exists.",
-                    cfg.project_name
-                )));
+                return Err(LoTaRError::ValidationError(format!("Project '{}' already exists.", cfg.project_name)));
             }
         }
 
         let prefix = if let Some(raw) = explicit_prefix {
             let normalized = raw.trim().to_uppercase();
             if normalized.is_empty() {
-                return Err(LoTaRError::ValidationError(
-                    "Project prefix cannot be empty".into(),
-                ));
+                return Err(LoTaRError::ValidationError("Project prefix cannot be empty".into()));
             }
-            crate::config::operations::validate_field_value("default_project", &normalized)
-                .map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
-            crate::utils::project::validate_explicit_prefix(
-                &normalized,
-                trimmed,
-                tasks_dir.as_path(),
-            )
-            .map_err(LoTaRError::ValidationError)?;
+            crate::config::operations::validate_field_value("default_project", &normalized).map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
+            crate::utils::project::validate_explicit_prefix(&normalized, trimmed, tasks_dir.as_path()).map_err(LoTaRError::ValidationError)?;
             normalized
         } else {
-            crate::utils::project::generate_unique_project_prefix(trimmed, tasks_dir.as_path())
-                .map_err(LoTaRError::ValidationError)?
+            crate::utils::project::generate_unique_project_prefix(trimmed, tasks_dir.as_path()).map_err(LoTaRError::ValidationError)?
         };
 
         let project_dir = crate::utils::paths::project_dir(tasks_dir, &prefix);
         if project_dir.exists() {
-            return Err(LoTaRError::ValidationError(format!(
-                "Project prefix '{}' already exists.",
-                prefix
-            )));
+            return Err(LoTaRError::ValidationError(format!("Project prefix '{}' already exists.", prefix)));
         }
 
         let mut updates = values.cloned().unwrap_or_default();
@@ -258,10 +188,7 @@ impl ConfigService {
 
         let _ = Self::set(resolver, &updates, false, Some(&prefix))?;
 
-        Ok(ProjectDTO {
-            name: trimmed.to_string(),
-            prefix,
-        })
+        Ok(ProjectDTO { name: trimmed.to_string(), prefix })
     }
 
     /// Set one or more fields with validation; returns aggregate result
@@ -287,10 +214,7 @@ impl ConfigService {
         let scope = if global {
             ConfigScope::Global
         } else {
-            let explicit = project
-                .map(str::trim)
-                .filter(|trimmed| !trimmed.is_empty())
-                .map(str::to_string);
+            let explicit = project.map(str::trim).filter(|trimmed| !trimmed.is_empty()).map(str::to_string);
             let prefix = explicit.unwrap_or_else(|| {
                 // Read-only default-project resolution: no config bootstrap
                 // before validation, matching the CLI behavior.
@@ -298,19 +222,14 @@ impl ConfigService {
                     .ok()
                     .and_then(|mgr| {
                         let default = mgr.get_resolved_config().default_project.clone();
-                        if default.is_empty() {
-                            None
-                        } else {
-                            Some(default)
-                        }
+                        if default.is_empty() { None } else { Some(default) }
                     })
                     .or_else(|| crate::config::persistence::auto_detect_prefix(tasks_dir))
                     .unwrap_or_default()
             });
             if prefix.is_empty() {
                 return Err(LoTaRError::ValidationError(
-                    "No default project set. Provide 'project' in the request or set a default project first."
-                        .to_string(),
+                    "No default project set. Provide 'project' in the request or set a default project first.".to_string(),
                 ));
             }
             ConfigScope::Project(prefix)
@@ -321,16 +240,9 @@ impl ConfigService {
         // the CLI's exact invalid-value contract: a malformed CSV such as
         // "Todo,,Done" can never normalize its way into an accepted clear.
         let is_global = matches!(scope, ConfigScope::Global);
-        let canonical_entries = candidate::canonicalize_entries(
-            &values
-                .iter()
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect::<Vec<_>>(),
-            is_global,
-        )
-        .map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
-        candidate::validate_raw_entries(&canonical_entries, is_global)
+        let canonical_entries = candidate::canonicalize_entries(&values.iter().map(|(k, v)| (k.clone(), v.clone())).collect::<Vec<_>>(), is_global)
             .map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
+        candidate::validate_raw_entries(&canonical_entries, is_global).map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
 
         let mut entries: Vec<(String, String)> = Vec::with_capacity(canonical_entries.len());
         if let ConfigScope::Project(_) = &scope {
@@ -341,15 +253,9 @@ impl ConfigService {
             // hand-edited explicit done policy), repair through this same
             // pipeline must stay possible, so the dedup pass is skipped and
             // the candidate pipeline performs the full validation.
-            let resolved_global = ConfigManager::new_manager_with_tasks_dir_readonly(tasks_dir)
-                .ok()
-                .map(|mgr| mgr.get_resolved_config().clone());
+            let resolved_global = ConfigManager::new_manager_with_tasks_dir_readonly(tasks_dir).ok().map(|mgr| mgr.get_resolved_config().clone());
             for (field, value) in &canonical_entries {
-                if value.trim().is_empty()
-                    || resolved_global
-                        .as_ref()
-                        .is_some_and(|global| Self::value_matches_global(global, field, value))
-                {
+                if value.trim().is_empty() || resolved_global.as_ref().is_some_and(|global| Self::value_matches_global(global, field, value)) {
                     entries.push((field.clone(), String::new()));
                 } else {
                     entries.push((field.clone(), value.clone()));
@@ -359,21 +265,10 @@ impl ConfigService {
             entries = canonical_entries;
         }
 
-        let result = candidate::apply_config_set(
-            tasks_dir,
-            &scope,
-            &ConfigSetRequest {
-                entries,
-                force: false,
-                dry_run: false,
-            },
-        )
-        .map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
+        let result = candidate::apply_config_set(tasks_dir, &scope, &ConfigSetRequest { entries, force: false, dry_run: false })
+            .map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
 
-        Ok(ConfigSetOutcome {
-            updated: result.updated,
-            validation: result.validation,
-        })
+        Ok(ConfigSetOutcome { updated: result.updated, validation: result.validation })
     }
 
     /// Add one agent profile to the project (or global) config through the
@@ -389,47 +284,29 @@ impl ConfigService {
     ) -> LoTaRResult<ConfigSetOutcome> {
         let tasks_dir = resolver.path.as_path();
         let name = name.trim();
-        let project = if global {
-            None
-        } else {
-            project
-                .map(str::trim)
-                .filter(|p| !p.is_empty())
-                .map(str::to_string)
-                .or_else(|| {
-                    crate::config::resolution::config_for_project(tasks_dir, None)
-                        .ok()
-                        .map(|config| config.default_project)
-                        .filter(|p| !p.is_empty())
+        let project =
+            if global {
+                None
+            } else {
+                project.map(str::trim).filter(|p| !p.is_empty()).map(str::to_string).or_else(|| {
+                    crate::config::resolution::config_for_project(tasks_dir, None).ok().map(|config| config.default_project).filter(|p| !p.is_empty())
                 })
-        };
+            };
         if !global && project.is_none() {
-            return Err(LoTaRError::ValidationError(
-                "No project given and no default project set".to_string(),
-            ));
+            return Err(LoTaRError::ValidationError("No project given and no default project set".to_string()));
         }
-        let resolved = crate::config::resolution::config_for_project(tasks_dir, project.as_deref())
-            .map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
+        let resolved = crate::config::resolution::config_for_project(tasks_dir, project.as_deref()).map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
         if resolved.agent_profiles.contains_key(name) {
-            return Err(LoTaRError::ValidationError(format!(
-                "An agent named '{name}' already exists"
-            )));
+            return Err(LoTaRError::ValidationError(format!("An agent named '{name}' already exists")));
         }
         let mut agents = match project.as_deref() {
-            None => {
-                crate::config::persistence::load_global_config(Some(tasks_dir))
-                    .map_err(|e| LoTaRError::ValidationError(e.to_string()))?
-                    .agents
-            }
-            Some(prefix) => {
-                crate::config::persistence::load_project_config_from_dir(prefix, tasks_dir)
-                    .map_err(|e| LoTaRError::ValidationError(e.to_string()))?
-                    .agents
-                    .unwrap_or_default()
-            }
+            None => crate::config::persistence::load_global_config(Some(tasks_dir)).map_err(|e| LoTaRError::ValidationError(e.to_string()))?.agents,
+            Some(prefix) => crate::config::persistence::load_project_config_from_dir(prefix, tasks_dir)
+                .map_err(|e| LoTaRError::ValidationError(e.to_string()))?
+                .agents
+                .unwrap_or_default(),
         };
-        let simple =
-            profile.model.is_none() && profile.effort.is_none() && profile.permissions.is_none();
+        let simple = profile.model.is_none() && profile.effort.is_none() && profile.permissions.is_none();
         agents.insert(
             name.to_string(),
             if simple {
@@ -438,8 +315,7 @@ impl ConfigService {
                 crate::config::types::AgentProfileConfig::Detailed(Box::new(profile))
             },
         );
-        let value = serde_json::to_string(&agents)
-            .map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
+        let value = serde_json::to_string(&agents).map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
         let values = std::collections::BTreeMap::from([("agents".to_string(), value)]);
         Self::set(resolver, &values, global, project.as_deref())
     }
@@ -449,20 +325,10 @@ impl ConfigService {
     /// override). Callers must have canonicalized and schema-validated the
     /// raw entry first; this comparison must never be the acceptance path for
     /// a malformed value.
-    fn value_matches_global(
-        global: &crate::config::types::ResolvedConfig,
-        key: &str,
-        raw_value: &str,
-    ) -> bool {
+    fn value_matches_global(global: &crate::config::types::ResolvedConfig, key: &str, raw_value: &str) -> bool {
         let value = raw_value;
         let value_trim = value.trim();
-        let csv = |s: &str| -> Vec<String> {
-            s.split(',')
-                .map(|p| p.trim())
-                .filter(|p| !p.is_empty())
-                .map(|p| p.to_string())
-                .collect()
-        };
+        let csv = |s: &str| -> Vec<String> { s.split(',').map(|p| p.trim()).filter(|p| !p.is_empty()).map(|p| p.to_string()).collect() };
         let join = |v: &Vec<String>| -> String { v.join(",") };
         let parse_bool = |raw: &str| -> Option<bool> {
             match raw.trim().to_lowercase().as_str() {
@@ -476,13 +342,8 @@ impl ConfigService {
             if trimmed.is_empty() {
                 return Some(Vec::new());
             }
-            if let Ok(map) =
-                serde_yaml_ng::from_str::<std::collections::HashMap<String, String>>(trimmed)
-            {
-                let mut vec: Vec<(String, String)> = map
-                    .into_iter()
-                    .map(|(k, v)| (k.to_lowercase(), v.trim().to_string()))
-                    .collect();
+            if let Ok(map) = serde_yaml_ng::from_str::<std::collections::HashMap<String, String>>(trimmed) {
+                let mut vec: Vec<(String, String)> = map.into_iter().map(|(k, v)| (k.to_lowercase(), v.trim().to_string())).collect();
                 vec.sort();
                 return Some(vec);
             }
@@ -507,45 +368,18 @@ impl ConfigService {
             "issue_done_states" => false,
             // enum list overrides
             "issue_states" => {
-                let local: Vec<String> = csv(value)
-                    .into_iter()
-                    .filter_map(|s| s.parse::<crate::types::TaskStatus>().ok())
-                    .map(|e| e.to_string())
-                    .collect();
-                let global_values: Vec<String> = global
-                    .issue_states
-                    .values
-                    .iter()
-                    .map(|x| x.to_string())
-                    .collect();
+                let local: Vec<String> = csv(value).into_iter().filter_map(|s| s.parse::<crate::types::TaskStatus>().ok()).map(|e| e.to_string()).collect();
+                let global_values: Vec<String> = global.issue_states.values.iter().map(|x| x.to_string()).collect();
                 local == global_values
             }
             "issue_types" => {
-                let local: Vec<String> = csv(value)
-                    .into_iter()
-                    .filter_map(|s| s.parse::<crate::types::TaskType>().ok())
-                    .map(|e| e.to_string())
-                    .collect();
-                let global_values: Vec<String> = global
-                    .issue_types
-                    .values
-                    .iter()
-                    .map(|x| x.to_string())
-                    .collect();
+                let local: Vec<String> = csv(value).into_iter().filter_map(|s| s.parse::<crate::types::TaskType>().ok()).map(|e| e.to_string()).collect();
+                let global_values: Vec<String> = global.issue_types.values.iter().map(|x| x.to_string()).collect();
                 local == global_values
             }
             "issue_priorities" => {
-                let local: Vec<String> = csv(value)
-                    .into_iter()
-                    .filter_map(|s| s.parse::<crate::types::Priority>().ok())
-                    .map(|e| e.to_string())
-                    .collect();
-                let global_values: Vec<String> = global
-                    .issue_priorities
-                    .values
-                    .iter()
-                    .map(|x| x.to_string())
-                    .collect();
+                let local: Vec<String> = csv(value).into_iter().filter_map(|s| s.parse::<crate::types::Priority>().ok()).map(|e| e.to_string()).collect();
+                let global_values: Vec<String> = global.issue_priorities.values.iter().map(|x| x.to_string()).collect();
                 local == global_values
             }
             "tags" => csv(value) == global.tags.values,
@@ -556,41 +390,18 @@ impl ConfigService {
                 Err(_) => false,
             },
             "default_status" => match value_trim.parse::<crate::types::TaskStatus>() {
-                Ok(sv) => {
-                    global
-                        .default_status
-                        .as_ref()
-                        .map(|s| s.to_string())
-                        .as_deref()
-                        == Some(&sv.to_string())
-                }
+                Ok(sv) => global.default_status.as_ref().map(|s| s.to_string()).as_deref() == Some(&sv.to_string()),
                 Err(_) => false,
             },
-            "default_assignee" => {
-                global
-                    .default_assignee
-                    .as_ref()
-                    .map(|s| s.to_string())
-                    .unwrap_or_default()
-                    == value_trim
-            }
-            "default_reporter" => {
-                global
-                    .default_reporter
-                    .as_ref()
-                    .map(|s| s.to_string())
-                    .unwrap_or_default()
-                    == value_trim
-            }
+            "default_assignee" => global.default_assignee.as_ref().map(|s| s.to_string()).unwrap_or_default() == value_trim,
+            "default_reporter" => global.default_reporter.as_ref().map(|s| s.to_string()).unwrap_or_default() == value_trim,
             "default_tags" => {
                 let global_value: String = join(&global.default_tags);
                 let local = csv(value);
                 join(&local) == global_value
             }
             "auto_set_reporter" => parse_bool(value_trim) == Some(global.auto_set_reporter),
-            "auto_reciprocal_relationships" => {
-                parse_bool(value_trim) == Some(global.auto_reciprocal_relationships)
-            }
+            "auto_reciprocal_relationships" => parse_bool(value_trim) == Some(global.auto_reciprocal_relationships),
             "auto_link_mentions" => parse_bool(value_trim) == Some(global.auto_link_mentions),
             "auto_assign_on_status" => parse_bool(value_trim) == Some(global.auto_assign_on_status),
             "scan_signal_words" => csv(value) == global.scan_signal_words,
@@ -599,40 +410,25 @@ impl ConfigService {
                 let global_value = global.scan_ticket_patterns.clone().unwrap_or_default();
                 local == global_value
             }
-            "scan_enable_ticket_words" => {
-                parse_bool(value_trim) == Some(global.scan_enable_ticket_words)
-            }
+            "scan_enable_ticket_words" => parse_bool(value_trim) == Some(global.scan_enable_ticket_words),
             "scan_enable_mentions" => parse_bool(value_trim) == Some(global.scan_enable_mentions),
             "scan_strip_attributes" => parse_bool(value_trim) == Some(global.scan_strip_attributes),
             "branch_type_aliases" => {
                 let local = parse_alias_pairs(value).unwrap_or_default();
-                let mut global_value: Vec<(String, String)> = global
-                    .branch_type_aliases
-                    .iter()
-                    .map(|(k, v)| (k.to_lowercase(), v.to_string()))
-                    .collect();
+                let mut global_value: Vec<(String, String)> = global.branch_type_aliases.iter().map(|(k, v)| (k.to_lowercase(), v.to_string())).collect();
                 global_value.sort();
                 local == global_value
             }
-            "tag_properties" => crate::config::operations::parse_tag_properties(value)
-                .is_ok_and(|local| local == global.tag_properties),
+            "tag_properties" => crate::config::operations::parse_tag_properties(value).is_ok_and(|local| local == global.tag_properties),
             "branch_status_aliases" => {
                 let local = parse_alias_pairs(value).unwrap_or_default();
-                let mut global_value: Vec<(String, String)> = global
-                    .branch_status_aliases
-                    .iter()
-                    .map(|(k, v)| (k.to_lowercase(), v.to_string()))
-                    .collect();
+                let mut global_value: Vec<(String, String)> = global.branch_status_aliases.iter().map(|(k, v)| (k.to_lowercase(), v.to_string())).collect();
                 global_value.sort();
                 local == global_value
             }
             "branch_priority_aliases" => {
                 let local = parse_alias_pairs(value).unwrap_or_default();
-                let mut global_value: Vec<(String, String)> = global
-                    .branch_priority_aliases
-                    .iter()
-                    .map(|(k, v)| (k.to_lowercase(), v.to_string()))
-                    .collect();
+                let mut global_value: Vec<(String, String)> = global.branch_priority_aliases.iter().map(|(k, v)| (k.to_lowercase(), v.to_string())).collect();
                 global_value.sort();
                 local == global_value
             }
@@ -682,26 +478,14 @@ fn redact_config(value: &mut serde_json::Value) {
 /// is explicit or inferred, and the live server-local calendar day. The
 /// calendar day is evaluated at response time, never cached in a resolved
 /// snapshot.
-fn insert_computed_completion_fields(
-    value: &mut serde_json::Value,
-    resolved: &crate::api_types::ResolvedConfigDTO,
-) {
+fn insert_computed_completion_fields(value: &mut serde_json::Value, resolved: &crate::api_types::ResolvedConfigDTO) {
     use crate::services::completion;
     let Some(map) = value.as_object_mut() else {
         return;
     };
-    map.insert(
-        "effective_done_states".to_string(),
-        serde_json::json!(completion::effective_done_status_values(resolved)),
-    );
-    map.insert(
-        "done_states_mode".to_string(),
-        serde_json::json!(completion::done_states_mode(resolved).as_str()),
-    );
-    map.insert(
-        "task_calendar_day".to_string(),
-        serde_json::json!(completion::local_calendar_day(chrono::Utc::now())),
-    );
+    map.insert("effective_done_states".to_string(), serde_json::json!(completion::effective_done_status_values(resolved)));
+    map.insert("done_states_mode".to_string(), serde_json::json!(completion::done_states_mode(resolved).as_str()));
+    map.insert("task_calendar_day".to_string(), serde_json::json!(completion::local_calendar_day(chrono::Utc::now())));
 }
 
 /// The resolved configuration whose completion policy the inspect
@@ -713,9 +497,7 @@ fn resolved_for_computed(
     mgr: &ConfigManager,
 ) -> crate::config::types::ResolvedConfig {
     match project_prefix {
-        Some(prefix) => mgr
-            .get_project_config(prefix)
-            .unwrap_or_else(|_| resolved_global.clone()),
+        Some(prefix) => mgr.get_project_config(prefix).unwrap_or_else(|_| resolved_global.clone()),
         None => resolved_global.clone(),
     }
 }

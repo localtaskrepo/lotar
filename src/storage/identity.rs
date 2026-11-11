@@ -54,10 +54,7 @@ impl fmt::Display for TaskIdError {
                 "project prefix '{prefix}' is invalid: must be 1-64 alphanumeric (or '_'/'-') \
                  characters without path separators"
             ),
-            TaskIdError::InvalidNumericSuffix(suffix) => write!(
-                f,
-                "numeric suffix '{suffix}' is invalid: expected decimal digits only"
-            ),
+            TaskIdError::InvalidNumericSuffix(suffix) => write!(f, "numeric suffix '{suffix}' is invalid: expected decimal digits only"),
             TaskIdError::NumericOverflow(suffix) => {
                 write!(f, "numeric suffix '{suffix}' overflows the supported range")
             }
@@ -74,9 +71,7 @@ impl std::error::Error for TaskIdError {}
 pub fn compare_task_ids(a: &str, b: &str) -> std::cmp::Ordering {
     fn split(id: &str) -> (&str, Option<&str>) {
         match id.rsplit_once('-') {
-            Some((prefix, suffix))
-                if !suffix.is_empty() && suffix.bytes().all(|b| b.is_ascii_digit()) =>
-            {
+            Some((prefix, suffix)) if !suffix.is_empty() && suffix.bytes().all(|b| b.is_ascii_digit()) => {
                 let digits = suffix.trim_start_matches('0');
                 (prefix, Some(digits))
             }
@@ -103,22 +98,15 @@ impl TaskId {
         if input.is_empty() {
             return Err(TaskIdError::Empty);
         }
-        let (prefix, suffix) = input
-            .rsplit_once('-')
-            .ok_or(TaskIdError::MissingNumericSuffix)?;
+        let (prefix, suffix) = input.rsplit_once('-').ok_or(TaskIdError::MissingNumericSuffix)?;
         if !is_valid_project_prefix(prefix) {
             return Err(TaskIdError::InvalidPrefix(prefix.to_string()));
         }
         if suffix.is_empty() || !suffix.bytes().all(|b| b.is_ascii_digit()) {
             return Err(TaskIdError::InvalidNumericSuffix(suffix.to_string()));
         }
-        let number = suffix
-            .parse::<u64>()
-            .map_err(|_| TaskIdError::NumericOverflow(suffix.to_string()))?;
-        Ok(Self {
-            project: prefix.to_string(),
-            number,
-        })
+        let number = suffix.parse::<u64>().map_err(|_| TaskIdError::NumericOverflow(suffix.to_string()))?;
+        Ok(Self { project: prefix.to_string(), number })
     }
 
     /// Canonical spelling: unpadded number, exact-case prefix.
@@ -142,12 +130,7 @@ impl TaskId {
                 continue;
             }
             for file in crate::storage::layout::find(&candidate.join(&self.project), self.number) {
-                out.push(TaskLocation {
-                    root: candidate.clone(),
-                    id: self.clone(),
-                    file: file.path,
-                    archived: file.archived,
-                });
+                out.push(TaskLocation { root: candidate.clone(), id: self.clone(), file: file.path, archived: file.archived });
             }
         }
         out
@@ -162,9 +145,7 @@ fn has_exact_child_dir(parent: &Path, name: &str) -> bool {
         return false;
     }
     match std::fs::read_dir(parent) {
-        Ok(entries) => entries
-            .flatten()
-            .any(|entry| entry.file_name().to_str() == Some(name)),
+        Ok(entries) => entries.flatten().any(|entry| entry.file_name().to_str() == Some(name)),
         Err(_) => true,
     }
 }
@@ -219,10 +200,7 @@ pub enum TaskLookupError {
     NotFound(String),
     /// More than one root/project holds this identifier; picking one would
     /// risk mutating the wrong task, so resolution fails closed instead.
-    Ambiguous {
-        request: String,
-        matches: Vec<TaskLocation>,
-    },
+    Ambiguous { request: String, matches: Vec<TaskLocation> },
 }
 
 impl fmt::Display for TaskLookupError {
@@ -237,15 +215,7 @@ impl fmt::Display for TaskLookupError {
                     f,
                     "Task '{}' matches multiple storage locations: {}; refusing to pick one arbitrarily",
                     request,
-                    matches
-                        .iter()
-                        .map(|location| format!(
-                            "{} ({})",
-                            location.file.display(),
-                            location.full_id()
-                        ))
-                        .collect::<Vec<_>>()
-                        .join("; ")
+                    matches.iter().map(|location| format!("{} ({})", location.file.display(), location.full_id())).collect::<Vec<_>>().join("; ")
                 )
             }
         }
@@ -272,13 +242,9 @@ pub fn resolve(root: &Path, raw: &str) -> Result<TaskLocation, TaskLookupError> 
 /// ambiguous and fails closed.
 pub fn resolve_numeric(root: &Path, raw: &str) -> Result<TaskLocation, TaskLookupError> {
     if raw.is_empty() || !raw.bytes().all(|b| b.is_ascii_digit()) {
-        return Err(TaskLookupError::Invalid(TaskIdError::InvalidNumericSuffix(
-            raw.to_string(),
-        )));
+        return Err(TaskLookupError::Invalid(TaskIdError::InvalidNumericSuffix(raw.to_string())));
     }
-    let number = raw
-        .parse::<u64>()
-        .map_err(|_| TaskLookupError::Invalid(TaskIdError::NumericOverflow(raw.to_string())))?;
+    let number = raw.parse::<u64>().map_err(|_| TaskLookupError::Invalid(TaskIdError::NumericOverflow(raw.to_string())))?;
     let mut matches = Vec::new();
     for candidate in StorageLocator::candidate_task_roots(root) {
         for (project, dir) in crate::utils::filesystem::list_visible_subdirs(&candidate) {
@@ -288,10 +254,7 @@ pub fn resolve_numeric(root: &Path, raw: &str) -> Result<TaskLocation, TaskLooku
             for file in crate::storage::layout::find(&dir, number) {
                 matches.push(TaskLocation {
                     root: candidate.clone(),
-                    id: TaskId {
-                        project: project.clone(),
-                        number,
-                    },
+                    id: TaskId { project: project.clone(), number },
                     file: file.path,
                     archived: file.archived,
                 });
@@ -305,10 +268,7 @@ fn single(mut matches: Vec<TaskLocation>, request: &str) -> Result<TaskLocation,
     match matches.len() {
         1 => Ok(matches.swap_remove(0)),
         0 => Err(TaskLookupError::NotFound(request.to_string())),
-        _ => Err(TaskLookupError::Ambiguous {
-            request: request.to_string(),
-            matches,
-        }),
+        _ => Err(TaskLookupError::Ambiguous { request: request.to_string(), matches }),
     }
 }
 
@@ -374,81 +334,41 @@ mod tests {
     #[test]
     fn parse_rejects_empty_and_separatorless_ids() {
         assert_eq!(TaskId::parse(""), Err(TaskIdError::Empty));
-        assert_eq!(
-            TaskId::parse("TP123"),
-            Err(TaskIdError::MissingNumericSuffix)
-        );
+        assert_eq!(TaskId::parse("TP123"), Err(TaskIdError::MissingNumericSuffix));
     }
 
     #[test]
     fn parse_rejects_malformed_suffixes() {
         for bad in [
-            "TP-ABC", "TP-", "TP--", "TP-1x", "TP-x1", "TP-1.5", "TP-1 2", "TP- 1", "TP-1 ",
-            "TP-１", // fullwidth digit is not ASCII
+            "TP-ABC", "TP-", "TP--", "TP-1x", "TP-x1", "TP-1.5", "TP-1 2", "TP- 1", "TP-1 ", "TP-１", // fullwidth digit is not ASCII
         ] {
-            assert!(
-                matches!(
-                    TaskId::parse(bad),
-                    Err(TaskIdError::InvalidNumericSuffix(_))
-                ),
-                "expected numeric-suffix rejection for {bad:?}"
-            );
+            assert!(matches!(TaskId::parse(bad), Err(TaskIdError::InvalidNumericSuffix(_))), "expected numeric-suffix rejection for {bad:?}");
         }
     }
 
     #[test]
     fn parse_rejects_plus_digit_suffix() {
-        assert!(matches!(
-            TaskId::parse("TP-+12"),
-            Err(TaskIdError::InvalidNumericSuffix(_))
-        ));
-        assert!(matches!(
-            TaskId::parse("TP-12+"),
-            Err(TaskIdError::InvalidNumericSuffix(_))
-        ));
+        assert!(matches!(TaskId::parse("TP-+12"), Err(TaskIdError::InvalidNumericSuffix(_))));
+        assert!(matches!(TaskId::parse("TP-12+"), Err(TaskIdError::InvalidNumericSuffix(_))));
     }
 
     #[test]
     fn parse_rejects_traversal_and_unsafe_prefixes() {
-        for bad in [
-            "../evil-1",
-            "..-1",
-            ".-1",
-            "a/b-1",
-            "a\\b-1",
-            "/tmp/abs-1",
-            "@sprints-1",
-            ".hidden-1",
-            "-flag-1",
-            "a b-1",
-            "a..b-1",
-        ] {
-            assert!(
-                matches!(TaskId::parse(bad), Err(TaskIdError::InvalidPrefix(_))),
-                "expected prefix rejection for {bad:?}"
-            );
+        for bad in ["../evil-1", "..-1", ".-1", "a/b-1", "a\\b-1", "/tmp/abs-1", "@sprints-1", ".hidden-1", "-flag-1", "a b-1", "a..b-1"] {
+            assert!(matches!(TaskId::parse(bad), Err(TaskIdError::InvalidPrefix(_))), "expected prefix rejection for {bad:?}");
         }
     }
 
     #[test]
     fn parse_rejects_numeric_overflow() {
-        assert!(matches!(
-            TaskId::parse("TP-99999999999999999999999"),
-            Err(TaskIdError::NumericOverflow(_))
-        ));
-        assert_eq!(
-            TaskId::parse("TP-18446744073709551615").unwrap().number,
-            u64::MAX
-        );
+        assert!(matches!(TaskId::parse("TP-99999999999999999999999"), Err(TaskIdError::NumericOverflow(_))));
+        assert_eq!(TaskId::parse("TP-18446744073709551615").unwrap().number, u64::MAX);
     }
 
     #[test]
     fn parse_rejects_overlong_prefix() {
         let long = "A".repeat(65);
-        assert!(matches!(
-            TaskId::parse(&format!("{long}-1")),
-            Err(TaskIdError::InvalidPrefix(_))
-        ));
+        assert!(matches!(TaskId::parse(&format!("{long}-1")), Err(TaskIdError::InvalidPrefix(_))));
         let max = format!("{}-1", "A".repeat(64));
         assert!(TaskId::parse(&max).is_ok());
     }
@@ -468,18 +388,9 @@ mod tests {
         std::fs::create_dir_all(root.join("TP")).unwrap();
         std::fs::write(root.join("TP").join("1.yml"), "x: 1\n").unwrap();
 
-        assert!(matches!(
-            resolve_numeric(&root, "abc"),
-            Err(TaskLookupError::Invalid(_))
-        ));
-        assert!(matches!(
-            resolve_numeric(&root, "99999999999999999999999"),
-            Err(TaskLookupError::Invalid(_))
-        ));
-        assert!(matches!(
-            resolve_numeric(&root, "2"),
-            Err(TaskLookupError::NotFound(_))
-        ));
+        assert!(matches!(resolve_numeric(&root, "abc"), Err(TaskLookupError::Invalid(_))));
+        assert!(matches!(resolve_numeric(&root, "99999999999999999999999"), Err(TaskLookupError::Invalid(_))));
+        assert!(matches!(resolve_numeric(&root, "2"), Err(TaskLookupError::NotFound(_))));
         assert_eq!(resolve_numeric(&root, "1").unwrap().full_id(), "TP-1");
     }
 }
@@ -490,31 +401,8 @@ mod natural_order_tests {
 
     #[test]
     fn task_ids_sort_by_prefix_then_number() {
-        let mut ids = vec![
-            "B-1",
-            "A-10",
-            "A-2",
-            "A-002",
-            "A-1",
-            "AB-3",
-            "A",
-            "A-x",
-            "A-99999999999999999999999",
-        ];
+        let mut ids = vec!["B-1", "A-10", "A-2", "A-002", "A-1", "AB-3", "A", "A-x", "A-99999999999999999999999"];
         ids.sort_by(|a, b| compare_task_ids(a, b));
-        assert_eq!(
-            ids,
-            vec![
-                "A",
-                "A-1",
-                "A-002",
-                "A-2",
-                "A-10",
-                "A-99999999999999999999999",
-                "A-x",
-                "AB-3",
-                "B-1",
-            ]
-        );
+        assert_eq!(ids, vec!["A", "A-1", "A-002", "A-2", "A-10", "A-99999999999999999999999", "A-x", "AB-3", "B-1",]);
     }
 }

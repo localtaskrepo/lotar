@@ -23,10 +23,7 @@ pub fn parse_task_type(raw: &str, config: &ResolvedConfig) -> LoTaRResult<TaskTy
 
 /// Validate a custom field name against project configuration, returning the
 /// canonical configured name when recognized.
-pub fn validate_custom_field_name(
-    field_name: &str,
-    config: &ResolvedConfig,
-) -> Result<String, String> {
+pub fn validate_custom_field_name(field_name: &str, config: &ResolvedConfig) -> Result<String, String> {
     if let Some(canonical) = crate::utils::fields::is_reserved_field(field_name) {
         return Err(format!(
             "Field name '{}' collides with built-in field '{}'. Use the built-in option instead, or pick a different custom field name.",
@@ -36,12 +33,7 @@ pub fn validate_custom_field_name(
     if config.custom_fields.has_wildcard() {
         return Ok(field_name.to_string());
     }
-    if let Some(existing) = config
-        .custom_fields
-        .values
-        .iter()
-        .find(|value| value.eq_ignore_ascii_case(field_name.trim()))
-    {
+    if let Some(existing) = config.custom_fields.values.iter().find(|value| value.eq_ignore_ascii_case(field_name.trim())) {
         return Ok(existing.clone());
     }
     let suggestion = find_closest_match(field_name, &config.custom_fields.values);
@@ -65,11 +57,7 @@ pub fn validate_custom_field_name(
 /// semantics; brand-new keys must be configured (or allowed by wildcard).
 /// Distinct keys that canonicalize to the same configured name are rejected
 /// instead of silently overwriting each other.
-pub fn resolve_custom_fields(
-    fields: &CustomFields,
-    config: &ResolvedConfig,
-    existing: Option<&CustomFields>,
-) -> LoTaRResult<CustomFields> {
+pub fn resolve_custom_fields(fields: &CustomFields, config: &ResolvedConfig, existing: Option<&CustomFields>) -> LoTaRResult<CustomFields> {
     let mut resolved = CustomFields::new();
     let mut sources: std::collections::HashMap<String, String> = std::collections::HashMap::new();
 
@@ -83,10 +71,7 @@ pub fn resolve_custom_fields(
         let target = match configured_field_key(key, config) {
             Some(canonical) => canonical,
             None => {
-                let legacy = existing.is_some_and(|map| {
-                    map.keys()
-                        .any(|existing_key| existing_key.eq_ignore_ascii_case(key.trim()))
-                });
+                let legacy = existing.is_some_and(|map| map.keys().any(|existing_key| existing_key.eq_ignore_ascii_case(key.trim())));
                 if config.custom_fields.has_wildcard() || legacy {
                     key.trim().to_string()
                 } else {
@@ -115,12 +100,7 @@ pub fn resolve_custom_fields(
 }
 
 fn configured_field_key(field_name: &str, config: &ResolvedConfig) -> Option<String> {
-    config
-        .custom_fields
-        .values
-        .iter()
-        .find(|value| value.eq_ignore_ascii_case(field_name.trim()))
-        .cloned()
+    config.custom_fields.values.iter().find(|value| value.eq_ignore_ascii_case(field_name.trim())).cloned()
 }
 
 /// Find the closest match for a string in a list (edit distance).
@@ -162,9 +142,7 @@ pub fn edit_distance(s1: &str, s2: &str) -> usize {
     for (i, c1) in s1.chars().enumerate() {
         for (j, c2) in s2.chars().enumerate() {
             let cost = if c1 == c2 { 0 } else { 1 };
-            matrix[i + 1][j + 1] = (matrix[i][j + 1] + 1)
-                .min(matrix[i + 1][j] + 1)
-                .min(matrix[i][j] + cost);
+            matrix[i + 1][j + 1] = (matrix[i][j + 1] + 1).min(matrix[i + 1][j] + 1).min(matrix[i][j] + cost);
         }
     }
 

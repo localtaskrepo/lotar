@@ -40,22 +40,13 @@ fn disables_path_tag_when_flag_off() {
     let assert = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(&pkg_api)
-        .args([
-            "add",
-            "No path tag",
-            "--project=TEST",
-            "--dry-run",
-            "--format=json",
-        ])
+        .args(["add", "No path tag", "--project=TEST", "--dry-run", "--format=json"])
         .assert()
         .success();
 
     let output = String::from_utf8_lossy(&assert.get_output().stdout);
     // Should have no tags when feature disabled (field may be omitted in JSON preview)
-    assert!(
-        !output.contains("\"tags\":"),
-        "Expected no derived tags field, got: {output}"
-    );
+    assert!(!output.contains("\"tags\":"), "Expected no derived tags field, got: {output}");
 
     // restored by guards
 }
@@ -77,22 +68,13 @@ fn enables_path_tag_when_flag_on() {
     let assert = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(&pkg_api)
-        .args([
-            "add",
-            "With path tag",
-            "--project=TEST",
-            "--dry-run",
-            "--format=json",
-        ])
+        .args(["add", "With path tag", "--project=TEST", "--dry-run", "--format=json"])
         .assert()
         .success();
 
     let output = String::from_utf8_lossy(&assert.get_output().stdout);
     // When flag on and tag is allowed (api), it should appear
-    assert!(
-        output.contains("\"tags\":[\"api\"]"),
-        "Expected derived tag 'api', got: {output}"
-    );
+    assert!(output.contains("\"tags\":[\"api\"]"), "Expected derived tag 'api', got: {output}");
 
     // restored by guards
 }

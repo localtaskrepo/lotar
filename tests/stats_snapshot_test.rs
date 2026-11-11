@@ -3,10 +3,7 @@ use predicates::prelude::*;
 use tempfile::TempDir;
 
 fn run(cmd: &mut Command, temp_dir: &TempDir, args: &[&str]) -> assert_cmd::assert::Assert {
-    cmd.current_dir(temp_dir.path())
-        .env("LOTAR_TEST_SILENT", "1")
-        .args(args)
-        .assert()
+    cmd.current_dir(temp_dir.path()).env("LOTAR_TEST_SILENT", "1").args(args).assert()
 }
 
 #[test]
@@ -15,32 +12,10 @@ fn stats_tags_and_custom_field_snapshot() {
 
     // Create tasks with tags and custom fields
     let mut c = crate::common::lotar_cmd().unwrap();
-    run(
-        &mut c,
-        &temp,
-        &[
-            "task",
-            "add",
-            "T1",
-            "--tag=infra",
-            "--tag=build",
-            "--field=product=bug",
-        ],
-    ) // ID 1
-    .success();
+    run(&mut c, &temp, &["task", "add", "T1", "--tag=infra", "--tag=build", "--field=product=bug"]) // ID 1
+        .success();
     let mut c = crate::common::lotar_cmd().unwrap();
-    run(
-        &mut c,
-        &temp,
-        &[
-            "task",
-            "add",
-            "T2",
-            "--tag=infra",
-            "--field=product=feature",
-        ],
-    )
-    .success();
+    run(&mut c, &temp, &["task", "add", "T2", "--tag=infra", "--field=product=feature"]).success();
 
     // Tags: infra=2, build=1
     let mut c = crate::common::lotar_cmd().unwrap();
@@ -51,58 +26,32 @@ fn stats_tags_and_custom_field_snapshot() {
 
     // Also verify JSON output shape for tags
     let mut c = crate::common::lotar_cmd().unwrap();
-    run(
-        &mut c,
-        &temp,
-        &["--format", "json", "stats", "tags", "--global"],
-    )
-    .success()
-    .stdout(predicate::str::contains("\"action\":\"stats.tags\""))
-    .stdout(predicate::str::contains("infra"));
+    run(&mut c, &temp, &["--format", "json", "stats", "tags", "--global"])
+        .success()
+        .stdout(predicate::str::contains("\"action\":\"stats.tags\""))
+        .stdout(predicate::str::contains("infra"));
 
     // Custom field values: bug=1, feature=1
     let mut c = crate::common::lotar_cmd().unwrap();
-    run(
-        &mut c,
-        &temp,
-        &["stats", "custom-field", "--field", "product", "--global"],
-    ) // project scope not required here
-    .success()
-    .stdout(predicate::str::contains("bug"))
-    .stdout(predicate::str::contains("feature"));
+    run(&mut c, &temp, &["stats", "custom-field", "--field", "product", "--global"]) // project scope not required here
+        .success()
+        .stdout(predicate::str::contains("bug"))
+        .stdout(predicate::str::contains("feature"));
 
     // And JSON for custom field distribution
     let mut c = crate::common::lotar_cmd().unwrap();
-    run(
-        &mut c,
-        &temp,
-        &[
-            "--format",
-            "json",
-            "stats",
-            "custom-field",
-            "--field",
-            "product",
-            "--global",
-        ],
-    )
-    .success()
-    .stdout(predicate::str::contains(
-        "\"action\":\"stats.custom.field\"",
-    ))
-    .stdout(predicate::str::contains("\"field\":\"product\""))
-    .stdout(predicate::str::contains("bug"));
+    run(&mut c, &temp, &["--format", "json", "stats", "custom-field", "--field", "product", "--global"])
+        .success()
+        .stdout(predicate::str::contains("\"action\":\"stats.custom.field\""))
+        .stdout(predicate::str::contains("\"field\":\"product\""))
+        .stdout(predicate::str::contains("bug"));
 
     // Custom keys should include product
     let mut c = crate::common::lotar_cmd().unwrap();
-    run(
-        &mut c,
-        &temp,
-        &["--format", "json", "stats", "custom-keys", "--global"],
-    )
-    .success()
-    .stdout(predicate::str::contains("\"action\":\"stats.custom.keys\""))
-    .stdout(predicate::str::contains("product"));
+    run(&mut c, &temp, &["--format", "json", "stats", "custom-keys", "--global"])
+        .success()
+        .stdout(predicate::str::contains("\"action\":\"stats.custom.keys\""))
+        .stdout(predicate::str::contains("product"));
 }
 
 #[test]
@@ -111,51 +60,24 @@ fn stats_distribution_snapshot() {
 
     // Add some tasks with tags and custom fields to populate fields
     let mut c = crate::common::lotar_cmd().unwrap();
-    run(
-        &mut c,
-        &temp,
-        &["task", "add", "D1", "--tag=ui", "--field=product=feature"],
-    )
-    .success();
+    run(&mut c, &temp, &["task", "add", "D1", "--tag=ui", "--field=product=feature"]).success();
     let mut c = crate::common::lotar_cmd().unwrap();
-    run(
-        &mut c,
-        &temp,
-        &["task", "add", "D2", "--tag=api", "--field=product=bug"],
-    )
-    .success();
+    run(&mut c, &temp, &["task", "add", "D2", "--tag=api", "--field=product=bug"]).success();
 
     // By status (all default to TODO)
     let mut c = crate::common::lotar_cmd().unwrap();
-    run(
-        &mut c,
-        &temp,
-        &[
-            "--format",
-            "json",
-            "stats",
-            "distribution",
-            "--field",
-            "status",
-        ],
-    )
-    .success()
-    .stdout(predicate::str::contains(
-        "\"action\":\"stats.distribution\"",
-    ))
-    .stdout(predicate::str::contains("\"field\":\"status\""))
-    .stdout(predicate::str::contains("\"Todo\""));
+    run(&mut c, &temp, &["--format", "json", "stats", "distribution", "--field", "status"])
+        .success()
+        .stdout(predicate::str::contains("\"action\":\"stats.distribution\""))
+        .stdout(predicate::str::contains("\"field\":\"status\""))
+        .stdout(predicate::str::contains("\"Todo\""));
 
     // By tag should include our tags
     let mut c = crate::common::lotar_cmd().unwrap();
-    run(
-        &mut c,
-        &temp,
-        &["stats", "distribution", "--field", "tag", "--global"],
-    )
-    .success()
-    .stdout(predicate::str::contains("ui"))
-    .stdout(predicate::str::contains("api"));
+    run(&mut c, &temp, &["stats", "distribution", "--field", "tag", "--global"])
+        .success()
+        .stdout(predicate::str::contains("ui"))
+        .stdout(predicate::str::contains("api"));
 }
 
 #[test]
@@ -176,12 +98,7 @@ fn stats_due_buckets_snapshot() {
 
     // Create tasks with different due dates
     let mut c = crate::common::lotar_cmd().unwrap();
-    run(
-        &mut c,
-        &temp,
-        &["task", "add", "Overdue", "--due", &overdue],
-    )
-    .success();
+    run(&mut c, &temp, &["task", "add", "Overdue", "--due", &overdue]).success();
     let mut c = crate::common::lotar_cmd().unwrap();
     run(&mut c, &temp, &["task", "add", "Today", "--due", &today_s]).success();
     let mut c = crate::common::lotar_cmd().unwrap();
@@ -193,56 +110,22 @@ fn stats_due_buckets_snapshot() {
 
     // The shared buckets (DEV-238): soon is the next 7 days, later the rest.
     let mut c = crate::common::lotar_cmd().unwrap();
-    let out = run(
-        &mut c,
-        &temp,
-        &["--format", "json", "stats", "due", "--global"],
-    )
-    .success();
+    let out = run(&mut c, &temp, &["--format", "json", "stats", "due", "--global"]).success();
     let v: serde_json::Value = serde_json::from_slice(&out.get_output().stdout).unwrap();
-    let counts: std::collections::BTreeMap<String, u64> = v["items"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|i| {
-            (
-                i["bucket"].as_str().unwrap().to_string(),
-                i["count"].as_u64().unwrap(),
-            )
-        })
-        .collect();
-    assert_eq!(
-        counts,
-        [("later", 2), ("overdue", 1), ("soon", 1), ("today", 1)]
-            .into_iter()
-            .map(|(k, n)| (k.to_string(), n))
-            .collect()
-    );
+    let counts: std::collections::BTreeMap<String, u64> =
+        v["items"].as_array().unwrap().iter().map(|i| (i["bucket"].as_str().unwrap().to_string(), i["count"].as_u64().unwrap())).collect();
+    assert_eq!(counts, [("later", 2), ("overdue", 1), ("soon", 1), ("today", 1)].into_iter().map(|(k, n)| (k.to_string(), n)).collect());
 
     // --filter narrows the counted tasks with the web search syntax.
     let mut c = crate::common::lotar_cmd().unwrap();
-    let out = run(
-        &mut c,
-        &temp,
-        &[
-            "--format", "json", "stats", "due", "--global", "--filter", "Later",
-        ],
-    )
-    .success();
+    let out = run(&mut c, &temp, &["--format", "json", "stats", "due", "--global", "--filter", "Later"]).success();
     let v: serde_json::Value = serde_json::from_slice(&out.get_output().stdout).unwrap();
-    let total: u64 = v["items"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|i| i["count"].as_u64().unwrap())
-        .sum();
+    let total: u64 = v["items"].as_array().unwrap().iter().map(|i| i["count"].as_u64().unwrap()).sum();
     assert_eq!(total, 1);
 
     // The old week/month buckets are gone.
     let mut c = crate::common::lotar_cmd().unwrap();
-    run(&mut c, &temp, &["stats", "due", "--buckets", "week"])
-        .failure()
-        .stderr(predicate::str::contains("Invalid bucket 'week'"));
+    run(&mut c, &temp, &["stats", "due", "--buckets", "week"]).failure().stderr(predicate::str::contains("Invalid bucket 'week'"));
 }
 
 #[test]
@@ -269,43 +152,17 @@ fn stats_due_overdue_threshold_snapshot() {
 
     // Overdue only with 0d threshold should count both overdue tasks
     let mut c = crate::common::lotar_cmd().unwrap();
-    run(
-        &mut c,
-        &temp,
-        &[
-            "--format",
-            "json",
-            "stats",
-            "due",
-            "--overdue",
-            "--threshold",
-            "0d",
-            "--global",
-        ],
-    )
-    .success()
-    .stdout(predicate::str::contains("\"overdue_only\":true"))
-    .stdout(predicate::str::contains("\"buckets\":\"overdue\""))
-    .stdout(predicate::str::contains("overdue"));
+    run(&mut c, &temp, &["--format", "json", "stats", "due", "--overdue", "--threshold", "0d", "--global"])
+        .success()
+        .stdout(predicate::str::contains("\"overdue_only\":true"))
+        .stdout(predicate::str::contains("\"buckets\":\"overdue\""))
+        .stdout(predicate::str::contains("overdue"));
 
     // Overdue only with 7d threshold should count only the 10d overdue
     let mut c = crate::common::lotar_cmd().unwrap();
-    run(
-        &mut c,
-        &temp,
-        &[
-            "--format",
-            "json",
-            "stats",
-            "due",
-            "--overdue",
-            "--threshold",
-            "7d",
-            "--global",
-        ],
-    )
-    .success()
-    .stdout(predicate::str::contains("\"overdue_only\":true"));
+    run(&mut c, &temp, &["--format", "json", "stats", "due", "--overdue", "--threshold", "7d", "--global"])
+        .success()
+        .stdout(predicate::str::contains("\"overdue_only\":true"));
 }
 
 // =============================================================================
@@ -340,10 +197,7 @@ mod effort_unit {
             .unwrap()
             .current_dir(temp.path())
             .env("LOTAR_TEST_SILENT", "1")
-            .args([
-                "--format", "json", "stats", "effort", "--by", "assignee", "--unit", "days",
-                "--global",
-            ]) // project-agnostic
+            .args(["--format", "json", "stats", "effort", "--by", "assignee", "--unit", "days", "--global"]) // project-agnostic
             .output()
             .unwrap();
         assert!(out.status.success());
@@ -364,10 +218,7 @@ mod effort_unit {
             .unwrap()
             .current_dir(temp.path())
             .env("LOTAR_TEST_SILENT", "1")
-            .args([
-                "--format", "json", "stats", "effort", "--by", "assignee", "--unit", "weeks",
-                "--global",
-            ]) // project-agnostic
+            .args(["--format", "json", "stats", "effort", "--by", "assignee", "--unit", "weeks", "--global"]) // project-agnostic
             .output()
             .unwrap();
         assert!(out2.status.success());
@@ -392,17 +243,7 @@ mod effort_points_auto_filters {
             .unwrap()
             .current_dir(temp.path())
             .env("LOTAR_TEST_SILENT", "1")
-            .args([
-                "task",
-                "add",
-                "T1",
-                "--assignee",
-                "@me",
-                "--tag",
-                "x",
-                "--effort",
-                "1d 2h",
-            ]) // 10h
+            .args(["task", "add", "T1", "--assignee", "@me", "--tag", "x", "--effort", "1d 2h"]) // 10h
             .assert()
             .success();
 
@@ -411,17 +252,7 @@ mod effort_points_auto_filters {
             .unwrap()
             .current_dir(temp.path())
             .env("LOTAR_TEST_SILENT", "1")
-            .args([
-                "task",
-                "add",
-                "T2",
-                "--assignee",
-                "@me",
-                "--tag",
-                "y",
-                "--effort",
-                "5pt",
-            ]) // 5 points
+            .args(["task", "add", "T2", "--assignee", "@me", "--tag", "y", "--effort", "5pt"]) // 5 points
             .assert()
             .success();
 
@@ -430,17 +261,7 @@ mod effort_points_auto_filters {
             .unwrap()
             .current_dir(temp.path())
             .env("LOTAR_TEST_SILENT", "1")
-            .args([
-                "task",
-                "add",
-                "T3",
-                "--assignee",
-                "@me",
-                "--tag",
-                "x",
-                "--effort",
-                "8h",
-            ]) // 8h
+            .args(["task", "add", "T3", "--assignee", "@me", "--tag", "x", "--effort", "8h"]) // 8h
             .assert()
             .success();
 
@@ -449,10 +270,7 @@ mod effort_points_auto_filters {
             .unwrap()
             .current_dir(temp.path())
             .env("LOTAR_TEST_SILENT", "1")
-            .args([
-                "--format", "json", "stats", "effort", "--by", "assignee", "--unit", "points",
-                "--global",
-            ])
+            .args(["--format", "json", "stats", "effort", "--by", "assignee", "--unit", "points", "--global"])
             .output()
             .unwrap();
         assert!(out_points.status.success());
@@ -475,19 +293,7 @@ mod effort_points_auto_filters {
             .unwrap()
             .current_dir(temp.path())
             .env("LOTAR_TEST_SILENT", "1")
-            .args([
-                "--format",
-                "json",
-                "stats",
-                "effort",
-                "--by",
-                "tag",
-                "--filter",
-                "assignee:@me",
-                "--unit",
-                "auto",
-                "--global",
-            ])
+            .args(["--format", "json", "stats", "effort", "--by", "tag", "--filter", "assignee:@me", "--unit", "auto", "--global"])
             .output()
             .unwrap();
         assert!(out_auto.status.success());
@@ -522,10 +328,7 @@ mod effort_comments_custom {
     use tempfile::TempDir;
 
     fn run(cmd: &mut Command, temp_dir: &TempDir, args: &[&str]) -> assert_cmd::assert::Assert {
-        cmd.current_dir(temp_dir.path())
-            .env("LOTAR_TEST_SILENT", "1")
-            .args(args)
-            .assert()
+        cmd.current_dir(temp_dir.path()).env("LOTAR_TEST_SILENT", "1").args(args).assert()
     }
 
     #[test]
@@ -533,45 +336,17 @@ mod effort_comments_custom {
         let temp = crate::common::temp_dir();
 
         // Create a few tasks with effort and custom fields
-        run(
-            &mut crate::common::lotar_cmd().unwrap(),
-            &temp,
-            &["task", "add", "A", "--effort", "2d", "--field", "team=eng"],
-        )
-        .success();
-        run(
-            &mut crate::common::lotar_cmd().unwrap(),
-            &temp,
-            &[
-                "task", "add", "B", "--effort", "5h", "--assign", "@bob", "--field", "team=eng",
-            ],
-        )
-        .success();
-        run(
-            &mut crate::common::lotar_cmd().unwrap(),
-            &temp,
-            &[
-                "task",
-                "add",
-                "C",
-                "--effort",
-                "1w",
-                "--assign",
-                "@alice",
-                "--field",
-                "priority_hint=low",
-            ],
-        )
-        .success();
+        run(&mut crate::common::lotar_cmd().unwrap(), &temp, &["task", "add", "A", "--effort", "2d", "--field", "team=eng"]).success();
+        run(&mut crate::common::lotar_cmd().unwrap(), &temp, &["task", "add", "B", "--effort", "5h", "--assign", "@bob", "--field", "team=eng"]).success();
+        run(&mut crate::common::lotar_cmd().unwrap(), &temp, &["task", "add", "C", "--effort", "1w", "--assign", "@alice", "--field", "priority_hint=low"])
+            .success();
 
         // Effort by assignee
         let out = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
             .env("LOTAR_TEST_SILENT", "1")
-            .args([
-                "--format", "json", "stats", "effort", "--by", "assignee", "--global",
-            ])
+            .args(["--format", "json", "stats", "effort", "--by", "assignee", "--global"])
             .output()
             .unwrap();
         assert!(out.status.success());
@@ -610,15 +385,7 @@ mod effort_comments_custom {
             .unwrap()
             .current_dir(temp.path())
             .env("LOTAR_TEST_SILENT", "1")
-            .args([
-                "--format",
-                "json",
-                "stats",
-                "custom-field",
-                "--field",
-                "team",
-                "--global",
-            ])
+            .args(["--format", "json", "stats", "custom-field", "--field", "team", "--global"])
             .output()
             .unwrap();
         assert!(out.status.success());

@@ -29,10 +29,7 @@ fn profiles_include_model_effort_and_permissions_sorted_by_name() {
     assert_eq!(response.status, 200);
     let body: Value = serde_json::from_slice(&response.body).unwrap();
     let profiles = body["data"]["profiles"].as_array().unwrap();
-    let names: Vec<&str> = profiles
-        .iter()
-        .map(|p| p["name"].as_str().unwrap())
-        .collect();
+    let names: Vec<&str> = profiles.iter().map(|p| p["name"].as_str().unwrap()).collect();
     assert_eq!(names, ["implement", "quick", "test"]);
 
     assert_eq!(profiles[0]["runner"], "claude");
@@ -50,11 +47,7 @@ fn profiles_without_a_project_come_from_the_default_project() {
     let tmp = tempfile::tempdir().unwrap();
     std::fs::write(tmp.path().join("config.yml"), "default:\n  project: WEB\n").unwrap();
     std::fs::create_dir_all(tmp.path().join("WEB")).unwrap();
-    std::fs::write(
-        tmp.path().join("WEB/config.yml"),
-        "project:\n  name: Web\nagents:\n  implement: claude\n",
-    )
-    .unwrap();
+    std::fs::write(tmp.path().join("WEB/config.yml"), "project:\n  name: Web\nagents:\n  implement: claude\n").unwrap();
     let _env = EnvVarGuard::set("LOTAR_TASKS_DIR", tmp.path().to_str().unwrap());
 
     let mut api = ApiServer::new();

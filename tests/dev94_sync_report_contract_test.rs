@@ -6,12 +6,7 @@ use std::collections::HashMap;
 
 #[test]
 fn empty_report_list_serializes_required_array() {
-    let page = SyncReportListResponse {
-        total: 0,
-        limit: 20,
-        offset: 0,
-        reports: vec![],
-    };
+    let page = SyncReportListResponse { total: 0, limit: 20, offset: 0, reports: vec![] };
     let value = serde_json::to_value(page).unwrap();
     assert_eq!(value["reports"], serde_json::json!([]));
     assert!(
@@ -54,14 +49,8 @@ fn empty_report_route_includes_array_in_global_and_project_scopes() {
 
 #[test]
 fn openapi_report_list_requires_array() {
-    let schema: serde_json::Value =
-        serde_json::from_str(include_str!("../docs/openapi.json")).unwrap();
+    let schema: serde_json::Value = serde_json::from_str(include_str!("../docs/openapi.json")).unwrap();
     let reports = &schema["components"]["schemas"]["SyncReportListResponse"];
     assert_eq!(reports["properties"]["reports"]["type"], "array");
-    assert!(
-        reports["required"]
-            .as_array()
-            .unwrap()
-            .contains(&serde_json::json!("reports"))
-    );
+    assert!(reports["required"].as_array().unwrap().contains(&serde_json::json!("reports")));
 }

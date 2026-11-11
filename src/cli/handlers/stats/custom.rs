@@ -1,6 +1,4 @@
-use super::common::{
-    custom_value_key, emit_items, header, list_tasks, ranked_counts, scope_project, tally,
-};
+use super::common::{custom_value_key, emit_items, header, list_tasks, ranked_counts, scope_project, tally};
 use crate::output::OutputRenderer;
 use crate::workspace::TasksDirectoryResolver;
 
@@ -14,11 +12,7 @@ pub(crate) fn run_keys(
 ) -> Result<(), String> {
     let scope = scope_project(global, project, resolver);
     let tasks = list_tasks(scope.as_deref(), resolver, filter)?;
-    let counts = tally(
-        tasks
-            .into_iter()
-            .flat_map(|(_, task)| task.custom_fields.into_keys()),
-    );
+    let counts = tally(tasks.into_iter().flat_map(|(_, task)| task.custom_fields.into_keys()));
     let rows = ranked_counts(counts, limit);
     emit_items(
         renderer,
@@ -42,11 +36,7 @@ pub(crate) fn run_field(
 ) -> Result<(), String> {
     let scope = scope_project(global, project, resolver);
     let tasks = list_tasks(scope.as_deref(), resolver, filter)?;
-    let counts = tally(
-        tasks
-            .iter()
-            .filter_map(|(_, task)| task.custom_fields.get(name).map(custom_value_key)),
-    );
+    let counts = tally(tasks.iter().filter_map(|(_, task)| task.custom_fields.get(name).map(custom_value_key)));
     let rows = ranked_counts(counts, limit);
     let mut head = header("stats.custom.field", global, scope.as_deref());
     head.insert("field".into(), serde_json::json!(name));

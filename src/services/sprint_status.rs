@@ -25,10 +25,7 @@ impl SprintLifecycleState {
     /// completion (Overdue) — the "in flight" predicate used by default-sprint
     /// resolution, velocity windows, and lifecycle helpers.
     pub fn is_active_or_overdue(&self) -> bool {
-        matches!(
-            self,
-            SprintLifecycleState::Active | SprintLifecycleState::Overdue
-        )
+        matches!(self, SprintLifecycleState::Active | SprintLifecycleState::Overdue)
     }
 }
 
@@ -82,31 +79,11 @@ pub fn derive_status(sprint: &Sprint, now: DateTime<Utc>) -> SprintLifecycleStat
     let plan = sprint.plan.as_ref();
     let actual = sprint.actual.as_ref();
 
-    let planned_start = parse_timestamp(
-        "plan.starts_at",
-        plan.and_then(|p| p.starts_at.as_ref()),
-        &mut warnings,
-    );
-    let planned_end = parse_timestamp(
-        "plan.ends_at",
-        plan.and_then(|p| p.ends_at.as_ref()),
-        &mut warnings,
-    );
-    let actual_start = parse_timestamp(
-        "actual.started_at",
-        actual.and_then(|a| a.started_at.as_ref()),
-        &mut warnings,
-    );
-    let actual_end = parse_timestamp(
-        "actual.closed_at",
-        actual.and_then(|a| a.closed_at.as_ref()),
-        &mut warnings,
-    );
-    let length = parse_length(
-        "plan.length",
-        plan.and_then(|p| p.length.as_ref()),
-        &mut warnings,
-    );
+    let planned_start = parse_timestamp("plan.starts_at", plan.and_then(|p| p.starts_at.as_ref()), &mut warnings);
+    let planned_end = parse_timestamp("plan.ends_at", plan.and_then(|p| p.ends_at.as_ref()), &mut warnings);
+    let actual_start = parse_timestamp("actual.started_at", actual.and_then(|a| a.started_at.as_ref()), &mut warnings);
+    let actual_end = parse_timestamp("actual.closed_at", actual.and_then(|a| a.closed_at.as_ref()), &mut warnings);
+    let length = parse_length("plan.length", plan.and_then(|p| p.length.as_ref()), &mut warnings);
     // Grace period after the end before the sprint counts as overdue
     // (DEV-154). Unreadable legacy values warn and give no grace.
     let grace = plan
@@ -119,10 +96,7 @@ pub fn derive_status(sprint: &Sprint, now: DateTime<Utc>) -> SprintLifecycleStat
             match time::parse_sprint_overdue_after(trimmed) {
                 Ok(duration) => Some(duration),
                 Err(_) => {
-                    warnings.push(SprintStatusWarning::UnparseableLength {
-                        field: "plan.overdue_after",
-                        value: raw.clone(),
-                    });
+                    warnings.push(SprintStatusWarning::UnparseableLength { field: "plan.overdue_after", value: raw.clone() });
                     None
                 }
             }
@@ -158,23 +132,10 @@ pub fn derive_status(sprint: &Sprint, now: DateTime<Utc>) -> SprintLifecycleStat
         SprintLifecycleState::Pending
     };
 
-    SprintLifecycleStatus {
-        state,
-        planned_start,
-        planned_end,
-        actual_start,
-        actual_end,
-        computed_end,
-        overdue_at,
-        warnings,
-    }
+    SprintLifecycleStatus { state, planned_start, planned_end, actual_start, actual_end, computed_end, overdue_at, warnings }
 }
 
-fn parse_timestamp(
-    field: &'static str,
-    value: Option<&String>,
-    warnings: &mut Vec<SprintStatusWarning>,
-) -> Option<DateTime<Utc>> {
+fn parse_timestamp(field: &'static str, value: Option<&String>, warnings: &mut Vec<SprintStatusWarning>) -> Option<DateTime<Utc>> {
     value.and_then(|raw| {
         let trimmed = raw.trim();
         if trimmed.is_empty() {
@@ -183,21 +144,14 @@ fn parse_timestamp(
         match time::parse_human_datetime_to_utc(trimmed) {
             Ok(dt) => Some(dt),
             Err(_) => {
-                warnings.push(SprintStatusWarning::UnparseableTimestamp {
-                    field,
-                    value: raw.clone(),
-                });
+                warnings.push(SprintStatusWarning::UnparseableTimestamp { field, value: raw.clone() });
                 None
             }
         }
     })
 }
 
-fn parse_length(
-    field: &'static str,
-    value: Option<&String>,
-    warnings: &mut Vec<SprintStatusWarning>,
-) -> Option<Duration> {
+fn parse_length(field: &'static str, value: Option<&String>, warnings: &mut Vec<SprintStatusWarning>) -> Option<Duration> {
     value.and_then(|raw| {
         let trimmed = raw.trim();
         if trimmed.is_empty() {
@@ -206,10 +160,7 @@ fn parse_length(
         match time::parse_duration_like(trimmed) {
             Some(duration) => Some(duration),
             None => {
-                warnings.push(SprintStatusWarning::UnparseableLength {
-                    field,
-                    value: raw.clone(),
-                });
+                warnings.push(SprintStatusWarning::UnparseableLength { field, value: raw.clone() });
                 None
             }
         }

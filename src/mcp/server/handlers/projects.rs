@@ -1,9 +1,8 @@
 use serde_json::{Value, json};
 
 use super::super::{
-    JsonRpcRequest, JsonRpcResponse, MCP_DEFAULT_PROJECT_LIST_LIMIT, MCP_MAX_CURSOR,
-    MCP_MAX_PROJECT_LIST_LIMIT, err, ok, parse_cursor_value, parse_limit_value, resolve_tasks_dir,
-    text_result,
+    JsonRpcRequest, JsonRpcResponse, MCP_DEFAULT_PROJECT_LIST_LIMIT, MCP_MAX_CURSOR, MCP_MAX_PROJECT_LIST_LIMIT, err, ok, parse_cursor_value,
+    parse_limit_value, resolve_tasks_dir, text_result,
 };
 use crate::services::project_service::ProjectService;
 
@@ -16,30 +15,16 @@ pub(crate) fn handle_project_list(req: JsonRpcRequest) -> JsonRpcResponse {
     let limit = match parse_limit_value(req.params.get("limit"), MCP_DEFAULT_PROJECT_LIST_LIMIT) {
         Ok(value) if (1..=MCP_MAX_PROJECT_LIST_LIMIT).contains(&value) => value,
         Ok(_) => {
-            return err(
-                req.id,
-                -32602,
-                &format!("limit must be between 1 and {}", MCP_MAX_PROJECT_LIST_LIMIT),
-                None,
-            );
+            return err(req.id, -32602, &format!("limit must be between 1 and {}", MCP_MAX_PROJECT_LIST_LIMIT), None);
         }
         Err(msg) => return err(req.id, -32602, msg, None),
     };
 
-    let cursor_value = req
-        .params
-        .get("cursor")
-        .filter(|value| !value.is_null())
-        .or_else(|| req.params.get("offset"));
+    let cursor_value = req.params.get("cursor").filter(|value| !value.is_null()).or_else(|| req.params.get("offset"));
     let cursor = match parse_cursor_value(cursor_value) {
         Ok(value) if value <= MCP_MAX_CURSOR => value,
         Ok(_) => {
-            return err(
-                req.id,
-                -32602,
-                &format!("cursor must be <= {}", MCP_MAX_CURSOR),
-                None,
-            );
+            return err(req.id, -32602, &format!("cursor must be <= {}", MCP_MAX_CURSOR), None);
         }
         Err(msg) => return err(req.id, -32602, msg, None),
     };
@@ -58,16 +43,8 @@ pub(crate) fn handle_project_list(req: JsonRpcRequest) -> JsonRpcResponse {
     payload.insert("cursor".to_string(), Value::from(start as u64));
     payload.insert("limit".to_string(), Value::from(limit as u64));
     payload.insert("hasMore".to_string(), Value::Bool(has_more));
-    payload.insert(
-        "nextCursor".to_string(),
-        next_cursor
-            .map(|pos| Value::String(pos.to_string()))
-            .unwrap_or(Value::Null),
-    );
-    payload.insert(
-        "projects".to_string(),
-        serde_json::to_value(&page).unwrap_or_else(|_| Value::Array(Vec::new())),
-    );
+    payload.insert("nextCursor".to_string(), next_cursor.map(|pos| Value::String(pos.to_string())).unwrap_or(Value::Null));
+    payload.insert("projects".to_string(), serde_json::to_value(&page).unwrap_or_else(|_| Value::Array(Vec::new())));
     ok(
         req.id,
         json!({

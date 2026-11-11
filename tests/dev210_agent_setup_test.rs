@@ -15,16 +15,9 @@ fn call(method: &str, body: Value) -> (u16, Value) {
         path: "/api/agents/profiles".into(),
         query: HashMap::new(),
         headers: HashMap::new(),
-        body: if body.is_null() {
-            Vec::new()
-        } else {
-            serde_json::to_vec(&body).unwrap()
-        },
+        body: if body.is_null() { Vec::new() } else { serde_json::to_vec(&body).unwrap() },
     });
-    (
-        response.status,
-        serde_json::from_slice(&response.body).unwrap(),
-    )
+    (response.status, serde_json::from_slice(&response.body).unwrap())
 }
 
 fn workspace() -> tempfile::TempDir {
@@ -46,10 +39,7 @@ fn adding_a_profile_writes_the_default_project_and_lists_it() {
     assert!(body["data"]["installed_runners"].is_array());
     assert_eq!(body["data"]["project"], "APP");
 
-    let (status, body) = call(
-        "POST",
-        json!({"name": "implement", "runner": "claude", "effort": "high"}),
-    );
+    let (status, body) = call("POST", json!({"name": "implement", "runner": "claude", "effort": "high"}));
     assert_eq!(status, 200, "{body}");
     assert_eq!(body["data"]["updated"], true);
     let project_yaml = std::fs::read_to_string(tmp.path().join("APP/config.yml")).unwrap();
@@ -64,12 +54,7 @@ fn adding_a_profile_writes_the_default_project_and_lists_it() {
     let (status, _) = call("POST", json!({"name": "review", "runner": "codex"}));
     assert_eq!(status, 200);
     let (_, body) = call("GET", Value::Null);
-    let names: Vec<&str> = body["data"]["profiles"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|p| p["name"].as_str().unwrap())
-        .collect();
+    let names: Vec<&str> = body["data"]["profiles"].as_array().unwrap().iter().map(|p| p["name"].as_str().unwrap()).collect();
     assert_eq!(names, ["implement", "review"]);
 }
 
@@ -77,32 +62,16 @@ fn adding_a_profile_writes_the_default_project_and_lists_it() {
 fn adding_refuses_duplicates_and_bad_values() {
     let tmp = workspace();
     let _env = EnvVarGuard::set("LOTAR_TASKS_DIR", tmp.path().to_str().unwrap());
-    assert_eq!(
-        call(
-            "POST",
-            json!({"name": "dev", "runner": "claude", "global": true})
-        )
-        .0,
-        200
-    );
+    assert_eq!(call("POST", json!({"name": "dev", "runner": "claude", "global": true})).0, 200);
     let global_yaml = std::fs::read_to_string(tmp.path().join("config.yml")).unwrap();
     assert!(global_yaml.contains("dev"), "{global_yaml}");
 
     for (request, message) in [
         (json!({"name": "dev", "runner": "codex"}), "already exists"),
-        (
-            json!({"name": "bad name", "runner": "claude"}),
-            "Invalid agent name",
-        ),
+        (json!({"name": "bad name", "runner": "claude"}), "Invalid agent name"),
         (json!({"name": "x", "runner": "vim"}), "unsupported runner"),
-        (
-            json!({"name": "x", "runner": "claude", "model": "--yolo"}),
-            "model",
-        ),
-        (
-            json!({"name": "x", "runner": "claude", "permissions": "root"}),
-            "Invalid permissions",
-        ),
+        (json!({"name": "x", "runner": "claude", "model": "--yolo"}), "model"),
+        (json!({"name": "x", "runner": "claude", "permissions": "root"}), "Invalid permissions"),
     ] {
         let (status, body) = call("POST", request.clone());
         assert_eq!(status, 400, "{request} -> {body}");
@@ -117,14 +86,7 @@ fn config_set_accepts_an_agents_map() {
         .unwrap()
         .env("LOTAR_TASKS_DIR", tmp.path())
         .env("LOTAR_TEST_SILENT", "1")
-        .args([
-            "config",
-            "set",
-            "agents",
-            r#"{"implement": {"runner": "claude", "model": "sonnet"}, "quick": "copilot"}"#,
-            "--project",
-            "APP",
-        ])
+        .args(["config", "set", "agents", r#"{"implement": {"runner": "claude", "model": "sonnet"}, "quick": "copilot"}"#, "--project", "APP"])
         .assert()
         .success();
     let yaml = std::fs::read_to_string(tmp.path().join("APP/config.yml")).unwrap();

@@ -43,10 +43,7 @@ impl Default for ApiServer {
 
 impl ApiServer {
     pub fn new() -> Self {
-        Self {
-            handlers: HashMap::new(),
-            prefix_handlers: Vec::new(),
-        }
+        Self { handlers: HashMap::new(), prefix_handlers: Vec::new() }
     }
 
     pub fn register_handler<F>(&mut self, method: &str, path: &str, callback: F)
@@ -54,12 +51,7 @@ impl ApiServer {
         F: Fn(&HttpRequest) -> HttpResponse + Send + Sync + 'static,
     {
         let key = Self::normalize_key(method, path);
-        self.handlers.insert(
-            key,
-            ApiHandler {
-                callback: Box::new(callback),
-            },
-        );
+        self.handlers.insert(key, ApiHandler { callback: Box::new(callback) });
     }
 
     /// Register a prefix-matching handler using the route's OpenAPI-style
@@ -74,11 +66,7 @@ impl ApiServer {
         F: Fn(&HttpRequest) -> HttpResponse + Send + Sync + 'static,
     {
         let normalized_template = template.trim_end_matches('/').to_lowercase();
-        let prefix = normalized_template
-            .split_once('{')
-            .map(|(head, _)| head)
-            .unwrap_or(&normalized_template)
-            .trim_end_matches('/');
+        let prefix = normalized_template.split_once('{').map(|(head, _)| head).unwrap_or(&normalized_template).trim_end_matches('/');
         self.prefix_handlers.push(ApiPrefixHandler {
             method: method.to_uppercase(),
             prefix: prefix.to_string(),
@@ -90,9 +78,7 @@ impl ApiServer {
     pub fn handle_request(&self, req: &HttpRequest) -> HttpResponse {
         // Archived tasks are read-only unless the request is forced (DEV-4).
         let _archived_writes = crate::storage::operations::allow_archived_writes(
-            req.query
-                .get("force_archived")
-                .is_some_and(|value| matches!(value.as_str(), "true" | "1" | "yes")),
+            req.query.get("force_archived").is_some_and(|value| matches!(value.as_str(), "true" | "1" | "yes")),
         );
         let key = Self::normalize_key(&req.method, &req.path);
         if let Some(handler) = self.handlers.get(&key) {
@@ -116,12 +102,7 @@ impl ApiServer {
                 .filter_map(|key| key.split_once(' '))
                 .filter(|(_, route)| *route == path)
                 .map(|(m, _)| m.to_string())
-                .chain(
-                    self.prefix_handlers
-                        .iter()
-                        .filter(|h| path == h.prefix || path.starts_with(&format!("{}/", h.prefix)))
-                        .map(|h| h.method.clone()),
-                )
+                .chain(self.prefix_handlers.iter().filter(|h| path == h.prefix || path.starts_with(&format!("{}/", h.prefix))).map(|h| h.method.clone()))
                 .collect::<std::collections::BTreeSet<_>>()
                 .into_iter()
                 .collect();
@@ -129,10 +110,7 @@ impl ApiServer {
                 let allow = allowed.join(", ");
                 return HttpResponse {
                     status: 405,
-                    headers: vec![
-                        ("Content-Type".into(), "application/json".into()),
-                        ("Allow".into(), allow.clone()),
-                    ],
+                    headers: vec![("Content-Type".into(), "application/json".into()), ("Allow".into(), allow.clone())],
                     body: serde_json::to_vec(&serde_json::json!({
                         "error": {
                             "code": "METHOD_NOT_ALLOWED",
@@ -145,8 +123,7 @@ impl ApiServer {
             HttpResponse {
                 status: 404,
                 headers: vec![("Content-Type".into(), "application/json".into())],
-                body: b"{\"error\":{\"code\":\"NOT_FOUND\",\"message\":\"Route not found\"}}"
-                    .to_vec(),
+                body: b"{\"error\":{\"code\":\"NOT_FOUND\",\"message\":\"Route not found\"}}".to_vec(),
             }
         }
     }
@@ -168,11 +145,7 @@ impl ApiServer {
                 let (method, path) = key.split_once(' ').unwrap_or((key, ""));
                 (method.to_string(), path.to_string())
             })
-            .chain(
-                self.prefix_handlers
-                    .iter()
-                    .map(|handler| (handler.method.clone(), handler.template.clone())),
-            )
+            .chain(self.prefix_handlers.iter().map(|handler| (handler.method.clone(), handler.template.clone())))
             .collect();
         routes.sort();
         routes.dedup();

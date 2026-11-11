@@ -23,16 +23,10 @@ pub(super) fn register(api_server: &mut ApiServer) {
         // Report once (DEV-317): `finding` names the problem; an existing
         // ticket for it is returned instead of a new one.
         if let Some(key) = finding {
-            return match crate::services::finding_service::FindingService::report(
-                &mut storage,
-                req_create,
-                &key,
-            ) {
+            return match crate::services::finding_service::FindingService::report(&mut storage, req_create, &key) {
                 Ok((outcome, task)) => {
                     if outcome.created {
-                        let actor = crate::utils::identity::resolve_current_user(Some(
-                            resolver.path.as_path(),
-                        ));
+                        let actor = crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
                         crate::api_events::emit_task_created(&task, actor.as_deref());
                     }
                     let status = if outcome.created { 201 } else { 200 };
@@ -43,8 +37,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
         }
         match TaskService::create(&mut storage, req_create) {
             Ok(task) => {
-                let actor =
-                    crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
+                let actor = crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
                 crate::api_events::emit_task_created(&task, actor.as_deref());
                 ok_json(201, json!({"data": task}))
             }
@@ -75,17 +68,9 @@ pub(super) fn register(api_server: &mut ApiServer) {
 
         let total = tasks.len();
         let (start, end) = crate::utils::pagination::slice_bounds(total, page.offset, page.limit);
-        let page_tasks = tasks[start..end]
-            .iter()
-            .map(|(_, task)| task.clone())
-            .collect::<Vec<_>>();
+        let page_tasks = tasks[start..end].iter().map(|(_, task)| task.clone()).collect::<Vec<_>>();
 
-        let payload = crate::api_types::TaskListResponse {
-            total,
-            limit: page.limit,
-            offset: page.offset,
-            tasks: page_tasks,
-        };
+        let payload = crate::api_types::TaskListResponse { total, limit: page.limit, offset: page.offset, tasks: page_tasks };
 
         ok_json(200, json!({"data": payload}))
     });
@@ -101,10 +86,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
         if let Some(format) = params.remove("format")
             && !format.trim().eq_ignore_ascii_case("csv")
         {
-            return bad_request(format!(
-                "Unsupported export format '{}': only csv is available",
-                format.trim()
-            ));
+            return bad_request(format!("Unsupported export format '{}': only csv is available", format.trim()));
         }
         // Export shares the full list query (DEV-57): every filter, the
         // requested global order, and no pagination.
@@ -117,16 +99,8 @@ pub(super) fn register(api_server: &mut ApiServer) {
         // RFC 4180 quoting; cells a spreadsheet would read as a formula get
         // a leading apostrophe (DEV-275).
         fn esc(s: &str) -> String {
-            let guarded = if s.starts_with(['=', '+', '-', '@', '\t', '\r']) {
-                format!("'{s}")
-            } else {
-                s.to_string()
-            };
-            if guarded.contains(['"', ',', '\n', '\r']) {
-                format!("\"{}\"", guarded.replace('"', "\"\""))
-            } else {
-                guarded
-            }
+            let guarded = if s.starts_with(['=', '+', '-', '@', '\t', '\r']) { format!("'{s}") } else { s.to_string() };
+            if guarded.contains(['"', ',', '\n', '\r']) { format!("\"{}\"", guarded.replace('"', "\"\"")) } else { guarded }
         }
         let mut wtr = String::from("id,title,status,priority,type,assignee,due_date,tags\n");
         for (id, t) in tasks {
@@ -144,20 +118,10 @@ pub(super) fn register(api_server: &mut ApiServer) {
             wtr.push('\n');
         }
         let headers = vec![
-            (
-                "Content-Type".to_string(),
-                "text/csv; charset=utf-8".to_string(),
-            ),
-            (
-                "Content-Disposition".to_string(),
-                "attachment; filename=tasks.csv".to_string(),
-            ),
+            ("Content-Type".to_string(), "text/csv; charset=utf-8".to_string()),
+            ("Content-Disposition".to_string(), "attachment; filename=tasks.csv".to_string()),
         ];
-        HttpResponse {
-            status: 200,
-            headers,
-            body: wtr.into_bytes(),
-        }
+        HttpResponse { status: 200, headers, body: wtr.into_bytes() }
     });
 
     // GET /api/tasks/get?id=ID[&project=PREFIX][&include_deleted=true]
@@ -174,19 +138,13 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Some("true") => true,
             Some("false") => false,
             Some(other) => {
-                return bad_request(format!(
-                    "Invalid include_deleted value: '{other}' (expected true or false)"
-                ));
+                return bad_request(format!("Invalid include_deleted value: '{other}' (expected true or false)"));
             }
         };
         let resolver = try_response!(resolve_tasks_dir());
         let storage = crate::storage::manager::Storage::new(&resolver.path);
         let outcome = if include_deleted {
-            TaskService::get_including_deleted(
-                &storage,
-                &id,
-                req.query.get("project").map(|s| s.as_str()),
-            )
+            TaskService::get_including_deleted(&storage, &id, req.query.get("project").map(|s| s.as_str()))
         } else {
             TaskService::get(&storage, &id, req.query.get("project").map(|s| s.as_str()))
         };
@@ -199,152 +157,121 @@ pub(super) fn register(api_server: &mut ApiServer) {
     // GET /api/references/snippet?code=<path#x>
 
     api_server.register_handler("POST", "/api/tasks/attachments/upload", |req: &HttpRequest| {
-    use base64::Engine;
+        use base64::Engine;
 
-    let payload: crate::api_types::AttachmentUploadRequest = try_response!(parse_body_or_empty(req));
+        let payload: crate::api_types::AttachmentUploadRequest = try_response!(parse_body_or_empty(req));
 
-    if payload.id.trim().is_empty() {
-        return bad_request("Missing task id".into());
-    }
-    if payload.filename.trim().is_empty() {
-        return bad_request("Missing filename".into());
-    }
-    if payload.content_base64.trim().is_empty() {
-        return bad_request("Missing attachment content".into());
-    }
-
-    let resolver = try_response!(resolve_tasks_dir());
-
-    let base_config = try_response!(load_merged_config(&resolver));
-
-    // Apply per-project overrides using the canonical ID prefix (final
-    // numeric suffix split, so hyphenated prefixes like ABC-OPS resolve fully)
-    let config = match crate::storage::TaskId::parse(payload.id.trim()) {
-        Ok(parsed) => resolution::get_project_config(
-            &base_config,
-            &parsed.project,
-            resolver.path.as_path(),
-        )
-        .unwrap_or(base_config),
-        Err(_) => base_config,
-    };
-
-    // Enforce configured upload limit before decoding base64.
-    match config.attachments_max_upload_mb {
-        0 => {
-            return bad_request(
-                "Attachment uploads are disabled by configuration".to_string(),
-            )
+        if payload.id.trim().is_empty() {
+            return bad_request("Missing task id".into());
         }
-        -1 => {}
-        n if n > 0 => {
-            // keep going; enforce after decoding
+        if payload.filename.trim().is_empty() {
+            return bad_request("Missing filename".into());
         }
-        _ => {}
-    }
+        if payload.content_base64.trim().is_empty() {
+            return bad_request("Missing attachment content".into());
+        }
 
-    let bytes = match base64::engine::general_purpose::STANDARD
-        .decode(payload.content_base64.trim())
-    {
-        Ok(b) => b,
-        Err(_) => return bad_request("Invalid base64 content".into()),
-    };
+        let resolver = try_response!(resolve_tasks_dir());
 
-    // Identity and mutation access resolve BEFORE any file bytes are written:
-    // the ID must be canonical, exist exactly once, and be mutable from this
-    // workspace (uploads attach a reference, which is a mutation). Nested,
-    // unknown, or ambiguous targets must not leave orphaned upload files.
-    let task_id = payload.id.trim();
-    if let Err(err) = crate::storage::TaskId::parse(task_id) {
-        return bad_request(format!("Invalid task ID: {err}"));
-    }
-    {
-        let storage = crate::storage::manager::Storage::new(&resolver.path);
-        // Typed precheck classification (DEV-58): a missing target is a
-        // 404; malformed or ambiguous identifiers and cross-root targets
-        // stay client errors, without message-string matching.
-        let refusal = match storage.resolve_task_location(task_id) {
-            Ok(location) if !location.is_in_root(&resolver.path) => Some(bad_request(format!(
-                "Task '{}' is stored in workspace tasks root {} and cannot be modified from {}; run the command inside that workspace",
-                location.full_id(),
-                location.root.display(),
-                resolver.path.display()
-            ))),
-            Ok(_) => None,
-            Err(crate::storage::identity::TaskLookupError::NotFound(_)) => {
-                Some(not_found(format!("Task '{}' not found", task_id)))
-            }
-            Err(err) => Some(bad_request(err.to_string())),
+        let base_config = try_response!(load_merged_config(&resolver));
+
+        // Apply per-project overrides using the canonical ID prefix (final
+        // numeric suffix split, so hyphenated prefixes like ABC-OPS resolve fully)
+        let config = match crate::storage::TaskId::parse(payload.id.trim()) {
+            Ok(parsed) => resolution::get_project_config(&base_config, &parsed.project, resolver.path.as_path()).unwrap_or(base_config),
+            Err(_) => base_config,
         };
-        drop(storage);
-        if let Some(response) = refusal {
-            return response;
-        }
-    }
 
-    match AttachmentService::upload_and_attach(
-        resolver.path.as_path(),
-        &config,
-        task_id,
-        &payload.filename,
-        bytes,
-    ) {
-        Ok(upload) => {
-            // The store guard has dropped: post-commit hooks are safe to run.
-            // A no-op attach (already referenced; attached=false) changed
-            // only the blob store, not the task, so it emits no task event.
-            let mut storage = crate::storage::manager::Storage::new(&resolver.path);
-            publish_reference_change(&mut storage, resolver.path.as_path(), &upload.attach);
-            ok_json(
-                200,
-                json!({"data": crate::api_types::AttachmentUploadResponse {
-                    stored_path: upload.stored,
-                    attached: upload.attach.changed,
-                    task: upload.attach.task,
-                    metadata_removed: upload.metadata_removed,
-                    warnings: upload.warnings,
-                }}),
-            )
+        // Enforce configured upload limit before decoding base64.
+        match config.attachments_max_upload_mb {
+            0 => return bad_request("Attachment uploads are disabled by configuration".to_string()),
+            -1 => {}
+            n if n > 0 => {
+                // keep going; enforce after decoding
+            }
+            _ => {}
         }
-        Err(crate::services::attachment_service::UploadFailure::Rejected(msg)) => bad_request(msg),
-        Err(crate::services::attachment_service::UploadFailure::Store(msg)) => internal_error(msg),
-        Err(crate::services::attachment_service::UploadFailure::Failed(e)) => map_lotar_error(e),
-    }
-});
+
+        let bytes = match base64::engine::general_purpose::STANDARD.decode(payload.content_base64.trim()) {
+            Ok(b) => b,
+            Err(_) => return bad_request("Invalid base64 content".into()),
+        };
+
+        // Identity and mutation access resolve BEFORE any file bytes are written:
+        // the ID must be canonical, exist exactly once, and be mutable from this
+        // workspace (uploads attach a reference, which is a mutation). Nested,
+        // unknown, or ambiguous targets must not leave orphaned upload files.
+        let task_id = payload.id.trim();
+        if let Err(err) = crate::storage::TaskId::parse(task_id) {
+            return bad_request(format!("Invalid task ID: {err}"));
+        }
+        {
+            let storage = crate::storage::manager::Storage::new(&resolver.path);
+            // Typed precheck classification (DEV-58): a missing target is a
+            // 404; malformed or ambiguous identifiers and cross-root targets
+            // stay client errors, without message-string matching.
+            let refusal = match storage.resolve_task_location(task_id) {
+                Ok(location) if !location.is_in_root(&resolver.path) => Some(bad_request(format!(
+                    "Task '{}' is stored in workspace tasks root {} and cannot be modified from {}; run the command inside that workspace",
+                    location.full_id(),
+                    location.root.display(),
+                    resolver.path.display()
+                ))),
+                Ok(_) => None,
+                Err(crate::storage::identity::TaskLookupError::NotFound(_)) => Some(not_found(format!("Task '{}' not found", task_id))),
+                Err(err) => Some(bad_request(err.to_string())),
+            };
+            drop(storage);
+            if let Some(response) = refusal {
+                return response;
+            }
+        }
+
+        match AttachmentService::upload_and_attach(resolver.path.as_path(), &config, task_id, &payload.filename, bytes) {
+            Ok(upload) => {
+                // The store guard has dropped: post-commit hooks are safe to run.
+                // A no-op attach (already referenced; attached=false) changed
+                // only the blob store, not the task, so it emits no task event.
+                let mut storage = crate::storage::manager::Storage::new(&resolver.path);
+                publish_reference_change(&mut storage, resolver.path.as_path(), &upload.attach);
+                ok_json(
+                    200,
+                    json!({"data": crate::api_types::AttachmentUploadResponse {
+                        stored_path: upload.stored,
+                        attached: upload.attach.changed,
+                        task: upload.attach.task,
+                        metadata_removed: upload.metadata_removed,
+                        warnings: upload.warnings,
+                    }}),
+                )
+            }
+            Err(crate::services::attachment_service::UploadFailure::Rejected(msg)) => bad_request(msg),
+            Err(crate::services::attachment_service::UploadFailure::Store(msg)) => internal_error(msg),
+            Err(crate::services::attachment_service::UploadFailure::Failed(e)) => map_lotar_error(e),
+        }
+    });
 
     // POST /api/tasks/attachments/reorder {id, attachments: [stored names]}
     // The first image becomes the card cover (DEV-216).
-    api_server.register_handler(
-        "POST",
-        "/api/tasks/attachments/reorder",
-        |req: &HttpRequest| {
-            let payload: crate::api_types::AttachmentReorderRequest =
-                try_response!(parse_body_or_empty(req));
-            if payload.id.trim().is_empty() {
-                return bad_request("Missing task id".into());
+    api_server.register_handler("POST", "/api/tasks/attachments/reorder", |req: &HttpRequest| {
+        let payload: crate::api_types::AttachmentReorderRequest = try_response!(parse_body_or_empty(req));
+        if payload.id.trim().is_empty() {
+            return bad_request("Missing task id".into());
+        }
+        let resolver = try_response!(resolve_tasks_dir());
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path);
+        match AttachmentService::reorder_attachments(&mut storage, payload.id.trim(), &payload.attachments) {
+            Ok(outcome) => {
+                publish_reference_change(&mut storage, resolver.path.as_path(), &outcome);
+                ok_json(200, json!({"data": outcome.task}))
             }
-            let resolver = try_response!(resolve_tasks_dir());
-            let mut storage = crate::storage::manager::Storage::new(&resolver.path);
-            match AttachmentService::reorder_attachments(
-                &mut storage,
-                payload.id.trim(),
-                &payload.attachments,
-            ) {
-                Ok(outcome) => {
-                    publish_reference_change(&mut storage, resolver.path.as_path(), &outcome);
-                    ok_json(200, json!({"data": outcome.task}))
-                }
-                Err(e) => map_lotar_error(e),
-            }
-        },
-    );
+            Err(e) => map_lotar_error(e),
+        }
+    });
 
     // POST /api/tasks/attachments/remove
 
-    api_server.register_handler(
-    "POST",
-    "/api/tasks/attachments/remove",
-    |req: &HttpRequest| {
+    api_server.register_handler("POST", "/api/tasks/attachments/remove", |req: &HttpRequest| {
         let payload: crate::api_types::AttachmentRemoveRequest = try_response!(parse_body_or_empty(req));
 
         if payload.id.trim().is_empty() {
@@ -359,12 +286,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
         let base_config = try_response!(load_merged_config(&resolver));
 
         let config = match crate::storage::TaskId::parse(payload.id.trim()) {
-            Ok(parsed) => resolution::get_project_config(
-                &base_config,
-                &parsed.project,
-                resolver.path.as_path(),
-            )
-            .unwrap_or(base_config),
+            Ok(parsed) => resolution::get_project_config(&base_config, &parsed.project, resolver.path.as_path()).unwrap_or(base_config),
             Err(_) => base_config,
         };
         let root = match AttachmentService::resolve_attachments_root(resolver.path.as_path(), &config) {
@@ -387,11 +309,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                 Err(e) => return map_lotar_error(e),
             };
 
-            match AttachmentService::detach_managed_reference(
-                &mut storage,
-                &payload.id,
-                &payload.stored_path,
-            ) {
+            match AttachmentService::detach_managed_reference(&mut storage, &payload.id, &payload.stored_path) {
                 Ok(outcome) => {
                     // Typed-membership gate before any blob cleanup (DEV-61):
                     // only a task that actually carried the managed attachment
@@ -399,16 +317,11 @@ pub(super) fn register(api_server: &mut ApiServer) {
                     // reference — including a same-named repository `file`
                     // entry — fails closed with the store untouched.
                     if !outcome.changed {
-                        return bad_request(format!(
-                            "Task '{}' does not reference attachment '{}'",
-                            payload.id, payload.stored_path
-                        ));
+                        return bad_request(format!("Task '{}' does not reference attachment '{}'", payload.id, payload.stored_path));
                     }
                     let hash_tag = AttachmentService::extract_hash_tag(&payload.stored_path);
                     let still_referenced = match hash_tag.as_deref() {
-                        Some(hash) => {
-                            AttachmentService::is_hash_referenced(&storage, &root, hash)
-                        }
+                        Some(hash) => AttachmentService::is_hash_referenced(&storage, &root, hash),
                         None => false,
                     };
 
@@ -416,9 +329,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                     if !still_referenced {
                         if let Some(hash) = hash_tag.as_deref() {
                             deleted = AttachmentService::delete_all_by_hash(&root, hash) > 0;
-                        } else if let Ok(path) =
-                            AttachmentService::resolve_attachment_path(&root, &payload.stored_path)
-                        {
+                        } else if let Ok(path) = AttachmentService::resolve_attachment_path(&root, &payload.stored_path) {
                             deleted = std::fs::remove_file(path).is_ok();
                         }
                     }
@@ -432,53 +343,39 @@ pub(super) fn register(api_server: &mut ApiServer) {
         match removed {
             Ok((outcome, still_referenced, deleted)) => {
                 publish_reference_change(&mut storage, resolver.path.as_path(), &outcome);
-                ok_json(
-                    200,
-                    json!({"data": crate::api_types::AttachmentRemoveResponse { task: outcome.task, deleted, still_referenced }}),
-                )
+                ok_json(200, json!({"data": crate::api_types::AttachmentRemoveResponse { task: outcome.task, deleted, still_referenced }}))
             }
             Err(e) => map_lotar_error(e),
         }
-    },
-);
+    });
 
     // POST /api/tasks/references/link/add
 
-    api_server.register_handler(
-        "POST",
-        "/api/tasks/references/link/add",
-        |req: &HttpRequest| {
-            let payload: crate::api_types::LinkReferenceAddRequest = try_response!(parse_body_or_empty(req));
+    api_server.register_handler("POST", "/api/tasks/references/link/add", |req: &HttpRequest| {
+        let payload: crate::api_types::LinkReferenceAddRequest = try_response!(parse_body_or_empty(req));
 
-            if payload.id.trim().is_empty() {
-                return bad_request("Missing task id".into());
-            }
-            if payload.url.trim().is_empty() {
-                return bad_request("Missing url".into());
-            }
+        if payload.id.trim().is_empty() {
+            return bad_request("Missing task id".into());
+        }
+        if payload.url.trim().is_empty() {
+            return bad_request("Missing url".into());
+        }
 
-            let resolver = try_response!(resolve_tasks_dir());
+        let resolver = try_response!(resolve_tasks_dir());
 
-            let mut storage = crate::storage::manager::Storage::new(&resolver.path);
-            match ReferenceService::attach_link_reference(&mut storage, &payload.id, &payload.url) {
-                Ok(outcome) => {
-                    publish_reference_change(&mut storage, resolver.path.as_path(), &outcome);
-                    ok_json(
-                        200,
-                        json!({"data": crate::api_types::LinkReferenceAddResponse { task: outcome.task, added: outcome.changed }}),
-                    )
-                }
-                Err(e) => map_lotar_error(e),
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path);
+        match ReferenceService::attach_link_reference(&mut storage, &payload.id, &payload.url) {
+            Ok(outcome) => {
+                publish_reference_change(&mut storage, resolver.path.as_path(), &outcome);
+                ok_json(200, json!({"data": crate::api_types::LinkReferenceAddResponse { task: outcome.task, added: outcome.changed }}))
             }
-        },
-    );
+            Err(e) => map_lotar_error(e),
+        }
+    });
 
     // POST /api/tasks/references/link/remove
 
-    api_server.register_handler(
-    "POST",
-    "/api/tasks/references/link/remove",
-    |req: &HttpRequest| {
+    api_server.register_handler("POST", "/api/tasks/references/link/remove", |req: &HttpRequest| {
         let payload: crate::api_types::LinkReferenceRemoveRequest = try_response!(parse_body_or_empty(req));
 
         if payload.id.trim().is_empty() {
@@ -494,60 +391,43 @@ pub(super) fn register(api_server: &mut ApiServer) {
         match ReferenceService::detach_link_reference(&mut storage, &payload.id, &payload.url) {
             Ok(outcome) => {
                 publish_reference_change(&mut storage, resolver.path.as_path(), &outcome);
-                ok_json(
-                    200,
-                    json!({"data": crate::api_types::LinkReferenceRemoveResponse { task: outcome.task, removed: outcome.changed }}),
-                )
+                ok_json(200, json!({"data": crate::api_types::LinkReferenceRemoveResponse { task: outcome.task, removed: outcome.changed }}))
             }
             Err(e) => map_lotar_error(e),
         }
-    },
-);
+    });
 
     // POST /api/tasks/references/code/add
 
-    api_server.register_handler(
-        "POST",
-        "/api/tasks/references/code/add",
-        |req: &HttpRequest| {
-            let payload: crate::api_types::CodeReferenceAddRequest = try_response!(parse_body_or_empty(req));
+    api_server.register_handler("POST", "/api/tasks/references/code/add", |req: &HttpRequest| {
+        let payload: crate::api_types::CodeReferenceAddRequest = try_response!(parse_body_or_empty(req));
 
-            if payload.id.trim().is_empty() {
-                return bad_request("Missing task id".into());
-            }
-            if payload.code.trim().is_empty() {
-                return bad_request("Missing code reference".into());
-            }
+        if payload.id.trim().is_empty() {
+            return bad_request("Missing task id".into());
+        }
+        if payload.code.trim().is_empty() {
+            return bad_request("Missing code reference".into());
+        }
 
-            let resolver = try_response!(resolve_tasks_dir());
-            let repo_root = match crate::utils::git::find_repo_root(&resolver.path) {
-                Some(root) => root,
-                None => return bad_request("Unable to locate git repository".into()),
-            };
+        let resolver = try_response!(resolve_tasks_dir());
+        let repo_root = match crate::utils::git::find_repo_root(&resolver.path) {
+            Some(root) => root,
+            None => return bad_request("Unable to locate git repository".into()),
+        };
 
-            let mut storage = crate::storage::manager::Storage::new(&resolver.path);
-            match ReferenceService::attach_code_reference(&mut storage,
-&repo_root,
-&payload.id,
-&payload.code,) {
-                Ok(outcome) => {
-                    publish_reference_change(&mut storage, resolver.path.as_path(), &outcome);
-                    ok_json(
-                        200,
-                        json!({"data": crate::api_types::CodeReferenceAddResponse { task: outcome.task, added: outcome.changed }}),
-                    )
-                }
-                Err(e) => map_lotar_error(e),
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path);
+        match ReferenceService::attach_code_reference(&mut storage, &repo_root, &payload.id, &payload.code) {
+            Ok(outcome) => {
+                publish_reference_change(&mut storage, resolver.path.as_path(), &outcome);
+                ok_json(200, json!({"data": crate::api_types::CodeReferenceAddResponse { task: outcome.task, added: outcome.changed }}))
             }
-        },
-    );
+            Err(e) => map_lotar_error(e),
+        }
+    });
 
     // POST /api/tasks/references/code/remove
 
-    api_server.register_handler(
-    "POST",
-    "/api/tasks/references/code/remove",
-    |req: &HttpRequest| {
+    api_server.register_handler("POST", "/api/tasks/references/code/remove", |req: &HttpRequest| {
         let payload: crate::api_types::CodeReferenceRemoveRequest = try_response!(parse_body_or_empty(req));
 
         if payload.id.trim().is_empty() {
@@ -563,60 +443,43 @@ pub(super) fn register(api_server: &mut ApiServer) {
         match ReferenceService::detach_code_reference(&mut storage, &payload.id, &payload.code) {
             Ok(outcome) => {
                 publish_reference_change(&mut storage, resolver.path.as_path(), &outcome);
-                ok_json(
-                    200,
-                    json!({"data": crate::api_types::CodeReferenceRemoveResponse { task: outcome.task, removed: outcome.changed }}),
-                )
+                ok_json(200, json!({"data": crate::api_types::CodeReferenceRemoveResponse { task: outcome.task, removed: outcome.changed }}))
             }
             Err(e) => map_lotar_error(e),
         }
-    },
-);
+    });
 
     // POST /api/tasks/references/file/add
 
-    api_server.register_handler(
-        "POST",
-        "/api/tasks/references/file/add",
-        |req: &HttpRequest| {
-            let payload: crate::api_types::FileReferenceAddRequest = try_response!(parse_body_or_empty(req));
+    api_server.register_handler("POST", "/api/tasks/references/file/add", |req: &HttpRequest| {
+        let payload: crate::api_types::FileReferenceAddRequest = try_response!(parse_body_or_empty(req));
 
-            if payload.id.trim().is_empty() {
-                return bad_request("Missing task id".into());
-            }
-            if payload.path.trim().is_empty() {
-                return bad_request("Missing file path".into());
-            }
+        if payload.id.trim().is_empty() {
+            return bad_request("Missing task id".into());
+        }
+        if payload.path.trim().is_empty() {
+            return bad_request("Missing file path".into());
+        }
 
-            let resolver = try_response!(resolve_tasks_dir());
-            let repo_root = match crate::utils::git::find_repo_root(&resolver.path) {
-                Some(root) => root,
-                None => return bad_request("Unable to locate git repository".into()),
-            };
+        let resolver = try_response!(resolve_tasks_dir());
+        let repo_root = match crate::utils::git::find_repo_root(&resolver.path) {
+            Some(root) => root,
+            None => return bad_request("Unable to locate git repository".into()),
+        };
 
-            let mut storage = crate::storage::manager::Storage::new(&resolver.path);
-            match ReferenceService::attach_file_reference(&mut storage,
-&repo_root,
-&payload.id,
-&payload.path,) {
-                Ok(outcome) => {
-                    publish_reference_change(&mut storage, resolver.path.as_path(), &outcome);
-                    ok_json(
-                        200,
-                        json!({"data": crate::api_types::FileReferenceAddResponse { task: outcome.task, added: outcome.changed }}),
-                    )
-                }
-                Err(e) => map_lotar_error(e),
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path);
+        match ReferenceService::attach_file_reference(&mut storage, &repo_root, &payload.id, &payload.path) {
+            Ok(outcome) => {
+                publish_reference_change(&mut storage, resolver.path.as_path(), &outcome);
+                ok_json(200, json!({"data": crate::api_types::FileReferenceAddResponse { task: outcome.task, added: outcome.changed }}))
             }
-        },
-    );
+            Err(e) => map_lotar_error(e),
+        }
+    });
 
     // POST /api/tasks/references/file/remove
 
-    api_server.register_handler(
-    "POST",
-    "/api/tasks/references/file/remove",
-    |req: &HttpRequest| {
+    api_server.register_handler("POST", "/api/tasks/references/file/remove", |req: &HttpRequest| {
         let payload: crate::api_types::FileReferenceRemoveRequest = try_response!(parse_body_or_empty(req));
 
         if payload.id.trim().is_empty() {
@@ -633,21 +496,14 @@ pub(super) fn register(api_server: &mut ApiServer) {
         };
 
         let mut storage = crate::storage::manager::Storage::new(&resolver.path);
-        match ReferenceService::detach_file_reference(&mut storage,
-&repo_root,
-&payload.id,
-&payload.path,) {
+        match ReferenceService::detach_file_reference(&mut storage, &repo_root, &payload.id, &payload.path) {
             Ok(outcome) => {
                 publish_reference_change(&mut storage, resolver.path.as_path(), &outcome);
-                ok_json(
-                    200,
-                    json!({"data": crate::api_types::FileReferenceRemoveResponse { task: outcome.task, removed: outcome.changed }}),
-                )
+                ok_json(200, json!({"data": crate::api_types::FileReferenceRemoveResponse { task: outcome.task, removed: outcome.changed }}))
             }
             Err(e) => map_lotar_error(e),
         }
-    },
-);
+    });
 
     // POST /api/tasks/references/add
 
@@ -672,16 +528,10 @@ pub(super) fn register(api_server: &mut ApiServer) {
         let resolver = try_response!(resolve_tasks_dir());
 
         let mut storage = crate::storage::manager::Storage::new(&resolver.path);
-        match ReferenceService::attach_platform_reference(&mut storage,
-&payload.id,
-&kind,
-&payload.value,) {
+        match ReferenceService::attach_platform_reference(&mut storage, &payload.id, &kind, &payload.value) {
             Ok(outcome) => {
                 publish_reference_change(&mut storage, resolver.path.as_path(), &outcome);
-                ok_json(
-                    200,
-                    json!({"data": crate::api_types::GenericReferenceAddResponse { task: outcome.task, added: outcome.changed }}),
-                )
+                ok_json(200, json!({"data": crate::api_types::GenericReferenceAddResponse { task: outcome.task, added: outcome.changed }}))
             }
             Err(e) => map_lotar_error(e),
         }
@@ -689,10 +539,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
 
     // POST /api/tasks/references/remove
 
-    api_server.register_handler(
-    "POST",
-    "/api/tasks/references/remove",
-    |req: &HttpRequest| {
+    api_server.register_handler("POST", "/api/tasks/references/remove", |req: &HttpRequest| {
         let payload: crate::api_types::GenericReferenceRemoveRequest = try_response!(parse_body_or_empty(req));
 
         if payload.id.trim().is_empty() {
@@ -713,21 +560,14 @@ pub(super) fn register(api_server: &mut ApiServer) {
         let resolver = try_response!(resolve_tasks_dir());
 
         let mut storage = crate::storage::manager::Storage::new(&resolver.path);
-        match ReferenceService::detach_platform_reference(&mut storage,
-&payload.id,
-&kind,
-&payload.value,) {
+        match ReferenceService::detach_platform_reference(&mut storage, &payload.id, &kind, &payload.value) {
             Ok(outcome) => {
                 publish_reference_change(&mut storage, resolver.path.as_path(), &outcome);
-                ok_json(
-                    200,
-                    json!({"data": crate::api_types::GenericReferenceRemoveResponse { task: outcome.task, removed: outcome.changed }}),
-                )
+                ok_json(200, json!({"data": crate::api_types::GenericReferenceRemoveResponse { task: outcome.task, removed: outcome.changed }}))
             }
             Err(e) => map_lotar_error(e),
         }
-    },
-);
+    });
 
     // GET /api/tasks/suggest?q=TEXT[&project=PREFIX][&limit=N]
 
@@ -736,15 +576,8 @@ pub(super) fn register(api_server: &mut ApiServer) {
         let storage = crate::storage::manager::Storage::new(&resolver.path);
         let q = req.query.get("q").cloned().unwrap_or_default();
         let project = req.query.get("project").cloned();
-        let limit: usize = req
-            .query
-            .get("limit")
-            .and_then(|s| s.parse::<usize>().ok())
-            .unwrap_or(20);
-        let list = TaskService::suggest(&storage, &q, project, limit)
-            .into_iter()
-            .map(|(id, t)| json!({"id": id, "title": t.title}))
-            .collect::<Vec<_>>();
+        let limit: usize = req.query.get("limit").and_then(|s| s.parse::<usize>().ok()).unwrap_or(20);
+        let list = TaskService::suggest(&storage, &q, project, limit).into_iter().map(|(id, t)| json!({"id": id, "title": t.title})).collect::<Vec<_>>();
         ok_json(200, json!({"data": list}))
     });
 
@@ -772,20 +605,14 @@ pub(super) fn register(api_server: &mut ApiServer) {
             None | Some(serde_json::Value::Null) => None,
             Some(serde_json::Value::String(raw)) if !raw.trim().is_empty() => Some(raw.clone()),
             Some(_) => {
-                return bad_request(
-                    "expected_modified must be the task's modified value as a string".into(),
-                );
+                return bad_request("expected_modified must be the task's modified value as a string".into());
             }
         };
         match TaskService::update_with_receipt(
             &mut storage,
             &id,
             patch,
-            crate::services::task_service::TaskUpdateContext {
-                expected_modified,
-                emit_api_event: true,
-                ..Default::default()
-            },
+            crate::services::task_service::TaskUpdateContext { expected_modified, emit_api_event: true, ..Default::default() },
         ) {
             Ok(receipt) => task_change_response(receipt),
             Err(e) => map_lotar_error(e),
@@ -810,18 +637,12 @@ pub(super) fn register(api_server: &mut ApiServer) {
             _ => return bad_request("Missing status".into()),
         };
         // Validation happens in the service against the task's project config.
-        let patch = crate::api_types::TaskUpdate {
-            status: Some(new_status),
-            ..Default::default()
-        };
+        let patch = crate::api_types::TaskUpdate { status: Some(new_status), ..Default::default() };
         match TaskService::update_with_receipt(
             &mut storage,
             &id,
             patch,
-            crate::services::task_service::TaskUpdateContext {
-                emit_api_event: true,
-                ..Default::default()
-            },
+            crate::services::task_service::TaskUpdateContext { emit_api_event: true, ..Default::default() },
         ) {
             Ok(receipt) => task_change_response(receipt),
             Err(e) => map_lotar_error(e),
@@ -882,13 +703,12 @@ pub(super) fn register(api_server: &mut ApiServer) {
         if trimmed.is_empty() {
             return bad_request("Missing text".into());
         }
-        let receipt =
-            match TaskService::update_comment_with_receipt(&mut storage, &id, index, trimmed) {
-                Ok(receipt) => receipt,
-                // Typed classification (DEV-58): malformed IDs, bad indices,
-                // and tombstone refusals stay 400s; storage faults are 500s.
-                Err(err) => return map_lotar_error(err),
-            };
+        let receipt = match TaskService::update_comment_with_receipt(&mut storage, &id, index, trimmed) {
+            Ok(receipt) => receipt,
+            // Typed classification (DEV-58): malformed IDs, bad indices,
+            // and tombstone refusals stay 400s; storage faults are 500s.
+            Err(err) => return map_lotar_error(err),
+        };
         if receipt.changed {
             let actor = crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
             crate::api_events::emit_task_updated(&receipt.dto, actor.as_deref());
@@ -905,28 +725,22 @@ pub(super) fn register(api_server: &mut ApiServer) {
         if payload.id.trim().is_empty() {
             return bad_request("Missing id".into());
         }
-        let (outcome, changed) = match TaskService::delete_with_receipt(
-            &mut storage,
-            payload.id.trim(),
-            req.query.get("project").map(|s| s.as_str()),
-            payload.hard,
-        ) {
-            Ok(value) => value,
-            Err(err) => {
-                // Typed classification (DEV-58): invalid IDs, project
-                // mismatches, ambiguity, and cross-root refusals are
-                // client errors; storage faults are internal failures.
-                return map_lotar_error(err);
-            }
-        };
+        let (outcome, changed) =
+            match TaskService::delete_with_receipt(&mut storage, payload.id.trim(), req.query.get("project").map(|s| s.as_str()), payload.hard) {
+                Ok(value) => value,
+                Err(err) => {
+                    // Typed classification (DEV-58): invalid IDs, project
+                    // mismatches, ambiguity, and cross-root refusals are
+                    // client errors; storage faults are internal failures.
+                    return map_lotar_error(err);
+                }
+            };
         if changed {
             // Emit the CANONICAL id: a padded request alias (TP-001) must not
             // leak into UI event streams as a stale identity. Soft and hard
             // deletion both surface as task_deleted; the tombstone state and
             // the physical file removal are distinguished by the response.
-            let canonical_id = crate::storage::TaskId::parse(payload.id.trim())
-                .map(|parsed| parsed.canonical())
-                .unwrap_or_else(|_| payload.id.clone());
+            let canonical_id = crate::storage::TaskId::parse(payload.id.trim()).map(|parsed| parsed.canonical()).unwrap_or_else(|_| payload.id.clone());
             let actor = crate::utils::identity::resolve_current_user(None);
             crate::api_events::emit_task_deleted(&canonical_id, actor.as_deref());
         }
@@ -946,11 +760,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Some(s) if !s.trim().is_empty() => s.trim().to_string(),
             _ => return bad_request("Missing id".into()),
         };
-        match TaskService::restore_with_receipt(
-            &mut storage,
-            &id,
-            req.query.get("project").map(|s| s.as_str()),
-        ) {
+        match TaskService::restore_with_receipt(&mut storage, &id, req.query.get("project").map(|s| s.as_str())) {
             Ok(receipt) => {
                 if receipt.changed {
                     let actor = crate::utils::identity::resolve_current_user(None);
@@ -963,10 +773,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
     });
 
     // POST /api/tasks/archive {id}[?project=PREFIX] and /api/tasks/unarchive (DEV-4)
-    for (path, archive) in [
-        ("/api/tasks/archive", true),
-        ("/api/tasks/unarchive", false),
-    ] {
+    for (path, archive) in [("/api/tasks/archive", true), ("/api/tasks/unarchive", false)] {
         api_server.register_handler("POST", path, move |req: &HttpRequest| {
             let resolver = try_response!(resolve_tasks_dir());
             let mut storage = crate::storage::manager::Storage::new(&resolver.path);
@@ -978,12 +785,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                 Some(s) if !s.trim().is_empty() => s.trim().to_string(),
                 _ => return bad_request("Missing id".into()),
             };
-            match TaskService::archive_with_receipt(
-                &mut storage,
-                &id,
-                req.query.get("project").map(|s| s.as_str()),
-                archive,
-            ) {
+            match TaskService::archive_with_receipt(&mut storage, &id, req.query.get("project").map(|s| s.as_str()), archive) {
                 Ok(receipt) => {
                     if receipt.changed {
                         let actor = crate::utils::identity::resolve_current_user(None);
@@ -1014,11 +816,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Ok(response) => {
                 if !response.dry_run {
                     let actor = crate::utils::identity::resolve_current_user(None);
-                    crate::api_events::emit_task_moved(
-                        &response.from,
-                        &response.task,
-                        actor.as_deref(),
-                    );
+                    crate::api_events::emit_task_moved(&response.from, &response.task, actor.as_deref());
                 }
                 ok_json(200, json!({"data": response}))
             }
@@ -1043,9 +841,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Err(_) => return bad_request("Invalid task id".into()),
         };
         let file_rel = task_file_rel(&repo_root, &tasks_rel, &parsed);
-        let mut commits = match crate::services::audit_service::AuditService::list_commits_for_task(
-            &repo_root, &tasks_abs, &file_rel,
-        ) {
+        let mut commits = match crate::services::audit_service::AuditService::list_commits_for_task(&repo_root, &tasks_abs, &file_rel) {
             Ok(v) => v,
             Err(e) => return internal_error(e),
         };
@@ -1083,24 +879,12 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Err(_) => return bad_request("Invalid task id".into()),
         };
         let file_rel = task_file_rel(&repo_root, &tasks_rel, &parsed);
-        let commits = crate::services::audit_service::AuditService::list_commits_for_task(
-            &repo_root, &tasks_abs, &file_rel,
-        )
-        .unwrap_or_default();
-        let at_commit = crate::services::audit_service::AuditService::path_at_commit(
-            &commits, &commit, &file_rel,
-        );
-        match crate::services::audit_service::AuditService::show_file_diff(
-            &repo_root, &commit, at_commit,
-        ) {
+        let commits = crate::services::audit_service::AuditService::list_commits_for_task(&repo_root, &tasks_abs, &file_rel).unwrap_or_default();
+        let at_commit = crate::services::audit_service::AuditService::path_at_commit(&commits, &commit, &file_rel);
+        match crate::services::audit_service::AuditService::show_file_diff(&repo_root, &commit, at_commit) {
             Ok(diff) => ok_json(200, json!({"data": diff})),
             // A commit git does not know is the caller's mistake (DEV-276).
-            Err(e)
-                if e.contains("bad revision")
-                    || e.contains("unknown revision")
-                    || e.contains("Invalid commit reference")
-                    || e.contains("bad object") =>
-            {
+            Err(e) if e.contains("bad revision") || e.contains("unknown revision") || e.contains("Invalid commit reference") || e.contains("bad object") => {
                 bad_request(e)
             }
             Err(e) => internal_error(e),
@@ -1116,10 +900,7 @@ fn parse_string_field(body: &serde_json::Value, key: &str) -> Result<Option<Stri
     }
 }
 
-fn parse_clearable_string_field(
-    body: &serde_json::Value,
-    keys: &[&str],
-) -> Result<Option<String>, String> {
+fn parse_clearable_string_field(body: &serde_json::Value, keys: &[&str]) -> Result<Option<String>, String> {
     for key in keys {
         match body.get(*key) {
             None => continue,
@@ -1131,10 +912,7 @@ fn parse_clearable_string_field(
     Ok(None)
 }
 
-fn parse_string_list_field(
-    body: &serde_json::Value,
-    key: &str,
-) -> Result<Option<Vec<String>>, String> {
+fn parse_string_list_field(body: &serde_json::Value, key: &str) -> Result<Option<Vec<String>>, String> {
     match body.get(key) {
         None => Ok(None),
         Some(serde_json::Value::Null) => Ok(Some(Vec::new())),
@@ -1159,10 +937,7 @@ fn parse_sprints_field(body: &serde_json::Value) -> Result<Option<Vec<u32>>, Str
         Some(serde_json::Value::Array(items)) => {
             let mut collected = Vec::with_capacity(items.len());
             for item in items {
-                let id = item
-                    .as_u64()
-                    .and_then(|v| u32::try_from(v).ok())
-                    .ok_or_else(|| "sprints must be an array of positive integers".to_string())?;
+                let id = item.as_u64().and_then(|v| u32::try_from(v).ok()).ok_or_else(|| "sprints must be an array of positive integers".to_string())?;
                 if id == 0 {
                     return Err("sprints must be an array of positive integers".to_string());
                 }
@@ -1174,25 +949,18 @@ fn parse_sprints_field(body: &serde_json::Value) -> Result<Option<Vec<u32>>, Str
     }
 }
 
-fn parse_relationships_field(
-    body: &serde_json::Value,
-    key: &str,
-) -> Result<Option<crate::types::TaskRelationships>, String> {
+fn parse_relationships_field(body: &serde_json::Value, key: &str) -> Result<Option<crate::types::TaskRelationships>, String> {
     match body.get(key) {
         None => Ok(None),
         Some(serde_json::Value::Null) => Ok(Some(crate::types::TaskRelationships::default())),
-        Some(value) => {
-            match serde_json::from_value::<crate::types::TaskRelationships>(value.clone()) {
-                Ok(rel) => Ok(Some(rel)),
-                Err(e) => Err(format!("Invalid relationships payload: {}", e)),
-            }
-        }
+        Some(value) => match serde_json::from_value::<crate::types::TaskRelationships>(value.clone()) {
+            Ok(rel) => Ok(Some(rel)),
+            Err(e) => Err(format!("Invalid relationships payload: {}", e)),
+        },
     }
 }
 
-fn parse_custom_fields_body(
-    body: &serde_json::Value,
-) -> Result<Option<crate::types::CustomFields>, String> {
+fn parse_custom_fields_body(body: &serde_json::Value) -> Result<Option<crate::types::CustomFields>, String> {
     let mut merged: Option<crate::types::CustomFields> = None;
 
     if let Some(fields) = body.get("fields")
@@ -1225,10 +993,7 @@ fn parse_custom_fields_body(
 fn parse_legacy_fields(fields: &serde_json::Value) -> Result<Vec<(String, String)>, String> {
     match fields {
         serde_json::Value::Null => Ok(Vec::new()),
-        serde_json::Value::Object(map) => Ok(map
-            .iter()
-            .map(|(k, v)| (k.clone(), v.as_str().unwrap_or(&v.to_string()).to_string()))
-            .collect()),
+        serde_json::Value::Object(map) => Ok(map.iter().map(|(k, v)| (k.clone(), v.as_str().unwrap_or(&v.to_string()).to_string())).collect()),
         serde_json::Value::Array(items) => {
             let mut out = Vec::with_capacity(items.len());
             for item in items {
@@ -1250,10 +1015,7 @@ fn parse_legacy_fields(fields: &serde_json::Value) -> Result<Vec<(String, String
     }
 }
 
-fn parse_task_create_body(
-    body: &serde_json::Value,
-    req: &HttpRequest,
-) -> Result<crate::api_types::TaskCreate, String> {
+fn parse_task_create_body(body: &serde_json::Value, req: &HttpRequest) -> Result<crate::api_types::TaskCreate, String> {
     let title = body
         .get("title")
         .and_then(|v| v.as_str())
@@ -1261,11 +1023,7 @@ fn parse_task_create_body(
         .filter(|s| !s.is_empty())
         .ok_or_else(|| "Missing required field: title".to_string())?;
 
-    let project = body
-        .get("project")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string())
-        .or_else(|| req.query.get("project").cloned());
+    let project = body.get("project").and_then(|v| v.as_str()).map(|s| s.to_string()).or_else(|| req.query.get("project").cloned());
 
     Ok(crate::api_types::TaskCreate {
         title,
@@ -1279,8 +1037,7 @@ fn parse_task_create_body(
         effort: parse_string_field(body, "effort")?,
         description: parse_string_field(body, "description")?,
         tags: parse_string_list_field(body, "tags")?.unwrap_or_default(),
-        acceptance_criteria: parse_string_list_field(body, "acceptance_criteria")?
-            .unwrap_or_default(),
+        acceptance_criteria: parse_string_list_field(body, "acceptance_criteria")?.unwrap_or_default(),
         relationships: match parse_relationships_field(body, "relationships")? {
             None => None,
             Some(rel) if rel.is_empty() => None,
@@ -1315,18 +1072,11 @@ const TASK_UPDATE_KEYS: &[&str] = &[
     "expected_modified",
 ];
 
-fn parse_task_update_body(
-    body: &serde_json::Value,
-) -> Result<crate::api_types::TaskUpdate, String> {
+fn parse_task_update_body(body: &serde_json::Value) -> Result<crate::api_types::TaskUpdate, String> {
     if let Some(map) = body.as_object()
-        && let Some(unknown) = map
-            .keys()
-            .find(|key| !TASK_UPDATE_KEYS.contains(&key.as_str()))
+        && let Some(unknown) = map.keys().find(|key| !TASK_UPDATE_KEYS.contains(&key.as_str()))
     {
-        return Err(format!(
-            "Unknown field '{unknown}'. Fields: {}",
-            TASK_UPDATE_KEYS[1..].join(", ")
-        ));
+        return Err(format!("Unknown field '{unknown}'. Fields: {}", TASK_UPDATE_KEYS[1..].join(", ")));
     }
     Ok(crate::api_types::TaskUpdate {
         title: parse_string_field(body, "title")?,
@@ -1386,33 +1136,16 @@ fn parse_list_query(
 /// Repo-relative path of a task's current file, in whatever subfolder or
 /// archive it sits (DEV-4); the top-level spelling when the file is gone,
 /// so git history of a removed task still resolves.
-fn task_file_rel(
-    repo_root: &std::path::Path,
-    tasks_rel: &std::path::Path,
-    parsed: &crate::storage::TaskId,
-) -> std::path::PathBuf {
+fn task_file_rel(repo_root: &std::path::Path, tasks_rel: &std::path::Path, parsed: &crate::storage::TaskId) -> std::path::PathBuf {
     let tasks_abs = repo_root.join(tasks_rel);
-    crate::storage::operations::StorageOperations::get_file_path_for_id(
-        &tasks_abs.join(&parsed.project),
-        &parsed.canonical(),
-    )
-    .and_then(|file| {
-        file.strip_prefix(&tasks_abs)
-            .ok()
-            .map(|rel| tasks_rel.join(rel))
-    })
-    .unwrap_or_else(|| {
-        tasks_rel
-            .join(&parsed.project)
-            .join(format!("{}.yml", parsed.number))
-    })
+    crate::storage::operations::StorageOperations::get_file_path_for_id(&tasks_abs.join(&parsed.project), &parsed.canonical())
+        .and_then(|file| file.strip_prefix(&tasks_abs).ok().map(|rel| tasks_rel.join(rel)))
+        .unwrap_or_else(|| tasks_rel.join(&parsed.project).join(format!("{}.yml", parsed.number)))
 }
 
 /// `{ data }`, plus `deferred` when a running agent job holds the status or
 /// assignee change for its end (DEV-320).
-fn task_change_response(
-    receipt: crate::services::task_service::TaskUpdateReceipt,
-) -> crate::api_server::HttpResponse {
+fn task_change_response(receipt: crate::services::task_service::TaskUpdateReceipt) -> crate::api_server::HttpResponse {
     match receipt.deferred {
         Some(deferred) => ok_json(200, json!({"data": receipt.dto, "deferred": deferred})),
         None => ok_json(200, json!({"data": receipt.dto})),

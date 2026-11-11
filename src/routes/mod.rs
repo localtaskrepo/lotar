@@ -1,10 +1,8 @@
 use crate::LoTaRError;
 use crate::api_server::{ApiServer, HttpRequest, HttpResponse};
 use crate::api_types::{
-    ScanRequest, SprintAssignmentRequest, SprintAssignmentResponse, SprintBacklogItem,
-    SprintBacklogResponse, SprintCreateRequest, SprintCreateResponse, SprintDeleteRequest,
-    SprintDeleteResponse, SprintListItem, SprintListResponse, SprintUpdateRequest,
-    SprintUpdateResponse, SyncRequest, SyncValidateRequest,
+    ScanRequest, SprintAssignmentRequest, SprintAssignmentResponse, SprintBacklogItem, SprintBacklogResponse, SprintCreateRequest, SprintCreateResponse,
+    SprintDeleteRequest, SprintDeleteResponse, SprintListItem, SprintListResponse, SprintUpdateRequest, SprintUpdateResponse, SyncRequest, SyncValidateRequest,
 };
 use crate::config::manager::ConfigManager;
 use crate::config::resolution;
@@ -13,12 +11,8 @@ use crate::services::sprint_assignment;
 use crate::services::sprint_integrity;
 use crate::services::sprint_metrics::SprintBurndownMetric;
 use crate::services::sprint_reports::{compute_sprint_burndown, compute_sprint_summary};
-pub(super) use crate::services::sprint_service::{
-    sprint_from_create_request, sprint_record_to_list_item,
-};
-use crate::services::sprint_velocity::{
-    DEFAULT_VELOCITY_WINDOW, VelocityComputation, VelocityOptions, compute_velocity,
-};
+pub(super) use crate::services::sprint_service::{sprint_from_create_request, sprint_record_to_list_item};
+use crate::services::sprint_velocity::{DEFAULT_VELOCITY_WINDOW, VelocityComputation, VelocityOptions, compute_velocity};
 use crate::services::{
     attachment_service::AttachmentService,
     automation_service::AutomationService,
@@ -73,9 +67,7 @@ pub(super) fn sprint_integrity_check(
         .map_err(|err| internal_error(format!("Failed to clean up sprint references: {err}")))
 }
 
-pub(super) fn sprint_patch_from_request(
-    payload: &SprintUpdateRequest,
-) -> crate::services::sprint_service::SprintMetadataPatch {
+pub(super) fn sprint_patch_from_request(payload: &SprintUpdateRequest) -> crate::services::sprint_service::SprintMetadataPatch {
     crate::services::sprint_service::SprintMetadataPatch::from_request(payload)
 }
 
@@ -86,26 +78,18 @@ pub(super) fn ok_json(status: u16, v: serde_json::Value) -> HttpResponse {
 /// Resolve the Git repository root and the tasks directory relative to it,
 /// for endpoints that read task history from Git. Symlinked paths resolve
 /// the same way as in the CLI (see `repo_relative_path`).
-pub(super) fn resolve_repo_tasks_paths()
--> Result<(std::path::PathBuf, std::path::PathBuf), HttpResponse> {
+pub(super) fn resolve_repo_tasks_paths() -> Result<(std::path::PathBuf, std::path::PathBuf), HttpResponse> {
     let resolver = TasksDirectoryResolver::resolve(None, None).map_err(internal_error)?;
     let cwd = std::env::current_dir().unwrap_or_else(|_| resolver.path.clone());
-    let repo_root = crate::utils::git::find_repo_root(&cwd)
-        .ok_or_else(|| bad_request("Not inside a git repository".into()))?;
-    let tasks_rel = crate::utils::git::repo_relative_path(&repo_root, &resolver.path)
-        .ok_or_else(|| bad_request("Tasks directory not inside repository".into()))?;
+    let repo_root = crate::utils::git::find_repo_root(&cwd).ok_or_else(|| bad_request("Not inside a git repository".into()))?;
+    let tasks_rel =
+        crate::utils::git::repo_relative_path(&repo_root, &resolver.path).ok_or_else(|| bad_request("Tasks directory not inside repository".into()))?;
     Ok((repo_root, tasks_rel))
 }
 
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "callers pass owned temporaries (format!/json!/errors), so taking ownership keeps call sites simple"
-)]
+#[expect(clippy::needless_pass_by_value, reason = "callers pass owned temporaries (format!/json!/errors), so taking ownership keeps call sites simple")]
 pub(super) fn bad_request(msg: String) -> HttpResponse {
-    ok_json(
-        400,
-        json!({"error": {"code": "INVALID_ARGUMENT", "message": msg}}),
-    )
+    ok_json(400, json!({"error": {"code": "INVALID_ARGUMENT", "message": msg}}))
 }
 
 pub(super) fn internal(v: serde_json::Value) -> HttpResponse {
@@ -123,20 +107,15 @@ pub(super) fn resolve_tasks_dir() -> Result<TasksDirectoryResolver, HttpResponse
 }
 
 /// Deserialize a JSON request body, or the 400 response to return.
-pub(super) fn parse_body<T: serde::de::DeserializeOwned>(
-    req: &HttpRequest,
-) -> Result<T, HttpResponse> {
+pub(super) fn parse_body<T: serde::de::DeserializeOwned>(req: &HttpRequest) -> Result<T, HttpResponse> {
     serde_json::from_slice(&req.body).map_err(|e| bad_request(format!("Invalid body: {e}")))
 }
 
 /// Like [`parse_body`], but an empty body counts as `{}` for requests whose
 /// fields are all optional.
-pub(super) fn parse_body_or_empty<T: serde::de::DeserializeOwned>(
-    req: &HttpRequest,
-) -> Result<T, HttpResponse> {
+pub(super) fn parse_body_or_empty<T: serde::de::DeserializeOwned>(req: &HttpRequest) -> Result<T, HttpResponse> {
     if req.body.iter().all(u8::is_ascii_whitespace) {
-        return serde_json::from_value(json!({}))
-            .map_err(|e| bad_request(format!("Invalid body: {e}")));
+        return serde_json::from_value(json!({})).map_err(|e| bad_request(format!("Invalid body: {e}")));
     }
     parse_body(req)
 }
@@ -153,9 +132,7 @@ pub(super) fn config_write_response(
         let actor = crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
         crate::api_events::emit_config_updated(actor.as_deref());
     }
-    let strings = |items: &[crate::config::validation::errors::ValidationError]| {
-        items.iter().map(ToString::to_string).collect::<Vec<_>>()
-    };
+    let strings = |items: &[crate::config::validation::errors::ValidationError]| items.iter().map(ToString::to_string).collect::<Vec<_>>();
     ok_json(
         200,
         json!({
@@ -171,11 +148,8 @@ pub(super) fn config_write_response(
 
 /// Load the merged configuration for the tasks directory, or the 500
 /// response to return (configuration failures are server-side, DEV-58).
-pub(super) fn load_merged_config(
-    resolver: &TasksDirectoryResolver,
-) -> Result<crate::config::types::ResolvedConfig, HttpResponse> {
-    resolution::load_and_merge_configs(Some(resolver.path.as_path()))
-        .map_err(|e| internal_error(format!("Failed to load config: {e}")))
+pub(super) fn load_merged_config(resolver: &TasksDirectoryResolver) -> Result<crate::config::types::ResolvedConfig, HttpResponse> {
+    resolution::load_and_merge_configs(Some(resolver.path.as_path())).map_err(|e| internal_error(format!("Failed to load config: {e}")))
 }
 
 /// 409: the resource changed since the caller read it (DEV-301).
@@ -183,10 +157,7 @@ pub(super) fn conflict(msg: &str) -> HttpResponse {
     ok_json(409, json!({"error": {"code": "CONFLICT", "message": msg}}))
 }
 
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "callers pass owned temporaries (format!/json!/errors), so taking ownership keeps call sites simple"
-)]
+#[expect(clippy::needless_pass_by_value, reason = "callers pass owned temporaries (format!/json!/errors), so taking ownership keeps call sites simple")]
 pub(super) fn not_found(msg: String) -> HttpResponse {
     ok_json(404, json!({"error": {"code": "NOT_FOUND", "message": msg}}))
 }
@@ -207,50 +178,25 @@ pub(super) fn map_lotar_error(err: LoTaRError) -> HttpResponse {
         // InvalidTaskId display keeps its "Invalid task ID: " qualifier.
         LoTaRError::ValidationError(msg) => bad_request(msg),
         err @ LoTaRError::InvalidTaskId(_) => bad_request(err.to_string()),
-        err @ (LoTaRError::TaskNotFound(_)
-        | LoTaRError::SprintNotFound(_)
-        | LoTaRError::ProjectNotFound(_)) => not_found(err.to_string()),
-        err @ (LoTaRError::SerializationError(_) | LoTaRError::IndexError(_)) => {
-            internal_error(err.to_string())
-        }
+        err @ (LoTaRError::TaskNotFound(_) | LoTaRError::SprintNotFound(_) | LoTaRError::ProjectNotFound(_)) => not_found(err.to_string()),
+        err @ (LoTaRError::SerializationError(_) | LoTaRError::IndexError(_)) => internal_error(err.to_string()),
         LoTaRError::Conflict(msg) => conflict(&msg),
         LoTaRError::IoError(io_err) => {
             let coordination_refusal = io_err.kind() == std::io::ErrorKind::WouldBlock
-                || io_err.get_ref().is_some_and(|inner| {
-                    inner
-                        .downcast_ref::<crate::storage::safety::PendingJournalRefusal>()
-                        .is_some()
-                });
+                || io_err.get_ref().is_some_and(|inner| inner.downcast_ref::<crate::storage::safety::PendingJournalRefusal>().is_some());
             let message = format!("IO error: {io_err}");
-            if coordination_refusal {
-                bad_request(message)
-            } else {
-                internal_error(message)
-            }
+            if coordination_refusal { bad_request(message) } else { internal_error(message) }
         }
     }
 }
 
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "callers pass owned temporaries (format!/json!/errors), so taking ownership keeps call sites simple"
-)]
-pub(super) fn json_response(
-    status: u16,
-    v: serde_json::Value,
-) -> Result<HttpResponse, serde_json::Error> {
+#[expect(clippy::needless_pass_by_value, reason = "callers pass owned temporaries (format!/json!/errors), so taking ownership keeps call sites simple")]
+pub(super) fn json_response(status: u16, v: serde_json::Value) -> Result<HttpResponse, serde_json::Error> {
     let body = serde_json::to_vec(&v)?;
-    Ok(HttpResponse {
-        status,
-        headers: vec![("Content-Type".into(), "application/json".into())],
-        body,
-    })
+    Ok(HttpResponse { status, headers: vec![("Content-Type".into(), "application/json".into())], body })
 }
 
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "callers pass owned temporaries (format!/json!/errors), so taking ownership keeps call sites simple"
-)]
+#[expect(clippy::needless_pass_by_value, reason = "callers pass owned temporaries (format!/json!/errors), so taking ownership keeps call sites simple")]
 pub(super) fn json_serialize_error(e: serde_json::Error) -> HttpResponse {
     let fallback = json!({"error": {"code": "SERIALIZE", "message": e.to_string()}});
     HttpResponse {
@@ -287,10 +233,7 @@ mod dev58_error_mapping_cases {
         let body: serde_json::Value = serde_json::from_slice(&resp.body).unwrap();
         assert_eq!(body["error"]["code"].as_str(), Some(code), "{body}");
         let actual = body["error"]["message"].as_str().unwrap_or_default();
-        assert!(
-            actual.contains(message),
-            "message {actual:?} must contain {message:?}"
-        );
+        assert!(actual.contains(message), "message {actual:?} must contain {message:?}");
     }
 
     /// Exhaustive mapper coverage: every `LoTaRError` variant plus the two
@@ -298,54 +241,14 @@ mod dev58_error_mapping_cases {
     /// and message contract.
     #[test]
     fn map_lotar_error_is_exhaustive_and_typed() {
-        assert_envelope(
-            &map_lotar_error(LoTaRError::ValidationError("bad enum".into())),
-            400,
-            "INVALID_ARGUMENT",
-            "bad enum",
-        );
-        assert_envelope(
-            &map_lotar_error(LoTaRError::InvalidTaskId("TP-x: nope".into())),
-            400,
-            "INVALID_ARGUMENT",
-            "Invalid task ID: TP-x: nope",
-        );
-        assert_envelope(
-            &map_lotar_error(LoTaRError::TaskNotFound("TP-9".into())),
-            404,
-            "NOT_FOUND",
-            "Task not found: TP-9",
-        );
-        assert_envelope(
-            &map_lotar_error(LoTaRError::SprintNotFound(42)),
-            404,
-            "NOT_FOUND",
-            "Sprint not found: 42",
-        );
-        assert_envelope(
-            &map_lotar_error(LoTaRError::ProjectNotFound("ORPH".into())),
-            404,
-            "NOT_FOUND",
-            "Project not found: ORPH",
-        );
-        assert_envelope(
-            &map_lotar_error(LoTaRError::SerializationError("bad yaml".into())),
-            500,
-            "INTERNAL",
-            "Serialization error: bad yaml",
-        );
-        assert_envelope(
-            &map_lotar_error(LoTaRError::IndexError("stale".into())),
-            500,
-            "INTERNAL",
-            "Index error: stale",
-        );
-        assert_envelope(
-            &map_lotar_error(LoTaRError::IoError(std::io::Error::other("disk on fire"))),
-            500,
-            "INTERNAL",
-            "IO error: disk on fire",
-        );
+        assert_envelope(&map_lotar_error(LoTaRError::ValidationError("bad enum".into())), 400, "INVALID_ARGUMENT", "bad enum");
+        assert_envelope(&map_lotar_error(LoTaRError::InvalidTaskId("TP-x: nope".into())), 400, "INVALID_ARGUMENT", "Invalid task ID: TP-x: nope");
+        assert_envelope(&map_lotar_error(LoTaRError::TaskNotFound("TP-9".into())), 404, "NOT_FOUND", "Task not found: TP-9");
+        assert_envelope(&map_lotar_error(LoTaRError::SprintNotFound(42)), 404, "NOT_FOUND", "Sprint not found: 42");
+        assert_envelope(&map_lotar_error(LoTaRError::ProjectNotFound("ORPH".into())), 404, "NOT_FOUND", "Project not found: ORPH");
+        assert_envelope(&map_lotar_error(LoTaRError::SerializationError("bad yaml".into())), 500, "INTERNAL", "Serialization error: bad yaml");
+        assert_envelope(&map_lotar_error(LoTaRError::IndexError("stale".into())), 500, "INTERNAL", "Index error: stale");
+        assert_envelope(&map_lotar_error(LoTaRError::IoError(std::io::Error::other("disk on fire"))), 500, "INTERNAL", "IO error: disk on fire");
         // Lock contention (io WouldBlock) stays a client-side retryable
         // refusal with its production diagnostics preserved.
         assert_envelope(
@@ -359,12 +262,9 @@ mod dev58_error_mapping_cases {
         );
         // Pending-journal refusal carries the typed marker and stays 400.
         assert_envelope(
-            &map_lotar_error(LoTaRError::IoError(std::io::Error::other(
-                crate::storage::safety::PendingJournalRefusal(
-                    "A pending task/sprint transaction journal exists at /w/.txn-pending.json"
-                        .into(),
-                ),
-            ))),
+            &map_lotar_error(LoTaRError::IoError(std::io::Error::other(crate::storage::safety::PendingJournalRefusal(
+                "A pending task/sprint transaction journal exists at /w/.txn-pending.json".into(),
+            )))),
             400,
             "INVALID_ARGUMENT",
             "pending task/sprint transaction journal",

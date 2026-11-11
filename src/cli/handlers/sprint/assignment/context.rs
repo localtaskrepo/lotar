@@ -2,9 +2,7 @@ use std::path::Path;
 
 use crate::cli::handlers::sprint::shared::{emit_cleanup_summary, emit_missing_report};
 use crate::output::OutputRenderer;
-use crate::services::sprint_integrity::{
-    self, IntegrityCheck, MissingSprintReport, SprintCleanupOutcome,
-};
+use crate::services::sprint_integrity::{self, IntegrityCheck, MissingSprintReport, SprintCleanupOutcome};
 use crate::services::sprint_service::{SprintRecord, SprintService};
 use crate::storage::manager::Storage;
 
@@ -41,13 +39,8 @@ impl AssignmentContext {
         renderer: &OutputRenderer,
         context_label: &str,
     ) -> Result<Option<SprintCleanupOutcome>, String> {
-        self.integrity = sprint_integrity::check_missing_sprints(
-            &mut self.storage,
-            &mut self.records,
-            cleanup_requested,
-            None,
-        )
-        .map_err(|err| err.to_string())?;
+        self.integrity =
+            sprint_integrity::check_missing_sprints(&mut self.storage, &mut self.records, cleanup_requested, None).map_err(|err| err.to_string())?;
         match self.integrity.cleanup.as_ref() {
             Some(outcome) => emit_cleanup_summary(renderer, outcome, context_label),
             None if !self.integrity.after.missing_sprints.is_empty() => {
@@ -62,10 +55,6 @@ impl AssignmentContext {
         let records = SprintService::list(&storage).map_err(|err| err.to_string())?;
         // Detection runs in `reconcile_missing`, which every caller invokes
         // before reading the integrity reports.
-        Ok(Self {
-            storage,
-            records,
-            integrity: IntegrityCheck::unchanged(MissingSprintReport::default()),
-        })
+        Ok(Self { storage, records, integrity: IntegrityCheck::unchanged(MissingSprintReport::default()) })
     }
 }

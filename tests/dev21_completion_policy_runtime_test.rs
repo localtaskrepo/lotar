@@ -32,13 +32,7 @@ fn mk_req(method: &str, path: &str, query: &[(&str, &str)]) -> HttpRequest {
     for (k, v) in query {
         q.insert((*k).to_string(), (*v).to_string());
     }
-    HttpRequest {
-        method: method.to_string(),
-        path: path.to_string(),
-        query: q,
-        headers: HashMap::new(),
-        body: Vec::new(),
-    }
+    HttpRequest { method: method.to_string(), path: path.to_string(), query: q, headers: HashMap::new(), body: Vec::new() }
 }
 
 struct Fixture {
@@ -51,10 +45,7 @@ impl Fixture {
         let tmp = tempfile::tempdir().unwrap();
         let tasks_dir = tmp.path().join(".tasks");
         std::fs::create_dir_all(&tasks_dir).unwrap();
-        Self {
-            _tmp: tmp,
-            tasks_dir,
-        }
+        Self { _tmp: tmp, tasks_dir }
     }
 
     fn project(&self, prefix: &str) -> std::path::PathBuf {
@@ -73,9 +64,7 @@ fn local_today() -> chrono::NaiveDate {
 }
 
 fn date_only(days_from_today: i64) -> String {
-    (local_today() + Duration::days(days_from_today))
-        .format("%Y-%m-%d")
-        .to_string()
+    (local_today() + Duration::days(days_from_today)).format("%Y-%m-%d").to_string()
 }
 
 fn api() -> ApiServer {
@@ -87,28 +76,13 @@ fn api() -> ApiServer {
 fn rest_ids(api: &ApiServer, query: &[(&str, &str)]) -> (u16, Vec<String>) {
     let resp = api.handle_request(&mk_req("GET", "/api/tasks/list", query));
     let body: Value = serde_json::from_slice(&resp.body).unwrap();
-    (
-        resp.status,
-        body["data"]["tasks"]
-            .as_array()
-            .map(|tasks| {
-                tasks
-                    .iter()
-                    .map(|t| t["id"].as_str().unwrap().to_string())
-                    .collect()
-            })
-            .unwrap_or_default(),
-    )
+    (resp.status, body["data"]["tasks"].as_array().map(|tasks| tasks.iter().map(|t| t["id"].as_str().unwrap().to_string()).collect()).unwrap_or_default())
 }
 
 fn rest_export_ids(api: &ApiServer, query: &[(&str, &str)]) -> Vec<String> {
     let resp = api.handle_request(&mk_req("GET", "/api/tasks/export", query));
     let text = String::from_utf8_lossy(&resp.body).to_string();
-    text.lines()
-        .skip(1)
-        .filter(|line| !line.trim().is_empty())
-        .map(|line| line.split(',').next().unwrap().to_string())
-        .collect()
+    text.lines().skip(1).filter(|line| !line.trim().is_empty()).map(|line| line.split(',').next().unwrap().to_string()).collect()
 }
 
 fn mcp_task_ids(params: Value) -> Vec<String> {
@@ -123,12 +97,7 @@ fn mcp_task_ids(params: Value) -> Vec<String> {
     assert!(resp.get("error").is_none(), "mcp error: {resp}");
     let text = resp["result"]["content"][0]["text"].as_str().unwrap();
     let payload: Value = serde_json::from_str(text).unwrap();
-    payload["tasks"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|t| t["id"].as_str().unwrap().to_string())
-        .collect()
+    payload["tasks"].as_array().unwrap().iter().map(|t| t["id"].as_str().unwrap().to_string()).collect()
 }
 
 fn task_yaml(status: &str, due: Option<&str>, extra: &[(&str, &str)]) -> String {
@@ -149,21 +118,14 @@ fn task_yaml(status: &str, due: Option<&str>, extra: &[(&str, &str)]) -> String 
 /// terminal. Global states cover both.
 fn mixed_policy_fixture() -> Fixture {
     let fx = Fixture::new();
-    std::fs::write(
-        fx.tasks_dir.join("config.yml"),
-        "issue:\n  states: [Todo, InProgress, Done, Shipped, Archived]\n",
-    )
-    .unwrap();
+    std::fs::write(fx.tasks_dir.join("config.yml"), "issue:\n  states: [Todo, InProgress, Done, Shipped, Archived]\n").unwrap();
     std::fs::write(
         fx.project("ALPHA").join("config.yml"),
         "project:\n  name: Alpha\nissue:\n  states: [Todo, Done, Shipped, Archived]\n  done_states: [Shipped]\n",
     )
     .unwrap();
-    std::fs::write(
-        fx.project("BETA").join("config.yml"),
-        "project:\n  name: Beta\nissue:\n  states: [Todo, InProgress, Done]\n  done_states: [Done]\n",
-    )
-    .unwrap();
+    std::fs::write(fx.project("BETA").join("config.yml"), "project:\n  name: Beta\nissue:\n  states: [Todo, InProgress, Done]\n  done_states: [Done]\n")
+        .unwrap();
 
     fx.write_task("ALPHA", 1, &task_yaml("Todo", Some(&date_only(-1)), &[]));
     // ALPHA Done is NOT terminal under ALPHA's policy: still overdue.
@@ -228,12 +190,7 @@ fn task_state_is_computed_on_dto_and_never_persisted() {
     assert_eq!(state["is_done"], json!(true));
     assert_eq!(state["done_states"], json!(["Done"]));
     assert!(state["due_bucket"].is_null());
-    assert!(
-        state["calendar_day"]
-            .as_str()
-            .is_some_and(|d| d.len() == 10),
-        "calendar_day snapshot: {state}"
-    );
+    assert!(state["calendar_day"].as_str().is_some_and(|d| d.len() == 10), "calendar_day snapshot: {state}");
 
     // ALPHA-2: Done but NOT terminal under ALPHA's explicit policy.
     let resp = api.handle_request(&mk_req("GET", "/api/tasks/get", &[("id", "ALPHA-2")]));
@@ -259,17 +216,11 @@ fn task_state_is_computed_on_dto_and_never_persisted() {
     let dto = lotar::services::task_service::TaskService::update(
         &mut storage,
         "BETA-2",
-        lotar::api_types::TaskUpdate {
-            status: Some("Done".to_string()),
-            ..Default::default()
-        },
+        lotar::api_types::TaskUpdate { status: Some("Done".to_string()), ..Default::default() },
     )
     .unwrap();
     assert!(dto.task_state.as_ref().unwrap().is_done);
-    assert_eq!(
-        dto.task_state.as_ref().unwrap().due_bucket,
-        Some(lotar::api_types::TaskDueBucketDTO::Today)
-    );
+    assert_eq!(dto.task_state.as_ref().unwrap().due_bucket, Some(lotar::api_types::TaskDueBucketDTO::Today));
 }
 
 #[test]
@@ -277,48 +228,23 @@ fn cli_overdue_and_stats_due_use_project_policies() {
     let fx = mixed_policy_fixture();
 
     let mut cmd = common::lotar_cmd().unwrap();
-    let output = cmd
-        .env("LOTAR_TASKS_DIR", fx.tasks_dir.to_string_lossy().as_ref())
-        .arg("--format")
-        .arg("json")
-        .args(["list", "due:overdue"])
-        .output()
-        .unwrap();
+    let output =
+        cmd.env("LOTAR_TASKS_DIR", fx.tasks_dir.to_string_lossy().as_ref()).arg("--format").arg("json").args(["list", "due:overdue"]).output().unwrap();
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     assert!(output.status.success(), "stdout: {stdout}");
-    assert!(
-        stdout.contains("ALPHA-2"),
-        "ALPHA Done stays overdue: {stdout}"
-    );
+    assert!(stdout.contains("ALPHA-2"), "ALPHA Done stays overdue: {stdout}");
     assert!(stdout.contains("ALPHA-1"));
-    assert!(
-        !stdout.contains("ALPHA-3") && !stdout.contains("BETA-1"),
-        "terminal tasks excluded: {stdout}"
-    );
+    assert!(!stdout.contains("ALPHA-3") && !stdout.contains("BETA-1"), "terminal tasks excluded: {stdout}");
 
     // stats due histogram: overdue counts only non-terminal past-due work;
     // today includes the done-today task.
     let mut cmd = common::lotar_cmd().unwrap();
-    let output = cmd
-        .env("LOTAR_TASKS_DIR", fx.tasks_dir.to_string_lossy().as_ref())
-        .arg("--format")
-        .arg("json")
-        .args(["stats", "due", "--global"])
-        .output()
-        .unwrap();
+    let output =
+        cmd.env("LOTAR_TASKS_DIR", fx.tasks_dir.to_string_lossy().as_ref()).arg("--format").arg("json").args(["stats", "due", "--global"]).output().unwrap();
     assert!(output.status.success());
     let body: Value = serde_json::from_slice(&output.stdout).unwrap();
-    let items: HashMap<String, u64> = body["items"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|item| {
-            (
-                item["bucket"].as_str().unwrap().to_string(),
-                item["count"].as_u64().unwrap_or(0),
-            )
-        })
-        .collect();
+    let items: HashMap<String, u64> =
+        body["items"].as_array().unwrap().iter().map(|item| (item["bucket"].as_str().unwrap().to_string(), item["count"].as_u64().unwrap_or(0))).collect();
     assert_eq!(items.get("overdue"), Some(&2), "items: {items:?}");
     assert_eq!(items.get("today"), Some(&2), "items: {items:?}");
     // +10 days is past the 7-day "soon" window, so it is "later", the same
@@ -335,18 +261,11 @@ fn sprint_window(tasks: &[&str], start: &str, end: &str) -> Sprint {
             ends_at: Some(format!("{end}T17:00:00Z")),
             ..SprintPlan::default()
         }),
-        actual: Some(SprintActual {
-            started_at: Some(format!("{start}T09:00:00Z")),
-            closed_at: Some(format!("{end}T17:00:00Z")),
-        }),
+        actual: Some(SprintActual { started_at: Some(format!("{start}T09:00:00Z")), closed_at: Some(format!("{end}T17:00:00Z")) }),
         tasks: tasks
             .iter()
             .enumerate()
-            .map(|(idx, id)| SprintTaskEntry {
-                extra: Default::default(),
-                id: (*id).to_string(),
-                order: Some((idx + 1) as u32),
-            })
+            .map(|(idx, id)| SprintTaskEntry { extra: Default::default(), id: (*id).to_string(), order: Some((idx + 1) as u32) })
             .collect(),
         ..Sprint::default()
     }
@@ -360,18 +279,9 @@ fn sprint_with(tasks: &[&str]) -> Sprint {
 fn mixed_project_sprint_analytics_resolve_each_task_policy() {
     let fx = mixed_policy_fixture();
     let mut storage = Storage::new(&fx.tasks_dir);
-    let created = SprintService::create(
-        &mut storage,
-        sprint_with(&["ALPHA-3", "BETA-1", "ALPHA-1"]),
-        None,
-    )
-    .unwrap();
+    let created = SprintService::create(&mut storage, sprint_with(&["ALPHA-3", "BETA-1", "ALPHA-1"]), None).unwrap();
     let records = SprintService::list(&storage).unwrap();
-    let record = records
-        .iter()
-        .find(|r| r.id == created.record.id)
-        .unwrap()
-        .clone();
+    let record = records.iter().find(|r| r.id == created.record.id).unwrap().clone();
     let config = lotar::config::resolution::load_and_merge_configs(Some(&fx.tasks_dir)).unwrap();
     let now = Utc.with_ymd_and_hms(2026, 5, 20, 12, 0, 0).unwrap();
 
@@ -394,11 +304,7 @@ fn mixed_project_sprint_analytics_resolve_each_task_policy() {
         },
         now,
     );
-    let entry = velocity
-        .entries
-        .iter()
-        .find(|e| e.sprint_id == record.id)
-        .unwrap();
+    let entry = velocity.entries.iter().find(|e| e.sprint_id == record.id).unwrap();
     assert_eq!(entry.completed, 2.0);
     assert_eq!(entry.committed, 3.0);
 
@@ -427,107 +333,49 @@ fn history_task_yaml(status: &str, history: &str) -> String {
 #[test]
 fn reopened_and_terminal_to_terminal_timing_replay_per_cut() {
     let fx = Fixture::new();
-    std::fs::write(
-        fx.tasks_dir.join("config.yml"),
-        "issue:\n  states: [Todo, Done, Closed]\n  done_states: [Done, Closed]\n",
-    )
-    .unwrap();
+    std::fs::write(fx.tasks_dir.join("config.yml"), "issue:\n  states: [Todo, Done, Closed]\n  done_states: [Done, Closed]\n").unwrap();
     let history = "history:\n  - at: 2026-09-02T10:00:00Z\n    changes:\n      - field: status\n        old: Todo\n        new: Done\n  - at: 2026-09-04T10:00:00Z\n    changes:\n      - field: status\n        old: Done\n        new: Todo\n  - at: 2026-09-05T10:00:00Z\n    changes:\n      - field: status\n        old: Todo\n        new: Done\n  - at: 2026-09-06T10:00:00Z\n    changes:\n      - field: status\n        old: Done\n        new: Closed\n";
     fx.write_task("RP", 1, &history_task_yaml("Closed", history));
 
     let mut storage = Storage::new(&fx.tasks_dir);
-    let created = SprintService::create(
-        &mut storage,
-        sprint_window(&["RP-1"], "2026-09-01", "2026-09-08"),
-        None,
-    )
-    .unwrap();
+    let created = SprintService::create(&mut storage, sprint_window(&["RP-1"], "2026-09-01", "2026-09-08"), None).unwrap();
     let records = SprintService::list(&storage).unwrap();
-    let record = records
-        .iter()
-        .find(|r| r.id == created.record.id)
-        .unwrap()
-        .clone();
+    let record = records.iter().find(|r| r.id == created.record.id).unwrap().clone();
     let config = lotar::config::resolution::load_and_merge_configs(Some(&fx.tasks_dir)).unwrap();
 
     let task = storage.get("RP-1", "RP").expect("task");
-    let done: std::collections::HashSet<String> =
-        ["done", "closed"].iter().map(|s| s.to_string()).collect();
+    let done: std::collections::HashSet<String> = ["done", "closed"].iter().map(|s| s.to_string()).collect();
 
     // Current unbroken interval: the reopen cleared the first completion,
     // the re-completion at 09-05 started the current interval, and the
     // Done -> Closed move did NOT restart it.
     let started = lotar::services::completion::current_completion_started_at(&task, &done);
-    assert_eq!(
-        started,
-        Some(
-            DateTime::parse_from_rfc3339("2026-09-05T10:00:00Z")
-                .unwrap()
-                .with_timezone(&Utc)
-        )
-    );
+    assert_eq!(started, Some(DateTime::parse_from_rfc3339("2026-09-05T10:00:00Z").unwrap().with_timezone(&Utc)));
 
     // Per-cut replay: done on 09-02/09-03, open after the reopen until the
     // re-completion, done afterwards (including the Closed day).
-    let cut = |day: &str, hour: u32| {
-        DateTime::parse_from_rfc3339(&format!("2026-09-{day}T{hour:02}:00:00Z"))
-            .unwrap()
-            .with_timezone(&Utc)
-    };
-    assert!(lotar::services::completion::task_done_at_cut(
-        &task,
-        &done,
-        cut("03", 0)
-    ));
+    let cut = |day: &str, hour: u32| DateTime::parse_from_rfc3339(&format!("2026-09-{day}T{hour:02}:00:00Z")).unwrap().with_timezone(&Utc);
+    assert!(lotar::services::completion::task_done_at_cut(&task, &done, cut("03", 0)));
     // Cuts are strictly-before: at the reopen instant itself the
     // pre-transition (Done) state still holds; one hour later it does not.
-    assert!(lotar::services::completion::task_done_at_cut(
-        &task,
-        &done,
-        cut("04", 10)
-    ));
-    assert!(!lotar::services::completion::task_done_at_cut(
-        &task,
-        &done,
-        cut("04", 11)
-    ));
-    assert!(!lotar::services::completion::task_done_at_cut(
-        &task,
-        &done,
-        cut("05", 0)
-    ));
-    assert!(lotar::services::completion::task_done_at_cut(
-        &task,
-        &done,
-        cut("06", 0)
-    ));
+    assert!(lotar::services::completion::task_done_at_cut(&task, &done, cut("04", 10)));
+    assert!(!lotar::services::completion::task_done_at_cut(&task, &done, cut("04", 11)));
+    assert!(!lotar::services::completion::task_done_at_cut(&task, &done, cut("05", 0)));
+    assert!(lotar::services::completion::task_done_at_cut(&task, &done, cut("06", 0)));
 
     // Burndown replays per calendar cut: remaining flips back up after the
     // reopen instead of using the earliest-ever done timestamp.
     let now = Utc.with_ymd_and_hms(2026, 9, 20, 12, 0, 0).unwrap();
     let burndown = compute_sprint_burndown(&storage, &record, &config, now).unwrap();
-    let remaining: Vec<usize> = burndown
-        .computation
-        .series
-        .iter()
-        .map(|point| point.remaining_tasks)
-        .collect();
+    let remaining: Vec<usize> = burndown.computation.series.iter().map(|point| point.remaining_tasks).collect();
     // Days 09-01..09-08 (window anchored by actual start/end).
-    assert_eq!(
-        remaining,
-        vec![1, 0, 0, 1, 0, 0, 0, 0],
-        "series: {remaining:?}"
-    );
+    assert_eq!(remaining, vec![1, 0, 0, 1, 0, 0, 0, 0], "series: {remaining:?}");
 }
 
 #[test]
 fn missing_history_falls_back_to_modified_estimate() {
     let fx = Fixture::new();
-    std::fs::write(
-        fx.tasks_dir.join("config.yml"),
-        "issue:\n  states: [Todo, Done]\n",
-    )
-    .unwrap();
+    std::fs::write(fx.tasks_dir.join("config.yml"), "issue:\n  states: [Todo, Done]\n").unwrap();
     // No history at all: legacy conscious estimate from modified.
     fx.write_task("LG", 1, &task_yaml("Done", None, &[]));
 
@@ -535,22 +383,9 @@ fn missing_history_falls_back_to_modified_estimate() {
     let task = storage.get("LG-1", "LG").expect("task");
     let done: std::collections::HashSet<String> = ["done"].iter().map(|s| s.to_string()).collect();
     let started = lotar::services::completion::current_completion_started_at(&task, &done);
-    assert_eq!(
-        started,
-        Some(
-            DateTime::parse_from_rfc3339("2026-01-02T00:00:00Z")
-                .unwrap()
-                .with_timezone(&Utc)
-        )
-    );
+    assert_eq!(started, Some(DateTime::parse_from_rfc3339("2026-01-02T00:00:00Z").unwrap().with_timezone(&Utc)));
     // Before the estimate the task counts as open.
-    assert!(!lotar::services::completion::task_done_at_cut(
-        &task,
-        &done,
-        DateTime::parse_from_rfc3339("2026-01-01T12:00:00Z")
-            .unwrap()
-            .with_timezone(&Utc)
-    ));
+    assert!(!lotar::services::completion::task_done_at_cut(&task, &done, DateTime::parse_from_rfc3339("2026-01-01T12:00:00Z").unwrap().with_timezone(&Utc)));
 }
 
 #[test]
@@ -561,11 +396,7 @@ fn query_predicates_evaluate_injected_clock_not_snapshots() {
     let now = Utc.with_ymd_and_hms(2026, 6, 15, 12, 0, 0).unwrap();
     let today = task_query::today_local(now);
     let tomorrow_local = (today + Duration::days(1)).and_hms_opt(18, 0, 0).unwrap();
-    let due_tomorrow = Local
-        .from_local_datetime(&tomorrow_local)
-        .single()
-        .unwrap()
-        .to_rfc3339();
+    let due_tomorrow = Local.from_local_datetime(&tomorrow_local).single().unwrap().to_rfc3339();
 
     // Stale snapshot claims a different calendar day and bucket; predicates
     // must ignore it and classify from the raw due value + injected clock.
@@ -603,17 +434,8 @@ fn query_predicates_evaluate_injected_clock_not_snapshots() {
         custom_fields: Default::default(),
     };
 
-    let mut tasks = vec![
-        ("X-1".to_string(), dto(Some(due_tomorrow.clone()))),
-        (
-            "X-2".to_string(),
-            dto(Some(today.format("%Y-%m-%d").to_string())),
-        ),
-    ];
-    let mut options = TaskQueryOptions {
-        due: Some(task_query::parse_due("soon").unwrap()),
-        ..TaskQueryOptions::default()
-    };
+    let mut tasks = vec![("X-1".to_string(), dto(Some(due_tomorrow.clone()))), ("X-2".to_string(), dto(Some(today.format("%Y-%m-%d").to_string())))];
+    let mut options = TaskQueryOptions { due: Some(task_query::parse_due("soon").unwrap()), ..TaskQueryOptions::default() };
     task_query::apply(&mut tasks, &options, now);
     let ids: Vec<&str> = tasks.iter().map(|(id, _)| id.as_str()).collect();
     // The stale `later` snapshot did not leak into the predicate.
@@ -622,26 +444,13 @@ fn query_predicates_evaluate_injected_clock_not_snapshots() {
     // Same dues, later clock: on rollover the previous tomorrow is today,
     // while the previous date-only today must no longer match.
     let later = now + Duration::hours(12);
-    let mut tasks = vec![
-        ("X-1".to_string(), dto(Some(due_tomorrow.clone()))),
-        (
-            "X-2".to_string(),
-            dto(Some(today.format("%Y-%m-%d").to_string())),
-        ),
-    ];
-    options = TaskQueryOptions {
-        due: Some(task_query::parse_due("today").unwrap()),
-        ..TaskQueryOptions::default()
-    };
+    let mut tasks = vec![("X-1".to_string(), dto(Some(due_tomorrow.clone()))), ("X-2".to_string(), dto(Some(today.format("%Y-%m-%d").to_string())))];
+    options = TaskQueryOptions { due: Some(task_query::parse_due("today").unwrap()), ..TaskQueryOptions::default() };
     task_query::apply(&mut tasks, &options, later);
     let today_later = task_query::today_local(later);
     let ids: Vec<&str> = tasks.iter().map(|(id, _)| id.as_str()).collect();
     if today_later != today {
-        assert_eq!(
-            ids,
-            vec!["X-1"],
-            "date rollover must re-bucket tomorrow into today"
-        );
+        assert_eq!(ids, vec!["X-1"], "date rollover must re-bucket tomorrow into today");
     } else {
         assert_eq!(ids, vec!["X-2"]);
     }
@@ -653,22 +462,13 @@ fn due_parser_and_buckets_agree_across_dst_boundary() {
 
     // Pin both sides of spring-forward and both passes of fall-back.
     // Explicit offsets avoid ambiguous local-time conversion and silent skips.
-    for rfc3339 in [
-        "2026-03-08T01:30:00-05:00",
-        "2026-03-08T03:30:00-04:00",
-        "2026-11-01T01:30:00-04:00",
-        "2026-11-01T01:30:00-05:00",
-    ] {
+    for rfc3339 in ["2026-03-08T01:30:00-05:00", "2026-03-08T03:30:00-04:00", "2026-11-01T01:30:00-04:00", "2026-11-01T01:30:00-05:00"] {
         let instant = chrono::DateTime::parse_from_rfc3339(rfc3339).unwrap();
         let now = instant.with_timezone(&Utc) - Duration::days(2);
         let today = today_local(now);
         let date_only = instant.with_timezone(&Local).date_naive();
         let bucket_rfc = due_raw_matches_bucket(Some(rfc3339), DueFilter::Soon, today);
-        let bucket_date = due_raw_matches_bucket(
-            Some(&date_only.format("%Y-%m-%d").to_string()),
-            DueFilter::Soon,
-            today,
-        );
+        let bucket_date = due_raw_matches_bucket(Some(&date_only.format("%Y-%m-%d").to_string()), DueFilter::Soon, today);
         assert!(bucket_rfc, "boundary instant must be due soon: {rfc3339}");
         assert_eq!(bucket_rfc, bucket_date, "rfc3339: {rfc3339}");
     }

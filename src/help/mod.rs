@@ -13,19 +13,12 @@ fn help_doc(path: &str) -> Option<String> {
     use std::io::Read;
     let (_, compressed) = HELP_DOCS.iter().find(|(name, _)| *name == path)?;
     let mut text = String::new();
-    flate2::read::GzDecoder::new(*compressed)
-        .read_to_string(&mut text)
-        .ok()?;
+    flate2::read::GzDecoder::new(*compressed).read_to_string(&mut text).ok()?;
     Some(text)
 }
 const ROOT_DIR: &str = env!("CARGO_MANIFEST_DIR");
 // Default to version-pinned docs on GitHub (e.g., v0.3.0); override with LOTAR_DOCS_BASE_URL
-static DEFAULT_DOCS_BASE_URL: LazyLock<String> = LazyLock::new(|| {
-    format!(
-        "https://github.com/localtaskrepo/lotar/blob/v{}/",
-        env!("CARGO_PKG_VERSION")
-    )
-});
+static DEFAULT_DOCS_BASE_URL: LazyLock<String> = LazyLock::new(|| format!("https://github.com/localtaskrepo/lotar/blob/v{}/", env!("CARGO_PKG_VERSION")));
 static HELP_ALIASES: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
     HashMap::from([
         ("sprint", "sprints"),
@@ -48,9 +41,7 @@ pub struct HelpSystem {
 impl HelpSystem {
     pub fn new(format: OutputFormat, _verbose: bool) -> Self {
         // Help rendering uses minimal logs; default Warn log level (no banners)
-        Self {
-            renderer: OutputRenderer::new(format, LogLevel::Warn),
-        }
+        Self { renderer: OutputRenderer::new(format, LogLevel::Warn) }
     }
 
     pub fn show_command_help(&self, command: &str) -> Result<String, String> {
@@ -96,9 +87,7 @@ impl HelpSystem {
                 let mut output = String::from("Available Help Topics:\n\n");
                 for file in help_files {
                     let command = file.replace(".md", "");
-                    let description = self
-                        .extract_description(&file)
-                        .unwrap_or_else(|| String::from("No description available"));
+                    let description = self.extract_description(&file).unwrap_or_else(|| String::from("No description available"));
                     let _ = writeln!(output, "  {} - {}", command, description);
                 }
                 Ok(output)
@@ -168,11 +157,7 @@ impl HelpSystem {
             _ => {
                 let no_color = std::env::var("NO_COLOR").is_ok();
                 let is_tty = std::io::stdout().is_terminal();
-                if !no_color && is_tty {
-                    HelpStyle::Ansi
-                } else {
-                    HelpStyle::Plain
-                }
+                if !no_color && is_tty { HelpStyle::Ansi } else { HelpStyle::Plain }
             }
         };
 
@@ -317,9 +302,7 @@ impl HelpSystem {
                 Event::Html(html) => {
                     out.push_str(&html);
                 }
-                Event::Start(Tag::Paragraph) | Event::End(TagEnd::Paragraph)
-                    if !out.ends_with('\n') =>
-                {
+                Event::Start(Tag::Paragraph) | Event::End(TagEnd::Paragraph) if !out.ends_with('\n') => {
                     out.push('\n');
                 }
                 _ => {}
@@ -332,23 +315,13 @@ impl HelpSystem {
         use std::path::{Path, PathBuf};
 
         // If target is an absolute URL or file, return as-is.
-        if target.starts_with("http://")
-            || target.starts_with("https://")
-            || target.starts_with("file://")
-            || target.starts_with("mailto:")
-        {
+        if target.starts_with("http://") || target.starts_with("https://") || target.starts_with("file://") || target.starts_with("mailto:") {
             return target.to_string();
         }
 
         // Determine the base URL for docs (env override or default to GitHub).
-        let base_url = std::env::var("LOTAR_DOCS_BASE_URL")
-            .ok()
-            .unwrap_or_else(|| DEFAULT_DOCS_BASE_URL.clone());
-        let base_url = if base_url.ends_with('/') {
-            base_url
-        } else {
-            format!("{}/", base_url)
-        };
+        let base_url = std::env::var("LOTAR_DOCS_BASE_URL").ok().unwrap_or_else(|| DEFAULT_DOCS_BASE_URL.clone());
+        let base_url = if base_url.ends_with('/') { base_url } else { format!("{}/", base_url) };
 
         // Compute a repo-relative path for the target.
         // Strategy:
@@ -364,30 +337,16 @@ impl HelpSystem {
             return format!("file://{}", abs.to_string_lossy());
         }
 
-        let candidate_paths: [PathBuf; 2] = [
-            Path::new(base_dir).join(target),
-            Path::new(ROOT_DIR).join(target),
-        ];
+        let candidate_paths: [PathBuf; 2] = [Path::new(base_dir).join(target), Path::new(ROOT_DIR).join(target)];
 
         // Pick the first existing candidate; else use the first as best-effort
-        let chosen = candidate_paths
-            .iter()
-            .find(|p| p.exists())
-            .cloned()
-            .unwrap_or_else(|| candidate_paths[0].clone());
+        let chosen = candidate_paths.iter().find(|p| p.exists()).cloned().unwrap_or_else(|| candidate_paths[0].clone());
 
         // Try to compute repo-relative by stripping ROOT_DIR
-        let repo_rel = chosen
-            .strip_prefix(ROOT_DIR)
-            .map(|p| p.to_path_buf())
-            .unwrap_or_else(|_| PathBuf::from(target));
+        let repo_rel = chosen.strip_prefix(ROOT_DIR).map(|p| p.to_path_buf()).unwrap_or_else(|_| PathBuf::from(target));
 
         // Normalize path separators to '/'
-        let repo_rel = repo_rel
-            .components()
-            .map(|c| c.as_os_str().to_string_lossy())
-            .collect::<Vec<_>>()
-            .join("/");
+        let repo_rel = repo_rel.components().map(|c| c.as_os_str().to_string_lossy()).collect::<Vec<_>>().join("/");
 
         format!("{}{}", base_url, repo_rel)
     }

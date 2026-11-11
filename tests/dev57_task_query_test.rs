@@ -24,13 +24,7 @@ fn mk_req(method: &str, path: &str, query: &[(&str, &str)]) -> HttpRequest {
     for (k, v) in query {
         q.insert((*k).to_string(), (*v).to_string());
     }
-    HttpRequest {
-        method: method.to_string(),
-        path: path.to_string(),
-        query: q,
-        headers: HashMap::new(),
-        body: Vec::new(),
-    }
+    HttpRequest { method: method.to_string(), path: path.to_string(), query: q, headers: HashMap::new(), body: Vec::new() }
 }
 
 struct Fixture {
@@ -45,11 +39,7 @@ impl Fixture {
         let tasks_dir = tmp.path().join(".tasks");
         let project_dir = tasks_dir.join(project);
         std::fs::create_dir_all(&project_dir).unwrap();
-        Self {
-            _tmp: tmp,
-            tasks_dir,
-            project_dir,
-        }
+        Self { _tmp: tmp, tasks_dir, project_dir }
     }
 
     fn write(&self, num: u32, body: &str) {
@@ -57,9 +47,7 @@ impl Fixture {
     }
 
     fn task_yaml(&self, num: u32, title: &str, modified: &str, extra: &[(&str, String)]) -> String {
-        let mut yaml = format!(
-            "title: {title}\nstatus: Todo\npriority: medium\ntype: task\ncreated: 2026-01-01T00:00:00Z\nmodified: {modified}\ntags: []\n"
-        );
+        let mut yaml = format!("title: {title}\nstatus: Todo\npriority: medium\ntype: task\ncreated: 2026-01-01T00:00:00Z\nmodified: {modified}\ntags: []\n");
         for (key, value) in extra {
             yaml.push_str(&format!("{key}: {value}\n"));
         }
@@ -82,26 +70,13 @@ fn rest_json(api: &ApiServer, query: &[(&str, &str)]) -> (u16, Value) {
 
 fn rest_ids_from_json(body: &Value) -> Vec<String> {
     // Empty pages omit the `tasks` field entirely.
-    body["data"]["tasks"]
-        .as_array()
-        .map(|tasks| {
-            tasks
-                .iter()
-                .map(|t| t["id"].as_str().unwrap().to_string())
-                .collect()
-        })
-        .unwrap_or_default()
+    body["data"]["tasks"].as_array().map(|tasks| tasks.iter().map(|t| t["id"].as_str().unwrap().to_string()).collect()).unwrap_or_default()
 }
 
 fn rest_export(api: &ApiServer, query: &[(&str, &str)]) -> (u16, Vec<String>) {
     let resp = api.handle_request(&mk_req("GET", "/api/tasks/export", query));
     let text = String::from_utf8_lossy(&resp.body).to_string();
-    let ids = text
-        .lines()
-        .skip(1)
-        .filter(|line| !line.trim().is_empty())
-        .map(|line| line.split(',').next().unwrap().to_string())
-        .collect();
+    let ids = text.lines().skip(1).filter(|line| !line.trim().is_empty()).map(|line| line.split(',').next().unwrap().to_string()).collect();
     (resp.status, ids)
 }
 
@@ -116,8 +91,7 @@ fn rest_list_all(api: &ApiServer, query: &[(&str, &str)], limit: usize) -> (u16,
     let total = body["data"]["total"].as_u64().unwrap_or(0) as usize;
     let _ = total;
     loop {
-        let mut with_page: Vec<(&str, String)> =
-            query.iter().map(|(k, v)| (*k, v.to_string())).collect();
+        let mut with_page: Vec<(&str, String)> = query.iter().map(|(k, v)| (*k, v.to_string())).collect();
         with_page.push(("limit", limit.to_string()));
         with_page.push(("offset", offset.to_string()));
         let pairs: Vec<(&str, &str)> = with_page.iter().map(|(k, v)| (*k, v.as_str())).collect();
@@ -153,12 +127,7 @@ fn mcp_call(method: &str, params: Value) -> Result<Value, Value> {
 }
 
 fn mcp_ids(payload: &Value) -> Vec<String> {
-    payload["tasks"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|t| t["id"].as_str().unwrap().to_string())
-        .collect()
+    payload["tasks"].as_array().unwrap().iter().map(|t| t["id"].as_str().unwrap().to_string()).collect()
 }
 
 fn mcp_list_all(params: Value, limit: usize) -> Vec<String> {
@@ -187,21 +156,14 @@ fn local_today() -> chrono::NaiveDate {
 }
 
 fn date_only(days_from_today: i64) -> String {
-    (local_today() + Duration::days(days_from_today))
-        .format("%Y-%m-%d")
-        .to_string()
+    (local_today() + Duration::days(days_from_today)).format("%Y-%m-%d").to_string()
 }
 
 /// RFC3339 instant of a local calendar date at the given wall-clock time.
 fn local_instant(days_from_today: i64, h: u32, m: u32) -> String {
     let date = local_today() + Duration::days(days_from_today);
     let naive = date.and_hms_opt(h, m, 0).unwrap();
-    Local
-        .from_local_datetime(&naive)
-        .single()
-        .unwrap()
-        .with_timezone(&Utc)
-        .to_rfc3339()
+    Local.from_local_datetime(&naive).single().unwrap().with_timezone(&Utc).to_rfc3339()
 }
 
 fn ids_prefixed(project: &str, nums: &[u32]) -> Vec<String> {
@@ -235,11 +197,7 @@ fn transports_agree_on_filter_and_global_order() {
     }
 
     let api = api();
-    let query = [
-        ("project", "QA"),
-        ("sort_by", "custom:size"),
-        ("order", "asc"),
-    ];
+    let query = [("project", "QA"), ("sort_by", "custom:size"), ("order", "asc")];
 
     let (status, rest_ids) = rest_list_all(&api, &query, 2);
     assert_eq!(status, 200);
@@ -250,22 +208,11 @@ fn transports_agree_on_filter_and_global_order() {
     assert_eq!(status, 200);
     assert_ids(&export_ids, &ids_prefixed("QA", &[1, 2, 5, 4, 6, 3]));
 
-    let mcp_ids = mcp_list_all(
-        json!({"project": "QA", "sort_by": "custom:size", "order": "asc"}),
-        2,
-    );
+    let mcp_ids = mcp_list_all(json!({"project": "QA", "sort_by": "custom:size", "order": "asc"}), 2);
     assert_ids(&mcp_ids, &ids_prefixed("QA", &[1, 2, 5, 4, 6, 3]));
 
     // Desc flips the primary order only; equal-size ties stay ID asc.
-    let (_, rest_desc) = rest_list_all(
-        &api,
-        &[
-            ("project", "QA"),
-            ("sort_by", "custom:size"),
-            ("order", "desc"),
-        ],
-        3,
-    );
+    let (_, rest_desc) = rest_list_all(&api, &[("project", "QA"), ("sort_by", "custom:size"), ("order", "desc")], 3);
     assert_ids(&rest_desc, &ids_prefixed("QA", &[3, 4, 6, 2, 5, 1]));
 }
 
@@ -278,35 +225,15 @@ fn export_applies_smart_filters_and_global_order() {
     let recent = (now - Duration::days(3)).to_rfc3339();
     let old = (now - Duration::days(30)).to_rfc3339();
 
-    fx.write(
-        1,
-        &fx.task_yaml(1, "overdue recent", &recent, &[("due_date", date_only(-1))]),
-    );
-    fx.write(
-        2,
-        &fx.task_yaml(2, "today old", &old, &[("due_date", date_only(0))]),
-    );
-    fx.write(
-        3,
-        &fx.task_yaml(3, "soon recent", &recent, &[("due_date", date_only(3))]),
-    );
-    fx.write(
-        4,
-        &fx.task_yaml(4, "later old", &old, &[("due_date", date_only(30))]),
-    );
+    fx.write(1, &fx.task_yaml(1, "overdue recent", &recent, &[("due_date", date_only(-1))]));
+    fx.write(2, &fx.task_yaml(2, "today old", &old, &[("due_date", date_only(0))]));
+    fx.write(3, &fx.task_yaml(3, "soon recent", &recent, &[("due_date", date_only(3))]));
+    fx.write(4, &fx.task_yaml(4, "later old", &old, &[("due_date", date_only(30))]));
 
     let api = api();
 
     // due filter + ascending due order on export (previously ignored).
-    let (status, ids) = rest_export(
-        &api,
-        &[
-            ("project", "QB"),
-            ("due", "overdue"),
-            ("sort_by", "due-date"),
-            ("order", "asc"),
-        ],
-    );
+    let (status, ids) = rest_export(&api, &[("project", "QB"), ("due", "overdue"), ("sort_by", "due-date"), ("order", "asc")]);
     assert_eq!(status, 200);
     assert_ids(&ids, &ids_prefixed("QB", &[1]));
 
@@ -334,10 +261,7 @@ fn export_applies_smart_filters_and_global_order() {
     assert_ids(&ids, &ids_prefixed("QB", &[5]));
 
     // Global order on export: modified asc puts the older tasks first.
-    let (status, ids) = rest_export(
-        &api,
-        &[("project", "QB"), ("sort_by", "modified"), ("order", "asc")],
-    );
+    let (status, ids) = rest_export(&api, &[("project", "QB"), ("sort_by", "modified"), ("order", "asc")]);
     assert_eq!(status, 200);
     assert_ids(&ids, &ids_prefixed("QB", &[2, 4, 1, 3, 5]));
 }
@@ -370,34 +294,15 @@ fn custom_sort_missing_values_are_deterministic() {
         "title: has field\nstatus: Todo\npriority: medium\ntype: task\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-01-01T00:00:00Z\ntags: []\ncustom_fields:\n  size: big\n",
     );
     fx.write(2, &fx.task_yaml(2, "missing", "2026-01-01T00:00:00Z", &[]));
-    fx.write(
-        3,
-        &fx.task_yaml(3, "missing too", "2026-01-01T00:00:00Z", &[]),
-    );
+    fx.write(3, &fx.task_yaml(3, "missing too", "2026-01-01T00:00:00Z", &[]));
 
     let api = api();
     // Ascending: missing (empty) values first, then present values; ties ID asc.
-    let (_, ids) = rest_list_all(
-        &api,
-        &[
-            ("project", "QD"),
-            ("sort_by", "custom:size"),
-            ("order", "asc"),
-        ],
-        50,
-    );
+    let (_, ids) = rest_list_all(&api, &[("project", "QD"), ("sort_by", "custom:size"), ("order", "asc")], 50);
     assert_ids(&ids, &ids_prefixed("QD", &[2, 3, 1]));
 
     // Descending: present values first, missing last, ties still ID asc.
-    let (_, ids) = rest_list_all(
-        &api,
-        &[
-            ("project", "QD"),
-            ("sort_by", "field:size"),
-            ("order", "desc"),
-        ],
-        50,
-    );
+    let (_, ids) = rest_list_all(&api, &[("project", "QD"), ("sort_by", "field:size"), ("order", "desc")], 50);
     assert_ids(&ids, &ids_prefixed("QD", &[1, 2, 3]));
 }
 
@@ -427,28 +332,17 @@ fn rest_rejects_invalid_explicit_query_params() {
     for (key, value) in &invalid {
         let query = [("project", "QE"), (key, value)];
         let (status, body) = rest_json(&api, &query);
-        assert_eq!(
-            status, 400,
-            "list {key}={value} should be rejected, got {body}"
-        );
+        assert_eq!(status, 400, "list {key}={value} should be rejected, got {body}");
         let (status, body_text) = rest_export(&api, &query);
         let _ = body_text;
         // Export shares the filter grammar; page params are its only
         // exception (still ignored, matching its no-pagination contract).
         let expects_400 = !matches!(*key, "limit" | "offset");
-        assert_eq!(
-            status,
-            if expects_400 { 400 } else { 200 },
-            "export {key}={value} unexpected status"
-        );
+        assert_eq!(status, if expects_400 { 400 } else { 200 }, "export {key}={value} unexpected status");
     }
 
     // Valid edge values still succeed.
-    for (key, value) in [
-        ("limit", "200"),
-        ("sprints", "1,2"),
-        ("needs", "effort,due"),
-    ] {
+    for (key, value) in [("limit", "200"), ("sprints", "1,2"), ("needs", "effort,due")] {
         let (status, _) = rest_json(&api, &[("project", "QE"), (key, value)]);
         assert_eq!(status, 200, "list {key}={value} should be valid");
     }
@@ -458,30 +352,15 @@ fn rest_rejects_invalid_explicit_query_params() {
 fn mcp_task_list_strict_params_and_new_filters() {
     let fx = Fixture::new("QF");
     let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", fx.tasks_dir.to_string_lossy().as_ref());
-    fx.write(
-        1,
-        &fx.task_yaml(
-            1,
-            "older",
-            "2026-01-01T00:00:00Z",
-            &[("effort", "2h".to_string())],
-        ),
-    );
-    fx.write(
-        2,
-        &fx.task_yaml(2, "newer no effort", "2026-02-01T00:00:00Z", &[]),
-    );
+    fx.write(1, &fx.task_yaml(1, "older", "2026-01-01T00:00:00Z", &[("effort", "2h".to_string())]));
+    fx.write(2, &fx.task_yaml(2, "newer no effort", "2026-02-01T00:00:00Z", &[]));
 
     // Default order is deterministic: modified desc.
     let payload = mcp_call("task/list", json!({"project": "QF"})).unwrap();
     assert_ids(&mcp_ids(&payload), &ids_prefixed("QF", &[2, 1]));
 
     // needs accepts arrays and filters tasks missing effort.
-    let payload = mcp_call(
-        "task/list",
-        json!({"project": "QF", "needs": ["effort"], "sort_by": "modified", "order": "asc"}),
-    )
-    .unwrap();
+    let payload = mcp_call("task/list", json!({"project": "QF", "needs": ["effort"], "sort_by": "modified", "order": "asc"})).unwrap();
     assert_ids(&mcp_ids(&payload), &ids_prefixed("QF", &[2]));
 
     // due/recent smart filters work over MCP too.
@@ -504,28 +383,17 @@ fn mcp_task_list_strict_params_and_new_filters() {
     ];
     for (key, value) in cases {
         let err = mcp_call("task/list", json!({"project": "QF", &key: value})).unwrap_err();
-        assert_eq!(
-            err["code"].as_i64(),
-            Some(-32602),
-            "task_list {key}={value} must fail closed: {err}"
-        );
+        assert_eq!(err["code"].as_i64(), Some(-32602), "task_list {key}={value} must fail closed: {err}");
     }
 
     // Type-confused params are also rejected.
-    let err = mcp_call(
-        "task/list",
-        json!({"project": "QF", "order": {"dir": "asc"}}),
-    )
-    .unwrap_err();
+    let err = mcp_call("task/list", json!({"project": "QF", "order": {"dir": "asc"}})).unwrap_err();
     assert_eq!(err["code"].as_i64(), Some(-32602));
 
     // Invalid status errors carry enum hints like the mutation tools.
     let err = mcp_call("task/list", json!({"project": "QF", "status": "Bogus"})).unwrap_err();
     let message = err["message"].as_str().unwrap();
-    assert!(
-        message.to_lowercase().contains("status"),
-        "error should name the field: {message}"
-    );
+    assert!(message.to_lowercase().contains("status"), "error should name the field: {message}");
 }
 
 #[test]
@@ -534,71 +402,15 @@ fn due_buckets_match_local_calendar_dates() {
     let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", fx.tasks_dir.to_string_lossy().as_ref());
 
     // Date-only values around every bucket boundary.
-    fx.write(
-        1,
-        &fx.task_yaml(
-            1,
-            "overdue",
-            "2026-01-01T00:00:00Z",
-            &[("due_date", date_only(-1))],
-        ),
-    );
-    fx.write(
-        2,
-        &fx.task_yaml(
-            2,
-            "today",
-            "2026-01-01T00:00:00Z",
-            &[("due_date", date_only(0))],
-        ),
-    );
-    fx.write(
-        3,
-        &fx.task_yaml(
-            3,
-            "soon first",
-            "2026-01-01T00:00:00Z",
-            &[("due_date", date_only(1))],
-        ),
-    );
-    fx.write(
-        4,
-        &fx.task_yaml(
-            4,
-            "soon last",
-            "2026-01-01T00:00:00Z",
-            &[("due_date", date_only(7))],
-        ),
-    );
-    fx.write(
-        5,
-        &fx.task_yaml(
-            5,
-            "later first",
-            "2026-01-01T00:00:00Z",
-            &[("due_date", date_only(8))],
-        ),
-    );
+    fx.write(1, &fx.task_yaml(1, "overdue", "2026-01-01T00:00:00Z", &[("due_date", date_only(-1))]));
+    fx.write(2, &fx.task_yaml(2, "today", "2026-01-01T00:00:00Z", &[("due_date", date_only(0))]));
+    fx.write(3, &fx.task_yaml(3, "soon first", "2026-01-01T00:00:00Z", &[("due_date", date_only(1))]));
+    fx.write(4, &fx.task_yaml(4, "soon last", "2026-01-01T00:00:00Z", &[("due_date", date_only(7))]));
+    fx.write(5, &fx.task_yaml(5, "later first", "2026-01-01T00:00:00Z", &[("due_date", date_only(8))]));
     // Stored RFC3339 instants: local midnight today and late tonight both
     // bucket as "today" (datetime dues bucket by local date, not instant).
-    fx.write(
-        6,
-        &fx.task_yaml(
-            6,
-            "rfc midnight",
-            "2026-01-01T00:00:00Z",
-            &[("due_date", local_instant(0, 0, 0))],
-        ),
-    );
-    fx.write(
-        7,
-        &fx.task_yaml(
-            7,
-            "rfc late",
-            "2026-01-01T00:00:00Z",
-            &[("due_date", local_instant(0, 23, 0))],
-        ),
-    );
+    fx.write(6, &fx.task_yaml(6, "rfc midnight", "2026-01-01T00:00:00Z", &[("due_date", local_instant(0, 0, 0))]));
+    fx.write(7, &fx.task_yaml(7, "rfc late", "2026-01-01T00:00:00Z", &[("due_date", local_instant(0, 23, 0))]));
     fx.write(8, &fx.task_yaml(8, "no due", "2026-01-01T00:00:00Z", &[]));
 
     let api = api();
@@ -633,24 +445,8 @@ fn recent_boundary_is_inclusive_at_seven_days() {
     // test with an injected clock.
     let now = Utc::now();
     let cutoff = now - Duration::days(7);
-    fx.write(
-        1,
-        &fx.task_yaml(
-            1,
-            "just inside cutoff",
-            &(cutoff + Duration::seconds(2)).to_rfc3339(),
-            &[],
-        ),
-    );
-    fx.write(
-        2,
-        &fx.task_yaml(
-            2,
-            "just outside cutoff",
-            &(cutoff - Duration::seconds(2)).to_rfc3339(),
-            &[],
-        ),
-    );
+    fx.write(1, &fx.task_yaml(1, "just inside cutoff", &(cutoff + Duration::seconds(2)).to_rfc3339(), &[]));
+    fx.write(2, &fx.task_yaml(2, "just outside cutoff", &(cutoff - Duration::seconds(2)).to_rfc3339(), &[]));
 
     let api = api();
     let (status, ids) = rest_list_all(&api, &[("project", "QH"), ("recent", "7d")], 50);
@@ -671,39 +467,16 @@ fn effort_sort_compares_parsed_values_across_transports() {
     let fx = Fixture::new("QI");
     let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", fx.tasks_dir.to_string_lossy().as_ref());
 
-    fx.write(
-        1,
-        &fx.task_yaml(
-            1,
-            "days",
-            "2026-01-01T00:00:00Z",
-            &[("effort", quote("1d"))],
-        ),
-    );
-    fx.write(
-        2,
-        &fx.task_yaml(
-            2,
-            "hours",
-            "2026-01-01T00:00:00Z",
-            &[("effort", quote("2h"))],
-        ),
-    );
+    fx.write(1, &fx.task_yaml(1, "days", "2026-01-01T00:00:00Z", &[("effort", quote("1d"))]));
+    fx.write(2, &fx.task_yaml(2, "hours", "2026-01-01T00:00:00Z", &[("effort", quote("2h"))]));
     fx.write(3, &fx.task_yaml(3, "none", "2026-01-01T00:00:00Z", &[]));
 
     let api = api();
     // 2h < 1d (8h); missing effort sorts last in ascending order.
-    let (_, ids) = rest_list_all(
-        &api,
-        &[("project", "QI"), ("sort_by", "effort"), ("order", "asc")],
-        50,
-    );
+    let (_, ids) = rest_list_all(&api, &[("project", "QI"), ("sort_by", "effort"), ("order", "asc")], 50);
     assert_ids(&ids, &ids_prefixed("QI", &[2, 1, 3]));
 
-    let mcp_ids = mcp_list_all(
-        json!({"project": "QI", "sort_by": "effort", "order": "asc"}),
-        50,
-    );
+    let mcp_ids = mcp_list_all(json!({"project": "QI", "sort_by": "effort", "order": "asc"}), 50);
     assert_ids(&mcp_ids, &ids_prefixed("QI", &[2, 1, 3]));
 }
 
@@ -740,25 +513,13 @@ fn cli_list_json(tasks_dir: &std::path::Path, extra: &[&str]) -> Result<Value, S
     let out = cmd.output().map_err(|e| e.to_string())?;
     let stdout = String::from_utf8_lossy(&out.stdout).to_string();
     if !out.status.success() {
-        return Err(format!(
-            "exit {:?}: {}",
-            out.status.code(),
-            String::from_utf8_lossy(&out.stderr)
-        ));
+        return Err(format!("exit {:?}: {}", out.status.code(), String::from_utf8_lossy(&out.stderr)));
     }
     serde_json::from_str(&stdout).map_err(|e| format!("bad json {e}: {stdout}"))
 }
 
 fn cli_ids(payload: &Value) -> Vec<String> {
-    payload["tasks"]
-        .as_array()
-        .map(|tasks| {
-            tasks
-                .iter()
-                .map(|t| t["id"].as_str().unwrap().to_string())
-                .collect()
-        })
-        .unwrap_or_default()
+    payload["tasks"].as_array().map(|tasks| tasks.iter().map(|t| t["id"].as_str().unwrap().to_string()).collect()).unwrap_or_default()
 }
 
 #[test]
@@ -766,27 +527,12 @@ fn project_scoped_enum_validation_rest_and_mcp() {
     let fx = Fixture::new("PA");
     // Base config allows Todo/Done; PA narrows to Todo/Special; PB keeps a
     // third set so "valid in one project, invalid in another" is exercised.
-    std::fs::write(
-        fx.tasks_dir.join("config.yml"),
-        "issue.states: [Todo, Done]\nissue.types: [Task]\n",
-    )
-    .unwrap();
+    std::fs::write(fx.tasks_dir.join("config.yml"), "issue.states: [Todo, Done]\nissue.types: [Task]\n").unwrap();
     std::fs::create_dir_all(fx.tasks_dir.join("PB")).unwrap();
-    std::fs::write(
-        fx.tasks_dir.join("PA").join("config.yml"),
-        "issue.states: [Todo, Special]\n",
-    )
-    .unwrap();
-    std::fs::write(
-        fx.tasks_dir.join("PB").join("config.yml"),
-        "issue.states: [Todo, Other]\n",
-    )
-    .unwrap();
+    std::fs::write(fx.tasks_dir.join("PA").join("config.yml"), "issue.states: [Todo, Special]\n").unwrap();
+    std::fs::write(fx.tasks_dir.join("PB").join("config.yml"), "issue.states: [Todo, Other]\n").unwrap();
 
-    fx.write(
-        1,
-        "title: special one\nstatus: Special\npriority: medium\ntype: Task\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-01-01T00:00:00Z\ntags: []\n",
-    );
+    fx.write(1, "title: special one\nstatus: Special\npriority: medium\ntype: Task\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-01-01T00:00:00Z\ntags: []\n");
     std::fs::write(
         fx.tasks_dir.join("PB").join("1.yml"),
         "title: other one\nstatus: Other\npriority: medium\ntype: Task\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-01-01T00:00:00Z\ntags: []\n",
@@ -812,8 +558,7 @@ fn project_scoped_enum_validation_rest_and_mcp() {
     assert_eq!(status, 400, "base scope must reject project-only status");
 
     // MCP parity: same project-scoped validation.
-    let payload = mcp_call("task/list", json!({"project": "PA", "status": "Special"}))
-        .expect("project-scoped status must validate over MCP");
+    let payload = mcp_call("task/list", json!({"project": "PA", "status": "Special"})).expect("project-scoped status must validate over MCP");
     assert_ids(&mcp_ids(&payload), &ids_prefixed("PA", &[1]));
 
     let err = mcp_call("task/list", json!({"project": "PA", "status": "Done"})).unwrap_err();
@@ -844,11 +589,7 @@ fn new_sort_keys_cover_title_reporter_tags_sprints() {
 
     let api = api();
     let sorted = |key: &str, order: &str| -> Vec<String> {
-        let (_, ids) = rest_list_all(
-            &api,
-            &[("project", "PK"), ("sort_by", key), ("order", order)],
-            50,
-        );
+        let (_, ids) = rest_list_all(&api, &[("project", "PK"), ("sort_by", key), ("order", order)], 50);
         ids
     };
 
@@ -866,15 +607,9 @@ fn new_sort_keys_cover_title_reporter_tags_sprints() {
     assert_ids(&sorted("sprints", "asc"), &ids_prefixed("PK", &[3, 2, 1]));
 
     // MCP parity for the two structured keys.
-    let mcp_sorted = mcp_list_all(
-        json!({"project": "PK", "sort_by": "sprints", "order": "asc"}),
-        50,
-    );
+    let mcp_sorted = mcp_list_all(json!({"project": "PK", "sort_by": "sprints", "order": "asc"}), 50);
     assert_ids(&mcp_sorted, &ids_prefixed("PK", &[3, 2, 1]));
-    let mcp_sorted = mcp_list_all(
-        json!({"project": "PK", "sort_by": "tags", "order": "desc"}),
-        50,
-    );
+    let mcp_sorted = mcp_list_all(json!({"project": "PK", "sort_by": "tags", "order": "desc"}), 50);
     assert_ids(&mcp_sorted, &ids_prefixed("PK", &[3, 1, 2]));
 }
 
@@ -892,11 +627,7 @@ fn strict_blank_smart_filters_are_errors() {
         assert_eq!(status, 400, "export {key}= (blank) must 400");
 
         let err = mcp_call("task/list", json!({"project": "PL", key: ""})).unwrap_err();
-        assert_eq!(
-            err["code"].as_i64(),
-            Some(-32602),
-            "mcp blank {key} must fail closed: {err}"
-        );
+        assert_eq!(err["code"].as_i64(), Some(-32602), "mcp blank {key} must fail closed: {err}");
     }
 }
 
@@ -923,32 +654,16 @@ fn cli_shares_default_order_strict_sort_and_due_buckets() {
         yaml
     };
     // Newest modified first by default; PM-2/PM-3 tie and break on ID asc.
-    fx.write(
-        1,
-        &mk(
-            1,
-            "2026-01-01T00:00:00Z",
-            &[("due_date", today_str.clone())],
-        ),
-    );
-    fx.write(
-        2,
-        &mk(2, "2026-02-01T00:00:00Z", &[("due_date", date_only(8))]),
-    );
-    fx.write(
-        3,
-        &mk(3, "2026-02-01T00:00:00Z", &[("due_date", date_only(-1))]),
-    );
+    fx.write(1, &mk(1, "2026-01-01T00:00:00Z", &[("due_date", today_str.clone())]));
+    fx.write(2, &mk(2, "2026-02-01T00:00:00Z", &[("due_date", date_only(8))]));
+    fx.write(3, &mk(3, "2026-02-01T00:00:00Z", &[("due_date", date_only(-1))]));
 
     let payload = cli_list_json(&fx.tasks_dir, &[]).unwrap();
     assert_ids(&cli_ids(&payload), &ids_prefixed("PM", &[2, 3, 1]));
 
     // Explicit invalid sort key errors instead of being ignored.
     let err = cli_list_json(&fx.tasks_dir, &["--sort-by", "bogus"]).unwrap_err();
-    assert!(
-        err.contains("Invalid --sort-by"),
-        "expected strict sort error, got: {err}"
-    );
+    assert!(err.contains("Invalid --sort-by"), "expected strict sort error, got: {err}");
 
     // Bare configured custom field still sorts; unknown bare names error.
     fx.write(
@@ -969,19 +684,14 @@ fn cli_shares_default_order_strict_sort_and_due_buckets() {
 
     // Custom window: today..=today+3 (nothing here fits since PM-1 is today
     // and PM-2 is +8), and +7 stays inclusive for the default window.
-    fx.write(
-        5,
-        &mk(5, "2026-01-15T00:00:00Z", &[("due_date", date_only(3))]),
-    );
-    let payload =
-        cli_list_json(&fx.tasks_dir, &["--due-within", "3", "--page-size", "50"]).unwrap();
+    fx.write(5, &mk(5, "2026-01-15T00:00:00Z", &[("due_date", date_only(3))]));
+    let payload = cli_list_json(&fx.tasks_dir, &["--due-within", "3", "--page-size", "50"]).unwrap();
     // Default order (modified desc) applies within the filtered set.
     assert_ids(&cli_ids(&payload), &ids_prefixed("PM", &[5, 1]));
     let payload = cli_list_json(&fx.tasks_dir, &["due_within:2", "--page-size", "50"]).unwrap();
     assert_ids(&cli_ids(&payload), &ids_prefixed("PM", &[1]));
 
     // Assignee matching is fuzzy like the API: stored "Alice" vs --assignee alice.
-    let payload =
-        cli_list_json(&fx.tasks_dir, &["--assignee", "alice", "--page-size", "50"]).unwrap();
+    let payload = cli_list_json(&fx.tasks_dir, &["--assignee", "alice", "--page-size", "50"]).unwrap();
     assert_eq!(cli_ids(&payload).len(), 5);
 }

@@ -12,10 +12,7 @@ pub(crate) fn run(
 ) -> Result<(), String> {
     let scope = scope_project(global, project, resolver);
     let tasks = list_tasks(scope.as_deref(), resolver, filter)?;
-    let rows = ranked_counts(
-        tally(tasks.into_iter().flat_map(|(_, task)| task.tags)),
-        limit,
-    );
+    let rows = ranked_counts(tally(tasks.into_iter().flat_map(|(_, task)| task.tags)), limit);
     emit_items(
         renderer,
         header("stats.tags", global, scope.as_deref()),

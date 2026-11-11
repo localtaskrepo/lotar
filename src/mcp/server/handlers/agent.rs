@@ -9,12 +9,7 @@ pub(crate) fn handle_agent_run(req: JsonRpcRequest) -> JsonRpcResponse {
     let ticket_id = match req.params.get("ticket_id").and_then(|v| v.as_str()) {
         Some(id) => id.to_string(),
         None => {
-            return err(
-                req.id,
-                -32602,
-                "Missing required parameter: ticket_id",
-                None,
-            );
+            return err(req.id, -32602, "Missing required parameter: ticket_id", None);
         }
     };
     let prompt = match req.params.get("prompt").and_then(|v| v.as_str()) {
@@ -25,43 +20,18 @@ pub(crate) fn handle_agent_run(req: JsonRpcRequest) -> JsonRpcResponse {
     let resolver = match TasksDirectoryResolver::resolve(None, None) {
         Ok(r) => r,
         Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                &format!("Cannot resolve tasks directory: {e}"),
-                None,
-            );
+            return err(req.id, -32603, &format!("Cannot resolve tasks directory: {e}"), None);
         }
     };
 
     let create_req = AgentJobCreateRequest {
         ticket_id,
         prompt,
-        runner: req
-            .params
-            .get("runner")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string()),
-        agent: req
-            .params
-            .get("agent")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string()),
-        model: req
-            .params
-            .get("model")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string()),
-        effort: req
-            .params
-            .get("effort")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string()),
-        provider: req
-            .params
-            .get("provider")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string()),
+        runner: req.params.get("runner").and_then(|v| v.as_str()).map(|s| s.to_string()),
+        agent: req.params.get("agent").and_then(|v| v.as_str()).map(|s| s.to_string()),
+        model: req.params.get("model").and_then(|v| v.as_str()).map(|s| s.to_string()),
+        effort: req.params.get("effort").and_then(|v| v.as_str()).map(|s| s.to_string()),
+        provider: req.params.get("provider").and_then(|v| v.as_str()).map(|s| s.to_string()),
     };
 
     match AgentJobService::start_job(create_req, &resolver) {

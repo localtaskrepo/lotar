@@ -255,9 +255,7 @@ fn strip_png(bytes: &[u8]) -> Option<Vec<u8>> {
             return None;
         }
         // length + type + data + CRC
-        let end = pos
-            .checked_add(12)?
-            .checked_add(usize::try_from(len).ok()?)?;
+        let end = pos.checked_add(12)?.checked_add(usize::try_from(len).ok()?)?;
         let chunk = bytes.get(pos..end)?;
         if !PNG_METADATA_CHUNKS.contains(&&kind) {
             out.extend_from_slice(chunk);
@@ -281,9 +279,7 @@ fn strip_webp(bytes: &[u8]) -> Option<Vec<u8>> {
     if bytes.get(..4)? != b"RIFF" || bytes.get(8..12)? != b"WEBP" {
         return None;
     }
-    let riff_end = usize::try_from(ByteOrder::Little.read_u32(bytes, 4)?)
-        .ok()?
-        .checked_add(8)?;
+    let riff_end = usize::try_from(ByteOrder::Little.read_u32(bytes, 4)?).ok()?.checked_add(8)?;
     let body = bytes.get(12..riff_end)?;
     let trailer = bytes.get(riff_end..)?;
 
@@ -294,10 +290,7 @@ fn strip_webp(bytes: &[u8]) -> Option<Vec<u8>> {
         let fourcc: [u8; 4] = body.get(pos..pos + 4)?.try_into().ok()?;
         let size = usize::try_from(ByteOrder::Little.read_u32(body, pos + 4)?).ok()?;
         // Odd-sized chunks are followed by a pad byte.
-        let end = pos
-            .checked_add(8)?
-            .checked_add(size)?
-            .checked_add(size & 1)?;
+        let end = pos.checked_add(8)?.checked_add(size)?.checked_add(size & 1)?;
         let chunk = body.get(pos..end)?;
         match &fourcc {
             b"EXIF" | b"XMP " => {}
@@ -324,10 +317,7 @@ fn strip_webp(bytes: &[u8]) -> Option<Vec<u8>> {
 fn is_bmp(bytes: &[u8]) -> bool {
     // "BM" alone is too weak (plain text can start with it): also require a
     // known DIB header size.
-    bytes.starts_with(b"BM")
-        && ByteOrder::Little
-            .read_u32(bytes, 14)
-            .is_some_and(|dib| matches!(dib, 12 | 16 | 40 | 52 | 56 | 64 | 108 | 124))
+    bytes.starts_with(b"BM") && ByteOrder::Little.read_u32(bytes, 14).is_some_and(|dib| matches!(dib, 12 | 16 | 40 | 52 | 56 | 64 | 108 | 124))
 }
 
 fn sniff_iso_bmff(bytes: &[u8]) -> Option<&'static str> {
@@ -342,10 +332,7 @@ fn sniff_iso_bmff(bytes: &[u8]) -> Option<&'static str> {
         0 | 1 => bytes.len(),
         size => size.min(bytes.len()),
     };
-    let (compatible, _) = bytes
-        .get(16..brands_end)
-        .unwrap_or_default()
-        .as_chunks::<4>();
+    let (compatible, _) = bytes.get(16..brands_end).unwrap_or_default().as_chunks::<4>();
 
     let specific = |brand: &[u8; 4]| match brand {
         b"avif" | b"avis" => Some("avif"),
@@ -359,9 +346,7 @@ fn sniff_iso_bmff(bytes: &[u8]) -> Option<&'static str> {
     // let a specific compatible brand decide first.
     let avif = compatible.iter().any(|b| specific(b) == Some("avif"));
     let heic = compatible.iter().any(|b| specific(b) == Some("heic"));
-    let generic = std::iter::once(&major)
-        .chain(compatible)
-        .any(|b| b == b"mif1" || b == b"msf1");
+    let generic = std::iter::once(&major).chain(compatible).any(|b| b == b"mif1" || b == b"msf1");
     if avif {
         Some("avif")
     } else if heic || generic {
@@ -374,9 +359,7 @@ fn sniff_iso_bmff(bytes: &[u8]) -> Option<&'static str> {
 const SVG_SNIFF_WINDOW: usize = 1024;
 
 fn looks_like_svg(bytes: &[u8]) -> bool {
-    let head = bytes
-        .get(..bytes.len().min(SVG_SNIFF_WINDOW))
-        .unwrap_or_default();
+    let head = bytes.get(..bytes.len().min(SVG_SNIFF_WINDOW)).unwrap_or_default();
     let mut rest = head.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(head);
     loop {
         rest = rest.trim_ascii_start();
@@ -394,15 +377,11 @@ fn looks_like_svg(bytes: &[u8]) -> bool {
             None => return false,
         }
     }
-    starts_with_ignore_case(rest, b"<svg")
-        && rest
-            .get(4)
-            .is_some_and(|&b| b.is_ascii_whitespace() || b == b'>' || b == b'/')
+    starts_with_ignore_case(rest, b"<svg") && rest.get(4).is_some_and(|&b| b.is_ascii_whitespace() || b == b'>' || b == b'/')
 }
 
 fn starts_with_ignore_case(hay: &[u8], prefix: &[u8]) -> bool {
-    hay.get(..prefix.len())
-        .is_some_and(|head| head.eq_ignore_ascii_case(prefix))
+    hay.get(..prefix.len()).is_some_and(|head| head.eq_ignore_ascii_case(prefix))
 }
 
 /// The bytes after the first occurrence of `needle`.
@@ -434,11 +413,7 @@ mod tests {
         for &byte in data {
             crc ^= u32::from(byte);
             for _ in 0..8 {
-                crc = if crc & 1 == 1 {
-                    (crc >> 1) ^ 0xEDB8_8320
-                } else {
-                    crc >> 1
-                };
+                crc = if crc & 1 == 1 { (crc >> 1) ^ 0xEDB8_8320 } else { crc >> 1 };
             }
         }
         !crc
@@ -486,10 +461,7 @@ mod tests {
         tiff
     }
 
-    const SCAN: &[u8] = &[
-        0xFF, 0xDA, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3F, 0x00, 0x12, 0xFF, 0x00, 0x34, 0xFF,
-        0xD0, 0x56, 0xFF, 0xD9,
-    ];
+    const SCAN: &[u8] = &[0xFF, 0xDA, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3F, 0x00, 0x12, 0xFF, 0x00, 0x34, 0xFF, 0xD0, 0x56, 0xFF, 0xD9];
 
     /// A JPEG carrying every kind of metadata, and the offset of its SOS.
     fn rich_jpeg(order: ByteOrder, orientation: Option<u16>) -> (Vec<u8>, usize) {
@@ -498,14 +470,8 @@ mod tests {
         let mut out = vec![0xFF, 0xD8];
         out.extend(jpeg_segment(0xE0, b"JFIF\0\x01\x01\0\0\x01\0\x01\0\0"));
         out.extend(jpeg_segment(0xE1, &exif));
-        out.extend(jpeg_segment(
-            0xE1,
-            b"http://ns.adobe.com/xap/1.0/\0<x:xmpmeta>TestCam</x:xmpmeta>",
-        ));
-        out.extend(jpeg_segment(
-            0xE1,
-            b"http://ns.adobe.com/xmp/extension/\0ABCDEF<rdf/>",
-        ));
+        out.extend(jpeg_segment(0xE1, b"http://ns.adobe.com/xap/1.0/\0<x:xmpmeta>TestCam</x:xmpmeta>"));
+        out.extend(jpeg_segment(0xE1, b"http://ns.adobe.com/xmp/extension/\0ABCDEF<rdf/>"));
         out.extend(jpeg_segment(0xE2, b"ICC_PROFILE\0\x01\x01fake-icc"));
         out.extend(jpeg_segment(0xED, b"Photoshop 3.0\08BIM\x04\x04TestCam"));
         out.extend(jpeg_segment(0xFE, b"secret comment"));
@@ -553,17 +519,11 @@ mod tests {
         out.extend(png_chunk(b"iCCP", b"icc\0\0fake-compressed"));
         out.extend(png_chunk(b"gAMA", &45455u32.to_be_bytes()));
         out.extend(png_chunk(b"tEXt", b"Comment\0TestCam"));
-        out.extend(png_chunk(
-            b"iTXt",
-            b"XML:com.adobe.xmp\0\0\0\0\0<x:xmpmeta>TestCam</x:xmpmeta>",
-        ));
+        out.extend(png_chunk(b"iTXt", b"XML:com.adobe.xmp\0\0\0\0\0<x:xmpmeta>TestCam</x:xmpmeta>"));
         out.extend(png_chunk(b"eXIf", &exif_tiff(ByteOrder::Big, Some(6))));
         out.extend(png_chunk(b"tIME", &[0x07, 0xE6, 1, 1, 0, 0, 0]));
         out.extend(png_chunk(b"pHYs", &[0, 0, 0x0B, 0x13, 0, 0, 0x0B, 0x13, 1]));
-        out.extend(png_chunk(
-            b"IDAT",
-            &[0x78, 0x9C, 0x63, 0x60, 0x60, 0x60, 0, 0, 0, 4, 0, 1],
-        ));
+        out.extend(png_chunk(b"IDAT", &[0x78, 0x9C, 0x63, 0x60, 0x60, 0x60, 0, 0, 0, 4, 0, 1]));
         out.extend(png_chunk(b"IEND", &[]));
         out
     }
@@ -620,10 +580,7 @@ mod tests {
         while pos < bytes.len() {
             let size = u32::from_le_bytes(bytes[pos + 4..pos + 8].try_into().unwrap()) as usize;
             let end = pos + 8 + size + (size & 1);
-            chunks.push((
-                bytes[pos..pos + 4].try_into().unwrap(),
-                bytes[pos..end].to_vec(),
-            ));
+            chunks.push((bytes[pos..pos + 4].try_into().unwrap(), bytes[pos..end].to_vec()));
             pos = end;
         }
         chunks
@@ -642,18 +599,8 @@ mod tests {
         assert_eq!(markers, [0xE0, 0xE2, 0xEE, 0xDB, 0xC0, 0xC4, 0xDA]);
         assert!(contains(&out, b"JFIF\0"));
         assert!(contains(&out, b"ICC_PROFILE\0"));
-        for leaked in [
-            b"Exif".as_slice(),
-            b"TestCam",
-            b"http://ns.adobe.com",
-            b"Photoshop",
-            b"secret comment",
-        ] {
-            assert!(
-                !contains(&out, leaked),
-                "{:?} leaked",
-                String::from_utf8_lossy(leaked)
-            );
+        for leaked in [b"Exif".as_slice(), b"TestCam", b"http://ns.adobe.com", b"Photoshop", b"secret comment"] {
+            assert!(!contains(&out, leaked), "{:?} leaked", String::from_utf8_lossy(leaked));
         }
     }
 
@@ -726,10 +673,7 @@ mod tests {
         assert!(out.starts_with(PNG_SIGNATURE));
         let chunks = png_chunks(&out);
         let kinds: Vec<&[u8; 4]> = chunks.iter().map(|(k, _)| k).collect();
-        assert_eq!(
-            kinds,
-            [b"IHDR", b"iCCP", b"gAMA", b"pHYs", b"IDAT", b"IEND"]
-        );
+        assert_eq!(kinds, [b"IHDR", b"iCCP", b"gAMA", b"pHYs", b"IDAT", b"IEND"]);
         let original = png_chunks(&input);
         for (kind, bytes) in &chunks {
             assert!(original.iter().any(|(k, b)| k == kind && b == bytes));
@@ -774,17 +718,8 @@ mod tests {
         png.extend(png_chunk(b"IEND", &[]));
 
         let simple_webp = riff(&[webp_chunk(b"VP8 ", VP8_DATA)]);
-        let vp8x_webp = riff(&[
-            webp_chunk(b"VP8X", &[VP8X_ICC, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-            webp_chunk(b"ICCP", ICCP_DATA),
-            webp_chunk(b"VP8 ", VP8_DATA),
-        ]);
-        vec![
-            ("jpg", jpeg),
-            ("png", png),
-            ("webp", simple_webp),
-            ("webp", vp8x_webp),
-        ]
+        let vp8x_webp = riff(&[webp_chunk(b"VP8X", &[VP8X_ICC, 0, 0, 0, 0, 0, 0, 0, 0, 0]), webp_chunk(b"ICCP", ICCP_DATA), webp_chunk(b"VP8 ", VP8_DATA)]);
+        vec![("jpg", jpeg), ("png", png), ("webp", simple_webp), ("webp", vp8x_webp)]
     }
 
     #[test]
@@ -796,12 +731,7 @@ mod tests {
 
     #[test]
     fn stripping_is_idempotent() {
-        let inputs = [
-            ("jpg", rich_jpeg(ByteOrder::Big, Some(6)).0),
-            ("jpg", rich_jpeg(ByteOrder::Little, None).0),
-            ("png", rich_png()),
-            ("webp", rich_webp()),
-        ];
+        let inputs = [("jpg", rich_jpeg(ByteOrder::Big, Some(6)).0), ("jpg", rich_jpeg(ByteOrder::Little, None).0), ("png", rich_png()), ("webp", rich_webp())];
         for (ext, input) in inputs {
             let once = strip_metadata(&input).expect("first pass strips");
             assert_eq!(strip_metadata(&once), None, "{ext}");
@@ -820,22 +750,14 @@ mod tests {
         }
         for (ext, input) in [("png", rich_png()), ("webp", rich_webp())] {
             for len in 0..input.len() {
-                assert_eq!(
-                    strip_metadata(&input[..len]),
-                    None,
-                    "{ext} truncated to {len}"
-                );
+                assert_eq!(strip_metadata(&input[..len]), None, "{ext} truncated to {len}");
             }
         }
     }
 
     #[test]
     fn corrupted_inputs_never_panic() {
-        let fixtures = [
-            ("jpg", rich_jpeg(ByteOrder::Big, Some(6)).0),
-            ("png", rich_png()),
-            ("webp", rich_webp()),
-        ];
+        let fixtures = [("jpg", rich_jpeg(ByteOrder::Big, Some(6)).0), ("png", rich_png()), ("webp", rich_webp())];
         let mut seed = 0x2545_F491_u32;
         let mut next = move || {
             seed ^= seed << 13;
@@ -853,11 +775,7 @@ mod tests {
                 let _ = strip_metadata(&bytes);
             }
         }
-        let prefixes: [&[u8]; 3] = [
-            PNG_SIGNATURE,
-            &[0xFF, 0xD8, 0xFF],
-            b"RIFF\xFF\xFF\xFF\xFFWEBP",
-        ];
+        let prefixes: [&[u8]; 3] = [PNG_SIGNATURE, &[0xFF, 0xD8, 0xFF], b"RIFF\xFF\xFF\xFF\xFFWEBP"];
         for prefix in prefixes {
             for _ in 0..2000 {
                 let mut bytes = prefix.to_vec();
@@ -898,10 +816,7 @@ mod tests {
             ("gif", b"GIF89a\x01\0\x01\0\0\0\0;"),
             ("tiff", b"II*\0\x08\0\0\0\0\0"),
             ("heic", &heic),
-            (
-                "svg",
-                b"<svg xmlns=\"http://www.w3.org/2000/svg\"><!-- TestCam --></svg>",
-            ),
+            ("svg", b"<svg xmlns=\"http://www.w3.org/2000/svg\"><!-- TestCam --></svg>"),
             ("png", b"just a text file named .png"),
         ];
         for (ext, bytes) in inputs {
@@ -926,10 +841,7 @@ mod tests {
                 ImageFormat::Jpeg => {
                     let mut exif = EXIF_HEADER.to_vec();
                     exif.extend(exif_tiff(ByteOrder::Big, Some(6)));
-                    (
-                        2,
-                        [jpeg_segment(0xE1, &exif), jpeg_segment(0xFE, b"TestCam")].concat(),
-                    )
+                    (2, [jpeg_segment(0xE1, &exif), jpeg_segment(0xFE, b"TestCam")].concat())
                 }
                 _ => {
                     let ihdr_end = PNG_SIGNATURE.len() + 12 + 13;
@@ -953,10 +865,7 @@ mod tests {
     #[test]
     fn sniffs_every_supported_format() {
         let ftyp = |major: &[u8; 4], compatible: &[&[u8; 4]]| {
-            let mut out = u32::try_from(16 + 4 * compatible.len())
-                .unwrap()
-                .to_be_bytes()
-                .to_vec();
+            let mut out = u32::try_from(16 + 4 * compatible.len()).unwrap().to_be_bytes().to_vec();
             out.extend_from_slice(b"ftyp");
             out.extend_from_slice(major);
             out.extend_from_slice(&[0, 0, 0, 0]);
@@ -1019,12 +928,7 @@ mod tests {
             &late_svg,
         ];
         for bytes in cases {
-            assert_eq!(
-                sniff_image_format(bytes),
-                None,
-                "{:?}",
-                String::from_utf8_lossy(bytes)
-            );
+            assert_eq!(sniff_image_format(bytes), None, "{:?}", String::from_utf8_lossy(bytes));
         }
     }
 }

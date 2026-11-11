@@ -46,15 +46,7 @@ impl EnumHints {
         {
             None
         } else {
-            Some(Self {
-                statuses,
-                priorities,
-                types,
-                projects,
-                members,
-                tags,
-                custom_fields,
-            })
+            Some(Self { statuses, priorities, types, projects, members, tags, custom_fields })
         }
     }
 }
@@ -80,26 +72,13 @@ pub(super) fn gather_enum_hints() -> Option<EnumHints> {
     EnumHints::from_resolved_config(&resolved, &project_names)
 }
 
-pub(super) fn insert_field_hint(
-    target: &mut JsonMap<String, Value>,
-    field: &str,
-    values: Option<&[String]>,
-    accepts_multiple: bool,
-) {
+pub(super) fn insert_field_hint(target: &mut JsonMap<String, Value>, field: &str, values: Option<&[String]>, accepts_multiple: bool) {
     if let Some(values) = values {
         if values.is_empty() {
             return;
         }
         let mut hint = JsonMap::new();
-        hint.insert(
-            "values".into(),
-            Value::Array(
-                values
-                    .iter()
-                    .map(|value| Value::String(value.clone()))
-                    .collect(),
-            ),
-        );
+        hint.insert("values".into(), Value::Array(values.iter().map(|value| Value::String(value.clone())).collect()));
         if accepts_multiple {
             hint.insert("acceptsMultiple".into(), Value::Bool(true));
         }
@@ -119,11 +98,7 @@ pub(super) fn attach_field_hints(tool: &mut Value, field_hints: JsonMap<String, 
     }
 }
 
-pub(super) fn make_enum_error_data(
-    field: &str,
-    provided: &str,
-    allowed: &[String],
-) -> Option<Value> {
+pub(super) fn make_enum_error_data(field: &str, provided: &str, allowed: &[String]) -> Option<Value> {
     if allowed.is_empty() {
         return None;
     }

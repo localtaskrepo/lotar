@@ -43,9 +43,7 @@ fn status_update_reports_storage_failure() {
         .arg("done")
         .assert()
         .failure()
-        .stderr(predicate::str::contains(
-            "Storage error while updating task",
-        ))
+        .stderr(predicate::str::contains("Storage error while updating task"))
         .stderr(predicate::str::contains(&task_id));
 
     std::fs::set_permissions(&project_dir, original_perms).expect("restore permissions");
@@ -85,9 +83,7 @@ fn task_delete_reports_storage_failure() {
         .args(["task", "delete", &task_id, "--force"])
         .assert()
         .failure()
-        .stderr(predicate::str::contains(
-            "Storage error while deleting task",
-        ))
+        .stderr(predicate::str::contains("Storage error while deleting task"))
         .stderr(predicate::str::contains(&task_id));
 
     std::fs::set_permissions(&project_dir, original_perms).expect("restore permissions");

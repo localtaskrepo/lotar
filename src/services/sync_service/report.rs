@@ -42,17 +42,10 @@ pub(super) struct SyncReportRecorder {
 
 impl SyncReportRecorder {
     pub(super) fn new(context: SyncRunContext) -> Self {
-        Self {
-            context,
-            summary: SyncSummary::default(),
-            entries: Vec::new(),
-        }
+        Self { context, summary: SyncSummary::default(), entries: Vec::new() }
     }
 
-    #[expect(
-        clippy::needless_pass_by_value,
-        reason = "the caller hands this value over and does not use it afterwards"
-    )]
+    #[expect(clippy::needless_pass_by_value, reason = "the caller hands this value over and does not use it afterwards")]
     pub(super) fn record(&mut self, status: SyncEntryStatus, entry: SyncReportEntry) {
         match status {
             SyncEntryStatus::Created => self.summary.created += 1,
@@ -77,12 +70,7 @@ impl SyncReportRecorder {
         );
     }
 
-    pub(super) fn report(
-        &self,
-        status: &str,
-        warnings: Vec<String>,
-        info: Vec<String>,
-    ) -> SyncReport {
+    pub(super) fn report(&self, status: &str, warnings: Vec<String>, info: Vec<String>) -> SyncReport {
         SyncReport {
             id: self.context.run_id.clone(),
             created_at: self.context.started_at.clone(),
@@ -99,13 +87,7 @@ impl SyncReportRecorder {
         }
     }
 
-    pub(super) fn meta(
-        &self,
-        status: &str,
-        warnings: Vec<String>,
-        info: Vec<String>,
-        stored_path: Option<String>,
-    ) -> SyncReportMeta {
+    pub(super) fn meta(&self, status: &str, warnings: Vec<String>, info: Vec<String>, stored_path: Option<String>) -> SyncReportMeta {
         SyncReportMeta {
             id: self.context.run_id.clone(),
             created_at: self.context.started_at.clone(),
@@ -125,10 +107,7 @@ impl SyncReportRecorder {
 }
 
 pub(super) fn emit_sync_event(kind: &str, payload: JsonValue) {
-    crate::api_events::emit(&crate::api_events::ApiEvent {
-        kind: kind.to_string(),
-        data: payload,
-    });
+    crate::api_events::emit(&crate::api_events::ApiEvent { kind: kind.to_string(), data: payload });
 }
 
 pub(super) fn make_run_id(client_run_id: Option<&str>) -> String {
@@ -150,15 +129,7 @@ pub(super) fn make_entry(
     title: Option<String>,
     message: Option<String>,
 ) -> SyncReportEntry {
-    SyncReportEntry {
-        status: status.as_str().to_string(),
-        at: Utc::now().to_rfc3339(),
-        task_id,
-        reference,
-        title,
-        message,
-        fields: Vec::new(),
-    }
+    SyncReportEntry { status: status.as_str().to_string(), at: Utc::now().to_rfc3339(), task_id, reference, title, message, fields: Vec::new() }
 }
 
 pub(super) fn make_entry_with_fields(
@@ -169,15 +140,7 @@ pub(super) fn make_entry_with_fields(
     fields: Vec<String>,
     message: Option<String>,
 ) -> SyncReportEntry {
-    SyncReportEntry {
-        status: status.as_str().to_string(),
-        at: Utc::now().to_rfc3339(),
-        task_id,
-        reference,
-        title,
-        message,
-        fields,
-    }
+    SyncReportEntry { status: status.as_str().to_string(), at: Utc::now().to_rfc3339(), task_id, reference, title, message, fields }
 }
 
 #[derive(Debug, Clone, Copy)]

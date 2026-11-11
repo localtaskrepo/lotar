@@ -81,18 +81,10 @@ impl TrustService {
         let mut push_dir = |dir: &Path, rel_prefix: &str| {
             let automation = dir.join("automation.yml");
             if let Ok(content) = std::fs::read_to_string(&automation) {
-                out.push(CommandSource {
-                    path: format!("{rel_prefix}automation.yml"),
-                    kind: "automation",
-                    content,
-                });
+                out.push(CommandSource { path: format!("{rel_prefix}automation.yml"), kind: "automation", content });
             }
             if let Some(agents) = agents_block(&dir.join("config.yml")) {
-                out.push(CommandSource {
-                    path: format!("{rel_prefix}config.yml"),
-                    kind: "agents",
-                    content: agents,
-                });
+                out.push(CommandSource { path: format!("{rel_prefix}config.yml"), kind: "agents", content: agents });
             }
         };
         push_dir(tasks_dir, "");
@@ -126,10 +118,7 @@ impl TrustService {
         if trust_all() {
             return TrustState::Trusted;
         }
-        match load_trust_file()
-            .ok()
-            .and_then(|file| file.workspaces.get(&workspace_key(tasks_dir)).cloned())
-        {
+        match load_trust_file().ok().and_then(|file| file.workspaces.get(&workspace_key(tasks_dir)).cloned()) {
             Some(record) if record.fingerprint == fingerprint => TrustState::Trusted,
             Some(_) => TrustState::Changed,
             None => TrustState::Untrusted,
@@ -147,13 +136,7 @@ impl TrustService {
             return Ok(false);
         };
         update_trust_file(|file| {
-            file.workspaces.insert(
-                workspace_key(tasks_dir),
-                TrustRecord {
-                    fingerprint,
-                    trusted_at: chrono::Utc::now().to_rfc3339(),
-                },
-            );
+            file.workspaces.insert(workspace_key(tasks_dir), TrustRecord { fingerprint, trusted_at: chrono::Utc::now().to_rfc3339() });
         })?;
         Ok(true)
     }
@@ -169,8 +152,7 @@ impl TrustService {
     /// Run a LoTaR write to a command source, keeping a trusted workspace
     /// trusted afterwards. An untrusted workspace stays untrusted.
     pub fn rewrite<T, E>(tasks_dir: &Path, write: impl FnOnce() -> Result<T, E>) -> Result<T, E> {
-        let before = (!trust_all() && Self::allows_commands(tasks_dir))
-            .then(|| Self::fingerprint(&Self::sources(tasks_dir)));
+        let before = (!trust_all() && Self::allows_commands(tasks_dir)).then(|| Self::fingerprint(&Self::sources(tasks_dir)));
         let result = write()?;
         let Some(before) = before else {
             return Ok(result);
@@ -178,26 +160,20 @@ impl TrustService {
         if Self::fingerprint(&Self::sources(tasks_dir)) != before
             && let Err(err) = Self::trust(tasks_dir)
         {
-            crate::output::OutputRenderer::new(
-                crate::output::OutputFormat::Text,
-                crate::output::LogLevel::Warn,
-            )
-            .log_warn(format_args!("Could not update the trust record: {err}"));
+            crate::output::OutputRenderer::new(crate::output::OutputFormat::Text, crate::output::LogLevel::Warn)
+                .log_warn(format_args!("Could not update the trust record: {err}"));
         }
         Ok(result)
     }
 
     /// Whether an agent profile name is defined by a repository config file.
     pub fn profile_from_repository(tasks_dir: &Path, profile: &str) -> bool {
-        Self::sources(tasks_dir)
-            .iter()
-            .filter(|source| source.kind == "agents")
-            .any(|source| {
-                serde_yaml_ng::from_str::<serde_yaml_ng::Value>(&source.content)
-                    .ok()
-                    .and_then(|value| value.as_mapping().cloned())
-                    .is_some_and(|map| map.contains_key(profile))
-            })
+        Self::sources(tasks_dir).iter().filter(|source| source.kind == "agents").any(|source| {
+            serde_yaml_ng::from_str::<serde_yaml_ng::Value>(&source.content)
+                .ok()
+                .and_then(|value| value.as_mapping().cloned())
+                .is_some_and(|map| map.contains_key(profile))
+        })
     }
 
     /// The message shown when a command from the repository is held back.
@@ -223,28 +199,17 @@ impl TrustService {
                         lines.push(format!("{}: no run commands", source.path));
                     }
                     for (rule, event, command) in runs {
-                        lines.push(format!(
-                            "{}: rule '{rule}' on {event} runs {command}",
-                            source.path
-                        ));
+                        lines.push(format!("{}: rule '{rule}' on {event} runs {command}", source.path));
                     }
                 }
                 _ => {
-                    let Ok(serde_yaml_ng::Value::Mapping(map)) =
-                        serde_yaml_ng::from_str::<serde_yaml_ng::Value>(&source.content)
-                    else {
+                    let Ok(serde_yaml_ng::Value::Mapping(map)) = serde_yaml_ng::from_str::<serde_yaml_ng::Value>(&source.content) else {
                         continue;
                     };
                     for (name, profile) in map {
                         let name = name.as_str().unwrap_or_default().to_string();
-                        let detail = serde_yaml_ng::to_string(&profile)
-                            .unwrap_or_default()
-                            .trim()
-                            .replace('\n', ", ");
-                        lines.push(format!(
-                            "{}: agent profile '{name}' ({detail})",
-                            source.path
-                        ));
+                        let detail = serde_yaml_ng::to_string(&profile).unwrap_or_default().trim().replace('\n', ", ");
+                        lines.push(format!("{}: agent profile '{name}' ({detail})", source.path));
                     }
                 }
             }
@@ -258,11 +223,7 @@ fn trust_all() -> bool {
 }
 
 fn workspace_key(tasks_dir: &Path) -> String {
-    tasks_dir
-        .canonicalize()
-        .unwrap_or_else(|_| tasks_dir.to_path_buf())
-        .to_string_lossy()
-        .into_owned()
+    tasks_dir.canonicalize().unwrap_or_else(|_| tasks_dir.to_path_buf()).to_string_lossy().into_owned()
 }
 
 /// `agents:` of a config file, re-serialized so unrelated settings in the
@@ -279,20 +240,12 @@ fn agents_block(config_path: &Path) -> Option<String> {
 
 /// (rule name, event, command) for every `run` in an automation file.
 fn run_commands(content: &str) -> Vec<(String, String, String)> {
-    let Ok(file) = serde_yaml_ng::from_str::<crate::automation::types::AutomationFile>(content)
-    else {
-        return vec![(
-            "?".to_string(),
-            "?".to_string(),
-            "(file does not parse)".to_string(),
-        )];
+    let Ok(file) = serde_yaml_ng::from_str::<crate::automation::types::AutomationFile>(content) else {
+        return vec![("?".to_string(), "?".to_string(), "(file does not parse)".to_string())];
     };
     let mut out = Vec::new();
     for (index, rule) in file.automation.rules().iter().enumerate() {
-        let name = rule
-            .name
-            .clone()
-            .unwrap_or_else(|| format!("#{}", index + 1));
+        let name = rule.name.clone().unwrap_or_else(|| format!("#{}", index + 1));
         let value = serde_yaml_ng::to_value(&rule.on).unwrap_or_default();
         let Some(map) = value.as_mapping() else {
             continue;
@@ -303,11 +256,7 @@ fn run_commands(content: &str) -> Vec<(String, String, String)> {
                     serde_yaml_ng::Value::String(raw) => raw.clone(),
                     other => serde_json::to_string(other).unwrap_or_default(),
                 };
-                out.push((
-                    name.clone(),
-                    event.as_str().unwrap_or_default().to_string(),
-                    command,
-                ));
+                out.push((name.clone(), event.as_str().unwrap_or_default().to_string(), command));
             }
         }
     }
@@ -320,12 +269,7 @@ fn trust_file_path() -> LoTaRResult<PathBuf> {
     {
         return Ok(PathBuf::from(path));
     }
-    let home = dirs::home_dir().ok_or_else(|| {
-        LoTaRError::IoError(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            "Home directory not found",
-        ))
-    })?;
+    let home = dirs::home_dir().ok_or_else(|| LoTaRError::IoError(std::io::Error::new(std::io::ErrorKind::NotFound, "Home directory not found")))?;
     let legacy_dir = home.join(".lotar");
     if legacy_dir.is_dir() {
         return Ok(legacy_dir.join("trust.yml"));
@@ -373,40 +317,23 @@ mod tests {
         std::fs::write(tasks.join("config.yml"), "default:\n  project: A\n").unwrap();
         assert!(TrustService::sources(tasks).is_empty(), "no agents block");
 
-        std::fs::write(
-            tasks.join("config.yml"),
-            "default:\n  project: A\nagents:\n  bot:\n    runner: command\n    command: sh\n",
-        )
-        .unwrap();
+        std::fs::write(tasks.join("config.yml"), "default:\n  project: A\nagents:\n  bot:\n    runner: command\n    command: sh\n").unwrap();
         std::fs::create_dir_all(tasks.join("A")).unwrap();
-        std::fs::write(
-            tasks.join("A").join("automation.yml"),
-            "automation:\n  rules:\n    - name: hi\n      on:\n        created:\n          run: echo hi\n",
-        )
-        .unwrap();
+        std::fs::write(tasks.join("A").join("automation.yml"), "automation:\n  rules:\n    - name: hi\n      on:\n        created:\n          run: echo hi\n")
+            .unwrap();
         let sources = TrustService::sources(tasks);
         let paths: Vec<_> = sources.iter().map(|s| s.path.as_str()).collect();
         assert_eq!(paths, vec!["config.yml", "A/automation.yml"]);
         let before = TrustService::fingerprint(&sources);
 
         // Unrelated config edits keep the fingerprint.
-        std::fs::write(
-            tasks.join("config.yml"),
-            "default:\n  project: B\nagents:\n  bot:\n    runner: command\n    command: sh\n",
-        )
-        .unwrap();
-        assert_eq!(
-            TrustService::fingerprint(&TrustService::sources(tasks)),
-            before
-        );
+        std::fs::write(tasks.join("config.yml"), "default:\n  project: B\nagents:\n  bot:\n    runner: command\n    command: sh\n").unwrap();
+        assert_eq!(TrustService::fingerprint(&TrustService::sources(tasks)), before);
         assert!(TrustService::profile_from_repository(tasks, "bot"));
         assert!(!TrustService::profile_from_repository(tasks, "other"));
 
         let described = TrustService::describe(tasks).join("\n");
-        assert!(
-            described.contains("rule 'hi' on created runs echo hi"),
-            "{described}"
-        );
+        assert!(described.contains("rule 'hi' on created runs echo hi"), "{described}");
         assert!(described.contains("agent profile 'bot'"), "{described}");
     }
 }

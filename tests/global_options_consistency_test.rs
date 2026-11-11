@@ -28,38 +28,21 @@ mod tasks_dir_consistency {
         fs::create_dir_all(&custom_tasks_dir).unwrap();
 
         // Test that --tasks-dir works with config commands
-        let output = fixtures.run_command(&[
-            "config",
-            "show",
-            "--tasks-dir",
-            custom_tasks_dir.to_str().unwrap(),
-        ]);
-        assert!(
-            output.is_ok(),
-            "Config show with --tasks-dir should succeed"
-        );
+        let output = fixtures.run_command(&["config", "show", "--tasks-dir", custom_tasks_dir.to_str().unwrap()]);
+        assert!(output.is_ok(), "Config show with --tasks-dir should succeed");
         let output_str = output.unwrap();
         assert!(output_str.contains(&*custom_tasks_dir.to_string_lossy()));
 
         // Test that --tasks-dir works with list commands
-        let output =
-            fixtures.run_command(&["list", "--tasks-dir", custom_tasks_dir.to_str().unwrap()]);
+        let output = fixtures.run_command(&["list", "--tasks-dir", custom_tasks_dir.to_str().unwrap()]);
         assert!(output.is_ok(), "List with --tasks-dir should succeed");
 
         // Test that --tasks-dir works with scan commands
-        let output =
-            fixtures.run_command(&["scan", "--tasks-dir", custom_tasks_dir.to_str().unwrap()]);
+        let output = fixtures.run_command(&["scan", "--tasks-dir", custom_tasks_dir.to_str().unwrap()]);
         assert!(output.is_ok(), "Scan with --tasks-dir should succeed");
 
         // Test that --tasks-dir works with add commands
-        let output = fixtures.run_command(&[
-            "add",
-            "test-task",
-            "--description",
-            "Test task description",
-            "--tasks-dir",
-            custom_tasks_dir.to_str().unwrap(),
-        ]);
+        let output = fixtures.run_command(&["add", "test-task", "--description", "Test task description", "--tasks-dir", custom_tasks_dir.to_str().unwrap()]);
         match &output {
             Ok(_) => {}
             Err(e) => {
@@ -75,10 +58,7 @@ mod tasks_dir_consistency {
             .filter_map(|entry| entry.ok())
             .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "yml"))
             .collect();
-        assert!(
-            !task_files.is_empty(),
-            "Task should be created in custom tasks directory"
-        );
+        assert!(!task_files.is_empty(), "Task should be created in custom tasks directory");
     }
 
     #[test]
@@ -100,18 +80,9 @@ mod tasks_dir_consistency {
         env::set_current_dir(fixtures.temp_dir.path()).unwrap();
 
         // Add a task with explicit --tasks-dir (should override auto-detection)
-        let output = fixtures.run_command(&[
-            "add",
-            "explicit-task",
-            "--description",
-            "Task with explicit dir",
-            "--tasks-dir",
-            custom_tasks_dir.to_str().unwrap(),
-        ]);
-        assert!(
-            output.is_ok(),
-            "Add with explicit --tasks-dir should succeed"
-        );
+        let output =
+            fixtures.run_command(&["add", "explicit-task", "--description", "Task with explicit dir", "--tasks-dir", custom_tasks_dir.to_str().unwrap()]);
+        assert!(output.is_ok(), "Add with explicit --tasks-dir should succeed");
 
         // Verify task is in custom dir, not default dir
         let custom_files: Vec<_> = fs::read_dir(&custom_tasks_dir)
@@ -119,20 +90,14 @@ mod tasks_dir_consistency {
             .filter_map(|entry| entry.ok())
             .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "yml"))
             .collect();
-        assert!(
-            !custom_files.is_empty(),
-            "Task should be in custom directory"
-        );
+        assert!(!custom_files.is_empty(), "Task should be in custom directory");
 
         let default_files: Vec<_> = fs::read_dir(&default_tasks_dir)
             .unwrap()
             .filter_map(|entry| entry.ok())
             .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "yml"))
             .collect();
-        assert!(
-            default_files.is_empty(),
-            "Task should NOT be in default directory"
-        );
+        assert!(default_files.is_empty(), "Task should NOT be in default directory");
     }
 
     #[test]
@@ -148,18 +113,8 @@ mod tasks_dir_consistency {
         env::set_current_dir(fixtures.temp_dir.path()).unwrap();
 
         // Use relative path for --tasks-dir
-        let output = fixtures.run_command(&[
-            "add",
-            "relative-task",
-            "--description",
-            "Task with relative path",
-            "--tasks-dir",
-            "project/tasks",
-        ]);
-        assert!(
-            output.is_ok(),
-            "Add with relative --tasks-dir should succeed"
-        );
+        let output = fixtures.run_command(&["add", "relative-task", "--description", "Task with relative path", "--tasks-dir", "project/tasks"]);
+        assert!(output.is_ok(), "Add with relative --tasks-dir should succeed");
 
         // Verify task was created
         let task_files: Vec<_> = fs::read_dir(&tasks_subdir)
@@ -167,10 +122,7 @@ mod tasks_dir_consistency {
             .filter_map(|entry| entry.ok())
             .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "yml"))
             .collect();
-        assert!(
-            !task_files.is_empty(),
-            "Task should be created with relative path"
-        );
+        assert!(!task_files.is_empty(), "Task should be created with relative path");
     }
 }
 
@@ -203,26 +155,19 @@ mod environment_variable_consistency {
 
             // Commands should use environment variable when no --tasks-dir is specified
             let output = fixtures.run_command(&["config", "show"]);
-            assert!(
-                output.is_ok(),
-                "Config show should work with environment variable"
-            );
+            assert!(output.is_ok(), "Config show should work with environment variable");
             let output_str = output.unwrap();
 
             // Check that the tasks directory line contains our environment path
             assert!(
-                output_str
-                    .lines()
-                    .any(|line| line.contains("Tasks directory:")
-                        && line.contains(&*env_tasks_dir.to_string_lossy())),
+                output_str.lines().any(|line| line.contains("Tasks directory:") && line.contains(&*env_tasks_dir.to_string_lossy())),
                 "Config should show environment-specified tasks directory"
             );
 
             let output = fixtures.run_command(&["list"]);
             assert!(output.is_ok(), "List should work with environment variable");
 
-            let output =
-                fixtures.run_command(&["add", "env-task", "--description", "Task using env var"]);
+            let output = fixtures.run_command(&["add", "env-task", "--description", "Task using env var"]);
             assert!(output.is_ok(), "Add should work with environment variable");
 
             // Verify task was created in environment directory
@@ -231,10 +176,7 @@ mod environment_variable_consistency {
                 .filter_map(|entry| entry.ok())
                 .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "yml"))
                 .collect();
-            assert!(
-                !task_files.is_empty(),
-                "Task should be created using LOTAR_TASKS_DIR"
-            );
+            assert!(!task_files.is_empty(), "Task should be created using LOTAR_TASKS_DIR");
 
             // Guard drops here
         }
@@ -249,18 +191,10 @@ mod environment_variable_consistency {
 
             // Commands should work without specific project config
             let output = fixtures.run_command(&["config", "show"]);
-            assert!(
-                output.is_ok(),
-                "Config show should work without project config"
-            );
+            assert!(output.is_ok(), "Config show should work without project config");
 
             // Should be able to add tasks even without project config (uses defaults)
-            let output = fixtures.run_command(&[
-                "add",
-                "isolated-task",
-                "--description",
-                "Task without project config",
-            ]);
+            let output = fixtures.run_command(&["add", "isolated-task", "--description", "Task without project config"]);
             assert!(output.is_ok(), "Add should work without project config");
 
             // Task should be created in the default tasks directory
@@ -273,10 +207,7 @@ mod environment_variable_consistency {
                     .filter_map(|entry| entry.ok())
                     .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "yml"))
                     .collect();
-                assert!(
-                    !task_files.is_empty(),
-                    "Task should be created in .tasks subdirectory"
-                );
+                assert!(!task_files.is_empty(), "Task should be created in .tasks subdirectory");
             } else {
                 // Check if task was created directly in test root directory
                 let current_files: Vec<_> = fs::read_dir(fixtures.temp_dir.path())
@@ -284,10 +215,7 @@ mod environment_variable_consistency {
                     .filter_map(|entry| entry.ok())
                     .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "yml"))
                     .collect();
-                assert!(
-                    !current_files.is_empty(),
-                    "Task should be created in test directory"
-                );
+                assert!(!current_files.is_empty(), "Task should be created in test directory");
             }
         }
 
@@ -305,22 +233,14 @@ mod environment_variable_consistency {
             let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", env_dir.to_str().unwrap());
 
             // Test 1: CLI option should win over environment variable
-            let output = fixtures.run_command(&[
-                "add",
-                "cli-wins",
-                "--description",
-                "CLI option wins",
-                "--tasks-dir",
-                cli_dir.to_str().unwrap(),
-            ]);
+            let output = fixtures.run_command(&["add", "cli-wins", "--description", "CLI option wins", "--tasks-dir", cli_dir.to_str().unwrap()]);
             assert!(output.is_ok(), "CLI precedence test should succeed");
 
             let cli_files: Vec<_> = fs::read_dir(&cli_dir).unwrap().collect();
             assert!(!cli_files.is_empty(), "CLI option should take precedence");
 
             // Test 2: Environment variable should be used when no CLI option
-            let output =
-                fixtures.run_command(&["add", "env-wins", "--description", "Environment wins"]);
+            let output = fixtures.run_command(&["add", "env-wins", "--description", "Environment wins"]);
             assert!(output.is_ok(), "Environment precedence test should succeed");
 
             let env_files: Vec<_> = fs::read_dir(&env_dir)
@@ -328,10 +248,7 @@ mod environment_variable_consistency {
                 .filter_map(|entry| entry.ok())
                 .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "yml"))
                 .collect();
-            assert!(
-                !env_files.is_empty(),
-                "Environment variable should be used when no CLI override"
-            );
+            assert!(!env_files.is_empty(), "Environment variable should be used when no CLI override");
 
             // Guard drops here
         }
@@ -350,14 +267,8 @@ mod environment_variable_consistency {
             let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", env_tasks_dir.to_str().unwrap());
 
             // Command line option should override environment variable
-            let output = fixtures.run_command(&[
-                "add",
-                "override-task",
-                "--description",
-                "Task overriding env var",
-                "--tasks-dir",
-                cli_tasks_dir.to_str().unwrap(),
-            ]);
+            let output =
+                fixtures.run_command(&["add", "override-task", "--description", "Task overriding env var", "--tasks-dir", cli_tasks_dir.to_str().unwrap()]);
             assert!(output.is_ok(), "Add with CLI override should succeed");
 
             // Verify task is in CLI directory, not environment directory
@@ -366,20 +277,14 @@ mod environment_variable_consistency {
                 .filter_map(|entry| entry.ok())
                 .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "yml"))
                 .collect();
-            assert!(
-                !cli_files.is_empty(),
-                "Task should be in CLI-specified directory"
-            );
+            assert!(!cli_files.is_empty(), "Task should be in CLI-specified directory");
 
             let env_files: Vec<_> = fs::read_dir(&env_tasks_dir)
                 .unwrap()
                 .filter_map(|entry| entry.ok())
                 .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "yml"))
                 .collect();
-            assert!(
-                env_files.is_empty(),
-                "Task should NOT be in environment directory"
-            );
+            assert!(env_files.is_empty(), "Task should NOT be in environment directory");
 
             // Guard drops here
         }
@@ -399,9 +304,7 @@ mod environment_variable_consistency {
             // Check that the tasks directory line contains our resolved path
             // (relative paths get resolved to absolute paths for display)
             assert!(
-                output_str
-                    .lines()
-                    .any(|line| line.contains("Tasks directory:") && line.contains("rel_tasks")),
+                output_str.lines().any(|line| line.contains("Tasks directory:") && line.contains("rel_tasks")),
                 "Config should show resolved path containing rel_tasks: {output_str}"
             );
 
@@ -410,23 +313,14 @@ mod environment_variable_consistency {
 
             // Verify task was created in relative directory from test working directory
             let rel_tasks_dir = fixtures.temp_dir.path().join("rel_tasks");
-            assert!(
-                rel_tasks_dir.exists(),
-                "Relative tasks directory should be created at: {}",
-                rel_tasks_dir.display()
-            );
+            assert!(rel_tasks_dir.exists(), "Relative tasks directory should be created at: {}", rel_tasks_dir.display());
 
             let task_files: Vec<_> = fs::read_dir(&rel_tasks_dir)
                 .unwrap_or_else(|_| panic!("Should be able to read rel_tasks directory"))
                 .filter_map(|entry| entry.ok())
-                .filter(|entry| {
-                    entry.path().is_dir() && entry.file_name().to_string_lossy().starts_with("REL")
-                })
+                .filter(|entry| entry.path().is_dir() && entry.file_name().to_string_lossy().starts_with("REL"))
                 .collect();
-            assert!(
-                !task_files.is_empty(),
-                "Task project directory should be created in relative path"
-            );
+            assert!(!task_files.is_empty(), "Task project directory should be created in relative path");
 
             // Guard drops here
         }
@@ -441,34 +335,20 @@ mod environment_variable_consistency {
             let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", "./env_rel_tasks");
 
             // Command line option should override environment variable
-            let output = fixtures.run_command(&[
-                "add",
-                "override-rel-task",
-                "--project=override",
-                "--tasks-dir",
-                cli_tasks_dir.to_str().unwrap(),
-            ]);
+            let output = fixtures.run_command(&["add", "override-rel-task", "--project=override", "--tasks-dir", cli_tasks_dir.to_str().unwrap()]);
             assert!(output.is_ok(), "Add with CLI override should succeed");
 
             // Verify task is in CLI directory, not environment directory
             let cli_files: Vec<_> = fs::read_dir(&cli_tasks_dir)
                 .unwrap()
                 .filter_map(|entry| entry.ok())
-                .filter(|entry| {
-                    entry.path().is_dir() && entry.file_name().to_string_lossy().starts_with("OVE")
-                })
+                .filter(|entry| entry.path().is_dir() && entry.file_name().to_string_lossy().starts_with("OVE"))
                 .collect();
-            assert!(
-                !cli_files.is_empty(),
-                "Task should be in CLI-specified directory"
-            );
+            assert!(!cli_files.is_empty(), "Task should be in CLI-specified directory");
 
             let env_rel_tasks_dir = fixtures.temp_dir.path().join("env_rel_tasks");
             // Environment directory should not exist since CLI override was used
-            assert!(
-                !env_rel_tasks_dir.exists(),
-                "Environment relative directory should not be created when CLI override is used"
-            );
+            assert!(!env_rel_tasks_dir.exists(), "Environment relative directory should not be created when CLI override is used");
 
             // Guard drops here
         }
@@ -491,42 +371,22 @@ mod parent_directory_resolution {
         fs::create_dir_all(&sub_dir).unwrap();
 
         // Test that --tasks-dir overrides the default tasks directory
-        let output =
-            fixtures.run_command(&["config", "show", "--tasks-dir", tasks_dir.to_str().unwrap()]);
-        assert!(
-            output.is_ok(),
-            "Config show should work with explicit tasks dir"
-        );
+        let output = fixtures.run_command(&["config", "show", "--tasks-dir", tasks_dir.to_str().unwrap()]);
+        assert!(output.is_ok(), "Config show should work with explicit tasks dir");
         let output_str = output.unwrap();
-        assert!(
-            output_str.contains(&*tasks_dir.to_string_lossy()),
-            "Should show specified tasks directory in config output"
-        );
+        assert!(output_str.contains(&*tasks_dir.to_string_lossy()), "Should show specified tasks directory in config output");
 
         // Add task with explicit tasks directory - should create task in specified location
-        let output = fixtures.run_command(&[
-            "add",
-            "subdir-task",
-            "--description",
-            "Task from subdirectory",
-            "--tasks-dir",
-            tasks_dir.to_str().unwrap(),
-        ]);
+        let output = fixtures.run_command(&["add", "subdir-task", "--description", "Task from subdirectory", "--tasks-dir", tasks_dir.to_str().unwrap()]);
         if let Err(e) = &output {
             eprintln!("Add command failed: {e}");
         }
         assert!(output.is_ok(), "Add should work with explicit tasks dir");
 
         // Verify task was created in the specified tasks directory
-        let task_files: Vec<_> = fs::read_dir(&tasks_dir)
-            .unwrap()
-            .filter_map(|entry| entry.ok())
-            .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "yml"))
-            .collect();
-        assert!(
-            !task_files.is_empty(),
-            "Task should be created in specified tasks directory"
-        );
+        let task_files: Vec<_> =
+            fs::read_dir(&tasks_dir).unwrap().filter_map(|entry| entry.ok()).filter(|entry| entry.path().extension().is_some_and(|ext| ext == "yml")).collect();
+        assert!(!task_files.is_empty(), "Task should be created in specified tasks directory");
     }
 
     mod git_required {
@@ -550,21 +410,10 @@ mod parent_directory_resolution {
             fs::create_dir_all(inner_project.join(".git")).unwrap();
 
             // Test with explicit tasks directory pointing to inner project
-            let output = fixtures.run_command(&[
-                "config",
-                "show",
-                "--tasks-dir",
-                inner_tasks.to_str().unwrap(),
-            ]);
-            assert!(
-                output.is_ok(),
-                "Config show should work with explicit tasks dir"
-            );
+            let output = fixtures.run_command(&["config", "show", "--tasks-dir", inner_tasks.to_str().unwrap()]);
+            assert!(output.is_ok(), "Config show should work with explicit tasks dir");
             let output_str = output.unwrap();
-            assert!(
-                output_str.contains(&*inner_tasks.to_string_lossy()),
-                "Should show specified tasks directory in config output"
-            );
+            assert!(output_str.contains(&*inner_tasks.to_string_lossy()), "Should show specified tasks directory in config output");
         }
     }
 }
@@ -614,10 +463,7 @@ mod global_options_integration {
         assert!(output.is_ok(), "Complex command should succeed");
 
         // Verify task created in explicit tasks directory
-        let all_files: Vec<_> = fs::read_dir(&tasks_dir)
-            .unwrap()
-            .filter_map(|entry| entry.ok())
-            .collect();
+        let all_files: Vec<_> = fs::read_dir(&tasks_dir).unwrap().filter_map(|entry| entry.ok()).collect();
 
         // Look for project subdirectories (tasks are organized by project).
         // Internal reserved folders (e.g. @sprints, created by the
@@ -625,13 +471,7 @@ mod global_options_integration {
         let project_dirs: Vec<_> = all_files
             .iter()
             .filter(|entry| entry.path().is_dir())
-            .filter(|entry| {
-                entry
-                    .path()
-                    .file_name()
-                    .and_then(|name| name.to_str())
-                    .is_some_and(|name| !name.starts_with('@') && !name.starts_with('.'))
-            })
+            .filter(|entry| entry.path().file_name().and_then(|name| name.to_str()).is_some_and(|name| !name.starts_with('@') && !name.starts_with('.')))
             .collect();
 
         if !project_dirs.is_empty() {
@@ -644,15 +484,11 @@ mod global_options_integration {
                 .filter(|entry| {
                     let path = entry.path();
                     // Only include .yml files that are NOT config.yml
-                    path.extension().is_some_and(|ext| ext == "yml")
-                        && path.file_name().is_some_and(|name| name != "config.yml")
+                    path.extension().is_some_and(|ext| ext == "yml") && path.file_name().is_some_and(|name| name != "config.yml")
                 })
                 .collect();
 
-            assert!(
-                !task_files.is_empty(),
-                "Should create at least one task file in project directory"
-            );
+            assert!(!task_files.is_empty(), "Should create at least one task file in project directory");
 
             // Verify task content includes the specified priority and environment assignee
             let task_file = &task_files[0];
@@ -664,10 +500,7 @@ mod global_options_integration {
                 eprintln!("File path: {:?}", task_file.path());
                 eprintln!("Task content:\n{task_content}");
                 eprintln!("Looking for: 'priority: High'");
-                eprintln!(
-                    "Priority field present: {}",
-                    task_content.contains("priority:")
-                );
+                eprintln!("Priority field present: {}", task_content.contains("priority:"));
                 eprintln!("All files in directory:");
                 if let Ok(entries) = fs::read_dir(task_file.path().parent().unwrap()) {
                     for entry in entries.flatten() {
@@ -677,10 +510,7 @@ mod global_options_integration {
                 eprintln!("=== END DEBUG ===");
             }
 
-            assert!(
-                task_content.contains("priority: High"),
-                "Task content should contain 'priority: High' (variant name from serde), but got: {task_content}"
-            );
+            assert!(task_content.contains("priority: High"), "Task content should contain 'priority: High' (variant name from serde), but got: {task_content}");
             assert!(task_content.contains("Complex scenario task"));
             assert!(task_content.contains("assignee: env-assignee")); // Environment variable was used
         } else {
@@ -691,10 +521,7 @@ mod global_options_integration {
                 .filter(|entry| entry.file_name() != "config.yml")
                 .collect();
 
-            assert!(
-                !task_files.is_empty(),
-                "Should create at least one task file"
-            );
+            assert!(!task_files.is_empty(), "Should create at least one task file");
 
             // Verify task content includes the specified priority and environment assignee
             let task_file = task_files[0];
@@ -706,10 +533,7 @@ mod global_options_integration {
                 eprintln!("File path: {:?}", task_file.path());
                 eprintln!("Task content:\n{task_content}");
                 eprintln!("Looking for: 'priority: High'");
-                eprintln!(
-                    "Priority field present: {}",
-                    task_content.contains("priority:")
-                );
+                eprintln!("Priority field present: {}", task_content.contains("priority:"));
                 eprintln!("All files in directory:");
                 if let Ok(entries) = fs::read_dir(task_file.path().parent().unwrap()) {
                     for entry in entries.flatten() {
@@ -719,10 +543,7 @@ mod global_options_integration {
                 eprintln!("=== END DEBUG ===");
             }
 
-            assert!(
-                task_content.contains("priority: High"),
-                "Task content should contain 'priority: High' (variant name from serde), but got: {task_content}"
-            );
+            assert!(task_content.contains("priority: High"), "Task content should contain 'priority: High' (variant name from serde), but got: {task_content}");
             assert!(task_content.contains("Complex scenario task"));
             assert!(task_content.contains("assignee: env-assignee")); // Environment variable was used
         }

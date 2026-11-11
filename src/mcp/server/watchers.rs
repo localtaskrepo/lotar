@@ -15,11 +15,7 @@ pub(super) enum ServerEvent {
     ToolsChanged { hint_categories: Vec<String> },
 }
 
-pub(super) fn spawn_event_dispatcher(
-    receiver: mpsc::Receiver<ServerEvent>,
-    stdout: Arc<Mutex<io::Stdout>>,
-    session: Option<Arc<McpSession>>,
-) {
+pub(super) fn spawn_event_dispatcher(receiver: mpsc::Receiver<ServerEvent>, stdout: Arc<Mutex<io::Stdout>>, session: Option<Arc<McpSession>>) {
     std::thread::spawn(move || {
         while let Ok(event) = receiver.recv() {
             match event {
@@ -87,10 +83,8 @@ fn spawn_tools_dir_watcher(tasks_dir: PathBuf, sender: mpsc::Sender<ServerEvent>
                     let Ok(event) = result else {
                         continue;
                     };
-                    if matches!(
-                        event.kind,
-                        EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)
-                    ) && event_affects_tooling(&event.paths, &tasks_dir)
+                    if matches!(event.kind, EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_))
+                        && event_affects_tooling(&event.paths, &tasks_dir)
                     {
                         emit_tools_change_if_changed(&sender, &mut previous_hints, &mut last_emit);
                     }
@@ -112,16 +106,9 @@ fn spawn_tools_dir_watcher(tasks_dir: PathBuf, sender: mpsc::Sender<ServerEvent>
 
 /// Re-gather enum hints and emit a tools-list change when they differ from
 /// the last snapshot, debounced to coalesce event bursts.
-fn emit_tools_change_if_changed(
-    sender: &mpsc::Sender<ServerEvent>,
-    previous_hints: &mut Option<EnumHints>,
-    last_emit: &mut Option<Instant>,
-) {
+fn emit_tools_change_if_changed(sender: &mpsc::Sender<ServerEvent>, previous_hints: &mut Option<EnumHints>, last_emit: &mut Option<Instant>) {
     let now = Instant::now();
-    if last_emit
-        .map(|instant| now.duration_since(instant) < Duration::from_millis(500))
-        .unwrap_or(false)
-    {
+    if last_emit.map(|instant| now.duration_since(instant) < Duration::from_millis(500)).unwrap_or(false) {
         return;
     }
 
@@ -145,12 +132,7 @@ pub(crate) fn event_affects_tooling(paths: &[PathBuf], tasks_dir: &Path) -> bool
         if path == tasks_dir {
             return true;
         }
-        if path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .map(|name| name.eq_ignore_ascii_case("config.yml"))
-            .unwrap_or(false)
-        {
+        if path.file_name().and_then(|name| name.to_str()).map(|name| name.eq_ignore_ascii_case("config.yml")).unwrap_or(false) {
             return true;
         }
         if path.parent().is_some_and(|parent| parent == tasks_dir) {
@@ -173,51 +155,27 @@ pub(super) fn build_tools_changed_notification(hint_categories: &[String]) -> Va
     })
 }
 
-pub(super) fn diff_hint_categories(
-    previous: Option<&EnumHints>,
-    current: Option<&EnumHints>,
-) -> Vec<String> {
+pub(super) fn diff_hint_categories(previous: Option<&EnumHints>, current: Option<&EnumHints>) -> Vec<String> {
     let mut changed = Vec::new();
-    if hint_values_changed(
-        previous.map(|h| h.projects.as_slice()),
-        current.map(|h| h.projects.as_slice()),
-    ) {
+    if hint_values_changed(previous.map(|h| h.projects.as_slice()), current.map(|h| h.projects.as_slice())) {
         changed.push("projects".to_string());
     }
-    if hint_values_changed(
-        previous.map(|h| h.statuses.as_slice()),
-        current.map(|h| h.statuses.as_slice()),
-    ) {
+    if hint_values_changed(previous.map(|h| h.statuses.as_slice()), current.map(|h| h.statuses.as_slice())) {
         changed.push("statuses".to_string());
     }
-    if hint_values_changed(
-        previous.map(|h| h.priorities.as_slice()),
-        current.map(|h| h.priorities.as_slice()),
-    ) {
+    if hint_values_changed(previous.map(|h| h.priorities.as_slice()), current.map(|h| h.priorities.as_slice())) {
         changed.push("priorities".to_string());
     }
-    if hint_values_changed(
-        previous.map(|h| h.types.as_slice()),
-        current.map(|h| h.types.as_slice()),
-    ) {
+    if hint_values_changed(previous.map(|h| h.types.as_slice()), current.map(|h| h.types.as_slice())) {
         changed.push("types".to_string());
     }
-    if hint_values_changed(
-        previous.map(|h| h.members.as_slice()),
-        current.map(|h| h.members.as_slice()),
-    ) {
+    if hint_values_changed(previous.map(|h| h.members.as_slice()), current.map(|h| h.members.as_slice())) {
         changed.push("members".to_string());
     }
-    if hint_values_changed(
-        previous.map(|h| h.tags.as_slice()),
-        current.map(|h| h.tags.as_slice()),
-    ) {
+    if hint_values_changed(previous.map(|h| h.tags.as_slice()), current.map(|h| h.tags.as_slice())) {
         changed.push("tags".to_string());
     }
-    if hint_values_changed(
-        previous.map(|h| h.custom_fields.as_slice()),
-        current.map(|h| h.custom_fields.as_slice()),
-    ) {
+    if hint_values_changed(previous.map(|h| h.custom_fields.as_slice()), current.map(|h| h.custom_fields.as_slice())) {
         changed.push("custom_fields".to_string());
     }
 
@@ -292,18 +250,9 @@ mod tests {
     fn build_notification_embeds_hint_categories() {
         let categories = vec!["statuses".to_string(), "tags".to_string()];
         let notification = build_tools_changed_notification(&categories);
-        assert_eq!(
-            notification.get("method").and_then(|v| v.as_str()),
-            Some("notifications/tools/list_changed")
-        );
-        let params = notification
-            .get("params")
-            .and_then(|v| v.as_object())
-            .unwrap();
-        let hints = params
-            .get("hintCategories")
-            .and_then(|value| value.as_array())
-            .unwrap();
+        assert_eq!(notification.get("method").and_then(|v| v.as_str()), Some("notifications/tools/list_changed"));
+        let params = notification.get("params").and_then(|v| v.as_object()).unwrap();
+        let hints = params.get("hintCategories").and_then(|value| value.as_array()).unwrap();
         assert_eq!(hints.len(), 2);
         assert_eq!(hints[0].as_str(), Some("statuses"));
         assert_eq!(hints[1].as_str(), Some("tags"));

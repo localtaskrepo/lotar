@@ -38,9 +38,7 @@ impl ArchiveFilter {
             "no" | "false" | "" => Ok(Self::Exclude),
             "yes" | "true" | "only" => Ok(Self::Only),
             "all" => Ok(Self::All),
-            other => Err(format!(
-                "Invalid archived value '{other}'. Use yes, no or all"
-            )),
+            other => Err(format!("Invalid archived value '{other}'. Use yes, no or all")),
         }
     }
 
@@ -78,12 +76,7 @@ pub fn task_files(project_dir: &Path, filter: ArchiveFilter) -> Vec<TaskFile> {
         walk(project_dir, false, &mut |_| true, &mut found);
     }
     if filter.includes(true) {
-        walk(
-            &project_dir.join(ARCHIVE_DIR),
-            true,
-            &mut |_| true,
-            &mut found,
-        );
+        walk(&project_dir.join(ARCHIVE_DIR), true, &mut |_| true, &mut found);
     }
     found.sort_by(|a, b| a.number.cmp(&b.number).then_with(|| a.path.cmp(&b.path)));
     found
@@ -112,12 +105,7 @@ pub fn find(project_dir: &Path, number: u64) -> Vec<TaskFile> {
     let mut found = Vec::new();
     let mut wanted = |n: u64| n == number;
     walk(project_dir, false, &mut wanted, &mut found);
-    walk(
-        &project_dir.join(ARCHIVE_DIR),
-        true,
-        &mut wanted,
-        &mut found,
-    );
+    walk(&project_dir.join(ARCHIVE_DIR), true, &mut wanted, &mut found);
     found.sort_by(|a, b| a.path.cmp(&b.path));
     found
 }
@@ -125,10 +113,7 @@ pub fn find(project_dir: &Path, number: u64) -> Vec<TaskFile> {
 /// Highest task number stored anywhere in the project, archive included, so a
 /// new task never reuses the number of a nested or archived one.
 pub fn max_number(project_dir: &Path) -> u64 {
-    task_files(project_dir, ArchiveFilter::All)
-        .last()
-        .map(|file| file.number)
-        .unwrap_or(0)
+    task_files(project_dir, ArchiveFilter::All).last().map(|file| file.number).unwrap_or(0)
 }
 
 /// Where a task file moves when archived (`archive == true`) or brought back.
@@ -185,29 +170,19 @@ pub fn parse_relative(rel: &Path) -> Option<RelativeTask> {
     if nested.iter().any(|name| is_skipped_dir(name)) {
         return None;
     }
-    Some(RelativeTask {
-        project: project.to_string(),
-        number,
-        archived,
-    })
+    Some(RelativeTask { project: project.to_string(), number, archived })
 }
 
 /// True when `file` is inside its project's archive folder.
 pub fn is_archived(project_dir: &Path, file: &Path) -> bool {
-    file.strip_prefix(project_dir)
-        .is_ok_and(|rel| rel.starts_with(ARCHIVE_DIR))
+    file.strip_prefix(project_dir).is_ok_and(|rel| rel.starts_with(ARCHIVE_DIR))
 }
 
 fn is_skipped_dir(name: &str) -> bool {
     name.starts_with('.') || name.starts_with('@')
 }
 
-fn walk(
-    dir: &Path,
-    archived: bool,
-    wanted: &mut dyn FnMut(u64) -> bool,
-    found: &mut Vec<TaskFile>,
-) {
+fn walk(dir: &Path, archived: bool, wanted: &mut dyn FnMut(u64) -> bool, found: &mut Vec<TaskFile>) {
     let mut stack = vec![dir.to_path_buf()];
     while let Some(current) = stack.pop() {
         let Ok(entries) = fs::read_dir(&current) else {
@@ -225,10 +200,7 @@ fn walk(
                 }
                 continue;
             }
-            let is_yml = path
-                .extension()
-                .and_then(|ext| ext.to_str())
-                .is_some_and(|ext| ext.eq_ignore_ascii_case("yml"));
+            let is_yml = path.extension().and_then(|ext| ext.to_str()).is_some_and(|ext| ext.eq_ignore_ascii_case("yml"));
             // Symlinked task files keep working as before (`is_file` follows them).
             if !is_yml || !path.is_file() {
                 continue;
@@ -236,11 +208,7 @@ fn walk(
             if let Some(number) = crate::utils::filesystem::file_numeric_stem(&path)
                 && wanted(number)
             {
-                found.push(TaskFile {
-                    number,
-                    path,
-                    archived,
-                });
+                found.push(TaskFile { number, path, archived });
             }
         }
     }
@@ -268,12 +236,7 @@ mod tests {
         touch(&dev.join(".git").join("7.yml"));
         touch(&dev.join("config.yml"));
 
-        let numbers = |filter| {
-            task_files(&dev, filter)
-                .into_iter()
-                .map(|file| file.number)
-                .collect::<Vec<_>>()
-        };
+        let numbers = |filter| task_files(&dev, filter).into_iter().map(|file| file.number).collect::<Vec<_>>();
         assert_eq!(numbers(ArchiveFilter::Exclude), [1, 2, 3]);
         assert_eq!(numbers(ArchiveFilter::Only), [4, 5]);
         assert_eq!(numbers(ArchiveFilter::All), [1, 2, 3, 4, 5]);
@@ -295,14 +258,8 @@ mod tests {
     #[test]
     fn archive_target_keeps_the_subfolder() {
         let dev = Path::new("/t/DEV");
-        assert_eq!(
-            archive_target(dev, &dev.join("web/12.yml"), true).unwrap(),
-            dev.join("@archive/web/12.yml")
-        );
-        assert_eq!(
-            archive_target(dev, &dev.join("@archive/web/12.yml"), false).unwrap(),
-            dev.join("web/12.yml")
-        );
+        assert_eq!(archive_target(dev, &dev.join("web/12.yml"), true).unwrap(), dev.join("@archive/web/12.yml"));
+        assert_eq!(archive_target(dev, &dev.join("@archive/web/12.yml"), false).unwrap(), dev.join("web/12.yml"));
         assert!(archive_target(dev, &dev.join("12.yml"), false).is_none());
         assert!(archive_target(dev, &dev.join("@archive/12.yml"), true).is_none());
     }

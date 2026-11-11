@@ -57,54 +57,28 @@ fn configured_default_beats_the_nearest_package_json() {
         let stdout = String::from_utf8_lossy(&out.stdout);
         assert!(out.status.success(), "{stdout}");
         assert!(stdout.contains("in project G "), "{stdout}");
-        assert!(
-            stdout.contains("project G from default.project"),
-            "{stdout}"
-        );
+        assert!(stdout.contains("project G from default.project"), "{stdout}");
 
         let out = lotar(&dir, &["add", "Plain title"]);
-        assert!(
-            out.status.success(),
-            "{}",
-            String::from_utf8_lossy(&out.stderr)
-        );
-        assert!(
-            out.stderr.is_empty(),
-            "{}",
-            String::from_utf8_lossy(&out.stderr)
-        );
+        assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+        assert!(out.stderr.is_empty(), "{}", String::from_utf8_lossy(&out.stderr));
     }
     assert_eq!(projects(&root.join(".tasks")), ["G"]);
     assert!(root.join(".tasks/G/2.yml").exists());
 
     // JSON explain carries the source as its own field.
-    let out = lotar(
-        root,
-        &["add", "x", "--dry-run", "--explain", "--format", "json"],
-    );
+    let out = lotar(root, &["add", "x", "--dry-run", "--explain", "--format", "json"]);
     let value: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(value["project"], "G");
-    assert_eq!(
-        value["project_source"],
-        "default.project in the configuration"
-    );
+    assert_eq!(value["project_source"], "default.project in the configuration");
 
     // The environment and the flag still win over the configured default.
     let out = lotar(root, &["add", "x", "--dry-run", "--explain", "-p", "OPS"]);
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.contains("project OPS from --project"), "{stdout}");
-    let out = common::lotar_cmd()
-        .unwrap()
-        .current_dir(root)
-        .env("LOTAR_PROJECT", "ENVP")
-        .args(["add", "x", "--dry-run", "--explain"])
-        .output()
-        .unwrap();
+    let out = common::lotar_cmd().unwrap().current_dir(root).env("LOTAR_PROJECT", "ENVP").args(["add", "x", "--dry-run", "--explain"]).output().unwrap();
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(
-        stdout.contains("project ENVP from the LOTAR_PROJECT environment variable"),
-        "{stdout}"
-    );
+    assert!(stdout.contains("project ENVP from the LOTAR_PROJECT environment variable"), "{stdout}");
 }
 
 #[test]
@@ -120,12 +94,7 @@ fn a_project_from_detection_is_announced() {
     let out = lotar(&web, &["add", "first", "--dry-run"]);
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success(), "{stderr}");
-    assert!(
-        stderr.contains("would create a new project WEB")
-            && stderr.contains("package.json")
-            && stderr.contains("--project"),
-        "{stderr}"
-    );
+    assert!(stderr.contains("would create a new project WEB") && stderr.contains("package.json") && stderr.contains("--project"), "{stderr}");
     assert!(!web.join(".tasks").exists());
 
     let out = lotar(&web, &["add", "first"]);
@@ -135,11 +104,7 @@ fn a_project_from_detection_is_announced() {
 
     // Once the project exists, adding to it says nothing.
     let out = lotar(&web, &["add", "second"]);
-    assert!(
-        out.stderr.is_empty(),
-        "{}",
-        String::from_utf8_lossy(&out.stderr)
-    );
+    assert!(out.stderr.is_empty(), "{}", String::from_utf8_lossy(&out.stderr));
     assert_eq!(projects(&web.join(".tasks")), ["WEB"]);
 }
 
@@ -152,14 +117,7 @@ fn service_create_without_a_project_uses_the_default() {
     let _env2 = EnvVarGuard::clear("LOTAR_DEFAULT_PROJECT");
 
     let mut storage = lotar::storage::manager::Storage::new(&tasks);
-    let created = TaskService::create(
-        &mut storage,
-        TaskCreate {
-            title: "From MCP".into(),
-            ..Default::default()
-        },
-    )
-    .unwrap();
+    let created = TaskService::create(&mut storage, TaskCreate { title: "From MCP".into(), ..Default::default() }).unwrap();
     assert_eq!(created.id, "G-1");
     assert_eq!(projects(&tasks), ["G"]);
 }

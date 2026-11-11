@@ -2,43 +2,23 @@
 
 use super::*;
 
-pub(super) fn perform_pull(
-    target: SyncTarget<'_>,
-    project: &str,
-    client: &SyncClient,
-    sinks: SyncSinks<'_>,
-) -> LoTaRResult<()> {
-    let SyncTarget {
-        resolver,
-        remote,
-        task_id,
-        dry_run,
-    } = target;
-    let SyncSinks {
-        recorder,
-        warnings,
-        journal,
-    } = sinks;
+pub(super) fn perform_pull(target: SyncTarget<'_>, project: &str, client: &SyncClient, sinks: SyncSinks<'_>) -> LoTaRResult<()> {
+    let SyncTarget { resolver, remote, task_id, dry_run } = target;
+    let SyncSinks { recorder, warnings, journal } = sinks;
     // Remote text mentions remote keys; never link them to local tasks that
     // happen to share the ID (DEV-286).
     let _no_mention_links = crate::services::task_service::MentionLinkingPaused::new();
     // Imported issues don't take type, priority, status or tags from the
     // local branch or folder (DEV-287).
     let _no_inference = crate::utils::task_intel::InferencePaused::new();
-    if remote.provider == SyncProvider::Github
-        && remote.repo.as_deref().unwrap_or("").trim().is_empty()
-    {
-        return Err(LoTaRError::ValidationError(
-            "GitHub remote must define repo".to_string(),
-        ));
+    if remote.provider == SyncProvider::Github && remote.repo.as_deref().unwrap_or("").trim().is_empty() {
+        return Err(LoTaRError::ValidationError("GitHub remote must define repo".to_string()));
     }
 
     if let Some(task_id) = task_id {
         let trimmed = task_id.trim();
         if trimmed.is_empty() {
-            return Err(LoTaRError::ValidationError(
-                "Task id cannot be empty".to_string(),
-            ));
+            return Err(LoTaRError::ValidationError("Task id cannot be empty".to_string()));
         }
 
         let storage = Storage::new(&resolver.path.clone());
@@ -48,24 +28,15 @@ pub(super) fn perform_pull(
         let reference = match determine_reference_state(remote, &existing) {
             ReferenceState::Matching(value) => value,
             ReferenceState::ProviderOnly(_) => {
-                return Err(LoTaRError::ValidationError(
-                    "Task reference does not match this remote".to_string(),
-                ));
+                return Err(LoTaRError::ValidationError("Task reference does not match this remote".to_string()));
             }
             ReferenceState::None => {
                 let pending_reference = journal
                     .links
                     .iter()
-                    .find(|link| {
-                        dry_run
-                            && link.project == project
-                            && link.task_id.as_deref() == Some(trimmed)
-                            && link.scope == pending_scope(remote, client)
-                    })
+                    .find(|link| dry_run && link.project == project && link.task_id.as_deref() == Some(trimmed) && link.scope == pending_scope(remote, client))
                     .and_then(|link| link.reference.clone());
-                pending_reference.ok_or_else(|| {
-                    LoTaRError::ValidationError("Task is missing a remote reference".to_string())
-                })?
+                pending_reference.ok_or_else(|| LoTaRError::ValidationError("Task is missing a remote reference".to_string()))?
             }
         };
 
@@ -76,12 +47,7 @@ pub(super) fn perform_pull(
             }
             SyncProvider::Github => {
                 let (repo, number) = parse_github_reference(&reference, remote.repo.as_deref())
-                    .ok_or_else(|| {
-                        LoTaRError::ValidationError(format!(
-                            "Invalid GitHub reference '{}'",
-                            reference
-                        ))
-                    })?;
+                    .ok_or_else(|| LoTaRError::ValidationError(format!("Invalid GitHub reference '{}'", reference)))?;
                 github_fetch_issue(client, &repo, number)?
             }
         };
@@ -129,10 +95,7 @@ pub(super) fn perform_pull(
                     Some(format!("Failed to update local task: {}", err)),
                 ),
             );
-            return Err(LoTaRError::ValidationError(format!(
-                "Failed to update local task {}: {}",
-                existing.id, err
-            )));
+            return Err(LoTaRError::ValidationError(format!("Failed to update local task {}: {}", existing.id, err)));
         }
 
         recorder.record(
@@ -159,21 +122,14 @@ pub(super) fn perform_pull(
     // Pull index includes tombstones (DEV-92): a remote issue whose local
     // task is soft-deleted must MATCH its existing task instead of being
     // re-imported as a duplicate. Deleted matches are then skipped below.
-    let filter = TaskListFilter {
-        project: Some(project.to_string()),
-        deletion: crate::api_types::DeletionFilter::All,
-        ..Default::default()
-    };
+    let filter = TaskListFilter { project: Some(project.to_string()), deletion: crate::api_types::DeletionFilter::All, ..Default::default() };
     // Move stubs (DEV-183) count too: an issue whose task moved to another
     // project matches the deleted stub here and is skipped, rather than being
     // imported again or synced into the other project.
     let mut tasks = TaskService::list_with_moved(&storage, &filter);
     for (id, task) in &mut tasks {
         task.id = canonical_sync_task_id(&resolver.path, project, &task.id)?;
-        if !matches!(
-            crate::storage::moves::follow(&resolver.path, &task.id),
-            Ok(Some(_))
-        ) {
+        if !matches!(crate::storage::moves::follow(&resolver.path, &task.id), Ok(Some(_))) {
             *task = TaskService::get_including_deleted(&storage, &task.id, None)?;
         }
         id.clone_from(&task.id);
@@ -189,9 +145,7 @@ pub(super) fn perform_pull(
                 && link.scope == pending_scope(remote, client)
                 && let (Some(id), Some(reference)) = (&link.task_id, &link.reference)
             {
-                reference_index
-                    .entry(reference.clone())
-                    .or_insert_with(|| id.clone());
+                reference_index.entry(reference.clone()).or_insert_with(|| id.clone());
             }
         }
     }
@@ -207,13 +161,7 @@ pub(super) fn perform_pull(
             None => {
                 recorder.record(
                     SyncEntryStatus::Skipped,
-                    make_entry(
-                        SyncEntryStatus::Skipped,
-                        None,
-                        None,
-                        issue_title.clone(),
-                        Some("Missing reference".to_string()),
-                    ),
+                    make_entry(SyncEntryStatus::Skipped, None, None, issue_title.clone(), Some("Missing reference".to_string())),
                 );
                 continue;
             }
@@ -224,10 +172,7 @@ pub(super) fn perform_pull(
             // Deleted matches are skipped, never updated or re-imported
             // (DEV-92). The journal-based dry-run reference index above
             // keeps its explicit recovery semantics unchanged.
-            if existing
-                .as_ref()
-                .is_some_and(|task| task.deleted_at.is_some())
-            {
+            if existing.as_ref().is_some_and(|task| task.deleted_at.is_some()) {
                 recorder.record(
                     SyncEntryStatus::Skipped,
                     make_entry(
@@ -240,8 +185,7 @@ pub(super) fn perform_pull(
                 );
                 continue;
             }
-            let update =
-                build_task_update_from_issue(remote.provider, remote, &issue, existing.as_ref());
+            let update = build_task_update_from_issue(remote.provider, remote, &issue, existing.as_ref());
             if task_update_is_empty(&update) {
                 recorder.record(
                     SyncEntryStatus::Skipped,
@@ -300,27 +244,14 @@ pub(super) fn perform_pull(
             if dry_run {
                 recorder.record(
                     SyncEntryStatus::Created,
-                    make_entry(
-                        SyncEntryStatus::Created,
-                        None,
-                        Some(reference.clone()),
-                        Some(create.title.clone()),
-                        Some("Dry run".to_string()),
-                    ),
+                    make_entry(SyncEntryStatus::Created, None, Some(reference.clone()), Some(create.title.clone()), Some("Dry run".to_string())),
                 );
                 continue;
             }
-            crate::storage::safety::validate_project_prefix(project)
-                .map_err(LoTaRError::ValidationError)?;
+            crate::storage::safety::validate_project_prefix(project).map_err(LoTaRError::ValidationError)?;
             let project_path = resolver.path.join(project);
-            if project_path.exists()
-                && !project_path
-                    .canonicalize()?
-                    .starts_with(resolver.path.canonicalize()?)
-            {
-                return Err(LoTaRError::ValidationError(
-                    "Sync project must be inside the locked tasks workspace".into(),
-                ));
+            if project_path.exists() && !project_path.canonicalize()?.starts_with(resolver.path.canonicalize()?) {
+                return Err(LoTaRError::ValidationError("Sync project must be inside the locked tasks workspace".into()));
             }
             let pending = journal.begin(PendingLink {
                 scope: pending_scope(remote, client),
@@ -331,11 +262,7 @@ pub(super) fn perform_pull(
             let created_task = match TaskService::create(&mut storage, create) {
                 Ok(task) => task,
                 Err(err) => {
-                    failures.push(format!(
-                        "Failed to create local task: {}; {}",
-                        err,
-                        journal.indeterminate()
-                    ));
+                    failures.push(format!("Failed to create local task: {}; {}", err, journal.indeterminate()));
                     recorder.record(
                         SyncEntryStatus::Failed,
                         make_entry(
@@ -351,16 +278,8 @@ pub(super) fn perform_pull(
             };
             journal.links[pending].task_id = Some(created_task.id.clone());
             journal.save_result(pending)?;
-            if let Err(err) = attach_sync_reference(
-                &mut storage,
-                &created_task.id,
-                provider_label(&remote.provider),
-                &reference,
-            ) {
-                failures.push(format!(
-                    "Failed to attach reference for {}: {}",
-                    created_task.id, err
-                ));
+            if let Err(err) = attach_sync_reference(&mut storage, &created_task.id, provider_label(&remote.provider), &reference) {
+                failures.push(format!("Failed to attach reference for {}: {}", created_task.id, err));
                 recorder.record(
                     SyncEntryStatus::Failed,
                     make_entry(
@@ -378,13 +297,7 @@ pub(super) fn perform_pull(
             tasks_by_id.insert(created_task.id.clone(), created_task.clone());
             recorder.record(
                 SyncEntryStatus::Created,
-                make_entry(
-                    SyncEntryStatus::Created,
-                    Some(created_task.id.clone()),
-                    Some(reference.clone()),
-                    Some(created_task.title.clone()),
-                    None,
-                ),
+                make_entry(SyncEntryStatus::Created, Some(created_task.id.clone()), Some(reference.clone()), Some(created_task.title.clone()), None),
             );
         }
     }
@@ -393,11 +306,7 @@ pub(super) fn perform_pull(
     Ok(())
 }
 
-pub(super) fn resolve_pull_project_prefix(
-    project_prefix: Option<String>,
-    remote: &SyncRemoteConfig,
-    warnings: &mut Vec<String>,
-) -> LoTaRResult<String> {
+pub(super) fn resolve_pull_project_prefix(project_prefix: Option<String>, remote: &SyncRemoteConfig, warnings: &mut Vec<String>) -> LoTaRResult<String> {
     if let Some(prefix) = project_prefix {
         return Ok(prefix);
     }
@@ -407,36 +316,22 @@ pub(super) fn resolve_pull_project_prefix(
             if let Some(project) = remote.project.as_ref() {
                 let trimmed = project.trim();
                 if !trimmed.is_empty() {
-                    warnings.push(format!(
-                        "Pulling without --project; using Jira project '{}' as local prefix",
-                        trimmed
-                    ));
+                    warnings.push(format!("Pulling without --project; using Jira project '{}' as local prefix", trimmed));
                     return Ok(trimmed.to_string());
                 }
             }
         }
         SyncProvider::Github => {
-            return Err(LoTaRError::ValidationError(
-                "Pull sync for GitHub requires --project or default_project".to_string(),
-            ));
+            return Err(LoTaRError::ValidationError("Pull sync for GitHub requires --project or default_project".to_string()));
         }
     }
 
-    Err(LoTaRError::ValidationError(
-        "Pull sync requires --project or default_project".to_string(),
-    ))
+    Err(LoTaRError::ValidationError("Pull sync requires --project or default_project".to_string()))
 }
 
-pub(super) fn build_task_update_from_issue(
-    provider: SyncProvider,
-    remote: &SyncRemoteConfig,
-    issue: &JsonValue,
-    existing: Option<&TaskDTO>,
-) -> TaskUpdate {
+pub(super) fn build_task_update_from_issue(provider: SyncProvider, remote: &SyncRemoteConfig, issue: &JsonValue, existing: Option<&TaskDTO>) -> TaskUpdate {
     let local = map_issue_to_local_fields(provider, remote, issue, existing);
-    let custom_fields = local
-        .custom_fields
-        .map(|fields| merge_custom_fields(existing.map(|task| &task.custom_fields), fields));
+    let custom_fields = local.custom_fields.map(|fields| merge_custom_fields(existing.map(|task| &task.custom_fields), fields));
     let mut update = TaskUpdate {
         title: local.title,
         status: local.status.map(|status| status.to_string()),
@@ -489,20 +384,11 @@ pub(super) fn build_task_update_from_issue(
     update
 }
 
-pub(super) fn build_task_create_from_issue(
-    provider: SyncProvider,
-    remote: &SyncRemoteConfig,
-    issue: &JsonValue,
-    project: &str,
-) -> LoTaRResult<TaskCreate> {
+pub(super) fn build_task_create_from_issue(provider: SyncProvider, remote: &SyncRemoteConfig, issue: &JsonValue, project: &str) -> LoTaRResult<TaskCreate> {
     let local = map_issue_to_local_fields(provider, remote, issue, None);
-    let title = local
-        .title
-        .or_else(|| default_title_from_issue(provider, issue));
+    let title = local.title.or_else(|| default_title_from_issue(provider, issue));
     let Some(title) = title else {
-        return Err(LoTaRError::ValidationError(
-            "Remote issue missing title".to_string(),
-        ));
+        return Err(LoTaRError::ValidationError("Remote issue missing title".to_string()));
     };
     let create = TaskCreate {
         title,

@@ -14,58 +14,35 @@ impl CommandHandler for CompletionsHandler {
     type Args = CompletionsArgs;
     type Result = Result<(), String>;
 
-    fn execute(
-        args: Self::Args,
-        _project: Option<&str>,
-        _resolver: &TasksDirectoryResolver,
-        renderer: &OutputRenderer,
-    ) -> Self::Result {
+    fn execute(args: Self::Args, _project: Option<&str>, _resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Self::Result {
         match args.action {
             None => {
                 emit_subcommand_overview(renderer, &["completions"]);
                 Ok(())
             }
-            Some(CompletionsAction::Generate {
-                shell,
-                output,
-                print,
-            }) => {
+            Some(CompletionsAction::Generate { shell, output, print }) => {
                 let (target_path, wrote_to_stdout) = match output {
                     Some(path) => {
-                        ensure_parent_exists(&path).map_err(|err| {
-                            format!(
-                                "Failed to prepare output directory {}: {}",
-                                path.display(),
-                                err
-                            )
-                        })?;
-                        let generated_path = write_completion(shell, Some(&path))
-                            .map_err(|err| format!("Failed to write completion: {}", err))?;
+                        ensure_parent_exists(&path).map_err(|err| format!("Failed to prepare output directory {}: {}", path.display(), err))?;
+                        let generated_path = write_completion(shell, Some(&path)).map_err(|err| format!("Failed to write completion: {}", err))?;
                         if let Some(path) = generated_path.clone() {
-                            renderer.emit_success(format_args!(
-                                "Generated {shell} completion at {}",
-                                path.display()
-                            ));
+                            renderer.emit_success(format_args!("Generated {shell} completion at {}", path.display()));
                         }
                         (generated_path, false)
                     }
                     None => {
-                        write_completion(shell, None)
-                            .map_err(|err| format!("Failed to write completion: {}", err))?;
+                        write_completion(shell, None).map_err(|err| format!("Failed to write completion: {}", err))?;
                         (None, true)
                     }
                 };
 
                 if print {
-                    let script = render_completion(shell)
-                        .map_err(|err| format!("Failed to render completion script: {}", err))?;
+                    let script = render_completion(shell).map_err(|err| format!("Failed to render completion script: {}", err))?;
                     renderer.emit_raw_stdout(&script);
                 } else if wrote_to_stdout {
                     // Completion script already emitted to stdout
                 } else if target_path.is_none() {
-                    renderer.emit_warning(
-                        "Completion script was written but resulting path is unknown",
-                    );
+                    renderer.emit_warning("Completion script was written but resulting path is unknown");
                 }
 
                 Ok(())
@@ -81,35 +58,24 @@ impl CommandHandler for CompletionsHandler {
 
                 for shell in shells {
                     let Some(target) = default_install_path(shell) else {
-                        warnings.push(format!(
-                            "Skipping {shell}: no default install location is configured for this shell"
-                        ));
+                        warnings.push(format!("Skipping {shell}: no default install location is configured for this shell"));
                         continue;
                     };
 
                     if let Some(parent) = target.parent()
                         && let Err(err) = fs::create_dir_all(parent)
                     {
-                        warnings.push(format!(
-                            "Could not create directory {} for {shell}: {}",
-                            parent.display(),
-                            err
-                        ));
+                        warnings.push(format!("Could not create directory {} for {shell}: {}", parent.display(), err));
                         continue;
                     }
 
                     match write_completion(shell, Some(&target)) {
                         Ok(Some(actual)) => {
-                            renderer.emit_success(format_args!(
-                                "Installed {shell} completion at {}",
-                                actual.display()
-                            ));
+                            renderer.emit_success(format_args!("Installed {shell} completion at {}", actual.display()));
                             installed_any = true;
                         }
                         Ok(None) => {
-                            warnings.push(format!(
-                                "Installed {shell} completion but could not determine the target path"
-                            ));
+                            warnings.push(format!("Installed {shell} completion but could not determine the target path"));
                             installed_any = true;
                         }
                         Err(err) => {
@@ -123,9 +89,7 @@ impl CommandHandler for CompletionsHandler {
                 }
 
                 if installed_any {
-                    renderer.emit_info(
-                        "Restart your shell or source the generated file to enable completions.",
-                    );
+                    renderer.emit_info("Restart your shell or source the generated file to enable completions.");
                     Ok(())
                 } else {
                     Err("No completions were installed. See warnings for details.".to_string())
@@ -139,11 +103,7 @@ fn ensure_parent_exists(path: &Path) -> io::Result<()> {
     if path.exists() && path.is_dir() {
         fs::create_dir_all(path)
     } else if let Some(parent) = path.parent() {
-        if !parent.as_os_str().is_empty() {
-            fs::create_dir_all(parent)
-        } else {
-            Ok(())
-        }
+        if !parent.as_os_str().is_empty() { fs::create_dir_all(parent) } else { Ok(()) }
     } else {
         Ok(())
     }
@@ -185,17 +145,14 @@ fn render_completion(shell: CompletionShell) -> Result<String, String> {
     let clap_shell = shell.as_clap_shell();
     let binary_name = cmd.get_name().to_string();
     generate(clap_shell, &mut cmd, &binary_name, &mut buffer);
-    String::from_utf8(buffer)
-        .map_err(|err| format!("Completion script is not valid UTF-8: {}", err))
+    String::from_utf8(buffer).map_err(|err| format!("Completion script is not valid UTF-8: {}", err))
 }
 
 fn default_install_path(shell: CompletionShell) -> Option<PathBuf> {
     let home = dirs::home_dir()?;
     match shell {
         CompletionShell::Bash => {
-            let base = std::env::var_os("XDG_DATA_HOME")
-                .map(PathBuf::from)
-                .unwrap_or_else(|| home.join(".local/share"));
+            let base = std::env::var_os("XDG_DATA_HOME").map(PathBuf::from).unwrap_or_else(|| home.join(".local/share"));
             Some(base.join("bash-completion/completions/lotar"))
         }
         CompletionShell::Zsh => {
@@ -212,9 +169,7 @@ fn default_install_path(shell: CompletionShell) -> Option<PathBuf> {
         }
         CompletionShell::Fish => Some(home.join(".config/fish/completions/lotar.fish")),
         CompletionShell::Powershell => {
-            let base = std::env::var_os("XDG_DATA_HOME")
-                .map(PathBuf::from)
-                .unwrap_or_else(|| home.join(".local/share"));
+            let base = std::env::var_os("XDG_DATA_HOME").map(PathBuf::from).unwrap_or_else(|| home.join(".local/share"));
             Some(base.join("powershell/Scripts/lotar.ps1"))
         }
         CompletionShell::Elvish => Some(home.join(".config/elvish/lib/lotar.elv")),

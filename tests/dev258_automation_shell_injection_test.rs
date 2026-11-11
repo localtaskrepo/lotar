@@ -39,23 +39,13 @@ fn task_titles_cannot_inject_commands_into_run() {
         .args(["add", title, "--project=INJ"])
         .output()
         .unwrap();
-    assert!(
-        output.status.success(),
-        "add failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
+    assert!(output.status.success(), "add failed: {}", String::from_utf8_lossy(&output.stderr));
 
     for marker in ["INJECTED1", "INJECTED2", "INJECTED3"] {
-        assert!(
-            !root.join(marker).exists(),
-            "{marker} was created: the title ran as a command"
-        );
+        assert!(!root.join(marker).exists(), "{marker} was created: the title ran as a command");
     }
     let logged = std::fs::read_to_string(root.join("notify.log")).unwrap();
     for prefix in ["nested", "double", "plain"] {
-        assert!(
-            logged.contains(&format!("{prefix}: {title}")),
-            "{prefix} rule should print the title verbatim:\n{logged}"
-        );
+        assert!(logged.contains(&format!("{prefix}: {title}")), "{prefix} rule should print the title verbatim:\n{logged}");
     }
 }

@@ -35,14 +35,8 @@ pub enum MoveError {
 impl fmt::Display for MoveError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            MoveError::Broken { from, missing } => write!(
-                f,
-                "Task '{from}' was moved to '{missing}', which no longer exists"
-            ),
-            MoveError::Loop { from } => write!(
-                f,
-                "Task '{from}' has a loop or an overly long chain of moves; fix the moved_to fields by hand"
-            ),
+            MoveError::Broken { from, missing } => write!(f, "Task '{from}' was moved to '{missing}', which no longer exists"),
+            MoveError::Loop { from } => write!(f, "Task '{from}' has a loop or an overly long chain of moves; fix the moved_to fields by hand"),
         }
     }
 }
@@ -56,10 +50,7 @@ pub fn stub_target(file: &Path) -> Option<String> {
     if !content.contains("moved_to") {
         return None;
     }
-    crate::storage::task::parse_task_yaml_tolerant(&content)?
-        .moved_to
-        .map(|id| id.trim().to_string())
-        .filter(|id| !id.is_empty())
+    crate::storage::task::parse_task_yaml_tolerant(&content)?.moved_to.map(|id| id.trim().to_string()).filter(|id| !id.is_empty())
 }
 
 /// Follow `raw` through any move stubs. `Ok(None)` when `raw` is not a
@@ -78,19 +69,14 @@ pub fn follow(root: &Path, raw: &str) -> Result<Option<String>, MoveError> {
         // Fast path: almost every task sits at `<project>/<number>.yml`, so
         // check that file before walking the project's folders.
         let parsed = TaskId::parse(&current).expect("canonical IDs parse");
-        let direct = root
-            .join(&parsed.project)
-            .join(format!("{}.yml", parsed.number));
+        let direct = root.join(&parsed.project).join(format!("{}.yml", parsed.number));
         let file = if direct.is_file() {
             direct
         } else {
             match identity::resolve(root, &current) {
                 Ok(location) => location.file,
                 Err(TaskLookupError::NotFound(_)) if moved => {
-                    return Err(MoveError::Broken {
-                        from: start,
-                        missing: current,
-                    });
+                    return Err(MoveError::Broken { from: start, missing: current });
                 }
                 Err(_) => return Ok(moved.then_some(current)),
             }
@@ -101,10 +87,7 @@ pub fn follow(root: &Path, raw: &str) -> Result<Option<String>, MoveError> {
         let next = match TaskId::parse(&next) {
             Ok(parsed) => parsed.canonical(),
             Err(_) => {
-                return Err(MoveError::Broken {
-                    from: start,
-                    missing: next,
-                });
+                return Err(MoveError::Broken { from: start, missing: next });
             }
         };
         if seen.contains(&next) || seen.len() > MAX_MOVE_HOPS {
@@ -122,9 +105,7 @@ pub fn follow(root: &Path, raw: &str) -> Result<Option<String>, MoveError> {
 pub fn current_id(root: &Path, raw: &str) -> String {
     match follow(root, raw) {
         Ok(Some(id)) => id,
-        _ => TaskId::parse(raw.trim())
-            .map(|id| id.canonical())
-            .unwrap_or_else(|_| raw.trim().to_string()),
+        _ => TaskId::parse(raw.trim()).map(|id| id.canonical()).unwrap_or_else(|_| raw.trim().to_string()),
     }
 }
 
@@ -137,10 +118,7 @@ pub struct MoveResolver<'a> {
 
 impl<'a> MoveResolver<'a> {
     pub fn new(root: &'a Path) -> Self {
-        Self {
-            root,
-            cache: RefCell::new(HashMap::new()),
-        }
+        Self { root, cache: RefCell::new(HashMap::new()) }
     }
 
     /// See [`current_id`].
@@ -149,9 +127,7 @@ impl<'a> MoveResolver<'a> {
             return hit.clone();
         }
         let resolved = current_id(self.root, raw);
-        self.cache
-            .borrow_mut()
-            .insert(raw.to_string(), resolved.clone());
+        self.cache.borrow_mut().insert(raw.to_string(), resolved.clone());
         resolved
     }
 
@@ -167,19 +143,12 @@ impl<'a> MoveResolver<'a> {
 
 /// Show relationship references under the current IDs of moved tasks.
 /// Spellings that resolve to the same task collapse into one entry.
-pub fn current_relationships(
-    moves: &MoveResolver,
-    relationships: &mut crate::types::TaskRelationships,
-) {
+pub fn current_relationships(moves: &MoveResolver, relationships: &mut crate::types::TaskRelationships) {
     let list = |values: &mut Vec<String>| {
         let mut seen = Vec::new();
         for value in values.drain(..) {
             let current = moves.current(&value);
-            let shown = if TaskId::parse(value.trim()).is_ok() {
-                current
-            } else {
-                value
-            };
+            let shown = if TaskId::parse(value.trim()).is_ok() { current } else { value };
             if !seen.contains(&shown) {
                 seen.push(shown);
             }
@@ -212,9 +181,7 @@ mod tests {
     }
 
     fn stub(to: &str) -> String {
-        format!(
-            "title: Moved\ncreated: '2026-10-29T00:00:00Z'\ndeleted_at: '2026-10-29T00:00:00Z'\nmoved_to: {to}\n"
-        )
+        format!("title: Moved\ncreated: '2026-10-29T00:00:00Z'\ndeleted_at: '2026-10-29T00:00:00Z'\nmoved_to: {to}\n")
     }
 
     const TASK: &str = "title: Live\ncreated: '2026-10-29T00:00:00Z'\n";
@@ -250,21 +217,12 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         write(root, "DEV/12.yml", &stub("WEB-40"));
-        assert_eq!(
-            follow(root, "DEV-12"),
-            Err(MoveError::Broken {
-                from: "DEV-12".into(),
-                missing: "WEB-40".into()
-            })
-        );
+        assert_eq!(follow(root, "DEV-12"), Err(MoveError::Broken { from: "DEV-12".into(), missing: "WEB-40".into() }));
         // A broken chain still names the old ID rather than guessing.
         assert_eq!(current_id(root, "DEV-12"), "DEV-12");
 
         write(root, "A/1.yml", &stub("B-1"));
         write(root, "B/1.yml", &stub("A-1"));
-        assert_eq!(
-            follow(root, "A-1"),
-            Err(MoveError::Loop { from: "A-1".into() })
-        );
+        assert_eq!(follow(root, "A-1"), Err(MoveError::Loop { from: "A-1".into() }));
     }
 }

@@ -11,10 +11,7 @@ fn normalize_token(input: &str) -> String {
 }
 
 pub(crate) fn canonical_key(input: &str) -> String {
-    input
-        .trim()
-        .to_ascii_lowercase()
-        .replace([' ', '_', '-'], "")
+    input.trim().to_ascii_lowercase().replace([' ', '_', '-'], "")
 }
 
 /// Case-, space-, underscore-, and hyphen-insensitive equality for enum-like
@@ -46,10 +43,7 @@ impl TaskStatus {
         self.0.eq_ignore_ascii_case(other.as_ref())
     }
 
-    pub fn parse_with_config(
-        raw: &str,
-        config: &crate::config::types::ResolvedConfig,
-    ) -> Result<Self, String> {
+    pub fn parse_with_config(raw: &str, config: &crate::config::types::ResolvedConfig) -> Result<Self, String> {
         let candidate = normalize_token(raw);
         if candidate.is_empty() {
             return Err("Status cannot be empty.".to_string());
@@ -59,39 +53,17 @@ impl TaskStatus {
             return Ok(TaskStatus::new(candidate));
         }
         let candidate_key = canonical_key(&candidate);
-        if let Some(existing) = allowed
-            .iter()
-            .find(|status| canonical_key(status.as_str()) == candidate_key)
-        {
+        if let Some(existing) = allowed.iter().find(|status| canonical_key(status.as_str()) == candidate_key) {
             return Ok(existing.clone());
         }
-        let labels = allowed
-            .iter()
-            .map(|status| status.as_str())
-            .collect::<Vec<_>>()
-            .join(", ");
-        Err(format!(
-            "Status '{}' is not enabled for this project. Valid statuses: {}",
-            candidate, labels
-        ))
+        let labels = allowed.iter().map(|status| status.as_str()).collect::<Vec<_>>().join(", ");
+        Err(format!("Status '{}' is not enabled for this project. Valid statuses: {}", candidate, labels))
     }
 
     fn sort_key(&self) -> (usize, String) {
-        const ORDER: &[&str] = &[
-            "todo",
-            "inprogress",
-            "verify",
-            "needsreview",
-            "blocked",
-            "done",
-            "canceled",
-            "cancelled",
-        ];
+        const ORDER: &[&str] = &["todo", "inprogress", "verify", "needsreview", "blocked", "done", "canceled", "cancelled"];
         let key = canonical_key(self.as_str());
-        let idx = ORDER
-            .iter()
-            .position(|item| *item == key)
-            .unwrap_or(ORDER.len());
+        let idx = ORDER.iter().position(|item| *item == key).unwrap_or(ORDER.len());
         (idx, key)
     }
 }
@@ -119,11 +91,7 @@ impl FromStr for TaskStatus {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let normalized = normalize_token(s);
-        if normalized.is_empty() {
-            Err("Status cannot be empty.".to_string())
-        } else {
-            Ok(TaskStatus(normalized))
-        }
+        if normalized.is_empty() { Err("Status cannot be empty.".to_string()) } else { Ok(TaskStatus(normalized)) }
     }
 }
 
@@ -161,10 +129,7 @@ impl TaskType {
         self.0.eq_ignore_ascii_case(other.as_ref())
     }
 
-    pub fn parse_with_config(
-        raw: &str,
-        config: &crate::config::types::ResolvedConfig,
-    ) -> Result<Self, String> {
+    pub fn parse_with_config(raw: &str, config: &crate::config::types::ResolvedConfig) -> Result<Self, String> {
         let candidate = normalize_token(raw);
         if candidate.is_empty() {
             return Err("Type cannot be empty.".to_string());
@@ -174,21 +139,11 @@ impl TaskType {
             return Ok(TaskType::new(candidate));
         }
         let candidate_key = canonical_key(&candidate);
-        if let Some(existing) = allowed
-            .iter()
-            .find(|ty| canonical_key(ty.as_str()) == candidate_key)
-        {
+        if let Some(existing) = allowed.iter().find(|ty| canonical_key(ty.as_str()) == candidate_key) {
             return Ok(existing.clone());
         }
-        let labels = allowed
-            .iter()
-            .map(|ty| ty.as_str())
-            .collect::<Vec<_>>()
-            .join(", ");
-        Err(format!(
-            "Type '{}' is not enabled for this project. Valid types: {}",
-            candidate, labels
-        ))
+        let labels = allowed.iter().map(|ty| ty.as_str()).collect::<Vec<_>>().join(", ");
+        Err(format!("Type '{}' is not enabled for this project. Valid types: {}", candidate, labels))
     }
 
     pub fn ensure_leading_uppercase(&mut self) {
@@ -227,19 +182,13 @@ impl FromStr for TaskType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let normalized = normalize_token(s);
-        if normalized.is_empty() {
-            Err("Type cannot be empty.".to_string())
-        } else {
-            Ok(TaskType(normalized))
-        }
+        if normalized.is_empty() { Err("Type cannot be empty.".to_string()) } else { Ok(TaskType(normalized)) }
     }
 }
 
 impl Ord for TaskType {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.0
-            .to_ascii_lowercase()
-            .cmp(&other.0.to_ascii_lowercase())
+        self.0.to_ascii_lowercase().cmp(&other.0.to_ascii_lowercase())
     }
 }
 
@@ -271,10 +220,7 @@ impl Priority {
         self.0.trim().is_empty()
     }
 
-    pub fn parse_with_config(
-        raw: &str,
-        config: &crate::config::types::ResolvedConfig,
-    ) -> Result<Self, String> {
+    pub fn parse_with_config(raw: &str, config: &crate::config::types::ResolvedConfig) -> Result<Self, String> {
         let candidate = normalize_token(raw);
         if candidate.is_empty() {
             return Err("Priority cannot be empty.".to_string());
@@ -284,35 +230,20 @@ impl Priority {
             return Ok(Priority::new(candidate));
         }
         let candidate_key = canonical_key(&candidate);
-        if let Some(existing) = allowed
-            .iter()
-            .find(|priority| canonical_key(priority.as_str()) == candidate_key)
-        {
+        if let Some(existing) = allowed.iter().find(|priority| canonical_key(priority.as_str()) == candidate_key) {
             return Ok(existing.clone());
         }
         if allowed.iter().any(|priority| priority.as_str() == "*") {
             return Ok(Priority::new(candidate));
         }
-        let labels = allowed
-            .iter()
-            .map(|priority| priority.as_str())
-            .collect::<Vec<_>>()
-            .join(", ");
-        Err(format!(
-            "Priority '{}' is not enabled for this project. Valid priorities: {}",
-            candidate, labels
-        ))
+        let labels = allowed.iter().map(|priority| priority.as_str()).collect::<Vec<_>>().join(", ");
+        Err(format!("Priority '{}' is not enabled for this project. Valid priorities: {}", candidate, labels))
     }
 
     fn sort_key(&self) -> (usize, String) {
-        const ORDER: &[&str] = &[
-            "lowest", "low", "medium", "normal", "high", "critical", "blocker", "urgent",
-        ];
+        const ORDER: &[&str] = &["lowest", "low", "medium", "normal", "high", "critical", "blocker", "urgent"];
         let key = canonical_key(self.as_str());
-        let idx = ORDER
-            .iter()
-            .position(|item| *item == key)
-            .unwrap_or(ORDER.len());
+        let idx = ORDER.iter().position(|item| *item == key).unwrap_or(ORDER.len());
         (idx, key)
     }
 }
@@ -340,11 +271,7 @@ impl FromStr for Priority {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let normalized = normalize_token(s);
-        if normalized.is_empty() {
-            Err("Priority cannot be empty.".to_string())
-        } else {
-            Ok(Priority(normalized))
-        }
+        if normalized.is_empty() { Err("Priority cannot be empty.".to_string()) } else { Ok(Priority(normalized)) }
     }
 }
 

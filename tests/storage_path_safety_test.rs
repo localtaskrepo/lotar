@@ -12,11 +12,7 @@ fn temp_tasks_root(name: &str) -> tempfile::TempDir {
 }
 
 fn sample_task(title: &str) -> Task {
-    Task::new(
-        std::path::PathBuf::from("."),
-        title.to_string(),
-        Priority::new("medium"),
-    )
+    Task::new(std::path::PathBuf::from("."), title.to_string(), Priority::new("medium"))
 }
 
 #[test]
@@ -25,43 +21,21 @@ fn add_rejects_absolute_project_paths() {
     let outside = std::env::temp_dir().join(format!("lotar-pwn-{}", std::process::id()));
     let _ = fs::remove_dir_all(&outside);
 
-    let result = StorageOperations::add(
-        tmp.path(),
-        &sample_task("pwned"),
-        &outside.to_string_lossy(),
-        None,
-    );
+    let result = StorageOperations::add(tmp.path(), &sample_task("pwned"), &outside.to_string_lossy(), None);
 
     assert!(result.is_err(), "absolute project path must be rejected");
-    assert!(
-        !outside.join("1.yml").exists(),
-        "no file may be written outside the tasks root"
-    );
+    assert!(!outside.join("1.yml").exists(), "no file may be written outside the tasks root");
     let _ = fs::remove_dir_all(&outside);
 }
 
 #[test]
 fn add_rejects_relative_traversal_projects() {
     let tmp = temp_tasks_root("lotar-traversal-project");
-    for evil in [
-        "../escape",
-        "a/../..",
-        "..\\windows",
-        "sub/../../up",
-        ".",
-        "..",
-    ] {
+    for evil in ["../escape", "a/../..", "..\\windows", "sub/../../up", ".", ".."] {
         let result = StorageOperations::add(tmp.path(), &sample_task("escape"), evil, None);
         assert!(result.is_err(), "project '{evil}' must be rejected");
-        let escaped = tmp
-            .path()
-            .parent()
-            .expect("temp dir always has a parent")
-            .join("escape");
-        assert!(
-            !escaped.exists(),
-            "traversal project '{evil}' must not create directories"
-        );
+        let escaped = tmp.path().parent().expect("temp dir always has a parent").join("escape");
+        assert!(!escaped.exists(), "traversal project '{evil}' must not create directories");
     }
 }
 
@@ -86,26 +60,17 @@ fn concurrent_task_creation_allocates_distinct_ids_without_lost_tasks() {
                 scope.spawn(move || {
                     barrier.wait();
                     let title = format!("Concurrent {i}");
-                    let id =
-                        StorageOperations::add(root, &sample_task(&title), "DEV", None).unwrap();
+                    let id = StorageOperations::add(root, &sample_task(&title), "DEV", None).unwrap();
                     (id, title)
                 })
             })
             .collect();
-        handles
-            .into_iter()
-            .map(|h| h.join().unwrap())
-            .collect::<Vec<_>>()
+        handles.into_iter().map(|h| h.join().unwrap()).collect::<Vec<_>>()
     });
     let distinct: std::collections::HashSet<_> = ids.iter().map(|(id, _)| id).collect();
     assert_eq!(distinct.len(), 8);
     for (id, title) in ids {
-        assert_eq!(
-            StorageOperations::get(tmp.path(), &id, "DEV")
-                .unwrap()
-                .title,
-            title
-        );
+        assert_eq!(StorageOperations::get(tmp.path(), &id, "DEV").unwrap().title, title);
     }
 }
 
@@ -126,12 +91,7 @@ fn yaml_extensions_survive_storage_and_service_mutations_without_dto_exposure() 
     let expected = task.extra_fields.clone();
     task.title = "Edited".into();
     StorageOperations::edit(&root, "DEV-1", &task).unwrap();
-    assert_eq!(
-        StorageOperations::get(&root, "DEV-1", "DEV")
-            .unwrap()
-            .extra_fields,
-        expected
-    );
+    assert_eq!(StorageOperations::get(&root, "DEV-1", "DEV").unwrap().extra_fields, expected);
 
     let mut task = StorageOperations::get(&root, "DEV-1", "DEV").unwrap();
     task.description = Some("Edit through the read cache".into());
@@ -187,12 +147,7 @@ fn held_task_lock_prevents_add_edit_and_delete() {
     assert_eq!(fs::read_to_string(&path).unwrap(), original);
     drop(held);
     StorageOperations::edit(tmp.path(), &id, &sample_task("Released")).unwrap();
-    assert_eq!(
-        StorageOperations::get(tmp.path(), &id, "DEV")
-            .unwrap()
-            .title,
-        "Released"
-    );
+    assert_eq!(StorageOperations::get(tmp.path(), &id, "DEV").unwrap().title, "Released");
 }
 
 #[test]
@@ -264,22 +219,9 @@ fn task_service_create_rejects_traversal_projects_end_to_end() {
     let outside_root = tempfile::tempdir_in(std::env::temp_dir()).unwrap();
     let evil = outside_root.path().join("pwn");
 
-    for bad in [
-        evil.to_string_lossy().to_string(),
-        "../../sibling".to_string(),
-    ] {
-        let result = TaskService::create(
-            &mut storage,
-            TaskCreate {
-                title: "nope".to_string(),
-                project: Some(bad.clone()),
-                ..Default::default()
-            },
-        );
+    for bad in [evil.to_string_lossy().to_string(), "../../sibling".to_string()] {
+        let result = TaskService::create(&mut storage, TaskCreate { title: "nope".to_string(), project: Some(bad.clone()), ..Default::default() });
         assert!(result.is_err(), "project '{bad}' must be rejected");
-        assert!(
-            !evil.join("config.yml").exists() && !root.join("../../sibling").exists(),
-            "traversal project '{bad}' must not be created"
-        );
+        assert!(!evil.join("config.yml").exists() && !root.join("../../sibling").exists(), "traversal project '{bad}' must not be created");
     }
 }

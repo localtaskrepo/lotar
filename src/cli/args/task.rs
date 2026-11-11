@@ -78,10 +78,7 @@ where
 {
     let v: JsonValue = JsonValue::deserialize(deserializer)?;
     match v {
-        JsonValue::Object(map) => Ok(map
-            .into_iter()
-            .map(|(k, v)| (k, v.as_str().unwrap_or(&v.to_string()).to_string()))
-            .collect()),
+        JsonValue::Object(map) => Ok(map.into_iter().map(|(k, v)| (k, v.as_str().unwrap_or(&v.to_string()).to_string())).collect()),
         JsonValue::Array(arr) => {
             let mut out = Vec::with_capacity(arr.len());
             for item in arr {
@@ -94,43 +91,29 @@ where
                         }
                     }
                     JsonValue::Array(two) if two.len() == 2 => {
-                        let k = two[0]
-                            .as_str()
-                            .ok_or_else(|| DeError::custom("Expected [key, value] with strings"))?;
-                        let val = two[1]
-                            .as_str()
-                            .ok_or_else(|| DeError::custom("Expected [key, value] with strings"))?;
+                        let k = two[0].as_str().ok_or_else(|| DeError::custom("Expected [key, value] with strings"))?;
+                        let val = two[1].as_str().ok_or_else(|| DeError::custom("Expected [key, value] with strings"))?;
                         out.push((k.to_string(), val.to_string()));
                     }
                     JsonValue::Object(o) => {
                         if o.len() != 1 {
-                            return Err(DeError::custom(
-                                "Object must contain exactly one key for pair",
-                            ));
+                            return Err(DeError::custom("Object must contain exactly one key for pair"));
                         }
                         if let Some((k, v)) = o.into_iter().next() {
                             out.push((k, v.as_str().unwrap_or(&v.to_string()).to_string()));
                         } else {
-                            return Err(DeError::custom(
-                                "Object must contain exactly one key for pair",
-                            ));
+                            return Err(DeError::custom("Object must contain exactly one key for pair"));
                         }
                     }
                     other => {
-                        return Err(DeError::custom(format!(
-                            "Unsupported fields entry type: {}",
-                            other
-                        )));
+                        return Err(DeError::custom(format!("Unsupported fields entry type: {}", other)));
                     }
                 }
             }
             Ok(out)
         }
         JsonValue::Null => Ok(Vec::new()),
-        other => Err(DeError::custom(format!(
-            "Expected object or array for fields, got {}",
-            other
-        ))),
+        other => Err(DeError::custom(format!("Expected object or array for fields, got {}", other))),
     }
 }
 
@@ -618,10 +601,7 @@ pub struct TaskSearchArgs {
     /// Search text and filters in the web search-box syntax, e.g.
     /// `status:todo,done priority:high has:tag owner:alice "login redirect"`
     #[arg(num_args = 0..)]
-    #[serde(
-        default,
-        deserialize_with = "crate::api_types::deserialize_string_or_vec"
-    )]
+    #[serde(default, deserialize_with = "crate::api_types::deserialize_string_or_vec")]
     pub query: Vec<String>,
 
     /// Excluded filters from the query (`-status:done`), routed here by the

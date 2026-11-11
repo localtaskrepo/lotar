@@ -6,10 +6,7 @@ use common::TestFixtures;
 
 fn assert_yaml_contains(anchor_list: &str, needle: &str) {
     let normalized = anchor_list.replace('\\', "/");
-    assert!(
-        normalized.contains(needle),
-        "expected YAML to include `{needle}` but was: {normalized}"
-    );
+    assert!(normalized.contains(needle), "expected YAML to include `{needle}` but was: {normalized}");
 }
 
 fn project_and_task_paths(root: &std::path::Path) -> (String, std::path::PathBuf) {
@@ -24,10 +21,7 @@ fn project_and_task_paths(root: &std::path::Path) -> (String, std::path::PathBuf
         .filter(|name| !name.starts_with('@') && !name.starts_with('.'))
         .collect::<Vec<_>>();
     projects.sort();
-    assert!(
-        !projects.is_empty(),
-        "expected a project folder under .tasks"
-    );
+    assert!(!projects.is_empty(), "expected a project folder under .tasks");
     let project = projects[0].clone();
     let task_file = tasks_dir.join(&project).join("1.yml");
     (project, task_file)
@@ -40,11 +34,7 @@ fn scan_adds_reference_for_existing_key_and_reanchors_on_move() {
 
     // Create an initial task via CLI add (id will be <PROJECT>-1)
     let mut add = crate::common::lotar_cmd().unwrap();
-    add.current_dir(root)
-        .arg("add")
-        .arg("First task for reanchor")
-        .assert()
-        .success();
+    add.current_dir(root).arg("add").arg("First task for reanchor").assert().success();
 
     // Discover project and id
     let (project, task_file) = project_and_task_paths(root);
@@ -57,17 +47,10 @@ fn scan_adds_reference_for_existing_key_and_reanchors_on_move() {
 
     // Run scan; should not create a new task, but should append a code reference to 1.yml
     let mut scan = crate::common::lotar_cmd().unwrap();
-    scan.current_dir(root)
-        .arg("scan")
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Found 1 TODO comment(s):"));
+    scan.current_dir(root).arg("scan").assert().success().stdout(predicate::str::contains("Found 1 TODO comment(s):"));
 
     let yaml = fs::read_to_string(&task_file).unwrap();
-    assert!(
-        yaml.contains("references:"),
-        "expected references section in YAML after scan"
-    );
+    assert!(yaml.contains("references:"), "expected references section in YAML after scan");
     assert_yaml_contains(&yaml, "code: main.rs#1");
 
     // Move the comment down by inserting a blank line on top -> line becomes 2
@@ -88,11 +71,7 @@ fn scan_adds_reference_when_file_is_renamed() {
 
     // Create a task
     let mut add = crate::common::lotar_cmd().unwrap();
-    add.current_dir(root)
-        .arg("add")
-        .arg("Task")
-        .assert()
-        .success();
+    add.current_dir(root).arg("add").arg("Task").assert().success();
     let (project, task_file) = project_and_task_paths(root);
     let id = format!("{project}-1");
 

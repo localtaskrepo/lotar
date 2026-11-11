@@ -28,11 +28,7 @@ fn task_add_args_deserialize_full() {
     assert_eq!(args.tags, vec!["api", "rust"]);
     assert!(args.fields.iter().any(|(k, v)| k == "estimate" && v == "5"));
     assert!(args.fields.iter().any(|(k, v)| k == "sprint" && v == "24"));
-    assert!(
-        args.fields
-            .iter()
-            .any(|(k, v)| k == "product" && v == "backend")
-    );
+    assert!(args.fields.iter().any(|(k, v)| k == "product" && v == "backend"));
 }
 
 #[test]
@@ -119,11 +115,7 @@ fn priority_handler_type_exists() {
 
 #[test]
 fn status_args_creation_and_get_only() {
-    let args = StatusArgs::new(
-        "AUTH-123".to_string(),
-        Some("InProgress".to_string()),
-        Some("auth".to_string()),
-    );
+    let args = StatusArgs::new("AUTH-123".to_string(), Some("InProgress".to_string()), Some("auth".to_string()));
     assert_eq!(args.task_id, "AUTH-123");
     assert_eq!(args.new_status, Some("InProgress".to_string()));
     assert_eq!(args.explicit_project, Some("auth".to_string()));

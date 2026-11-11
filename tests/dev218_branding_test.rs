@@ -25,12 +25,7 @@ fn workspace(config: &str) -> Fixture {
     std::fs::create_dir_all(repo.join("assets")).unwrap();
     std::fs::write(tasks_dir.join("config.yml"), config).unwrap();
     let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
-    Fixture {
-        _tmp: tmp,
-        repo,
-        tasks_dir,
-        _guard_tasks,
-    }
+    Fixture { _tmp: tmp, repo, tasks_dir, _guard_tasks }
 }
 
 fn server() -> ApiServer {
@@ -40,13 +35,7 @@ fn server() -> ApiServer {
 }
 
 fn get(api: &ApiServer, path: &str) -> HttpResponse {
-    api.handle_request(&HttpRequest {
-        method: "GET".into(),
-        path: path.into(),
-        query: HashMap::new(),
-        headers: HashMap::new(),
-        body: Vec::new(),
-    })
+    api.handle_request(&HttpRequest { method: "GET".into(), path: path.into(), query: HashMap::new(), headers: HashMap::new(), body: Vec::new() })
 }
 
 fn post(api: &ApiServer, path: &str, body: Value) -> HttpResponse {
@@ -65,10 +54,7 @@ fn data(resp: &HttpResponse) -> Value {
 }
 
 fn header<'a>(resp: &'a HttpResponse, name: &str) -> Option<&'a str> {
-    resp.headers
-        .iter()
-        .find(|(key, _)| key.eq_ignore_ascii_case(name))
-        .map(|(_, value)| value.as_str())
+    resp.headers.iter().find(|(key, _)| key.eq_ignore_ascii_case(name)).map(|(_, value)| value.as_str())
 }
 
 #[test]
@@ -86,51 +72,24 @@ fn branding_reports_settings_and_serves_repository_images() {
     assert_eq!(branding["theme_source"], "repository");
     assert!(branding.get("repository_theme").is_none());
     assert_eq!(branding["name"], "Acme Tracker");
-    assert!(
-        branding["logo"]
-            .as_str()
-            .unwrap()
-            .starts_with("/api/branding/logo?v=")
-    );
+    assert!(branding["logo"].as_str().unwrap().starts_with("/api/branding/logo?v="));
     assert!(branding.get("logo_dark").is_none());
     assert!(branding.get("icon").is_none());
-    let problems: Vec<&str> = branding["problems"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .filter_map(Value::as_str)
-        .collect();
+    let problems: Vec<&str> = branding["problems"].as_array().unwrap().iter().filter_map(Value::as_str).collect();
     assert_eq!(problems.len(), 2, "{problems:?}");
-    assert!(
-        problems
-            .iter()
-            .any(|p| p.contains("assets/missing.svg was not found"))
-    );
-    assert!(
-        problems
-            .iter()
-            .any(|p| p.contains("assets/fake.png is not an image"))
-    );
+    assert!(problems.iter().any(|p| p.contains("assets/missing.svg was not found")));
+    assert!(problems.iter().any(|p| p.contains("assets/fake.png is not an image")));
 
     let logo = get(&api, "/api/branding/logo");
     assert_eq!(logo.status, 200);
     assert_eq!(logo.body, SVG);
     assert_eq!(header(&logo, "content-type"), Some("image/svg+xml"));
-    assert!(
-        header(&logo, "content-security-policy")
-            .unwrap()
-            .contains("sandbox")
-    );
+    assert!(header(&logo, "content-security-policy").unwrap().contains("sandbox"));
     assert_eq!(header(&logo, "cache-control"), Some("no-cache"));
 
     let etag = header(&logo, "etag").unwrap().to_string();
-    let mut conditional = HttpRequest {
-        method: "GET".into(),
-        path: "/api/branding/logo".into(),
-        query: HashMap::new(),
-        headers: HashMap::new(),
-        body: Vec::new(),
-    };
+    let mut conditional =
+        HttpRequest { method: "GET".into(), path: "/api/branding/logo".into(), query: HashMap::new(), headers: HashMap::new(), body: Vec::new() };
     conditional.headers.insert("if-none-match".into(), etag);
     assert_eq!(api.handle_request(&conditional).status, 304);
 
@@ -143,36 +102,15 @@ fn branding_reports_settings_and_serves_repository_images() {
 fn settings_are_validated_and_stay_inside_the_repository() {
     let fx = workspace("default:\n  project: APP\n");
     let api = server();
-    for (field, value) in [
-        ("ui.theme", "neon"),
-        ("ui.logo", "../outside.png"),
-        ("ui.logo", "/etc/logo.png"),
-        ("ui.icon", "assets/readme.md"),
-    ] {
-        let resp = post(
-            &api,
-            "/api/config/set",
-            json!({"global": true, "values": {field: value}}),
-        );
-        assert_eq!(
-            resp.status,
-            400,
-            "{field}={value}: {}",
-            String::from_utf8_lossy(&resp.body)
-        );
+    for (field, value) in [("ui.theme", "neon"), ("ui.logo", "../outside.png"), ("ui.logo", "/etc/logo.png"), ("ui.icon", "assets/readme.md")] {
+        let resp = post(&api, "/api/config/set", json!({"global": true, "values": {field: value}}));
+        assert_eq!(resp.status, 400, "{field}={value}: {}", String::from_utf8_lossy(&resp.body));
     }
 
-    let resp = post(
-        &api,
-        "/api/config/set",
-        json!({"global": true, "values": {"ui.theme": "rose", "ui.name": "Shop"}}),
-    );
+    let resp = post(&api, "/api/config/set", json!({"global": true, "values": {"ui.theme": "rose", "ui.name": "Shop"}}));
     assert_eq!(resp.status, 200, "{}", String::from_utf8_lossy(&resp.body));
     let saved = std::fs::read_to_string(fx.tasks_dir.join("config.yml")).unwrap();
-    assert!(
-        saved.contains("ui:") && saved.contains("theme: rose") && saved.contains("name: Shop"),
-        "{saved}"
-    );
+    assert!(saved.contains("ui:") && saved.contains("theme: rose") && saved.contains("name: Shop"), "{saved}");
     assert_eq!(data(&get(&api, "/api/branding"))["theme"], "rose");
 }
 
@@ -206,18 +144,11 @@ fn uploads_store_the_image_in_the_repository_and_point_the_setting_at_it() {
 
     let stored = data(&upload("logo", "Brand Mark.svg", SVG));
     assert_eq!(stored["path"], ".tasks/@branding/logo.svg");
-    assert_eq!(
-        std::fs::read(fx.tasks_dir.join("@branding/logo.svg")).unwrap(),
-        SVG
-    );
+    assert_eq!(std::fs::read(fx.tasks_dir.join("@branding/logo.svg")).unwrap(), SVG);
     // Storing a file does not change the settings; the Config page saves them.
     let saved = std::fs::read_to_string(fx.tasks_dir.join("config.yml")).unwrap();
     assert!(!saved.contains("logo"), "{saved}");
-    let resp = post(
-        &api,
-        "/api/config/set",
-        json!({"global": true, "values": {"ui.logo": ".tasks/@branding/logo.svg"}}),
-    );
+    let resp = post(&api, "/api/config/set", json!({"global": true, "values": {"ui.logo": ".tasks/@branding/logo.svg"}}));
     assert_eq!(resp.status, 200);
     assert_eq!(get(&api, "/api/branding/logo").body, SVG);
 
@@ -235,9 +166,7 @@ fn uploads_store_the_image_in_the_repository_and_point_the_setting_at_it() {
 #[test]
 fn repository_skins_are_reduced_to_theme_variables() {
     // DEV-220: ui.theme_file points at a CSS skin in the repository.
-    let fx = workspace(
-        "default:\n  project: APP\nui:\n  theme: custom\n  theme_file: assets/skin.css\n",
-    );
+    let fx = workspace("default:\n  project: APP\nui:\n  theme: custom\n  theme_file: assets/skin.css\n");
     std::fs::write(
         fx.repo.join("assets/skin.css"),
         ":root { --color-accent: #c0392b; color: red; }\n[data-mode=\"dark\"] { --color-bg: #111; --page-background: url(https://example.com/x.png); }\n",
@@ -249,24 +178,14 @@ fn repository_skins_are_reduced_to_theme_variables() {
     assert_eq!(branding["theme"], "custom");
     assert_eq!(branding["theme_file"], "assets/skin.css");
     let problems = branding["problems"].as_array().unwrap();
-    assert!(
-        problems
-            .iter()
-            .any(|p| p.as_str().unwrap().contains("2 declarations")),
-        "{problems:?}"
-    );
+    assert!(problems.iter().any(|p| p.as_str().unwrap().contains("2 declarations")), "{problems:?}");
 
     let css = get(&api, "/api/branding/theme.css");
     assert_eq!(css.status, 200);
-    assert_eq!(
-        header(&css, "content-type"),
-        Some("text/css; charset=utf-8")
-    );
+    assert_eq!(header(&css, "content-type"), Some("text/css; charset=utf-8"));
     let text = String::from_utf8(css.body).unwrap();
     assert!(text.contains("[data-theme-name='custom'] {\n  --color-accent: #c0392b;\n}"));
-    assert!(
-        text.contains("[data-theme-name='custom'][data-mode='dark'] {\n  --color-bg: #111;\n}")
-    );
+    assert!(text.contains("[data-theme-name='custom'][data-mode='dark'] {\n  --color-bg: #111;\n}"));
     assert!(!text.contains("url("));
     assert!(!text.contains("color: red"));
 }
@@ -290,38 +209,15 @@ fn skin_stylesheet_is_empty_without_a_skin_and_uploads_are_checked() {
             }),
         )
     };
-    assert_eq!(
-        data(&upload("Acme.css", ":root { --color-accent: #123456; }"))["path"],
-        ".tasks/@branding/theme.css"
-    );
+    assert_eq!(data(&upload("Acme.css", ":root { --color-accent: #123456; }"))["path"], ".tasks/@branding/theme.css");
     assert!(fx.tasks_dir.join("@branding/theme.css").exists());
-    assert_eq!(
-        upload("skin.css", "body { color: red; }").status,
-        400,
-        "no variables"
-    );
-    assert_eq!(
-        upload("skin.txt", ":root { --x: 1; }").status,
-        400,
-        "not css"
-    );
+    assert_eq!(upload("skin.css", "body { color: red; }").status, 400, "no variables");
+    assert_eq!(upload("skin.txt", ":root { --x: 1; }").status, 400, "not css");
 
-    for (field, value) in [
-        ("ui.theme_file", "../skin.css"),
-        ("ui.theme_file", "assets/skin.scss"),
-        ("ui.theme", "terminal:plaid"),
-    ] {
-        let resp = post(
-            &api,
-            "/api/config/set",
-            json!({"global": true, "values": {field: value}}),
-        );
+    for (field, value) in [("ui.theme_file", "../skin.css"), ("ui.theme_file", "assets/skin.scss"), ("ui.theme", "terminal:plaid")] {
+        let resp = post(&api, "/api/config/set", json!({"global": true, "values": {field: value}}));
         assert_eq!(resp.status, 400, "{field}={value}");
     }
-    let resp = post(
-        &api,
-        "/api/config/set",
-        json!({"global": true, "values": {"ui.theme": "terminal:red"}}),
-    );
+    let resp = post(&api, "/api/config/set", json!({"global": true, "values": {"ui.theme": "terminal:red"}}));
     assert_eq!(resp.status, 200, "{}", String::from_utf8_lossy(&resp.body));
 }

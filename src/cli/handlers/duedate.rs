@@ -3,9 +3,8 @@ use crate::cli::handlers::CommandHandler;
 use crate::cli::handlers::task::context::TaskCommandContext;
 use crate::cli::handlers::task::mutation::{LoadedTask, load_task};
 use crate::cli::handlers::task::render::{
-    ExplainPlacement, PropertyCurrent, PropertyExplain, PropertyNoop, PropertyPreview,
-    PropertySuccess, render_property_current, render_property_noop, render_property_preview,
-    render_property_success,
+    ExplainPlacement, PropertyCurrent, PropertyExplain, PropertyNoop, PropertyPreview, PropertySuccess, render_property_current, render_property_noop,
+    render_property_preview, render_property_success,
 };
 use crate::cli::validation::CliValidator;
 use crate::output::OutputRenderer;
@@ -25,49 +24,22 @@ pub struct DueDateArgs {
 }
 
 impl DueDateArgs {
-    pub fn new(
-        task_id: String,
-        new_due_date: Option<String>,
-        explicit_project: Option<String>,
-        dry_run: bool,
-        explain: bool,
-    ) -> Self {
-        Self {
-            task_id,
-            new_due_date,
-            explicit_project,
-            dry_run,
-            explain,
-        }
+    pub fn new(task_id: String, new_due_date: Option<String>, explicit_project: Option<String>, dry_run: bool, explain: bool) -> Self {
+        Self { task_id, new_due_date, explicit_project, dry_run, explain }
     }
 }
 
-const DUEDATE_DRY_RUN_EXPLANATION: &str =
-    "due date validated against project settings; no write performed";
+const DUEDATE_DRY_RUN_EXPLANATION: &str = "due date validated against project settings; no write performed";
 
 impl CommandHandler for DueDateHandler {
     type Args = DueDateArgs;
     type Result = Result<(), String>;
 
-    fn execute(
-        args: Self::Args,
-        project: Option<&str>,
-        resolver: &TasksDirectoryResolver,
-        renderer: &OutputRenderer,
-    ) -> Self::Result {
-        let DueDateArgs {
-            task_id,
-            new_due_date,
-            explicit_project,
-            dry_run,
-            explain,
-        } = args;
+    fn execute(args: Self::Args, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Self::Result {
+        let DueDateArgs { task_id, new_due_date, explicit_project, dry_run, explain } = args;
 
         let project_hint = explicit_project.as_deref().or(project);
-        renderer.log_info(format_args!(
-            "duedate: begin task_id={} explicit_project={:?}",
-            task_id, project_hint
-        ));
+        renderer.log_info(format_args!("duedate: begin task_id={} explicit_project={:?}", task_id, project_hint));
 
         let mut ctx = if new_due_date.is_some() {
             TaskCommandContext::new(resolver, project_hint, Some(task_id.as_str()))?
@@ -82,9 +54,7 @@ impl CommandHandler for DueDateHandler {
                 render_current_due_date(renderer, &full_id, task.due_date.as_deref(), explain);
                 Ok(())
             }
-            Some(candidate) => handle_set_due_date(
-                &candidate, dry_run, explain, &full_id, task, &mut ctx, renderer,
-            ),
+            Some(candidate) => handle_set_due_date(&candidate, dry_run, explain, &full_id, task, &mut ctx, renderer),
         }
     }
 }
@@ -99,14 +69,9 @@ fn handle_set_due_date(
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
     let validator = CliValidator::new(&ctx.config);
-    renderer.log_debug(format_args!(
-        "duedate: validating new_due_date='{}'",
-        candidate
-    ));
+    renderer.log_debug(format_args!("duedate: validating new_due_date='{}'", candidate));
 
-    let normalized = validator
-        .parse_due_date(candidate)
-        .map_err(|e| format!("Due date validation failed: {}", e))?;
+    let normalized = validator.parse_due_date(candidate).map_err(|e| format!("Due date validation failed: {}", e))?;
 
     let previous = task.due_date.clone();
 
@@ -116,13 +81,7 @@ fn handle_set_due_date(
     }
 
     if dry_run {
-        render_due_date_dry_run(
-            renderer,
-            full_id,
-            previous.as_deref(),
-            Some(normalized.as_str()),
-            explain,
-        );
+        render_due_date_dry_run(renderer, full_id, previous.as_deref(), Some(normalized.as_str()), explain);
         return Ok(());
     }
 
@@ -144,36 +103,17 @@ fn handle_set_due_date(
         custom_fields: None,
         sprints: None,
     };
-    let updated =
-        TaskService::update(&mut ctx.storage, full_id, patch).map_err(|e| e.to_string())?;
+    let updated = TaskService::update(&mut ctx.storage, full_id, patch).map_err(|e| e.to_string())?;
 
-    render_due_date_success(
-        renderer,
-        full_id,
-        previous.as_deref(),
-        updated.due_date.as_deref(),
-    );
+    render_due_date_success(renderer, full_id, previous.as_deref(), updated.due_date.as_deref());
     Ok(())
 }
 
-fn render_current_due_date(
-    renderer: &OutputRenderer,
-    task_id: &str,
-    due_date: Option<&str>,
-    explain: bool,
-) {
+fn render_current_due_date(renderer: &OutputRenderer, task_id: &str, due_date: Option<&str>, explain: bool) {
     let display = due_date.unwrap_or("-");
-    let mut current = PropertyCurrent::new(
-        task_id,
-        "due_date",
-        due_date.map(|value| value.to_string()),
-        format!("Task {} due date: {}", task_id, display),
-    );
+    let mut current = PropertyCurrent::new(task_id, "due_date", due_date.map(|value| value.to_string()), format!("Task {} due date: {}", task_id, display));
     if explain {
-        current = current.with_explain(PropertyExplain::info(
-            "Use --dry-run to preview parsing results before persisting a change.",
-            ExplainPlacement::After,
-        ));
+        current = current.with_explain(PropertyExplain::info("Use --dry-run to preview parsing results before persisting a change.", ExplainPlacement::After));
     }
     render_property_current(renderer, current);
 }
@@ -195,13 +135,7 @@ fn render_due_date_noop(renderer: &OutputRenderer, task_id: &str, due_date: Opti
     render_property_noop(renderer, noop);
 }
 
-fn render_due_date_dry_run(
-    renderer: &OutputRenderer,
-    task_id: &str,
-    old_due_date: Option<&str>,
-    new_due_date: Option<&str>,
-    explain: bool,
-) {
+fn render_due_date_dry_run(renderer: &OutputRenderer, task_id: &str, old_due_date: Option<&str>, new_due_date: Option<&str>, explain: bool) {
     let old_display = old_due_date.unwrap_or("-");
     let new_display = new_due_date.unwrap_or("-");
     let mut preview = PropertyPreview::new(
@@ -211,26 +145,15 @@ fn render_due_date_dry_run(
         "new_due_date",
         old_due_date.map(|value| value.to_string()),
         new_due_date.map(|value| value.to_string()),
-        format!(
-            "DRY RUN: Would change {} due date from {} to {}",
-            task_id, old_display, new_display
-        ),
+        format!("DRY RUN: Would change {} due date from {} to {}", task_id, old_display, new_display),
     );
     if explain {
-        preview = preview.with_explain(PropertyExplain::info(
-            DUEDATE_DRY_RUN_EXPLANATION,
-            ExplainPlacement::After,
-        ));
+        preview = preview.with_explain(PropertyExplain::info(DUEDATE_DRY_RUN_EXPLANATION, ExplainPlacement::After));
     }
     render_property_preview(renderer, preview);
 }
 
-fn render_due_date_success(
-    renderer: &OutputRenderer,
-    task_id: &str,
-    old_due_date: Option<&str>,
-    new_due_date: Option<&str>,
-) {
+fn render_due_date_success(renderer: &OutputRenderer, task_id: &str, old_due_date: Option<&str>, new_due_date: Option<&str>) {
     let old_display = old_due_date.unwrap_or("-");
     let new_display = new_due_date.unwrap_or("-");
     let success = PropertySuccess::new(
@@ -239,14 +162,8 @@ fn render_due_date_success(
         "new_due_date",
         old_due_date.map(|value| value.to_string()),
         new_due_date.map(|value| value.to_string()),
-        format!(
-            "Task {} due date changed from {} to {}",
-            task_id, old_display, new_display
-        ),
-        format!(
-            "Task {} due date changed: {} -> {}",
-            task_id, old_display, new_display
-        ),
+        format!("Task {} due date changed from {} to {}", task_id, old_display, new_display),
+        format!("Task {} due date changed: {} -> {}", task_id, old_display, new_display),
     );
     render_property_success(renderer, success);
 }

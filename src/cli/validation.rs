@@ -44,21 +44,13 @@ impl<'a> CliValidator<'a> {
         } else if self.config.tags.values.contains(&normalized.to_string()) {
             Ok(normalized.to_string())
         } else {
-            let suggestion = crate::services::task_validation::find_closest_match(
-                normalized,
-                &self.config.tags.values,
-            );
+            let suggestion = crate::services::task_validation::find_closest_match(normalized, &self.config.tags.values);
             let suggestion_text = match suggestion {
                 Some(s) => format!(" Did you mean '{}'?", s),
                 None => String::new(),
             };
 
-            Err(format!(
-                "Tag '{}' is not allowed in this project. Valid tags: {}.{}",
-                normalized,
-                self.config.tags.values.join(", "),
-                suggestion_text
-            ))
+            Err(format!("Tag '{}' is not allowed in this project. Valid tags: {}.{}", normalized, self.config.tags.values.join(", "), suggestion_text))
         }
     }
 
@@ -68,11 +60,7 @@ impl<'a> CliValidator<'a> {
     }
 
     /// Validate custom field key-value pair
-    pub fn validate_custom_field(
-        &self,
-        field_name: &str,
-        field_value: &str,
-    ) -> Result<(String, String), String> {
+    pub fn validate_custom_field(&self, field_name: &str, field_value: &str) -> Result<(String, String), String> {
         // First validate the field name
         let validated_name = self.validate_custom_field_name(field_name)?;
 
@@ -125,20 +113,10 @@ impl<'a> CliValidator<'a> {
         };
 
         // Datetime-like forms normalize to RFC3339 (UTC)
-        let datetime_like = chrono::DateTime::parse_from_rfc3339(s_raw).is_ok()
-            || crate::utils::time::parse_naive_local_datetime_to_utc(s_raw).is_some();
+        let datetime_like = chrono::DateTime::parse_from_rfc3339(s_raw).is_ok() || crate::utils::time::parse_naive_local_datetime_to_utc(s_raw).is_some();
 
         crate::utils::time::parse_human_datetime_to_utc(s_raw)
-            .map(|dt| {
-                if datetime_like {
-                    dt.to_rfc3339()
-                } else {
-                    dt.with_timezone(&chrono::Local)
-                        .date_naive()
-                        .format("%Y-%m-%d")
-                        .to_string()
-                }
-            })
+            .map(|dt| if datetime_like { dt.to_rfc3339() } else { dt.with_timezone(&chrono::Local).date_naive().format("%Y-%m-%d").to_string() })
             .map_err(|_| invalid())
     }
 
@@ -148,7 +126,9 @@ impl<'a> CliValidator<'a> {
         let t = effort.trim().to_lowercase();
         match crate::utils::effort::parse_effort(&t) {
             Ok(_) => Ok(effort.to_string()),
-            Err(_) => Err("Invalid effort format. Use a number followed by a valid unit (h, d, w, m, pt, points, etc.), e.g., 2h, 1.5d, 1w, 5pt, 3points".to_string()),
+            Err(_) => {
+                Err("Invalid effort format. Use a number followed by a valid unit (h, d, w, m, pt, points, etc.), e.g., 2h, 1.5d, 1w, 5pt, 3points".to_string())
+            }
         }
     }
 
@@ -180,15 +160,8 @@ impl<'a> CliValidator<'a> {
         self.enforce_member_value(field_label, Some(value), &allowed)
     }
 
-    fn validate_member_value(
-        &self,
-        field_label: &str,
-        raw_value: &str,
-        allow_unknown: bool,
-    ) -> Result<String, String> {
-        use crate::utils::member::{
-            is_builtin_directive, is_email_like, is_valid_username, normalize_member_value,
-        };
+    fn validate_member_value(&self, field_label: &str, raw_value: &str, allow_unknown: bool) -> Result<String, String> {
+        use crate::utils::member::{is_builtin_directive, is_email_like, is_valid_username, normalize_member_value};
 
         let trimmed = raw_value.trim();
 
@@ -207,9 +180,7 @@ impl<'a> CliValidator<'a> {
                 return Err("Invalid username format. Usernames can only contain letters, numbers, underscore, dash, and period.".to_string());
             }
             // Normalize: strip @ for non-directive / non-agent values.
-            let result = normalize_member_value(trimmed, |name| {
-                self.config.agent_profiles.contains_key(name)
-            });
+            let result = normalize_member_value(trimmed, |name| self.config.agent_profiles.contains_key(name));
             if !allow_unknown {
                 self.enforce_member_for_value(field_label, &result)?;
             }
@@ -232,18 +203,10 @@ impl<'a> CliValidator<'a> {
             return Ok(trimmed.to_string());
         }
 
-        Err(format!(
-            "{} must be a username, email address, or @directive",
-            field_label
-        ))
+        Err(format!("{} must be a username, email address, or @directive", field_label))
     }
 
-    fn enforce_member_value(
-        &self,
-        field_label: &str,
-        value: Option<&str>,
-        allowed: &[String],
-    ) -> Result<(), String> {
+    fn enforce_member_value(&self, field_label: &str, value: Option<&str>, allowed: &[String]) -> Result<(), String> {
         let Some(raw) = value else {
             return Ok(());
         };
@@ -254,28 +217,18 @@ impl<'a> CliValidator<'a> {
         }
 
         let norm_val = crate::utils::member::member_for_comparison(trimmed);
-        let permitted = allowed
-            .iter()
-            .any(|candidate| crate::utils::member::member_for_comparison(candidate) == norm_val);
+        let permitted = allowed.iter().any(|candidate| crate::utils::member::member_for_comparison(candidate) == norm_val);
 
         if permitted {
             return Ok(());
         }
 
         let preview = self.member_preview(allowed);
-        Err(format!(
-            "{} '{}' is not in configured members. Allowed members: {}.",
-            field_label, trimmed, preview
-        ))
+        Err(format!("{} '{}' is not in configured members. Allowed members: {}.", field_label, trimmed, preview))
     }
 
     fn normalized_members(&self) -> Vec<String> {
-        self.config
-            .members
-            .iter()
-            .map(|member| member.trim().to_string())
-            .filter(|member| !member.is_empty())
-            .collect()
+        self.config.members.iter().map(|member| member.trim().to_string()).filter(|member| !member.is_empty()).collect()
     }
 
     fn member_preview(&self, allowed: &[String]) -> String {
@@ -285,12 +238,7 @@ impl<'a> CliValidator<'a> {
         if allowed.len() <= 10 {
             allowed.join(", ")
         } else {
-            let head = allowed
-                .iter()
-                .take(10)
-                .map(String::as_str)
-                .collect::<Vec<_>>()
-                .join(", ");
+            let head = allowed.iter().take(10).map(String::as_str).collect::<Vec<_>>().join(", ");
             format!("{} ... (+{} more)", head, allowed.len() - 10)
         }
     }

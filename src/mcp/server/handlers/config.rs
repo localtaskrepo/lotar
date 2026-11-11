@@ -5,33 +5,19 @@ use super::super::{JsonRpcRequest, JsonRpcResponse, err, ok, resolve_tasks_dir, 
 use crate::services::config_service::ConfigService;
 
 pub(crate) fn handle_config_show(req: JsonRpcRequest) -> JsonRpcResponse {
-    let global = req
-        .params
-        .get("global")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
+    let global = req.params.get("global").and_then(|v| v.as_bool()).unwrap_or(false);
     let project = req.params.get("project").and_then(|v| v.as_str());
     let resolver = try_rpc!(resolve_tasks_dir(&req.id));
     let scope = if global { None } else { project };
     match ConfigService::show(&resolver, scope) {
         Ok(val) => text_result(req.id, &val),
-        Err(e) => err(
-            req.id,
-            -32001,
-            "Config error",
-            Some(json!({"message": e.to_string()})),
-        ),
+        Err(e) => err(req.id, -32001, "Config error", Some(json!({"message": e.to_string()}))),
     }
 }
 
 pub(crate) fn handle_config_set(req: JsonRpcRequest) -> JsonRpcResponse {
     let resolver = try_rpc!(resolve_tasks_dir(&req.id));
-    let values = req
-        .params
-        .get("values")
-        .and_then(|v| v.as_object())
-        .cloned()
-        .unwrap_or_default();
+    let values = req.params.get("values").and_then(|v| v.as_object()).cloned().unwrap_or_default();
     let mut map = BTreeMap::new();
     for (k, v) in values.iter() {
         let Some(text) = v.as_str() else {
@@ -39,11 +25,7 @@ pub(crate) fn handle_config_set(req: JsonRpcRequest) -> JsonRpcResponse {
         };
         map.insert(k.clone(), text.to_string());
     }
-    let global = req
-        .params
-        .get("global")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
+    let global = req.params.get("global").and_then(|v| v.as_bool()).unwrap_or(false);
     let project = req.params.get("project").and_then(|v| v.as_str());
     match ConfigService::set(&resolver, &map, global, project) {
         Ok(outcome) => {
@@ -70,11 +52,6 @@ pub(crate) fn handle_config_set(req: JsonRpcRequest) -> JsonRpcResponse {
                 }),
             )
         }
-        Err(e) => err(
-            req.id,
-            -32002,
-            "Config set failed",
-            Some(json!({"message": e.to_string()})),
-        ),
+        Err(e) => err(req.id, -32002, "Config set failed", Some(json!({"message": e.to_string()}))),
     }
 }

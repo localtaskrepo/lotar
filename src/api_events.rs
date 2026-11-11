@@ -10,8 +10,7 @@ pub struct ApiEvent {
     pub data: JsonValue,
 }
 
-static SUBSCRIBERS: LazyLock<Mutex<Vec<mpsc::Sender<ApiEvent>>>> =
-    LazyLock::new(|| Mutex::new(Vec::new()));
+static SUBSCRIBERS: LazyLock<Mutex<Vec<mpsc::Sender<ApiEvent>>>> = LazyLock::new(|| Mutex::new(Vec::new()));
 
 pub fn subscribe() -> mpsc::Receiver<ApiEvent> {
     let (tx, rx) = mpsc::channel::<ApiEvent>();
@@ -35,8 +34,7 @@ pub fn emit(event: &ApiEvent) {
 
 /// Writes this process announced itself, so the file watcher can drop its
 /// own echo of them (DEV-273): task id -> (modified stamp, when).
-static OWN_TASK_WRITES: LazyLock<Mutex<HashMap<String, (String, Instant)>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
+static OWN_TASK_WRITES: LazyLock<Mutex<HashMap<String, (String, Instant)>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 static OWN_CONFIG_WRITE: LazyLock<Mutex<Option<Instant>>> = LazyLock::new(|| Mutex::new(None));
 const ECHO_WINDOW: Duration = Duration::from_secs(10);
 const CONFIG_ECHO_WINDOW: Duration = Duration::from_secs(2);
@@ -53,18 +51,12 @@ fn remember_task_write(task: &crate::api_types::TaskDTO) {
 /// Whether a watcher change to task `id` with stamp `modified` is the echo
 /// of a write this process already announced with a full DTO.
 pub fn is_own_task_write(id: &str, modified: &str) -> bool {
-    OWN_TASK_WRITES.lock().is_ok_and(|writes| {
-        writes
-            .get(id)
-            .is_some_and(|(stamp, at)| stamp == modified && at.elapsed() < ECHO_WINDOW)
-    })
+    OWN_TASK_WRITES.lock().is_ok_and(|writes| writes.get(id).is_some_and(|(stamp, at)| stamp == modified && at.elapsed() < ECHO_WINDOW))
 }
 
 /// Whether this process announced a config change in the last moments.
 pub fn is_recent_own_config_write() -> bool {
-    OWN_CONFIG_WRITE
-        .lock()
-        .is_ok_and(|at| at.is_some_and(|at| at.elapsed() < CONFIG_ECHO_WINDOW))
+    OWN_CONFIG_WRITE.lock().is_ok_and(|at| at.is_some_and(|at| at.elapsed() < CONFIG_ECHO_WINDOW))
 }
 
 pub fn emit_task_created(task: &crate::api_types::TaskDTO, triggered_by: Option<&str>) {
@@ -76,10 +68,7 @@ pub fn emit_task_created(task: &crate::api_types::TaskDTO, triggered_by: Option<
     if let (JsonValue::Object(map), Some(actor)) = (&mut payload, triggered_by) {
         map.insert("triggered_by".into(), JsonValue::String(actor.to_string()));
     }
-    emit(&ApiEvent {
-        kind: "task_created".into(),
-        data: payload,
-    });
+    emit(&ApiEvent { kind: "task_created".into(), data: payload });
 }
 
 pub fn emit_task_updated(task: &crate::api_types::TaskDTO, triggered_by: Option<&str>) {
@@ -91,10 +80,7 @@ pub fn emit_task_updated(task: &crate::api_types::TaskDTO, triggered_by: Option<
     if let (JsonValue::Object(map), Some(actor)) = (&mut payload, triggered_by) {
         map.insert("triggered_by".into(), JsonValue::String(actor.to_string()));
     }
-    emit(&ApiEvent {
-        kind: "task_updated".into(),
-        data: payload,
-    });
+    emit(&ApiEvent { kind: "task_updated".into(), data: payload });
 }
 
 pub fn emit_task_deleted(id: &str, triggered_by: Option<&str>) {
@@ -102,10 +88,7 @@ pub fn emit_task_deleted(id: &str, triggered_by: Option<&str>) {
     if let (JsonValue::Object(map), Some(actor)) = (&mut payload, triggered_by) {
         map.insert("triggered_by".into(), JsonValue::String(actor.to_string()));
     }
-    emit(&ApiEvent {
-        kind: "task_deleted".into(),
-        data: payload,
-    });
+    emit(&ApiEvent { kind: "task_deleted".into(), data: payload });
 }
 
 /// A task moved to another project (DEV-183): its old ID is gone from lists
@@ -116,10 +99,7 @@ pub fn emit_task_moved(from: &str, task: &crate::api_types::TaskDTO, triggered_b
     if let (JsonValue::Object(map), Some(actor)) = (&mut payload, triggered_by) {
         map.insert("triggered_by".into(), JsonValue::String(actor.to_string()));
     }
-    emit(&ApiEvent {
-        kind: "task_deleted".into(),
-        data: payload,
-    });
+    emit(&ApiEvent { kind: "task_deleted".into(), data: payload });
     emit_task_created(task, triggered_by);
 }
 
@@ -131,10 +111,7 @@ pub fn emit_config_updated(triggered_by: Option<&str>) {
     if let (JsonValue::Object(map), Some(actor)) = (&mut payload, triggered_by) {
         map.insert("triggered_by".into(), JsonValue::String(actor.to_string()));
     }
-    emit(&ApiEvent {
-        kind: "config_updated".into(),
-        data: payload,
-    });
+    emit(&ApiEvent { kind: "config_updated".into(), data: payload });
 }
 
 /// Emit a task_error event when a file change is detected but the task can't be parsed.

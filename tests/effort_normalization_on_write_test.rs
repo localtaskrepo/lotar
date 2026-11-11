@@ -3,10 +3,7 @@ use serde_json::Value;
 use tempfile::TempDir;
 
 fn run(cmd: &mut Command, temp_dir: &TempDir, args: &[&str]) -> assert_cmd::assert::Assert {
-    cmd.current_dir(temp_dir.path())
-        .env("LOTAR_TEST_SILENT", "1")
-        .args(args)
-        .assert()
+    cmd.current_dir(temp_dir.path()).env("LOTAR_TEST_SILENT", "1").args(args).assert()
 }
 
 #[test]
@@ -14,21 +11,11 @@ fn effort_is_normalized_on_add_and_edit() {
     let temp = crate::common::temp_dir();
 
     // Create a task with a variety of effort spellings that should normalize to hours
-    run(
-        &mut crate::common::lotar_cmd().unwrap(),
-        &temp,
-        &["task", "add", "A", "--effort", "1 hr 30 min"],
-    )
-    .success();
+    run(&mut crate::common::lotar_cmd().unwrap(), &temp, &["task", "add", "A", "--effort", "1 hr 30 min"]).success();
 
     // List as JSON and verify the stored effort is canonical (1.50h)
-    let out = crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(temp.path())
-        .env("LOTAR_TEST_SILENT", "1")
-        .args(["task", "list", "--format", "json"])
-        .output()
-        .unwrap();
+    let out =
+        crate::common::lotar_cmd().unwrap().current_dir(temp.path()).env("LOTAR_TEST_SILENT", "1").args(["task", "list", "--format", "json"]).output().unwrap();
     assert!(out.status.success());
     let v: Value = serde_json::from_slice(&out.stdout).unwrap();
     let tasks = v["tasks"].as_array().unwrap();
@@ -38,20 +25,10 @@ fn effort_is_normalized_on_add_and_edit() {
 
     // Now edit with a different shape and confirm it re-normalizes
     let id = tasks[0]["id"].as_str().unwrap();
-    run(
-        &mut crate::common::lotar_cmd().unwrap(),
-        &temp,
-        &["task", "edit", id, "--effort", "2 days"],
-    )
-    .success();
+    run(&mut crate::common::lotar_cmd().unwrap(), &temp, &["task", "edit", id, "--effort", "2 days"]).success();
 
-    let out2 = crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(temp.path())
-        .env("LOTAR_TEST_SILENT", "1")
-        .args(["task", "list", "--format", "json"])
-        .output()
-        .unwrap();
+    let out2 =
+        crate::common::lotar_cmd().unwrap().current_dir(temp.path()).env("LOTAR_TEST_SILENT", "1").args(["task", "list", "--format", "json"]).output().unwrap();
     assert!(out2.status.success());
     let v2: Value = serde_json::from_slice(&out2.stdout).unwrap();
     let tasks2 = v2["tasks"].as_array().unwrap();

@@ -6,12 +6,7 @@ use crate::cli::handlers::task::mutation::load_task_including_deleted;
 use crate::output::{OutputFormat, OutputRenderer};
 use crate::workspace::TasksDirectoryResolver;
 
-pub fn handle_show(
-    id: &str,
-    project: Option<&str>,
-    resolver: &TasksDirectoryResolver,
-    renderer: &OutputRenderer,
-) -> Result<(), String> {
+pub fn handle_show(id: &str, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
     let mut ctx = TaskCommandContext::for_reading(resolver, project, Some(id))?;
     let loaded = load_task_including_deleted(&mut ctx, id, project)?;
     match renderer.format {
@@ -25,11 +20,7 @@ pub fn handle_show(
 /// references and comments. Empty sections are left out.
 pub fn render_task_text(task: &TaskDTO) -> String {
     let mut out = format!("{}  {}\n", task.id, task.title);
-    let mut state = vec![
-        format!("Status: {}", task.status),
-        format!("Priority: {}", task.priority),
-        format!("Type: {}", task.task_type),
-    ];
+    let mut state = vec![format!("Status: {}", task.status), format!("Priority: {}", task.priority), format!("Type: {}", task.task_type)];
     if task.deleted_at.is_some() {
         state.push("Deleted".into());
     } else if task.archived {
@@ -48,20 +39,8 @@ pub fn render_task_text(task: &TaskDTO) -> String {
     push("Reporter", task.reporter.clone());
     push("Due", task.due_date.clone());
     push("Effort", task.effort.clone());
-    push(
-        "Tags",
-        (!task.tags.is_empty()).then(|| task.tags.join(", ")),
-    );
-    push(
-        "Sprints",
-        (!task.sprints.is_empty()).then(|| {
-            task.sprints
-                .iter()
-                .map(|id| format!("#{id}"))
-                .collect::<Vec<_>>()
-                .join(", ")
-        }),
-    );
+    push("Tags", (!task.tags.is_empty()).then(|| task.tags.join(", ")));
+    push("Sprints", (!task.sprints.is_empty()).then(|| task.sprints.iter().map(|id| format!("#{id}")).collect::<Vec<_>>().join(", ")));
     push("Created", Some(task.created.clone()));
     push("Modified", Some(task.modified.clone()));
     for (name, value) in &task.custom_fields {
@@ -137,11 +116,7 @@ pub fn render_task_text(task: &TaskDTO) -> String {
         out.push_str(&format!("\nComments ({})\n", task.comments.len()));
         for comment in &task.comments {
             let mut lines = comment.text.lines();
-            out.push_str(&format!(
-                "  {}  {}\n",
-                comment.date,
-                lines.next().unwrap_or_default()
-            ));
+            out.push_str(&format!("  {}  {}\n", comment.date, lines.next().unwrap_or_default()));
             for line in lines {
                 out.push_str(&format!("    {line}\n"));
             }

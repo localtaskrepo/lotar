@@ -1,7 +1,4 @@
-use crate::automation::types::{
-    AutomationAction, AutomationConditionGroup, AutomationFieldCondition, AutomationFile,
-    AutomationRunAction,
-};
+use crate::automation::types::{AutomationAction, AutomationConditionGroup, AutomationFieldCondition, AutomationFile, AutomationRunAction};
 use crate::config::types::ResolvedConfig;
 use crate::config::validation::errors::{ValidationError, ValidationResult};
 use crate::services::automation_service::{SetEnumField, SetPlan};
@@ -55,11 +52,7 @@ pub(crate) fn validate_rules(file: &AutomationFile, config: &ResolvedConfig) -> 
     result
 }
 
-fn validate_condition_group(
-    group: &AutomationConditionGroup,
-    config: &ResolvedConfig,
-    result: &mut ValidationResult,
-) {
+fn validate_condition_group(group: &AutomationConditionGroup, config: &ResolvedConfig, result: &mut ValidationResult) {
     if let Some(all) = group.all.as_ref() {
         for entry in all {
             validate_condition_group(entry, config, result);
@@ -87,21 +80,11 @@ fn validate_condition_group(
         validate_condition_value(field, condition, config, result);
     }
     for (field, condition) in group.custom_fields.iter() {
-        validate_condition_value(
-            &format!("custom_fields.{}", field),
-            condition,
-            config,
-            result,
-        );
+        validate_condition_value(&format!("custom_fields.{}", field), condition, config, result);
     }
 }
 
-fn validate_condition_value(
-    field: &str,
-    condition: &AutomationFieldCondition,
-    config: &ResolvedConfig,
-    result: &mut ValidationResult,
-) {
+fn validate_condition_value(field: &str, condition: &AutomationFieldCondition, config: &ResolvedConfig, result: &mut ValidationResult) {
     let map = condition.as_map();
     // An invalid pattern would silently never match; say so when saving.
     if let Some(pattern) = map.matches.as_ref()
@@ -112,9 +95,7 @@ fn validate_condition_value(
         let reason = reason.strip_prefix("error: ").unwrap_or(reason);
         result.add_error(ValidationError::error(
             Some("automation".to_string()),
-            format!(
-                "Automation condition on '{field}' has an invalid pattern '{pattern}': {reason}."
-            ),
+            format!("Automation condition on '{field}' has an invalid pattern '{pattern}': {reason}."),
         ));
     }
     // Time operators need a readable span (DEV-241).
@@ -124,65 +105,40 @@ fn validate_condition_value(
         {
             result.add_error(ValidationError::error(
                 Some("automation".to_string()),
-                format!(
-                    "Automation condition on '{field}' has an unreadable {operator} '{span}'; use a number and a unit, such as 12h, 7d or 2w."
-                ),
+                format!("Automation condition on '{field}' has an unreadable {operator} '{span}'; use a number and a unit, such as 12h, 7d or 2w."),
             ));
         }
     }
-    if matches!(
-        field.to_lowercase().as_str(),
-        "created" | "modified" | "status_changed"
-    ) && map.before.is_none()
+    if matches!(field.to_lowercase().as_str(), "created" | "modified" | "status_changed")
+        && map.before.is_none()
         && map.within.is_none()
         && map.older_than.is_none()
         && map.exists.is_none()
     {
         result.add_error(ValidationError::error(
             Some("automation".to_string()),
-            format!(
-                "Automation condition on '{field}' needs older_than, within or before, e.g. {field}: {{ older_than: 30d }}."
-            ),
+            format!("Automation condition on '{field}' needs older_than, within or before, e.g. {field}: {{ older_than: 30d }}."),
         ));
         return;
     }
     let Some(target) = map.equals.as_ref() else {
         if let Some(values) = map.any.as_ref() {
             for value in values {
-                validate_condition_value(
-                    field,
-                    &AutomationFieldCondition::Scalar(value.clone()),
-                    config,
-                    result,
-                );
+                validate_condition_value(field, &AutomationFieldCondition::Scalar(value.clone()), config, result);
             }
         }
         return;
     };
     match field.to_lowercase().as_str() {
         "status" if TaskStatus::parse_with_config(target, config).is_err() => {
-            result.add_error(ValidationError::warning(
-                Some("automation".to_string()),
-                format!(
-                    "Automation condition references unknown status '{}'.",
-                    target
-                ),
-            ));
+            result.add_error(ValidationError::warning(Some("automation".to_string()), format!("Automation condition references unknown status '{}'.", target)));
         }
         "priority" if Priority::parse_with_config(target, config).is_err() => {
-            result.add_error(ValidationError::warning(
-                Some("automation".to_string()),
-                format!(
-                    "Automation condition references unknown priority '{}'.",
-                    target
-                ),
-            ));
+            result
+                .add_error(ValidationError::warning(Some("automation".to_string()), format!("Automation condition references unknown priority '{}'.", target)));
         }
         "type" | "task_type" if TaskType::parse_with_config(target, config).is_err() => {
-            result.add_error(ValidationError::warning(
-                Some("automation".to_string()),
-                format!("Automation condition references unknown type '{}'.", target),
-            ));
+            result.add_error(ValidationError::warning(Some("automation".to_string()), format!("Automation condition references unknown type '{}'.", target)));
         }
         "assignee" if target.eq_ignore_ascii_case("@agent") && config.agent_profiles.is_empty() => {
             result.add_error(ValidationError::warning(
@@ -194,11 +150,7 @@ fn validate_condition_value(
     }
 }
 
-fn validate_action(
-    action: Option<&AutomationAction>,
-    config: &ResolvedConfig,
-    result: &mut ValidationResult,
-) {
+fn validate_action(action: Option<&AutomationAction>, config: &ResolvedConfig, result: &mut ValidationResult) {
     let Some(action) = action else {
         return;
     };
@@ -210,10 +162,7 @@ fn validate_action(
                 SetEnumField::Priority => "priority",
                 SetEnumField::Type => "type",
             };
-            result.add_error(ValidationError::warning(
-                Some("automation".to_string()),
-                format!("Automation action sets unknown {} '{}'.", label, value),
-            ));
+            result.add_error(ValidationError::warning(Some("automation".to_string()), format!("Automation action sets unknown {} '{}'.", label, value)));
         }
     }
 
@@ -223,10 +172,7 @@ fn validate_action(
             AutomationRunAction::Command(command) => command.command.trim(),
         };
         if trimmed.is_empty() {
-            result.add_error(ValidationError::warning(
-                Some("automation".to_string()),
-                "Automation run command cannot be empty.".to_string(),
-            ));
+            result.add_error(ValidationError::warning(Some("automation".to_string()), "Automation run command cannot be empty.".to_string()));
         }
     }
 }
@@ -246,14 +192,7 @@ mod tests {
         let result = validate(
             "automation:\n  rules:\n    - when:\n        title:\n          matches: '(unclosed'\n      on:\n        updated:\n          add_tags: [x]\n",
         );
-        assert!(
-            result
-                .errors
-                .iter()
-                .any(|error| error.to_string().contains("invalid pattern '(unclosed'")),
-            "{:?}",
-            result.errors
-        );
+        assert!(result.errors.iter().any(|error| error.to_string().contains("invalid pattern '(unclosed'")), "{:?}", result.errors);
         let ok = validate(
             "automation:\n  rules:\n    - when:\n        title:\n          matches: '^\\p{L}+ \\w+$'\n      on:\n        updated:\n          add_tags: [x]\n",
         );
@@ -264,8 +203,7 @@ mod tests {
     /// automation) keep after trimming the regex crate's tables.
     #[test]
     fn unicode_support_in_user_patterns() {
-        let matches =
-            |pattern: &str, text: &str| regex::Regex::new(pattern).unwrap().is_match(text);
+        let matches = |pattern: &str, text: &str| regex::Regex::new(pattern).unwrap().is_match(text);
         // Every script works with \w, \b, case folding and general categories.
         assert!(matches(r"^\w+$", "Größe"));
         assert!(matches(r"^\w+$", "задача"));

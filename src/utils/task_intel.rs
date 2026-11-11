@@ -29,9 +29,7 @@ pub struct InferencePaused {
 
 impl InferencePaused {
     pub fn new() -> Self {
-        Self {
-            previous: INFERENCE_PAUSED.with(|paused| paused.replace(true)),
-        }
+        Self { previous: INFERENCE_PAUSED.with(|paused| paused.replace(true)) }
     }
 }
 
@@ -62,28 +60,13 @@ impl BranchContext {
         };
         let branch = crate::utils::git::read_current_branch(&repo_root)?;
         let branch_lower = branch.to_lowercase();
-        let first_segment = branch_lower
-            .split('/')
-            .next()
-            .unwrap_or(&branch_lower)
-            .to_string();
-        let primary_token = first_segment
-            .split(['-', '_'])
-            .next()
-            .unwrap_or(&first_segment)
-            .to_string();
-        Some(Self {
-            branch_lower,
-            first_segment,
-            primary_token,
-        })
+        let first_segment = branch_lower.split('/').next().unwrap_or(&branch_lower).to_string();
+        let primary_token = first_segment.split(['-', '_']).next().unwrap_or(&first_segment).to_string();
+        Some(Self { branch_lower, first_segment, primary_token })
     }
 }
 
-fn alias_lookup<T: Clone>(
-    map: &std::collections::BTreeMap<String, T>,
-    candidate: &str,
-) -> Option<T> {
+fn alias_lookup<T: Clone>(map: &std::collections::BTreeMap<String, T>, candidate: &str) -> Option<T> {
     if map.is_empty() {
         return None;
     }
@@ -98,17 +81,10 @@ fn alias_lookup<T: Clone>(
     map.iter()
         .find(|(key, _)| key.trim().eq_ignore_ascii_case(trimmed))
         .map(|(_, value)| value.clone())
-        .or_else(|| {
-            map.iter()
-                .find(|(key, _)| key.trim().to_ascii_lowercase() == needle)
-                .map(|(_, value)| value.clone())
-        })
+        .or_else(|| map.iter().find(|(key, _)| key.trim().to_ascii_lowercase() == needle).map(|(_, value)| value.clone()))
 }
 
-fn alias_prefix_match<T: Clone>(
-    map: &std::collections::BTreeMap<String, T>,
-    branch_lower: &str,
-) -> Option<T> {
+fn alias_prefix_match<T: Clone>(map: &std::collections::BTreeMap<String, T>, branch_lower: &str) -> Option<T> {
     if map.is_empty() {
         return None;
     }
@@ -163,9 +139,7 @@ pub fn infer_task_type_from_branch(config: &ResolvedConfig) -> Option<TaskType> 
     match ctx.primary_token.as_str() {
         "feat" | "feature" => TaskType::parse_with_config("Feature", config).ok(),
         "fix" | "bugfix" | "hotfix" => TaskType::parse_with_config("Bug", config).ok(),
-        "chore" | "docs" | "refactor" | "test" | "perf" => {
-            TaskType::parse_with_config("Chore", config).ok()
-        }
+        "chore" | "docs" | "refactor" | "test" | "perf" => TaskType::parse_with_config("Chore", config).ok(),
         _ => None,
     }
 }
@@ -209,10 +183,7 @@ pub fn auto_tag_from_path(config: &ResolvedConfig) -> Option<String> {
     if let Some(tasks_dir) = WORKSPACE_ROOT.get()
         && let Some(repo_root) = crate::utils::git::find_repo_root(tasks_dir)
         && let Ok(cwd) = std::env::current_dir()
-        && !cwd
-            .canonicalize()
-            .unwrap_or(cwd)
-            .starts_with(repo_root.canonicalize().unwrap_or(repo_root))
+        && !cwd.canonicalize().unwrap_or(cwd).starts_with(repo_root.canonicalize().unwrap_or(repo_root))
     {
         return None;
     }

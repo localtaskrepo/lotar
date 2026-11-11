@@ -23,10 +23,7 @@ use std::time::{Duration, SystemTime};
 use tempfile::TempDir;
 
 fn resolver_for(path: &Path) -> TasksDirectoryResolver {
-    TasksDirectoryResolver {
-        path: path.to_path_buf(),
-        source: TasksDirectorySource::CurrentDirectory,
-    }
+    TasksDirectoryResolver { path: path.to_path_buf(), source: TasksDirectorySource::CurrentDirectory }
 }
 
 fn ensure_tasks_dir(root: &Path) -> std::path::PathBuf {
@@ -36,10 +33,7 @@ fn ensure_tasks_dir(root: &Path) -> std::path::PathBuf {
 }
 
 fn map(entries: &[(&str, &str)]) -> BTreeMap<String, String> {
-    entries
-        .iter()
-        .map(|(k, v)| (k.to_string(), v.to_string()))
-        .collect()
+    entries.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
 }
 
 fn run_cli(cwd: &Path, args: &[&str]) -> (bool, String) {
@@ -58,24 +52,11 @@ fn file_state(path: &Path) -> (Vec<u8>, SystemTime) {
     (bytes, mtime)
 }
 
-fn apply(
-    tasks_dir: &Path,
-    scope: &ConfigScope,
-    entries: &[(&str, &str)],
-    force: bool,
-    dry_run: bool,
-) -> candidate::ConfigSetResult {
+fn apply(tasks_dir: &Path, scope: &ConfigScope, entries: &[(&str, &str)], force: bool, dry_run: bool) -> candidate::ConfigSetResult {
     candidate::apply_config_set(
         tasks_dir,
         scope,
-        &ConfigSetRequest {
-            entries: entries
-                .iter()
-                .map(|(k, v)| (k.to_string(), v.to_string()))
-                .collect(),
-            force,
-            dry_run,
-        },
+        &ConfigSetRequest { entries: entries.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(), force, dry_run },
     )
     .expect("candidate pipeline should accept the request")
 }
@@ -91,40 +72,20 @@ fn dev102_service_same_value_multifield_global_noop() {
     let resolver = resolver_for(&tasks_dir);
     let config_path = tasks_dir.join("config.yml");
 
-    let seed = ConfigService::set(
-        &resolver,
-        &map(&[("default_assignee", "alice"), ("default_reporter", "bob")]),
-        true,
-        None,
-    )
-    .expect("seed global values");
+    let seed = ConfigService::set(&resolver, &map(&[("default_assignee", "alice"), ("default_reporter", "bob")]), true, None).expect("seed global values");
     assert!(seed.updated, "seeding absent fields is a real change");
     let before = file_state(&config_path);
 
     // Re-sending the exact same multi-field request is a no-op.
-    let noop = ConfigService::set(
-        &resolver,
-        &map(&[("default_assignee", "alice"), ("default_reporter", "bob")]),
-        true,
-        None,
-    )
-    .expect("same-value request must stay accepted");
+    let noop = ConfigService::set(&resolver, &map(&[("default_assignee", "alice"), ("default_reporter", "bob")]), true, None)
+        .expect("same-value request must stay accepted");
     assert!(!noop.updated, "same values must not report updated");
     let after = file_state(&config_path);
     assert_eq!(before.0, after.0, "no-op must preserve global bytes");
-    assert_eq!(
-        before.1, after.1,
-        "no-op must preserve the global config mtime (no rewrite)"
-    );
+    assert_eq!(before.1, after.1, "no-op must preserve the global config mtime (no rewrite)");
 
     // Control: a genuinely different value still writes.
-    let real = ConfigService::set(
-        &resolver,
-        &map(&[("default_assignee", "carol"), ("default_reporter", "bob")]),
-        true,
-        None,
-    )
-    .expect("real change must apply");
+    let real = ConfigService::set(&resolver, &map(&[("default_assignee", "carol"), ("default_reporter", "bob")]), true, None).expect("real change must apply");
     assert!(real.updated, "changed value must report updated");
     assert_ne!(before.0, fs::read(&config_path).unwrap());
 }
@@ -136,30 +97,16 @@ fn dev102_service_same_value_project_noop() {
     let resolver = resolver_for(&tasks_dir);
     let config_path = tasks_dir.join("ENG/config.yml");
 
-    let seed = ConfigService::set(
-        &resolver,
-        &map(&[("issue_states", "Todo,Done")]),
-        false,
-        Some("ENG"),
-    )
-    .expect("seed project override");
+    let seed = ConfigService::set(&resolver, &map(&[("issue_states", "Todo,Done")]), false, Some("ENG")).expect("seed project override");
     assert!(seed.updated);
     let before = file_state(&config_path);
 
-    let noop = ConfigService::set(
-        &resolver,
-        &map(&[("issue_states", "Todo,Done")]),
-        false,
-        Some("ENG"),
-    )
-    .expect("same-value project request must stay accepted");
+    let noop =
+        ConfigService::set(&resolver, &map(&[("issue_states", "Todo,Done")]), false, Some("ENG")).expect("same-value project request must stay accepted");
     assert!(!noop.updated, "same project values must not report updated");
     let after = file_state(&config_path);
     assert_eq!(before.0, after.0, "no-op must preserve project bytes");
-    assert_eq!(
-        before.1, after.1,
-        "no-op must preserve the project config mtime (no rewrite)"
-    );
+    assert_eq!(before.1, after.1, "no-op must preserve the project config mtime (no rewrite)");
 }
 
 #[test]
@@ -171,30 +118,20 @@ fn dev102_service_clear_absent_override_is_noop_and_real_clear_writes() {
 
     // The project config exists (with a member override) but never carried
     // an issue_states override: clearing it changes nothing.
-    ConfigService::set(&resolver, &map(&[("members", "alice")]), false, Some("ENG"))
-        .expect("seed unrelated project override");
+    ConfigService::set(&resolver, &map(&[("members", "alice")]), false, Some("ENG")).expect("seed unrelated project override");
     let before = file_state(&config_path);
 
-    let noop = ConfigService::set(&resolver, &map(&[("issue_states", "")]), false, Some("ENG"))
-        .expect("clearing an absent override must stay accepted");
+    let noop = ConfigService::set(&resolver, &map(&[("issue_states", "")]), false, Some("ENG")).expect("clearing an absent override must stay accepted");
     assert!(!noop.updated, "clearing a non-existent override is a no-op");
     let after = file_state(&config_path);
     assert_eq!(before.0, after.0, "absent-clear must preserve bytes");
     assert_eq!(before.1, after.1, "absent-clear must preserve mtime");
 
     // Control: clearing an override that DOES exist is a real change.
-    ConfigService::set(
-        &resolver,
-        &map(&[("issue_states", "Todo,Done")]),
-        false,
-        Some("ENG"),
-    )
-    .expect("seed states override");
-    let real = ConfigService::set(&resolver, &map(&[("issue_states", "")]), false, Some("ENG"))
-        .expect("real clear must apply");
+    ConfigService::set(&resolver, &map(&[("issue_states", "Todo,Done")]), false, Some("ENG")).expect("seed states override");
+    let real = ConfigService::set(&resolver, &map(&[("issue_states", "")]), false, Some("ENG")).expect("real clear must apply");
     assert!(real.updated, "clearing an existing override writes");
-    let cleared =
-        lotar::config::persistence::load_project_config_from_dir("ENG", &tasks_dir).unwrap();
+    let cleared = lotar::config::persistence::load_project_config_from_dir("ENG", &tasks_dir).unwrap();
     assert!(cleared.issue_states.is_none(), "override removed");
 }
 
@@ -216,33 +153,14 @@ fn dev102_candidate_explicit_override_equal_to_inherited_default_is_real_change(
     apply(&tasks_dir, &scope, &[("members", "alice")], false, false);
     let inherited = "Todo,InProgress,NeedsReview,Done";
 
-    let first = apply(
-        &tasks_dir,
-        &scope,
-        &[("issue_states", inherited)],
-        false,
-        false,
-    );
-    assert!(
-        first.updated,
-        "explicit override equal to the inherited default is a genuine change"
-    );
-    let stored =
-        lotar::config::persistence::load_project_config_from_dir("ENG", &tasks_dir).unwrap();
-    assert!(
-        stored.issue_states.is_some(),
-        "explicit override persisted: {stored:?}"
-    );
+    let first = apply(&tasks_dir, &scope, &[("issue_states", inherited)], false, false);
+    assert!(first.updated, "explicit override equal to the inherited default is a genuine change");
+    let stored = lotar::config::persistence::load_project_config_from_dir("ENG", &tasks_dir).unwrap();
+    assert!(stored.issue_states.is_some(), "explicit override persisted: {stored:?}");
 
     // Re-sending the same explicit override is now the no-op case.
     let before = file_state(&config_path);
-    let second = apply(
-        &tasks_dir,
-        &scope,
-        &[("issue_states", inherited)],
-        false,
-        false,
-    );
+    let second = apply(&tasks_dir, &scope, &[("issue_states", inherited)], false, false);
     assert!(!second.updated, "identical re-send is a no-op");
     let after = file_state(&config_path);
     assert_eq!(before.0, after.0);
@@ -257,31 +175,16 @@ fn dev102_candidate_explicit_pin_of_builtin_port_is_change_then_noop() {
     let config_path = tasks_dir.join("config.yml");
 
     // Seed a global config WITHOUT a server.port pin.
-    apply(
-        &tasks_dir,
-        &scope,
-        &[("default_assignee", "alice")],
-        false,
-        false,
-    );
+    apply(&tasks_dir, &scope, &[("default_assignee", "alice")], false, false);
     let seeded = fs::read_to_string(&config_path).unwrap();
-    assert!(
-        !seeded.contains("port:"),
-        "seed must not carry a port pin: {seeded}"
-    );
+    assert!(!seeded.contains("port:"), "seed must not carry a port pin: {seeded}");
 
     // Pinning the built-in default port is a provenance change: the raw
     // file gains the explicit pin even though the value equals the default.
     let pin = apply(&tasks_dir, &scope, &[("server_port", "8080")], false, false);
-    assert!(
-        pin.updated,
-        "explicit pin of the default port must be a real change"
-    );
+    assert!(pin.updated, "explicit pin of the default port must be a real change");
     let pinned = fs::read_to_string(&config_path).unwrap();
-    assert!(
-        pinned.contains("port: 8080"),
-        "pin must be stored: {pinned}"
-    );
+    assert!(pinned.contains("port: 8080"), "pin must be stored: {pinned}");
 
     // Re-pinning the same stored port is a no-op.
     let before = file_state(&config_path);
@@ -298,28 +201,13 @@ fn dev102_candidate_global_noop_never_populates_builtin_port() {
     let tasks_dir = ensure_tasks_dir(tmp.path());
     let scope = ConfigScope::Global;
 
-    apply(
-        &tasks_dir,
-        &scope,
-        &[("default_assignee", "alice")],
-        false,
-        false,
-    );
+    apply(&tasks_dir, &scope, &[("default_assignee", "alice")], false, false);
     // Same-value no-op on a file without a pin: nothing may inject the
     // built-in port (ServerPortSaveIntent::PreserveExisting semantics).
-    let noop = apply(
-        &tasks_dir,
-        &scope,
-        &[("default_assignee", "alice")],
-        false,
-        false,
-    );
+    let noop = apply(&tasks_dir, &scope, &[("default_assignee", "alice")], false, false);
     assert!(!noop.updated);
     let config = fs::read_to_string(tasks_dir.join("config.yml")).unwrap();
-    assert!(
-        !config.contains("port:"),
-        "no-op must not populate the builtin port: {config}"
-    );
+    assert!(!config.contains("port:"), "no-op must not populate the builtin port: {config}");
 }
 
 // ---------------------------------------------------------------------------
@@ -333,22 +221,10 @@ fn dev102_candidate_dryrun_real_change_preserves_bytes_and_mtime() {
     let scope = ConfigScope::Global;
     let config_path = tasks_dir.join("config.yml");
 
-    apply(
-        &tasks_dir,
-        &scope,
-        &[("default_assignee", "alice")],
-        false,
-        false,
-    );
+    apply(&tasks_dir, &scope, &[("default_assignee", "alice")], false, false);
     let before = file_state(&config_path);
 
-    let dry = apply(
-        &tasks_dir,
-        &scope,
-        &[("default_assignee", "zoe")],
-        false,
-        true,
-    );
+    let dry = apply(&tasks_dir, &scope, &[("default_assignee", "zoe")], false, true);
     assert!(!dry.updated, "dry runs never report updated");
     let after = file_state(&config_path);
     assert_eq!(before.0, after.0, "dry-run preserves bytes");
@@ -364,23 +240,13 @@ fn dev102_candidate_force_cannot_escape_schema_errors() {
     let err = match candidate::apply_config_set(
         &tasks_dir,
         &scope,
-        &ConfigSetRequest {
-            entries: vec![("server_port".to_string(), "not-a-port".to_string())],
-            force: true,
-            dry_run: false,
-        },
+        &ConfigSetRequest { entries: vec![("server_port".to_string(), "not-a-port".to_string())], force: true, dry_run: false },
     ) {
         Err(err) => err,
         Ok(_) => panic!("force must not bypass schema validation"),
     };
-    assert!(
-        err.to_string().contains("Invalid port"),
-        "schema error surfaced: {err}"
-    );
-    assert!(
-        !tasks_dir.join("config.yml").exists(),
-        "rejected forced set must not write"
-    );
+    assert!(err.to_string().contains("Invalid port"), "schema error surfaced: {err}");
+    assert!(!tasks_dir.join("config.yml").exists(), "rejected forced set must not write");
 }
 
 #[test]
@@ -395,19 +261,12 @@ fn dev102_noop_shaped_request_still_rejects_malformed_current_config() {
     let err = match candidate::apply_config_set(
         &tasks_dir,
         &ConfigScope::Global,
-        &ConfigSetRequest {
-            entries: vec![("default_assignee".to_string(), "alice".to_string())],
-            force: false,
-            dry_run: false,
-        },
+        &ConfigSetRequest { entries: vec![("default_assignee".to_string(), "alice".to_string())], force: false, dry_run: false },
     ) {
         Err(err) => err,
         Ok(_) => panic!("malformed current config must block even no-op-shaped sets"),
     };
-    assert!(
-        err.to_string().contains("Malformed global config"),
-        "malformed config surfaced: {err}"
-    );
+    assert!(err.to_string().contains("Malformed global config"), "malformed config surfaced: {err}");
     let after = fs::read_to_string(tasks_dir.join("config.yml")).unwrap();
     assert_eq!(after, broken, "rejected request preserves bytes exactly");
 }
@@ -435,9 +294,7 @@ fn rest_set(values: serde_json::Value, global: bool) -> (u16, serde_json::Value)
 }
 
 fn next_config_event(rx: &std::sync::mpsc::Receiver<api_events::ApiEvent>) -> Option<String> {
-    rx.recv_timeout(Duration::from_millis(500))
-        .ok()
-        .map(|event| event.kind)
+    rx.recv_timeout(Duration::from_millis(500)).ok().map(|event| event.kind)
 }
 
 #[test]
@@ -447,27 +304,14 @@ fn dev102_rest_noop_reports_updated_false_and_emits_no_event() {
     let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
 
     let resolver = resolver_for(&tasks_dir);
-    ConfigService::set(
-        &resolver,
-        &map(&[("default_assignee", "alice")]),
-        true,
-        None,
-    )
-    .expect("seed global value");
+    ConfigService::set(&resolver, &map(&[("default_assignee", "alice")]), true, None).expect("seed global value");
     let before = file_state(&tasks_dir.join("config.yml"));
 
     let rx = api_events::subscribe();
     let (status, body) = rest_set(serde_json::json!({"default_assignee": "alice"}), true);
     assert_eq!(status, 200, "no-op stays a success: {body}");
-    assert_eq!(
-        body.get("data").and_then(|d| d.get("updated")),
-        Some(&serde_json::json!(false)),
-        "existing shape reports updated:false: {body}"
-    );
-    assert!(
-        next_config_event(&rx).is_none(),
-        "no-op must not emit config_updated"
-    );
+    assert_eq!(body.get("data").and_then(|d| d.get("updated")), Some(&serde_json::json!(false)), "existing shape reports updated:false: {body}");
+    assert!(next_config_event(&rx).is_none(), "no-op must not emit config_updated");
     let after = file_state(&tasks_dir.join("config.yml"));
     assert_eq!(before.0, after.0, "REST no-op preserves bytes");
     assert_eq!(before.1, after.1, "REST no-op preserves mtime");
@@ -475,15 +319,8 @@ fn dev102_rest_noop_reports_updated_false_and_emits_no_event() {
     // Control: a genuine change emits exactly one config_updated.
     let (status, body) = rest_set(serde_json::json!({"default_assignee": "carol"}), true);
     assert_eq!(status, 200);
-    assert_eq!(
-        body.get("data").and_then(|d| d.get("updated")),
-        Some(&serde_json::json!(true))
-    );
-    assert_eq!(
-        next_config_event(&rx).as_deref(),
-        Some("config_updated"),
-        "real change must emit config_updated"
-    );
+    assert_eq!(body.get("data").and_then(|d| d.get("updated")), Some(&serde_json::json!(true)));
+    assert_eq!(next_config_event(&rx).as_deref(), Some("config_updated"), "real change must emit config_updated");
 }
 
 #[test]
@@ -495,19 +332,9 @@ fn dev102_rest_empty_values_updated_false_no_event() {
     let rx = api_events::subscribe();
     let (status, body) = rest_set(serde_json::json!({}), true);
     assert_eq!(status, 200, "empty entries keep the existing shape: {body}");
-    assert_eq!(
-        body.get("data").and_then(|d| d.get("updated")),
-        Some(&serde_json::json!(false)),
-        "empty entries report updated:false: {body}"
-    );
-    assert!(
-        next_config_event(&rx).is_none(),
-        "empty entries must not emit config_updated"
-    );
-    assert!(
-        !tasks_dir.join("config.yml").exists(),
-        "empty entries must not create artifacts"
-    );
+    assert_eq!(body.get("data").and_then(|d| d.get("updated")), Some(&serde_json::json!(false)), "empty entries report updated:false: {body}");
+    assert!(next_config_event(&rx).is_none(), "empty entries must not emit config_updated");
+    assert!(!tasks_dir.join("config.yml").exists(), "empty entries must not create artifacts");
 }
 
 // ---------------------------------------------------------------------------
@@ -517,18 +344,12 @@ fn dev102_rest_empty_values_updated_false_no_event() {
 #[test]
 fn dev102_cli_same_value_preserves_bytes_and_mtime() {
     let tmp = TempDir::new().unwrap();
-    let (ok, output) = run_cli(
-        tmp.path(),
-        &["config", "set", "default_assignee", "alice", "--global"],
-    );
+    let (ok, output) = run_cli(tmp.path(), &["config", "set", "default_assignee", "alice", "--global"]);
     assert!(ok, "seed CLI set: {output}");
     let config_path = tmp.path().join(".tasks/config.yml");
     let before = file_state(&config_path);
 
-    let (ok, output) = run_cli(
-        tmp.path(),
-        &["config", "set", "default_assignee", "alice", "--global"],
-    );
+    let (ok, output) = run_cli(tmp.path(), &["config", "set", "default_assignee", "alice", "--global"]);
     assert!(ok, "same-value CLI set stays a success: {output}");
     let after = file_state(&config_path);
     assert_eq!(before.0, after.0, "CLI no-op preserves bytes");
@@ -542,13 +363,7 @@ fn dev102_mcp_same_value_preserves_bytes_and_mtime() {
     let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
 
     let resolver = resolver_for(&tasks_dir);
-    ConfigService::set(
-        &resolver,
-        &map(&[("default_assignee", "alice")]),
-        true,
-        None,
-    )
-    .expect("seed global value");
+    ConfigService::set(&resolver, &map(&[("default_assignee", "alice")]), true, None).expect("seed global value");
     let before = file_state(&tasks_dir.join("config.yml"));
 
     let line = serde_json::to_string(&serde_json::json!({
@@ -561,18 +376,10 @@ fn dev102_mcp_same_value_preserves_bytes_and_mtime() {
         }
     }))
     .unwrap();
-    let resp: serde_json::Value =
-        serde_json::from_str(&lotar::mcp::server::handle_json_line(&line)).unwrap();
-    assert!(
-        resp.get("error").is_none(),
-        "same-value MCP set must succeed: {resp}"
-    );
+    let resp: serde_json::Value = serde_json::from_str(&lotar::mcp::server::handle_json_line(&line)).unwrap();
+    assert!(resp.get("error").is_none(), "same-value MCP set must succeed: {resp}");
     let result = resp.get("result").cloned().unwrap_or_default();
-    assert_ne!(
-        result.get("isError"),
-        Some(&serde_json::json!(true)),
-        "no-op is not a tool failure: {resp}"
-    );
+    assert_ne!(result.get("isError"), Some(&serde_json::json!(true)), "no-op is not a tool failure: {resp}");
     let after = file_state(&tasks_dir.join("config.yml"));
     assert_eq!(before.0, after.0, "MCP no-op preserves bytes");
     assert_eq!(before.1, after.1, "MCP no-op preserves mtime");
@@ -586,19 +393,13 @@ fn dev134_cli_same_value_reports_no_change() {
     let tasks_dir = ensure_tasks_dir(tmp.path());
     let (ok, first) = run_cli(tmp.path(), &["config", "set", "server.port", "9123"]);
     assert!(ok, "{first}");
-    assert!(
-        first.contains("Successfully updated server_port"),
-        "{first}"
-    );
+    assert!(first.contains("Successfully updated server_port"), "{first}");
     let path = tasks_dir.join("config.yml");
     let before = file_state(&path);
 
     let (ok, second) = run_cli(tmp.path(), &["config", "set", "server_port", "9123"]);
     assert!(ok, "{second}");
-    assert!(
-        second.contains("server_port is already set to 9123; nothing changed"),
-        "{second}"
-    );
+    assert!(second.contains("server_port is already set to 9123; nothing changed"), "{second}");
     assert!(!second.contains("Successfully updated"), "{second}");
     assert_eq!(file_state(&path), before, "no-op must not rewrite the file");
 }

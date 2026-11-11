@@ -52,33 +52,23 @@ impl IntegrityCheck {
         }
         Some(crate::api_types::SprintIntegrityDiagnostics {
             missing_sprints: self.after.missing_sprints.clone(),
-            tasks_with_missing: (self.before.tasks_with_missing > 0)
-                .then_some(self.before.tasks_with_missing),
-            auto_cleanup: self.cleanup.as_ref().map(|outcome| {
-                crate::api_types::SprintCleanupSummary {
-                    removed_references: outcome.removed_references,
-                    updated_tasks: outcome.updated_tasks,
-                    removed_by_sprint: outcome
-                        .removed_by_sprint
-                        .iter()
-                        .map(|metric| crate::api_types::SprintCleanupMetric {
-                            sprint_id: metric.sprint_id,
-                            count: metric.count,
-                        })
-                        .collect(),
-                    remaining_missing: outcome.remaining_missing.clone(),
-                }
+            tasks_with_missing: (self.before.tasks_with_missing > 0).then_some(self.before.tasks_with_missing),
+            auto_cleanup: self.cleanup.as_ref().map(|outcome| crate::api_types::SprintCleanupSummary {
+                removed_references: outcome.removed_references,
+                updated_tasks: outcome.updated_tasks,
+                removed_by_sprint: outcome
+                    .removed_by_sprint
+                    .iter()
+                    .map(|metric| crate::api_types::SprintCleanupMetric { sprint_id: metric.sprint_id, count: metric.count })
+                    .collect(),
+                remaining_missing: outcome.remaining_missing.clone(),
             }),
         })
     }
 
     /// A check without cleanup (read-only callers).
     pub fn unchanged(report: MissingSprintReport) -> Self {
-        Self {
-            after: report.clone(),
-            before: report,
-            cleanup: None,
-        }
+        Self { after: report.clone(), before: report, cleanup: None }
     }
 }
 
@@ -86,23 +76,14 @@ impl IntegrityCheck {
 /// and check again. Without a `target` the cleanup only runs when something
 /// is missing; with a target (a just-deleted sprint) it always runs for that
 /// sprint. The one implementation used by REST, CLI and MCP (DEV-173).
-pub fn check_missing_sprints(
-    storage: &mut Storage,
-    records: &mut Vec<SprintRecord>,
-    cleanup: bool,
-    target: Option<u32>,
-) -> LoTaRResult<IntegrityCheck> {
+pub fn check_missing_sprints(storage: &mut Storage, records: &mut Vec<SprintRecord>, cleanup: bool, target: Option<u32>) -> LoTaRResult<IntegrityCheck> {
     let before = detect_missing_sprints(storage, records);
     if !cleanup || (target.is_none() && before.missing_sprints.is_empty()) {
         return Ok(IntegrityCheck::unchanged(before));
     }
     let outcome = cleanup_missing_sprint_refs(storage, records, target)?;
     let after = detect_missing_sprints(storage, records);
-    Ok(IntegrityCheck {
-        before,
-        after,
-        cleanup: Some(outcome),
-    })
+    Ok(IntegrityCheck { before, after, cleanup: Some(outcome) })
 }
 
 pub fn detect_missing_sprints(storage: &Storage, records: &[SprintRecord]) -> MissingSprintReport {
@@ -110,18 +91,11 @@ pub fn detect_missing_sprints(storage: &Storage, records: &[SprintRecord]) -> Mi
     // Integrity scans include tombstones (DEV-92): a deleted task's sprint
     // references are still stored invariants and must be reported (and
     // locked for) exactly like active ones.
-    let tasks = storage.search(&TaskFilter {
-        deletion: DeletionFilter::All,
-        ..Default::default()
-    });
+    let tasks = storage.search(&TaskFilter { deletion: DeletionFilter::All, ..Default::default() });
     build_missing_report(&tasks, &existing_ids)
 }
 
-pub fn cleanup_missing_sprint_refs(
-    storage: &mut Storage,
-    records: &mut Vec<SprintRecord>,
-    target: Option<u32>,
-) -> LoTaRResult<SprintCleanupOutcome> {
+pub fn cleanup_missing_sprint_refs(storage: &mut Storage, records: &mut Vec<SprintRecord>, target: Option<u32>) -> LoTaRResult<SprintCleanupOutcome> {
     // Coordinated transaction (DEV-55): all task edits and sprint membership
     // writes in one staged commit. The pre-scan only picks candidate project
     // directories for the initial lock set; the authoritative project set is
@@ -131,16 +105,11 @@ pub fn cleanup_missing_sprint_refs(
     // are only written back after a successful commit.
     let mut locked_projects: BTreeSet<String> = {
         let mut projects: BTreeSet<String> = BTreeSet::new();
-        for (task_id, task) in storage.search(&TaskFilter {
-            deletion: DeletionFilter::All,
-            ..Default::default()
-        }) {
+        for (task_id, task) in storage.search(&TaskFilter { deletion: DeletionFilter::All, ..Default::default() }) {
             if TaskService::normalize_sprint_ids(&task.sprints).is_empty() {
                 continue;
             }
-            if let Some(prefix) =
-                crate::storage::operations::StorageOperations::get_project_for_task(&task_id)
-            {
+            if let Some(prefix) = crate::storage::operations::StorageOperations::get_project_for_task(&task_id) {
                 projects.insert(prefix);
             }
         }
@@ -151,15 +120,9 @@ pub fn cleanup_missing_sprint_refs(
     let mut last_coverage_err = None;
     for _attempt in 0..MAX_LOCK_EXTENSION_ATTEMPTS {
         let candidate_projects: Vec<String> = locked_projects.iter().cloned().collect();
-        let txn = crate::storage::transaction::MultiFileTransaction::begin(
-            &storage.root_path,
-            &candidate_projects,
-        )?;
+        let txn = crate::storage::transaction::MultiFileTransaction::begin(&storage.root_path, &candidate_projects)?;
         let fresh_records = crate::services::sprint_service::SprintService::list(storage)?;
-        let tasks_snapshot = storage.search(&TaskFilter {
-            deletion: DeletionFilter::All,
-            ..Default::default()
-        });
+        let tasks_snapshot = storage.search(&TaskFilter { deletion: DeletionFilter::All, ..Default::default() });
 
         // Authoritative coverage check under the locks: every project that
         // still holds sprint references must be locked, otherwise abort this
@@ -169,9 +132,7 @@ pub fn cleanup_missing_sprint_refs(
             if TaskService::normalize_sprint_ids(&task.sprints).is_empty() {
                 continue;
             }
-            if let Some(prefix) =
-                crate::storage::operations::StorageOperations::get_project_for_task(task_id)
-            {
+            if let Some(prefix) = crate::storage::operations::StorageOperations::get_project_for_task(task_id) {
                 observed.insert(prefix);
             }
         }
@@ -187,20 +148,9 @@ pub fn cleanup_missing_sprint_refs(
             return Err(last_coverage_err.expect("coverage error checked above"));
         }
 
-        return cleanup_under_transaction(
-            storage,
-            records,
-            target,
-            txn,
-            fresh_records,
-            tasks_snapshot,
-        );
+        return cleanup_under_transaction(storage, records, target, txn, fresh_records, tasks_snapshot);
     }
-    Err(last_coverage_err.unwrap_or_else(|| {
-        LoTaRError::ValidationError(
-            "Sprint cleanup could not stabilize its project lock set; retry the operation".into(),
-        )
-    }))
+    Err(last_coverage_err.unwrap_or_else(|| LoTaRError::ValidationError("Sprint cleanup could not stabilize its project lock set; retry the operation".into())))
 }
 
 fn cleanup_under_transaction(
@@ -248,12 +198,7 @@ fn cleanup_under_transaction(
             }
         }
 
-        let touched = TaskService::apply_memberships_to_records(
-            &storage.root_path,
-            working_records.as_mut_slice(),
-            &task_id,
-            &desired,
-        )?;
+        let touched = TaskService::apply_memberships_to_records(&storage.root_path, working_records.as_mut_slice(), &task_id, &desired)?;
         touched_sprints.extend(touched);
 
         if removed_for_task.is_empty() {
@@ -267,41 +212,23 @@ fn cleanup_under_transaction(
 
         task.sprints = desired.into_iter().collect();
         task.modified = Utc::now().to_rfc3339();
-        let project_prefix =
-            crate::storage::operations::StorageOperations::get_project_for_task(&task_id)
-                .unwrap_or_default();
+        let project_prefix = crate::storage::operations::StorageOperations::get_project_for_task(&task_id).unwrap_or_default();
         let project_path = storage.root_path.join(&project_prefix);
-        let (file_path, file_string) =
-            crate::storage::operations::StorageOperations::prepare_task_edit(
-                &project_path,
-                &task_id,
-                &task,
-            )
+        let (file_path, file_string) = crate::storage::operations::StorageOperations::prepare_task_edit(&project_path, &task_id, &task)
             .map_err(crate::storage::manager::map_storage_error)?;
         txn.stage(&file_path, file_string)?;
         updated_tasks += 1;
     }
 
-    TaskService::stage_sprint_records(
-        &mut txn,
-        &storage.root_path,
-        &working_records,
-        &touched_sprints,
-    )?;
+    TaskService::stage_sprint_records(&mut txn, &storage.root_path, &working_records, &touched_sprints)?;
     txn.commit()?;
     // Only a committed outcome updates the caller's snapshot (review L4).
     *records = working_records;
 
-    let refreshed_tasks = storage.search(&TaskFilter {
-        deletion: DeletionFilter::All,
-        ..Default::default()
-    });
+    let refreshed_tasks = storage.search(&TaskFilter { deletion: DeletionFilter::All, ..Default::default() });
     let remaining_report = build_missing_report(&refreshed_tasks, &existing_ids);
 
-    let removed_by_sprint_vec = removed_by_sprint
-        .into_iter()
-        .map(|(sprint_id, count)| SprintMissingReference { sprint_id, count })
-        .collect();
+    let removed_by_sprint_vec = removed_by_sprint.into_iter().map(|(sprint_id, count)| SprintMissingReference { sprint_id, count }).collect();
 
     Ok(SprintCleanupOutcome {
         scanned_tasks: report.scanned_tasks,
@@ -314,10 +241,7 @@ fn cleanup_under_transaction(
     })
 }
 
-fn build_missing_report(
-    tasks: &[(String, Task)],
-    existing_ids: &HashSet<u32>,
-) -> MissingSprintReport {
+fn build_missing_report(tasks: &[(String, Task)], existing_ids: &HashSet<u32>) -> MissingSprintReport {
     let scanned_tasks = tasks.len();
     let mut reference_counts: BTreeMap<u32, usize> = BTreeMap::new();
     let mut tasks_with_missing = 0usize;
@@ -336,18 +260,7 @@ fn build_missing_report(
     }
 
     let missing_sprints: Vec<u32> = reference_counts.keys().copied().collect();
-    let reference_counts_vec = reference_counts
-        .into_iter()
-        .map(|(sprint_id, references)| SprintMissingReference {
-            sprint_id,
-            count: references,
-        })
-        .collect();
+    let reference_counts_vec = reference_counts.into_iter().map(|(sprint_id, references)| SprintMissingReference { sprint_id, count: references }).collect();
 
-    MissingSprintReport {
-        scanned_tasks,
-        tasks_with_missing,
-        missing_sprints,
-        reference_counts: reference_counts_vec,
-    }
+    MissingSprintReport { scanned_tasks, tasks_with_missing, missing_sprints, reference_counts: reference_counts_vec }
 }

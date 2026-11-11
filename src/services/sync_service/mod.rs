@@ -14,14 +14,10 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use crate::api_types::{
-    SyncReport, SyncReportEntry, SyncReportMeta, SyncResponse, SyncSummary, SyncValidateResponse,
-    TaskCreate, TaskDTO, TaskListFilter, TaskUpdate,
+    SyncReport, SyncReportEntry, SyncReportMeta, SyncResponse, SyncSummary, SyncValidateResponse, TaskCreate, TaskDTO, TaskListFilter, TaskUpdate,
 };
 use crate::config::manager::ConfigManager;
-use crate::config::types::{
-    SyncAuthProfile, SyncFieldMapping, SyncFieldMappingDetail, SyncProvider, SyncRemoteConfig,
-    SyncWhenEmpty,
-};
+use crate::config::types::{SyncAuthProfile, SyncFieldMapping, SyncFieldMappingDetail, SyncProvider, SyncRemoteConfig, SyncWhenEmpty};
 use crate::errors::{LoTaRError, LoTaRResult};
 use crate::services::reference_service::ReferenceService;
 use crate::services::sync_report_service::SyncReportService;
@@ -140,17 +136,11 @@ struct SyncSinks<'a> {
 }
 
 impl SyncService {
-    pub fn push(
-        resolver: &TasksDirectoryResolver,
-        options: SyncOptions<'_>,
-    ) -> LoTaRResult<SyncResponse> {
+    pub fn push(resolver: &TasksDirectoryResolver, options: SyncOptions<'_>) -> LoTaRResult<SyncResponse> {
         Self::run(resolver, SyncDirection::Push, options)
     }
 
-    pub fn pull(
-        resolver: &TasksDirectoryResolver,
-        options: SyncOptions<'_>,
-    ) -> LoTaRResult<SyncResponse> {
+    pub fn pull(resolver: &TasksDirectoryResolver, options: SyncOptions<'_>) -> LoTaRResult<SyncResponse> {
         Self::run(resolver, SyncDirection::Pull, options)
     }
 
@@ -166,30 +156,17 @@ impl SyncService {
 
         let trimmed_remote = remote.and_then(|value| {
             let trimmed = value.trim();
-            if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed.to_string())
-            }
+            if trimmed.is_empty() { None } else { Some(trimmed.to_string()) }
         });
 
         let (remote_label, remote_config) = if let Some(override_config) = remote_override {
-            let label = trimmed_remote
-                .clone()
-                .unwrap_or_else(|| "custom".to_string());
+            let label = trimmed_remote.clone().unwrap_or_else(|| "custom".to_string());
             (label, override_config)
         } else {
-            let name = trimmed_remote.clone().ok_or_else(|| {
-                LoTaRError::ValidationError("Sync remote name is required".to_string())
-            })?;
+            let name = trimmed_remote.clone().ok_or_else(|| LoTaRError::ValidationError("Sync remote name is required".to_string()))?;
             let project_prefix = resolve_project_prefix(&mgr, resolver, project, None)?;
             let resolved = if let Some(prefix) = project_prefix.as_deref() {
-                mgr.get_project_config(prefix).map_err(|e| {
-                    LoTaRError::ValidationError(format!(
-                        "Failed to load project config '{}': {}",
-                        prefix, e
-                    ))
-                })?
+                mgr.get_project_config(prefix).map_err(|e| LoTaRError::ValidationError(format!("Failed to load project config '{}': {}", prefix, e)))?
             } else {
                 mgr.get_resolved_config().clone()
             };
@@ -198,11 +175,7 @@ impl SyncService {
                 if available.is_empty() {
                     LoTaRError::ValidationError("No remotes are configured".to_string())
                 } else {
-                    LoTaRError::ValidationError(format!(
-                        "Unknown sync remote '{}'. Available: {}",
-                        name,
-                        available.join(", ")
-                    ))
+                    LoTaRError::ValidationError(format!("Unknown sync remote '{}'. Available: {}", name, available.join(", ")))
                 }
             })?;
             (name, remote_config)
@@ -211,21 +184,15 @@ impl SyncService {
         let mut warnings = Vec::new();
         let info = Vec::new();
         let auth_profile_name = select_auth_profile(auth_profile, &remote_config);
-        let profile_name = auth_profile_name.as_deref().ok_or_else(|| {
-            LoTaRError::ValidationError("Auth profile is required for sync validation".to_string())
-        })?;
+        let profile_name =
+            auth_profile_name.as_deref().ok_or_else(|| LoTaRError::ValidationError("Auth profile is required for sync validation".to_string()))?;
 
-        let home_config = ConfigManager::load_home_config().map_err(|e| {
-            LoTaRError::ValidationError(format!("Failed to load home config: {}", e))
-        })?;
-        let profile = home_config.auth_profiles.get(profile_name).ok_or_else(|| {
-            LoTaRError::ValidationError(format!(
-                "Auth profile '{}' not found in home config",
-                profile_name
-            ))
-        })?;
-        let auth_context =
-            build_auth_context(&remote_config, profile_name, profile, &mut warnings)?;
+        let home_config = ConfigManager::load_home_config().map_err(|e| LoTaRError::ValidationError(format!("Failed to load home config: {}", e)))?;
+        let profile = home_config
+            .auth_profiles
+            .get(profile_name)
+            .ok_or_else(|| LoTaRError::ValidationError(format!("Auth profile '{}' not found in home config", profile_name)))?;
+        let auth_context = build_auth_context(&remote_config, profile_name, profile, &mut warnings)?;
         let client = SyncClient::new(auth_context);
 
         match remote_config.provider {
@@ -240,9 +207,7 @@ impl SyncService {
                 jira_validate_query(&client, &jql)?;
             }
             SyncProvider::Github => {
-                let repo = remote_config.repo.as_deref().ok_or_else(|| {
-                    LoTaRError::ValidationError("GitHub remote must define repo".to_string())
-                })?;
+                let repo = remote_config.repo.as_deref().ok_or_else(|| LoTaRError::ValidationError("GitHub remote must define repo".to_string()))?;
                 let _ = github_fetch_repo(&client, repo)?;
                 if let Some(filter) = remote_config.filter.as_deref() {
                     let trimmed = filter.trim();
@@ -266,26 +231,11 @@ impl SyncService {
         })
     }
 
-    pub fn run(
-        resolver: &TasksDirectoryResolver,
-        direction: SyncDirection,
-        options: SyncOptions<'_>,
-    ) -> LoTaRResult<SyncResponse> {
-        let SyncOptions {
-            remote,
-            project,
-            dry_run,
-            auth_profile,
-            task_id,
-            write_report,
-            include_report,
-            client_run_id,
-        } = options;
+    pub fn run(resolver: &TasksDirectoryResolver, direction: SyncDirection, options: SyncOptions<'_>) -> LoTaRResult<SyncResponse> {
+        let SyncOptions { remote, project, dry_run, auth_profile, task_id, write_report, include_report, client_run_id } = options;
         let trimmed_remote = remote.trim();
         if trimmed_remote.is_empty() {
-            return Err(LoTaRError::ValidationError(
-                "Sync remote name is required".to_string(),
-            ));
+            return Err(LoTaRError::ValidationError("Sync remote name is required".to_string()));
         }
 
         let mgr = ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path)
@@ -297,53 +247,34 @@ impl SyncService {
             if !trimmed.is_empty() {
                 let expected = format!("{}-", prefix);
                 if !trimmed.starts_with(&expected) {
-                    return Err(LoTaRError::ValidationError(format!(
-                        "Task '{}' does not belong to project '{}'",
-                        trimmed, prefix
-                    )));
+                    return Err(LoTaRError::ValidationError(format!("Task '{}' does not belong to project '{}'", trimmed, prefix)));
                 }
             }
         }
-        let project_prefix = project_prefix
-            .map(|prefix| canonical_sync_project(&resolver.path, &prefix))
-            .transpose()?;
+        let project_prefix = project_prefix.map(|prefix| canonical_sync_project(&resolver.path, &prefix)).transpose()?;
         let canonical_target = task_id
             .map(|id| {
                 let id = id.trim();
                 let prefix =
-                    crate::storage::operations::StorageOperations::get_project_for_task(id)
-                        .ok_or_else(|| LoTaRError::InvalidTaskId(id.to_string()))?;
+                    crate::storage::operations::StorageOperations::get_project_for_task(id).ok_or_else(|| LoTaRError::InvalidTaskId(id.to_string()))?;
                 canonical_sync_task_id(&resolver.path, &prefix, id)
             })
             .transpose()?;
         let task_id = canonical_target.as_deref();
         let resolved = if let Some(prefix) = project_prefix.as_deref() {
-            mgr.get_project_config(prefix).map_err(|e| {
-                LoTaRError::ValidationError(format!(
-                    "Failed to load project config '{}': {}",
-                    prefix, e
-                ))
-            })?
+            mgr.get_project_config(prefix).map_err(|e| LoTaRError::ValidationError(format!("Failed to load project config '{}': {}", prefix, e)))?
         } else {
             mgr.get_resolved_config().clone()
         };
 
-        let remote_config = resolved
-            .remotes
-            .get(trimmed_remote)
-            .cloned()
-            .ok_or_else(|| {
-                let available = resolved.remotes.keys().cloned().collect::<Vec<_>>();
-                if available.is_empty() {
-                    LoTaRError::ValidationError("No remotes are configured".to_string())
-                } else {
-                    LoTaRError::ValidationError(format!(
-                        "Unknown sync remote '{}'. Available: {}",
-                        trimmed_remote,
-                        available.join(", ")
-                    ))
-                }
-            })?;
+        let remote_config = resolved.remotes.get(trimmed_remote).cloned().ok_or_else(|| {
+            let available = resolved.remotes.keys().cloned().collect::<Vec<_>>();
+            if available.is_empty() {
+                LoTaRError::ValidationError("No remotes are configured".to_string())
+            } else {
+                LoTaRError::ValidationError(format!("Unknown sync remote '{}'. Available: {}", trimmed_remote, available.join(", ")))
+            }
+        })?;
 
         let mut warnings = Vec::new();
         let mut info = Vec::new();
@@ -351,38 +282,22 @@ impl SyncService {
         let needs_auth = direction == SyncDirection::Pull || !dry_run;
 
         let auth_context = if needs_auth {
-            let profile_name = auth_profile_name.as_deref().ok_or_else(|| {
-                LoTaRError::ValidationError(
-                    "Auth profile is required for sync operations".to_string(),
-                )
-            })?;
-            let home_config = ConfigManager::load_home_config().map_err(|e| {
-                LoTaRError::ValidationError(format!("Failed to load home config: {}", e))
-            })?;
-            let profile = home_config.auth_profiles.get(profile_name).ok_or_else(|| {
-                LoTaRError::ValidationError(format!(
-                    "Auth profile '{}' not found in home config",
-                    profile_name
-                ))
-            })?;
-            Some(build_auth_context(
-                &remote_config,
-                profile_name,
-                profile,
-                &mut warnings,
-            )?)
+            let profile_name =
+                auth_profile_name.as_deref().ok_or_else(|| LoTaRError::ValidationError("Auth profile is required for sync operations".to_string()))?;
+            let home_config = ConfigManager::load_home_config().map_err(|e| LoTaRError::ValidationError(format!("Failed to load home config: {}", e)))?;
+            let profile = home_config
+                .auth_profiles
+                .get(profile_name)
+                .ok_or_else(|| LoTaRError::ValidationError(format!("Auth profile '{}' not found in home config", profile_name)))?;
+            Some(build_auth_context(&remote_config, profile_name, profile, &mut warnings)?)
         } else {
             if let Some(profile_name) = auth_profile_name.as_deref() {
                 if let Ok(home) = ConfigManager::load_home_config() {
                     if !home.auth_profiles.contains_key(profile_name) {
-                        warnings.push(format!(
-                            "Auth profile '{}' not found in home config",
-                            profile_name
-                        ));
+                        warnings.push(format!("Auth profile '{}' not found in home config", profile_name));
                     }
                 } else {
-                    warnings
-                        .push("Home config not available; auth profile cannot be resolved".into());
+                    warnings.push("Home config not available; auth profile cannot be resolved".into());
                 }
             }
             None
@@ -390,21 +305,10 @@ impl SyncService {
 
         let client = auth_context.map(SyncClient::new);
 
-        let pull_project = if direction == SyncDirection::Pull {
-            Some(resolve_pull_project_prefix(
-                project_prefix.clone(),
-                &remote_config,
-                &mut warnings,
-            )?)
-        } else {
-            None
-        };
+        let pull_project =
+            if direction == SyncDirection::Pull { Some(resolve_pull_project_prefix(project_prefix.clone(), &remote_config, &mut warnings)?) } else { None };
 
-        let run_project = if direction == SyncDirection::Pull {
-            pull_project.clone()
-        } else {
-            project_prefix.clone()
-        };
+        let run_project = if direction == SyncDirection::Pull { pull_project.clone() } else { project_prefix.clone() };
         let context = SyncRunContext {
             run_id: make_run_id(client_run_id),
             started_at: Utc::now().to_rfc3339(),
@@ -432,43 +336,18 @@ impl SyncService {
         let outcome = (|| {
             let mut journal = SyncJournal::open(&resolver.path, dry_run)?;
             if let Some(client) = client.as_ref() {
-                journal.reconcile(
-                    resolver,
-                    &pending_scope(&remote_config, client),
-                    run_project.as_deref(),
-                    task_id,
-                    &remote_config,
-                )?;
+                journal.reconcile(resolver, &pending_scope(&remote_config, client), run_project.as_deref(), task_id, &remote_config)?;
             } else if !journal.links.is_empty() {
-                warnings.push(
-                    "Pending sync recovery exists; dry-run creation estimates do not reconcile it"
-                        .into(),
-                );
+                warnings.push("Pending sync recovery exists; dry-run creation estimates do not reconcile it".into());
             }
 
-            let target = SyncTarget {
-                resolver,
-                remote: &remote_config,
-                task_id,
-                dry_run,
-            };
-            let sinks = SyncSinks {
-                recorder: &mut recorder,
-                warnings: &mut warnings,
-                journal: &mut journal,
-            };
+            let target = SyncTarget { resolver, remote: &remote_config, task_id, dry_run };
+            let sinks = SyncSinks { recorder: &mut recorder, warnings: &mut warnings, journal: &mut journal };
             match direction {
-                SyncDirection::Push => {
-                    perform_push(target, project_prefix.as_deref(), client.as_ref(), sinks)
+                SyncDirection::Push => perform_push(target, project_prefix.as_deref(), client.as_ref(), sinks),
+                SyncDirection::Pull => {
+                    perform_pull(target, pull_project.as_deref().expect("pull project must be resolved"), client.as_ref().expect("sync client required"), sinks)
                 }
-                SyncDirection::Pull => perform_pull(
-                    target,
-                    pull_project
-                        .as_deref()
-                        .expect("pull project must be resolved"),
-                    client.as_ref().expect("sync client required"),
-                    sinks,
-                ),
             }
         })();
 
@@ -494,19 +373,10 @@ impl SyncService {
         }
 
         // Some items failed: the run finished, but not cleanly (DEV-300).
-        let report_status = if recorder.summary.failed > 0 {
-            "partial"
-        } else {
-            "ok"
-        };
+        let report_status = if recorder.summary.failed > 0 { "partial" } else { "ok" };
         let report = recorder.report(report_status, warnings.clone(), info.clone());
         let write_enabled = !dry_run && write_report.unwrap_or(resolved.sync_write_reports);
-        let stored_path = match SyncReportService::write_report(
-            &resolver.path,
-            &resolved,
-            &report,
-            write_enabled,
-        ) {
+        let stored_path = match SyncReportService::write_report(&resolver.path, &resolved, &report, write_enabled) {
             Ok(path) => path,
             Err(err) => {
                 warnings.push(format!("Failed to write sync report: {}", err));
@@ -525,11 +395,7 @@ impl SyncService {
             }),
         );
 
-        let report_entries = if include_report {
-            recorder.entries.clone()
-        } else {
-            Vec::new()
-        };
+        let report_entries = if include_report { recorder.entries.clone() } else { Vec::new() };
 
         Ok(SyncResponse {
             status: report_status.to_string(),
@@ -548,18 +414,11 @@ impl SyncService {
     }
 }
 
-fn resolve_project_prefix(
-    mgr: &ConfigManager,
-    resolver: &TasksDirectoryResolver,
-    project: Option<&str>,
-    task_id: Option<&str>,
-) -> LoTaRResult<Option<String>> {
+fn resolve_project_prefix(mgr: &ConfigManager, resolver: &TasksDirectoryResolver, project: Option<&str>, task_id: Option<&str>) -> LoTaRResult<Option<String>> {
     if let Some(project) = project {
         let resolved = crate::utils::project::resolve_project_input(project, &resolver.path);
         if resolved.trim().is_empty() {
-            return Err(LoTaRError::ValidationError(
-                "Project cannot be empty".to_string(),
-            ));
+            return Err(LoTaRError::ValidationError("Project cannot be empty".to_string()));
         }
         return Ok(Some(resolved));
     }
@@ -571,28 +430,16 @@ fn resolve_project_prefix(
     }
 
     let default_project = mgr.get_resolved_config().default_project.trim().to_string();
-    if default_project.is_empty() {
-        Ok(None)
-    } else {
-        Ok(Some(default_project))
-    }
+    if default_project.is_empty() { Ok(None) } else { Ok(Some(default_project)) }
 }
 
 fn select_auth_profile(provided: Option<&str>, remote: &SyncRemoteConfig) -> Option<String> {
     if let Some(profile) = provided {
         let trimmed = profile.trim();
-        if trimmed.is_empty() {
-            None
-        } else {
-            Some(trimmed.to_string())
-        }
+        if trimmed.is_empty() { None } else { Some(trimmed.to_string()) }
     } else if let Some(profile) = remote.auth_profile.as_deref() {
         let trimmed = profile.trim();
-        if trimmed.is_empty() {
-            None
-        } else {
-            Some(trimmed.to_string())
-        }
+        if trimmed.is_empty() { None } else { Some(trimmed.to_string()) }
     } else {
         None
     }
@@ -607,10 +454,7 @@ fn append_failure_warnings(failures: &[String], warnings: &mut Vec<String>) {
         warnings.push(failure.clone());
     }
     if failures.len() > limit {
-        warnings.push(format!(
-            "{} additional sync errors omitted",
-            failures.len() - limit
-        ));
+        warnings.push(format!("{} additional sync errors omitted", failures.len() - limit));
     }
 }
 
@@ -662,16 +506,9 @@ mod tests {
         let root = tmp.path().join(".tasks");
         std::fs::create_dir_all(root.join("ABC-OPS")).unwrap();
         std::fs::create_dir_all(root.join("TP")).unwrap();
-        std::fs::write(
-            root.join("ABC-OPS").join("12.yml"),
-            "title: nested\nstatus: Todo\npriority: Medium\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\n",
-        )
-        .unwrap();
-        std::fs::write(
-            root.join("TP").join("1.yml"),
-            "title: padded\nstatus: Todo\npriority: Medium\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\n",
-        )
-        .unwrap();
+        std::fs::write(root.join("ABC-OPS").join("12.yml"), "title: nested\nstatus: Todo\npriority: Medium\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\n")
+            .unwrap();
+        std::fs::write(root.join("TP").join("1.yml"), "title: padded\nstatus: Todo\npriority: Medium\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\n").unwrap();
         (tmp, root)
     }
 
@@ -738,17 +575,11 @@ mod tests {
             "status".to_string(),
             SyncFieldMapping::Detailed(SyncFieldMappingDetail {
                 field: Some("state".to_string()),
-                values: std::collections::BTreeMap::from([
-                    (String::from("Todo"), String::from("open")),
-                    (String::from("Done"), String::from("closed")),
-                ]),
+                values: std::collections::BTreeMap::from([(String::from("Todo"), String::from("open")), (String::from("Done"), String::from("closed"))]),
                 ..Default::default()
             }),
         );
-        remote.mapping.insert(
-            "tags".to_string(),
-            SyncFieldMapping::Simple("labels".to_string()),
-        );
+        remote.mapping.insert("tags".to_string(), SyncFieldMapping::Simple("labels".to_string()));
 
         let payload = build_github_payload(&remote, &sample_task(), SyncOperation::Update);
         assert_eq!(payload.state.as_deref(), Some("open"));
@@ -765,10 +596,7 @@ mod tests {
             auth_profile: None,
             mapping: std::collections::BTreeMap::new(),
         };
-        remote.mapping.insert(
-            "status".to_string(),
-            SyncFieldMapping::Simple("status".to_string()),
-        );
+        remote.mapping.insert("status".to_string(), SyncFieldMapping::Simple("status".to_string()));
 
         let issue = json!({
             "key": "DEMO-1",

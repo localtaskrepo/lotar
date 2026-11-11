@@ -8,22 +8,15 @@ pub fn load_global_automation(tasks_dir: &Path) -> LoTaRResult<Option<Automation
     load_automation_from_path(&path)
 }
 
-pub fn load_project_automation(
-    tasks_dir: &Path,
-    project: &str,
-) -> LoTaRResult<Option<AutomationFile>> {
+pub fn load_project_automation(tasks_dir: &Path, project: &str) -> LoTaRResult<Option<AutomationFile>> {
     let path = crate::utils::paths::project_automation_path(tasks_dir, project);
     load_automation_from_path(&path)
 }
 
 pub fn load_home_automation() -> LoTaRResult<Option<AutomationFile>> {
     if std::env::var("RUST_TEST_THREADS").is_ok()
-        || std::env::var("LOTAR_TEST_MODE")
-            .map(|v| v == "1")
-            .unwrap_or(false)
-        || std::env::var("LOTAR_IGNORE_HOME_CONFIG")
-            .map(|v| v == "1")
-            .unwrap_or(false)
+        || std::env::var("LOTAR_TEST_MODE").map(|v| v == "1").unwrap_or(false)
+        || std::env::var("LOTAR_IGNORE_HOME_CONFIG").map(|v| v == "1").unwrap_or(false)
     {
         return Ok(None);
     }
@@ -34,20 +27,12 @@ pub fn load_home_automation() -> LoTaRResult<Option<AutomationFile>> {
 
 pub fn save_global_automation(tasks_dir: &Path, file: &AutomationFile) -> LoTaRResult<()> {
     let path = crate::utils::paths::global_automation_path(tasks_dir);
-    crate::services::trust_service::TrustService::rewrite(tasks_dir, || {
-        write_automation_file(&path, file)
-    })
+    crate::services::trust_service::TrustService::rewrite(tasks_dir, || write_automation_file(&path, file))
 }
 
-pub fn save_project_automation(
-    tasks_dir: &Path,
-    project: &str,
-    file: &AutomationFile,
-) -> LoTaRResult<()> {
+pub fn save_project_automation(tasks_dir: &Path, project: &str, file: &AutomationFile) -> LoTaRResult<()> {
     let path = crate::utils::paths::project_automation_path(tasks_dir, project);
-    crate::services::trust_service::TrustService::rewrite(tasks_dir, || {
-        write_automation_file(&path, file)
-    })
+    crate::services::trust_service::TrustService::rewrite(tasks_dir, || write_automation_file(&path, file))
 }
 
 pub fn save_home_automation(file: &AutomationFile) -> LoTaRResult<()> {
@@ -69,12 +54,7 @@ pub fn to_canonical_yaml(file: &AutomationFile) -> LoTaRResult<String> {
     }
 
     let rules = file.automation.rules().to_vec();
-    let output = AutomationFileOutput {
-        automation: AutomationRulesOutput {
-            max_iterations: file.automation.max_iterations(),
-            rules,
-        },
-    };
+    let output = AutomationFileOutput { automation: AutomationRulesOutput { max_iterations: file.automation.max_iterations(), rules } };
     serde_yaml_ng::to_string(&output).map_err(LoTaRError::from)
 }
 
@@ -96,8 +76,7 @@ pub fn to_canonical_yaml(file: &AutomationFile) -> LoTaRResult<String> {
 /// file's bytes/mtime) instead of canonical-reformatting the file; removing
 /// such raw-only content requires editing the file, not `set`.
 pub fn files_effectively_equal(a: &AutomationFile, b: &AutomationFile) -> bool {
-    a.automation.rules() == b.automation.rules()
-        && a.automation.max_iterations() == b.automation.max_iterations()
+    a.automation.rules() == b.automation.rules() && a.automation.max_iterations() == b.automation.max_iterations()
 }
 
 fn load_automation_from_path(path: &Path) -> LoTaRResult<Option<AutomationFile>> {
@@ -119,12 +98,7 @@ fn write_automation_file(path: &Path, file: &AutomationFile) -> LoTaRResult<()> 
 }
 
 fn resolve_home_automation_path() -> LoTaRResult<PathBuf> {
-    let home_dir = dirs::home_dir().ok_or_else(|| {
-        LoTaRError::IoError(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            "Home directory not found",
-        ))
-    })?;
+    let home_dir = dirs::home_dir().ok_or_else(|| LoTaRError::IoError(std::io::Error::new(std::io::ErrorKind::NotFound, "Home directory not found")))?;
     let legacy_file = home_dir.join(".lotar");
     if legacy_file.is_dir() {
         return Ok(legacy_file.join("automation.yml"));
@@ -133,10 +107,5 @@ fn resolve_home_automation_path() -> LoTaRResult<PathBuf> {
 }
 
 pub fn empty_file() -> AutomationFile {
-    AutomationFile {
-        automation: AutomationRuleSet::Rules {
-            rules: Vec::new(),
-            max_iterations: None,
-        },
-    }
+    AutomationFile { automation: AutomationRuleSet::Rules { rules: Vec::new(), max_iterations: None } }
 }

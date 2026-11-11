@@ -1,9 +1,7 @@
 use crate::config::types::*;
 use crate::config::validation::errors::ValidationResult;
 use crate::types::{Priority, TaskStatus, TaskType};
-use crate::utils::project::{
-    RESERVED_PREFIX_MESSAGE, generate_project_prefix, is_reserved_project_prefix,
-};
+use crate::utils::project::{RESERVED_PREFIX_MESSAGE, generate_project_prefix, is_reserved_project_prefix};
 use serde::de::DeserializeOwned;
 use serde_yaml_ng;
 use std::collections::BTreeMap;
@@ -16,17 +14,13 @@ fn parse_done_states_value(value: &str) -> Result<Vec<TaskStatus>, ConfigError> 
     let values = parse_token_list::<TaskStatus>(value, "task status")?;
     if values.is_empty() {
         return Err(ConfigError::ParseError(
-            "issue_done_states must list at least one terminal status; leave it unset to use the inferred completion policy"
-                .to_string(),
+            "issue_done_states must list at least one terminal status; leave it unset to use the inferred completion policy".to_string(),
         ));
     }
     let mut seen = std::collections::HashSet::new();
     for status in &values {
         if !seen.insert(status.as_str().to_ascii_lowercase()) {
-            return Err(ConfigError::ParseError(format!(
-                "Duplicate done state '{}' in issue_done_states",
-                status.as_str()
-            )));
+            return Err(ConfigError::ParseError(format!("Duplicate done state '{}' in issue_done_states", status.as_str())));
         }
     }
     Ok(values)
@@ -51,14 +45,9 @@ where
         .map(|part| part.trim())
         .map(|token| {
             if token.is_empty() {
-                Err(ConfigError::ParseError(format!(
-                    "{} entries cannot be empty.",
-                    label
-                )))
+                Err(ConfigError::ParseError(format!("{} entries cannot be empty.", label)))
             } else {
-                token.parse::<T>().map_err(|err| {
-                    ConfigError::ParseError(format!("Invalid {} '{}': {}", label, token, err))
-                })
+                token.parse::<T>().map_err(|err| ConfigError::ParseError(format!("Invalid {} '{}': {}", label, token, err)))
             }
         })
         .collect()
@@ -70,116 +59,70 @@ fn parse_sync_remotes(value: &str) -> Result<BTreeMap<String, SyncRemoteConfig>,
         return Ok(BTreeMap::new());
     }
 
-    serde_yaml_ng::from_str::<BTreeMap<String, SyncRemoteConfig>>(trimmed)
-        .map_err(|err| ConfigError::ParseError(format!("Invalid remotes value: {}", err)))
+    serde_yaml_ng::from_str::<BTreeMap<String, SyncRemoteConfig>>(trimmed).map_err(|err| ConfigError::ParseError(format!("Invalid remotes value: {}", err)))
 }
 
 /// Agent profiles as a YAML/JSON mapping of name to profile (a runner name
 /// or a detailed profile). Names must work as `@name` assignees.
-fn parse_agent_profiles(
-    value: &str,
-) -> Result<BTreeMap<String, crate::config::types::AgentProfileConfig>, ConfigError> {
+fn parse_agent_profiles(value: &str) -> Result<BTreeMap<String, crate::config::types::AgentProfileConfig>, ConfigError> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
         return Ok(BTreeMap::new());
     }
     let profiles: BTreeMap<String, crate::config::types::AgentProfileConfig> =
-        serde_yaml_ng::from_str(trimmed)
-            .map_err(|err| ConfigError::ParseError(format!("Invalid agents value: {}", err)))?;
+        serde_yaml_ng::from_str(trimmed).map_err(|err| ConfigError::ParseError(format!("Invalid agents value: {}", err)))?;
     for (name, profile) in &profiles {
-        let valid_name = !name.is_empty()
-            && name.len() <= 64
-            && name
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'));
+        let valid_name = !name.is_empty() && name.len() <= 64 && name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'));
         if !valid_name {
-            return Err(ConfigError::ParseError(format!(
-                "Invalid agent name '{name}': use letters, digits, '-', '_' or '.'"
-            )));
+            return Err(ConfigError::ParseError(format!("Invalid agent name '{name}': use letters, digits, '-', '_' or '.'")));
         }
         let runner = profile.to_detail().runner;
-        if runner
-            .parse::<crate::services::agent_runner::AgentRunnerKind>()
-            .is_err()
-        {
-            return Err(ConfigError::ParseError(format!(
-                "Agent '{name}' has unsupported runner '{runner}'. Expected {}",
-                AGENT_RUNNERS.join(", ")
-            )));
+        if runner.parse::<crate::services::agent_runner::AgentRunnerKind>().is_err() {
+            return Err(ConfigError::ParseError(format!("Agent '{name}' has unsupported runner '{runner}'. Expected {}", AGENT_RUNNERS.join(", "))));
         }
     }
     Ok(profiles)
 }
 
 /// Runner kinds an agent profile can use.
-pub const AGENT_RUNNERS: &[&str] = &[
-    "claude",
-    "codex",
-    "copilot",
-    "gemini",
-    "cursor",
-    "amp",
-    "droid",
-    "opencode",
-    "kilo",
-    "antigravity",
-    "t3",
-    "command",
-];
+pub const AGENT_RUNNERS: &[&str] = &["claude", "codex", "copilot", "gemini", "cursor", "amp", "droid", "opencode", "kilo", "antigravity", "t3", "command"];
 
 fn parse_bool_flag(value: &str, field: &str) -> Result<bool, ConfigError> {
     let normalized = value.trim().to_lowercase();
     match normalized.as_str() {
         "true" => Ok(true),
         "false" => Ok(false),
-        other => Err(ConfigError::ParseError(format!(
-            "{} must be 'true' or 'false', got '{}'",
-            field, other
-        ))),
+        other => Err(ConfigError::ParseError(format!("{} must be 'true' or 'false', got '{}'", field, other))),
     }
 }
 
 fn parse_optional_bool_flag(value: &str, field: &str) -> Result<Option<bool>, ConfigError> {
     let trimmed = value.trim();
-    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("inherit") {
-        Ok(None)
-    } else {
-        parse_bool_flag(trimmed, field).map(Some)
-    }
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("inherit") { Ok(None) } else { parse_bool_flag(trimmed, field).map(Some) }
 }
 
 /// Agent job limit (DEV-153): a whole number; 0 pauses new jobs, empty (or
 /// `inherit` in a project) means no limit of its own.
 fn parse_max_parallel_jobs(value: &str, field: &str) -> Result<Option<usize>, ConfigError> {
     let trimmed = value.trim();
-    if trimmed.is_empty()
-        || trimmed.eq_ignore_ascii_case("inherit")
-        || trimmed.eq_ignore_ascii_case("unlimited")
-    {
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("inherit") || trimmed.eq_ignore_ascii_case("unlimited") {
         return Ok(None);
     }
-    trimmed.parse::<usize>().map(Some).map_err(|_| {
-        ConfigError::ParseError(format!(
-            "{field} must be a whole number (0 pauses new jobs), or empty for no limit"
-        ))
-    })
+    trimmed
+        .parse::<usize>()
+        .map(Some)
+        .map_err(|_| ConfigError::ParseError(format!("{field} must be a whole number (0 pauses new jobs), or empty for no limit")))
 }
 
 fn parse_optional_string(value: &str) -> Option<String> {
     let trimmed = value.trim();
-    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("inherit") {
-        None
-    } else {
-        Some(trimmed.to_string())
-    }
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("inherit") { None } else { Some(trimmed.to_string()) }
 }
 
 fn parse_review_reviewers(value: &str) -> Result<Vec<String>, ConfigError> {
     let trimmed = value.trim();
     let values = if trimmed.starts_with('[') || trimmed.starts_with('{') {
-        serde_yaml_ng::from_str::<Vec<String>>(trimmed).map_err(|error| {
-            ConfigError::ParseError(format!("Invalid review.reviewers list: {error}"))
-        })?
+        serde_yaml_ng::from_str::<Vec<String>>(trimmed).map_err(|error| ConfigError::ParseError(format!("Invalid review.reviewers list: {error}")))?
     } else {
         value.split(',').map(str::to_string).collect()
     };
@@ -200,70 +143,46 @@ fn parse_simple_csv(value: &str) -> Vec<String> {
         return list;
     }
 
-    value
-        .split(',')
-        .map(|s| s.trim())
-        .filter(|s| !s.is_empty())
-        .map(|s| s.to_string())
-        .collect()
+    value.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).map(|s| s.to_string()).collect()
 }
 
 /// Tag properties for `config set tag_properties` (DEV-20): a YAML/JSON map
 /// (`{ui: {color: "#0ea5e9"}}`) or colour shorthand (`ui=#0ea5e9, backend=teal`).
 /// Empty means none. Colours must be valid; names must be unique ignoring case.
-pub fn parse_tag_properties(
-    value: &str,
-) -> Result<std::collections::BTreeMap<String, TagProperties>, ConfigError> {
+pub fn parse_tag_properties(value: &str) -> Result<std::collections::BTreeMap<String, TagProperties>, ConfigError> {
     use std::collections::BTreeMap;
     let trimmed = value.trim();
     if trimmed.is_empty() {
         return Ok(BTreeMap::new());
     }
-    let parsed: BTreeMap<String, TagProperties> =
-        match serde_yaml_ng::from_str::<BTreeMap<String, TagProperties>>(trimmed) {
-            Ok(map) => map,
-            Err(_) if !trimmed.starts_with('{') => {
-                let mut map = BTreeMap::new();
-                for part in trimmed.split([',', ';', '\n']) {
-                    let part = part.trim();
-                    if part.is_empty() {
-                        continue;
-                    }
-                    let (name, color) = part.split_once('=').ok_or_else(|| {
-                        ConfigError::ParseError(format!(
-                            "Tag colour '{part}' must be written as name=colour"
-                        ))
-                    })?;
-                    map.insert(
-                        name.trim().to_string(),
-                        TagProperties {
-                            color: Some(color.trim().to_string()),
-                            ..TagProperties::default()
-                        },
-                    );
+    let parsed: BTreeMap<String, TagProperties> = match serde_yaml_ng::from_str::<BTreeMap<String, TagProperties>>(trimmed) {
+        Ok(map) => map,
+        Err(_) if !trimmed.starts_with('{') => {
+            let mut map = BTreeMap::new();
+            for part in trimmed.split([',', ';', '\n']) {
+                let part = part.trim();
+                if part.is_empty() {
+                    continue;
                 }
-                map
+                let (name, color) =
+                    part.split_once('=').ok_or_else(|| ConfigError::ParseError(format!("Tag colour '{part}' must be written as name=colour")))?;
+                map.insert(name.trim().to_string(), TagProperties { color: Some(color.trim().to_string()), ..TagProperties::default() });
             }
-            Err(_) => {
-                return Err(ConfigError::ParseError(
-                "Tag properties must map tag names to properties, e.g. {ui: {color: \"#0ea5e9\"}}"
-                    .into(),
-            ));
-            }
-        };
+            map
+        }
+        Err(_) => {
+            return Err(ConfigError::ParseError("Tag properties must map tag names to properties, e.g. {ui: {color: \"#0ea5e9\"}}".into()));
+        }
+    };
     let mut seen = std::collections::HashSet::new();
     let mut out = BTreeMap::new();
     for (name, mut props) in parsed {
         let name = name.trim().to_string();
         if name.is_empty() || name == "*" {
-            return Err(ConfigError::ParseError(
-                "Tag properties need a tag name".into(),
-            ));
+            return Err(ConfigError::ParseError("Tag properties need a tag name".into()));
         }
         if !seen.insert(name.to_lowercase()) {
-            return Err(ConfigError::ParseError(format!(
-                "Tag '{name}' has properties more than once"
-            )));
+            return Err(ConfigError::ParseError(format!("Tag '{name}' has properties more than once")));
         }
         if let Some(color) = props.color.as_mut() {
             *color = color.trim().to_string();
@@ -293,25 +212,13 @@ where
         return Ok(BTreeMap::new());
     }
 
-    fn insert_alias<T>(
-        target: &mut BTreeMap<String, T>,
-        raw_key: &str,
-        value: T,
-        label: &str,
-    ) -> Result<(), ConfigError> {
+    fn insert_alias<T>(target: &mut BTreeMap<String, T>, raw_key: &str, value: T, label: &str) -> Result<(), ConfigError> {
         let canonical = raw_key.trim().to_ascii_lowercase();
         if canonical.is_empty() {
-            return Err(ConfigError::ParseError(format!(
-                "{} alias cannot be empty",
-                label
-            )));
+            return Err(ConfigError::ParseError(format!("{} alias cannot be empty", label)));
         }
         if target.contains_key(&canonical) {
-            return Err(ConfigError::ParseError(format!(
-                "Duplicate {} alias '{}' detected",
-                label,
-                raw_key.trim()
-            )));
+            return Err(ConfigError::ParseError(format!("Duplicate {} alias '{}' detected", label, raw_key.trim())));
         }
         target.insert(canonical, value);
         Ok(())
@@ -328,9 +235,7 @@ where
     if let Ok(map) = serde_yaml_ng::from_str::<BTreeMap<String, String>>(trimmed) {
         let mut out = BTreeMap::new();
         for (k, raw) in map.into_iter() {
-            let parsed = raw.parse::<T>().map_err(|err| {
-                ConfigError::ParseError(format!("Invalid {} '{}': {}", label, raw, err))
-            })?;
+            let parsed = raw.parse::<T>().map_err(|err| ConfigError::ParseError(format!("Invalid {} '{}': {}", label, raw, err)))?;
             insert_alias(&mut out, &k, parsed, label)?;
         }
         return Ok(out);
@@ -345,23 +250,13 @@ where
         let (alias, target) = entry
             .split_once('=')
             .or_else(|| entry.split_once(':'))
-            .ok_or_else(|| {
-                ConfigError::ParseError(format!(
-                    "Alias entry '{}' must use '=' or ':' to separate alias and value",
-                    entry
-                ))
-            })?;
-        let parsed = target.trim().parse::<T>().map_err(|err| {
-            ConfigError::ParseError(format!("Invalid {} '{}': {}", label, target.trim(), err))
-        })?;
+            .ok_or_else(|| ConfigError::ParseError(format!("Alias entry '{}' must use '=' or ':' to separate alias and value", entry)))?;
+        let parsed = target.trim().parse::<T>().map_err(|err| ConfigError::ParseError(format!("Invalid {} '{}': {}", label, target.trim(), err)))?;
         insert_alias(&mut out, alias, parsed, label)?;
     }
 
     if out.is_empty() {
-        return Err(ConfigError::ParseError(format!(
-            "Unable to parse alias map for {}",
-            label
-        )));
+        return Err(ConfigError::ParseError(format!("Unable to parse alias map for {}", label)));
     }
 
     Ok(out)
@@ -397,44 +292,27 @@ pub fn save_global_config(tasks_dir: &Path, config: &GlobalConfig) -> Result<(),
 /// malformed config file blocks those paths before this save runs, so the
 /// `PreserveExisting` presence read below only ever sees a file that
 /// parse-verified callers already accepted.
-pub fn save_global_config_with_port(
-    tasks_dir: &Path,
-    config: &GlobalConfig,
-    port_intent: ServerPortSaveIntent,
-) -> Result<(), ConfigError> {
+pub fn save_global_config_with_port(tasks_dir: &Path, config: &GlobalConfig, port_intent: ServerPortSaveIntent) -> Result<(), ConfigError> {
     let config_path = crate::utils::paths::global_config_path(tasks_dir);
 
     // Ensure the tasks directory exists
     if let Some(parent) = config_path.parent() {
-        fs::create_dir_all(parent).map_err(|e| {
-            ConfigError::IoError(format!("Failed to create tasks directory: {}", e))
-        })?;
+        fs::create_dir_all(parent).map_err(|e| ConfigError::IoError(format!("Failed to create tasks directory: {}", e)))?;
     }
 
     let explicit_server_port = match port_intent {
         ServerPortSaveIntent::ExplicitPin => true,
-        ServerPortSaveIntent::PreserveExisting => {
-            crate::config::persistence::config_file_server_port(&config_path, "global config")
-                .ok()
-                .flatten()
-                .is_some()
-        }
+        ServerPortSaveIntent::PreserveExisting => crate::config::persistence::config_file_server_port(&config_path, "global config").ok().flatten().is_some(),
     };
 
     // Serialize in canonical nested format
-    let config_yaml = crate::config::normalization::to_canonical_global_yaml_with(
-        config,
-        crate::config::normalization::GlobalYamlOptions {
-            explicit_server_port,
-        },
-    );
+    let config_yaml =
+        crate::config::normalization::to_canonical_global_yaml_with(config, crate::config::normalization::GlobalYamlOptions { explicit_server_port });
 
     // Agent profiles are command sources (DEV-259): keep a trusted
     // workspace trusted across LoTaR's own config writes.
-    crate::services::trust_service::TrustService::rewrite(tasks_dir, || {
-        crate::storage::safety::atomic_write_file(&config_path, &config_yaml)
-    })
-    .map_err(|e| ConfigError::IoError(format!("Failed to write global config: {}", e)))?;
+    crate::services::trust_service::TrustService::rewrite(tasks_dir, || crate::storage::safety::atomic_write_file(&config_path, &config_yaml))
+        .map_err(|e| ConfigError::IoError(format!("Failed to write global config: {}", e)))?;
 
     // Invalidate cache for this tasks_dir
     crate::config::resolution::invalidate_config_cache_for(Some(tasks_dir));
@@ -444,11 +322,7 @@ pub fn save_global_config_with_port(
 }
 
 /// Save updated project configuration to tasks_dir/{project}/config.yml
-pub fn save_project_config(
-    tasks_dir: &Path,
-    project_prefix: &str,
-    config: &ProjectConfig,
-) -> Result<(), ConfigError> {
+pub fn save_project_config(tasks_dir: &Path, project_prefix: &str, config: &ProjectConfig) -> Result<(), ConfigError> {
     if let Err(e) = crate::storage::safety::validate_project_prefix(project_prefix) {
         return Err(ConfigError::IoError(e));
     }
@@ -456,16 +330,13 @@ pub fn save_project_config(
     let config_path = crate::utils::paths::project_config_path(tasks_dir, project_prefix);
 
     // Ensure the project directory exists
-    fs::create_dir_all(&project_dir)
-        .map_err(|e| ConfigError::IoError(format!("Failed to create project directory: {}", e)))?;
+    fs::create_dir_all(&project_dir).map_err(|e| ConfigError::IoError(format!("Failed to create project directory: {}", e)))?;
 
     // Serialize in canonical nested format
     let config_yaml = crate::config::normalization::to_canonical_project_yaml(config);
 
-    crate::services::trust_service::TrustService::rewrite(tasks_dir, || {
-        crate::storage::safety::atomic_write_file(&config_path, &config_yaml)
-    })
-    .map_err(|e| ConfigError::IoError(format!("Failed to write project config: {}", e)))?;
+    crate::services::trust_service::TrustService::rewrite(tasks_dir, || crate::storage::safety::atomic_write_file(&config_path, &config_yaml))
+        .map_err(|e| ConfigError::IoError(format!("Failed to write project config: {}", e)))?;
 
     // Invalidate cache for this tasks_dir
     crate::config::resolution::invalidate_config_cache_for(Some(tasks_dir));
@@ -482,8 +353,7 @@ pub fn auto_populate_project_members(
     base_members: &[String],
     new_members: &[String],
 ) -> Result<Option<Vec<String>>, ConfigError> {
-    match plan_auto_populated_project_config(tasks_dir, project_prefix, base_members, new_members)?
-    {
+    match plan_auto_populated_project_config(tasks_dir, project_prefix, base_members, new_members)? {
         Some((project_config, effective)) => {
             save_project_config(tasks_dir, project_prefix, &project_config)?;
             Ok(Some(effective))
@@ -506,17 +376,12 @@ pub fn plan_auto_populated_project_config(
         return Ok(None);
     }
 
-    let mut project_config =
-        crate::config::persistence::load_project_config_from_dir(project_prefix, tasks_dir)?;
+    let mut project_config = crate::config::persistence::load_project_config_from_dir(project_prefix, tasks_dir)?;
 
     let mut effective: Vec<String> = if let Some(existing) = project_config.members.clone() {
         existing
     } else {
-        base_members
-            .iter()
-            .map(|value| value.trim().to_string())
-            .filter(|value| !value.is_empty())
-            .collect()
+        base_members.iter().map(|value| value.trim().to_string()).filter(|value| !value.is_empty()).collect()
     };
 
     let mut changed = false;
@@ -525,9 +390,7 @@ pub fn plan_auto_populated_project_config(
         if trimmed.is_empty() {
             continue;
         }
-        let already_present = effective
-            .iter()
-            .any(|existing| existing.eq_ignore_ascii_case(trimmed));
+        let already_present = effective.iter().any(|existing| existing.eq_ignore_ascii_case(trimmed));
         if !already_present {
             effective.push(trimmed.to_string());
             changed = true;
@@ -549,12 +412,7 @@ pub fn plan_auto_populated_project_config(
 /// DEV-71 pipeline (schema, config, resolved, and real-task validation before
 /// a single atomic write). Dotted canonical field names are accepted. See
 /// [`crate::config::candidate`].
-pub fn update_config_field(
-    tasks_dir: &Path,
-    field: &str,
-    value: &str,
-    project_prefix: Option<&str>,
-) -> Result<ValidationResult, ConfigError> {
+pub fn update_config_field(tasks_dir: &Path, field: &str, value: &str, project_prefix: Option<&str>) -> Result<ValidationResult, ConfigError> {
     let scope = match project_prefix {
         Some(prefix) => crate::config::candidate::ConfigScope::Project(prefix.to_string()),
         None => crate::config::candidate::ConfigScope::Global,
@@ -562,58 +420,36 @@ pub fn update_config_field(
     let result = crate::config::candidate::apply_config_set(
         tasks_dir,
         &scope,
-        &crate::config::candidate::ConfigSetRequest {
-            entries: vec![(field.to_string(), value.to_string())],
-            force: false,
-            dry_run: false,
-        },
+        &crate::config::candidate::ConfigSetRequest { entries: vec![(field.to_string(), value.to_string())], force: false, dry_run: false },
     )?;
     Ok(result.validation)
 }
 
 /// Apply a field update to GlobalConfig
-pub fn apply_field_to_global_config(
-    config: &mut GlobalConfig,
-    field: &str,
-    value: &str,
-) -> Result<(), ConfigError> {
+pub fn apply_field_to_global_config(config: &mut GlobalConfig, field: &str, value: &str) -> Result<(), ConfigError> {
     match field {
         "server_port" => {
-            config.server_port = value
-                .parse::<u16>()
-                .map_err(|_| ConfigError::ParseError(format!("Invalid port number: {}", value)))?;
+            config.server_port = value.parse::<u16>().map_err(|_| ConfigError::ParseError(format!("Invalid port number: {}", value)))?;
         }
         "default_project" => {
             // Normalize to storage prefix, accepting either full project name or prefix
             config.default_project = generate_project_prefix(value);
         }
         "default_assignee" => {
-            config.default_assignee = if value.is_empty() {
-                None
-            } else {
-                Some(value.to_string())
-            };
+            config.default_assignee = if value.is_empty() { None } else { Some(value.to_string()) };
         }
         "default_reporter" => {
-            config.default_reporter = if value.is_empty() {
-                None
-            } else {
-                Some(value.to_string())
-            };
+            config.default_reporter = if value.is_empty() { None } else { Some(value.to_string()) };
         }
         "default_priority" => {
-            config.default_priority = value.parse::<Priority>().map_err(|err| {
-                ConfigError::ParseError(format!("Invalid priority '{}': {}", value, err))
-            })?;
+            config.default_priority = value.parse::<Priority>().map_err(|err| ConfigError::ParseError(format!("Invalid priority '{}': {}", value, err)))?;
         }
         "default_status" => {
             if value.trim().is_empty() {
                 config.default_status = None;
                 return Ok(());
             }
-            let status = value.parse::<TaskStatus>().map_err(|err| {
-                ConfigError::ParseError(format!("Invalid status '{}': {}", value, err))
-            })?;
+            let status = value.parse::<TaskStatus>().map_err(|err| ConfigError::ParseError(format!("Invalid status '{}': {}", value, err)))?;
             config.default_status = Some(status);
         }
         "issue_states" => {
@@ -710,15 +546,9 @@ pub fn apply_field_to_global_config(
         "attachments_max_upload_mb" => {
             let trimmed = value.trim();
             if trimmed.is_empty() {
-                config.attachments_max_upload_mb =
-                    GlobalConfig::default().attachments_max_upload_mb;
+                config.attachments_max_upload_mb = GlobalConfig::default().attachments_max_upload_mb;
             } else {
-                let parsed = trimmed.parse::<i64>().map_err(|_| {
-                    ConfigError::ParseError(format!(
-                        "{} must be an integer (MiB), got '{}'",
-                        field, trimmed
-                    ))
-                })?;
+                let parsed = trimmed.parse::<i64>().map_err(|_| ConfigError::ParseError(format!("{} must be an integer (MiB), got '{}'", field, trimmed)))?;
                 config.attachments_max_upload_mb = parsed;
             }
         }
@@ -734,55 +564,33 @@ pub fn apply_field_to_global_config(
         "agent_context_extension" => {
             let trimmed = value.trim();
             if trimmed.is_empty() {
-                return Err(ConfigError::ParseError(
-                    "agent_context_extension cannot be empty".to_string(),
-                ));
+                return Err(ConfigError::ParseError("agent_context_extension cannot be empty".to_string()));
             }
             config.agent_context_extension = trimmed.to_string();
         }
         "agent_logs_dir" => {
             let trimmed = value.trim();
-            config.agent_logs_dir = if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed.to_string())
-            };
+            config.agent_logs_dir = if trimmed.is_empty() { None } else { Some(trimmed.to_string()) };
         }
         "agent_instructions" => {
             let trimmed = value.trim();
-            config.agent_instructions = if trimmed.is_empty() {
-                None
-            } else {
-                Some(AgentInstructionsConfig::Inline(trimmed.to_string()))
-            };
+            config.agent_instructions = if trimmed.is_empty() { None } else { Some(AgentInstructionsConfig::Inline(trimmed.to_string())) };
         }
         "agent_instructions_file" => {
             let trimmed = value.trim();
-            config.agent_instructions = if trimmed.is_empty() {
-                None
-            } else {
-                Some(AgentInstructionsConfig::File {
-                    file: trimmed.to_string(),
-                })
-            };
+            config.agent_instructions = if trimmed.is_empty() { None } else { Some(AgentInstructionsConfig::File { file: trimmed.to_string() }) };
         }
         "agent_worktree_enabled" => {
             config.agent_worktree.enabled = parse_bool_flag(value, field)?;
         }
         "agent_worktree_dir" => {
             let trimmed = value.trim();
-            config.agent_worktree.dir = if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed.to_string())
-            };
+            config.agent_worktree.dir = if trimmed.is_empty() { None } else { Some(trimmed.to_string()) };
         }
         "agent_worktree_branch_prefix" => {
             let trimmed = value.trim();
             if trimmed.is_empty() {
-                return Err(ConfigError::ParseError(
-                    "agent_worktree_branch_prefix cannot be empty".to_string(),
-                ));
+                return Err(ConfigError::ParseError("agent_worktree_branch_prefix cannot be empty".to_string()));
             }
             config.agent_worktree.branch_prefix = trimmed.to_string();
         }
@@ -850,12 +658,7 @@ pub fn apply_field_to_global_config(
             if trimmed.is_empty() {
                 config.sprints.defaults.capacity_points = None;
             } else {
-                let parsed = trimmed.parse::<u32>().map_err(|err| {
-                    ConfigError::ParseError(format!(
-                        "Invalid sprint capacity points '{}': {}",
-                        value, err
-                    ))
-                })?;
+                let parsed = trimmed.parse::<u32>().map_err(|err| ConfigError::ParseError(format!("Invalid sprint capacity points '{}': {}", value, err)))?;
                 config.sprints.defaults.capacity_points = Some(parsed);
             }
         }
@@ -864,12 +667,7 @@ pub fn apply_field_to_global_config(
             if trimmed.is_empty() {
                 config.sprints.defaults.capacity_hours = None;
             } else {
-                let parsed = trimmed.parse::<u32>().map_err(|err| {
-                    ConfigError::ParseError(format!(
-                        "Invalid sprint capacity hours '{}': {}",
-                        value, err
-                    ))
-                })?;
+                let parsed = trimmed.parse::<u32>().map_err(|err| ConfigError::ParseError(format!("Invalid sprint capacity hours '{}': {}", value, err)))?;
                 config.sprints.defaults.capacity_hours = Some(parsed);
             }
         }
@@ -905,8 +703,7 @@ pub fn apply_field_to_global_config(
             config.ui_theme_file = parse_optional_string(value);
         }
         "ui_theme" | "ui_name" | "ui_logo" | "ui_logo_dark" | "ui_icon" => {
-            crate::services::branding_service::validate_ui_field(field, value)
-                .map_err(ConfigError::ParseError)?;
+            crate::services::branding_service::validate_ui_field(field, value).map_err(ConfigError::ParseError)?;
             let next = parse_optional_string(value);
             match field {
                 "ui_theme" => config.ui_theme = next,
@@ -917,47 +714,30 @@ pub fn apply_field_to_global_config(
             }
         }
         _ => {
-            return Err(ConfigError::ParseError(format!(
-                "Unknown global config field: {}",
-                field
-            )));
+            return Err(ConfigError::ParseError(format!("Unknown global config field: {}", field)));
         }
     }
     Ok(())
 }
 
 /// Apply a field update to ProjectConfig
-pub fn apply_field_to_project_config(
-    config: &mut ProjectConfig,
-    field: &str,
-    value: &str,
-) -> Result<(), ConfigError> {
+pub fn apply_field_to_project_config(config: &mut ProjectConfig, field: &str, value: &str) -> Result<(), ConfigError> {
     match field {
         "project_name" => {
             config.project_name = value.to_string();
         }
         "default_assignee" => {
-            config.default_assignee = if value.is_empty() {
-                None
-            } else {
-                Some(value.to_string())
-            };
+            config.default_assignee = if value.is_empty() { None } else { Some(value.to_string()) };
         }
         "default_reporter" => {
-            config.default_reporter = if value.is_empty() {
-                None
-            } else {
-                Some(value.to_string())
-            };
+            config.default_reporter = if value.is_empty() { None } else { Some(value.to_string()) };
         }
         "default_priority" => {
             if value.trim().is_empty() {
                 config.default_priority = None;
                 return Ok(());
             }
-            let priority = value.parse::<Priority>().map_err(|err| {
-                ConfigError::ParseError(format!("Invalid priority '{}': {}", value, err))
-            })?;
+            let priority = value.parse::<Priority>().map_err(|err| ConfigError::ParseError(format!("Invalid priority '{}': {}", value, err)))?;
             config.default_priority = Some(priority);
         }
         "default_status" => {
@@ -965,33 +745,19 @@ pub fn apply_field_to_project_config(
                 config.default_status = None;
                 return Ok(());
             }
-            let status = value.parse::<TaskStatus>().map_err(|err| {
-                ConfigError::ParseError(format!("Invalid status '{}': {}", value, err))
-            })?;
+            let status = value.parse::<TaskStatus>().map_err(|err| ConfigError::ParseError(format!("Invalid status '{}': {}", value, err)))?;
             config.default_status = Some(status);
         }
         "default_tags" => {
             let values = parse_simple_csv(value);
-            config.default_tags = if values.is_empty() {
-                None
-            } else {
-                Some(values)
-            };
+            config.default_tags = if values.is_empty() { None } else { Some(values) };
         }
         "members" => {
             let members = parse_simple_csv(value);
-            config.members = if members.is_empty() {
-                None
-            } else {
-                Some(members)
-            };
+            config.members = if members.is_empty() { None } else { Some(members) };
         }
         "review_reviewers" => {
-            config.review_reviewers = if value.trim().is_empty() {
-                None
-            } else {
-                Some(parse_review_reviewers(value)?)
-            };
+            config.review_reviewers = if value.trim().is_empty() { None } else { Some(parse_review_reviewers(value)?) };
         }
         "strict_members" => {
             config.strict_members = parse_optional_bool_flag(value, field)?;
@@ -1077,19 +843,11 @@ pub fn apply_field_to_project_config(
         }
         "scan_signal_words" => {
             let entries = parse_simple_csv(value);
-            config.scan_signal_words = if entries.is_empty() {
-                None
-            } else {
-                Some(entries)
-            };
+            config.scan_signal_words = if entries.is_empty() { None } else { Some(entries) };
         }
         "scan_ticket_patterns" => {
             let entries = parse_simple_csv(value);
-            config.scan_ticket_patterns = if entries.is_empty() {
-                None
-            } else {
-                Some(entries)
-            };
+            config.scan_ticket_patterns = if entries.is_empty() { None } else { Some(entries) };
         }
         "scan_enable_ticket_words" => {
             config.scan_enable_ticket_words = parse_optional_bool_flag(value, field)?;
@@ -1102,33 +860,20 @@ pub fn apply_field_to_project_config(
         }
         "attachments_dir" => {
             let trimmed = value.trim();
-            config.attachments_dir = if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed.to_string())
-            };
+            config.attachments_dir = if trimmed.is_empty() { None } else { Some(trimmed.to_string()) };
         }
         "attachments_max_upload_mb" => {
             let trimmed = value.trim();
             if trimmed.is_empty() {
                 config.attachments_max_upload_mb = None;
             } else {
-                let parsed = trimmed.parse::<i64>().map_err(|_| {
-                    ConfigError::ParseError(format!(
-                        "{} must be an integer (MiB), got '{}'",
-                        field, trimmed
-                    ))
-                })?;
+                let parsed = trimmed.parse::<i64>().map_err(|_| ConfigError::ParseError(format!("{} must be an integer (MiB), got '{}'", field, trimmed)))?;
                 config.attachments_max_upload_mb = Some(parsed);
             }
         }
         "sync_reports_dir" => {
             let trimmed = value.trim();
-            config.sync_reports_dir = if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed.to_string())
-            };
+            config.sync_reports_dir = if trimmed.is_empty() { None } else { Some(trimmed.to_string()) };
         }
         "sync_write_reports" => {
             config.sync_write_reports = parse_optional_bool_flag(value, field)?;
@@ -1138,41 +883,24 @@ pub fn apply_field_to_project_config(
         }
         "agent_context_extension" => {
             let trimmed = value.trim();
-            config.agent_context_extension =
-                if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("inherit") {
-                    None
-                } else {
-                    Some(trimmed.to_string())
-                };
+            config.agent_context_extension = if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("inherit") { None } else { Some(trimmed.to_string()) };
         }
         "agent_logs_dir" => {
             let trimmed = value.trim();
-            config.agent_logs_dir = if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("inherit")
-            {
-                None
-            } else {
-                Some(trimmed.to_string())
-            };
+            config.agent_logs_dir = if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("inherit") { None } else { Some(trimmed.to_string()) };
         }
         "agent_instructions" => {
             let trimmed = value.trim();
             config.agent_instructions =
-                if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("inherit") {
-                    None
-                } else {
-                    Some(AgentInstructionsConfig::Inline(trimmed.to_string()))
-                };
+                if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("inherit") { None } else { Some(AgentInstructionsConfig::Inline(trimmed.to_string())) };
         }
         "agent_instructions_file" => {
             let trimmed = value.trim();
-            config.agent_instructions =
-                if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("inherit") {
-                    None
-                } else {
-                    Some(AgentInstructionsConfig::File {
-                        file: trimmed.to_string(),
-                    })
-                };
+            config.agent_instructions = if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("inherit") {
+                None
+            } else {
+                Some(AgentInstructionsConfig::File { file: trimmed.to_string() })
+            };
         }
         "agent_worktree_enabled" => {
             let worktree = config.agent_worktree.get_or_insert_with(Default::default);
@@ -1227,11 +955,7 @@ pub fn apply_field_to_project_config(
         }
         "tag_properties" => {
             let properties = parse_tag_properties(value)?;
-            config.tag_properties = if properties.is_empty() {
-                None
-            } else {
-                Some(properties)
-            };
+            config.tag_properties = if properties.is_empty() { None } else { Some(properties) };
         }
         "branch_status_aliases" => {
             if value.trim().is_empty() {
@@ -1250,10 +974,7 @@ pub fn apply_field_to_project_config(
             }
         }
         _ => {
-            return Err(ConfigError::ParseError(format!(
-                "Unknown project config field: {}",
-                field
-            )));
+            return Err(ConfigError::ParseError(format!("Unknown project config field: {}", field)));
         }
     }
     Ok(())
@@ -1269,12 +990,7 @@ pub fn validate_field_name(field: &str, is_global: bool) -> Result<(), ConfigErr
     let valid_fields = valid_fields(is_global);
     if !valid_fields.contains(&field) {
         let scope = if is_global { "global" } else { "project" };
-        return Err(ConfigError::ParseError(format!(
-            "Invalid {} config field: '{}'. Valid fields: {}",
-            scope,
-            field,
-            valid_fields.join(", ")
-        )));
+        return Err(ConfigError::ParseError(format!("Invalid {} config field: '{}'. Valid fields: {}", scope, field, valid_fields.join(", "))));
     }
     Ok(())
 }
@@ -1289,9 +1005,7 @@ pub fn validate_field_name(field: &str, is_global: bool) -> Result<(), ConfigErr
 pub fn canonicalize_field_name(field: &str, is_global: bool) -> Result<String, ConfigError> {
     let trimmed = field.trim();
     if trimmed.is_empty() {
-        return Err(ConfigError::ParseError(
-            "Config field name cannot be empty".to_string(),
-        ));
+        return Err(ConfigError::ParseError("Config field name cannot be empty".to_string()));
     }
     let valid_fields = valid_fields(is_global);
     if valid_fields.contains(&trimmed) {
@@ -1302,10 +1016,7 @@ pub fn canonicalize_field_name(field: &str, is_global: bool) -> Result<String, C
             return Ok(flat.to_string());
         }
         let scope = if is_global { "global" } else { "project" };
-        return Err(ConfigError::ParseError(format!(
-            "Canonical field '{}' maps to '{}' which is not settable for {} configurations",
-            trimmed, flat, scope
-        )));
+        return Err(ConfigError::ParseError(format!("Canonical field '{}' maps to '{}' which is not settable for {} configurations", trimmed, flat, scope)));
     }
     if let Some(hint) = retired_field_hint(trimmed) {
         return Err(ConfigError::ParseError(hint));
@@ -1337,11 +1048,7 @@ fn retired_field_hint(field: &str) -> Option<String> {
 /// friends to the global scope without requiring `--global`.
 pub fn is_global_only_field_name(field: &str) -> Option<String> {
     let canonical = canonicalize_field_name(field, true).ok()?;
-    if valid_fields(false).contains(&canonical.as_str()) {
-        None
-    } else {
-        Some(canonical)
-    }
+    if valid_fields(false).contains(&canonical.as_str()) { None } else { Some(canonical) }
 }
 
 /// Validate that a field value is valid for the given field
@@ -1622,10 +1329,7 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
 /// `agent_worktree_dir`) clears only that subfield and preserves sibling
 /// settings; emptied sections are pruned instead of leaving empty shells.
 /// Unknown fields are rejected.
-pub fn clear_project_override_field(
-    config: &mut ProjectConfig,
-    field: &str,
-) -> Result<(), ConfigError> {
+pub fn clear_project_override_field(config: &mut ProjectConfig, field: &str) -> Result<(), ConfigError> {
     match field {
         // Scalar option fields
         "default_assignee" => config.default_assignee = None,
@@ -1702,10 +1406,7 @@ pub fn clear_project_override_field(
         // Project name is not optional; do not clear it silently
         "project_name" => { /* no-op: cannot clear non-optional */ }
         other => {
-            return Err(ConfigError::ParseError(format!(
-                "Unknown project config field: {}",
-                other
-            )));
+            return Err(ConfigError::ParseError(format!("Unknown project config field: {}", other)));
         }
     }
     Ok(())
@@ -1757,20 +1458,12 @@ fn clear_agent_worktree_field(config: &mut ProjectConfig, subfield: WorktreeSubf
 ///
 /// Compatibility wrapper routed through the shared DEV-71 candidate pipeline
 /// (validation before a single atomic write).
-pub fn clear_project_field(
-    tasks_dir: &Path,
-    project_prefix: &str,
-    field: &str,
-) -> Result<(), ConfigError> {
+pub fn clear_project_field(tasks_dir: &Path, project_prefix: &str, field: &str) -> Result<(), ConfigError> {
     let scope = crate::config::candidate::ConfigScope::Project(project_prefix.to_string());
     crate::config::candidate::apply_config_set(
         tasks_dir,
         &scope,
-        &crate::config::candidate::ConfigSetRequest {
-            entries: vec![(field.to_string(), String::new())],
-            force: false,
-            dry_run: false,
-        },
+        &crate::config::candidate::ConfigSetRequest { entries: vec![(field.to_string(), String::new())], force: false, dry_run: false },
     )?;
     Ok(())
 }
@@ -1784,8 +1477,7 @@ mod tests {
         let mut config = ProjectConfig::new("demo".to_string());
         config.default_priority = Some(Priority::from("Existing"));
 
-        apply_field_to_project_config(&mut config, "default_priority", " ")
-            .expect("should allow clearing values");
+        apply_field_to_project_config(&mut config, "default_priority", " ").expect("should allow clearing values");
 
         assert!(config.default_priority.is_none());
     }
@@ -1794,14 +1486,9 @@ mod tests {
     fn setting_custom_default_priority_preserves_token() {
         let mut config = ProjectConfig::new("demo".to_string());
 
-        apply_field_to_project_config(&mut config, "default_priority", "🔥 Hot")
-            .expect("custom priority should be accepted");
+        apply_field_to_project_config(&mut config, "default_priority", "🔥 Hot").expect("custom priority should be accepted");
 
-        let stored = config
-            .default_priority
-            .expect("priority should be set")
-            .as_str()
-            .to_string();
+        let stored = config.default_priority.expect("priority should be set").as_str().to_string();
         assert_eq!(stored, "🔥 Hot");
     }
 
@@ -1810,8 +1497,7 @@ mod tests {
         let mut config = ProjectConfig::new("demo".to_string());
         config.default_status = Some(TaskStatus::from("Todo"));
 
-        apply_field_to_project_config(&mut config, "default_status", "")
-            .expect("should allow clearing default status");
+        apply_field_to_project_config(&mut config, "default_status", "").expect("should allow clearing default status");
 
         assert!(config.default_status.is_none());
     }
@@ -1819,8 +1505,7 @@ mod tests {
     #[test]
     fn parse_alias_map_accepts_mixed_delimiters() {
         let raw = "feat=Feature; bug : Bug\nchore=Chore";
-        let parsed =
-            parse_alias_map::<TaskType>(raw, "branch type alias").expect("alias map should parse");
+        let parsed = parse_alias_map::<TaskType>(raw, "branch type alias").expect("alias map should parse");
         assert_eq!(parsed.len(), 3);
         assert_eq!(parsed.get("feat").unwrap().to_string(), "Feature");
         assert_eq!(parsed.get("bug").unwrap().to_string(), "Bug");
@@ -1830,8 +1515,7 @@ mod tests {
     #[test]
     fn parse_alias_map_normalizes_keys_to_lowercase() {
         let raw_yaml = r#"{ Feat: Feature, BUGFIX: Bug }"#;
-        let parsed = parse_alias_map::<TaskType>(raw_yaml, "branch type alias")
-            .expect("alias map should parse");
+        let parsed = parse_alias_map::<TaskType>(raw_yaml, "branch type alias").expect("alias map should parse");
         assert!(parsed.contains_key("feat"));
         assert!(parsed.contains_key("bugfix"));
     }
@@ -1839,15 +1523,13 @@ mod tests {
     #[test]
     fn parse_alias_map_rejects_duplicate_aliases() {
         let raw = "feat=Feature,FEAT=Bug";
-        let err = parse_alias_map::<TaskType>(raw, "branch type alias")
-            .expect_err("duplicate aliases should error");
+        let err = parse_alias_map::<TaskType>(raw, "branch type alias").expect_err("duplicate aliases should error");
         assert!(format!("{}", err).contains("Duplicate branch type alias"));
     }
 
     #[test]
     fn parse_alias_map_rejects_empty_alias_keys() {
-        let err = parse_alias_map::<TaskType>("=Feature", "branch type alias")
-            .expect_err("empty alias should error");
+        let err = parse_alias_map::<TaskType>("=Feature", "branch type alias").expect_err("empty alias should error");
         assert!(format!("{}", err).contains("alias cannot be empty"));
     }
 
@@ -1855,16 +1537,9 @@ mod tests {
     fn custom_issue_states_are_trimmed_and_preserved() {
         let mut config = ProjectConfig::new("demo".to_string());
 
-        apply_field_to_project_config(&mut config, "issue_states", "Queued, In QA")
-            .expect("custom states should be accepted");
+        apply_field_to_project_config(&mut config, "issue_states", "Queued, In QA").expect("custom states should be accepted");
 
-        let states = config
-            .issue_states
-            .expect("states should be set")
-            .values
-            .into_iter()
-            .map(|status| status.as_str().to_string())
-            .collect::<Vec<_>>();
+        let states = config.issue_states.expect("states should be set").values.into_iter().map(|status| status.as_str().to_string()).collect::<Vec<_>>();
         assert_eq!(states, vec!["Queued", "In QA"]);
     }
 
@@ -1872,8 +1547,7 @@ mod tests {
     fn issue_states_empty_entries_error() {
         let mut config = ProjectConfig::new("demo".to_string());
 
-        let err = apply_field_to_project_config(&mut config, "issue_states", "Todo, , Done")
-            .expect_err("should reject empty entries");
+        let err = apply_field_to_project_config(&mut config, "issue_states", "Todo, , Done").expect_err("should reject empty entries");
 
         assert!(format!("{}", err).contains("entries cannot be empty"));
     }

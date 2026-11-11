@@ -12,11 +12,7 @@ fn lotar(dir: &std::path::Path, home: &std::path::Path, args: &[&str]) -> String
         .args(args)
         .output()
         .unwrap();
-    format!(
-        "{}{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    )
+    format!("{}{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr))
 }
 
 fn git_init(dir: &std::path::Path) {
@@ -28,17 +24,9 @@ fn git_init(dir: &std::path::Path) {
 fn read_only_commands_create_nothing() {
     let root = tempfile::tempdir().unwrap();
     let home = tempfile::tempdir().unwrap();
-    for args in [
-        &["list"][..],
-        &["show", "X-1"],
-        &["stats", "tags"],
-        &["--format", "json", "list"],
-    ] {
+    for args in [&["list"][..], &["show", "X-1"], &["stats", "tags"], &["--format", "json", "list"]] {
         lotar(root.path(), home.path(), args);
-        assert!(
-            !root.path().join(".tasks").exists(),
-            "{args:?} created a workspace"
-        );
+        assert!(!root.path().join(".tasks").exists(), "{args:?} created a workspace");
     }
 }
 
@@ -47,11 +35,7 @@ fn nested_repositories_and_home_get_their_own_workspace() {
     let home = tempfile::tempdir().unwrap();
     let home_path = home.path();
     std::fs::create_dir_all(home_path.join(".tasks")).unwrap();
-    std::fs::write(
-        home_path.join(".tasks/config.yml"),
-        "default:\n  project: HOMEWS\n",
-    )
-    .unwrap();
+    std::fs::write(home_path.join(".tasks/config.yml"), "default:\n  project: HOMEWS\n").unwrap();
 
     // A plain folder below home does not adopt ~/.tasks.
     let plain = home_path.join("notes/sub");
@@ -67,10 +51,7 @@ fn nested_repositories_and_home_get_their_own_workspace() {
     let inner = outer.join("inner");
     git_init(&inner);
     lotar(&inner, home_path, &["add", "inner"]);
-    assert!(
-        inner.join(".tasks").exists(),
-        "inner repo gets its own workspace"
-    );
+    assert!(inner.join(".tasks").exists(), "inner repo gets its own workspace");
 
     // Inside a repository, subfolders still find the repository's workspace.
     let sub = outer.join("src/deep");

@@ -72,10 +72,7 @@ mod test_environment {
         let scratch = base.join(format!(
             "{}-{}",
             std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_nanos())
-                .unwrap_or(0),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0),
         ));
         // Retry: a finishing process removes the base once it is empty,
         // which can happen between creating the base and the scratch.
@@ -105,10 +102,7 @@ mod test_environment {
     /// rationale). Shares the routing-key inventory with the production
     /// `git_command` factory via `is_repository_routing_key`.
     fn scrub_repository_routing_env() {
-        let offenders: Vec<String> = std::env::vars()
-            .map(|(key, _)| key)
-            .filter(|key| crate::utils::git::is_repository_routing_key(key))
-            .collect();
+        let offenders: Vec<String> = std::env::vars().map(|(key, _)| key).filter(|key| crate::utils::git::is_repository_routing_key(key)).collect();
         for key in offenders {
             // Manipulating process-wide env vars requires `unsafe`. Keep
             // scope tiny; the ctor runs before any test thread exists.
@@ -130,18 +124,13 @@ mod test_environment {
             let Some(name) = entry.file_name().to_str().map(str::to_string) else {
                 continue;
             };
-            let Some(owner) = name
-                .split('-')
-                .next()
-                .and_then(|pid| pid.parse::<u32>().ok())
-            else {
+            let Some(owner) = name.split('-').next().and_then(|pid| pid.parse::<u32>().ok()) else {
                 continue;
             };
             if owner == own_pid {
                 continue;
             }
-            let dead = unsafe { libc::kill(owner as i32, 0) == -1 }
-                && std::io::Error::last_os_error().raw_os_error() == Some(libc::ESRCH);
+            let dead = unsafe { libc::kill(owner as i32, 0) == -1 } && std::io::Error::last_os_error().raw_os_error() == Some(libc::ESRCH);
             if dead {
                 let _ = std::fs::remove_dir_all(entry.path());
             }

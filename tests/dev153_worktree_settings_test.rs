@@ -8,14 +8,7 @@ fn run(dir: &std::path::Path, args: &[&str]) -> (bool, String) {
     cmd.env("LOTAR_IGNORE_HOME_CONFIG", "1");
     cmd.current_dir(dir);
     let out = cmd.args(args).output().unwrap();
-    (
-        out.status.success(),
-        format!(
-            "{}{}",
-            String::from_utf8_lossy(&out.stdout),
-            String::from_utf8_lossy(&out.stderr)
-        ),
-    )
+    (out.status.success(), format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr)))
 }
 
 fn read(dir: &std::path::Path, rel: &str) -> String {
@@ -52,93 +45,21 @@ fn job_limit_and_cleanup_settings_are_settable() {
     }
 
     // 0 pauses new jobs; anything that is not a whole number is refused.
-    assert!(
-        run(
-            dir,
-            &[
-                "config",
-                "set",
-                "agent_worktree_max_parallel_jobs",
-                "0",
-                "--global"
-            ]
-        )
-        .0
-    );
+    assert!(run(dir, &["config", "set", "agent_worktree_max_parallel_jobs", "0", "--global"]).0);
     assert!(read(dir, "config.yml").contains("max_parallel_jobs: 0"));
-    let (ok, out) = run(
-        dir,
-        &[
-            "config",
-            "set",
-            "agent_worktree_max_parallel_jobs",
-            "two",
-            "--global",
-        ],
-    );
+    let (ok, out) = run(dir, &["config", "set", "agent_worktree_max_parallel_jobs", "two", "--global"]);
     assert!(!ok && out.contains("whole number"), "{out}");
     // Empty removes the limit.
-    assert!(
-        run(
-            dir,
-            &[
-                "config",
-                "set",
-                "agent_worktree_max_parallel_jobs",
-                "",
-                "--global"
-            ]
-        )
-        .0
-    );
+    assert!(run(dir, &["config", "set", "agent_worktree_max_parallel_jobs", "", "--global"]).0);
     assert!(!read(dir, "config.yml").contains("max_parallel_jobs"));
 
     // Project overrides set and clear one setting at a time.
-    assert!(
-        run(
-            dir,
-            &[
-                "config",
-                "set",
-                "agent_worktree_cleanup_on_done",
-                "false",
-                "-p",
-                "WT"
-            ]
-        )
-        .0
-    );
-    assert!(
-        run(
-            dir,
-            &[
-                "config",
-                "set",
-                "agent_worktree_max_parallel_jobs",
-                "1",
-                "-p",
-                "WT"
-            ]
-        )
-        .0
-    );
+    assert!(run(dir, &["config", "set", "agent_worktree_cleanup_on_done", "false", "-p", "WT"]).0);
+    assert!(run(dir, &["config", "set", "agent_worktree_max_parallel_jobs", "1", "-p", "WT"]).0);
     let project = read(dir, "WT/config.yml");
     assert!(project.contains("cleanup_on_done: false"), "{project}");
     assert!(project.contains("max_parallel_jobs: 1"), "{project}");
-    assert!(
-        run(
-            dir,
-            &[
-                "config",
-                "set",
-                "agent_worktree_cleanup_on_done",
-                "",
-                "-p",
-                "WT"
-            ]
-        )
-        .0
-    );
+    assert!(run(dir, &["config", "set", "agent_worktree_cleanup_on_done", "", "-p", "WT"]).0);
     let project = read(dir, "WT/config.yml");
     assert!(!project.contains("cleanup_on_done"), "{project}");
     assert!(project.contains("max_parallel_jobs: 1"), "{project}");

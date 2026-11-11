@@ -23,10 +23,7 @@ pub fn parse_output_format(s: &str) -> Result<OutputFormat, String> {
         "table" | "markdown" | "md" => Ok(OutputFormat::Text),
         "json" => Ok(OutputFormat::Json),
         "jsonl" | "json-lines" | "ndjson" => Ok(OutputFormat::Json), // alias to Json for now
-        other => Err(format!(
-            "invalid format: '{}' . Supported formats: text, json",
-            other
-        )),
+        other => Err(format!("invalid format: '{}' . Supported formats: text, json", other)),
     }
 }
 
@@ -90,12 +87,7 @@ pub trait Outputable {
 // Implement Outputable for Task
 impl Outputable for Task {
     fn to_text(&self) -> String {
-        let status_key = self
-            .status
-            .as_str()
-            .trim()
-            .to_ascii_lowercase()
-            .replace([' ', '_', '-'], "");
+        let status_key = self.status.as_str().trim().to_ascii_lowercase().replace([' ', '_', '-'], "");
         let status_emoji = match status_key.as_str() {
             "todo" => "📋",
             "inprogress" => "🚧",
@@ -111,14 +103,7 @@ impl Outputable for Task {
         let type_str = self.task_type.to_string();
         let type_styled = type_str;
 
-        let mut output = format!(
-            "{} {} [{}] - {} ({})",
-            status_emoji,
-            self.title.clone(),
-            type_styled,
-            priority_color,
-            self.status
-        );
+        let mut output = format!("{} {} [{}] - {} ({})", status_emoji, self.title.clone(), type_styled, priority_color, self.status);
 
         if let Some(assignee) = &self.assignee {
             let _ = write!(output, " - 👤 {}", assignee);
@@ -144,18 +129,12 @@ impl Outputable for Task {
             self.assignee.as_deref().unwrap_or("-").to_owned(),
             self.due_date.as_deref().unwrap_or("-").to_owned(),
             self.effort.as_deref().unwrap_or("-").to_owned(),
-            if self.tags.is_empty() {
-                String::from("-")
-            } else {
-                self.tags.join(", ")
-            },
+            if self.tags.is_empty() { String::from("-") } else { self.tags.join(", ") },
         ]
     }
 
     fn table_headers() -> Vec<&'static str> {
-        vec![
-            "Title", "Status", "Priority", "Type", "Assignee", "Due Date", "Effort", "Tags",
-        ]
+        vec!["Title", "Status", "Priority", "Type", "Assignee", "Due Date", "Effort", "Tags"]
     }
 }
 
@@ -171,20 +150,11 @@ pub struct TaskSummary {
 
 impl Outputable for TaskSummary {
     fn to_text(&self) -> String {
-        format!(
-            "[{}] {} - {} ({}, {})",
-            self.id, self.title, self.status, self.priority, self.task_type
-        )
+        format!("[{}] {} - {} ({}, {})", self.id, self.title, self.status, self.priority, self.task_type)
     }
 
     fn to_table_row(&self) -> Vec<String> {
-        vec![
-            self.id.clone(),
-            self.title.clone(),
-            self.status.to_string(),
-            self.priority.to_string(),
-            self.task_type.to_string(),
-        ]
+        vec![self.id.clone(), self.title.clone(), self.status.to_string(), self.priority.to_string(), self.task_type.to_string()]
     }
 
     fn table_headers() -> Vec<&'static str> {
@@ -202,11 +172,7 @@ pub struct OutputRenderer {
 impl OutputRenderer {
     pub fn new(format: OutputFormat, log_level: LogLevel) -> Self {
         let pretty_json = matches!(log_level, LogLevel::Debug | LogLevel::Trace);
-        Self {
-            format,
-            log_level,
-            pretty_json,
-        }
+        Self { format, log_level, pretty_json }
     }
 
     // Small helpers to reduce duplication
@@ -227,11 +193,7 @@ impl OutputRenderer {
         }
     }
 
-    pub fn render_list<T: Outputable + Serialize>(
-        &self,
-        items: &[T],
-        title: Option<&str>,
-    ) -> String {
+    pub fn render_list<T: Outputable + Serialize>(&self, items: &[T], title: Option<&str>) -> String {
         match self.format {
             OutputFormat::Text => self.render_text_list(items, title),
             OutputFormat::Json => self.render_json_list(items),
@@ -406,22 +368,14 @@ pub(crate) fn no_color_disables(no_color: Option<&std::ffi::OsStr>) -> bool {
     no_color.is_some()
 }
 
-pub(crate) fn styling_allowed(
-    format_is_text: bool,
-    no_color_set: bool,
-    stdout_is_tty: bool,
-) -> bool {
+pub(crate) fn styling_allowed(format_is_text: bool, no_color_set: bool, stdout_is_tty: bool) -> bool {
     format_is_text && !no_color_set && stdout_is_tty
 }
 
 /// Whether stdout styling is appropriate for this renderer right now.
 /// Machine formats (JSON) and piped/plain streams never receive ANSI.
 pub(crate) fn stdout_styling_enabled(format: &OutputFormat) -> bool {
-    styling_allowed(
-        matches!(format, OutputFormat::Text),
-        no_color_disables(std::env::var_os("NO_COLOR").as_deref()),
-        std::io::stdout().is_terminal(),
-    )
+    styling_allowed(matches!(format, OutputFormat::Text), no_color_disables(std::env::var_os("NO_COLOR").as_deref()), std::io::stdout().is_terminal())
 }
 
 #[cfg(test)]
@@ -461,10 +415,7 @@ mod styling_tests {
 
     #[test]
     fn styling_requires_terminal() {
-        assert!(
-            !styling_allowed(true, false, false),
-            "piped output stays plain"
-        );
+        assert!(!styling_allowed(true, false, false), "piped output stays plain");
     }
 
     #[test]
@@ -478,18 +429,11 @@ mod styling_tests {
 
     #[test]
     fn bold_highlight_is_bold_and_yellow_in_one_sequence() {
-        assert_eq!(
-            ansi_bold_highlight("Port: 777"),
-            "\x1b[1;33mPort: 777\x1b[0m",
-            "fallback port uses one exact bold+yellow sequence"
-        );
+        assert_eq!(ansi_bold_highlight("Port: 777"), "\x1b[1;33mPort: 777\x1b[0m", "fallback port uses one exact bold+yellow sequence");
         let styled = ansi_bold_highlight("Port: 777");
         assert!(styled.starts_with("\x1b[1;33m"));
         assert!(styled.ends_with("\x1b[0m"));
-        assert_eq!(
-            styled.len(),
-            "Port: 777".len() + "\x1b[1;33m".len() + "\x1b[0m".len()
-        );
+        assert_eq!(styled.len(), "Port: 777".len() + "\x1b[1;33m".len() + "\x1b[0m".len());
         // Distinct from plain bold so callers cannot silently downgrade.
         assert_ne!(styled, ansi_bold("Port: 777"));
     }

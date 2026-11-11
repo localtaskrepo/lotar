@@ -9,18 +9,11 @@ pub fn command_index(raw_args: &[String]) -> Option<usize> {
     while idx < raw_args.len() {
         let token = raw_args[idx].as_str();
         match token {
-            "-p" | "--project" | "-f" | "--format" | "-l" | "--log-level" | "--tasks-dir"
-            | "--config" => idx += 2,
+            "-p" | "--project" | "-f" | "--format" | "-l" | "--log-level" | "--tasks-dir" | "--config" => idx += 2,
             "-v" | "--verbose" | "--force-archived" => idx += 1,
             "--" => return None,
             _ if token.starts_with("--") && token.contains('=') => idx += 1,
-            _ if (token.starts_with("-f")
-                || token.starts_with("-l")
-                || token.starts_with("-p"))
-                && token.len() > 2 =>
-            {
-                idx += 1
-            }
+            _ if (token.starts_with("-f") || token.starts_with("-l") || token.starts_with("-p")) && token.len() > 2 => idx += 1,
             _ => return Some(idx),
         }
     }
@@ -49,10 +42,7 @@ pub fn normalize_args(raw_args: &[String]) -> Result<Vec<String>, String> {
 /// `-s Todo` or `-s=Todo` keep working.
 fn route_query_exclusions(args: &[String]) -> Vec<String> {
     let takes_query = |idx: usize| {
-        args[..idx].iter().enumerate().any(|(i, arg)| {
-            matches!(arg.as_str(), "list" | "ls")
-                || (arg == "backlog" && i > 0 && args[i - 1] == "sprint")
-        })
+        args[..idx].iter().enumerate().any(|(i, arg)| matches!(arg.as_str(), "list" | "ls") || (arg == "backlog" && i > 0 && args[i - 1] == "sprint"))
     };
     let mut out = Vec::with_capacity(args.len());
     let mut after_separator = false;
@@ -73,12 +63,7 @@ fn is_excluded_filter(arg: &str) -> bool {
         return false;
     }
     let parsed = crate::utils::search_syntax::parse(arg);
-    parsed.text.is_empty()
-        && parsed.errors.is_empty()
-        && parsed.filters.keys().any(|key| {
-            key.strip_prefix('-')
-                .is_some_and(|k| k.chars().count() >= 2)
-        })
+    parsed.text.is_empty() && parsed.errors.is_empty() && parsed.filters.keys().any(|key| key.strip_prefix('-').is_some_and(|k| k.chars().count() >= 2))
 }
 
 fn hoist_global_flags(raw_args: &[String]) -> Result<Vec<String>, String> {
@@ -120,60 +105,38 @@ fn hoist_global_flags(raw_args: &[String]) -> Result<Vec<String>, String> {
     Ok(normalized)
 }
 
-fn try_hoist_global_flag(
-    args: &[String],
-    idx: usize,
-) -> Result<Option<(usize, Vec<String>)>, String> {
+fn try_hoist_global_flag(args: &[String], idx: usize) -> Result<Option<(usize, Vec<String>)>, String> {
     let token = &args[idx];
 
     match token.as_str() {
         "--format" => {
-            let value = args
-                .get(idx + 1)
-                .ok_or_else(|| "Option '--format' requires a value".to_string())?
-                .clone();
+            let value = args.get(idx + 1).ok_or_else(|| "Option '--format' requires a value".to_string())?.clone();
             return Ok(Some((2, vec!["--format".to_string(), value])));
         }
         "--log-level" => {
-            let value = args
-                .get(idx + 1)
-                .ok_or_else(|| "Option '--log-level' requires a value".to_string())?
-                .clone();
+            let value = args.get(idx + 1).ok_or_else(|| "Option '--log-level' requires a value".to_string())?.clone();
             return Ok(Some((2, vec!["--log-level".to_string(), value])));
         }
         "--tasks-dir" => {
-            let value = args
-                .get(idx + 1)
-                .ok_or_else(|| "Option '--tasks-dir' requires a value".to_string())?
-                .clone();
+            let value = args.get(idx + 1).ok_or_else(|| "Option '--tasks-dir' requires a value".to_string())?.clone();
             return Ok(Some((2, vec!["--tasks-dir".to_string(), value])));
         }
         "--verbose" => {
             return Ok(Some((1, vec!["--verbose".to_string()])));
         }
         "--project" => {
-            let value = args
-                .get(idx + 1)
-                .ok_or_else(|| "Option '--project' requires a value".to_string())?
-                .clone();
+            let value = args.get(idx + 1).ok_or_else(|| "Option '--project' requires a value".to_string())?.clone();
             return Ok(Some((2, vec!["--project".to_string(), value])));
         }
         _ => {}
     }
 
-    if token.starts_with("--format=")
-        || token.starts_with("--log-level=")
-        || token.starts_with("--tasks-dir=")
-        || token.starts_with("--project=")
-    {
+    if token.starts_with("--format=") || token.starts_with("--log-level=") || token.starts_with("--tasks-dir=") || token.starts_with("--project=") {
         return Ok(Some((1, vec![token.clone()])));
     }
 
     if token == "-f" {
-        let value = args
-            .get(idx + 1)
-            .ok_or_else(|| "Option '-f' requires a value".to_string())?
-            .clone();
+        let value = args.get(idx + 1).ok_or_else(|| "Option '-f' requires a value".to_string())?.clone();
         return Ok(Some((2, vec!["--format".to_string(), value])));
     }
 
@@ -183,18 +146,12 @@ fn try_hoist_global_flag(
     }
     // `-fjson` is the format flag; `-fix: flaky test` (a title, comment or
     // option value) is not, so only real formats are hoisted (DEV-281).
-    if token.starts_with("-f")
-        && token.len() > 2
-        && crate::output::parse_output_format(&token[2..]).is_ok()
-    {
+    if token.starts_with("-f") && token.len() > 2 && crate::output::parse_output_format(&token[2..]).is_ok() {
         return Ok(Some((1, vec![format!("--format={}", &token[2..])])));
     }
 
     if token == "-l" {
-        let value = args
-            .get(idx + 1)
-            .ok_or_else(|| "Option '-l' requires a value".to_string())?
-            .clone();
+        let value = args.get(idx + 1).ok_or_else(|| "Option '-l' requires a value".to_string())?.clone();
         return Ok(Some((2, vec!["--log-level".to_string(), value])));
     }
 
@@ -445,24 +402,18 @@ pub fn removed_flag_hint(args: &[String]) -> Option<String> {
         let flag = arg.split('=').next().unwrap_or(arg);
         let instead = match flag {
             "--high" | "-H" => "`priority:high` in `lotar list`, `--priority high` in `lotar add`",
-            "--critical" | "-C" => {
-                "`priority:critical` in `lotar list`, `--priority critical` in `lotar add`"
-            }
+            "--critical" | "-C" => "`priority:critical` in `lotar list`, `--priority critical` in `lotar add`",
             "--bug" => "`--type bug`",
             "--epic" => "`--type epic`",
             "--mine" | "-m" => "`mine:true` (or `--assignee @me`)",
             "--unassigned" => "`assignee:__none__`",
             "--overdue" => "`due:overdue`",
             "--due-soon" => "`due_within:<days>` (or `--due-within <days>`)",
-            "--where" => {
-                "`key=value` or `field:name=value` in the search syntax: the `lotar list` query, `--filter` in `stats effort`"
-            }
+            "--where" => "`key=value` or `field:name=value` in the search syntax: the `lotar list` query, `--filter` in `stats effort`",
             "--select-where" | "--select-query" => "`--select '<query>'` in the search syntax",
             _ => return None,
         };
-        Some(format!(
-            "'{flag}' was removed; write {instead}. See `lotar help list`."
-        ))
+        Some(format!("'{flag}' was removed; write {instead}. See `lotar help list`."))
     })
 }
 
@@ -520,12 +471,7 @@ mod tests {
     fn transforms_with_global_flags() {
         let args = to_vec(&["lotar", "--format", "json", "serve", "-p", "7000", "--open"]);
         let normalized = normalize_args(&args).unwrap();
-        assert_eq!(
-            normalized,
-            to_vec(&[
-                "lotar", "--format", "json", "serve", "--port", "7000", "--open"
-            ])
-        );
+        assert_eq!(normalized, to_vec(&["lotar", "--format", "json", "serve", "--port", "7000", "--open"]));
     }
 
     #[test]
@@ -539,46 +485,21 @@ mod tests {
     fn hoists_global_flags_after_subcommand() {
         let args = to_vec(&["lotar", "sprint", "list", "--format", "json"]);
         let normalized = normalize_args(&args).unwrap();
-        assert_eq!(
-            normalized,
-            to_vec(&["lotar", "--format", "json", "sprint", "list"])
-        );
+        assert_eq!(normalized, to_vec(&["lotar", "--format", "json", "sprint", "list"]));
     }
 
     #[test]
     fn hoists_tasks_dir_and_log_level_forms() {
-        let args = to_vec(&[
-            "lotar",
-            "sprint",
-            "list",
-            "--tasks-dir",
-            "./tmp",
-            "-linfo",
-            "-fjson",
-        ]);
+        let args = to_vec(&["lotar", "sprint", "list", "--tasks-dir", "./tmp", "-linfo", "-fjson"]);
         let normalized = normalize_args(&args).unwrap();
-        assert_eq!(
-            normalized,
-            to_vec(&[
-                "lotar",
-                "--tasks-dir",
-                "./tmp",
-                "--log-level=info",
-                "--format=json",
-                "sprint",
-                "list",
-            ])
-        );
+        assert_eq!(normalized, to_vec(&["lotar", "--tasks-dir", "./tmp", "--log-level=info", "--format=json", "sprint", "list",]));
     }
 
     #[test]
     fn hoists_project_flag_for_subcommand() {
         let args = to_vec(&["lotar", "sprint", "list", "--project", "APP"]);
         let normalized = normalize_args(&args).unwrap();
-        assert_eq!(
-            normalized,
-            to_vec(&["lotar", "--project", "APP", "sprint", "list"])
-        );
+        assert_eq!(normalized, to_vec(&["lotar", "--project", "APP", "sprint", "list"]));
     }
 
     #[test]
@@ -597,58 +518,16 @@ mod tests {
 
     #[test]
     fn hoists_project_equals_form() {
-        let args = to_vec(&[
-            "lotar",
-            "sprint",
-            "add",
-            "--project=TEST",
-            "--sprint",
-            "8",
-            "TEST-1",
-        ]);
+        let args = to_vec(&["lotar", "sprint", "add", "--project=TEST", "--sprint", "8", "TEST-1"]);
         let normalized = normalize_args(&args).unwrap();
-        assert_eq!(
-            normalized,
-            to_vec(&[
-                "lotar",
-                "--project=TEST",
-                "sprint",
-                "add",
-                "--sprint",
-                "8",
-                "TEST-1"
-            ])
-        );
+        assert_eq!(normalized, to_vec(&["lotar", "--project=TEST", "sprint", "add", "--sprint", "8", "TEST-1"]));
     }
 
     #[test]
     fn hoists_project_with_positional_args() {
-        let args = to_vec(&[
-            "lotar",
-            "sprint",
-            "add",
-            "--sprint",
-            "8",
-            "--project",
-            "TEST",
-            "TEST-1",
-            "TEST-2",
-        ]);
+        let args = to_vec(&["lotar", "sprint", "add", "--sprint", "8", "--project", "TEST", "TEST-1", "TEST-2"]);
         let normalized = normalize_args(&args).unwrap();
-        assert_eq!(
-            normalized,
-            to_vec(&[
-                "lotar",
-                "--project",
-                "TEST",
-                "sprint",
-                "add",
-                "--sprint",
-                "8",
-                "TEST-1",
-                "TEST-2"
-            ])
-        );
+        assert_eq!(normalized, to_vec(&["lotar", "--project", "TEST", "sprint", "add", "--sprint", "8", "TEST-1", "TEST-2"]));
     }
 
     #[test]
@@ -662,41 +541,17 @@ mod tests {
 
     #[test]
     fn removed_flags_get_a_hint() {
-        let hint =
-            crate::cli::preprocess::removed_flag_hint(&to_vec(&["lotar", "list", "--due-soon=3"]))
-                .unwrap();
+        let hint = crate::cli::preprocess::removed_flag_hint(&to_vec(&["lotar", "list", "--due-soon=3"])).unwrap();
         assert!(hint.contains("due_within"), "{hint}");
-        assert!(
-            crate::cli::preprocess::removed_flag_hint(&to_vec(&[
-                "lotar", "list", "--status", "todo"
-            ]))
-            .is_none()
-        );
+        assert!(crate::cli::preprocess::removed_flag_hint(&to_vec(&["lotar", "list", "--status", "todo"])).is_none());
     }
 
     #[test]
     fn routes_excluded_filters_after_list_to_the_query() {
-        let args = to_vec(&[
-            "lotar",
-            "list",
-            "-status:done",
-            "-s",
-            "Todo",
-            "-s=Todo",
-            "-oauth",
-        ]);
+        let args = to_vec(&["lotar", "list", "-status:done", "-s", "Todo", "-s=Todo", "-oauth"]);
         assert_eq!(
             crate::cli::preprocess::normalize_args(&args).unwrap(),
-            to_vec(&[
-                "lotar",
-                "list",
-                "--query-term",
-                "-status:done",
-                "-s",
-                "Todo",
-                "-s=Todo",
-                "-oauth"
-            ])
+            to_vec(&["lotar", "list", "--query-term", "-status:done", "-s", "Todo", "-s=Todo", "-oauth"])
         );
         // Not a list command: left alone.
         let args = to_vec(&["lotar", "add", "-status:done"]);

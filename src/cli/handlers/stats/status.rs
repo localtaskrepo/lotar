@@ -20,19 +20,11 @@ pub(crate) fn run_status(
     // Resolve project + full task id
     let mut project_resolver = crate::cli::project::ProjectResolver::new(resolver)?;
     project_resolver.validate_task_id_format(id)?;
-    let final_effective_project =
-        project.map(|p| crate::utils::resolve_project_input(p, resolver.path.as_path()));
-    let resolved_project =
-        project_resolver.resolve_project(id, final_effective_project.as_deref())?;
+    let final_effective_project = project.map(|p| crate::utils::resolve_project_input(p, resolver.path.as_path()));
+    let resolved_project = project_resolver.resolve_project(id, final_effective_project.as_deref())?;
     let full_task_id = project_resolver.get_full_task_id(id, final_effective_project.as_deref())?;
 
-    let mut header = super::common::window_header(
-        "stats.time_in_status",
-        since_dt,
-        until_dt,
-        false,
-        Some(&resolved_project),
-    );
+    let mut header = super::common::window_header("stats.time_in_status", since_dt, until_dt, false, Some(&resolved_project));
     // A single task has no global scope.
     header.remove("global");
     let Some(git) = super::common::git_window(resolver, renderer, header)? else {
@@ -42,26 +34,18 @@ pub(crate) fn run_status(
 
     // Compute path to the single task file relative to repo root
     let tasks_abs = git.tasks_abs().clone();
-    let project_folder =
-        crate::storage::operations::StorageOperations::get_project_for_task(&full_task_id)
-            .ok_or_else(|| format!("Cannot resolve project for '{}'", full_task_id))?;
+    let project_folder = crate::storage::operations::StorageOperations::get_project_for_task(&full_task_id)
+        .ok_or_else(|| format!("Cannot resolve project for '{}'", full_task_id))?;
     let project_path = tasks_abs.join(&project_folder);
-    let rel_file = crate::storage::operations::StorageOperations::get_file_path_for_id(
-        &project_path,
-        &full_task_id,
-    )
-    .ok_or_else(|| format!("Task '{}' not found", full_task_id))?;
+    let rel_file = crate::storage::operations::StorageOperations::get_file_path_for_id(&project_path, &full_task_id)
+        .ok_or_else(|| format!("Task '{}' not found", full_task_id))?;
     let file_rel = if rel_file.starts_with(&repo_root) {
-        rel_file
-            .strip_prefix(&repo_root)
-            .map(std::path::PathBuf::from)
-            .unwrap_or_else(|_| rel_file.clone())
+        rel_file.strip_prefix(&repo_root).map(std::path::PathBuf::from).unwrap_or_else(|_| rel_file.clone())
     } else {
         rel_file
     };
 
-    let Some(durations) = status_durations(&repo_root, &tasks_abs, &file_rel, since_dt, until_dt)?
-    else {
+    let Some(durations) = status_durations(&repo_root, &tasks_abs, &file_rel, since_dt, until_dt)? else {
         match renderer.format {
             crate::output::OutputFormat::Json => {
                 let obj = serde_json::json!({
@@ -108,24 +92,16 @@ pub(crate) fn run_status(
                     let st = it["status"].as_str().unwrap_or("?");
                     let hrs = it["hours"].as_f64().unwrap_or(0.0);
                     let pct = it["percent"].as_f64().unwrap_or(0.0) * 100.0;
-                    renderer
-                        .emit_raw_stdout(format_args!("  {:>12}: {:.2}h ({:.1}%)", st, hrs, pct));
+                    renderer.emit_raw_stdout(format_args!("  {:>12}: {:.2}h ({:.1}%)", st, hrs, pct));
                 }
-                renderer.emit_raw_stdout(format_args!(
-                    "  {:>12}: {:.2}h",
-                    "Total",
-                    (total_seconds as f64) / 3600.0
-                ));
+                renderer.emit_raw_stdout(format_args!("  {:>12}: {:.2}h", "Total", (total_seconds as f64) / 3600.0));
             }
         }
     }
     Ok(())
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "one parameter per CLI flag; this handler forwards them unchanged"
-)]
+#[expect(clippy::too_many_arguments, reason = "one parameter per CLI flag; this handler forwards them unchanged")]
 pub(crate) fn run_time_in_status(
     since: Option<&str>,
     until: Option<&str>,
@@ -141,13 +117,7 @@ pub(crate) fn run_time_in_status(
 
     let scope_project = super::common::scope_project(global, project, resolver);
 
-    let header = super::common::window_header(
-        "stats.time_in_status",
-        since_dt,
-        until_dt,
-        global,
-        scope_project.as_deref(),
-    );
+    let header = super::common::window_header("stats.time_in_status", since_dt, until_dt, global, scope_project.as_deref());
     let Some(git) = super::common::git_window(resolver, renderer, header.clone())? else {
         return Ok(());
     };
@@ -157,11 +127,7 @@ pub(crate) fn run_time_in_status(
     // Walk tasks to collect files in-scope
     let mut task_files: Vec<(String, std::path::PathBuf)> = Vec::new();
     let base = repo_root.join(&tasks_rel);
-    let walker_root = if let Some(p) = scope_project.as_deref() {
-        base.join(p)
-    } else {
-        base.clone()
-    };
+    let walker_root = if let Some(p) = scope_project.as_deref() { base.join(p) } else { base.clone() };
     for p in crate::utils::filesystem::list_files_with_ext_recursive(&walker_root, "yml") {
         if let Ok(in_tasks) = p.strip_prefix(&base)
             && let Some(task) = crate::storage::layout::parse_relative(in_tasks)
@@ -182,8 +148,7 @@ pub(crate) fn run_time_in_status(
     // Then compute durations per status on [since, until]
     let mut results: Vec<serde_json::Value> = Vec::new();
     for (id, file_rel) in task_files.into_iter() {
-        let Some(durations) = status_durations(&repo_root, &base, &file_rel, since_dt, until_dt)?
-        else {
+        let Some(durations) = status_durations(&repo_root, &base, &file_rel, since_dt, until_dt)? else {
             continue;
         };
         // Skip empty
@@ -201,14 +166,7 @@ pub(crate) fn run_time_in_status(
 
     // Sort by total seconds desc and limit
     results.sort_by(|a, b| {
-        let sum = |v: &serde_json::Value| -> i64 {
-            v["items"]
-                .as_array()
-                .unwrap_or(&Vec::new())
-                .iter()
-                .map(|x| x["seconds"].as_i64().unwrap_or(0))
-                .sum()
-        };
+        let sum = |v: &serde_json::Value| -> i64 { v["items"].as_array().unwrap_or(&Vec::new()).iter().map(|x| x["seconds"].as_i64().unwrap_or(0)).sum() };
         sum(b).cmp(&sum(a))
     });
     let limited: Vec<_> = results.into_iter().take(limit).collect();
@@ -240,10 +198,7 @@ pub(crate) fn run_time_in_status(
                             let st = it["status"].as_str().unwrap_or("?");
                             let hrs = it["hours"].as_f64().unwrap_or(0.0);
                             let pct = it["percent"].as_f64().unwrap_or(0.0) * 100.0;
-                            renderer.emit_raw_stdout(format_args!(
-                                "  {:>12}: {:.2}h ({:.1}%)",
-                                st, hrs, pct
-                            ));
+                            renderer.emit_raw_stdout(format_args!("  {:>12}: {:.2}h ({:.1}%)", st, hrs, pct));
                         }
                         let tot = row["total_hours"].as_f64().unwrap_or(0.0);
                         renderer.emit_raw_stdout(format_args!("  {:>12}: {:.2}h", "Total", tot));
@@ -255,10 +210,7 @@ pub(crate) fn run_time_in_status(
     Ok(())
 }
 
-type StatusSnapshot = (
-    chrono::DateTime<chrono::Utc>,
-    Option<crate::types::TaskStatus>,
-);
+type StatusSnapshot = (chrono::DateTime<chrono::Utc>, Option<crate::types::TaskStatus>);
 
 /// Seconds a task file spent in each status within `since..=until`, replayed
 /// from its git history. `None` when the file has no commits up to `until`.
@@ -277,11 +229,7 @@ fn status_durations(
     let mut snaps: Vec<StatusSnapshot> = commits
         .iter()
         .filter(|c| c.date <= until_dt)
-        .filter_map(|c| {
-            AuditService::show_file_at(repo_root, &c.commit, &c.path)
-                .ok()
-                .map(|content| (c.date, parse_status_from_yaml(&content)))
-        })
+        .filter_map(|c| AuditService::show_file_at(repo_root, &c.commit, &c.path).ok().map(|content| (c.date, parse_status_from_yaml(&content))))
         .collect();
     if snaps.is_empty() {
         return Ok(None);
@@ -289,21 +237,16 @@ fn status_durations(
     snaps.sort_by_key(|snap| snap.0);
 
     // Status at `since`: the latest known one before it, else the first known.
-    let mut current_status = snaps
-        .iter()
-        .take_while(|(dt, _)| *dt <= since_dt)
-        .filter_map(|(_, st)| st.clone())
-        .last()
-        .or_else(|| snaps.iter().find_map(|(_, st)| st.clone()));
+    let mut current_status =
+        snaps.iter().take_while(|(dt, _)| *dt <= since_dt).filter_map(|(_, st)| st.clone()).last().or_else(|| snaps.iter().find_map(|(_, st)| st.clone()));
 
     let mut durations = std::collections::BTreeMap::new();
-    let mut add =
-        |status: &Option<crate::types::TaskStatus>, from, to: chrono::DateTime<chrono::Utc>| {
-            if let Some(status) = status {
-                let secs = to.signed_duration_since(from).num_seconds().max(0);
-                *durations.entry(status.to_string()).or_insert(0) += secs;
-            }
-        };
+    let mut add = |status: &Option<crate::types::TaskStatus>, from, to: chrono::DateTime<chrono::Utc>| {
+        if let Some(status) = status {
+            let secs = to.signed_duration_since(from).num_seconds().max(0);
+            *durations.entry(status.to_string()).or_insert(0) += secs;
+        }
+    };
     let mut cursor = since_dt.max(snaps[0].0);
     for (dt, st) in snaps {
         if dt <= since_dt {
@@ -325,18 +268,12 @@ fn status_durations(
 }
 
 /// Total seconds and per-status JSON items (`seconds`, `hours`, `percent`).
-fn duration_items(
-    durations: std::collections::BTreeMap<String, i64>,
-) -> (i64, Vec<serde_json::Value>) {
+fn duration_items(durations: std::collections::BTreeMap<String, i64>) -> (i64, Vec<serde_json::Value>) {
     let total_seconds: i64 = durations.values().sum();
     let items = durations
         .into_iter()
         .map(|(status, seconds)| {
-            let percent = if total_seconds > 0 {
-                seconds as f64 / total_seconds as f64
-            } else {
-                0.0
-            };
+            let percent = if total_seconds > 0 { seconds as f64 / total_seconds as f64 } else { 0.0 };
             serde_json::json!({
                 "status": status,
                 "seconds": seconds,

@@ -33,11 +33,7 @@ impl BinaryIdentity {
         if !meta.is_file() {
             return None;
         }
-        Some(Self {
-            target,
-            len: meta.len(),
-            modified: meta.modified().ok(),
-        })
+        Some(Self { target, len: meta.len(), modified: meta.modified().ok() })
     }
 }
 
@@ -63,22 +59,13 @@ pub fn watched_path() -> Option<PathBuf> {
         })
     });
     match launched {
-        Some(path)
-            if running_target.is_some() && std::fs::canonicalize(&path).ok() == running_target =>
-        {
-            Some(path)
-        }
+        Some(path) if running_target.is_some() && std::fs::canonicalize(&path).ok() == running_target => Some(path),
         _ => Some(running),
     }
 }
 
 fn interval() -> Duration {
-    std::env::var(INTERVAL_ENV)
-        .ok()
-        .and_then(|raw| raw.trim().parse::<u64>().ok())
-        .filter(|ms| *ms > 0)
-        .map(Duration::from_millis)
-        .unwrap_or(DEFAULT_INTERVAL)
+    std::env::var(INTERVAL_ENV).ok().and_then(|raw| raw.trim().parse::<u64>().ok()).filter(|ms| *ms > 0).map(Duration::from_millis).unwrap_or(DEFAULT_INTERVAL)
 }
 
 /// Run `on_change` once, on a background thread, after the binary at
@@ -107,11 +94,7 @@ pub fn exit_when_replaced() -> bool {
 }
 
 /// [`spawn_watcher`] for a given path and interval.
-pub fn spawn_watcher_for(
-    path: PathBuf,
-    interval: Duration,
-    on_change: impl FnOnce() + Send + 'static,
-) -> bool {
+pub fn spawn_watcher_for(path: PathBuf, interval: Duration, on_change: impl FnOnce() + Send + 'static) -> bool {
     let Some(initial) = BinaryIdentity::of(&path) else {
         return false;
     };

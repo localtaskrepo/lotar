@@ -13,10 +13,7 @@ impl ConfigManager {
     #[cfg(test)]
     pub fn from_resolved_config(resolved_config: ResolvedConfig) -> Self {
         let default_root = crate::utils::paths::tasks_root_from(Path::new("."));
-        Self {
-            resolved_config,
-            tasks_dir: default_root,
-        }
+        Self { resolved_config, tasks_dir: default_root }
     }
 
     /// Get a reference to the resolved configuration
@@ -31,19 +28,13 @@ impl ConfigManager {
         // entry computed before it existed.
         crate::config::resolution::invalidate_config_cache_for(Some(tasks_dir));
         let resolved_config = crate::config::resolution::load_and_merge_configs(Some(tasks_dir))?;
-        Ok(Self {
-            resolved_config,
-            tasks_dir: tasks_dir.to_path_buf(),
-        })
+        Ok(Self { resolved_config, tasks_dir: tasks_dir.to_path_buf() })
     }
 
     /// Create a ConfigManager instance for read-only operations (does not create config files)
     pub fn new_manager_with_tasks_dir_readonly(tasks_dir: &Path) -> Result<Self, ConfigError> {
         let resolved_config = crate::config::resolution::load_and_merge_configs(Some(tasks_dir))?;
-        Ok(Self {
-            resolved_config,
-            tasks_dir: tasks_dir.to_path_buf(),
-        })
+        Ok(Self { resolved_config, tasks_dir: tasks_dir.to_path_buf() })
     }
 
     /// The configured default project, else the first existing project, else
@@ -57,9 +48,7 @@ impl ConfigManager {
             return detected;
         }
         // No existing projects, generate from current directory
-        crate::project::get_project_name()
-            .map(|name| generate_project_prefix(&name))
-            .unwrap_or_else(|| "DEFAULT".to_string())
+        crate::project::get_project_name().map(|name| generate_project_prefix(&name)).unwrap_or_else(|| "DEFAULT".to_string())
     }
 
     /// Ensure default_project is set in global config, auto-detecting if necessary
@@ -76,8 +65,7 @@ impl ConfigManager {
         let config_path = crate::utils::paths::global_config_path(tasks_dir);
         if config_path.exists() {
             // Load current config
-            let mut global_config =
-                crate::config::persistence::load_global_config(Some(tasks_dir))?;
+            let mut global_config = crate::config::persistence::load_global_config(Some(tasks_dir))?;
 
             // Update the default_project
             global_config.default_project = detected_prefix.clone();
@@ -94,11 +82,7 @@ impl ConfigManager {
 
     /// Get project-specific configuration by merging with global config
     pub fn get_project_config(&self, project_name: &str) -> Result<ResolvedConfig, ConfigError> {
-        crate::config::resolution::get_project_config(
-            &self.resolved_config,
-            project_name,
-            &self.tasks_dir,
-        )
+        crate::config::resolution::get_project_config(&self.resolved_config, project_name, &self.tasks_dir)
     }
 
     /// Delegate to operations module
@@ -107,21 +91,12 @@ impl ConfigManager {
     }
 
     /// Delegate to operations module
-    pub fn save_project_config(
-        tasks_dir: &Path,
-        project_prefix: &str,
-        config: &ProjectConfig,
-    ) -> Result<(), ConfigError> {
+    pub fn save_project_config(tasks_dir: &Path, project_prefix: &str, config: &ProjectConfig) -> Result<(), ConfigError> {
         crate::config::operations::save_project_config(tasks_dir, project_prefix, config)
     }
 
     /// Delegate to operations module
-    pub fn update_config_field(
-        tasks_dir: &Path,
-        field: &str,
-        value: &str,
-        project_prefix: Option<&str>,
-    ) -> Result<ValidationResult, ConfigError> {
+    pub fn update_config_field(tasks_dir: &Path, field: &str, value: &str, project_prefix: Option<&str>) -> Result<ValidationResult, ConfigError> {
         crate::config::operations::update_config_field(tasks_dir, field, value, project_prefix)
     }
 
@@ -141,9 +116,7 @@ impl ConfigManager {
     }
 
     /// Delegate to persistence module
-    pub fn load_home_config_with_override(
-        home_config_path: Option<&Path>,
-    ) -> Result<GlobalConfig, ConfigError> {
+    pub fn load_home_config_with_override(home_config_path: Option<&Path>) -> Result<GlobalConfig, ConfigError> {
         crate::config::persistence::load_home_config_with_override(home_config_path)
     }
 }
@@ -155,9 +128,6 @@ pub mod test_support {
 
     pub fn from_resolved_config(resolved_config: ResolvedConfig) -> ConfigManager {
         let default_root = crate::utils::paths::tasks_root_from(Path::new("."));
-        ConfigManager {
-            resolved_config,
-            tasks_dir: default_root,
-        }
+        ConfigManager { resolved_config, tasks_dir: default_root }
     }
 }

@@ -14,26 +14,13 @@ impl SyncHandler {
         resolver: &TasksDirectoryResolver,
         renderer: &OutputRenderer,
     ) -> Result<(), String> {
-        let mut project_resolver = ProjectResolver::new(resolver)
-            .map_err(|e| format!("Failed to initialize project resolver: {}", e))?;
+        let mut project_resolver = ProjectResolver::new(resolver).map_err(|e| format!("Failed to initialize project resolver: {}", e))?;
 
         let project_prefix = if let Some(explicit) = project {
-            Some(
-                project_resolver
-                    .resolve_project("", Some(explicit))
-                    .map_err(|e| format!("Project resolution failed: {}", e))?,
-            )
+            Some(project_resolver.resolve_project("", Some(explicit)).map_err(|e| format!("Project resolution failed: {}", e))?)
         } else {
-            let default_project = project_resolver
-                .get_config()
-                .default_project
-                .trim()
-                .to_string();
-            if default_project.is_empty() {
-                None
-            } else {
-                Some(default_project)
-            }
+            let default_project = project_resolver.get_config().default_project.trim().to_string();
+            if default_project.is_empty() { None } else { Some(default_project) }
         };
 
         let options = SyncOptions {
@@ -52,15 +39,7 @@ impl SyncHandler {
                 "Sync {} finished with {} failed item(s); see the warnings{}",
                 result.direction,
                 result.summary.failed,
-                if result
-                    .report
-                    .as_ref()
-                    .is_some_and(|r| r.stored_path.is_some())
-                {
-                    " and the sync report"
-                } else {
-                    ""
-                }
+                if result.report.as_ref().is_some_and(|r| r.stored_path.is_some()) { " and the sync report" } else { "" }
             ))
         } else {
             Ok(())
@@ -71,19 +50,13 @@ impl SyncHandler {
             return outcome;
         }
 
-        renderer.emit_success(format!(
-            "Sync {} complete ({})",
-            result.direction, result.remote
-        ));
+        renderer.emit_success(format!("Sync {} complete ({})", result.direction, result.remote));
         if let Some(project) = result.project.as_deref() {
             renderer.emit_info(format!("Project: {}", project));
         }
         renderer.emit_info(format!(
             "Created: {}, Updated: {}, Skipped: {}, Failed: {}",
-            result.summary.created,
-            result.summary.updated,
-            result.summary.skipped,
-            result.summary.failed
+            result.summary.created, result.summary.updated, result.summary.skipped, result.summary.failed
         ));
 
         for warning in &result.warnings {
@@ -96,52 +69,25 @@ impl SyncHandler {
         outcome
     }
 
-    pub fn check(
-        args: &SyncCheckArgs,
-        project: Option<&str>,
-        resolver: &TasksDirectoryResolver,
-        renderer: &OutputRenderer,
-    ) -> Result<(), String> {
-        let mut project_resolver = ProjectResolver::new(resolver)
-            .map_err(|e| format!("Failed to initialize project resolver: {}", e))?;
+    pub fn check(args: &SyncCheckArgs, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
+        let mut project_resolver = ProjectResolver::new(resolver).map_err(|e| format!("Failed to initialize project resolver: {}", e))?;
 
         let project_prefix = if let Some(explicit) = project {
-            Some(
-                project_resolver
-                    .resolve_project("", Some(explicit))
-                    .map_err(|e| format!("Project resolution failed: {}", e))?,
-            )
+            Some(project_resolver.resolve_project("", Some(explicit)).map_err(|e| format!("Project resolution failed: {}", e))?)
         } else {
-            let default_project = project_resolver
-                .get_config()
-                .default_project
-                .trim()
-                .to_string();
-            if default_project.is_empty() {
-                None
-            } else {
-                Some(default_project)
-            }
+            let default_project = project_resolver.get_config().default_project.trim().to_string();
+            if default_project.is_empty() { None } else { Some(default_project) }
         };
 
-        let result = SyncService::validate(
-            resolver,
-            project_prefix.as_deref(),
-            Some(&args.remote),
-            None,
-            args.auth_profile.as_deref(),
-        )
-        .map_err(|e| e.to_string())?;
+        let result =
+            SyncService::validate(resolver, project_prefix.as_deref(), Some(&args.remote), None, args.auth_profile.as_deref()).map_err(|e| e.to_string())?;
 
         if matches!(renderer.format, OutputFormat::Json) {
             renderer.emit_json(&result);
             return Ok(());
         }
 
-        renderer.emit_success(format!(
-            "Sync check OK ({} {})",
-            result.provider, result.remote
-        ));
+        renderer.emit_success(format!("Sync check OK ({} {})", result.provider, result.remote));
         if let Some(project) = result.project.as_deref() {
             renderer.emit_info(format!("Project: {}", project));
         }

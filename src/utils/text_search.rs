@@ -184,10 +184,7 @@ impl SearchQuery {
             }
             // `-word`, `-"phrase"`, `-/regex/` and `-title:x` exclude; a lone
             // or doubled dash is text.
-            let negated = chars[i] == '-'
-                && chars
-                    .get(i + 1)
-                    .is_some_and(|&next| next == '"' || next == '/' || next.is_alphanumeric());
+            let negated = chars[i] == '-' && chars.get(i + 1).is_some_and(|&next| next == '"' || next == '/' || next.is_alphanumeric());
             if negated {
                 i += 1;
             }
@@ -198,17 +195,10 @@ impl SearchQuery {
             let (matcher, next) = read_value(&chars, i, strict)?;
             i = next;
             if let Some(matcher) = matcher {
-                terms.push(Term {
-                    matcher,
-                    negated,
-                    scope,
-                });
+                terms.push(Term { matcher, negated, scope });
             }
         }
-        Ok(Self {
-            terms,
-            whole: fold(raw.trim()),
-        })
+        Ok(Self { terms, whole: fold(raw.trim()) })
     }
 
     /// True when the query has nothing to match (blank or only quotes).
@@ -239,9 +229,7 @@ impl SearchQuery {
             }
         }
         if !self.whole.is_empty() {
-            if fold(doc.id) == self.whole
-                || doc.moved_from.iter().any(|old| fold(old) == self.whole)
-            {
+            if fold(doc.id) == self.whole || doc.moved_from.iter().any(|old| fold(old) == self.whole) {
                 total += EXACT_ID_BONUS;
             }
             let title = collapse_whitespace(&fold(doc.title));
@@ -259,10 +247,7 @@ impl SearchQuery {
 /// A field prefix such as `title:` at `start`, with its length including the
 /// colon. Unknown names (`status:todo`, `http://`) stay ordinary text.
 fn scope_prefix(chars: &[char], start: usize) -> Option<(&'static [Field], usize)> {
-    let name_len = chars[start..]
-        .iter()
-        .take_while(|c| c.is_ascii_alphabetic())
-        .count();
+    let name_len = chars[start..].iter().take_while(|c| c.is_ascii_alphabetic()).count();
     let colon = start + name_len;
     if name_len == 0 || chars.get(colon) != Some(&':') {
         return None;
@@ -271,10 +256,7 @@ fn scope_prefix(chars: &[char], start: usize) -> Option<(&'static [Field], usize
     if chars.get(colon + 1).is_none_or(|c| c.is_whitespace()) {
         return None;
     }
-    let name: String = chars[start..colon]
-        .iter()
-        .collect::<String>()
-        .to_ascii_lowercase();
+    let name: String = chars[start..colon].iter().collect::<String>().to_ascii_lowercase();
     let fields: &'static [Field] = match name.as_str() {
         "id" => &[Field::Id],
         "title" => &[Field::Title],
@@ -291,16 +273,9 @@ fn scope_prefix(chars: &[char], start: usize) -> Option<(&'static [Field], usize
 
 /// Read one value at `start`: a quoted phrase, a `/regex/` or a word. Returns
 /// the matcher (none for blank input) and the index after the value.
-fn read_value(
-    chars: &[char],
-    start: usize,
-    strict: bool,
-) -> Result<(Option<Matcher>, usize), String> {
+fn read_value(chars: &[char], start: usize, strict: bool) -> Result<(Option<Matcher>, usize), String> {
     if chars.get(start) == Some(&'"') {
-        let end = chars[start + 1..]
-            .iter()
-            .position(|&c| c == '"')
-            .map_or(chars.len(), |offset| start + 1 + offset);
+        let end = chars[start + 1..].iter().position(|&c| c == '"').map_or(chars.len(), |offset| start + 1 + offset);
         let text: String = chars[start + 1..end].iter().collect();
         let phrase = collapse_whitespace(&fold(&text));
         let matcher = (!phrase.is_empty()).then_some(Matcher::Phrase(phrase));
@@ -311,10 +286,7 @@ fn read_value(
         && chars.get(start + 1).is_some_and(|c| !c.is_whitespace())
         && let Some(close) = regex_end(chars, start)
     {
-        let pattern: String = chars[start + 1..close]
-            .iter()
-            .collect::<String>()
-            .replace("\\/", "/");
+        let pattern: String = chars[start + 1..close].iter().collect::<String>().replace("\\/", "/");
         match compile_pattern(&pattern) {
             Ok(regex) => return Ok((Some(Matcher::Regex(regex)), close + 1)),
             Err(error) if strict => return Err(error),
@@ -322,10 +294,7 @@ fn read_value(
             Err(_) => {}
         }
     }
-    let end = chars[start..]
-        .iter()
-        .position(|c| c.is_whitespace())
-        .map_or(chars.len(), |offset| start + offset);
+    let end = chars[start..].iter().position(|c| c.is_whitespace()).map_or(chars.len(), |offset| start + offset);
     let word = fold(&chars[start..end].iter().collect::<String>());
     Ok(((!word.is_empty()).then_some(Matcher::Word(word)), end))
 }
@@ -349,23 +318,16 @@ fn regex_end(chars: &[char], start: usize) -> Option<usize> {
 
 fn compile_pattern(pattern: &str) -> Result<regex::Regex, String> {
     if pattern.chars().count() > MAX_PATTERN_CHARS {
-        return Err(format!(
-            "Search pattern is too long (max {MAX_PATTERN_CHARS} characters)"
-        ));
+        return Err(format!("Search pattern is too long (max {MAX_PATTERN_CHARS} characters)"));
     }
-    regex::RegexBuilder::new(pattern)
-        .case_insensitive(true)
-        .size_limit(PATTERN_SIZE_LIMIT)
-        .dfa_size_limit(PATTERN_SIZE_LIMIT)
-        .build()
-        .map_err(|error| {
-            // The library's message spans several lines with a caret marker;
-            // its last line names the problem.
-            let detail = error.to_string();
-            let reason = detail.lines().last().unwrap_or("invalid pattern").trim();
-            let reason = reason.strip_prefix("error: ").unwrap_or(reason);
-            format!("Invalid search pattern /{pattern}/: {reason}")
-        })
+    regex::RegexBuilder::new(pattern).case_insensitive(true).size_limit(PATTERN_SIZE_LIMIT).dfa_size_limit(PATTERN_SIZE_LIMIT).build().map_err(|error| {
+        // The library's message spans several lines with a caret marker;
+        // its last line names the problem.
+        let detail = error.to_string();
+        let reason = detail.lines().last().unwrap_or("invalid pattern").trim();
+        let reason = reason.strip_prefix("error: ").unwrap_or(reason);
+        format!("Invalid search pattern /{pattern}/: {reason}")
+    })
 }
 
 /// Lowercase text with common Latin accents removed and whitespace runs kept
@@ -426,11 +388,7 @@ fn folded_fields<'a>(doc: &SearchDocument<'a>) -> Vec<FoldedField<'a>> {
     let mut fields = Vec::with_capacity(4 + doc.tags.len() + doc.comments.len());
     let mut push = |field: Field, text: &'a str| {
         if !text.trim().is_empty() {
-            fields.push(FoldedField {
-                field,
-                text: fold(text),
-                raw: text,
-            });
+            fields.push(FoldedField { field, text: fold(text), raw: text });
         }
     };
     push(Field::Id, doc.id);
@@ -451,17 +409,7 @@ fn folded_fields<'a>(doc: &SearchDocument<'a>) -> Vec<FoldedField<'a>> {
         push(Field::AcceptanceCriteria, criterion);
     }
     for reference in doc.references {
-        for value in [
-            &reference.link,
-            &reference.code,
-            &reference.file,
-            &reference.attachment,
-            &reference.jira,
-            &reference.github,
-        ]
-        .into_iter()
-        .flatten()
-        {
+        for value in [&reference.link, &reference.code, &reference.file, &reference.attachment, &reference.jira, &reference.github].into_iter().flatten() {
             push(Field::Reference, value);
         }
     }
@@ -475,15 +423,12 @@ fn folded_fields<'a>(doc: &SearchDocument<'a>) -> Vec<FoldedField<'a>> {
 /// it matches none. Exact and substring matches are checked in every field
 /// before falling back to typo tolerance, which is the expensive part.
 fn best_match(term: &Term, fields: &[FoldedField<'_>]) -> Option<u32> {
-    let in_scope =
-        |field: &&FoldedField<'_>| term.scope.is_none_or(|scope| scope.contains(&field.field));
+    let in_scope = |field: &&FoldedField<'_>| term.scope.is_none_or(|scope| scope.contains(&field.field));
     let mut best = None;
     for field in fields.iter().filter(in_scope) {
         let strength = match &term.matcher {
             Matcher::Word(text) => substring_strength(&field.text, text),
-            Matcher::Phrase(text) => collapse_whitespace(&field.text)
-                .contains(text.as_str())
-                .then_some(Strength::Word),
+            Matcher::Phrase(text) => collapse_whitespace(&field.text).contains(text.as_str()).then_some(Strength::Word),
             Matcher::Regex(regex) => regex.is_match(field.raw).then_some(Strength::Word),
         };
         if let Some(strength) = strength {
@@ -537,8 +482,7 @@ fn is_word_char(c: char) -> bool {
 }
 
 fn words(text: &str) -> impl Iterator<Item = &str> {
-    text.split(|c: char| !is_word_char(c))
-        .filter(|word| !word.is_empty())
+    text.split(|c: char| !is_word_char(c)).filter(|word| !word.is_empty())
 }
 
 /// Allowed edits for a term: none below four characters (too many false
@@ -570,8 +514,7 @@ fn within_typos(term: &[char], word: &str, max_edits: usize) -> bool {
         // Compare against prefixes around the term's length.
         let shortest = term.len().saturating_sub(max_edits).max(1);
         let longest = (term.len() + max_edits).min(word.len());
-        return (shortest..=longest)
-            .any(|len| edit_distance(term, &word[..len], max_edits) <= max_edits);
+        return (shortest..=longest).any(|len| edit_distance(term, &word[..len], max_edits) <= max_edits);
     }
     false
 }
@@ -591,9 +534,7 @@ fn edit_distance(a: &[char], b: &[char], limit: usize) -> usize {
         let mut row_min = current[0];
         for j in 1..=b.len() {
             let cost = usize::from(a[i - 1] != b[j - 1]);
-            let mut value = (previous[j] + 1)
-                .min(current[j - 1] + 1)
-                .min(previous[j - 1] + cost);
+            let mut value = (previous[j] + 1).min(current[j - 1] + 1).min(previous[j - 1] + cost);
             if i > 1 && j > 1 && a[i - 1] == b[j - 2] && a[i - 2] == b[j - 1] {
                 value = value.min(before[j - 2] + 1);
             }
@@ -613,23 +554,8 @@ fn edit_distance(a: &[char], b: &[char], limit: usize) -> usize {
 mod tests {
     use super::*;
 
-    fn doc<'a>(
-        id: &'a str,
-        title: &'a str,
-        description: Option<&'a str>,
-        tags: &'a [String],
-    ) -> SearchDocument<'a> {
-        SearchDocument {
-            id,
-            title,
-            subtitle: None,
-            description,
-            tags,
-            acceptance_criteria: &[],
-            comments: &[],
-            references: &[],
-            moved_from: &[],
-        }
+    fn doc<'a>(id: &'a str, title: &'a str, description: Option<&'a str>, tags: &'a [String]) -> SearchDocument<'a> {
+        SearchDocument { id, title, subtitle: None, description, tags, acceptance_criteria: &[], comments: &[], references: &[], moved_from: &[] }
     }
 
     fn matches(query: &str, document: &SearchDocument<'_>) -> bool {
@@ -639,12 +565,7 @@ mod tests {
     #[test]
     fn words_match_in_any_order_and_any_field() {
         let tags = vec!["auth".to_string()];
-        let task = doc(
-            "WEB-12",
-            "Fix the login redirect loop",
-            Some("Happens after OAuth"),
-            &tags,
-        );
+        let task = doc("WEB-12", "Fix the login redirect loop", Some("Happens after OAuth"), &tags);
         assert!(matches("redirect login", &task));
         assert!(matches("loop oauth auth", &task));
         assert!(!matches("redirect logout", &task));
@@ -670,12 +591,7 @@ mod tests {
 
     #[test]
     fn exclusions_remove_matches() {
-        let task = doc(
-            "WEB-12",
-            "Fix the login redirect loop",
-            Some("OAuth only"),
-            &[],
-        );
+        let task = doc("WEB-12", "Fix the login redirect loop", Some("OAuth only"), &[]);
         assert!(!matches("login -oauth", &task));
         assert!(matches("login -saml", &task));
         assert!(!matches("-\"redirect loop\"", &task));
@@ -696,12 +612,7 @@ mod tests {
 
     #[test]
     fn tolerates_typos_in_longer_words_only() {
-        let task = doc(
-            "WEB-12",
-            "Fix the login redirect loop",
-            Some("Authentication breaks"),
-            &[],
-        );
+        let task = doc("WEB-12", "Fix the login redirect loop", Some("Authentication breaks"), &[]);
         assert!(matches("redirct", &task));
         assert!(matches("rdeirect", &task));
         assert!(matches("athentcation", &task));
@@ -720,10 +631,7 @@ mod tests {
         let prefix = doc("A-2", "Logins are slow", None, &[]);
         let description = doc("A-3", "Page", Some("The login page"), &[]);
         let typo = doc("A-4", "Lgoin page", None, &[]);
-        let scores: Vec<u32> = [&title, &prefix, &description, &typo]
-            .iter()
-            .map(|task| query.score(task).unwrap())
-            .collect();
+        let scores: Vec<u32> = [&title, &prefix, &description, &typo].iter().map(|task| query.score(task).unwrap()).collect();
         assert!(scores[0] > scores[1], "{scores:?}");
         assert!(scores[1] > scores[2], "{scores:?}");
         assert!(scores[2] > scores[3], "{scores:?}");
@@ -735,16 +643,9 @@ mod tests {
 
     #[test]
     fn searches_comments_criteria_and_references() {
-        let comments = vec![TaskComment {
-            extra: Default::default(),
-            date: "2026-01-01".into(),
-            text: "Reproduced on Safari".into(),
-        }];
+        let comments = vec![TaskComment { extra: Default::default(), date: "2026-01-01".into(), text: "Reproduced on Safari".into() }];
         let criteria = vec!["Works offline".to_string()];
-        let references = vec![ReferenceEntry {
-            code: Some("web/src/sync/queue.ts#20-33".into()),
-            ..Default::default()
-        }];
+        let references = vec![ReferenceEntry { code: Some("web/src/sync/queue.ts#20-33".into()), ..Default::default() }];
         let task = SearchDocument {
             id: "WEB-1",
             title: "Sync",
@@ -764,12 +665,7 @@ mod tests {
     #[test]
     fn regex_terms_match_original_text_case_insensitively() {
         let tags = vec!["release-2.4".to_string()];
-        let task = doc(
-            "WEB-12",
-            "Fixes #142 in the Café login",
-            Some("Seen on Safari 17"),
-            &tags,
-        );
+        let task = doc("WEB-12", "Fixes #142 in the Café login", Some("Seen on Safari 17"), &tags);
         assert!(matches(r"/fix(es|ed)? #\d+/", &task));
         assert!(matches("/café/", &task));
         assert!(matches(r"/^fixes/", &task));
@@ -791,27 +687,16 @@ mod tests {
         assert!(matches("/api/tasks", &task));
         let lone = SearchQuery::parse("/ //");
         assert_eq!(lone.terms.len(), 2);
-        assert!(
-            lone.terms
-                .iter()
-                .all(|term| matches!(term.matcher, Matcher::Word(_)))
-        );
+        assert!(lone.terms.iter().all(|term| matches!(term.matcher, Matcher::Word(_))));
     }
 
     #[test]
     fn invalid_patterns_are_errors_when_strict_and_text_when_lenient() {
         let error = SearchQuery::try_parse("login /fix(/").unwrap_err();
-        assert!(
-            error.starts_with("Invalid search pattern /fix(/:"),
-            "{error}"
-        );
+        assert!(error.starts_with("Invalid search pattern /fix(/:"), "{error}");
         assert!(!error.contains('\n'), "{error}");
         let long = format!("/{}/", "a".repeat(MAX_PATTERN_CHARS + 1));
-        assert!(
-            SearchQuery::try_parse(&long)
-                .unwrap_err()
-                .contains("too long")
-        );
+        assert!(SearchQuery::try_parse(&long).unwrap_err().contains("too long"));
         assert!(SearchQuery::validate("/(a|b)+/ ok").is_ok());
         // Lenient parsing keeps the text searchable as typed.
         let task = doc("WEB-1", "Document /fix(/ syntax", None, &[]);
@@ -820,11 +705,7 @@ mod tests {
 
     #[test]
     fn field_scopes_limit_terms_to_one_field() {
-        let comments = vec![TaskComment {
-            extra: Default::default(),
-            date: "2026-01-01".into(),
-            text: "Needs repro on Safari".into(),
-        }];
+        let comments = vec![TaskComment { extra: Default::default(), date: "2026-01-01".into(), text: "Needs repro on Safari".into() }];
         let tags = vec!["frontend".to_string()];
         let task = SearchDocument {
             id: "WEB-7",

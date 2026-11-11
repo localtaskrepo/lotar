@@ -4,11 +4,7 @@ use super::super::{JsonRpcRequest, JsonRpcResponse, ok};
 use crate::utils::identity;
 
 pub(crate) fn handle_whoami(req: JsonRpcRequest) -> JsonRpcResponse {
-    let explain = req
-        .params
-        .get("explain")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
+    let explain = req.params.get("explain").and_then(|v| v.as_bool()).unwrap_or(false);
 
     let resolver = crate::workspace::TasksDirectoryResolver::resolve(None, None).ok();
     let tasks_root = resolver.as_ref().map(|resolver| resolver.path.as_path());
@@ -16,10 +12,7 @@ pub(crate) fn handle_whoami(req: JsonRpcRequest) -> JsonRpcResponse {
 
     let mut payload = serde_json::Map::new();
     payload.insert("status".to_string(), Value::String("ok".to_string()));
-    payload.insert(
-        "user".to_string(),
-        resolved.clone().map(Value::String).unwrap_or(Value::Null),
-    );
+    payload.insert("user".to_string(), resolved.clone().map(Value::String).unwrap_or(Value::Null));
 
     if explain {
         let detection = identity::resolve_current_user_explain(tasks_root);
@@ -30,10 +23,7 @@ pub(crate) fn handle_whoami(req: JsonRpcRequest) -> JsonRpcResponse {
                 obj.insert("user".to_string(), Value::String(det.user));
                 obj.insert("source".to_string(), Value::String(det.source.to_string()));
                 obj.insert("confidence".to_string(), Value::from(det.confidence));
-                obj.insert(
-                    "details".to_string(),
-                    det.details.map(Value::String).unwrap_or(Value::Null),
-                );
+                obj.insert("details".to_string(), det.details.map(Value::String).unwrap_or(Value::Null));
                 Value::Object(obj)
             }
         };

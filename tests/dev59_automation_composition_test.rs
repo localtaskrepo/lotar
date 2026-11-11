@@ -32,26 +32,13 @@ fn set_automation(tasks_dir: &Path, rules: &str) {
 fn create_task(storage: &mut Storage, title: &str, tags: &[&str]) -> TaskDTO {
     TaskService::create(
         storage,
-        TaskCreate {
-            title: title.to_string(),
-            project: Some("TEST".to_string()),
-            tags: tags.iter().map(|t| t.to_string()).collect(),
-            ..TaskCreate::default()
-        },
+        TaskCreate { title: title.to_string(), project: Some("TEST".to_string()), tags: tags.iter().map(|t| t.to_string()).collect(), ..TaskCreate::default() },
     )
     .expect("create task")
 }
 
 fn start_in_progress(storage: &mut Storage, id: &str) -> TaskDTO {
-    TaskService::update(
-        storage,
-        id,
-        TaskUpdate {
-            status: Some("InProgress".to_string()),
-            ..TaskUpdate::default()
-        },
-    )
-    .expect("update task")
+    TaskService::update(storage, id, TaskUpdate { status: Some("InProgress".to_string()), ..TaskUpdate::default() }).expect("update task")
 }
 
 fn get_task(storage: &Storage, id: &str) -> TaskDTO {
@@ -78,16 +65,7 @@ fn sequential_rules_tag_additions_compose() {
     start_in_progress(&mut storage, &task.id);
 
     let after = get_task(&storage, &task.id);
-    assert_eq!(
-        after.tags,
-        vec![
-            "alpha".to_string(),
-            "rule-one-only".to_string(),
-            "beta".to_string()
-        ],
-        "{:?}",
-        after.tags
-    );
+    assert_eq!(after.tags, vec!["alpha".to_string(), "rule-one-only".to_string(), "beta".to_string()], "{:?}", after.tags);
     // The duplicate add in the second rule must not duplicate the tag.
     assert_eq!(tag_count(&after, "alpha"), 1, "{:?}", after.tags);
 }
@@ -105,12 +83,7 @@ fn later_removals_keep_earlier_additions() {
     start_in_progress(&mut storage, &task.id);
 
     let after = get_task(&storage, &task.id);
-    assert_eq!(
-        after.tags,
-        vec!["keep".to_string(), "fresh".to_string()],
-        "{:?}",
-        after.tags
-    );
+    assert_eq!(after.tags, vec!["keep".to_string(), "fresh".to_string()], "{:?}", after.tags);
 }
 
 #[test]
@@ -126,22 +99,8 @@ fn custom_fields_merge_across_rules_with_last_write_per_key() {
     start_in_progress(&mut storage, &task.id);
 
     let after = get_task(&storage, &task.id);
-    assert!(
-        after
-            .custom_fields
-            .get("team")
-            .is_some_and(|v| v.as_str().is_some_and(|s| s.contains("platform"))),
-        "{:?}",
-        after.custom_fields
-    );
-    assert!(
-        after
-            .custom_fields
-            .get("layer")
-            .is_some_and(|v| v.as_str().is_some_and(|s| s.contains("backend"))),
-        "{:?}",
-        after.custom_fields
-    );
+    assert!(after.custom_fields.get("team").is_some_and(|v| v.as_str().is_some_and(|s| s.contains("platform"))), "{:?}", after.custom_fields);
+    assert!(after.custom_fields.get("layer").is_some_and(|v| v.as_str().is_some_and(|s| s.contains("backend"))), "{:?}", after.custom_fields);
 }
 
 #[test]
@@ -157,10 +116,7 @@ fn relationships_compose_across_rules_without_duplicates() {
         TaskCreate {
             title: "Compose links".to_string(),
             project: Some("TEST".to_string()),
-            relationships: Some(TaskRelationships {
-                depends_on: vec![seeded.id.clone()],
-                ..TaskRelationships::default()
-            }),
+            relationships: Some(TaskRelationships { depends_on: vec![seeded.id.clone()], ..TaskRelationships::default() }),
             ..TaskCreate::default()
         },
     )
@@ -184,38 +140,12 @@ fn relationships_compose_across_rules_without_duplicates() {
     start_in_progress(&mut storage, &task.id);
 
     let after = get_task(&storage, &task.id);
-    assert_eq!(
-        after.relationships.depends_on,
-        vec![overlap.id.clone(), first_only.id.clone()],
-        "{:?}",
-        after.relationships
-    );
-    assert_eq!(
-        after.relationships.blocks,
-        vec![blocked_only.id.clone()],
-        "{:?}",
-        after.relationships
-    );
-    assert_eq!(
-        get_task(&storage, &overlap.id).relationships.blocks,
-        std::slice::from_ref(&task.id)
-    );
-    assert_eq!(
-        get_task(&storage, &first_only.id).relationships.blocks,
-        std::slice::from_ref(&task.id)
-    );
-    assert_eq!(
-        get_task(&storage, &blocked_only.id)
-            .relationships
-            .depends_on,
-        [task.id]
-    );
-    assert!(
-        get_task(&storage, &seeded.id)
-            .relationships
-            .blocks
-            .is_empty()
-    );
+    assert_eq!(after.relationships.depends_on, vec![overlap.id.clone(), first_only.id.clone()], "{:?}", after.relationships);
+    assert_eq!(after.relationships.blocks, vec![blocked_only.id.clone()], "{:?}", after.relationships);
+    assert_eq!(get_task(&storage, &overlap.id).relationships.blocks, std::slice::from_ref(&task.id));
+    assert_eq!(get_task(&storage, &first_only.id).relationships.blocks, std::slice::from_ref(&task.id));
+    assert_eq!(get_task(&storage, &blocked_only.id).relationships.depends_on, [task.id]);
+    assert!(get_task(&storage, &seeded.id).relationships.blocks.is_empty());
 }
 
 #[test]
@@ -231,25 +161,12 @@ fn same_rule_multiple_hooks_and_legacy_start_compose() {
     TaskService::update(
         &mut storage,
         &task.id,
-        TaskUpdate {
-            status: Some("InProgress".to_string()),
-            assignee: Some("alice".to_string()),
-            ..TaskUpdate::default()
-        },
+        TaskUpdate { status: Some("InProgress".to_string()), assignee: Some("alice".to_string()), ..TaskUpdate::default() },
     )
     .expect("update task");
 
     let after = get_task(&storage, &task.id);
-    assert_eq!(
-        after.tags,
-        vec![
-            "evt-updated".to_string(),
-            "evt-assigned".to_string(),
-            "legacy-start".to_string()
-        ],
-        "{:?}",
-        after.tags
-    );
+    assert_eq!(after.tags, vec!["evt-updated".to_string(), "evt-assigned".to_string(), "legacy-start".to_string()], "{:?}", after.tags);
 }
 
 #[test]
@@ -265,16 +182,7 @@ fn set_replaces_collections_and_scalars_last_writer_wins() {
     start_in_progress(&mut storage, &task.id);
 
     let after = get_task(&storage, &task.id);
-    assert_eq!(
-        after.tags,
-        vec![
-            "set-first".to_string(),
-            "add-after".to_string(),
-            "cross-rule".to_string()
-        ],
-        "{:?}",
-        after.tags
-    );
+    assert_eq!(after.tags, vec!["set-first".to_string(), "add-after".to_string(), "cross-rule".to_string()], "{:?}", after.tags);
     // set.tags replaced the seeded tag; the later rule's scalar write wins.
     assert!(!after.tags.contains(&"original".to_string()));
     assert!(after.priority.to_string().contains("High"));
@@ -295,26 +203,11 @@ fn conditions_and_templates_keep_event_values_after_earlier_mutations() {
     let after = get_task(&storage, &task.id);
     // Both rules matched the event (status changed to InProgress) even though
     // the first rule had already persisted status Done when the second ran.
-    assert!(
-        after.tags.contains(&"mutated".to_string()),
-        "{:?}",
-        after.tags
-    );
-    assert!(
-        after.tags.contains(&"observed".to_string()),
-        "{:?}",
-        after.tags
-    );
+    assert!(after.tags.contains(&"mutated".to_string()), "{:?}", after.tags);
+    assert!(after.tags.contains(&"observed".to_string()), "{:?}", after.tags);
     assert!(after.status.to_string().contains("Done"));
     // Templates resolved event-time values, not the mutated persisted state.
-    assert!(
-        after
-            .comments
-            .iter()
-            .any(|c| c.text.contains("Was Todo, event InProgress")),
-        "{:?}",
-        after.comments
-    );
+    assert!(after.comments.iter().any(|c| c.text.contains("Was Todo, event InProgress")), "{:?}", after.comments);
 }
 
 #[test]
@@ -330,20 +223,8 @@ fn comment_event_dispatch_composes_across_rules() {
     TaskService::add_comment(&mut storage, &task.id, "hello world").expect("add comment");
 
     let after = get_task(&storage, &task.id);
-    assert_eq!(
-        after.tags,
-        vec!["comment-1".to_string(), "comment-2".to_string()],
-        "{:?}",
-        after.tags
-    );
-    assert!(
-        after
-            .comments
-            .iter()
-            .any(|c| c.text.contains("Saw hello world")),
-        "{:?}",
-        after.comments
-    );
+    assert_eq!(after.tags, vec!["comment-1".to_string(), "comment-2".to_string()], "{:?}", after.tags);
+    assert!(after.comments.iter().any(|c| c.text.contains("Saw hello world")), "{:?}", after.comments);
 }
 
 #[test]
@@ -356,16 +237,10 @@ fn job_event_dispatch_composes_across_rules() {
         "    - name: job-one\n      on: {complete: {add: {tags: [job-a]}}}\n    - name: job-two\n      on: {complete: {add: {tags: [job-b]}}}\n",
     );
 
-    AutomationService::apply_job_event(&tasks_dir, &task.id, AutomationEvent::JobCompleted, None)
-        .expect("apply job event");
+    AutomationService::apply_job_event(&tasks_dir, &task.id, AutomationEvent::JobCompleted, None).expect("apply job event");
 
     let after = get_task(&storage, &task.id);
-    assert_eq!(
-        after.tags,
-        vec!["job-a".to_string(), "job-b".to_string()],
-        "{:?}",
-        after.tags
-    );
+    assert_eq!(after.tags, vec!["job-a".to_string(), "job-b".to_string()], "{:?}", after.tags);
 }
 
 #[test]
@@ -382,14 +257,7 @@ fn comment_only_rule_keeps_earlier_collection_updates() {
 
     let after = get_task(&storage, &task.id);
     assert_eq!(after.tags, vec!["kept".to_string()], "{:?}", after.tags);
-    assert!(
-        after
-            .comments
-            .iter()
-            .any(|c| c.text.contains("noted by automation")),
-        "{:?}",
-        after.comments
-    );
+    assert!(after.comments.iter().any(|c| c.text.contains("noted by automation")), "{:?}", after.comments);
 }
 
 #[test]
@@ -409,9 +277,5 @@ fn automation_writes_do_not_recurse() {
     // rule (which would match a user-driven change to Done) never fires.
     assert!(after.status.to_string().contains("Done"));
     assert_eq!(tag_count(&after, "guard-applied"), 1, "{:?}", after.tags);
-    assert!(
-        !after.tags.contains(&"pong".to_string()),
-        "{:?}",
-        after.tags
-    );
+    assert!(!after.tags.contains(&"pong".to_string()), "{:?}", after.tags);
 }

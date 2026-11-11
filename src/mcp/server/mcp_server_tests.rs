@@ -41,15 +41,9 @@ fn require_git_for_test() {
                 command.env(key, value);
             }
         }
-        command
-            .output()
-            .map(|output| output.status.success() && repo.join(".git").exists())
-            .unwrap_or(false)
+        command.output().map(|output| output.status.success() && repo.join(".git").exists()).unwrap_or(false)
     });
-    assert!(
-        available,
-        "this test requires Git, but the runtime `git init` probe failed; failing closed instead of passing silently (DEV-79)"
-    );
+    assert!(available, "this test requires Git, but the runtime `git init` probe failed; failing closed instead of passing silently (DEV-79)");
 }
 
 fn seed_single_project_config(tasks_dir: &Path) {
@@ -73,10 +67,7 @@ custom:
 }
 
 fn field_hint<'a>(tool: &'a Value, field: &str) -> &'a Value {
-    tool.get("hints")
-        .and_then(|h| h.get("fields"))
-        .and_then(|fields| fields.get(field))
-        .unwrap_or_else(|| panic!("missing hint for field {field}"))
+    tool.get("hints").and_then(|h| h.get("fields")).and_then(|fields| fields.get(field)).unwrap_or_else(|| panic!("missing hint for field {field}"))
 }
 
 fn field_values(tool: &Value, field: &str) -> Vec<String> {
@@ -90,22 +81,15 @@ fn field_values(tool: &Value, field: &str) -> Vec<String> {
 }
 
 fn accepts_multiple(tool: &Value, field: &str) -> Option<bool> {
-    field_hint(tool, field)
-        .get("acceptsMultiple")
-        .and_then(|flag| flag.as_bool())
+    field_hint(tool, field).get("acceptsMultiple").and_then(|flag| flag.as_bool())
 }
 
 fn tool_by_name<'a>(tools: &'a [Value], name: &str) -> &'a Value {
-    tools
-        .iter()
-        .find(|tool| tool.get("name").and_then(|v| v.as_str()) == Some(name))
-        .unwrap_or_else(|| panic!("Missing tool {}", name))
+    tools.iter().find(|tool| tool.get("name").and_then(|v| v.as_str()) == Some(name)).unwrap_or_else(|| panic!("Missing tool {}", name))
 }
 
 fn tool_description(tool: &Value) -> &str {
-    tool.get("description")
-        .and_then(|v| v.as_str())
-        .unwrap_or_else(|| panic!("Missing description for tool"))
+    tool.get("description").and_then(|v| v.as_str()).unwrap_or_else(|| panic!("Missing description for tool"))
 }
 
 fn set_tasks_dir_env(tasks_dir: &Path) {
@@ -126,18 +110,11 @@ fn tool_response_payload(resp: &JsonRpcResponse) -> &Value {
 }
 
 fn tool_content_entries(resp: &JsonRpcResponse) -> &[Value] {
-    tool_response_payload(resp)
-        .get("content")
-        .and_then(|v| v.as_array())
-        .unwrap_or_else(|| panic!("missing content array"))
+    tool_response_payload(resp).get("content").and_then(|v| v.as_array()).unwrap_or_else(|| panic!("missing content array"))
 }
 
 fn first_tool_text(resp: &JsonRpcResponse) -> &str {
-    tool_content_entries(resp)
-        .first()
-        .and_then(|entry| entry.get("text"))
-        .and_then(|v| v.as_str())
-        .unwrap_or_else(|| panic!("missing text entry"))
+    tool_content_entries(resp).first().and_then(|entry| entry.get("text")).and_then(|v| v.as_str()).unwrap_or_else(|| panic!("missing text entry"))
 }
 
 fn parse_tool_payload(resp: &JsonRpcResponse) -> serde_json::Value {
@@ -171,38 +148,20 @@ mod git_required {
             "name": "task_create",
             "arguments": { "title": "MCP References", "project": "MCP" }
         });
-        let create_req = JsonRpcRequest {
-            jsonrpc: "2.0".into(),
-            id: Some(json!(30)),
-            method: "tools/call".into(),
-            params: create_args,
-        };
+        let create_req = JsonRpcRequest { jsonrpc: "2.0".into(), id: Some(json!(30)), method: "tools/call".into(), params: create_args };
         let create_resp = dispatch(create_req);
         assert!(create_resp.error.is_none(), "task_create failed");
         let task_json = parse_tool_payload(&create_resp);
-        let id = task_json
-            .get("task")
-            .and_then(|task| task.get("id"))
-            .and_then(|v| v.as_str())
-            .unwrap()
-            .to_string();
+        let id = task_json.get("task").and_then(|task| task.get("id")).and_then(|v| v.as_str()).unwrap().to_string();
 
         // Add link reference
         let add_link_args = json!({
             "name": "task_reference_add",
             "arguments": { "id": id, "kind": "link", "value": "https://example.com" }
         });
-        let add_link_req = JsonRpcRequest {
-            jsonrpc: "2.0".into(),
-            id: Some(json!(31)),
-            method: "tools/call".into(),
-            params: add_link_args,
-        };
+        let add_link_req = JsonRpcRequest { jsonrpc: "2.0".into(), id: Some(json!(31)), method: "tools/call".into(), params: add_link_args };
         let add_link_resp = dispatch(add_link_req);
-        assert!(
-            add_link_resp.error.is_none(),
-            "task_reference_add link failed"
-        );
+        assert!(add_link_resp.error.is_none(), "task_reference_add link failed");
         let payload = parse_tool_payload(&add_link_resp);
         assert!(payload.get("changed").and_then(|v| v.as_bool()).unwrap());
 
@@ -211,85 +170,35 @@ mod git_required {
             "name": "task_reference_add",
             "arguments": { "id": payload.get("id").and_then(|v| v.as_str()).unwrap(), "kind": "file", "value": "src/example.rs" }
         });
-        let add_file_req = JsonRpcRequest {
-            jsonrpc: "2.0".into(),
-            id: Some(json!(32)),
-            method: "tools/call".into(),
-            params: add_file_args,
-        };
+        let add_file_req = JsonRpcRequest { jsonrpc: "2.0".into(), id: Some(json!(32)), method: "tools/call".into(), params: add_file_args };
         let add_file_resp = dispatch(add_file_req);
-        assert!(
-            add_file_resp.error.is_none(),
-            "task_reference_add file failed"
-        );
+        assert!(add_file_resp.error.is_none(), "task_reference_add file failed");
 
         // Add code reference
         let add_code_args = json!({
             "name": "task_reference_add",
             "arguments": { "id": payload.get("id").and_then(|v| v.as_str()).unwrap(), "kind": "code", "value": "src/example.rs#1" }
         });
-        let add_code_req = JsonRpcRequest {
-            jsonrpc: "2.0".into(),
-            id: Some(json!(33)),
-            method: "tools/call".into(),
-            params: add_code_args,
-        };
+        let add_code_req = JsonRpcRequest { jsonrpc: "2.0".into(), id: Some(json!(33)), method: "tools/call".into(), params: add_code_args };
         let add_code_resp = dispatch(add_code_req);
-        assert!(
-            add_code_resp.error.is_none(),
-            "task_reference_add code failed"
-        );
+        assert!(add_code_resp.error.is_none(), "task_reference_add code failed");
         let payload = parse_tool_payload(&add_code_resp);
-        let refs = payload
-            .get("task")
-            .and_then(|t| t.get("references"))
-            .and_then(|v| v.as_array())
-            .cloned()
-            .unwrap_or_default();
-        assert!(refs.iter().any(|r| {
-            r.get("link")
-                .and_then(|v| v.as_str())
-                .is_some_and(|s| s == "https://example.com")
-        }));
-        assert!(refs.iter().any(|r| {
-            r.get("file")
-                .and_then(|v| v.as_str())
-                .is_some_and(|s| s == "src/example.rs")
-        }));
-        assert!(refs.iter().any(|r| {
-            r.get("code")
-                .and_then(|v| v.as_str())
-                .is_some_and(|s| s == "src/example.rs#1")
-        }));
+        let refs = payload.get("task").and_then(|t| t.get("references")).and_then(|v| v.as_array()).cloned().unwrap_or_default();
+        assert!(refs.iter().any(|r| { r.get("link").and_then(|v| v.as_str()).is_some_and(|s| s == "https://example.com") }));
+        assert!(refs.iter().any(|r| { r.get("file").and_then(|v| v.as_str()).is_some_and(|s| s == "src/example.rs") }));
+        assert!(refs.iter().any(|r| { r.get("code").and_then(|v| v.as_str()).is_some_and(|s| s == "src/example.rs#1") }));
 
         // Remove code reference
         let remove_code_args = json!({
             "name": "task_reference_remove",
             "arguments": { "id": payload.get("id").and_then(|v| v.as_str()).unwrap(), "kind": "code", "value": "src/example.rs#1" }
         });
-        let remove_code_req = JsonRpcRequest {
-            jsonrpc: "2.0".into(),
-            id: Some(json!(34)),
-            method: "tools/call".into(),
-            params: remove_code_args,
-        };
+        let remove_code_req = JsonRpcRequest { jsonrpc: "2.0".into(), id: Some(json!(34)), method: "tools/call".into(), params: remove_code_args };
         let remove_code_resp = dispatch(remove_code_req);
-        assert!(
-            remove_code_resp.error.is_none(),
-            "task_reference_remove code failed"
-        );
+        assert!(remove_code_resp.error.is_none(), "task_reference_remove code failed");
         let payload = parse_tool_payload(&remove_code_resp);
-        let refs = payload
-            .get("task")
-            .and_then(|t| t.get("references"))
-            .and_then(|v| v.as_array())
-            .cloned()
-            .unwrap_or_default();
-        assert!(!refs.iter().any(|r| {
-            r.get("code")
-                .and_then(|v| v.as_str())
-                .is_some_and(|s| s == "src/example.rs#1")
-        }));
+        let refs = payload.get("task").and_then(|t| t.get("references")).and_then(|v| v.as_array()).cloned().unwrap_or_default();
+        assert!(!refs.iter().any(|r| { r.get("code").and_then(|v| v.as_str()).is_some_and(|s| s == "src/example.rs#1") }));
     }
 }
 
@@ -309,21 +218,11 @@ fn tools_call_update_delete_list_and_invalid_enum() {
         "name": "task_create",
         "arguments": { "title": "MCP Update", "project": "MCP" }
     });
-    let create_req = JsonRpcRequest {
-        jsonrpc: "2.0".into(),
-        id: Some(json!(10)),
-        method: "tools/call".into(),
-        params: create_args,
-    };
+    let create_req = JsonRpcRequest { jsonrpc: "2.0".into(), id: Some(json!(10)), method: "tools/call".into(), params: create_args };
     let create_resp = dispatch(create_req);
     assert!(create_resp.error.is_none(), "task_create failed");
     let task_json = parse_tool_payload(&create_resp);
-    let id = task_json
-        .get("task")
-        .and_then(|task| task.get("id"))
-        .and_then(|v| v.as_str())
-        .unwrap()
-        .to_string();
+    let id = task_json.get("task").and_then(|task| task.get("id")).and_then(|v| v.as_str()).unwrap().to_string();
 
     // Update the task. `project` is not an advertised task_update argument
     // (the project is derived from the task id); the schema layer rejects it.
@@ -331,12 +230,7 @@ fn tools_call_update_delete_list_and_invalid_enum() {
         "name": "task_update",
         "arguments": { "id": id, "patch": { "title": "Updated Title" } }
     });
-    let update_req = JsonRpcRequest {
-        jsonrpc: "2.0".into(),
-        id: Some(json!(11)),
-        method: "tools/call".into(),
-        params: update_args,
-    };
+    let update_req = JsonRpcRequest { jsonrpc: "2.0".into(), id: Some(json!(11)), method: "tools/call".into(), params: update_args };
     let update_resp = dispatch(update_req);
     if update_resp.error.is_some() {
         // Print tree to help debug
@@ -356,100 +250,49 @@ fn tools_call_update_delete_list_and_invalid_enum() {
         eprintln!("Update failed; .tasks tree:");
         print_dir_tree(&tasks_dir, 2);
     }
-    assert!(
-        update_resp.error.is_none(),
-        "task_update failed: {:?}",
-        update_resp.error
-    );
+    assert!(update_resp.error.is_none(), "task_update failed: {:?}", update_resp.error);
     let updated_json = parse_tool_payload(&update_resp);
     assert_eq!(updated_json.get("title").unwrap(), "Updated Title");
 
     // List tasks
     let list_args = json!({ "name": "task_list", "arguments": { "project": "MCP" } });
-    let list_req = JsonRpcRequest {
-        jsonrpc: "2.0".into(),
-        id: Some(json!(12)),
-        method: "tools/call".into(),
-        params: list_args,
-    };
+    let list_req = JsonRpcRequest { jsonrpc: "2.0".into(), id: Some(json!(12)), method: "tools/call".into(), params: list_args };
     let list_resp = dispatch(list_req);
     assert!(list_resp.error.is_none(), "task_list failed");
     let payload = parse_tool_payload(&list_resp);
     assert!(payload.get("hasMore").and_then(|v| v.as_bool()).is_some());
-    let listed_tasks = payload
-        .get("tasks")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
-    assert!(
-        listed_tasks
-            .iter()
-            .any(|t| t.get("id").unwrap() == &serde_json::Value::String(id.clone()))
-    );
+    let listed_tasks = payload.get("tasks").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+    assert!(listed_tasks.iter().any(|t| t.get("id").unwrap() == &serde_json::Value::String(id.clone())));
 
     // Delete the task (default soft delete): structured payload with
     // deleted/hard/warnings so callers can discover retained attachments
     // and incoming relationships without parsing human text.
     let delete_args = json!({ "name": "task_delete", "arguments": { "id": id, "project": "MCP" } });
-    let delete_req = JsonRpcRequest {
-        jsonrpc: "2.0".into(),
-        id: Some(json!(13)),
-        method: "tools/call".into(),
-        params: delete_args,
-    };
+    let delete_req = JsonRpcRequest { jsonrpc: "2.0".into(), id: Some(json!(13)), method: "tools/call".into(), params: delete_args };
     let delete_resp = dispatch(delete_req);
     assert!(delete_resp.error.is_none(), "task_delete failed");
     let del_payload = parse_tool_payload(&delete_resp);
     assert_eq!(del_payload.get("deleted"), Some(&json!(true)));
     assert_eq!(del_payload.get("hard"), Some(&json!(false)));
-    assert!(
-        del_payload
-            .get("warnings")
-            .and_then(|v| v.as_array())
-            .is_some(),
-        "task_delete payload must carry a warnings array"
-    );
+    assert!(del_payload.get("warnings").and_then(|v| v.as_array()).is_some(), "task_delete payload must carry a warnings array");
 
     // Negative test: invalid priority
     let bad_args = json!({ "name": "task_create", "arguments": { "title": "bad", "project": "MCP", "priority": "NOT_A_PRIORITY" } });
-    let bad_req = JsonRpcRequest {
-        jsonrpc: "2.0".into(),
-        id: Some(json!(14)),
-        method: "tools/call".into(),
-        params: bad_args,
-    };
+    let bad_req = JsonRpcRequest { jsonrpc: "2.0".into(), id: Some(json!(14)), method: "tools/call".into(), params: bad_args };
     let bad_resp = dispatch(bad_req);
-    let error = bad_resp
-        .error
-        .as_ref()
-        .expect("Expected error for invalid priority");
+    let error = bad_resp.error.as_ref().expect("Expected error for invalid priority");
     let msg = error.message.to_lowercase();
     assert!(msg.contains("priority"));
     let data = error.data.as_ref().expect("priority error data");
     assert_eq!(data.get("field").and_then(|v| v.as_str()), Some("priority"));
-    let suggestions = data
-        .get("suggestions")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
-    assert!(
-        suggestions.iter().any(|val| val.as_str() == Some("Low")),
-        "expected priority suggestions"
-    );
+    let suggestions = data.get("suggestions").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+    assert!(suggestions.iter().any(|val| val.as_str() == Some("Low")), "expected priority suggestions");
 
     // Negative test: invalid type
     let bad_type_args = json!({ "name": "task_create", "arguments": { "title": "bad", "project": "MCP", "type": "NOT_A_TYPE" } });
-    let bad_type_req = JsonRpcRequest {
-        jsonrpc: "2.0".into(),
-        id: Some(json!(15)),
-        method: "tools/call".into(),
-        params: bad_type_args,
-    };
+    let bad_type_req = JsonRpcRequest { jsonrpc: "2.0".into(), id: Some(json!(15)), method: "tools/call".into(), params: bad_type_args };
     let bad_type_resp = dispatch(bad_type_req);
-    let error = bad_type_resp
-        .error
-        .as_ref()
-        .expect("Expected error for invalid type");
+    let error = bad_type_resp.error.as_ref().expect("Expected error for invalid type");
     let msg = error.message.to_lowercase();
     assert!(msg.contains("type"));
     let data = error.data.as_ref().expect("type error data");
@@ -468,11 +311,7 @@ fn tools_call_update_delete_list_and_invalid_enum() {
     let recreate_resp = dispatch(recreate_req);
     assert!(recreate_resp.error.is_none(), "recreate task failed");
     let recreate_json = parse_tool_payload(&recreate_resp);
-    let recreated_id = recreate_json
-        .get("task")
-        .and_then(|task| task.get("id"))
-        .and_then(|v| v.as_str())
-        .expect("recreated id");
+    let recreated_id = recreate_json.get("task").and_then(|task| task.get("id")).and_then(|v| v.as_str()).expect("recreated id");
     let bad_status_req = JsonRpcRequest {
         jsonrpc: "2.0".into(),
         id: Some(json!(17)),
@@ -480,10 +319,7 @@ fn tools_call_update_delete_list_and_invalid_enum() {
         params: json!({"id": recreated_id, "patch": {"status": "NOT_A_STATUS"}}),
     };
     let bad_status_resp = dispatch(bad_status_req);
-    let error = bad_status_resp
-        .error
-        .as_ref()
-        .expect("Expected status validation error");
+    let error = bad_status_resp.error.as_ref().expect("Expected status validation error");
     assert!(error.message.to_ascii_lowercase().contains("status"));
     let data = error.data.as_ref().expect("status error data");
     assert_eq!(data.get("field").and_then(|v| v.as_str()), Some("status"));
@@ -511,12 +347,7 @@ fn tools_call_soft_delete_restore_and_deletion_views() {
         }),
     });
     assert!(create.error.is_none(), "task_create failed");
-    let id = parse_tool_payload(&create)
-        .get("task")
-        .and_then(|task| task.get("id"))
-        .and_then(|v| v.as_str())
-        .unwrap()
-        .to_string();
+    let id = parse_tool_payload(&create).get("task").and_then(|task| task.get("id")).and_then(|v| v.as_str()).unwrap().to_string();
 
     // Default delete is soft: structured payload, no warnings.
     let del = dispatch(JsonRpcRequest {
@@ -532,14 +363,7 @@ fn tools_call_soft_delete_restore_and_deletion_views() {
     let payload = parse_tool_payload(&del);
     assert_eq!(payload.get("deleted"), Some(&json!(true)));
     assert_eq!(payload.get("hard"), Some(&json!(false)));
-    assert_eq!(
-        payload
-            .get("warnings")
-            .and_then(|v| v.as_array())
-            .map(Vec::len),
-        Some(0),
-        "soft delete must not warn"
-    );
+    assert_eq!(payload.get("warnings").and_then(|v| v.as_array()).map(Vec::len), Some(0), "soft delete must not warn");
 
     // task_get excludes the soft-deleted task by default (converted
     // domain failure -> isError result, not a protocol error).
@@ -550,11 +374,7 @@ fn tools_call_soft_delete_restore_and_deletion_views() {
         params: json!({ "name": "task_get", "arguments": { "id": id } }),
     });
     assert!(get_active.error.is_none());
-    assert_eq!(
-        tool_response_payload(&get_active).get("isError"),
-        Some(&json!(true)),
-        "deleted task must not resolve without include_deleted"
-    );
+    assert_eq!(tool_response_payload(&get_active).get("isError"), Some(&json!(true)), "deleted task must not resolve without include_deleted");
 
     // include_deleted resolves it and exposes deleted_at.
     let get_deleted = dispatch(JsonRpcRequest {
@@ -568,10 +388,7 @@ fn tools_call_soft_delete_restore_and_deletion_views() {
     });
     assert!(get_deleted.error.is_none());
     let dto = parse_tool_payload(&get_deleted);
-    assert!(
-        dto.get("deleted_at").and_then(|v| v.as_str()).is_some(),
-        "soft-deleted DTO must carry deleted_at"
-    );
+    assert!(dto.get("deleted_at").and_then(|v| v.as_str()).is_some(), "soft-deleted DTO must carry deleted_at");
 
     // task_list deletion views: active hides, deleted/all show.
     let listed_ids = |deletion: Option<&str>| {
@@ -589,29 +406,13 @@ fn tools_call_soft_delete_restore_and_deletion_views() {
         parse_tool_payload(&resp)
             .get("tasks")
             .and_then(|v| v.as_array())
-            .map(|tasks| {
-                tasks
-                    .iter()
-                    .map(|t| {
-                        t.get("id")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("")
-                            .to_string()
-                    })
-                    .collect::<Vec<_>>()
-            })
+            .map(|tasks| tasks.iter().map(|t| t.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string()).collect::<Vec<_>>())
             .unwrap_or_default()
     };
     assert!(!listed_ids(None).contains(&id), "active view hides");
-    assert!(
-        listed_ids(Some("deleted")).contains(&id),
-        "deleted view shows"
-    );
+    assert!(listed_ids(Some("deleted")).contains(&id), "deleted view shows");
     assert!(listed_ids(Some("all")).contains(&id), "all view shows");
-    assert!(
-        listed_ids(Some("active")).is_empty(),
-        "active view explicit"
-    );
+    assert!(listed_ids(Some("active")).is_empty(), "active view explicit");
 
     // Strict enum: unknown deletion value is invalid params.
     let bogus = dispatch(JsonRpcRequest {
@@ -639,17 +440,8 @@ fn tools_call_soft_delete_restore_and_deletion_views() {
     });
     assert!(restore.error.is_none(), "task_restore failed");
     let restored = parse_tool_payload(&restore);
-    assert!(
-        restored
-            .get("deleted_at")
-            .map(|v| v.is_null())
-            .unwrap_or(true),
-        "restored DTO must have deleted_at null or omitted"
-    );
-    assert!(
-        listed_ids(None).contains(&id),
-        "active view shows restored task"
-    );
+    assert!(restored.get("deleted_at").map(|v| v.is_null()).unwrap_or(true), "restored DTO must have deleted_at null or omitted");
+    assert!(listed_ids(None).contains(&id), "active view shows restored task");
 
     clear_tasks_dir_env();
 }
@@ -675,14 +467,7 @@ fn tools_call_hard_delete_reports_warnings_and_is_final() {
             }),
         })
     };
-    let id_of = |resp: &JsonRpcResponse| {
-        parse_tool_payload(resp)
-            .get("task")
-            .and_then(|task| task.get("id"))
-            .and_then(|v| v.as_str())
-            .unwrap()
-            .to_string()
-    };
+    let id_of = |resp: &JsonRpcResponse| parse_tool_payload(resp).get("task").and_then(|task| task.get("id")).and_then(|v| v.as_str()).unwrap().to_string();
     let target = id_of(&create("hard delete target", 1));
     let dependent = id_of(&create("dependent task", 2));
 
@@ -715,14 +500,9 @@ fn tools_call_hard_delete_reports_warnings_and_is_final() {
     let payload = parse_tool_payload(&del);
     assert_eq!(payload.get("deleted"), Some(&json!(true)));
     assert_eq!(payload.get("hard"), Some(&json!(true)));
-    let warnings = payload
-        .get("warnings")
-        .and_then(|v| v.as_array())
-        .expect("hard delete payload must carry warnings");
+    let warnings = payload.get("warnings").and_then(|v| v.as_array()).expect("hard delete payload must carry warnings");
     assert!(
-        warnings
-            .iter()
-            .any(|w| w.as_str().is_some_and(|text| text.contains(&dependent))),
+        warnings.iter().any(|w| w.as_str().is_some_and(|text| text.contains(&dependent))),
         "warnings must name the incoming relationship from {dependent}: {warnings:?}"
     );
 
@@ -738,11 +518,7 @@ fn tools_call_hard_delete_reports_warnings_and_is_final() {
         }),
     });
     assert!(get_deleted.error.is_none());
-    assert_eq!(
-        tool_response_payload(&get_deleted).get("isError"),
-        Some(&json!(true)),
-        "hard-deleted task must not resolve"
-    );
+    assert_eq!(tool_response_payload(&get_deleted).get("isError"), Some(&json!(true)), "hard-deleted task must not resolve");
     let restore = dispatch(JsonRpcRequest {
         jsonrpc: "2.0".into(),
         id: Some(json!(6)),
@@ -753,11 +529,7 @@ fn tools_call_hard_delete_reports_warnings_and_is_final() {
         }),
     });
     assert!(restore.error.is_none());
-    assert_eq!(
-        tool_response_payload(&restore).get("isError"),
-        Some(&json!(true)),
-        "restore of a hard-deleted task must fail as a domain error"
-    );
+    assert_eq!(tool_response_payload(&restore).get("isError"), Some(&json!(true)), "restore of a hard-deleted task must fail as a domain error");
 
     clear_tasks_dir_env();
 }
@@ -793,16 +565,9 @@ fn project_list_is_paginated() {
     assert_eq!(payload.get("cursor").and_then(|v| v.as_u64()), Some(0));
     assert_eq!(payload.get("hasMore").and_then(|v| v.as_bool()), Some(true));
 
-    let next_cursor = payload
-        .get("nextCursor")
-        .and_then(|v| v.as_str())
-        .expect("expected nextCursor");
+    let next_cursor = payload.get("nextCursor").and_then(|v| v.as_str()).expect("expected nextCursor");
 
-    let first_page = payload
-        .get("projects")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    let first_page = payload.get("projects").and_then(|v| v.as_array()).cloned().unwrap_or_default();
     assert_eq!(first_page.len(), 1);
 
     // Second page (use cursor)
@@ -817,17 +582,10 @@ fn project_list_is_paginated() {
     let payload = parse_tool_payload(&list_resp);
     assert_eq!(payload.get("total").and_then(|v| v.as_u64()), Some(2));
     assert_eq!(payload.get("count").and_then(|v| v.as_u64()), Some(1));
-    assert_eq!(
-        payload.get("hasMore").and_then(|v| v.as_bool()),
-        Some(false)
-    );
+    assert_eq!(payload.get("hasMore").and_then(|v| v.as_bool()), Some(false));
     assert!(payload.get("nextCursor").is_some_and(|v| v.is_null()));
 
-    let second_page = payload
-        .get("projects")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    let second_page = payload.get("projects").and_then(|v| v.as_array()).cloned().unwrap_or_default();
     assert_eq!(second_page.len(), 1);
 
     // Offset alias should behave the same as cursor.
@@ -838,17 +596,10 @@ fn project_list_is_paginated() {
         params: json!({ "name": "project_list", "arguments": { "limit": 1, "offset": 1 } }),
     };
     let list_resp = dispatch(list_req);
-    assert!(
-        list_resp.error.is_none(),
-        "project_list offset alias failed"
-    );
+    assert!(list_resp.error.is_none(), "project_list offset alias failed");
     let payload = parse_tool_payload(&list_resp);
     assert_eq!(payload.get("cursor").and_then(|v| v.as_u64()), Some(1));
-    let page = payload
-        .get("projects")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    let page = payload.get("projects").and_then(|v| v.as_array()).cloned().unwrap_or_default();
     assert_eq!(page.len(), 1);
 
     clear_tasks_dir_env();
@@ -875,11 +626,7 @@ fn task_list_pagination_includes_message_and_pages() {
             }),
         };
         let create_resp = dispatch(create_req);
-        assert!(
-            create_resp.error.is_none(),
-            "task_create failed: {:?}",
-            create_resp.error
-        );
+        assert!(create_resp.error.is_none(), "task_create failed: {:?}", create_resp.error);
     }
 
     // First page
@@ -899,14 +646,8 @@ fn task_list_pagination_includes_message_and_pages() {
     assert_eq!(payload.get("totalPages").and_then(|v| v.as_u64()), Some(2));
     assert_eq!(payload.get("hasMore").and_then(|v| v.as_bool()), Some(true));
     assert_eq!(payload.get("nextCursor").and_then(|v| v.as_u64()), Some(2));
-    let message = payload
-        .get("message")
-        .and_then(|v| v.as_str())
-        .expect("message must be present");
-    assert!(
-        message.contains("page 1 of 2") && message.contains("cursor=2"),
-        "message should call out next cursor: {message}"
-    );
+    let message = payload.get("message").and_then(|v| v.as_str()).expect("message must be present");
+    assert!(message.contains("page 1 of 2") && message.contains("cursor=2"), "message should call out next cursor: {message}");
 
     // Last page (using the returned cursor)
     let last = dispatch(JsonRpcRequest {
@@ -923,19 +664,10 @@ fn task_list_pagination_includes_message_and_pages() {
     assert_eq!(payload.get("count").and_then(|v| v.as_u64()), Some(1));
     assert_eq!(payload.get("page").and_then(|v| v.as_u64()), Some(2));
     assert_eq!(payload.get("totalPages").and_then(|v| v.as_u64()), Some(2));
-    assert_eq!(
-        payload.get("hasMore").and_then(|v| v.as_bool()),
-        Some(false)
-    );
+    assert_eq!(payload.get("hasMore").and_then(|v| v.as_bool()), Some(false));
     assert!(payload.get("nextCursor").is_some_and(|v| v.is_null()));
-    let message = payload
-        .get("message")
-        .and_then(|v| v.as_str())
-        .expect("message must be present on last page");
-    assert!(
-        message.contains("last page"),
-        "last page message should mention it: {message}"
-    );
+    let message = payload.get("message").and_then(|v| v.as_str()).expect("message must be present on last page");
+    assert!(message.contains("last page"), "last page message should mention it: {message}");
 
     clear_tasks_dir_env();
 }
@@ -949,25 +681,13 @@ fn task_list_tool_description_documents_pagination() {
     seed_single_project_config(&tasks_dir);
     set_tasks_dir_env(&tasks_dir);
 
-    let resp = dispatch(JsonRpcRequest {
-        jsonrpc: "2.0".into(),
-        id: Some(json!(1)),
-        method: "tools/list".into(),
-        params: json!({}),
-    });
+    let resp = dispatch(JsonRpcRequest { jsonrpc: "2.0".into(), id: Some(json!(1)), method: "tools/list".into(), params: json!({}) });
     assert!(resp.error.is_none(), "tools/list failed: {:?}", resp.error);
     let result = resp.result.expect("tools/list result");
-    let tools = result
-        .get("tools")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .expect("tools array");
+    let tools = result.get("tools").and_then(|v| v.as_array()).cloned().expect("tools array");
     let task_list = tool_by_name(&tools, "task_list");
     let description = tool_description(task_list);
-    assert!(
-        description.contains("PAGINATION"),
-        "task_list description should explain pagination, got: {description}"
-    );
+    assert!(description.contains("PAGINATION"), "task_list description should explain pagination, got: {description}");
     assert!(
         description.contains("hasMore") && description.contains("nextCursor"),
         "task_list description should reference hasMore + nextCursor, got: {description}"
@@ -1001,68 +721,31 @@ custom:
     std::fs::write(tasks_dir.join("config.yml"), config_yaml).unwrap();
     set_tasks_dir_env(&tasks_dir);
 
-    let req = JsonRpcRequest {
-        jsonrpc: "2.0".into(),
-        id: Some(json!(99)),
-        method: "tools/list".into(),
-        params: json!({}),
-    };
+    let req = JsonRpcRequest { jsonrpc: "2.0".into(), id: Some(json!(99)), method: "tools/list".into(), params: json!({}) };
     let resp = dispatch(req);
     assert!(resp.error.is_none(), "tools/list failed: {:?}", resp.error);
-    let tools = resp
-        .result
-        .as_ref()
-        .and_then(|value| value.get("tools"))
-        .and_then(|value| value.as_array())
-        .expect("tools array available");
+    let tools = resp.result.as_ref().and_then(|value| value.get("tools")).and_then(|value| value.as_array()).expect("tools array available");
 
-    let task_create = tools
-        .iter()
-        .find(|tool| tool.get("name").and_then(|v| v.as_str()) == Some("task_create"))
-        .expect("task_create tool present");
-    assert_eq!(
-        field_values(task_create, "priority"),
-        vec!["Low", "Medium", "High"]
-    );
-    assert_eq!(
-        field_values(task_create, "type"),
-        vec!["Feature", "Bug", "Chore"]
-    );
+    let task_create = tools.iter().find(|tool| tool.get("name").and_then(|v| v.as_str()) == Some("task_create")).expect("task_create tool present");
+    assert_eq!(field_values(task_create, "priority"), vec!["Low", "Medium", "High"]);
+    assert_eq!(field_values(task_create, "type"), vec!["Feature", "Bug", "Chore"]);
     assert_eq!(field_values(task_create, "project"), vec!["MCP"]);
     assert_eq!(field_values(task_create, "reporter"), vec!["alice", "bob"]);
     assert_eq!(field_values(task_create, "assignee"), vec!["alice", "bob"]);
     assert_eq!(field_values(task_create, "tags"), vec!["cli", "infra"]);
     assert_eq!(accepts_multiple(task_create, "tags"), Some(true));
-    assert_eq!(
-        field_values(task_create, "custom_fields"),
-        vec!["severity", "impact"]
-    );
+    assert_eq!(field_values(task_create, "custom_fields"), vec!["severity", "impact"]);
 
-    let task_list = tools
-        .iter()
-        .find(|tool| tool.get("name").and_then(|v| v.as_str()) == Some("task_list"))
-        .expect("task_list tool present");
-    assert_eq!(
-        field_values(task_list, "status"),
-        vec!["Todo", "InProgress", "NeedsReview", "Done"]
-    );
+    let task_list = tools.iter().find(|tool| tool.get("name").and_then(|v| v.as_str()) == Some("task_list")).expect("task_list tool present");
+    assert_eq!(field_values(task_list, "status"), vec!["Todo", "InProgress", "NeedsReview", "Done"]);
     assert_eq!(accepts_multiple(task_list, "status"), Some(true));
     assert_eq!(field_values(task_list, "assignee"), vec!["alice", "bob"]);
     assert_eq!(field_values(task_list, "project"), vec!["MCP"]);
 
-    let sprint_backlog = tools
-        .iter()
-        .find(|tool| tool.get("name").and_then(|v| v.as_str()) == Some("sprint_backlog"))
-        .expect("sprint_backlog tool present");
-    assert_eq!(
-        field_values(sprint_backlog, "assignee"),
-        vec!["alice", "bob"]
-    );
+    let sprint_backlog = tools.iter().find(|tool| tool.get("name").and_then(|v| v.as_str()) == Some("sprint_backlog")).expect("sprint_backlog tool present");
+    assert_eq!(field_values(sprint_backlog, "assignee"), vec!["alice", "bob"]);
 
-    let config_show = tools
-        .iter()
-        .find(|tool| tool.get("name").and_then(|v| v.as_str()) == Some("config_show"))
-        .expect("config_show tool present");
+    let config_show = tools.iter().find(|tool| tool.get("name").and_then(|v| v.as_str()) == Some("config_show")).expect("config_show tool present");
     assert_eq!(field_values(config_show, "project"), vec!["MCP"]);
 
     clear_tasks_dir_env();
@@ -1077,38 +760,16 @@ fn tools_list_skips_enum_hints_with_multiple_projects() {
     std::fs::create_dir_all(tasks_dir.join("BBB")).unwrap();
     set_tasks_dir_env(&tasks_dir);
 
-    let req = JsonRpcRequest {
-        jsonrpc: "2.0".into(),
-        id: Some(json!(100)),
-        method: "tools/list".into(),
-        params: json!({}),
-    };
+    let req = JsonRpcRequest { jsonrpc: "2.0".into(), id: Some(json!(100)), method: "tools/list".into(), params: json!({}) };
     let resp = dispatch(req);
     assert!(resp.error.is_none(), "tools/list failed: {:?}", resp.error);
-    let tools = resp
-        .result
-        .as_ref()
-        .and_then(|value| value.get("tools"))
-        .and_then(|value| value.as_array())
-        .expect("tools array available");
+    let tools = resp.result.as_ref().and_then(|value| value.get("tools")).and_then(|value| value.as_array()).expect("tools array available");
 
-    let task_create = tools
-        .iter()
-        .find(|tool| tool.get("name").and_then(|v| v.as_str()) == Some("task_create"))
-        .expect("task_create tool present");
-    assert!(
-        task_create.get("hints").is_none(),
-        "hints should be absent for task_create when multiple projects exist"
-    );
+    let task_create = tools.iter().find(|tool| tool.get("name").and_then(|v| v.as_str()) == Some("task_create")).expect("task_create tool present");
+    assert!(task_create.get("hints").is_none(), "hints should be absent for task_create when multiple projects exist");
 
-    let task_list = tools
-        .iter()
-        .find(|tool| tool.get("name").and_then(|v| v.as_str()) == Some("task_list"))
-        .expect("task_list tool present");
-    assert!(
-        task_list.get("hints").is_none(),
-        "task_list hints should be absent when multiple projects"
-    );
+    let task_list = tools.iter().find(|tool| tool.get("name").and_then(|v| v.as_str()) == Some("task_list")).expect("task_list tool present");
+    assert!(task_list.get("hints").is_none(), "task_list hints should be absent when multiple projects");
 
     clear_tasks_dir_env();
 }
@@ -1138,20 +799,10 @@ custom:
     std::fs::write(tasks_dir.join("config.yml"), config_yaml).unwrap();
     set_tasks_dir_env(&tasks_dir);
 
-    let req = JsonRpcRequest {
-        jsonrpc: "2.0".into(),
-        id: Some(json!(321)),
-        method: "tools/list".into(),
-        params: json!({}),
-    };
+    let req = JsonRpcRequest { jsonrpc: "2.0".into(), id: Some(json!(321)), method: "tools/list".into(), params: json!({}) };
     let resp = dispatch(req);
     assert!(resp.error.is_none(), "tools/list failed: {:?}", resp.error);
-    let tools = resp
-        .result
-        .as_ref()
-        .and_then(|value| value.get("tools"))
-        .and_then(|value| value.as_array())
-        .expect("tools array available");
+    let tools = resp.result.as_ref().and_then(|value| value.get("tools")).and_then(|value| value.as_array()).expect("tools array available");
 
     let task_create_desc = tool_description(tool_by_name(tools, "task_create"));
     assert!(task_create_desc.contains("Available projects: MCP."));
@@ -1179,20 +830,10 @@ fn tool_descriptions_remain_static_with_multiple_projects() {
         std::env::set_var("LOTAR_TASKS_DIR", &tasks_dir);
     }
 
-    let req = JsonRpcRequest {
-        jsonrpc: "2.0".into(),
-        id: Some(json!(322)),
-        method: "tools/list".into(),
-        params: json!({}),
-    };
+    let req = JsonRpcRequest { jsonrpc: "2.0".into(), id: Some(json!(322)), method: "tools/list".into(), params: json!({}) };
     let resp = dispatch(req);
     assert!(resp.error.is_none(), "tools/list failed: {:?}", resp.error);
-    let tools = resp
-        .result
-        .as_ref()
-        .and_then(|value| value.get("tools"))
-        .and_then(|value| value.as_array())
-        .expect("tools array available");
+    let tools = resp.result.as_ref().and_then(|value| value.get("tools")).and_then(|value| value.as_array()).expect("tools array available");
 
     let task_create_desc = tool_description(tool_by_name(tools, "task_create"));
     assert!(!task_create_desc.contains("Available"));
@@ -1231,29 +872,14 @@ fn task_create_response_includes_metadata_and_enum_hints() {
     let resp = dispatch(req);
     assert!(resp.error.is_none(), "task_create failed: {:?}", resp.error);
     let payload = parse_tool_payload(&resp);
-    let metadata = payload
-        .get("metadata")
-        .and_then(|value| value.as_object())
-        .expect("metadata present");
-    let applied = metadata
-        .get("appliedDefaults")
-        .and_then(|value| value.as_array())
-        .expect("appliedDefaults array");
-    let fields: Vec<&str> = applied
-        .iter()
-        .filter_map(|entry| entry.get("field").and_then(|value| value.as_str()))
-        .collect();
+    let metadata = payload.get("metadata").and_then(|value| value.as_object()).expect("metadata present");
+    let applied = metadata.get("appliedDefaults").and_then(|value| value.as_array()).expect("appliedDefaults array");
+    let fields: Vec<&str> = applied.iter().filter_map(|entry| entry.get("field").and_then(|value| value.as_str())).collect();
     assert!(fields.contains(&"priority"));
     assert!(fields.contains(&"status"));
     assert!(fields.contains(&"type"));
-    let enum_hints = metadata
-        .get("enumHints")
-        .and_then(|value| value.as_object())
-        .expect("enumHints present");
-    let projects = enum_hints
-        .get("projects")
-        .and_then(|value| value.as_array())
-        .expect("projects array present");
+    let enum_hints = metadata.get("enumHints").and_then(|value| value.as_object()).expect("enumHints present");
+    let projects = enum_hints.get("projects").and_then(|value| value.as_array()).expect("projects array present");
     assert_eq!(projects[0].as_str(), Some("MCP"));
 
     unsafe {
@@ -1288,34 +914,15 @@ fn task_list_payload_includes_enum_hints() {
     let create_resp = dispatch(create_req);
     assert!(create_resp.error.is_none(), "seed create failed");
 
-    let list_req = JsonRpcRequest {
-        jsonrpc: "2.0".into(),
-        id: Some(json!(402)),
-        method: "task/list".into(),
-        params: json!({ "project": "MCP" }),
-    };
+    let list_req = JsonRpcRequest { jsonrpc: "2.0".into(), id: Some(json!(402)), method: "task/list".into(), params: json!({ "project": "MCP" }) };
     let list_resp = dispatch(list_req);
     assert!(list_resp.error.is_none(), "task/list failed");
-    let content = list_resp
-        .result
-        .as_ref()
-        .and_then(|value| value.get("content"))
-        .and_then(|value| value.as_array())
-        .expect("content array present");
-    let payload_text = content[0]
-        .get("text")
-        .and_then(|value| value.as_str())
-        .expect("text payload available");
+    let content = list_resp.result.as_ref().and_then(|value| value.get("content")).and_then(|value| value.as_array()).expect("content array present");
+    let payload_text = content[0].get("text").and_then(|value| value.as_str()).expect("text payload available");
     let payload: serde_json::Value = serde_json::from_str(payload_text).unwrap();
-    let enum_hints = payload
-        .get("enumHints")
-        .and_then(|value| value.as_object())
-        .expect("enumHints present");
+    let enum_hints = payload.get("enumHints").and_then(|value| value.as_object()).expect("enumHints present");
     assert!(enum_hints.get("statuses").is_some());
-    let projects = enum_hints
-        .get("projects")
-        .and_then(|value| value.as_array())
-        .expect("projects array present");
+    let projects = enum_hints.get("projects").and_then(|value| value.as_array()).expect("projects array present");
     assert_eq!(projects[0].as_str(), Some("MCP"));
 
     unsafe {
@@ -1334,34 +941,15 @@ fn sprint_backlog_payload_includes_enum_hints() {
         std::env::set_var("LOTAR_TASKS_DIR", &tasks_dir);
     }
 
-    let req = JsonRpcRequest {
-        jsonrpc: "2.0".into(),
-        id: Some(json!(403)),
-        method: "sprint/backlog".into(),
-        params: json!({ "project": "MCP" }),
-    };
+    let req = JsonRpcRequest { jsonrpc: "2.0".into(), id: Some(json!(403)), method: "sprint/backlog".into(), params: json!({ "project": "MCP" }) };
     let resp = dispatch(req);
     assert!(resp.error.is_none(), "sprint/backlog failed");
-    let content = resp
-        .result
-        .as_ref()
-        .and_then(|value| value.get("content"))
-        .and_then(|value| value.as_array())
-        .expect("content array present");
-    let payload_text = content[0]
-        .get("text")
-        .and_then(|value| value.as_str())
-        .expect("text payload available");
+    let content = resp.result.as_ref().and_then(|value| value.get("content")).and_then(|value| value.as_array()).expect("content array present");
+    let payload_text = content[0].get("text").and_then(|value| value.as_str()).expect("text payload available");
     let payload: serde_json::Value = serde_json::from_str(payload_text).unwrap();
-    let enum_hints = payload
-        .get("enumHints")
-        .and_then(|value| value.as_object())
-        .expect("enumHints present");
+    let enum_hints = payload.get("enumHints").and_then(|value| value.as_object()).expect("enumHints present");
     assert!(enum_hints.get("priorities").is_some());
-    let projects = enum_hints
-        .get("projects")
-        .and_then(|value| value.as_array())
-        .expect("projects array present");
+    let projects = enum_hints.get("projects").and_then(|value| value.as_array()).expect("projects array present");
     assert_eq!(projects[0].as_str(), Some("MCP"));
 
     unsafe {
@@ -1380,39 +968,16 @@ fn schema_discover_filters_tools_case_insensitively() {
         std::env::set_var("LOTAR_TASKS_DIR", &tasks_dir);
     }
 
-    let req = JsonRpcRequest {
-        jsonrpc: "2.0".into(),
-        id: Some(json!(201)),
-        method: "schema/discover".into(),
-        params: json!({ "tool": "TASK_CREATE" }),
-    };
+    let req = JsonRpcRequest { jsonrpc: "2.0".into(), id: Some(json!(201)), method: "schema/discover".into(), params: json!({ "tool": "TASK_CREATE" }) };
     let resp = dispatch(req);
-    assert!(
-        resp.error.is_none(),
-        "schema/discover failed: {:?}",
-        resp.error
-    );
-    let content = resp
-        .result
-        .as_ref()
-        .and_then(|value| value.get("content"))
-        .and_then(|value| value.as_array())
-        .expect("content array present");
-    let text = content[0]
-        .get("text")
-        .and_then(|value| value.as_str())
-        .expect("text payload present");
+    assert!(resp.error.is_none(), "schema/discover failed: {:?}", resp.error);
+    let content = resp.result.as_ref().and_then(|value| value.get("content")).and_then(|value| value.as_array()).expect("content array present");
+    let text = content[0].get("text").and_then(|value| value.as_str()).expect("text payload present");
     let payload: serde_json::Value = serde_json::from_str(text).expect("valid payload json");
     assert_eq!(payload.get("toolCount").and_then(|v| v.as_u64()), Some(1));
-    let tools = payload
-        .get("tools")
-        .and_then(|value| value.as_array())
-        .expect("tools array present");
+    let tools = payload.get("tools").and_then(|value| value.as_array()).expect("tools array present");
     assert_eq!(tools.len(), 1, "expected only filtered tool");
-    assert_eq!(
-        tools[0].get("name").and_then(|value| value.as_str()),
-        Some("task_create")
-    );
+    assert_eq!(tools[0].get("name").and_then(|value| value.as_str()), Some("task_create"));
 
     unsafe {
         std::env::remove_var("LOTAR_TASKS_DIR");
@@ -1458,11 +1023,7 @@ fn tools_call_task_update_accepts_project_only_status() {
     // Project MCP allows states that the global defaults do not include.
     let mcp_dir = tasks_dir.join("MCP");
     std::fs::create_dir_all(&mcp_dir).unwrap();
-    std::fs::write(
-        mcp_dir.join("config.yml"),
-        "issue_states: [Queued, Active, Review, Complete]\n",
-    )
-    .unwrap();
+    std::fs::write(mcp_dir.join("config.yml"), "issue_states: [Queued, Active, Review, Complete]\n").unwrap();
     set_tasks_dir_env(&tasks_dir);
 
     let create_resp = dispatch(JsonRpcRequest {
@@ -1476,17 +1037,9 @@ fn tools_call_task_update_accepts_project_only_status() {
     });
     assert!(create_resp.error.is_none(), "task_create failed");
     let created = parse_tool_payload(&create_resp);
-    let id = created
-        .get("task")
-        .and_then(|task| task.get("id"))
-        .and_then(|v| v.as_str())
-        .unwrap()
-        .to_string();
+    let id = created.get("task").and_then(|task| task.get("id")).and_then(|v| v.as_str()).unwrap().to_string();
     assert_eq!(
-        created
-            .get("task")
-            .and_then(|task| task.get("status"))
-            .and_then(|v| v.as_str()),
+        created.get("task").and_then(|task| task.get("status")).and_then(|v| v.as_str()),
         Some("Review"),
         "explicit project status must be created atomically"
     );
@@ -1502,16 +1055,9 @@ fn tools_call_task_update_accepts_project_only_status() {
             "arguments": { "id": id, "patch": { "status": "Active" } }
         }),
     });
-    assert!(
-        update_resp.error.is_none(),
-        "task_update with project status failed: {:?}",
-        update_resp.error
-    );
+    assert!(update_resp.error.is_none(), "task_update with project status failed: {:?}", update_resp.error);
     let updated = parse_tool_payload(&update_resp);
-    assert_eq!(
-        updated.get("status").and_then(|v| v.as_str()),
-        Some("Active")
-    );
+    assert_eq!(updated.get("status").and_then(|v| v.as_str()), Some("Active"));
 
     // A status outside the project's set is rejected with suggestions from
     // the project, not the global defaults.
@@ -1524,26 +1070,12 @@ fn tools_call_task_update_accepts_project_only_status() {
             "arguments": { "id": id, "patch": { "status": "Todo" } }
         }),
     });
-    let error = bad_resp
-        .error
-        .as_ref()
-        .expect("expected rejection for status outside project set");
+    let error = bad_resp.error.as_ref().expect("expected rejection for status outside project set");
     assert_eq!(error.code, -32602);
     let data = error.data.as_ref().expect("expected enum hint data");
-    let suggestions = data
-        .get("suggestions")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
-    assert!(
-        suggestions.iter().any(|v| v.as_str() == Some("Queued")),
-        "expected project-scoped suggestions, got {:?}",
-        suggestions
-    );
-    assert!(
-        !suggestions.iter().any(|v| v.as_str() == Some("Todo")),
-        "global-only values must not be suggested for project MCP"
-    );
+    let suggestions = data.get("suggestions").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+    assert!(suggestions.iter().any(|v| v.as_str() == Some("Queued")), "expected project-scoped suggestions, got {:?}", suggestions);
+    assert!(!suggestions.iter().any(|v| v.as_str() == Some("Todo")), "global-only values must not be suggested for project MCP");
 
     clear_tasks_dir_env();
 }
@@ -1555,17 +1087,9 @@ fn tools_call_task_bulk_update_reports_per_project_enum_failures() {
     let tasks_dir = tmp.path().join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();
     std::fs::create_dir_all(tasks_dir.join("MCP")).unwrap();
-    std::fs::write(
-        tasks_dir.join("MCP").join("config.yml"),
-        "issue_states: [Queued, Active, Review, Complete]\n",
-    )
-    .unwrap();
+    std::fs::write(tasks_dir.join("MCP").join("config.yml"), "issue_states: [Queued, Active, Review, Complete]\n").unwrap();
     std::fs::create_dir_all(tasks_dir.join("MCP2")).unwrap();
-    std::fs::write(
-        tasks_dir.join("MCP2").join("config.yml"),
-        "issue_states: [Todo, InProgress, Done]\n",
-    )
-    .unwrap();
+    std::fs::write(tasks_dir.join("MCP2").join("config.yml"), "issue_states: [Todo, InProgress, Done]\n").unwrap();
     set_tasks_dir_env(&tasks_dir);
 
     let make_task = |project: &str, call_id: i64| -> String {
@@ -1579,12 +1103,7 @@ fn tools_call_task_bulk_update_reports_per_project_enum_failures() {
             }),
         });
         assert!(resp.error.is_none(), "task_create failed");
-        parse_tool_payload(&resp)
-            .get("task")
-            .and_then(|task| task.get("id"))
-            .and_then(|v| v.as_str())
-            .unwrap()
-            .to_string()
+        parse_tool_payload(&resp).get("task").and_then(|task| task.get("id")).and_then(|v| v.as_str()).unwrap().to_string()
     };
 
     let mcp_id = make_task("MCP", 70);
@@ -1601,27 +1120,13 @@ fn tools_call_task_bulk_update_reports_per_project_enum_failures() {
     });
     assert!(bulk_resp.error.is_none(), "bulk call failed");
     let payload = parse_tool_payload(&bulk_resp);
-    let updated = payload
-        .get("updated")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
-    let failed = payload
-        .get("failed")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    let updated = payload.get("updated").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+    let failed = payload.get("failed").and_then(|v| v.as_array()).cloned().unwrap_or_default();
     assert_eq!(updated.len(), 1, "MCP task should accept Review: {payload}");
-    assert_eq!(
-        updated[0].get("status").and_then(|v| v.as_str()),
-        Some("Review")
-    );
+    assert_eq!(updated[0].get("status").and_then(|v| v.as_str()), Some("Review"));
     assert_eq!(failed.len(), 1, "MCP2 task should reject Review: {payload}");
     assert!(
-        failed[0]
-            .get("error")
-            .and_then(|v| v.as_str())
-            .is_some_and(|msg| msg.contains("not enabled")),
+        failed[0].get("error").and_then(|v| v.as_str()).is_some_and(|msg| msg.contains("not enabled")),
         "failure should explain the invalid status: {payload}"
     );
 
@@ -1655,12 +1160,7 @@ fn tools_call_task_update_null_clears_clearable_scalars() {
     });
     assert!(created.error.is_none(), "task_create failed");
     let payload = parse_tool_payload(&created);
-    let id = payload
-        .get("task")
-        .and_then(|task| task.get("id"))
-        .and_then(|v| v.as_str())
-        .unwrap()
-        .to_string();
+    let id = payload.get("task").and_then(|task| task.get("id")).and_then(|v| v.as_str()).unwrap().to_string();
 
     // Omitted fields stay; null clears the clearable scalars.
     let update = dispatch(JsonRpcRequest {
@@ -1675,26 +1175,12 @@ fn tools_call_task_update_null_clears_clearable_scalars() {
             }
         }),
     });
-    assert!(
-        update.error.is_none(),
-        "null clears failed: {:?}",
-        update.error
-    );
+    assert!(update.error.is_none(), "null clears failed: {:?}", update.error);
     let updated = parse_tool_payload(&update);
     assert!(updated.get("assignee").is_none() || updated["assignee"].is_null());
     assert!(updated.get("effort").is_none() || updated["effort"].is_null());
-    assert!(
-        updated.get("description").is_none() || updated["description"].is_null(),
-        "null must clear description: {updated}"
-    );
-    assert_eq!(
-        updated
-            .get("tags")
-            .and_then(|v| v.as_array())
-            .map(|a| a.len()),
-        Some(1),
-        "omitted tags stay unchanged: {updated}"
-    );
+    assert!(updated.get("description").is_none() || updated["description"].is_null(), "null must clear description: {updated}");
+    assert_eq!(updated.get("tags").and_then(|v| v.as_array()).map(|a| a.len()), Some(1), "omitted tags stay unchanged: {updated}");
 
     // Empty title is rejected instead of blanking the task.
     let blank = dispatch(JsonRpcRequest {
@@ -1721,10 +1207,7 @@ fn tools_call_task_update_null_clears_clearable_scalars() {
                 "arguments": { "id": id, "patch": { "sprints": bad_sprints } }
             }),
         });
-        let error = bad
-            .error
-            .as_ref()
-            .expect("invalid sprints must be rejected");
+        let error = bad.error.as_ref().expect("invalid sprints must be rejected");
         assert_eq!(error.code, -32602, "sprints payload: {bad_sprints}");
     }
 
@@ -1737,10 +1220,7 @@ fn tools_call_task_update_null_clears_clearable_scalars() {
             "arguments": { "title": "bad sprints", "project": "MCP", "sprints": [0, 3] }
         }),
     });
-    let error = bad_create
-        .error
-        .as_ref()
-        .expect("invalid create sprints must be rejected");
+    let error = bad_create.error.as_ref().expect("invalid create sprints must be rejected");
     assert_eq!(error.code, -32602, "create sprints must be strict");
 
     clear_tasks_dir_env();
@@ -1771,12 +1251,7 @@ fn tools_call_task_bulk_update_null_clears() {
     });
     assert!(created.error.is_none(), "task_create failed");
     let payload = parse_tool_payload(&created);
-    let id = payload
-        .get("task")
-        .and_then(|task| task.get("id"))
-        .and_then(|v| v.as_str())
-        .unwrap()
-        .to_string();
+    let id = payload.get("task").and_then(|task| task.get("id")).and_then(|v| v.as_str()).unwrap().to_string();
 
     let bulk = dispatch(JsonRpcRequest {
         jsonrpc: "2.0".into(),
@@ -1790,17 +1265,9 @@ fn tools_call_task_bulk_update_null_clears() {
             }
         }),
     });
-    assert!(
-        bulk.error.is_none(),
-        "bulk null clears failed: {:?}",
-        bulk.error
-    );
+    assert!(bulk.error.is_none(), "bulk null clears failed: {:?}", bulk.error);
     let payload = parse_tool_payload(&bulk);
-    let updated = payload
-        .get("updated")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    let updated = payload.get("updated").and_then(|v| v.as_array()).cloned().unwrap_or_default();
     assert_eq!(updated.len(), 1, "bulk payload: {payload}");
     let task = &updated[0];
     assert!(task.get("reporter").is_none() || task["reporter"].is_null());
@@ -1815,11 +1282,8 @@ fn tools_call_task_create_membership_error_keeps_operation_envelope() {
     let tmp = tempfile::tempdir().unwrap();
     let tasks_dir = tmp.path().join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();
-    std::fs::write(
-        tasks_dir.join("config.yml"),
-        "default:\n  project: MCP\nmembers:\n  - alice\nstrict_members: true\nauto:\n  populate_members: false\n",
-    )
-    .unwrap();
+    std::fs::write(tasks_dir.join("config.yml"), "default:\n  project: MCP\nmembers:\n  - alice\nstrict_members: true\nauto:\n  populate_members: false\n")
+        .unwrap();
     set_tasks_dir_env(&tasks_dir);
 
     let resp = dispatch(JsonRpcRequest {
@@ -1839,37 +1303,15 @@ fn tools_call_task_create_membership_error_keeps_operation_envelope() {
     // Recoverable tool/domain failures are successful JSON-RPC responses with
     // result.isError = true; the strict-member violation must not surface as
     // a bare protocol error.
-    assert!(
-        resp.error.is_none(),
-        "domain failure must convert to isError: {:?}",
-        resp.error
-    );
+    assert!(resp.error.is_none(), "domain failure must convert to isError: {:?}", resp.error);
     let result = resp.result.as_ref().expect("isError result present");
     assert_eq!(result.get("isError"), Some(&json!(true)));
-    let text = result
-        .get("content")
-        .and_then(|content| content.get(0))
-        .and_then(|entry| entry.get("text"))
-        .and_then(|v| v.as_str())
-        .expect("isError content text");
-    assert!(
-        text.contains("Assignee 'intruder' is not in configured members"),
-        "unexpected detail: {text}"
-    );
-    let function_response = result
-        .get("functionResponse")
-        .and_then(|fr| fr.get("response"))
-        .expect("structured functionResponse for isError");
-    assert_eq!(
-        function_response.get("isError"),
-        Some(&json!(true)),
-        "functionResponse carries the error flag"
-    );
-    assert_eq!(
-        function_response.get("message").and_then(|v| v.as_str()),
-        Some("Task create failed"),
-        "structured message keeps the operation envelope"
-    );
+    let text =
+        result.get("content").and_then(|content| content.get(0)).and_then(|entry| entry.get("text")).and_then(|v| v.as_str()).expect("isError content text");
+    assert!(text.contains("Assignee 'intruder' is not in configured members"), "unexpected detail: {text}");
+    let function_response = result.get("functionResponse").and_then(|fr| fr.get("response")).expect("structured functionResponse for isError");
+    assert_eq!(function_response.get("isError"), Some(&json!(true)), "functionResponse carries the error flag");
+    assert_eq!(function_response.get("message").and_then(|v| v.as_str()), Some("Task create failed"), "structured message keeps the operation envelope");
     assert!(
         function_response
             .get("data")
@@ -1892,11 +1334,7 @@ fn tools_call_task_create_membership_error_keeps_operation_envelope() {
     });
     let error = enum_resp.error.as_ref().expect("invalid status must fail");
     assert_eq!(error.code, -32602, "enum failures use invalid-params code");
-    assert!(
-        error.message.contains("Status validation failed"),
-        "unexpected message: {}",
-        error.message
-    );
+    assert!(error.message.contains("Status validation failed"), "unexpected message: {}", error.message);
 
     clear_tasks_dir_env();
 }
@@ -1908,12 +1346,7 @@ fn dev64_backlog_empty_pages_keep_pagination_contract() {
     let tasks_dir = tmp.path().join(".tasks");
     set_tasks_dir_env(&tasks_dir);
 
-    for (name, rows) in [
-        ("sprint_backlog", "tasks"),
-        ("task_list", "tasks"),
-        ("sprint_list", "sprints"),
-        ("project_list", "projects"),
-    ] {
+    for (name, rows) in [("sprint_backlog", "tasks"), ("task_list", "tasks"), ("sprint_list", "sprints"), ("project_list", "projects")] {
         let response = dispatch(JsonRpcRequest {
             jsonrpc: "2.0".into(),
             id: Some(json!(1)),
@@ -1928,11 +1361,7 @@ fn dev64_backlog_empty_pages_keep_pagination_contract() {
         assert_eq!(payload["limit"], 3, "{name}: {payload}");
         assert_eq!(payload["cursor"], 0, "{name}: {payload}");
         assert_eq!(payload["hasMore"], false, "{name}: {payload}");
-        assert_eq!(
-            payload.get("nextCursor"),
-            Some(&Value::Null),
-            "{name}: {payload}"
-        );
+        assert_eq!(payload.get("nextCursor"), Some(&Value::Null), "{name}: {payload}");
     }
 }
 
@@ -1948,10 +1377,7 @@ fn dev64_backlog_empty_storage_still_validates_pagination() {
             method: "tools/call".into(),
             params: json!({"name": "sprint_backlog", "arguments": arguments}),
         });
-        assert_eq!(
-            response.error.as_ref().map(|error| error.code),
-            Some(-32602)
-        );
+        assert_eq!(response.error.as_ref().map(|error| error.code), Some(-32602));
     }
 }
 
@@ -1963,12 +1389,9 @@ fn dev64_backlog_project_validation_and_hints_refresh_together() {
     seed_single_project_config(&tasks_dir);
     std::fs::create_dir_all(tasks_dir.join("MCP")).unwrap();
     let config_path = tasks_dir.join("MCP/config.yml");
-    std::fs::write(
-        &config_path,
-        "issue.states: [Ready, Closed]\nissue.priorities: [Urgent]\n",
-    )
-    .unwrap();
-    std::fs::write(tasks_dir.join("MCP/1.yml"), "title: Project task\nstatus: Ready\npriority: Urgent\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\n").unwrap();
+    std::fs::write(&config_path, "issue.states: [Ready, Closed]\nissue.priorities: [Urgent]\n").unwrap();
+    std::fs::write(tasks_dir.join("MCP/1.yml"), "title: Project task\nstatus: Ready\npriority: Urgent\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\n")
+        .unwrap();
     set_tasks_dir_env(&tasks_dir);
 
     let call = |arguments| {
@@ -1991,22 +1414,12 @@ fn dev64_backlog_project_validation_and_hints_refresh_together() {
     let invalid = call(json!({"project": "MCP", "status": "Bogus"}));
     let error = invalid.error.as_ref().expect("invalid status must fail");
     assert_eq!(error.code, -32602);
-    assert_eq!(
-        error.data.as_ref().unwrap()["suggestions"],
-        json!(["Ready", "Closed"])
-    );
+    assert_eq!(error.data.as_ref().unwrap()["suggestions"], json!(["Ready", "Closed"]));
 
-    std::fs::write(
-        &config_path,
-        "issue.states: [Ready, Reviewing, Closed]\nissue.priorities: [Immediate]\n",
-    )
-    .unwrap();
+    std::fs::write(&config_path, "issue.states: [Ready, Reviewing, Closed]\nissue.priorities: [Immediate]\n").unwrap();
     let refreshed = call(json!({"project": "MCP"}));
     let payload = parse_tool_payload(&refreshed);
-    assert_eq!(
-        payload["enumHints"]["statuses"],
-        json!(["Ready", "Reviewing", "Closed"])
-    );
+    assert_eq!(payload["enumHints"]["statuses"], json!(["Ready", "Reviewing", "Closed"]));
     assert_eq!(payload["enumHints"]["priorities"], json!(["Immediate"]));
 }
 
@@ -2018,15 +1431,12 @@ fn dev64_nullable_cursor_does_not_mask_offset_alias() {
     seed_single_project_config(&tasks_dir);
     for prefix in ["MCP", "OTHER"] {
         std::fs::create_dir_all(tasks_dir.join(prefix)).unwrap();
-        std::fs::write(tasks_dir.join(prefix).join("1.yml"), "title: Task\nstatus: Todo\npriority: Medium\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\n").unwrap();
+        std::fs::write(tasks_dir.join(prefix).join("1.yml"), "title: Task\nstatus: Todo\npriority: Medium\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\n")
+            .unwrap();
     }
     std::fs::create_dir_all(tasks_dir.join("@sprints")).unwrap();
     for id in [1, 2] {
-        std::fs::write(
-            tasks_dir.join("@sprints").join(format!("{id}.yml")),
-            "created: 2026-01-01T00:00:00Z\n",
-        )
-        .unwrap();
+        std::fs::write(tasks_dir.join("@sprints").join(format!("{id}.yml")), "created: 2026-01-01T00:00:00Z\n").unwrap();
     }
     set_tasks_dir_env(&tasks_dir);
     for name in ["sprint_backlog", "sprint_list", "project_list", "task_list"] {
@@ -2053,16 +1463,8 @@ fn dev64_nullable_force_single_does_not_mask_force_alias() {
     std::fs::create_dir_all(tasks_dir.join("MCP")).unwrap();
     std::fs::write(tasks_dir.join("MCP/1.yml"), "title: Task\nstatus: Todo\npriority: Medium\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\n").unwrap();
     std::fs::create_dir_all(tasks_dir.join("@sprints")).unwrap();
-    std::fs::write(
-        tasks_dir.join("@sprints/1.yml"),
-        "created: 2026-01-01T00:00:00Z\ntasks:\n  - id: MCP-1\n",
-    )
-    .unwrap();
-    std::fs::write(
-        tasks_dir.join("@sprints/2.yml"),
-        "created: 2026-01-01T00:00:00Z\n",
-    )
-    .unwrap();
+    std::fs::write(tasks_dir.join("@sprints/1.yml"), "created: 2026-01-01T00:00:00Z\ntasks:\n  - id: MCP-1\n").unwrap();
+    std::fs::write(tasks_dir.join("@sprints/2.yml"), "created: 2026-01-01T00:00:00Z\n").unwrap();
     set_tasks_dir_env(&tasks_dir);
     let response = dispatch(JsonRpcRequest {
         jsonrpc: "2.0".into(),
@@ -2074,19 +1476,8 @@ fn dev64_nullable_force_single_does_not_mask_force_alias() {
     assert_ne!(response.result.as_ref().unwrap()["isError"], json!(true));
     let storage = crate::storage::manager::Storage::try_open(&tasks_dir).unwrap();
     let records = crate::services::sprint_service::SprintService::list(&storage).unwrap();
-    assert!(
-        records
-            .iter()
-            .find(|r| r.id == 1)
-            .unwrap()
-            .sprint
-            .tasks
-            .is_empty()
-    );
-    assert_eq!(
-        records.iter().find(|r| r.id == 2).unwrap().sprint.tasks[0].id,
-        "MCP-1"
-    );
+    assert!(records.iter().find(|r| r.id == 1).unwrap().sprint.tasks.is_empty());
+    assert_eq!(records.iter().find(|r| r.id == 2).unwrap().sprint.tasks[0].id, "MCP-1");
 }
 
 /// DEV-208: agent jobs start `lotar mcp` with LOTAR_MCP_TOOLS so an agent can
@@ -2096,18 +1487,8 @@ fn tool_allowlist_limits_listing_and_calls() {
     let _lock = lock_var("LOTAR_MCP_TOOLS");
     // SAFETY: the variable is guarded by the test env lock above.
     unsafe { std::env::set_var("LOTAR_MCP_TOOLS", "task_get, task_comment_add") };
-    let list = dispatch(JsonRpcRequest {
-        jsonrpc: "2.0".into(),
-        id: Some(json!(1)),
-        method: "tools/list".into(),
-        params: json!({}),
-    });
-    let names: Vec<String> = list.result.as_ref().unwrap()["tools"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|tool| tool["name"].as_str().unwrap().to_string())
-        .collect();
+    let list = dispatch(JsonRpcRequest { jsonrpc: "2.0".into(), id: Some(json!(1)), method: "tools/list".into(), params: json!({}) });
+    let names: Vec<String> = list.result.as_ref().unwrap()["tools"].as_array().unwrap().iter().map(|tool| tool["name"].as_str().unwrap().to_string()).collect();
     let call = dispatch(JsonRpcRequest {
         jsonrpc: "2.0".into(),
         id: Some(json!(2)),
@@ -2133,44 +1514,21 @@ fn tool_allowlist_covers_every_entry_point() {
     let tmp = tempfile::tempdir().unwrap();
     let tasks_dir = tmp.path().join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();
-    std::fs::write(
-        tasks_dir.join("config.yml"),
-        "default:\n  project: MCP\nagents:\n  helper:\n    runner: command\n    command: 'true'\n",
-    )
-    .unwrap();
+    std::fs::write(tasks_dir.join("config.yml"), "default:\n  project: MCP\nagents:\n  helper:\n    runner: command\n    command: 'true'\n").unwrap();
     // SAFETY: both variables are guarded by the test env locks above.
     unsafe {
         std::env::set_var("LOTAR_TASKS_DIR", &tasks_dir);
     }
-    let call = |method: &str, params: Value| {
-        dispatch(JsonRpcRequest {
-            jsonrpc: "2.0".into(),
-            id: Some(json!(1)),
-            method: method.into(),
-            params,
-        })
-    };
-    let created = call(
-        "tools/call",
-        json!({"name": "task_create", "arguments": {"title": "Guarded", "project": "MCP"}}),
-    );
+    let call = |method: &str, params: Value| dispatch(JsonRpcRequest { jsonrpc: "2.0".into(), id: Some(json!(1)), method: method.into(), params });
+    let created = call("tools/call", json!({"name": "task_create", "arguments": {"title": "Guarded", "project": "MCP"}}));
     assert!(created.error.is_none(), "{:?}", created.error);
 
     unsafe { std::env::set_var("LOTAR_MCP_TOOLS", "task_get,task_update") };
     let direct = call("task/delete", json!({"id": "MCP-1"}));
-    let alias = call(
-        "tools/call",
-        json!({"name": "task/get", "arguments": {"id": "MCP-1"}}),
-    );
+    let alias = call("tools/call", json!({"name": "task/get", "arguments": {"id": "MCP-1"}}));
     let discover = call("schema/discover", json!({}));
-    let assign = call(
-        "tools/call",
-        json!({"name": "task_update", "arguments": {"id": "MCP-1", "patch": {"assignee": "@helper"}}}),
-    );
-    let assign_person = call(
-        "tools/call",
-        json!({"name": "task_update", "arguments": {"id": "MCP-1", "patch": {"assignee": "alice"}}}),
-    );
+    let assign = call("tools/call", json!({"name": "task_update", "arguments": {"id": "MCP-1", "patch": {"assignee": "@helper"}}}));
+    let assign_person = call("tools/call", json!({"name": "task_update", "arguments": {"id": "MCP-1", "patch": {"assignee": "alice"}}}));
     unsafe {
         std::env::remove_var("LOTAR_MCP_TOOLS");
         std::env::remove_var("LOTAR_TASKS_DIR");
@@ -2180,15 +1538,8 @@ fn tool_allowlist_covers_every_entry_point() {
     assert!(error.message.contains("not available"), "{}", error.message);
     let stored = std::fs::read_to_string(tasks_dir.join("MCP").join("1.yml")).unwrap();
     assert!(!stored.contains("deleted_at"), "task must not be deleted");
-    assert!(
-        alias.error.is_none(),
-        "alias of an allowed tool works: {:?}",
-        alias.error
-    );
-    let text = discover.result.as_ref().unwrap()["content"][0]["text"]
-        .as_str()
-        .unwrap()
-        .to_string();
+    assert!(alias.error.is_none(), "alias of an allowed tool works: {:?}", alias.error);
+    let text = discover.result.as_ref().unwrap()["content"][0]["text"].as_str().unwrap().to_string();
     let payload: Value = serde_json::from_str(&text).unwrap();
     assert_eq!(payload["toolCount"], 2, "{payload}");
     let error = assign.error.expect("agent assignment refused");

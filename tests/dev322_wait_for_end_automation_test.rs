@@ -32,23 +32,9 @@ fn agent_run_wait_returns_after_the_job_completed_rule() {
             .env("LOTAR_TEST_SILENT", "1");
         cmd
     };
-    assert!(
-        cmd()
-            .args(["add", "quick work"])
-            .status()
-            .unwrap()
-            .success()
-    );
+    assert!(cmd().args(["add", "quick work"]).status().unwrap().success());
 
-    let run = cmd()
-        .args(["agent", "run", "WAIT-1", "go", "--agent", "quick", "--wait"])
-        .output()
-        .unwrap();
-    assert!(
-        run.status.success(),
-        "{}{}",
-        String::from_utf8_lossy(&run.stdout),
-        String::from_utf8_lossy(&run.stderr)
-    );
+    let run = cmd().args(["agent", "run", "WAIT-1", "go", "--agent", "quick", "--wait"]).output().unwrap();
+    assert!(run.status.success(), "{}{}", String::from_utf8_lossy(&run.stdout), String::from_utf8_lossy(&run.stderr));
     assert!(marker.exists(), "--wait returned before the rule finished");
 }

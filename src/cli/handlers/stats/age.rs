@@ -1,9 +1,6 @@
 use crate::cli::args::stats::StatsAgeDistribution;
 
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "parsed CLI arguments are moved in from the command"
-)]
+#[expect(clippy::needless_pass_by_value, reason = "parsed CLI arguments are moved in from the command")]
 pub(crate) fn run(
     distribution: StatsAgeDistribution,
     limit: usize,
@@ -27,9 +24,7 @@ pub(crate) fn run(
     match distribution {
         StatsAgeDistribution::Day => {
             for (_id, t) in tasks.into_iter() {
-                if let Ok(created) = chrono::DateTime::parse_from_rfc3339(&t.created)
-                    .map(|dt| dt.with_timezone(&chrono::Utc))
-                {
+                if let Ok(created) = chrono::DateTime::parse_from_rfc3339(&t.created).map(|dt| dt.with_timezone(&chrono::Utc)) {
                     let days = (now - created).num_days().max(0);
                     *counts.entry(days).or_insert(0) += 1;
                 }
@@ -37,9 +32,7 @@ pub(crate) fn run(
         }
         StatsAgeDistribution::Week => {
             for (_id, t) in tasks.into_iter() {
-                if let Ok(created) = chrono::DateTime::parse_from_rfc3339(&t.created)
-                    .map(|dt| dt.with_timezone(&chrono::Utc))
-                {
+                if let Ok(created) = chrono::DateTime::parse_from_rfc3339(&t.created).map(|dt| dt.with_timezone(&chrono::Utc)) {
                     let weeks = ((now - created).num_days().max(0)) / 7;
                     *counts.entry(weeks).or_insert(0) += 1;
                 }
@@ -47,9 +40,7 @@ pub(crate) fn run(
         }
         StatsAgeDistribution::Month => {
             for (_id, t) in tasks.into_iter() {
-                if let Ok(created) = chrono::DateTime::parse_from_rfc3339(&t.created)
-                    .map(|dt| dt.with_timezone(&chrono::Utc))
-                {
+                if let Ok(created) = chrono::DateTime::parse_from_rfc3339(&t.created).map(|dt| dt.with_timezone(&chrono::Utc)) {
                     let months = ((now - created).num_days().max(0)) / 30; // approx
                     *counts.entry(months).or_insert(0) += 1;
                 }
@@ -71,24 +62,15 @@ pub(crate) fn run(
     // We'll reverse to show newest first (0d/0w/0m at top)
     items.sort_by(|a, b| {
         // parse numeric prefix
-        let pa =
-            a.0.trim_end_matches(|c: char| c.is_alphabetic())
-                .parse::<i64>()
-                .unwrap_or(i64::MAX);
-        let pb =
-            b.0.trim_end_matches(|c: char| c.is_alphabetic())
-                .parse::<i64>()
-                .unwrap_or(i64::MAX);
+        let pa = a.0.trim_end_matches(|c: char| c.is_alphabetic()).parse::<i64>().unwrap_or(i64::MAX);
+        let pb = b.0.trim_end_matches(|c: char| c.is_alphabetic()).parse::<i64>().unwrap_or(i64::MAX);
         pa.cmp(&pb)
     });
     let items: Vec<_> = items.into_iter().take(limit).collect();
 
     match renderer.format {
         crate::output::OutputFormat::Json => {
-            let json_items: Vec<_> = items
-                .iter()
-                .map(|(label, count)| serde_json::json!({"age": label, "count": count}))
-                .collect();
+            let json_items: Vec<_> = items.iter().map(|(label, count)| serde_json::json!({"age": label, "count": count})).collect();
             let obj = serde_json::json!({
                 "status": "ok",
                 "action": "stats.age",

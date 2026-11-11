@@ -7,8 +7,8 @@ use lotar::cli::handlers::duedate::{DueDateArgs, DueDateHandler};
 use lotar::cli::handlers::priority::{PriorityArgs, PriorityHandler};
 use lotar::cli::handlers::status::{StatusArgs, StatusHandler};
 use lotar::cli::handlers::{
-    AddHandler, AgentHandler, AutomationHandler, CommandHandler, CompletionsHandler, ConfigHandler,
-    GitHandler, ScanHandler, ServeHandler, SprintHandler, StatsHandler, SyncHandler, TaskHandler,
+    AddHandler, AgentHandler, AutomationHandler, CommandHandler, CompletionsHandler, ConfigHandler, GitHandler, ScanHandler, ServeHandler, SprintHandler,
+    StatsHandler, SyncHandler, TaskHandler,
 };
 use lotar::cli::preprocess::normalize_args;
 use lotar::cli::{Cli, Commands, ConfigAction, SyncCommandAction, TaskAction};
@@ -19,9 +19,7 @@ use lotar::workspace::TasksDirectoryResolver;
 use lotar::{help, output};
 
 /// Resolve the tasks directory based on config and command line arguments
-fn resolve_tasks_directory_with_override(
-    override_path: Option<&str>,
-) -> Result<TasksDirectoryResolver, String> {
+fn resolve_tasks_directory_with_override(override_path: Option<&str>) -> Result<TasksDirectoryResolver, String> {
     TasksDirectoryResolver::resolve(
         override_path,
         None, // Use default .tasks folder name
@@ -71,11 +69,8 @@ fn main() {
 
     // No arguments: print usage/help to stderr and exit with failure (tests expect "Usage")
     if args.len() == 1 {
-        let renderer =
-            output::OutputRenderer::new(output::OutputFormat::Text, output::LogLevel::Warn);
-        renderer.emit_raw_stderr(
-            "Usage: lotar <COMMAND> [ARGS]\nTry 'lotar help' for available commands.",
-        );
+        let renderer = output::OutputRenderer::new(output::OutputFormat::Text, output::LogLevel::Warn);
+        renderer.emit_raw_stderr("Usage: lotar <COMMAND> [ARGS]\nTry 'lotar help' for available commands.");
         std::process::exit(1);
     }
 
@@ -86,8 +81,7 @@ fn main() {
     let command_idx = lotar::cli::preprocess::command_index(&args);
     let command_word = command_idx.map(|idx| args[idx].as_str());
     if matches!(command_word, Some("version" | "--version" | "-V")) {
-        let renderer =
-            output::OutputRenderer::new(output::OutputFormat::Text, output::LogLevel::Warn);
+        let renderer = output::OutputRenderer::new(output::OutputFormat::Text, output::LogLevel::Warn);
         renderer.emit_raw_stdout(format_args!("lotar {}", env!("CARGO_PKG_VERSION")));
         return;
     }
@@ -98,13 +92,8 @@ fn main() {
         }
         return;
     }
-    let before_separator = args
-        .iter()
-        .position(|arg| arg == "--")
-        .unwrap_or(args.len());
-    let has_help_flag = args[1..before_separator]
-        .iter()
-        .any(|arg| arg == "--help" || arg == "-h");
+    let before_separator = args.iter().position(|arg| arg == "--").unwrap_or(args.len());
+    let has_help_flag = args[1..before_separator].iter().any(|arg| arg == "--help" || arg == "-h");
     if has_help_flag {
         match command_word {
             Some(command) if is_valid_command(command) => show_command_help(command),
@@ -115,10 +104,7 @@ fn main() {
     // Group commands without a subcommand show their overview page.
     if let Some(idx) = command_idx
         && idx + 1 == args.len()
-        && matches!(
-            args[idx].as_str(),
-            "stats" | "agent" | "automation" | "sync"
-        )
+        && matches!(args[idx].as_str(), "stats" | "agent" | "automation" | "sync")
     {
         show_command_help(&args[idx]);
         return;
@@ -128,8 +114,7 @@ fn main() {
     let normalized_args = match normalize_args(&args) {
         Ok(v) => v,
         Err(message) => {
-            let renderer =
-                output::OutputRenderer::new(output::OutputFormat::Text, output::LogLevel::Warn);
+            let renderer = output::OutputRenderer::new(output::OutputFormat::Text, output::LogLevel::Warn);
             renderer.emit_error(&message);
             std::process::exit(1);
         }
@@ -140,8 +125,7 @@ fn main() {
     let cli = match Cli::try_parse_from(normalized_args) {
         Ok(cli) => cli,
         Err(e) => {
-            let renderer =
-                output::OutputRenderer::new(output::OutputFormat::Text, output::LogLevel::Warn);
+            let renderer = output::OutputRenderer::new(output::OutputFormat::Text, output::LogLevel::Warn);
             renderer.emit_raw_stderr(e.to_string());
             if e.kind() == clap::error::ErrorKind::UnknownArgument
                 && let Some(hint) = removed_hint
@@ -153,11 +137,7 @@ fn main() {
     };
 
     if let Err(err) = lotar::config::resolution::configure_cli_overrides(&cli.config_overrides) {
-        let early_level = if cli.verbose {
-            output::LogLevel::Info
-        } else {
-            cli.log_level
-        };
+        let early_level = if cli.verbose { output::LogLevel::Info } else { cli.log_level };
         let renderer = output::OutputRenderer::new(cli.format, early_level);
         renderer.emit_error(format_args!("Invalid --config override: {}", err));
         std::process::exit(1);
@@ -167,12 +147,7 @@ fn main() {
     let _archived_writes = lotar::storage::operations::allow_archived_writes(cli.force_archived);
 
     // Resolve tasks directory
-    let relationship_command = matches!(
-        &cli.command,
-        Commands::Task {
-            action: Some(TaskAction::Relationships(_))
-        }
-    );
+    let relationship_command = matches!(&cli.command, Commands::Task { action: Some(TaskAction::Relationships(_)) });
     let resolved = if relationship_command {
         TasksDirectoryResolver::resolve_read_only(cli.tasks_dir.as_deref(), None)
     } else {
@@ -184,42 +159,27 @@ fn main() {
             resolver
         }
         Err(error) => {
-            let renderer =
-                output::OutputRenderer::new(output::OutputFormat::Text, output::LogLevel::Warn);
+            let renderer = output::OutputRenderer::new(output::OutputFormat::Text, output::LogLevel::Warn);
             renderer.emit_error(format_args!("Error resolving tasks directory: {}", error));
             std::process::exit(1);
         }
     };
 
     // Create output renderer
-    let effective_level = if cli.verbose {
-        output::LogLevel::Info
-    } else {
-        cli.log_level
-    };
+    let effective_level = if cli.verbose { output::LogLevel::Info } else { cli.log_level };
     let renderer = output::OutputRenderer::new(cli.format, effective_level);
 
     // Execute the command
     let result = match cli.command {
         Commands::Add(args) => {
             renderer.log_info("BEGIN ADD");
-            match AddHandler::execute_with_finding(
-                args,
-                cli.project.as_deref(),
-                &resolver,
-                &renderer,
-            ) {
+            match AddHandler::execute_with_finding(args, cli.project.as_deref(), &resolver, &renderer) {
                 Ok(added) => {
                     // Use the shared output rendering function
                     if added.task_id.ends_with("-PREVIEW") {
                         // Dry run preview already printed
                     } else {
-                        AddHandler::render_add_result(
-                            &added,
-                            cli.project.as_deref(),
-                            &resolver,
-                            &renderer,
-                        );
+                        AddHandler::render_add_result(&added, cli.project.as_deref(), &resolver, &renderer);
                     }
                     renderer.log_info("END ADD status=ok");
                     Ok(())
@@ -247,12 +207,7 @@ fn main() {
         }
         Commands::Automation(args) => {
             renderer.log_info("BEGIN AUTOMATION");
-            match AutomationHandler::execute(
-                args.action,
-                cli.project.as_deref(),
-                &resolver,
-                &renderer,
-            ) {
+            match AutomationHandler::execute(args.action, cli.project.as_deref(), &resolver, &renderer) {
                 Ok(()) => {
                     renderer.log_info("END AUTOMATION status=ok");
                     Ok(())
@@ -264,24 +219,14 @@ fn main() {
                 }
             }
         }
-        Commands::Show(args) => match TaskHandler::execute(
-            Some(TaskAction::Show(args)),
-            cli.project.as_deref(),
-            &resolver,
-            &renderer,
-        ) {
+        Commands::Show(args) => match TaskHandler::execute(Some(TaskAction::Show(args)), cli.project.as_deref(), &resolver, &renderer) {
             Ok(()) => Ok(()),
             Err(e) => {
                 renderer.emit_error(&e);
                 Err(e)
             }
         },
-        Commands::Edit(args) => match TaskHandler::execute(
-            Some(TaskAction::Edit(args)),
-            cli.project.as_deref(),
-            &resolver,
-            &renderer,
-        ) {
+        Commands::Edit(args) => match TaskHandler::execute(Some(TaskAction::Edit(args)), cli.project.as_deref(), &resolver, &renderer) {
             Ok(()) => Ok(()),
             Err(e) => {
                 renderer.emit_error(&e);
@@ -291,12 +236,7 @@ fn main() {
         Commands::List(args) => {
             renderer.log_info("BEGIN LIST");
             let task_action = TaskAction::List(args);
-            match TaskHandler::execute(
-                Some(task_action),
-                cli.project.as_deref(),
-                &resolver,
-                &renderer,
-            ) {
+            match TaskHandler::execute(Some(task_action), cli.project.as_deref(), &resolver, &renderer) {
                 Ok(()) => {
                     renderer.log_info("END LIST status=ok");
                     Ok(())
@@ -308,18 +248,12 @@ fn main() {
                 }
             }
         }
-        Commands::Status {
-            id,
-            status,
-            dry_run,
-            explain,
-        } => {
+        Commands::Status { id, status, dry_run, explain } => {
             renderer.log_info("BEGIN STATUS");
             let mut status_args = StatusArgs::new(id, status, cli.project.clone());
             status_args.dry_run = dry_run;
             status_args.explain = explain;
-            match StatusHandler::execute(status_args, cli.project.as_deref(), &resolver, &renderer)
-            {
+            match StatusHandler::execute(status_args, cli.project.as_deref(), &resolver, &renderer) {
                 Ok(()) => {
                     renderer.log_info("END STATUS status=ok");
                     Ok(())
@@ -331,21 +265,10 @@ fn main() {
                 }
             }
         }
-        Commands::Priority {
-            id,
-            priority,
-            dry_run,
-            explain,
-        } => {
+        Commands::Priority { id, priority, dry_run, explain } => {
             renderer.log_info("BEGIN PRIORITY");
-            let priority_args =
-                PriorityArgs::new(id, priority, cli.project.clone()).with_preview(dry_run, explain);
-            match PriorityHandler::execute(
-                priority_args,
-                cli.project.as_deref(),
-                &resolver,
-                &renderer,
-            ) {
+            let priority_args = PriorityArgs::new(id, priority, cli.project.clone()).with_preview(dry_run, explain);
+            match PriorityHandler::execute(priority_args, cli.project.as_deref(), &resolver, &renderer) {
                 Ok(()) => {
                     renderer.log_info("END PRIORITY status=ok");
                     Ok(())
@@ -357,12 +280,7 @@ fn main() {
                 }
             }
         }
-        Commands::DueDate {
-            id,
-            clear: true,
-            dry_run,
-            ..
-        } => lotar::cli::handlers::clear_field::clear_task_field(
+        Commands::DueDate { id, clear: true, dry_run, .. } => lotar::cli::handlers::clear_field::clear_task_field(
             &resolver,
             cli.project.as_deref(),
             &id,
@@ -371,13 +289,7 @@ fn main() {
             &renderer,
         )
         .inspect_err(|e| renderer.emit_error(e)),
-        Commands::DueDate {
-            id,
-            due_date,
-            dry_run,
-            explain,
-            ..
-        } => {
+        Commands::DueDate { id, due_date, dry_run, explain, .. } => {
             renderer.log_info("BEGIN DUEDATE");
             let args = DueDateArgs::new(id, due_date, cli.project.clone(), dry_run, explain);
             match DueDateHandler::execute(args, cli.project.as_deref(), &resolver, &renderer) {
@@ -392,28 +304,10 @@ fn main() {
                 }
             }
         }
-        Commands::Effort {
-            id,
-            effort,
-            clear,
-            dry_run,
-            explain,
-        } => {
+        Commands::Effort { id, effort, clear, dry_run, explain } => {
             renderer.log_info("BEGIN EFFORT");
-            let args = lotar::cli::handlers::effort::EffortArgs::new(
-                id,
-                effort,
-                clear,
-                cli.project.clone(),
-                dry_run,
-                explain,
-            );
-            match lotar::cli::handlers::effort::EffortHandler::execute(
-                args,
-                cli.project.as_deref(),
-                &resolver,
-                &renderer,
-            ) {
+            let args = lotar::cli::handlers::effort::EffortArgs::new(id, effort, clear, cli.project.clone(), dry_run, explain);
+            match lotar::cli::handlers::effort::EffortHandler::execute(args, cli.project.as_deref(), &resolver, &renderer) {
                 Ok(()) => {
                     renderer.log_info("END EFFORT status=ok");
                     Ok(())
@@ -425,12 +319,7 @@ fn main() {
                 }
             }
         }
-        Commands::Assignee {
-            id,
-            clear: true,
-            dry_run,
-            ..
-        } => lotar::cli::handlers::clear_field::clear_task_field(
+        Commands::Assignee { id, clear: true, dry_run, .. } => lotar::cli::handlers::clear_field::clear_task_field(
             &resolver,
             cli.project.as_deref(),
             &id,
@@ -439,13 +328,7 @@ fn main() {
             &renderer,
         )
         .inspect_err(|e| renderer.emit_error(e)),
-        Commands::Assignee {
-            id,
-            assignee,
-            dry_run,
-            explain,
-            ..
-        } => {
+        Commands::Assignee { id, assignee, dry_run, explain, .. } => {
             renderer.log_info("BEGIN ASSIGNEE");
             let args = AssigneeArgs::new(id, assignee, cli.project.clone(), dry_run, explain);
             match AssigneeHandler::execute(args, cli.project.as_deref(), &resolver, &renderer) {
@@ -460,29 +343,17 @@ fn main() {
                 }
             }
         }
-        Commands::Comment {
-            id,
-            text,
-            message,
-            file,
-            dry_run,
-            explain,
-        } => {
+        Commands::Comment { id, text, message, file, dry_run, explain } => {
             renderer.log_info("BEGIN COMMENT");
             // Resolve comment content from args: file > message > text > stdin
-            let resolved_text =
-                match lotar::cli::handlers::comment::resolve_comment_text(file, message, text) {
-                    Ok(text) => text,
-                    Err(e) => {
-                        renderer.emit_error(&e);
-                        std::process::exit(1);
-                    }
-                };
-            let text_value = if resolved_text.trim().is_empty() {
-                None
-            } else {
-                Some(resolved_text)
+            let resolved_text = match lotar::cli::handlers::comment::resolve_comment_text(file, message, text) {
+                Ok(text) => text,
+                Err(e) => {
+                    renderer.emit_error(&e);
+                    std::process::exit(1);
+                }
             };
+            let text_value = if resolved_text.trim().is_empty() { None } else { Some(resolved_text) };
             let args = CommentArgs::new(id, text_value, None, dry_run, explain);
             match CommentHandler::execute(args, cli.project.as_deref(), &resolver, &renderer) {
                 Ok(()) => {
@@ -526,12 +397,7 @@ fn main() {
         }
         Commands::Init(args) => {
             renderer.log_info("BEGIN INIT");
-            match ConfigHandler::execute(
-                Some(ConfigAction::Init(args)),
-                cli.project.as_deref(),
-                &resolver,
-                &renderer,
-            ) {
+            match ConfigHandler::execute(Some(ConfigAction::Init(args)), cli.project.as_deref(), &resolver, &renderer) {
                 Ok(()) => {
                     renderer.log_info("END INIT status=ok");
                     Ok(())
@@ -559,13 +425,7 @@ fn main() {
         }
         Commands::Pull(args) => {
             renderer.log_info("BEGIN PULL");
-            match SyncHandler::execute(
-                SyncDirection::Pull,
-                &args,
-                cli.project.as_deref(),
-                &resolver,
-                &renderer,
-            ) {
+            match SyncHandler::execute(SyncDirection::Pull, &args, cli.project.as_deref(), &resolver, &renderer) {
                 Ok(()) => {
                     renderer.log_info("END PULL status=ok");
                     Ok(())
@@ -579,13 +439,7 @@ fn main() {
         }
         Commands::Push(args) => {
             renderer.log_info("BEGIN PUSH");
-            match SyncHandler::execute(
-                SyncDirection::Push,
-                &args,
-                cli.project.as_deref(),
-                &resolver,
-                &renderer,
-            ) {
+            match SyncHandler::execute(SyncDirection::Push, &args, cli.project.as_deref(), &resolver, &renderer) {
                 Ok(()) => {
                     renderer.log_info("END PUSH status=ok");
                     Ok(())
@@ -600,8 +454,7 @@ fn main() {
         Commands::Sync(args) => match args.action {
             SyncCommandAction::Check(check_args) => {
                 renderer.log_info("BEGIN SYNC CHECK");
-                match SyncHandler::check(&check_args, cli.project.as_deref(), &resolver, &renderer)
-                {
+                match SyncHandler::check(&check_args, cli.project.as_deref(), &resolver, &renderer) {
                     Ok(()) => {
                         renderer.log_info("END SYNC CHECK status=ok");
                         Ok(())
@@ -660,14 +513,12 @@ fn main() {
         Commands::Changelog { since, global } => {
             renderer.log_info("BEGIN CHANGELOG");
             let outcome = (|| -> Result<(), String> {
-                let cwd = std::env::current_dir()
-                    .map_err(|e| format!("Failed to resolve current directory: {}", e))?;
+                let cwd = std::env::current_dir().map_err(|e| format!("Failed to resolve current directory: {}", e))?;
                 let maybe_repo = lotar::utils::git::find_repo_root(&cwd);
                 if let Some(repo_root) = maybe_repo {
                     // Compute tasks relative path
                     let tasks_abs = resolver.path.clone();
-                    let tasks_rel = lotar::utils::git::repo_relative_path(&repo_root, &tasks_abs)
-                        .unwrap_or_else(|| tasks_abs.clone());
+                    let tasks_rel = lotar::utils::git::repo_relative_path(&repo_root, &tasks_abs).unwrap_or_else(|| tasks_abs.clone());
                     // Resolve project scoping
                     let project_filter: Option<String> = if global {
                         None
@@ -683,11 +534,7 @@ fn main() {
                     let changed_files: Vec<std::path::PathBuf> = if let Some(ref_base) = &since {
                         // Range: ref_base..HEAD
                         let mut cmd = lotar::utils::git::git_command(&repo_root);
-                        cmd.arg("diff")
-                            .arg("--name-only")
-                            .arg(format!("{}..HEAD", ref_base))
-                            .arg("--")
-                            .arg(&tasks_rel);
+                        cmd.arg("diff").arg("--name-only").arg(format!("{}..HEAD", ref_base)).arg("--").arg(&tasks_rel);
                         match cmd.output() {
                             Ok(o) if o.status.success() => {
                                 let out_str = String::from_utf8_lossy(&o.stdout).to_string();
@@ -698,22 +545,16 @@ fn main() {
                                     .filter(|p| p.starts_with(&tasks_rel));
                                 let iter = if let Some(ref proj) = project_filter {
                                     let expect = tasks_rel.join(proj);
-                                    Box::new(base_iter.filter(move |p| p.starts_with(&expect)))
-                                        as Box<dyn Iterator<Item = std::path::PathBuf>>
+                                    Box::new(base_iter.filter(move |p| p.starts_with(&expect))) as Box<dyn Iterator<Item = std::path::PathBuf>>
                                 } else {
-                                    Box::new(base_iter)
-                                        as Box<dyn Iterator<Item = std::path::PathBuf>>
+                                    Box::new(base_iter) as Box<dyn Iterator<Item = std::path::PathBuf>>
                                 };
                                 iter.collect()
                             }
                             // A ref git doesn't know is an error, not "no
                             // changes" (DEV-283).
                             Ok(o) => {
-                                return Err(format!(
-                                    "git diff {}..HEAD failed: {}",
-                                    ref_base,
-                                    String::from_utf8_lossy(&o.stderr).trim()
-                                ));
+                                return Err(format!("git diff {}..HEAD failed: {}", ref_base, String::from_utf8_lossy(&o.stderr).trim()));
                             }
                             Err(e) => return Err(format!("Failed to run git: {e}")),
                         }
@@ -749,18 +590,14 @@ fn main() {
                                 let iter = files.into_iter().filter(|p| p.starts_with(&tasks_rel));
                                 let iter = if let Some(ref proj) = project_filter {
                                     let expect = tasks_rel.join(proj);
-                                    Box::new(iter.filter(move |p| p.starts_with(&expect)))
-                                        as Box<dyn Iterator<Item = std::path::PathBuf>>
+                                    Box::new(iter.filter(move |p| p.starts_with(&expect))) as Box<dyn Iterator<Item = std::path::PathBuf>>
                                 } else {
                                     Box::new(iter) as Box<dyn Iterator<Item = std::path::PathBuf>>
                                 };
                                 iter.collect()
                             }
                             Ok(o) => {
-                                return Err(format!(
-                                    "git status failed: {}",
-                                    String::from_utf8_lossy(&o.stderr).trim()
-                                ));
+                                return Err(format!("git status failed: {}", String::from_utf8_lossy(&o.stderr).trim()));
                             }
                             Err(e) => return Err(format!("Failed to run git: {e}")),
                         }
@@ -787,11 +624,7 @@ fn main() {
                             continue;
                         }
                         // Resolve ID from .tasks/<PROJECT>/[folders/]<NUM>.yml
-                        let Some(task_path) = rel_path
-                            .strip_prefix(&tasks_rel)
-                            .ok()
-                            .and_then(lotar::storage::layout::parse_relative)
-                        else {
+                        let Some(task_path) = rel_path.strip_prefix(&tasks_rel).ok().and_then(lotar::storage::layout::parse_relative) else {
                             continue;
                         };
                         let id = task_path.id();
@@ -799,17 +632,12 @@ fn main() {
 
                         // Load snapshots with tolerant fallback for mixed-case enums in YAML
                         let load_yaml_as_task =
-                            |content: &str| -> Option<lotar::storage::task::Task> {
-                                lotar::storage::task::parse_task_yaml_tolerant(content)
-                            };
+                            |content: &str| -> Option<lotar::storage::task::Task> { lotar::storage::task::parse_task_yaml_tolerant(content) };
 
                         // Current content (right side)
                         let current_content: Option<String> = if since.is_some() {
                             // Right = HEAD version
-                            lotar::services::audit_service::AuditService::show_file_at(
-                                &repo_root, "HEAD", &rel_path,
-                            )
-                            .ok()
+                            lotar::services::audit_service::AuditService::show_file_at(&repo_root, "HEAD", &rel_path).ok()
                         } else {
                             // Working tree absolute path
                             let abs = repo_root.join(&rel_path);
@@ -818,16 +646,10 @@ fn main() {
 
                         // Base content (left side)
                         let base_content: Option<String> = if let Some(ref_base) = &since {
-                            lotar::services::audit_service::AuditService::show_file_at(
-                                &repo_root, ref_base, &rel_path,
-                            )
-                            .ok()
+                            lotar::services::audit_service::AuditService::show_file_at(&repo_root, ref_base, &rel_path).ok()
                         } else {
                             // HEAD version
-                            lotar::services::audit_service::AuditService::show_file_at(
-                                &repo_root, "HEAD", &rel_path,
-                            )
-                            .ok()
+                            lotar::services::audit_service::AuditService::show_file_at(&repo_root, "HEAD", &rel_path).ok()
                         };
 
                         let cur_task = current_content.as_deref().and_then(load_yaml_as_task);
@@ -842,68 +664,24 @@ fn main() {
                         let mut deltas: Vec<BasicDelta> = Vec::new();
                         let mut push = |k: &str, old: serde_json::Value, new: serde_json::Value| {
                             if old != new {
-                                deltas.push(BasicDelta {
-                                    field: k.to_string(),
-                                    old,
-                                    new,
-                                });
+                                deltas.push(BasicDelta { field: k.to_string(), old, new });
                             }
                         };
                         match (cur_task.as_ref(), base_task.as_ref()) {
                             (Some(cur), Some(prev)) => {
-                                push(
-                                    "title",
-                                    serde_json::json!(prev.title),
-                                    serde_json::json!(cur.title),
-                                );
-                                push(
-                                    "status",
-                                    serde_json::json!(prev.status.to_string()),
-                                    serde_json::json!(cur.status.to_string()),
-                                );
-                                push(
-                                    "priority",
-                                    serde_json::json!(prev.priority.to_string()),
-                                    serde_json::json!(cur.priority.to_string()),
-                                );
-                                push(
-                                    "task_type",
-                                    serde_json::json!(prev.task_type.to_string()),
-                                    serde_json::json!(cur.task_type.to_string()),
-                                );
-                                push(
-                                    "assignee",
-                                    serde_json::json!(prev.assignee),
-                                    serde_json::json!(cur.assignee),
-                                );
-                                push(
-                                    "reporter",
-                                    serde_json::json!(prev.reporter),
-                                    serde_json::json!(cur.reporter),
-                                );
-                                push(
-                                    "due_date",
-                                    serde_json::json!(prev.due_date),
-                                    serde_json::json!(cur.due_date),
-                                );
-                                push(
-                                    "effort",
-                                    serde_json::json!(prev.effort),
-                                    serde_json::json!(cur.effort),
-                                );
-                                push(
-                                    "tags",
-                                    serde_json::json!(prev.tags),
-                                    serde_json::json!(cur.tags),
-                                );
+                                push("title", serde_json::json!(prev.title), serde_json::json!(cur.title));
+                                push("status", serde_json::json!(prev.status.to_string()), serde_json::json!(cur.status.to_string()));
+                                push("priority", serde_json::json!(prev.priority.to_string()), serde_json::json!(cur.priority.to_string()));
+                                push("task_type", serde_json::json!(prev.task_type.to_string()), serde_json::json!(cur.task_type.to_string()));
+                                push("assignee", serde_json::json!(prev.assignee), serde_json::json!(cur.assignee));
+                                push("reporter", serde_json::json!(prev.reporter), serde_json::json!(cur.reporter));
+                                push("due_date", serde_json::json!(prev.due_date), serde_json::json!(cur.due_date));
+                                push("effort", serde_json::json!(prev.effort), serde_json::json!(cur.effort));
+                                push("tags", serde_json::json!(prev.tags), serde_json::json!(cur.tags));
                             }
                             (Some(cur), None) => {
                                 // Created
-                                push(
-                                    "created",
-                                    serde_json::Value::Null,
-                                    serde_json::json!(cur.title),
-                                );
+                                push("created", serde_json::Value::Null, serde_json::json!(cur.title));
                             }
                             (None, Some(_prev)) => {
                                 // Deleted
@@ -913,12 +691,7 @@ fn main() {
                         }
 
                         if !deltas.is_empty() {
-                            items.push(Item {
-                                id,
-                                project,
-                                file: rel_path.to_string_lossy().to_string(),
-                                changes: deltas,
-                            });
+                            items.push(Item { id, project, file: rel_path.to_string_lossy().to_string(), changes: deltas });
                         }
                     }
 
@@ -972,11 +745,7 @@ fn main() {
                                         };
                                         parts.push(s);
                                     }
-                                    renderer.emit_raw_stdout(format_args!(
-                                        "{}  {}",
-                                        it.id,
-                                        parts.join("; ")
-                                    ));
+                                    renderer.emit_raw_stdout(format_args!("{}  {}", it.id, parts.join("; ")));
                                 }
                             }
                         }
@@ -1004,24 +773,14 @@ fn main() {
         }
         Commands::Whoami { explain } => {
             renderer.log_info("BEGIN WHOAMI");
-            let identity_project = lotar::utils::identity::effective_project(
-                Some(resolver.path.as_path()),
-                cli.project.as_deref(),
-            );
+            let identity_project = lotar::utils::identity::effective_project(Some(resolver.path.as_path()), cli.project.as_deref());
             // Try to resolve using detector framework (with explain)
-            let det = lotar::utils::identity::resolve_current_user_explain_for_project(
-                Some(resolver.path.as_path()),
-                identity_project.as_deref(),
-            );
+            let det = lotar::utils::identity::resolve_current_user_explain_for_project(Some(resolver.path.as_path()), identity_project.as_deref());
             if let Some(info) = det {
                 if matches!(renderer.format, output::OutputFormat::Json) {
                     if explain {
                         // Augment with toggle states
-                        let cfg = lotar::config::resolution::config_for_project(
-                            resolver.path.as_path(),
-                            identity_project.as_deref(),
-                        )
-                        .ok();
+                        let cfg = lotar::config::resolution::config_for_project(resolver.path.as_path(), identity_project.as_deref()).ok();
                         renderer.emit_raw_stdout(
                             serde_json::json!({
                                 "user": info.user,
@@ -1044,23 +803,16 @@ fn main() {
                 } else {
                     renderer.emit_success(&info.user);
                     if explain {
-                        let mut msg =
-                            format!("source: {}, confidence: {}", info.source, info.confidence);
+                        let mut msg = format!("source: {}, confidence: {}", info.source, info.confidence);
                         if let Some(d) = info.details {
                             msg.push_str(", details: ");
                             msg.push_str(&d);
                         }
                         renderer.emit_info(&msg);
-                        let cfg = lotar::config::resolution::config_for_project(
-                            resolver.path.as_path(),
-                            identity_project.as_deref(),
-                        )
-                        .ok();
+                        let cfg = lotar::config::resolution::config_for_project(resolver.path.as_path(), identity_project.as_deref()).ok();
                         if let Some(cfg) = cfg {
                             if !cfg.auto_identity {
-                                renderer.emit_info(
-                                    "Auto identity disabled; using configured default only",
-                                );
+                                renderer.emit_info("Auto identity disabled; using configured default only");
                             } else if !cfg.auto_identity_git {
                                 renderer.emit_info("Git identity auto-detection disabled");
                             } else {
@@ -1092,8 +844,7 @@ fn main() {
             }
         }
         Commands::Trust { status, revoke } => {
-            lotar::cli::handlers::trust::TrustHandler::execute(status, revoke, &resolver, &renderer)
-                .inspect_err(|e| renderer.emit_error(e))
+            lotar::cli::handlers::trust::TrustHandler::execute(status, revoke, &resolver, &renderer).inspect_err(|e| renderer.emit_error(e))
         }
         Commands::Completions(args) => {
             renderer.log_info("BEGIN COMPLETIONS");
@@ -1121,8 +872,7 @@ fn show_enhanced_help() {
     let help_system = help::HelpSystem::new(output::OutputFormat::Text, false);
     match help_system.show_global_help() {
         Ok(help_text) => {
-            let renderer =
-                output::OutputRenderer::new(output::OutputFormat::Text, output::LogLevel::Warn);
+            let renderer = output::OutputRenderer::new(output::OutputFormat::Text, output::LogLevel::Warn);
             renderer.emit_raw_stdout(&help_text);
         }
         Err(_) => {
@@ -1137,13 +887,11 @@ fn show_command_help(command: &str) {
     let help_system = help::HelpSystem::new(output::OutputFormat::Text, false);
     match help_system.show_command_help(command) {
         Ok(help_text) => {
-            let renderer =
-                output::OutputRenderer::new(output::OutputFormat::Text, output::LogLevel::Warn);
+            let renderer = output::OutputRenderer::new(output::OutputFormat::Text, output::LogLevel::Warn);
             renderer.emit_raw_stdout(&help_text);
         }
         Err(e) => {
-            let renderer =
-                output::OutputRenderer::new(output::OutputFormat::Text, output::LogLevel::Warn);
+            let renderer = output::OutputRenderer::new(output::OutputFormat::Text, output::LogLevel::Warn);
             renderer.emit_error(format_args!("Error showing help for '{}': {}", command, e));
             renderer.emit_info("Run 'lotar help topics' to list every help page.");
             std::process::exit(1);

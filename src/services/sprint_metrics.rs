@@ -25,19 +25,11 @@ pub fn metric_label(metric: SprintBurndownMetric) -> &'static str {
 }
 
 pub fn ratio(done: f64, total: f64) -> Option<f64> {
-    if total.abs() < f64::EPSILON {
-        None
-    } else {
-        Some(done / total)
-    }
+    if total.abs() < f64::EPSILON { None } else { Some(done / total) }
 }
 
 pub fn ratio_usize(done: usize, total: usize) -> Option<f64> {
-    if total == 0 {
-        None
-    } else {
-        Some(done as f64 / total as f64)
-    }
+    if total == 0 { None } else { Some(done as f64 / total as f64) }
 }
 
 /// Effective terminal statuses for a resolved configuration. Delegates to
@@ -81,10 +73,7 @@ pub struct VelocityTotals {
     pub done_hours: f64,
 }
 
-pub fn compute_velocity_totals(
-    tasks: &[(String, StoredTask)],
-    done_sets: &crate::services::completion::TaskDoneSets,
-) -> VelocityTotals {
+pub fn compute_velocity_totals(tasks: &[(String, StoredTask)], done_sets: &crate::services::completion::TaskDoneSets) -> VelocityTotals {
     let mut totals = VelocityTotals::default();
 
     for (id, task) in tasks.iter() {

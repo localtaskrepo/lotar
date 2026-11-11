@@ -31,14 +31,8 @@ pub struct RenumberOutcome {
 impl TaskService {
     /// Renumber one copy of a duplicated task ID; `file` picks the copy and
     /// is required, since nothing tells the copies apart reliably.
-    pub fn renumber_duplicate(
-        storage: &mut Storage,
-        id: &str,
-        file: Option<&Path>,
-        dry_run: bool,
-    ) -> LoTaRResult<RenumberOutcome> {
-        let parsed =
-            TaskId::parse(id).map_err(|err| LoTaRError::InvalidTaskId(format!("{id}: {err}")))?;
+    pub fn renumber_duplicate(storage: &mut Storage, id: &str, file: Option<&Path>, dry_run: bool) -> LoTaRResult<RenumberOutcome> {
+        let parsed = TaskId::parse(id).map_err(|err| LoTaRError::InvalidTaskId(format!("{id}: {err}")))?;
         let from = parsed.canonical();
         let root = storage.root_path.clone();
         let project_dir = root.join(&parsed.project);
@@ -53,13 +47,7 @@ impl TaskService {
                 }
                 _ => {}
             }
-            let listing = || {
-                copies
-                    .iter()
-                    .map(|copy| copy.path.display().to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            };
+            let listing = || copies.iter().map(|copy| copy.path.display().to_string()).collect::<Vec<_>>().join(", ");
             let Some(wanted) = file else {
                 return Err(LoTaRError::ValidationError(format!(
                     "Task '{from}' is stored in {} files: {}. Choose the copy to renumber with --file <path>",
@@ -67,28 +55,15 @@ impl TaskService {
                     listing()
                 )));
             };
-            let wanted = wanted
-                .canonicalize()
-                .unwrap_or_else(|_| wanted.to_path_buf());
-            let Some(chosen) = copies
-                .iter()
-                .find(|copy| copy.path.canonicalize().is_ok_and(|path| path == wanted))
-            else {
-                return Err(LoTaRError::ValidationError(format!(
-                    "'{}' is not one of the files of '{from}': {}",
-                    wanted.display(),
-                    listing()
-                )));
+            let wanted = wanted.canonicalize().unwrap_or_else(|_| wanted.to_path_buf());
+            let Some(chosen) = copies.iter().find(|copy| copy.path.canonicalize().is_ok_and(|path| path == wanted)) else {
+                return Err(LoTaRError::ValidationError(format!("'{}' is not one of the files of '{from}': {}", wanted.display(), listing())));
             };
 
             let content = std::fs::read_to_string(&chosen.path)?;
-            let mut task =
-                crate::storage::task::parse_task_yaml_tolerant(&content).ok_or_else(|| {
-                    LoTaRError::ValidationError(format!(
-                        "Cannot renumber malformed task YAML in {}; repair the file first",
-                        chosen.path.display()
-                    ))
-                })?;
+            let mut task = crate::storage::task::parse_task_yaml_tolerant(&content).ok_or_else(|| {
+                LoTaRError::ValidationError(format!("Cannot renumber malformed task YAML in {}; repair the file first", chosen.path.display()))
+            })?;
             if let Some(target) = task.moved_to.as_deref() {
                 return Err(LoTaRError::ValidationError(format!(
                     "{} is the redirect stub of a task moved to '{target}'; renumber the other copy",
@@ -99,18 +74,8 @@ impl TaskService {
             let number = StorageOperations::get_current_id(&project_dir) + 1;
             let to = format!("{}-{number}", parsed.project);
             let new_file = chosen.path.with_file_name(format!("{number}.yml"));
-            let kept = copies
-                .iter()
-                .filter(|copy| copy.path != chosen.path)
-                .map(|copy| copy.path.clone())
-                .collect();
-            let outcome = RenumberOutcome {
-                from: from.clone(),
-                to: to.clone(),
-                old_file: chosen.path.clone(),
-                new_file: new_file.clone(),
-                kept,
-            };
+            let kept = copies.iter().filter(|copy| copy.path != chosen.path).map(|copy| copy.path.clone()).collect();
+            let outcome = RenumberOutcome { from: from.clone(), to: to.clone(), old_file: chosen.path.clone(), new_file: new_file.clone(), kept };
             if dry_run {
                 return Ok(outcome);
             }
@@ -118,18 +83,10 @@ impl TaskService {
             task.history.push(TaskChangeLogEntry {
                 extra: Default::default(),
                 at: chrono::Utc::now().to_rfc3339(),
-                actor: crate::utils::identity::resolve_current_user_for_project(
-                    Some(root.as_path()),
-                    Some(&parsed.project),
-                ),
-                changes: vec![TaskChange {
-                    field: "renumbered".into(),
-                    old: Some(from.clone()),
-                    new: Some(to.clone()),
-                }],
+                actor: crate::utils::identity::resolve_current_user_for_project(Some(root.as_path()), Some(&parsed.project)),
+                changes: vec![TaskChange { field: "renumbered".into(), old: Some(from.clone()), new: Some(to.clone()) }],
             });
-            let serialized = serde_yaml_ng::to_string(&task)
-                .map_err(|err| LoTaRError::SerializationError(err.to_string()))?;
+            let serialized = serde_yaml_ng::to_string(&task).map_err(|err| LoTaRError::SerializationError(err.to_string()))?;
             crate::storage::safety::atomic_write_file(&new_file, &serialized)?;
             std::fs::remove_file(&chosen.path)?;
             Ok(outcome)

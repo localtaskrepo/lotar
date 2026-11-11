@@ -20,9 +20,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             match resolve_tasks_dir() {
                 Ok(resolver) => {
                     let moves = crate::storage::moves::MoveResolver::new(&resolver.path);
-                    jobs.retain(|job| {
-                        job.ticket_id == *ticket_id || moves.same(&job.ticket_id, ticket_id)
-                    });
+                    jobs.retain(|job| job.ticket_id == *ticket_id || moves.same(&job.ticket_id, ticket_id));
                 }
                 Err(_) => jobs.retain(|job| job.ticket_id == *ticket_id),
             }
@@ -31,10 +29,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             jobs.retain(|job| job.status.eq_ignore_ascii_case(status));
         }
         let queue_stats = crate::services::agent_job_service::AgentJobService::queue_stats();
-        ok_json(
-            200,
-            json!({"data": {"jobs": jobs, "queue_stats": queue_stats}}),
-        )
+        ok_json(200, json!({"data": {"jobs": jobs, "queue_stats": queue_stats}}))
     });
 
     // GET /api/jobs/get -> fetch agent job status
@@ -77,24 +72,20 @@ pub(super) fn register(api_server: &mut ApiServer) {
 
     // POST /api/jobs/cancel-all -> cancel all queued/running agent jobs
 
-    api_server.register_handler("POST", "/api/jobs/cancel-all", |_req: &HttpRequest| {
-        match crate::services::agent_job_service::AgentJobService::cancel_all_jobs() {
-            Ok(jobs) => ok_json(
-                200,
-                json!({"data": {"cancelled": jobs.len(), "jobs": jobs}}),
-            ),
+    api_server.register_handler(
+        "POST",
+        "/api/jobs/cancel-all",
+        |_req: &HttpRequest| match crate::services::agent_job_service::AgentJobService::cancel_all_jobs() {
+            Ok(jobs) => ok_json(200, json!({"data": {"cancelled": jobs.len(), "jobs": jobs}})),
             Err(err) => bad_request(err.to_string()),
-        }
-    });
+        },
+    );
 
     // POST /api/jobs/message -> send message to agent job
 
     api_server.register_handler("POST", "/api/jobs/message", |req: &HttpRequest| {
         let payload: crate::api_types::AgentJobMessageRequest = try_response!(parse_body(req));
-        match crate::services::agent_job_service::AgentJobService::send_message(
-            &payload.id,
-            &payload.message,
-        ) {
+        match crate::services::agent_job_service::AgentJobService::send_message(&payload.id, &payload.message) {
             Ok(job) => ok_json(200, json!({"data": {"accepted": true, "job": job}})),
             Err(err) => bad_request(err.to_string()),
         }

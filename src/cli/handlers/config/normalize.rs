@@ -45,44 +45,32 @@ impl ConfigHandler {
 
         let mut changed = 0usize;
         for (label, path) in targets {
-            let content = std::fs::read_to_string(&path)
-                .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
+            let content = std::fs::read_to_string(&path).map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
 
             // Attempt normalization via round-trip through our tolerant parsers,
             // then emit in canonical nested style.
             let canonical = if label == "global" {
-                let parsed = crate::config::normalization::parse_global_from_yaml_str(&content)
-                    .map_err(|e| e.to_string())?;
+                let parsed = crate::config::normalization::parse_global_from_yaml_str(&content).map_err(|e| e.to_string())?;
                 crate::config::normalization::to_canonical_global_yaml(&parsed)
             } else {
                 // label is project:<prefix>
                 let proj = label.split_once(':').map(|(_, p)| p).unwrap_or("");
-                let parsed =
-                    crate::config::normalization::parse_project_from_yaml_str(proj, &content)
-                        .map_err(|e| e.to_string())?;
+                let parsed = crate::config::normalization::parse_project_from_yaml_str(proj, &content).map_err(|e| e.to_string())?;
                 crate::config::normalization::to_canonical_project_yaml(&parsed)
             };
 
             if write {
-                std::fs::write(&path, canonical.as_bytes())
-                    .map_err(|e| format!("Failed to write {}: {}", path.display(), e))?;
+                std::fs::write(&path, canonical.as_bytes()).map_err(|e| format!("Failed to write {}: {}", path.display(), e))?;
                 renderer.emit_success(format_args!("Normalized {} -> {}", label, path.display()));
                 changed += 1;
             } else {
-                renderer.emit_info(format_args!(
-                    "Would normalize {} -> {}",
-                    label,
-                    path.display()
-                ));
+                renderer.emit_info(format_args!("Would normalize {} -> {}", label, path.display()));
                 renderer.emit_raw_stdout(&canonical);
             }
         }
 
         if write {
-            renderer.emit_success(format_args!(
-                "Normalization complete ({} file(s) updated)",
-                changed
-            ));
+            renderer.emit_success(format_args!("Normalization complete ({} file(s) updated)", changed));
         }
         Ok(())
     }

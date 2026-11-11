@@ -49,16 +49,9 @@ impl SprintReassignmentInfo {
         let mut previous = self.previous.clone();
         previous.sort_unstable();
         previous.dedup();
-        let formatted = previous
-            .into_iter()
-            .map(|id| format!("#{}", id))
-            .collect::<Vec<_>>()
-            .join(", ");
+        let formatted = previous.into_iter().map(|id| format!("#{}", id)).collect::<Vec<_>>().join(", ");
 
-        Some(format!(
-            "{} moved from sprint(s) {}",
-            self.task_id, formatted
-        ))
+        Some(format!("{} moved from sprint(s) {}", self.task_id, formatted))
     }
 }
 
@@ -77,15 +70,7 @@ pub fn assign_tasks(
         return Err("No sprints found. Create a sprint before assigning tasks.".to_string());
     }
 
-    apply_assignment(
-        storage,
-        records,
-        tasks,
-        sprint_reference,
-        allow_closed,
-        force_single,
-        SprintAssignmentAction::Add,
-    )
+    apply_assignment(storage, records, tasks, sprint_reference, allow_closed, force_single, SprintAssignmentAction::Add)
 }
 
 /// Remove tasks from a sprint with the same atomic guarantees as
@@ -100,15 +85,7 @@ pub fn remove_tasks(
         return Err("No sprints found. Create a sprint before removing memberships.".to_string());
     }
 
-    apply_assignment(
-        storage,
-        records,
-        tasks,
-        sprint_reference,
-        true,
-        false,
-        SprintAssignmentAction::Remove,
-    )
+    apply_assignment(storage, records, tasks, sprint_reference, true, false, SprintAssignmentAction::Remove)
 }
 
 fn apply_assignment(
@@ -122,12 +99,8 @@ fn apply_assignment(
 ) -> Result<SprintAssignmentOutcome, String> {
     if tasks.is_empty() {
         let message = match action {
-            SprintAssignmentAction::Add => {
-                "Provide at least one task identifier to assign.".to_string()
-            }
-            SprintAssignmentAction::Remove => {
-                "Provide at least one task identifier to update.".to_string()
-            }
+            SprintAssignmentAction::Add => "Provide at least one task identifier to assign.".to_string(),
+            SprintAssignmentAction::Remove => "Provide at least one task identifier to update.".to_string(),
         };
         return Err(message);
     }
@@ -136,35 +109,24 @@ fn apply_assignment(
     // sprints lock, compute the full membership batch, then publish every
     // changed sprint file in one staged commit. A mid-batch failure rolls
     // all of them back, so force-single moves cannot lose memberships.
-    let mut txn = crate::storage::transaction::MultiFileTransaction::begin(&storage.root_path, &[])
-        .map_err(|err| err.to_string())?;
+    let mut txn = crate::storage::transaction::MultiFileTransaction::begin(&storage.root_path, &[]).map_err(|err| err.to_string())?;
     *records = SprintService::list(storage).map_err(|err| err.to_string())?;
     if records.is_empty() {
         return Err("No sprints found. Create a sprint before assigning tasks.".to_string());
     }
 
     let sprint_id = resolve_sprint_id(records, sprint_reference)?;
-    let target_record = records
-        .iter()
-        .find(|record| record.id == sprint_id)
-        .ok_or_else(|| format!("Sprint #{} not found.", sprint_id))?;
+    let target_record = records.iter().find(|record| record.id == sprint_id).ok_or_else(|| format!("Sprint #{} not found.", sprint_id))?;
 
     if action == SprintAssignmentAction::Add && !allow_closed {
         ensure_sprint_is_open(target_record)?;
     }
 
     // Detach the target metadata before `records` is refreshed post-commit.
-    let target_sprint_label = target_record
-        .sprint
-        .plan
-        .as_ref()
-        .and_then(|plan| plan.label.clone());
+    let target_sprint_label = target_record.sprint.plan.as_ref().and_then(|plan| plan.label.clone());
     let target_sprint_display_name = sprint_display_name(target_record);
 
-    let mut sprint_map: BTreeMap<u32, Sprint> = records
-        .iter()
-        .map(|record| (record.id, record.sprint.clone()))
-        .collect();
+    let mut sprint_map: BTreeMap<u32, Sprint> = records.iter().map(|record| (record.id, record.sprint.clone())).collect();
 
     let mut changed_sprints: HashSet<u32> = HashSet::new();
     let moves_root = storage.root_path.clone();
@@ -184,10 +146,7 @@ fn apply_assignment(
 
         match action {
             SprintAssignmentAction::Add => {
-                let current_membership = membership
-                    .get(&task_id)
-                    .map(|set| set.iter().copied().collect::<Vec<_>>())
-                    .unwrap_or_default();
+                let current_membership = membership.get(&task_id).map(|set| set.iter().copied().collect::<Vec<_>>()).unwrap_or_default();
 
                 let mut removed_from: Vec<u32> = Vec::new();
 
@@ -209,9 +168,7 @@ fn apply_assignment(
                 let mut added_to_target = false;
 
                 if !already_in_target {
-                    let sprint = sprint_map
-                        .get_mut(&sprint_id)
-                        .ok_or_else(|| format!("Sprint #{} not found.", sprint_id))?;
+                    let sprint = sprint_map.get_mut(&sprint_id).ok_or_else(|| format!("Sprint #{} not found.", sprint_id))?;
                     if add_task_to_sprint(&moves, sprint, &task_id) {
                         changed_sprints.insert(sprint_id);
                         added_to_target = true;
@@ -227,14 +184,10 @@ fn apply_assignment(
                     let mut previous = removed_from.clone();
                     previous.sort_unstable();
                     previous.dedup();
-                    replaced.push(SprintReassignmentInfo {
-                        task_id: task_id.clone(),
-                        previous,
-                    });
+                    replaced.push(SprintReassignmentInfo { task_id: task_id.clone(), previous });
                 }
 
-                let mut updated_membership: BTreeSet<u32> =
-                    current_membership.into_iter().collect();
+                let mut updated_membership: BTreeSet<u32> = current_membership.into_iter().collect();
                 for id in &removed_from {
                     updated_membership.remove(id);
                 }
@@ -252,25 +205,19 @@ fn apply_assignment(
                 }
             }
             SprintAssignmentAction::Remove => {
-                let current_membership = membership
-                    .get(&task_id)
-                    .map(|set| set.iter().copied().collect::<Vec<_>>())
-                    .unwrap_or_default();
+                let current_membership = membership.get(&task_id).map(|set| set.iter().copied().collect::<Vec<_>>()).unwrap_or_default();
 
                 if !current_membership.contains(&sprint_id) {
                     unchanged.push(task_id.clone());
                     continue;
                 }
 
-                let sprint = sprint_map
-                    .get_mut(&sprint_id)
-                    .ok_or_else(|| format!("Sprint #{} not found.", sprint_id))?;
+                let sprint = sprint_map.get_mut(&sprint_id).ok_or_else(|| format!("Sprint #{} not found.", sprint_id))?;
                 if remove_task_from_sprint(&moves, sprint, &task_id) {
                     changed_sprints.insert(sprint_id);
                 }
 
-                let mut updated_membership: BTreeSet<u32> =
-                    current_membership.into_iter().collect();
+                let mut updated_membership: BTreeSet<u32> = current_membership.into_iter().collect();
                 updated_membership.remove(&sprint_id);
                 if updated_membership.is_empty() {
                     membership.remove(&task_id);
@@ -288,8 +235,7 @@ fn apply_assignment(
     changed.sort_unstable();
     for sprint_id in changed {
         if let Some(sprint) = sprint_map.get(&sprint_id) {
-            SprintService::stage_update(&mut txn, &storage.root_path, sprint_id, sprint.clone())
-                .map_err(|err| err.to_string())?;
+            SprintService::stage_update(&mut txn, &storage.root_path, sprint_id, sprint.clone()).map_err(|err| err.to_string())?;
         }
     }
     txn.commit().map_err(|err| err.to_string())?;
@@ -308,10 +254,7 @@ fn apply_assignment(
     })
 }
 
-fn build_membership_index(
-    moves: &crate::storage::moves::MoveResolver,
-    sprint_map: &BTreeMap<u32, Sprint>,
-) -> HashMap<String, BTreeSet<u32>> {
+fn build_membership_index(moves: &crate::storage::moves::MoveResolver, sprint_map: &BTreeMap<u32, Sprint>) -> HashMap<String, BTreeSet<u32>> {
     let mut map: HashMap<String, BTreeSet<u32>> = HashMap::new();
     for (sprint_id, sprint) in sprint_map.iter() {
         for entry in &sprint.tasks {
@@ -328,11 +271,7 @@ fn build_membership_index(
     map
 }
 
-fn add_task_to_sprint(
-    moves: &crate::storage::moves::MoveResolver,
-    sprint: &mut Sprint,
-    task_id: &str,
-) -> bool {
+fn add_task_to_sprint(moves: &crate::storage::moves::MoveResolver, sprint: &mut Sprint, task_id: &str) -> bool {
     let normalized = task_id.trim();
     if normalized.is_empty() {
         return false;
@@ -341,10 +280,7 @@ fn add_task_to_sprint(
     // sprint means TP-1 is a member; never append a duplicate spelling.
     let already = sprint.tasks.iter().any(|entry| {
         let entry_id = entry.id.trim();
-        match (
-            crate::storage::TaskId::parse(entry_id),
-            crate::storage::TaskId::parse(normalized),
-        ) {
+        match (crate::storage::TaskId::parse(entry_id), crate::storage::TaskId::parse(normalized)) {
             (Ok(entry), Ok(task)) => entry == task || moves.same(entry_id, normalized),
             _ => entry_id == normalized,
         }
@@ -352,27 +288,16 @@ fn add_task_to_sprint(
     if already {
         return false;
     }
-    sprint.tasks.push(SprintTaskEntry {
-        extra: Default::default(),
-        id: normalized.to_string(),
-        order: None,
-    });
+    sprint.tasks.push(SprintTaskEntry { extra: Default::default(), id: normalized.to_string(), order: None });
     true
 }
 
-fn remove_task_from_sprint(
-    moves: &crate::storage::moves::MoveResolver,
-    sprint: &mut Sprint,
-    task_id: &str,
-) -> bool {
+fn remove_task_from_sprint(moves: &crate::storage::moves::MoveResolver, sprint: &mut Sprint, task_id: &str) -> bool {
     let before = sprint.tasks.len();
     // Remove EVERY spelling of the member (TP-1 and TP-001 alike).
     sprint.tasks.retain(|entry| {
         let entry_id = entry.id.trim();
-        match (
-            crate::storage::TaskId::parse(entry_id),
-            crate::storage::TaskId::parse(task_id.trim()),
-        ) {
+        match (crate::storage::TaskId::parse(entry_id), crate::storage::TaskId::parse(task_id.trim())) {
             (Ok(entry), Ok(task)) => entry != task && !moves.same(entry_id, task_id.trim()),
             _ => entry_id != task_id.trim(),
         }
@@ -409,37 +334,26 @@ pub struct SprintBacklogResult {
     pub truncated: bool,
 }
 
-pub fn fetch_backlog(
-    storage: &Storage,
-    options: &SprintBacklogOptions,
-) -> Result<SprintBacklogResult, String> {
+pub fn fetch_backlog(storage: &Storage, options: &SprintBacklogOptions) -> Result<SprintBacklogResult, String> {
     // Tasks the query selects that are in no sprint.
-    let mut entries: Vec<SprintBacklogEntry> =
-        crate::services::task_list::run(storage, &options.query, chrono::Utc::now())
-            .into_iter()
-            .filter(|(_, task)| task.sprints.is_empty())
-            .map(|(id, task)| SprintBacklogEntry {
-                id,
-                title: task.title,
-                status: task.status.to_string(),
-                priority: task.priority.to_string(),
-                assignee: task.assignee,
-                due_date: task.due_date,
-                tags: task.tags,
-            })
-            .collect();
+    let mut entries: Vec<SprintBacklogEntry> = crate::services::task_list::run(storage, &options.query, chrono::Utc::now())
+        .into_iter()
+        .filter(|(_, task)| task.sprints.is_empty())
+        .map(|(id, task)| SprintBacklogEntry {
+            id,
+            title: task.title,
+            status: task.status.to_string(),
+            priority: task.priority.to_string(),
+            assignee: task.assignee,
+            due_date: task.due_date,
+            tags: task.tags,
+        })
+        .collect();
 
     if options.manual_order {
-        let order = crate::services::task_order::backlog_order_for_ids(
-            storage,
-            entries.iter().map(|entry| entry.id.clone()),
-        )
-        .map_err(|error| error.to_string())?;
-        let positions: HashMap<_, _> = order
-            .into_iter()
-            .enumerate()
-            .map(|(index, id)| (id, index))
-            .collect();
+        let order =
+            crate::services::task_order::backlog_order_for_ids(storage, entries.iter().map(|entry| entry.id.clone())).map_err(|error| error.to_string())?;
+        let positions: HashMap<_, _> = order.into_iter().enumerate().map(|(index, id)| (id, index)).collect();
         entries.sort_by_key(|entry| positions.get(&entry.id).copied().unwrap_or(usize::MAX));
     }
 
@@ -469,17 +383,10 @@ pub fn resolve_sprint_id(records: &[SprintRecord], reference: Option<&str>) -> R
             "active" => resolve_default_sprint(records),
             _ => {
                 let normalized = trimmed.strip_prefix('#').unwrap_or(trimmed);
-                let parsed = normalized.parse::<u32>().map_err(|_| {
-                    format!(
-                        "Invalid sprint reference '{}'. Expected a numeric identifier or keyword (next/previous).",
-                        token
-                    )
-                })?;
-                records
-                    .iter()
-                    .find(|record| record.id == parsed)
-                    .map(|record| record.id)
-                    .ok_or_else(|| format!("Sprint #{} not found.", parsed))
+                let parsed = normalized
+                    .parse::<u32>()
+                    .map_err(|_| format!("Invalid sprint reference '{}'. Expected a numeric identifier or keyword (next/previous).", token))?;
+                records.iter().find(|record| record.id == parsed).map(|record| record.id).ok_or_else(|| format!("Sprint #{} not found.", parsed))
             }
         };
     }
@@ -490,28 +397,16 @@ pub fn resolve_sprint_id(records: &[SprintRecord], reference: Option<&str>) -> R
 /// IDs of sprints currently active or overdue, in record order.
 pub fn active_sprint_ids(records: &[SprintRecord]) -> Vec<u32> {
     let now = Utc::now();
-    records
-        .iter()
-        .filter(|record| {
-            sprint_status::derive_status(&record.sprint, now)
-                .state
-                .is_active_or_overdue()
-        })
-        .map(|record| record.id)
-        .collect()
+    records.iter().filter(|record| sprint_status::derive_status(&record.sprint, now).state.is_active_or_overdue()).map(|record| record.id).collect()
 }
 
 pub fn resolve_default_sprint(records: &[SprintRecord]) -> Result<u32, String> {
     let active = active_sprint_ids(records);
 
     match active.len() {
-        0 => Err(
-            "No active sprint found. Specify a sprint identifier with --sprint or prefix the command with the sprint number.".to_string(),
-        ),
+        0 => Err("No active sprint found. Specify a sprint identifier with --sprint or prefix the command with the sprint number.".to_string()),
         1 => Ok(active[0]),
-        _ => Err(
-            "Multiple active sprints detected. Specify a sprint identifier with --sprint or prefix the command with the sprint number.".to_string(),
-        ),
+        _ => Err("Multiple active sprints detected. Specify a sprint identifier with --sprint or prefix the command with the sprint number.".to_string()),
     }
 }
 
@@ -519,40 +414,26 @@ pub fn resolve_next_sprint(records: &[SprintRecord]) -> Result<u32, String> {
     let base = resolve_default_sprint(records)?;
     let mut ids: Vec<u32> = records.iter().map(|record| record.id).collect();
     ids.sort_unstable();
-    ids.into_iter()
-        .find(|id| *id > base)
-        .ok_or_else(|| format!("Sprint #{} is already the latest sprint.", base))
+    ids.into_iter().find(|id| *id > base).ok_or_else(|| format!("Sprint #{} is already the latest sprint.", base))
 }
 
 pub fn resolve_previous_sprint(records: &[SprintRecord]) -> Result<u32, String> {
     let base = resolve_default_sprint(records)?;
     let mut ids: Vec<u32> = records.iter().map(|record| record.id).collect();
     ids.sort_unstable();
-    ids.into_iter()
-        .rev()
-        .find(|id| *id < base)
-        .ok_or_else(|| format!("Sprint #{} is the earliest sprint.", base))
+    ids.into_iter().rev().find(|id| *id < base).ok_or_else(|| format!("Sprint #{} is the earliest sprint.", base))
 }
 
 pub fn ensure_sprint_is_open(record: &SprintRecord) -> Result<(), String> {
     let lifecycle = sprint_status::derive_status(&record.sprint, Utc::now());
     if matches!(lifecycle.state, SprintLifecycleState::Complete) {
-        return Err(format!(
-            "Sprint #{} ({}) is closed. Pass --allow-closed to override.",
-            record.id,
-            sprint_display_name(record)
-        ));
+        return Err(format!("Sprint #{} ({}) is closed. Pass --allow-closed to override.", record.id, sprint_display_name(record)));
     }
     Ok(())
 }
 
 pub fn sprint_display_name(record: &SprintRecord) -> String {
-    record
-        .sprint
-        .plan
-        .as_ref()
-        .and_then(|plan| plan.label.clone())
-        .unwrap_or_else(|| format!("Sprint {}", record.id))
+    record.sprint.plan.as_ref().and_then(|plan| plan.label.clone()).unwrap_or_else(|| format!("Sprint {}", record.id))
 }
 
 pub fn resolve_task_identifier(storage: &Storage, raw: &str) -> Result<String, String> {
@@ -577,10 +458,9 @@ pub fn resolve_task_identifier(storage: &Storage, raw: &str) -> Result<String, S
 
     match storage.resolve_numeric_id(token) {
         Ok((full_id, _)) => Ok(full_id),
-        Err(crate::storage::identity::TaskLookupError::NotFound(_)) => Err(format!(
-            "Task {} not found. Use the fully-qualified identifier (e.g. TEST-123).",
-            token
-        )),
+        Err(crate::storage::identity::TaskLookupError::NotFound(_)) => {
+            Err(format!("Task {} not found. Use the fully-qualified identifier (e.g. TEST-123).", token))
+        }
         Err(err) => Err(err.to_string()),
     }
 }

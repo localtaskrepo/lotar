@@ -33,15 +33,7 @@ pub struct ConfigFieldMeta {
 }
 
 const fn field(flat: &'static str) -> ConfigFieldMeta {
-    ConfigFieldMeta {
-        flat,
-        global: false,
-        project: false,
-        aliases: &[],
-        source: None,
-        resolved_relevant: false,
-        task_conflict: false,
-    }
+    ConfigFieldMeta { flat, global: false, project: false, aliases: &[], source: None, resolved_relevant: false, task_conflict: false }
 }
 
 impl ConfigFieldMeta {
@@ -84,250 +76,72 @@ impl ConfigFieldMeta {
 /// The catalog. Order is the order of the global settable-field listing.
 /// Fields with neither scope are load-only (aliases) or inspect-only.
 pub const CONFIG_FIELDS: &[ConfigFieldMeta] = &[
-    field("project_name")
-        .project()
-        .aliases(&["config.project_name", "project.id", "project.name"]),
-    field("review_reviewers")
-        .project()
-        .aliases(&["review.reviewers"])
-        .source("review.reviewers"),
-    field("server_port")
-        .global()
-        .aliases(&["server.port"])
-        .source("server.port"),
-    field("default_project")
-        .global()
-        .aliases(&["default.project"])
-        .source("default.project"),
-    field("default_assignee")
-        .both()
-        .aliases(&["default.assignee"])
-        .source("default.assignee"),
-    field("default_reporter")
-        .both()
-        .aliases(&["default.reporter"])
-        .source("default.reporter"),
-    field("default_tags")
-        .both()
-        .aliases(&["default.tags"])
-        .source("default.tags")
-        .resolved(),
-    field("members")
-        .both()
-        .aliases(&["default.members", "members"])
-        .source("members")
-        .resolved(),
-    field("strict_members")
-        .both()
-        .aliases(&["default.strict_members"])
-        .source("default.strict-members")
-        .resolved(),
-    field("auto_populate_members")
-        .both()
-        .aliases(&["auto.populate_members"])
-        .source("auto.populate-members"),
-    field("default_priority")
-        .both()
-        .aliases(&["default.priority"])
-        .source("default.priority")
-        .resolved(),
-    field("default_status")
-        .both()
-        .aliases(&["default.status"])
-        .source("default.status")
-        .resolved(),
-    field("tags")
-        .both()
-        .aliases(&["taxonomy.tags", "issue.tags"])
-        .source_as("issue.tags", "issue_tags")
-        .resolved(),
-    field("tag_properties")
-        .both()
-        .aliases(&["issue.tag_properties"])
-        .source("issue.tag-properties"),
-    field("custom_fields")
-        .both()
-        .aliases(&["custom.fields"])
-        .source("custom.fields"),
-    field("issue_states")
-        .both()
-        .aliases(&["issue.states"])
-        .source("issue.states")
-        .resolved()
-        .task_conflict(),
-    field("issue_done_states")
-        .both()
-        .aliases(&["issue.done_states"])
-        .source("issue.done_states")
-        .resolved(),
-    field("issue_types")
-        .both()
-        .aliases(&["issue.types"])
-        .source("issue.types")
-        .resolved()
-        .task_conflict(),
-    field("issue_priorities")
-        .both()
-        .aliases(&["issue.priorities"])
-        .source("issue.priorities")
-        .resolved()
-        .task_conflict(),
-    field("auto_set_reporter")
-        .both()
-        .aliases(&["auto.set_reporter"])
-        .source("auto.set-reporter"),
-    field("auto_reciprocal_relationships")
-        .both()
-        .aliases(&["auto.reciprocal_relationships"])
-        .source("auto.reciprocal-relationships"),
-    field("auto_link_mentions")
-        .both()
-        .aliases(&["auto.link_mentions"])
-        .source("auto.link-mentions"),
-    field("auto_assign_on_status")
-        .both()
-        .aliases(&["auto.assign_on_status"])
-        .source("auto.assign-on-status"),
-    field("auto_codeowners_assign")
-        .both()
-        .aliases(&["auto.codeowners_assign"])
-        .source("auto.codeowners-assign"),
-    field("auto_tags_from_path")
-        .both()
-        .aliases(&["auto.tags_from_path"])
-        .source("auto.tags-from-path"),
-    field("auto_branch_infer_type")
-        .both()
-        .aliases(&["auto.branch_infer_type"])
-        .source("auto.branch-infer-type"),
-    field("auto_branch_infer_status")
-        .both()
-        .aliases(&["auto.branch_infer_status"])
-        .source("auto.branch-infer-status"),
-    field("auto_branch_infer_priority")
-        .both()
-        .aliases(&["auto.branch_infer_priority"])
-        .source("auto.branch-infer-priority"),
-    field("auto_identity")
-        .both()
-        .aliases(&["auto.identity"])
-        .source("auto.identity"),
-    field("auto_identity_git")
-        .both()
-        .aliases(&["auto.identity_git"])
-        .source("auto.identity-git"),
-    field("scan_signal_words")
-        .both()
-        .aliases(&["scan.signal_words"])
-        .source("scan.signal-words"),
-    field("scan_ticket_patterns")
-        .both()
-        .aliases(&["scan.ticket_patterns"])
-        .source("scan.ticket-patterns"),
-    field("scan_enable_ticket_words")
-        .both()
-        .aliases(&["scan.enable_ticket_words"])
-        .source("scan.enable-ticket-words"),
-    field("scan_enable_mentions")
-        .both()
-        .aliases(&["scan.enable_mentions"])
-        .source("scan.enable-mentions"),
-    field("scan_strip_attributes")
-        .both()
-        .aliases(&["scan.strip_attributes"])
-        .source("scan.strip-attributes"),
-    field("branch_type_aliases")
-        .both()
-        .aliases(&["branch.type_aliases"])
-        .source("branch.type-aliases")
-        .resolved(),
-    field("branch_status_aliases")
-        .both()
-        .aliases(&["branch.status_aliases"])
-        .source("branch.status-aliases")
-        .resolved(),
-    field("branch_priority_aliases")
-        .both()
-        .aliases(&["branch.priority_aliases"])
-        .source("branch.priority-aliases")
-        .resolved(),
-    field("attachments_dir")
-        .both()
-        .aliases(&["attachments.dir"])
-        .source("attachments.dir"),
-    field("attachments_max_upload_mb")
-        .both()
-        .aliases(&["attachments.max_upload_mb"])
-        .source("attachments.max_upload_mb"),
-    field("sync_reports_dir")
-        .both()
-        .aliases(&["sync.reports_dir"])
-        .source("sync.reports_dir"),
-    field("sync_write_reports")
-        .both()
-        .aliases(&["sync.write_reports"])
-        .source("sync.write_reports"),
-    field("agent_context_enabled")
-        .both()
-        .aliases(&["agent.context_enabled"])
-        .source("agent.context-enabled"),
-    field("agent_context_extension")
-        .both()
-        .aliases(&["agent.context_extension"])
-        .source("agent.context-extension"),
+    field("project_name").project().aliases(&["config.project_name", "project.id", "project.name"]),
+    field("review_reviewers").project().aliases(&["review.reviewers"]).source("review.reviewers"),
+    field("server_port").global().aliases(&["server.port"]).source("server.port"),
+    field("default_project").global().aliases(&["default.project"]).source("default.project"),
+    field("default_assignee").both().aliases(&["default.assignee"]).source("default.assignee"),
+    field("default_reporter").both().aliases(&["default.reporter"]).source("default.reporter"),
+    field("default_tags").both().aliases(&["default.tags"]).source("default.tags").resolved(),
+    field("members").both().aliases(&["default.members", "members"]).source("members").resolved(),
+    field("strict_members").both().aliases(&["default.strict_members"]).source("default.strict-members").resolved(),
+    field("auto_populate_members").both().aliases(&["auto.populate_members"]).source("auto.populate-members"),
+    field("default_priority").both().aliases(&["default.priority"]).source("default.priority").resolved(),
+    field("default_status").both().aliases(&["default.status"]).source("default.status").resolved(),
+    field("tags").both().aliases(&["taxonomy.tags", "issue.tags"]).source_as("issue.tags", "issue_tags").resolved(),
+    field("tag_properties").both().aliases(&["issue.tag_properties"]).source("issue.tag-properties"),
+    field("custom_fields").both().aliases(&["custom.fields"]).source("custom.fields"),
+    field("issue_states").both().aliases(&["issue.states"]).source("issue.states").resolved().task_conflict(),
+    field("issue_done_states").both().aliases(&["issue.done_states"]).source("issue.done_states").resolved(),
+    field("issue_types").both().aliases(&["issue.types"]).source("issue.types").resolved().task_conflict(),
+    field("issue_priorities").both().aliases(&["issue.priorities"]).source("issue.priorities").resolved().task_conflict(),
+    field("auto_set_reporter").both().aliases(&["auto.set_reporter"]).source("auto.set-reporter"),
+    field("auto_reciprocal_relationships").both().aliases(&["auto.reciprocal_relationships"]).source("auto.reciprocal-relationships"),
+    field("auto_link_mentions").both().aliases(&["auto.link_mentions"]).source("auto.link-mentions"),
+    field("auto_assign_on_status").both().aliases(&["auto.assign_on_status"]).source("auto.assign-on-status"),
+    field("auto_codeowners_assign").both().aliases(&["auto.codeowners_assign"]).source("auto.codeowners-assign"),
+    field("auto_tags_from_path").both().aliases(&["auto.tags_from_path"]).source("auto.tags-from-path"),
+    field("auto_branch_infer_type").both().aliases(&["auto.branch_infer_type"]).source("auto.branch-infer-type"),
+    field("auto_branch_infer_status").both().aliases(&["auto.branch_infer_status"]).source("auto.branch-infer-status"),
+    field("auto_branch_infer_priority").both().aliases(&["auto.branch_infer_priority"]).source("auto.branch-infer-priority"),
+    field("auto_identity").both().aliases(&["auto.identity"]).source("auto.identity"),
+    field("auto_identity_git").both().aliases(&["auto.identity_git"]).source("auto.identity-git"),
+    field("scan_signal_words").both().aliases(&["scan.signal_words"]).source("scan.signal-words"),
+    field("scan_ticket_patterns").both().aliases(&["scan.ticket_patterns"]).source("scan.ticket-patterns"),
+    field("scan_enable_ticket_words").both().aliases(&["scan.enable_ticket_words"]).source("scan.enable-ticket-words"),
+    field("scan_enable_mentions").both().aliases(&["scan.enable_mentions"]).source("scan.enable-mentions"),
+    field("scan_strip_attributes").both().aliases(&["scan.strip_attributes"]).source("scan.strip-attributes"),
+    field("branch_type_aliases").both().aliases(&["branch.type_aliases"]).source("branch.type-aliases").resolved(),
+    field("branch_status_aliases").both().aliases(&["branch.status_aliases"]).source("branch.status-aliases").resolved(),
+    field("branch_priority_aliases").both().aliases(&["branch.priority_aliases"]).source("branch.priority-aliases").resolved(),
+    field("attachments_dir").both().aliases(&["attachments.dir"]).source("attachments.dir"),
+    field("attachments_max_upload_mb").both().aliases(&["attachments.max_upload_mb"]).source("attachments.max_upload_mb"),
+    field("sync_reports_dir").both().aliases(&["sync.reports_dir"]).source("sync.reports_dir"),
+    field("sync_write_reports").both().aliases(&["sync.write_reports"]).source("sync.write_reports"),
+    field("agent_context_enabled").both().aliases(&["agent.context_enabled"]).source("agent.context-enabled"),
+    field("agent_context_extension").both().aliases(&["agent.context_extension"]).source("agent.context-extension"),
     field("agent_logs_dir").both().aliases(&["agent.logs_dir"]),
-    field("agent_instructions")
-        .both()
-        .aliases(&["agent.instructions"])
-        .source("agent.instructions"),
+    field("agent_instructions").both().aliases(&["agent.instructions"]).source("agent.instructions"),
     field("agent_instructions_file").both(),
-    field("agent_worktree_enabled")
-        .both()
-        .source("agent.worktree.enabled"),
-    field("agent_worktree_dir")
-        .both()
-        .source("agent.worktree.dir"),
-    field("agent_worktree_branch_prefix")
-        .both()
-        .source("agent.worktree.branch_prefix"),
-    field("agent_worktree_max_parallel_jobs")
-        .both()
-        .source("agent.worktree.max_parallel_jobs"),
-    field("agent_worktree_cleanup_on_done")
-        .both()
-        .source("agent.worktree.cleanup_on_done"),
-    field("agent_worktree_cleanup_on_failure")
-        .both()
-        .source("agent.worktree.cleanup_on_failure"),
-    field("agent_worktree_cleanup_on_cancel")
-        .both()
-        .source("agent.worktree.cleanup_on_cancel"),
-    field("agent_worktree_cleanup_delete_branches")
-        .both()
-        .source("agent.worktree.cleanup_delete_branches"),
-    field("agent_worktree_cleanup_ignored_files")
-        .both()
-        .source("agent.worktree.cleanup_ignored_files"),
+    field("agent_worktree_enabled").both().source("agent.worktree.enabled"),
+    field("agent_worktree_dir").both().source("agent.worktree.dir"),
+    field("agent_worktree_branch_prefix").both().source("agent.worktree.branch_prefix"),
+    field("agent_worktree_max_parallel_jobs").both().source("agent.worktree.max_parallel_jobs"),
+    field("agent_worktree_cleanup_on_done").both().source("agent.worktree.cleanup_on_done"),
+    field("agent_worktree_cleanup_on_failure").both().source("agent.worktree.cleanup_on_failure"),
+    field("agent_worktree_cleanup_on_cancel").both().source("agent.worktree.cleanup_on_cancel"),
+    field("agent_worktree_cleanup_delete_branches").both().source("agent.worktree.cleanup_delete_branches"),
+    field("agent_worktree_cleanup_ignored_files").both().source("agent.worktree.cleanup_ignored_files"),
     field("agent_automation").aliases(&["agent.automation"]),
     field("agent_worktree").aliases(&["agent.worktree"]),
     field("remotes").both().aliases(&["sync.remotes"]),
     field("agents").both(),
     field("auth_profiles").aliases(&["sync.auth_profiles"]),
-    field("sprints_defaults_capacity_points")
-        .global()
-        .source("sprints.defaults.capacity_points"),
-    field("sprints_defaults_capacity_hours")
-        .global()
-        .source("sprints.defaults.capacity_hours"),
-    field("sprints_defaults_length")
-        .global()
-        .source("sprints.defaults.length"),
-    field("sprints_defaults_overdue_after")
-        .global()
-        .source("sprints.defaults.overdue_after"),
-    field("sprints_notifications_enabled")
-        .global()
-        .source("sprints.notifications.enabled"),
+    field("sprints_defaults_capacity_points").global().source("sprints.defaults.capacity_points"),
+    field("sprints_defaults_capacity_hours").global().source("sprints.defaults.capacity_hours"),
+    field("sprints_defaults_length").global().source("sprints.defaults.length"),
+    field("sprints_defaults_overdue_after").global().source("sprints.defaults.overdue_after"),
+    field("sprints_notifications_enabled").global().source("sprints.notifications.enabled"),
     field("web_ui_path").global(),
     field("ui_theme").global().aliases(&["ui.theme"]),
     field("ui_name").global().aliases(&["ui.name"]),
@@ -337,43 +151,23 @@ pub const CONFIG_FIELDS: &[ConfigFieldMeta] = &[
     field("ui_theme_file").global().aliases(&["ui.theme_file"]),
 ];
 
-static GLOBAL_SETTABLE: LazyLock<Vec<&'static str>> = LazyLock::new(|| {
-    CONFIG_FIELDS
-        .iter()
-        .filter(|meta| meta.global)
-        .map(|meta| meta.flat)
-        .collect()
-});
+static GLOBAL_SETTABLE: LazyLock<Vec<&'static str>> = LazyLock::new(|| CONFIG_FIELDS.iter().filter(|meta| meta.global).map(|meta| meta.flat).collect());
 
-static PROJECT_SETTABLE: LazyLock<Vec<&'static str>> = LazyLock::new(|| {
-    CONFIG_FIELDS
-        .iter()
-        .filter(|meta| meta.project)
-        .map(|meta| meta.flat)
-        .collect()
-});
+static PROJECT_SETTABLE: LazyLock<Vec<&'static str>> = LazyLock::new(|| CONFIG_FIELDS.iter().filter(|meta| meta.project).map(|meta| meta.flat).collect());
 
 /// Canonical flat names settable through `config set` in the given scope.
 pub fn settable_fields(is_global: bool) -> &'static [&'static str] {
-    if is_global {
-        &GLOBAL_SETTABLE
-    } else {
-        &PROJECT_SETTABLE
-    }
+    if is_global { &GLOBAL_SETTABLE } else { &PROJECT_SETTABLE }
 }
 
 /// Every (dotted alias, flat field) pair, in config-file application order.
 pub fn alias_paths() -> impl Iterator<Item = (&'static str, &'static str)> {
-    CONFIG_FIELDS
-        .iter()
-        .flat_map(|meta| meta.aliases.iter().map(move |alias| (*alias, meta.flat)))
+    CONFIG_FIELDS.iter().flat_map(|meta| meta.aliases.iter().map(move |alias| (*alias, meta.flat)))
 }
 
 /// Flat field a dotted alias maps to, if any.
 pub fn flat_for_alias(alias: &str) -> Option<&'static str> {
-    alias_paths()
-        .find(|(dotted, _)| *dotted == alias)
-        .map(|(_, flat)| flat)
+    alias_paths().find(|(dotted, _)| *dotted == alias).map(|(_, flat)| flat)
 }
 
 fn lookup(flat: &str) -> Option<&'static ConfigFieldMeta> {
@@ -556,10 +350,7 @@ mod tests {
         ("auto.identity_git", "auto_identity_git"),
         ("auto.populate_members", "auto_populate_members"),
         ("auto.set_reporter", "auto_set_reporter"),
-        (
-            "auto.reciprocal_relationships",
-            "auto_reciprocal_relationships",
-        ),
+        ("auto.reciprocal_relationships", "auto_reciprocal_relationships"),
         ("auto.link_mentions", "auto_link_mentions"),
         ("auto.assign_on_status", "auto_assign_on_status"),
         ("auto.codeowners_assign", "auto_codeowners_assign"),
@@ -604,209 +395,53 @@ mod tests {
         ("default.priority", "default_priority", "default_priority"),
         ("default.status", "default_status", "default_status"),
         ("issue.states", "issue_states", "issue_states"),
-        (
-            "issue.done_states",
-            "issue_done_states",
-            "issue_done_states",
-        ),
+        ("issue.done_states", "issue_done_states", "issue_done_states"),
         ("issue.types", "issue_types", "issue_types"),
         ("issue.priorities", "issue_priorities", "issue_priorities"),
         ("issue.tags", "issue_tags", "tags"),
         ("issue.tag-properties", "tag_properties", "tag_properties"),
         ("custom.fields", "custom_fields", "custom_fields"),
-        (
-            "scan.signal-words",
-            "scan_signal_words",
-            "scan_signal_words",
-        ),
-        (
-            "scan.ticket-patterns",
-            "scan_ticket_patterns",
-            "scan_ticket_patterns",
-        ),
-        (
-            "scan.enable-ticket-words",
-            "scan_enable_ticket_words",
-            "scan_enable_ticket_words",
-        ),
-        (
-            "scan.enable-mentions",
-            "scan_enable_mentions",
-            "scan_enable_mentions",
-        ),
-        (
-            "scan.strip-attributes",
-            "scan_strip_attributes",
-            "scan_strip_attributes",
-        ),
-        (
-            "auto.populate-members",
-            "auto_populate_members",
-            "auto_populate_members",
-        ),
-        (
-            "auto.set-reporter",
-            "auto_set_reporter",
-            "auto_set_reporter",
-        ),
-        (
-            "auto.reciprocal-relationships",
-            "auto_reciprocal_relationships",
-            "auto_reciprocal_relationships",
-        ),
-        (
-            "auto.link-mentions",
-            "auto_link_mentions",
-            "auto_link_mentions",
-        ),
-        (
-            "auto.assign-on-status",
-            "auto_assign_on_status",
-            "auto_assign_on_status",
-        ),
-        (
-            "auto.codeowners-assign",
-            "auto_codeowners_assign",
-            "auto_codeowners_assign",
-        ),
-        (
-            "auto.tags-from-path",
-            "auto_tags_from_path",
-            "auto_tags_from_path",
-        ),
-        (
-            "auto.branch-infer-type",
-            "auto_branch_infer_type",
-            "auto_branch_infer_type",
-        ),
-        (
-            "auto.branch-infer-status",
-            "auto_branch_infer_status",
-            "auto_branch_infer_status",
-        ),
-        (
-            "auto.branch-infer-priority",
-            "auto_branch_infer_priority",
-            "auto_branch_infer_priority",
-        ),
+        ("scan.signal-words", "scan_signal_words", "scan_signal_words"),
+        ("scan.ticket-patterns", "scan_ticket_patterns", "scan_ticket_patterns"),
+        ("scan.enable-ticket-words", "scan_enable_ticket_words", "scan_enable_ticket_words"),
+        ("scan.enable-mentions", "scan_enable_mentions", "scan_enable_mentions"),
+        ("scan.strip-attributes", "scan_strip_attributes", "scan_strip_attributes"),
+        ("auto.populate-members", "auto_populate_members", "auto_populate_members"),
+        ("auto.set-reporter", "auto_set_reporter", "auto_set_reporter"),
+        ("auto.reciprocal-relationships", "auto_reciprocal_relationships", "auto_reciprocal_relationships"),
+        ("auto.link-mentions", "auto_link_mentions", "auto_link_mentions"),
+        ("auto.assign-on-status", "auto_assign_on_status", "auto_assign_on_status"),
+        ("auto.codeowners-assign", "auto_codeowners_assign", "auto_codeowners_assign"),
+        ("auto.tags-from-path", "auto_tags_from_path", "auto_tags_from_path"),
+        ("auto.branch-infer-type", "auto_branch_infer_type", "auto_branch_infer_type"),
+        ("auto.branch-infer-status", "auto_branch_infer_status", "auto_branch_infer_status"),
+        ("auto.branch-infer-priority", "auto_branch_infer_priority", "auto_branch_infer_priority"),
         ("auto.identity", "auto_identity", "auto_identity"),
-        (
-            "auto.identity-git",
-            "auto_identity_git",
-            "auto_identity_git",
-        ),
+        ("auto.identity-git", "auto_identity_git", "auto_identity_git"),
         ("attachments.dir", "attachments_dir", "attachments_dir"),
-        (
-            "attachments.max_upload_mb",
-            "attachments_max_upload_mb",
-            "attachments_max_upload_mb",
-        ),
+        ("attachments.max_upload_mb", "attachments_max_upload_mb", "attachments_max_upload_mb"),
         ("sync.reports_dir", "sync_reports_dir", "sync_reports_dir"),
-        (
-            "sync.write_reports",
-            "sync_write_reports",
-            "sync_write_reports",
-        ),
-        (
-            "sprints.defaults.capacity_points",
-            "sprints_defaults_capacity_points",
-            "sprints_defaults_capacity_points",
-        ),
-        (
-            "sprints.defaults.capacity_hours",
-            "sprints_defaults_capacity_hours",
-            "sprints_defaults_capacity_hours",
-        ),
-        (
-            "sprints.defaults.length",
-            "sprints_defaults_length",
-            "sprints_defaults_length",
-        ),
-        (
-            "sprints.defaults.overdue_after",
-            "sprints_defaults_overdue_after",
-            "sprints_defaults_overdue_after",
-        ),
-        (
-            "sprints.notifications.enabled",
-            "sprints_notifications_enabled",
-            "sprints_notifications_enabled",
-        ),
-        (
-            "agent.context-enabled",
-            "agent_context_enabled",
-            "agent_context_enabled",
-        ),
-        (
-            "agent.context-extension",
-            "agent_context_extension",
-            "agent_context_extension",
-        ),
-        (
-            "agent.instructions",
-            "agent_instructions",
-            "agent_instructions",
-        ),
-        (
-            "agent.worktree.enabled",
-            "agent_worktree_enabled",
-            "agent_worktree_enabled",
-        ),
-        (
-            "agent.worktree.dir",
-            "agent_worktree_dir",
-            "agent_worktree_dir",
-        ),
-        (
-            "agent.worktree.branch_prefix",
-            "agent_worktree_branch_prefix",
-            "agent_worktree_branch_prefix",
-        ),
-        (
-            "agent.worktree.max_parallel_jobs",
-            "agent_worktree_max_parallel_jobs",
-            "agent_worktree_max_parallel_jobs",
-        ),
-        (
-            "agent.worktree.cleanup_on_done",
-            "agent_worktree_cleanup_on_done",
-            "agent_worktree_cleanup_on_done",
-        ),
-        (
-            "agent.worktree.cleanup_on_failure",
-            "agent_worktree_cleanup_on_failure",
-            "agent_worktree_cleanup_on_failure",
-        ),
-        (
-            "agent.worktree.cleanup_on_cancel",
-            "agent_worktree_cleanup_on_cancel",
-            "agent_worktree_cleanup_on_cancel",
-        ),
-        (
-            "agent.worktree.cleanup_delete_branches",
-            "agent_worktree_cleanup_delete_branches",
-            "agent_worktree_cleanup_delete_branches",
-        ),
-        (
-            "agent.worktree.cleanup_ignored_files",
-            "agent_worktree_cleanup_ignored_files",
-            "agent_worktree_cleanup_ignored_files",
-        ),
-        (
-            "branch.type-aliases",
-            "branch_type_aliases",
-            "branch_type_aliases",
-        ),
-        (
-            "branch.status-aliases",
-            "branch_status_aliases",
-            "branch_status_aliases",
-        ),
-        (
-            "branch.priority-aliases",
-            "branch_priority_aliases",
-            "branch_priority_aliases",
-        ),
+        ("sync.write_reports", "sync_write_reports", "sync_write_reports"),
+        ("sprints.defaults.capacity_points", "sprints_defaults_capacity_points", "sprints_defaults_capacity_points"),
+        ("sprints.defaults.capacity_hours", "sprints_defaults_capacity_hours", "sprints_defaults_capacity_hours"),
+        ("sprints.defaults.length", "sprints_defaults_length", "sprints_defaults_length"),
+        ("sprints.defaults.overdue_after", "sprints_defaults_overdue_after", "sprints_defaults_overdue_after"),
+        ("sprints.notifications.enabled", "sprints_notifications_enabled", "sprints_notifications_enabled"),
+        ("agent.context-enabled", "agent_context_enabled", "agent_context_enabled"),
+        ("agent.context-extension", "agent_context_extension", "agent_context_extension"),
+        ("agent.instructions", "agent_instructions", "agent_instructions"),
+        ("agent.worktree.enabled", "agent_worktree_enabled", "agent_worktree_enabled"),
+        ("agent.worktree.dir", "agent_worktree_dir", "agent_worktree_dir"),
+        ("agent.worktree.branch_prefix", "agent_worktree_branch_prefix", "agent_worktree_branch_prefix"),
+        ("agent.worktree.max_parallel_jobs", "agent_worktree_max_parallel_jobs", "agent_worktree_max_parallel_jobs"),
+        ("agent.worktree.cleanup_on_done", "agent_worktree_cleanup_on_done", "agent_worktree_cleanup_on_done"),
+        ("agent.worktree.cleanup_on_failure", "agent_worktree_cleanup_on_failure", "agent_worktree_cleanup_on_failure"),
+        ("agent.worktree.cleanup_on_cancel", "agent_worktree_cleanup_on_cancel", "agent_worktree_cleanup_on_cancel"),
+        ("agent.worktree.cleanup_delete_branches", "agent_worktree_cleanup_delete_branches", "agent_worktree_cleanup_delete_branches"),
+        ("agent.worktree.cleanup_ignored_files", "agent_worktree_cleanup_ignored_files", "agent_worktree_cleanup_ignored_files"),
+        ("branch.type-aliases", "branch_type_aliases", "branch_type_aliases"),
+        ("branch.status-aliases", "branch_status_aliases", "branch_status_aliases"),
+        ("branch.priority-aliases", "branch_priority_aliases", "branch_priority_aliases"),
     ];
 
     fn set<'a>(items: impl IntoIterator<Item = &'a str>) -> BTreeSet<&'a str> {
@@ -821,15 +456,8 @@ mod tests {
     #[test]
     fn project_settable_fields_match_legacy_list() {
         let derived = settable_fields(false);
-        assert_eq!(
-            derived.len(),
-            LEGACY_PROJECT.len(),
-            "no duplicates or extras"
-        );
-        assert_eq!(
-            set(derived.iter().copied()),
-            set(LEGACY_PROJECT.iter().copied())
-        );
+        assert_eq!(derived.len(), LEGACY_PROJECT.len(), "no duplicates or extras");
+        assert_eq!(set(derived.iter().copied()), set(LEGACY_PROJECT.iter().copied()));
     }
 
     #[test]
@@ -854,21 +482,14 @@ mod tests {
 
     #[test]
     fn source_entries_match_legacy_table() {
-        let derived: BTreeSet<(&str, &str, &str)> = CONFIG_FIELDS
-            .iter()
-            .filter_map(|meta| meta.source.map(|(path, label)| (path, label, meta.flat)))
-            .collect();
+        let derived: BTreeSet<(&str, &str, &str)> = CONFIG_FIELDS.iter().filter_map(|meta| meta.source.map(|(path, label)| (path, label, meta.flat))).collect();
         let expected: BTreeSet<_> = LEGACY_SOURCE_ENTRIES.iter().copied().collect();
         assert_eq!(derived, expected);
     }
 
     #[test]
     fn validation_flags_match_legacy_sets() {
-        let resolved: BTreeSet<_> = CONFIG_FIELDS
-            .iter()
-            .filter(|meta| meta.resolved_relevant)
-            .map(|meta| meta.flat)
-            .collect();
+        let resolved: BTreeSet<_> = CONFIG_FIELDS.iter().filter(|meta| meta.resolved_relevant).map(|meta| meta.flat).collect();
         assert_eq!(
             resolved,
             set([
@@ -887,15 +508,8 @@ mod tests {
                 "branch_priority_aliases",
             ])
         );
-        let conflicts: BTreeSet<_> = CONFIG_FIELDS
-            .iter()
-            .filter(|meta| meta.task_conflict)
-            .map(|meta| meta.flat)
-            .collect();
-        assert_eq!(
-            conflicts,
-            set(["issue_states", "issue_types", "issue_priorities"])
-        );
+        let conflicts: BTreeSet<_> = CONFIG_FIELDS.iter().filter(|meta| meta.task_conflict).map(|meta| meta.flat).collect();
+        assert_eq!(conflicts, set(["issue_states", "issue_types", "issue_priorities"]));
     }
 
     #[test]
@@ -906,26 +520,14 @@ mod tests {
                 for name in std::iter::once(meta.flat).chain(meta.aliases.iter().copied()) {
                     let result = canonicalize_field_name(name, is_global);
                     if allowed {
-                        assert_eq!(
-                            result.ok().as_deref(),
-                            Some(meta.flat),
-                            "{name} global={is_global}"
-                        );
+                        assert_eq!(result.ok().as_deref(), Some(meta.flat), "{name} global={is_global}");
                     } else {
-                        assert!(
-                            result.is_err(),
-                            "{name} must be rejected for global={is_global}"
-                        );
+                        assert!(result.is_err(), "{name} must be rejected for global={is_global}");
                     }
                 }
             }
             let global_only = meta.global && !meta.project;
-            assert_eq!(
-                is_global_only_field_name(meta.flat).is_some(),
-                global_only,
-                "{} global-only promotion",
-                meta.flat
-            );
+            assert_eq!(is_global_only_field_name(meta.flat).is_some(), global_only, "{} global-only promotion", meta.flat);
             // Inspect label paths are display names, not accepted spellings,
             // unless they are also listed as aliases.
             if let Some((path, _)) = meta.source
@@ -954,11 +556,7 @@ mod tests {
             // Task-conflict fields are always revalidated.
             assert!(!meta.task_conflict || meta.resolved_relevant);
             // Every field is reachable somehow.
-            assert!(
-                meta.global || meta.project || !meta.aliases.is_empty() || meta.source.is_some(),
-                "{} has no role",
-                meta.flat
-            );
+            assert!(meta.global || meta.project || !meta.aliases.is_empty() || meta.source.is_some(), "{} has no role", meta.flat);
         }
     }
 }

@@ -20,10 +20,7 @@ pub enum AutomationRuleSet {
 
 impl Default for AutomationRuleSet {
     fn default() -> Self {
-        AutomationRuleSet::Rules {
-            rules: Vec::new(),
-            max_iterations: None,
-        }
+        AutomationRuleSet::Rules { rules: Vec::new(), max_iterations: None }
     }
 }
 
@@ -149,12 +146,8 @@ impl PartialEq for AutomationFieldCondition {
         // Assignee placeholders are interpreted only in scalar form by the
         // matcher. Keep their map spellings distinct rather than hiding a
         // genuine behavior change behind shorthand normalization.
-        if let (Self::Scalar(value), Self::Map(_)) | (Self::Map(_), Self::Scalar(value)) =
-            (self, other)
-            && matches!(
-                value.trim().to_ascii_lowercase().as_str(),
-                "@any" | "@agent" | "@user"
-            )
+        if let (Self::Scalar(value), Self::Map(_)) | (Self::Map(_), Self::Scalar(value)) = (self, other)
+            && matches!(value.trim().to_ascii_lowercase().as_str(), "@any" | "@agent" | "@user")
         {
             return false;
         }
@@ -165,14 +158,8 @@ impl PartialEq for AutomationFieldCondition {
 impl AutomationFieldCondition {
     pub fn as_map(&self) -> AutomationFieldConditionMap {
         match self {
-            AutomationFieldCondition::Scalar(value) => AutomationFieldConditionMap {
-                equals: Some(value.clone()),
-                ..AutomationFieldConditionMap::default()
-            },
-            AutomationFieldCondition::List(values) => AutomationFieldConditionMap {
-                any: Some(values.clone()),
-                ..AutomationFieldConditionMap::default()
-            },
+            AutomationFieldCondition::Scalar(value) => AutomationFieldConditionMap { equals: Some(value.clone()), ..AutomationFieldConditionMap::default() },
+            AutomationFieldCondition::List(values) => AutomationFieldConditionMap { any: Some(values.clone()), ..AutomationFieldConditionMap::default() },
             AutomationFieldCondition::Map(map) => *map.clone(),
         }
     }

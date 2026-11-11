@@ -34,14 +34,7 @@ impl CodeOwners {
                 matched = Some(rule);
             }
         }
-        if let Some(rule) = matched {
-            rule.owners
-                .iter()
-                .map(|o| o.trim_start_matches('@').to_string())
-                .collect()
-        } else {
-            Vec::new()
-        }
+        if let Some(rule) = matched { rule.owners.iter().map(|o| o.trim_start_matches('@').to_string()).collect() } else { Vec::new() }
     }
 
     /// The first individual owner of the catch-all rule. Team slugs
@@ -66,11 +59,7 @@ fn parse_rules(content: &str) -> Vec<Rule> {
                 continue;
             }
             let anchored = pattern.starts_with('/');
-            rules.push(Rule {
-                pattern: pattern.to_string(),
-                owners,
-                anchored,
-            });
+            rules.push(Rule { pattern: pattern.to_string(), owners, anchored });
         }
     }
     rules
@@ -148,9 +137,7 @@ docs/**  @docs
         assert_eq!(cfg.owners_for_path("docs/guide.md")[0], "docs");
         // A team slug is not an assignee (DEV-287).
         assert_eq!(cfg.default_owner(), None);
-        let mixed = CodeOwners {
-            rules: parse_rules("* @acme/platform @bob\n"),
-        };
+        let mixed = CodeOwners { rules: parse_rules("* @acme/platform @bob\n") };
         assert_eq!(mixed.default_owner().as_deref(), Some("bob"));
     }
 }

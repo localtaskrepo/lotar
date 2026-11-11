@@ -44,11 +44,10 @@ pub(super) fn register(api_server: &mut ApiServer) {
 
     api_server.register_handler("POST", "/api/automation/simulate", |req: &HttpRequest| {
         let resolver = try_response!(resolve_tasks_dir());
-        let body: crate::api_types::AutomationSimulateRequest =
-            match serde_json::from_slice(&req.body) {
-                Ok(b) => b,
-                Err(e) => return bad_request(format!("Invalid request: {}", e)),
-            };
+        let body: crate::api_types::AutomationSimulateRequest = match serde_json::from_slice(&req.body) {
+            Ok(b) => b,
+            Err(e) => return bad_request(format!("Invalid request: {}", e)),
+        };
 
         let ticket_id = body.ticket_id.trim();
         if ticket_id.is_empty() {
@@ -63,27 +62,17 @@ pub(super) fn register(api_server: &mut ApiServer) {
 
         // Load the task
         let storage = crate::storage::manager::Storage::new(&resolver.path);
-        let task_before =
-            match crate::services::task_service::TaskService::get(&storage, ticket_id, None) {
-                Ok(t) => t,
-                Err(e) => return bad_request(format!("Task not found: {}", e)),
-            };
+        let task_before = match crate::services::task_service::TaskService::get(&storage, ticket_id, None) {
+            Ok(t) => t,
+            Err(e) => return bad_request(format!("Task not found: {}", e)),
+        };
 
         // Simulate automation: the saved rules, or the rule being edited (DEV-241)
         let outcome = match body.rule.as_ref() {
-            Some(value) => {
-                match serde_json::from_value::<crate::automation::types::AutomationRule>(
-                    value.clone(),
-                ) {
-                    Ok(rule) => AutomationService::simulate_rule(
-                        resolver.path.as_path(),
-                        ticket_id,
-                        event,
-                        &rule,
-                    ),
-                    Err(e) => return bad_request(format!("Invalid rule: {}", e)),
-                }
-            }
+            Some(value) => match serde_json::from_value::<crate::automation::types::AutomationRule>(value.clone()) {
+                Ok(rule) => AutomationService::simulate_rule(resolver.path.as_path(), ticket_id, event, &rule),
+                Err(e) => return bad_request(format!("Invalid rule: {}", e)),
+            },
             None => AutomationService::simulate(resolver.path.as_path(), ticket_id, event),
         };
         match outcome {
@@ -91,10 +80,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                 let actions: Vec<crate::api_types::AutomationSimulatedAction> = result
                     .actions
                     .iter()
-                    .map(|a| crate::api_types::AutomationSimulatedAction {
-                        action: a.action.clone(),
-                        description: a.description.clone(),
-                    })
+                    .map(|a| crate::api_types::AutomationSimulatedAction { action: a.action.clone(), description: a.description.clone() })
                     .collect();
 
                 ok_json(
@@ -127,12 +113,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             }
         };
         let mut storage = crate::storage::manager::Storage::new(&resolver.path);
-        match AutomationService::run_manual(
-            &mut storage,
-            &body.rules,
-            body.query.as_deref(),
-            body.dry_run,
-        ) {
+        match AutomationService::run_manual(&mut storage, &body.rules, body.query.as_deref(), body.dry_run) {
             Ok(report) => {
                 let entries = report
                     .entries
@@ -143,10 +124,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                         actions: entry
                             .actions
                             .into_iter()
-                            .map(|a| crate::api_types::AutomationSimulatedAction {
-                                action: a.action,
-                                description: a.description,
-                            })
+                            .map(|a| crate::api_types::AutomationSimulatedAction { action: a.action, description: a.description })
                             .collect(),
                         warnings: entry.warnings,
                         error: entry.error,

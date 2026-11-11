@@ -1,15 +1,8 @@
-# Rust formatting configuration for Lotar
-# Using only stable rustfmt features for consistent code style
-
-# Basic formatting
-# Match Cargo.toml so standalone rustfmt (editors) formats like `cargo fmt`,
-# which already passes the crate's 2024 edition and style.
+# Source: standards configs/rust/rustfmt.toml. Copy it unchanged (this line lets scripts/repos.ts report drift).
+# Editors call rustfmt directly; without this it formats as edition 2015.
 edition = "2024"
-max_width = 100
-hard_tabs = false
-tab_spaces = 4
-
-# String and misc formatting
+# Wide lines: fewer tokens for agents (owner 2026-11-09, same width as TypeScript).
+max_width = 160
+# Calls, struct literals and chains use the full width too (owner 2026-11-11; lotar -3.7 percent tokens, edits flat).
+use_small_heuristics = "Max"
 newline_style = "Unix"
-remove_nested_parens = true
-use_small_heuristics = "Default"

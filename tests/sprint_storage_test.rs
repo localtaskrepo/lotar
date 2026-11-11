@@ -1,8 +1,6 @@
 use lotar::Storage;
 use lotar::services::sprint_service::SprintService;
-use lotar::storage::sprint::{
-    Sprint, SprintActual, SprintCanonicalizationWarning, SprintCapacity, SprintPlan,
-};
+use lotar::storage::sprint::{Sprint, SprintActual, SprintCanonicalizationWarning, SprintCapacity, SprintPlan};
 
 #[test]
 fn sprint_create_canonicalizes_length_when_ends_at_present() {
@@ -24,17 +22,11 @@ fn sprint_create_canonicalizes_length_when_ends_at_present() {
 
     let outcome = SprintService::create(&mut storage, sprint, None).expect("create sprint");
     assert_eq!(outcome.record.id, 1);
-    assert_eq!(
-        outcome.warnings,
-        vec![SprintCanonicalizationWarning::LengthDiscardedInFavorOfEndsAt]
-    );
+    assert_eq!(outcome.warnings, vec![SprintCanonicalizationWarning::LengthDiscardedInFavorOfEndsAt]);
     assert!(outcome.applied_defaults.is_empty());
 
     let plan = outcome.record.sprint.plan.expect("plan exists");
-    assert!(
-        plan.length.is_none(),
-        "length should be cleared when ends_at present"
-    );
+    assert!(plan.length.is_none(), "length should be cleared when ends_at present");
     assert!(plan.ends_at.is_some());
     assert_eq!(plan.notes.unwrap(), "Kickoff on Monday.");
 
@@ -54,17 +46,11 @@ fn sprint_create_and_list_trims_empty_sections() {
     let sprint = Sprint {
         plan: Some(SprintPlan {
             label: Some("Sprint 42".to_string()),
-            capacity: Some(SprintCapacity {
-                points: Some(0),
-                hours: None,
-            }),
+            capacity: Some(SprintCapacity { points: Some(0), hours: None }),
             overdue_after: Some(String::new()),
             ..SprintPlan::default()
         }),
-        actual: Some(SprintActual {
-            started_at: Some(String::new()),
-            closed_at: None,
-        }),
+        actual: Some(SprintActual { started_at: Some(String::new()), closed_at: None }),
         ..Sprint::default()
     };
 

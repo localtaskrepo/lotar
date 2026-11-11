@@ -1,6 +1,4 @@
-use crate::types::{
-    CustomFields, Priority, ReferenceEntry, TaskComment, TaskRelationships, TaskStatus, TaskType,
-};
+use crate::types::{CustomFields, Priority, ReferenceEntry, TaskComment, TaskRelationships, TaskStatus, TaskType};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fmt;
@@ -15,12 +13,7 @@ pub struct Task {
     pub status: TaskStatus,
     #[serde(skip_serializing_if = "Priority::is_empty", default)]
     pub priority: Priority,
-    #[serde(
-        rename = "type",
-        alias = "task_type",
-        skip_serializing_if = "TaskType::is_empty",
-        default
-    )]
+    #[serde(rename = "type", alias = "task_type", skip_serializing_if = "TaskType::is_empty", default)]
     pub task_type: TaskType,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub reporter: Option<String>,
@@ -120,10 +113,7 @@ fn is_builtin_key(key: &str) -> bool {
     )
 }
 
-fn serialize_extra_fields<S: serde::Serializer>(
-    fields: &BTreeMap<String, serde_yaml_ng::Value>,
-    serializer: S,
-) -> Result<S::Ok, S::Error> {
+fn serialize_extra_fields<S: serde::Serializer>(fields: &BTreeMap<String, serde_yaml_ng::Value>, serializer: S) -> Result<S::Ok, S::Error> {
     use serde::ser::SerializeMap;
     let mut map = serializer.serialize_map(None)?;
     for (key, value) in fields {
@@ -138,12 +128,7 @@ fn serialize_extra_fields<S: serde::Serializer>(
 
 impl Task {
     pub fn new(_root_path: PathBuf, title: String, priority: Priority) -> Self {
-        Self {
-            title,
-            priority,
-            created: chrono::Utc::now().to_rfc3339(),
-            ..Self::default()
-        }
+        Self { title, priority, created: chrono::Utc::now().to_rfc3339(), ..Self::default() }
     }
 }
 
@@ -152,15 +137,7 @@ impl fmt::Display for Task {
         write!(
             f,
             "title: {}\nstatus: {}\nsubtitle: {:?}\ndescription: {:?}\npriority: {}\ncreated: {}\nmodified: {}\ndue_date: {:?}\ntags: {:?}",
-            self.title,
-            self.status,
-            self.subtitle,
-            self.description,
-            self.priority,
-            self.created,
-            self.modified,
-            self.due_date,
-            self.tags
+            self.title, self.status, self.subtitle, self.description, self.priority, self.created, self.modified, self.due_date, self.tags
         )
     }
 }
@@ -231,9 +208,7 @@ pub const MISSING_CREATED: &str = "1970-01-01T00:00:00Z";
 pub fn parse_task_file_tolerant(path: &std::path::Path, content: &str) -> Option<Task> {
     let mut task = parse_task_yaml_tolerant(content)?;
     if task.created == MISSING_CREATED
-        && let Some(modified) = std::fs::metadata(path)
-            .ok()
-            .and_then(|meta| meta.modified().ok())
+        && let Some(modified) = std::fs::metadata(path).ok().and_then(|meta| meta.modified().ok())
     {
         task.created = chrono::DateTime::<chrono::Utc>::from(modified).to_rfc3339();
     }
@@ -248,9 +223,7 @@ pub fn parse_task_yaml_tolerant(content: &str) -> Option<Task> {
     let mut v: serde_yaml_ng::Value = serde_yaml_ng::from_str(content).ok()?;
     let mapping = v.as_mapping_mut()?;
     for (key, default) in [("title", ""), ("created", MISSING_CREATED)] {
-        mapping
-            .entry(serde_yaml_ng::Value::String(key.into()))
-            .or_insert_with(|| serde_yaml_ng::Value::String(default.into()));
+        mapping.entry(serde_yaml_ng::Value::String(key.into())).or_insert_with(|| serde_yaml_ng::Value::String(default.into()));
     }
     for key in ["status", "priority", "type", "task_type"] {
         let Some(value) = mapping.get_mut(serde_yaml_ng::Value::String(key.into())) else {
@@ -275,7 +248,8 @@ pub fn parse_task_yaml_tolerant(content: &str) -> Option<Task> {
 mod tests {
     use super::*;
 
-    const EXTENSIONS: &str = "x_text: '001'\nx_number: 42\nx_bool: true\nx_null: null\nx_list: [one, 2, false]\nx_nested: {inner: {values: [null, 3.5, text]}}\n";
+    const EXTENSIONS: &str =
+        "x_text: '001'\nx_number: 42\nx_bool: true\nx_null: null\nx_list: [one, 2, false]\nx_nested: {inner: {values: [null, 3.5, text]}}\n";
 
     #[test]
     fn yaml_extensions_roundtrip_semantically_with_typed_edits() {
@@ -283,8 +257,7 @@ mod tests {
         let mut task: Task = serde_yaml_ng::from_str(&input).unwrap();
         assert_eq!(task.extra_fields.len(), 6);
         task.title = "After".into();
-        let output: serde_yaml_ng::Value =
-            serde_yaml_ng::from_str(&serde_yaml_ng::to_string(&task).unwrap()).unwrap();
+        let output: serde_yaml_ng::Value = serde_yaml_ng::from_str(&serde_yaml_ng::to_string(&task).unwrap()).unwrap();
         let expected: serde_yaml_ng::Value = serde_yaml_ng::from_str(EXTENSIONS).unwrap();
         for (key, value) in expected.as_mapping().unwrap() {
             assert_eq!(output.get(key), Some(value));
@@ -305,8 +278,7 @@ mod tests {
         assert_eq!(task.references.len(), 1);
         assert_eq!(task.sprints, vec![3]);
         assert_eq!(task.acceptance_criteria, vec!["Keep"]);
-        let output: Task =
-            serde_yaml_ng::from_str(&serde_yaml_ng::to_string(&task).unwrap()).unwrap();
+        let output: Task = serde_yaml_ng::from_str(&serde_yaml_ng::to_string(&task).unwrap()).unwrap();
         assert_eq!(output.extra_fields, task.extra_fields);
         assert_eq!(output.comments.len(), 1);
         assert!(!output.relationships.is_empty());
@@ -315,20 +287,9 @@ mod tests {
 
     #[test]
     fn extensions_cannot_shadow_builtin_fields_or_aliases() {
-        let mut task = Task {
-            title: "Authoritative".into(),
-            ..Task::default()
-        };
-        for key in [
-            "title",
-            "status",
-            "type",
-            "task_type",
-            "comments",
-            "custom_fields",
-        ] {
-            task.extra_fields
-                .insert(key.into(), serde_yaml_ng::Value::String("shadow".into()));
+        let mut task = Task { title: "Authoritative".into(), ..Task::default() };
+        for key in ["title", "status", "type", "task_type", "comments", "custom_fields"] {
+            task.extra_fields.insert(key.into(), serde_yaml_ng::Value::String("shadow".into()));
         }
         let output = serde_yaml_ng::to_string(&task).unwrap();
         let parsed: Task = serde_yaml_ng::from_str(&output).unwrap();
@@ -340,13 +301,8 @@ mod tests {
 
     #[test]
     fn malformed_structured_values_are_not_silently_dropped() {
-        assert!(
-            parse_task_yaml_tolerant("title: Legacy\ncomments: not-a-list\nx_keep: true\n")
-                .is_none()
-        );
-        assert!(
-            parse_task_yaml_tolerant("title: Legacy\ntags: [valid, {invalid: tag}]\n").is_none()
-        );
+        assert!(parse_task_yaml_tolerant("title: Legacy\ncomments: not-a-list\nx_keep: true\n").is_none());
+        assert!(parse_task_yaml_tolerant("title: Legacy\ntags: [valid, {invalid: tag}]\n").is_none());
         assert!(parse_task_yaml_tolerant("[]").is_none());
         let legacy = parse_task_yaml_tolerant("title: Legacy\ntask_type: bug\n").unwrap();
         assert!(legacy.extra_fields.is_empty());

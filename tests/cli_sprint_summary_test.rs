@@ -31,10 +31,7 @@ issue.priorities: [Low, Medium, High]
             label: Some("Sprint A".to_string()),
             goal: Some("Deliver feature".to_string()),
             length: Some("1w".to_string()),
-            capacity: Some(SprintCapacity {
-                points: Some(20),
-                hours: Some(40),
-            }),
+            capacity: Some(SprintCapacity { points: Some(20), hours: Some(40) }),
             ..SprintPlan::default()
         }),
         ..Sprint::default()
@@ -45,10 +42,7 @@ issue.priorities: [Low, Medium, High]
     let sprint_id_arg = sprint_id.to_string();
 
     let mut sprint_doc = created.record.sprint;
-    sprint_doc.actual = Some(SprintActual {
-        started_at: Some("2025-10-01T09:00:00Z".to_string()),
-        ..SprintActual::default()
-    });
+    sprint_doc.actual = Some(SprintActual { started_at: Some("2025-10-01T09:00:00Z".to_string()), ..SprintActual::default() });
     SprintService::update(&mut storage, sprint_id, sprint_doc).expect("set sprint actuals");
 
     let feature = TaskService::create(
@@ -76,12 +70,7 @@ issue.priorities: [Low, Medium, High]
     TaskService::update(
         &mut storage,
         &feature.id,
-        TaskUpdate {
-            status: Some("Done".to_string()),
-            effort: Some("5pt".to_string()),
-            sprints: Some(vec![sprint_id]),
-            ..TaskUpdate::default()
-        },
+        TaskUpdate { status: Some("Done".to_string()), effort: Some("5pt".to_string()), sprints: Some(vec![sprint_id]), ..TaskUpdate::default() },
     )
     .expect("update feature task");
 
@@ -126,34 +115,18 @@ issue.priorities: [Low, Medium, High]
     cmd.args(["sprint", "summary", sprint_id_arg.as_str()])
         .assert()
         .success()
-        .stdout(predicate::str::contains(format!(
-            "Sprint summary for #{sprint_id} (Sprint A)."
-        )))
+        .stdout(predicate::str::contains(format!("Sprint summary for #{sprint_id} (Sprint A).")))
         .stdout(predicate::str::contains("Goal: Deliver feature"))
         .stdout(predicate::str::contains("Progress: 2 committed"))
         .stdout(predicate::str::contains("Status highlights:"))
         .stdout(predicate::str::contains(&blocker_id))
         .stdout(predicate::str::contains("Points: 5"))
         .stdout(predicate::str::contains("Hours: 4"))
-        .stderr(predicate::str::contains(
-            "blocked task(s) require attention",
-        ))
+        .stderr(predicate::str::contains("blocked task(s) require attention"))
         .stderr(predicate::str::contains("Overdue by"));
 
     let mut json_cmd = common::cargo_bin_in(&fixtures);
-    let output = json_cmd
-        .args([
-            "--format",
-            "json",
-            "sprint",
-            "summary",
-            sprint_id_arg.as_str(),
-        ])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
+    let output = json_cmd.args(["--format", "json", "sprint", "summary", sprint_id_arg.as_str()]).assert().success().get_output().stdout.clone();
 
     let payload: Value = serde_json::from_slice(&output).expect("parse summary json");
 

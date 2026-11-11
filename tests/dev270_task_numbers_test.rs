@@ -7,28 +7,13 @@ use crate::common;
 use common::TestFixtures;
 
 fn lotar_in(dir: &std::path::Path, args: &[&str]) -> std::process::Output {
-    common::lotar_cmd()
-        .unwrap()
-        .current_dir(dir)
-        .env("LOTAR_DEFAULT_REPORTER", "tester")
-        .args(args)
-        .output()
-        .unwrap()
+    common::lotar_cmd().unwrap().current_dir(dir).env("LOTAR_DEFAULT_REPORTER", "tester").args(args).output().unwrap()
 }
 
 fn ok(dir: &std::path::Path, args: &[&str]) -> String {
     let out = lotar_in(dir, args);
-    assert!(
-        out.status.success(),
-        "{args:?}: {}{}",
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr)
-    );
-    format!(
-        "{}{}",
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr)
-    )
+    assert!(out.status.success(), "{args:?}: {}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
+    format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr))
 }
 
 #[test]
@@ -49,11 +34,7 @@ fn hard_delete_drops_sprint_memberships_and_warns_about_reuse() {
     ok(root, &["add", "brand new", "-p", "HD"]);
     let shown = ok(root, &["show", "HD-3", "--format", "json"]);
     let value: serde_json::Value = serde_json::from_str(shown.trim()).unwrap();
-    let sprints = value["task"]["sprints"]
-        .as_array()
-        .or_else(|| value["sprints"].as_array())
-        .cloned()
-        .unwrap_or_default();
+    let sprints = value["task"]["sprints"].as_array().or_else(|| value["sprints"].as_array()).cloned().unwrap_or_default();
     assert!(sprints.is_empty(), "{shown}");
 }
 
@@ -64,10 +45,7 @@ fn nested_workspaces_sharing_a_prefix_get_distinct_ids() {
     ok(root, &["add", "root task", "-p", "DEV"]);
     let pkg = root.join("pkg");
     std::fs::create_dir_all(pkg.join(".tasks")).unwrap();
-    let out = ok(
-        &pkg,
-        &["--tasks-dir", ".tasks", "add", "pkg task", "-p", "DEV"],
-    );
+    let out = ok(&pkg, &["--tasks-dir", ".tasks", "add", "pkg task", "-p", "DEV"]);
     assert!(out.contains("DEV-2"), "{out}");
     let out = ok(root, &["add", "root again", "-p", "DEV"]);
     assert!(out.contains("DEV-3"), "{out}");
@@ -86,11 +64,7 @@ fn renumber_resolves_a_number_stored_twice() {
     let copy = root.join(".tasks/DUP/merged/1.yml");
     std::fs::create_dir_all(copy.parent().unwrap()).unwrap();
     let original = std::fs::read_to_string(root.join(".tasks/DUP/1.yml")).unwrap();
-    std::fs::write(
-        &copy,
-        original.replace("title: first", "title: their first"),
-    )
-    .unwrap();
+    std::fs::write(&copy, original.replace("title: first", "title: their first")).unwrap();
 
     // A single copy is not renumbered; a duplicate needs --file.
     let single = lotar_in(root, &["task", "renumber", "DUP-2"]);
@@ -100,40 +74,18 @@ fn renumber_resolves_a_number_stored_twice() {
     assert!(!unnamed.status.success());
     assert!(String::from_utf8_lossy(&unnamed.stderr).contains("--file"));
 
-    let preview = ok(
-        root,
-        &[
-            "task",
-            "renumber",
-            "DUP-1",
-            "--file",
-            ".tasks/DUP/merged/1.yml",
-            "-n",
-        ],
-    );
+    let preview = ok(root, &["task", "renumber", "DUP-1", "--file", ".tasks/DUP/merged/1.yml", "-n"]);
     assert!(preview.contains("DUP-3"), "{preview}");
     assert!(copy.exists());
 
-    ok(
-        root,
-        &[
-            "task",
-            "renumber",
-            "DUP-1",
-            "--file",
-            ".tasks/DUP/merged/1.yml",
-        ],
-    );
+    ok(root, &["task", "renumber", "DUP-1", "--file", ".tasks/DUP/merged/1.yml"]);
     assert!(!copy.exists());
     let renumbered = std::fs::read_to_string(root.join(".tasks/DUP/merged/3.yml")).unwrap();
     assert!(renumbered.contains("their first"), "{renumbered}");
     assert!(renumbered.contains("renumbered"), "{renumbered}");
 
     let shown = ok(root, &["show", "DUP-1"]);
-    assert!(
-        shown.contains("first") && !shown.contains("their first"),
-        "{shown}"
-    );
+    assert!(shown.contains("first") && !shown.contains("their first"), "{shown}");
     ok(root, &["status", "DUP-1", "InProgress"]);
     let shown = ok(root, &["show", "DUP-3"]);
     assert!(shown.contains("their first"), "{shown}");

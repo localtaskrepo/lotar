@@ -15,10 +15,7 @@ fn project_and_task_paths(root: &std::path::Path) -> (String, std::path::PathBuf
         .filter(|name| !name.starts_with('@') && !name.starts_with('.'))
         .collect::<Vec<_>>();
     projects.sort();
-    assert!(
-        !projects.is_empty(),
-        "expected a project folder under .tasks"
-    );
+    assert!(!projects.is_empty(), "expected a project folder under .tasks");
     let project = projects[0].clone();
     let task_file = tasks_dir.join(&project).join("1.yml");
     (project, task_file)
@@ -31,11 +28,7 @@ fn reanchor_runs_even_when_no_todos_found() {
 
     // Create task
     let mut add = crate::common::lotar_cmd().unwrap();
-    add.current_dir(root)
-        .arg("add")
-        .arg("Task")
-        .assert()
-        .success();
+    add.current_dir(root).arg("add").arg("Task").assert().success();
     let (project, task_file) = project_and_task_paths(root);
     let id = format!("{project}-1");
 
@@ -45,10 +38,7 @@ fn reanchor_runs_even_when_no_todos_found() {
     let mut scan = crate::common::lotar_cmd().unwrap();
     scan.current_dir(root).arg("scan").assert().success();
     let yaml = fs::read_to_string(&task_file).unwrap();
-    assert!(
-        yaml.contains("code: file.rs#1"),
-        "expected initial anchor at L1"
-    );
+    assert!(yaml.contains("code: file.rs#1"), "expected initial anchor at L1");
 
     // Move line down and remove signal word, keeping only the key marker
     fs::write(&src, format!("\n// do it ({id})\n")).unwrap();
@@ -58,8 +48,5 @@ fn reanchor_runs_even_when_no_todos_found() {
     scan2.current_dir(root).arg("scan").assert().success();
 
     let yaml2 = fs::read_to_string(&task_file).unwrap();
-    assert!(
-        yaml2.contains("code: file.rs#2"),
-        "expected anchor updated to L2 after move without TODO"
-    );
+    assert!(yaml2.contains("code: file.rs#2"), "expected anchor updated to L2 after move without TODO");
 }

@@ -31,27 +31,17 @@ impl TaskFilterSource for crate::api_types::TaskDTO {
 /// task. Single source of truth for REST unknown-key filters, CLI search,
 /// sprint selection, and stats grouping so `@`- and `field:`-handling cannot
 /// drift between surfaces.
-pub fn resolve_task_filter_values<T: TaskFilterSource>(
-    id: &str,
-    task: &T,
-    key: &str,
-    config: &ResolvedConfig,
-) -> Option<Vec<String>> {
+pub fn resolve_task_filter_values<T: TaskFilterSource>(id: &str, task: &T, key: &str, config: &ResolvedConfig) -> Option<Vec<String>> {
     let raw = key.trim();
 
     if let Some(canonical) = crate::utils::fields::is_reserved_field(raw) {
         if canonical == "project" {
-            return Some(vec![
-                crate::storage::TaskId::parse(id)
-                    .map(|parsed| parsed.project)
-                    .unwrap_or_default(),
-            ]);
+            return Some(vec![crate::storage::TaskId::parse(id).map(|parsed| parsed.project).unwrap_or_default()]);
         }
         return task.reserved_field_values(canonical);
     }
 
-    resolve_filter_name(raw, config)
-        .and_then(|name| extract_value_strings(task.custom_fields(), &name))
+    resolve_filter_name(raw, config).and_then(|name| extract_value_strings(task.custom_fields(), &name))
 }
 
 /// Determine whether a `--where` key targets a custom field and return the
@@ -77,11 +67,7 @@ pub fn resolve_filter_name(raw_key: &str, config: &ResolvedConfig) -> Option<Str
     if config.custom_fields.has_wildcard()
         || trimmed.eq_ignore_ascii_case(crate::services::finding_service::FINDING_FIELD)
         || trimmed.eq_ignore_ascii_case(crate::services::finding_service::FINDING_SEEN_FIELD)
-        || config
-            .custom_fields
-            .values
-            .iter()
-            .any(|value| value.eq_ignore_ascii_case(trimmed))
+        || config.custom_fields.values.iter().any(|value| value.eq_ignore_ascii_case(trimmed))
     {
         return Some(trimmed.to_string());
     }
@@ -97,10 +83,7 @@ pub fn extract_value_strings(fields: &CustomFields, name: &str) -> Option<Vec<St
     }
 
     let target = name.to_ascii_lowercase();
-    fields
-        .iter()
-        .find(|(key, _)| key.to_ascii_lowercase() == target)
-        .map(|(_, value)| vec![custom_value_to_string(value)])
+    fields.iter().find(|(key, _)| key.to_ascii_lowercase() == target).map(|(_, value)| vec![custom_value_to_string(value)])
 }
 
 /// Canonicalize a custom field key for set membership checks.
@@ -115,36 +98,23 @@ mod tests {
     use crate::types::{CustomFields, custom_value_string};
 
     fn config_with_fields(names: &[&str]) -> ResolvedConfig {
-        let global = GlobalConfig {
-            custom_fields: StringConfigField {
-                values: names.iter().map(|value| value.to_string()).collect(),
-            },
-            ..GlobalConfig::default()
-        };
+        let global =
+            GlobalConfig { custom_fields: StringConfigField { values: names.iter().map(|value| value.to_string()).collect() }, ..GlobalConfig::default() };
         ResolvedConfig::from_global(global)
     }
 
     #[test]
     fn resolve_filter_name_accepts_prefix_and_declared_fields() {
         let config = config_with_fields(&["sprint", "release"]);
-        assert_eq!(
-            resolve_filter_name("field:sprint", &config),
-            Some("sprint".into())
-        );
-        assert_eq!(
-            resolve_filter_name("release", &config),
-            Some("release".into())
-        );
+        assert_eq!(resolve_filter_name("field:sprint", &config), Some("sprint".into()));
+        assert_eq!(resolve_filter_name("release", &config), Some("release".into()));
         assert_eq!(resolve_filter_name("  ", &config), None);
     }
 
     #[test]
     fn resolve_filter_name_uses_wildcard_when_allowed() {
         let config = config_with_fields(&["*"]);
-        assert_eq!(
-            resolve_filter_name("unknown", &config),
-            Some("unknown".into())
-        );
+        assert_eq!(resolve_filter_name("unknown", &config), Some("unknown".into()));
     }
 
     #[test]

@@ -21,22 +21,15 @@ impl SyncReportService {
     pub fn compute_reports_root(tasks_dir: &Path, config: &ResolvedConfig) -> LoTaRResult<PathBuf> {
         let raw = config.sync_reports_dir.trim();
         if raw.is_empty() {
-            return Err(LoTaRError::ValidationError(
-                "sync_reports_dir cannot be empty".to_string(),
-            ));
+            return Err(LoTaRError::ValidationError("sync_reports_dir cannot be empty".to_string()));
         }
 
         let configured = Path::new(raw);
         let root = if configured.is_absolute() {
             configured.to_path_buf()
         } else {
-            if configured
-                .components()
-                .any(|c| matches!(c, Component::ParentDir))
-            {
-                return Err(LoTaRError::ValidationError(
-                    "sync_reports_dir cannot contain '..'".to_string(),
-                ));
+            if configured.components().any(|c| matches!(c, Component::ParentDir)) {
+                return Err(LoTaRError::ValidationError("sync_reports_dir cannot contain '..'".to_string()));
             }
             tasks_dir.join(configured)
         };
@@ -49,32 +42,17 @@ impl SyncReportService {
         Ok(root)
     }
 
-    pub fn write_report(
-        tasks_dir: &Path,
-        config: &ResolvedConfig,
-        report: &SyncReport,
-        write_enabled: bool,
-    ) -> LoTaRResult<Option<String>> {
+    pub fn write_report(tasks_dir: &Path, config: &ResolvedConfig, report: &SyncReport, write_enabled: bool) -> LoTaRResult<Option<String>> {
         if !write_enabled {
             return Ok(None);
         }
 
         let root = Self::resolve_reports_root(tasks_dir, config)?;
-        let payload = serde_yaml_ng::to_string(report).map_err(|err| {
-            LoTaRError::SerializationError(format!("Failed to serialize sync report: {}", err))
-        })?;
+        let payload = serde_yaml_ng::to_string(report).map_err(|err| LoTaRError::SerializationError(format!("Failed to serialize sync report: {}", err)))?;
         let filename = build_report_filename(report);
         for suffix in 0u64.. {
-            let candidate = if suffix == 0 {
-                filename.clone()
-            } else {
-                format!("{}-{suffix}.yml", filename.trim_end_matches(".yml"))
-            };
-            let mut file = match fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(root.join(&candidate))
-            {
+            let candidate = if suffix == 0 { filename.clone() } else { format!("{}-{suffix}.yml", filename.trim_end_matches(".yml")) };
+            let mut file = match fs::OpenOptions::new().write(true).create_new(true).open(root.join(&candidate)) {
                 Ok(file) => file,
                 Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => continue,
                 Err(err) => return Err(err.into()),
@@ -86,23 +64,11 @@ impl SyncReportService {
         unreachable!("report filename suffix exhausted")
     }
 
-    #[expect(
-        clippy::needless_pass_by_value,
-        reason = "the caller hands this value over and does not use it afterwards"
-    )]
-    pub fn list_reports(
-        tasks_dir: &Path,
-        config: &ResolvedConfig,
-        filter: SyncReportListFilter,
-    ) -> LoTaRResult<SyncReportListResponse> {
+    #[expect(clippy::needless_pass_by_value, reason = "the caller hands this value over and does not use it afterwards")]
+    pub fn list_reports(tasks_dir: &Path, config: &ResolvedConfig, filter: SyncReportListFilter) -> LoTaRResult<SyncReportListResponse> {
         let root = Self::compute_reports_root(tasks_dir, config)?;
         if !root.exists() {
-            return Ok(SyncReportListResponse {
-                total: 0,
-                limit: filter.limit,
-                offset: filter.offset,
-                reports: Vec::new(),
-            });
+            return Ok(SyncReportListResponse { total: 0, limit: filter.limit, offset: filter.offset, reports: Vec::new() });
         }
 
         let mut reports = Vec::new();
@@ -132,10 +98,7 @@ impl SyncReportService {
             {
                 continue;
             }
-            let stored_path = path
-                .file_name()
-                .and_then(|s| s.to_str())
-                .map(|s| s.to_string());
+            let stored_path = path.file_name().and_then(|s| s.to_str()).map(|s| s.to_string());
             reports.push(report_to_meta(&report, stored_path));
         }
 
@@ -144,65 +107,37 @@ impl SyncReportService {
         let total = reports.len();
         let start = filter.offset.min(total);
         let end = start.saturating_add(filter.limit).min(total);
-        let page = if start >= end {
-            Vec::new()
-        } else {
-            reports[start..end].to_vec()
-        };
+        let page = if start >= end { Vec::new() } else { reports[start..end].to_vec() };
 
-        Ok(SyncReportListResponse {
-            total,
-            limit: filter.limit,
-            offset: filter.offset,
-            reports: page,
-        })
+        Ok(SyncReportListResponse { total, limit: filter.limit, offset: filter.offset, reports: page })
     }
 
-    pub fn read_report(
-        tasks_dir: &Path,
-        config: &ResolvedConfig,
-        rel_path: &str,
-    ) -> LoTaRResult<SyncReport> {
+    pub fn read_report(tasks_dir: &Path, config: &ResolvedConfig, rel_path: &str) -> LoTaRResult<SyncReport> {
         let root = Self::compute_reports_root(tasks_dir, config)?;
         let path = resolve_report_path(&root, rel_path)?;
         let payload = fs::read_to_string(&path)?;
-        parse_report_payload(&payload).map_err(|err| {
-            LoTaRError::SerializationError(format!("Invalid report content: {}", err))
-        })
+        parse_report_payload(&payload).map_err(|err| LoTaRError::SerializationError(format!("Invalid report content: {}", err)))
     }
 }
 
 fn resolve_report_path(root: &Path, rel: &str) -> LoTaRResult<PathBuf> {
     let trimmed = rel.trim();
     if trimmed.is_empty() {
-        return Err(LoTaRError::ValidationError(
-            "Missing report path".to_string(),
-        ));
+        return Err(LoTaRError::ValidationError("Missing report path".to_string()));
     }
     let rel_path = Path::new(trimmed);
     if rel_path.is_absolute() {
-        return Err(LoTaRError::ValidationError(
-            "Invalid report path".to_string(),
-        ));
+        return Err(LoTaRError::ValidationError("Invalid report path".to_string()));
     }
-    if rel_path
-        .components()
-        .any(|c| matches!(c, Component::ParentDir))
-    {
-        return Err(LoTaRError::ValidationError(
-            "Invalid report path".to_string(),
-        ));
+    if rel_path.components().any(|c| matches!(c, Component::ParentDir)) {
+        return Err(LoTaRError::ValidationError("Invalid report path".to_string()));
     }
 
-    let root_canon = fs::canonicalize(root)
-        .map_err(|e| LoTaRError::ValidationError(format!("Invalid reports root: {}", e)))?;
+    let root_canon = fs::canonicalize(root).map_err(|e| LoTaRError::ValidationError(format!("Invalid reports root: {}", e)))?;
     let joined = root.join(rel_path);
-    let joined_canon = fs::canonicalize(&joined)
-        .map_err(|_| LoTaRError::ValidationError("Report not found".to_string()))?;
+    let joined_canon = fs::canonicalize(&joined).map_err(|_| LoTaRError::ValidationError("Report not found".to_string()))?;
     if !joined_canon.starts_with(&root_canon) {
-        return Err(LoTaRError::ValidationError(
-            "Invalid report path".to_string(),
-        ));
+        return Err(LoTaRError::ValidationError("Invalid report path".to_string()));
     }
     Ok(joined_canon)
 }
@@ -238,16 +173,8 @@ fn sanitize_component(input: &str, max_len: usize) -> String {
         }
     }
     let cleaned = out.trim_matches('-').trim_matches('.').to_string();
-    let trimmed = if cleaned.is_empty() {
-        "sync".to_string()
-    } else {
-        cleaned
-    };
-    if trimmed.chars().count() <= max_len {
-        trimmed
-    } else {
-        trimmed.chars().take(max_len).collect()
-    }
+    let trimmed = if cleaned.is_empty() { "sync".to_string() } else { cleaned };
+    if trimmed.chars().count() <= max_len { trimmed } else { trimmed.chars().take(max_len).collect() }
 }
 
 fn report_to_meta(report: &SyncReport, stored_path: Option<String>) -> SyncReportMeta {
@@ -269,11 +196,7 @@ fn report_to_meta(report: &SyncReport, stored_path: Option<String>) -> SyncRepor
 }
 
 fn sort_report_meta(a: &SyncReportMeta, b: &SyncReportMeta) -> std::cmp::Ordering {
-    let parse = |value: &str| {
-        DateTime::parse_from_rfc3339(value)
-            .ok()
-            .map(|dt| dt.with_timezone(&Utc))
-    };
+    let parse = |value: &str| DateTime::parse_from_rfc3339(value).ok().map(|dt| dt.with_timezone(&Utc));
     let a_time = parse(&a.created_at);
     let b_time = parse(&b.created_at);
     match (a_time, b_time) {

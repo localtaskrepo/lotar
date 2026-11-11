@@ -12,11 +12,7 @@ fn probe_reports_missing_git_binary() {
     let missing = dir.path().join("git");
     let probe = common::probe_git_with_binary(Some(&missing));
     assert!(!probe.available);
-    assert!(
-        probe.reason.contains("git"),
-        "reason should mention git: {}",
-        probe.reason
-    );
+    assert!(probe.reason.contains("git"), "reason should mention git: {}", probe.reason);
 }
 
 #[test]
@@ -26,10 +22,7 @@ fn probe_verdict_is_deterministic_and_cached() {
     assert_eq!(common::git_available(), cached.available);
     assert_eq!(fresh.available, cached.available);
     if !cached.available {
-        assert!(
-            !fresh.reason.is_empty(),
-            "unavailable verdicts carry a reason"
-        );
+        assert!(!fresh.reason.is_empty(), "unavailable verdicts carry a reason");
     }
 }
 
@@ -40,11 +33,7 @@ fn require_git_fails_closed_when_the_probe_fails() {
         common::require_git();
     } else {
         let panicked = std::panic::catch_unwind(common::require_git).is_err();
-        assert!(
-            panicked,
-            "require_git must fail closed when the probe fails, reason: {}",
-            probe.reason
-        );
+        assert!(panicked, "require_git must fail closed when the probe fails, reason: {}", probe.reason);
     }
 }
 
@@ -68,11 +57,7 @@ mod fake_git_probes {
         let (_dir, git) = write_fake_git("#!/bin/sh\nexit 0\n");
         let probe = super::common::probe_git_with_binary(Some(&git));
         assert!(!probe.available);
-        assert!(
-            probe.reason.contains(".git"),
-            "reason should mention the missing artifact: {}",
-            probe.reason
-        );
+        assert!(probe.reason.contains(".git"), "reason should mention the missing artifact: {}", probe.reason);
     }
 
     #[test]
@@ -80,11 +65,7 @@ mod fake_git_probes {
         let (_dir, git) = write_fake_git("#!/bin/sh\necho probe-boom >&2\nexit 3\n");
         let probe = super::common::probe_git_with_binary(Some(&git));
         assert!(!probe.available);
-        assert!(
-            probe.reason.contains("probe-boom"),
-            "reason should surface stderr: {}",
-            probe.reason
-        );
+        assert!(probe.reason.contains("probe-boom"), "reason should surface stderr: {}", probe.reason);
     }
 
     /// The probe child must run with a fresh environment: routing variables
@@ -95,16 +76,11 @@ mod fake_git_probes {
     fn probe_child_environment_has_no_inherited_git_routing() {
         use super::common::env_mutex::EnvVarGuard;
         let outside = tempfile::tempdir().unwrap();
-        let _guard_dir =
-            EnvVarGuard::set("GIT_DIR", outside.path().join("escaped").to_str().unwrap());
-        let _guard_lower = EnvVarGuard::set(
-            "git_dir",
-            outside.path().join("escaped-lower").to_str().unwrap(),
-        );
+        let _guard_dir = EnvVarGuard::set("GIT_DIR", outside.path().join("escaped").to_str().unwrap());
+        let _guard_lower = EnvVarGuard::set("git_dir", outside.path().join("escaped-lower").to_str().unwrap());
         let _guard_worktree = EnvVarGuard::set("GIT_WORK_TREE", outside.path().to_str().unwrap());
 
-        let (_dir, git) =
-            write_fake_git("#!/bin/sh\nenv > probe-env-capture.txt\nmkdir -p repo/.git\nexit 0\n");
+        let (_dir, git) = write_fake_git("#!/bin/sh\nenv > probe-env-capture.txt\nmkdir -p repo/.git\nexit 0\n");
         let root = tempfile::tempdir().unwrap();
         let probe = super::common::probe_git_in(root.path(), Some(&git));
         // The availability verdict depends on `.git`-named creation being
@@ -118,26 +94,14 @@ mod fake_git_probes {
             assert!(
                 !(upper.starts_with("GIT_DIR=")
                     || upper.starts_with("GIT_WORK_TREE=")
-                    || upper.starts_with("GIT_CONFIG_GLOBAL=/")
-                        && !line.contains(root.path().to_str().unwrap())),
+                    || upper.starts_with("GIT_CONFIG_GLOBAL=/") && !line.contains(root.path().to_str().unwrap())),
                 "probe child inherited a routing variable: {line}"
             );
         }
-        assert!(
-            captured.contains("GIT_CONFIG_NOSYSTEM=1"),
-            "probe child must disable system config"
-        );
+        assert!(captured.contains("GIT_CONFIG_NOSYSTEM=1"), "probe child must disable system config");
         let owned_prefix = root.path().to_str().unwrap();
-        assert!(
-            captured
-                .lines()
-                .any(|l| l.starts_with("HOME=") && l.contains(owned_prefix)),
-            "probe child HOME must be the owned root"
-        );
-        assert!(
-            captured.lines().any(|l| l.starts_with("PATH=")),
-            "probe child keeps PATH to resolve the git binary"
-        );
+        assert!(captured.lines().any(|l| l.starts_with("HOME=") && l.contains(owned_prefix)), "probe child HOME must be the owned root");
+        assert!(captured.lines().any(|l| l.starts_with("PATH=")), "probe child keeps PATH to resolve the git binary");
     }
 
     /// Write-integrity control: with the fix, an inherited absolute GIT_DIR
@@ -153,20 +117,13 @@ mod fake_git_probes {
         std::fs::create_dir_all(&escape_target).unwrap();
         let _guard = EnvVarGuard::set("GIT_DIR", escape_target.to_str().unwrap());
 
-        let (_dir, git) = write_fake_git(
-            "#!/bin/sh\nif [ -n \"${GIT_DIR:-}\" ]; then touch \"$GIT_DIR/escaped-marker\" 2>/dev/null; fi\nmkdir -p repo/.git\nexit 0\n",
-        );
+        let (_dir, git) =
+            write_fake_git("#!/bin/sh\nif [ -n \"${GIT_DIR:-}\" ]; then touch \"$GIT_DIR/escaped-marker\" 2>/dev/null; fi\nmkdir -p repo/.git\nexit 0\n");
         let root = tempfile::tempdir().unwrap();
         let probe = super::common::probe_git_in(root.path(), Some(&git));
-        assert!(
-            !escape_target.join("escaped-marker").exists(),
-            "probe child saw GIT_DIR and wrote outside the owned root"
-        );
+        assert!(!escape_target.join("escaped-marker").exists(), "probe child saw GIT_DIR and wrote outside the owned root");
         if probe.available {
-            assert!(
-                root.path().join("repo").join(".git").exists(),
-                "the artifact must be created inside the owned root"
-            );
+            assert!(root.path().join("repo").join(".git").exists(), "the artifact must be created inside the owned root");
         }
     }
 
@@ -185,14 +142,8 @@ mod fake_git_probes {
 
         let root = tempfile::tempdir().unwrap();
         let probe = super::common::probe_git_in(root.path(), None);
-        assert!(
-            probe.available,
-            "real git must satisfy the probe: {probe:?}"
-        );
-        assert!(
-            !escape_target.join(".git").exists(),
-            "real git init wrote into the inherited GIT_DIR outside the owned root"
-        );
+        assert!(probe.available, "real git must satisfy the probe: {probe:?}");
+        assert!(!escape_target.join(".git").exists(), "real git init wrote into the inherited GIT_DIR outside the owned root");
         assert!(root.path().join("repo").join(".git").exists());
     }
 }
@@ -202,10 +153,7 @@ mod fake_git_probes {
 #[test]
 fn process_baseline_has_no_repository_routing_env() {
     for (key, _) in std::env::vars() {
-        assert!(
-            !lotar::utils::git::is_repository_routing_key(&key),
-            "routing variable {key} survived the test-environment baseline"
-        );
+        assert!(!lotar::utils::git::is_repository_routing_key(&key), "routing variable {key} survived the test-environment baseline");
     }
 }
 
@@ -214,34 +162,10 @@ fn process_baseline_has_no_repository_routing_env() {
 /// not (they must survive sanitization for Cargo and normal git use).
 #[test]
 fn routing_key_matcher_covers_case_and_config_variants() {
-    for key in [
-        "GIT_DIR",
-        "git_dir",
-        "Git_Work_Tree",
-        "GIT_INDEX_FILE",
-        "GIT_CONFIG_COUNT",
-        "GIT_CONFIG_GLOBAL",
-        "git_config_system",
-    ] {
-        assert!(
-            lotar::utils::git::is_repository_routing_key(key),
-            "{key} must be a routing key"
-        );
+    for key in ["GIT_DIR", "git_dir", "Git_Work_Tree", "GIT_INDEX_FILE", "GIT_CONFIG_COUNT", "GIT_CONFIG_GLOBAL", "git_config_system"] {
+        assert!(lotar::utils::git::is_repository_routing_key(key), "{key} must be a routing key");
     }
-    for key in [
-        "GIT_SSH_COMMAND",
-        "GIT_SSH_VARIANT",
-        "GIT_ASKPASS",
-        "GIT_AUTHOR_NAME",
-        "GIT_COMMITTER_EMAIL",
-        "GIT_EDITOR",
-        "PATH",
-        "HOME",
-        "USERPROFILE",
-    ] {
-        assert!(
-            !lotar::utils::git::is_repository_routing_key(key),
-            "{key} must NOT be a routing key"
-        );
+    for key in ["GIT_SSH_COMMAND", "GIT_SSH_VARIANT", "GIT_ASKPASS", "GIT_AUTHOR_NAME", "GIT_COMMITTER_EMAIL", "GIT_EDITOR", "PATH", "HOME", "USERPROFILE"] {
+        assert!(!lotar::utils::git::is_repository_routing_key(key), "{key} must NOT be a routing key");
     }
 }

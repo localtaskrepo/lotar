@@ -166,10 +166,7 @@ impl MultiFileTransaction {
     pub(crate) fn begin(root: &Path, project_prefixes: &[String]) -> LoTaRResult<Self> {
         let sprints_dir = crate::storage::sprint::Sprint::dir(root);
         fs::create_dir_all(&sprints_dir)?;
-        let locks = vec![acquire_storage_lock(
-            &sprints_dir,
-            crate::storage::safety::sprint_lock_name(),
-        )?];
+        let locks = vec![acquire_storage_lock(&sprints_dir, crate::storage::safety::sprint_lock_name())?];
 
         Self::begin_locked(root, project_prefixes, locks)
     }
@@ -180,10 +177,7 @@ impl MultiFileTransaction {
     pub(crate) fn begin_all(root: &Path, extra: &[String]) -> LoTaRResult<Self> {
         let sprints_dir = crate::storage::sprint::Sprint::dir(root);
         fs::create_dir_all(&sprints_dir)?;
-        let locks = vec![acquire_storage_lock(
-            &sprints_dir,
-            crate::storage::safety::sprint_lock_name(),
-        )?];
+        let locks = vec![acquire_storage_lock(&sprints_dir, crate::storage::safety::sprint_lock_name())?];
         let mut projects = Self::project_prefixes(root)?;
         projects.extend_from_slice(extra);
         Self::begin_locked(root, &projects, locks)
@@ -191,21 +185,15 @@ impl MultiFileTransaction {
 
     pub(crate) fn project_prefixes(root: &Path) -> LoTaRResult<Vec<String>> {
         let mut projects = Vec::new();
-        let unavailable = |error: std::io::Error| {
-            LoTaRError::ValidationError(format!(
-                "Relationship project inventory unavailable at {}: {error}",
-                root.display()
-            ))
-        };
+        let unavailable =
+            |error: std::io::Error| LoTaRError::ValidationError(format!("Relationship project inventory unavailable at {}: {error}", root.display()));
         for entry in fs::read_dir(root).map_err(unavailable)? {
             let entry = entry.map_err(unavailable)?;
             let name = entry.file_name().to_string_lossy().into_owned();
             if crate::storage::safety::is_valid_project_prefix(&name) {
                 let ty = entry.file_type().map_err(unavailable)?;
                 if ty.is_symlink() {
-                    return Err(LoTaRError::ValidationError(format!(
-                        "Relationship snapshot refuses symlink project '{name}'"
-                    )));
+                    return Err(LoTaRError::ValidationError(format!("Relationship snapshot refuses symlink project '{name}'")));
                 }
                 if ty.is_dir() {
                     projects.push(name);
@@ -216,16 +204,11 @@ impl MultiFileTransaction {
         Ok(projects)
     }
 
-    fn begin_locked(
-        root: &Path,
-        project_prefixes: &[String],
-        mut locks: Vec<File>,
-    ) -> LoTaRResult<Self> {
+    fn begin_locked(root: &Path, project_prefixes: &[String], mut locks: Vec<File>) -> LoTaRResult<Self> {
         let journal_path = root.join(JOURNAL_FILE_NAME);
         let mut sorted: BTreeSet<String> = BTreeSet::new();
         for prefix in project_prefixes {
-            crate::storage::safety::validate_project_prefix(prefix)
-                .map_err(LoTaRError::ValidationError)?;
+            crate::storage::safety::validate_project_prefix(prefix).map_err(LoTaRError::ValidationError)?;
             sorted.insert(prefix.clone());
         }
         for prefix in peek_pending_journal_projects(root, &journal_path)? {
@@ -239,14 +222,7 @@ impl MultiFileTransaction {
 
         recover_pending_journal(root, &journal_path)?;
 
-        Ok(Self {
-            root: root.to_path_buf(),
-            journal_path,
-            _locks: locks,
-            locked_prefixes: sorted,
-            staged: Vec::new(),
-            committed: false,
-        })
+        Ok(Self { root: root.to_path_buf(), journal_path, _locks: locks, locked_prefixes: sorted, staged: Vec::new(), committed: false })
     }
 
     /// Fail closed unless every listed project's task lock is already held.
@@ -254,17 +230,10 @@ impl MultiFileTransaction {
     /// read under the coordinated locks) use this to abort and retry with a
     /// wider lock set instead of writing into unlocked projects (review L1).
     pub(crate) fn ensure_covers(&self, project_prefixes: &[String]) -> LoTaRResult<()> {
-        if let Some(missing) = project_prefixes
-            .iter()
-            .find(|prefix| !self.locked_prefixes.contains(*prefix))
-        {
+        if let Some(missing) = project_prefixes.iter().find(|prefix| !self.locked_prefixes.contains(*prefix)) {
             return Err(LoTaRError::ValidationError(format!(
                 "Transaction holds task locks for [{}] only; refusing writes for unlocked project '{missing}'",
-                self.locked_prefixes
-                    .iter()
-                    .cloned()
-                    .collect::<Vec<_>>()
-                    .join(", ")
+                self.locked_prefixes.iter().cloned().collect::<Vec<_>>().join(", ")
             )));
         }
         Ok(())
@@ -277,33 +246,21 @@ impl MultiFileTransaction {
     /// path twice or staging a no-op write is rejected.
     pub(crate) fn stage(&mut self, path: &Path, contents: String) -> LoTaRResult<()> {
         if path == self.journal_path {
-            return Err(LoTaRError::ValidationError(
-                "Transaction cannot stage the recovery journal itself".to_string(),
-            ));
+            return Err(LoTaRError::ValidationError("Transaction cannot stage the recovery journal itself".to_string()));
         }
         let relative = relative_under_root(&self.root, path)?;
         // Same symlink discipline as journal recovery: staged backups and
         // publishes must target real directories the locks actually cover.
         validate_components_not_symlinks(&self.root, &relative)?;
         if fs::symlink_metadata(path).is_ok_and(|meta| meta.is_symlink()) {
-            return Err(LoTaRError::ValidationError(format!(
-                "Transaction cannot stage symlink '{}'",
-                path.display()
-            )));
+            return Err(LoTaRError::ValidationError(format!("Transaction cannot stage symlink '{}'", path.display())));
         }
         let owner = relative.split('/').next().unwrap_or_default();
         if owner != "@sprints" && !self.locked_prefixes.contains(owner) {
-            return Err(LoTaRError::ValidationError(format!(
-                "Transaction cannot stage '{}': project '{}' has no held task lock",
-                path.display(),
-                owner
-            )));
+            return Err(LoTaRError::ValidationError(format!("Transaction cannot stage '{}': project '{}' has no held task lock", path.display(), owner)));
         }
         if self.staged.iter().any(|w| w.relative == relative) {
-            return Err(LoTaRError::ValidationError(format!(
-                "Transaction cannot stage '{}' twice",
-                path.display()
-            )));
+            return Err(LoTaRError::ValidationError(format!("Transaction cannot stage '{}' twice", path.display())));
         }
         let original = match fs::read(path) {
             Ok(bytes) => {
@@ -316,12 +273,7 @@ impl MultiFileTransaction {
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => None,
             Err(err) => return Err(err.into()),
         };
-        self.staged.push(StagedWrite {
-            path: path.to_path_buf(),
-            relative,
-            contents,
-            original,
-        });
+        self.staged.push(StagedWrite { path: path.to_path_buf(), relative, contents, original });
         Ok(())
     }
 
@@ -341,10 +293,7 @@ impl MultiFileTransaction {
         self.commit_retaining_locks_checked(check).map(drop)
     }
 
-    pub(crate) fn commit_retaining_locks_checked(
-        mut self,
-        check: impl Fn() -> LoTaRResult<()>,
-    ) -> LoTaRResult<Vec<File>> {
+    pub(crate) fn commit_retaining_locks_checked(mut self, check: impl Fn() -> LoTaRResult<()>) -> LoTaRResult<Vec<File>> {
         self.publish_checked(check)?;
         self.committed = true;
         Ok(self._locks)
@@ -366,10 +315,7 @@ impl MultiFileTransaction {
                 .iter()
                 .map(|w| JournalWrite {
                     path: w.relative.clone(),
-                    original: w
-                        .original
-                        .as_ref()
-                        .map(|bytes| base64::engine::general_purpose::STANDARD.encode(bytes)),
+                    original: w.original.as_ref().map(|bytes| base64::engine::general_purpose::STANDARD.encode(bytes)),
                     new: base64::engine::general_purpose::STANDARD.encode(w.contents.as_bytes()),
                 })
                 .collect(),
@@ -385,9 +331,7 @@ impl MultiFileTransaction {
                 let _ = write_index;
                 #[cfg(test)]
                 if fail_at == Some(write_index) {
-                    return Err(LoTaRError::IoError(std::io::Error::other(
-                        "injected publish failure",
-                    )));
+                    return Err(LoTaRError::IoError(std::io::Error::other("injected publish failure")));
                 }
                 atomic_write_file(&write.path, &write.contents)?;
                 // Persist the directory entry of every completed rename before
@@ -452,16 +396,10 @@ impl MultiFileTransaction {
                         Ok(current) if current == *original => continue,
                         Ok(_) => {}
                         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-                            return Err(LoTaRError::ValidationError(format!(
-                                "cannot roll back '{}': file disappeared",
-                                write.path.display()
-                            )));
+                            return Err(LoTaRError::ValidationError(format!("cannot roll back '{}': file disappeared", write.path.display())));
                         }
                         Err(err) => {
-                            return Err(LoTaRError::ValidationError(format!(
-                                "cannot roll back '{}': {err}",
-                                write.path.display()
-                            )));
+                            return Err(LoTaRError::ValidationError(format!("cannot roll back '{}': {err}", write.path.display())));
                         }
                     }
                     atomic_write_bytes(&write.path, original)?;
@@ -519,26 +457,14 @@ fn recover_pending_journal(root: &Path, journal_path: &Path) -> LoTaRResult<()> 
             .original
             .as_ref()
             .map(|encoded| {
-                base64::engine::general_purpose::STANDARD
-                    .decode(encoded)
-                    .map_err(|err| {
-                        LoTaRError::ValidationError(format!(
-                            "Invalid original-bytes payload for '{}' in {}: {err}",
-                            write.path,
-                            journal_path.display()
-                        ))
-                    })
+                base64::engine::general_purpose::STANDARD.decode(encoded).map_err(|err| {
+                    LoTaRError::ValidationError(format!("Invalid original-bytes payload for '{}' in {}: {err}", write.path, journal_path.display()))
+                })
             })
             .transpose()?;
         let new = base64::engine::general_purpose::STANDARD
             .decode(&write.new)
-            .map_err(|err| {
-                LoTaRError::ValidationError(format!(
-                    "Invalid new-bytes payload for '{}' in {}: {err}",
-                    write.path,
-                    journal_path.display()
-                ))
-            })?;
+            .map_err(|err| LoTaRError::ValidationError(format!("Invalid new-bytes payload for '{}' in {}: {err}", write.path, journal_path.display())))?;
         let current = fs::read(path);
         let state_ok = match (&original, &current) {
             (Some(original), Ok(current)) => *current == *original || *current == new,
@@ -555,10 +481,7 @@ fn recover_pending_journal(root: &Path, journal_path: &Path) -> LoTaRResult<()> 
         }
         match &original {
             Some(original) => {
-                if current
-                    .as_ref()
-                    .is_ok_and(|current| current == original.as_slice())
-                {
+                if current.as_ref().is_ok_and(|current| current == original.as_slice()) {
                     continue;
                 }
                 atomic_write_bytes(path, original)?;
@@ -577,9 +500,7 @@ fn recover_pending_journal(root: &Path, journal_path: &Path) -> LoTaRResult<()> 
 }
 
 fn write_journal(journal_path: &Path, journal: &PendingJournal) -> LoTaRResult<()> {
-    let payload = serde_json::to_string(journal).map_err(|err| {
-        LoTaRError::SerializationError(format!("Failed to serialize transaction journal: {err}"))
-    })?;
+    let payload = serde_json::to_string(journal).map_err(|err| LoTaRError::SerializationError(format!("Failed to serialize transaction journal: {err}")))?;
     atomic_write_file(journal_path, &payload)?;
     #[cfg(unix)]
     if let Some(parent) = journal_path.parent()
@@ -639,22 +560,10 @@ fn sync_parent_dir(path: &Path) -> LoTaRResult<()> {
     if let Some(parent) = path.parent() {
         #[cfg(test)]
         if fault::take_fail_parent_sync_once() {
-            return Err(LoTaRError::IoError(std::io::Error::other(
-                "injected parent directory sync failure",
-            )));
+            return Err(LoTaRError::IoError(std::io::Error::other("injected parent directory sync failure")));
         }
-        let dir = File::open(parent).map_err(|err| {
-            LoTaRError::ValidationError(format!(
-                "cannot sync parent directory of '{}': {err}",
-                path.display()
-            ))
-        })?;
-        dir.sync_all().map_err(|err| {
-            LoTaRError::ValidationError(format!(
-                "failed to sync parent directory of '{}': {err}",
-                path.display()
-            ))
-        })?;
+        let dir = File::open(parent).map_err(|err| LoTaRError::ValidationError(format!("cannot sync parent directory of '{}': {err}", path.display())))?;
+        dir.sync_all().map_err(|err| LoTaRError::ValidationError(format!("failed to sync parent directory of '{}': {err}", path.display())))?;
     }
     #[cfg(not(unix))]
     let _ = path;
@@ -693,8 +602,7 @@ fn peek_pending_journal_projects(root: &Path, journal_path: &Path) -> LoTaRResul
         if let Some(owner) = write.path.split('/').next()
             && owner != "@sprints"
         {
-            crate::storage::safety::validate_project_prefix(owner)
-                .map_err(LoTaRError::ValidationError)?;
+            crate::storage::safety::validate_project_prefix(owner).map_err(LoTaRError::ValidationError)?;
             projects.insert(owner.to_string());
         }
     }
@@ -708,11 +616,7 @@ fn validate_components_not_symlinks(root: &Path, relative: &str) -> LoTaRResult<
     for component in relative.split('/') {
         path.push(component);
         if fs::symlink_metadata(&path).is_ok_and(|meta| meta.is_symlink()) {
-            return Err(LoTaRError::ValidationError(format!(
-                "Transaction path '{}' passes through symlink '{}'; refusing to stage",
-                relative,
-                path.display()
-            )));
+            return Err(LoTaRError::ValidationError(format!("Transaction path '{}' passes through symlink '{}'; refusing to stage", relative, path.display())));
         }
     }
     Ok(())
@@ -723,38 +627,24 @@ fn validate_components_not_symlinks(root: &Path, relative: &str) -> LoTaRResult<
 fn relative_under_root(root: &Path, path: &Path) -> LoTaRResult<String> {
     let relative = path
         .strip_prefix(root)
-        .map_err(|_| {
-            LoTaRError::ValidationError(format!(
-                "Transaction path '{}' is outside the tasks root '{}'",
-                path.display(),
-                root.display()
-            ))
-        })?
+        .map_err(|_| LoTaRError::ValidationError(format!("Transaction path '{}' is outside the tasks root '{}'", path.display(), root.display())))?
         .to_string_lossy()
         .replace('\\', "/");
     validate_relative_path(&relative)?;
     if relative.is_empty() {
-        return Err(LoTaRError::ValidationError(
-            "Transaction path cannot be the tasks root itself".to_string(),
-        ));
+        return Err(LoTaRError::ValidationError("Transaction path cannot be the tasks root itself".to_string()));
     }
     Ok(relative)
 }
 
 /// Resolve a journal-relative path against `root`, refusing absolute paths,
 /// traversal, dot components, the journal itself, and any symlink component.
-fn resolve_journal_relative_path(
-    root: &Path,
-    journal_path: &Path,
-    relative: &str,
-) -> LoTaRResult<PathBuf> {
+fn resolve_journal_relative_path(root: &Path, journal_path: &Path, relative: &str) -> LoTaRResult<PathBuf> {
     validate_relative_path(relative)?;
     let mut path = root.to_path_buf();
     for component in relative.split('/') {
         path.push(component);
-        let is_symlink = fs::symlink_metadata(&path)
-            .map(|meta| meta.is_symlink())
-            .unwrap_or(false);
+        let is_symlink = fs::symlink_metadata(&path).map(|meta| meta.is_symlink()).unwrap_or(false);
         if is_symlink {
             return Err(LoTaRError::ValidationError(format!(
                 "Pending transaction journal path '{}' passes through symlink '{}'; reconcile manually",
@@ -764,28 +654,17 @@ fn resolve_journal_relative_path(
         }
     }
     if path == journal_path {
-        return Err(LoTaRError::ValidationError(
-            "Pending transaction journal cannot target itself".to_string(),
-        ));
+        return Err(LoTaRError::ValidationError("Pending transaction journal cannot target itself".to_string()));
     }
     Ok(path)
 }
 
 fn validate_relative_path(relative: &str) -> LoTaRResult<()> {
     let mut components = Path::new(relative).components();
-    let valid = components
-        .all(|component| matches!(component, Component::Normal(_) | Component::CurDir))
-        && Path::new(relative)
-            .components()
-            .any(|component| matches!(component, Component::Normal(_)))
+    let valid = components.all(|component| matches!(component, Component::Normal(_) | Component::CurDir))
+        && Path::new(relative).components().any(|component| matches!(component, Component::Normal(_)))
         && !relative.starts_with('/');
-    if valid {
-        Ok(())
-    } else {
-        Err(LoTaRError::ValidationError(format!(
-            "Unsafe transaction path '{relative}': expected a relative path without traversal"
-        )))
-    }
+    if valid { Ok(()) } else { Err(LoTaRError::ValidationError(format!("Unsafe transaction path '{relative}': expected a relative path without traversal"))) }
 }
 
 #[cfg(test)]
@@ -850,14 +729,7 @@ mod tests {
 
         fault::fail_publish_at(1);
         let mut txn = MultiFileTransaction::begin(&root, &["DEV".to_string()]).unwrap();
-        stage_all(
-            &mut txn,
-            &[
-                (&first, "first new"),
-                (&second, "second new"),
-                (&created, "created"),
-            ],
-        );
+        stage_all(&mut txn, &[(&first, "first new"), (&second, "second new"), (&created, "created")]);
         let err = txn.commit().unwrap_err();
         assert!(err.to_string().contains("injected publish failure"));
 
@@ -884,10 +756,7 @@ mod tests {
         txn.commit().unwrap_err();
 
         assert_eq!(fs::read_to_string(&file).unwrap(), "private original");
-        assert_eq!(
-            fs::metadata(&file).unwrap().permissions().mode() & 0o777,
-            0o600
-        );
+        assert_eq!(fs::metadata(&file).unwrap().permissions().mode() & 0o777, 0o600);
     }
 
     #[test]
@@ -917,26 +786,17 @@ mod tests {
 
         {
             let mut txn = MultiFileTransaction::begin(&root, &["DEV".to_string()]).unwrap();
-            stage_all(
-                &mut txn,
-                &[(&overwritten, "sprint new"), (&created, "created new")],
-            );
+            stage_all(&mut txn, &[(&overwritten, "sprint new"), (&created, "created new")]);
             // Simulate a crash after the journal and the first file landed.
             let journal = PendingJournal {
                 version: JOURNAL_VERSION,
                 writes: vec![
                     JournalWrite {
                         path: "@sprints/1.yml".to_string(),
-                        original: Some(
-                            base64::engine::general_purpose::STANDARD.encode(b"sprint original"),
-                        ),
+                        original: Some(base64::engine::general_purpose::STANDARD.encode(b"sprint original")),
                         new: base64::engine::general_purpose::STANDARD.encode(b"sprint new"),
                     },
-                    JournalWrite {
-                        path: "DEV/3.yml".to_string(),
-                        original: None,
-                        new: base64::engine::general_purpose::STANDARD.encode(b"created new"),
-                    },
+                    JournalWrite { path: "DEV/3.yml".to_string(), original: None, new: base64::engine::general_purpose::STANDARD.encode(b"created new") },
                 ],
             };
             write_journal(&root.join(JOURNAL_FILE_NAME), &journal).unwrap();
@@ -958,10 +818,7 @@ mod tests {
         fs::write(&journal_path, "{not json").unwrap();
 
         let err = MultiFileTransaction::begin(&root, &[]).unwrap_err();
-        assert!(
-            err.to_string()
-                .contains("Corrupt pending transaction journal")
-        );
+        assert!(err.to_string().contains("Corrupt pending transaction journal"));
         assert!(journal_path.exists());
     }
 
@@ -972,11 +829,7 @@ mod tests {
         let journal_path = root.join(JOURNAL_FILE_NAME);
         let journal = PendingJournal {
             version: JOURNAL_VERSION,
-            writes: vec![JournalWrite {
-                path: "../escape.yml".to_string(),
-                original: None,
-                new: base64::engine::general_purpose::STANDARD.encode(b"evil"),
-            }],
+            writes: vec![JournalWrite { path: "../escape.yml".to_string(), original: None, new: base64::engine::general_purpose::STANDARD.encode(b"evil") }],
         };
         fs::write(&journal_path, serde_json::to_string(&journal).unwrap()).unwrap();
 
@@ -998,11 +851,7 @@ mod tests {
         let journal_path = root.join(JOURNAL_FILE_NAME);
         let journal = PendingJournal {
             version: JOURNAL_VERSION,
-            writes: vec![JournalWrite {
-                path: "DEV/link.yml".to_string(),
-                original: None,
-                new: base64::engine::general_purpose::STANDARD.encode(b"new"),
-            }],
+            writes: vec![JournalWrite { path: "DEV/link.yml".to_string(), original: None, new: base64::engine::general_purpose::STANDARD.encode(b"new") }],
         };
         fs::write(&journal_path, serde_json::to_string(&journal).unwrap()).unwrap();
 
@@ -1043,10 +892,7 @@ mod tests {
         let file = root.join("DEV").join("1.yml");
         fs::create_dir_all(root.join("DEV")).unwrap();
         let mut txn = MultiFileTransaction::begin(&root, &["DEV".to_string()]).unwrap();
-        assert!(
-            txn.stage(&root.parent().unwrap().join("outside.yml"), "x".into())
-                .is_err()
-        );
+        assert!(txn.stage(&root.parent().unwrap().join("outside.yml"), "x".into()).is_err());
         txn.stage(&file, "first".to_string()).unwrap();
         assert!(txn.stage(&file, "second".to_string()).is_err());
     }
@@ -1086,25 +932,14 @@ mod tests {
         // concurrent `lotar comment add` would. Recovery must not restore the
         // AUTH file without that lock: begin blocks on it and fails closed
         // after the storage-lock timeout instead of clobbering the writer.
-        let held = File::options()
-            .write(true)
-            .create(true)
-            .truncate(false)
-            .open(root.join("AUTH").join(".task.lock"))
-            .unwrap();
+        let held = File::options().write(true).create(true).truncate(false).open(root.join("AUTH").join(".task.lock")).unwrap();
         use fs2::FileExt;
         held.try_lock_exclusive().unwrap();
 
         let started = std::time::Instant::now();
         let err = MultiFileTransaction::begin(&root, &[]).unwrap_err();
-        assert!(
-            err.to_string().contains("busy") || err.to_string().contains("WouldBlock"),
-            "expected lock timeout, got: {err}"
-        );
-        assert!(
-            started.elapsed() >= Duration::from_secs(2),
-            "begin must have waited on the AUTH task lock"
-        );
+        assert!(err.to_string().contains("busy") || err.to_string().contains("WouldBlock"), "expected lock timeout, got: {err}");
+        assert!(started.elapsed() >= Duration::from_secs(2), "begin must have waited on the AUTH task lock");
         // The journaled file was left untouched while its lock was unavailable.
         assert_eq!(fs::read_to_string(&auth_task).unwrap(), "auth new");
         assert!(journal_path.exists());
@@ -1155,9 +990,7 @@ mod tests {
         let (_tmp, root) = workspace();
         let txn = MultiFileTransaction::begin(&root, &["DEV".to_string()]).unwrap();
         assert!(txn.ensure_covers(&["DEV".to_string()]).is_ok());
-        let err = txn
-            .ensure_covers(&["DEV".to_string(), "AUTH".to_string()])
-            .unwrap_err();
+        let err = txn.ensure_covers(&["DEV".to_string(), "AUTH".to_string()]).unwrap_err();
         assert!(err.to_string().contains("unlocked project 'AUTH'"), "{err}");
     }
 
@@ -1178,9 +1011,7 @@ mod tests {
     fn staging_rejects_the_journal_itself() {
         let (_tmp, root) = workspace();
         let mut txn = MultiFileTransaction::begin(&root, &[]).unwrap();
-        let err = txn
-            .stage(&root.join(JOURNAL_FILE_NAME), "x".to_string())
-            .unwrap_err();
+        let err = txn.stage(&root.join(JOURNAL_FILE_NAME), "x".to_string()).unwrap_err();
         assert!(err.to_string().contains("journal"), "{err}");
     }
 
@@ -1197,11 +1028,7 @@ mod tests {
         let mut txn = MultiFileTransaction::begin(&root, &[]).unwrap();
         stage_all(&mut txn, &[(&first, "first new"), (&second, "second new")]);
         let err = txn.commit().unwrap_err();
-        assert!(
-            err.to_string()
-                .contains("injected parent directory sync failure"),
-            "{err}"
-        );
+        assert!(err.to_string().contains("injected parent directory sync failure"), "{err}");
         assert_eq!(fs::read_to_string(&first).unwrap(), "first original");
         assert_eq!(fs::read_to_string(&second).unwrap(), "second original");
         assert!(!root.join(JOURNAL_FILE_NAME).exists());
@@ -1222,15 +1049,8 @@ mod tests {
         let mut txn = MultiFileTransaction::begin(&root, &[]).unwrap();
         stage_all(&mut txn, &[(&file, "new value")]);
         let err = txn.commit().unwrap_err();
-        assert!(
-            err.to_string().contains("injected journal removal failure"),
-            "{err}"
-        );
-        assert_eq!(
-            fs::read_to_string(&file).unwrap(),
-            "original",
-            "files must be unchanged the moment the error is returned"
-        );
+        assert!(err.to_string().contains("injected journal removal failure"), "{err}");
+        assert_eq!(fs::read_to_string(&file).unwrap(), "original", "files must be unchanged the moment the error is returned");
         assert!(!root.join(JOURNAL_FILE_NAME).exists());
     }
 
@@ -1249,28 +1069,15 @@ mod tests {
         let mut txn = MultiFileTransaction::begin(&root, &[]).unwrap();
         stage_all(&mut txn, &[(&file, "new value")]);
         let err = txn.commit().unwrap_err();
-        assert!(
-            err.to_string().contains("injected journal removal failure"),
-            "{err}"
-        );
-        assert!(
-            err.to_string().contains("every affected file was restored"),
-            "{err}"
-        );
-        assert_eq!(
-            fs::read_to_string(&file).unwrap(),
-            "original",
-            "files must be unchanged the moment the error is returned"
-        );
+        assert!(err.to_string().contains("injected journal removal failure"), "{err}");
+        assert!(err.to_string().contains("every affected file was restored"), "{err}");
+        assert_eq!(fs::read_to_string(&file).unwrap(), "original", "files must be unchanged the moment the error is returned");
         assert!(root.join(JOURNAL_FILE_NAME).exists());
 
         // Third failure: even recovery cannot clean up yet, so begin fails
         // closed while leaving the (already restored) files untouched.
         let err = MultiFileTransaction::begin(&root, &[]).unwrap_err();
-        assert!(
-            err.to_string().contains("injected journal removal failure"),
-            "{err}"
-        );
+        assert!(err.to_string().contains("injected journal removal failure"), "{err}");
         assert_eq!(fs::read_to_string(&file).unwrap(), "original");
 
         // Counter exhausted: the next begin verifies the no-op state, removes
@@ -1293,8 +1100,7 @@ mod tests {
         fault::fail_journal_removal_fsync_once();
         let mut txn = MultiFileTransaction::begin(&root, &[]).unwrap();
         stage_all(&mut txn, &[(&file, "acknowledged")]);
-        txn.commit()
-            .expect("successful journal removal rename acknowledges the commit");
+        txn.commit().expect("successful journal removal rename acknowledges the commit");
         assert_eq!(fs::read_to_string(&file).unwrap(), "acknowledged");
         assert!(!root.join(JOURNAL_FILE_NAME).exists());
     }
@@ -1315,8 +1121,7 @@ mod tests {
             scope.spawn(move || {
                 for round in 0..40u32 {
                     let mut txn = MultiFileTransaction::begin(&root, &["DEV".to_string()]).unwrap();
-                    txn.stage(&sprint, format!("tasks:\n- DEV-{round}\n"))
-                        .unwrap();
+                    txn.stage(&sprint, format!("tasks:\n- DEV-{round}\n")).unwrap();
                     txn.stage(&task, format!("title: round-{round}\n")).unwrap();
                     txn.commit().unwrap();
                 }
@@ -1351,17 +1156,12 @@ mod tests {
     /// read-back-your-own-write assertion meaningful while removing
     /// wall-clock sensitivity; every other failure surfaces unchanged, and
     /// the dedicated lock-timeout test below keeps asserting the 2s bound.
-    fn begin_retrying_contention(
-        root: &Path,
-        prefixes: &[String],
-    ) -> LoTaRResult<MultiFileTransaction> {
+    fn begin_retrying_contention(root: &Path, prefixes: &[String]) -> LoTaRResult<MultiFileTransaction> {
         let mut busy_retries = 6u32;
         loop {
             match MultiFileTransaction::begin(root, prefixes) {
                 Ok(txn) => return Ok(txn),
-                Err(LoTaRError::IoError(io_err))
-                    if io_err.kind() == std::io::ErrorKind::WouldBlock =>
-                {
+                Err(LoTaRError::IoError(io_err)) if io_err.kind() == std::io::ErrorKind::WouldBlock => {
                     if busy_retries == 0 {
                         return Err(LoTaRError::IoError(io_err));
                     }
@@ -1389,8 +1189,7 @@ mod tests {
                 let file = file.clone();
                 scope.spawn(move || {
                     for round in 0..25u32 {
-                        let mut txn = begin_retrying_contention(&root, &["DEV".to_string()])
-                            .expect("begin under contention");
+                        let mut txn = begin_retrying_contention(&root, &["DEV".to_string()]).expect("begin under contention");
                         let next = format!("{}-{}", worker, round);
                         txn.stage(&file, next.clone()).unwrap();
                         txn.commit().unwrap();

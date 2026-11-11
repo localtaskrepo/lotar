@@ -3,35 +3,23 @@ use std::path::Path;
 use crate::api_types::SprintCreateRequest;
 use crate::cli::args::sprint::{SprintCreateArgs, SprintUpdateArgs};
 use crate::output::OutputRenderer;
-use crate::services::sprint_service::{
-    SprintMetadataPatch, SprintService, sprint_from_create_request,
-};
+use crate::services::sprint_service::{SprintMetadataPatch, SprintService, sprint_from_create_request};
 use crate::storage::manager::Storage;
 use crate::storage::sprint::Sprint;
 
 use super::support::{SprintOperationKind, render_operation_response};
 
-pub(crate) fn handle_create(
-    create_args: &SprintCreateArgs,
-    tasks_root: &Path,
-    renderer: &OutputRenderer,
-) -> Result<(), String> {
+pub(crate) fn handle_create(create_args: &SprintCreateArgs, tasks_root: &Path, renderer: &OutputRenderer) -> Result<(), String> {
     let mut storage = Storage::new(tasks_root);
 
-    let resolved_config = crate::config::resolution::load_and_merge_configs(Some(tasks_root))
-        .map_err(|err| err.to_string())?;
+    let resolved_config = crate::config::resolution::load_and_merge_configs(Some(tasks_root)).map_err(|err| err.to_string())?;
 
     let sprint = build_sprint_from_args(create_args);
-    let defaults = if create_args.no_defaults {
-        None
-    } else {
-        Some(&resolved_config.sprint_defaults)
-    };
+    let defaults = if create_args.no_defaults { None } else { Some(&resolved_config.sprint_defaults) };
 
     let warnings_enabled = resolved_config.sprint_notifications.enabled;
 
-    let outcome = SprintService::create(&mut storage, sprint, defaults)
-        .map_err(|err| format!("Failed to create sprint: {}", err))?;
+    let outcome = SprintService::create(&mut storage, sprint, defaults).map_err(|err| format!("Failed to create sprint: {}", err))?;
 
     render_operation_response(
         SprintOperationKind::Create,
@@ -46,19 +34,14 @@ pub(crate) fn handle_create(
     Ok(())
 }
 
-pub(crate) fn handle_update(
-    update_args: &SprintUpdateArgs,
-    tasks_root: &Path,
-    renderer: &OutputRenderer,
-) -> Result<(), String> {
+pub(crate) fn handle_update(update_args: &SprintUpdateArgs, tasks_root: &Path, renderer: &OutputRenderer) -> Result<(), String> {
     if !update_args.has_mutations() {
         return Err("No updates provided; specify fields to mutate.".to_string());
     }
 
     let mut storage = Storage::new(tasks_root);
 
-    let resolved_config = crate::config::resolution::load_and_merge_configs(Some(tasks_root))
-        .map_err(|err| err.to_string())?;
+    let resolved_config = crate::config::resolution::load_and_merge_configs(Some(tasks_root)).map_err(|err| err.to_string())?;
 
     let sprint_id = update_args.resolved_sprint_id();
 
@@ -78,12 +61,10 @@ pub(crate) fn handle_update(
 
     let warnings_enabled = resolved_config.sprint_notifications.enabled;
 
-    let outcome = SprintService::update_with_patch(&mut storage, sprint_id, &patch).map_err(
-        |err| match err {
-            crate::errors::LoTaRError::SprintNotFound(_) => err.to_string(),
-            other => format!("Failed to update sprint: {}", other),
-        },
-    )?;
+    let outcome = SprintService::update_with_patch(&mut storage, sprint_id, &patch).map_err(|err| match err {
+        crate::errors::LoTaRError::SprintNotFound(_) => err.to_string(),
+        other => format!("Failed to update sprint: {}", other),
+    })?;
 
     render_operation_response(
         SprintOperationKind::Update,

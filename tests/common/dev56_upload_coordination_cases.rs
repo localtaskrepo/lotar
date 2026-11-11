@@ -23,11 +23,7 @@ fn upload_fixture() -> UploadFixture {
     // Set before any worker threads spawn and restored (in Drop) after they
     // join, so no thread observes a concurrent env mutation.
     let guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
-    UploadFixture {
-        _tmp: tmp,
-        tasks_dir,
-        _guard: guard,
-    }
+    UploadFixture { _tmp: tmp, tasks_dir, _guard: guard }
 }
 
 fn mk_upload_req(id: &str, filename: &str, bytes: &[u8]) -> HttpRequest {
@@ -48,12 +44,7 @@ fn mk_upload_req(id: &str, filename: &str, bytes: &[u8]) -> HttpRequest {
 
 fn count_stored_files(dir: &std::path::Path) -> usize {
     std::fs::read_dir(dir)
-        .map(|entries| {
-            entries
-                .flatten()
-                .filter(|e| e.path().is_file() && !e.file_name().to_string_lossy().starts_with('.'))
-                .count()
-        })
+        .map(|entries| entries.flatten().filter(|e| e.path().is_file() && !e.file_name().to_string_lossy().starts_with('.')).count())
         .unwrap_or(0)
 }
 
@@ -70,11 +61,7 @@ fn concurrent_failed_upload_cannot_break_a_deduping_peer() {
     // Two target tasks in the primary root.
     let mut seed = crate::storage::manager::Storage::new(&fixture.tasks_dir);
     for title in ["A target", "B target"] {
-        let task = crate::storage::task::Task::new(
-            fixture.tasks_dir.clone(),
-            title.to_string(),
-            crate::types::Priority::from("Medium"),
-        );
+        let task = crate::storage::task::Task::new(fixture.tasks_dir.clone(), title.to_string(), crate::types::Priority::from("Medium"));
         seed.add(&task, "TP", None).unwrap();
     }
 
@@ -84,34 +71,22 @@ fn concurrent_failed_upload_cannot_break_a_deduping_peer() {
 
     let a = std::thread::spawn(move || {
         // Thread-local injection: park between store and attach, then fail.
-        crate::services::attachment_service::upload_fault::arm_park_after_store(
-            stored_tx, release_rx,
-        );
+        crate::services::attachment_service::upload_fault::arm_park_after_store(stored_tx, release_rx);
         crate::services::attachment_service::upload_fault::fail_next_attach();
         let mut api = ApiServer::new();
         crate::routes::initialize(&mut api);
-        (
-            api.handle_request(&mk_upload_req("TP-1", "a.txt", b"shared-blob"))
-                .status,
-            tasks_dir_a,
-        )
+        (api.handle_request(&mk_upload_req("TP-1", "a.txt", b"shared-blob")).status, tasks_dir_a)
     });
 
     // Deterministic ordering: A created the blob and is parked (holding the
     // store lock) before B starts. B attempts the same content concurrently
     // and must wait for A's rollback decision.
-    stored_rx
-        .recv_timeout(std::time::Duration::from_secs(10))
-        .expect("A must signal after storing the blob");
+    stored_rx.recv_timeout(std::time::Duration::from_secs(10)).expect("A must signal after storing the blob");
     let tasks_dir_b = fixture.tasks_dir.clone();
     let b = std::thread::spawn(move || {
         let mut api = ApiServer::new();
         crate::routes::initialize(&mut api);
-        (
-            api.handle_request(&mk_upload_req("TP-2", "b.txt", b"shared-blob"))
-                .status,
-            tasks_dir_b,
-        )
+        (api.handle_request(&mk_upload_req("TP-2", "b.txt", b"shared-blob")).status, tasks_dir_b)
     });
 
     // Release A: attach fails (injected), cleanup deletes its just-created
@@ -131,42 +106,17 @@ fn concurrent_failed_upload_cannot_break_a_deduping_peer() {
     // Uploads attach typed `attachment` entries (DEV-61), never `file`.
     let storage = crate::storage::manager::Storage::try_open(&tasks_dir).unwrap();
     let b_task = crate::services::task_service::TaskService::get(&storage, "TP-2", None).unwrap();
-    assert!(
-        b_task.references.iter().any(|r| r.attachment.is_some()),
-        "B keeps its reference: {:?}",
-        b_task.references
-    );
-    assert!(
-        b_task.references.iter().all(|r| r.file.is_none()),
-        "uploads never write repository file entries: {:?}",
-        b_task.references
-    );
+    assert!(b_task.references.iter().any(|r| r.attachment.is_some()), "B keeps its reference: {:?}", b_task.references);
+    assert!(b_task.references.iter().all(|r| r.file.is_none()), "uploads never write repository file entries: {:?}", b_task.references);
     let a_task = crate::services::task_service::TaskService::get(&storage, "TP-1", None).unwrap();
-    assert!(
-        a_task.references.iter().all(|r| r.attachment.is_none()),
-        "A must not keep a dangling reference: {:?}",
-        a_task.references
-    );
+    assert!(a_task.references.iter().all(|r| r.attachment.is_none()), "A must not keep a dangling reference: {:?}", a_task.references);
 
     // The blob B references still exists on disk (not removed by A's cleanup).
-    let stored_path = b_task
-        .references
-        .iter()
-        .find_map(|r| r.attachment.clone())
-        .unwrap();
-    let leaf = stored_path
-        .rsplit('/')
-        .next()
-        .unwrap_or(stored_path.trim_start_matches('@'));
+    let stored_path = b_task.references.iter().find_map(|r| r.attachment.clone()).unwrap();
+    let leaf = stored_path.rsplit('/').next().unwrap_or(stored_path.trim_start_matches('@'));
     let attachments_root = attachments.clone();
     assert!(
-        std::fs::read_dir(&attachments_root)
-            .map(|entries| {
-                entries
-                    .flatten()
-                    .any(|e| e.file_name().to_string_lossy() == leaf)
-            })
-            .unwrap_or(false),
+        std::fs::read_dir(&attachments_root).map(|entries| { entries.flatten().any(|e| e.file_name().to_string_lossy() == leaf) }).unwrap_or(false),
         "B's blob {stored_path} still exists under {}",
         attachments_root.display()
     );
@@ -181,30 +131,18 @@ fn upload_fails_closed_while_another_instance_holds_the_store_lock() {
     let fixture = upload_fixture();
     let attachments = fixture.tasks_dir.join("@attachments");
     let mut seed = crate::storage::manager::Storage::new(&fixture.tasks_dir);
-    let task = crate::storage::task::Task::new(
-        fixture.tasks_dir.clone(),
-        "Locked store target".to_string(),
-        crate::types::Priority::from("Medium"),
-    );
+    let task = crate::storage::task::Task::new(fixture.tasks_dir.clone(), "Locked store target".to_string(), crate::types::Priority::from("Medium"));
     seed.add(&task, "TP", None).unwrap();
 
     // Held exactly as another API process would hold it (the store dir
     // already exists in production; create it like lock_store does).
     std::fs::create_dir_all(&attachments).unwrap();
-    let held =
-        crate::storage::safety::acquire_storage_lock(&attachments, "attachments-store").unwrap();
+    let held = crate::storage::safety::acquire_storage_lock(&attachments, "attachments-store").unwrap();
     let mut api = ApiServer::new();
     crate::routes::initialize(&mut api);
     let resp = api.handle_request(&mk_upload_req("TP-1", "held.txt", b"while-locked"));
-    assert_ne!(
-        resp.status, 200,
-        "upload must fail closed while store is locked"
-    );
-    assert!(
-        resp.body.len() < 4096,
-        "bounded failure diagnostics: {}",
-        String::from_utf8_lossy(&resp.body)
-    );
+    assert_ne!(resp.status, 200, "upload must fail closed while store is locked");
+    assert!(resp.body.len() < 4096, "bounded failure diagnostics: {}", String::from_utf8_lossy(&resp.body));
     assert_eq!(count_stored_files(&attachments), 0, "no blob written");
 
     drop(held);
@@ -223,11 +161,7 @@ fn upload_rollback_and_remove_reclaim_serialize_on_the_store_lock() {
     let attachments = fixture.tasks_dir.join("@attachments");
     let mut seed = crate::storage::manager::Storage::new(&fixture.tasks_dir);
     for _ in 0..3 {
-        let task = crate::storage::task::Task::new(
-            fixture.tasks_dir.clone(),
-            "Seed target".to_string(),
-            crate::types::Priority::from("Medium"),
-        );
+        let task = crate::storage::task::Task::new(fixture.tasks_dir.clone(), "Seed target".to_string(), crate::types::Priority::from("Medium"));
         seed.add(&task, "TP", None).unwrap();
     }
 
@@ -237,10 +171,7 @@ fn upload_rollback_and_remove_reclaim_serialize_on_the_store_lock() {
     let committed = api.handle_request(&mk_upload_req("TP-3", "committed.txt", b"committed-blob"));
     assert_eq!(committed.status, 200);
     let committed_body: serde_json::Value = serde_json::from_slice(&committed.body).unwrap();
-    let committed_path = committed_body["data"]["stored_path"]
-        .as_str()
-        .unwrap()
-        .to_string();
+    let committed_path = committed_body["data"]["stored_path"].as_str().unwrap().to_string();
     assert_eq!(count_stored_files(&attachments), 1);
 
     let (stored_tx, stored_rx) = channel::<()>();
@@ -248,22 +179,14 @@ fn upload_rollback_and_remove_reclaim_serialize_on_the_store_lock() {
     let tasks_dir_a = fixture.tasks_dir.clone();
 
     let a = std::thread::spawn(move || {
-        crate::services::attachment_service::upload_fault::arm_park_after_store(
-            stored_tx, release_rx,
-        );
+        crate::services::attachment_service::upload_fault::arm_park_after_store(stored_tx, release_rx);
         crate::services::attachment_service::upload_fault::fail_next_attach();
         let mut api = ApiServer::new();
         crate::routes::initialize(&mut api);
-        (
-            api.handle_request(&mk_upload_req("TP-1", "rollback.txt", b"rollback-blob"))
-                .status,
-            tasks_dir_a,
-        )
+        (api.handle_request(&mk_upload_req("TP-1", "rollback.txt", b"rollback-blob")).status, tasks_dir_a)
     });
 
-    stored_rx
-        .recv_timeout(std::time::Duration::from_secs(10))
-        .expect("A stored and parked");
+    stored_rx.recv_timeout(std::time::Duration::from_secs(10)).expect("A stored and parked");
 
     // Concurrent remove of the committed attachment: serialized behind A's
     // parked critical section (blocks on the store lock, then proceeds).
@@ -284,21 +207,13 @@ fn upload_rollback_and_remove_reclaim_serialize_on_the_store_lock() {
     assert_eq!(status_b, 200, "B remove completed after serialization");
 
     // No orphan from A, and the removed committed blob is gone.
-    assert_eq!(
-        count_stored_files(&attachments),
-        0,
-        "rollback blob reaped, committed blob reclaimed"
-    );
+    assert_eq!(count_stored_files(&attachments), 0, "rollback blob reaped, committed blob reclaimed");
 
     // Neither task keeps a dangling managed attachment reference.
     let storage = crate::storage::manager::Storage::try_open(&tasks_dir).unwrap();
     for id in ["TP-1", "TP-3"] {
         let dto = crate::services::task_service::TaskService::get(&storage, id, None).unwrap();
-        assert!(
-            dto.references.iter().all(|r| r.attachment.is_none()),
-            "{id} must not keep a dangling reference: {:?}",
-            dto.references
-        );
+        assert!(dto.references.iter().all(|r| r.attachment.is_none()), "{id} must not keep a dangling reference: {:?}", dto.references);
     }
 }
 

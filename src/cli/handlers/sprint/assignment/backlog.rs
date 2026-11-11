@@ -3,19 +3,13 @@ use std::path::Path;
 use serde::Serialize;
 
 use crate::cli::args::sprint::SprintBacklogArgs;
-use crate::cli::handlers::sprint::shared::{
-    SprintAssignmentIntegrityPayload, build_assignment_integrity, truncate,
-};
+use crate::cli::handlers::sprint::shared::{SprintAssignmentIntegrityPayload, build_assignment_integrity, truncate};
 use crate::output::{OutputFormat, OutputRenderer};
 use crate::services::sprint_assignment::{self, SprintBacklogEntry};
 
 use super::context::AssignmentContext;
 
-pub(crate) fn handle_backlog(
-    backlog_args: &SprintBacklogArgs,
-    tasks_root: &Path,
-    renderer: &OutputRenderer,
-) -> Result<(), String> {
+pub(crate) fn handle_backlog(backlog_args: &SprintBacklogArgs, tasks_root: &Path, renderer: &OutputRenderer) -> Result<(), String> {
     if backlog_args.limit == 0 {
         return Err("--limit must be greater than zero".to_string());
     }
@@ -25,14 +19,8 @@ pub(crate) fn handle_backlog(
         None => {
             match renderer.format {
                 OutputFormat::Json => {
-                    let payload = SprintBacklogResponse {
-                        status: "ok",
-                        count: 0,
-                        truncated: false,
-                        tasks: Vec::new(),
-                        missing_sprints: Vec::new(),
-                        integrity: None,
-                    };
+                    let payload =
+                        SprintBacklogResponse { status: "ok", count: 0, truncated: false, tasks: Vec::new(), missing_sprints: Vec::new(), integrity: None };
                     renderer.emit_json(&payload);
                 }
                 _ => renderer.emit_success("No backlog tasks found."),
@@ -41,39 +29,23 @@ pub(crate) fn handle_backlog(
         }
     };
 
-    let cleanup_summary = context.reconcile_missing(
-        backlog_args.cleanup_missing,
-        renderer,
-        "loading the sprint backlog",
-    )?;
+    let cleanup_summary = context.reconcile_missing(backlog_args.cleanup_missing, renderer, "loading the sprint backlog")?;
 
     // The shared task query (DEV-236): the flags plus the search syntax.
     let mut input = crate::services::task_list::TaskQueryInput {
-        project: backlog_args
-            .project
-            .as_deref()
-            .map(|project| crate::utils::resolve_project_input(project, tasks_root)),
+        project: backlog_args.project.as_deref().map(|project| crate::utils::resolve_project_input(project, tasks_root)),
         status: backlog_args.status.clone(),
         tags: backlog_args.tag.clone(),
         assignee: backlog_args.assignee.clone(),
         ..Default::default()
     };
     input
-        .add_search(&crate::utils::search_syntax::parse(
-            &[
-                backlog_args.query.join(" "),
-                backlog_args.query_terms.join(" "),
-            ]
-            .join(" "),
-        ))
+        .add_search(&crate::utils::search_syntax::parse(&[backlog_args.query.join(" "), backlog_args.query_terms.join(" ")].join(" ")))
         .map_err(|e| e.cli_message())?;
     let manual_order = input.sort_by.is_none();
-    let base = crate::config::resolution::load_and_merge_configs(Some(tasks_root))
-        .map_err(|e| format!("Failed to load config: {e}"))?;
+    let base = crate::config::resolution::load_and_merge_configs(Some(tasks_root)).map_err(|e| format!("Failed to load config: {e}"))?;
     let options = sprint_assignment::SprintBacklogOptions {
-        query: input
-            .resolve(&base, tasks_root)
-            .map_err(|e| e.cli_message())?,
+        query: input.resolve(&base, tasks_root).map_err(|e| e.cli_message())?,
         manual_order,
         limit: backlog_args.limit,
     };
@@ -91,11 +63,7 @@ pub(crate) fn handle_backlog(
                     truncated: false,
                     tasks: Vec::new(),
                     missing_sprints: context.integrity().missing_sprints.clone(),
-                    integrity: build_assignment_integrity(
-                        context.baseline_integrity(),
-                        context.integrity(),
-                        cleanup_summary.as_ref(),
-                    ),
+                    integrity: build_assignment_integrity(context.baseline_integrity(), context.integrity(), cleanup_summary.as_ref()),
                 };
                 renderer.emit_json(&payload);
             }
@@ -112,21 +80,13 @@ pub(crate) fn handle_backlog(
                 truncated,
                 tasks: entries.clone(),
                 missing_sprints: context.integrity().missing_sprints.clone(),
-                integrity: build_assignment_integrity(
-                    context.baseline_integrity(),
-                    context.integrity(),
-                    cleanup_summary.as_ref(),
-                ),
+                integrity: build_assignment_integrity(context.baseline_integrity(), context.integrity(), cleanup_summary.as_ref()),
             };
             renderer.emit_json(&payload);
         }
         _ => {
-            renderer.emit_raw_stdout(
-                "ID          Title                          Status      Assignee        Priority    Due",
-            );
-            renderer.emit_raw_stdout(
-                "--------------------------------------------------------------------------------",
-            );
+            renderer.emit_raw_stdout("ID          Title                          Status      Assignee        Priority    Due");
+            renderer.emit_raw_stdout("--------------------------------------------------------------------------------");
             for entry in &entries {
                 let title = truncate(&entry.title, 30);
                 let status = truncate(&entry.status, 12);

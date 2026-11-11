@@ -25,11 +25,7 @@ fn write_task_file(dir: &Path, id: u32, title: &str) {
 }
 
 fn search_titles(storage: &Storage) -> Vec<String> {
-    storage
-        .search(&Default::default())
-        .into_iter()
-        .map(|(_, task)| task.title.clone())
-        .collect()
+    storage.search(&Default::default()).into_iter().map(|(_, task)| task.title.clone()).collect()
 }
 
 struct MtimeClock {
@@ -38,27 +34,17 @@ struct MtimeClock {
 
 impl MtimeClock {
     fn new() -> Self {
-        Self {
-            next: SystemTime::now()
-                .checked_add(Duration::from_secs(600))
-                .expect("clock arithmetic"),
-        }
+        Self { next: SystemTime::now().checked_add(Duration::from_secs(600)).expect("clock arithmetic") }
     }
 
     fn advance(&mut self) -> SystemTime {
-        self.next = self
-            .next
-            .checked_add(Duration::from_secs(1))
-            .expect("clock arithmetic");
+        self.next = self.next.checked_add(Duration::from_secs(1)).expect("clock arithmetic");
         self.next
     }
 }
 
 fn set_mtime(path: &Path, at: SystemTime) {
-    let file = fs::File::options()
-        .write(true)
-        .open(path)
-        .expect("open file for set_modified");
+    let file = fs::File::options().write(true).open(path).expect("open file for set_modified");
     file.set_modified(at).expect("set modified time");
 }
 
@@ -102,10 +88,7 @@ fn search_detects_same_length_title_edit_via_mtime_only() {
     // serve the stale task.
     write_task_file(&project_dir, 1, "modified title");
     let len_after = fs::metadata(&task_file).unwrap().len();
-    assert_eq!(
-        len_before, len_after,
-        "test premise: replacement must keep the file length identical"
-    );
+    assert_eq!(len_before, len_after, "test premise: replacement must keep the file length identical");
     let mut clock = MtimeClock::new();
     set_mtime(&task_file, clock.advance());
 
@@ -122,27 +105,18 @@ fn search_and_get_detect_same_length_edits_with_unchanged_mtime() {
     write_task_file(&project_dir, 1, "original title");
     let storage = Storage::new(&tasks_dir);
     assert_eq!(search_titles(&storage), vec!["original title"]);
-    assert_eq!(
-        storage.get("CACHE-1", "CACHE").unwrap().title,
-        "original title"
-    );
+    assert_eq!(storage.get("CACHE-1", "CACHE").unwrap().title, "original title");
     let before = fs::metadata(&task_file).unwrap();
     let mtime = before.modified().unwrap();
     write_task_file(&project_dir, 1, "modified title");
     set_mtime(&task_file, mtime);
     assert_eq!(fs::metadata(&task_file).unwrap().len(), before.len());
-    assert_eq!(
-        storage.get("CACHE-1", "CACHE").unwrap().title,
-        "modified title"
-    );
+    assert_eq!(storage.get("CACHE-1", "CACHE").unwrap().title, "modified title");
     assert_eq!(search_titles(&storage), vec!["modified title"]);
     write_task_file(&project_dir, 1, "original title");
     set_mtime(&task_file, mtime);
     assert_eq!(search_titles(&storage), vec!["original title"]);
-    assert_eq!(
-        storage.get("CACHE-1", "CACHE").unwrap().title,
-        "original title"
-    );
+    assert_eq!(storage.get("CACHE-1", "CACHE").unwrap().title, "original title");
 }
 
 #[test]
@@ -162,10 +136,7 @@ fn cached_task_detects_atomic_replacement_with_preserved_metadata() {
     assert_eq!(fs::metadata(&replacement).unwrap().len(), before.len());
     fs::rename(replacement, &task_file).unwrap();
     assert_eq!(search_titles(&storage), vec!["modified title"]);
-    assert_eq!(
-        storage.get("CACHE-1", "CACHE").unwrap().title,
-        "modified title"
-    );
+    assert_eq!(storage.get("CACHE-1", "CACHE").unwrap().title, "modified title");
 }
 
 #[test]

@@ -17,21 +17,11 @@ pub struct ValidationError {
 
 impl ValidationError {
     pub fn error(field: Option<String>, message: String) -> Self {
-        Self {
-            severity: ValidationSeverity::Error,
-            field,
-            message,
-            fix_suggestion: None,
-        }
+        Self { severity: ValidationSeverity::Error, field, message, fix_suggestion: None }
     }
 
     pub fn warning(field: Option<String>, message: String) -> Self {
-        Self {
-            severity: ValidationSeverity::Warning,
-            field,
-            message,
-            fix_suggestion: None,
-        }
+        Self { severity: ValidationSeverity::Warning, field, message, fix_suggestion: None }
     }
 
     pub fn with_fix(mut self, fix: String) -> Self {
@@ -77,11 +67,7 @@ impl Default for ValidationResult {
 
 impl ValidationResult {
     pub fn new() -> Self {
-        Self {
-            errors: Vec::new(),
-            warnings: Vec::new(),
-            info: Vec::new(),
-        }
+        Self { errors: Vec::new(), warnings: Vec::new(), info: Vec::new() }
     }
 
     pub fn add_error(&mut self, error: ValidationError) {

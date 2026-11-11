@@ -12,17 +12,11 @@ use crate::storage::manager::Storage;
 
 use super::helpers::{format_float, select_sprint_id_for_review};
 
-pub(crate) fn handle_burndown(
-    burndown_args: &SprintBurndownArgs,
-    tasks_root: &Path,
-    renderer: &OutputRenderer,
-) -> Result<(), String> {
+pub(crate) fn handle_burndown(burndown_args: &SprintBurndownArgs, tasks_root: &Path, renderer: &OutputRenderer) -> Result<(), String> {
     let config_root = tasks_root;
-    let storage = Storage::try_open(tasks_root)
-        .ok_or_else(|| "No sprints found. Create one before running burndown.".to_string())?;
+    let storage = Storage::try_open(tasks_root).ok_or_else(|| "No sprints found. Create one before running burndown.".to_string())?;
 
-    let resolved_config =
-        load_and_merge_configs(Some(config_root)).map_err(|err| err.to_string())?;
+    let resolved_config = load_and_merge_configs(Some(config_root)).map_err(|err| err.to_string())?;
 
     let records = SprintService::list(&storage).map_err(|err| err.to_string())?;
     if records.is_empty() {
@@ -31,15 +25,11 @@ pub(crate) fn handle_burndown(
 
     let target_id = match burndown_args.sprint_id {
         Some(id) => id,
-        None => select_sprint_id_for_review(&records)
-            .ok_or_else(|| "No sprints available for burndown.".to_string())?,
+        None => select_sprint_id_for_review(&records).ok_or_else(|| "No sprints available for burndown.".to_string())?,
     };
 
     if burndown_args.sprint_id.is_none() && !matches!(renderer.format, OutputFormat::Json) {
-        renderer.emit_info(format_args!(
-            "Auto-selected sprint #{} for burndown.",
-            target_id
-        ));
+        renderer.emit_info(format_args!("Auto-selected sprint #{} for burndown.", target_id));
     }
 
     let record = SprintService::get(&storage, target_id).map_err(|err| err.to_string())?;
@@ -55,25 +45,16 @@ pub(crate) fn handle_burndown(
     Ok(())
 }
 
-fn render_burndown_text(
-    renderer: &OutputRenderer,
-    context: &SprintBurndownContext,
-    requested_metric: SprintBurndownMetric,
-) {
+fn render_burndown_text(renderer: &OutputRenderer, context: &SprintBurndownContext, requested_metric: SprintBurndownMetric) {
     let summary = &context.summary;
     let computation = &context.computation;
 
     let mut focus_metric = requested_metric;
-    if matches!(focus_metric, SprintBurndownMetric::Points)
-        && computation.totals.points.unwrap_or(0.0) <= 0.0
-    {
-        renderer
-            .emit_warning("No point estimates recorded for this sprint; falling back to tasks.");
+    if matches!(focus_metric, SprintBurndownMetric::Points) && computation.totals.points.unwrap_or(0.0) <= 0.0 {
+        renderer.emit_warning("No point estimates recorded for this sprint; falling back to tasks.");
         focus_metric = SprintBurndownMetric::Tasks;
     }
-    if matches!(focus_metric, SprintBurndownMetric::Hours)
-        && computation.totals.hours.unwrap_or(0.0) <= 0.0
-    {
+    if matches!(focus_metric, SprintBurndownMetric::Hours) && computation.totals.hours.unwrap_or(0.0) <= 0.0 {
         renderer.emit_warning("No hour estimates recorded for this sprint; falling back to tasks.");
         focus_metric = SprintBurndownMetric::Tasks;
     }
@@ -81,11 +62,7 @@ fn render_burndown_text(
     renderer.emit_success(format_args!(
         "Sprint burndown for #{}{}.",
         summary.id,
-        summary
-            .label
-            .as_ref()
-            .map(|label| format!(" ({})", label))
-            .unwrap_or_default()
+        summary.label.as_ref().map(|label| format!(" ({})", label)).unwrap_or_default()
     ));
     renderer.emit_raw_stdout(format_args!("Status: {}", summary.status));
 
@@ -99,16 +76,10 @@ fn render_burndown_text(
 
     match focus_metric {
         SprintBurndownMetric::Tasks => {
-            renderer.emit_raw_stdout(format_args!(
-                "Total tasks: {} | Ideal horizon: {} days",
-                computation.totals.tasks, computation.day_span
-            ));
+            renderer.emit_raw_stdout(format_args!("Total tasks: {} | Ideal horizon: {} days", computation.totals.tasks, computation.day_span));
             for point in &context.computation.series {
                 let date_display = point.date.date_naive();
-                renderer.emit_raw_stdout(format_args!(
-                    "{}  {:>9}  {:>5.1}",
-                    date_display, point.remaining_tasks, point.ideal_tasks
-                ));
+                renderer.emit_raw_stdout(format_args!("{}  {:>9}  {:>5.1}", date_display, point.remaining_tasks, point.ideal_tasks));
             }
         }
         SprintBurndownMetric::Points => {
@@ -145,14 +116,10 @@ fn render_burndown_text(
         }
     }
 
-    if computation.totals.points.unwrap_or(0.0) > 0.0
-        && !matches!(focus_metric, SprintBurndownMetric::Points)
-    {
+    if computation.totals.points.unwrap_or(0.0) > 0.0 && !matches!(focus_metric, SprintBurndownMetric::Points) {
         renderer.emit_info("Tip: run with --metric points for point-based burndown.");
     }
-    if computation.totals.hours.unwrap_or(0.0) > 0.0
-        && !matches!(focus_metric, SprintBurndownMetric::Hours)
-    {
+    if computation.totals.hours.unwrap_or(0.0) > 0.0 && !matches!(focus_metric, SprintBurndownMetric::Hours) {
         renderer.emit_info("Tip: run with --metric hours for time-based burndown.");
     }
     renderer.emit_info("Use --format json to feed the series into custom dashboards.");

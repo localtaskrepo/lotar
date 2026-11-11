@@ -2,8 +2,8 @@ use serde_json::{Value, json};
 
 use super::super::hints::{EnumHints, enum_hints_to_value, make_enum_error_data};
 use super::super::{
-    JsonRpcRequest, JsonRpcResponse, MCP_DEFAULT_TASK_LIST_LIMIT, MCP_MAX_TASK_LIST_LIMIT, err,
-    internal_error, ok, parse_cursor_value, parse_limit_value, resolve_tasks_dir, text_result,
+    JsonRpcRequest, JsonRpcResponse, MCP_DEFAULT_TASK_LIST_LIMIT, MCP_MAX_TASK_LIST_LIMIT, err, internal_error, ok, parse_cursor_value, parse_limit_value,
+    resolve_tasks_dir, text_result,
 };
 use crate::api_types::{TaskCreate, TaskDTO, TaskUpdate};
 use crate::cli::project::ProjectResolver;
@@ -22,20 +22,13 @@ use crate::utils::git::find_repo_root;
 fn parse_sprint_ids_strict(value: Option<&Value>) -> Result<Vec<u32>, String> {
     fn parse_one(raw: &Value) -> Result<u32, String> {
         let parsed = match raw {
-            Value::Number(num) => num
-                .as_u64()
-                .and_then(|v| u32::try_from(v).ok())
-                .ok_or_else(|| "sprints entries must be positive integers".to_string())?,
+            Value::Number(num) => num.as_u64().and_then(|v| u32::try_from(v).ok()).ok_or_else(|| "sprints entries must be positive integers".to_string())?,
             Value::String(text) => {
                 let trimmed = text.trim();
                 if trimmed.is_empty() {
                     return Err("sprints entries must be positive integers".to_string());
                 }
-                trimmed
-                    .strip_prefix('#')
-                    .unwrap_or(trimmed)
-                    .parse::<u32>()
-                    .map_err(|_| "sprints entries must be positive integers".to_string())?
+                trimmed.strip_prefix('#').unwrap_or(trimmed).parse::<u32>().map_err(|_| "sprints entries must be positive integers".to_string())?
             }
             _ => return Err("sprints entries must be positive integers".to_string()),
         };
@@ -72,19 +65,8 @@ fn parse_sprint_ids_strict(value: Option<&Value>) -> Result<Vec<u32>, String> {
 fn parse_tags_params(params: &Value) -> Vec<String> {
     fn parse_multi(value: Option<&Value>) -> Vec<String> {
         match value {
-            Some(Value::String(s)) => s
-                .split(',')
-                .map(|token| token.trim())
-                .filter(|token| !token.is_empty())
-                .map(|token| token.to_string())
-                .collect(),
-            Some(Value::Array(arr)) => arr
-                .iter()
-                .filter_map(|v| v.as_str())
-                .map(|s| s.trim())
-                .filter(|s| !s.is_empty())
-                .map(|s| s.to_string())
-                .collect(),
+            Some(Value::String(s)) => s.split(',').map(|token| token.trim()).filter(|token| !token.is_empty()).map(|token| token.to_string()).collect(),
+            Some(Value::Array(arr)) => arr.iter().filter_map(|v| v.as_str()).map(|s| s.trim()).filter(|s| !s.is_empty()).map(|s| s.to_string()).collect(),
             _ => Vec::new(),
         }
     }
@@ -129,10 +111,7 @@ fn parse_strict_sprint_ids(value: Option<&Value>) -> Result<Vec<u32>, String> {
     }
 }
 
-fn parse_task_update_patch(
-    req_id: Option<Value>,
-    patch_val: &Value,
-) -> Result<TaskUpdate, JsonRpcResponse> {
+fn parse_task_update_patch(req_id: Option<Value>, patch_val: &Value) -> Result<TaskUpdate, JsonRpcResponse> {
     if !patch_val.is_object() {
         return Err(err(req_id, -32602, "Invalid patch (expected object)", None));
     }
@@ -153,12 +132,7 @@ fn parse_task_update_patch(
 
     // `type` is canonical and `task_type` its alias; an explicit null means
     // omitted, so it falls through to the alias instead of shadowing it.
-    if let Some(s) = patch_val
-        .get("type")
-        .filter(|v| !v.is_null())
-        .or_else(|| patch_val.get("task_type"))
-        .and_then(|v| v.as_str())
-    {
+    if let Some(s) = patch_val.get("type").filter(|v| !v.is_null()).or_else(|| patch_val.get("task_type")).and_then(|v| v.as_str()) {
         patch.task_type = Some(s.to_string());
     }
 
@@ -191,20 +165,10 @@ fn parse_task_update_patch(
         match arr {
             Value::Null => patch.tags = Some(Vec::new()),
             Value::Array(items) => {
-                patch.tags = Some(
-                    items
-                        .iter()
-                        .filter_map(|x| x.as_str().map(|s| s.to_string()))
-                        .collect(),
-                );
+                patch.tags = Some(items.iter().filter_map(|x| x.as_str().map(|s| s.to_string())).collect());
             }
             _ => {
-                return Err(err(
-                    req_id,
-                    -32602,
-                    "tags must be an array of strings or null",
-                    None,
-                ));
+                return Err(err(req_id, -32602, "tags must be an array of strings or null", None));
             }
         }
     }
@@ -213,20 +177,10 @@ fn parse_task_update_patch(
         match arr {
             Value::Null => patch.acceptance_criteria = Some(Vec::new()),
             Value::Array(items) => {
-                patch.acceptance_criteria = Some(
-                    items
-                        .iter()
-                        .filter_map(|x| x.as_str().map(|s| s.to_string()))
-                        .collect(),
-                );
+                patch.acceptance_criteria = Some(items.iter().filter_map(|x| x.as_str().map(|s| s.to_string())).collect());
             }
             _ => {
-                return Err(err(
-                    req_id,
-                    -32602,
-                    "acceptance_criteria must be an array of strings or null",
-                    None,
-                ));
+                return Err(err(req_id, -32602, "acceptance_criteria must be an array of strings or null", None));
             }
         }
     }
@@ -237,12 +191,7 @@ fn parse_task_update_patch(
             value => match serde_json::from_value::<TaskRelationships>(value.clone()) {
                 Ok(rel) => patch.relationships = Some(rel),
                 Err(e) => {
-                    return Err(err(
-                        req_id,
-                        -32602,
-                        &format!("Invalid relationships payload: {}", e),
-                        None,
-                    ));
+                    return Err(err(req_id, -32602, &format!("Invalid relationships payload: {}", e), None));
                 }
             },
         }
@@ -259,12 +208,7 @@ fn parse_task_update_patch(
                 patch.custom_fields = Some(custom_fields_map);
             }
             _ => {
-                return Err(err(
-                    req_id,
-                    -32602,
-                    "custom_fields must be an object or null",
-                    None,
-                ));
+                return Err(err(req_id, -32602, "custom_fields must be an object or null", None));
             }
         }
     }
@@ -275,29 +219,15 @@ fn parse_task_update_patch(
             Some(Value::Array(items)) => {
                 let mut ids = Vec::new();
                 for item in items {
-                    let Some(id) = item
-                        .as_u64()
-                        .and_then(|v| u32::try_from(v).ok())
-                        .filter(|v| *v > 0)
-                    else {
-                        return Err(err(
-                            req_id,
-                            -32602,
-                            "sprints must be an array of positive integers or null",
-                            None,
-                        ));
+                    let Some(id) = item.as_u64().and_then(|v| u32::try_from(v).ok()).filter(|v| *v > 0) else {
+                        return Err(err(req_id, -32602, "sprints must be an array of positive integers or null", None));
                     };
                     ids.push(id);
                 }
                 patch.sprints = Some(ids);
             }
             _ => {
-                return Err(err(
-                    req_id,
-                    -32602,
-                    "sprints must be an array of positive integers or null",
-                    None,
-                ));
+                return Err(err(req_id, -32602, "sprints must be an array of positive integers or null", None));
             }
         }
     }
@@ -307,10 +237,7 @@ fn parse_task_update_patch(
 
 /// Best-effort enum hints scoped to a project's resolved configuration so
 /// validation errors can suggest the values that project actually allows.
-fn enum_hints_for_project(
-    tasks_root: &std::path::Path,
-    project: Option<&str>,
-) -> Option<EnumHints> {
+fn enum_hints_for_project(tasks_root: &std::path::Path, project: Option<&str>) -> Option<EnumHints> {
     let scope: Vec<String> = project.iter().map(|p| p.to_string()).collect();
     let cfg = crate::config::resolution::config_for_project(tasks_root, project).ok()?;
     EnumHints::from_resolved_config(&cfg, &scope)
@@ -319,47 +246,21 @@ fn enum_hints_for_project(
 /// Map a service failure to a JSON-RPC error response. Validation errors
 /// embed the project's allowed values in their message; `hint_data` carries
 /// optional structured enum suggestions for MCP hosts.
-fn task_mutation_error(
-    req_id: Option<Value>,
-    error: LoTaRError,
-    fallback_code: i64,
-    fallback_message: &str,
-    hint_data: Option<Value>,
-) -> JsonRpcResponse {
+fn task_mutation_error(req_id: Option<Value>, error: LoTaRError, fallback_code: i64, fallback_message: &str, hint_data: Option<Value>) -> JsonRpcResponse {
     match error {
-        LoTaRError::TaskNotFound(id) => err(
-            req_id,
-            -32004,
-            "Task not found",
-            Some(json!({"message": format!("Task '{}' not found", id)})),
-        ),
+        LoTaRError::TaskNotFound(id) => err(req_id, -32004, "Task not found", Some(json!({"message": format!("Task '{}' not found", id)}))),
         LoTaRError::ValidationError(msg) => {
             // Membership failures keep the operation envelope (`Task
             // create/update failed` + `data.message`) clients already parse;
             // other validation errors use the invalid-params code with
             // optional enum suggestions.
             if msg.contains("configured members") {
-                err(
-                    req_id,
-                    fallback_code,
-                    fallback_message,
-                    Some(json!({"message": msg})),
-                )
+                err(req_id, fallback_code, fallback_message, Some(json!({"message": msg})))
             } else {
-                err(
-                    req_id,
-                    -32602,
-                    &format!("Validation failed: {}", msg),
-                    hint_data,
-                )
+                err(req_id, -32602, &format!("Validation failed: {}", msg), hint_data)
             }
         }
-        other => err(
-            req_id,
-            fallback_code,
-            fallback_message,
-            Some(json!({"message": other.to_string()})),
-        ),
+        other => err(req_id, fallback_code, fallback_message, Some(json!({"message": other.to_string()}))),
     }
 }
 
@@ -370,85 +271,45 @@ pub(crate) fn handle_task_create(req: JsonRpcRequest) -> JsonRpcResponse {
         Some(s) if !s.trim().is_empty() => s.to_string(),
         _ => return err(req.id, -32602, "Missing required field: title", None),
     };
-    let project = req
-        .params
-        .get("project")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
+    let project = req.params.get("project").and_then(|v| v.as_str()).map(|s| s.to_string());
     let project = TaskService::resolve_create_project(&resolver.path, project);
-    let project_cfg =
-        match crate::config::resolution::config_for_project(&resolver.path, Some(&project)) {
-            Ok(config) => config,
-            Err(error) => {
-                return err(
-                    req.id,
-                    -32000,
-                    "Failed to resolve configuration",
-                    Some(json!({"message": error.to_string()})),
-                );
-            }
-        };
+    let project_cfg = match crate::config::resolution::config_for_project(&resolver.path, Some(&project)) {
+        Ok(config) => config,
+        Err(error) => {
+            return err(req.id, -32000, "Failed to resolve configuration", Some(json!({"message": error.to_string()})));
+        }
+    };
     let enum_hints = EnumHints::from_resolved_config(&project_cfg, std::slice::from_ref(&project));
     // Pre-validate enums with the target project's config so failures carry
     // structured suggestions; the service re-validates authoritatively.
     if let Some(raw) = req.params.get("status").and_then(|v| v.as_str())
         && let Err(e) = crate::types::TaskStatus::parse_with_config(raw, &project_cfg)
     {
-        let data = enum_hints
-            .as_ref()
-            .and_then(|h| make_enum_error_data("status", raw, &h.statuses));
-        return err(
-            req.id,
-            -32602,
-            &format!("Status validation failed: {}", e),
-            data,
-        );
+        let data = enum_hints.as_ref().and_then(|h| make_enum_error_data("status", raw, &h.statuses));
+        return err(req.id, -32602, &format!("Status validation failed: {}", e), data);
     }
     if let Some(raw) = req.params.get("priority").and_then(|v| v.as_str())
         && let Err(e) = crate::types::Priority::parse_with_config(raw, &project_cfg)
     {
-        let data = enum_hints
-            .as_ref()
-            .and_then(|h| make_enum_error_data("priority", raw, &h.priorities));
-        return err(
-            req.id,
-            -32602,
-            &format!("Priority validation failed: {}", e),
-            data,
-        );
+        let data = enum_hints.as_ref().and_then(|h| make_enum_error_data("priority", raw, &h.priorities));
+        return err(req.id, -32602, &format!("Priority validation failed: {}", e), data);
     }
     // `type` is canonical; `task_type` is its alias and only applies when
     // `type` is absent or explicitly null (null means omitted, so it falls
     // through to the alias instead of shadowing it).
-    let type_param = req
-        .params
-        .get("type")
-        .filter(|v| !v.is_null())
-        .or_else(|| req.params.get("task_type"))
-        .and_then(|v| v.as_str());
+    let type_param = req.params.get("type").filter(|v| !v.is_null()).or_else(|| req.params.get("task_type")).and_then(|v| v.as_str());
     if let Some(raw) = type_param
         && let Err(e) = crate::types::TaskType::parse_with_config(raw, &project_cfg)
     {
-        let data = enum_hints
-            .as_ref()
-            .and_then(|h| make_enum_error_data("type", raw, &h.types));
-        return err(
-            req.id,
-            -32602,
-            &format!("Type validation failed: {}", e),
-            data,
-        );
+        let data = enum_hints.as_ref().and_then(|h| make_enum_error_data("type", raw, &h.types));
+        return err(req.id, -32602, &format!("Type validation failed: {}", e), data);
     }
 
     let acceptance_criteria = req
         .params
         .get("acceptance_criteria")
         .and_then(|v| v.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|x| x.as_str().map(|s| s.to_string()))
-                .collect::<Vec<_>>()
-        })
+        .map(|arr| arr.iter().filter_map(|x| x.as_str().map(|s| s.to_string())).collect::<Vec<_>>())
         .unwrap_or_default();
 
     let custom_fields_map = req
@@ -463,11 +324,7 @@ pub(crate) fn handle_task_create(req: JsonRpcRequest) -> JsonRpcResponse {
             m
         })
         .unwrap_or_default();
-    let custom_fields = if custom_fields_map.is_empty() {
-        None
-    } else {
-        Some(custom_fields_map)
-    };
+    let custom_fields = if custom_fields_map.is_empty() { None } else { Some(custom_fields_map) };
 
     let relationships = match req.params.get("relationships") {
         // Explicit null matches the shared TaskCreate DTO's Option semantics
@@ -482,21 +339,13 @@ pub(crate) fn handle_task_create(req: JsonRpcRequest) -> JsonRpcResponse {
                 }
             }
             Err(e) => {
-                return err(
-                    req.id,
-                    -32602,
-                    &format!("Invalid relationships payload: {}", e),
-                    None,
-                );
+                return err(req.id, -32602, &format!("Invalid relationships payload: {}", e), None);
             }
         },
     };
 
     fn opt_string(params: &Value, key: &str) -> Option<String> {
-        params
-            .get(key)
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string())
+        params.get(key).and_then(|v| v.as_str()).map(|s| s.to_string())
     }
 
     let dto = TaskCreate {
@@ -517,11 +366,7 @@ pub(crate) fn handle_task_create(req: JsonRpcRequest) -> JsonRpcResponse {
             .params
             .get("tags")
             .and_then(|v| v.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|x| x.as_str().map(|s| s.to_string()))
-                    .collect::<Vec<_>>()
-            })
+            .map(|arr| arr.iter().filter_map(|x| x.as_str().map(|s| s.to_string())).collect::<Vec<_>>())
             .unwrap_or_default(),
         acceptance_criteria,
         relationships,
@@ -536,19 +381,11 @@ pub(crate) fn handle_task_create(req: JsonRpcRequest) -> JsonRpcResponse {
     // Report once (DEV-317): an existing ticket for the finding is returned
     // instead of a new one.
     if let Some(key) = opt_string(&req.params, "finding") {
-        return match crate::services::finding_service::FindingService::report(
-            &mut storage,
-            dto,
-            &key,
-        ) {
+        return match crate::services::finding_service::FindingService::report(&mut storage, dto, &key) {
             Ok((outcome, task)) => {
-                let mut response_body =
-                    make_task_create_payload(&task, &req.params, enum_hints.as_ref());
+                let mut response_body = make_task_create_payload(&task, &req.params, enum_hints.as_ref());
                 if let Some(root) = response_body.as_object_mut() {
-                    root.insert(
-                        "finding".into(),
-                        serde_json::to_value(&outcome).unwrap_or(Value::Null),
-                    );
+                    root.insert("finding".into(), serde_json::to_value(&outcome).unwrap_or(Value::Null));
                     if !outcome.created {
                         root.remove("metadata");
                     }
@@ -567,16 +404,9 @@ pub(crate) fn handle_task_create(req: JsonRpcRequest) -> JsonRpcResponse {
     }
 }
 
-fn make_task_create_payload(
-    task: &TaskDTO,
-    params: &Value,
-    enum_hints: Option<&EnumHints>,
-) -> Value {
+fn make_task_create_payload(task: &TaskDTO, params: &Value, enum_hints: Option<&EnumHints>) -> Value {
     let mut root = serde_json::Map::new();
-    root.insert(
-        "task".into(),
-        serde_json::to_value(task).unwrap_or(Value::Null),
-    );
+    root.insert("task".into(), serde_json::to_value(task).unwrap_or(Value::Null));
 
     let mut metadata = serde_json::Map::new();
     let applied_defaults = applied_defaults_for_task_create(params, task);
@@ -595,45 +425,24 @@ fn make_task_create_payload(
 
 fn applied_defaults_for_task_create(params: &Value, task: &TaskDTO) -> Vec<Value> {
     fn provided(params: &Value, key: &str) -> bool {
-        params.get(key).is_some_and(|value| {
-            if let Some(s) = value.as_str() {
-                !s.trim().is_empty()
-            } else {
-                !value.is_null()
-            }
-        })
+        params.get(key).is_some_and(|value| if let Some(s) = value.as_str() { !s.trim().is_empty() } else { !value.is_null() })
     }
 
-    #[expect(
-        clippy::needless_pass_by_value,
-        reason = "callers pass owned temporaries (format!/json!/errors), so taking ownership keeps call sites simple"
-    )]
+    #[expect(clippy::needless_pass_by_value, reason = "callers pass owned temporaries (format!/json!/errors), so taking ownership keeps call sites simple")]
     fn push_default(acc: &mut Vec<Value>, field: &str, value: Value) {
         acc.push(json!({ "field": field, "value": value }));
     }
 
     let mut defaults = Vec::new();
     if !provided(params, "priority") {
-        push_default(
-            &mut defaults,
-            "priority",
-            Value::String(task.priority.to_string()),
-        );
+        push_default(&mut defaults, "priority", Value::String(task.priority.to_string()));
     }
     let provided_type = provided(params, "type") || provided(params, "task_type");
     if !provided_type {
-        push_default(
-            &mut defaults,
-            "type",
-            Value::String(task.task_type.to_string()),
-        );
+        push_default(&mut defaults, "type", Value::String(task.task_type.to_string()));
     }
     if !provided(params, "status") {
-        push_default(
-            &mut defaults,
-            "status",
-            Value::String(task.status.to_string()),
-        );
+        push_default(&mut defaults, "status", Value::String(task.status.to_string()));
     }
     if !provided(params, "reporter")
         && let Some(reporter) = task.reporter.as_ref()
@@ -646,11 +455,7 @@ fn applied_defaults_for_task_create(params: &Value, task: &TaskDTO) -> Vec<Value
         push_default(&mut defaults, "assignee", Value::String(assignee.clone()));
     }
     if params.get("tags").is_none() && !task.tags.is_empty() {
-        push_default(
-            &mut defaults,
-            "tags",
-            serde_json::to_value(&task.tags).unwrap_or(Value::Array(Vec::new())),
-        );
+        push_default(&mut defaults, "tags", serde_json::to_value(&task.tags).unwrap_or(Value::Array(Vec::new())));
     }
 
     defaults
@@ -661,26 +466,13 @@ pub(crate) fn handle_task_get(req: JsonRpcRequest) -> JsonRpcResponse {
         return err(req.id, -32602, "Missing id", None);
     };
     let project = req.params.get("project").and_then(|v| v.as_str());
-    let include_deleted = req
-        .params
-        .get("include_deleted")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
+    let include_deleted = req.params.get("include_deleted").and_then(|v| v.as_bool()).unwrap_or(false);
     let resolver = try_rpc!(resolve_tasks_dir(&req.id));
     let storage = Storage::new(&resolver.path);
-    let outcome = if include_deleted {
-        TaskService::get_including_deleted(&storage, id, project)
-    } else {
-        TaskService::get(&storage, id, project)
-    };
+    let outcome = if include_deleted { TaskService::get_including_deleted(&storage, id, project) } else { TaskService::get(&storage, id, project) };
     match outcome {
         Ok(task) => text_result(req.id, &task),
-        Err(e) => err(
-            req.id,
-            -32004,
-            "Task not found",
-            Some(json!({"message": e.to_string()})),
-        ),
+        Err(e) => err(req.id, -32004, "Task not found", Some(json!({"message": e.to_string()}))),
     }
 }
 
@@ -698,57 +490,27 @@ pub(crate) fn handle_task_update(req: JsonRpcRequest) -> JsonRpcResponse {
     // Pre-validate enum strings against the task's project configuration so
     // failures carry structured suggestions; the service re-validates
     // authoritatively with the same resolved config.
-    let project_prefix = crate::storage::TaskId::parse(id)
-        .map(|parsed| parsed.project)
-        .unwrap_or_default();
-    let project_cfg = crate::config::resolution::config_for_project(
-        resolver.path.as_path(),
-        Some(project_prefix.as_str()),
-    )
-    .unwrap_or_else(|_| {
-        crate::config::types::ResolvedConfig::from_global(
-            crate::config::types::GlobalConfig::default(),
-        )
-    });
+    let project_prefix = crate::storage::TaskId::parse(id).map(|parsed| parsed.project).unwrap_or_default();
+    let project_cfg = crate::config::resolution::config_for_project(resolver.path.as_path(), Some(project_prefix.as_str()))
+        .unwrap_or_else(|_| crate::config::types::ResolvedConfig::from_global(crate::config::types::GlobalConfig::default()));
     let enum_hints = enum_hints_for_project(resolver.path.as_path(), Some(&project_prefix));
     if let Some(raw) = patch.status.as_deref()
         && let Err(e) = crate::types::TaskStatus::parse_with_config(raw, &project_cfg)
     {
-        let data = enum_hints
-            .as_ref()
-            .and_then(|h| make_enum_error_data("status", raw, &h.statuses));
-        return err(
-            req.id,
-            -32602,
-            &format!("Status validation failed: {}", e),
-            data,
-        );
+        let data = enum_hints.as_ref().and_then(|h| make_enum_error_data("status", raw, &h.statuses));
+        return err(req.id, -32602, &format!("Status validation failed: {}", e), data);
     }
     if let Some(raw) = patch.priority.as_deref()
         && let Err(e) = crate::types::Priority::parse_with_config(raw, &project_cfg)
     {
-        let data = enum_hints
-            .as_ref()
-            .and_then(|h| make_enum_error_data("priority", raw, &h.priorities));
-        return err(
-            req.id,
-            -32602,
-            &format!("Priority validation failed: {}", e),
-            data,
-        );
+        let data = enum_hints.as_ref().and_then(|h| make_enum_error_data("priority", raw, &h.priorities));
+        return err(req.id, -32602, &format!("Priority validation failed: {}", e), data);
     }
     if let Some(raw) = patch.task_type.as_deref()
         && let Err(e) = crate::types::TaskType::parse_with_config(raw, &project_cfg)
     {
-        let data = enum_hints
-            .as_ref()
-            .and_then(|h| make_enum_error_data("type", raw, &h.types));
-        return err(
-            req.id,
-            -32602,
-            &format!("Type validation failed: {}", e),
-            data,
-        );
+        let data = enum_hints.as_ref().and_then(|h| make_enum_error_data("type", raw, &h.types));
+        return err(req.id, -32602, &format!("Type validation failed: {}", e), data);
     }
 
     // A restricted session (agent jobs) may not start agents, and assigning
@@ -758,23 +520,11 @@ pub(crate) fn handle_task_update(req: JsonRpcRequest) -> JsonRpcResponse {
         && let Some(profile) = assignee.trim().strip_prefix('@')
         && project_cfg.agent_profiles.contains_key(profile)
     {
-        return err(
-            req.id,
-            -32602,
-            &format!(
-                "Assigning tickets to agent profile '@{profile}' is not available in this session"
-            ),
-            None,
-        );
+        return err(req.id, -32602, &format!("Assigning tickets to agent profile '@{profile}' is not available in this session"), None);
     }
 
     let mut storage = Storage::new(&resolver.path.clone());
-    match TaskService::update_with_receipt(
-        &mut storage,
-        id,
-        patch,
-        crate::services::task_service::TaskUpdateContext::default(),
-    ) {
+    match TaskService::update_with_receipt(&mut storage, id, patch, crate::services::task_service::TaskUpdateContext::default()) {
         // A running agent job holds a status/assignee change for its end
         // (DEV-320): the task JSON gains `deferred` and a `message`.
         Ok(receipt) => match receipt.deferred {
@@ -811,12 +561,7 @@ pub(crate) fn handle_task_comment_add(req: JsonRpcRequest) -> JsonRpcResponse {
         Err(error) => {
             let msg = error.to_string();
             if msg.contains("not found") {
-                return err(
-                    req.id,
-                    -32004,
-                    "Task not found",
-                    Some(json!({"message": format!("Task '{}' not found", id)})),
-                );
+                return err(req.id, -32004, "Task not found", Some(json!({"message": format!("Task '{}' not found", id)})));
             }
             return internal_error(req.id, msg);
         }
@@ -859,12 +604,7 @@ pub(crate) fn handle_task_comment_update(req: JsonRpcRequest) -> JsonRpcResponse
         Err(error) => {
             let msg = error.to_string();
             if msg.contains("not found") {
-                return err(
-                    req.id,
-                    -32004,
-                    "Task not found",
-                    Some(json!({"message": format!("Task '{}' not found", id)})),
-                );
+                return err(req.id, -32004, "Task not found", Some(json!({"message": format!("Task '{}' not found", id)})));
             }
             if msg.contains("Invalid comment index") {
                 return err(req.id, -32602, "Invalid comment index", None);
@@ -886,13 +626,7 @@ pub(crate) fn handle_task_comment_update(req: JsonRpcRequest) -> JsonRpcResponse
 
 pub(crate) fn handle_task_bulk_update(req: JsonRpcRequest) -> JsonRpcResponse {
     let ids = match req.params.get("ids").and_then(|v| v.as_array()) {
-        Some(arr) => arr
-            .iter()
-            .filter_map(|v| v.as_str())
-            .map(|s| s.trim())
-            .filter(|s| !s.is_empty())
-            .map(|s| s.to_string())
-            .collect::<Vec<_>>(),
+        Some(arr) => arr.iter().filter_map(|v| v.as_str()).map(|s| s.trim()).filter(|s| !s.is_empty()).map(|s| s.to_string()).collect::<Vec<_>>(),
         None => return err(req.id, -32602, "Missing ids", None),
     };
     if ids.is_empty() {
@@ -901,11 +635,7 @@ pub(crate) fn handle_task_bulk_update(req: JsonRpcRequest) -> JsonRpcResponse {
 
     let patch_val = req.params.get("patch").cloned().unwrap_or(json!({}));
 
-    let stop_on_error = req
-        .params
-        .get("stop_on_error")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
+    let stop_on_error = req.params.get("stop_on_error").and_then(|v| v.as_bool()).unwrap_or(false);
 
     let resolver = try_rpc!(resolve_tasks_dir(&req.id));
 
@@ -922,12 +652,7 @@ pub(crate) fn handle_task_bulk_update(req: JsonRpcRequest) -> JsonRpcResponse {
 
     let mut deferred: Vec<Value> = Vec::new();
     for id in ids {
-        match TaskService::update_with_receipt(
-            &mut storage,
-            &id,
-            patch.clone(),
-            crate::services::task_service::TaskUpdateContext::default(),
-        ) {
+        match TaskService::update_with_receipt(&mut storage, &id, patch.clone(), crate::services::task_service::TaskUpdateContext::default()) {
             Ok(receipt) => {
                 if let Some(outcome) = receipt.deferred {
                     deferred.push(json!({"id": receipt.dto.id, "message": outcome.describe().join("; "), "outcome": outcome}));
@@ -957,13 +682,7 @@ pub(crate) fn handle_task_bulk_update(req: JsonRpcRequest) -> JsonRpcResponse {
 
 pub(crate) fn handle_task_bulk_comment_add(req: JsonRpcRequest) -> JsonRpcResponse {
     let ids = match req.params.get("ids").and_then(|v| v.as_array()) {
-        Some(arr) => arr
-            .iter()
-            .filter_map(|v| v.as_str())
-            .map(|s| s.trim())
-            .filter(|s| !s.is_empty())
-            .map(|s| s.to_string())
-            .collect::<Vec<_>>(),
+        Some(arr) => arr.iter().filter_map(|v| v.as_str()).map(|s| s.trim()).filter(|s| !s.is_empty()).map(|s| s.to_string()).collect::<Vec<_>>(),
         None => return err(req.id, -32602, "Missing ids", None),
     };
     if ids.is_empty() {
@@ -973,11 +692,7 @@ pub(crate) fn handle_task_bulk_comment_add(req: JsonRpcRequest) -> JsonRpcRespon
         Some(s) if !s.trim().is_empty() => s.trim().to_string(),
         _ => return err(req.id, -32602, "Missing text", None),
     };
-    let stop_on_error = req
-        .params
-        .get("stop_on_error")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
+    let stop_on_error = req.params.get("stop_on_error").and_then(|v| v.as_bool()).unwrap_or(false);
 
     let resolver = try_rpc!(resolve_tasks_dir(&req.id));
 
@@ -1021,13 +736,7 @@ pub(crate) fn handle_task_bulk_reference_remove(req: JsonRpcRequest) -> JsonRpcR
 
 fn handle_task_bulk_reference_mutation(req: JsonRpcRequest, is_add: bool) -> JsonRpcResponse {
     let ids = match req.params.get("ids").and_then(|v| v.as_array()) {
-        Some(arr) => arr
-            .iter()
-            .filter_map(|v| v.as_str())
-            .map(|s| s.trim())
-            .filter(|s| !s.is_empty())
-            .map(|s| s.to_string())
-            .collect::<Vec<_>>(),
+        Some(arr) => arr.iter().filter_map(|v| v.as_str()).map(|s| s.trim()).filter(|s| !s.is_empty()).map(|s| s.to_string()).collect::<Vec<_>>(),
         None => return err(req.id, -32602, "Missing ids", None),
     };
     if ids.is_empty() {
@@ -1042,11 +751,7 @@ fn handle_task_bulk_reference_mutation(req: JsonRpcRequest, is_add: bool) -> Jso
         _ => return err(req.id, -32602, "Missing value", None),
     };
 
-    let stop_on_error = req
-        .params
-        .get("stop_on_error")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
+    let stop_on_error = req.params.get("stop_on_error").and_then(|v| v.as_bool()).unwrap_or(false);
 
     let resolver = try_rpc!(resolve_tasks_dir(&req.id));
 
@@ -1056,11 +761,7 @@ fn handle_task_bulk_reference_mutation(req: JsonRpcRequest, is_add: bool) -> Jso
     // code REMOVE matches stored values only and works outside Git (same
     // rule as the single-task handler). A missing root fails just the
     // items that need it instead of aborting the whole batch.
-    let repo_root = if kind == "code" || kind == "file" {
-        find_repo_root(storage.root_path.as_path())
-    } else {
-        None
-    };
+    let repo_root = if kind == "code" || kind == "file" { find_repo_root(storage.root_path.as_path()) } else { None };
 
     let mut updated: Vec<Value> = Vec::new();
     let mut failed: Vec<Value> = Vec::new();
@@ -1075,9 +776,7 @@ fn handle_task_bulk_reference_mutation(req: JsonRpcRequest, is_add: bool) -> Jso
     // (rejected by the service guard), so they stay unlocked.
 
     for id in ids {
-        let normalized_id = if let Some(project_override) =
-            req.params.get("project").and_then(|v| v.as_str())
-        {
+        let normalized_id = if let Some(project_override) = req.params.get("project").and_then(|v| v.as_str()) {
             let mut project_resolver = match ProjectResolver::new(&resolver) {
                 Ok(r) => r,
                 Err(e) => {
@@ -1121,79 +820,27 @@ fn handle_task_bulk_reference_mutation(req: JsonRpcRequest, is_add: bool) -> Jso
         }
 
         let result: Result<ReferenceMutationOutcome, String> = match (kind.as_str(), is_add) {
-            ("link", true) => {
-                ReferenceService::attach_link_reference(&mut storage, &normalized_id, &value)
-            }
-            ("link", false) => {
-                ReferenceService::detach_link_reference(&mut storage, &normalized_id, &value)
-            }
+            ("link", true) => ReferenceService::attach_link_reference(&mut storage, &normalized_id, &value),
+            ("link", false) => ReferenceService::detach_link_reference(&mut storage, &normalized_id, &value),
             ("code", true) => match repo_root.as_deref() {
-                Some(root) => ReferenceService::attach_code_reference(
-                    &mut storage,
-                    root,
-                    &normalized_id,
-                    &value,
-                ),
-                None => Err(LoTaRError::ValidationError(
-                    "Unable to locate git repository".to_string(),
-                )),
+                Some(root) => ReferenceService::attach_code_reference(&mut storage, root, &normalized_id, &value),
+                None => Err(LoTaRError::ValidationError("Unable to locate git repository".to_string())),
             },
-            ("code", false) => {
-                ReferenceService::detach_code_reference(&mut storage, &normalized_id, &value)
-            }
+            ("code", false) => ReferenceService::detach_code_reference(&mut storage, &normalized_id, &value),
             ("file", true) => match repo_root.as_deref() {
-                Some(root) => ReferenceService::attach_file_reference(
-                    &mut storage,
-                    root,
-                    &normalized_id,
-                    &value,
-                ),
-                None => Err(LoTaRError::ValidationError(
-                    "Unable to locate git repository".to_string(),
-                )),
+                Some(root) => ReferenceService::attach_file_reference(&mut storage, root, &normalized_id, &value),
+                None => Err(LoTaRError::ValidationError("Unable to locate git repository".to_string())),
             },
             ("file", false) => match repo_root.as_deref() {
-                Some(root) => ReferenceService::detach_file_reference(
-                    &mut storage,
-                    root,
-                    &normalized_id,
-                    &value,
-                ),
-                None => Err(LoTaRError::ValidationError(
-                    "Unable to locate git repository".to_string(),
-                )),
+                Some(root) => ReferenceService::detach_file_reference(&mut storage, root, &normalized_id, &value),
+                None => Err(LoTaRError::ValidationError("Unable to locate git repository".to_string())),
             },
-            ("jira", true) => ReferenceService::attach_platform_reference(
-                &mut storage,
-                &normalized_id,
-                "jira",
-                &value,
-            ),
-            ("jira", false) => ReferenceService::detach_platform_reference(
-                &mut storage,
-                &normalized_id,
-                "jira",
-                &value,
-            ),
-            ("github", true) => ReferenceService::attach_platform_reference(
-                &mut storage,
-                &normalized_id,
-                "github",
-                &value,
-            ),
-            ("github", false) => ReferenceService::detach_platform_reference(
-                &mut storage,
-                &normalized_id,
-                "github",
-                &value,
-            ),
+            ("jira", true) => ReferenceService::attach_platform_reference(&mut storage, &normalized_id, "jira", &value),
+            ("jira", false) => ReferenceService::detach_platform_reference(&mut storage, &normalized_id, "jira", &value),
+            ("github", true) => ReferenceService::attach_platform_reference(&mut storage, &normalized_id, "github", &value),
+            ("github", false) => ReferenceService::detach_platform_reference(&mut storage, &normalized_id, "github", &value),
             _ => {
-                return err(
-                    req.id,
-                    -32602,
-                    "Invalid kind",
-                    Some(json!({"message": "kind must be one of: link, file, code, jira, github, attachment"})),
-                );
+                return err(req.id, -32602, "Invalid kind", Some(json!({"message": "kind must be one of: link, file, code, jira, github, attachment"})));
             }
         }
         .map_err(|e| e.to_string());
@@ -1203,9 +850,7 @@ fn handle_task_bulk_reference_mutation(req: JsonRpcRequest, is_add: bool) -> Jso
                 // link/code/file/platform items hold no store lock; hook
                 // dispatch here is already after every relevant lock.
                 ReferenceService::dispatch_post_commit(&mut storage, &outcome);
-                updated.push(
-                    json!({"id": normalized_id, "changed": outcome.changed, "task": outcome.task}),
-                )
+                updated.push(json!({"id": normalized_id, "changed": outcome.changed, "task": outcome.task}))
             }
             Err(error) => {
                 failed.push(json!({"id": normalized_id, "error": error}));
@@ -1236,38 +881,19 @@ fn handle_task_bulk_reference_mutation(req: JsonRpcRequest, is_add: bool) -> Jso
 /// different `attachments.dir` stores never lock or precheck the wrong
 /// root. Adds require the named blob in THAT store; removes are
 /// reference-only and work with missing/stale blobs.
-fn attachment_bulk_item(
-    storage: &mut Storage,
-    full_id: &str,
-    value: &str,
-    is_add: bool,
-) -> Result<ReferenceMutationOutcome, String> {
-    let location = storage
-        .resolve_task_location(full_id)
-        .map_err(|e| e.to_string())?;
+fn attachment_bulk_item(storage: &mut Storage, full_id: &str, value: &str, is_add: bool) -> Result<ReferenceMutationOutcome, String> {
+    let location = storage.resolve_task_location(full_id).map_err(|e| e.to_string())?;
     let project = location.id.project.clone();
-    let cfg = crate::config::resolution::config_for_project(&location.root, Some(&project))
-        .map_err(|e| format!("Failed to load project config: {e}"))?;
-    let root = crate::services::attachment_service::AttachmentService::resolve_attachments_root(
-        &location.root,
-        &cfg,
-    )
-    .map_err(|e| e.to_string())?;
-    let _guard = crate::services::attachment_service::AttachmentService::lock_store(&root)
-        .map_err(|e| e.to_string())?;
+    let cfg = crate::config::resolution::config_for_project(&location.root, Some(&project)).map_err(|e| format!("Failed to load project config: {e}"))?;
+    let root = crate::services::attachment_service::AttachmentService::resolve_attachments_root(&location.root, &cfg).map_err(|e| e.to_string())?;
+    let _guard = crate::services::attachment_service::AttachmentService::lock_store(&root).map_err(|e| e.to_string())?;
     if is_add {
-        crate::services::attachment_service::AttachmentService::resolve_attachment_path(
-            &root, value,
-        )?;
+        crate::services::attachment_service::AttachmentService::resolve_attachment_path(&root, value)?;
     }
     if is_add {
-        crate::services::attachment_service::AttachmentService::attach_managed_reference(
-            storage, full_id, value,
-        )
+        crate::services::attachment_service::AttachmentService::attach_managed_reference(storage, full_id, value)
     } else {
-        crate::services::attachment_service::AttachmentService::detach_managed_reference(
-            storage, full_id, value,
-        )
+        crate::services::attachment_service::AttachmentService::detach_managed_reference(storage, full_id, value)
     }
     .map_err(|e| e.to_string())
 }
@@ -1300,22 +926,14 @@ fn handle_task_reference_mutation(req: JsonRpcRequest, is_add: bool) -> JsonRpcR
     let mut project_resolver = match ProjectResolver::new(&resolver) {
         Ok(r) => r,
         Err(e) => {
-            return internal_error(
-                req.id,
-                format!("Failed to initialize project resolver: {}", e),
-            );
+            return internal_error(req.id, format!("Failed to initialize project resolver: {}", e));
         }
     };
 
     let full_id = match project_resolver.get_full_task_id(&id, project) {
         Ok(v) => v,
         Err(e) => {
-            return err(
-                req.id,
-                -32602,
-                "Invalid task id",
-                Some(json!({"message": e})),
-            );
+            return err(req.id, -32602, "Invalid task id", Some(json!({"message": e})));
         }
     };
 
@@ -1329,31 +947,16 @@ fn handle_task_reference_mutation(req: JsonRpcRequest, is_add: bool) -> JsonRpcR
         // resolve inside the store (rejected by the service guard) and stay
         // unlocked.
         let _store_guard = if kind == "attachment" {
-            let project = crate::storage::TaskId::parse(&full_id)
-                .ok()
-                .map(|parsed| parsed.project);
-            let cfg =
-                crate::config::resolution::config_for_project(&resolver.path, project.as_deref())
-                    .unwrap_or_else(|_| {
-                        crate::config::types::ResolvedConfig::from_global(
-                            crate::config::types::GlobalConfig::default(),
-                        )
-                    });
-            let root =
-            match crate::services::attachment_service::AttachmentService::resolve_attachments_root(
-                &resolver.path,
-                &cfg,
-            ) {
+            let project = crate::storage::TaskId::parse(&full_id).ok().map(|parsed| parsed.project);
+            let cfg = crate::config::resolution::config_for_project(&resolver.path, project.as_deref())
+                .unwrap_or_else(|_| crate::config::types::ResolvedConfig::from_global(crate::config::types::GlobalConfig::default()));
+            let root = match crate::services::attachment_service::AttachmentService::resolve_attachments_root(&resolver.path, &cfg) {
                 Ok(root) => root,
                 Err(e) => {
                     return err(
                         req.id,
                         -32000,
-                        if is_add {
-                            "Task reference add failed"
-                        } else {
-                            "Task reference remove failed"
-                        },
+                        if is_add { "Task reference add failed" } else { "Task reference remove failed" },
                         Some(json!({"message": e.to_string()})),
                     );
                 }
@@ -1364,17 +967,8 @@ fn handle_task_reference_mutation(req: JsonRpcRequest, is_add: bool) -> JsonRpcR
                     // store — checked UNDER the store lock (matching the
                     // bulk handler and CLI) so a concurrent remove cannot
                     // delete the blob between the check and the attach.
-                    if is_add
-                        && let Err(message) = crate::services::attachment_service::AttachmentService::resolve_attachment_path(
-                            &root, &value,
-                        )
-                    {
-                        return err(
-                            req.id,
-                            -32000,
-                            "Task reference add failed",
-                            Some(json!({"message": message})),
-                        );
+                    if is_add && let Err(message) = crate::services::attachment_service::AttachmentService::resolve_attachment_path(&root, &value) {
+                        return err(req.id, -32000, "Task reference add failed", Some(json!({"message": message})));
                     }
                     Some(guard)
                 }
@@ -1382,11 +976,7 @@ fn handle_task_reference_mutation(req: JsonRpcRequest, is_add: bool) -> JsonRpcR
                     return err(
                         req.id,
                         -32000,
-                        if is_add {
-                            "Task reference add failed"
-                        } else {
-                            "Task reference remove failed"
-                        },
+                        if is_add { "Task reference add failed" } else { "Task reference remove failed" },
                         Some(json!({"message": e.to_string()})),
                     );
                 }
@@ -1396,87 +986,47 @@ fn handle_task_reference_mutation(req: JsonRpcRequest, is_add: bool) -> JsonRpcR
         };
 
         match (kind.as_str(), is_add) {
-        ("link", true) => ReferenceService::attach_link_reference(&mut storage, &full_id, &value),
-        ("link", false) => ReferenceService::detach_link_reference(&mut storage, &full_id, &value),
-        ("code", true) => {
-            let repo_root = match find_repo_root(storage.root_path.as_path()) {
-                Some(root) => root,
-                None => {
-                    return err(
-                        req.id,
-                        -32000,
-                        "Task reference add failed",
-                        Some(json!({"message": "Unable to locate git repository"})),
-                    );
-                }
-            };
-            ReferenceService::attach_code_reference(&mut storage, &repo_root, &full_id, &value)
+            ("link", true) => ReferenceService::attach_link_reference(&mut storage, &full_id, &value),
+            ("link", false) => ReferenceService::detach_link_reference(&mut storage, &full_id, &value),
+            ("code", true) => {
+                let repo_root = match find_repo_root(storage.root_path.as_path()) {
+                    Some(root) => root,
+                    None => {
+                        return err(req.id, -32000, "Task reference add failed", Some(json!({"message": "Unable to locate git repository"})));
+                    }
+                };
+                ReferenceService::attach_code_reference(&mut storage, &repo_root, &full_id, &value)
+            }
+            ("code", false) => ReferenceService::detach_code_reference(&mut storage, &full_id, &value),
+            ("file", true) => {
+                let repo_root = match find_repo_root(storage.root_path.as_path()) {
+                    Some(root) => root,
+                    None => {
+                        return err(req.id, -32000, "Task reference add failed", Some(json!({"message": "Unable to locate git repository"})));
+                    }
+                };
+                ReferenceService::attach_file_reference(&mut storage, &repo_root, &full_id, &value)
+            }
+            ("file", false) => {
+                let repo_root = match find_repo_root(storage.root_path.as_path()) {
+                    Some(root) => root,
+                    None => {
+                        return err(req.id, -32000, "Task reference remove failed", Some(json!({"message": "Unable to locate git repository"})));
+                    }
+                };
+                ReferenceService::detach_file_reference(&mut storage, &repo_root, &full_id, &value)
+            }
+            ("attachment", true) => crate::services::attachment_service::AttachmentService::attach_managed_reference(&mut storage, &full_id, &value),
+            ("attachment", false) => crate::services::attachment_service::AttachmentService::detach_managed_reference(&mut storage, &full_id, &value),
+            ("jira", true) => ReferenceService::attach_platform_reference(&mut storage, &full_id, "jira", &value),
+            ("jira", false) => ReferenceService::detach_platform_reference(&mut storage, &full_id, "jira", &value),
+            ("github", true) => ReferenceService::attach_platform_reference(&mut storage, &full_id, "github", &value),
+            ("github", false) => ReferenceService::detach_platform_reference(&mut storage, &full_id, "github", &value),
+            _ => {
+                return err(req.id, -32602, "Invalid kind", Some(json!({"message": "kind must be one of: link, file, code, jira, github, attachment"})));
+            }
         }
-        ("code", false) => ReferenceService::detach_code_reference(&mut storage, &full_id, &value),
-        ("file", true) => {
-            let repo_root = match find_repo_root(storage.root_path.as_path()) {
-                Some(root) => root,
-                None => {
-                    return err(
-                        req.id,
-                        -32000,
-                        "Task reference add failed",
-                        Some(json!({"message": "Unable to locate git repository"})),
-                    );
-                }
-            };
-            ReferenceService::attach_file_reference(&mut storage, &repo_root, &full_id, &value)
-        }
-        ("file", false) => {
-            let repo_root = match find_repo_root(storage.root_path.as_path()) {
-                Some(root) => root,
-                None => {
-                    return err(
-                        req.id,
-                        -32000,
-                        "Task reference remove failed",
-                        Some(json!({"message": "Unable to locate git repository"})),
-                    );
-                }
-            };
-            ReferenceService::detach_file_reference(&mut storage, &repo_root, &full_id, &value)
-        }
-        ("attachment", true) => {
-            crate::services::attachment_service::AttachmentService::attach_managed_reference(
-                &mut storage,
-                &full_id,
-                &value,
-            )
-        }
-        ("attachment", false) => {
-            crate::services::attachment_service::AttachmentService::detach_managed_reference(
-                &mut storage,
-                &full_id,
-                &value,
-            )
-        }
-        ("jira", true) => {
-            ReferenceService::attach_platform_reference(&mut storage, &full_id, "jira", &value)
-        }
-        ("jira", false) => {
-            ReferenceService::detach_platform_reference(&mut storage, &full_id, "jira", &value)
-        }
-        ("github", true) => {
-            ReferenceService::attach_platform_reference(&mut storage, &full_id, "github", &value)
-        }
-        ("github", false) => {
-            ReferenceService::detach_platform_reference(&mut storage, &full_id, "github", &value)
-        }
-        _ => {
-            return err(
-                req.id,
-                -32602,
-                "Invalid kind",
-                Some(json!({"message": "kind must be one of: link, file, code, jira, github, attachment"})),
-            );
-        }
-    }
-    .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())
     }; // the store guard (if any) has dropped: hooks are safe to run
 
     if let Ok(outcome) = &result {
@@ -1495,16 +1045,9 @@ fn handle_task_reference_mutation(req: JsonRpcRequest, is_add: bool) -> JsonRpcR
             });
             text_result(req.id, &payload)
         }
-        Err(message) => err(
-            req.id,
-            -32000,
-            if is_add {
-                "Task reference add failed"
-            } else {
-                "Task reference remove failed"
-            },
-            Some(json!({"message": message})),
-        ),
+        Err(message) => {
+            err(req.id, -32000, if is_add { "Task reference add failed" } else { "Task reference remove failed" }, Some(json!({"message": message})))
+        }
     }
 }
 
@@ -1513,11 +1056,7 @@ pub(crate) fn handle_task_delete(req: JsonRpcRequest) -> JsonRpcResponse {
         return err(req.id, -32602, "Missing id", None);
     };
     let project = req.params.get("project").and_then(|v| v.as_str());
-    let hard = req
-        .params
-        .get("hard")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
+    let hard = req.params.get("hard").and_then(|v| v.as_bool()).unwrap_or(false);
     let resolver = try_rpc!(resolve_tasks_dir(&req.id));
     let mut storage = Storage::new(&resolver.path);
     match TaskService::delete_with_options(&mut storage, id, project, hard) {
@@ -1529,12 +1068,7 @@ pub(crate) fn handle_task_delete(req: JsonRpcRequest) -> JsonRpcResponse {
             });
             text_result(req.id, &payload)
         }
-        Err(e) => err(
-            req.id,
-            -32006,
-            "Task delete failed",
-            Some(json!({"message": e.to_string()})),
-        ),
+        Err(e) => err(req.id, -32006, "Task delete failed", Some(json!({"message": e.to_string()}))),
     }
 }
 
@@ -1547,12 +1081,7 @@ pub(crate) fn handle_task_restore(req: JsonRpcRequest) -> JsonRpcResponse {
     let mut storage = Storage::new(&resolver.path);
     match TaskService::restore(&mut storage, id, project) {
         Ok(task) => text_result(req.id, &task),
-        Err(e) => err(
-            req.id,
-            -32007,
-            "Task restore failed",
-            Some(json!({"message": e.to_string()})),
-        ),
+        Err(e) => err(req.id, -32007, "Task restore failed", Some(json!({"message": e.to_string()}))),
     }
 }
 
@@ -1573,77 +1102,42 @@ fn archive_tool(req: JsonRpcRequest, archive: bool) -> JsonRpcResponse {
     let mut storage = Storage::new(&resolver.path);
     match TaskService::archive_with_receipt(&mut storage, id, project, archive) {
         Ok(receipt) => text_result(req.id, &receipt.dto),
-        Err(e) => err(
-            req.id,
-            -32007,
-            if archive {
-                "Task archive failed"
-            } else {
-                "Task unarchive failed"
-            },
-            Some(json!({"message": e.to_string()})),
-        ),
+        Err(e) => err(req.id, -32007, if archive { "Task archive failed" } else { "Task unarchive failed" }, Some(json!({"message": e.to_string()}))),
     }
 }
 
 pub(crate) fn handle_task_move(req: JsonRpcRequest) -> JsonRpcResponse {
-    let request: crate::api_types::TaskMoveRequest =
-        match serde_json::from_value(req.params.clone()) {
-            Ok(request) => request,
-            Err(e) => {
-                return err(
-                    req.id,
-                    -32602,
-                    "Invalid task_move params",
-                    Some(json!({"message": e.to_string()})),
-                );
-            }
-        };
+    let request: crate::api_types::TaskMoveRequest = match serde_json::from_value(req.params.clone()) {
+        Ok(request) => request,
+        Err(e) => {
+            return err(req.id, -32602, "Invalid task_move params", Some(json!({"message": e.to_string()})));
+        }
+    };
     let resolver = try_rpc!(resolve_tasks_dir(&req.id));
     let mut storage = Storage::new(&resolver.path);
     match TaskService::move_task(&mut storage, &request) {
         Ok(response) => {
             if !response.dry_run {
                 let actor = crate::utils::identity::resolve_current_user(None);
-                crate::api_events::emit_task_moved(
-                    &response.from,
-                    &response.task,
-                    actor.as_deref(),
-                );
+                crate::api_events::emit_task_moved(&response.from, &response.task, actor.as_deref());
             }
             text_result(req.id, &response)
         }
-        Err(e) => err(
-            req.id,
-            -32007,
-            "Task move failed",
-            Some(json!({"message": e.to_string()})),
-        ),
+        Err(e) => err(req.id, -32007, "Task move failed", Some(json!({"message": e.to_string()}))),
     }
 }
 
 /// Map `task_list` params onto the shared task query (DEV-230). Only JSON
 /// shape errors are reported here; values are validated by the query.
-pub(crate) fn task_list_input(
-    params: &Value,
-) -> Result<crate::services::task_list::TaskQueryInput, String> {
+pub(crate) fn task_list_input(params: &Value) -> Result<crate::services::task_list::TaskQueryInput, String> {
     /// A string, or for list params a CSV string or an array of strings.
     fn strings(params: &Value, key: &str) -> Result<Vec<String>, String> {
         match params.get(key) {
             None | Some(Value::Null) => Ok(Vec::new()),
-            Some(Value::String(s)) => Ok(s
-                .split(',')
-                .map(str::trim)
-                .filter(|part| !part.is_empty())
-                .map(str::to_string)
-                .collect()),
+            Some(Value::String(s)) => Ok(s.split(',').map(str::trim).filter(|part| !part.is_empty()).map(str::to_string).collect()),
             Some(Value::Array(items)) => items
                 .iter()
-                .map(|item| {
-                    item.as_str()
-                        .map(|text| text.trim().to_string())
-                        .ok_or_else(|| format!("{key} entries must be strings"))
-                })
+                .map(|item| item.as_str().map(|text| text.trim().to_string()).ok_or_else(|| format!("{key} entries must be strings")))
                 .filter(|item| !matches!(item, Ok(text) if text.is_empty()))
                 .collect(),
             Some(_) => Err(format!("{key} must be a string or array of strings")),
@@ -1663,11 +1157,7 @@ pub(crate) fn task_list_input(
         match params.get(key) {
             Some(Value::Array(items)) => items
                 .iter()
-                .map(|item| {
-                    item.as_str()
-                        .map(|text| text.trim().to_string())
-                        .ok_or_else(|| format!("{key} entries must be strings"))
-                })
+                .map(|item| item.as_str().map(|text| text.trim().to_string()).ok_or_else(|| format!("{key} entries must be strings")))
                 .collect::<Result<Vec<_>, _>>()
                 .map(|parts| Some(parts.join(","))),
             Some(Value::String(_)) | None | Some(Value::Null) => string(params, key),
@@ -1682,9 +1172,7 @@ pub(crate) fn task_list_input(
             "deleted" => crate::storage::DeletionFilter::Deleted,
             "all" => crate::storage::DeletionFilter::All,
             other => {
-                return Err(format!(
-                    "deletion must be one of: active, deleted, all (found '{other}')"
-                ));
+                return Err(format!("deletion must be one of: active, deleted, all (found '{other}')"));
             }
         },
         Some(_) => return Err("deletion must be a string (active|deleted|all)".to_string()),
@@ -1702,9 +1190,7 @@ pub(crate) fn task_list_input(
                 Value::Array(items) => items.iter().filter_map(Value::as_str).collect(),
                 Value::Null => Vec::new(),
                 _ => {
-                    return Err(
-                        "custom_fields entries must be strings or arrays of strings".to_string()
-                    );
+                    return Err("custom_fields entries must be strings or arrays of strings".to_string());
                 }
             };
             for value in values.into_iter().map(str::trim).filter(|v| !v.is_empty()) {
@@ -1713,36 +1199,20 @@ pub(crate) fn task_list_input(
         }
     }
 
-    let task_type = if params.get("type").is_some_and(|v| !v.is_null()) {
-        strings(params, "type")?
-    } else {
-        strings(params, "task_type")?
-    };
+    let task_type = if params.get("type").is_some_and(|v| !v.is_null()) { strings(params, "type")? } else { strings(params, "task_type")? };
 
     let mut input = crate::services::task_list::TaskQueryInput {
-        project: params
-            .get("project")
-            .and_then(Value::as_str)
-            .map(str::to_string),
+        project: params.get("project").and_then(Value::as_str).map(str::to_string),
         status: strings(params, "status")?,
         priority: strings(params, "priority")?,
         task_type,
         tags: parse_tags_params(params),
-        text: params
-            .get("search")
-            .and_then(Value::as_str)
-            .map(str::to_string),
+        text: params.get("search").and_then(Value::as_str).map(str::to_string),
         sprints: parse_sprint_ids_strict(params.get("sprints"))?,
-        assignee: params
-            .get("assignee")
-            .and_then(Value::as_str)
-            .map(str::to_string),
+        assignee: params.get("assignee").and_then(Value::as_str).map(str::to_string),
         fields,
         deletion,
-        archived: string(params, "archived")?
-            .map(|raw| crate::storage::layout::ArchiveFilter::parse(&raw))
-            .transpose()?
-            .unwrap_or_default(),
+        archived: string(params, "archived")?.map(|raw| crate::storage::layout::ArchiveFilter::parse(&raw)).transpose()?.unwrap_or_default(),
         due: string(params, "due")?,
         due_within: string(params, "due_within")?,
         recent: string(params, "recent")?,
@@ -1756,9 +1226,7 @@ pub(crate) fn task_list_input(
     };
     // The web search syntax (DEV-235), added to the other params.
     if let Some(text) = string(params, "query")? {
-        input
-            .add_search(&crate::utils::search_syntax::parse(&text))
-            .map_err(|e| e.to_string())?;
+        input.add_search(&crate::utils::search_syntax::parse(&text)).map_err(|e| e.to_string())?;
     }
     Ok(input)
 }
@@ -1774,17 +1242,10 @@ pub(crate) fn query_error(
     base_cfg: &crate::config::types::ResolvedConfig,
 ) -> JsonRpcResponse {
     match error {
-        TaskQueryError::InvalidEnum {
-            field,
-            value,
-            message,
-        } => {
+        TaskQueryError::InvalidEnum { field, value, message } => {
             let prefix = project.map(str::trim).filter(|p| !p.is_empty());
-            let cfg = prefix
-                .and_then(|prefix| {
-                    crate::config::resolution::config_for_project(tasks_root, Some(prefix)).ok()
-                })
-                .unwrap_or_else(|| base_cfg.clone());
+            let cfg =
+                prefix.and_then(|prefix| crate::config::resolution::config_for_project(tasks_root, Some(prefix)).ok()).unwrap_or_else(|| base_cfg.clone());
             let scope: Vec<String> = prefix.map(str::to_string).into_iter().collect();
             let data = EnumHints::from_resolved_config(&cfg, &scope).and_then(|h| {
                 let allowed = match field {
@@ -1794,21 +1255,14 @@ pub(crate) fn query_error(
                 };
                 make_enum_error_data(field, &value, allowed)
             });
-            err(
-                id,
-                -32602,
-                &format!("{field} validation failed: {message}"),
-                data,
-            )
+            err(id, -32602, &format!("{field} validation failed: {message}"), data)
         }
         // Fail closed: an unresolvable identity must never widen the query.
         TaskQueryError::UnresolvedMe => err(
             id,
             -32002,
             "Could not resolve @me: no identity configured",
-            Some(
-                json!({"message": "Set default_reporter in config, git user.name, or USER environment"}),
-            ),
+            Some(json!({"message": "Set default_reporter in config, git user.name, or USER environment"})),
         ),
         other => err(id, -32602, &other.to_string(), None),
     }
@@ -1845,29 +1299,17 @@ pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
     let storage = Storage::new(&resolver.path.clone());
     // Filtered and in global order BEFORE pagination, so pages are stable
     // and match the REST list/export order.
-    let tasks = crate::services::task_list::run(&storage, &query, chrono::Utc::now())
-        .into_iter()
-        .map(|(_, t)| t)
-        .collect::<Vec<_>>();
+    let tasks = crate::services::task_list::run(&storage, &query, chrono::Utc::now()).into_iter().map(|(_, t)| t).collect::<Vec<_>>();
     let limit = match parse_limit_value(req.params.get("limit"), MCP_DEFAULT_TASK_LIST_LIMIT) {
         Ok(value) if (1..=MCP_MAX_TASK_LIST_LIMIT).contains(&value) => value,
         Ok(_) => {
-            return err(
-                req.id,
-                -32602,
-                &format!("limit must be between 1 and {}", MCP_MAX_TASK_LIST_LIMIT),
-                None,
-            );
+            return err(req.id, -32602, &format!("limit must be between 1 and {}", MCP_MAX_TASK_LIST_LIMIT), None);
         }
         Err(msg) => return err(req.id, -32602, msg, None),
     };
     // `cursor` is canonical and `offset` its alias; an explicit null means
     // "first page", so it falls through to the alias instead of shadowing it.
-    let cursor_value = req
-        .params
-        .get("cursor")
-        .filter(|v| !v.is_null())
-        .or_else(|| req.params.get("offset"));
+    let cursor_value = req.params.get("cursor").filter(|v| !v.is_null()).or_else(|| req.params.get("offset"));
     let cursor = match parse_cursor_value(cursor_value) {
         Ok(value) => value,
         Err(msg) => return err(req.id, -32602, msg, None),
@@ -1878,11 +1320,7 @@ pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
     let page = tasks[start..end].to_vec();
     let next_cursor = if end < total { Some(end) } else { None };
     let page_number = start.checked_div(limit).map(|q| q + 1).unwrap_or(1);
-    let total_pages = if limit == 0 {
-        1
-    } else {
-        total.div_ceil(limit).max(1)
-    };
+    let total_pages = if limit == 0 { 1 } else { total.div_ceil(limit).max(1) };
     let shown_start = if page.is_empty() { 0 } else { start + 1 };
     let shown_end = end;
     let has_more = next_cursor.is_some();
@@ -1895,10 +1333,7 @@ pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
             shown_start, shown_end, total, page_number, total_pages, remaining, end
         )
     } else if start > 0 {
-        format!(
-            "Showing tasks {}–{} of {} (page {} of {}, last page).",
-            shown_start, shown_end, total, page_number, total_pages
-        )
+        format!("Showing tasks {}–{} of {} (page {} of {}, last page).", shown_start, shown_end, total, page_number, total_pages)
     } else {
         format!("Showing all {} matching task(s).", total)
     };
@@ -1913,16 +1348,8 @@ pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
     payload.insert("page".into(), Value::from(page_number as u64));
     payload.insert("totalPages".into(), Value::from(total_pages as u64));
     payload.insert("hasMore".into(), Value::Bool(has_more));
-    payload.insert(
-        "nextCursor".into(),
-        next_cursor
-            .map(|pos| Value::from(pos as u64))
-            .unwrap_or(Value::Null),
-    );
-    payload.insert(
-        "tasks".into(),
-        serde_json::to_value(&page).unwrap_or_else(|_| Value::Array(Vec::new())),
-    );
+    payload.insert("nextCursor".into(), next_cursor.map(|pos| Value::from(pos as u64)).unwrap_or(Value::Null));
+    payload.insert("tasks".into(), serde_json::to_value(&page).unwrap_or_else(|_| Value::Array(Vec::new())));
     if let Some(hints) = enum_hints {
         payload.insert("enumHints".into(), enum_hints_to_value(&hints));
     }

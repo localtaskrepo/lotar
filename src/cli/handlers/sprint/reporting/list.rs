@@ -4,10 +4,7 @@ use chrono::Utc;
 use serde::Serialize;
 
 use crate::cli::args::sprint::SprintListArgs;
-use crate::cli::handlers::sprint::shared::{
-    SprintAssignmentIntegrityPayload, build_assignment_integrity, emit_cleanup_summary,
-    emit_missing_report, truncate,
-};
+use crate::cli::handlers::sprint::shared::{SprintAssignmentIntegrityPayload, build_assignment_integrity, emit_cleanup_summary, emit_missing_report, truncate};
 use crate::output::{OutputFormat, OutputRenderer};
 use crate::services::sprint_analytics::SprintSummary;
 use crate::services::sprint_integrity::{self, MissingSprintReport};
@@ -26,18 +23,10 @@ const MAX_WINDOW_COL_WIDTH: usize = 42;
 const MAX_GOAL_COL_WIDTH: usize = 48;
 
 const COLUMN_GAP_COUNT: usize = 4; // spaces between the five table columns
-const MIN_TABLE_TOTAL_WIDTH: usize = MIN_ID_COL_WIDTH
-    + MIN_STATUS_COL_WIDTH
-    + MIN_LABEL_COL_WIDTH
-    + MIN_WINDOW_COL_WIDTH
-    + MIN_GOAL_COL_WIDTH
-    + COLUMN_GAP_COUNT;
+const MIN_TABLE_TOTAL_WIDTH: usize =
+    MIN_ID_COL_WIDTH + MIN_STATUS_COL_WIDTH + MIN_LABEL_COL_WIDTH + MIN_WINDOW_COL_WIDTH + MIN_GOAL_COL_WIDTH + COLUMN_GAP_COUNT;
 
-pub(crate) fn handle_list(
-    list_args: &SprintListArgs,
-    tasks_root: &Path,
-    renderer: &OutputRenderer,
-) -> Result<(), String> {
+pub(crate) fn handle_list(list_args: &SprintListArgs, tasks_root: &Path, renderer: &OutputRenderer) -> Result<(), String> {
     if let Some(limit) = list_args.limit
         && limit == 0
     {
@@ -50,20 +39,12 @@ pub(crate) fn handle_list(
 
     if let Some(storage) = storage_opt.as_mut() {
         records = SprintService::list(storage).map_err(|err| err.to_string())?;
-        check = sprint_integrity::check_missing_sprints(
-            storage,
-            &mut records,
-            list_args.cleanup_missing,
-            None,
-        )
-        .map_err(|err| err.to_string())?;
+        check = sprint_integrity::check_missing_sprints(storage, &mut records, list_args.cleanup_missing, None).map_err(|err| err.to_string())?;
         if let Some(outcome) = check.cleanup.as_ref() {
             emit_cleanup_summary(renderer, outcome, "listing sprints");
         }
     } else if list_args.cleanup_missing {
-        renderer.emit_warning(
-            "Cannot clean up missing sprint references: no tasks workspace detected.",
-        );
+        renderer.emit_warning("Cannot clean up missing sprint references: no tasks workspace detected.");
     }
     let integrity = &check.after;
     let cleanup_summary = check.cleanup.as_ref();
@@ -81,11 +62,7 @@ pub(crate) fn handle_list(
                     truncated: false,
                     sprints: Vec::new(),
                     missing_sprints: integrity.missing_sprints.clone(),
-                    integrity: build_assignment_integrity(
-                        &check.before,
-                        integrity,
-                        cleanup_summary,
-                    ),
+                    integrity: build_assignment_integrity(&check.before, integrity, cleanup_summary),
                 };
                 renderer.emit_json(&payload);
             }
@@ -124,10 +101,7 @@ pub(crate) fn handle_list(
             renderer.emit_json(&payload);
         }
         _ => {
-            let rows: Vec<PreparedSummaryRow> = summaries
-                .iter()
-                .map(PreparedSummaryRow::from_summary)
-                .collect();
+            let rows: Vec<PreparedSummaryRow> = summaries.iter().map(PreparedSummaryRow::from_summary).collect();
             let widths = compute_column_widths(&rows);
 
             renderer.emit_raw_stdout(format_table_header(&widths));
@@ -137,9 +111,7 @@ pub(crate) fn handle_list(
                 renderer.emit_raw_stdout(format_summary_row(row, &widths));
             }
             if truncated {
-                renderer.emit_warning(
-                    "List truncated by --limit; rerun without --limit for the complete list.",
-                );
+                renderer.emit_warning("List truncated by --limit; rerun without --limit for the complete list.");
             }
         }
     }
@@ -177,13 +149,7 @@ impl ColumnWidths {
 
 impl Default for ColumnWidths {
     fn default() -> Self {
-        Self {
-            id: MIN_ID_COL_WIDTH,
-            status: MIN_STATUS_COL_WIDTH,
-            label: MIN_LABEL_COL_WIDTH,
-            window: MIN_WINDOW_COL_WIDTH,
-            goal: MIN_GOAL_COL_WIDTH,
-        }
+        Self { id: MIN_ID_COL_WIDTH, status: MIN_STATUS_COL_WIDTH, label: MIN_LABEL_COL_WIDTH, window: MIN_WINDOW_COL_WIDTH, goal: MIN_GOAL_COL_WIDTH }
     }
 }
 
@@ -200,17 +166,9 @@ impl PreparedSummaryRow {
         Self {
             id: format!("#{}", summary.id),
             status: build_status_display(summary),
-            label: summary
-                .label
-                .clone()
-                .unwrap_or_else(|| format!("Sprint {}", summary.id)),
+            label: summary.label.clone().unwrap_or_else(|| format!("Sprint {}", summary.id)),
             window: build_window_display(summary),
-            goal: summary
-                .goal
-                .as_deref()
-                .filter(|goal| !goal.trim().is_empty())
-                .unwrap_or("-")
-                .to_string(),
+            goal: summary.goal.as_deref().filter(|goal| !goal.trim().is_empty()).unwrap_or("-").to_string(),
         }
     }
 }
@@ -218,38 +176,19 @@ impl PreparedSummaryRow {
 fn compute_column_widths(rows: &[PreparedSummaryRow]) -> ColumnWidths {
     let mut widths = ColumnWidths::default();
 
-    widths.id = widths
-        .id
-        .max("ID".len())
-        .max(rows.iter().map(|row| row.id.len()).max().unwrap_or(0));
+    widths.id = widths.id.max("ID".len()).max(rows.iter().map(|row| row.id.len()).max().unwrap_or(0));
 
     let status_target = rows.iter().map(|row| row.status.len()).max().unwrap_or(0);
-    widths.status = widths
-        .status
-        .max("Status".len())
-        .max(status_target)
-        .max(max_possible_status_display_width());
+    widths.status = widths.status.max("Status".len()).max(status_target).max(max_possible_status_display_width());
 
     let label_target = rows.iter().map(|row| row.label.len()).max().unwrap_or(0);
-    widths.label = widths
-        .label
-        .max("Label".len())
-        .max(label_target)
-        .min(MAX_LABEL_COL_WIDTH);
+    widths.label = widths.label.max("Label".len()).max(label_target).min(MAX_LABEL_COL_WIDTH);
 
     let window_target = rows.iter().map(|row| row.window.len()).max().unwrap_or(0);
-    widths.window = widths
-        .window
-        .max("Window".len())
-        .max(window_target)
-        .min(MAX_WINDOW_COL_WIDTH);
+    widths.window = widths.window.max("Window".len()).max(window_target).min(MAX_WINDOW_COL_WIDTH);
 
     let goal_target = rows.iter().map(|row| row.goal.len()).max().unwrap_or(0);
-    widths.goal = widths
-        .goal
-        .max("Goal".len())
-        .max(goal_target)
-        .min(MAX_GOAL_COL_WIDTH);
+    widths.goal = widths.goal.max("Goal".len()).max(goal_target).min(MAX_GOAL_COL_WIDTH);
 
     adjust_column_widths_for_terminal(widths)
 }
@@ -311,10 +250,7 @@ fn adjust_column_widths_for_terminal(mut widths: ColumnWidths) -> ColumnWidths {
 }
 
 fn detect_terminal_width() -> Option<usize> {
-    std::env::var("COLUMNS")
-        .ok()
-        .and_then(|raw| raw.parse::<usize>().ok())
-        .filter(|&cols| cols >= MIN_TABLE_TOTAL_WIDTH)
+    std::env::var("COLUMNS").ok().and_then(|raw| raw.parse::<usize>().ok()).filter(|&cols| cols >= MIN_TABLE_TOTAL_WIDTH)
 }
 
 fn max_possible_status_display_width() -> usize {
@@ -360,19 +296,12 @@ fn format_summary_row(row: &PreparedSummaryRow, widths: &ColumnWidths) -> String
 }
 
 fn build_status_display(summary: &SprintSummary) -> String {
-    if summary.has_warnings {
-        format!("[{}!]", summary.status)
-    } else {
-        format!("[{}]", summary.status)
-    }
+    if summary.has_warnings { format!("[{}!]", summary.status) } else { format!("[{}]", summary.status) }
 }
 
 fn build_window_display(summary: &SprintSummary) -> String {
     let start = summary.starts_at.as_deref().map(format_short_datetime);
-    let end_source = summary
-        .ends_at
-        .as_deref()
-        .or(summary.computed_end.as_deref());
+    let end_source = summary.ends_at.as_deref().or(summary.computed_end.as_deref());
     let end = end_source.map(format_short_datetime);
 
     match (start, end) {
@@ -392,11 +321,7 @@ fn format_short_datetime(raw: &str) -> String {
         Ok(dt) => {
             use chrono::Timelike;
 
-            if dt.hour() == 0 && dt.minute() == 0 && dt.second() == 0 {
-                dt.format("%b %-d").to_string()
-            } else {
-                dt.format("%b %-d %H:%M").to_string()
-            }
+            if dt.hour() == 0 && dt.minute() == 0 && dt.second() == 0 { dt.format("%b %-d").to_string() } else { dt.format("%b %-d %H:%M").to_string() }
         }
         Err(_) => raw.to_string(),
     }

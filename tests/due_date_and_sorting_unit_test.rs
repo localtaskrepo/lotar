@@ -17,20 +17,9 @@ fn cfg() -> ResolvedConfig {
             ],
         },
         issue_done_states: None,
-        issue_types: ConfigurableField {
-            values: vec![
-                TaskType::from("Feature"),
-                TaskType::from("Bug"),
-                TaskType::from("Epic"),
-            ],
-        },
+        issue_types: ConfigurableField { values: vec![TaskType::from("Feature"), TaskType::from("Bug"), TaskType::from("Epic")] },
         issue_priorities: ConfigurableField {
-            values: vec![
-                Priority::from("Low"),
-                Priority::from("Medium"),
-                Priority::from("High"),
-                Priority::from("Critical"),
-            ],
+            values: vec![Priority::from("Low"), Priority::from("Medium"), Priority::from("High"), Priority::from("Critical")],
         },
         tags: StringConfigField::new_wildcard(),
         tag_properties: Default::default(),
@@ -48,13 +37,7 @@ fn cfg() -> ResolvedConfig {
         default_priority: Priority::from("Medium"),
         default_status: None,
         custom_fields: StringConfigField::new_wildcard(),
-        scan_signal_words: vec![
-            "TODO".to_string(),
-            "FIXME".to_string(),
-            "HACK".to_string(),
-            "BUG".to_string(),
-            "NOTE".to_string(),
-        ],
+        scan_signal_words: vec!["TODO".to_string(), "FIXME".to_string(), "HACK".to_string(), "BUG".to_string(), "NOTE".to_string()],
         scan_strip_attributes: true,
         scan_ticket_patterns: None,
         scan_enable_ticket_words: false,

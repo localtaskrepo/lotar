@@ -8,10 +8,7 @@ use lotar::workspace::{TasksDirectoryResolver, TasksDirectorySource};
 use tempfile::TempDir;
 
 fn resolver_for(path: &std::path::Path) -> TasksDirectoryResolver {
-    TasksDirectoryResolver {
-        path: path.to_path_buf(),
-        source: TasksDirectorySource::CurrentDirectory,
-    }
+    TasksDirectoryResolver { path: path.to_path_buf(), source: TasksDirectorySource::CurrentDirectory }
 }
 
 fn ensure_tasks_dir(root: &std::path::Path) -> std::path::PathBuf {
@@ -24,12 +21,8 @@ struct CliOverrideGuard;
 
 impl CliOverrideGuard {
     fn set(pairs: &[(&str, &str)]) -> Self {
-        let overrides = pairs
-            .iter()
-            .map(|(k, v)| (k.to_string(), v.to_string()))
-            .collect::<Vec<_>>();
-        lotar::config::resolution::configure_cli_overrides(&overrides)
-            .expect("configure CLI overrides");
+        let overrides = pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect::<Vec<_>>();
+        lotar::config::resolution::configure_cli_overrides(&overrides).expect("configure CLI overrides");
         Self
     }
 }
@@ -52,20 +45,14 @@ fn project_config_overrides_environment_defaults() {
 
     let mut project_values = BTreeMap::new();
     project_values.insert("default_status".to_string(), "InProgress".to_string());
-    ConfigService::set(&resolver, &project_values, false, Some("ENG"))
-        .expect("apply project default status");
+    ConfigService::set(&resolver, &project_values, false, Some("ENG")).expect("apply project default status");
 
     let _guard = EnvVarGuard::set("LOTAR_DEFAULT_STATUS", "Done");
 
     let baseline = load_and_merge_configs(Some(tasks_dir.as_path())).expect("resolved base config");
-    let resolved =
-        get_project_config(&baseline, "ENG", tasks_dir.as_path()).expect("project config");
+    let resolved = get_project_config(&baseline, "ENG", tasks_dir.as_path()).expect("project config");
 
-    assert_eq!(
-        resolved.default_status,
-        Some(TaskStatus::from("InProgress")),
-        "project-specific default should win over env override"
-    );
+    assert_eq!(resolved.default_status, Some(TaskStatus::from("InProgress")), "project-specific default should win over env override");
 }
 
 #[test]
@@ -81,20 +68,14 @@ fn environment_fills_gap_when_project_omits_value() {
     // Create a project config file without overriding default_status
     let mut project_values = BTreeMap::new();
     project_values.insert("project_name".to_string(), "Ops".to_string());
-    ConfigService::set(&resolver, &project_values, false, Some("OPS"))
-        .expect("create project config without overrides");
+    ConfigService::set(&resolver, &project_values, false, Some("OPS")).expect("create project config without overrides");
 
     let _guard = EnvVarGuard::set("LOTAR_DEFAULT_STATUS", "Done");
 
     let baseline = load_and_merge_configs(Some(tasks_dir.as_path())).expect("resolved base config");
-    let resolved =
-        get_project_config(&baseline, "OPS", tasks_dir.as_path()).expect("project config");
+    let resolved = get_project_config(&baseline, "OPS", tasks_dir.as_path()).expect("project config");
 
-    assert_eq!(
-        resolved.default_status,
-        Some(TaskStatus::from("Done")),
-        "env override should still apply when project does not set the field"
-    );
+    assert_eq!(resolved.default_status, Some(TaskStatus::from("Done")), "env override should still apply when project does not set the field");
 }
 
 #[test]
@@ -110,21 +91,15 @@ fn cli_overrides_have_highest_priority() {
     let mut project_values = BTreeMap::new();
     project_values.insert("project_name".to_string(), "Cli Demo".to_string());
     project_values.insert("default_status".to_string(), "InProgress".to_string());
-    ConfigService::set(&resolver, &project_values, false, Some("CLI"))
-        .expect("set project default status");
+    ConfigService::set(&resolver, &project_values, false, Some("CLI")).expect("set project default status");
 
     let _env_guard = EnvVarGuard::set("LOTAR_DEFAULT_STATUS", "Done");
     let _cli_guard = CliOverrideGuard::set(&[("default_status", "Todo")]);
 
     let baseline = load_and_merge_configs(Some(tasks_dir.as_path())).expect("base config");
-    let resolved =
-        get_project_config(&baseline, "CLI", tasks_dir.as_path()).expect("project config");
+    let resolved = get_project_config(&baseline, "CLI", tasks_dir.as_path()).expect("project config");
 
-    assert_eq!(
-        resolved.default_status,
-        Some(TaskStatus::from("Todo")),
-        "CLI overrides should win even when project/env attempt to set the same field"
-    );
+    assert_eq!(resolved.default_status, Some(TaskStatus::from("Todo")), "CLI overrides should win even when project/env attempt to set the same field");
 }
 
 #[test]
@@ -141,19 +116,11 @@ fn project_overrides_can_toggle_auto_codeowners() {
     let mut project_values = BTreeMap::new();
     project_values.insert("project_name".to_string(), "Auto Demo".to_string());
     project_values.insert("auto_codeowners_assign".to_string(), "true".to_string());
-    ConfigService::set(&resolver, &project_values, false, Some("AUTO"))
-        .expect("set project auto toggles");
+    ConfigService::set(&resolver, &project_values, false, Some("AUTO")).expect("set project auto toggles");
 
     let baseline = load_and_merge_configs(Some(tasks_dir.as_path())).expect("base config");
-    assert!(
-        !baseline.auto_codeowners_assign,
-        "global scope should remain false"
-    );
+    assert!(!baseline.auto_codeowners_assign, "global scope should remain false");
 
-    let resolved =
-        get_project_config(&baseline, "AUTO", tasks_dir.as_path()).expect("project config");
-    assert!(
-        resolved.auto_codeowners_assign,
-        "project override should flip auto_codeowners_assign"
-    );
+    let resolved = get_project_config(&baseline, "AUTO", tasks_dir.as_path()).expect("project config");
+    assert!(resolved.auto_codeowners_assign, "project override should flip auto_codeowners_assign");
 }

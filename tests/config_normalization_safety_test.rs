@@ -1,9 +1,6 @@
 use lotar::config::{
     manager::ConfigManager,
-    normalization::{
-        parse_global_from_yaml_str, parse_project_from_yaml_str, to_canonical_global_yaml,
-        to_canonical_project_yaml,
-    },
+    normalization::{parse_global_from_yaml_str, parse_project_from_yaml_str, to_canonical_global_yaml, to_canonical_project_yaml},
     persistence,
     types::{GlobalConfig, ProjectConfig},
 };
@@ -67,28 +64,16 @@ auth_profiles:
 fn every_shipped_flat_field_survives_parse_and_canonical_roundtrip() {
     let expected: GlobalConfig = serde_yaml_ng::from_str(FLAT_CONFIG).unwrap();
     let parsed = parse_global_from_yaml_str(FLAT_CONFIG).unwrap();
-    assert_eq!(
-        serde_json::to_value(&parsed).unwrap(),
-        serde_json::to_value(&expected).unwrap()
-    );
+    assert_eq!(serde_json::to_value(&parsed).unwrap(), serde_json::to_value(&expected).unwrap());
     let reloaded = parse_global_from_yaml_str(&to_canonical_global_yaml(&parsed)).unwrap();
-    assert_eq!(
-        serde_json::to_value(&reloaded).unwrap(),
-        serde_json::to_value(&expected).unwrap()
-    );
+    assert_eq!(serde_json::to_value(&reloaded).unwrap(), serde_json::to_value(&expected).unwrap());
 
     let project_yaml = format!("project_name: Full Project Name\n{FLAT_CONFIG}");
     let expected: ProjectConfig = serde_yaml_ng::from_str(&project_yaml).unwrap();
     let parsed = parse_project_from_yaml_str("DEV", &project_yaml).unwrap();
-    assert_eq!(
-        serde_json::to_value(&parsed).unwrap(),
-        serde_json::to_value(&expected).unwrap()
-    );
+    assert_eq!(serde_json::to_value(&parsed).unwrap(), serde_json::to_value(&expected).unwrap());
     let reloaded = parse_project_from_yaml_str("DEV", &to_canonical_project_yaml(&parsed)).unwrap();
-    assert_eq!(
-        serde_json::to_value(&reloaded).unwrap(),
-        serde_json::to_value(&expected).unwrap()
-    );
+    assert_eq!(serde_json::to_value(&reloaded).unwrap(), serde_json::to_value(&expected).unwrap());
 }
 
 #[test]
@@ -114,31 +99,17 @@ fn flat_defaults_are_effective_and_preserved_when_default_project_is_set() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path().join(".tasks");
     std::fs::create_dir_all(root.join("DEV")).unwrap();
-    std::fs::write(
-        root.join("DEV/config.yml"),
-        "project: {name: Development}\n",
-    )
-    .unwrap();
+    std::fs::write(root.join("DEV/config.yml"), "project: {name: Development}\n").unwrap();
     let path = root.join("config.yml");
     std::fs::write(&path, FLAT_CONFIG).unwrap();
-    let resolver = TasksDirectoryResolver {
-        path: root.clone(),
-        source: TasksDirectorySource::CurrentDirectory,
-    };
+    let resolver = TasksDirectoryResolver { path: root.clone(), source: TasksDirectorySource::CurrentDirectory };
     assert_eq!(lotar::project::get_effective_project_name(&resolver), "DEV");
-    std::fs::write(
-        &path,
-        FLAT_CONFIG.replace("default_project: DEV", "default_project: ''"),
-    )
-    .unwrap();
+    std::fs::write(&path, FLAT_CONFIG.replace("default_project: DEV", "default_project: ''")).unwrap();
     let mut manager = ConfigManager::new_manager_with_tasks_dir_readonly(&root).unwrap();
     assert_eq!(manager.ensure_default_project(&root).unwrap(), "DEV");
     let cfg = persistence::load_global_config(Some(&root)).unwrap();
     let expected: GlobalConfig = serde_yaml_ng::from_str(FLAT_CONFIG).unwrap();
-    assert_eq!(
-        serde_json::to_value(cfg).unwrap(),
-        serde_json::to_value(expected).unwrap()
-    );
+    assert_eq!(serde_json::to_value(cfg).unwrap(), serde_json::to_value(expected).unwrap());
 }
 
 #[test]
@@ -175,23 +146,10 @@ fn invalid_recognized_types_and_nonmapping_roots_are_errors() {
         "default: {project: []}\ndefault.project: DEV",
         "default.project: DEV\ndefault: {project: []}",
     ] {
-        assert!(
-            parse_global_from_yaml_str(yaml).is_err(),
-            "accepted invalid config: {yaml}"
-        );
+        assert!(parse_global_from_yaml_str(yaml).is_err(), "accepted invalid config: {yaml}");
     }
-    for yaml in [
-        "[]",
-        "project: {name: []}",
-        "default_assignee: []",
-        "default: {assignee: []}",
-        "agent: {logs_dir: []}",
-        "scan: {enable_mentions: wrong}",
-    ] {
-        assert!(
-            parse_project_from_yaml_str("DEV", yaml).is_err(),
-            "accepted invalid project config: {yaml}"
-        );
+    for yaml in ["[]", "project: {name: []}", "default_assignee: []", "default: {assignee: []}", "agent: {logs_dir: []}", "scan: {enable_mentions: wrong}"] {
+        assert!(parse_project_from_yaml_str("DEV", yaml).is_err(), "accepted invalid project config: {yaml}");
     }
     for yaml in ["", "# built-in defaults\n", "{}"] {
         assert!(parse_global_from_yaml_str(yaml).is_ok());
@@ -204,10 +162,7 @@ fn empty_project_overrides_roundtrip_without_becoming_inheritance() {
     let yaml = "project_name: Example\ndefault_tags: []\nagents: {}\nbranch_type_aliases: {}\nattachments_dir: ''\nsync_reports_dir: ''\n";
     let cfg = parse_project_from_yaml_str("EX", yaml).unwrap();
     let reloaded = parse_project_from_yaml_str("EX", &to_canonical_project_yaml(&cfg)).unwrap();
-    assert_eq!(
-        serde_json::to_value(cfg).unwrap(),
-        serde_json::to_value(reloaded).unwrap()
-    );
+    assert_eq!(serde_json::to_value(cfg).unwrap(), serde_json::to_value(reloaded).unwrap());
 }
 
 #[test]
@@ -215,16 +170,10 @@ fn literal_dotted_profile_names_and_environment_keys_roundtrip() {
     let yaml = "agents:\n  example.worker:\n    runner: codex\n    env: {FAKE.KEY: harmless-test-value}\nbranch_type_aliases: {fix.bug: Bug}\nauth_profiles:\n  example.profile: {provider: github, method: token}\n";
     let cfg = parse_global_from_yaml_str(yaml).unwrap();
     assert!(cfg.agents.contains_key("example.worker"));
-    assert_eq!(
-        cfg.agents["example.worker"].to_detail().env["FAKE.KEY"],
-        "harmless-test-value"
-    );
+    assert_eq!(cfg.agents["example.worker"].to_detail().env["FAKE.KEY"], "harmless-test-value");
     assert!(cfg.branch_type_aliases.contains_key("fix.bug"));
     let reloaded = parse_global_from_yaml_str(&to_canonical_global_yaml(&cfg)).unwrap();
-    assert_eq!(
-        serde_json::to_value(cfg).unwrap(),
-        serde_json::to_value(reloaded).unwrap()
-    );
+    assert_eq!(serde_json::to_value(cfg).unwrap(), serde_json::to_value(reloaded).unwrap());
 }
 
 #[test]
@@ -233,18 +182,9 @@ fn canonical_placeholder_name_does_not_block_smart_prefix_reuse() {
     let root = temp.path().join(".tasks");
     std::fs::create_dir_all(root.join("MYAW")).unwrap();
     std::fs::write(root.join("MYAW/config.yml"), "project: {name: MYAW}\n").unwrap();
-    assert_eq!(
-        lotar::utils::project::generate_unique_project_prefix("myawesomeproject", &root).unwrap(),
-        "MYAW"
-    );
-    std::fs::write(
-        root.join("MYAW/config.yml"),
-        "project: {name: Another Project}\n",
-    )
-    .unwrap();
-    assert!(
-        lotar::utils::project::generate_unique_project_prefix("myawesomeproject", &root).is_err()
-    );
+    assert_eq!(lotar::utils::project::generate_unique_project_prefix("myawesomeproject", &root).unwrap(), "MYAW");
+    std::fs::write(root.join("MYAW/config.yml"), "project: {name: Another Project}\n").unwrap();
+    assert!(lotar::utils::project::generate_unique_project_prefix("myawesomeproject", &root).is_err());
 }
 
 #[test]

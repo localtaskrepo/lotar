@@ -21,23 +21,11 @@ mod status_command_pattern {
 
         // Create a task first using the new CLI with explicit project
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("task")
-            .arg("add")
-            .arg("Test task for status get")
-            .arg("--project=test-project")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("task").arg("add").arg("Test task for status get").arg("--project=test-project").assert().success();
 
         // Get the status (should be Todo by default)
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("status")
-            .arg("1")
-            .arg("--project=test-project")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("status: Todo"));
+        cmd.current_dir(temp_dir).arg("status").arg("1").arg("--project=test-project").assert().success().stdout(predicate::str::contains("status: Todo"));
     }
 
     #[test]
@@ -47,13 +35,7 @@ mod status_command_pattern {
 
         // Create a task first using the new CLI with explicit project
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("task")
-            .arg("add")
-            .arg("Test task for status set")
-            .arg("--project=test-project")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("task").arg("add").arg("Test task for status set").arg("--project=test-project").assert().success();
 
         // Set the status to in_progress
         let mut cmd = crate::common::lotar_cmd().unwrap();
@@ -64,9 +46,7 @@ mod status_command_pattern {
             .arg("--project=test-project")
             .assert()
             .success()
-            .stdout(predicate::str::contains(
-                "status changed from Todo to InProgress",
-            ));
+            .stdout(predicate::str::contains("status changed from Todo to InProgress"));
     }
 
     #[test]
@@ -76,33 +56,15 @@ mod status_command_pattern {
 
         // Create a task using the new CLI with explicit project
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("task")
-            .arg("add")
-            .arg("Test task for get after set")
-            .arg("--project=test-project")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("task").arg("add").arg("Test task for get after set").arg("--project=test-project").assert().success();
 
         // Set status to done
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("status")
-            .arg("1")
-            .arg("done")
-            .arg("--project=test-project")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("status").arg("1").arg("done").arg("--project=test-project").assert().success();
 
         // Verify the status was changed
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("status")
-            .arg("1")
-            .arg("--project=test-project")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("status: Done"));
+        cmd.current_dir(temp_dir).arg("status").arg("1").arg("--project=test-project").assert().success().stdout(predicate::str::contains("status: Done"));
     }
 
     #[test]
@@ -112,23 +74,11 @@ mod status_command_pattern {
 
         // Create a task using the new CLI with explicit project
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("task")
-            .arg("add")
-            .arg("Test task for alias get")
-            .arg("--project=test-project")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("task").arg("add").arg("Test task for alias get").arg("--project=test-project").assert().success();
 
         // Use status command to get status (testing that it works without alias)
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("status")
-            .arg("1")
-            .arg("--project=test-project")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("status: Todo"));
+        cmd.current_dir(temp_dir).arg("status").arg("1").arg("--project=test-project").assert().success().stdout(predicate::str::contains("status: Todo"));
     }
 
     #[test]
@@ -138,13 +88,7 @@ mod status_command_pattern {
 
         // Create a task using the new CLI with explicit project
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("task")
-            .arg("add")
-            .arg("Test task for alias set")
-            .arg("--project=test-project")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("task").arg("add").arg("Test task for alias set").arg("--project=test-project").assert().success();
 
         // Use status command to set status (testing that it works without alias)
         let mut cmd = crate::common::lotar_cmd().unwrap();
@@ -155,9 +99,7 @@ mod status_command_pattern {
             .arg("--project=test-project")
             .assert()
             .success()
-            .stdout(predicate::str::contains(
-                "status changed from Todo to InProgress",
-            ));
+            .stdout(predicate::str::contains("status changed from Todo to InProgress"));
     }
 
     #[test]
@@ -167,21 +109,11 @@ mod status_command_pattern {
 
         // Create a task
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("add")
-            .arg("Test task for same status warning")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("add").arg("Test task for same status warning").assert().success();
 
         // Try to set status to the same value (Todo)
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("status")
-            .arg("1")
-            .arg("todo")
-            .assert()
-            .success()
-            .stderr(predicate::str::contains("already has status 'Todo'"));
+        cmd.current_dir(temp_dir).arg("status").arg("1").arg("todo").assert().success().stderr(predicate::str::contains("already has status 'Todo'"));
     }
 
     #[test]
@@ -191,21 +123,11 @@ mod status_command_pattern {
 
         // Create a task
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("add")
-            .arg("Test task for invalid status")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("add").arg("Test task for invalid status").assert().success();
 
         // Try to set an invalid status
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("status")
-            .arg("1")
-            .arg("invalid_status")
-            .assert()
-            .failure()
-            .stderr(predicate::str::contains("Status validation failed"));
+        cmd.current_dir(temp_dir).arg("status").arg("1").arg("invalid_status").assert().failure().stderr(predicate::str::contains("Status validation failed"));
     }
 
     #[test]
@@ -215,12 +137,7 @@ mod status_command_pattern {
 
         // Try to get status of non-existent task
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("status")
-            .arg("999")
-            .assert()
-            .failure()
-            .stderr(predicate::str::contains("not found"));
+        cmd.current_dir(temp_dir).arg("status").arg("999").assert().failure().stderr(predicate::str::contains("not found"));
     }
 
     #[test]
@@ -230,15 +147,7 @@ mod status_command_pattern {
 
         // Create a task (will get auto-generated prefix)
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        let output = cmd
-            .current_dir(temp_dir)
-            .arg("add")
-            .arg("Test task with prefix")
-            .assert()
-            .success()
-            .get_output()
-            .stdout
-            .clone();
+        let output = cmd.current_dir(temp_dir).arg("add").arg("Test task with prefix").assert().success().get_output().stdout.clone();
 
         // Extract the task ID from the output
         let output_str = String::from_utf8_lossy(&output);
@@ -250,12 +159,7 @@ mod status_command_pattern {
 
         // Use full task ID to get status
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("status")
-            .arg(task_id)
-            .assert()
-            .success()
-            .stdout(predicate::str::contains(format!("{task_id} status: Todo")));
+        cmd.current_dir(temp_dir).arg("status").arg(task_id).assert().success().stdout(predicate::str::contains(format!("{task_id} status: Todo")));
     }
 
     #[test]
@@ -265,38 +169,18 @@ mod status_command_pattern {
 
         // Create a task
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("add")
-            .arg("Test dual interface")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("add").arg("Test dual interface").assert().success();
 
         // Set status using quick command
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("status")
-            .arg("1")
-            .arg("in_progress")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("status").arg("1").arg("in_progress").assert().success();
 
         // Set status using full command (should still work)
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("task")
-            .arg("status")
-            .arg("1")
-            .arg("done")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("task").arg("status").arg("1").arg("done").assert().success();
 
         // Verify final status with quick command
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("status")
-            .arg("1")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("status: Done"));
+        cmd.current_dir(temp_dir).arg("status").arg("1").assert().success().stdout(predicate::str::contains("status: Done"));
     }
 }

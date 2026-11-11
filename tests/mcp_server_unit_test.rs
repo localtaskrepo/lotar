@@ -18,10 +18,7 @@ impl Drop for CwdGuard {
 }
 
 fn task_from_payload(payload: &serde_json::Value) -> serde_json::Value {
-    payload
-        .get("task")
-        .cloned()
-        .unwrap_or_else(|| payload.clone())
+    payload.get("task").cloned().unwrap_or_else(|| payload.clone())
 }
 
 fn task_from_text(text: &str) -> serde_json::Value {
@@ -34,9 +31,7 @@ fn function_response(resp: &serde_json::Value) -> Option<&serde_json::Value> {
 }
 
 fn function_response_name(resp: &serde_json::Value) -> Option<&str> {
-    function_response(resp)
-        .and_then(|fr| fr.get("name"))
-        .and_then(|v| v.as_str())
+    function_response(resp).and_then(|fr| fr.get("name")).and_then(|v| v.as_str())
 }
 
 fn tool_response_payload(resp: &serde_json::Value) -> Option<&serde_json::Value> {
@@ -44,11 +39,7 @@ fn tool_response_payload(resp: &serde_json::Value) -> Option<&serde_json::Value>
 }
 
 fn tool_content(resp: &serde_json::Value) -> Vec<serde_json::Value> {
-    tool_response_payload(resp)
-        .and_then(|payload| payload.get("content"))
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default()
+    tool_response_payload(resp).and_then(|payload| payload.get("content")).and_then(|v| v.as_array()).cloned().unwrap_or_default()
 }
 
 fn first_tool_text(resp: &serde_json::Value) -> Option<String> {
@@ -76,24 +67,9 @@ fn mcp_tools_list_includes_underscore_names() {
     let line = serde_json::to_string(&req).unwrap();
     let resp_line = lotar::mcp::server::handle_json_line(&line);
     let resp: serde_json::Value = serde_json::from_str(&resp_line).unwrap();
-    assert!(
-        resp.get("error").is_none(),
-        "tools/list should not error: {resp}"
-    );
-    let tools = resp
-        .get("result")
-        .and_then(|r| r.get("tools"))
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
-    let names: Vec<String> = tools
-        .iter()
-        .filter_map(|t| {
-            t.get("name")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string())
-        })
-        .collect();
+    assert!(resp.get("error").is_none(), "tools/list should not error: {resp}");
+    let tools = resp.get("result").and_then(|r| r.get("tools")).and_then(|v| v.as_array()).cloned().unwrap_or_default();
+    let names: Vec<String> = tools.iter().filter_map(|t| t.get("name").and_then(|v| v.as_str()).map(|s| s.to_string())).collect();
     assert!(names.contains(&"task_create".to_string()));
     assert!(names.contains(&"project_list".to_string()));
 }
@@ -105,18 +81,8 @@ fn mcp_parse_error_sets_null_id() {
     assert_eq!(resp.get("jsonrpc").and_then(|v| v.as_str()), Some("2.0"));
     assert!(resp.get("result").is_none());
     assert_eq!(resp.get("id"), Some(&serde_json::Value::Null));
-    assert_eq!(
-        resp.get("error")
-            .and_then(|e| e.get("code"))
-            .and_then(|v| v.as_i64()),
-        Some(-32700)
-    );
-    assert_eq!(
-        resp.get("error")
-            .and_then(|e| e.get("message"))
-            .and_then(|v| v.as_str()),
-        Some("Parse error")
-    );
+    assert_eq!(resp.get("error").and_then(|e| e.get("code")).and_then(|v| v.as_i64()), Some(-32700));
+    assert_eq!(resp.get("error").and_then(|e| e.get("message")).and_then(|v| v.as_str()), Some("Parse error"));
 }
 
 #[test]
@@ -135,15 +101,8 @@ fn mcp_initialize_advertises_list_changed_capability() {
     let resp_line = lotar::mcp::server::handle_json_line(&line);
     let resp: serde_json::Value = serde_json::from_str(&resp_line).unwrap();
     assert!(resp.get("error").is_none(), "initialize failed: {resp}");
-    let capabilities = resp
-        .get("result")
-        .and_then(|r| r.get("capabilities"))
-        .cloned()
-        .expect("capabilities present");
-    let list_changed = capabilities
-        .get("tools")
-        .and_then(|tools| tools.get("listChanged"))
-        .and_then(|flag| flag.as_bool());
+    let capabilities = resp.get("result").and_then(|r| r.get("capabilities")).cloned().expect("capabilities present");
+    let list_changed = capabilities.get("tools").and_then(|tools| tools.get("listChanged")).and_then(|flag| flag.as_bool());
     assert_eq!(list_changed, Some(true));
 }
 
@@ -158,10 +117,7 @@ fn mcp_schema_discover_lists_tools() {
     let line = serde_json::to_string(&req).unwrap();
     let resp_line = lotar::mcp::server::handle_json_line(&line);
     let resp: serde_json::Value = serde_json::from_str(&resp_line).unwrap();
-    assert!(
-        resp.get("error").is_none(),
-        "schema/discover failed: {resp}"
-    );
+    assert!(resp.get("error").is_none(), "schema/discover failed: {resp}");
     let payload = resp
         .get("result")
         .and_then(|r| r.get("content"))
@@ -171,13 +127,7 @@ fn mcp_schema_discover_lists_tools() {
         .and_then(|v| v.as_str())
         .map(|text| serde_json::from_str::<serde_json::Value>(text).unwrap())
         .unwrap();
-    assert!(
-        payload
-            .get("toolCount")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(0)
-            > 0
-    );
+    assert!(payload.get("toolCount").and_then(|v| v.as_u64()).unwrap_or(0) > 0);
     let filtered_req = serde_json::json!({
         "jsonrpc": "2.0",
         "id": 44,
@@ -187,10 +137,7 @@ fn mcp_schema_discover_lists_tools() {
     let filtered_line = serde_json::to_string(&filtered_req).unwrap();
     let filtered_resp_line = lotar::mcp::server::handle_json_line(&filtered_line);
     let filtered_resp: serde_json::Value = serde_json::from_str(&filtered_resp_line).unwrap();
-    assert!(
-        filtered_resp.get("error").is_none(),
-        "filtered schema/discover failed: {filtered_resp}"
-    );
+    assert!(filtered_resp.get("error").is_none(), "filtered schema/discover failed: {filtered_resp}");
     let filtered_payload = filtered_resp
         .get("result")
         .and_then(|r| r.get("content"))
@@ -200,20 +147,13 @@ fn mcp_schema_discover_lists_tools() {
         .and_then(|v| v.as_str())
         .map(|text| serde_json::from_str::<serde_json::Value>(text).unwrap())
         .unwrap();
-    assert_eq!(
-        filtered_payload.get("toolCount").and_then(|v| v.as_u64()),
-        Some(1)
-    );
+    assert_eq!(filtered_payload.get("toolCount").and_then(|v| v.as_u64()), Some(1));
     let names: Vec<String> = filtered_payload
         .get("tools")
         .and_then(|v| v.as_array())
         .unwrap()
         .iter()
-        .filter_map(|tool| {
-            tool.get("name")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string())
-        })
+        .filter_map(|tool| tool.get("name").and_then(|v| v.as_str()).map(|s| s.to_string()))
         .collect();
     assert_eq!(names, vec!["task_create".to_string()]);
 }
@@ -229,10 +169,7 @@ fn mcp_logging_set_level_acknowledged() {
     let line = serde_json::to_string(&req).unwrap();
     let resp_line = lotar::mcp::server::handle_json_line(&line);
     let resp: serde_json::Value = serde_json::from_str(&resp_line).unwrap();
-    assert!(
-        resp.get("error").is_none(),
-        "logging/setLevel should be accepted: {resp}"
-    );
+    assert!(resp.get("error").is_none(), "logging/setLevel should be accepted: {resp}");
 
     // Levels outside the MCP set are invalid params (DEV-280).
     for level in ["warn", "trace", "off"] {
@@ -264,20 +201,14 @@ fn mcp_tools_call_accepts_underscore_name_for_task_create() {
     let line = serde_json::to_string(&req).unwrap();
     let resp_line = lotar::mcp::server::handle_json_line(&line);
     let resp: serde_json::Value = serde_json::from_str(&resp_line).unwrap();
-    assert!(
-        resp.get("error").is_none(),
-        "tools/call task_create failed: {resp}"
-    );
+    assert!(resp.get("error").is_none(), "tools/call task_create failed: {resp}");
     assert_eq!(function_response_name(&resp), Some("task_create"));
     let content = tool_content(&resp);
     assert!(!content.is_empty(), "expected content array with task json");
     let text = first_tool_text(&resp).unwrap_or_default();
     let task_json = task_from_text(&text);
     let id = task_json.get("id").and_then(|v| v.as_str()).unwrap_or("");
-    assert!(
-        id.starts_with("MCP-"),
-        "expected id to start with MCP-, got {id}"
-    );
+    assert!(id.starts_with("MCP-"), "expected id to start with MCP-, got {id}");
 
     // guard drops here
 }
@@ -313,29 +244,14 @@ fn mcp_task_create_accepts_custom_fields() {
     assert!(!content.is_empty());
     let text = first_tool_text(&resp).unwrap_or_default();
     let task_json = task_from_text(&text);
-    let custom_fields = task_json
-        .get("custom_fields")
-        .and_then(|v| v.as_object())
-        .cloned()
-        .unwrap_or_default();
-    assert_eq!(
-        custom_fields.get("product").and_then(|v| v.as_str()),
-        Some("Platform")
-    );
+    let custom_fields = task_json.get("custom_fields").and_then(|v| v.as_object()).cloned().unwrap_or_default();
+    assert_eq!(custom_fields.get("product").and_then(|v| v.as_str()), Some("Platform"));
 
-    let task_id = task_json
-        .get("id")
-        .and_then(|v| v.as_str())
-        .unwrap()
-        .to_string();
+    let task_id = task_json.get("id").and_then(|v| v.as_str()).unwrap().to_string();
     let resolver = lotar::TasksDirectoryResolver::resolve(None, None).unwrap();
     let storage = lotar::Storage::new(&resolver.path);
-    let stored = lotar::services::task_service::TaskService::get(&storage, &task_id, None)
-        .expect("stored task");
-    let stored_product = stored
-        .custom_fields
-        .get("product")
-        .map(lotar::types::custom_value_to_string);
+    let stored = lotar::services::task_service::TaskService::get(&storage, &task_id, None).expect("stored task");
+    let stored_product = stored.custom_fields.get("product").map(lotar::types::custom_value_to_string);
     assert_eq!(stored_product, Some("Platform".to_string()));
 }
 
@@ -350,10 +266,7 @@ fn mcp_task_update_overwrites_custom_fields() {
     let resolver = lotar::TasksDirectoryResolver::resolve(None, None).unwrap();
     let mut storage = lotar::Storage::new(&resolver.path.clone());
     let mut custom_fields: lotar::types::CustomFields = Default::default();
-    custom_fields.insert(
-        "product".to_string(),
-        lotar::types::custom_value_string("Initial"),
-    );
+    custom_fields.insert("product".to_string(), lotar::types::custom_value_string("Initial"));
     let created = lotar::services::task_service::TaskService::create(
         &mut storage,
         lotar::api_types::TaskCreate {
@@ -386,26 +299,12 @@ fn mcp_task_update_overwrites_custom_fields() {
     assert!(!content.is_empty());
     let text = first_tool_text(&resp).unwrap_or_default();
     let task_json: serde_json::Value = serde_json::from_str(&text).unwrap();
-    let custom_fields = task_json
-        .get("custom_fields")
-        .and_then(|v| v.as_object())
-        .cloned()
-        .unwrap_or_default();
-    assert_eq!(
-        custom_fields.get("product").and_then(|v| v.as_str()),
-        Some("Docs")
-    );
+    let custom_fields = task_json.get("custom_fields").and_then(|v| v.as_object()).cloned().unwrap_or_default();
+    assert_eq!(custom_fields.get("product").and_then(|v| v.as_str()), Some("Docs"));
 
     let storage = lotar::Storage::new(&resolver.path);
-    let stored = lotar::services::task_service::TaskService::get(&storage, &created.id, None)
-        .expect("stored task");
-    assert_eq!(
-        stored
-            .custom_fields
-            .get("product")
-            .map(lotar::types::custom_value_to_string),
-        Some("Docs".to_string())
-    );
+    let stored = lotar::services::task_service::TaskService::get(&storage, &created.id, None).expect("stored task");
+    assert_eq!(stored.custom_fields.get("product").map(lotar::types::custom_value_to_string), Some("Docs".to_string()));
 }
 
 #[test]
@@ -419,15 +318,9 @@ fn mcp_task_list_includes_custom_fields() {
     let mut storage = lotar::Storage::new(&resolver.path);
 
     let mut product_a: lotar::types::CustomFields = Default::default();
-    product_a.insert(
-        "product".to_string(),
-        lotar::types::custom_value_string("Platform"),
-    );
+    product_a.insert("product".to_string(), lotar::types::custom_value_string("Platform"));
     let mut product_b: lotar::types::CustomFields = Default::default();
-    product_b.insert(
-        "product".to_string(),
-        lotar::types::custom_value_string("Docs"),
-    );
+    product_b.insert("product".to_string(), lotar::types::custom_value_string("Docs"));
 
     lotar::services::task_service::TaskService::create(
         &mut storage,
@@ -460,43 +353,19 @@ fn mcp_task_list_includes_custom_fields() {
     let list_line = serde_json::to_string(&list_req).unwrap();
     let list_resp_line = lotar::mcp::server::handle_json_line(&list_line);
     let list_resp: serde_json::Value = serde_json::from_str(&list_resp_line).unwrap();
-    assert!(
-        list_resp.get("error").is_none(),
-        "task/list failed: {list_resp}"
-    );
-    let content = list_resp
-        .get("result")
-        .and_then(|r| r.get("content"))
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    assert!(list_resp.get("error").is_none(), "task/list failed: {list_resp}");
+    let content = list_resp.get("result").and_then(|r| r.get("content")).and_then(|v| v.as_array()).cloned().unwrap_or_default();
     assert!(!content.is_empty());
-    let text = content[0]
-        .get("text")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
+    let text = content[0].get("text").and_then(|v| v.as_str()).unwrap_or("");
     let payload: serde_json::Value = serde_json::from_str(text).unwrap();
-    let tasks = payload
-        .get("tasks")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
-    assert_eq!(
-        payload.get("hasMore").and_then(|v| v.as_bool()),
-        Some(false)
-    );
+    let tasks = payload.get("tasks").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+    assert_eq!(payload.get("hasMore").and_then(|v| v.as_bool()), Some(false));
     assert_eq!(tasks.len(), 2);
     let mut seen = tasks
         .into_iter()
         .filter_map(|task| {
             task.as_object().and_then(|obj| {
-                obj.get("custom_fields")
-                    .and_then(|v| v.as_object())
-                    .and_then(|cf| {
-                        cf.get("product")
-                            .and_then(|v| v.as_str())
-                            .map(|s| s.to_string())
-                    })
+                obj.get("custom_fields").and_then(|v| v.as_object()).and_then(|cf| cf.get("product").and_then(|v| v.as_str()).map(|s| s.to_string()))
             })
         })
         .collect::<Vec<_>>();
@@ -516,10 +385,7 @@ fn mcp_task_list_filters_by_custom_fields() {
 
     for (title, product) in [("Platform", "Platform"), ("Docs", "Docs")] {
         let mut fields: lotar::types::CustomFields = Default::default();
-        fields.insert(
-            "product".to_string(),
-            lotar::types::custom_value_string(product),
-        );
+        fields.insert("product".to_string(), lotar::types::custom_value_string(product));
         lotar::services::task_service::TaskService::create(
             &mut storage,
             lotar::api_types::TaskCreate {
@@ -544,34 +410,14 @@ fn mcp_task_list_filters_by_custom_fields() {
     let list_line = serde_json::to_string(&list_req).unwrap();
     let list_resp_line = lotar::mcp::server::handle_json_line(&list_line);
     let list_resp: serde_json::Value = serde_json::from_str(&list_resp_line).unwrap();
-    assert!(
-        list_resp.get("error").is_none(),
-        "task/list failed: {list_resp}"
-    );
-    let content = list_resp
-        .get("result")
-        .and_then(|r| r.get("content"))
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    assert!(list_resp.get("error").is_none(), "task/list failed: {list_resp}");
+    let content = list_resp.get("result").and_then(|r| r.get("content")).and_then(|v| v.as_array()).cloned().unwrap_or_default();
     assert!(!content.is_empty());
-    let text = content[0]
-        .get("text")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
+    let text = content[0].get("text").and_then(|v| v.as_str()).unwrap_or("");
     let payload: serde_json::Value = serde_json::from_str(text).unwrap();
-    let tasks = payload
-        .get("tasks")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    let tasks = payload.get("tasks").and_then(|v| v.as_array()).cloned().unwrap_or_default();
     assert_eq!(tasks.len(), 1, "expected only docs task in response");
-    let product = tasks[0]
-        .get("custom_fields")
-        .and_then(|v| v.as_object())
-        .and_then(|cf| cf.get("product"))
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
+    let product = tasks[0].get("custom_fields").and_then(|v| v.as_object()).and_then(|cf| cf.get("product")).and_then(|v| v.as_str()).unwrap_or("");
     assert_eq!(product, "Docs");
 }
 
@@ -587,11 +433,7 @@ fn mcp_task_list_supports_pagination() {
     for idx in 0..3 {
         lotar::services::task_service::TaskService::create(
             &mut storage,
-            lotar::api_types::TaskCreate {
-                title: format!("Paginate {idx}"),
-                project: Some("MCP".into()),
-                ..lotar::api_types::TaskCreate::default()
-            },
+            lotar::api_types::TaskCreate { title: format!("Paginate {idx}"), project: Some("MCP".into()), ..lotar::api_types::TaskCreate::default() },
         )
         .expect("create task");
     }
@@ -602,13 +444,9 @@ fn mcp_task_list_supports_pagination() {
         "method": "task/list",
         "params": {"project": "MCP", "limit": 2}
     });
-    let first_resp_line =
-        lotar::mcp::server::handle_json_line(&serde_json::to_string(&first_req).unwrap());
+    let first_resp_line = lotar::mcp::server::handle_json_line(&serde_json::to_string(&first_req).unwrap());
     let first_resp: serde_json::Value = serde_json::from_str(&first_resp_line).unwrap();
-    assert!(
-        first_resp.get("error").is_none(),
-        "first page failed: {first_resp}"
-    );
+    assert!(first_resp.get("error").is_none(), "first page failed: {first_resp}");
     let first_payload = first_resp
         .get("result")
         .and_then(|r| r.get("content"))
@@ -619,14 +457,8 @@ fn mcp_task_list_supports_pagination() {
         .map(|text| serde_json::from_str::<serde_json::Value>(text).unwrap())
         .unwrap();
     assert_eq!(first_payload.get("count").and_then(|v| v.as_u64()), Some(2));
-    assert_eq!(
-        first_payload.get("hasMore").and_then(|v| v.as_bool()),
-        Some(true)
-    );
-    let cursor = first_payload
-        .get("nextCursor")
-        .and_then(|v| v.as_u64())
-        .expect("next cursor present") as usize;
+    assert_eq!(first_payload.get("hasMore").and_then(|v| v.as_bool()), Some(true));
+    let cursor = first_payload.get("nextCursor").and_then(|v| v.as_u64()).expect("next cursor present") as usize;
 
     let second_req = serde_json::json!({
         "jsonrpc": "2.0",
@@ -634,13 +466,9 @@ fn mcp_task_list_supports_pagination() {
         "method": "task/list",
         "params": {"project": "MCP", "cursor": cursor, "limit": 2}
     });
-    let second_resp_line =
-        lotar::mcp::server::handle_json_line(&serde_json::to_string(&second_req).unwrap());
+    let second_resp_line = lotar::mcp::server::handle_json_line(&serde_json::to_string(&second_req).unwrap());
     let second_resp: serde_json::Value = serde_json::from_str(&second_resp_line).unwrap();
-    assert!(
-        second_resp.get("error").is_none(),
-        "second page failed: {second_resp}"
-    );
+    assert!(second_resp.get("error").is_none(), "second page failed: {second_resp}");
     let second_payload = second_resp
         .get("result")
         .and_then(|r| r.get("content"))
@@ -650,14 +478,8 @@ fn mcp_task_list_supports_pagination() {
         .and_then(|v| v.as_str())
         .map(|text| serde_json::from_str::<serde_json::Value>(text).unwrap())
         .unwrap();
-    assert_eq!(
-        second_payload.get("count").and_then(|v| v.as_u64()),
-        Some(1)
-    );
-    assert_eq!(
-        second_payload.get("hasMore").and_then(|v| v.as_bool()),
-        Some(false)
-    );
+    assert_eq!(second_payload.get("count").and_then(|v| v.as_u64()), Some(1));
+    assert_eq!(second_payload.get("hasMore").and_then(|v| v.as_bool()), Some(false));
 }
 
 #[test]
@@ -688,27 +510,14 @@ fn mcp_task_create_and_list_resolve_me_aliases() {
     let create_line = serde_json::to_string(&create_req).unwrap();
     let create_resp_line = lotar::mcp::server::handle_json_line(&create_line);
     let create_resp: serde_json::Value = serde_json::from_str(&create_resp_line).unwrap();
-    assert!(
-        create_resp.get("error").is_none(),
-        "task_create failed: {create_resp}"
-    );
+    assert!(create_resp.get("error").is_none(), "task_create failed: {create_resp}");
     let create_content = tool_content(&create_resp);
     assert!(!create_content.is_empty());
     let create_text = first_tool_text(&create_resp).unwrap_or_default();
     let created_task = task_from_text(&create_text);
-    let created_id = created_task
-        .get("id")
-        .and_then(|v| v.as_str())
-        .expect("task id present")
-        .to_string();
-    assert_eq!(
-        created_task.get("assignee").and_then(|v| v.as_str()),
-        Some("mcp-user")
-    );
-    assert_eq!(
-        created_task.get("reporter").and_then(|v| v.as_str()),
-        Some("mcp-user")
-    );
+    let created_id = created_task.get("id").and_then(|v| v.as_str()).expect("task id present").to_string();
+    assert_eq!(created_task.get("assignee").and_then(|v| v.as_str()), Some("mcp-user"));
+    assert_eq!(created_task.get("reporter").and_then(|v| v.as_str()), Some("mcp-user"));
 
     let list_req = serde_json::json!({
         "jsonrpc": "2.0",
@@ -719,35 +528,14 @@ fn mcp_task_create_and_list_resolve_me_aliases() {
     let list_line = serde_json::to_string(&list_req).unwrap();
     let list_resp_line = lotar::mcp::server::handle_json_line(&list_line);
     let list_resp: serde_json::Value = serde_json::from_str(&list_resp_line).unwrap();
-    assert!(
-        list_resp.get("error").is_none(),
-        "task/list failed: {list_resp}"
-    );
-    let list_content = list_resp
-        .get("result")
-        .and_then(|r| r.get("content"))
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    assert!(list_resp.get("error").is_none(), "task/list failed: {list_resp}");
+    let list_content = list_resp.get("result").and_then(|r| r.get("content")).and_then(|v| v.as_array()).cloned().unwrap_or_default();
     assert!(!list_content.is_empty());
-    let list_text = list_content[0]
-        .get("text")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
+    let list_text = list_content[0].get("text").and_then(|v| v.as_str()).unwrap_or("");
     let payload: serde_json::Value = serde_json::from_str(list_text).unwrap();
-    let tasks = payload
-        .get("tasks")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    let tasks = payload.get("tasks").and_then(|v| v.as_array()).cloned().unwrap_or_default();
     assert_eq!(tasks.len(), 1, "expected single task filtered by @me");
-    assert_eq!(
-        tasks[0]
-            .get("id")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string()),
-        Some(created_id)
-    );
+    assert_eq!(tasks[0].get("id").and_then(|v| v.as_str()).map(|s| s.to_string()), Some(created_id));
 }
 
 #[test]
@@ -765,44 +553,24 @@ fn mcp_sprint_tools_assign_and_backlog() {
 
     let mut storage = lotar::storage::manager::Storage::new(&tasks_dir.clone());
     let mut sprint = lotar::storage::sprint::Sprint::default();
-    sprint.plan = Some(lotar::storage::sprint::SprintPlan {
-        label: Some("Iteration".into()),
-        ..Default::default()
-    });
-    sprint.actual = Some(lotar::storage::sprint::SprintActual {
-        started_at: Some(chrono::Utc::now().to_rfc3339()),
-        ..Default::default()
-    });
-    let created =
-        lotar::services::sprint_service::SprintService::create(&mut storage, sprint, None)
-            .expect("create sprint");
+    sprint.plan = Some(lotar::storage::sprint::SprintPlan { label: Some("Iteration".into()), ..Default::default() });
+    sprint.actual = Some(lotar::storage::sprint::SprintActual { started_at: Some(chrono::Utc::now().to_rfc3339()), ..Default::default() });
+    let created = lotar::services::sprint_service::SprintService::create(&mut storage, sprint, None).expect("create sprint");
     let sprint_id = created.record.id;
 
     let task_a = lotar::services::task_service::TaskService::create(
         &mut storage,
-        lotar::api_types::TaskCreate {
-            title: "MCP Sprint A".into(),
-            project: Some("MCP".into()),
-            ..lotar::api_types::TaskCreate::default()
-        },
+        lotar::api_types::TaskCreate { title: "MCP Sprint A".into(), project: Some("MCP".into()), ..lotar::api_types::TaskCreate::default() },
     )
     .expect("task a");
     let task_b = lotar::services::task_service::TaskService::create(
         &mut storage,
-        lotar::api_types::TaskCreate {
-            title: "MCP Sprint B".into(),
-            project: Some("MCP".into()),
-            ..lotar::api_types::TaskCreate::default()
-        },
+        lotar::api_types::TaskCreate { title: "MCP Sprint B".into(), project: Some("MCP".into()), ..lotar::api_types::TaskCreate::default() },
     )
     .expect("task b");
     let task_c = lotar::services::task_service::TaskService::create(
         &mut storage,
-        lotar::api_types::TaskCreate {
-            title: "MCP Backlog".into(),
-            project: Some("MCP".into()),
-            ..lotar::api_types::TaskCreate::default()
-        },
+        lotar::api_types::TaskCreate { title: "MCP Backlog".into(), project: Some("MCP".into()), ..lotar::api_types::TaskCreate::default() },
     )
     .expect("task c");
     drop(storage);
@@ -824,16 +592,9 @@ fn mcp_sprint_tools_assign_and_backlog() {
     let add_line = serde_json::to_string(&add_req).unwrap();
     let add_resp_line = lotar::mcp::server::handle_json_line(&add_line);
     let add_resp: serde_json::Value = serde_json::from_str(&add_resp_line).unwrap();
-    assert!(
-        add_resp.get("error").is_none(),
-        "sprint_add failed: {add_resp:?}"
-    );
+    assert!(add_resp.get("error").is_none(), "sprint_add failed: {add_resp:?}");
     let add_payload = tool_payload_json(&add_resp).expect("sprint_add payload");
-    let modified = add_payload
-        .get("modified")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    let modified = add_payload.get("modified").and_then(|v| v.as_array()).cloned().unwrap_or_default();
     assert_eq!(modified.len(), 2);
 
     let backlog_req = serde_json::json!({
@@ -848,29 +609,13 @@ fn mcp_sprint_tools_assign_and_backlog() {
     let backlog_line = serde_json::to_string(&backlog_req).unwrap();
     let backlog_resp_line = lotar::mcp::server::handle_json_line(&backlog_line);
     let backlog_resp: serde_json::Value = serde_json::from_str(&backlog_resp_line).unwrap();
-    assert!(
-        backlog_resp.get("error").is_none(),
-        "sprint_backlog failed: {backlog_resp:?}"
-    );
+    assert!(backlog_resp.get("error").is_none(), "sprint_backlog failed: {backlog_resp:?}");
     let backlog_payload = tool_payload_json(&backlog_resp).expect("sprint_backlog payload");
-    assert_eq!(
-        backlog_payload.get("cursor").and_then(|v| v.as_u64()),
-        Some(0)
-    );
-    assert_eq!(
-        backlog_payload.get("hasMore").and_then(|v| v.as_bool()),
-        Some(false)
-    );
-    let backlog_tasks = backlog_payload
-        .get("tasks")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    assert_eq!(backlog_payload.get("cursor").and_then(|v| v.as_u64()), Some(0));
+    assert_eq!(backlog_payload.get("hasMore").and_then(|v| v.as_bool()), Some(false));
+    let backlog_tasks = backlog_payload.get("tasks").and_then(|v| v.as_array()).cloned().unwrap_or_default();
     assert_eq!(backlog_tasks.len(), 1);
-    assert_eq!(
-        backlog_tasks[0].get("id").and_then(|v| v.as_str()),
-        Some(task_c.id.as_str())
-    );
+    assert_eq!(backlog_tasks[0].get("id").and_then(|v| v.as_str()), Some(task_c.id.as_str()));
 
     let remove_req = serde_json::json!({
         "jsonrpc": "2.0",
@@ -887,16 +632,11 @@ fn mcp_sprint_tools_assign_and_backlog() {
     let remove_line = serde_json::to_string(&remove_req).unwrap();
     let remove_resp_line = lotar::mcp::server::handle_json_line(&remove_line);
     let remove_resp: serde_json::Value = serde_json::from_str(&remove_resp_line).unwrap();
-    assert!(
-        remove_resp.get("error").is_none(),
-        "sprint_remove failed: {remove_resp:?}"
-    );
+    assert!(remove_resp.get("error").is_none(), "sprint_remove failed: {remove_resp:?}");
 
     let storage = lotar::storage::manager::Storage::new(&tasks_dir);
-    let task_a_post = lotar::services::task_service::TaskService::get(&storage, &task_a.id, None)
-        .expect("task a post remove");
-    let task_b_post = lotar::services::task_service::TaskService::get(&storage, &task_b.id, None)
-        .expect("task b post add");
+    let task_a_post = lotar::services::task_service::TaskService::get(&storage, &task_a.id, None).expect("task a post remove");
+    let task_b_post = lotar::services::task_service::TaskService::get(&storage, &task_b.id, None).expect("task b post add");
     assert!(task_a_post.sprints.is_empty());
     assert_eq!(task_b_post.sprints, vec![sprint_id]);
 }
@@ -912,21 +652,13 @@ fn mcp_sprint_backlog_reports_missing_integrity_and_cleanup() {
     let mut storage = lotar::Storage::new(&resolver.path);
     let ghost = lotar::services::task_service::TaskService::create(
         &mut storage,
-        lotar::api_types::TaskCreate {
-            title: "Ghost sprint member".into(),
-            project: Some("MCP".into()),
-            ..lotar::api_types::TaskCreate::default()
-        },
+        lotar::api_types::TaskCreate { title: "Ghost sprint member".into(), project: Some("MCP".into()), ..lotar::api_types::TaskCreate::default() },
     )
     .expect("create ghost task");
     let project_prefix = ghost.id.split('-').next().unwrap_or_default().to_string();
-    let mut ghost_record = storage
-        .get(&ghost.id, &project_prefix)
-        .expect("ghost record on disk");
+    let mut ghost_record = storage.get(&ghost.id, &project_prefix).expect("ghost record on disk");
     ghost_record.sprints = vec![42];
-    storage
-        .edit(&ghost.id, &ghost_record)
-        .expect("failed to persist ghost task");
+    storage.edit(&ghost.id, &ghost_record).expect("failed to persist ghost task");
     drop(storage);
 
     let backlog_req = serde_json::json!({
@@ -938,51 +670,18 @@ fn mcp_sprint_backlog_reports_missing_integrity_and_cleanup() {
     let backlog_line = serde_json::to_string(&backlog_req).unwrap();
     let backlog_resp_line = lotar::mcp::server::handle_json_line(&backlog_line);
     let backlog_resp: serde_json::Value = serde_json::from_str(&backlog_resp_line).unwrap();
-    assert!(
-        backlog_resp.get("error").is_none(),
-        "sprint_backlog failed: {backlog_resp:?}"
-    );
+    assert!(backlog_resp.get("error").is_none(), "sprint_backlog failed: {backlog_resp:?}");
     let backlog_payload = tool_payload_json(&backlog_resp).expect("sprint_backlog payload");
-    let missing_initial = backlog_payload
-        .get("missing_sprints")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
-    assert_eq!(
-        missing_initial
-            .iter()
-            .map(|v| v.as_u64().unwrap())
-            .collect::<Vec<_>>(),
-        vec![42]
-    );
-    let integrity_initial = backlog_payload
-        .get("integrity")
-        .and_then(|v| v.as_object())
-        .expect("integrity diagnostics present");
-    let integrity_missing = integrity_initial
-        .get("missing_sprints")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
-    assert_eq!(
-        integrity_missing
-            .iter()
-            .map(|v| v.as_u64().unwrap())
-            .collect::<Vec<_>>(),
-        vec![42]
-    );
-    assert_eq!(
-        integrity_initial
-            .get("tasks_with_missing")
-            .and_then(|v| v.as_u64()),
-        Some(1)
-    );
+    let missing_initial = backlog_payload.get("missing_sprints").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+    assert_eq!(missing_initial.iter().map(|v| v.as_u64().unwrap()).collect::<Vec<_>>(), vec![42]);
+    let integrity_initial = backlog_payload.get("integrity").and_then(|v| v.as_object()).expect("integrity diagnostics present");
+    let integrity_missing = integrity_initial.get("missing_sprints").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+    assert_eq!(integrity_missing.iter().map(|v| v.as_u64().unwrap()).collect::<Vec<_>>(), vec![42]);
+    assert_eq!(integrity_initial.get("tasks_with_missing").and_then(|v| v.as_u64()), Some(1));
     assert!(integrity_initial.get("auto_cleanup").is_none());
 
     let storage = lotar::Storage::new(&tasks_dir.clone());
-    let ghost_before = storage
-        .get(&ghost.id, &project_prefix)
-        .expect("ghost before cleanup");
+    let ghost_before = storage.get(&ghost.id, &project_prefix).expect("ghost before cleanup");
     assert_eq!(ghost_before.sprints, vec![42]);
     drop(storage);
 
@@ -995,40 +694,17 @@ fn mcp_sprint_backlog_reports_missing_integrity_and_cleanup() {
     let cleanup_line = serde_json::to_string(&cleanup_req).unwrap();
     let cleanup_resp_line = lotar::mcp::server::handle_json_line(&cleanup_line);
     let cleanup_resp: serde_json::Value = serde_json::from_str(&cleanup_resp_line).unwrap();
-    assert!(
-        cleanup_resp.get("error").is_none(),
-        "sprint_backlog cleanup failed: {cleanup_resp:?}"
-    );
+    assert!(cleanup_resp.get("error").is_none(), "sprint_backlog cleanup failed: {cleanup_resp:?}");
     let cleanup_payload = tool_payload_json(&cleanup_resp).expect("cleanup payload");
-    let missing_after = cleanup_payload
-        .get("missing_sprints")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    let missing_after = cleanup_payload.get("missing_sprints").and_then(|v| v.as_array()).cloned().unwrap_or_default();
     assert!(missing_after.is_empty());
-    let cleanup_integrity = cleanup_payload
-        .get("integrity")
-        .and_then(|v| v.as_object())
-        .expect("cleanup integrity diagnostics present");
-    let auto_cleanup = cleanup_integrity
-        .get("auto_cleanup")
-        .and_then(|v| v.as_object())
-        .expect("auto cleanup summary present");
-    assert_eq!(
-        auto_cleanup
-            .get("removed_references")
-            .and_then(|v| v.as_u64()),
-        Some(1)
-    );
-    assert_eq!(
-        auto_cleanup.get("updated_tasks").and_then(|v| v.as_u64()),
-        Some(1)
-    );
+    let cleanup_integrity = cleanup_payload.get("integrity").and_then(|v| v.as_object()).expect("cleanup integrity diagnostics present");
+    let auto_cleanup = cleanup_integrity.get("auto_cleanup").and_then(|v| v.as_object()).expect("auto cleanup summary present");
+    assert_eq!(auto_cleanup.get("removed_references").and_then(|v| v.as_u64()), Some(1));
+    assert_eq!(auto_cleanup.get("updated_tasks").and_then(|v| v.as_u64()), Some(1));
 
     let storage = lotar::Storage::new(&tasks_dir);
-    let ghost_after = storage
-        .get(&ghost.id, &project_prefix)
-        .expect("ghost after cleanup");
+    let ghost_after = storage.get(&ghost.id, &project_prefix).expect("ghost after cleanup");
     assert!(ghost_after.sprints.is_empty());
 }
 
@@ -1044,11 +720,7 @@ fn mcp_sprint_backlog_supports_pagination() {
     for idx in 0..3 {
         lotar::services::task_service::TaskService::create(
             &mut storage,
-            lotar::api_types::TaskCreate {
-                title: format!("Backlog {idx}"),
-                project: Some("MCP".into()),
-                ..lotar::api_types::TaskCreate::default()
-            },
+            lotar::api_types::TaskCreate { title: format!("Backlog {idx}"), project: Some("MCP".into()), ..lotar::api_types::TaskCreate::default() },
         )
         .expect("create task");
     }
@@ -1063,23 +735,13 @@ fn mcp_sprint_backlog_supports_pagination() {
             "arguments": {"project": "MCP", "limit": 1}
         }
     });
-    let first_resp_line =
-        lotar::mcp::server::handle_json_line(&serde_json::to_string(&first_req).unwrap());
+    let first_resp_line = lotar::mcp::server::handle_json_line(&serde_json::to_string(&first_req).unwrap());
     let first_resp: serde_json::Value = serde_json::from_str(&first_resp_line).unwrap();
-    assert!(
-        first_resp.get("error").is_none(),
-        "first backlog page failed: {first_resp}"
-    );
+    assert!(first_resp.get("error").is_none(), "first backlog page failed: {first_resp}");
     let first_payload = tool_payload_json(&first_resp).expect("first backlog payload");
     assert_eq!(first_payload.get("count").and_then(|v| v.as_u64()), Some(1));
-    assert_eq!(
-        first_payload.get("hasMore").and_then(|v| v.as_bool()),
-        Some(true)
-    );
-    let cursor = first_payload
-        .get("nextCursor")
-        .and_then(|v| v.as_u64())
-        .expect("next cursor present") as usize;
+    assert_eq!(first_payload.get("hasMore").and_then(|v| v.as_bool()), Some(true));
+    let cursor = first_payload.get("nextCursor").and_then(|v| v.as_u64()).expect("next cursor present") as usize;
 
     let second_req = serde_json::json!({
         "jsonrpc": "2.0",
@@ -1090,22 +752,12 @@ fn mcp_sprint_backlog_supports_pagination() {
             "arguments": {"project": "MCP", "limit": 2, "cursor": cursor}
         }
     });
-    let second_resp_line =
-        lotar::mcp::server::handle_json_line(&serde_json::to_string(&second_req).unwrap());
+    let second_resp_line = lotar::mcp::server::handle_json_line(&serde_json::to_string(&second_req).unwrap());
     let second_resp: serde_json::Value = serde_json::from_str(&second_resp_line).unwrap();
-    assert!(
-        second_resp.get("error").is_none(),
-        "second backlog page failed: {second_resp}"
-    );
+    assert!(second_resp.get("error").is_none(), "second backlog page failed: {second_resp}");
     let second_payload = tool_payload_json(&second_resp).expect("second backlog payload");
-    assert_eq!(
-        second_payload.get("count").and_then(|v| v.as_u64()),
-        Some(2)
-    );
-    assert_eq!(
-        second_payload.get("hasMore").and_then(|v| v.as_bool()),
-        Some(false)
-    );
+    assert_eq!(second_payload.get("count").and_then(|v| v.as_u64()), Some(2));
+    assert_eq!(second_payload.get("hasMore").and_then(|v| v.as_bool()), Some(false));
 }
 
 #[test]
@@ -1136,28 +788,17 @@ fn mcp_task_create_honors_default_assignee() {
     let create_line = serde_json::to_string(&create_req).unwrap();
     let create_resp_line = lotar::mcp::server::handle_json_line(&create_line);
     let create_resp: serde_json::Value = serde_json::from_str(&create_resp_line).unwrap();
-    assert!(
-        create_resp.get("error").is_none(),
-        "task_create failed: {create_resp}"
-    );
+    assert!(create_resp.get("error").is_none(), "task_create failed: {create_resp}");
     let content = tool_content(&create_resp);
     assert!(!content.is_empty());
     let text = first_tool_text(&create_resp).unwrap_or_default();
     let task_json = task_from_text(&text);
-    assert_eq!(
-        task_json.get("assignee").and_then(|v| v.as_str()),
-        Some("default-user@example.com")
-    );
+    assert_eq!(task_json.get("assignee").and_then(|v| v.as_str()), Some("default-user@example.com"));
 
-    let task_id = task_json
-        .get("id")
-        .and_then(|v| v.as_str())
-        .unwrap()
-        .to_string();
+    let task_id = task_json.get("id").and_then(|v| v.as_str()).unwrap().to_string();
     let resolver = lotar::TasksDirectoryResolver::resolve(None, None).unwrap();
     let storage = lotar::Storage::new(&resolver.path);
-    let stored = lotar::services::task_service::TaskService::get(&storage, &task_id, None)
-        .expect("stored task");
+    let stored = lotar::services::task_service::TaskService::get(&storage, &task_id, None).expect("stored task");
     assert_eq!(stored.assignee.as_deref(), Some("default-user@example.com"));
 }
 
@@ -1174,8 +815,7 @@ mod git_required {
         let git_dir = repo_root.join(".git");
         std::fs::create_dir_all(&git_dir).unwrap();
         std::fs::write(git_dir.join("HEAD"), "ref: refs/heads/feat/new-ui\n").unwrap();
-        let _guard_tasks =
-            EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
+        let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
 
         std::fs::write(
             tasks_dir.join("config.yml"),
@@ -1200,26 +840,14 @@ mod git_required {
         let create_line = serde_json::to_string(&create_req).unwrap();
         let create_resp_line = lotar::mcp::server::handle_json_line(&create_line);
         let create_resp: serde_json::Value = serde_json::from_str(&create_resp_line).unwrap();
-        assert!(
-            create_resp.get("error").is_none(),
-            "task_create failed: {create_resp}"
-        );
+        assert!(create_resp.get("error").is_none(), "task_create failed: {create_resp}");
         let content = tool_content(&create_resp);
         assert!(!content.is_empty());
         let text = first_tool_text(&create_resp).unwrap_or_default();
         let task_json = task_from_text(&text);
-        assert_eq!(
-            task_json.get("priority").and_then(|v| v.as_str()),
-            Some("High")
-        );
-        assert_eq!(
-            task_json.get("status").and_then(|v| v.as_str()),
-            Some("InProgress")
-        );
-        assert_eq!(
-            task_json.get("task_type").and_then(|v| v.as_str()),
-            Some("Feature")
-        );
+        assert_eq!(task_json.get("priority").and_then(|v| v.as_str()), Some("High"));
+        assert_eq!(task_json.get("status").and_then(|v| v.as_str()), Some("InProgress"));
+        assert_eq!(task_json.get("task_type").and_then(|v| v.as_str()), Some("Feature"));
     }
 }
 
@@ -1231,8 +859,7 @@ fn mcp_task_create_and_get() {
     std::fs::create_dir_all(&tasks_dir).unwrap();
     let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
 
-    let create =
-        serde_json::json!({"title":"From MCP","project":"MCP","priority":"High","tags":[]});
+    let create = serde_json::json!({"title":"From MCP","project":"MCP","priority":"High","tags":[]});
     let resolver = lotar::TasksDirectoryResolver::resolve(None, None).unwrap();
     let mut storage = lotar::Storage::new(&resolver.path.clone());
     let req: lotar::api_types::TaskCreate = serde_json::from_value(create).unwrap();
@@ -1261,24 +888,12 @@ fn mcp_tools_call_with_invalid_tool_name_returns_invalid_params() {
     // Unknown tools under tools/call use invalid params per MCP guidance,
     // not method-not-found (that code is reserved for unknown wire methods).
     assert_eq!(err.get("code").and_then(|v| v.as_i64()), Some(-32602));
-    assert_eq!(
-        err.get("message").and_then(|v| v.as_str()),
-        Some("Unknown tool: does_not_exist")
-    );
+    assert_eq!(err.get("message").and_then(|v| v.as_str()), Some("Unknown tool: does_not_exist"));
 }
 
 #[test]
 fn mcp_tools_call_never_dispatches_control_plane_methods() {
-    for name in [
-        "initialize",
-        "ping",
-        "tools/list",
-        "tools_list",
-        "tools/call",
-        "tools_call",
-        "logging/setLevel",
-        "logging_setLevel",
-    ] {
+    for name in ["initialize", "ping", "tools/list", "tools_list", "tools/call", "tools_call", "logging/setLevel", "logging_setLevel"] {
         let req = serde_json::json!({
             "jsonrpc": "2.0",
             "id": 77,
@@ -1288,19 +903,9 @@ fn mcp_tools_call_never_dispatches_control_plane_methods() {
         let line = serde_json::to_string(&req).unwrap();
         let resp_line = lotar::mcp::server::handle_json_line(&line);
         let resp: serde_json::Value = serde_json::from_str(&resp_line).unwrap();
-        let err = resp
-            .get("error")
-            .cloned()
-            .unwrap_or_else(|| panic!("tools/call {name} must not dispatch"));
-        assert_eq!(
-            err.get("code").and_then(|v| v.as_i64()),
-            Some(-32602),
-            "tools/call {name}"
-        );
-        assert_eq!(
-            err.get("message").and_then(|v| v.as_str()),
-            Some(format!("Unknown tool: {name}").as_str())
-        );
+        let err = resp.get("error").cloned().unwrap_or_else(|| panic!("tools/call {name} must not dispatch"));
+        assert_eq!(err.get("code").and_then(|v| v.as_i64()), Some(-32602), "tools/call {name}");
+        assert_eq!(err.get("message").and_then(|v| v.as_str()), Some(format!("Unknown tool: {name}").as_str()));
     }
 
     // schema_discover remains a callable advertised tool through tools/call.
@@ -1313,10 +918,7 @@ fn mcp_tools_call_never_dispatches_control_plane_methods() {
     let line = serde_json::to_string(&req).unwrap();
     let resp_line = lotar::mcp::server::handle_json_line(&line);
     let resp: serde_json::Value = serde_json::from_str(&resp_line).unwrap();
-    assert!(
-        resp.get("error").is_none(),
-        "schema_discover must stay callable: {resp}"
-    );
+    assert!(resp.get("error").is_none(), "schema_discover must stay callable: {resp}");
     assert_eq!(function_response_name(&resp), Some("schema_discover"));
 }
 
@@ -1339,12 +941,7 @@ fn mcp_task_create_missing_title_returns_invalid_params() {
     let err = resp.get("error").cloned().unwrap();
     assert_eq!(err.get("code").and_then(|v| v.as_i64()), Some(-32602));
     // Schema-layer rejections carry structured issues naming the violation.
-    let issues = err
-        .get("data")
-        .and_then(|data| data.get("issues"))
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    let issues = err.get("data").and_then(|data| data.get("issues")).and_then(|v| v.as_array()).cloned().unwrap_or_default();
     assert!(
         issues.iter().any(|issue| {
             let text = issue.as_str().unwrap_or("");
@@ -1366,17 +963,9 @@ fn mcp_strict_input_pins_reject_on_the_tools_call_surface() {
     let cases = [
         // sprint_delete "force" was advertised-but-ignored; intentionally
         // rejected now on the tools/call surface as well.
-        (
-            "sprint_delete",
-            serde_json::json!({"sprint": "#1", "force": true}),
-            "force",
-        ),
+        ("sprint_delete", serde_json::json!({"sprint": "#1", "force": true}), "force"),
         // config_set values must be strings (no silent coercion).
-        (
-            "config_set",
-            serde_json::json!({"values": {"default.project": 42}}),
-            "default.project",
-        ),
+        ("config_set", serde_json::json!({"values": {"default.project": 42}}), "default.project"),
     ];
     for (tool, arguments, field) in cases {
         let req = serde_json::json!({
@@ -1388,34 +977,15 @@ fn mcp_strict_input_pins_reject_on_the_tools_call_surface() {
         let line = serde_json::to_string(&req).unwrap();
         let resp_line = lotar::mcp::server::handle_json_line(&line);
         let resp: serde_json::Value = serde_json::from_str(&resp_line).unwrap();
-        let err = resp
-            .get("error")
-            .cloned()
-            .unwrap_or_else(|| panic!("tools/call {tool} with {field} must be rejected: {resp}"));
+        let err = resp.get("error").cloned().unwrap_or_else(|| panic!("tools/call {tool} with {field} must be rejected: {resp}"));
         assert_eq!(err.get("code").and_then(|v| v.as_i64()), Some(-32602));
-        let issues = err
-            .get("data")
-            .and_then(|data| data.get("issues"))
-            .and_then(|v| v.as_array())
-            .cloned()
-            .unwrap_or_default();
-        assert!(
-            issues
-                .iter()
-                .any(|issue| { issue.as_str().unwrap_or("").contains(field) }),
-            "{tool} issues must name {field}: {issues:?}"
-        );
+        let issues = err.get("data").and_then(|data| data.get("issues")).and_then(|v| v.as_array()).cloned().unwrap_or_default();
+        assert!(issues.iter().any(|issue| { issue.as_str().unwrap_or("").contains(field) }), "{tool} issues must name {field}: {issues:?}");
     }
     // Side-effect safety: nothing was created in the workspace.
-    let entries: Vec<_> = std::fs::read_dir(&tasks_dir)
-        .unwrap()
-        .filter_map(|entry| entry.ok())
-        .map(|entry| entry.file_name().to_string_lossy().to_string())
-        .collect();
-    assert!(
-        entries.is_empty(),
-        "rejected pins must not write: {entries:?}"
-    );
+    let entries: Vec<_> =
+        std::fs::read_dir(&tasks_dir).unwrap().filter_map(|entry| entry.ok()).map(|entry| entry.file_name().to_string_lossy().to_string()).collect();
+    assert!(entries.is_empty(), "rejected pins must not write: {entries:?}");
 
     // guard drops here
 }
@@ -1436,23 +1006,10 @@ fn mcp_long_multibyte_enum_rejection_reports_error_instead_of_panicking() {
         });
         let line = serde_json::to_string(&req).unwrap();
         let resp_line = lotar::mcp::server::handle_json_line(&line);
-        let resp: serde_json::Value = serde_json::from_str(&resp_line)
-            .unwrap_or_else(|error| panic!("{note}: non-JSON response {resp_line:?}: {error}"));
-        let err = resp
-            .get("error")
-            .cloned()
-            .unwrap_or_else(|| panic!("{note}: expected error, got {resp}"));
-        assert_eq!(
-            err.get("code").and_then(|v| v.as_i64()),
-            Some(-32602),
-            "{note}"
-        );
-        let issues = err
-            .get("data")
-            .and_then(|data| data.get("issues"))
-            .and_then(|v| v.as_array())
-            .cloned()
-            .unwrap_or_default();
+        let resp: serde_json::Value = serde_json::from_str(&resp_line).unwrap_or_else(|error| panic!("{note}: non-JSON response {resp_line:?}: {error}"));
+        let err = resp.get("error").cloned().unwrap_or_else(|| panic!("{note}: expected error, got {resp}"));
+        assert_eq!(err.get("code").and_then(|v| v.as_i64()), Some(-32602), "{note}");
+        let issues = err.get("data").and_then(|data| data.get("issues")).and_then(|v| v.as_array()).cloned().unwrap_or_default();
         assert!(!issues.is_empty(), "{note}: issues required");
     };
 
@@ -1495,18 +1052,12 @@ fn mcp_task_create_resolves_me_alias() {
     let line = serde_json::to_string(&req).unwrap();
     let resp_line = lotar::mcp::server::handle_json_line(&line);
     let resp: serde_json::Value = serde_json::from_str(&resp_line).unwrap();
-    assert!(
-        resp.get("error").is_none(),
-        "task_create should not error: {resp}"
-    );
+    assert!(resp.get("error").is_none(), "task_create should not error: {resp}");
     let content = tool_content(&resp);
     assert!(!content.is_empty());
     let text = first_tool_text(&resp).unwrap_or_default();
     let task_json = task_from_text(&text);
-    assert_eq!(
-        task_json.get("assignee").and_then(|v| v.as_str()),
-        Some("carol")
-    );
+    assert_eq!(task_json.get("assignee").and_then(|v| v.as_str()), Some("carol"));
 
     // guard drops here
 }
@@ -1532,11 +1083,7 @@ fn mcp_task_update_resolves_me_in_patch() {
     let mut storage = lotar::Storage::new(&resolver.path);
     let created = lotar::services::task_service::TaskService::create(
         &mut storage,
-        lotar::api_types::TaskCreate {
-            title: "Update @me patch".into(),
-            project: Some("MCP".into()),
-            ..lotar::api_types::TaskCreate::default()
-        },
+        lotar::api_types::TaskCreate { title: "Update @me patch".into(), project: Some("MCP".into()), ..lotar::api_types::TaskCreate::default() },
     )
     .expect("create initial task");
 
@@ -1556,22 +1103,13 @@ fn mcp_task_update_resolves_me_in_patch() {
     let line = serde_json::to_string(&req).unwrap();
     let resp_line = lotar::mcp::server::handle_json_line(&line);
     let resp: serde_json::Value = serde_json::from_str(&resp_line).unwrap();
-    assert!(
-        resp.get("error").is_none(),
-        "task_update should not error: {resp}"
-    );
+    assert!(resp.get("error").is_none(), "task_update should not error: {resp}");
     let content = tool_content(&resp);
     assert!(!content.is_empty());
     let text = first_tool_text(&resp).unwrap_or_default();
     let task_json: serde_json::Value = serde_json::from_str(&text).unwrap();
-    assert_eq!(
-        task_json.get("assignee").and_then(|v| v.as_str()),
-        Some("dave")
-    );
-    assert_eq!(
-        task_json.get("reporter").and_then(|v| v.as_str()),
-        Some("dave")
-    );
+    assert_eq!(task_json.get("assignee").and_then(|v| v.as_str()), Some("dave"));
+    assert_eq!(task_json.get("reporter").and_then(|v| v.as_str()), Some("dave"));
 
     // guard drops here
 }

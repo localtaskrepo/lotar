@@ -134,14 +134,8 @@ pub fn parse_effort(input: &str) -> Result<EffortParsed, String> {
     let parts: Vec<&str> = s.split_whitespace().collect();
     if parts.len() == 1 {
         match parse_token(parts[0])? {
-            EffortKind::TimeHours(h) => Ok(EffortParsed {
-                kind: EffortKind::TimeHours(h),
-                canonical: format!("{:.2}h", h),
-            }),
-            EffortKind::Points(p) => Ok(EffortParsed {
-                kind: EffortKind::Points(p),
-                canonical: format!("{}pt", trim_float(p)),
-            }),
+            EffortKind::TimeHours(h) => Ok(EffortParsed { kind: EffortKind::TimeHours(h), canonical: format!("{:.2}h", h) }),
+            EffortKind::Points(p) => Ok(EffortParsed { kind: EffortKind::Points(p), canonical: format!("{}pt", trim_float(p)) }),
         }
     } else {
         // Combined tokens: allow number+unit pairs (e.g., "1 hr", "30 min") and single tokens
@@ -213,36 +207,23 @@ pub fn parse_effort(input: &str) -> Result<EffortParsed, String> {
             return Err("cannot mix points with time tokens".into());
         }
         if total_points > 0.0 {
-            return Ok(EffortParsed {
-                kind: EffortKind::Points(total_points),
-                canonical: format!("{}pt", trim_float(total_points)),
-            });
+            return Ok(EffortParsed { kind: EffortKind::Points(total_points), canonical: format!("{}pt", trim_float(total_points)) });
         }
-        Ok(EffortParsed {
-            kind: EffortKind::TimeHours(total_hours),
-            canonical: format!("{:.2}h", total_hours),
-        })
+        Ok(EffortParsed { kind: EffortKind::TimeHours(total_hours), canonical: format!("{:.2}h", total_hours) })
     }
 }
 
 /// Return hours if the input represents a time effort; otherwise None.
 pub fn effort_hours(input: &str) -> Option<f64> {
     match parse_effort(input) {
-        Ok(EffortParsed {
-            kind: EffortKind::TimeHours(h),
-            ..
-        }) => Some(h),
+        Ok(EffortParsed { kind: EffortKind::TimeHours(h), .. }) => Some(h),
         _ => None,
     }
 }
 
 fn trim_float(n: f64) -> String {
     // Render without trailing .0 if integer; otherwise keep up to 2 decimals
-    if (n.fract() - 0.0).abs() < f64::EPSILON {
-        format!("{}", n as i64)
-    } else {
-        format!("{:.2}", n)
-    }
+    if (n.fract() - 0.0).abs() < f64::EPSILON { format!("{}", n as i64) } else { format!("{:.2}", n) }
 }
 
 fn time_word_unit_factor(unit: &str) -> Option<f64> {

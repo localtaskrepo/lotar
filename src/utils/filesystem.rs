@@ -12,10 +12,7 @@ pub fn list_visible_subdirs(dir: &Path) -> Vec<(String, PathBuf)> {
             if path.is_dir()
                 && let Some(name) = path.file_name().and_then(|n| n.to_str())
             {
-                if name.starts_with('.')
-                    || name.contains('@')
-                    || name.eq_ignore_ascii_case("sprints")
-                {
+                if name.starts_with('.') || name.contains('@') || name.eq_ignore_ascii_case("sprints") {
                     continue;
                 }
                 result.push((name.to_string(), path));
@@ -79,7 +76,5 @@ pub fn parse_numeric_stem(stem: &str) -> Option<u64> {
 
 /// Extract numeric stem from a file path if its stem is a u64.
 pub fn file_numeric_stem(path: &Path) -> Option<u64> {
-    path.file_stem()
-        .and_then(|s| s.to_str())
-        .and_then(parse_numeric_stem)
+    path.file_stem().and_then(|s| s.to_str()).and_then(parse_numeric_stem)
 }

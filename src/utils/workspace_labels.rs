@@ -6,10 +6,7 @@ use std::path::Path;
 /// - Else if path includes examples/<name> or services/<name>, return <name>
 /// - Else return the leaf directory name
 pub fn derive_path_label_from(dir: &Path) -> Option<String> {
-    let segs: Vec<String> = dir
-        .components()
-        .filter_map(|c| c.as_os_str().to_str().map(|s| s.to_string()))
-        .collect();
+    let segs: Vec<String> = dir.components().filter_map(|c| c.as_os_str().to_str().map(|s| s.to_string())).collect();
     if segs.is_empty() {
         return None;
     }
@@ -31,7 +28,5 @@ pub fn derive_path_label_from(dir: &Path) -> Option<String> {
 
 /// Convenience derived label from current working directory
 pub fn derive_label_from_cwd() -> Option<String> {
-    std::env::current_dir()
-        .ok()
-        .and_then(|p| derive_path_label_from(&p))
+    std::env::current_dir().ok().and_then(|p| derive_path_label_from(&p))
 }

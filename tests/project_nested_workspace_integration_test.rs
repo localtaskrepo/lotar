@@ -37,11 +37,7 @@ mod git_required {
 
         // packages/api has package.json
         fs::create_dir_all(server.parent().unwrap()).unwrap();
-        fs::write(
-            server.parent().unwrap().join("package.json"),
-            r#"{ "name": "api" }"#,
-        )
-        .unwrap();
+        fs::write(server.parent().unwrap().join("package.json"), r#"{ "name": "api" }"#).unwrap();
 
         // server has its own Cargo.toml
         fs::write(

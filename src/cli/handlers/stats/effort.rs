@@ -24,10 +24,7 @@ pub(crate) fn run(
     // The tasks to aggregate: the scope plus `--filter` (DEV-232/238).
     let mut tasks = super::common::list_tasks(scope_project.as_deref(), resolver, filter)?;
     // Performance guardrail: cap tasks processed for aggregation
-    let cap: usize = std::env::var("LOTAR_STATS_EFFORT_CAP")
-        .ok()
-        .and_then(|s| s.parse::<usize>().ok())
-        .unwrap_or(20000);
+    let cap: usize = std::env::var("LOTAR_STATS_EFFORT_CAP").ok().and_then(|s| s.parse::<usize>().ok()).unwrap_or(20000);
     if tasks.len() > cap {
         tasks.truncate(cap);
     }
@@ -46,17 +43,8 @@ pub(crate) fn run(
         if std::env::var("LOTAR_DEBUG").is_ok() {
             use std::fs::OpenOptions;
             use std::io::Write;
-            if let Ok(mut f) = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open("/tmp/lotar_transitions_debug.log")
-            {
-                let _ = writeln!(
-                    f,
-                    "[START] tasks_pre={} cwd={}",
-                    tasks.len(),
-                    cwd.to_string_lossy()
-                );
+            if let Ok(mut f) = OpenOptions::new().create(true).append(true).open("/tmp/lotar_transitions_debug.log") {
+                let _ = writeln!(f, "[START] tasks_pre={} cwd={}", tasks.len(), cwd.to_string_lossy());
             }
         }
         let tasks_abs = resolver.path.clone();
@@ -65,20 +53,11 @@ pub(crate) fn run(
         let tasks_abs_real = std::fs::canonicalize(&tasks_abs).unwrap_or(tasks_abs.clone());
         // Fall back to the tasks directory name to stay repo-relative
         let tasks_rel = crate::utils::git::repo_relative_path(&repo_root, &tasks_abs)
-            .unwrap_or_else(|| {
-                tasks_abs
-                    .file_name()
-                    .map(std::path::PathBuf::from)
-                    .unwrap_or(tasks_abs.clone())
-            });
+            .unwrap_or_else(|| tasks_abs.file_name().map(std::path::PathBuf::from).unwrap_or(tasks_abs.clone()));
         if std::env::var("LOTAR_DEBUG").is_ok() {
             use std::fs::OpenOptions;
             use std::io::Write;
-            if let Ok(mut f) = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open("/tmp/lotar_transitions_debug.log")
-            {
+            if let Ok(mut f) = OpenOptions::new().create(true).append(true).open("/tmp/lotar_transitions_debug.log") {
                 let _ = writeln!(
                     f,
                     "[PATHS] repo_root_real={} tasks_abs_real={} tasks_rel={}",
@@ -93,40 +72,19 @@ pub(crate) fn run(
             let Ok(parsed) = crate::storage::TaskId::parse(id) else {
                 return false;
             };
-            let Some(file_abs) =
-                crate::storage::operations::StorageOperations::get_file_path_for_id(
-                    &tasks_abs_real.join(&parsed.project),
-                    id,
-                )
-            else {
+            let Some(file_abs) = crate::storage::operations::StorageOperations::get_file_path_for_id(&tasks_abs_real.join(&parsed.project), id) else {
                 return false;
             };
-            let file_rel =
-                tasks_rel.join(file_abs.strip_prefix(&tasks_abs_real).unwrap_or(&file_abs));
-            let mut commits =
-                match crate::services::audit_service::AuditService::list_commits_for_task(
-                    &repo_root_real,
-                    &tasks_abs_real,
-                    &file_rel,
-                ) {
-                    Ok(c) => c,
-                    Err(_) => return false,
-                };
+            let file_rel = tasks_rel.join(file_abs.strip_prefix(&tasks_abs_real).unwrap_or(&file_abs));
+            let mut commits = match crate::services::audit_service::AuditService::list_commits_for_task(&repo_root_real, &tasks_abs_real, &file_rel) {
+                Ok(c) => c,
+                Err(_) => return false,
+            };
             if std::env::var("LOTAR_DEBUG").is_ok() {
                 use std::fs::OpenOptions;
                 use std::io::Write;
-                if let Ok(mut f) = OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open("/tmp/lotar_transitions_debug.log")
-                {
-                    let _ = writeln!(
-                        f,
-                        "[FILE] id={}, rel={}, commits={}",
-                        id,
-                        file_rel.to_string_lossy(),
-                        commits.len()
-                    );
+                if let Ok(mut f) = OpenOptions::new().create(true).append(true).open("/tmp/lotar_transitions_debug.log") {
+                    let _ = writeln!(f, "[FILE] id={}, rel={}, commits={}", id, file_rel.to_string_lossy(), commits.len());
                 }
             }
             if commits.is_empty() {
@@ -139,48 +97,25 @@ pub(crate) fn run(
                 if c.date > until_dt {
                     break;
                 }
-                if let Ok(content) = crate::services::audit_service::AuditService::show_file_at(
-                    &repo_root_real,
-                    &c.commit,
-                    &c.path,
-                ) && let Some(ts) = parse_status_from_yaml(&content)
+                if let Ok(content) = crate::services::audit_service::AuditService::show_file_at(&repo_root_real, &c.commit, &c.path)
+                    && let Some(ts) = parse_status_from_yaml(&content)
                 {
                     let curr_status = ts.to_string();
                     if std::env::var("LOTAR_DEBUG").is_ok() {
                         use std::fs::OpenOptions;
                         use std::io::Write;
-                        if let Ok(mut f) = OpenOptions::new()
-                            .create(true)
-                            .append(true)
-                            .open("/tmp/lotar_transitions_debug.log")
-                        {
-                            let _ = writeln!(
-                                f,
-                                "  - commit @{} status={} (prev={:?})",
-                                c.date.to_rfc3339(),
-                                curr_status,
-                                prev_status
-                            );
+                        if let Ok(mut f) = OpenOptions::new().create(true).append(true).open("/tmp/lotar_transitions_debug.log") {
+                            let _ = writeln!(f, "  - commit @{} status={} (prev={:?})", c.date.to_rfc3339(), curr_status, prev_status);
                         }
                     }
                     if c.date >= since_dt && c.date <= until_dt {
                         // Detect transition into target within the window
-                        if prev_status.as_deref() != Some(curr_status.as_str())
-                            && curr_status == trans_status
-                        {
+                        if prev_status.as_deref() != Some(curr_status.as_str()) && curr_status == trans_status {
                             if std::env::var("LOTAR_DEBUG").is_ok() {
                                 use std::fs::OpenOptions;
                                 use std::io::Write;
-                                if let Ok(mut f) = OpenOptions::new()
-                                    .create(true)
-                                    .append(true)
-                                    .open("/tmp/lotar_transitions_debug.log")
-                                {
-                                    let _ = writeln!(
-                                        f,
-                                        "  -> MATCH: id={} transitioned into {}",
-                                        id, curr_status
-                                    );
+                                if let Ok(mut f) = OpenOptions::new().create(true).append(true).open("/tmp/lotar_transitions_debug.log") {
+                                    let _ = writeln!(f, "  -> MATCH: id={} transitioned into {}", id, curr_status);
                                 }
                             }
                             return true;
@@ -194,11 +129,7 @@ pub(crate) fn run(
         if std::env::var("LOTAR_DEBUG").is_ok() {
             use std::fs::OpenOptions;
             use std::io::Write;
-            if let Ok(mut f) = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open("/tmp/lotar_transitions_debug.log")
-            {
+            if let Ok(mut f) = OpenOptions::new().create(true).append(true).open("/tmp/lotar_transitions_debug.log") {
                 let _ = writeln!(f, "[END] tasks_post={}", tasks.len());
             }
         }
@@ -209,11 +140,8 @@ pub(crate) fn run(
             let mut matched: Vec<(String, crate::api_types::TaskDTO)> = Vec::new();
             // Enumerate project folders directly under tasks_abs_real
             if let Ok(project_dirs) = fs::read_dir(&tasks_abs_real) {
-                let fallback_storage =
-                    crate::storage::manager::Storage::open_read_only(&tasks_abs_real);
-                let sprint_lookup = crate::services::task_service::TaskService::load_sprint_lookup(
-                    &fallback_storage,
-                );
+                let fallback_storage = crate::storage::manager::Storage::open_read_only(&tasks_abs_real);
+                let sprint_lookup = crate::services::task_service::TaskService::load_sprint_lookup(&fallback_storage);
                 for entry in project_dirs.flatten() {
                     let p = entry.path();
                     if !p.is_dir() {
@@ -224,10 +152,7 @@ pub(crate) fn run(
                         None => continue,
                     };
                     // Task files in this project folder (nested folders too)
-                    for file in crate::storage::layout::task_files(
-                        &p,
-                        crate::storage::layout::ArchiveFilter::Exclude,
-                    ) {
+                    for file in crate::storage::layout::task_files(&p, crate::storage::layout::ArchiveFilter::Exclude) {
                         // Move stubs stand for tasks that live on elsewhere (DEV-183).
                         if crate::storage::moves::stub_target(&file.path).is_some() {
                             continue;
@@ -235,14 +160,8 @@ pub(crate) fn run(
                         let num = file.number;
                         let id = format!("{}-{}", project_folder, num);
                         let abs_file = file.path;
-                        let file_rel = tasks_rel
-                            .join(abs_file.strip_prefix(&tasks_abs_real).unwrap_or(&abs_file));
-                        let mut commits =
-                            crate::services::audit_service::AuditService::list_commits_for_task(
-                                &repo_root_real,
-                                &tasks_abs_real,
-                                &file_rel,
-                            )
+                        let file_rel = tasks_rel.join(abs_file.strip_prefix(&tasks_abs_real).unwrap_or(&abs_file));
+                        let mut commits = crate::services::audit_service::AuditService::list_commits_for_task(&repo_root_real, &tasks_abs_real, &file_rel)
                             .unwrap_or_default();
                         if commits.is_empty() {
                             continue;
@@ -254,12 +173,7 @@ pub(crate) fn run(
                             if c.date > until_dt {
                                 break;
                             }
-                            if let Ok(content) =
-                                crate::services::audit_service::AuditService::show_file_at(
-                                    &repo_root_real,
-                                    &c.commit,
-                                    &c.path,
-                                )
+                            if let Ok(content) = crate::services::audit_service::AuditService::show_file_at(&repo_root_real, &c.commit, &c.path)
                                 && let Some(ts) = parse_status_from_yaml(&content)
                             {
                                 let curr_status = ts.to_string();
@@ -278,14 +192,8 @@ pub(crate) fn run(
                             continue;
                         }
                         // Build a TaskDTO by tolerantly reading current YAML
-                        let task = crate::storage::task::parse_task_yaml_tolerant(
-                            &fs::read_to_string(&abs_file).unwrap_or_default(),
-                        )
-                        .unwrap_or_default();
-                        let sprints: Vec<u32> = sprint_lookup
-                            .get(&id)
-                            .map(|orders| orders.keys().copied().collect::<Vec<u32>>())
-                            .unwrap_or_default();
+                        let task = crate::storage::task::parse_task_yaml_tolerant(&fs::read_to_string(&abs_file).unwrap_or_default()).unwrap_or_default();
+                        let sprints: Vec<u32> = sprint_lookup.get(&id).map(|orders| orders.keys().copied().collect::<Vec<u32>>()).unwrap_or_default();
                         let dto = crate::api_types::TaskDTO {
                             task_state: None,
                             archived: false,
@@ -319,10 +227,7 @@ pub(crate) fn run(
                 }
             }
             if std::env::var("LOTAR_DEBUG").is_ok()
-                && let Ok(mut f) = std::fs::OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open("/tmp/lotar_transitions_debug.log")
+                && let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/lotar_transitions_debug.log")
             {
                 use std::io::Write;
                 let _ = writeln!(f, "[FALLBACK] tasks_added={}", matched.len());
@@ -334,17 +239,12 @@ pub(crate) fn run(
     }
 
     // Unified field resolver: returns optional grouping key for a task given a key pattern
-    let resolve_group_key = |id: &str,
-                             t: &crate::api_types::TaskDTO,
-                             key: &str,
-                             cfg: &crate::config::types::ResolvedConfig|
-     -> Option<Vec<String>> {
+    let resolve_group_key = |id: &str, t: &crate::api_types::TaskDTO, key: &str, cfg: &crate::config::types::ResolvedConfig| -> Option<Vec<String>> {
         crate::utils::custom_fields::resolve_task_filter_values(id, t, key, cfg)
     };
 
     // Custom field keys for grouping resolve against the base configuration.
-    let cfg = crate::config::resolution::load_and_merge_configs(Some(resolver.path.as_path()))
-        .map_err(|e| format!("Failed to load config: {}", e))?;
+    let cfg = crate::config::resolution::load_and_merge_configs(Some(resolver.path.as_path())).map_err(|e| format!("Failed to load config: {}", e))?;
 
     // Aggregate: keep both time hours and points totals to support unit modes
     let mut agg: BTreeMap<String, (f64, f64, usize)> = BTreeMap::new(); // (hours, points, count)
@@ -370,25 +270,13 @@ pub(crate) fn run(
         {
             keys = vec![a.clone()];
         }
-        let keys = if keys.is_empty() {
-            vec![String::new()]
-        } else {
-            keys
-        };
+        let keys = if keys.is_empty() { vec![String::new()] } else { keys };
         if std::env::var("LOTAR_DEBUG").is_ok() {
             for key in keys.iter() {
                 use std::fs::OpenOptions;
                 use std::io::Write;
-                if let Ok(mut f) = OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open("/tmp/lotar_stats_debug.log")
-                {
-                    let _ = writeln!(
-                        f,
-                        "[DEBUG] Task: id={}, assignee={:?}, effort={:?}, kind={}, group_key={:?}",
-                        id, t.assignee, t.effort, effort_kind, key
-                    );
+                if let Ok(mut f) = OpenOptions::new().create(true).append(true).open("/tmp/lotar_stats_debug.log") {
+                    let _ = writeln!(f, "[DEBUG] Task: id={}, assignee={:?}, effort={:?}, kind={}, group_key={:?}", id, t.assignee, t.effort, effort_kind, key);
                 }
             }
         }
@@ -437,12 +325,7 @@ pub(crate) fn run(
         rows.push(obj);
     }
     // Sort by hours desc
-    rows.sort_by(|a, b| {
-        b["hours"]
-            .as_f64()
-            .partial_cmp(&a["hours"].as_f64())
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    rows.sort_by(|a, b| b["hours"].as_f64().partial_cmp(&a["hours"].as_f64()).unwrap_or(std::cmp::Ordering::Equal));
     let rows: Vec<_> = rows.into_iter().take(limit).collect();
 
     match renderer.format {
@@ -466,18 +349,10 @@ pub(crate) fn run(
                 for r in &rows {
                     let key = r["key"].as_str().unwrap_or("");
                     let (val_str, suffix) = match unit {
-                        crate::cli::args::stats::StatsEffortUnit::Hours => {
-                            (format!("{:.2}", r["hours"].as_f64().unwrap_or(0.0)), "h")
-                        }
-                        crate::cli::args::stats::StatsEffortUnit::Days => {
-                            (format!("{:.2}", r["days"].as_f64().unwrap_or(0.0)), "d")
-                        }
-                        crate::cli::args::stats::StatsEffortUnit::Weeks => {
-                            (format!("{:.2}", r["weeks"].as_f64().unwrap_or(0.0)), "w")
-                        }
-                        crate::cli::args::stats::StatsEffortUnit::Points => {
-                            (format!("{}", r["points"].as_f64().unwrap_or(0.0)), "pt")
-                        }
+                        crate::cli::args::stats::StatsEffortUnit::Hours => (format!("{:.2}", r["hours"].as_f64().unwrap_or(0.0)), "h"),
+                        crate::cli::args::stats::StatsEffortUnit::Days => (format!("{:.2}", r["days"].as_f64().unwrap_or(0.0)), "d"),
+                        crate::cli::args::stats::StatsEffortUnit::Weeks => (format!("{:.2}", r["weeks"].as_f64().unwrap_or(0.0)), "w"),
+                        crate::cli::args::stats::StatsEffortUnit::Points => (format!("{}", r["points"].as_f64().unwrap_or(0.0)), "pt"),
                         crate::cli::args::stats::StatsEffortUnit::Auto => {
                             let unit = r["auto_unit"].as_str().unwrap_or("hours");
                             let v = r["auto_value"].as_f64().unwrap_or(0.0);

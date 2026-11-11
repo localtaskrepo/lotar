@@ -3,9 +3,8 @@ use crate::cli::handlers::CommandHandler;
 use crate::cli::handlers::task::context::TaskCommandContext;
 use crate::cli::handlers::task::mutation::{LoadedTask, load_task};
 use crate::cli::handlers::task::render::{
-    ExplainPlacement, PropertyCurrent, PropertyExplain, PropertyNoop, PropertyPreview,
-    PropertySuccess, render_property_current, render_property_noop, render_property_preview,
-    render_property_success,
+    ExplainPlacement, PropertyCurrent, PropertyExplain, PropertyNoop, PropertyPreview, PropertySuccess, render_property_current, render_property_noop,
+    render_property_preview, render_property_success,
 };
 use crate::output::OutputRenderer;
 use crate::services::task_service::TaskService;
@@ -24,52 +23,22 @@ pub struct EffortArgs {
 }
 
 impl EffortArgs {
-    pub fn new(
-        task_id: String,
-        new_effort: Option<String>,
-        clear: bool,
-        explicit_project: Option<String>,
-        dry_run: bool,
-        explain: bool,
-    ) -> Self {
-        Self {
-            task_id,
-            new_effort,
-            clear,
-            explicit_project,
-            dry_run,
-            explain,
-        }
+    pub fn new(task_id: String, new_effort: Option<String>, clear: bool, explicit_project: Option<String>, dry_run: bool, explain: bool) -> Self {
+        Self { task_id, new_effort, clear, explicit_project, dry_run, explain }
     }
 }
 
-const EFFORT_DRY_RUN_EXPLANATION: &str =
-    "effort normalized into canonical units; no write performed in dry run";
+const EFFORT_DRY_RUN_EXPLANATION: &str = "effort normalized into canonical units; no write performed in dry run";
 
 impl CommandHandler for EffortHandler {
     type Args = EffortArgs;
     type Result = Result<(), String>;
 
-    fn execute(
-        args: Self::Args,
-        project: Option<&str>,
-        resolver: &TasksDirectoryResolver,
-        renderer: &OutputRenderer,
-    ) -> Self::Result {
-        let EffortArgs {
-            task_id,
-            new_effort,
-            clear,
-            explicit_project,
-            dry_run,
-            explain,
-        } = args;
+    fn execute(args: Self::Args, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Self::Result {
+        let EffortArgs { task_id, new_effort, clear, explicit_project, dry_run, explain } = args;
 
         let project_hint = explicit_project.as_deref().or(project);
-        renderer.log_info(format_args!(
-            "effort: begin task_id={} explicit_project={:?}",
-            task_id, project_hint
-        ));
+        renderer.log_info(format_args!("effort: begin task_id={} explicit_project={:?}", task_id, project_hint));
 
         let needs_write = new_effort.is_some() || clear;
         let mut ctx = if needs_write {
@@ -90,9 +59,7 @@ impl CommandHandler for EffortHandler {
         }
 
         if let Some(candidate) = new_effort {
-            return handle_set_effort(
-                &candidate, dry_run, explain, &full_id, &task, &mut ctx, renderer,
-            );
+            return handle_set_effort(&candidate, dry_run, explain, &full_id, &task, &mut ctx, renderer);
         }
 
         Err("Invalid effort command state".into())
@@ -111,14 +78,7 @@ fn handle_clear_effort(
 
     if previous.is_none() {
         if dry_run {
-            render_effort_preview(
-                renderer,
-                full_id,
-                None,
-                None,
-                explain,
-                "Task effort already clear; nothing to change",
-            );
+            render_effort_preview(renderer, full_id, None, None, explain, "Task effort already clear; nothing to change");
             return Ok(());
         }
         render_effort_noop(renderer, full_id, None);
@@ -126,14 +86,7 @@ fn handle_clear_effort(
     }
 
     if dry_run {
-        render_effort_preview(
-            renderer,
-            full_id,
-            previous.as_deref(),
-            None,
-            explain,
-            "Would clear task effort",
-        );
+        render_effort_preview(renderer, full_id, previous.as_deref(), None, explain, "Would clear task effort");
         return Ok(());
     }
 
@@ -141,8 +94,7 @@ fn handle_clear_effort(
         effort: Some(String::new()), // empty string = clear
         ..Default::default()
     };
-    crate::services::task_service::TaskService::update(&mut ctx.storage, full_id, patch)
-        .map_err(|e| e.to_string())?;
+    crate::services::task_service::TaskService::update(&mut ctx.storage, full_id, patch).map_err(|e| e.to_string())?;
     render_effort_clear_success(renderer, full_id, previous.as_deref());
     Ok(())
 }
@@ -156,8 +108,7 @@ fn handle_set_effort(
     ctx: &mut TaskCommandContext,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
-    let parsed = crate::utils::effort::parse_effort(candidate)
-        .map_err(|e| format!("Effort validation failed: {}", e))?;
+    let parsed = crate::utils::effort::parse_effort(candidate).map_err(|e| format!("Effort validation failed: {}", e))?;
     let normalized = parsed.canonical;
 
     let previous = task.effort.clone();
@@ -167,14 +118,7 @@ fn handle_set_effort(
     }
 
     if dry_run {
-        render_effort_preview(
-            renderer,
-            full_id,
-            previous.as_deref(),
-            Some(normalized.as_str()),
-            explain,
-            "Would update task effort",
-        );
+        render_effort_preview(renderer, full_id, previous.as_deref(), Some(normalized.as_str()), explain, "Would update task effort");
         return Ok(());
     }
 
@@ -194,36 +138,18 @@ fn handle_set_effort(
         custom_fields: None,
         sprints: None,
     };
-    let updated =
-        TaskService::update(&mut ctx.storage, full_id, patch).map_err(|e| e.to_string())?;
+    let updated = TaskService::update(&mut ctx.storage, full_id, patch).map_err(|e| e.to_string())?;
 
-    render_effort_set_success(
-        renderer,
-        full_id,
-        previous.as_deref(),
-        updated.effort.as_deref(),
-    );
+    render_effort_set_success(renderer, full_id, previous.as_deref(), updated.effort.as_deref());
     Ok(())
 }
 
-fn render_current_effort(
-    renderer: &OutputRenderer,
-    task_id: &str,
-    effort: Option<&str>,
-    explain: bool,
-) {
+fn render_current_effort(renderer: &OutputRenderer, task_id: &str, effort: Option<&str>, explain: bool) {
     let display = effort.unwrap_or("-");
-    let mut current = PropertyCurrent::new(
-        task_id,
-        "effort",
-        effort.map(|value| value.to_string()),
-        format!("Task {} effort: {}", task_id, display),
-    );
+    let mut current = PropertyCurrent::new(task_id, "effort", effort.map(|value| value.to_string()), format!("Task {} effort: {}", task_id, display));
     if explain {
-        current = current.with_explain(PropertyExplain::info(
-            "Effort values are normalized on write using time units (m/h/d/w) or points.",
-            ExplainPlacement::Before,
-        ));
+        current = current
+            .with_explain(PropertyExplain::info("Effort values are normalized on write using time units (m/h/d/w) or points.", ExplainPlacement::Before));
     }
     render_property_current(renderer, current);
 }
@@ -240,25 +166,12 @@ fn render_effort_noop(renderer: &OutputRenderer, task_id: &str, effort: Option<&
     render_property_noop(renderer, noop);
 }
 
-fn render_effort_preview(
-    renderer: &OutputRenderer,
-    task_id: &str,
-    old_effort: Option<&str>,
-    new_effort: Option<&str>,
-    explain: bool,
-    message: &str,
-) {
+fn render_effort_preview(renderer: &OutputRenderer, task_id: &str, old_effort: Option<&str>, new_effort: Option<&str>, explain: bool, message: &str) {
     let old_display = old_effort.unwrap_or("-");
     let text = if let Some(new) = new_effort {
-        format!(
-            "DRY RUN: Would change {} effort: {} -> {}",
-            task_id, old_display, new
-        )
+        format!("DRY RUN: Would change {} effort: {} -> {}", task_id, old_display, new)
     } else if old_effort.is_some() {
-        format!(
-            "DRY RUN: Would clear effort for task {} (old: {})",
-            task_id, old_display
-        )
+        format!("DRY RUN: Would clear effort for task {} (old: {})", task_id, old_display)
     } else {
         format!("DRY RUN: {}", message)
     };
@@ -275,21 +188,13 @@ fn render_effort_preview(
     .with_json_message(message.to_string());
 
     if explain {
-        preview = preview.with_explain(PropertyExplain::info(
-            EFFORT_DRY_RUN_EXPLANATION,
-            ExplainPlacement::After,
-        ));
+        preview = preview.with_explain(PropertyExplain::info(EFFORT_DRY_RUN_EXPLANATION, ExplainPlacement::After));
     }
 
     render_property_preview(renderer, preview);
 }
 
-fn render_effort_set_success(
-    renderer: &OutputRenderer,
-    task_id: &str,
-    old_effort: Option<&str>,
-    new_effort: Option<&str>,
-) {
+fn render_effort_set_success(renderer: &OutputRenderer, task_id: &str, old_effort: Option<&str>, new_effort: Option<&str>) {
     let old_display = old_effort.unwrap_or("-");
     let new_display = new_effort.unwrap_or("-");
     let success = PropertySuccess::new(
@@ -299,10 +204,7 @@ fn render_effort_set_success(
         old_effort.map(|value| value.to_string()),
         new_effort.map(|value| value.to_string()),
         format!("Task {} effort updated", task_id),
-        format!(
-            "Task {} effort changed: {} -> {}",
-            task_id, old_display, new_display
-        ),
+        format!("Task {} effort changed: {} -> {}", task_id, old_display, new_display),
     );
     render_property_success(renderer, success);
 }

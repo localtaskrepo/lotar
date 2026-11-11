@@ -27,27 +27,15 @@ pub fn is_reserved_project_prefix(candidate: &str) -> bool {
 pub fn generate_project_prefix(project_name: &str) -> String {
     // Strip leading dots (hidden dirs) and '@' (reserved namespaces).
     let trimmed = project_name.trim_start_matches(&['.', '@'][..]);
-    let source = if trimmed.is_empty() {
-        FALLBACK_PREFIX
-    } else {
-        trimmed
-    };
+    let source = if trimmed.is_empty() { FALLBACK_PREFIX } else { trimmed };
 
     if source.len() <= 4 {
         source.to_uppercase()
     } else {
         let normalized = source.to_uppercase();
-        if normalized.contains('-')
-            || normalized.contains('_')
-            || normalized.contains(' ')
-            || normalized.contains('.')
-        {
+        if normalized.contains('-') || normalized.contains('_') || normalized.contains(' ') || normalized.contains('.') {
             // For hyphenated/underscored/spaced names, take first letters of each word
-            normalized
-                .split(&['-', '_', ' ', '.'][..])
-                .filter_map(|word| word.chars().next())
-                .take(4)
-                .collect::<String>()
+            normalized.split(&['-', '_', ' ', '.'][..]).filter_map(|word| word.chars().next()).take(4).collect::<String>()
         } else {
             // For single words, take first 4 characters
             normalized.chars().take(4).collect::<String>()
@@ -63,10 +51,7 @@ pub fn generate_project_prefix(project_name: &str) -> String {
 /// 3. Generated prefixes that match existing prefixes (with different project names)
 ///
 /// Returns an error if a conflict is detected that cannot be resolved.
-pub fn generate_unique_project_prefix(
-    project_name: &str,
-    tasks_dir: &std::path::Path,
-) -> Result<String, String> {
+pub fn generate_unique_project_prefix(project_name: &str, tasks_dir: &std::path::Path) -> Result<String, String> {
     let generated_prefix = generate_project_prefix(project_name);
     crate::storage::safety::validate_project_prefix(&generated_prefix)?;
 
@@ -84,9 +69,7 @@ pub fn generate_unique_project_prefix(
 
         // Try to read project name from config
         let config_path = crate::utils::paths::project_config_path(tasks_dir, &dir_name);
-        if let Some(existing_project_name) =
-            crate::utils::config::read_project_name_from_config(&config_path)
-        {
+        if let Some(existing_project_name) = crate::utils::config::read_project_name_from_config(&config_path) {
             existing_projects.push((existing_project_name, dir_name.clone()));
         }
     }
@@ -104,9 +87,7 @@ pub fn generate_unique_project_prefix(
 
     // 2. Check if our generated prefix matches an existing project name
     for (existing_project_name, existing_prefix) in &existing_projects {
-        if generated_prefix.eq_ignore_ascii_case(existing_project_name)
-            && !existing_project_name.eq_ignore_ascii_case(existing_prefix)
-        {
+        if generated_prefix.eq_ignore_ascii_case(existing_project_name) && !existing_project_name.eq_ignore_ascii_case(existing_prefix) {
             return Err(format!(
                 "Cannot create project '{}' with prefix '{}': This prefix conflicts with existing project name '{}'. Choose a different project name.",
                 project_name, generated_prefix, existing_project_name
@@ -155,11 +136,7 @@ pub fn generate_unique_project_prefix(
 /// Checks for conflicts between:
 /// 1. Explicit prefix matching existing project names  
 /// 2. Explicit prefix matching existing prefixes (with different project names)
-pub fn validate_explicit_prefix(
-    explicit_prefix: &str,
-    project_name: &str,
-    tasks_dir: &std::path::Path,
-) -> Result<(), String> {
+pub fn validate_explicit_prefix(explicit_prefix: &str, project_name: &str, tasks_dir: &std::path::Path) -> Result<(), String> {
     if is_reserved_project_prefix(explicit_prefix) {
         return Err(RESERVED_PREFIX_MESSAGE.to_string());
     }
@@ -179,9 +156,7 @@ pub fn validate_explicit_prefix(
 
         // Try to read project name from config
         let config_path = crate::utils::paths::project_config_path(tasks_dir, &dir_name);
-        if let Some(existing_project_name) =
-            crate::utils::config::read_project_name_from_config(&config_path)
-        {
+        if let Some(existing_project_name) = crate::utils::config::read_project_name_from_config(&config_path) {
             existing_projects.push((existing_project_name, dir_name.clone()));
         }
     }
@@ -200,9 +175,7 @@ pub fn validate_explicit_prefix(
 
     // 2. Check if our explicit prefix matches an existing prefix for a different project (case insensitive)
     for (existing_project_name, existing_prefix) in &existing_projects {
-        if explicit_prefix.eq_ignore_ascii_case(existing_prefix)
-            && project_name != existing_project_name
-        {
+        if explicit_prefix.eq_ignore_ascii_case(existing_prefix) && project_name != existing_project_name {
             return Err(format!(
                 "Cannot use prefix '{}': This prefix is already used by project '{}'. Choose a different prefix.",
                 explicit_prefix, existing_project_name
@@ -217,24 +190,13 @@ pub fn validate_explicit_prefix(
 /// Smart resolver that accepts either a project name or prefix and returns the appropriate prefix
 /// for storage operations. This allows users to use either format in --project parameters.
 pub fn resolve_project_input(input: &str, tasks_dir: &std::path::Path) -> String {
-    let folders: Vec<String> = crate::utils::filesystem::list_visible_subdirs(tasks_dir)
-        .into_iter()
-        .map(|(name, _)| name)
-        .collect();
+    let folders: Vec<String> = crate::utils::filesystem::list_visible_subdirs(tasks_dir).into_iter().map(|(name, _)| name).collect();
     // Folder names are compared by listing the directory, never with
     // `exists()`: on macOS and Windows `DEMO` also "exists" as `demo`, which
     // gave one task two IDs (DEV-269). A name that differs only in case
     // resolves to the existing folder's spelling on every platform.
     let existing = |candidate: &str| -> Option<String> {
-        folders
-            .iter()
-            .find(|name| name.as_str() == candidate)
-            .or_else(|| {
-                folders
-                    .iter()
-                    .find(|name| name.eq_ignore_ascii_case(candidate))
-            })
-            .cloned()
+        folders.iter().find(|name| name.as_str() == candidate).or_else(|| folders.iter().find(|name| name.eq_ignore_ascii_case(candidate))).cloned()
     };
 
     // Inputs containing path separators or traversal sequences are never
@@ -249,8 +211,7 @@ pub fn resolve_project_input(input: &str, tasks_dir: &std::path::Path) -> String
     // A configured project name.
     for dir_name in &folders {
         let config_path = crate::utils::paths::project_config_path(tasks_dir, dir_name);
-        if let Some(project_name) =
-            crate::utils::config::read_project_name_from_config(&config_path)
+        if let Some(project_name) = crate::utils::config::read_project_name_from_config(&config_path)
             && project_name == input
         {
             return dir_name.clone();
@@ -269,9 +230,7 @@ pub fn resolve_project_input(input: &str, tasks_dir: &std::path::Path) -> String
         };
         let config_path = crate::utils::paths::project_config_path(tasks_dir, &folder);
         match crate::utils::config::read_project_name_from_config(&config_path) {
-            Some(name)
-                if !name.eq_ignore_ascii_case(input) && !name.eq_ignore_ascii_case(&folder) =>
-            {
+            Some(name) if !name.eq_ignore_ascii_case(input) && !name.eq_ignore_ascii_case(&folder) => {
                 candidate = format!("{generated_prefix}{suffix}");
             }
             _ => return folder,
@@ -307,10 +266,7 @@ pub fn format_project_label(prefix: &str, display_name: Option<&str>) -> String 
 
 /// Attempt to load the display name for a project from its configuration file.
 /// Returns `None` when no config is present or the name is blank.
-pub fn project_display_name_from_config(
-    tasks_dir: &std::path::Path,
-    project_prefix: &str,
-) -> Option<String> {
+pub fn project_display_name_from_config(tasks_dir: &std::path::Path, project_prefix: &str) -> Option<String> {
     let config_path = crate::utils::paths::project_config_path(tasks_dir, project_prefix);
 
     let explicit_name = crate::utils::config::read_project_name_from_config(&config_path);

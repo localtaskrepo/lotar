@@ -9,11 +9,7 @@ fn task_command_without_subcommand_lists_options() {
     cmd.args(["task"]) // intentionally omit a subcommand
         .assert()
         .success()
-        .stdout(
-            predicate::str::contains("Available task subcommands")
-                .and(predicate::str::contains("add"))
-                .and(predicate::str::contains("list")),
-        )
+        .stdout(predicate::str::contains("Available task subcommands").and(predicate::str::contains("add")).and(predicate::str::contains("list")))
         .stderr(predicate::str::is_empty());
 }
 
@@ -25,11 +21,7 @@ fn config_command_without_subcommand_lists_options() {
     cmd.args(["config"]) // no subcommand
         .assert()
         .success()
-        .stdout(
-            predicate::str::contains("Available config subcommands")
-                .and(predicate::str::contains("show"))
-                .and(predicate::str::contains("set")),
-        )
+        .stdout(predicate::str::contains("Available config subcommands").and(predicate::str::contains("show")).and(predicate::str::contains("set")))
         .stderr(predicate::str::is_empty());
 }
 
@@ -41,11 +33,7 @@ fn sprint_command_without_subcommand_lists_options() {
     cmd.args(["sprint"]) // missing subcommand
         .assert()
         .success()
-        .stdout(
-            predicate::str::contains("Available sprint subcommands")
-                .and(predicate::str::contains("create"))
-                .and(predicate::str::contains("list")),
-        )
+        .stdout(predicate::str::contains("Available sprint subcommands").and(predicate::str::contains("create")).and(predicate::str::contains("list")))
         .stderr(predicate::str::is_empty());
 }
 
@@ -57,10 +45,7 @@ fn git_command_without_subcommand_lists_options() {
     cmd.args(["git"]) // no subcommand
         .assert()
         .success()
-        .stdout(
-            predicate::str::contains("Available git subcommands")
-                .and(predicate::str::contains("hooks")),
-        )
+        .stdout(predicate::str::contains("Available git subcommands").and(predicate::str::contains("hooks")))
         .stderr(predicate::str::is_empty());
 }
 
@@ -72,9 +57,6 @@ fn git_hooks_without_subcommand_lists_options() {
     cmd.args(["git", "hooks"]) // missing nested subcommand
         .assert()
         .success()
-        .stdout(
-            predicate::str::contains("Available git hooks subcommands")
-                .and(predicate::str::contains("install")),
-        )
+        .stdout(predicate::str::contains("Available git hooks subcommands").and(predicate::str::contains("install")))
         .stderr(predicate::str::is_empty());
 }

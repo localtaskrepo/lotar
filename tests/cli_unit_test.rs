@@ -18,11 +18,7 @@ fn priority_handler_type_exists() {
 
 #[test]
 fn status_args_creation() {
-    let args = StatusArgs::new(
-        "AUTH-123".to_string(),
-        Some("InProgress".to_string()),
-        Some("auth".to_string()),
-    );
+    let args = StatusArgs::new("AUTH-123".to_string(), Some("InProgress".to_string()), Some("auth".to_string()));
     assert_eq!(args.task_id, "AUTH-123");
     assert_eq!(args.new_status, Some("InProgress".to_string()));
     assert_eq!(args.explicit_project, Some("auth".to_string()));
@@ -46,10 +42,7 @@ mod effort_normalization {
     use tempfile::TempDir;
 
     fn run(cmd: &mut Command, temp_dir: &TempDir, args: &[&str]) -> assert_cmd::assert::Assert {
-        cmd.current_dir(temp_dir.path())
-            .env("LOTAR_TESTS_SILENT", "1")
-            .args(args)
-            .assert()
+        cmd.current_dir(temp_dir.path()).env("LOTAR_TESTS_SILENT", "1").args(args).assert()
     }
 
     #[test]
@@ -57,12 +50,7 @@ mod effort_normalization {
         let temp = crate::common::temp_dir();
 
         // Create a task with a variety of effort spellings that should normalize to hours
-        run(
-            &mut crate::common::lotar_cmd().unwrap(),
-            &temp,
-            &["task", "add", "A", "--effort", "1 hr 30 min"],
-        )
-        .success();
+        run(&mut crate::common::lotar_cmd().unwrap(), &temp, &["task", "add", "A", "--effort", "1 hr 30 min"]).success();
 
         // List as JSON and verify the stored effort is canonical (1.50h)
         let out = crate::common::lotar_cmd()
@@ -81,12 +69,7 @@ mod effort_normalization {
 
         // Now edit with a different shape and confirm it re-normalizes
         let id = tasks[0]["id"].as_str().unwrap();
-        run(
-            &mut crate::common::lotar_cmd().unwrap(),
-            &temp,
-            &["task", "edit", id, "--effort", "2 days"],
-        )
-        .success();
+        run(&mut crate::common::lotar_cmd().unwrap(), &temp, &["task", "edit", id, "--effort", "2 days"]).success();
 
         let out2 = crate::common::lotar_cmd()
             .unwrap()

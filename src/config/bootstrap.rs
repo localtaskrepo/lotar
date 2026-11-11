@@ -9,10 +9,7 @@ use std::path::Path;
 /// default project prefix: the explicit `project_context`, else an existing
 /// project, else the surrounding repository name. An existing project comes
 /// before the name, or the next add would start a second project (DEV-312).
-pub fn ensure_global_config(
-    root_path: &Path,
-    project_context: Option<&str>,
-) -> std::io::Result<()> {
+pub fn ensure_global_config(root_path: &Path, project_context: Option<&str>) -> std::io::Result<()> {
     let global_config_path = crate::utils::paths::global_config_path(root_path);
 
     if global_config_path.exists() {
@@ -33,10 +30,7 @@ pub fn ensure_global_config(
     fs::write(&global_config_path, config_yaml)
 }
 
-fn determine_smart_default_project(
-    root_path: &Path,
-    project_context: Option<&str>,
-) -> Option<String> {
+fn determine_smart_default_project(root_path: &Path, project_context: Option<&str>) -> Option<String> {
     if let Some(project_name) = project_context
         && let Ok(prefix) = generate_unique_project_prefix(project_name, root_path)
     {
@@ -53,8 +47,5 @@ fn determine_smart_default_project(
         return Some(prefix);
     }
 
-    crate::utils::filesystem::list_visible_subdirs(root_path)
-        .into_iter()
-        .map(|(dir_name, _)| dir_name)
-        .next()
+    crate::utils::filesystem::list_visible_subdirs(root_path).into_iter().map(|(dir_name, _)| dir_name).next()
 }

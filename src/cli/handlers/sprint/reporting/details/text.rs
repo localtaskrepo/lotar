@@ -1,7 +1,5 @@
 use crate::output::OutputRenderer;
-use crate::services::sprint_reports::{
-    SprintReviewContext, SprintStatsContext, SprintSummaryContext,
-};
+use crate::services::sprint_reports::{SprintReviewContext, SprintStatsContext, SprintSummaryContext};
 use crate::storage::sprint::{SprintActual, SprintPlan};
 
 use super::super::helpers::{format_duration, format_float, format_percentage};
@@ -14,11 +12,7 @@ pub(super) fn render_review_text(renderer: &OutputRenderer, context: &SprintRevi
     renderer.emit_success(format_args!(
         "Sprint review for #{}{}.",
         summary.id,
-        summary
-            .label
-            .as_ref()
-            .map(|label| format!(" ({})", label))
-            .unwrap_or_default()
+        summary.label.as_ref().map(|label| format!(" ({})", label)).unwrap_or_default()
     ));
     renderer.emit_raw_stdout(format_args!("Lifecycle status: {}", summary.status));
 
@@ -29,10 +23,7 @@ pub(super) fn render_review_text(renderer: &OutputRenderer, context: &SprintRevi
     if let Some(actual_start) = lifecycle.actual_start.as_ref() {
         renderer.emit_raw_stdout(format_args!("Started at: {}", actual_start.to_rfc3339()));
     } else if let Some(planned_start) = lifecycle.planned_start.as_ref() {
-        renderer.emit_raw_stdout(format_args!(
-            "Planned start: {}",
-            planned_start.to_rfc3339()
-        ));
+        renderer.emit_raw_stdout(format_args!("Planned start: {}", planned_start.to_rfc3339()));
     }
 
     if let Some(actual_end) = lifecycle.actual_end.as_ref() {
@@ -48,19 +39,13 @@ pub(super) fn render_review_text(renderer: &OutputRenderer, context: &SprintRevi
 
     let remaining_count = metrics.remaining_tasks_count();
 
-    renderer.emit_raw_stdout(format_args!(
-        "Tasks: {} total • {} done • {} remaining",
-        metrics.total_tasks, metrics.done_tasks, remaining_count
-    ));
+    renderer.emit_raw_stdout(format_args!("Tasks: {} total • {} done • {} remaining", metrics.total_tasks, metrics.done_tasks, remaining_count));
 
     if !metrics.status_breakdown.is_empty() {
         renderer.emit_raw_stdout("Status breakdown:");
         for metric in &metrics.status_breakdown {
             let suffix = if metric.done { " (done)" } else { "" };
-            renderer.emit_raw_stdout(format_args!(
-                "  - {}: {}{}",
-                metric.status, metric.count, suffix
-            ));
+            renderer.emit_raw_stdout(format_args!("  - {}: {}{}", metric.status, metric.count, suffix));
         }
     }
 
@@ -70,15 +55,9 @@ pub(super) fn render_review_text(renderer: &OutputRenderer, context: &SprintRevi
         renderer.emit_raw_stdout("Remaining tasks:");
         for task in &metrics.remaining_tasks {
             if let Some(assignee) = task.assignee.as_ref() {
-                renderer.emit_raw_stdout(format_args!(
-                    "  - {}: {} [{}] (assignee: {})",
-                    task.id, task.title, task.status, assignee
-                ));
+                renderer.emit_raw_stdout(format_args!("  - {}: {} [{}] (assignee: {})", task.id, task.title, task.status, assignee));
             } else {
-                renderer.emit_raw_stdout(format_args!(
-                    "  - {}: {} [{}]",
-                    task.id, task.title, task.status
-                ));
+                renderer.emit_raw_stdout(format_args!("  - {}: {} [{}]", task.id, task.title, task.status));
             }
         }
     }
@@ -94,11 +73,7 @@ pub(super) fn render_summary_text(renderer: &OutputRenderer, context: &SprintSum
     renderer.emit_success(format_args!(
         "Sprint summary for #{}{}.",
         summary.id,
-        summary
-            .label
-            .as_ref()
-            .map(|label| format!(" ({})", label))
-            .unwrap_or_default()
+        summary.label.as_ref().map(|label| format!(" ({})", label)).unwrap_or_default()
     ));
     renderer.emit_raw_stdout(format_args!("Status: {}", summary.status));
 
@@ -127,41 +102,26 @@ pub(super) fn render_summary_text(renderer: &OutputRenderer, context: &SprintSum
             renderer.emit_raw_stdout("Status highlights:");
             for metric in metrics.status_breakdown.iter().take(5) {
                 let suffix = if metric.done { " (done)" } else { "" };
-                renderer.emit_raw_stdout(format_args!(
-                    "  - {}: {}{}",
-                    metric.status, metric.count, suffix
-                ));
+                renderer.emit_raw_stdout(format_args!("  - {}: {}{}", metric.status, metric.count, suffix));
             }
             if metrics.status_breakdown.len() > 5 {
-                renderer.emit_info(
-                    "Additional statuses omitted; use --format json for full breakdown.",
-                );
+                renderer.emit_info("Additional statuses omitted; use --format json for full breakdown.");
             }
         }
     }
 
     let blocked_tasks = &metrics.blocked_tasks;
     if !blocked_tasks.is_empty() {
-        renderer.emit_warning(format_args!(
-            "{} blocked task(s) require attention:",
-            blocked_tasks.len()
-        ));
+        renderer.emit_warning(format_args!("{} blocked task(s) require attention:", blocked_tasks.len()));
         for task in blocked_tasks.iter().take(10) {
             if let Some(assignee) = task.assignee.as_ref() {
-                renderer.emit_raw_stdout(format_args!(
-                    "  - {}: {} [{}] (assignee: {})",
-                    task.id, task.title, task.status, assignee
-                ));
+                renderer.emit_raw_stdout(format_args!("  - {}: {} [{}] (assignee: {})", task.id, task.title, task.status, assignee));
             } else {
-                renderer.emit_raw_stdout(format_args!(
-                    "  - {}: {} [{}]",
-                    task.id, task.title, task.status
-                ));
+                renderer.emit_raw_stdout(format_args!("  - {}: {} [{}]", task.id, task.title, task.status));
             }
         }
         if blocked_tasks.len() > 10 {
-            renderer
-                .emit_warning("Blocked task list truncated; use --format json for full details.");
+            renderer.emit_warning("Blocked task list truncated; use --format json for full details.");
         }
     }
 
@@ -183,10 +143,7 @@ pub(super) fn render_summary_text(renderer: &OutputRenderer, context: &SprintSum
             ));
 
             if points.committed > capacity + 0.000_1 {
-                renderer.emit_warning(format_args!(
-                    "Points commitment exceeds capacity by {}.",
-                    format_float(points.committed - capacity)
-                ));
+                renderer.emit_warning(format_args!("Points commitment exceeds capacity by {}.", format_float(points.committed - capacity)));
             }
         }
     }
@@ -209,10 +166,7 @@ pub(super) fn render_summary_text(renderer: &OutputRenderer, context: &SprintSum
             ));
 
             if hours.committed > capacity + 0.000_1 {
-                renderer.emit_warning(format_args!(
-                    "Hour commitment exceeds capacity by {}.",
-                    format_float(hours.committed - capacity)
-                ));
+                renderer.emit_warning(format_args!("Hour commitment exceeds capacity by {}.", format_float(hours.committed - capacity)));
             }
         }
     }
@@ -230,27 +184,15 @@ pub(super) fn render_summary_text(renderer: &OutputRenderer, context: &SprintSum
     }
 
     if let Some(duration) = durations.planned {
-        renderer.emit_raw_stdout(format_args!(
-            "Planned duration: {}",
-            format_duration(duration)
-        ));
+        renderer.emit_raw_stdout(format_args!("Planned duration: {}", format_duration(duration)));
     }
     if let Some(duration) = durations.actual {
-        renderer.emit_raw_stdout(format_args!(
-            "Actual duration: {}",
-            format_duration(duration)
-        ));
+        renderer.emit_raw_stdout(format_args!("Actual duration: {}", format_duration(duration)));
     } else if let Some(duration) = durations.elapsed {
-        renderer.emit_raw_stdout(format_args!(
-            "Elapsed so far: {}",
-            format_duration(duration)
-        ));
+        renderer.emit_raw_stdout(format_args!("Elapsed so far: {}", format_duration(duration)));
     }
     if let Some(duration) = durations.remaining {
-        renderer.emit_raw_stdout(format_args!(
-            "Time remaining: {}",
-            format_duration(duration)
-        ));
+        renderer.emit_raw_stdout(format_args!("Time remaining: {}", format_duration(duration)));
     }
     if let Some(duration) = durations.overdue {
         renderer.emit_warning(format_args!("Overdue by: {}", format_duration(duration)));
@@ -264,15 +206,7 @@ pub(super) fn render_stats_text(renderer: &OutputRenderer, context: &SprintStats
     let durations = &context.durations;
     let payload = &context.payload;
 
-    renderer.emit_success(format_args!(
-        "Sprint stats for #{}{}.",
-        summary.id,
-        summary
-            .label
-            .as_ref()
-            .map(|label| format!(" ({})", label))
-            .unwrap_or_default()
-    ));
+    renderer.emit_success(format_args!("Sprint stats for #{}{}.", summary.id, summary.label.as_ref().map(|label| format!(" ({})", label)).unwrap_or_default()));
     renderer.emit_raw_stdout(format_args!("Lifecycle status: {}", summary.status));
 
     if metrics.total_tasks == 0 {
@@ -290,10 +224,7 @@ pub(super) fn render_stats_text(renderer: &OutputRenderer, context: &SprintStats
             renderer.emit_raw_stdout("Status breakdown:");
             for metric in &metrics.status_breakdown {
                 let suffix = if metric.done { " (done)" } else { "" };
-                renderer.emit_raw_stdout(format_args!(
-                    "  - {}: {}{}",
-                    metric.status, metric.count, suffix
-                ));
+                renderer.emit_raw_stdout(format_args!("  - {}: {}{}", metric.status, metric.count, suffix));
             }
         }
     }
@@ -316,10 +247,7 @@ pub(super) fn render_stats_text(renderer: &OutputRenderer, context: &SprintStats
             ));
 
             if points.committed > capacity + 0.000_1 {
-                renderer.emit_warning(format_args!(
-                    "Points commitment exceeds capacity by {}.",
-                    format_float(points.committed - capacity)
-                ));
+                renderer.emit_warning(format_args!("Points commitment exceeds capacity by {}.", format_float(points.committed - capacity)));
             }
         }
     }
@@ -342,10 +270,7 @@ pub(super) fn render_stats_text(renderer: &OutputRenderer, context: &SprintStats
             ));
 
             if hours.committed > capacity + 0.000_1 {
-                renderer.emit_warning(format_args!(
-                    "Hour commitment exceeds capacity by {}.",
-                    format_float(hours.committed - capacity)
-                ));
+                renderer.emit_warning(format_args!("Hour commitment exceeds capacity by {}.", format_float(hours.committed - capacity)));
             }
         }
     }
@@ -361,11 +286,7 @@ pub(super) fn render_stats_text(renderer: &OutputRenderer, context: &SprintStats
         renderer.emit_raw_stdout(format_args!("  Planned end: {}", end.to_rfc3339()));
     }
     if let Some(end) = lifecycle.computed_end.as_ref() {
-        let differs = lifecycle
-            .planned_end
-            .as_ref()
-            .map(|planned| planned != end)
-            .unwrap_or(true);
+        let differs = lifecycle.planned_end.as_ref().map(|planned| planned != end).unwrap_or(true);
         if lifecycle.actual_end.is_none() && differs {
             renderer.emit_raw_stdout(format_args!("  Computed end: {}", end.to_rfc3339()));
         }
@@ -374,27 +295,15 @@ pub(super) fn render_stats_text(renderer: &OutputRenderer, context: &SprintStats
         renderer.emit_raw_stdout(format_args!("  Actual end: {}", end.to_rfc3339()));
     }
     if let Some(duration) = durations.planned {
-        renderer.emit_raw_stdout(format_args!(
-            "  Planned duration: {}",
-            format_duration(duration)
-        ));
+        renderer.emit_raw_stdout(format_args!("  Planned duration: {}", format_duration(duration)));
     }
     if let Some(duration) = durations.actual {
-        renderer.emit_raw_stdout(format_args!(
-            "  Actual duration: {}",
-            format_duration(duration)
-        ));
+        renderer.emit_raw_stdout(format_args!("  Actual duration: {}", format_duration(duration)));
     } else if let Some(duration) = durations.elapsed {
-        renderer.emit_raw_stdout(format_args!(
-            "  Elapsed so far: {}",
-            format_duration(duration)
-        ));
+        renderer.emit_raw_stdout(format_args!("  Elapsed so far: {}", format_duration(duration)));
     }
     if let Some(duration) = durations.remaining {
-        renderer.emit_raw_stdout(format_args!(
-            "  Time remaining: {}",
-            format_duration(duration)
-        ));
+        renderer.emit_raw_stdout(format_args!("  Time remaining: {}", format_duration(duration)));
     }
     if let Some(duration) = durations.overdue {
         renderer.emit_raw_stdout(format_args!("  Overdue by: {}", format_duration(duration)));

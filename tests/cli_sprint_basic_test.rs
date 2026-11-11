@@ -18,50 +18,24 @@ fn append_sprint_tasks(storage: &mut Storage, sprint_id: u32, task_ids: &[String
         if tasks.iter().any(|entry| entry.id == *id) {
             continue;
         }
-        tasks.push(SprintTaskEntry {
-            extra: Default::default(),
-            id: id.clone(),
-            order: None,
-        });
+        tasks.push(SprintTaskEntry { extra: Default::default(), id: id.clone(), order: None });
     }
     record.sprint.tasks = tasks;
     SprintService::update(storage, sprint_id, record.sprint).expect("update sprint");
 }
 
 fn sprint_task_ids(storage: &Storage, sprint_id: u32) -> Vec<String> {
-    SprintService::get(storage, sprint_id)
-        .map(|record| {
-            record
-                .sprint
-                .tasks
-                .iter()
-                .map(|entry| entry.id.clone())
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default()
+    SprintService::get(storage, sprint_id).map(|record| record.sprint.tasks.iter().map(|entry| entry.id.clone()).collect::<Vec<_>>()).unwrap_or_default()
 }
 
 fn task_sprint_ids(storage: &Storage, task_id: &str) -> Vec<u32> {
     let mut memberships: Vec<(u32, usize)> = SprintService::list(storage)
         .unwrap_or_default()
         .into_iter()
-        .filter_map(|record| {
-            record
-                .sprint
-                .tasks
-                .iter()
-                .enumerate()
-                .find(|(_, entry)| entry.id == task_id)
-                .map(|(index, _)| (record.id, index))
-        })
+        .filter_map(|record| record.sprint.tasks.iter().enumerate().find(|(_, entry)| entry.id == task_id).map(|(index, _)| (record.id, index)))
         .collect();
-    memberships.sort_by(|(sprint_a, index_a), (sprint_b, index_b)| {
-        sprint_a.cmp(sprint_b).then_with(|| index_a.cmp(index_b))
-    });
-    memberships
-        .into_iter()
-        .map(|(sprint_id, _)| sprint_id)
-        .collect()
+    memberships.sort_by(|(sprint_a, index_a), (sprint_b, index_b)| sprint_a.cmp(sprint_b).then_with(|| index_a.cmp(index_b)));
+    memberships.into_iter().map(|(sprint_id, _)| sprint_id).collect()
 }
 
 #[test]
@@ -74,18 +48,11 @@ fn sprint_delete_requires_force_without_interactive_confirmation() {
         let original = std::fs::read(&sprint_path).expect("read original sprint");
 
         let mut cmd = common::cargo_bin_in(&fixtures);
-        cmd.args([
-            "--format",
-            format,
-            "sprint",
-            "delete",
-            "1",
-            "--cleanup-missing",
-        ])
-        .write_stdin("yes\n")
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("--force"));
+        cmd.args(["--format", format, "sprint", "delete", "1", "--cleanup-missing"])
+            .write_stdin("yes\n")
+            .assert()
+            .failure()
+            .stderr(predicate::str::contains("--force"));
 
         assert_eq!(
             std::fs::read(&sprint_path).expect("refused deletion must preserve sprint"),
@@ -103,14 +70,10 @@ fn sprint_delete_force_works_in_text_and_json() {
         SprintService::create(&mut storage, Sprint::default(), None).expect("create sprint");
 
         let mut cmd = common::cargo_bin_in(&fixtures);
-        let result = cmd
-            .args(["--format", format, "sprint", "delete", "1", "--force"])
-            .assert()
-            .success();
+        let result = cmd.args(["--format", format, "sprint", "delete", "1", "--force"]).assert().success();
         assert!(!fixtures.tasks_root.join("@sprints/1.yml").exists());
         if format == "json" {
-            let payload: Value = serde_json::from_slice(&result.get_output().stdout)
-                .expect("one structured deletion response");
+            let payload: Value = serde_json::from_slice(&result.get_output().stdout).expect("one structured deletion response");
             assert_eq!(payload["deleted"], true);
             assert_eq!(payload["sprint_id"], 1);
         } else {
@@ -124,10 +87,7 @@ fn sprint_list_reports_empty_state() {
     let fixtures = common::TestFixtures::new();
 
     let mut cmd = common::cargo_bin_in(&fixtures);
-    cmd.args(["sprint", "list"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("No sprints found."));
+    cmd.args(["sprint", "list"]).assert().success().stdout(predicate::str::contains("No sprints found."));
 }
 
 #[test]
@@ -152,12 +112,7 @@ fn sprint_list_and_show_surface_created_sprint() {
 
     // list should show the sprint with pending status and label
     let mut list_cmd = common::cargo_bin_in(&fixtures);
-    list_cmd
-        .args(["sprint", "list"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Sprint 42"))
-        .stdout(predicate::str::contains("[pending]"));
+    list_cmd.args(["sprint", "list"]).assert().success().stdout(predicate::str::contains("Sprint 42")).stdout(predicate::str::contains("[pending]"));
 
     // show should print the detailed output including goal and notes
     let mut show_cmd = common::cargo_bin_in(&fixtures);
@@ -175,33 +130,15 @@ fn sprint_list_ignores_lock_and_backup_artifacts() {
     let fixtures = common::TestFixtures::new();
     let mut storage = Storage::new(&fixtures.tasks_root);
 
-    let sprint = Sprint {
-        plan: Some(SprintPlan {
-            label: Some("Sprint Live".to_string()),
-            ..SprintPlan::default()
-        }),
-        ..Sprint::default()
-    };
+    let sprint = Sprint { plan: Some(SprintPlan { label: Some("Sprint Live".to_string()), ..SprintPlan::default() }), ..Sprint::default() };
     SprintService::create(&mut storage, sprint, None).expect("create sprint");
     drop(storage);
 
     let sprints_dir = fixtures.tasks_root.join("@sprints");
-    assert!(
-        sprints_dir.join(".sprints.lock").exists(),
-        "sprint mutation must leave the storage lock file behind"
-    );
-    std::fs::write(
-        sprints_dir.join("1.yml.bak"),
-        "plan:\n  label: Sprint Yml Backup\n",
-    )
-    .expect("write yml backup");
-    std::fs::write(
-        sprints_dir.join("2.bak"),
-        "plan:\n  label: Sprint Numeric Backup\n",
-    )
-    .expect("write numeric backup");
-    std::fs::write(sprints_dir.join(".1.yml.tmp-123-7"), "partial write\n")
-        .expect("write stale temp file");
+    assert!(sprints_dir.join(".sprints.lock").exists(), "sprint mutation must leave the storage lock file behind");
+    std::fs::write(sprints_dir.join("1.yml.bak"), "plan:\n  label: Sprint Yml Backup\n").expect("write yml backup");
+    std::fs::write(sprints_dir.join("2.bak"), "plan:\n  label: Sprint Numeric Backup\n").expect("write numeric backup");
+    std::fs::write(sprints_dir.join(".1.yml.tmp-123-7"), "partial write\n").expect("write stale temp file");
 
     let mut cmd = common::lotar_cmd().unwrap();
     cmd.args(["sprint", "list"])
@@ -219,22 +156,12 @@ fn sprint_list_still_warns_for_corrupt_sprint_yaml() {
     let fixtures = common::TestFixtures::new();
     let mut storage = Storage::new(&fixtures.tasks_root);
 
-    let sprint = Sprint {
-        plan: Some(SprintPlan {
-            label: Some("Sprint Healthy".to_string()),
-            ..SprintPlan::default()
-        }),
-        ..Sprint::default()
-    };
+    let sprint = Sprint { plan: Some(SprintPlan { label: Some("Sprint Healthy".to_string()), ..SprintPlan::default() }), ..Sprint::default() };
     SprintService::create(&mut storage, sprint, None).expect("create sprint");
     drop(storage);
 
     let sprints_dir = fixtures.tasks_root.join("@sprints");
-    std::fs::write(
-        sprints_dir.join("2.yaml"),
-        "plan:\n  label: Sprint Yaml Extension\n",
-    )
-    .expect("write yaml-extension sprint");
+    std::fs::write(sprints_dir.join("2.yaml"), "plan:\n  label: Sprint Yaml Extension\n").expect("write yaml-extension sprint");
     std::fs::write(sprints_dir.join("3.yml"), "plan: [oops\n").expect("write corrupt sprint");
 
     let mut cmd = common::lotar_cmd().unwrap();
@@ -305,20 +232,11 @@ sprints:
     .expect("write config");
 
     let mut cmd = common::cargo_bin_in(&fixtures);
-    cmd.args([
-        "sprint",
-        "create",
-        "--label",
-        "Sprint 99",
-        "--ends-at",
-        "2025-10-24T17:00:00Z",
-    ])
-    .assert()
-    .success()
-    .stdout(predicate::str::contains("Created sprint #1 (Sprint 99)."))
-    .stderr(predicate::str::contains(
-        "plan.length was ignored because plan.ends_at was provided.",
-    ));
+    cmd.args(["sprint", "create", "--label", "Sprint 99", "--ends-at", "2025-10-24T17:00:00Z"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Created sprint #1 (Sprint 99)."))
+        .stderr(predicate::str::contains("plan.length was ignored because plan.ends_at was provided."));
 
     let sprint_file = fixtures.tasks_root.join("@sprints/1.yml");
     let contents = std::fs::read_to_string(&sprint_file).expect("sprint file written");
@@ -364,25 +282,13 @@ fn sprint_service_applies_defaults_for_direct_callers() {
     let fixtures = common::TestFixtures::new();
     let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
-    let defaults = SprintDefaultsConfig {
-        capacity_points: Some(18),
-        capacity_hours: None,
-        length: Some("1w".to_string()),
-        overdue_after: Some("8h".to_string()),
-    };
+    let defaults =
+        SprintDefaultsConfig { capacity_points: Some(18), capacity_hours: None, length: Some("1w".to_string()), overdue_after: Some("8h".to_string()) };
 
-    let outcome = SprintService::create(&mut storage, Sprint::default(), Some(&defaults))
-        .expect("create sprint with defaults");
+    let outcome = SprintService::create(&mut storage, Sprint::default(), Some(&defaults)).expect("create sprint with defaults");
 
     assert_eq!(outcome.record.id, 1);
-    assert_eq!(
-        outcome.applied_defaults,
-        vec![
-            "capacity_points".to_string(),
-            "length".to_string(),
-            "overdue_after".to_string()
-        ]
-    );
+    assert_eq!(outcome.applied_defaults, vec!["capacity_points".to_string(), "length".to_string(), "overdue_after".to_string()]);
 
     let sprint_file = fixtures.tasks_root.join("@sprints/1.yml");
     let contents = std::fs::read_to_string(&sprint_file).expect("sprint file written");
@@ -397,11 +303,7 @@ fn sprint_update_modifies_plan_and_actual_fields() {
     let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let sprint = Sprint {
-        plan: Some(SprintPlan {
-            label: Some("Sprint 7".to_string()),
-            goal: Some("Initial goal".to_string()),
-            ..SprintPlan::default()
-        }),
+        plan: Some(SprintPlan { label: Some("Sprint 7".to_string()), goal: Some("Initial goal".to_string()), ..SprintPlan::default() }),
         ..Sprint::default()
     };
 
@@ -409,21 +311,11 @@ fn sprint_update_modifies_plan_and_actual_fields() {
     assert_eq!(outcome.record.id, 1);
 
     let mut cmd = common::cargo_bin_in(&fixtures);
-    cmd.args([
-        "sprint",
-        "update",
-        "1",
-        "--goal",
-        "Updated goal",
-        "--actual-started-at",
-        "2025-10-01T09:00:00Z",
-        "--length",
-        "2w",
-    ])
-    .assert()
-    .success()
-    .stdout(predicate::str::contains("Updated sprint #1 (Sprint 7)."))
-    .stdout(predicate::str::contains("Computed end:"));
+    cmd.args(["sprint", "update", "1", "--goal", "Updated goal", "--actual-started-at", "2025-10-01T09:00:00Z", "--length", "2w"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Updated sprint #1 (Sprint 7)."))
+        .stdout(predicate::str::contains("Computed end:"));
 
     let sprint_file = fixtures.tasks_root.join("@sprints/1.yml");
     let contents = std::fs::read_to_string(&sprint_file).expect("sprint file written");
@@ -448,11 +340,7 @@ fn sprint_start_auto_selects_pending_sprint() {
     };
 
     let sprint_two = Sprint {
-        plan: Some(SprintPlan {
-            label: Some("Sprint Beta".to_string()),
-            starts_at: Some("2035-01-01T09:00:00Z".to_string()),
-            ..SprintPlan::default()
-        }),
+        plan: Some(SprintPlan { label: Some("Sprint Beta".to_string()), starts_at: Some("2035-01-01T09:00:00Z".to_string()), ..SprintPlan::default() }),
         ..Sprint::default()
     };
 
@@ -466,12 +354,8 @@ fn sprint_start_auto_selects_pending_sprint() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Auto-selected sprint #1"))
-        .stdout(predicate::str::contains(
-            "Started sprint #1 (Sprint Alpha).",
-        ))
-        .stdout(predicate::str::contains(
-            "Started at: 2025-10-01T09:00:00+00:00",
-        ));
+        .stdout(predicate::str::contains("Started sprint #1 (Sprint Alpha)."))
+        .stdout(predicate::str::contains("Started at: 2025-10-01T09:00:00+00:00"));
 
     let sprint_file = fixtures.tasks_root.join("@sprints/1.yml");
     let contents = std::fs::read_to_string(&sprint_file).expect("sprint file written");
@@ -487,21 +371,12 @@ fn sprint_close_defaults_to_last_active_sprint() {
     let fixtures = common::TestFixtures::new();
     let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
-    let sprint = Sprint {
-        plan: Some(SprintPlan {
-            label: Some("Sprint Gamma".to_string()),
-            ..SprintPlan::default()
-        }),
-        ..Sprint::default()
-    };
+    let sprint = Sprint { plan: Some(SprintPlan { label: Some("Sprint Gamma".to_string()), ..SprintPlan::default() }), ..Sprint::default() };
 
     SprintService::create(&mut storage, sprint, None).expect("create sprint");
 
     let mut cmd_start = common::cargo_bin_in(&fixtures);
-    cmd_start
-        .args(["sprint", "start", "1", "--at", "2025-10-01T09:00:00Z"])
-        .assert()
-        .success();
+    cmd_start.args(["sprint", "start", "1", "--at", "2025-10-01T09:00:00Z"]).assert().success();
 
     let mut cmd_close = common::cargo_bin_in(&fixtures);
     cmd_close
@@ -510,9 +385,7 @@ fn sprint_close_defaults_to_last_active_sprint() {
         .success()
         .stdout(predicate::str::contains("Auto-selected sprint #1"))
         .stdout(predicate::str::contains("Closed sprint #1 (Sprint Gamma)."))
-        .stdout(predicate::str::contains(
-            "Closed at: 2025-10-15T17:00:00+00:00",
-        ));
+        .stdout(predicate::str::contains("Closed at: 2025-10-15T17:00:00+00:00"));
 
     let sprint_file = fixtures.tasks_root.join("@sprints/1.yml");
     let contents = std::fs::read_to_string(&sprint_file).expect("sprint file written");
@@ -525,20 +398,12 @@ fn sprint_start_warns_about_parallel_active_sprints() {
     let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let sprint_alpha = Sprint {
-        plan: Some(SprintPlan {
-            label: Some("Sprint Alpha".to_string()),
-            length: Some("2w".to_string()),
-            ..SprintPlan::default()
-        }),
+        plan: Some(SprintPlan { label: Some("Sprint Alpha".to_string()), length: Some("2w".to_string()), ..SprintPlan::default() }),
         ..Sprint::default()
     };
 
     let sprint_beta = Sprint {
-        plan: Some(SprintPlan {
-            label: Some("Sprint Beta".to_string()),
-            length: Some("2w".to_string()),
-            ..SprintPlan::default()
-        }),
+        plan: Some(SprintPlan { label: Some("Sprint Beta".to_string()), length: Some("2w".to_string()), ..SprintPlan::default() }),
         ..Sprint::default()
     };
 
@@ -546,19 +411,14 @@ fn sprint_start_warns_about_parallel_active_sprints() {
     SprintService::create(&mut storage, sprint_beta, None).expect("create sprint beta");
 
     let mut start_alpha = common::cargo_bin_in(&fixtures);
-    start_alpha
-        .args(["sprint", "start", "1", "--at", "2025-10-01T09:00:00Z"])
-        .assert()
-        .success();
+    start_alpha.args(["sprint", "start", "1", "--at", "2025-10-01T09:00:00Z"]).assert().success();
 
     let mut start_beta = common::cargo_bin_in(&fixtures);
     start_beta
         .args(["sprint", "start", "2", "--at", "2025-10-05T09:00:00Z"])
         .assert()
         .success()
-        .stdout(predicate::str::contains(
-            "Started sprint #2 (Sprint Beta).",
-        ))
+        .stdout(predicate::str::contains("Started sprint #2 (Sprint Beta)."))
         .stderr(predicate::str::contains(
             "Another sprint is still running: #1 (Sprint Alpha) is active. Close it before starting another sprint or pass --force if you intend to overlap.",
         ));
@@ -570,20 +430,12 @@ fn sprint_close_warns_about_remaining_active_sprints() {
     let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let sprint_alpha = Sprint {
-        plan: Some(SprintPlan {
-            label: Some("Sprint Alpha".to_string()),
-            length: Some("2w".to_string()),
-            ..SprintPlan::default()
-        }),
+        plan: Some(SprintPlan { label: Some("Sprint Alpha".to_string()), length: Some("2w".to_string()), ..SprintPlan::default() }),
         ..Sprint::default()
     };
 
     let sprint_beta = Sprint {
-        plan: Some(SprintPlan {
-            label: Some("Sprint Beta".to_string()),
-            length: Some("2w".to_string()),
-            ..SprintPlan::default()
-        }),
+        plan: Some(SprintPlan { label: Some("Sprint Beta".to_string()), length: Some("2w".to_string()), ..SprintPlan::default() }),
         ..Sprint::default()
     };
 
@@ -591,16 +443,10 @@ fn sprint_close_warns_about_remaining_active_sprints() {
     SprintService::create(&mut storage, sprint_beta, None).expect("create sprint beta");
 
     let mut start_alpha = common::cargo_bin_in(&fixtures);
-    start_alpha
-        .args(["sprint", "start", "1", "--at", "2025-10-01T09:00:00Z"])
-        .assert()
-        .success();
+    start_alpha.args(["sprint", "start", "1", "--at", "2025-10-01T09:00:00Z"]).assert().success();
 
     let mut start_beta = common::cargo_bin_in(&fixtures);
-    start_beta
-        .args(["sprint", "start", "2", "--at", "2025-10-05T09:00:00Z"])
-        .assert()
-        .success();
+    start_beta.args(["sprint", "start", "2", "--at", "2025-10-05T09:00:00Z"]).assert().success();
 
     let mut close_alpha = common::cargo_bin_in(&fixtures);
     close_alpha
@@ -608,9 +454,7 @@ fn sprint_close_warns_about_remaining_active_sprints() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Closed sprint #1 (Sprint Alpha)."))
-        .stderr(predicate::str::contains(
-            "Additional sprints remain active: #2 (Sprint Beta) is active.",
-        ));
+        .stderr(predicate::str::contains("Additional sprints remain active: #2 (Sprint Beta) is active."));
 }
 
 #[test]
@@ -618,13 +462,7 @@ fn sprint_start_warns_when_start_time_far_in_future() {
     let fixtures = common::TestFixtures::new();
     let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
-    let sprint = Sprint {
-        plan: Some(SprintPlan {
-            label: Some("Sprint Delta".to_string()),
-            ..SprintPlan::default()
-        }),
-        ..Sprint::default()
-    };
+    let sprint = Sprint { plan: Some(SprintPlan { label: Some("Sprint Delta".to_string()), ..SprintPlan::default() }), ..Sprint::default() };
 
     SprintService::create(&mut storage, sprint, None).expect("create sprint");
 
@@ -635,9 +473,7 @@ fn sprint_start_warns_when_start_time_far_in_future() {
         .arg(&future_start)
         .assert()
         .success()
-        .stdout(predicate::str::contains(
-            "Started sprint #1 (Sprint Delta).",
-        ))
+        .stdout(predicate::str::contains("Started sprint #1 (Sprint Delta)."))
         .stderr(predicate::str::contains("more than 12 hours in the future"));
 
     let later_start = (Utc::now() + Duration::hours(36)).to_rfc3339();
@@ -660,11 +496,7 @@ fn sprint_start_warns_when_planned_start_is_overdue() {
     let planned_start = (Utc::now() - Duration::hours(36)).to_rfc3339();
 
     let sprint = Sprint {
-        plan: Some(SprintPlan {
-            label: Some("Sprint Overdue Start".to_string()),
-            starts_at: Some(planned_start.clone()),
-            ..SprintPlan::default()
-        }),
+        plan: Some(SprintPlan { label: Some("Sprint Overdue Start".to_string()), starts_at: Some(planned_start.clone()), ..SprintPlan::default() }),
         ..Sprint::default()
     };
 
@@ -674,9 +506,7 @@ fn sprint_start_warns_when_planned_start_is_overdue() {
     cmd.args(["sprint", "start", "1"])
         .assert()
         .success()
-        .stdout(predicate::str::contains(
-            "Started sprint #1 (Sprint Overdue Start).",
-        ))
+        .stdout(predicate::str::contains("Started sprint #1 (Sprint Overdue Start)."))
         .stderr(predicate::str::contains("was scheduled to start at"))
         .stderr(predicate::str::contains(&planned_start));
 }
@@ -703,10 +533,7 @@ fn sprint_close_warns_when_past_planned_end() {
     SprintService::create(&mut storage, sprint, None).expect("create sprint");
 
     let mut cmd_start = common::cargo_bin_in(&fixtures);
-    cmd_start
-        .args(["sprint", "start", "1", "--at", &planned_start_str])
-        .assert()
-        .success();
+    cmd_start.args(["sprint", "start", "1", "--at", &planned_start_str]).assert().success();
 
     let close_at = Utc::now().to_rfc3339();
 
@@ -716,9 +543,7 @@ fn sprint_close_warns_when_past_planned_end() {
         .arg(&close_at)
         .assert()
         .success()
-        .stdout(predicate::str::contains(
-            "Closed sprint #1 (Sprint Overdue Close).",
-        ))
+        .stdout(predicate::str::contains("Closed sprint #1 (Sprint Overdue Close)."))
         .stderr(predicate::str::contains("was scheduled to end by"))
         .stderr(predicate::str::contains(&computed_end));
 }
@@ -745,20 +570,12 @@ sprints:
     let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let sprint_alpha = Sprint {
-        plan: Some(SprintPlan {
-            label: Some("Sprint Alpha".to_string()),
-            length: Some("2w".to_string()),
-            ..SprintPlan::default()
-        }),
+        plan: Some(SprintPlan { label: Some("Sprint Alpha".to_string()), length: Some("2w".to_string()), ..SprintPlan::default() }),
         ..Sprint::default()
     };
 
     let sprint_beta = Sprint {
-        plan: Some(SprintPlan {
-            label: Some("Sprint Beta".to_string()),
-            length: Some("2w".to_string()),
-            ..SprintPlan::default()
-        }),
+        plan: Some(SprintPlan { label: Some("Sprint Beta".to_string()), length: Some("2w".to_string()), ..SprintPlan::default() }),
         ..Sprint::default()
     };
 
@@ -766,10 +583,7 @@ sprints:
     SprintService::create(&mut storage, sprint_beta, None).expect("create sprint beta");
 
     let mut start_alpha = common::cargo_bin_in(&fixtures);
-    start_alpha
-        .args(["sprint", "start", "1", "--at", "2025-10-01T09:00:00Z"])
-        .assert()
-        .success();
+    start_alpha.args(["sprint", "start", "1", "--at", "2025-10-01T09:00:00Z"]).assert().success();
 
     let mut start_beta = common::cargo_bin_in(&fixtures);
     start_beta
@@ -786,20 +600,12 @@ fn sprint_no_warn_suppresses_lifecycle_warnings() {
     let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let sprint_alpha = Sprint {
-        plan: Some(SprintPlan {
-            label: Some("Sprint Alpha".to_string()),
-            length: Some("1w".to_string()),
-            ..SprintPlan::default()
-        }),
+        plan: Some(SprintPlan { label: Some("Sprint Alpha".to_string()), length: Some("1w".to_string()), ..SprintPlan::default() }),
         ..Sprint::default()
     };
 
     let sprint_beta = Sprint {
-        plan: Some(SprintPlan {
-            label: Some("Sprint Beta".to_string()),
-            length: Some("1w".to_string()),
-            ..SprintPlan::default()
-        }),
+        plan: Some(SprintPlan { label: Some("Sprint Beta".to_string()), length: Some("1w".to_string()), ..SprintPlan::default() }),
         ..Sprint::default()
     };
 
@@ -808,11 +614,7 @@ fn sprint_no_warn_suppresses_lifecycle_warnings() {
 
     let start_alpha_at = Utc::now() - Duration::hours(1);
     let mut start_alpha = common::cargo_bin_in(&fixtures);
-    start_alpha
-        .args(["sprint", "start", "1", "--at"])
-        .arg(start_alpha_at.to_rfc3339())
-        .assert()
-        .success();
+    start_alpha.args(["sprint", "start", "1", "--at"]).arg(start_alpha_at.to_rfc3339()).assert().success();
 
     let future_start = (Utc::now() + Duration::hours(24)).to_rfc3339();
 
@@ -858,57 +660,27 @@ issue.priorities: [Medium]
 
     let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
-    let sprint = Sprint {
-        plan: Some(SprintPlan {
-            label: Some("Sprint Review".to_string()),
-            ..SprintPlan::default()
-        }),
-        ..Sprint::default()
-    };
+    let sprint = Sprint { plan: Some(SprintPlan { label: Some("Sprint Review".to_string()), ..SprintPlan::default() }), ..Sprint::default() };
 
     SprintService::create(&mut storage, sprint, None).expect("create sprint");
 
     let mut start_cmd = common::cargo_bin_in(&fixtures);
-    start_cmd
-        .args(["sprint", "start", "1", "--at", "2025-01-01T09:00:00Z"])
-        .assert()
-        .success();
+    start_cmd.args(["sprint", "start", "1", "--at", "2025-01-01T09:00:00Z"]).assert().success();
 
     let mut close_cmd = common::cargo_bin_in(&fixtures);
-    close_cmd
-        .args(["sprint", "close", "1", "--at", "2025-01-14T17:00:00Z"])
-        .assert()
-        .success();
+    close_cmd.args(["sprint", "close", "1", "--at", "2025-01-14T17:00:00Z"]).assert().success();
 
-    let mut task_done = Task::new(
-        fixtures.tasks_root.clone(),
-        "Finish release notes".to_string(),
-        Priority::from("Medium"),
-    );
+    let mut task_done = Task::new(fixtures.tasks_root.clone(), "Finish release notes".to_string(), Priority::from("Medium"));
     task_done.status = TaskStatus::from("Done");
-    let task_done_id = storage
-        .add(&task_done, "TEST", Some("Test Project"))
-        .expect("failed to add done task");
+    let task_done_id = storage.add(&task_done, "TEST", Some("Test Project")).expect("failed to add done task");
 
-    let mut task_in_progress = Task::new(
-        fixtures.tasks_root.clone(),
-        "Implement feature".to_string(),
-        Priority::from("Medium"),
-    );
+    let mut task_in_progress = Task::new(fixtures.tasks_root.clone(), "Implement feature".to_string(), Priority::from("Medium"));
     task_in_progress.status = TaskStatus::from("InProgress");
-    let task_in_progress_id = storage
-        .add(&task_in_progress, "TEST", Some("Test Project"))
-        .expect("failed to add in-progress task");
+    let task_in_progress_id = storage.add(&task_in_progress, "TEST", Some("Test Project")).expect("failed to add in-progress task");
 
-    let mut task_todo = Task::new(
-        fixtures.tasks_root.clone(),
-        "Backlog refinement".to_string(),
-        Priority::from("Medium"),
-    );
+    let mut task_todo = Task::new(fixtures.tasks_root.clone(), "Backlog refinement".to_string(), Priority::from("Medium"));
     task_todo.status = TaskStatus::from("Todo");
-    let task_todo_id = storage
-        .add(&task_todo, "TEST", Some("Test Project"))
-        .expect("failed to add todo task");
+    let task_todo_id = storage.add(&task_todo, "TEST", Some("Test Project")).expect("failed to add todo task");
 
     let task_ids = vec![task_done_id, task_in_progress_id, task_todo_id];
     append_sprint_tasks(&mut storage, 1, &task_ids);
@@ -918,12 +690,8 @@ issue.priorities: [Medium]
         .args(["sprint", "review", "1"])
         .assert()
         .success()
-        .stdout(predicate::str::contains(
-            "Sprint review for #1 (Sprint Review).",
-        ))
-        .stdout(predicate::str::contains(
-            "Tasks: 3 total • 1 done • 2 remaining",
-        ))
+        .stdout(predicate::str::contains("Sprint review for #1 (Sprint Review)."))
+        .stdout(predicate::str::contains("Tasks: 3 total • 1 done • 2 remaining"))
         .stdout(predicate::str::contains("Status breakdown:"))
         .stdout(predicate::str::contains("Implement feature [InProgress]"))
         .stdout(predicate::str::contains("Backlog refinement [Todo]"));
@@ -952,10 +720,7 @@ issue.priorities: [Medium]
             label: Some("Sprint Stats".to_string()),
             starts_at: Some("2025-01-01T09:00:00Z".to_string()),
             ends_at: Some("2025-01-08T09:00:00Z".to_string()),
-            capacity: Some(SprintCapacity {
-                points: Some(30),
-                hours: Some(80),
-            }),
+            capacity: Some(SprintCapacity { points: Some(30), hours: Some(80) }),
             ..SprintPlan::default()
         }),
         ..Sprint::default()
@@ -966,69 +731,34 @@ issue.priorities: [Medium]
     drop(storage);
 
     let mut start_cmd = common::cargo_bin_in(&fixtures);
-    start_cmd
-        .args(["sprint", "start", "1", "--at", "2025-01-01T09:00:00Z"])
-        .assert()
-        .success();
+    start_cmd.args(["sprint", "start", "1", "--at", "2025-01-01T09:00:00Z"]).assert().success();
 
     let mut close_cmd = common::cargo_bin_in(&fixtures);
-    close_cmd
-        .args(["sprint", "close", "1", "--at", "2025-01-08T09:00:00Z"])
-        .assert()
-        .success();
+    close_cmd.args(["sprint", "close", "1", "--at", "2025-01-08T09:00:00Z"]).assert().success();
 
     let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
-    let mut done_hours_task = Task::new(
-        fixtures.tasks_root.clone(),
-        "Complete API work".to_string(),
-        Priority::from("Medium"),
-    );
+    let mut done_hours_task = Task::new(fixtures.tasks_root.clone(), "Complete API work".to_string(), Priority::from("Medium"));
     done_hours_task.status = TaskStatus::from("Done");
     done_hours_task.effort = Some("8h".to_string());
-    let done_hours_id = storage
-        .add(&done_hours_task, "TEST", Some("Test Project"))
-        .expect("failed to add done hours task");
+    let done_hours_id = storage.add(&done_hours_task, "TEST", Some("Test Project")).expect("failed to add done hours task");
 
-    let mut remaining_hours_task = Task::new(
-        fixtures.tasks_root.clone(),
-        "Continue UI polish".to_string(),
-        Priority::from("Medium"),
-    );
+    let mut remaining_hours_task = Task::new(fixtures.tasks_root.clone(), "Continue UI polish".to_string(), Priority::from("Medium"));
     remaining_hours_task.status = TaskStatus::from("InProgress");
     remaining_hours_task.effort = Some("4h".to_string());
-    let remaining_hours_id = storage
-        .add(&remaining_hours_task, "TEST", Some("Test Project"))
-        .expect("failed to add remaining hours task");
+    let remaining_hours_id = storage.add(&remaining_hours_task, "TEST", Some("Test Project")).expect("failed to add remaining hours task");
 
-    let mut done_points_task = Task::new(
-        fixtures.tasks_root.clone(),
-        "Deploy landing page".to_string(),
-        Priority::from("Medium"),
-    );
+    let mut done_points_task = Task::new(fixtures.tasks_root.clone(), "Deploy landing page".to_string(), Priority::from("Medium"));
     done_points_task.status = TaskStatus::from("Done");
     done_points_task.effort = Some("3pt".to_string());
-    let done_points_id = storage
-        .add(&done_points_task, "TEST", Some("Test Project"))
-        .expect("failed to add done points task");
+    let done_points_id = storage.add(&done_points_task, "TEST", Some("Test Project")).expect("failed to add done points task");
 
-    let mut remaining_points_task = Task::new(
-        fixtures.tasks_root.clone(),
-        "Write documentation".to_string(),
-        Priority::from("Medium"),
-    );
+    let mut remaining_points_task = Task::new(fixtures.tasks_root.clone(), "Write documentation".to_string(), Priority::from("Medium"));
     remaining_points_task.status = TaskStatus::from("Todo");
     remaining_points_task.effort = Some("5pt".to_string());
-    let remaining_points_id = storage
-        .add(&remaining_points_task, "TEST", Some("Test Project"))
-        .expect("failed to add remaining points task");
+    let remaining_points_id = storage.add(&remaining_points_task, "TEST", Some("Test Project")).expect("failed to add remaining points task");
 
-    let task_ids = vec![
-        done_hours_id,
-        remaining_hours_id,
-        done_points_id,
-        remaining_points_id,
-    ];
+    let task_ids = vec![done_hours_id, remaining_hours_id, done_points_id, remaining_points_id];
     append_sprint_tasks(&mut storage, 1, &task_ids);
 
     drop(storage);
@@ -1038,31 +768,15 @@ issue.priorities: [Medium]
         .args(["sprint", "stats", "1"])
         .assert()
         .success()
-        .stdout(predicate::str::contains(
-            "Sprint stats for #1 (Sprint Stats).",
-        ))
-        .stdout(predicate::str::contains(
-            "Tasks: 4 committed • 2 done • 2 remaining (50.0% complete)",
-        ))
-        .stdout(predicate::str::contains(
-            "Points: 8 committed • 3 done • 5 remaining (37.5% complete)",
-        ))
-        .stdout(predicate::str::contains(
-            "  Capacity: 30 planned • 26.7% committed • 10.0% consumed",
-        ))
-        .stdout(predicate::str::contains(
-            "Hours: 12 committed • 8 done • 4 remaining (66.7% complete)",
-        ))
-        .stdout(predicate::str::contains(
-            "  Capacity: 80 planned • 15.0% committed • 10.0% consumed",
-        ))
+        .stdout(predicate::str::contains("Sprint stats for #1 (Sprint Stats)."))
+        .stdout(predicate::str::contains("Tasks: 4 committed • 2 done • 2 remaining (50.0% complete)"))
+        .stdout(predicate::str::contains("Points: 8 committed • 3 done • 5 remaining (37.5% complete)"))
+        .stdout(predicate::str::contains("  Capacity: 30 planned • 26.7% committed • 10.0% consumed"))
+        .stdout(predicate::str::contains("Hours: 12 committed • 8 done • 4 remaining (66.7% complete)"))
+        .stdout(predicate::str::contains("  Capacity: 80 planned • 15.0% committed • 10.0% consumed"))
         .stdout(predicate::str::contains("Timeline:"))
-        .stdout(predicate::str::contains(
-            "  Planned start: 2025-01-01T09:00:00+00:00",
-        ))
-        .stdout(predicate::str::contains(
-            "  Actual end: 2025-01-08T09:00:00+00:00",
-        ))
+        .stdout(predicate::str::contains("  Planned start: 2025-01-01T09:00:00+00:00"))
+        .stdout(predicate::str::contains("  Actual end: 2025-01-08T09:00:00+00:00"))
         .stdout(predicate::str::contains("  Actual duration: 7d"));
 }
 
@@ -1072,63 +786,33 @@ fn sprint_review_auto_selects_latest_completed_when_id_omitted() {
 
     let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
-    let sprint_one = Sprint {
-        plan: Some(SprintPlan {
-            label: Some("Sprint One".to_string()),
-            ..SprintPlan::default()
-        }),
-        ..Sprint::default()
-    };
+    let sprint_one = Sprint { plan: Some(SprintPlan { label: Some("Sprint One".to_string()), ..SprintPlan::default() }), ..Sprint::default() };
 
-    let sprint_two = Sprint {
-        plan: Some(SprintPlan {
-            label: Some("Sprint Two".to_string()),
-            ..SprintPlan::default()
-        }),
-        ..Sprint::default()
-    };
+    let sprint_two = Sprint { plan: Some(SprintPlan { label: Some("Sprint Two".to_string()), ..SprintPlan::default() }), ..Sprint::default() };
 
     SprintService::create(&mut storage, sprint_one, None).expect("create sprint one");
     SprintService::create(&mut storage, sprint_two, None).expect("create sprint two");
 
     let mut start_first = common::cargo_bin_in(&fixtures);
-    start_first
-        .args(["sprint", "start", "1", "--at", "2024-01-01T09:00:00Z"])
-        .assert()
-        .success();
+    start_first.args(["sprint", "start", "1", "--at", "2024-01-01T09:00:00Z"]).assert().success();
 
     let mut close_first = common::cargo_bin_in(&fixtures);
-    close_first
-        .args(["sprint", "close", "1", "--at", "2024-01-07T17:00:00Z"])
-        .assert()
-        .success();
+    close_first.args(["sprint", "close", "1", "--at", "2024-01-07T17:00:00Z"]).assert().success();
 
     let mut start_second = common::cargo_bin_in(&fixtures);
-    start_second
-        .args(["sprint", "start", "2", "--at", "2024-02-01T09:00:00Z"])
-        .assert()
-        .success();
+    start_second.args(["sprint", "start", "2", "--at", "2024-02-01T09:00:00Z"]).assert().success();
 
     let mut close_second = common::cargo_bin_in(&fixtures);
-    close_second
-        .args(["sprint", "close", "2", "--at", "2024-02-14T17:00:00Z"])
-        .assert()
-        .success();
+    close_second.args(["sprint", "close", "2", "--at", "2024-02-14T17:00:00Z"]).assert().success();
 
     let mut review_cmd = common::cargo_bin_in(&fixtures);
     review_cmd
         .args(["sprint", "review"])
         .assert()
         .success()
-        .stdout(predicate::str::contains(
-            "Auto-selected sprint #2 for review.",
-        ))
-        .stdout(predicate::str::contains(
-            "Sprint review for #2 (Sprint Two).",
-        ))
-        .stdout(predicate::str::contains(
-            "No tasks are linked to this sprint.",
-        ));
+        .stdout(predicate::str::contains("Auto-selected sprint #2 for review."))
+        .stdout(predicate::str::contains("Sprint review for #2 (Sprint Two)."))
+        .stdout(predicate::str::contains("No tasks are linked to this sprint."));
 }
 
 #[test]
@@ -1137,26 +821,14 @@ fn sprint_cleanup_refs_prunes_missing_memberships() {
 
     let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
-    let sprint = Sprint {
-        plan: Some(SprintPlan {
-            label: Some("Sprint Present".to_string()),
-            ..SprintPlan::default()
-        }),
-        ..Sprint::default()
-    };
+    let sprint = Sprint { plan: Some(SprintPlan { label: Some("Sprint Present".to_string()), ..SprintPlan::default() }), ..Sprint::default() };
 
     SprintService::create(&mut storage, sprint, None).expect("create sprint");
 
-    let mut task = Task::new(
-        fixtures.tasks_root.clone(),
-        "Task with dangling sprint".to_string(),
-        Priority::from("Medium"),
-    );
+    let mut task = Task::new(fixtures.tasks_root.clone(), "Task with dangling sprint".to_string(), Priority::from("Medium"));
     task.status = TaskStatus::from("Todo");
     task.sprints = vec![1, 99];
-    let task_id = storage
-        .add(&task, "TEST", Some("Test Project"))
-        .expect("failed to add sprint cleanup task");
+    let task_id = storage.add(&task, "TEST", Some("Test Project")).expect("failed to add sprint cleanup task");
 
     drop(storage);
 
@@ -1164,19 +836,12 @@ fn sprint_cleanup_refs_prunes_missing_memberships() {
     cmd.args(["sprint", "cleanup-refs"])
         .assert()
         .success()
-        .stdout(predicate::str::contains(
-            "Removed 1 sprint reference(s) across 1 task(s).",
-        ))
-        .stdout(predicate::str::contains(
-            "Sprint #99: removed 1 reference(s).",
-        ));
+        .stdout(predicate::str::contains("Removed 1 sprint reference(s) across 1 task(s)."))
+        .stdout(predicate::str::contains("Sprint #99: removed 1 reference(s)."));
 
     let storage_after = Storage::new(&fixtures.tasks_root);
     let tasks = storage_after.search(&TaskFilter::default());
-    let (_, updated_task) = tasks
-        .into_iter()
-        .find(|(id, _)| id == &task_id)
-        .expect("task still exists");
+    let (_, updated_task) = tasks.into_iter().find(|(id, _)| id == &task_id).expect("task still exists");
 
     assert_eq!(updated_task.sprints, vec![1]);
     let memberships = task_sprint_ids(&storage_after, &task_id);
@@ -1189,16 +854,10 @@ fn sprint_cleanup_refs_targets_requested_sprint() {
 
     let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
-    let mut task = Task::new(
-        fixtures.tasks_root.clone(),
-        "Task with multiple missing sprints".to_string(),
-        Priority::from("Medium"),
-    );
+    let mut task = Task::new(fixtures.tasks_root.clone(), "Task with multiple missing sprints".to_string(), Priority::from("Medium"));
     task.status = TaskStatus::from("Todo");
     task.sprints = vec![5, 6];
-    let task_id = storage
-        .add(&task, "TEST", Some("Test Project"))
-        .expect("failed to add cleanup target");
+    let task_id = storage.add(&task, "TEST", Some("Test Project")).expect("failed to add cleanup target");
 
     drop(storage);
 
@@ -1206,22 +865,13 @@ fn sprint_cleanup_refs_targets_requested_sprint() {
     cmd.args(["sprint", "cleanup-refs", "5"])
         .assert()
         .success()
-        .stdout(predicate::str::contains(
-            "Removed 2 sprint reference(s) across 1 task(s).",
-        ))
-        .stdout(predicate::str::contains(
-            "Sprint #5: removed 1 reference(s).",
-        ))
-        .stdout(predicate::str::contains(
-            "Sprint #6: removed 1 reference(s).",
-        ));
+        .stdout(predicate::str::contains("Removed 2 sprint reference(s) across 1 task(s)."))
+        .stdout(predicate::str::contains("Sprint #5: removed 1 reference(s)."))
+        .stdout(predicate::str::contains("Sprint #6: removed 1 reference(s)."));
 
     let storage_after = Storage::new(&fixtures.tasks_root);
     let tasks = storage_after.search(&TaskFilter::default());
-    let (_, updated_task) = tasks
-        .into_iter()
-        .find(|(id, _)| id == &task_id)
-        .expect("task still exists");
+    let (_, updated_task) = tasks.into_iter().find(|(id, _)| id == &task_id).expect("task still exists");
 
     assert!(updated_task.sprints.is_empty());
     let memberships = task_sprint_ids(&storage_after, &task_id);
@@ -1234,43 +884,23 @@ fn sprint_add_assigns_tasks_to_sprint() {
 
     let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
-    let sprint = Sprint {
-        plan: Some(SprintPlan {
-            label: Some("Sprint Attach".to_string()),
-            ..SprintPlan::default()
-        }),
-        ..Sprint::default()
-    };
+    let sprint = Sprint { plan: Some(SprintPlan { label: Some("Sprint Attach".to_string()), ..SprintPlan::default() }), ..Sprint::default() };
     SprintService::create(&mut storage, sprint, None).expect("create sprint");
 
-    let mut task_a = Task::new(
-        fixtures.tasks_root.clone(),
-        "Attach Alpha".to_string(),
-        Priority::from("Medium"),
-    );
+    let mut task_a = Task::new(fixtures.tasks_root.clone(), "Attach Alpha".to_string(), Priority::from("Medium"));
     task_a.status = TaskStatus::from("Todo");
-    let mut task_b = Task::new(
-        fixtures.tasks_root.clone(),
-        "Attach Beta".to_string(),
-        Priority::from("Medium"),
-    );
+    let mut task_b = Task::new(fixtures.tasks_root.clone(), "Attach Beta".to_string(), Priority::from("Medium"));
     task_b.status = TaskStatus::from("Todo");
 
-    let id_a = storage
-        .add(&task_a, "TEST", Some("Test Project"))
-        .expect("failed to add task a");
-    let id_b = storage
-        .add(&task_b, "TEST", Some("Test Project"))
-        .expect("failed to add task b");
+    let id_a = storage.add(&task_a, "TEST", Some("Test Project")).expect("failed to add task a");
+    let id_b = storage.add(&task_b, "TEST", Some("Test Project")).expect("failed to add task b");
     drop(storage);
 
     let mut cmd = common::cargo_bin_in(&fixtures);
     cmd.args(["sprint", "add", "--sprint", "1", &id_a, &id_b])
         .assert()
         .success()
-        .stdout(predicate::str::contains(
-            "Attached sprint #1 (Sprint Attach) to 2 task(s).",
-        ));
+        .stdout(predicate::str::contains("Attached sprint #1 (Sprint Attach) to 2 task(s)."));
 
     let storage_after = Storage::new(&fixtures.tasks_root);
     let task_a_after = storage_after.get(&id_a, "TEST").expect("task a exists");
@@ -1288,78 +918,31 @@ fn global_project_flag_does_not_select_every_task() {
     // `lotar -p X sprint add|remove <id>` changed every task in X.
     let fixtures = common::TestFixtures::new();
     let mut storage = Storage::new(&fixtures.tasks_root.clone());
-    let sprint = Sprint {
-        plan: Some(SprintPlan {
-            label: Some("Scoped".to_string()),
-            ..SprintPlan::default()
-        }),
-        ..Sprint::default()
-    };
+    let sprint = Sprint { plan: Some(SprintPlan { label: Some("Scoped".to_string()), ..SprintPlan::default() }), ..Sprint::default() };
     SprintService::create(&mut storage, sprint, None).expect("create sprint");
     let mut ids = Vec::new();
     for title in ["One", "Two", "Three"] {
-        let mut task = Task::new(
-            fixtures.tasks_root.clone(),
-            title.to_string(),
-            Priority::from("Medium"),
-        );
+        let mut task = Task::new(fixtures.tasks_root.clone(), title.to_string(), Priority::from("Medium"));
         task.status = TaskStatus::from("Todo");
         ids.push(storage.add(&task, "TEST", Some("Test Project")).unwrap());
     }
     drop(storage);
 
-    for args in [
-        vec![
-            "-p",
-            "TEST",
-            "sprint",
-            "add",
-            "--sprint",
-            "1",
-            ids[0].as_str(),
-        ],
-        vec![
-            "sprint",
-            "add",
-            "--sprint",
-            "1",
-            ids[1].as_str(),
-            "--project",
-            "TEST",
-        ],
-    ] {
-        common::cargo_bin_in(&fixtures)
-            .args(&args)
-            .assert()
-            .success();
+    for args in
+        [vec!["-p", "TEST", "sprint", "add", "--sprint", "1", ids[0].as_str()], vec!["sprint", "add", "--sprint", "1", ids[1].as_str(), "--project", "TEST"]]
+    {
+        common::cargo_bin_in(&fixtures).args(&args).assert().success();
     }
     let members = sprint_task_ids(&Storage::new(&fixtures.tasks_root), 1);
     assert_eq!(members, vec![ids[0].clone(), ids[1].clone()]);
 
-    common::cargo_bin_in(&fixtures)
-        .args([
-            "-p",
-            "TEST",
-            "sprint",
-            "remove",
-            "--sprint",
-            "1",
-            ids[0].as_str(),
-        ])
-        .assert()
-        .success();
+    common::cargo_bin_in(&fixtures).args(["-p", "TEST", "sprint", "remove", "--sprint", "1", ids[0].as_str()]).assert().success();
     let members = sprint_task_ids(&Storage::new(&fixtures.tasks_root), 1);
     assert_eq!(members, vec![ids[1].clone()], "only the named task leaves");
 
     // The explicit selector still selects the whole project.
-    common::cargo_bin_in(&fixtures)
-        .args(["sprint", "add", "--sprint", "1", "--select-project", "TEST"])
-        .assert()
-        .success();
-    assert_eq!(
-        sprint_task_ids(&Storage::new(&fixtures.tasks_root), 1).len(),
-        3
-    );
+    common::cargo_bin_in(&fixtures).args(["sprint", "add", "--sprint", "1", "--select-project", "TEST"]).assert().success();
+    assert_eq!(sprint_task_ids(&Storage::new(&fixtures.tasks_root), 1).len(), 3);
 }
 
 #[test]
@@ -1368,54 +951,24 @@ fn sprint_add_requires_force_for_existing_membership() {
 
     let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
-    let sprint_one = Sprint {
-        plan: Some(SprintPlan {
-            label: Some("Alpha".to_string()),
-            ..SprintPlan::default()
-        }),
-        ..Sprint::default()
-    };
-    let sprint_two = Sprint {
-        plan: Some(SprintPlan {
-            label: Some("Beta".to_string()),
-            ..SprintPlan::default()
-        }),
-        ..Sprint::default()
-    };
+    let sprint_one = Sprint { plan: Some(SprintPlan { label: Some("Alpha".to_string()), ..SprintPlan::default() }), ..Sprint::default() };
+    let sprint_two = Sprint { plan: Some(SprintPlan { label: Some("Beta".to_string()), ..SprintPlan::default() }), ..Sprint::default() };
     SprintService::create(&mut storage, sprint_one, None).expect("create sprint #1");
     SprintService::create(&mut storage, sprint_two, None).expect("create sprint #2");
 
-    let mut task = Task::new(
-        fixtures.tasks_root.clone(),
-        "Already Assigned".to_string(),
-        Priority::from("Medium"),
-    );
+    let mut task = Task::new(fixtures.tasks_root.clone(), "Already Assigned".to_string(), Priority::from("Medium"));
     task.status = TaskStatus::from("Todo");
-    let task_id = storage
-        .add(&task, "TEST", Some("Test Project"))
-        .expect("failed to add sprint-assigned task");
+    let task_id = storage.add(&task, "TEST", Some("Test Project")).expect("failed to add sprint-assigned task");
     let mut sprint_one_record = SprintService::get(&storage, 1).expect("load sprint #1");
-    sprint_one_record.sprint.tasks.push(SprintTaskEntry {
-        extra: Default::default(),
-        id: task_id.clone(),
-        order: None,
-    });
-    SprintService::update(&mut storage, sprint_one_record.id, sprint_one_record.sprint)
-        .expect("persist sprint membership");
+    sprint_one_record.sprint.tasks.push(SprintTaskEntry { extra: Default::default(), id: task_id.clone(), order: None });
+    SprintService::update(&mut storage, sprint_one_record.id, sprint_one_record.sprint).expect("persist sprint membership");
     drop(storage);
 
     let mut cmd = common::cargo_bin_in(&fixtures);
-    cmd.args(["sprint", "add", "--sprint", "2", &task_id])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains(
-            "Attached sprint #2 (Beta) to 1 task(s).",
-        ));
+    cmd.args(["sprint", "add", "--sprint", "2", &task_id]).assert().success().stdout(predicate::str::contains("Attached sprint #2 (Beta) to 1 task(s)."));
 
     let storage_after = Storage::new(&fixtures.tasks_root.clone());
-    let fetched = storage_after
-        .get(&task_id, "TEST")
-        .expect("task still exists");
+    let fetched = storage_after.get(&task_id, "TEST").expect("task still exists");
     assert!(fetched.sprints.is_empty());
     let memberships = task_sprint_ids(&storage_after, &task_id);
     assert_eq!(memberships, vec![1, 2]);
@@ -1426,9 +979,7 @@ fn sprint_add_requires_force_for_existing_membership() {
         .args(["sprint", "add", "--force", "--sprint", "2", &task_id])
         .assert()
         .success()
-        .stdout(predicate::str::contains(
-            "Attached sprint #2 (Beta) to 1 task(s).",
-        ))
+        .stdout(predicate::str::contains("Attached sprint #2 (Beta) to 1 task(s)."))
         .stdout(predicate::str::contains("moved from sprint(s) #1"));
 
     let storage_final = Storage::new(&fixtures.tasks_root);
@@ -1444,49 +995,24 @@ fn sprint_move_reassigns_memberships() {
 
     let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
-    let sprint_one = Sprint {
-        plan: Some(SprintPlan {
-            label: Some("Alpha".to_string()),
-            ..SprintPlan::default()
-        }),
-        ..Sprint::default()
-    };
-    let sprint_two = Sprint {
-        plan: Some(SprintPlan {
-            label: Some("Release".to_string()),
-            ..SprintPlan::default()
-        }),
-        ..Sprint::default()
-    };
+    let sprint_one = Sprint { plan: Some(SprintPlan { label: Some("Alpha".to_string()), ..SprintPlan::default() }), ..Sprint::default() };
+    let sprint_two = Sprint { plan: Some(SprintPlan { label: Some("Release".to_string()), ..SprintPlan::default() }), ..Sprint::default() };
     SprintService::create(&mut storage, sprint_one, None).expect("create sprint #1");
     SprintService::create(&mut storage, sprint_two, None).expect("create sprint #2");
 
-    let mut task = Task::new(
-        fixtures.tasks_root.clone(),
-        "Move Me".to_string(),
-        Priority::from("Medium"),
-    );
+    let mut task = Task::new(fixtures.tasks_root.clone(), "Move Me".to_string(), Priority::from("Medium"));
     task.status = TaskStatus::from("Todo");
-    let task_id = storage
-        .add(&task, "TEST", Some("Test Project"))
-        .expect("failed to add task for sprint move");
+    let task_id = storage.add(&task, "TEST", Some("Test Project")).expect("failed to add task for sprint move");
     let mut sprint_one_record = SprintService::get(&storage, 1).expect("load sprint #1");
-    sprint_one_record.sprint.tasks.push(SprintTaskEntry {
-        extra: Default::default(),
-        id: task_id.clone(),
-        order: None,
-    });
-    SprintService::update(&mut storage, sprint_one_record.id, sprint_one_record.sprint)
-        .expect("persist sprint membership");
+    sprint_one_record.sprint.tasks.push(SprintTaskEntry { extra: Default::default(), id: task_id.clone(), order: None });
+    SprintService::update(&mut storage, sprint_one_record.id, sprint_one_record.sprint).expect("persist sprint membership");
     drop(storage);
 
     let mut cmd = common::cargo_bin_in(&fixtures);
     cmd.args(["sprint", "move", "--sprint", "2", &task_id])
         .assert()
         .success()
-        .stdout(predicate::str::contains(
-            "Moved 1 task(s) to sprint #2 (Release).",
-        ))
+        .stdout(predicate::str::contains("Moved 1 task(s) to sprint #2 (Release)."))
         .stdout(predicate::str::contains("moved from sprint(s) #1"));
 
     let storage_after = Storage::new(&fixtures.tasks_root);
@@ -1502,63 +1028,26 @@ fn sprint_move_json_reports_reassignment_messages() {
 
     let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
-    let sprint_one = Sprint {
-        plan: Some(SprintPlan {
-            label: Some("Alpha".to_string()),
-            ..SprintPlan::default()
-        }),
-        ..Sprint::default()
-    };
-    let sprint_two = Sprint {
-        plan: Some(SprintPlan {
-            label: Some("Release".to_string()),
-            ..SprintPlan::default()
-        }),
-        ..Sprint::default()
-    };
+    let sprint_one = Sprint { plan: Some(SprintPlan { label: Some("Alpha".to_string()), ..SprintPlan::default() }), ..Sprint::default() };
+    let sprint_two = Sprint { plan: Some(SprintPlan { label: Some("Release".to_string()), ..SprintPlan::default() }), ..Sprint::default() };
     SprintService::create(&mut storage, sprint_one, None).expect("create sprint #1");
     SprintService::create(&mut storage, sprint_two, None).expect("create sprint #2");
 
-    let mut task = Task::new(
-        fixtures.tasks_root.clone(),
-        "Move Me".to_string(),
-        Priority::from("Medium"),
-    );
+    let mut task = Task::new(fixtures.tasks_root.clone(), "Move Me".to_string(), Priority::from("Medium"));
     task.status = TaskStatus::from("Todo");
-    let task_id = storage
-        .add(&task, "TEST", Some("Test Project"))
-        .expect("failed to add task for sprint move json");
+    let task_id = storage.add(&task, "TEST", Some("Test Project")).expect("failed to add task for sprint move json");
     let mut sprint_one_record = SprintService::get(&storage, 1).expect("load sprint #1");
-    sprint_one_record.sprint.tasks.push(SprintTaskEntry {
-        extra: Default::default(),
-        id: task_id.clone(),
-        order: None,
-    });
-    SprintService::update(&mut storage, sprint_one_record.id, sprint_one_record.sprint)
-        .expect("persist sprint membership");
+    sprint_one_record.sprint.tasks.push(SprintTaskEntry { extra: Default::default(), id: task_id.clone(), order: None });
+    SprintService::update(&mut storage, sprint_one_record.id, sprint_one_record.sprint).expect("persist sprint membership");
     drop(storage);
 
     let mut cmd = common::cargo_bin_in(&fixtures);
-    let assert = cmd
-        .args([
-            "--format", "json", "sprint", "move", "--sprint", "2", &task_id,
-        ])
-        .assert()
-        .success();
+    let assert = cmd.args(["--format", "json", "sprint", "move", "--sprint", "2", &task_id]).assert().success();
     let output = String::from_utf8_lossy(&assert.get_output().stdout);
     let payload: Value = serde_json::from_str(output.trim()).expect("valid json payload");
 
-    let messages = payload
-        .get("messages")
-        .and_then(|value| value.as_array())
-        .cloned()
-        .unwrap_or_default();
-    assert!(messages.iter().any(|message| {
-        message
-            .as_str()
-            .map(|text| text.contains("moved from sprint(s) #1"))
-            .unwrap_or(false)
-    }));
+    let messages = payload.get("messages").and_then(|value| value.as_array()).cloned().unwrap_or_default();
+    assert!(messages.iter().any(|message| { message.as_str().map(|text| text.contains("moved from sprint(s) #1")).unwrap_or(false) }));
 }
 
 #[test]
@@ -1567,61 +1056,28 @@ fn sprint_add_appends_select_filter_results() {
 
     let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
-    let sprint = Sprint {
-        plan: Some(SprintPlan {
-            label: Some("Select".to_string()),
-            ..SprintPlan::default()
-        }),
-        ..Sprint::default()
-    };
+    let sprint = Sprint { plan: Some(SprintPlan { label: Some("Select".to_string()), ..SprintPlan::default() }), ..Sprint::default() };
     SprintService::create(&mut storage, sprint, None).expect("create sprint");
 
-    let mut manual = Task::new(
-        fixtures.tasks_root.clone(),
-        "Manual".to_string(),
-        Priority::from("Medium"),
-    );
+    let mut manual = Task::new(fixtures.tasks_root.clone(), "Manual".to_string(), Priority::from("Medium"));
     manual.status = TaskStatus::from("Todo");
-    let manual_id = storage
-        .add(&manual, "TEST", Some("Test Project"))
-        .expect("add manual task");
+    let manual_id = storage.add(&manual, "TEST", Some("Test Project")).expect("add manual task");
 
-    let mut selected = Task::new(
-        fixtures.tasks_root.clone(),
-        "Selected".to_string(),
-        Priority::from("Medium"),
-    );
+    let mut selected = Task::new(fixtures.tasks_root.clone(), "Selected".to_string(), Priority::from("Medium"));
     selected.status = TaskStatus::from("Todo");
-    selected
-        .custom_fields
-        .insert("iteration".to_string(), custom_value_string("beta"));
-    let selected_id = storage
-        .add(&selected, "TEST", Some("Test Project"))
-        .expect("add selected task");
+    selected.custom_fields.insert("iteration".to_string(), custom_value_string("beta"));
+    let selected_id = storage.add(&selected, "TEST", Some("Test Project")).expect("add selected task");
     drop(storage);
 
     let mut cmd = common::cargo_bin_in(&fixtures);
-    cmd.args([
-        "sprint",
-        "add",
-        "--sprint",
-        "1",
-        &manual_id,
-        "--select",
-        "field:iteration=beta",
-    ])
-    .assert()
-    .success()
-    .stdout(predicate::str::contains("2 task(s)"));
+    cmd.args(["sprint", "add", "--sprint", "1", &manual_id, "--select", "field:iteration=beta"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("2 task(s)"));
 
     let storage_after = Storage::new(&fixtures.tasks_root);
     let record = SprintService::get(&storage_after, 1).expect("sprint #1 exists");
-    let assigned: Vec<String> = record
-        .sprint
-        .tasks
-        .iter()
-        .map(|entry| entry.id.clone())
-        .collect();
+    let assigned: Vec<String> = record.sprint.tasks.iter().map(|entry| entry.id.clone()).collect();
     assert!(assigned.contains(&manual_id));
     assert!(assigned.contains(&selected_id));
 }
@@ -1632,41 +1088,22 @@ fn sprint_remove_detaches_tasks() {
 
     let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
-    let sprint = Sprint {
-        plan: Some(SprintPlan {
-            label: Some("Sprint Detach".to_string()),
-            ..SprintPlan::default()
-        }),
-        ..Sprint::default()
-    };
+    let sprint = Sprint { plan: Some(SprintPlan { label: Some("Sprint Detach".to_string()), ..SprintPlan::default() }), ..Sprint::default() };
     SprintService::create(&mut storage, sprint, None).expect("create sprint");
 
-    let mut task = Task::new(
-        fixtures.tasks_root.clone(),
-        "Detach Me".to_string(),
-        Priority::from("Medium"),
-    );
+    let mut task = Task::new(fixtures.tasks_root.clone(), "Detach Me".to_string(), Priority::from("Medium"));
     task.status = TaskStatus::from("Todo");
-    let task_id = storage
-        .add(&task, "TEST", Some("Test Project"))
-        .expect("failed to add task for sprint remove");
+    let task_id = storage.add(&task, "TEST", Some("Test Project")).expect("failed to add task for sprint remove");
     let mut sprint_record = SprintService::get(&storage, 1).expect("load sprint #1");
-    sprint_record.sprint.tasks.push(SprintTaskEntry {
-        extra: Default::default(),
-        id: task_id.clone(),
-        order: None,
-    });
-    SprintService::update(&mut storage, sprint_record.id, sprint_record.sprint)
-        .expect("persist sprint membership");
+    sprint_record.sprint.tasks.push(SprintTaskEntry { extra: Default::default(), id: task_id.clone(), order: None });
+    SprintService::update(&mut storage, sprint_record.id, sprint_record.sprint).expect("persist sprint membership");
     drop(storage);
 
     let mut cmd = common::cargo_bin_in(&fixtures);
     cmd.args(["sprint", "remove", "--sprint", "1", &task_id])
         .assert()
         .success()
-        .stdout(predicate::str::contains(
-            "Removed sprint #1 (Sprint Detach) from 1 task(s).",
-        ));
+        .stdout(predicate::str::contains("Removed sprint #1 (Sprint Detach) from 1 task(s)."));
 
     let storage_after = Storage::new(&fixtures.tasks_root);
     let task_after = storage_after.get(&task_id, "TEST").expect("task exists");
@@ -1681,45 +1118,21 @@ fn sprint_backlog_lists_unassigned_tasks() {
 
     let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
-    let sprint = Sprint {
-        plan: Some(SprintPlan {
-            label: Some("Sprint Active".to_string()),
-            ..SprintPlan::default()
-        }),
-        ..Sprint::default()
-    };
+    let sprint = Sprint { plan: Some(SprintPlan { label: Some("Sprint Active".to_string()), ..SprintPlan::default() }), ..Sprint::default() };
     SprintService::create(&mut storage, sprint, None).expect("create sprint");
 
-    let mut backlog_task = Task::new(
-        fixtures.tasks_root.clone(),
-        "Backlog Candidate".to_string(),
-        Priority::from("Medium"),
-    );
+    let mut backlog_task = Task::new(fixtures.tasks_root.clone(), "Backlog Candidate".to_string(), Priority::from("Medium"));
     backlog_task.status = TaskStatus::from("Todo");
-    let backlog_id = storage
-        .add(&backlog_task, "TEST", Some("Test Project"))
-        .expect("failed to add backlog task");
+    let backlog_id = storage.add(&backlog_task, "TEST", Some("Test Project")).expect("failed to add backlog task");
 
-    let mut assigned_task = Task::new(
-        fixtures.tasks_root.clone(),
-        "Assigned".to_string(),
-        Priority::from("Medium"),
-    );
+    let mut assigned_task = Task::new(fixtures.tasks_root.clone(), "Assigned".to_string(), Priority::from("Medium"));
     assigned_task.status = TaskStatus::from("InProgress");
-    let assigned_id = storage
-        .add(&assigned_task, "TEST", Some("Test Project"))
-        .expect("failed to add assigned task");
+    let assigned_id = storage.add(&assigned_task, "TEST", Some("Test Project")).expect("failed to add assigned task");
     append_sprint_tasks(&mut storage, 1, std::slice::from_ref(&assigned_id));
     drop(storage);
 
     let mut cmd = common::cargo_bin_in(&fixtures);
-    let output = cmd
-        .args(["sprint", "backlog", "--project", "TEST", "--limit", "5"])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
+    let output = cmd.args(["sprint", "backlog", "--project", "TEST", "--limit", "5"]).assert().success().get_output().stdout.clone();
 
     let stdout = String::from_utf8_lossy(&output);
     assert!(stdout.contains(&backlog_id));
@@ -1746,12 +1159,8 @@ fn sprint_normalize_detects_non_canonical_yaml_in_check_mode() {
     cmd.args(["sprint", "normalize"])
         .assert()
         .failure()
-        .stderr(predicate::str::contains(
-            "Sprint normalization required for: #1",
-        ))
-        .stderr(predicate::str::contains(
-            "Sprint #1 canonicalization notice: plan.length was ignored because plan.ends_at was provided.",
-        ));
+        .stderr(predicate::str::contains("Sprint normalization required for: #1"))
+        .stderr(predicate::str::contains("Sprint #1 canonicalization notice: plan.length was ignored because plan.ends_at was provided."));
 
     let contents = std::fs::read_to_string(sprint_dir.join("1.yml")).expect("read sprint file");
     assert!(contents.contains("length: 2w"));
@@ -1778,9 +1187,7 @@ fn sprint_normalize_rewrites_yaml_when_requested() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Normalized sprint #1."))
-        .stdout(predicate::str::contains(
-            "Normalization complete (1 sprint(s) processed, 1 updated).",
-        ));
+        .stdout(predicate::str::contains("Normalization complete (1 sprint(s) processed, 1 updated)."));
 
     let contents = std::fs::read_to_string(sprint_dir.join("1.yml")).expect("read sprint file");
     assert!(!contents.contains("length: 2w"));

@@ -11,21 +11,13 @@ pub struct ProjectResolver {
 
 impl ProjectResolver {
     pub fn new(resolver: &TasksDirectoryResolver) -> Result<Self, String> {
-        let config_manager = ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path)
-            .map_err(|e| format!("Failed to load config: {}", e))?;
+        let config_manager = ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path).map_err(|e| format!("Failed to load config: {}", e))?;
 
-        Ok(Self {
-            config_manager,
-            tasks_dir: resolver.path.clone(),
-        })
+        Ok(Self { config_manager, tasks_dir: resolver.path.clone() })
     }
 
     /// Resolve project from task ID, explicit project arg, or default
-    pub fn resolve_project(
-        &mut self,
-        task_id: &str,
-        explicit_project: Option<&str>,
-    ) -> Result<String, String> {
+    pub fn resolve_project(&mut self, task_id: &str, explicit_project: Option<&str>) -> Result<String, String> {
         // Extract project from task ID if present
         let id_project = self.extract_project_from_task_id(task_id);
 
@@ -48,10 +40,7 @@ impl ProjectResolver {
                     if explicit_as_prefix == *id_prefix {
                         Ok(id_prefix.clone()) // Use the prefix from task ID
                     } else {
-                        Err(format!(
-                            "Project mismatch: task ID '{}' belongs to project '{}', but '{}' was specified",
-                            task_id, id_prefix, explicit
-                        ))
+                        Err(format!("Project mismatch: task ID '{}' belongs to project '{}', but '{}' was specified", task_id, id_prefix, explicit))
                     }
                 }
             }
@@ -68,10 +57,8 @@ impl ProjectResolver {
             // Neither provided - use default
             (None, None) => {
                 // Ensure default_project is set, auto-detecting if necessary
-                let default_project = self
-                    .config_manager
-                    .ensure_default_project(&self.tasks_dir)
-                    .map_err(|e| format!("Failed to determine default project: {}", e))?;
+                let default_project =
+                    self.config_manager.ensure_default_project(&self.tasks_dir).map_err(|e| format!("Failed to determine default project: {}", e))?;
                 Ok(default_project)
             }
         }
@@ -80,8 +67,7 @@ impl ProjectResolver {
     /// The project a command without `--project` would use, without saving
     /// a detected default to the configuration (for dry runs).
     pub fn preview_default_project(&self) -> String {
-        self.config_manager
-            .default_project_or_detected(&self.tasks_dir)
+        self.config_manager.default_project_or_detected(&self.tasks_dir)
     }
 
     /// Resolve a project name (which could be a full name) to its prefix
@@ -98,26 +84,13 @@ impl ProjectResolver {
 
         // Project names should be alphanumeric (allowing underscores, hyphens, and spaces)
         // but not special characters like ! ? @ etc.
-        if !project_name
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == ' ')
-        {
-            return Err(format!(
-                "Invalid project name '{}'. Project names can only contain letters, numbers, underscores, hyphens, and spaces",
-                project_name
-            ));
+        if !project_name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == ' ') {
+            return Err(format!("Invalid project name '{}'. Project names can only contain letters, numbers, underscores, hyphens, and spaces", project_name));
         }
 
         // Should not start or end with special characters
-        if project_name.starts_with('-')
-            || project_name.starts_with('_')
-            || project_name.ends_with('-')
-            || project_name.ends_with('_')
-        {
-            return Err(format!(
-                "Invalid project name '{}'. Project names cannot start or end with hyphens or underscores",
-                project_name
-            ));
+        if project_name.starts_with('-') || project_name.starts_with('_') || project_name.ends_with('-') || project_name.ends_with('_') {
+            return Err(format!("Invalid project name '{}'. Project names cannot start or end with hyphens or underscores", project_name));
         }
 
         Ok(())
@@ -129,9 +102,7 @@ impl ProjectResolver {
     /// (Unicode alphanumerics, digits, `_`/`-`, exact case) instead of an
     /// uppercase-ASCII-only rule, so supported prefixes keep working.
     pub fn extract_project_from_task_id(&self, task_id: &str) -> Option<String> {
-        crate::storage::TaskId::parse(task_id)
-            .ok()
-            .map(|parsed| parsed.project)
+        crate::storage::TaskId::parse(task_id).ok().map(|parsed| parsed.project)
     }
 
     /// Get the resolved global configuration
@@ -141,9 +112,7 @@ impl ProjectResolver {
 
     /// Get project-specific configuration
     pub fn get_project_config(&self, project_name: &str) -> Result<ResolvedConfig, String> {
-        self.config_manager
-            .get_project_config(project_name)
-            .map_err(|e| format!("Failed to get project config for '{}': {}", project_name, e))
+        self.config_manager.get_project_config(project_name).map_err(|e| format!("Failed to get project config for '{}': {}", project_name, e))
     }
 
     /// Validate if a task ID format is valid
@@ -161,20 +130,13 @@ impl ProjectResolver {
             if task_id.chars().all(|c| c.is_ascii_digit()) {
                 Ok(())
             } else {
-                Err(format!(
-                    "Invalid task ID format: '{}'. Expected format: PROJECT-NUMBER (e.g., AUTH-123) or NUMBER (e.g., 123)",
-                    task_id
-                ))
+                Err(format!("Invalid task ID format: '{}'. Expected format: PROJECT-NUMBER (e.g., AUTH-123) or NUMBER (e.g., 123)", task_id))
             }
         }
     }
 
     /// Get the full task ID with project prefix
-    pub fn get_full_task_id(
-        &mut self,
-        task_id: &str,
-        explicit_project: Option<&str>,
-    ) -> Result<String, String> {
+    pub fn get_full_task_id(&mut self, task_id: &str, explicit_project: Option<&str>) -> Result<String, String> {
         // If task ID already has a prefix, use as-is
         if self.extract_project_from_task_id(task_id).is_some() {
             return Ok(self.follow_moves(task_id));
@@ -210,15 +172,9 @@ pub mod test_support {
     use crate::config::types::ResolvedConfig;
 
     /// Create a ProjectResolver from a provided ResolvedConfig and tasks_dir
-    pub fn resolver_from_config(
-        config: ResolvedConfig,
-        tasks_dir: std::path::PathBuf,
-    ) -> ProjectResolver {
+    pub fn resolver_from_config(config: ResolvedConfig, tasks_dir: std::path::PathBuf) -> ProjectResolver {
         // Build a ConfigManager via public test support
         let config_manager = crate::config::manager::test_support::from_resolved_config(config);
-        ProjectResolver {
-            config_manager,
-            tasks_dir,
-        }
+        ProjectResolver { config_manager, tasks_dir }
     }
 }

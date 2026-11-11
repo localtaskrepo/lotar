@@ -1,7 +1,4 @@
-#[expect(
-    clippy::too_many_arguments,
-    reason = "one parameter per CLI flag; this handler forwards them unchanged"
-)]
+#[expect(clippy::too_many_arguments, reason = "one parameter per CLI flag; this handler forwards them unchanged")]
 pub(crate) fn run(
     buckets: Option<String>,
     overdue: bool,
@@ -26,15 +23,9 @@ pub(crate) fn run(
         buckets.unwrap_or_else(|| BUCKETS.join(","))
     };
     let mut enabled: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
-    for bucket in buckets_csv
-        .split(',')
-        .map(|s| s.trim().to_lowercase())
-        .filter(|s| !s.is_empty())
-    {
+    for bucket in buckets_csv.split(',').map(|s| s.trim().to_lowercase()).filter(|s| !s.is_empty()) {
         if !BUCKETS.contains(&bucket.as_str()) {
-            return Err(format!(
-                "Invalid bucket '{bucket}' (expected overdue, today, soon, later)"
-            ));
+            return Err(format!("Invalid bucket '{bucket}' (expected overdue, today, soon, later)"));
         }
         enabled.insert(bucket);
     }
@@ -52,20 +43,14 @@ pub(crate) fn run(
     let overdue_cutoff_days: i64 = if overdue {
         let t = threshold.trim().to_lowercase();
         if let Some(num) = t.strip_suffix('d') {
-            num.parse::<i64>()
-                .map_err(|_| format!("Invalid threshold: {}", threshold))?
+            num.parse::<i64>().map_err(|_| format!("Invalid threshold: {}", threshold))?
         } else if let Some(num) = t.strip_suffix('w') {
-            let n = num
-                .parse::<i64>()
-                .map_err(|_| format!("Invalid threshold: {}", threshold))?;
+            let n = num.parse::<i64>().map_err(|_| format!("Invalid threshold: {}", threshold))?;
             n * 7
         } else if t.is_empty() || t == "0" || t == "0d" {
             0
         } else {
-            return Err(format!(
-                "Invalid threshold '{}'. Use Nd or Nw, e.g., 0d, 7d, 2w",
-                threshold
-            ));
+            return Err(format!("Invalid threshold '{}'. Use Nd or Nw, e.g., 0d, 7d, 2w", threshold));
         }
     } else {
         0
@@ -80,15 +65,10 @@ pub(crate) fn run(
         let Some(due_raw) = t.due_date.as_deref() else {
             continue;
         };
-        let bucket = [
-            (DueFilter::Overdue, "overdue"),
-            (DueFilter::Today, "today"),
-            (DueFilter::Soon, "soon"),
-            (DueFilter::Later, "later"),
-        ]
-        .into_iter()
-        .find(|(filter, _)| due_raw_matches_bucket(Some(due_raw), *filter, today))
-        .map(|(_, name)| name);
+        let bucket = [(DueFilter::Overdue, "overdue"), (DueFilter::Today, "today"), (DueFilter::Soon, "soon"), (DueFilter::Later, "later")]
+            .into_iter()
+            .find(|(filter, _)| due_raw_matches_bucket(Some(due_raw), *filter, today))
+            .map(|(_, name)| name);
         let Some(bucket) = bucket.filter(|name| enabled.contains(*name)) else {
             continue;
         };
@@ -100,9 +80,7 @@ pub(crate) fn run(
             }
             // In overdue-only mode, count only tasks overdue by the threshold.
             if overdue {
-                let days_overdue = crate::services::task_query::parse_stored_due(due_raw)
-                    .map(|due| (today - due.local_date()).num_days())
-                    .unwrap_or(0);
+                let days_overdue = crate::services::task_query::parse_stored_due(due_raw).map(|due| (today - due.local_date()).num_days()).unwrap_or(0);
                 if days_overdue < overdue_cutoff_days {
                     continue;
                 }
@@ -113,10 +91,7 @@ pub(crate) fn run(
 
     match renderer.format {
         crate::output::OutputFormat::Json => {
-            let items: Vec<_> = counts
-                .into_iter()
-                .map(|(k, v)| serde_json::json!({"bucket": k, "count": v}))
-                .collect();
+            let items: Vec<_> = counts.into_iter().map(|(k, v)| serde_json::json!({"bucket": k, "count": v})).collect();
             let obj = serde_json::json!({
                 "status":"ok",
                 "action":"stats.due",

@@ -32,11 +32,7 @@ pub fn project_automation_path(tasks_root: &Path, project_prefix: &str) -> PathB
 
 /// Try to produce a path string relative to the git repo root, else to cwd, else absolute.
 pub fn repo_relative_display(path: &Path) -> String {
-    let repo_rel = path
-        .parent()
-        .and_then(crate::utils::git::find_repo_root)
-        .and_then(|root| path.strip_prefix(&root).ok())
-        .map(|p| p.to_path_buf());
+    let repo_rel = path.parent().and_then(crate::utils::git::find_repo_root).and_then(|root| path.strip_prefix(&root).ok()).map(|p| p.to_path_buf());
     if let Some(rel) = repo_rel {
         return rel.display().to_string();
     }

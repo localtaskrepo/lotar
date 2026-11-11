@@ -23,72 +23,30 @@ impl Fixture {
         let tmp = tempfile::tempdir().unwrap();
         let tasks_dir = tmp.path().join(".tasks");
         std::fs::create_dir_all(tasks_dir.join("QP")).unwrap();
-        std::fs::write(
-            tasks_dir.join("config.yml"),
-            "default:\n  project: QP\nissue:\n  priorities: [Low, Medium, High, Critical]\n  custom_fields: ['*']\n",
-        )
-        .unwrap();
-        Self {
-            _tmp: tmp,
-            tasks_dir,
-        }
+        std::fs::write(tasks_dir.join("config.yml"), "default:\n  project: QP\nissue:\n  priorities: [Low, Medium, High, Critical]\n  custom_fields: ['*']\n")
+            .unwrap();
+        Self { _tmp: tmp, tasks_dir }
     }
 
     fn task(&self, num: u32, title: &str, priority: &str, extra: &str) {
-        let modified =
-            (Utc::now() - Duration::days(30) + Duration::minutes(i64::from(num))).to_rfc3339();
-        let yaml = format!(
-            "title: {title}\nstatus: Todo\npriority: {priority}\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\nmodified: {modified}\n{extra}"
-        );
+        let modified = (Utc::now() - Duration::days(30) + Duration::minutes(i64::from(num))).to_rfc3339();
+        let yaml = format!("title: {title}\nstatus: Todo\npriority: {priority}\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\nmodified: {modified}\n{extra}");
         std::fs::write(self.tasks_dir.join("QP").join(format!("{num}.yml")), yaml).unwrap();
     }
 }
 
 fn date(days_from_today: i64) -> String {
-    (Local::now().date_naive() + Duration::days(days_from_today))
-        .format("%Y-%m-%d")
-        .to_string()
+    (Local::now().date_naive() + Duration::days(days_from_today)).format("%Y-%m-%d").to_string()
 }
 
 /// Tasks covering every filter below; QP-n has modified time order n.
 fn seed(fx: &Fixture) {
     let recent = Utc::now().to_rfc3339();
-    fx.task(
-        1,
-        "Tagged estimate",
-        "Medium",
-        "tags: [ui]\neffort: 4h\nassignee: alice\n",
-    );
-    fx.task(
-        2,
-        "Untagged big",
-        "Medium",
-        &format!("effort: 2d\ndue_date: {}\nassignee: bob\n", date(2)),
-    );
-    fx.task(
-        3,
-        "Overdue screenshot",
-        "Medium",
-        &format!(
-            "tags: [bug]\ndue_date: {}\nreferences:\n- attachment: shot.png\n",
-            date(-3)
-        ),
-    );
-    fx.task(
-        4,
-        "Linked later",
-        "High",
-        &format!(
-            "due_date: {}\nreferences:\n- link: https://example.com\ncustom_fields:\n  area: billing\n",
-            date(20)
-        ),
-    );
-    fx.task(
-        5,
-        "Points task",
-        "Critical",
-        &format!("effort: 3pt\ntags: [ui, api]\ndue_date: {}\n", date(0)),
-    );
+    fx.task(1, "Tagged estimate", "Medium", "tags: [ui]\neffort: 4h\nassignee: alice\n");
+    fx.task(2, "Untagged big", "Medium", &format!("effort: 2d\ndue_date: {}\nassignee: bob\n", date(2)));
+    fx.task(3, "Overdue screenshot", "Medium", &format!("tags: [bug]\ndue_date: {}\nreferences:\n- attachment: shot.png\n", date(-3)));
+    fx.task(4, "Linked later", "High", &format!("due_date: {}\nreferences:\n- link: https://example.com\ncustom_fields:\n  area: billing\n", date(20)));
+    fx.task(5, "Points task", "Critical", &format!("effort: 3pt\ntags: [ui, api]\ndue_date: {}\n", date(0)));
     // Recently modified (overrides the generated timestamp).
     std::fs::write(
         fx.tasks_dir.join("QP").join("6.yml"),
@@ -113,10 +71,7 @@ fn request(path: &str, query: &[(&str, &str)]) -> HttpRequest {
     HttpRequest {
         method: "GET".to_string(),
         path: path.to_string(),
-        query: query
-            .iter()
-            .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
-            .collect::<HashMap<_, _>>(),
+        query: query.iter().map(|(k, v)| ((*k).to_string(), (*v).to_string())).collect::<HashMap<_, _>>(),
         headers: HashMap::new(),
         body: Vec::new(),
     }
@@ -130,26 +85,13 @@ fn rest_ids(api: &ApiServer, query: &[(&str, &str)]) -> Result<Vec<String>, Stri
     if resp.status != 200 {
         return Err(body["error"]["message"].as_str().unwrap_or("").to_string());
     }
-    Ok(body["data"]["tasks"]
-        .as_array()
-        .map(|tasks| {
-            tasks
-                .iter()
-                .map(|t| t["id"].as_str().unwrap().to_string())
-                .collect()
-        })
-        .unwrap_or_default())
+    Ok(body["data"]["tasks"].as_array().map(|tasks| tasks.iter().map(|t| t["id"].as_str().unwrap().to_string()).collect()).unwrap_or_default())
 }
 
 fn export_ids(api: &ApiServer, query: &[(&str, &str)]) -> Vec<String> {
     let resp = api.handle_request(&request("/api/tasks/export", query));
     assert_eq!(resp.status, 200, "{}", String::from_utf8_lossy(&resp.body));
-    String::from_utf8(resp.body)
-        .unwrap()
-        .lines()
-        .skip(1)
-        .map(|line| line.split(',').next().unwrap().to_string())
-        .collect()
+    String::from_utf8(resp.body).unwrap().lines().skip(1).map(|line| line.split(',').next().unwrap().to_string()).collect()
 }
 
 fn mcp_ids(params: Value) -> Result<Vec<String>, String> {
@@ -166,14 +108,8 @@ fn mcp_ids(params: Value) -> Result<Vec<String>, String> {
     if let Some(error) = resp.get("error") {
         return Err(error.to_string());
     }
-    let payload: Value =
-        serde_json::from_str(resp["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
-    Ok(payload["tasks"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|t| t["id"].as_str().unwrap().to_string())
-        .collect())
+    let payload: Value = serde_json::from_str(resp["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
+    Ok(payload["tasks"].as_array().unwrap().iter().map(|t| t["id"].as_str().unwrap().to_string()).collect())
 }
 
 fn cli_ids(tasks_dir: &std::path::Path, args: &[&str]) -> Result<Vec<String>, String> {
@@ -187,15 +123,7 @@ fn cli_ids(tasks_dir: &std::path::Path, args: &[&str]) -> Result<Vec<String>, St
         return Err(String::from_utf8_lossy(&out.stderr).to_string());
     }
     let payload: Value = serde_json::from_slice(&out.stdout).map_err(|e| e.to_string())?;
-    Ok(payload["tasks"]
-        .as_array()
-        .map(|tasks| {
-            tasks
-                .iter()
-                .map(|t| t["id"].as_str().unwrap().to_string())
-                .collect()
-        })
-        .unwrap_or_default())
+    Ok(payload["tasks"].as_array().map(|tasks| tasks.iter().map(|t| t["id"].as_str().unwrap().to_string()).collect()).unwrap_or_default())
 }
 
 fn ids(nums: &[u32]) -> Vec<String> {
@@ -219,27 +147,9 @@ fn every_interface_runs_the_same_query() {
 
     // Default order is newest change first: QP-6, then 5..1.
     let cases = [
-        Case {
-            name: "has tag",
-            cli: &["--has", "tag"],
-            rest: &[("has", "tag")],
-            mcp: json!({"has": ["tag"]}),
-            expected: &[5, 3, 1],
-        },
-        Case {
-            name: "has image and link kinds",
-            cli: &["with:image"],
-            rest: &[("has", "image")],
-            mcp: json!({"has": "image"}),
-            expected: &[3],
-        },
-        Case {
-            name: "needs effort",
-            cli: &["needs:effort"],
-            rest: &[("needs", "effort")],
-            mcp: json!({"needs": "effort"}),
-            expected: &[6, 4, 3],
-        },
+        Case { name: "has tag", cli: &["--has", "tag"], rest: &[("has", "tag")], mcp: json!({"has": ["tag"]}), expected: &[5, 3, 1] },
+        Case { name: "has image and link kinds", cli: &["with:image"], rest: &[("has", "image")], mcp: json!({"has": "image"}), expected: &[3] },
+        Case { name: "needs effort", cli: &["needs:effort"], rest: &[("needs", "effort")], mcp: json!({"needs": "effort"}), expected: &[6, 4, 3] },
         Case {
             name: "effort window",
             cli: &["--effort-min", "2h", "--effort-max", "1d"],
@@ -247,55 +157,13 @@ fn every_interface_runs_the_same_query() {
             mcp: json!({"effort_min": "2h", "effort_max": "1d"}),
             expected: &[1],
         },
-        Case {
-            name: "due within three days",
-            cli: &["due_within:3"],
-            rest: &[("due_within", "3")],
-            mcp: json!({"due_within": 3}),
-            expected: &[5, 2],
-        },
-        Case {
-            name: "overdue",
-            cli: &["due:overdue"],
-            rest: &[("due", "overdue")],
-            mcp: json!({"due": "overdue"}),
-            expected: &[3],
-        },
-        Case {
-            name: "due later bucket",
-            cli: &["--due", "later"],
-            rest: &[("due", "later")],
-            mcp: json!({"due": "later"}),
-            expected: &[4],
-        },
-        Case {
-            name: "recent",
-            cli: &["recent:7d"],
-            rest: &[("recent", "7d")],
-            mcp: json!({"recent": "7d"}),
-            expected: &[6],
-        },
-        Case {
-            name: "unassigned",
-            cli: &["assignee:__none__"],
-            rest: &[("assignee", "__none__")],
-            mcp: json!({"assignee": "__none__"}),
-            expected: &[5, 4, 3],
-        },
-        Case {
-            name: "assignee",
-            cli: &["--assignee", "alice"],
-            rest: &[("assignee", "alice")],
-            mcp: json!({"assignee": "alice"}),
-            expected: &[6, 1],
-        },
-        Case {
-            name: "sprints",
-            cli: &["--sprint", "1,2"],
-            rest: &[("sprints", "1,2")],
-            mcp: json!({"sprints": [1, 2]}),
-            expected: &[5, 4, 1],
-        },
+        Case { name: "due within three days", cli: &["due_within:3"], rest: &[("due_within", "3")], mcp: json!({"due_within": 3}), expected: &[5, 2] },
+        Case { name: "overdue", cli: &["due:overdue"], rest: &[("due", "overdue")], mcp: json!({"due": "overdue"}), expected: &[3] },
+        Case { name: "due later bucket", cli: &["--due", "later"], rest: &[("due", "later")], mcp: json!({"due": "later"}), expected: &[4] },
+        Case { name: "recent", cli: &["recent:7d"], rest: &[("recent", "7d")], mcp: json!({"recent": "7d"}), expected: &[6] },
+        Case { name: "unassigned", cli: &["assignee:__none__"], rest: &[("assignee", "__none__")], mcp: json!({"assignee": "__none__"}), expected: &[5, 4, 3] },
+        Case { name: "assignee", cli: &["--assignee", "alice"], rest: &[("assignee", "alice")], mcp: json!({"assignee": "alice"}), expected: &[6, 1] },
+        Case { name: "sprints", cli: &["--sprint", "1,2"], rest: &[("sprints", "1,2")], mcp: json!({"sprints": [1, 2]}), expected: &[5, 4, 1] },
         Case {
             name: "custom field",
             cli: &["area=billing"],
@@ -321,12 +189,7 @@ fn every_interface_runs_the_same_query() {
         Case {
             name: "search with filters, sorted",
             cli: &["t tag:ui", "sort_by=title", "order=asc"],
-            rest: &[
-                ("q", "t"),
-                ("tags", "ui"),
-                ("sort_by", "title"),
-                ("order", "asc"),
-            ],
+            rest: &[("q", "t"), ("tags", "ui"), ("sort_by", "title"), ("order", "asc")],
             mcp: json!({"search": "t", "tags": "ui", "sort_by": "title", "order": "asc"}),
             expected: &[5, 1],
         },
@@ -334,8 +197,7 @@ fn every_interface_runs_the_same_query() {
 
     for case in cases {
         let expected = ids(case.expected);
-        let cli =
-            cli_ids(&fx.tasks_dir, case.cli).unwrap_or_else(|e| panic!("{}: cli {e}", case.name));
+        let cli = cli_ids(&fx.tasks_dir, case.cli).unwrap_or_else(|e| panic!("{}: cli {e}", case.name));
         let rest = rest_ids(&api, case.rest).unwrap_or_else(|e| panic!("{}: rest {e}", case.name));
         let export = export_ids(&api, case.rest);
         let mcp = mcp_ids(case.mcp).unwrap_or_else(|e| panic!("{}: mcp {e}", case.name));
@@ -371,9 +233,6 @@ fn every_interface_rejects_the_same_invalid_values() {
         // MCP may reject an out-of-vocabulary value at its schema layer
         // first; either way it is an invalid-params error naming the param.
         let mcp_err = mcp_ids(mcp).expect_err("mcp should fail");
-        assert!(
-            mcp_err.contains("-32602") && mcp_err.contains(param),
-            "mcp: {mcp_err}"
-        );
+        assert!(mcp_err.contains("-32602") && mcp_err.contains(param), "mcp: {mcp_err}");
     }
 }

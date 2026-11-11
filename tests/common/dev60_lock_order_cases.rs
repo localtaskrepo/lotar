@@ -10,11 +10,8 @@ fn dev60_workspace(project: &str) -> (tempfile::TempDir, std::path::PathBuf) {
     let tmp = tempfile::tempdir().unwrap();
     let tasks_dir = tmp.path().join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();
-    std::fs::write(
-        crate::utils::paths::global_config_path(&tasks_dir),
-        format!("default.project: {project}\nissue.states: [Todo, InProgress, Done]\n"),
-    )
-    .unwrap();
+    std::fs::write(crate::utils::paths::global_config_path(&tasks_dir), format!("default.project: {project}\nissue.states: [Todo, InProgress, Done]\n"))
+        .unwrap();
     (tmp, tasks_dir)
 }
 
@@ -24,19 +21,10 @@ fn dispatch_post_commit_refuses_to_run_while_store_lock_is_held() {
     let mut storage = crate::storage::manager::Storage::new(&tasks_dir);
     let task = crate::services::task_service::TaskService::create(
         &mut storage,
-        crate::api_types::TaskCreate {
-            title: "Lock ordering target".to_string(),
-            project: Some("D6L1".to_string()),
-            ..Default::default()
-        },
+        crate::api_types::TaskCreate { title: "Lock ordering target".to_string(), project: Some("D6L1".to_string()), ..Default::default() },
     )
     .expect("create task");
-    let outcome = ReferenceService::attach_link_reference(
-        &mut storage,
-        &task.id,
-        "https://example.com/locked",
-    )
-    .expect("attach");
+    let outcome = ReferenceService::attach_link_reference(&mut storage, &task.id, "https://example.com/locked").expect("attach");
 
     // Hold the store lock on this thread: dispatch must trip its guard
     // (deterministic assertion, not timing) instead of running automation
@@ -44,14 +32,8 @@ fn dispatch_post_commit_refuses_to_run_while_store_lock_is_held() {
     let store_root = tasks_dir.join("@attachments");
     let guard = AttachmentService::lock_store(&store_root).expect("store lock");
     assert_eq!(AttachmentService::store_locks_held(), 1);
-    let panicked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        ReferenceService::dispatch_post_commit(&mut storage, &outcome)
-    }))
-    .is_err();
-    assert!(
-        panicked,
-        "dispatch must refuse to run while the store lock is held"
-    );
+    let panicked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| ReferenceService::dispatch_post_commit(&mut storage, &outcome))).is_err();
+    assert!(panicked, "dispatch must refuse to run while the store lock is held");
     drop(guard);
     assert_eq!(AttachmentService::store_locks_held(), 0);
 

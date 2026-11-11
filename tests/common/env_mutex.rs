@@ -1,9 +1,6 @@
 // Also included by the library's unit tests via #[path]; each including
 // crate uses a different subset of these helpers.
-#![allow(
-    dead_code,
-    reason = "each including test crate uses a different subset of these helpers"
-)]
+#![allow(dead_code, reason = "each including test crate uses a different subset of these helpers")]
 
 use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex, MutexGuard};
@@ -11,8 +8,7 @@ use std::{env, ffi::OsString};
 
 // Registry of per-environment-variable mutexes.
 // We store leaked &'static Mutex<()> pointers so we can return 'static guards safely.
-static ENV_LOCKS: LazyLock<Mutex<HashMap<String, &'static Mutex<()>>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
+static ENV_LOCKS: LazyLock<Mutex<HashMap<String, &'static Mutex<()>>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 fn get_mutex_for(var: &str) -> &'static Mutex<()> {
     let mut map = ENV_LOCKS.lock().expect("ENV_LOCKS poisoned");
@@ -49,11 +45,7 @@ impl EnvVarGuard {
         unsafe {
             env::set_var(var, value);
         }
-        Self {
-            var: var.to_string(),
-            prev,
-            _guard: guard,
-        }
+        Self { var: var.to_string(), prev, _guard: guard }
     }
 
     /// Temporarily clear/unset an env var. The previous value will be restored when the guard is dropped.
@@ -65,11 +57,7 @@ impl EnvVarGuard {
         unsafe {
             env::remove_var(var);
         }
-        Self {
-            var: var.to_string(),
-            prev,
-            _guard: guard,
-        }
+        Self { var: var.to_string(), prev, _guard: guard }
     }
 }
 

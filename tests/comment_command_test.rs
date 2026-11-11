@@ -8,11 +8,7 @@ fn comment_positional_text_adds_comment() {
     let tf = TestFixtures::new();
     // create a task
     let mut cmd = crate::common::lotar_cmd().unwrap();
-    cmd.current_dir(tf.get_temp_path())
-        .args(["add", "Test task for comments"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Created task:"));
+    cmd.current_dir(tf.get_temp_path()).args(["add", "Test task for comments"]).assert().success().stdout(predicate::str::contains("Created task:"));
 
     // list to get ID
     let output = crate::common::lotar_cmd()
@@ -32,11 +28,7 @@ fn comment_positional_text_adds_comment() {
 
     // add comment
     let mut cmd = crate::common::lotar_cmd().unwrap();
-    cmd.current_dir(tf.get_temp_path())
-        .args(["comment", &id, "hello world"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Comment added to"));
+    cmd.current_dir(tf.get_temp_path()).args(["comment", &id, "hello world"]).assert().success().stdout(predicate::str::contains("Comment added to"));
 
     // verify via JSON second run
     let out = crate::common::lotar_cmd()
@@ -55,12 +47,7 @@ fn comment_positional_text_adds_comment() {
 fn comment_message_flag_adds_comment() {
     let tf = TestFixtures::new();
     // create a task
-    crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(tf.get_temp_path())
-        .args(["add", "Task for -m"])
-        .assert()
-        .success();
+    crate::common::lotar_cmd().unwrap().current_dir(tf.get_temp_path()).args(["add", "Task for -m"]).assert().success();
 
     // get id (use JSON for stability)
     let out = crate::common::lotar_cmd()
@@ -78,24 +65,14 @@ fn comment_message_flag_adds_comment() {
         .expect("Expected an ID in list JSON output");
 
     // add comment with -m
-    crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(tf.get_temp_path())
-        .args(["comment", &id, "-m", "via flag message"])
-        .assert()
-        .success();
+    crate::common::lotar_cmd().unwrap().current_dir(tf.get_temp_path()).args(["comment", &id, "-m", "via flag message"]).assert().success();
 }
 
 #[test]
 fn comment_requires_text() {
     let tf = TestFixtures::new();
     // create a task
-    crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(tf.get_temp_path())
-        .args(["add", "Task for empty check"])
-        .assert()
-        .success();
+    crate::common::lotar_cmd().unwrap().current_dir(tf.get_temp_path()).args(["add", "Task for empty check"]).assert().success();
 
     // get id via JSON list
     let out = crate::common::lotar_cmd()
@@ -127,19 +104,9 @@ fn comment_requires_text() {
 #[test]
 fn comment_dry_run_preview_includes_explain() {
     let tf = TestFixtures::new();
-    crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(tf.get_temp_path())
-        .args(["add", "Task for dry-run comment"])
-        .assert()
-        .success();
+    crate::common::lotar_cmd().unwrap().current_dir(tf.get_temp_path()).args(["add", "Task for dry-run comment"]).assert().success();
 
-    let id_output = crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(tf.get_temp_path())
-        .args(["list", "--format", "json"])
-        .output()
-        .unwrap();
+    let id_output = crate::common::lotar_cmd().unwrap().current_dir(tf.get_temp_path()).args(["list", "--format", "json"]).output().unwrap();
     let body = String::from_utf8_lossy(&id_output.stdout);
     let id = regex::Regex::new(r#"id"\s*:\s*"([A-Z0-9]+-\d+)"#)
         .unwrap()
@@ -151,15 +118,7 @@ fn comment_dry_run_preview_includes_explain() {
     crate::common::lotar_cmd()
         .unwrap()
         .current_dir(tf.get_temp_path())
-        .args([
-            "--format",
-            "json",
-            "comment",
-            &id,
-            "--dry-run",
-            "--explain",
-            "preview from test",
-        ])
+        .args(["--format", "json", "comment", &id, "--dry-run", "--explain", "preview from test"])
         .assert()
         .success()
         .stdout(predicate::str::contains("\"status\":\"preview\""))

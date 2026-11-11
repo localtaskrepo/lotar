@@ -8,12 +8,7 @@ use crate::workspace::TasksDirectoryResolver;
 pub struct TrustHandler;
 
 impl TrustHandler {
-    pub fn execute(
-        status: bool,
-        revoke: bool,
-        resolver: &TasksDirectoryResolver,
-        renderer: &OutputRenderer,
-    ) -> Result<(), String> {
+    pub fn execute(status: bool, revoke: bool, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
         let tasks_dir = resolver.path.as_path();
         let json = matches!(renderer.format, OutputFormat::Json);
 
@@ -41,19 +36,10 @@ impl TrustHandler {
                 return Ok(());
             }
             let line = match state {
-                TrustState::NothingToTrust => {
-                    "Nothing to trust: no automation rules or agent profiles in this repository"
-                        .to_string()
-                }
+                TrustState::NothingToTrust => "Nothing to trust: no automation rules or agent profiles in this repository".to_string(),
                 TrustState::Trusted => format!("Trusted: {}", tasks_dir.display()),
-                TrustState::Changed => format!(
-                    "Changed since you trusted it: {} (run `lotar trust` after reviewing)",
-                    tasks_dir.display()
-                ),
-                TrustState::Untrusted => format!(
-                    "Not trusted: {} (run `lotar trust` after reviewing)",
-                    tasks_dir.display()
-                ),
+                TrustState::Changed => format!("Changed since you trusted it: {} (run `lotar trust` after reviewing)", tasks_dir.display()),
+                TrustState::Untrusted => format!("Not trusted: {} (run `lotar trust` after reviewing)", tasks_dir.display()),
             };
             renderer.emit_info(line);
             for command in &commands {
@@ -71,9 +57,7 @@ impl TrustHandler {
             return Ok(());
         }
         if !trusted {
-            renderer.emit_notice(
-                "Nothing to trust: no automation rules or agent profiles in this repository",
-            );
+            renderer.emit_notice("Nothing to trust: no automation rules or agent profiles in this repository");
             return Ok(());
         }
         renderer.emit_success(format!("Trusted {}", tasks_dir.display()));
@@ -81,9 +65,7 @@ impl TrustHandler {
         for command in &commands {
             renderer.emit_raw_stdout(format_args!("  {command}"));
         }
-        renderer.emit_info(
-            "Any change to these files (a pull, a merge) needs `lotar trust` again; edits made through LoTaR keep the trust.",
-        );
+        renderer.emit_info("Any change to these files (a pull, a merge) needs `lotar trust` again; edits made through LoTaR keep the trust.");
         Ok(())
     }
 }

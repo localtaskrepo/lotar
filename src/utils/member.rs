@@ -46,11 +46,7 @@ pub fn normalize_member_value(value: &str, is_agent_profile: impl Fn(&str) -> bo
     }
 
     // Everything else: strip the `@`.
-    if name.is_empty() {
-        trimmed.to_string()
-    } else {
-        name.to_string()
-    }
+    if name.is_empty() { trimmed.to_string() } else { name.to_string() }
 }
 
 /// Strip the `@` prefix (if any) and lowercase for **comparison** purposes.
@@ -63,10 +59,7 @@ pub fn member_for_comparison(value: &str) -> String {
 
 /// Compare assignment identities without conflating operational directives
 /// with same-named humans. Unknown human aliases still normalize as before.
-pub fn member_for_assignment_comparison(
-    value: &str,
-    is_agent_profile: impl Fn(&str) -> bool,
-) -> String {
+pub fn member_for_assignment_comparison(value: &str, is_agent_profile: impl Fn(&str) -> bool) -> String {
     normalize_member_value(value, is_agent_profile).to_ascii_lowercase()
 }
 
@@ -86,11 +79,7 @@ pub fn is_valid_username(s: &str) -> bool {
 
 /// Returns `true` when `s` looks like an email address (single `@` with a dot).
 pub fn is_email_like(s: &str) -> bool {
-    s.contains('@')
-        && s.matches('@').count() == 1
-        && s.contains('.')
-        && !s.starts_with('@')
-        && !s.ends_with('@')
+    s.contains('@') && s.matches('@').count() == 1 && s.contains('.') && !s.starts_with('@') && !s.ends_with('@')
 }
 
 #[cfg(test)]
@@ -100,18 +89,9 @@ mod tests {
     #[test]
     fn assignment_comparison_preserves_registered_agent_directives() {
         let agent = |name: &str| name == "copilot";
-        assert_ne!(
-            member_for_assignment_comparison("@copilot", agent),
-            member_for_assignment_comparison("copilot", agent)
-        );
-        assert_eq!(
-            member_for_assignment_comparison(" @Alice ", agent),
-            member_for_assignment_comparison("alice", agent)
-        );
-        assert_ne!(
-            member_for_assignment_comparison("@me", agent),
-            member_for_assignment_comparison("me", agent)
-        );
+        assert_ne!(member_for_assignment_comparison("@copilot", agent), member_for_assignment_comparison("copilot", agent));
+        assert_eq!(member_for_assignment_comparison(" @Alice ", agent), member_for_assignment_comparison("alice", agent));
+        assert_ne!(member_for_assignment_comparison("@me", agent), member_for_assignment_comparison("me", agent));
     }
 
     #[test]
@@ -134,10 +114,7 @@ mod tests {
         let no_agent = |_: &str| false;
         assert_eq!(normalize_member_value("alice", no_agent), "alice");
         assert_eq!(normalize_member_value("john.doe", no_agent), "john.doe");
-        assert_eq!(
-            normalize_member_value("user@example.com", no_agent),
-            "user@example.com"
-        );
+        assert_eq!(normalize_member_value("user@example.com", no_agent), "user@example.com");
     }
 
     #[test]
@@ -158,10 +135,7 @@ mod tests {
         assert_eq!(member_for_comparison("@Alice"), "alice");
         assert_eq!(member_for_comparison("alice"), "alice");
         assert_eq!(member_for_comparison("  @BOB  "), "bob");
-        assert_eq!(
-            member_for_comparison("user@example.com"),
-            "user@example.com"
-        );
+        assert_eq!(member_for_comparison("user@example.com"), "user@example.com");
     }
 
     #[test]

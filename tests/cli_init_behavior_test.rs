@@ -6,11 +6,7 @@ use tempfile::TempDir;
 use crate::common;
 fn run(args: &[&str], dir: &Path) -> Output {
     let mut cmd = common::lotar_cmd().expect("lotar cmd");
-    cmd.current_dir(dir)
-        .env("LOTAR_TEST_SILENT", "1")
-        .args(args)
-        .output()
-        .expect("run lotar")
+    cmd.current_dir(dir).env("LOTAR_TEST_SILENT", "1").args(args).output().expect("run lotar")
 }
 
 fn run_ok(args: &[&str], dir: &Path) -> String {
@@ -62,27 +58,14 @@ fn init_rejects_unsafe_prefixes_even_with_force_and_absent_root() {
 fn init_rejects_symlink_destinations_without_changing_outside_files() {
     use std::os::unix::fs::symlink;
     for force in [false, true] {
-        for target in [
-            ".tasks",
-            ".tasks/EX",
-            ".tasks/EX/config.yml",
-            ".tasks/config.yml",
-        ] {
+        for target in [".tasks", ".tasks/EX", ".tasks/EX/config.yml", ".tasks/config.yml"] {
             let tmp = TempDir::new().unwrap();
             let outside = TempDir::new().unwrap();
             let outside_config = outside.path().join("config.yml");
             std::fs::write(&outside_config, "untouched").unwrap();
             let link = tmp.path().join(target);
             std::fs::create_dir_all(link.parent().unwrap()).unwrap();
-            symlink(
-                if target.ends_with("yml") {
-                    &outside_config
-                } else {
-                    outside.path()
-                },
-                &link,
-            )
-            .unwrap();
+            symlink(if target.ends_with("yml") { &outside_config } else { outside.path() }, &link).unwrap();
             let mut args = vec!["init", "--yes", "--project=Example", "--prefix=EX"];
             if force {
                 args.push("--force");
@@ -135,15 +118,9 @@ fn init_rejects_structurally_invalid_global_before_any_project_write() {
                 if force {
                     args.push("--force");
                 }
-                assert!(
-                    !run(&args, tmp.path()).status.success(),
-                    "accepted invalid config: {yaml}"
-                );
+                assert!(!run(&args, tmp.path()).status.success(), "accepted invalid config: {yaml}");
                 assert_eq!(read(&path), yaml);
-                assert!(
-                    !root.join("EX").exists(),
-                    "created project before validating global config"
-                );
+                assert!(!root.join("EX").exists(), "created project before validating global config");
             }
         }
     }
@@ -158,17 +135,9 @@ fn validate_after_init_succeeds() {
     let tmp = TempDir::new().unwrap();
     run_ok(&["init", "--yes", "--project=App"], tmp.path());
     let stdout = run_ok(&["config", "validate", "--project=APP"], tmp.path());
-    assert!(
-        stdout.contains("All configurations are valid"),
-        "validate output should say valid:\n{}",
-        stdout
-    );
+    assert!(stdout.contains("All configurations are valid"), "validate output should say valid:\n{}", stdout);
     let stdout = run_ok(&["config", "validate", "--global"], tmp.path());
-    assert!(
-        stdout.contains("All configurations are valid"),
-        "global validate should pass:\n{}",
-        stdout
-    );
+    assert!(stdout.contains("All configurations are valid"), "global validate should pass:\n{}", stdout);
 }
 
 #[test]
@@ -179,26 +148,10 @@ fn rerun_with_force_overwrites_project() {
     let tmp = TempDir::new().unwrap();
     run_ok(&["init", "--yes", "--project=App"], tmp.path());
     let before = read(&tmp.path().join(".tasks/APP/config.yml"));
-    assert!(
-        !before.contains("Verify"),
-        "default workflow should not contain Verify state"
-    );
-    run_ok(
-        &[
-            "init",
-            "--yes",
-            "--project=App",
-            "--workflow=agile",
-            "--force",
-        ],
-        tmp.path(),
-    );
+    assert!(!before.contains("Verify"), "default workflow should not contain Verify state");
+    run_ok(&["init", "--yes", "--project=App", "--workflow=agile", "--force"], tmp.path());
     let after = read(&tmp.path().join(".tasks/APP/config.yml"));
-    assert!(
-        after.contains("Verify"),
-        "agile workflow should overwrite states:\n{}",
-        after
-    );
+    assert!(after.contains("Verify"), "agile workflow should overwrite states:\n{}", after);
 }
 
 #[test]
@@ -214,25 +167,12 @@ fn bare_init_writes_global_and_minimal_project() {
 
     let g = read(&global);
     assert!(g.contains("default:"), "global should set default");
-    assert!(
-        g.contains("project: MYAP"),
-        "global should carry default.project"
-    );
+    assert!(g.contains("project: MYAP"), "global should carry default.project");
 
     let p = read(&proj);
-    assert!(
-        p.contains("project:"),
-        "project config should have project block"
-    );
-    assert!(
-        p.contains("name: MyApp"),
-        "project.name should be the human name"
-    );
-    assert!(
-        !p.contains("{{project_name}}"),
-        "project config must not contain placeholder, got:\n{}",
-        p
-    );
+    assert!(p.contains("project:"), "project config should have project block");
+    assert!(p.contains("name: MyApp"), "project.name should be the human name");
+    assert!(!p.contains("{{project_name}}"), "project config must not contain placeholder, got:\n{}", p);
 }
 
 #[test]
@@ -244,12 +184,7 @@ fn init_never_writes_placeholder_literal() {
     for entry in walkdir(&tmp.path().join(".tasks")) {
         if entry.extension().and_then(|s| s.to_str()) == Some("yml") {
             let text = read(&entry);
-            assert!(
-                !text.contains("{{project_name}}"),
-                "{} contains placeholder:\n{}",
-                entry.display(),
-                text
-            );
+            assert!(!text.contains("{{project_name}}"), "{} contains placeholder:\n{}", entry.display(), text);
         }
     }
 }
@@ -258,18 +193,10 @@ fn init_never_writes_placeholder_literal() {
 fn workflow_agile_writes_expected_states() {
     common::reset_lotar_test_environment();
     let tmp = TempDir::new().unwrap();
-    run_ok(
-        &["init", "--yes", "--project=App", "--workflow=agile"],
-        tmp.path(),
-    );
+    run_ok(&["init", "--yes", "--project=App", "--workflow=agile"], tmp.path());
     let cfg = read(&tmp.path().join(".tasks/APP/config.yml"));
     for s in ["Todo", "InProgress", "Verify", "Done"] {
-        assert!(
-            cfg.contains(s),
-            "agile states should include {}:\n{}",
-            s,
-            cfg
-        );
+        assert!(cfg.contains(s), "agile states should include {}:\n{}", s, cfg);
     }
 }
 
@@ -277,37 +204,22 @@ fn workflow_agile_writes_expected_states() {
 fn with_automation_scaffold_writes_file() {
     common::reset_lotar_test_environment();
     let tmp = TempDir::new().unwrap();
-    run_ok(
-        &["init", "--yes", "--project=App", "--with=automation"],
-        tmp.path(),
-    );
+    run_ok(&["init", "--yes", "--project=App", "--with=automation"], tmp.path());
     let path = tmp.path().join(".tasks/APP/automation.yml");
     assert!(path.exists(), "automation.yml should be written");
     let text = read(&path);
-    assert!(
-        text.contains("automation:"),
-        "automation.yml should have automation key"
-    );
+    assert!(text.contains("automation:"), "automation.yml should have automation key");
 }
 
 #[test]
 fn with_agents_pipeline_scaffold_merges_profiles_into_config() {
     common::reset_lotar_test_environment();
     let tmp = TempDir::new().unwrap();
-    run_ok(
-        &["init", "--yes", "--project=App", "--with=agents:pipeline"],
-        tmp.path(),
-    );
-    assert!(
-        !tmp.path().join(".tasks/APP/agents.yml").exists(),
-        "agent profiles belong in config.yml; nothing reads agents.yml"
-    );
+    run_ok(&["init", "--yes", "--project=App", "--with=agents:pipeline"], tmp.path());
+    assert!(!tmp.path().join(".tasks/APP/agents.yml").exists(), "agent profiles belong in config.yml; nothing reads agents.yml");
     let config = yaml(&tmp.path().join(".tasks/APP/config.yml"));
     for agent in ["implement", "test", "merge"] {
-        assert!(
-            config["agents"][agent]["runner"].is_string(),
-            "config should define agent {agent}:\n{config:?}"
-        );
+        assert!(config["agents"][agent]["runner"].is_string(), "config should define agent {agent}:\n{config:?}");
     }
 }
 
@@ -315,10 +227,7 @@ fn with_agents_pipeline_scaffold_merges_profiles_into_config() {
 fn with_agents_example_appends_a_commented_profile() {
     common::reset_lotar_test_environment();
     let tmp = TempDir::new().unwrap();
-    run_ok(
-        &["init", "--yes", "--project=App", "--with=agents"],
-        tmp.path(),
-    );
+    run_ok(&["init", "--yes", "--project=App", "--with=agents"], tmp.path());
     let text = read(&tmp.path().join(".tasks/APP/config.yml"));
     assert!(text.contains("# agents:"), "{text}");
     let config = yaml(&tmp.path().join(".tasks/APP/config.yml"));
@@ -327,10 +236,7 @@ fn with_agents_example_appends_a_commented_profile() {
 
 #[test]
 fn agent_templates_produce_a_project_their_automation_can_drive() {
-    for (template, prefix, extra_state) in [
-        ("agent-pipeline", "PIPE", None),
-        ("agent-reviewed", "REVI", Some("Review")),
-    ] {
+    for (template, prefix, extra_state) in [("agent-pipeline", "PIPE", None), ("agent-reviewed", "REVI", Some("Review"))] {
         common::reset_lotar_test_environment();
         let tmp = TempDir::new().unwrap();
         let project = format!("--project={prefix}");
@@ -346,17 +252,10 @@ fn agent_templates_produce_a_project_their_automation_can_drive() {
             .iter()
             .filter_map(|v| v.as_str().map(str::to_string))
             .collect();
-        for state in ["Testing", "Merging", "HelpNeeded"]
-            .into_iter()
-            .chain(extra_state)
-        {
+        for state in ["Testing", "Merging", "HelpNeeded"].into_iter().chain(extra_state) {
             assert!(states.iter().any(|s| s == state), "{template}: {states:?}");
         }
-        assert_eq!(
-            config["agent"]["worktree"]["enabled"].as_bool(),
-            Some(true),
-            "{template}: worktrees must be on for the merge phase:\n{config:?}"
-        );
+        assert_eq!(config["agent"]["worktree"]["enabled"].as_bool(), Some(true), "{template}: worktrees must be on for the merge phase:\n{config:?}");
         let agents: Vec<String> = config["agents"]
             .as_mapping()
             .unwrap_or_else(|| panic!("{template}: agents missing"))
@@ -366,24 +265,16 @@ fn agent_templates_produce_a_project_their_automation_can_drive() {
 
         // Every status and agent the rules hand the ticket to must exist.
         let automation = yaml(&project_dir.join("automation.yml"));
-        let rules = automation["automation"]["rules"]
-            .as_sequence()
-            .expect("rules");
+        let rules = automation["automation"]["rules"].as_sequence().expect("rules");
         let mut targets = Vec::new();
         for rule in rules {
             let when = rule["when"]["assignee"].as_str().unwrap_or_default();
             targets.push(("when", when.to_string()));
             for (event, action) in rule["on"].as_mapping().expect("on") {
                 let event = event.as_str().unwrap_or_default();
-                assert!(
-                    event.starts_with("job_"),
-                    "{template}: use canonical job event names, got {event}"
-                );
+                assert!(event.starts_with("job_"), "{template}: use canonical job event names, got {event}");
                 if let Some(status) = action["set"]["status"].as_str() {
-                    assert!(
-                        states.iter().any(|s| s == status),
-                        "{template}: rule sets unknown status {status}"
-                    );
+                    assert!(states.iter().any(|s| s == status), "{template}: rule sets unknown status {status}");
                 }
                 if let Some(assignee) = action["set"]["assignee"].as_str() {
                     targets.push(("set", assignee.to_string()));
@@ -394,21 +285,10 @@ fn agent_templates_produce_a_project_their_automation_can_drive() {
             let Some(name) = target.strip_prefix('@') else {
                 continue;
             };
-            if [
-                "agent",
-                "reporter",
-                "assignee",
-                "assignee_or_reporter",
-                "me",
-            ]
-            .contains(&name)
-            {
+            if ["agent", "reporter", "assignee", "assignee_or_reporter", "me"].contains(&name) {
                 continue;
             }
-            assert!(
-                agents.iter().any(|a| a == name),
-                "{template}: rule refers to unknown agent @{name}; agents: {agents:?}"
-            );
+            assert!(agents.iter().any(|a| a == name), "{template}: rule refers to unknown agent @{name}; agents: {agents:?}");
         }
     }
 }
@@ -443,57 +323,21 @@ fn dry_run_writes_no_files() {
 fn override_default_priority_lands_in_config() {
     common::reset_lotar_test_environment();
     let tmp = TempDir::new().unwrap();
-    run_ok(
-        &[
-            "init",
-            "--yes",
-            "--project=App",
-            "--default-priority=High",
-            "--default-assignee=@me",
-        ],
-        tmp.path(),
-    );
+    run_ok(&["init", "--yes", "--project=App", "--default-priority=High", "--default-assignee=@me"], tmp.path());
     let cfg = read(&tmp.path().join(".tasks/APP/config.yml"));
-    assert!(
-        cfg.contains("priority: High") || cfg.contains("priority: HIGH"),
-        "expected default.priority set:\n{}",
-        cfg
-    );
-    assert!(
-        cfg.contains("'@me'") || cfg.contains("\"@me\"") || cfg.contains("@me"),
-        "expected default.assignee set:\n{}",
-        cfg
-    );
+    assert!(cfg.contains("priority: High") || cfg.contains("priority: HIGH"), "expected default.priority set:\n{}", cfg);
+    assert!(cfg.contains("'@me'") || cfg.contains("\"@me\"") || cfg.contains("@me"), "expected default.assignee set:\n{}", cfg);
 }
 
 #[test]
 fn copy_from_merges_but_replaces_project_name() {
     common::reset_lotar_test_environment();
     let tmp = TempDir::new().unwrap();
-    run_ok(
-        &[
-            "init",
-            "--yes",
-            "--project=Source",
-            "--default-priority=High",
-        ],
-        tmp.path(),
-    );
-    run_ok(
-        &["init", "--yes", "--project=Target", "--copy-from=SOUR"],
-        tmp.path(),
-    );
+    run_ok(&["init", "--yes", "--project=Source", "--default-priority=High"], tmp.path());
+    run_ok(&["init", "--yes", "--project=Target", "--copy-from=SOUR"], tmp.path());
     let cfg = read(&tmp.path().join(".tasks/TARG/config.yml"));
-    assert!(
-        cfg.contains("name: Target"),
-        "target keeps its own name:\n{}",
-        cfg
-    );
-    assert!(
-        cfg.contains("High") || cfg.contains("HIGH"),
-        "copied default priority should be present:\n{}",
-        cfg
-    );
+    assert!(cfg.contains("name: Target"), "target keeps its own name:\n{}", cfg);
+    assert!(cfg.contains("High") || cfg.contains("HIGH"), "copied default priority should be present:\n{}", cfg);
 }
 
 // Tiny walker — avoid adding a dev-dep just for tests.

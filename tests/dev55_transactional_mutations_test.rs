@@ -42,13 +42,7 @@ fn task_path(tasks_dir: &Path, id: u32) -> PathBuf {
 
 fn labeled_sprint(label: &str) -> Sprint {
     use lotar::storage::sprint::SprintPlan;
-    Sprint {
-        plan: Some(SprintPlan {
-            label: Some(label.to_string()),
-            ..SprintPlan::default()
-        }),
-        ..Sprint::default()
-    }
+    Sprint { plan: Some(SprintPlan { label: Some(label.to_string()), ..SprintPlan::default() }), ..Sprint::default() }
 }
 
 /// Lock-contention signature from `acquire_storage_lock`
@@ -70,9 +64,7 @@ fn is_lock_contention_busy(error: &str) -> bool {
 /// under heavy IO/fsync load one worker's multi-fsync commit can
 /// legitimately outlast another worker's contention window — coordination
 /// working as designed, not a lost serialization guarantee.
-fn retry_lock_contention<T, E: std::fmt::Display>(
-    mut operation: impl FnMut() -> Result<T, E>,
-) -> Result<T, E> {
+fn retry_lock_contention<T, E: std::fmt::Display>(mut operation: impl FnMut() -> Result<T, E>) -> Result<T, E> {
     let mut busy_retries = 6u32;
     loop {
         match operation() {
@@ -93,22 +85,11 @@ fn lock_contention_retry_classifier_matches_only_the_real_busy_contract() {
     let (_tmp, tasks_dir) = workspace();
     let sprints_dir = tasks_dir.join("@sprints");
     std::fs::create_dir_all(&sprints_dir).unwrap();
-    let held = lotar::storage::safety::acquire_storage_lock(
-        &sprints_dir,
-        lotar::storage::safety::sprint_lock_name(),
-    )
-    .unwrap();
-    let busy = lotar::storage::safety::acquire_storage_lock(
-        &sprints_dir,
-        lotar::storage::safety::sprint_lock_name(),
-    )
-    .unwrap_err();
+    let held = lotar::storage::safety::acquire_storage_lock(&sprints_dir, lotar::storage::safety::sprint_lock_name()).unwrap();
+    let busy = lotar::storage::safety::acquire_storage_lock(&sprints_dir, lotar::storage::safety::sprint_lock_name()).unwrap_err();
     assert_eq!(busy.kind(), std::io::ErrorKind::WouldBlock);
     let text = busy.to_string();
-    assert!(
-        is_lock_contention_busy(&text),
-        "classifier must accept the live busy contract: {text}"
-    );
+    assert!(is_lock_contention_busy(&text), "classifier must accept the live busy contract: {text}");
     drop(held);
 
     // Permanent failures carry the same not-run promise but no busy marker.
@@ -119,13 +100,9 @@ fn lock_contention_retry_classifier_matches_only_the_real_busy_contract() {
         "Cannot acquire storage lock /w/.task.lock: Operation not supported; check filesystem locking support and permissions; mutation was not run"
     ));
     // The busy marker alone, without the nothing-ran guarantee, must not retry.
-    assert!(!is_lock_contention_busy(
-        "Storage lock /w/.sprints.lock is still busy after 2 seconds"
-    ));
+    assert!(!is_lock_contention_busy("Storage lock /w/.sprints.lock is still busy after 2 seconds"));
     // Unrelated mutation errors never retry.
-    assert!(!is_lock_contention_busy(
-        "A pending task/sprint transaction journal exists at /w/.txn-pending.json"
-    ));
+    assert!(!is_lock_contention_busy("A pending task/sprint transaction journal exists at /w/.txn-pending.json"));
     assert!(!is_lock_contention_busy("Sprint not found: 999"));
     assert!(!is_lock_contention_busy(""));
 }
@@ -133,17 +110,14 @@ fn lock_contention_retry_classifier_matches_only_the_real_busy_contract() {
 #[test]
 fn lock_contention_retry_helper_retries_busy_and_passes_through_other_errors() {
     use std::cell::Cell;
-    let busy_text = "IO error: Storage lock /w/.sprints/.sprints.lock is still busy after 2 seconds; retry after the other writer finishes; mutation was not run";
+    let busy_text =
+        "IO error: Storage lock /w/.sprints/.sprints.lock is still busy after 2 seconds; retry after the other writer finishes; mutation was not run";
 
     // Busy failures are retried until the operation succeeds.
     let attempts = Cell::new(0u32);
     let outcome: Result<u32, String> = retry_lock_contention(|| {
         attempts.set(attempts.get() + 1);
-        if attempts.get() < 3 {
-            Err(busy_text.to_string())
-        } else {
-            Ok(attempts.get())
-        }
+        if attempts.get() < 3 { Err(busy_text.to_string()) } else { Ok(attempts.get()) }
     });
     assert_eq!(outcome.unwrap(), 3);
     assert_eq!(attempts.get(), 3);
@@ -194,24 +168,14 @@ fn invalid_sprint_create_leaves_every_file_unchanged() {
     assert!(err.to_string().contains("Sprint not found: 999"), "{err}");
 
     assert!(!task_path(&tasks_dir, 1).exists());
-    assert_eq!(
-        read_bytes(&sprint_path(&tasks_dir, 1)).unwrap(),
-        sprint_before
-    );
-    assert_eq!(
-        read_bytes(&tasks_dir.join("TEST").join("config.yml")),
-        config_before,
-        "auto-populated config must not be mutated by a failed create"
-    );
+    assert_eq!(read_bytes(&sprint_path(&tasks_dir, 1)).unwrap(), sprint_before);
+    assert_eq!(read_bytes(&tasks_dir.join("TEST").join("config.yml")), config_before, "auto-populated config must not be mutated by a failed create");
 }
 
 #[test]
 fn invalid_member_update_leaves_task_and_sprint_bytes_unchanged() {
     let (_tmp, tasks_dir) = workspace();
-    write_global_config(
-        &tasks_dir,
-        "strict_members: true\nauto.populate_members: false\nmembers: [alice]\n",
-    );
+    write_global_config(&tasks_dir, "strict_members: true\nauto.populate_members: false\nmembers: [alice]\n");
     let mut storage = Storage::new(&tasks_dir);
     SprintService::create(&mut storage, labeled_sprint("Alpha"), None).unwrap();
     let task = TaskService::create(
@@ -229,26 +193,13 @@ fn invalid_member_update_leaves_task_and_sprint_bytes_unchanged() {
     let task_before = read_bytes(&task_path(&tasks_dir, 1)).unwrap();
     let sprint_before = read_bytes(&sprint_path(&tasks_dir, 1)).unwrap();
 
-    let err = TaskService::update(
-        &mut storage,
-        &task.id,
-        TaskUpdate {
-            assignee: Some("mallory".to_string()),
-            sprints: Some(vec![1]),
-            ..TaskUpdate::default()
-        },
-    )
-    .unwrap_err();
-    assert!(
-        err.to_string().contains("not in configured members"),
-        "{err}"
-    );
+    let err =
+        TaskService::update(&mut storage, &task.id, TaskUpdate { assignee: Some("mallory".to_string()), sprints: Some(vec![1]), ..TaskUpdate::default() })
+            .unwrap_err();
+    assert!(err.to_string().contains("not in configured members"), "{err}");
 
     assert_eq!(read_bytes(&task_path(&tasks_dir, 1)).unwrap(), task_before);
-    assert_eq!(
-        read_bytes(&sprint_path(&tasks_dir, 1)).unwrap(),
-        sprint_before
-    );
+    assert_eq!(read_bytes(&sprint_path(&tasks_dir, 1)).unwrap(), sprint_before);
     let dto = TaskService::get(&storage, &task.id, None).unwrap();
     assert!(dto.sprints.is_empty());
 }
@@ -262,23 +213,13 @@ fn create_failure_retry_creates_single_task_without_duplicates() {
 
     let failed = TaskService::create(
         &mut storage,
-        TaskCreate {
-            title: "First attempt".to_string(),
-            project: Some("TEST".to_string()),
-            sprints: vec![424242],
-            ..TaskCreate::default()
-        },
+        TaskCreate { title: "First attempt".to_string(), project: Some("TEST".to_string()), sprints: vec![424242], ..TaskCreate::default() },
     );
     assert!(failed.is_err());
 
     let dto = TaskService::create(
         &mut storage,
-        TaskCreate {
-            title: "Retry".to_string(),
-            project: Some("TEST".to_string()),
-            sprints: vec![1],
-            ..TaskCreate::default()
-        },
+        TaskCreate { title: "Retry".to_string(), project: Some("TEST".to_string()), sprints: vec![1], ..TaskCreate::default() },
     )
     .unwrap();
 
@@ -293,14 +234,8 @@ fn create_failure_retry_creates_single_task_without_duplicates() {
     }
     assert_eq!(count, 1);
 
-    let sprint: Sprint =
-        serde_yaml_ng::from_str(&std::fs::read_to_string(sprint_path(&tasks_dir, 1)).unwrap())
-            .unwrap();
-    let memberships = sprint
-        .tasks
-        .iter()
-        .filter(|entry| entry.id == "TEST-1")
-        .count();
+    let sprint: Sprint = serde_yaml_ng::from_str(&std::fs::read_to_string(sprint_path(&tasks_dir, 1)).unwrap()).unwrap();
+    let memberships = sprint.tasks.iter().filter(|entry| entry.id == "TEST-1").count();
     assert_eq!(memberships, 1, "retry must not duplicate the membership");
 }
 
@@ -310,41 +245,20 @@ fn malformed_task_yaml_update_failure_leaves_sprint_bytes() {
     write_global_config(&tasks_dir, "");
     let mut storage = Storage::new(&tasks_dir);
     SprintService::create(&mut storage, labeled_sprint("Alpha"), None).unwrap();
-    let task = TaskService::create(
-        &mut storage,
-        TaskCreate {
-            title: "Will corrupt".to_string(),
-            project: Some("TEST".to_string()),
-            ..TaskCreate::default()
-        },
-    )
-    .unwrap();
+    let task = TaskService::create(&mut storage, TaskCreate { title: "Will corrupt".to_string(), project: Some("TEST".to_string()), ..TaskCreate::default() })
+        .unwrap();
 
     // Simulate external corruption that tolerant parsing refuses to edit.
     let corrupted = "title: [unclosed\n";
     std::fs::write(task_path(&tasks_dir, 1), corrupted).unwrap();
     let sprint_before = read_bytes(&sprint_path(&tasks_dir, 1)).unwrap();
 
-    let err = TaskService::update(
-        &mut storage,
-        &task.id,
-        TaskUpdate {
-            sprints: Some(vec![1]),
-            ..TaskUpdate::default()
-        },
-    )
-    .unwrap_err();
+    let err = TaskService::update(&mut storage, &task.id, TaskUpdate { sprints: Some(vec![1]), ..TaskUpdate::default() }).unwrap_err();
     // The unreadable task fails the operation before any sprint write.
     assert!(err.to_string().contains("Task not found"), "{err}");
 
-    assert_eq!(
-        std::fs::read_to_string(task_path(&tasks_dir, 1)).unwrap(),
-        corrupted
-    );
-    assert_eq!(
-        read_bytes(&sprint_path(&tasks_dir, 1)).unwrap(),
-        sprint_before
-    );
+    assert_eq!(std::fs::read_to_string(task_path(&tasks_dir, 1)).unwrap(), corrupted);
+    assert_eq!(read_bytes(&sprint_path(&tasks_dir, 1)).unwrap(), sprint_before);
 }
 
 #[test]
@@ -352,33 +266,16 @@ fn successful_create_preserves_unknown_sprint_fields_and_member_order() {
     let (_tmp, tasks_dir) = workspace();
     write_global_config(&tasks_dir, "");
     let mut storage = Storage::new(&tasks_dir);
-    TaskService::create(
-        &mut storage,
-        TaskCreate {
-            title: "Existing".to_string(),
-            project: Some("TEST".to_string()),
-            ..TaskCreate::default()
-        },
-    )
-    .unwrap();
+    TaskService::create(&mut storage, TaskCreate { title: "Existing".to_string(), project: Some("TEST".to_string()), ..TaskCreate::default() }).unwrap();
     drop(storage);
 
     // Handwritten sprint YAML with user-owned extension and a preset member.
-    std::fs::write(
-        sprint_path(&tasks_dir, 1),
-        "plan:\n  label: Alpha\ntasks:\n  - TEST-1\nx_team_extension:\n  board: core\n",
-    )
-    .unwrap();
+    std::fs::write(sprint_path(&tasks_dir, 1), "plan:\n  label: Alpha\ntasks:\n  - TEST-1\nx_team_extension:\n  board: core\n").unwrap();
 
     let mut storage = Storage::new(&tasks_dir);
     let second = TaskService::create(
         &mut storage,
-        TaskCreate {
-            title: "Joined later".to_string(),
-            project: Some("TEST".to_string()),
-            sprints: vec![1],
-            ..TaskCreate::default()
-        },
+        TaskCreate { title: "Joined later".to_string(), project: Some("TEST".to_string()), sprints: vec![1], ..TaskCreate::default() },
     )
     .unwrap();
     assert_eq!(second.id, "TEST-2");
@@ -386,10 +283,7 @@ fn successful_create_preserves_unknown_sprint_fields_and_member_order() {
     let raw = std::fs::read_to_string(sprint_path(&tasks_dir, 1)).unwrap();
     let sprint: Sprint = serde_yaml_ng::from_str(&raw).unwrap();
     assert_eq!(
-        sprint
-            .extra_fields
-            .get("x_team_extension")
-            .and_then(|value| value.get("board")),
+        sprint.extra_fields.get("x_team_extension").and_then(|value| value.get("board")),
         Some(&serde_yaml_ng::Value::String("core".to_string())),
         "unknown sprint fields must survive membership writes: {raw}"
     );
@@ -406,16 +300,9 @@ fn concurrent_creates_and_assignments_lose_no_memberships() {
 
     let preexisting: Vec<String> = (0..6)
         .map(|i| {
-            TaskService::create(
-                &mut storage,
-                TaskCreate {
-                    title: format!("Existing {i}"),
-                    project: Some("TEST".to_string()),
-                    ..TaskCreate::default()
-                },
-            )
-            .unwrap()
-            .id
+            TaskService::create(&mut storage, TaskCreate { title: format!("Existing {i}"), project: Some("TEST".to_string()), ..TaskCreate::default() })
+                .unwrap()
+                .id
         })
         .collect();
 
@@ -447,17 +334,8 @@ fn concurrent_creates_and_assignments_lose_no_memberships() {
             scope.spawn(move || {
                 let mut storage = Storage::new(&root);
                 let mut records = SprintService::list(&storage).unwrap();
-                retry_lock_contention(|| {
-                    sprint_assignment::assign_tasks(
-                        &mut storage,
-                        &mut records,
-                        &ids,
-                        Some("1"),
-                        false,
-                        false,
-                    )
-                })
-                .expect("assignment under coordinated contention");
+                retry_lock_contention(|| sprint_assignment::assign_tasks(&mut storage, &mut records, &ids, Some("1"), false, false))
+                    .expect("assignment under coordinated contention");
             });
         }
     });
@@ -475,9 +353,7 @@ fn concurrent_creates_and_assignments_lose_no_memberships() {
     assert_eq!(numeric_ids, expected, "no lost or duplicated task files");
 
     // The sprint holds every task exactly once: 6 preexisting + 12 created.
-    let sprint: Sprint =
-        serde_yaml_ng::from_str(&std::fs::read_to_string(sprint_path(&tasks_dir, 1)).unwrap())
-            .unwrap();
+    let sprint: Sprint = serde_yaml_ng::from_str(&std::fs::read_to_string(sprint_path(&tasks_dir, 1)).unwrap()).unwrap();
     let mut members: Vec<&str> = sprint.tasks.iter().map(|entry| entry.id.as_str()).collect();
     members.sort_unstable();
     members.dedup();
@@ -539,12 +415,7 @@ mod api_boundary {
         ));
         assert_eq!(resp.status, 404, "invalid sprint must be rejected");
         let body: Value = serde_json::from_slice(&resp.body).unwrap();
-        assert!(
-            body["error"]["message"]
-                .as_str()
-                .unwrap()
-                .contains("Sprint not found: 31337")
-        );
+        assert!(body["error"]["message"].as_str().unwrap().contains("Sprint not found: 31337"));
 
         assert!(!task_path(&tasks_dir, 1).exists());
         assert!(read_bytes(&tasks_dir.join("TEST").join("config.yml")).is_none());

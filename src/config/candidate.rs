@@ -22,8 +22,7 @@
 // `task_conflict` fields can invalidate existing tasks.
 use crate::config::fields::{is_resolved_relevant, is_task_conflict_field};
 use crate::config::operations::{
-    apply_field_to_global_config, apply_field_to_project_config, canonicalize_field_name,
-    clear_project_override_field, validate_field_value,
+    apply_field_to_global_config, apply_field_to_project_config, canonicalize_field_name, clear_project_override_field, validate_field_value,
 };
 use crate::config::resolution;
 use crate::config::types::{ConfigError, GlobalConfig, ProjectConfig, ResolvedConfig};
@@ -71,27 +70,17 @@ pub struct ConfigSetResult {
 /// `tags` and `issue.tags`) are accepted when they carry the identical value
 /// and rejected deterministically when their values differ, regardless of
 /// input order.
-pub fn canonicalize_entries(
-    entries: &[(String, String)],
-    is_global: bool,
-) -> Result<Vec<(String, String)>, ConfigError> {
+pub fn canonicalize_entries(entries: &[(String, String)], is_global: bool) -> Result<Vec<(String, String)>, ConfigError> {
     let mut canonical: Vec<(String, String)> = Vec::new();
     for (raw_name, raw_value) in entries {
-        let canonical_field = canonicalize_field_name(raw_name, is_global).map_err(|e| {
-            ConfigError::ParseError(format!("Invalid config entry '{}': {}", raw_name.trim(), e))
-        })?;
-        match canonical
-            .iter_mut()
-            .find(|(field, _)| *field == canonical_field)
-        {
+        let canonical_field =
+            canonicalize_field_name(raw_name, is_global).map_err(|e| ConfigError::ParseError(format!("Invalid config entry '{}': {}", raw_name.trim(), e)))?;
+        match canonical.iter_mut().find(|(field, _)| *field == canonical_field) {
             Some((_, existing)) if existing != raw_value => {
                 // Report the pair sorted so the message is identical
                 // regardless of input order.
-                let (first, second) = if existing.trim() <= raw_value.trim() {
-                    (existing.trim(), raw_value.trim())
-                } else {
-                    (raw_value.trim(), existing.trim())
-                };
+                let (first, second) =
+                    if existing.trim() <= raw_value.trim() { (existing.trim(), raw_value.trim()) } else { (raw_value.trim(), existing.trim()) };
                 return Err(ConfigError::ParseError(format!(
                     "Conflicting duplicate entries for configuration field '{}' ('{}' vs '{}'); supply a single value",
                     canonical_field, first, second
@@ -106,19 +95,11 @@ pub fn canonicalize_entries(
 }
 
 /// Build, validate, and (unless dry-running) atomically save one candidate.
-pub fn apply_config_set(
-    tasks_dir: &Path,
-    scope: &ConfigScope,
-    request: &ConfigSetRequest,
-) -> Result<ConfigSetResult, ConfigError> {
+pub fn apply_config_set(tasks_dir: &Path, scope: &ConfigScope, request: &ConfigSetRequest) -> Result<ConfigSetResult, ConfigError> {
     let is_global = matches!(scope, ConfigScope::Global);
     let canonical = canonicalize_entries(&request.entries, is_global)?;
     if canonical.is_empty() {
-        return Ok(ConfigSetResult {
-            updated: false,
-            validation: ValidationResult::new(),
-            normalized_fields: Vec::new(),
-        });
+        return Ok(ConfigSetResult { updated: false, validation: ValidationResult::new(), normalized_fields: Vec::new() });
     }
 
     validate_raw_entries(&canonical, is_global)?;
@@ -135,11 +116,7 @@ pub fn apply_config_set(
             for (field, value) in &canonical {
                 apply_field_to_global_config(&mut candidate, field, value)?;
             }
-            block_newly_introduced_errors(
-                &validator.validate_global_config(&global_base),
-                &validator.validate_global_config(&candidate),
-                "global",
-            )?;
+            block_newly_introduced_errors(&validator.validate_global_config(&global_base), &validator.validate_global_config(&candidate), "global")?;
 
             let before_resolved = resolution::preview_base_resolved(&global_base);
             let after_resolved = resolution::preview_base_resolved(&candidate);
@@ -151,11 +128,7 @@ pub fn apply_config_set(
             validation.merge(validator.validate_global_config(&candidate));
             validation.merge(validator.validate_resolved_config(&after_resolved));
 
-            let changed: Vec<&str> = canonical
-                .iter()
-                .map(|(field, _)| field.as_str())
-                .filter(|field| is_resolved_relevant(field))
-                .collect();
+            let changed: Vec<&str> = canonical.iter().map(|(field, _)| field.as_str()).filter(|field| is_resolved_relevant(field)).collect();
             if !changed.is_empty() {
                 // Enumerate real projects fail-closed: a malformed project
                 // config or task file must block the change rather than
@@ -164,11 +137,7 @@ pub fn apply_config_set(
                 projects.sort_by(|a, b| a.0.cmp(&b.0));
                 for (prefix, dir) in projects {
                     let project_cfg = load_project_base(tasks_dir, &prefix)?;
-                    let affected: Vec<&str> = changed
-                        .iter()
-                        .copied()
-                        .filter(|field| !project_overrides_field(&project_cfg, field))
-                        .collect();
+                    let affected: Vec<&str> = changed.iter().copied().filter(|field| !project_overrides_field(&project_cfg, field)).collect();
                     if affected.is_empty() {
                         continue;
                     }
@@ -179,14 +148,7 @@ pub fn apply_config_set(
                         &validator.validate_resolved_config(&after),
                         &format!("resolved project '{}'", prefix),
                     )?;
-                    collect_task_conflicts(
-                        &before,
-                        &after,
-                        &affected,
-                        &dir,
-                        &prefix,
-                        &mut conflicts,
-                    )?;
+                    collect_task_conflicts(&before, &after, &affected, &dir, &prefix, &mut conflicts)?;
                 }
             }
 
@@ -210,19 +172,11 @@ pub fn apply_config_set(
             // key); a missing file means the save itself is the change
             // (bootstrap/creation semantics, e.g. project creation).
             let global_path = crate::utils::paths::global_config_path(tasks_dir);
-            let port_pin_missing = port_requested
-                && crate::config::persistence::config_file_server_port(
-                    &global_path,
-                    "global config",
-                )
-                .ok()
-                .flatten()
-                .is_none();
+            let port_pin_missing =
+                port_requested && crate::config::persistence::config_file_server_port(&global_path, "global config").ok().flatten().is_none();
             let changed = !global_path.exists() || candidate != global_base || port_pin_missing;
 
-            finish(request, canonical, validation, &conflicts, changed, || {
-                save_global(tasks_dir, &candidate, port_intent)
-            })
+            finish(request, canonical, validation, &conflicts, changed, || save_global(tasks_dir, &candidate, port_intent))
         }
         ConfigScope::Project(prefix) => {
             let project_base = load_project_base(tasks_dir, prefix)?;
@@ -250,20 +204,9 @@ pub fn apply_config_set(
             validation.merge(validator.validate_project_config(&candidate));
             validation.merge(validator.validate_resolved_config(&after));
 
-            let changed: Vec<&str> = canonical
-                .iter()
-                .map(|(field, _)| field.as_str())
-                .filter(|field| is_resolved_relevant(field))
-                .collect();
+            let changed: Vec<&str> = canonical.iter().map(|(field, _)| field.as_str()).filter(|field| is_resolved_relevant(field)).collect();
             if !changed.is_empty() {
-                collect_task_conflicts(
-                    &before,
-                    &after,
-                    &changed,
-                    &tasks_dir.join(prefix),
-                    prefix,
-                    &mut conflicts,
-                )?;
+                collect_task_conflicts(&before, &after, &changed, &tasks_dir.join(prefix), prefix, &mut conflicts)?;
             }
 
             // DEV-102 no-op boundary: skip the write only when the stored
@@ -272,11 +215,8 @@ pub fn apply_config_set(
             // creation semantics (the write is the change); an explicit
             // override equal to an inherited default differs from `None`
             // and is therefore a genuine provenance change.
-            let changed = !crate::utils::paths::project_config_path(tasks_dir, prefix).exists()
-                || candidate != project_base;
-            finish(request, canonical, validation, &conflicts, changed, || {
-                save_project(tasks_dir, prefix, &candidate)
-            })
+            let changed = !crate::utils::paths::project_config_path(tasks_dir, prefix).exists() || candidate != project_base;
+            finish(request, canonical, validation, &conflicts, changed, || save_project(tasks_dir, prefix, &candidate))
         }
     }
 }
@@ -299,9 +239,7 @@ fn finish(
     if !conflicts.is_empty() {
         if request.force {
             for conflict in conflicts {
-                validation
-                    .warnings
-                    .push(ValidationError::warning(None, conflict.clone()));
+                validation.warnings.push(ValidationError::warning(None, conflict.clone()));
             }
         } else {
             return Err(ConfigError::ParseError(format!(
@@ -314,43 +252,23 @@ fn finish(
     let normalized_fields: Vec<String> = canonical.into_iter().map(|(field, _)| field).collect();
 
     if request.dry_run {
-        return Ok(ConfigSetResult {
-            updated: false,
-            validation,
-            normalized_fields,
-        });
+        return Ok(ConfigSetResult { updated: false, validation, normalized_fields });
     }
 
     if !changed {
-        return Ok(ConfigSetResult {
-            updated: false,
-            validation,
-            normalized_fields,
-        });
+        return Ok(ConfigSetResult { updated: false, validation, normalized_fields });
     }
 
     save()?;
 
-    Ok(ConfigSetResult {
-        updated: true,
-        validation,
-        normalized_fields,
-    })
+    Ok(ConfigSetResult { updated: true, validation, normalized_fields })
 }
 
-fn save_global(
-    tasks_dir: &Path,
-    candidate: &GlobalConfig,
-    port_intent: crate::config::operations::ServerPortSaveIntent,
-) -> Result<(), ConfigError> {
+fn save_global(tasks_dir: &Path, candidate: &GlobalConfig, port_intent: crate::config::operations::ServerPortSaveIntent) -> Result<(), ConfigError> {
     crate::config::operations::save_global_config_with_port(tasks_dir, candidate, port_intent)
 }
 
-fn save_project(
-    tasks_dir: &Path,
-    prefix: &str,
-    candidate: &ProjectConfig,
-) -> Result<(), ConfigError> {
+fn save_project(tasks_dir: &Path, prefix: &str, candidate: &ProjectConfig) -> Result<(), ConfigError> {
     crate::config::operations::save_project_config(tasks_dir, prefix, candidate)
 }
 
@@ -359,13 +277,8 @@ fn save_project(
 fn load_global_base(tasks_dir: &Path) -> Result<GlobalConfig, ConfigError> {
     let path = crate::utils::paths::global_config_path(tasks_dir);
     if path.exists() {
-        crate::config::persistence::load_global_config(Some(tasks_dir)).map_err(|e| {
-            ConfigError::ParseError(format!(
-                "Malformed global config {} (required for validation): {}",
-                path.display(),
-                e
-            ))
-        })
+        crate::config::persistence::load_global_config(Some(tasks_dir))
+            .map_err(|e| ConfigError::ParseError(format!("Malformed global config {} (required for validation): {}", path.display(), e)))
     } else {
         Ok(GlobalConfig::default())
     }
@@ -374,14 +287,8 @@ fn load_global_base(tasks_dir: &Path) -> Result<GlobalConfig, ConfigError> {
 fn load_project_base(tasks_dir: &Path, prefix: &str) -> Result<ProjectConfig, ConfigError> {
     let path = crate::utils::paths::project_config_path(tasks_dir, prefix);
     if path.exists() {
-        crate::config::persistence::load_project_config_from_dir(prefix, tasks_dir).map_err(|e| {
-            ConfigError::ParseError(format!(
-                "Malformed config for project '{}' at {} (required for validation): {}",
-                prefix,
-                path.display(),
-                e
-            ))
-        })
+        crate::config::persistence::load_project_config_from_dir(prefix, tasks_dir)
+            .map_err(|e| ConfigError::ParseError(format!("Malformed config for project '{}' at {} (required for validation): {}", prefix, path.display(), e)))
     } else {
         Ok(ProjectConfig::new(prefix.to_string()))
     }
@@ -396,43 +303,25 @@ fn load_project_base(tasks_dir: &Path, prefix: &str) -> Result<ProjectConfig, Co
 /// force-escapable. Project-scope empty values express "clear this override"
 /// and skip value schema checks — empties reach validation only where the
 /// field's validator accepts them as clears.
-pub fn validate_raw_entries(
-    canonical: &[(String, String)],
-    is_global: bool,
-) -> Result<(), ConfigError> {
+pub fn validate_raw_entries(canonical: &[(String, String)], is_global: bool) -> Result<(), ConfigError> {
     for (field, value) in canonical {
         if !is_global && value.trim().is_empty() {
             continue;
         }
-        validate_field_value(field, value).map_err(|e| {
-            ConfigError::ParseError(format!("Invalid value for '{}': {}", field, e))
-        })?;
+        validate_field_value(field, value).map_err(|e| ConfigError::ParseError(format!("Invalid value for '{}': {}", field, e)))?;
     }
     Ok(())
 }
 
 /// Block only on errors the candidate newly introduces: pre-existing errors in
 /// an already-broken configuration must not make every unrelated update fail.
-fn block_newly_introduced_errors(
-    before: &ValidationResult,
-    after: &ValidationResult,
-    label: &str,
-) -> Result<(), ConfigError> {
+fn block_newly_introduced_errors(before: &ValidationResult, after: &ValidationResult, label: &str) -> Result<(), ConfigError> {
     let before_keys: HashSet<String> = before.errors.iter().map(|e| e.to_string()).collect();
-    let introduced: Vec<String> = after
-        .errors
-        .iter()
-        .filter(|e| !before_keys.contains(&e.to_string()))
-        .map(|e| e.to_string())
-        .collect();
+    let introduced: Vec<String> = after.errors.iter().filter(|e| !before_keys.contains(&e.to_string())).map(|e| e.to_string()).collect();
     if introduced.is_empty() {
         Ok(())
     } else {
-        Err(ConfigError::ParseError(format!(
-            "Validation failed for {} configuration:\n{}",
-            label,
-            introduced.join("\n")
-        )))
+        Err(ConfigError::ParseError(format!("Validation failed for {} configuration:\n{}", label, introduced.join("\n"))))
     }
 }
 
@@ -476,16 +365,9 @@ fn collect_task_conflicts(
     let needs_tasks = fields.iter().any(|field| {
         is_task_conflict_field(field)
             && match *field {
-                "issue_states" => {
-                    !status_lists_equal(&before.issue_states.values, &after.issue_states.values)
-                }
-                "issue_types" => {
-                    !type_lists_equal(&before.issue_types.values, &after.issue_types.values)
-                }
-                "issue_priorities" => !priority_lists_equal(
-                    &before.issue_priorities.values,
-                    &after.issue_priorities.values,
-                ),
+                "issue_states" => !status_lists_equal(&before.issue_states.values, &after.issue_states.values),
+                "issue_types" => !type_lists_equal(&before.issue_types.values, &after.issue_types.values),
+                "issue_priorities" => !priority_lists_equal(&before.issue_priorities.values, &after.issue_priorities.values),
                 _ => false,
             }
     });
@@ -501,54 +383,27 @@ fn collect_task_conflicts(
             }
             let (was_valid, now_valid, kind, value) = match *field {
                 "issue_states" => (
-                    before
-                        .issue_states
-                        .values
-                        .iter()
-                        .any(|s| enum_token_eq(s.as_str(), task.status.as_str())),
-                    after
-                        .issue_states
-                        .values
-                        .iter()
-                        .any(|s| enum_token_eq(s.as_str(), task.status.as_str())),
+                    before.issue_states.values.iter().any(|s| enum_token_eq(s.as_str(), task.status.as_str())),
+                    after.issue_states.values.iter().any(|s| enum_token_eq(s.as_str(), task.status.as_str())),
                     "status",
                     task.status.as_str().to_string(),
                 ),
                 "issue_types" => (
-                    before
-                        .issue_types
-                        .values
-                        .iter()
-                        .any(|t| enum_token_eq(t.as_str(), task.task_type.as_str())),
-                    after
-                        .issue_types
-                        .values
-                        .iter()
-                        .any(|t| enum_token_eq(t.as_str(), task.task_type.as_str())),
+                    before.issue_types.values.iter().any(|t| enum_token_eq(t.as_str(), task.task_type.as_str())),
+                    after.issue_types.values.iter().any(|t| enum_token_eq(t.as_str(), task.task_type.as_str())),
                     "type",
                     task.task_type.as_str().to_string(),
                 ),
                 "issue_priorities" => (
-                    before
-                        .issue_priorities
-                        .values
-                        .iter()
-                        .any(|p| enum_token_eq(p.as_str(), task.priority.as_str())),
-                    after
-                        .issue_priorities
-                        .values
-                        .iter()
-                        .any(|p| enum_token_eq(p.as_str(), task.priority.as_str())),
+                    before.issue_priorities.values.iter().any(|p| enum_token_eq(p.as_str(), task.priority.as_str())),
+                    after.issue_priorities.values.iter().any(|p| enum_token_eq(p.as_str(), task.priority.as_str())),
                     "priority",
                     task.priority.as_str().to_string(),
                 ),
                 _ => continue,
             };
             if was_valid && !now_valid {
-                conflicts.push(format!(
-                    "Task {} has {} '{}' which is not in the new {} list",
-                    id, kind, value, field
-                ));
+                conflicts.push(format!("Task {} has {} '{}' which is not in the new {} list", id, kind, value, field));
             }
         }
     }
@@ -556,62 +411,35 @@ fn collect_task_conflicts(
 }
 
 fn status_lists_equal(a: &[crate::types::TaskStatus], b: &[crate::types::TaskStatus]) -> bool {
-    a.len() == b.len()
-        && a.iter()
-            .zip(b.iter())
-            .all(|(x, y)| enum_token_eq(x.as_str(), y.as_str()))
+    a.len() == b.len() && a.iter().zip(b.iter()).all(|(x, y)| enum_token_eq(x.as_str(), y.as_str()))
 }
 
 fn type_lists_equal(a: &[crate::types::TaskType], b: &[crate::types::TaskType]) -> bool {
-    a.len() == b.len()
-        && a.iter()
-            .zip(b.iter())
-            .all(|(x, y)| enum_token_eq(x.as_str(), y.as_str()))
+    a.len() == b.len() && a.iter().zip(b.iter()).all(|(x, y)| enum_token_eq(x.as_str(), y.as_str()))
 }
 
 fn priority_lists_equal(a: &[crate::types::Priority], b: &[crate::types::Priority]) -> bool {
-    a.len() == b.len()
-        && a.iter()
-            .zip(b.iter())
-            .all(|(x, y)| enum_token_eq(x.as_str(), y.as_str()))
+    a.len() == b.len() && a.iter().zip(b.iter()).all(|(x, y)| enum_token_eq(x.as_str(), y.as_str()))
 }
 
 /// Enumerate a project's task files fail-closed. Non-numeric YAML files are
 /// ignored (matching search semantics); numeric-stem files must be readable
 /// and parseable or validation cannot claim the task set was inspected.
-fn enumerate_project_tasks(
-    project_dir: &Path,
-    prefix: &str,
-) -> Result<Vec<(String, Task)>, ConfigError> {
+fn enumerate_project_tasks(project_dir: &Path, prefix: &str) -> Result<Vec<(String, Task)>, ConfigError> {
     if !project_dir.is_dir() {
         return Ok(Vec::new());
     }
     // Nested folders count; archived tasks do not, so old values kept only
     // by archived tasks never block a config change (unarchive re-validates).
-    let files: Vec<PathBuf> = crate::storage::layout::task_files(
-        project_dir,
-        crate::storage::layout::ArchiveFilter::Exclude,
-    )
-    .into_iter()
-    .map(|file| file.path)
-    .collect();
+    let files: Vec<PathBuf> =
+        crate::storage::layout::task_files(project_dir, crate::storage::layout::ArchiveFilter::Exclude).into_iter().map(|file| file.path).collect();
     let mut tasks = Vec::new();
     for path in files {
         let numeric = crate::utils::filesystem::file_numeric_stem(&path).unwrap_or_default();
-        let content = std::fs::read_to_string(&path).map_err(|e| {
-            ConfigError::IoError(format!(
-                "Failed to read task file {} during conflict validation: {}",
-                path.display(),
-                e
-            ))
-        })?;
-        let task: Task = serde_yaml_ng::from_str(&content).map_err(|e| {
-            ConfigError::ParseError(format!(
-                "Malformed task file {} during conflict validation: {}",
-                path.display(),
-                e
-            ))
-        })?;
+        let content = std::fs::read_to_string(&path)
+            .map_err(|e| ConfigError::IoError(format!("Failed to read task file {} during conflict validation: {}", path.display(), e)))?;
+        let task: Task = serde_yaml_ng::from_str(&content)
+            .map_err(|e| ConfigError::ParseError(format!("Malformed task file {} during conflict validation: {}", path.display(), e)))?;
         tasks.push((format!("{}-{}", prefix, numeric), task));
     }
     Ok(tasks)
@@ -623,23 +451,11 @@ mod tests {
 
     #[test]
     fn canonicalize_accepts_flat_and_dotted_including_exceptions() {
-        assert_eq!(
-            canonicalize_field_name("issue_states", false).unwrap(),
-            "issue_states"
-        );
-        assert_eq!(
-            canonicalize_field_name("issue.states", false).unwrap(),
-            "issue_states"
-        );
-        assert_eq!(
-            canonicalize_field_name("default.strict_members", false).unwrap(),
-            "strict_members"
-        );
+        assert_eq!(canonicalize_field_name("issue_states", false).unwrap(), "issue_states");
+        assert_eq!(canonicalize_field_name("issue.states", false).unwrap(), "issue_states");
+        assert_eq!(canonicalize_field_name("default.strict_members", false).unwrap(), "strict_members");
         assert_eq!(canonicalize_field_name("issue.tags", true).unwrap(), "tags");
-        assert_eq!(
-            canonicalize_field_name("server.port", true).unwrap(),
-            "server_port"
-        );
+        assert_eq!(canonicalize_field_name("server.port", true).unwrap(), "server_port");
     }
 
     #[test]
@@ -653,14 +469,8 @@ mod tests {
 
     #[test]
     fn collision_detection_is_order_independent() {
-        let a = vec![
-            ("tags".to_string(), "a".to_string()),
-            ("issue.tags".to_string(), "b".to_string()),
-        ];
-        let b = vec![
-            ("issue.tags".to_string(), "b".to_string()),
-            ("tags".to_string(), "a".to_string()),
-        ];
+        let a = vec![("tags".to_string(), "a".to_string()), ("issue.tags".to_string(), "b".to_string())];
+        let b = vec![("issue.tags".to_string(), "b".to_string()), ("tags".to_string(), "a".to_string())];
         let err_a = canonicalize_entries(&a, true).unwrap_err().to_string();
         let err_b = canonicalize_entries(&b, true).unwrap_err().to_string();
         assert!(err_a.contains("Conflicting duplicate entries"), "{err_a}");
@@ -669,26 +479,17 @@ mod tests {
 
     #[test]
     fn identical_canonical_duplicates_dedup() {
-        let entries = vec![
-            ("tags".to_string(), "a,b".to_string()),
-            ("issue.tags".to_string(), "a,b".to_string()),
-        ];
+        let entries = vec![("tags".to_string(), "a,b".to_string()), ("issue.tags".to_string(), "a,b".to_string())];
         let canon = canonicalize_entries(&entries, true).unwrap();
         assert_eq!(canon, vec![("tags".to_string(), "a,b".to_string())]);
     }
 
     #[test]
     fn entries_are_sorted_deterministically() {
-        let entries = vec![
-            ("members".to_string(), "x".to_string()),
-            ("default.assignee".to_string(), "y".to_string()),
-            ("agent_logs_dir".to_string(), "z".to_string()),
-        ];
+        let entries =
+            vec![("members".to_string(), "x".to_string()), ("default.assignee".to_string(), "y".to_string()), ("agent_logs_dir".to_string(), "z".to_string())];
         let canon = canonicalize_entries(&entries, true).unwrap();
         let fields: Vec<&str> = canon.iter().map(|(f, _)| f.as_str()).collect();
-        assert_eq!(
-            fields,
-            vec!["agent_logs_dir", "default_assignee", "members"]
-        );
+        assert_eq!(fields, vec!["agent_logs_dir", "default_assignee", "members"]);
     }
 }

@@ -25,10 +25,7 @@ mod basic_commands {
     #[test]
     fn test_help_command() {
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.arg("help")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("help"));
+        cmd.arg("help").assert().success().stdout(predicate::str::contains("help"));
     }
 
     #[test]
@@ -40,18 +37,13 @@ mod basic_commands {
     #[test]
     fn test_no_command() {
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.assert()
-            .failure()
-            .stderr(predicate::str::contains("Usage"));
+        cmd.assert().failure().stderr(predicate::str::contains("Usage"));
     }
 
     #[test]
     fn test_version_command() {
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.arg("--version")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("lotar"));
+        cmd.arg("--version").assert().success().stdout(predicate::str::contains("lotar"));
     }
 }
 
@@ -68,11 +60,7 @@ mod task_management {
         let temp_dir = TempDir::new().unwrap();
 
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(&temp_dir)
-            .args(["task", "add", "Test Task"])
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("Created task:"));
+        cmd.current_dir(&temp_dir).args(["task", "add", "Test Task"]).assert().success().stdout(predicate::str::contains("Created task:"));
     }
 
     #[test]
@@ -80,10 +68,7 @@ mod task_management {
         let temp_dir = TempDir::new().unwrap();
 
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(&temp_dir)
-            .args(["task", "add"])
-            .assert()
-            .failure();
+        cmd.current_dir(&temp_dir).args(["task", "add"]).assert().failure();
     }
 
     #[test]
@@ -108,53 +93,30 @@ mod task_management {
     fn test_task_list() {
         let test_fixtures = TestFixtures::new();
         let temp_dir = test_fixtures.temp_dir.path();
-        let _guard = EnvVarGuard::set(
-            "LOTAR_TASKS_DIR",
-            &test_fixtures.tasks_root.to_string_lossy(),
-        );
+        let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &test_fixtures.tasks_root.to_string_lossy());
 
         // First create a task
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("add")
-            .arg("List Test Task")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("add").arg("List Test Task").assert().success();
 
         // List tasks
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("list")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("List Test Task"));
+        cmd.current_dir(temp_dir).arg("list").assert().success().stdout(predicate::str::contains("List Test Task"));
     }
 
     #[test]
     fn test_task_status_update() {
         let test_fixtures = TestFixtures::new();
         let temp_dir = test_fixtures.temp_dir.path();
-        let _guard = EnvVarGuard::set(
-            "LOTAR_TASKS_DIR",
-            &test_fixtures.tasks_root.to_string_lossy(),
-        );
+        let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &test_fixtures.tasks_root.to_string_lossy());
 
         // First create a task
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("add")
-            .arg("Status update test")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("add").arg("Status update test").assert().success();
 
         // Update task status using correct syntax
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("status")
-            .arg("1")
-            .arg("in_progress")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("status").arg("1").arg("in_progress").assert().success();
     }
 }
 
@@ -171,12 +133,7 @@ mod project_management {
 
         let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&temp_dir)
-            .args([
-                "task",
-                "add",
-                "Project Test Task",
-                "--project=frontend-components",
-            ])
+            .args(["task", "add", "Project Test Task", "--project=frontend-components"])
             .assert()
             .success()
             .stdout(predicate::str::contains("Created task:"));
@@ -188,23 +145,11 @@ mod project_management {
 
         // Create task with full project name
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(&temp_dir)
-            .args([
-                "task",
-                "add",
-                "Smart Resolution Test",
-                "--project=FRONTEND-COMPONENTS",
-            ])
-            .assert()
-            .success();
+        cmd.current_dir(&temp_dir).args(["task", "add", "Smart Resolution Test", "--project=FRONTEND-COMPONENTS"]).assert().success();
 
         // List using prefix (should resolve to same project)
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(&temp_dir)
-            .args(["task", "list", "--project=FC"])
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("Smart Resolution Test"));
+        cmd.current_dir(&temp_dir).args(["task", "list", "--project=FC"]).assert().success().stdout(predicate::str::contains("Smart Resolution Test"));
     }
 
     #[test]
@@ -213,18 +158,11 @@ mod project_management {
 
         // Create task with uppercase project
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(&temp_dir)
-            .args(["task", "add", "Case Test Task", "--project=FRONTEND"])
-            .assert()
-            .success();
+        cmd.current_dir(&temp_dir).args(["task", "add", "Case Test Task", "--project=FRONTEND"]).assert().success();
 
         // List using lowercase
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(&temp_dir)
-            .args(["task", "list", "--project=frontend"])
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("Case Test Task"));
+        cmd.current_dir(&temp_dir).args(["task", "list", "--project=frontend"]).assert().success().stdout(predicate::str::contains("Case Test Task"));
     }
 }
 
@@ -249,10 +187,7 @@ mod output_formatting {
             .arg("--format=json")
             .assert()
             .success()
-            .stdout(
-                predicate::str::contains("Created task:")
-                    .or(predicate::str::contains("JSON Test Task")),
-            );
+            .stdout(predicate::str::contains("Created task:").or(predicate::str::contains("JSON Test Task")));
     }
 
     #[test]
@@ -260,10 +195,7 @@ mod output_formatting {
         let temp_dir = TempDir::new().unwrap();
 
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(&temp_dir)
-            .args(["--verbose", "task", "add", "Verbose Test Task"])
-            .assert()
-            .success();
+        cmd.current_dir(&temp_dir).args(["--verbose", "task", "add", "Verbose Test Task"]).assert().success();
     }
 
     #[test]
@@ -278,33 +210,20 @@ mod output_formatting {
         crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
-            .args([
-                "config",
-                "init",
-                "--project",
-                "Example Project",
-                "--prefix",
-                "EXM",
-            ])
+            .args(["config", "init", "--project", "Example Project", "--prefix", "EXM"])
             .assert()
             .success();
 
         // Strip the project name so only the prefix remains
         let project_config = temp.path().join(".tasks").join("EXM").join("config.yml");
-        std::fs::write(project_config, "default:\n  priority: High\n")
-            .expect("failed to overwrite project config");
+        std::fs::write(project_config, "default:\n  priority: High\n").expect("failed to overwrite project config");
         // Remove any global config the new init may have created so the validator
         // only checks the (minimal) project-scoped config.
         let global_config = temp.path().join(".tasks").join("config.yml");
         let _ = std::fs::remove_file(&global_config);
 
         // Add a task with explicit project prefix
-        crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(temp.path())
-            .args(["task", "add", "Test Task", "--project", "EXM"])
-            .assert()
-            .success();
+        crate::common::lotar_cmd().unwrap().current_dir(temp.path()).args(["task", "add", "Test Task", "--project", "EXM"]).assert().success();
 
         // Config show should display the prefix-only label
         let show_output = crate::common::lotar_cmd()
@@ -313,16 +232,9 @@ mod output_formatting {
             .args(["config", "show", "--project", "EXM"])
             .output()
             .expect("failed to run config show");
-        assert!(
-            show_output.status.success(),
-            "config show failed: {}",
-            String::from_utf8_lossy(&show_output.stderr)
-        );
+        assert!(show_output.status.success(), "config show failed: {}", String::from_utf8_lossy(&show_output.stderr));
         let show_stdout = String::from_utf8_lossy(&show_output.stdout);
-        assert!(
-            show_stdout.contains("Project configuration (EXM) – canonical YAML:"),
-            "project config show should include canonical heading\n{show_stdout}"
-        );
+        assert!(show_stdout.contains("Project configuration (EXM) – canonical YAML:"), "project config show should include canonical heading\n{show_stdout}");
 
         // Config validate should also show prefix-only label
         let validate_output = crate::common::lotar_cmd()
@@ -331,11 +243,7 @@ mod output_formatting {
             .args(["config", "validate", "--project", "EXM"])
             .output()
             .expect("failed to run config validate");
-        assert!(
-            validate_output.status.success(),
-            "config validate failed: {}",
-            String::from_utf8_lossy(&validate_output.stderr)
-        );
+        assert!(validate_output.status.success(), "config validate failed: {}", String::from_utf8_lossy(&validate_output.stderr));
         let validate_stdout = String::from_utf8_lossy(&validate_output.stdout);
         assert!(validate_stdout.contains("Validating project configuration for 'EXM'"));
 
@@ -363,24 +271,12 @@ mod argument_normalization {
     use tempfile::TempDir;
 
     fn create_task_in(dir: &Path, title: &str) {
-        crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(dir)
-            .arg("task")
-            .arg("add")
-            .arg(title)
-            .assert()
-            .success();
+        crate::common::lotar_cmd().unwrap().current_dir(dir).arg("task").arg("add").arg(title).assert().success();
     }
 
     fn assert_has_task(payload: &Value, title: &str) {
         let tasks = payload["tasks"].as_array().expect("tasks array present");
-        assert!(
-            tasks
-                .iter()
-                .any(|task| task["title"].as_str() == Some(title)),
-            "missing task '{title}' in payload: {payload:?}"
-        );
+        assert!(tasks.iter().any(|task| task["title"].as_str() == Some(title)), "missing task '{title}' in payload: {payload:?}");
     }
 
     #[test]
@@ -390,17 +286,9 @@ mod argument_normalization {
         let run_dir = TempDir::new().unwrap();
         let tasks_dir = fixtures.tasks_root.to_string_lossy().to_string();
 
-        let output = crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(run_dir.path())
-            .args(["task", "list", "--tasks-dir", &tasks_dir, "-fjson"])
-            .output()
-            .unwrap();
-        assert!(
-            output.status.success(),
-            "task list failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
+        let output =
+            crate::common::lotar_cmd().unwrap().current_dir(run_dir.path()).args(["task", "list", "--tasks-dir", &tasks_dir, "-fjson"]).output().unwrap();
+        assert!(output.status.success(), "task list failed: {}", String::from_utf8_lossy(&output.stderr));
 
         let payload: Value = serde_json::from_slice(&output.stdout).unwrap();
         assert_eq!(payload["status"].as_str(), Some("success"));
@@ -426,11 +314,7 @@ mod argument_normalization {
             .arg("json")
             .output()
             .unwrap();
-        assert!(
-            output.status.success(),
-            "task list with --tasks-dir failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
+        assert!(output.status.success(), "task list with --tasks-dir failed: {}", String::from_utf8_lossy(&output.stderr));
 
         let payload: Value = serde_json::from_slice(&output.stdout).unwrap();
         assert_has_task(&payload, "External Tasks Dir");
@@ -446,21 +330,10 @@ mod argument_normalization {
         let output = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(run_dir.path())
-            .args([
-                "task",
-                "list",
-                "--tasks-dir",
-                &tasks_dir,
-                "-linfo",
-                "-fjson",
-            ])
+            .args(["task", "list", "--tasks-dir", &tasks_dir, "-linfo", "-fjson"])
             .output()
             .unwrap();
-        assert!(
-            output.status.success(),
-            "task list with inline flags failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
+        assert!(output.status.success(), "task list with inline flags failed: {}", String::from_utf8_lossy(&output.stderr));
 
         let payload: Value = serde_json::from_slice(&output.stdout).unwrap();
         assert_eq!(payload["status"].as_str(), Some("success"));
@@ -498,17 +371,11 @@ mod error_handling {
 
         // Create a task first
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(&temp_dir)
-            .args(["task", "add", "Status Error Test"])
-            .assert()
-            .success();
+        cmd.current_dir(&temp_dir).args(["task", "add", "Status Error Test"]).assert().success();
 
         // Try to set invalid status
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(&temp_dir)
-            .args(["status", "TEST-1", "invalid_status"])
-            .assert()
-            .failure();
+        cmd.current_dir(&temp_dir).args(["status", "TEST-1", "invalid_status"]).assert().failure();
     }
 
     #[test]
@@ -517,10 +384,7 @@ mod error_handling {
 
         // Create a task under default project (TEST)
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(&temp_dir)
-            .args(["task", "add", "Mismatch Test Task", "--project=FOO"])
-            .assert()
-            .success();
+        cmd.current_dir(&temp_dir).args(["task", "add", "Mismatch Test Task", "--project=FOO"]).assert().success();
 
         // Try to set status with wrong explicit project -> should error due to mismatch
         let mut cmd = crate::common::lotar_cmd().unwrap();
@@ -537,54 +401,24 @@ mod error_handling {
 
         // Add with multiple fields set
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(&temp_dir)
-            .args([
-                "task",
-                "add",
-                "Original",
-                "--assignee=dev@example.com",
-                "--priority=high",
-                "--type=feature",
-            ])
-            .assert()
-            .success();
+        cmd.current_dir(&temp_dir).args(["task", "add", "Original", "--assignee=dev@example.com", "--priority=high", "--type=feature"]).assert().success();
 
         // Discover created task id via list json
-        let list_out = crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(&temp_dir)
-            .args(["--format=json", "list"])
-            .output()
-            .unwrap();
+        let list_out = crate::common::lotar_cmd().unwrap().current_dir(&temp_dir).args(["--format=json", "list"]).output().unwrap();
         assert!(list_out.status.success());
         let list_json: serde_json::Value = serde_json::from_slice(&list_out.stdout).unwrap();
         let task_id = list_json["tasks"][0]["id"].as_str().unwrap().to_string();
 
         // Edit only title
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(&temp_dir)
-            .args(["task", "edit", &task_id, "--title=Renamed"])
-            .assert()
-            .success();
+        cmd.current_dir(&temp_dir).args(["task", "edit", &task_id, "--title=Renamed"]).assert().success();
 
         // List JSON and verify assignee/priority/type preserved
         let task = super::get_task_as_json(&temp_dir, &task_id);
         assert_eq!(task["title"].as_str(), Some("Renamed"));
         assert_eq!(task["assignee"].as_str(), Some("dev@example.com"));
-        assert!(
-            task["priority"]
-                .as_str()
-                .unwrap_or("")
-                .to_uppercase()
-                .contains("HIGH")
-        );
-        assert!(
-            task["task_type"]
-                .as_str()
-                .unwrap_or("")
-                .to_lowercase()
-                .contains("feature")
-        );
+        assert!(task["priority"].as_str().unwrap_or("").to_uppercase().contains("HIGH"));
+        assert!(task["task_type"].as_str().unwrap_or("").to_lowercase().contains("feature"));
     }
 }
 
@@ -607,20 +441,10 @@ mod list_alias {
         let temp = TempDir::new().unwrap();
 
         // Create a task to ensure list returns something
-        crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(temp.path())
-            .args(["task", "add", "Hello world"])
-            .assert()
-            .success();
+        crate::common::lotar_cmd().unwrap().current_dir(temp.path()).args(["task", "add", "Hello world"]).assert().success();
 
         // Use alias `ls`
-        let out = crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(temp.path())
-            .args(["--format", "json", "ls"])
-            .output()
-            .unwrap();
+        let out = crate::common::lotar_cmd().unwrap().current_dir(temp.path()).args(["--format", "json", "ls"]).output().unwrap();
         assert!(out.status.success());
         let v: Value = serde_json::from_slice(&out.stdout).unwrap();
         assert_eq!(v["status"], "success");
@@ -638,10 +462,7 @@ mod list_effort {
     use tempfile::TempDir;
 
     fn run(cmd: &mut Command, temp: &TempDir, args: &[&str]) -> assert_cmd::assert::Assert {
-        cmd.current_dir(temp.path())
-            .env("LOTAR_TEST_SILENT", "1")
-            .args(args)
-            .assert()
+        cmd.current_dir(temp.path()).env("LOTAR_TEST_SILENT", "1").args(args).assert()
     }
 
     #[test]
@@ -649,52 +470,23 @@ mod list_effort {
         let temp = TempDir::new().unwrap();
 
         // Create three tasks with time efforts: 30m (0.50h), 2h (2.00h), 1d (8.00h)
-        run(
-            &mut crate::common::lotar_cmd().unwrap(),
-            &temp,
-            &["task", "add", "A", "--effort", "30m"],
-        )
-        .success();
-        run(
-            &mut crate::common::lotar_cmd().unwrap(),
-            &temp,
-            &["task", "add", "B", "--effort", "2h"],
-        )
-        .success();
-        run(
-            &mut crate::common::lotar_cmd().unwrap(),
-            &temp,
-            &["task", "add", "C", "--effort", "1d"],
-        )
-        .success();
+        run(&mut crate::common::lotar_cmd().unwrap(), &temp, &["task", "add", "A", "--effort", "30m"]).success();
+        run(&mut crate::common::lotar_cmd().unwrap(), &temp, &["task", "add", "B", "--effort", "2h"]).success();
+        run(&mut crate::common::lotar_cmd().unwrap(), &temp, &["task", "add", "C", "--effort", "1d"]).success();
 
         // Ascending
         let out = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
             .env("LOTAR_TEST_SILENT", "1")
-            .args([
-                "task",
-                "list",
-                "--format",
-                "json",
-                "--sort-by=effort",
-                "order=asc",
-            ])
+            .args(["task", "list", "--format", "json", "--sort-by=effort", "order=asc"])
             .output()
             .unwrap();
         assert!(out.status.success());
         let v: Value = serde_json::from_slice(&out.stdout).unwrap();
         let tasks = v["tasks"].as_array().unwrap();
-        let efforts: Vec<&str> = tasks
-            .iter()
-            .map(|t| t["effort"].as_str().unwrap_or("-"))
-            .collect();
-        assert_eq!(
-            efforts,
-            vec!["0.50h", "2.00h", "8.00h"],
-            "ascending effort order"
-        );
+        let efforts: Vec<&str> = tasks.iter().map(|t| t["effort"].as_str().unwrap_or("-")).collect();
+        assert_eq!(efforts, vec!["0.50h", "2.00h", "8.00h"], "ascending effort order");
 
         // Descending
         let out2 = crate::common::lotar_cmd()
@@ -707,15 +499,8 @@ mod list_effort {
         assert!(out2.status.success());
         let v2: Value = serde_json::from_slice(&out2.stdout).unwrap();
         let tasks2 = v2["tasks"].as_array().unwrap();
-        let efforts2: Vec<&str> = tasks2
-            .iter()
-            .map(|t| t["effort"].as_str().unwrap_or("-"))
-            .collect();
-        assert_eq!(
-            efforts2,
-            vec!["8.00h", "2.00h", "0.50h"],
-            "descending effort order"
-        );
+        let efforts2: Vec<&str> = tasks2.iter().map(|t| t["effort"].as_str().unwrap_or("-")).collect();
+        assert_eq!(efforts2, vec!["8.00h", "2.00h", "0.50h"], "descending effort order");
     }
 
     #[test]
@@ -723,56 +508,23 @@ mod list_effort {
         let temp = TempDir::new().unwrap();
 
         // Time efforts: 0.50h, 2.00h, 8.00h
-        run(
-            &mut crate::common::lotar_cmd().unwrap(),
-            &temp,
-            &["task", "add", "A", "--effort", "30m"],
-        )
-        .success();
-        run(
-            &mut crate::common::lotar_cmd().unwrap(),
-            &temp,
-            &["task", "add", "B", "--effort", "2h"],
-        )
-        .success();
-        run(
-            &mut crate::common::lotar_cmd().unwrap(),
-            &temp,
-            &["task", "add", "C", "--effort", "1d"],
-        )
-        .success();
+        run(&mut crate::common::lotar_cmd().unwrap(), &temp, &["task", "add", "A", "--effort", "30m"]).success();
+        run(&mut crate::common::lotar_cmd().unwrap(), &temp, &["task", "add", "B", "--effort", "2h"]).success();
+        run(&mut crate::common::lotar_cmd().unwrap(), &temp, &["task", "add", "C", "--effort", "1d"]).success();
 
         // Filter [1h, 1d] inclusive; expect 2.00h and 8.00h
         let out = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
             .env("LOTAR_TEST_SILENT", "1")
-            .args([
-                "task",
-                "list",
-                "--format",
-                "json",
-                "--effort-min",
-                "1h",
-                "--effort-max",
-                "1d",
-                "--sort-by=effort",
-                "order=asc",
-            ])
+            .args(["task", "list", "--format", "json", "--effort-min", "1h", "--effort-max", "1d", "--sort-by=effort", "order=asc"])
             .output()
             .unwrap();
         assert!(out.status.success());
         let v: Value = serde_json::from_slice(&out.stdout).unwrap();
         let tasks = v["tasks"].as_array().unwrap();
-        let efforts: Vec<&str> = tasks
-            .iter()
-            .map(|t| t["effort"].as_str().unwrap_or("-"))
-            .collect();
-        assert_eq!(
-            efforts,
-            vec!["2.00h", "8.00h"],
-            "filtered inclusive time window"
-        );
+        let efforts: Vec<&str> = tasks.iter().map(|t| t["effort"].as_str().unwrap_or("-")).collect();
+        assert_eq!(efforts, vec!["2.00h", "8.00h"], "filtered inclusive time window");
     }
 
     #[test]
@@ -780,40 +532,16 @@ mod list_effort {
         let temp = TempDir::new().unwrap();
 
         // Mixed: time and points
-        run(
-            &mut crate::common::lotar_cmd().unwrap(),
-            &temp,
-            &["task", "add", "T1", "--effort", "2h"],
-        )
-        .success();
-        run(
-            &mut crate::common::lotar_cmd().unwrap(),
-            &temp,
-            &["task", "add", "P3", "--effort", "3pt"],
-        )
-        .success();
-        run(
-            &mut crate::common::lotar_cmd().unwrap(),
-            &temp,
-            &["task", "add", "P5", "--effort", "5"],
-        )
-        .success(); // bare number => points
+        run(&mut crate::common::lotar_cmd().unwrap(), &temp, &["task", "add", "T1", "--effort", "2h"]).success();
+        run(&mut crate::common::lotar_cmd().unwrap(), &temp, &["task", "add", "P3", "--effort", "3pt"]).success();
+        run(&mut crate::common::lotar_cmd().unwrap(), &temp, &["task", "add", "P5", "--effort", "5"]).success(); // bare number => points
 
         // Points filter: --effort-min 4 (points). Should include only P5; time tasks excluded by kind.
         let out = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
             .env("LOTAR_TEST_SILENT", "1")
-            .args([
-                "task",
-                "list",
-                "--format",
-                "json",
-                "--effort-min",
-                "4",
-                "--sort-by=effort",
-                "order=asc",
-            ])
+            .args(["task", "list", "--format", "json", "--effort-min", "4", "--sort-by=effort", "order=asc"])
             .output()
             .unwrap();
         assert!(out.status.success());
@@ -836,50 +564,26 @@ mod status_patterns {
     fn test_status_get_operation() {
         let test_fixtures = TestFixtures::new();
         let temp_dir = test_fixtures.temp_dir.path();
-        let _guard = EnvVarGuard::set(
-            "LOTAR_TASKS_DIR",
-            &test_fixtures.tasks_root.to_string_lossy(),
-        );
+        let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &test_fixtures.tasks_root.to_string_lossy());
 
         // Create a task first using the new CLI with explicit project
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("task")
-            .arg("add")
-            .arg("Test task for status get")
-            .arg("--project=test-project")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("task").arg("add").arg("Test task for status get").arg("--project=test-project").assert().success();
 
         // Get the status (should be TODO by default)
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("status")
-            .arg("1")
-            .arg("--project=test-project")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("status: Todo"));
+        cmd.current_dir(temp_dir).arg("status").arg("1").arg("--project=test-project").assert().success().stdout(predicate::str::contains("status: Todo"));
     }
 
     #[test]
     fn test_status_set_operation() {
         let test_fixtures = TestFixtures::new();
         let temp_dir = test_fixtures.temp_dir.path();
-        let _guard = EnvVarGuard::set(
-            "LOTAR_TASKS_DIR",
-            &test_fixtures.tasks_root.to_string_lossy(),
-        );
+        let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &test_fixtures.tasks_root.to_string_lossy());
 
         // Create a task first using the new CLI with explicit project
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("task")
-            .arg("add")
-            .arg("Test task for status set")
-            .arg("--project=test-project")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("task").arg("add").arg("Test task for status set").arg("--project=test-project").assert().success();
 
         // Set the status to in_progress
         let mut cmd = crate::common::lotar_cmd().unwrap();
@@ -890,99 +594,52 @@ mod status_patterns {
             .arg("--project=test-project")
             .assert()
             .success()
-            .stdout(predicate::str::contains(
-                "status changed from Todo to InProgress",
-            ));
+            .stdout(predicate::str::contains("status changed from Todo to InProgress"));
     }
 
     #[test]
     fn test_status_get_after_set() {
         let test_fixtures = TestFixtures::new();
         let temp_dir = test_fixtures.temp_dir.path();
-        let _guard = EnvVarGuard::set(
-            "LOTAR_TASKS_DIR",
-            &test_fixtures.tasks_root.to_string_lossy(),
-        );
+        let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &test_fixtures.tasks_root.to_string_lossy());
 
         // Create a task using the new CLI with explicit project
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("task")
-            .arg("add")
-            .arg("Test task for get after set")
-            .arg("--project=test-project")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("task").arg("add").arg("Test task for get after set").arg("--project=test-project").assert().success();
 
         // Set status to done
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("status")
-            .arg("1")
-            .arg("done")
-            .arg("--project=test-project")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("status").arg("1").arg("done").arg("--project=test-project").assert().success();
 
         // Verify the status was changed
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("status")
-            .arg("1")
-            .arg("--project=test-project")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("status: Done"));
+        cmd.current_dir(temp_dir).arg("status").arg("1").arg("--project=test-project").assert().success().stdout(predicate::str::contains("status: Done"));
     }
 
     #[test]
     fn test_status_full_command_get_operation() {
         let test_fixtures = TestFixtures::new();
         let temp_dir = test_fixtures.temp_dir.path();
-        let _guard = EnvVarGuard::set(
-            "LOTAR_TASKS_DIR",
-            &test_fixtures.tasks_root.to_string_lossy(),
-        );
+        let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &test_fixtures.tasks_root.to_string_lossy());
 
         // Create a task using the new CLI with explicit project
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("task")
-            .arg("add")
-            .arg("Test task for alias get")
-            .arg("--project=test-project")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("task").arg("add").arg("Test task for alias get").arg("--project=test-project").assert().success();
 
         // Use status command to get status (testing that it works without alias)
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("status")
-            .arg("1")
-            .arg("--project=test-project")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("status: Todo"));
+        cmd.current_dir(temp_dir).arg("status").arg("1").arg("--project=test-project").assert().success().stdout(predicate::str::contains("status: Todo"));
     }
 
     #[test]
     fn test_status_full_command_set_operation() {
         let test_fixtures = TestFixtures::new();
         let temp_dir = test_fixtures.temp_dir.path();
-        let _guard = EnvVarGuard::set(
-            "LOTAR_TASKS_DIR",
-            &test_fixtures.tasks_root.to_string_lossy(),
-        );
+        let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &test_fixtures.tasks_root.to_string_lossy());
 
         // Create a task using the new CLI with explicit project
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("task")
-            .arg("add")
-            .arg("Test task for alias set")
-            .arg("--project=test-project")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("task").arg("add").arg("Test task for alias set").arg("--project=test-project").assert().success();
 
         // Use status command to set status (testing that it works without alias)
         let mut cmd = crate::common::lotar_cmd().unwrap();
@@ -993,106 +650,59 @@ mod status_patterns {
             .arg("--project=test-project")
             .assert()
             .success()
-            .stdout(predicate::str::contains(
-                "status changed from Todo to InProgress",
-            ));
+            .stdout(predicate::str::contains("status changed from Todo to InProgress"));
     }
 
     #[test]
     fn test_status_set_same_value_warning() {
         let test_fixtures = TestFixtures::new();
         let temp_dir = test_fixtures.temp_dir.path();
-        let _guard = EnvVarGuard::set(
-            "LOTAR_TASKS_DIR",
-            &test_fixtures.tasks_root.to_string_lossy(),
-        );
+        let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &test_fixtures.tasks_root.to_string_lossy());
 
         // Create a task
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("add")
-            .arg("Test task for same status warning")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("add").arg("Test task for same status warning").assert().success();
 
         // Try to set status to the same value (TODO)
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("status")
-            .arg("1")
-            .arg("todo")
-            .assert()
-            .success()
-            .stderr(predicate::str::contains("already has status 'Todo'"));
+        cmd.current_dir(temp_dir).arg("status").arg("1").arg("todo").assert().success().stderr(predicate::str::contains("already has status 'Todo'"));
     }
 
     #[test]
     fn test_status_invalid_status_error() {
         let test_fixtures = TestFixtures::new();
         let temp_dir = test_fixtures.temp_dir.path();
-        let _guard = EnvVarGuard::set(
-            "LOTAR_TASKS_DIR",
-            &test_fixtures.tasks_root.to_string_lossy(),
-        );
+        let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &test_fixtures.tasks_root.to_string_lossy());
 
         // Create a task
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("add")
-            .arg("Test task for invalid status")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("add").arg("Test task for invalid status").assert().success();
 
         // Try to set an invalid status
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("status")
-            .arg("1")
-            .arg("invalid_status")
-            .assert()
-            .failure()
-            .stderr(predicate::str::contains("Status validation failed"));
+        cmd.current_dir(temp_dir).arg("status").arg("1").arg("invalid_status").assert().failure().stderr(predicate::str::contains("Status validation failed"));
     }
 
     #[test]
     fn test_status_nonexistent_task_error() {
         let test_fixtures = TestFixtures::new();
         let temp_dir = test_fixtures.temp_dir.path();
-        let _guard = EnvVarGuard::set(
-            "LOTAR_TASKS_DIR",
-            &test_fixtures.tasks_root.to_string_lossy(),
-        );
+        let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &test_fixtures.tasks_root.to_string_lossy());
 
         // Try to get status of non-existent task
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("status")
-            .arg("999")
-            .assert()
-            .failure()
-            .stderr(predicate::str::contains("not found"));
+        cmd.current_dir(temp_dir).arg("status").arg("999").assert().failure().stderr(predicate::str::contains("not found"));
     }
 
     #[test]
     fn test_status_with_project_prefix() {
         let test_fixtures = TestFixtures::new();
         let temp_dir = test_fixtures.temp_dir.path();
-        let _guard = EnvVarGuard::set(
-            "LOTAR_TASKS_DIR",
-            &test_fixtures.tasks_root.to_string_lossy(),
-        );
+        let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &test_fixtures.tasks_root.to_string_lossy());
 
         // Create a task (will get auto-generated prefix)
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        let output = cmd
-            .current_dir(temp_dir)
-            .arg("add")
-            .arg("Test task with prefix")
-            .assert()
-            .success()
-            .get_output()
-            .stdout
-            .clone();
+        let output = cmd.current_dir(temp_dir).arg("add").arg("Test task with prefix").assert().success().get_output().stdout.clone();
 
         // Extract the task ID from the output
         let output_str = String::from_utf8_lossy(&output);
@@ -1104,63 +714,30 @@ mod status_patterns {
 
         // Use full task ID to get status
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("status")
-            .arg(task_id)
-            .assert()
-            .success()
-            .stdout(predicate::str::contains(format!("{task_id} status: Todo")));
+        cmd.current_dir(temp_dir).arg("status").arg(task_id).assert().success().stdout(predicate::str::contains(format!("{task_id} status: Todo")));
     }
 
     #[test]
     fn test_dual_interface_compatibility() {
         let test_fixtures = TestFixtures::new();
         let temp_dir = test_fixtures.temp_dir.path();
-        let _guard = EnvVarGuard::set(
-            "LOTAR_TASKS_DIR",
-            &test_fixtures.tasks_root.to_string_lossy(),
-        );
+        let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &test_fixtures.tasks_root.to_string_lossy());
 
         // Create a task with explicit project to make numeric ID resolution unambiguous
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("task")
-            .arg("add")
-            .arg("Test dual interface")
-            .arg("--project=test-project")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("task").arg("add").arg("Test dual interface").arg("--project=test-project").assert().success();
 
         // Set status using quick command
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("status")
-            .arg("1")
-            .arg("in_progress")
-            .arg("--project=test-project")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("status").arg("1").arg("in_progress").arg("--project=test-project").assert().success();
 
         // Set status using full command (should still work)
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("task")
-            .arg("status")
-            .arg("1")
-            .arg("done")
-            .arg("--project=test-project")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("task").arg("status").arg("1").arg("done").arg("--project=test-project").assert().success();
 
         // Verify final status with quick command
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("status")
-            .arg("1")
-            .arg("--project=test-project")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("status: Done"));
+        cmd.current_dir(temp_dir).arg("status").arg("1").arg("--project=test-project").assert().success().stdout(predicate::str::contains("status: Done"));
     }
 }
 
@@ -1178,22 +755,10 @@ mod dry_run {
 
         // Create a task first and extract ID from output
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        let add_out = cmd
-            .current_dir(temp)
-            .arg("task")
-            .arg("add")
-            .arg("Initial Task")
-            .output()
-            .unwrap();
+        let add_out = cmd.current_dir(temp).arg("task").arg("add").arg("Initial Task").output().unwrap();
         assert!(add_out.status.success());
         let stdout = String::from_utf8_lossy(&add_out.stdout);
-        let id = stdout
-            .lines()
-            .find_map(|l| {
-                l.strip_prefix("✅ Created task: ")
-                    .map(|s| s.trim().to_string())
-            })
-            .expect("expected created task id in output");
+        let id = stdout.lines().find_map(|l| l.strip_prefix("✅ Created task: ").map(|s| s.trim().to_string())).expect("expected created task id in output");
 
         // Dry-run edit change priority
         let mut edit = crate::common::lotar_cmd().unwrap();
@@ -1216,22 +781,10 @@ mod dry_run {
 
         // Create a task first and extract ID from output
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        let add_out = cmd
-            .current_dir(temp)
-            .arg("task")
-            .arg("add")
-            .arg("Task To Delete")
-            .output()
-            .unwrap();
+        let add_out = cmd.current_dir(temp).arg("task").arg("add").arg("Task To Delete").output().unwrap();
         assert!(add_out.status.success());
         let stdout = String::from_utf8_lossy(&add_out.stdout);
-        let id = stdout
-            .lines()
-            .find_map(|l| {
-                l.strip_prefix("✅ Created task: ")
-                    .map(|s| s.trim().to_string())
-            })
-            .expect("expected created task id in output");
+        let id = stdout.lines().find_map(|l| l.strip_prefix("✅ Created task: ").map(|s| s.trim().to_string())).expect("expected created task id in output");
 
         // Dry-run delete
         let mut del = crate::common::lotar_cmd().unwrap();
@@ -1247,14 +800,7 @@ mod dry_run {
         // Verify the task still exists by attempting to delete for real
         // (soft delete succeeds and mentions the restore path)
         let mut del2 = crate::common::lotar_cmd().unwrap();
-        del2.current_dir(temp)
-            .arg("task")
-            .arg("delete")
-            .arg(&id)
-            .arg("--force")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("deleted (soft"));
+        del2.current_dir(temp).arg("task").arg("delete").arg(&id).arg("--force").assert().success().stdout(predicate::str::contains("deleted (soft"));
     }
 }
 
@@ -1409,11 +955,7 @@ issue.priorities: [Low, Medium, High]
         let mut storage = Storage::new(&tasks_dir);
         let created = TaskService::create(
             &mut storage,
-            TaskCreate {
-                title: "Preview status change".to_string(),
-                project: Some("TEST".to_string()),
-                ..TaskCreate::default()
-            },
+            TaskCreate { title: "Preview status change".to_string(), project: Some("TEST".to_string()), ..TaskCreate::default() },
         )
         .expect("create task");
 
@@ -1453,13 +995,7 @@ issue.priorities: [Low, Medium, High]
         // Run add in dry-run mode
         let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp.path())
-            .args([
-                "add",
-                "Dry run task",
-                "--project=TEST",
-                "--dry-run",
-                "--explain",
-            ])
+            .args(["add", "Dry run task", "--project=TEST", "--dry-run", "--explain"])
             .assert()
             .success()
             .stdout(predicate::str::contains("DRY RUN: Would create task"))
@@ -1467,10 +1003,7 @@ issue.priorities: [Low, Medium, High]
 
         // No new YAML files should be written
         let after_count = count_task_yaml_files(&tasks_dir);
-        assert_eq!(
-            before_count, after_count,
-            "dry-run should not write task files"
-        );
+        assert_eq!(before_count, after_count, "dry-run should not write task files");
     }
 
     fn count_task_yaml_files(tasks_dir: &std::path::Path) -> usize {
@@ -1512,10 +1045,7 @@ mod comments {
         let tf = TestFixtures::new();
         // create a task
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(tf.get_temp_path())
-            .args(["add", "Test task for comments"])
-            .assert()
-            .success();
+        cmd.current_dir(tf.get_temp_path()).args(["add", "Test task for comments"]).assert().success();
 
         // list to get ID
         let output = crate::common::lotar_cmd()
@@ -1535,10 +1065,7 @@ mod comments {
 
         // add comment
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(tf.get_temp_path())
-            .args(["comment", &id, "hello world"])
-            .assert()
-            .success();
+        cmd.current_dir(tf.get_temp_path()).args(["comment", &id, "hello world"]).assert().success();
 
         // verify via JSON second run
         let out = crate::common::lotar_cmd()
@@ -1557,12 +1084,7 @@ mod comments {
     fn comment_message_flag_adds_comment() {
         let tf = TestFixtures::new();
         // create a task
-        crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(tf.get_temp_path())
-            .args(["add", "Task for -m"])
-            .assert()
-            .success();
+        crate::common::lotar_cmd().unwrap().current_dir(tf.get_temp_path()).args(["add", "Task for -m"]).assert().success();
 
         // get id (use JSON for stability)
         let out = crate::common::lotar_cmd()
@@ -1580,24 +1102,14 @@ mod comments {
             .expect("Expected an ID in list JSON output");
 
         // add comment with -m
-        crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(tf.get_temp_path())
-            .args(["comment", &id, "-m", "via flag message"])
-            .assert()
-            .success();
+        crate::common::lotar_cmd().unwrap().current_dir(tf.get_temp_path()).args(["comment", &id, "-m", "via flag message"]).assert().success();
     }
 
     #[test]
     fn comment_requires_text() {
         let tf = TestFixtures::new();
         // create a task
-        crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(tf.get_temp_path())
-            .args(["add", "Task for empty check"])
-            .assert()
-            .success();
+        crate::common::lotar_cmd().unwrap().current_dir(tf.get_temp_path()).args(["add", "Task for empty check"]).assert().success();
 
         // get id via JSON list
         let out = crate::common::lotar_cmd()
@@ -1630,12 +1142,7 @@ mod comments {
         use tempfile::TempDir;
         let temp = TempDir::new().unwrap();
         // Create a task
-        crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(temp.path())
-            .args(["task", "add", "A"])
-            .assert()
-            .success();
+        crate::common::lotar_cmd().unwrap().current_dir(temp.path()).args(["task", "add", "A"]).assert().success();
 
         // Resolve created ID by listing
         let out = crate::common::lotar_cmd()
@@ -1672,12 +1179,7 @@ mod comments {
     fn task_comment_parity_list_on_empty() {
         let tf = TestFixtures::new();
         // create a task
-        crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(tf.get_temp_path())
-            .args(["add", "Task for task comment parity"])
-            .assert()
-            .success();
+        crate::common::lotar_cmd().unwrap().current_dir(tf.get_temp_path()).args(["add", "Task for task comment parity"]).assert().success();
 
         // get id via JSON list
         let out = crate::common::lotar_cmd()
@@ -1716,86 +1218,31 @@ mod list_features {
 
     fn list_json(temp_dir: &std::path::Path, args: &[&str]) -> Value {
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        let output = cmd
-            .current_dir(temp_dir)
-            .env("LOTAR_TEST_SILENT", "1")
-            .args(args)
-            .arg("--format=json")
-            .output()
-            .expect("run list");
-        assert!(
-            output.status.success(),
-            "list {:?} failed: {}",
-            args,
-            String::from_utf8_lossy(&output.stderr)
-        );
-        serde_json::from_slice(&output.stdout).unwrap_or_else(|e| {
-            panic!(
-                "list must emit valid JSON: {e}: {}",
-                String::from_utf8_lossy(&output.stdout)
-            )
-        })
+        let output = cmd.current_dir(temp_dir).env("LOTAR_TEST_SILENT", "1").args(args).arg("--format=json").output().expect("run list");
+        assert!(output.status.success(), "list {:?} failed: {}", args, String::from_utf8_lossy(&output.stderr));
+        serde_json::from_slice(&output.stdout).unwrap_or_else(|e| panic!("list must emit valid JSON: {e}: {}", String::from_utf8_lossy(&output.stdout)))
     }
 
     fn titles(payload: &Value) -> Vec<String> {
-        let mut titles: Vec<String> = payload["tasks"]
-            .as_array()
-            .expect("tasks array")
-            .iter()
-            .map(|task| task["title"].as_str().expect("title").to_string())
-            .collect();
+        let mut titles: Vec<String> =
+            payload["tasks"].as_array().expect("tasks array").iter().map(|task| task["title"].as_str().expect("title").to_string()).collect();
         titles.sort();
         titles
     }
 
     fn seed_filter_tasks(temp_dir: &std::path::Path) {
         for (title, extra) in [
-            (
-                "Bug task",
-                vec![
-                    "--type=bug",
-                    "--priority=high",
-                    "--assignee=alice@company.com",
-                ],
-            ),
-            (
-                "Feature task",
-                vec![
-                    "--type=feature",
-                    "--priority=medium",
-                    "--assignee=bob@company.com",
-                ],
-            ),
+            ("Bug task", vec!["--type=bug", "--priority=high", "--assignee=alice@company.com"]),
+            ("Feature task", vec!["--type=feature", "--priority=medium", "--assignee=bob@company.com"]),
             ("Chore task", vec!["--type=chore", "--priority=medium"]),
         ] {
             let mut cmd = crate::common::lotar_cmd().unwrap();
-            let output = cmd
-                .current_dir(temp_dir)
-                .env("LOTAR_TEST_SILENT", "1")
-                .arg("add")
-                .arg(title)
-                .args(&extra)
-                .output()
-                .expect("seed task");
-            assert!(
-                output.status.success(),
-                "seed {} failed: {}",
-                title,
-                String::from_utf8_lossy(&output.stderr)
-            );
+            let output = cmd.current_dir(temp_dir).env("LOTAR_TEST_SILENT", "1").arg("add").arg(title).args(&extra).output().expect("seed task");
+            assert!(output.status.success(), "seed {} failed: {}", title, String::from_utf8_lossy(&output.stderr));
         }
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        let output = cmd
-            .current_dir(temp_dir)
-            .env("LOTAR_TEST_SILENT", "1")
-            .args(["status", "2", "in_progress"])
-            .output()
-            .expect("set status");
-        assert!(
-            output.status.success(),
-            "status update failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
+        let output = cmd.current_dir(temp_dir).env("LOTAR_TEST_SILENT", "1").args(["status", "2", "in_progress"]).output().expect("set status");
+        assert!(output.status.success(), "status update failed: {}", String::from_utf8_lossy(&output.stderr));
     }
 
     #[test]
@@ -1809,21 +1256,10 @@ mod list_features {
             vec!["Bug task", "Chore task"],
             "status filter must return exactly the Todo tasks"
         );
+        assert_eq!(titles(&list_json(temp_dir, &["list", "--priority=high"])), vec!["Bug task"], "priority filter must return exactly the High task");
+        assert_eq!(titles(&list_json(temp_dir, &["list", "priority:high"])), vec!["Bug task"], "priority:high in the query must match the priority flag");
         assert_eq!(
-            titles(&list_json(temp_dir, &["list", "--priority=high"])),
-            vec!["Bug task"],
-            "priority filter must return exactly the High task"
-        );
-        assert_eq!(
-            titles(&list_json(temp_dir, &["list", "priority:high"])),
-            vec!["Bug task"],
-            "priority:high in the query must match the priority flag"
-        );
-        assert_eq!(
-            titles(&list_json(
-                temp_dir,
-                &["list", "--assignee=alice@company.com"]
-            )),
+            titles(&list_json(temp_dir, &["list", "--assignee=alice@company.com"])),
             vec!["Bug task"],
             "assignee filter must return exactly the assigned task"
         );
@@ -1836,18 +1272,12 @@ mod list_features {
         seed_filter_tasks(temp_dir);
 
         assert_eq!(
-            titles(&list_json(
-                temp_dir,
-                &["list", "--status=todo", "--status=in_progress"]
-            )),
+            titles(&list_json(temp_dir, &["list", "--status=todo", "--status=in_progress"])),
             vec!["Bug task", "Chore task", "Feature task"],
             "repeated --status flags must combine with OR"
         );
         assert_eq!(
-            titles(&list_json(
-                temp_dir,
-                &["list", "--type=bug", "--type=feature"]
-            )),
+            titles(&list_json(temp_dir, &["list", "--type=bug", "--type=feature"])),
             vec!["Bug task", "Feature task"],
             "repeated --type flags must combine with OR"
         );
@@ -1877,17 +1307,9 @@ mod list_features {
         seed_filter_tasks(temp_dir);
 
         let payload = list_json(temp_dir, &["list", "--sort-by=priority"]);
-        let ordered: Vec<String> = payload["tasks"]
-            .as_array()
-            .expect("tasks array")
-            .iter()
-            .map(|task| task["title"].as_str().expect("title").to_string())
-            .collect();
-        assert_eq!(
-            ordered,
-            vec!["Bug task", "Feature task", "Chore task"],
-            "priority sort must be High first with ascending-ID tiebreak for equal priorities"
-        );
+        let ordered: Vec<String> =
+            payload["tasks"].as_array().expect("tasks array").iter().map(|task| task["title"].as_str().expect("title").to_string()).collect();
+        assert_eq!(ordered, vec!["Bug task", "Feature task", "Chore task"], "priority sort must be High first with ascending-ID tiebreak for equal priorities");
     }
 
     #[test]
@@ -1896,17 +1318,9 @@ mod list_features {
         let temp_dir = fixtures.temp_dir.path();
         seed_filter_tasks(temp_dir);
 
-        assert_eq!(
-            titles(&list_json(temp_dir, &["list", "Bug"])),
-            vec!["Bug task"],
-            "positional search must filter by title text"
-        );
+        assert_eq!(titles(&list_json(temp_dir, &["list", "Bug"])), vec!["Bug task"], "positional search must filter by title text");
         let payload = list_json(temp_dir, &["list", "zzz-no-match"]);
-        assert_eq!(
-            titles(&payload),
-            Vec::<String>::new(),
-            "non-matching search text must return an empty result: {payload}"
-        );
+        assert_eq!(titles(&payload), Vec::<String>::new(), "non-matching search text must return an empty result: {payload}");
     }
 
     #[test]
@@ -1924,36 +1338,18 @@ mod list_features {
                 .arg("--type=feature")
                 .output()
                 .expect("seed task");
-            assert!(
-                output.status.success(),
-                "seed task {i} failed: {}",
-                String::from_utf8_lossy(&output.stderr)
-            );
+            assert!(output.status.success(), "seed task {i} failed: {}", String::from_utf8_lossy(&output.stderr));
         }
 
-        let limited = list_json(
-            temp_dir,
-            &["list", "--limit=3", "--sort-by=id", "order=asc"],
-        );
+        let limited = list_json(temp_dir, &["list", "--limit=3", "--sort-by=id", "order=asc"]);
         assert_eq!(
             titles(&limited),
-            vec![
-                "Performance test task 1",
-                "Performance test task 2",
-                "Performance test task 3"
-            ],
+            vec!["Performance test task 1", "Performance test task 2", "Performance test task 3"],
             "--limit=3 must cap results to the first three tasks"
         );
 
-        let all = list_json(
-            temp_dir,
-            &["list", "--sort-by=id", "order=asc", "--page-size=20"],
-        );
-        assert_eq!(
-            titles(&all).len(),
-            5,
-            "listing without --limit must return all five tasks"
-        );
+        let all = list_json(temp_dir, &["list", "--sort-by=id", "order=asc", "--page-size=20"]);
+        assert_eq!(titles(&all).len(), 5, "listing without --limit must return all five tasks");
     }
 
     #[test]
@@ -1963,65 +1359,22 @@ mod list_features {
 
         for i in 1..=5 {
             let mut cmd = crate::common::lotar_cmd().unwrap();
-            let output = cmd
-                .current_dir(temp_dir)
-                .env("LOTAR_TEST_SILENT", "1")
-                .arg("add")
-                .arg(format!("Pagination task {i}"))
-                .output()
-                .expect("seed task");
-            assert!(
-                output.status.success(),
-                "seed task {i} failed: {}",
-                String::from_utf8_lossy(&output.stderr)
-            );
+            let output = cmd.current_dir(temp_dir).env("LOTAR_TEST_SILENT", "1").arg("add").arg(format!("Pagination task {i}")).output().expect("seed task");
+            assert!(output.status.success(), "seed task {i} failed: {}", String::from_utf8_lossy(&output.stderr));
         }
 
         let ids = |payload: &Value| -> Vec<String> {
-            payload["tasks"]
-                .as_array()
-                .expect("tasks array")
-                .iter()
-                .map(|task| task["id"].as_str().expect("id").to_string())
-                .collect()
+            payload["tasks"].as_array().expect("tasks array").iter().map(|task| task["id"].as_str().expect("id").to_string()).collect()
         };
 
-        let first = list_json(
-            temp_dir,
-            &["list", "--page-size=2", "--sort-by=id", "order=asc"],
-        );
-        let by_offset = list_json(
-            temp_dir,
-            &[
-                "list",
-                "--page-size=2",
-                "--offset=2",
-                "--sort-by=id",
-                "order=asc",
-            ],
-        );
-        let by_page = list_json(
-            temp_dir,
-            &[
-                "list",
-                "--page-size=2",
-                "--page=2",
-                "--sort-by=id",
-                "order=asc",
-            ],
-        );
+        let first = list_json(temp_dir, &["list", "--page-size=2", "--sort-by=id", "order=asc"]);
+        let by_offset = list_json(temp_dir, &["list", "--page-size=2", "--offset=2", "--sort-by=id", "order=asc"]);
+        let by_page = list_json(temp_dir, &["list", "--page-size=2", "--page=2", "--sort-by=id", "order=asc"]);
 
         assert_eq!(ids(&first).len(), 2, "first page must have two tasks");
         assert_eq!(ids(&by_offset).len(), 2, "offset page must have two tasks");
-        assert!(
-            ids(&first).iter().all(|id| !ids(&by_offset).contains(id)),
-            "second page (by offset) should not repeat first page"
-        );
-        assert_eq!(
-            ids(&by_offset),
-            ids(&by_page),
-            "--page=2 should match --offset=2 when page-size=2"
-        );
+        assert!(ids(&first).iter().all(|id| !ids(&by_offset).contains(id)), "second page (by offset) should not repeat first page");
+        assert_eq!(ids(&by_offset), ids(&by_page), "--page=2 should match --offset=2 when page-size=2");
     }
 
     #[test]
@@ -2032,32 +1385,14 @@ mod list_features {
         let output = cmd
             .current_dir(temp_dir)
             .env("LOTAR_TEST_SILENT", "1")
-            .args([
-                "add",
-                "Summary test task",
-                "--type=feature",
-                "--priority=high",
-            ])
+            .args(["add", "Summary test task", "--type=feature", "--priority=high"])
             .output()
             .expect("seed task");
-        assert!(
-            output.status.success(),
-            "seed failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
+        assert!(output.status.success(), "seed failed: {}", String::from_utf8_lossy(&output.stderr));
 
-        for args in [
-            vec!["list"],
-            vec!["list", "--status=todo"],
-            vec!["list", "--limit=5"],
-        ] {
+        for args in [vec!["list"], vec!["list", "--status=todo"], vec!["list", "--limit=5"]] {
             let payload = list_json(temp_dir, &args);
-            assert_eq!(
-                titles(&payload),
-                vec!["Summary test task"],
-                "list {:?} must return the seeded task",
-                args
-            );
+            assert_eq!(titles(&payload), vec!["Summary test task"], "list {:?} must return the seeded task", args);
         }
 
         let mut cmd = crate::common::lotar_cmd().unwrap();
@@ -2087,63 +1422,22 @@ mod list_features {
             let temp_dir = fixtures.temp_dir.path();
 
             let mut cmd = crate::common::lotar_cmd().unwrap();
-            cmd.current_dir(temp_dir)
-                .arg("add")
-                .arg("Backend task")
-                .arg("--tag=urgent")
-                .arg("--tag=backend")
-                .arg("--tag=feature")
-                .assert()
-                .success();
+            cmd.current_dir(temp_dir).arg("add").arg("Backend task").arg("--tag=urgent").arg("--tag=backend").arg("--tag=feature").assert().success();
 
             let mut cmd = crate::common::lotar_cmd().unwrap();
-            cmd.current_dir(temp_dir)
-                .arg("add")
-                .arg("Frontend task")
-                .arg("--tag=frontend")
-                .arg("--tag=testing")
-                .assert()
-                .success();
+            cmd.current_dir(temp_dir).arg("add").arg("Frontend task").arg("--tag=frontend").arg("--tag=testing").assert().success();
 
             let mut cmd = crate::common::lotar_cmd().unwrap();
-            cmd.current_dir(temp_dir)
-                .arg("add")
-                .arg("Database task")
-                .arg("--tag=database")
-                .arg("--tag=backend")
-                .assert()
-                .success();
+            cmd.current_dir(temp_dir).arg("add").arg("Database task").arg("--tag=database").arg("--tag=backend").assert().success();
 
             let mut cmd = crate::common::lotar_cmd().unwrap();
-            let output = cmd
-                .current_dir(temp_dir)
-                .arg("list")
-                .arg("--tag=urgent")
-                .arg("--format=json")
-                .assert()
-                .success()
-                .get_output()
-                .stdout
-                .clone();
+            let output = cmd.current_dir(temp_dir).arg("list").arg("--tag=urgent").arg("--format=json").assert().success().get_output().stdout.clone();
 
             let stdout = String::from_utf8_lossy(&output);
             let json: serde_json::Value = serde_json::from_str(&stdout).expect("Valid JSON");
-            let tasks = if let Some(arr) = json.as_array() {
-                arr
-            } else {
-                json["tasks"].as_array().expect("Tasks array")
-            };
-            assert_eq!(
-                tasks.len(),
-                1,
-                "Should find exactly one task with 'urgent' tag"
-            );
-            assert!(
-                tasks[0]["tags"]
-                    .as_array()
-                    .unwrap()
-                    .contains(&serde_json::Value::String("urgent".to_string()))
-            );
+            let tasks = if let Some(arr) = json.as_array() { arr } else { json["tasks"].as_array().expect("Tasks array") };
+            assert_eq!(tasks.len(), 1, "Should find exactly one task with 'urgent' tag");
+            assert!(tasks[0]["tags"].as_array().unwrap().contains(&serde_json::Value::String("urgent".to_string())));
 
             let mut cmd = crate::common::lotar_cmd().unwrap();
             let output = cmd
@@ -2160,21 +1454,10 @@ mod list_features {
 
             let stdout = String::from_utf8_lossy(&output);
             let json: serde_json::Value = serde_json::from_str(&stdout).expect("Valid JSON");
-            let tasks = if let Some(arr) = json.as_array() {
-                arr
-            } else {
-                json["tasks"].as_array().expect("Tasks array")
-            };
-            assert_eq!(
-                tasks.len(),
-                2,
-                "Should find two tasks: one with 'urgent' and one with 'frontend' tag"
-            );
+            let tasks = if let Some(arr) = json.as_array() { arr } else { json["tasks"].as_array().expect("Tasks array") };
+            assert_eq!(tasks.len(), 2, "Should find two tasks: one with 'urgent' and one with 'frontend' tag");
 
-            let task_titles: Vec<String> = tasks
-                .iter()
-                .map(|t| t["title"].as_str().unwrap().to_string())
-                .collect();
+            let task_titles: Vec<String> = tasks.iter().map(|t| t["title"].as_str().unwrap().to_string()).collect();
             assert!(task_titles.contains(&"Backend task".to_string()));
             assert!(task_titles.contains(&"Frontend task".to_string()));
 
@@ -2193,16 +1476,8 @@ mod list_features {
 
             let stdout = String::from_utf8_lossy(&output);
             let json: serde_json::Value = serde_json::from_str(&stdout).expect("Valid JSON");
-            let tasks = if let Some(arr) = json.as_array() {
-                arr
-            } else {
-                json["tasks"].as_array().expect("Tasks array")
-            };
-            assert_eq!(
-                tasks.len(),
-                3,
-                "Should find three tasks: two with 'backend' and one with 'testing' tag"
-            );
+            let tasks = if let Some(arr) = json.as_array() { arr } else { json["tasks"].as_array().expect("Tasks array") };
+            assert_eq!(tasks.len(), 3, "Should find three tasks: two with 'backend' and one with 'testing' tag");
         }
 
         #[test]
@@ -2227,15 +1502,7 @@ mod list_features {
                 .success();
 
             let mut cmd = crate::common::lotar_cmd().unwrap();
-            let output = cmd
-                .current_dir(temp_dir)
-                .arg("list")
-                .arg("--format=json")
-                .assert()
-                .success()
-                .get_output()
-                .stdout
-                .clone();
+            let output = cmd.current_dir(temp_dir).arg("list").arg("--format=json").assert().success().get_output().stdout.clone();
 
             let stdout = String::from_utf8_lossy(&output);
             let json: serde_json::Value = serde_json::from_str(&stdout).expect("Valid JSON");
@@ -2273,9 +1540,7 @@ mod list_features {
             assert!(task["project"].as_str().is_some());
             assert!(!task["project"].is_null());
 
-            let custom_fields = task["custom_fields"]
-                .as_object()
-                .expect("Custom fields should be an object");
+            let custom_fields = task["custom_fields"].as_object().expect("Custom fields should be an object");
             assert_eq!(custom_fields.get("product").unwrap(), "web");
             assert!(custom_fields.contains_key("custom"));
         }
@@ -2286,12 +1551,7 @@ mod list_features {
             let temp_dir = fixtures.temp_dir.path();
 
             let mut cmd = crate::common::lotar_cmd().unwrap();
-            cmd.current_dir(temp_dir)
-                .arg("add")
-                .arg("Test task")
-                .arg("--tag=test")
-                .assert()
-                .success();
+            cmd.current_dir(temp_dir).arg("add").arg("Test task").arg("--tag=test").assert().success();
 
             let mut cmd = crate::common::lotar_cmd().unwrap();
             cmd.current_dir(temp_dir)
@@ -2307,28 +1567,16 @@ mod list_features {
 
 fn get_task_as_json(temp_dir: &TempDir, task_id: &str) -> serde_json::Value {
     let mut cmd = crate::common::lotar_cmd().unwrap();
-    let output = cmd
-        .current_dir(temp_dir)
-        .args(["--format=json", "list"])
-        .output()
-        .unwrap();
+    let output = cmd.current_dir(temp_dir).args(["--format=json", "list"]).output().unwrap();
 
-    assert!(
-        output.status.success(),
-        "Should be able to retrieve task list as JSON"
-    );
+    assert!(output.status.success(), "Should be able to retrieve task list as JSON");
 
-    let json: serde_json::Value =
-        serde_json::from_slice(&output.stdout).expect("Should produce valid JSON");
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).expect("Should produce valid JSON");
 
     // Find the task with the matching ID in the tasks array
     if let Some(tasks) = json.get("tasks").and_then(|t| t.as_array()) {
         for task in tasks {
-            if task
-                .get("id")
-                .and_then(|i| i.as_str())
-                .is_some_and(|id| id == task_id)
-            {
+            if task.get("id").and_then(|i| i.as_str()).is_some_and(|id| id == task_id) {
                 return task.clone();
             }
         }
@@ -2338,18 +1586,10 @@ fn get_task_as_json(temp_dir: &TempDir, task_id: &str) -> serde_json::Value {
 }
 
 fn read_task_yaml(temp_dir: &TempDir, task_id: &str) -> serde_yaml_ng::Value {
-    let (project, sequence) = task_id
-        .rsplit_once('-')
-        .unwrap_or_else(|| panic!("Unexpected task id format: {task_id}"));
-    let path = temp_dir
-        .path()
-        .join(".tasks")
-        .join(project)
-        .join(format!("{sequence}.yml"));
-    let contents = fs::read_to_string(&path)
-        .unwrap_or_else(|_| panic!("Failed to read task file at {}", path.display()));
-    serde_yaml_ng::from_str(&contents)
-        .unwrap_or_else(|_| panic!("Failed to parse YAML for task {task_id}"))
+    let (project, sequence) = task_id.rsplit_once('-').unwrap_or_else(|| panic!("Unexpected task id format: {task_id}"));
+    let path = temp_dir.path().join(".tasks").join(project).join(format!("{sequence}.yml"));
+    let contents = fs::read_to_string(&path).unwrap_or_else(|_| panic!("Failed to read task file at {}", path.display()));
+    serde_yaml_ng::from_str(&contents).unwrap_or_else(|_| panic!("Failed to parse YAML for task {task_id}"))
 }
 
 // =============================================================================
@@ -2368,13 +1608,7 @@ mod dual_interface {
         let mut cmd1 = crate::common::lotar_cmd().unwrap();
         let output1 = cmd1
             .current_dir(&temp_dir)
-            .args([
-                "add",
-                "Test task quick",
-                "--priority=high",
-                "--reporter=reporter@example.com",
-                "--assignee=test@example.com",
-            ])
+            .args(["add", "Test task quick", "--priority=high", "--reporter=reporter@example.com", "--assignee=test@example.com"])
             .output()
             .unwrap();
 
@@ -2388,14 +1622,7 @@ mod dual_interface {
         let mut cmd2 = crate::common::lotar_cmd().unwrap();
         let output2 = cmd2
             .current_dir(&temp_dir)
-            .args([
-                "task",
-                "add",
-                "Test task full",
-                "--priority=high",
-                "--reporter=reporter@example.com",
-                "--assignee=test@example.com",
-            ])
+            .args(["task", "add", "Test task full", "--priority=high", "--reporter=reporter@example.com", "--assignee=test@example.com"])
             .output()
             .unwrap();
 
@@ -2404,14 +1631,8 @@ mod dual_interface {
         let task_id2 = extract_task_id_from_output(&stdout2);
 
         // Verify both tasks were created
-        assert!(
-            task_id1.is_some(),
-            "Quick interface should create task with ID"
-        );
-        assert!(
-            task_id2.is_some(),
-            "Full interface should create task with ID"
-        );
+        assert!(task_id1.is_some(), "Quick interface should create task with ID");
+        assert!(task_id2.is_some(), "Full interface should create task with ID");
 
         // Get both tasks and compare their properties (excluding ID and creation time)
         let task_id1 = task_id1.unwrap();
@@ -2427,14 +1648,8 @@ mod dual_interface {
 
         let task1_yaml = read_task_yaml(&temp_dir, &task_id1);
         let task2_yaml = read_task_yaml(&temp_dir, &task_id2);
-        assert_eq!(
-            task1_yaml["reporter"],
-            serde_yaml_ng::Value::String("reporter@example.com".to_string())
-        );
-        assert_eq!(
-            task2_yaml["reporter"],
-            serde_yaml_ng::Value::String("reporter@example.com".to_string())
-        );
+        assert_eq!(task1_yaml["reporter"], serde_yaml_ng::Value::String("reporter@example.com".to_string()));
+        assert_eq!(task2_yaml["reporter"], serde_yaml_ng::Value::String("reporter@example.com".to_string()));
     }
 
     #[test]
@@ -2444,24 +1659,11 @@ mod dual_interface {
         // Test that parameters work the same way in both interfaces
         let test_cases = [
             // (quick_args, full_args, description)
-            (
-                vec!["add", "Simple task"],
-                vec!["task", "add", "Simple task"],
-                "Basic title setting",
-            ),
-            (
-                vec!["add", "Priority task", "--priority=medium"],
-                vec!["task", "add", "Priority task", "--priority=medium"],
-                "Priority setting",
-            ),
+            (vec!["add", "Simple task"], vec!["task", "add", "Simple task"], "Basic title setting"),
+            (vec!["add", "Priority task", "--priority=medium"], vec!["task", "add", "Priority task", "--priority=medium"], "Priority setting"),
             (
                 vec!["add", "Assigned task", "--assignee=user@example.com"],
-                vec![
-                    "task",
-                    "add",
-                    "Assigned task",
-                    "--assignee=user@example.com",
-                ],
+                vec!["task", "add", "Assigned task", "--assignee=user@example.com"],
                 "Assignee setting",
             ),
         ];
@@ -2469,17 +1671,11 @@ mod dual_interface {
         for (quick_args, full_args, _description) in test_cases.iter() {
             // Test quick interface
             let mut cmd1 = crate::common::lotar_cmd().unwrap();
-            cmd1.current_dir(&temp_dir)
-                .args(quick_args)
-                .assert()
-                .success();
+            cmd1.current_dir(&temp_dir).args(quick_args).assert().success();
 
             // Test full interface
             let mut cmd2 = crate::common::lotar_cmd().unwrap();
-            cmd2.current_dir(&temp_dir)
-                .args(full_args)
-                .assert()
-                .success();
+            cmd2.current_dir(&temp_dir).args(full_args).assert().success();
         }
     }
 
@@ -2491,58 +1687,30 @@ mod dual_interface {
 
         // Quick interface with JSON output
         let mut cmd1 = crate::common::lotar_cmd().unwrap();
-        let output1 = cmd1
-            .current_dir(&temp_dir)
-            .args(["--format", "json", "add", "Output test quick"])
-            .output()
-            .unwrap();
+        let output1 = cmd1.current_dir(&temp_dir).args(["--format", "json", "add", "Output test quick"]).output().unwrap();
 
         assert!(output1.status.success());
-        let json1: Value = serde_json::from_slice(&output1.stdout)
-            .expect("Quick interface should produce valid JSON");
+        let json1: Value = serde_json::from_slice(&output1.stdout).expect("Quick interface should produce valid JSON");
 
         // Full interface with JSON output
         let mut cmd2 = crate::common::lotar_cmd().unwrap();
-        let output2 = cmd2
-            .current_dir(&temp_dir)
-            .args(["--format", "json", "task", "add", "Output test full"])
-            .output()
-            .unwrap();
+        let output2 = cmd2.current_dir(&temp_dir).args(["--format", "json", "task", "add", "Output test full"]).output().unwrap();
 
         assert!(output2.status.success());
-        let json2: Value = serde_json::from_slice(&output2.stdout)
-            .expect("Full interface should produce valid JSON");
+        let json2: Value = serde_json::from_slice(&output2.stdout).expect("Full interface should produce valid JSON");
 
         // Both should have the same JSON structure
-        assert!(
-            json1.get("task").is_some(),
-            "Quick interface JSON should include task object"
-        );
-        assert!(
-            json2.get("task").is_some(),
-            "Full interface JSON should include task object"
-        );
+        assert!(json1.get("task").is_some(), "Quick interface JSON should include task object");
+        assert!(json2.get("task").is_some(), "Full interface JSON should include task object");
 
         // Check the task objects have the required fields
         if let Some(task1) = json1.get("task") {
-            assert!(
-                task1.get("id").is_some(),
-                "Quick interface task should have ID"
-            );
-            assert!(
-                task1.get("title").is_some(),
-                "Quick interface task should have title"
-            );
+            assert!(task1.get("id").is_some(), "Quick interface task should have ID");
+            assert!(task1.get("title").is_some(), "Quick interface task should have title");
         }
         if let Some(task2) = json2.get("task") {
-            assert!(
-                task2.get("id").is_some(),
-                "Full interface task should have ID"
-            );
-            assert!(
-                task2.get("title").is_some(),
-                "Full interface task should have title"
-            );
+            assert!(task2.get("id").is_some(), "Full interface task should have ID");
+            assert!(task2.get("title").is_some(), "Full interface task should have title");
         }
     }
 
@@ -2552,41 +1720,20 @@ mod dual_interface {
 
         // Test that enhanced add output shows all set properties
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        let output = cmd
-            .current_dir(&temp_dir)
-            .args([
-                "add",
-                "Enhanced output test",
-                "--priority=high",
-                "--assignee=test@example.com",
-            ])
-            .output()
-            .unwrap();
+        let output = cmd.current_dir(&temp_dir).args(["add", "Enhanced output test", "--priority=high", "--assignee=test@example.com"]).output().unwrap();
 
         assert!(output.status.success());
         let stdout = String::from_utf8_lossy(&output.stdout);
 
         // Should show task ID
-        assert!(
-            stdout.contains("Created task:") || stdout.contains("Task"),
-            "Output should mention task creation"
-        );
+        assert!(stdout.contains("Created task:") || stdout.contains("Task"), "Output should mention task creation");
 
         // Should show title
-        assert!(
-            stdout.contains("Enhanced output test"),
-            "Output should show the task title"
-        );
+        assert!(stdout.contains("Enhanced output test"), "Output should show the task title");
 
         // Should show set properties
-        assert!(
-            stdout.to_lowercase().contains("high") || stdout.to_lowercase().contains("priority"),
-            "Output should show priority information"
-        );
-        assert!(
-            stdout.contains("test@example.com") || stdout.to_lowercase().contains("assignee"),
-            "Output should show assignee information"
-        );
+        assert!(stdout.to_lowercase().contains("high") || stdout.to_lowercase().contains("priority"), "Output should show priority information");
+        assert!(stdout.contains("test@example.com") || stdout.to_lowercase().contains("assignee"), "Output should show assignee information");
     }
 
     #[test]
@@ -2594,45 +1741,16 @@ mod dual_interface {
         let temp_dir = TempDir::new().unwrap();
 
         // Create test tasks
-        crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(&temp_dir)
-            .args(["add", "Task 1", "--priority=high", "--type=feature"])
-            .assert()
-            .success();
+        crate::common::lotar_cmd().unwrap().current_dir(&temp_dir).args(["add", "Task 1", "--priority=high", "--type=feature"]).assert().success();
 
-        crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(&temp_dir)
-            .args(["add", "Task 2", "--priority=low", "--type=bug"])
-            .assert()
-            .success();
+        crate::common::lotar_cmd().unwrap().current_dir(&temp_dir).args(["add", "Task 2", "--priority=low", "--type=bug"]).assert().success();
 
         // Test basic list commands
-        let quick_list = crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(&temp_dir)
-            .args(["list"])
-            .assert()
-            .success()
-            .get_output()
-            .stdout
-            .clone();
+        let quick_list = crate::common::lotar_cmd().unwrap().current_dir(&temp_dir).args(["list"]).assert().success().get_output().stdout.clone();
 
-        let full_list = crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(&temp_dir)
-            .args(["task", "list"])
-            .assert()
-            .success()
-            .get_output()
-            .stdout
-            .clone();
+        let full_list = crate::common::lotar_cmd().unwrap().current_dir(&temp_dir).args(["task", "list"]).assert().success().get_output().stdout.clone();
 
-        assert_eq!(
-            quick_list, full_list,
-            "Basic list commands should return identical output"
-        );
+        assert_eq!(quick_list, full_list, "Basic list commands should return identical output");
     }
 
     #[test]
@@ -2643,58 +1761,25 @@ mod dual_interface {
         crate::common::lotar_cmd()
             .unwrap()
             .current_dir(&temp_dir)
-            .args([
-                "add",
-                "High Priority Feature",
-                "--priority=high",
-                "--type=feature",
-            ])
+            .args(["add", "High Priority Feature", "--priority=high", "--type=feature"])
             .assert()
             .success();
 
-        crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(&temp_dir)
-            .args(["add", "Low Priority Bug", "--priority=low", "--type=bug"])
-            .assert()
-            .success();
+        crate::common::lotar_cmd().unwrap().current_dir(&temp_dir).args(["add", "Low Priority Bug", "--priority=low", "--type=bug"]).assert().success();
 
         // Test filtered lists
-        let quick_filtered = crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(&temp_dir)
-            .args(["list", "--priority=high"])
-            .assert()
-            .success()
-            .get_output()
-            .stdout
-            .clone();
+        let quick_filtered =
+            crate::common::lotar_cmd().unwrap().current_dir(&temp_dir).args(["list", "--priority=high"]).assert().success().get_output().stdout.clone();
 
-        let full_filtered = crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(&temp_dir)
-            .args(["task", "list", "--priority=high"])
-            .assert()
-            .success()
-            .get_output()
-            .stdout
-            .clone();
+        let full_filtered =
+            crate::common::lotar_cmd().unwrap().current_dir(&temp_dir).args(["task", "list", "--priority=high"]).assert().success().get_output().stdout.clone();
 
-        assert_eq!(
-            quick_filtered, full_filtered,
-            "Filtered list commands should return identical output"
-        );
+        assert_eq!(quick_filtered, full_filtered, "Filtered list commands should return identical output");
 
         // Verify the filter worked
         let stdout = String::from_utf8_lossy(&quick_filtered);
-        assert!(
-            stdout.contains("High Priority Feature"),
-            "Should contain high priority task"
-        );
-        assert!(
-            !stdout.contains("Low Priority Bug"),
-            "Should not contain low priority task"
-        );
+        assert!(stdout.contains("High Priority Feature"), "Should contain high priority task");
+        assert!(!stdout.contains("Low Priority Bug"), "Should not contain low priority task");
     }
 
     #[test]
@@ -2702,53 +1787,22 @@ mod dual_interface {
         let temp_dir = TempDir::new().unwrap();
 
         // Create test task
-        crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(&temp_dir)
-            .args(["add", "JSON Test Task", "--priority=medium"])
-            .assert()
-            .success();
+        crate::common::lotar_cmd().unwrap().current_dir(&temp_dir).args(["add", "JSON Test Task", "--priority=medium"]).assert().success();
 
         // Test JSON output
-        let quick_json = crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(&temp_dir)
-            .args(["list", "--format=json"])
-            .assert()
-            .success()
-            .get_output()
-            .stdout
-            .clone();
+        let quick_json =
+            crate::common::lotar_cmd().unwrap().current_dir(&temp_dir).args(["list", "--format=json"]).assert().success().get_output().stdout.clone();
 
-        let full_json = crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(&temp_dir)
-            .args(["task", "list", "--format=json"])
-            .assert()
-            .success()
-            .get_output()
-            .stdout
-            .clone();
+        let full_json =
+            crate::common::lotar_cmd().unwrap().current_dir(&temp_dir).args(["task", "list", "--format=json"]).assert().success().get_output().stdout.clone();
 
-        assert_eq!(
-            quick_json, full_json,
-            "JSON list commands should return identical output"
-        );
+        assert_eq!(quick_json, full_json, "JSON list commands should return identical output");
 
         // Verify JSON structure
         let stdout = String::from_utf8_lossy(&quick_json);
-        assert!(
-            stdout.contains("\"tasks\""),
-            "JSON should contain tasks array"
-        );
-        assert!(
-            stdout.contains("\"status\":\"success\""),
-            "JSON should contain success status"
-        );
-        assert!(
-            stdout.contains("JSON Test Task"),
-            "JSON should contain the task"
-        );
+        assert!(stdout.contains("\"tasks\""), "JSON should contain tasks array");
+        assert!(stdout.contains("\"status\":\"success\""), "JSON should contain success status");
+        assert!(stdout.contains("JSON Test Task"), "JSON should contain the task");
     }
 
     #[test]
@@ -2756,30 +1810,13 @@ mod dual_interface {
         let temp_dir = TempDir::new().unwrap();
 
         // Create tasks with different priorities
-        crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(&temp_dir)
-            .args(["add", "Low Priority Task", "--priority=low"])
-            .assert()
-            .success();
+        crate::common::lotar_cmd().unwrap().current_dir(&temp_dir).args(["add", "Low Priority Task", "--priority=low"]).assert().success();
 
-        crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(&temp_dir)
-            .args(["add", "High Priority Task", "--priority=high"])
-            .assert()
-            .success();
+        crate::common::lotar_cmd().unwrap().current_dir(&temp_dir).args(["add", "High Priority Task", "--priority=high"]).assert().success();
 
         // Test sorted lists
-        let quick_sorted = crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(&temp_dir)
-            .args(["list", "--sort-by=priority"])
-            .assert()
-            .success()
-            .get_output()
-            .stdout
-            .clone();
+        let quick_sorted =
+            crate::common::lotar_cmd().unwrap().current_dir(&temp_dir).args(["list", "--sort-by=priority"]).assert().success().get_output().stdout.clone();
 
         let full_sorted = crate::common::lotar_cmd()
             .unwrap()
@@ -2791,10 +1828,7 @@ mod dual_interface {
             .stdout
             .clone();
 
-        assert_eq!(
-            quick_sorted, full_sorted,
-            "Sorted list commands should return identical output"
-        );
+        assert_eq!(quick_sorted, full_sorted, "Sorted list commands should return identical output");
     }
 }
 
@@ -2811,10 +1845,7 @@ mod file_structure {
 
         // Create a task to trigger directory creation
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(&temp_dir)
-            .args(["task", "add", "Directory Test"])
-            .assert()
-            .success();
+        cmd.current_dir(&temp_dir).args(["task", "add", "Directory Test"]).assert().success();
 
         // Verify .tasks directory was created
         let tasks_dir = temp_dir.path().join(".tasks");
@@ -2826,15 +1857,7 @@ mod file_structure {
         let temp_dir = TempDir::new().unwrap();
 
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(&temp_dir)
-            .args([
-                "task",
-                "add",
-                "Project Directory Test",
-                "--project=test-project",
-            ])
-            .assert()
-            .success();
+        cmd.current_dir(&temp_dir).args(["task", "add", "Project Directory Test", "--project=test-project"]).assert().success();
 
         // Verify project directory was created (with appropriate prefix)
         let tasks_dir = temp_dir.path().join(".tasks");
@@ -2842,18 +1865,11 @@ mod file_structure {
         let project_dirs: Vec<_> = entries
             .filter_map(|entry| {
                 let entry = entry.ok()?;
-                if entry.file_type().ok()?.is_dir() {
-                    Some(entry.file_name().to_string_lossy().to_string())
-                } else {
-                    None
-                }
+                if entry.file_type().ok()?.is_dir() { Some(entry.file_name().to_string_lossy().to_string()) } else { None }
             })
             .collect();
 
-        assert!(
-            !project_dirs.is_empty(),
-            "At least one project directory should exist"
-        );
+        assert!(!project_dirs.is_empty(), "At least one project directory should exist");
     }
 
     #[test]
@@ -2861,10 +1877,7 @@ mod file_structure {
         let temp_dir = TempDir::new().unwrap();
 
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(&temp_dir)
-            .args(["task", "add", "File Creation Test"])
-            .assert()
-            .success();
+        cmd.current_dir(&temp_dir).args(["task", "add", "File Creation Test"]).assert().success();
 
         // Check that task files were created
         let tasks_dir = temp_dir.path().join(".tasks");
@@ -2881,9 +1894,7 @@ mod file_structure {
                 if let Ok(project_entries) = fs::read_dir(project_dir) {
                     for project_entry in project_entries.flatten() {
                         let filename = project_entry.file_name();
-                        if filename.to_string_lossy().ends_with(".yml")
-                            && filename.to_string_lossy() != "config.yml"
-                        {
+                        if filename.to_string_lossy().ends_with(".yml") && filename.to_string_lossy() != "config.yml" {
                             found_task_file = true;
                             break;
                         }
@@ -2904,38 +1915,20 @@ mod file_structure {
 
         // Test that write operations (like add) DO create global config
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(&temp_dir)
-            .args(["add", "Test global config creation"])
-            .assert()
-            .success();
+        cmd.current_dir(&temp_dir).args(["add", "Test global config creation"]).assert().success();
 
         let tasks_dir = temp_dir.path().join(".tasks");
-        assert!(
-            tasks_dir.exists(),
-            "Write operations should create .tasks directory"
-        );
+        assert!(tasks_dir.exists(), "Write operations should create .tasks directory");
 
         // Check for global config.yml (should exist)
         let global_config = tasks_dir.join("config.yml");
-        assert!(
-            global_config.exists(),
-            "Global config.yml SHOULD be created by write operations"
-        );
+        assert!(global_config.exists(), "Global config.yml SHOULD be created by write operations");
 
         // Verify it's a valid global config file, even if all values are defaults
         let config_content = fs::read_to_string(&global_config).unwrap();
-        assert!(
-            config_content.contains("default:\n  project:"),
-            "Global config should record default project prefix"
-        );
-        assert!(
-            !config_content.contains("server:"),
-            "Default global config should not redundantly include server section"
-        );
-        assert!(
-            !config_content.contains("issue:"),
-            "Default global config should omit issue taxonomy defaults"
-        );
+        assert!(config_content.contains("default:\n  project:"), "Global config should record default project prefix");
+        assert!(!config_content.contains("server:"), "Default global config should not redundantly include server section");
+        assert!(!config_content.contains("issue:"), "Default global config should omit issue taxonomy defaults");
     }
 
     #[test]
@@ -2944,40 +1937,22 @@ mod file_structure {
 
         // Test that read-only operations don't create .tasks directory
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(&temp_dir)
-            .args(["status", "TEST-001"])
-            .assert()
-            .failure(); // Expected to fail since task doesn't exist
+        cmd.current_dir(&temp_dir).args(["status", "TEST-001"]).assert().failure(); // Expected to fail since task doesn't exist
 
         let tasks_dir = temp_dir.path().join(".tasks");
-        assert!(
-            !tasks_dir.exists(),
-            "Read-only operations should not create any directories"
-        );
+        assert!(!tasks_dir.exists(), "Read-only operations should not create any directories");
 
         // Test other read-only operations
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(&temp_dir)
-            .args(["priority", "TEST-001"])
-            .assert()
-            .failure(); // Expected to fail since task doesn't exist
+        cmd.current_dir(&temp_dir).args(["priority", "TEST-001"]).assert().failure(); // Expected to fail since task doesn't exist
 
-        assert!(
-            !tasks_dir.exists(),
-            "Read-only property commands should not create directories"
-        );
+        assert!(!tasks_dir.exists(), "Read-only property commands should not create directories");
 
         // Test task subcommand read operations
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(&temp_dir)
-            .args(["task", "priority", "TEST-001"])
-            .assert()
-            .failure(); // Expected to fail since task doesn't exist
+        cmd.current_dir(&temp_dir).args(["task", "priority", "TEST-001"]).assert().failure(); // Expected to fail since task doesn't exist
 
-        assert!(
-            !tasks_dir.exists(),
-            "Task subcommand read operations should not create directories"
-        );
+        assert!(!tasks_dir.exists(), "Task subcommand read operations should not create directories");
     }
 
     #[test]
@@ -2986,23 +1961,14 @@ mod file_structure {
 
         // Add a task (write operation)
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(&temp_dir)
-            .args(["add", "Test config creation"])
-            .assert()
-            .success();
+        cmd.current_dir(&temp_dir).args(["add", "Test config creation"]).assert().success();
 
         let tasks_dir = temp_dir.path().join(".tasks");
-        assert!(
-            tasks_dir.exists(),
-            "Write operations should create .tasks directory"
-        );
+        assert!(tasks_dir.exists(), "Write operations should create .tasks directory");
 
         // Check for global config.yml (should exist)
         let global_config = tasks_dir.join("config.yml");
-        assert!(
-            global_config.exists(),
-            "Global config.yml SHOULD be created by write operations"
-        );
+        assert!(global_config.exists(), "Global config.yml SHOULD be created by write operations");
 
         // Check for project-specific config (should exist in project directory)
         let entries = fs::read_dir(&tasks_dir).unwrap();
@@ -3019,10 +1985,7 @@ mod file_structure {
             }
         }
 
-        assert!(
-            found_project_config,
-            "Project-specific config.yml should also be created by add command"
-        );
+        assert!(found_project_config, "Project-specific config.yml should also be created by add command");
     }
 
     #[test]
@@ -3033,33 +1996,21 @@ mod file_structure {
 
         // First, test quick interface
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(&temp_dir)
-            .args(["add", "Quick interface test"])
-            .assert()
-            .success();
+        cmd.current_dir(&temp_dir).args(["add", "Quick interface test"]).assert().success();
 
         let tasks_dir = temp_dir.path().join(".tasks");
         let global_config = tasks_dir.join("config.yml");
-        assert!(
-            global_config.exists(),
-            "Quick interface SHOULD create global config"
-        );
+        assert!(global_config.exists(), "Quick interface SHOULD create global config");
 
         // Clean up for next test
         fs::remove_dir_all(&tasks_dir).unwrap();
 
         // Test full interface
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(&temp_dir)
-            .args(["task", "add", "Full interface test"])
-            .assert()
-            .success();
+        cmd.current_dir(&temp_dir).args(["task", "add", "Full interface test"]).assert().success();
 
         let global_config = tasks_dir.join("config.yml");
-        assert!(
-            global_config.exists(),
-            "Full interface SHOULD create global config"
-        );
+        assert!(global_config.exists(), "Full interface SHOULD create global config");
 
         // Both interfaces should behave identically regarding config creation
     }
@@ -3070,24 +2021,16 @@ mod file_structure {
 
         // Test with explicit project - should set smart default_project
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(&temp_dir)
-            .args(["add", "Test smart prefix", "--project=myawesomeproject"])
-            .assert()
-            .success();
+        cmd.current_dir(&temp_dir).args(["add", "Test smart prefix", "--project=myawesomeproject"]).assert().success();
 
         let global_config = temp_dir.path().join(".tasks/config.yml");
         assert!(global_config.exists(), "Global config should be created");
 
         let config_content = fs::read_to_string(&global_config).unwrap();
-        assert!(
-            config_content.contains("default:") && config_content.contains("project:"),
-            "Global config should have default.project"
-        );
+        assert!(config_content.contains("default:") && config_content.contains("project:"), "Global config should have default.project");
         // Should have some form of project prefix (exact value depends on generation logic)
         assert!(
-            config_content.contains("MYAW")
-                || config_content.contains("MAP")
-                || config_content.contains("MY"),
+            config_content.contains("MYAW") || config_content.contains("MAP") || config_content.contains("MY"),
             "Global config should have a smart default_project derived from project name"
         );
     }
@@ -3098,16 +2041,10 @@ mod file_structure {
 
         // First, create a task to establish .tasks directory and global config
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(&temp_dir)
-            .args(["add", "First task"])
-            .assert()
-            .success();
+        cmd.current_dir(&temp_dir).args(["add", "First task"]).assert().success();
 
         let global_config = temp_dir.path().join(".tasks/config.yml");
-        assert!(
-            global_config.exists(),
-            "Global config should be created initially"
-        );
+        assert!(global_config.exists(), "Global config should be created initially");
 
         // Delete the global config
         fs::remove_file(&global_config).unwrap();
@@ -3115,15 +2052,9 @@ mod file_structure {
 
         // Add another task - global config should be regenerated
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(&temp_dir)
-            .args(["add", "Second task"])
-            .assert()
-            .success();
+        cmd.current_dir(&temp_dir).args(["add", "Second task"]).assert().success();
 
-        assert!(
-            global_config.exists(),
-            "Global config should be regenerated when missing"
-        );
+        assert!(global_config.exists(), "Global config should be regenerated when missing");
     }
 
     #[test]
@@ -3133,19 +2064,13 @@ mod file_structure {
 
         // Create task using quick interface
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        let output = cmd
-            .current_dir(temp_dir)
-            .arg("add")
-            .arg("Test project name config")
-            .output()
-            .expect("Failed to execute command");
+        let output = cmd.current_dir(temp_dir).arg("add").arg("Test project name config").output().expect("Failed to execute command");
 
         assert!(output.status.success());
 
         // Extract task ID from output
         let output_str = String::from_utf8(output.stdout).unwrap();
-        let task_id = extract_task_id_from_output(&output_str)
-            .expect("Could not extract task ID from output");
+        let task_id = extract_task_id_from_output(&output_str).expect("Could not extract task ID from output");
 
         // Get the project prefix from task ID (e.g., "TTF-1" -> "TTF")
         let prefix = task_id.split('-').next().unwrap();
@@ -3159,14 +2084,9 @@ mod file_structure {
         // Should contain the actual project name, not the prefix
         // For temp directory, it will be detected as the directory name (starting with tmp)
         // So we just verify it's not the prefix (which would be uppercase)
+        assert!(config_content.contains("project:\n  name:") || config_content.contains("project.name:"), "Config should contain canonical project.name field");
         assert!(
-            config_content.contains("project:\n  name:")
-                || config_content.contains("project.name:"),
-            "Config should contain canonical project.name field"
-        );
-        assert!(
-            !config_content.contains(&format!("project.name: {prefix}"))
-                && !config_content.contains(&format!("name: {prefix}")),
+            !config_content.contains(&format!("project.name: {prefix}")) && !config_content.contains(&format!("name: {prefix}")),
             "Project config should NOT contain prefix '{prefix}' as project name. Config content: {config_content}"
         );
         assert!(
@@ -3245,32 +2165,16 @@ mod file_structure {
         let full_json_str = String::from_utf8(full_json_output.stdout).unwrap();
 
         // Both should be valid JSON with same structure
-        let quick_json: serde_json::Value = serde_json::from_str(&quick_json_str)
-            .expect("Quick interface should produce valid JSON");
-        let full_json: serde_json::Value =
-            serde_json::from_str(&full_json_str).expect("Full interface should produce valid JSON");
+        let quick_json: serde_json::Value = serde_json::from_str(&quick_json_str).expect("Quick interface should produce valid JSON");
+        let full_json: serde_json::Value = serde_json::from_str(&full_json_str).expect("Full interface should produce valid JSON");
 
         // Both should have the same JSON structure
-        assert_eq!(
-            quick_json.get("status"),
-            Some(&serde_json::Value::String("success".to_string()))
-        );
-        assert_eq!(
-            full_json.get("status"),
-            Some(&serde_json::Value::String("success".to_string()))
-        );
+        assert_eq!(quick_json.get("status"), Some(&serde_json::Value::String("success".to_string())));
+        assert_eq!(full_json.get("status"), Some(&serde_json::Value::String("success".to_string())));
         assert!(quick_json.get("task").is_some());
         assert!(full_json.get("task").is_some());
-        let quick_priority = quick_json
-            .get("task")
-            .and_then(|task| task.get("priority"))
-            .and_then(|value| value.as_str())
-            .unwrap_or_default();
-        let full_priority = full_json
-            .get("task")
-            .and_then(|task| task.get("priority"))
-            .and_then(|value| value.as_str())
-            .unwrap_or_default();
+        let quick_priority = quick_json.get("task").and_then(|task| task.get("priority")).and_then(|value| value.as_str()).unwrap_or_default();
+        let full_priority = full_json.get("task").and_then(|task| task.get("priority")).and_then(|value| value.as_str()).unwrap_or_default();
         assert_eq!(quick_priority, "Low");
         assert_eq!(full_priority, "Low");
     }

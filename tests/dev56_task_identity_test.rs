@@ -23,13 +23,7 @@ fn mk_req(method: &str, path: &str, query: &[(&str, &str)], body: Value) -> Http
     for (k, v) in query {
         q.insert((*k).to_string(), (*v).to_string());
     }
-    HttpRequest {
-        method: method.to_string(),
-        path: path.to_string(),
-        query: q,
-        headers: HashMap::new(),
-        body: serde_json::to_vec(&body).unwrap(),
-    }
+    HttpRequest { method: method.to_string(), path: path.to_string(), query: q, headers: HashMap::new(), body: serde_json::to_vec(&body).unwrap() }
 }
 
 struct Dev56Fixture {
@@ -53,12 +47,7 @@ fn isolated_workspace_in(base: &std::path::Path) -> Dev56Fixture {
     let tasks_dir = tmp.path().join("main").join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();
     let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
-    Dev56Fixture {
-        _tmp: tmp,
-        tasks_dir,
-        _guard_tasks,
-        _guard_fast,
-    }
+    Dev56Fixture { _tmp: tmp, tasks_dir, _guard_tasks, _guard_fast }
 }
 
 impl Dev56Fixture {
@@ -83,12 +72,7 @@ fn body_of(resp: &lotar::api_server::HttpResponse) -> Value {
 }
 
 fn rest_create(api: &ApiServer, project: &str, title: &str) -> String {
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/add",
-        &[],
-        json!({"title": title, "project": project}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/add", &[], json!({"title": title, "project": project})));
     assert_eq!(resp.status, 201, "create in {project}: {}", resp.body.len());
     body_of(&resp)["data"]["id"].as_str().unwrap().to_string()
 }
@@ -102,9 +86,7 @@ fn write_task_file(tasks_dir: &std::path::Path, project: &str, number: u64, titl
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(
         dir.join(format!("{number}.yml")),
-        format!(
-            "title: {title}\nstatus: Todo\npriority: Medium\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\n"
-        ),
+        format!("title: {title}\nstatus: Todo\npriority: Medium\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\n"),
     )
     .unwrap();
 }
@@ -113,24 +95,12 @@ fn base64_encode(data: &[u8]) -> String {
     const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::new();
     for chunk in data.chunks(3) {
-        let b = [
-            chunk[0],
-            *chunk.get(1).unwrap_or(&0),
-            *chunk.get(2).unwrap_or(&0),
-        ];
+        let b = [chunk[0], *chunk.get(1).unwrap_or(&0), *chunk.get(2).unwrap_or(&0)];
         let n = (u32::from(b[0]) << 16) | (u32::from(b[1]) << 8) | u32::from(b[2]);
         out.push(TABLE[(n >> 18) as usize & 63] as char);
         out.push(TABLE[(n >> 12) as usize & 63] as char);
-        out.push(if chunk.len() > 1 {
-            TABLE[(n >> 6) as usize & 63] as char
-        } else {
-            '='
-        });
-        out.push(if chunk.len() > 2 {
-            TABLE[n as usize & 63] as char
-        } else {
-            '='
-        });
+        out.push(if chunk.len() > 1 { TABLE[(n >> 6) as usize & 63] as char } else { '=' });
+        out.push(if chunk.len() > 2 { TABLE[n as usize & 63] as char } else { '=' });
     }
     out
 }
@@ -149,22 +119,14 @@ fn mcall(name: &str, args: Value) -> Value {
 /// True when the tool call failed: either a JSON-RPC protocol error or a
 /// recoverable domain failure surfaced as result.isError (DEV-63).
 fn mcp_failed(resp: &Value) -> bool {
-    resp.get("error").is_some()
-        || resp.get("result").and_then(|result| result.get("isError"))
-            == Some(&serde_json::json!(true))
+    resp.get("error").is_some() || resp.get("result").and_then(|result| result.get("isError")) == Some(&serde_json::json!(true))
 }
 
 /// Explanatory text of a failed tool call across both error shapes.
 fn mcp_failure_text(resp: &Value) -> String {
     if let Some(result) = resp.get("result") {
-        let structured = result
-            .get("functionResponse")
-            .and_then(|fr| fr.get("response"));
-        if let Some(message) = structured
-            .and_then(|r| r.get("data"))
-            .and_then(|data| data.get("message"))
-            .and_then(|m| m.as_str())
-        {
+        let structured = result.get("functionResponse").and_then(|fr| fr.get("response"));
+        if let Some(message) = structured.and_then(|r| r.get("data")).and_then(|data| data.get("message")).and_then(|m| m.as_str()) {
             return message.to_string();
         }
         return result
@@ -175,11 +137,7 @@ fn mcp_failure_text(resp: &Value) -> String {
             .unwrap_or_default()
             .to_string();
     }
-    resp["error"]["data"]["message"]
-        .as_str()
-        .or_else(|| resp["error"]["message"].as_str())
-        .unwrap_or_default()
-        .to_string()
+    resp["error"]["data"]["message"].as_str().or_else(|| resp["error"]["message"].as_str()).unwrap_or_default().to_string()
 }
 
 fn mcp_text(resp: &Value) -> Option<String> {
@@ -203,10 +161,7 @@ fn hyphenated_prefix_crud_comment_and_status_roundtrip() {
 
     let id = rest_create(&api, "ABC-OPS", "Hyphenated identity");
     assert_eq!(id, "ABC-OPS-1", "first task numbered under ABC-OPS");
-    assert!(
-        fx.tasks_dir.join("ABC-OPS").join("1.yml").exists(),
-        "file stored under the hyphenated project folder"
-    );
+    assert!(fx.tasks_dir.join("ABC-OPS").join("1.yml").exists(), "file stored under the hyphenated project folder");
 
     // Read back through REST with the full hyphenated ID.
     let resp = rest_get(&api, &id);
@@ -214,23 +169,13 @@ fn hyphenated_prefix_crud_comment_and_status_roundtrip() {
     assert_eq!(body_of(&resp)["data"]["title"], "Hyphenated identity");
 
     // Status transition.
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/status",
-        &[],
-        json!({"id": id, "status": "InProgress"}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/status", &[], json!({"id": id, "status": "InProgress"})));
     assert_eq!(resp.status, 200, "status update on hyphenated id");
     let yaml = std::fs::read_to_string(fx.tasks_dir.join("ABC-OPS").join("1.yml")).unwrap();
     assert!(yaml.contains("status: InProgress"), "{yaml}");
 
     // Comment via REST.
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/comment",
-        &[],
-        json!({"id": id, "text": "comment on hyphenated id"}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/comment", &[], json!({"id": id, "text": "comment on hyphenated id"})));
     assert_eq!(resp.status, 200, "comment on hyphenated id");
 
     // Delete via REST (soft by default, DEV-92): the file becomes a
@@ -251,81 +196,31 @@ fn hyphenated_prefix_reference_and_sprint_boundaries() {
     let id2 = rest_create(&api, "ABC-OPS", "Second task");
 
     // Link reference attach via REST.
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/references/link/add",
-        &[],
-        json!({"id": id, "url": "https://example.com/ops"}),
-    ));
-    assert_eq!(
-        resp.status,
-        200,
-        "attach link reference: {}",
-        resp.body.len()
-    );
-    assert!(
-        body_of(&resp)["data"]["task"]["references"]
-            .as_array()
-            .is_some_and(|refs| !refs.is_empty()),
-        "reference recorded"
-    );
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/references/link/add", &[], json!({"id": id, "url": "https://example.com/ops"})));
+    assert_eq!(resp.status, 200, "attach link reference: {}", resp.body.len());
+    assert!(body_of(&resp)["data"]["task"]["references"].as_array().is_some_and(|refs| !refs.is_empty()), "reference recorded");
 
     // Attachment upload attaches a managed file reference to the task.
     let content = base64_encode(b"attachment-bytes");
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/attachments/upload",
-        &[],
-        json!({"id": id, "filename": "evidence.txt", "content_base64": content}),
-    ));
+    let resp =
+        api.handle_request(&mk_req("POST", "/api/tasks/attachments/upload", &[], json!({"id": id, "filename": "evidence.txt", "content_base64": content})));
     assert_eq!(resp.status, 200, "attachment upload: {}", resp.body.len());
     let upload = body_of(&resp);
     assert_eq!(upload["data"]["attached"], true, "attachment attached");
     let stored = upload["data"]["stored_path"].as_str().unwrap().to_string();
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/attachments/remove",
-        &[],
-        json!({"id": id, "stored_path": stored}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/attachments/remove", &[], json!({"id": id, "stored_path": stored})));
     assert_eq!(resp.status, 200, "attachment remove: {}", resp.body.len());
 
     // Sprint create + assign the hyphenated task.
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/sprints/create",
-        &[],
-        json!({"name": "Ops sprint"}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/sprints/create", &[], json!({"name": "Ops sprint"})));
     assert_eq!(resp.status, 200, "create sprint: {}", resp.body.len());
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/sprints/add",
-        &[],
-        json!({"sprint": 1, "tasks": [id, id2], "allow_closed": true}),
-    ));
-    assert_eq!(
-        resp.status,
-        200,
-        "sprint assign hyphenated ids: {}",
-        String::from_utf8_lossy(&resp.body)
-    );
-    let modified = body_of(&resp)["data"]["modified"]
-        .as_array()
-        .cloned()
-        .unwrap_or_default();
-    assert!(
-        modified.len() == 2,
-        "both hyphenated ids assigned: {modified:?}"
-    );
+    let resp = api.handle_request(&mk_req("POST", "/api/sprints/add", &[], json!({"sprint": 1, "tasks": [id, id2], "allow_closed": true})));
+    assert_eq!(resp.status, 200, "sprint assign hyphenated ids: {}", String::from_utf8_lossy(&resp.body));
+    let modified = body_of(&resp)["data"]["modified"].as_array().cloned().unwrap_or_default();
+    assert!(modified.len() == 2, "both hyphenated ids assigned: {modified:?}");
 
     // Sprint listing still resolves hyphenated members to their tasks.
-    let resp = api.handle_request(&mk_req(
-        "GET",
-        "/api/sprints/list",
-        &[("include_tasks", "true")],
-        json!({}),
-    ));
+    let resp = api.handle_request(&mk_req("GET", "/api/sprints/list", &[("include_tasks", "true")], json!({})));
     assert_eq!(resp.status, 200, "sprint list");
 }
 
@@ -388,31 +283,13 @@ fn nested_root_discovery_is_consistent_across_query_shapes() {
     // Unfiltered list must discover nested-root tasks.
     let resp = api.handle_request(&mk_req("GET", "/api/tasks/list", &[], json!({})));
     assert_eq!(resp.status, 200);
-    let ids: Vec<String> = body_of(&resp)["data"]["tasks"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .filter_map(|t| t["id"].as_str().map(|s| s.to_string()))
-        .collect();
-    assert!(
-        ids.contains(&"NEST-1".to_string()),
-        "unfiltered list finds nested task: {ids:?}"
-    );
+    let ids: Vec<String> = body_of(&resp)["data"]["tasks"].as_array().unwrap().iter().filter_map(|t| t["id"].as_str().map(|s| s.to_string())).collect();
+    assert!(ids.contains(&"NEST-1".to_string()), "unfiltered list finds nested task: {ids:?}");
     assert!(ids.contains(&"DEV-1".to_string()), "primary tasks listed");
 
     // Project-filtered list finds it too.
-    let resp = api.handle_request(&mk_req(
-        "GET",
-        "/api/tasks/list",
-        &[("project", "NEST")],
-        json!({}),
-    ));
-    let ids: Vec<String> = body_of(&resp)["data"]["tasks"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .filter_map(|t| t["id"].as_str().map(|s| s.to_string()))
-        .collect();
+    let resp = api.handle_request(&mk_req("GET", "/api/tasks/list", &[("project", "NEST")], json!({})));
+    let ids: Vec<String> = body_of(&resp)["data"]["tasks"].as_array().unwrap().iter().filter_map(|t| t["id"].as_str().map(|s| s.to_string())).collect();
     assert_eq!(ids, vec!["NEST-1".to_string()]);
 
     // Full-ID get reads the nested task from its actual root.
@@ -427,11 +304,7 @@ fn nested_root_discovery_is_consistent_across_query_shapes() {
         Err(err) => err,
         Ok((id, _)) => panic!("ambiguous numeric must fail closed, got {id}"),
     };
-    assert!(
-        err.to_string()
-            .contains("matches multiple storage locations"),
-        "{err}"
-    );
+    assert!(err.to_string().contains("matches multiple storage locations"), "{err}");
     // A number unique to one root still resolves.
     write_task_file(&fx.tasks_dir, "DEV", 5, "primary dev five");
     let resolved = storage.resolve_numeric_id("5").expect("unique numeric");
@@ -452,11 +325,7 @@ fn nested_root_numeric_lookup_prefers_nothing_when_ambiguous() {
         Err(err) => err,
         Ok((id, _)) => panic!("ambiguous numeric must fail closed, resolved {id}"),
     };
-    assert!(
-        err.to_string()
-            .contains("matches multiple storage locations"),
-        "{err}"
-    );
+    assert!(err.to_string().contains("matches multiple storage locations"), "{err}");
     // Legacy wrapper degrades to None rather than guessing.
     assert!(storage.find_task_by_numeric_id("1").is_none());
 }
@@ -472,21 +341,14 @@ fn duplicate_full_id_across_roots_fails_closed() {
     // Plain get never maps the ambiguous ID to an arbitrary root.
     assert!(storage.get("DUP-7", "DUP").is_none());
     // Resolver reports the ambiguity with both locations.
-    let err = storage
-        .resolve_task_location("DUP-7")
-        .expect_err("duplicate id must be ambiguous");
+    let err = storage.resolve_task_location("DUP-7").expect_err("duplicate id must be ambiguous");
     assert!(err.to_string().contains("matches multiple"), "{err}");
     // Service get maps the failure to TaskNotFound, not a wrong task.
     let err = TaskService::get(&storage, "DUP-7", None).unwrap_err();
-    assert!(
-        matches!(err, lotar::errors::LoTaRError::TaskNotFound(_)),
-        "{err}"
-    );
+    assert!(matches!(err, lotar::errors::LoTaRError::TaskNotFound(_)), "{err}");
     // Mutation of the ambiguous ID refuses before any side effect.
     let mut storage = storage;
-    let err = storage
-        .edit("DUP-7", &lotar::storage::task::Task::default())
-        .unwrap_err();
+    let err = storage.edit("DUP-7", &lotar::storage::task::Task::default()).unwrap_err();
     assert!(err.to_string().contains("matches multiple"), "{err}");
     assert!(fx.tasks_dir.join("DUP").join("7.yml").exists());
     assert!(sibling.join("DUP").join("7.yml").exists());
@@ -500,37 +362,19 @@ fn cross_root_mutation_refused_before_side_effects() {
 
     let storage = Storage::try_open(&fx.tasks_dir).unwrap();
     // Reads resolve the nested task...
-    assert_eq!(
-        TaskService::get(&storage, "NEST-3", None).unwrap().title,
-        "nested immutable"
-    );
+    assert_eq!(TaskService::get(&storage, "NEST-3", None).unwrap().title, "nested immutable");
 
     // ...but mutation refuses with an actionable error and no file change.
     let mut storage = Storage::try_open(&fx.tasks_dir).unwrap();
-    let err = TaskService::update(
-        &mut storage,
-        "NEST-3",
-        lotar::api_types::TaskUpdate {
-            title: Some("hijacked".to_string()),
-            ..Default::default()
-        },
-    )
-    .unwrap_err();
+    let err =
+        TaskService::update(&mut storage, "NEST-3", lotar::api_types::TaskUpdate { title: Some("hijacked".to_string()), ..Default::default() }).unwrap_err();
     let message = err.to_string();
-    assert!(
-        message.contains("cannot be modified from"),
-        "clear cross-root refusal: {message}"
-    );
+    assert!(message.contains("cannot be modified from"), "clear cross-root refusal: {message}");
     let yaml = std::fs::read_to_string(sibling.join("NEST").join("3.yml")).unwrap();
-    assert!(
-        yaml.contains("nested immutable"),
-        "sibling untouched: {yaml}"
-    );
+    assert!(yaml.contains("nested immutable"), "sibling untouched: {yaml}");
 
     // Direct storage edit and delete refuse as well.
-    let err = storage
-        .edit("NEST-3", &lotar::storage::task::Task::default())
-        .unwrap_err();
+    let err = storage.edit("NEST-3", &lotar::storage::task::Task::default()).unwrap_err();
     assert!(err.to_string().contains("cannot be modified from"), "{err}");
     let err = storage.delete("NEST-3", "NEST").unwrap_err();
     assert!(err.to_string().contains("cannot be modified from"), "{err}");
@@ -547,33 +391,11 @@ fn malformed_ids_fail_closed_at_boundaries() {
     let api = server();
     let _ = rest_create(&api, "DEV", "seed");
 
-    for bad in [
-        "DEV-ABC",
-        "DEV-",
-        "DEV--",
-        "DEV-+12",
-        "DEV-1.5",
-        "../evil-1",
-        "DEV- 1",
-        "-1",
-        "DEV-99999999999999999999999",
-    ] {
+    for bad in ["DEV-ABC", "DEV-", "DEV--", "DEV-+12", "DEV-1.5", "../evil-1", "DEV- 1", "-1", "DEV-99999999999999999999999"] {
         let resp = rest_get(&api, bad);
-        assert!(
-            resp.status == 400 || resp.status == 404,
-            "malformed {bad:?} must fail closed, got {}",
-            resp.status
-        );
-        let second = api.handle_request(&mk_req(
-            "POST",
-            "/api/tasks/comment",
-            &[],
-            json!({"id": bad, "text": "x"}),
-        ));
-        assert!(
-            second.status == 400 || second.status == 404,
-            "comment on malformed {bad:?} must fail closed"
-        );
+        assert!(resp.status == 400 || resp.status == 404, "malformed {bad:?} must fail closed, got {}", resp.status);
+        let second = api.handle_request(&mk_req("POST", "/api/tasks/comment", &[], json!({"id": bad, "text": "x"})));
+        assert!(second.status == 400 || second.status == 404, "comment on malformed {bad:?} must fail closed");
     }
 
     // Traversal never reads files outside the tasks root.
@@ -588,12 +410,7 @@ fn malformed_ids_fail_closed_at_boundaries() {
 
 fn count_stored_files(dir: &std::path::Path) -> usize {
     std::fs::read_dir(dir)
-        .map(|entries| {
-            entries
-                .flatten()
-                .filter(|e| e.path().is_file() && !e.file_name().to_string_lossy().starts_with('.'))
-                .count()
-        })
+        .map(|entries| entries.flatten().filter(|e| e.path().is_file() && !e.file_name().to_string_lossy().starts_with('.')).count())
         .unwrap_or(0)
 }
 
@@ -610,54 +427,30 @@ fn delete_project_mismatch_refused_and_bytes_unchanged() {
     // provided project's folder.
     let mut storage = Storage::try_open(&fx.tasks_dir).unwrap();
     let err = storage.delete("DEV-5", "TP").unwrap_err();
-    assert!(
-        err.to_string().contains("refusing to cross projects"),
-        "{err}"
-    );
+    assert!(err.to_string().contains("refusing to cross projects"), "{err}");
     assert!(tp_five.exists() && dev_five.exists(), "no bytes changed");
 
     // REST: mismatch is a 400, not a silent cross-project delete.
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/delete",
-        &[("project", "TP")],
-        json!({"id": "DEV-5"}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/delete", &[("project", "TP")], json!({"id": "DEV-5"})));
     assert_eq!(resp.status, 400, "REST mismatch refused");
-    assert!(
-        tp_five.exists() && dev_five.exists(),
-        "REST bytes unchanged"
-    );
+    assert!(tp_five.exists() && dev_five.exists(), "REST bytes unchanged");
 
     // MCP boundary behaves the same (recoverable failure -> isError result).
     let resp = mcall("task_delete", json!({"id": "DEV-5", "project": "TP"}));
     assert!(mcp_failed(&resp), "MCP mismatch refused: {resp}");
-    assert!(
-        mcp_failure_text(&resp).contains("refusing to cross projects"),
-        "{resp}"
-    );
+    assert!(mcp_failure_text(&resp).contains("refusing to cross projects"), "{resp}");
     assert!(tp_five.exists() && dev_five.exists(), "MCP bytes unchanged");
 
     // Correct pairing still targets exactly the right task: soft delete
     // writes the tombstone (DEV-92) and hard delete removes the file.
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/delete",
-        &[("project", "DEV")],
-        json!({"id": "DEV-5"}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/delete", &[("project", "DEV")], json!({"id": "DEV-5"})));
     assert_eq!(resp.status, 200);
     assert!(dev_five.exists(), "soft delete keeps the file");
     let dev_yaml = std::fs::read_to_string(&dev_five).unwrap();
     assert!(dev_yaml.contains("deleted_at:"), "{dev_yaml}");
     assert!(tp_five.exists(), "TP untouched by valid delete");
 
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/delete",
-        &[("project", "DEV")],
-        json!({"id": "DEV-5", "hard": true}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/delete", &[("project", "DEV")], json!({"id": "DEV-5", "hard": true})));
     assert_eq!(resp.status, 200);
     assert!(!dev_five.exists(), "hard delete removes the file");
     assert!(tp_five.exists(), "TP untouched by hard delete");
@@ -668,12 +461,7 @@ fn padded_alias_sprint_membership_is_canonical_across_reload() {
     let fx = isolated_workspace();
     let api = server();
     rest_create(&api, "TP", "Padded member");
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/sprints/create",
-        &[],
-        json!({"name": "Canonical sprint"}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/sprints/create", &[], json!({"name": "Canonical sprint"})));
     assert_eq!(resp.status, 200, "{}", String::from_utf8_lossy(&resp.body));
 
     // Legacy sprint file carrying a PADDED membership spelling.
@@ -688,60 +476,24 @@ fn padded_alias_sprint_membership_is_canonical_across_reload() {
     // Padded update keeping the same membership must not rewrite the file.
     let before = std::fs::read_to_string(&sprint_file).unwrap();
     let mut storage = Storage::try_open(&fx.tasks_dir).unwrap();
-    TaskService::update(
-        &mut storage,
-        "TP-001",
-        lotar::api_types::TaskUpdate {
-            sprints: Some(vec![1]),
-            ..Default::default()
-        },
-    )
-    .unwrap();
-    assert_eq!(
-        std::fs::read_to_string(&sprint_file).unwrap(),
-        before,
-        "no rewrite when canonically unchanged"
-    );
+    TaskService::update(&mut storage, "TP-001", lotar::api_types::TaskUpdate { sprints: Some(vec![1]), ..Default::default() }).unwrap();
+    assert_eq!(std::fs::read_to_string(&sprint_file).unwrap(), before, "no rewrite when canonically unchanged");
 
     // Removal via the canonical id drops the padded spelling too.
-    TaskService::update(
-        &mut storage,
-        "TP-1",
-        lotar::api_types::TaskUpdate {
-            sprints: Some(vec![]),
-            ..Default::default()
-        },
-    )
-    .unwrap();
+    TaskService::update(&mut storage, "TP-1", lotar::api_types::TaskUpdate { sprints: Some(vec![]), ..Default::default() }).unwrap();
     let yaml = std::fs::read_to_string(&sprint_file).unwrap();
     assert!(!yaml.contains("TP-0"), "padded spelling removed: {yaml}");
 
     // The assignment boundary canonicalizes padded tokens before writing.
-    let resolved =
-        lotar::services::sprint_assignment::resolve_task_identifier(&storage, "TP-001").unwrap();
+    let resolved = lotar::services::sprint_assignment::resolve_task_identifier(&storage, "TP-001").unwrap();
     assert_eq!(resolved, "TP-1");
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/sprints/add",
-        &[],
-        json!({"sprint": 1, "tasks": ["TP-001"], "allow_closed": true}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/sprints/add", &[], json!({"sprint": 1, "tasks": ["TP-001"], "allow_closed": true})));
     assert_eq!(resp.status, 200, "{}", String::from_utf8_lossy(&resp.body));
     let yaml = std::fs::read_to_string(&sprint_file).unwrap();
     let entry_lines: Vec<&str> = yaml.lines().map(str::trim).collect();
-    assert!(
-        entry_lines.contains(&"- TP-1"),
-        "canonical spelling persisted: {yaml}"
-    );
-    assert!(
-        !entry_lines.contains(&"- TP-001"),
-        "no padded duplicate: {yaml}"
-    );
-    assert_eq!(
-        yaml.matches("TP-").count(),
-        1,
-        "exactly one membership entry: {yaml}"
-    );
+    assert!(entry_lines.contains(&"- TP-1"), "canonical spelling persisted: {yaml}");
+    assert!(!entry_lines.contains(&"- TP-001"), "no padded duplicate: {yaml}");
+    assert_eq!(yaml.matches("TP-").count(), 1, "exactly one membership entry: {yaml}");
 
     // Comment DTOs surface the canonical id, never the padded alias.
     let dto = TaskService::add_comment(&mut storage, "TP-001", "canonical please").unwrap();
@@ -789,11 +541,7 @@ fn attachment_upload_prechecks_before_any_write() {
     assert_eq!(count_stored_files(&attachments), 1);
     let resp = upload(&id, "second.txt", b"duplicate-me");
     assert_eq!(resp.status, 200, "{}", String::from_utf8_lossy(&resp.body));
-    assert_eq!(
-        count_stored_files(&attachments),
-        1,
-        "content dedup preserved"
-    );
+    assert_eq!(count_stored_files(&attachments), 1, "content dedup preserved");
 
     // A failure AFTER the precheck (read-only project dir breaks the task
     // edit) must not leave the just-created upload file behind.
@@ -805,11 +553,7 @@ fn attachment_upload_prechecks_before_any_write() {
         let resp = upload(&id, "orphan.txt", b"orphan-bytes");
         std::fs::set_permissions(&project_dir, std::fs::Permissions::from_mode(0o755)).unwrap();
         assert_ne!(resp.status, 200, "attach must fail on read-only project");
-        assert_eq!(
-            count_stored_files(&attachments),
-            1,
-            "orphaned upload cleaned up; pre-existing dedup content kept"
-        );
+        assert_eq!(count_stored_files(&attachments), 1, "orphaned upload cleaned up; pre-existing dedup content kept");
     }
 }
 
@@ -819,30 +563,20 @@ fn agent_context_refuses_cross_root_writes_and_reads_actual_root() {
     let sibling = fx.sibling_tasks_dir("sibling");
     write_task_file(&sibling, "NEST", 3, "nested context target");
 
-    let cfg = lotar::config::types::ResolvedConfig::from_global(
-        lotar::config::types::GlobalConfig::default(),
-    );
+    let cfg = lotar::config::types::ResolvedConfig::from_global(lotar::config::types::GlobalConfig::default());
 
     // Cross-root write is refused BEFORE any file or directory is created.
     let err = lotar::services::agent_context_service::AgentContextService::append_messages(
         &fx.tasks_dir,
         &cfg,
         "NEST-3",
-        vec![lotar::services::agent_context_service::build_user_message(
-            "hello",
-        )],
+        vec![lotar::services::agent_context_service::build_user_message("hello")],
         None,
     )
     .unwrap_err();
     assert!(err.to_string().contains("cannot be written from"), "{err}");
-    assert!(
-        !fx.tasks_dir.join("NEST").exists(),
-        "primary root must stay untouched"
-    );
-    assert!(
-        !sibling.join("NEST").join("NEST-3.context").exists(),
-        "no context created anywhere on refusal"
-    );
+    assert!(!fx.tasks_dir.join("NEST").exists(), "primary root must stay untouched");
+    assert!(!sibling.join("NEST").join("NEST-3.context").exists(), "no context created anywhere on refusal");
 
     // Actual-root-aware read: a context placed next to the nested task file
     // is found even when resolving from the primary workspace.
@@ -853,17 +587,8 @@ fn agent_context_refuses_cross_root_writes_and_reads_actual_root() {
         "updated_at": "2026-01-01T00:00:00Z",
         "messages": [{"role": "user", "content": "nested", "at": "2026-01-01T00:00:00Z"}]
     });
-    std::fs::write(
-        context_dir.join("NEST-3.context"),
-        serde_json::to_string(&payload).unwrap(),
-    )
-    .unwrap();
-    let loaded = lotar::services::agent_context_service::AgentContextService::load(
-        &fx.tasks_dir,
-        &cfg,
-        "NEST-3",
-    )
-    .unwrap();
+    std::fs::write(context_dir.join("NEST-3.context"), serde_json::to_string(&payload).unwrap()).unwrap();
+    let loaded = lotar::services::agent_context_service::AgentContextService::load(&fx.tasks_dir, &cfg, "NEST-3").unwrap();
     assert!(loaded.is_some(), "actual-root context readable");
     assert_eq!(loaded.unwrap().ticket_id, "NEST-3");
 }
@@ -878,24 +603,15 @@ fn delete_event_emits_canonical_id_for_padded_alias() {
     // Subscribe BEFORE the delete so the event cannot be missed. The
     // registry is process-global, so drain until OUR event arrives.
     let rx = lotar::api_events::subscribe();
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/delete",
-        &[],
-        json!({"id": "TP-001"}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/delete", &[], json!({"id": "TP-001"})));
     assert_eq!(resp.status, 200, "padded alias delete");
     // Soft deletion (DEV-92): the tombstone file remains on disk.
     assert!(fx.tasks_dir.join("TP").join("1.yml").exists());
 
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
     loop {
-        let event = rx
-            .recv_timeout(deadline.saturating_duration_since(std::time::Instant::now()))
-            .expect("task_deleted event must arrive");
-        if event.kind == "task_deleted"
-            && event.data.get("id").and_then(|v| v.as_str()) == Some("TP-1")
-        {
+        let event = rx.recv_timeout(deadline.saturating_duration_since(std::time::Instant::now())).expect("task_deleted event must arrive");
+        if event.kind == "task_deleted" && event.data.get("id").and_then(|v| v.as_str()) == Some("TP-1") {
             break;
         }
     }
@@ -950,9 +666,7 @@ fn mcp_single_file_reference_blocks_on_held_store_lock() {
             if by_ancestry {
                 eprintln!("lock section via real repo root discovered by ancestry");
             } else {
-                eprintln!(
-                    "skipping lock section: no .git marker creatable and no repo ancestor (repo-less build); remaining gap tracked in DEV-79"
-                );
+                eprintln!("skipping lock section: no .git marker creatable and no repo ancestor (repo-less build); remaining gap tracked in DEV-79");
             }
             (fx, by_ancestry)
         }
@@ -964,14 +678,8 @@ fn mcp_single_file_reference_blocks_on_held_store_lock() {
         // Repo-rooted file references are untestable here: assert the
         // handler still fails closed (no task changes) and skip the lock
         // section, matching the git_available convention.
-        let resp = mcall(
-            "task_reference_add",
-            json!({"id": "TP-2", "kind": "file", "value": "@attachments/whatever.txt"}),
-        );
-        assert!(
-            mcp_failed(&resp),
-            "file reference without a repo root must fail closed: {resp}"
-        );
+        let resp = mcall("task_reference_add", json!({"id": "TP-2", "kind": "file", "value": "@attachments/whatever.txt"}));
+        assert!(mcp_failed(&resp), "file reference without a repo root must fail closed: {resp}");
         let storage = Storage::try_open(&fx.tasks_dir).unwrap();
         let tp2 = TaskService::get(&storage, "TP-2", None).unwrap();
         assert!(tp2.references.iter().all(|r| r.file.is_none()));
@@ -981,77 +689,38 @@ fn mcp_single_file_reference_blocks_on_held_store_lock() {
     // references through the typed `attachment` kind (DEV-61: store blobs
     // are no longer reachable as repository `file` references).
     let content = base64_encode(b"mcp-single-blob");
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/attachments/upload",
-        &[],
-        json!({"id": "TP-1", "filename": "shared.txt", "content_base64": content}),
-    ));
+    let resp =
+        api.handle_request(&mk_req("POST", "/api/tasks/attachments/upload", &[], json!({"id": "TP-1", "filename": "shared.txt", "content_base64": content})));
     assert_eq!(resp.status, 200, "{}", String::from_utf8_lossy(&resp.body));
-    let filename = body_of(&resp)["data"]["stored_path"]
-        .as_str()
-        .unwrap()
-        .to_string();
+    let filename = body_of(&resp)["data"]["stored_path"].as_str().unwrap().to_string();
     let attachments = fx.tasks_dir.join("@attachments");
 
     // Independently held fs2 store lock == another LoTaR process.
-    let held =
-        lotar::storage::safety::acquire_storage_lock(&attachments, "attachments-store").unwrap();
+    let held = lotar::storage::safety::acquire_storage_lock(&attachments, "attachments-store").unwrap();
 
     // Single-task MCP attachment add must fail closed while the store is
     // locked, leaving the task untouched.
-    let resp = mcall(
-        "task_reference_add",
-        json!({"id": "TP-2", "kind": "attachment", "value": filename}),
-    );
+    let resp = mcall("task_reference_add", json!({"id": "TP-2", "kind": "attachment", "value": filename}));
     assert!(mcp_failed(&resp), "locked store must refuse: {resp}");
     let message = mcp_failure_text(&resp);
-    assert!(
-        message.contains("attachments-store") || message.contains("busy"),
-        "fail-closed lock diagnostics: {message}"
-    );
+    assert!(message.contains("attachments-store") || message.contains("busy"), "fail-closed lock diagnostics: {message}");
     let storage = Storage::try_open(&fx.tasks_dir).unwrap();
     let tp2 = TaskService::get(&storage, "TP-2", None).unwrap();
-    assert!(
-        tp2.references.iter().all(|r| r.attachment.is_none()),
-        "no task changes while locked: {:?}",
-        tp2.references
-    );
+    assert!(tp2.references.iter().all(|r| r.attachment.is_none()), "no task changes while locked: {:?}", tp2.references);
 
     // After release the same MCP call succeeds and lands on the typed key.
     drop(held);
-    let resp = mcall(
-        "task_reference_add",
-        json!({"id": "TP-2", "kind": "attachment", "value": filename}),
-    );
+    let resp = mcall("task_reference_add", json!({"id": "TP-2", "kind": "attachment", "value": filename}));
     assert!(resp.get("error").is_none(), "after release: {resp}");
     let storage = Storage::try_open(&fx.tasks_dir).unwrap();
     let tp2 = TaskService::get(&storage, "TP-2", None).unwrap();
-    assert!(
-        tp2.references.iter().any(|r| r.attachment.is_some()),
-        "reference attached after release: {:?}",
-        tp2.references
-    );
-    assert!(
-        tp2.references.iter().all(|r| r.file.is_none()),
-        "attachment kind never writes file entries: {:?}",
-        tp2.references
-    );
+    assert!(tp2.references.iter().any(|r| r.attachment.is_some()), "reference attached after release: {:?}", tp2.references);
+    assert!(tp2.references.iter().all(|r| r.file.is_none()), "attachment kind never writes file entries: {:?}", tp2.references);
 
     // The store blob must not be reachable as a repository file reference
     // even by its repo-relative or absolute path.
-    for value in [
-        attachments.join(&filename).to_string_lossy().to_string(),
-        format!(".tasks/@attachments/{filename}"),
-        filename.clone(),
-    ] {
-        let resp = mcall(
-            "task_reference_add",
-            json!({"id": "TP-2", "kind": "file", "value": value}),
-        );
-        assert!(
-            mcp_failed(&resp),
-            "store paths must not be attachable as file references: {resp}"
-        );
+    for value in [attachments.join(&filename).to_string_lossy().to_string(), format!(".tasks/@attachments/{filename}"), filename.clone()] {
+        let resp = mcall("task_reference_add", json!({"id": "TP-2", "kind": "file", "value": value}));
+        assert!(mcp_failed(&resp), "store paths must not be attachable as file references: {resp}");
     }
 }

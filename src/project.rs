@@ -14,11 +14,7 @@ pub fn get_effective_project_name(resolver: &TasksDirectoryResolver) -> String {
     }
 
     // Fall back to auto-detection (but generate prefix from detected name)
-    if let Some(project_name) = get_project_name() {
-        generate_project_prefix(&project_name)
-    } else {
-        "DEFAULT".to_string()
-    }
+    if let Some(project_name) = get_project_name() { generate_project_prefix(&project_name) } else { "DEFAULT".to_string() }
 }
 
 pub fn get_project_name() -> Option<String> {
@@ -36,10 +32,7 @@ pub fn detect_project_name_with_source() -> Option<(String, String)> {
     if let Ok(project) = std::env::var("LOTAR_PROJECT")
         && !project.is_empty()
     {
-        return Some((
-            project,
-            "the LOTAR_PROJECT environment variable".to_string(),
-        ));
+        return Some((project, "the LOTAR_PROJECT environment variable".to_string()));
     }
 
     // 2. Try to detect from project files (nearest manifest upwards)
@@ -51,10 +44,7 @@ pub fn detect_project_name_with_source() -> Option<(String, String)> {
     if let Some(repo_root) = crate::utils::git::find_repo_root(&std::env::current_dir().ok()?)
         && let Some(repo_name) = repo_root.file_name().and_then(|s| s.to_str())
     {
-        return Some((
-            repo_name.to_string(),
-            "the git repository folder name".to_string(),
-        ));
+        return Some((repo_name.to_string(), "the git repository folder name".to_string()));
     }
 
     // 4. Use current folder name
@@ -115,10 +105,7 @@ fn read_cargo_toml_name(dir: &Path) -> Option<String> {
     // Simple regex-based parsing for the name field within Cargo.toml
     let re = regex::Regex::new(r#"(?m)^\s*name\s*=\s*"([^"]+)""#).ok()?;
     let captures = re.captures(&content)?;
-    captures
-        .get(1)
-        .map(|m| m.as_str().to_string())
-        .filter(|s| !s.is_empty())
+    captures.get(1).map(|m| m.as_str().to_string()).filter(|s| !s.is_empty())
 }
 
 fn read_package_json_name(dir: &Path) -> Option<String> {
@@ -156,12 +143,7 @@ fn read_go_mod_name(dir: &Path) -> Option<String> {
 }
 
 fn get_current_folder_name() -> Option<String> {
-    std::env::current_dir()
-        .ok()?
-        .file_name()?
-        .to_str()
-        .map(|s| s.to_string())
-        .filter(|s| !s.is_empty() && s != "/" && s != ".")
+    std::env::current_dir().ok()?.file_name()?.to_str().map(|s| s.to_string()).filter(|s| !s.is_empty() && s != "/" && s != ".")
 }
 
 pub fn get_project_path() -> Option<PathBuf> {

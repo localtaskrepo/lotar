@@ -53,24 +53,12 @@ mod assignment {
         std::fs::create_dir_all(&tasks_dir).unwrap();
         let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
         // Disable via config
-        std::fs::write(
-            paths::global_config_path(&tasks_dir),
-            "default.project: TEST\nauto.set_reporter: false\n",
-        )
-        .unwrap();
+        std::fs::write(paths::global_config_path(&tasks_dir), "default.project: TEST\nauto.set_reporter: false\n").unwrap();
 
         let mut storage = Storage::new(&tasks_dir);
-        let req = TaskCreate {
-            title: "No reporter".to_string(),
-            project: Some("TEST".to_string()),
-            status: None,
-            ..TaskCreate::default()
-        };
+        let req = TaskCreate { title: "No reporter".to_string(), project: Some("TEST".to_string()), status: None, ..TaskCreate::default() };
         let created = TaskService::create(&mut storage, req).expect("service create");
-        assert!(
-            created.reporter.is_none(),
-            "reporter should be None when disabled"
-        );
+        assert!(created.reporter.is_none(), "reporter should be None when disabled");
     }
 
     #[test]
@@ -81,12 +69,7 @@ mod assignment {
         let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
 
         let mut storage = Storage::new(&tasks_dir);
-        let req = TaskCreate {
-            title: "File reporter".to_string(),
-            project: Some("TEST".to_string()),
-            status: None,
-            ..TaskCreate::default()
-        };
+        let req = TaskCreate { title: "File reporter".to_string(), project: Some("TEST".to_string()), status: None, ..TaskCreate::default() };
         let created = TaskService::create(&mut storage, req).expect("service create");
         let _ = created.reporter; // may be Some or None; ensure no crash
     }
@@ -110,12 +93,7 @@ mod assignment {
         lotar::utils::identity::invalidate_identity_cache(Some(&tasks_dir));
 
         let mut storage = Storage::new(&tasks_dir);
-        let req = TaskCreate {
-            title: "Alias reporter".to_string(),
-            project: Some("TEST".to_string()),
-            status: None,
-            ..TaskCreate::default()
-        };
+        let req = TaskCreate { title: "Alias reporter".to_string(), project: Some("TEST".to_string()), status: None, ..TaskCreate::default() };
         let created = TaskService::create(&mut storage, req).expect("service create");
         assert_eq!(created.reporter.as_deref(), Some("alias-user"));
     }
@@ -134,30 +112,16 @@ mod assignment {
         )
         .unwrap();
 
-        let merged = lotar::config::resolution::load_and_merge_configs(Some(&tasks_dir))
-            .expect("load merged config");
+        let merged = lotar::config::resolution::load_and_merge_configs(Some(&tasks_dir)).expect("load merged config");
         assert_eq!(merged.default_reporter.as_deref(), Some("bob"));
 
         let mut storage = Storage::new(&tasks_dir.clone());
-        let create = TaskCreate {
-            title: "Needs assignee".to_string(),
-            project: Some("TEST".to_string()),
-            status: None,
-            ..TaskCreate::default()
-        };
+        let create = TaskCreate { title: "Needs assignee".to_string(), project: Some("TEST".to_string()), status: None, ..TaskCreate::default() };
         let created = TaskService::create(&mut storage, create).unwrap();
         assert!(created.assignee.is_none(), "assignee should start None");
 
         let mut storage = Storage::new(&tasks_dir);
-        let updated = TaskService::update(
-            &mut storage,
-            &created.id,
-            TaskUpdate {
-                status: Some("InProgress".to_string()),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+        let updated = TaskService::update(&mut storage, &created.id, TaskUpdate { status: Some("InProgress".to_string()), ..Default::default() }).unwrap();
         assert_eq!(updated.assignee.as_deref(), Some("bob"));
     }
 
@@ -167,36 +131,16 @@ mod assignment {
         let tasks_dir = tmp.path().join(".tasks");
         std::fs::create_dir_all(&tasks_dir).unwrap();
         let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
-        std::fs::write(
-            paths::global_config_path(&tasks_dir),
-            "default.project: TEST\nauto.assign_on_status: false\n",
-        )
-        .unwrap();
+        std::fs::write(paths::global_config_path(&tasks_dir), "default.project: TEST\nauto.assign_on_status: false\n").unwrap();
 
         let mut storage = Storage::new(&tasks_dir.clone());
-        let create = TaskCreate {
-            title: "No auto assign".to_string(),
-            project: Some("TEST".to_string()),
-            status: None,
-            ..TaskCreate::default()
-        };
+        let create = TaskCreate { title: "No auto assign".to_string(), project: Some("TEST".to_string()), status: None, ..TaskCreate::default() };
         let created = TaskService::create(&mut storage, create).unwrap();
         assert!(created.assignee.is_none());
 
         let mut storage = Storage::new(&tasks_dir);
-        let updated = TaskService::update(
-            &mut storage,
-            &created.id,
-            TaskUpdate {
-                status: Some("Done".to_string()),
-                ..Default::default()
-            },
-        )
-        .unwrap();
-        assert!(
-            updated.assignee.is_none(),
-            "assignee should remain None when disabled"
-        );
+        let updated = TaskService::update(&mut storage, &created.id, TaskUpdate { status: Some("Done".to_string()), ..Default::default() }).unwrap();
+        assert!(updated.assignee.is_none(), "assignee should remain None when disabled");
     }
 
     #[test]
@@ -215,27 +159,13 @@ mod assignment {
         let mut storage = Storage::new(&tasks_dir.clone());
         let created = TaskService::create(
             &mut storage,
-            TaskCreate {
-                title: "Preset assignee".into(),
-                project: Some("AAA".into()),
-                status: None,
-                assignee: Some("sam".into()),
-                ..TaskCreate::default()
-            },
+            TaskCreate { title: "Preset assignee".into(), project: Some("AAA".into()), status: None, assignee: Some("sam".into()), ..TaskCreate::default() },
         )
         .unwrap();
 
         // Status change should not override existing assignee
         let mut storage = Storage::new(&tasks_dir);
-        let updated = TaskService::update(
-            &mut storage,
-            &created.id,
-            TaskUpdate {
-                status: Some("InProgress".to_string()),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+        let updated = TaskService::update(&mut storage, &created.id, TaskUpdate { status: Some("InProgress".to_string()), ..Default::default() }).unwrap();
         assert_eq!(updated.assignee.as_deref(), Some("sam"));
     }
 
@@ -248,17 +178,9 @@ mod assignment {
         let _guard_rep = EnvVarGuard::set("LOTAR_DEFAULT_REPORTER", "env-reporter@example.com");
 
         let mut storage = Storage::new(&tasks_dir);
-        let req = TaskCreate {
-            title: "Env reporter".to_string(),
-            project: Some("TEST".to_string()),
-            status: None,
-            ..TaskCreate::default()
-        };
+        let req = TaskCreate { title: "Env reporter".to_string(), project: Some("TEST".to_string()), status: None, ..TaskCreate::default() };
         let created = TaskService::create(&mut storage, req).expect("create");
-        assert_eq!(
-            created.reporter.as_deref(),
-            Some("env-reporter@example.com")
-        );
+        assert_eq!(created.reporter.as_deref(), Some("env-reporter@example.com"));
     }
 }
 
@@ -266,9 +188,7 @@ impl TestEnvironment {
     fn new() -> Self {
         crate::common::reset_lotar_test_environment();
 
-        TestEnvironment {
-            temp_dir: TempDir::new().unwrap(),
-        }
+        TestEnvironment { temp_dir: TempDir::new().unwrap() }
     }
 
     fn path(&self) -> &std::path::Path {
@@ -314,26 +234,12 @@ impl TestEnvironment {
 
     /// Helper to create task without warnings
     fn create_task(&self, project: &str, title: &str) {
-        crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(self.path())
-            .arg("add")
-            .arg(title)
-            .arg(format!("--project={project}"))
-            .assert()
-            .success();
+        crate::common::lotar_cmd().unwrap().current_dir(self.path()).arg("add").arg(title).arg(format!("--project={project}")).assert().success();
     }
 
     /// Helper to initialize project
     fn init_project(&self, project: &str) {
-        crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(self.path())
-            .arg("config")
-            .arg("init")
-            .arg(format!("--project={project}"))
-            .assert()
-            .success();
+        crate::common::lotar_cmd().unwrap().current_dir(self.path()).arg("config").arg("init").arg(format!("--project={project}")).assert().success();
     }
 
     /// Helper to set config value
@@ -359,11 +265,7 @@ mod priority_smart_defaults {
         let env = TestEnvironment::new();
 
         env.init_project("prio-global");
-        env.set_config(
-            "prio-global",
-            "issue_priorities",
-            "Critical,High,Medium,Low",
-        );
+        env.set_config("prio-global", "issue_priorities", "Critical,High,Medium,Low");
         env.create_task("prio-global", "Test global default priority");
 
         // Should use global default (Medium) since it's in the project list
@@ -376,11 +278,7 @@ mod priority_smart_defaults {
 
         env.init_project("prio-fallback");
         env.set_config("prio-fallback", "issue_priorities", "Critical,High"); // No Medium
-        env.create_task_with_warning(
-            "prio-fallback",
-            "Test priority fallback",
-            "Warning: Global default priority 'Medium' is not in project priority list",
-        );
+        env.create_task_with_warning("prio-fallback", "Test priority fallback", "Warning: Global default priority 'Medium' is not in project priority list");
 
         // Should fall back to first in list (Critical)
         env.assert_task_priority("prio-fallback", "Critical");
@@ -391,11 +289,7 @@ mod priority_smart_defaults {
         let env = TestEnvironment::new();
 
         env.init_project("prio-explicit");
-        env.set_config(
-            "prio-explicit",
-            "issue_priorities",
-            "Critical,High,Medium,Low",
-        );
+        env.set_config("prio-explicit", "issue_priorities", "Critical,High,Medium,Low");
         env.set_config("prio-explicit", "default_priority", "High");
         env.create_task("prio-explicit", "Test explicit priority");
 
@@ -495,11 +389,7 @@ mod combined_scenarios {
         env.set_config("mixed", "issue_states", "TODO,BLOCKED,DONE");
         env.set_config("mixed", "default_status", "BLOCKED");
 
-        env.create_task_with_warning(
-            "mixed",
-            "Test mixed defaults",
-            "Warning: Global default priority 'Medium' is not in project priority list",
-        );
+        env.create_task_with_warning("mixed", "Test mixed defaults", "Warning: Global default priority 'Medium' is not in project priority list");
 
         // Should get fallback priority + explicit status
         env.assert_task_priority("mixed", "Critical");
@@ -513,11 +403,7 @@ mod combined_scenarios {
         env.init_project("both-explicit");
 
         // Both priority and status have explicit defaults
-        env.set_config(
-            "both-explicit",
-            "issue_priorities",
-            "Low,Medium,High,Critical",
-        );
+        env.set_config("both-explicit", "issue_priorities", "Low,Medium,High,Critical");
         env.set_config("both-explicit", "default_priority", "High");
 
         env.set_config("both-explicit", "issue_states", "TODO,BLOCKED,VERIFY,DONE");
@@ -539,12 +425,7 @@ mod combined_scenarios {
         env.set_config("precedence", "issue_states", "TODO,IN_PROGRESS,DONE");
 
         // Set global default_status to value not present in project list
-        crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(env.path())
-            .args(["config", "set", "default_status", "BLOCKED", "--global"])
-            .assert()
-            .success();
+        crate::common::lotar_cmd().unwrap().current_dir(env.path()).args(["config", "set", "default_status", "BLOCKED", "--global"]).assert().success();
 
         // Create task and ensure it falls back to first project state
         env.create_task("precedence", "Test precedence fallback");
@@ -562,11 +443,7 @@ mod edge_cases {
 
         env.init_project("single-prio");
         env.set_config("single-prio", "issue_priorities", "Critical"); // Only one option
-        env.create_task_with_warning(
-            "single-prio",
-            "Test single priority",
-            "Warning: Global default priority 'Medium' is not in project priority list",
-        );
+        env.create_task_with_warning("single-prio", "Test single priority", "Warning: Global default priority 'Medium' is not in project priority list");
 
         // Should use the only available priority
         env.assert_task_priority("single-prio", "Critical");
@@ -594,21 +471,11 @@ mod edge_cases {
 
         // Create multiple tasks
         for i in 1..=3 {
-            env.create_task_with_warning(
-                "consistent",
-                &format!("Test task {i}"),
-                "Warning: Global default priority 'Medium' is not in project priority list",
-            );
+            env.create_task_with_warning("consistent", &format!("Test task {i}"), "Warning: Global default priority 'Medium' is not in project priority list");
         }
 
         // All tasks should have consistent defaults
-        let output = crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(env.path())
-            .arg("list")
-            .arg("--project=consistent")
-            .output()
-            .unwrap();
+        let output = crate::common::lotar_cmd().unwrap().current_dir(env.path()).arg("list").arg("--project=consistent").output().unwrap();
 
         let stdout = String::from_utf8_lossy(&output.stdout);
         // Should have 3 tasks all with Critical priority and VERIFY status
@@ -630,30 +497,13 @@ mod default_status_tests {
         let _ignore_env = EnvVarGuard::set("LOTAR_IGNORE_ENV_TASKS_DIR", "1");
 
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("config")
-            .arg("init")
-            .arg("--project=custom-status")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("config").arg("init").arg("--project=custom-status").assert().success();
 
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("config")
-            .arg("set")
-            .arg("issue_states")
-            .arg("IN_PROGRESS,TODO,DONE")
-            .arg("--project=custom-status")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("config").arg("set").arg("issue_states").arg("IN_PROGRESS,TODO,DONE").arg("--project=custom-status").assert().success();
 
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("add")
-            .arg("Test default status")
-            .arg("--project=custom-status")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("add").arg("Test default status").arg("--project=custom-status").assert().success();
 
         let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
@@ -672,12 +522,7 @@ mod default_status_tests {
         let _ignore_env = EnvVarGuard::set("LOTAR_IGNORE_ENV_TASKS_DIR", "1");
 
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("config")
-            .arg("init")
-            .arg("--project=explicit-default")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("config").arg("init").arg("--project=explicit-default").assert().success();
 
         let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
@@ -690,31 +535,13 @@ mod default_status_tests {
             .success();
 
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("config")
-            .arg("set")
-            .arg("default_status")
-            .arg("DONE")
-            .arg("--project=explicit-default")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("config").arg("set").arg("default_status").arg("DONE").arg("--project=explicit-default").assert().success();
 
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("add")
-            .arg("Test explicit default")
-            .arg("--project=explicit-default")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("add").arg("Test explicit default").arg("--project=explicit-default").assert().success();
 
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("status")
-            .arg("1")
-            .arg("--project=explicit-default")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("status: DONE"));
+        cmd.current_dir(temp_dir).arg("status").arg("1").arg("--project=explicit-default").assert().success().stdout(predicate::str::contains("status: DONE"));
     }
 
     #[test]
@@ -724,18 +551,9 @@ mod default_status_tests {
         let _ignore_env = EnvVarGuard::set("LOTAR_IGNORE_ENV_TASKS_DIR", "1");
 
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("add")
-            .arg("Test fallback default")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("add").arg("Test fallback default").assert().success();
 
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("status")
-            .arg("1")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("status: Todo"));
+        cmd.current_dir(temp_dir).arg("status").arg("1").assert().success().stdout(predicate::str::contains("status: Todo"));
     }
 }

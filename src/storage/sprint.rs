@@ -24,18 +24,14 @@ impl SprintCanonicalizationWarning {
     /// Stable machine-readable identifier for the warning variant.
     pub fn code(&self) -> &'static str {
         match self {
-            SprintCanonicalizationWarning::LengthDiscardedInFavorOfEndsAt => {
-                "length_discarded_in_favor_of_ends_at"
-            }
+            SprintCanonicalizationWarning::LengthDiscardedInFavorOfEndsAt => "length_discarded_in_favor_of_ends_at",
         }
     }
 
     /// Human-friendly explanation suitable for CLI output.
     pub fn message(&self) -> &'static str {
         match self {
-            SprintCanonicalizationWarning::LengthDiscardedInFavorOfEndsAt => {
-                "plan.length was ignored because plan.ends_at was provided."
-            }
+            SprintCanonicalizationWarning::LengthDiscardedInFavorOfEndsAt => "plan.length was ignored because plan.ends_at was provided.",
         }
     }
 }
@@ -64,16 +60,10 @@ pub struct Sprint {
 }
 
 fn is_builtin_sprint_key(key: &str) -> bool {
-    matches!(
-        key,
-        "created" | "modified" | "plan" | "actual" | "tasks" | "history"
-    )
+    matches!(key, "created" | "modified" | "plan" | "actual" | "tasks" | "history")
 }
 
-fn serialize_extra_fields<S: serde::Serializer>(
-    fields: &BTreeMap<String, serde_yaml_ng::Value>,
-    serializer: S,
-) -> Result<S::Ok, S::Error> {
+fn serialize_extra_fields<S: serde::Serializer>(fields: &BTreeMap<String, serde_yaml_ng::Value>, serializer: S) -> Result<S::Ok, S::Error> {
     use serde::ser::SerializeMap;
     let mut map = serializer.serialize_map(None)?;
     for (key, value) in fields {
@@ -107,13 +97,9 @@ impl Sprint {
         self.canonicalize_tasks();
 
         // Drop empty history entries to keep diffs tidy.
-        self.history.retain(|entry| {
-            !entry.at.is_empty() || entry.actor.is_some() || !entry.changes.is_empty()
-        });
+        self.history.retain(|entry| !entry.at.is_empty() || entry.actor.is_some() || !entry.changes.is_empty());
         self.history.iter_mut().for_each(|entry| {
-            entry.changes.retain(|change| {
-                change.old.is_some() || change.new.is_some() || !change.field.is_empty()
-            });
+            entry.changes.retain(|change| change.old.is_some() || change.new.is_some() || !change.field.is_empty());
         });
         warnings
     }
@@ -143,10 +129,7 @@ impl Sprint {
             match fs::rename(&legacy, &target) {
                 Ok(_) => return target,
                 Err(err) => {
-                    eprintln!(
-                        "[lotar][warn] failed to migrate legacy .tasks/sprints directory: {}",
-                        err
-                    );
+                    eprintln!("[lotar][warn] failed to migrate legacy .tasks/sprints directory: {}", err);
                     return legacy;
                 }
             }
@@ -259,20 +242,14 @@ impl<'de> Deserialize<'de> for SprintTaskEntry {
             where
                 E: de::Error,
             {
-                Ok(SprintTaskEntry {
-                    id: value.to_string(),
-                    ..SprintTaskEntry::default()
-                })
+                Ok(SprintTaskEntry { id: value.to_string(), ..SprintTaskEntry::default() })
             }
 
             fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
             where
                 E: de::Error,
             {
-                Ok(SprintTaskEntry {
-                    id: value,
-                    ..SprintTaskEntry::default()
-                })
+                Ok(SprintTaskEntry { id: value, ..SprintTaskEntry::default() })
             }
 
             fn visit_map<M>(self, mut map: M) -> Result<Self::Value, M::Error>

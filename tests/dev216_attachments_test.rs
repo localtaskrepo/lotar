@@ -22,12 +22,7 @@ fn workspace() -> Fixture {
     let tasks_dir = tmp.path().join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();
     let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
-    Fixture {
-        _tmp: tmp,
-        tasks_dir,
-        _guard_tasks,
-        _guard_fast,
-    }
+    Fixture { _tmp: tmp, tasks_dir, _guard_tasks, _guard_fast }
 }
 
 fn server() -> ApiServer {
@@ -40,10 +35,7 @@ fn request(method: &str, path: &str, query: &[(&str, &str)], body: Value) -> Htt
     HttpRequest {
         method: method.to_string(),
         path: path.to_string(),
-        query: query
-            .iter()
-            .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
-            .collect::<HashMap<_, _>>(),
+        query: query.iter().map(|(k, v)| ((*k).to_string(), (*v).to_string())).collect::<HashMap<_, _>>(),
         headers: HashMap::new(),
         body: serde_json::to_vec(&body).unwrap(),
     }
@@ -54,19 +46,11 @@ fn json_of(resp: &HttpResponse) -> Value {
 }
 
 fn header<'a>(resp: &'a HttpResponse, name: &str) -> Option<&'a str> {
-    resp.headers
-        .iter()
-        .find(|(key, _)| key.eq_ignore_ascii_case(name))
-        .map(|(_, value)| value.as_str())
+    resp.headers.iter().find(|(key, _)| key.eq_ignore_ascii_case(name)).map(|(_, value)| value.as_str())
 }
 
 fn create(api: &ApiServer, title: &str) -> String {
-    let resp = api.handle_request(&request(
-        "POST",
-        "/api/tasks/add",
-        &[],
-        json!({"title": title, "project": "IMG"}),
-    ));
+    let resp = api.handle_request(&request("POST", "/api/tasks/add", &[], json!({"title": title, "project": "IMG"})));
     assert_eq!(resp.status, 201, "{}", String::from_utf8_lossy(&resp.body));
     json_of(&resp)["data"]["id"].as_str().unwrap().to_string()
 }
@@ -91,16 +75,9 @@ fn hash_of(stored: &str) -> String {
 }
 
 fn png(width: u32, height: u32) -> Vec<u8> {
-    let image = image::RgbImage::from_fn(width, height, |x, y| {
-        image::Rgb([(x % 256) as u8, (y % 256) as u8, 90])
-    });
+    let image = image::RgbImage::from_fn(width, height, |x, y| image::Rgb([(x % 256) as u8, (y % 256) as u8, 90]));
     let mut bytes = Vec::new();
-    image::DynamicImage::ImageRgb8(image)
-        .write_to(
-            &mut std::io::Cursor::new(&mut bytes),
-            image::ImageFormat::Png,
-        )
-        .unwrap();
+    image::DynamicImage::ImageRgb8(image).write_to(&mut std::io::Cursor::new(&mut bytes), image::ImageFormat::Png).unwrap();
     bytes
 }
 
@@ -118,11 +95,7 @@ fn png_with_text(width: u32, height: u32) -> Vec<u8> {
     for byte in b"tEXt".iter().chain(data.iter()) {
         crc ^= u32::from(*byte);
         for _ in 0..8 {
-            crc = if crc & 1 != 0 {
-                (crc >> 1) ^ 0xedb8_8320
-            } else {
-                crc >> 1
-            };
+            crc = if crc & 1 != 0 { (crc >> 1) ^ 0xedb8_8320 } else { crc >> 1 };
         }
     }
     chunk.extend_from_slice(&(!crc).to_be_bytes());
@@ -140,15 +113,8 @@ fn uploads_strip_metadata_and_warn_about_fake_images() {
     assert_eq!(data["metadata_removed"], json!(true));
     let stored = data["stored_path"].as_str().unwrap();
     let on_disk = std::fs::read(fx.tasks_dir.join("@attachments").join(stored)).unwrap();
-    assert!(
-        !on_disk
-            .windows(8)
-            .any(|w| w == b"TestCam\0" || w == b"Software")
-    );
-    assert_eq!(
-        image::load_from_memory(&on_disk).unwrap().to_rgb8(),
-        image::load_from_memory(&png(8, 8)).unwrap().to_rgb8()
-    );
+    assert!(!on_disk.windows(8).any(|w| w == b"TestCam\0" || w == b"Software"));
+    assert_eq!(image::load_from_memory(&on_disk).unwrap().to_rgb8(), image::load_from_memory(&png(8, 8)).unwrap().to_rgb8());
 
     let clean = upload(&api, &id, "clean.png", &png(9, 9));
     assert!(clean.get("metadata_removed").is_none());
@@ -165,10 +131,7 @@ fn hash_route_serves_cached_thumbnails() {
     let _fx = workspace();
     let api = server();
     let id = create(&api, "Big");
-    let stored = upload(&api, &id, "big.png", &png(1200, 600))["stored_path"]
-        .as_str()
-        .unwrap()
-        .to_string();
+    let stored = upload(&api, &id, "big.png", &png(1200, 600))["stored_path"].as_str().unwrap().to_string();
     let path = format!("/api/attachments/h/{}/big.png", hash_of(&stored));
 
     let resp = api.handle_request(&request("GET", &path, &[("w", "300")], json!({})));
@@ -176,22 +139,11 @@ fn hash_route_serves_cached_thumbnails() {
     assert_eq!(header(&resp, "content-type"), Some("image/jpeg"));
     let thumb = image::load_from_memory(&resp.body).unwrap();
     assert_eq!((thumb.width(), thumb.height()), (480, 240));
-    assert_eq!(
-        header(&resp, "etag").unwrap(),
-        format!("\"{}-w480\"", hash_of(&stored))
-    );
+    assert_eq!(header(&resp, "etag").unwrap(), format!("\"{}-w480\"", hash_of(&stored)));
 
     // Already small enough: the original comes back.
-    let small = upload(&api, &id, "small.png", &png(20, 20))["stored_path"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    let resp = api.handle_request(&request(
-        "GET",
-        &format!("/api/attachments/h/{}/small.png", hash_of(&small)),
-        &[("w", "96")],
-        json!({}),
-    ));
+    let small = upload(&api, &id, "small.png", &png(20, 20))["stored_path"].as_str().unwrap().to_string();
+    let resp = api.handle_request(&request("GET", &format!("/api/attachments/h/{}/small.png", hash_of(&small)), &[("w", "96")], json!({})));
     assert_eq!(header(&resp, "content-type"), Some("image/png"));
     assert_eq!(image::load_from_memory(&resp.body).unwrap().width(), 20);
 
@@ -204,14 +156,8 @@ fn info_reports_sizes_and_dimensions() {
     let _fx = workspace();
     let api = server();
     let id = create(&api, "Info");
-    let image = upload(&api, &id, "shot.png", &png(30, 20))["stored_path"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    let text = upload(&api, &id, "notes.txt", b"hello")["stored_path"]
-        .as_str()
-        .unwrap()
-        .to_string();
+    let image = upload(&api, &id, "shot.png", &png(30, 20))["stored_path"].as_str().unwrap().to_string();
+    let text = upload(&api, &id, "notes.txt", b"hello")["stored_path"].as_str().unwrap().to_string();
     let resp = api.handle_request(&request(
         "POST",
         "/api/attachments/info",
@@ -232,51 +178,21 @@ fn attachments_can_be_reordered() {
     let _fx = workspace();
     let api = server();
     let id = create(&api, "Order");
-    let a = upload(&api, &id, "a.txt", b"a")["stored_path"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    api.handle_request(&request(
-        "POST",
-        "/api/tasks/references/link/add",
-        &[],
-        json!({"id": id, "url": "https://example.com/spec"}),
-    ));
-    let b = upload(&api, &id, "b.png", &png(4, 4))["stored_path"]
-        .as_str()
-        .unwrap()
-        .to_string();
+    let a = upload(&api, &id, "a.txt", b"a")["stored_path"].as_str().unwrap().to_string();
+    api.handle_request(&request("POST", "/api/tasks/references/link/add", &[], json!({"id": id, "url": "https://example.com/spec"})));
+    let b = upload(&api, &id, "b.png", &png(4, 4))["stored_path"].as_str().unwrap().to_string();
 
-    let resp = api.handle_request(&request(
-        "POST",
-        "/api/tasks/attachments/reorder",
-        &[],
-        json!({"id": id, "attachments": [b, a]}),
-    ));
+    let resp = api.handle_request(&request("POST", "/api/tasks/attachments/reorder", &[], json!({"id": id, "attachments": [b, a]})));
     assert_eq!(resp.status, 200, "{}", String::from_utf8_lossy(&resp.body));
     let task = json_of(&resp)["data"].clone();
-    let attachments: Vec<&str> = task["references"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .filter_map(|r| r["attachment"].as_str())
-        .collect();
+    let attachments: Vec<&str> = task["references"].as_array().unwrap().iter().filter_map(|r| r["attachment"].as_str()).collect();
     assert_eq!(attachments, vec![b.as_str(), a.as_str()]);
     let history = task["history"].as_array().unwrap();
-    assert!(
-        history
-            .iter()
-            .any(|entry| entry["changes"][0]["field"] == "attachments_reordered")
-    );
+    assert!(history.iter().any(|entry| entry["changes"][0]["field"] == "attachments_reordered"));
 
     // Must be an exact permutation of the task's attachments.
     for bad in [json!([a]), json!([a, a]), json!([a, b, "other.txt"])] {
-        let resp = api.handle_request(&request(
-            "POST",
-            "/api/tasks/attachments/reorder",
-            &[],
-            json!({"id": id, "attachments": bad}),
-        ));
+        let resp = api.handle_request(&request("POST", "/api/tasks/attachments/reorder", &[], json!({"id": id, "attachments": bad})));
         assert_eq!(resp.status, 400, "{bad}");
     }
 }
@@ -292,21 +208,11 @@ fn list_filters_by_what_tasks_carry() {
     create(&api, "Plain");
 
     let ids = |has: &str| -> Vec<String> {
-        let resp = api.handle_request(&request(
-            "GET",
-            "/api/tasks/list",
-            &[("has", has)],
-            json!({}),
-        ));
+        let resp = api.handle_request(&request("GET", "/api/tasks/list", &[("has", has)], json!({})));
         assert_eq!(resp.status, 200, "{}", String::from_utf8_lossy(&resp.body));
         let body = json_of(&resp);
-        let mut ids: Vec<String> = body["data"]["tasks"]
-            .as_array()
-            .map(Vec::as_slice)
-            .unwrap_or_default()
-            .iter()
-            .map(|task| task["id"].as_str().unwrap().to_string())
-            .collect();
+        let mut ids: Vec<String> =
+            body["data"]["tasks"].as_array().map(Vec::as_slice).unwrap_or_default().iter().map(|task| task["id"].as_str().unwrap().to_string()).collect();
         ids.sort();
         ids
     };
@@ -316,12 +222,7 @@ fn list_filters_by_what_tasks_carry() {
     assert_eq!(ids("image"), vec![with_image.clone()]);
     assert!(ids("link").is_empty());
 
-    let resp = api.handle_request(&request(
-        "GET",
-        "/api/tasks/list",
-        &[("has", "pdf")],
-        json!({}),
-    ));
+    let resp = api.handle_request(&request("GET", "/api/tasks/list", &[("has", "pdf")], json!({})));
     assert_eq!(resp.status, 400);
 }
 
@@ -330,24 +231,10 @@ fn download_names_keep_non_ascii_characters() {
     let _fx = workspace();
     let api = server();
     let id = create(&api, "Names");
-    let stored = upload(&api, &id, "Größe ✓.txt", b"x")["stored_path"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    let resp = api.handle_request(&request(
-        "GET",
-        &format!(
-            "/api/attachments/h/{}/Gr%C3%B6%C3%9Fe%20%E2%9C%93.txt",
-            hash_of(&stored)
-        ),
-        &[],
-        json!({}),
-    ));
+    let stored = upload(&api, &id, "Größe ✓.txt", b"x")["stored_path"].as_str().unwrap().to_string();
+    let resp = api.handle_request(&request("GET", &format!("/api/attachments/h/{}/Gr%C3%B6%C3%9Fe%20%E2%9C%93.txt", hash_of(&stored)), &[], json!({})));
     assert_eq!(resp.status, 200);
-    assert_eq!(
-        header(&resp, "content-disposition"),
-        Some("inline; filename=\"Gr__e _.txt\"; filename*=UTF-8''Gr%C3%B6%C3%9Fe%20%E2%9C%93.txt")
-    );
+    assert_eq!(header(&resp, "content-disposition"), Some("inline; filename=\"Gr__e _.txt\"; filename*=UTF-8''Gr%C3%B6%C3%9Fe%20%E2%9C%93.txt"));
 }
 
 #[test]
@@ -355,10 +242,7 @@ fn media_supports_byte_ranges() {
     let _fx = workspace();
     let api = server();
     let id = create(&api, "Clip");
-    let stored = upload(&api, &id, "clip.mp4", b"0123456789")["stored_path"]
-        .as_str()
-        .unwrap()
-        .to_string();
+    let stored = upload(&api, &id, "clip.mp4", b"0123456789")["stored_path"].as_str().unwrap().to_string();
     let path = format!("/api/attachments/h/{}/clip.mp4", hash_of(&stored));
     let ranged = |range: &str| {
         let mut req = request("GET", &path, &[], json!({}));

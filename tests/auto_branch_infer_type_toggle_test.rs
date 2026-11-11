@@ -39,11 +39,7 @@ mod git_required {
         // Also add a project to restrict allowed types to Feature, forcing default behavior
         let proj = tasks.join("TEST");
         std::fs::create_dir_all(&proj).unwrap();
-        std::fs::write(
-            proj.join("config.yml"),
-            "project.name: TEST\nissue.types: [Feature]\n",
-        )
-        .unwrap();
+        std::fs::write(proj.join("config.yml"), "project.name: TEST\nissue.types: [Feature]\n").unwrap();
 
         let assert = crate::common::lotar_cmd()
             .unwrap()
@@ -51,13 +47,7 @@ mod git_required {
             .env("LOTAR_TASKS_DIR", tasks.to_string_lossy().to_string())
             .env("LOTAR_TEST_SILENT", "1")
             .env("HOME", root.to_string_lossy().to_string())
-            .args([
-                "add",
-                "Test",
-                "--project=TEST",
-                "--dry-run",
-                "--format=json",
-            ])
+            .args(["add", "Test", "--project=TEST", "--dry-run", "--format=json"])
             .assert()
             .success();
 
@@ -81,13 +71,7 @@ mod git_required {
             .env("LOTAR_TASKS_DIR", tasks.to_string_lossy().to_string())
             .env("LOTAR_TEST_SILENT", "1")
             .env("HOME", root.to_string_lossy().to_string())
-            .args([
-                "add",
-                "Test",
-                "--project=TEST",
-                "--dry-run",
-                "--format=json",
-            ])
+            .args(["add", "Test", "--project=TEST", "--dry-run", "--format=json"])
             .assert()
             .success();
 

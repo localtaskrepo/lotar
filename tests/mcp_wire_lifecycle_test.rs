@@ -29,8 +29,7 @@ impl Wire {
             Wire::Line(line) => line.as_str(),
             Wire::Frame(body) => body.as_str(),
         };
-        serde_json::from_str(text)
-            .unwrap_or_else(|error| panic!("non-JSON output {text:?}: {error}"))
+        serde_json::from_str(text).unwrap_or_else(|error| panic!("non-JSON output {text:?}: {error}"))
     }
 
     fn is_framed(&self) -> bool {
@@ -91,11 +90,7 @@ impl McpChild {
                     continue;
                 }
                 if trimmed.to_ascii_lowercase().starts_with("content-length:") {
-                    let length = trimmed
-                        .split(':')
-                        .nth(1)
-                        .and_then(|value| value.trim().parse::<usize>().ok())
-                        .unwrap_or(0);
+                    let length = trimmed.split(':').nth(1).and_then(|value| value.trim().parse::<usize>().ok()).unwrap_or(0);
                     loop {
                         let mut extra = String::new();
                         match reader.read_line(&mut extra) {
@@ -111,10 +106,7 @@ impl McpChild {
                     if reader.read_exact(&mut body).is_err() {
                         break;
                     }
-                    if tx
-                        .send(Wire::Frame(String::from_utf8_lossy(&body).to_string()))
-                        .is_err()
-                    {
+                    if tx.send(Wire::Frame(String::from_utf8_lossy(&body).to_string())).is_err() {
                         break;
                     }
                 } else if tx.send(Wire::Line(trimmed.to_string())).is_err() {
@@ -140,12 +132,7 @@ impl McpChild {
             }
         });
 
-        Self {
-            child,
-            stdin,
-            messages: rx,
-            stderr_log,
-        }
+        Self { child, stdin, messages: rx, stderr_log }
     }
 
     fn send(&mut self, value: &Value) {
@@ -160,22 +147,15 @@ impl McpChild {
     }
 
     fn send_frame(&mut self, body: &str) {
-        write!(self.stdin, "Content-Length: {}\r\n\r\n{}", body.len(), body)
-            .expect("write frame to mcp stdin");
+        write!(self.stdin, "Content-Length: {}\r\n\r\n{}", body.len(), body).expect("write frame to mcp stdin");
         self.stdin.flush().expect("flush mcp stdin");
     }
 
     fn next_wire(&mut self, what: &str) -> Wire {
         match self.messages.recv_timeout(Duration::from_secs(10)) {
             Ok(wire) => wire,
-            Err(RecvTimeoutError::Timeout) => panic!(
-                "timed out waiting for {what}; stderr: {:?}",
-                self.stderr_log.lock().unwrap()
-            ),
-            Err(RecvTimeoutError::Disconnected) => panic!(
-                "server exited while waiting for {what}; stderr: {:?}",
-                self.stderr_log.lock().unwrap()
-            ),
+            Err(RecvTimeoutError::Timeout) => panic!("timed out waiting for {what}; stderr: {:?}", self.stderr_log.lock().unwrap()),
+            Err(RecvTimeoutError::Disconnected) => panic!("server exited while waiting for {what}; stderr: {:?}", self.stderr_log.lock().unwrap()),
         }
     }
 
@@ -186,10 +166,7 @@ impl McpChild {
     fn expect_silence(&mut self, what: &str) {
         match self.messages.recv_timeout(Duration::from_millis(600)) {
             Ok(wire) => panic!("unexpected output while {what}: {wire:?}"),
-            Err(RecvTimeoutError::Disconnected) => panic!(
-                "server exited unexpectedly while {what}; stderr: {:?}",
-                self.stderr_log.lock().unwrap()
-            ),
+            Err(RecvTimeoutError::Disconnected) => panic!("server exited unexpectedly while {what}; stderr: {:?}", self.stderr_log.lock().unwrap()),
             Err(RecvTimeoutError::Timeout) => {}
         }
     }
@@ -217,29 +194,16 @@ fn workspace() -> (tempfile::TempDir, std::path::PathBuf) {
 
 fn workspace_with_config() -> (tempfile::TempDir, std::path::PathBuf) {
     let (tmp, tasks_dir) = workspace();
-    std::fs::write(
-        tasks_dir.join("config.yml"),
-        "default:\n  project: MCP\nissue:\n  tags:\n    - alpha\n",
-    )
-    .unwrap();
+    std::fs::write(tasks_dir.join("config.yml"), "default:\n  project: MCP\nissue:\n  tags:\n    - alpha\n").unwrap();
     (tmp, tasks_dir)
 }
 
 fn error_code(response: &Value) -> i64 {
-    response
-        .get("error")
-        .and_then(|error| error.get("code"))
-        .and_then(|code| code.as_i64())
-        .unwrap_or(0)
+    response.get("error").and_then(|error| error.get("code")).and_then(|code| code.as_i64()).unwrap_or(0)
 }
 
 fn error_message(response: &Value) -> String {
-    response
-        .get("error")
-        .and_then(|error| error.get("message"))
-        .and_then(|message| message.as_str())
-        .unwrap_or_default()
-        .to_string()
+    response.get("error").and_then(|error| error.get("message")).and_then(|message| message.as_str()).unwrap_or_default().to_string()
 }
 
 fn ready_session(tasks_dir: &std::path::Path) -> McpChild {
@@ -269,11 +233,7 @@ fn premature_requests_rejected_with_not_initialized_and_zero_writes() {
 
     for (id, method, params) in [
         (1, "tools/list", json!({})),
-        (
-            2,
-            "tools/call",
-            json!({"name": "task_list", "arguments": {}}),
-        ),
+        (2, "tools/call", json!({"name": "task_list", "arguments": {}})),
         (3, "schema/discover", json!({})),
         (4, "logging/setLevel", json!({"level": "debug"})),
         (5, "task/list", json!({})),
@@ -281,21 +241,9 @@ fn premature_requests_rejected_with_not_initialized_and_zero_writes() {
         (7, "sync/push", json!({"remote": "origin"})),
     ] {
         let response = child.request(id, method, params);
-        assert_eq!(
-            error_code(&response),
-            -32002,
-            "{method} before initialize must be rejected: {response}"
-        );
-        assert_eq!(
-            error_message(&response),
-            "Server not initialized",
-            "{method}"
-        );
-        assert_eq!(
-            response.get("id").and_then(|v| v.as_i64()),
-            Some(id),
-            "id must be echoed for {method}"
-        );
+        assert_eq!(error_code(&response), -32002, "{method} before initialize must be rejected: {response}");
+        assert_eq!(error_message(&response), "Server not initialized", "{method}");
+        assert_eq!(response.get("id").and_then(|v| v.as_i64()), Some(id), "id must be echoed for {method}");
     }
 
     // ping is exempt before initialization and returns an empty result.
@@ -304,15 +252,9 @@ fn premature_requests_rejected_with_not_initialized_and_zero_writes() {
     assert_eq!(ping.get("result"), Some(&json!({})));
 
     // Zero task/config writes happened.
-    let entries: Vec<_> = std::fs::read_dir(&tasks_dir)
-        .unwrap()
-        .filter_map(|entry| entry.ok())
-        .map(|entry| entry.file_name().to_string_lossy().to_string())
-        .collect();
-    assert!(
-        entries.is_empty(),
-        "premature requests must not write anything: {entries:?}"
-    );
+    let entries: Vec<_> =
+        std::fs::read_dir(&tasks_dir).unwrap().filter_map(|entry| entry.ok()).map(|entry| entry.file_name().to_string_lossy().to_string()).collect();
+    assert!(entries.is_empty(), "premature requests must not write anything: {entries:?}");
 }
 
 #[test]
@@ -323,32 +265,13 @@ fn initialize_response_and_await_window_before_initialized_notification() {
     let initialize = child.request(1, "initialize", valid_initialize_params());
     assert!(initialize.get("error").is_none(), "initialize failed");
     let result = initialize.get("result").expect("initialize result");
-    assert_eq!(
-        result.get("protocolVersion").and_then(|v| v.as_str()),
-        Some("2025-06-18")
-    );
-    assert!(
-        result
-            .get("capabilities")
-            .and_then(|v| v.as_object())
-            .is_some(),
-        "capabilities object required"
-    );
+    assert_eq!(result.get("protocolVersion").and_then(|v| v.as_str()), Some("2025-06-18"));
+    assert!(result.get("capabilities").and_then(|v| v.as_object()).is_some(), "capabilities object required");
     let server_info = result.get("serverInfo").expect("serverInfo");
     assert!(server_info.get("name").and_then(|v| v.as_str()).is_some());
+    assert!(server_info.get("version").and_then(|v| v.as_str()).is_some());
     assert!(
-        server_info
-            .get("version")
-            .and_then(|v| v.as_str())
-            .is_some()
-    );
-    assert!(
-        result
-            .get("capabilities")
-            .and_then(|c| c.get("tools"))
-            .and_then(|tools| tools.get("listChanged"))
-            .and_then(|flag| flag.as_bool())
-            == Some(true),
+        result.get("capabilities").and_then(|c| c.get("tools")).and_then(|tools| tools.get("listChanged")).and_then(|flag| flag.as_bool()) == Some(true),
         "tools.listChanged capability stays camelCase"
     );
 
@@ -365,15 +288,8 @@ fn initialize_response_and_await_window_before_initialized_notification() {
     let ping = child.request(3, "ping", json!({}));
     assert_eq!(ping.get("result"), Some(&json!({})));
     let list = child.request(4, "tools/list", json!({}));
-    assert!(
-        list.get("error").is_none(),
-        "tools/list after ready: {list}"
-    );
-    let tools = list
-        .get("result")
-        .and_then(|result| result.get("tools"))
-        .and_then(|tools| tools.as_array())
-        .expect("tools array");
+    assert!(list.get("error").is_none(), "tools/list after ready: {list}");
+    let tools = list.get("result").and_then(|result| result.get("tools")).and_then(|tools| tools.as_array()).expect("tools array");
     assert_eq!(tools.len(), 46, "advertised tool count");
 }
 
@@ -402,11 +318,7 @@ fn tool_methods_sent_as_notifications_never_execute_or_reply() {
     let list = child.request(51, "task/list", json!({}));
     assert!(list.get("error").is_none(), "task/list must work: {list}");
     let payload = direct_tool_payload(&list);
-    assert_eq!(
-        payload.get("total").and_then(|v| v.as_u64()),
-        Some(0),
-        "notification-sent tool calls must not execute"
-    );
+    assert_eq!(payload.get("total").and_then(|v| v.as_u64()), Some(0), "notification-sent tool calls must not execute");
 }
 
 #[test]
@@ -424,19 +336,12 @@ fn out_of_order_initialized_never_grants_readiness() {
     let initialize = child.request(2, "initialize", valid_initialize_params());
     assert!(initialize.get("error").is_none());
     let still_awaiting = child.request(3, "tools/list", json!({}));
-    assert_eq!(
-        error_code(&still_awaiting),
-        -32002,
-        "stale initialized must not grant readiness: {still_awaiting}"
-    );
+    assert_eq!(error_code(&still_awaiting), -32002, "stale initialized must not grant readiness: {still_awaiting}");
 
     // The real initialized notification completes the lifecycle.
     child.send(&json!({"jsonrpc": "2.0", "method": "notifications/initialized"}));
     let list = child.request(4, "tools/list", json!({}));
-    assert!(
-        list.get("error").is_none(),
-        "ready after initialized: {list}"
-    );
+    assert!(list.get("error").is_none(), "ready after initialized: {list}");
 }
 
 #[test]
@@ -445,17 +350,11 @@ fn second_initialize_does_not_reset_live_session() {
     let mut child = ready_session(&tasks_dir);
 
     let reinitialize = child.request(2, "initialize", valid_initialize_params());
-    assert!(
-        reinitialize.get("error").is_none(),
-        "repeated initialize answers without error: {reinitialize}"
-    );
+    assert!(reinitialize.get("error").is_none(), "repeated initialize answers without error: {reinitialize}");
 
     // The session stayed ready: operational requests still work.
     let list = child.request(3, "tools/list", json!({}));
-    assert!(
-        list.get("error").is_none(),
-        "session must stay ready: {list}"
-    );
+    assert!(list.get("error").is_none(), "session must stay ready: {list}");
 }
 
 #[test]
@@ -510,33 +409,14 @@ fn initialize_params_shape_is_enforced_and_versions_negotiate() {
 
     for (label, params) in [
         ("empty", json!({})),
-        (
-            "missing clientInfo",
-            json!({"protocolVersion": "2025-06-18", "capabilities": {}}),
-        ),
-        (
-            "missing capabilities",
-            json!({"protocolVersion": "2025-06-18", "clientInfo": {"name": "x", "version": "1"}}),
-        ),
-        (
-            "missing protocolVersion",
-            json!({"capabilities": {}, "clientInfo": {"name": "x", "version": "1"}}),
-        ),
-        (
-            "non-string protocolVersion",
-            json!({"protocolVersion": 2025, "capabilities": {}, "clientInfo": {"name": "x", "version": "1"}}),
-        ),
-        (
-            "clientInfo missing version",
-            json!({"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "x"}}),
-        ),
+        ("missing clientInfo", json!({"protocolVersion": "2025-06-18", "capabilities": {}})),
+        ("missing capabilities", json!({"protocolVersion": "2025-06-18", "clientInfo": {"name": "x", "version": "1"}})),
+        ("missing protocolVersion", json!({"capabilities": {}, "clientInfo": {"name": "x", "version": "1"}})),
+        ("non-string protocolVersion", json!({"protocolVersion": 2025, "capabilities": {}, "clientInfo": {"name": "x", "version": "1"}})),
+        ("clientInfo missing version", json!({"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "x"}})),
     ] {
         let response = child.request(1, "initialize", params);
-        assert_eq!(
-            error_code(&response),
-            -32602,
-            "initialize params ({label}) must be invalid: {response}"
-        );
+        assert_eq!(error_code(&response), -32602, "initialize params ({label}) must be invalid: {response}");
         // Session stays uninitialized.
         let premature = child.request(2, "tools/list", json!({}));
         assert_eq!(error_code(&premature), -32002, "after {label}");
@@ -553,13 +433,7 @@ fn initialize_params_shape_is_enforced_and_versions_negotiate() {
         }),
     );
     assert!(negotiate.get("error").is_none(), "negotiation failed");
-    assert_eq!(
-        negotiate
-            .get("result")
-            .and_then(|result| result.get("protocolVersion"))
-            .and_then(|v| v.as_str()),
-        Some("2025-06-18")
-    );
+    assert_eq!(negotiate.get("result").and_then(|result| result.get("protocolVersion")).and_then(|v| v.as_str()), Some("2025-06-18"));
 }
 
 #[test]
@@ -580,10 +454,7 @@ fn framed_transport_roundtrips_and_recovers_from_oversize_frames() {
     let initialize = child.next_wire("framed initialize");
     assert!(initialize.is_framed(), "expected framed output");
     let initialize = initialize.parse_json();
-    assert!(
-        initialize.get("error").is_none(),
-        "framed initialize failed"
-    );
+    assert!(initialize.get("error").is_none(), "framed initialize failed");
 
     child.send(&json!({"jsonrpc": "2.0", "method": "notifications/initialized"}));
     child.expect_silence("framed session ready");
@@ -630,9 +501,8 @@ fn oversize_ndjson_line_answers_parse_error_and_server_survives() {
     // framed bound): the server must answer a parse error, keep its memory
     // bounded, and resynchronize at the next line.
     let huge = "a".repeat(10 * 1024 * 1024 + 1);
-    let payload = format!(
-        "{{\"jsonrpc\":\"2.0\",\"id\":80,\"method\":\"tools/call\",\"params\":{{\"name\":\"task_list\",\"arguments\":{{\"search\":\"{huge}\"}}}}}}"
-    );
+    let payload =
+        format!("{{\"jsonrpc\":\"2.0\",\"id\":80,\"method\":\"tools/call\",\"params\":{{\"name\":\"task_list\",\"arguments\":{{\"search\":\"{huge}\"}}}}}}");
     child.send_raw(&payload);
     let overlong = child.next_json("oversize line parse error");
     assert_eq!(error_code(&overlong), -32700);
@@ -713,11 +583,7 @@ fn deferred_list_changed_is_coalesced_and_emitted_after_ready() {
 
     // Trigger a tools-hint change (tags list grows) while only initialized,
     // not ready. Give the poller ample time to observe it.
-    std::fs::write(
-        tasks_dir.join("config.yml"),
-        "default:\n  project: MCP\nissue:\n  tags:\n    - alpha\n    - beta\n",
-    )
-    .unwrap();
+    std::fs::write(tasks_dir.join("config.yml"), "default:\n  project: MCP\nissue:\n  tags:\n    - alpha\n    - beta\n").unwrap();
     std::thread::sleep(Duration::from_millis(2600));
 
     // Nothing may be emitted pre-ready.
@@ -733,10 +599,7 @@ fn deferred_list_changed_is_coalesced_and_emitted_after_ready() {
         Some("notifications/tools/list_changed"),
         "notification method must use the notifications namespace: {notification}"
     );
-    assert!(
-        notification.get("id").is_none(),
-        "notifications never carry an id"
-    );
+    assert!(notification.get("id").is_none(), "notifications never carry an id");
 
     // The session is ready and operational afterwards.
     let ping = child.request(2, "ping", json!({}));

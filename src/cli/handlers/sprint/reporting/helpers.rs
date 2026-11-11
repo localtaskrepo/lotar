@@ -15,11 +15,7 @@ pub(crate) fn format_float(value: f64) -> String {
     if !value.is_finite() {
         return "n/a".to_string();
     }
-    if (value - value.round()).abs() < 0.05 {
-        format!("{:.0}", value)
-    } else {
-        format!("{:.1}", value)
-    }
+    if (value - value.round()).abs() < 0.05 { format!("{:.0}", value) } else { format!("{:.1}", value) }
 }
 
 pub(crate) fn format_velocity_value(metric: SprintBurndownMetric, value: f64) -> String {
@@ -80,34 +76,22 @@ pub(crate) fn select_sprint_id_for_review(records: &[SprintRecord]) -> Option<u3
         let lifecycle = sprint_status::derive_status(&record.sprint, now);
         match lifecycle.state {
             SprintLifecycleState::Complete => {
-                let reference = lifecycle
-                    .actual_end
-                    .or(lifecycle.computed_end)
-                    .unwrap_or(now);
+                let reference = lifecycle.actual_end.or(lifecycle.computed_end).unwrap_or(now);
                 completed.push((reference, record.id));
             }
             SprintLifecycleState::Active | SprintLifecycleState::Overdue => {
-                let reference = lifecycle
-                    .actual_start
-                    .or(lifecycle.planned_start)
-                    .unwrap_or(now);
+                let reference = lifecycle.actual_start.or(lifecycle.planned_start).unwrap_or(now);
                 active.push((reference, record.id));
             }
             SprintLifecycleState::Pending => pending.push(record.id),
         }
     }
 
-    if let Some((_, id)) = completed
-        .into_iter()
-        .max_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)))
-    {
+    if let Some((_, id)) = completed.into_iter().max_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1))) {
         return Some(id);
     }
 
-    if let Some((_, id)) = active
-        .into_iter()
-        .max_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)))
-    {
+    if let Some((_, id)) = active.into_iter().max_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1))) {
         return Some(id);
     }
 

@@ -48,11 +48,7 @@ default.status: Todo
         .output()
         .expect("Failed to execute command");
 
-    assert!(
-        output.status.success(),
-        "Command failed with stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
+    assert!(output.status.success(), "Command failed with stderr: {}", String::from_utf8_lossy(&output.stderr));
 
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert!(stdout.contains("Validating global configuration"));

@@ -42,58 +42,43 @@ impl SyncJournal {
         let lock = if dry_run {
             None
         } else {
-            let file = OpenOptions::new()
-                .create(true)
-                .truncate(false)
-                .read(true)
-                .write(true)
-                .open(root.join(".sync-pending.lock"))?;
-            file.try_lock_exclusive().map_err(|_| {
-                LoTaRError::ValidationError(
-                    "Another sync is running in this workspace; retry after it finishes".into(),
-                )
-            })?;
+            let file = OpenOptions::new().create(true).truncate(false).read(true).write(true).open(root.join(".sync-pending.lock"))?;
+            file.try_lock_exclusive().map_err(|_| LoTaRError::ValidationError("Another sync is running in this workspace; retry after it finishes".into()))?;
             Some(file)
         };
         let path = root.join(".sync-pending.json");
         let mut links: Vec<PendingLink> = match fs::read_to_string(&path) {
-            Ok(payload) => serde_json::from_str(&payload).map_err(|err| LoTaRError::ValidationError(
-                format!("Invalid sync recovery journal {}: {err}; do not delete it or retry creation before reconciling", path.display())))?,
+            Ok(payload) => serde_json::from_str(&payload).map_err(|err| {
+                LoTaRError::ValidationError(format!(
+                    "Invalid sync recovery journal {}: {err}; do not delete it or retry creation before reconciling",
+                    path.display()
+                ))
+            })?,
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => Vec::new(),
             Err(err) => return Err(err.into()),
         };
         // Validate every stored identity before any scope/target filtering. An
         // unknown task must not turn into an unrelated entry that can be skipped.
         for link in &mut links {
-            link.canonicalize(root).map_err(|err| LoTaRError::ValidationError(format!(
-                "Invalid sync recovery identity in {}: {err}; reconcile the journal before retrying creation", path.display()
-            )))?;
+            link.canonicalize(root).map_err(|err| {
+                LoTaRError::ValidationError(format!(
+                    "Invalid sync recovery identity in {}: {err}; reconcile the journal before retrying creation",
+                    path.display()
+                ))
+            })?;
         }
-        Ok(Self {
-            path,
-            _lock: lock,
-            links,
-            dry_run,
-        })
+        Ok(Self { path, _lock: lock, links, dry_run })
     }
 
     pub(super) fn save(&self) -> LoTaRResult<()> {
         if self.dry_run {
-            return Err(LoTaRError::ValidationError(
-                "Dry run cannot write sync recovery state".into(),
-            ));
+            return Err(LoTaRError::ValidationError("Dry run cannot write sync recovery state".into()));
         }
         #[cfg(test)]
-        if self
-            .links
-            .iter()
-            .any(|link| link.task_id.is_some() && link.reference.is_some())
-            && FAIL_SYNC_RESULT_SAVE.replace(false)
-        {
+        if self.links.iter().any(|link| link.task_id.is_some() && link.reference.is_some()) && FAIL_SYNC_RESULT_SAVE.replace(false) {
             return Err(std::io::Error::other("injected sync result journal failure").into());
         }
-        let payload = serde_json::to_string_pretty(&self.links)
-            .map_err(|err| LoTaRError::SerializationError(err.to_string()))?;
+        let payload = serde_json::to_string_pretty(&self.links).map_err(|err| LoTaRError::SerializationError(err.to_string()))?;
         // The shared writer must sync its temporary file before non-destructive
         // publication. On Unix, also persist the directory entry here. Portable
         // std::fs does not provide directory fsync on Windows.
@@ -108,8 +93,7 @@ impl SyncJournal {
         if self.links.iter().any(|pending| {
             pending.scope == link.scope
                 && pending.project == link.project
-                && ((link.task_id.is_some() && pending.task_id == link.task_id)
-                    || (link.reference.is_some() && pending.reference == link.reference))
+                && ((link.task_id.is_some() && pending.task_id == link.task_id) || (link.reference.is_some() && pending.reference == link.reference))
         }) {
             return Err(self.indeterminate());
         }
@@ -146,15 +130,12 @@ impl SyncJournal {
         task_id: Option<&str>,
         remote: &SyncRemoteConfig,
     ) -> LoTaRResult<()> {
-        let project = project
-            .map(|project| canonical_sync_project(&resolver.path, project))
-            .transpose()?;
+        let project = project.map(|project| canonical_sync_project(&resolver.path, project)).transpose()?;
         let project = project.as_deref();
         let task_id = task_id
             .map(|id| {
                 let prefix =
-                    crate::storage::operations::StorageOperations::get_project_for_task(id.trim())
-                        .ok_or_else(|| LoTaRError::InvalidTaskId(id.to_string()))?;
+                    crate::storage::operations::StorageOperations::get_project_for_task(id.trim()).ok_or_else(|| LoTaRError::InvalidTaskId(id.to_string()))?;
                 canonical_sync_task_id(&resolver.path, &prefix, id.trim())
             })
             .transpose()?;
@@ -163,13 +144,7 @@ impl SyncJournal {
         let mut index = 0;
         while index < self.links.len() {
             let link = &self.links[index];
-            if project.is_some_and(|p| p != link.project)
-                || task_id.is_some_and(|id| {
-                    link.task_id
-                        .as_deref()
-                        .is_some_and(|known| known != id.trim())
-                })
-            {
+            if project.is_some_and(|p| p != link.project) || task_id.is_some_and(|id| link.task_id.as_deref().is_some_and(|known| known != id.trim())) {
                 index += 1;
                 continue;
             }
@@ -183,16 +158,10 @@ impl SyncJournal {
             let (Some(id), Some(reference)) = (&link.task_id, &link.reference) else {
                 return Err(self.indeterminate());
             };
-            crate::storage::safety::validate_project_prefix(&link.project)
-                .map_err(LoTaRError::ValidationError)?;
-            let canonical_prefix_matches = crate::storage::TaskId::parse(id)
-                .is_ok_and(|parsed| parsed.project == link.project);
-            if !canonical_prefix_matches
-                || normalize_reference_for_remote(remote, reference).as_deref() != Some(reference)
-            {
-                return Err(LoTaRError::ValidationError(
-                    "Pending sync identity does not match its project/remote".into(),
-                ));
+            crate::storage::safety::validate_project_prefix(&link.project).map_err(LoTaRError::ValidationError)?;
+            let canonical_prefix_matches = crate::storage::TaskId::parse(id).is_ok_and(|parsed| parsed.project == link.project);
+            if !canonical_prefix_matches || normalize_reference_for_remote(remote, reference).as_deref() != Some(reference) {
+                return Err(LoTaRError::ValidationError("Pending sync identity does not match its project/remote".into()));
             }
             let existing = TaskService::get(&storage, id, Some(&link.project))?;
             sync_task_path(resolver, &link.project, id)?;
@@ -216,16 +185,9 @@ impl SyncJournal {
         Ok(())
     }
 
-    pub(super) fn finish(
-        &mut self,
-        index: usize,
-        resolver: &TasksDirectoryResolver,
-    ) -> LoTaRResult<()> {
+    pub(super) fn finish(&mut self, index: usize, resolver: &TasksDirectoryResolver) -> LoTaRResult<()> {
         let link = &self.links[index];
-        let id = link
-            .task_id
-            .as_deref()
-            .ok_or_else(|| self.indeterminate())?;
+        let id = link.task_id.as_deref().ok_or_else(|| self.indeterminate())?;
         // Make the link durable before forgetting its recovery identity.
         let path = sync_task_path(resolver, &link.project, id)?;
         OpenOptions::new().write(true).open(&path)?.sync_all()?;
@@ -239,65 +201,37 @@ impl SyncJournal {
 pub(super) fn pending_scope(remote: &SyncRemoteConfig, client: &SyncClient) -> PendingScope {
     PendingScope {
         provider: provider_label(&remote.provider).into(),
-        endpoint_hash: blake3::hash(client.auth.api_base.trim_end_matches('/').as_bytes())
-            .to_hex()
-            .to_string(),
+        endpoint_hash: blake3::hash(client.auth.api_base.trim_end_matches('/').as_bytes()).to_hex().to_string(),
         destination: match remote.provider {
             SyncProvider::Github => normalize_github_repo(remote.repo.as_deref().unwrap_or("")),
-            SyncProvider::Jira => remote
-                .project
-                .as_deref()
-                .unwrap_or("")
-                .trim()
-                .to_ascii_uppercase(),
+            SyncProvider::Jira => remote.project.as_deref().unwrap_or("").trim().to_ascii_uppercase(),
         },
     }
 }
 
-pub(super) fn sync_task_path(
-    resolver: &TasksDirectoryResolver,
-    project: &str,
-    id: &str,
-) -> LoTaRResult<PathBuf> {
-    let folders =
-        crate::storage::locator::StorageLocator::project_folders_for_name(&resolver.path, project);
+pub(super) fn sync_task_path(resolver: &TasksDirectoryResolver, project: &str, id: &str) -> LoTaRResult<PathBuf> {
+    let folders = crate::storage::locator::StorageLocator::project_folders_for_name(&resolver.path, project);
     let path = folders
         .iter()
-        .find_map(|folder| {
-            crate::storage::operations::StorageOperations::get_file_path_for_id(
-                &resolver.path.join(folder),
-                id,
-            )
-        })
+        .find_map(|folder| crate::storage::operations::StorageOperations::get_file_path_for_id(&resolver.path.join(folder), id))
         .ok_or_else(|| LoTaRError::TaskNotFound(id.to_string()))?;
-    if !path
-        .canonicalize()?
-        .starts_with(resolver.path.canonicalize()?)
-    {
-        return Err(LoTaRError::ValidationError(
-            "Sync task must be inside the locked tasks workspace".into(),
-        ));
+    if !path.canonicalize()?.starts_with(resolver.path.canonicalize()?) {
+        return Err(LoTaRError::ValidationError("Sync task must be inside the locked tasks workspace".into()));
     }
     Ok(path)
 }
 
 pub(super) fn canonical_sync_project(root: &Path, project: &str) -> LoTaRResult<String> {
-    crate::storage::safety::validate_project_prefix(project)
-        .map_err(LoTaRError::ValidationError)?;
+    crate::storage::safety::validate_project_prefix(project).map_err(LoTaRError::ValidationError)?;
     let path = root.join(project);
     if !path.exists() {
         return Ok(project.to_string());
     }
     let path = path.canonicalize()?;
     if path.parent() != Some(root.canonicalize()?.as_path()) || !path.is_dir() {
-        return Err(LoTaRError::ValidationError(
-            "Sync project must be directly inside the locked tasks workspace".into(),
-        ));
+        return Err(LoTaRError::ValidationError("Sync project must be directly inside the locked tasks workspace".into()));
     }
-    path.file_name()
-        .and_then(|name| name.to_str())
-        .map(str::to_string)
-        .ok_or_else(|| LoTaRError::ValidationError("Invalid sync project directory".into()))
+    path.file_name().and_then(|name| name.to_str()).map(str::to_string).ok_or_else(|| LoTaRError::ValidationError("Invalid sync project directory".into()))
 }
 
 pub(super) fn canonical_sync_task_id(root: &Path, project: &str, id: &str) -> LoTaRResult<String> {
@@ -306,30 +240,20 @@ pub(super) fn canonical_sync_task_id(root: &Path, project: &str, id: &str) -> Lo
     // collapse to TP-1) plus a single-root existence check: sync
     // canonicalization stays locked to the provided tasks workspace and never
     // adopts a sibling-root task.
-    if StorageOperations::get_project_for_task(id).as_deref() != Some(project)
-        || StorageOperations::get_in_root(root, id, project).is_none()
-    {
+    if StorageOperations::get_project_for_task(id).as_deref() != Some(project) || StorageOperations::get_in_root(root, id, project).is_none() {
         return Err(LoTaRError::InvalidTaskId(id.to_string()));
     }
     let project = canonical_sync_project(root, project)?;
-    let path = StorageOperations::get_file_path_for_id(&root.join(&project), id)
-        .ok_or_else(|| LoTaRError::TaskNotFound(id.to_string()))?
-        .canonicalize()?;
+    let path = StorageOperations::get_file_path_for_id(&root.join(&project), id).ok_or_else(|| LoTaRError::TaskNotFound(id.to_string()))?.canonicalize()?;
     // Any folder inside the project counts (DEV-4); outside it never does.
     if !path.starts_with(root.join(&project).canonicalize()?) || !path.is_file() {
-        return Err(LoTaRError::ValidationError(
-            "Sync task identity crosses its project boundary".into(),
-        ));
+        return Err(LoTaRError::ValidationError("Sync task identity crosses its project boundary".into()));
     }
-    let number = path
-        .file_stem()
-        .and_then(|stem| stem.to_str())
-        .and_then(|stem| stem.parse::<u64>().ok())
-        .ok_or_else(|| LoTaRError::InvalidTaskId(id.to_string()))?;
+    let number =
+        path.file_stem().and_then(|stem| stem.to_str()).and_then(|stem| stem.parse::<u64>().ok()).ok_or_else(|| LoTaRError::InvalidTaskId(id.to_string()))?;
     let canonical = format!("{project}-{number}");
-    let canonical_path = StorageOperations::get_file_path_for_id(&root.join(&project), &canonical)
-        .ok_or_else(|| LoTaRError::InvalidTaskId(id.to_string()))?
-        .canonicalize()?;
+    let canonical_path =
+        StorageOperations::get_file_path_for_id(&root.join(&project), &canonical).ok_or_else(|| LoTaRError::InvalidTaskId(id.to_string()))?.canonicalize()?;
     if canonical_path != path {
         return Err(LoTaRError::InvalidTaskId(id.to_string()));
     }
@@ -342,12 +266,7 @@ thread_local! {
     pub(super) static FAIL_SYNC_RESULT_SAVE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
-pub(super) fn attach_sync_reference(
-    storage: &mut Storage,
-    id: &str,
-    provider: &str,
-    reference: &str,
-) -> LoTaRResult<(TaskDTO, bool)> {
+pub(super) fn attach_sync_reference(storage: &mut Storage, id: &str, provider: &str, reference: &str) -> LoTaRResult<(TaskDTO, bool)> {
     #[cfg(test)]
     if FAIL_SYNC_LINK.replace(false) {
         return Err(std::io::Error::other("injected sync link failure").into());

@@ -11,30 +11,12 @@ struct CommentRanking {
 }
 
 /// Tasks in scope ranked by comment count.
-fn rank_by_comments(
-    global: bool,
-    project: Option<&str>,
-    limit: usize,
-    filter: &str,
-    resolver: &TasksDirectoryResolver,
-) -> Result<CommentRanking, String> {
+fn rank_by_comments(global: bool, project: Option<&str>, limit: usize, filter: &str, resolver: &TasksDirectoryResolver) -> Result<CommentRanking, String> {
     let scope = scope_project(global, project, resolver);
     let tasks = list_tasks(scope.as_deref(), resolver, filter)?;
-    let rows = ranked_counts(
-        tasks
-            .iter()
-            .map(|(id, task)| (id.clone(), task.comments.len())),
-        limit,
-    );
-    let titles = tasks
-        .into_iter()
-        .map(|(id, task)| (id, task.title))
-        .collect();
-    Ok(CommentRanking {
-        scope,
-        rows,
-        titles,
-    })
+    let rows = ranked_counts(tasks.iter().map(|(id, task)| (id.clone(), task.comments.len())), limit);
+    let titles = tasks.into_iter().map(|(id, task)| (id, task.title)).collect();
+    Ok(CommentRanking { scope, rows, titles })
 }
 
 pub(crate) fn run_top(

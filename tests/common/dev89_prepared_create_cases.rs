@@ -16,11 +16,7 @@ fn write_global_config(tasks_dir: &std::path::Path, extra: &str) {
 }
 
 fn prepared_task(tasks_dir: &std::path::Path, reporter: &str) -> Task {
-    let mut task = Task::new(
-        tasks_dir.to_path_buf(),
-        "Prepared".to_string(),
-        Priority::from("Medium"),
-    );
+    let mut task = Task::new(tasks_dir.to_path_buf(), "Prepared".to_string(), Priority::from("Medium"));
     task.reporter = Some(reporter.to_string());
     task.status = TaskStatus::from("Todo");
     task
@@ -30,10 +26,7 @@ fn prepared_task(tasks_dir: &std::path::Path, reporter: &str) -> Task {
 fn prepared_create_midpublish_failure_rolls_back_config_bytes_and_created_task() {
     let tmp = tempfile::tempdir().unwrap();
     let tasks_dir = tmp.path().join(".tasks");
-    write_global_config(
-        &tasks_dir,
-        "members: [alice]\nauto.populate_members: true\n",
-    );
+    write_global_config(&tasks_dir, "members: [alice]\nauto.populate_members: true\n");
 
     let storage = Storage::new(&tasks_dir);
     let config_path = tasks_dir.join("TEST").join("config.yml");
@@ -62,32 +55,19 @@ fn prepared_create_midpublish_failure_rolls_back_config_bytes_and_created_task()
         },
     )
     .unwrap_err();
-    assert!(
-        err.to_string().contains("injected publish failure"),
-        "{err}"
-    );
+    assert!(err.to_string().contains("injected publish failure"), "{err}");
 
     assert_eq!(std::fs::read(&config_path).unwrap(), config_before);
-    assert_eq!(
-        String::from_utf8_lossy(&std::fs::read(&config_path).unwrap()),
-        original_config
-    );
+    assert_eq!(String::from_utf8_lossy(&std::fs::read(&config_path).unwrap()), original_config);
     assert!(!tasks_dir.join("TEST").join("1.yml").exists());
-    assert!(
-        !tasks_dir
-            .join(crate::storage::transaction::JOURNAL_FILE_NAME)
-            .exists()
-    );
+    assert!(!tasks_dir.join(crate::storage::transaction::JOURNAL_FILE_NAME).exists());
 }
 
 #[test]
 fn prepared_create_midpublish_failure_removes_config_file_it_created() {
     let tmp = tempfile::tempdir().unwrap();
     let tasks_dir = tmp.path().join(".tasks");
-    write_global_config(
-        &tasks_dir,
-        "members: [alice]\nauto.populate_members: true\n",
-    );
+    write_global_config(&tasks_dir, "members: [alice]\nauto.populate_members: true\n");
 
     let storage = Storage::new(&tasks_dir);
     let config_path = tasks_dir.join("FRESH").join("config.yml");
@@ -113,31 +93,18 @@ fn prepared_create_midpublish_failure_removes_config_file_it_created() {
         },
     )
     .unwrap_err();
-    assert!(
-        err.to_string().contains("injected publish failure"),
-        "{err}"
-    );
+    assert!(err.to_string().contains("injected publish failure"), "{err}");
 
-    assert!(
-        !config_path.exists(),
-        "config file the transaction created must be removed on rollback"
-    );
+    assert!(!config_path.exists(), "config file the transaction created must be removed on rollback");
     assert!(!tasks_dir.join("FRESH").join("1.yml").exists());
-    assert!(
-        !tasks_dir
-            .join(crate::storage::transaction::JOURNAL_FILE_NAME)
-            .exists()
-    );
+    assert!(!tasks_dir.join(crate::storage::transaction::JOURNAL_FILE_NAME).exists());
 }
 
 #[test]
 fn prepared_create_commits_config_members_and_task_together() {
     let tmp = tempfile::tempdir().unwrap();
     let tasks_dir = tmp.path().join(".tasks");
-    write_global_config(
-        &tasks_dir,
-        "members: [alice]\nauto.populate_members: true\n",
-    );
+    write_global_config(&tasks_dir, "members: [alice]\nauto.populate_members: true\n");
 
     let storage = Storage::new(&tasks_dir);
     let config_path = tasks_dir.join("TEST").join("config.yml");
@@ -164,17 +131,8 @@ fn prepared_create_commits_config_members_and_task_together() {
 
     assert_eq!(id, "TEST-1");
     let committed = std::fs::read_to_string(&config_path).unwrap();
-    assert!(
-        committed.contains("bob"),
-        "member merge must be persisted: {committed}"
-    );
+    assert!(committed.contains("bob"), "member merge must be persisted: {committed}");
     assert!(committed.contains("alice"), "{committed}");
-    let task_yaml = serde_yaml_ng::from_str::<serde_yaml_ng::Value>(
-        &std::fs::read_to_string(tasks_dir.join("TEST").join("1.yml")).unwrap(),
-    )
-    .unwrap();
-    assert_eq!(
-        task_yaml.get("reporter").and_then(|v| v.as_str()),
-        Some("bob")
-    );
+    let task_yaml = serde_yaml_ng::from_str::<serde_yaml_ng::Value>(&std::fs::read_to_string(tasks_dir.join("TEST").join("1.yml")).unwrap()).unwrap();
+    assert_eq!(task_yaml.get("reporter").and_then(|v| v.as_str()), Some("bob"));
 }

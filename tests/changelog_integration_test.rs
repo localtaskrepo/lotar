@@ -7,33 +7,15 @@ fn write_task(dir: &Path, proj: &str, id: &str, title: &str) {
     let tasks = dir.join(".tasks").join(proj);
     fs::create_dir_all(&tasks).unwrap();
     let path = tasks.join(format!("{id}.yml"));
-    let content = format!(
-        "title: {title}\nstatus: Todo\npriority: Medium\ntype: Feature\ncreated: 2024-01-01T00:00:00Z\nmodified: 2024-01-01T00:00:00Z\n"
-    );
+    let content = format!("title: {title}\nstatus: Todo\npriority: Medium\ntype: Feature\ncreated: 2024-01-01T00:00:00Z\nmodified: 2024-01-01T00:00:00Z\n");
     fs::write(path, content).unwrap();
 }
 
 fn init_repo(root: &Path) {
-    Command::new("git")
-        .current_dir(root)
-        .args(["init"])
-        .assert()
-        .success();
-    Command::new("git")
-        .current_dir(root)
-        .args(["config", "user.email", "dev@example.com"])
-        .assert()
-        .success();
-    Command::new("git")
-        .current_dir(root)
-        .args(["config", "user.name", "Dev"])
-        .assert()
-        .success();
-    Command::new("git")
-        .current_dir(root)
-        .args(["config", "commit.gpgsign", "false"])
-        .assert()
-        .success();
+    Command::new("git").current_dir(root).args(["init"]).assert().success();
+    Command::new("git").current_dir(root).args(["config", "user.email", "dev@example.com"]).assert().success();
+    Command::new("git").current_dir(root).args(["config", "user.name", "Dev"]).assert().success();
+    Command::new("git").current_dir(root).args(["config", "commit.gpgsign", "false"]).assert().success();
 }
 
 /// The outside-git contract needs no repository at all: the changelog
@@ -44,12 +26,7 @@ mod smoke {
     fn changelog_outside_git_no_crash() {
         let temp = crate::common::temp_dir();
         // No git repo here; command should not crash
-        crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(temp.path())
-            .args(["changelog"])
-            .assert()
-            .success();
+        crate::common::lotar_cmd().unwrap().current_dir(temp.path()).args(["changelog"]).assert().success();
     }
 }
 
@@ -72,37 +49,16 @@ mod git_required {
 
             // initial commit
             write_task(root, "TEST", "1", "first");
-            Command::new("git")
-                .current_dir(root)
-                .args(["add", "."])
-                .assert()
-                .success();
-            Command::new("git")
-                .current_dir(root)
-                .args(["commit", "-m", "init"])
-                .assert()
-                .success();
+            Command::new("git").current_dir(root).args(["add", "."]).assert().success();
+            Command::new("git").current_dir(root).args(["commit", "-m", "init"]).assert().success();
 
             // second change
             write_task(root, "TEST", "1", "second");
-            Command::new("git")
-                .current_dir(root)
-                .args(["add", "."])
-                .assert()
-                .success();
-            Command::new("git")
-                .current_dir(root)
-                .args(["commit", "-m", "second"])
-                .assert()
-                .success();
+            Command::new("git").current_dir(root).args(["add", "."]).assert().success();
+            Command::new("git").current_dir(root).args(["commit", "-m", "second"]).assert().success();
 
             // run changelog for HEAD~1..HEAD (implicitly via since ref)
-            crate::common::lotar_cmd()
-                .unwrap()
-                .current_dir(root)
-                .args(["changelog", "HEAD~1", "--global"])
-                .assert()
-                .success();
+            crate::common::lotar_cmd().unwrap().current_dir(root).args(["changelog", "HEAD~1", "--global"]).assert().success();
         }
     }
 
@@ -118,28 +74,12 @@ mod git_required {
             init_repo(root);
 
             write_task(root, "PRJ", "1", "v1");
-            Command::new("git")
-                .current_dir(root)
-                .args(["add", "."])
-                .assert()
-                .success();
-            Command::new("git")
-                .current_dir(root)
-                .args(["commit", "-m", "init"])
-                .assert()
-                .success();
+            Command::new("git").current_dir(root).args(["add", "."]).assert().success();
+            Command::new("git").current_dir(root).args(["commit", "-m", "init"]).assert().success();
 
             write_task(root, "PRJ", "1", "v2");
-            Command::new("git")
-                .current_dir(root)
-                .args(["add", "."])
-                .assert()
-                .success();
-            Command::new("git")
-                .current_dir(root)
-                .args(["commit", "-m", "second"])
-                .assert()
-                .success();
+            Command::new("git").current_dir(root).args(["add", "."]).assert().success();
+            Command::new("git").current_dir(root).args(["commit", "-m", "second"]).assert().success();
 
             let out = crate::common::lotar_cmd()
                 .unwrap()
@@ -173,16 +113,8 @@ mod git_required {
 
             // commit initial task
             write_task(root, "TEST", "1", "first");
-            Command::new("git")
-                .current_dir(root)
-                .args(["add", "."])
-                .assert()
-                .success();
-            Command::new("git")
-                .current_dir(root)
-                .args(["commit", "-m", "init"])
-                .assert()
-                .success();
+            Command::new("git").current_dir(root).args(["add", "."]).assert().success();
+            Command::new("git").current_dir(root).args(["commit", "-m", "init"]).assert().success();
 
             // modify working tree (not committed)
             write_task(root, "TEST", "1", "changed");
@@ -205,17 +137,10 @@ mod git_required {
 
             // find TEST-1
             let items = json["items"].as_array().unwrap();
-            let found = items
-                .iter()
-                .find(|it| it["id"] == "TEST-1")
-                .expect("TEST-1 present");
+            let found = items.iter().find(|it| it["id"] == "TEST-1").expect("TEST-1 present");
             let changes = found["changes"].as_array().unwrap();
             // expect a title change old:first -> new:changed
-            assert!(
-                changes
-                    .iter()
-                    .any(|c| c["field"] == "title" && c["old"] == "first" && c["new"] == "changed")
-            );
+            assert!(changes.iter().any(|c| c["field"] == "title" && c["old"] == "first" && c["new"] == "changed"));
         }
 
         #[test]
@@ -227,16 +152,8 @@ mod git_required {
 
             // commit initial task 1
             write_task(root, "TEST", "1", "first");
-            Command::new("git")
-                .current_dir(root)
-                .args(["add", "."])
-                .assert()
-                .success();
-            Command::new("git")
-                .current_dir(root)
-                .args(["commit", "-m", "init"])
-                .assert()
-                .success();
+            Command::new("git").current_dir(root).args(["add", "."]).assert().success();
+            Command::new("git").current_dir(root).args(["commit", "-m", "init"]).assert().success();
 
             // create new task 2 (uncommitted) and delete 1 from working tree
             write_task(root, "TEST", "2", "new");
@@ -258,18 +175,12 @@ mod git_required {
             let items = json["items"].as_array().unwrap();
 
             // TEST-2 should have a "created" change
-            let item2 = items
-                .iter()
-                .find(|it| it["id"] == "TEST-2")
-                .expect("TEST-2 present");
+            let item2 = items.iter().find(|it| it["id"] == "TEST-2").expect("TEST-2 present");
             let changes2 = item2["changes"].as_array().unwrap();
             assert!(changes2.iter().any(|c| c["field"] == "created"));
 
             // TEST-1 should have a "deleted" change
-            let item1 = items
-                .iter()
-                .find(|it| it["id"] == "TEST-1")
-                .expect("TEST-1 present");
+            let item1 = items.iter().find(|it| it["id"] == "TEST-1").expect("TEST-1 present");
             let changes1 = item1["changes"].as_array().unwrap();
             assert!(changes1.iter().any(|c| c["field"] == "deleted"));
         }

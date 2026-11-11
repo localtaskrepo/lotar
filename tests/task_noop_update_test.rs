@@ -107,12 +107,7 @@ fn set_old_mtime(path: &Path) -> SystemTime {
     // Rapid writes can share one filesystem clock tick. An old fixture
     // timestamp makes the genuine-write assertion independent of granularity.
     let old = SystemTime::UNIX_EPOCH + Duration::from_secs(946_684_800);
-    std::fs::File::options()
-        .write(true)
-        .open(path)
-        .unwrap()
-        .set_modified(old)
-        .unwrap();
+    std::fs::File::options().write(true).open(path).unwrap().set_modified(old).unwrap();
     assert_eq!(mtime(path), old);
     old
 }
@@ -128,10 +123,7 @@ fn updated_events(rx: &std::sync::mpsc::Receiver<api_events::ApiEvent>) -> usize
 }
 
 fn emitting() -> TaskUpdateContext {
-    TaskUpdateContext {
-        emit_api_event: true,
-        ..TaskUpdateContext::default()
-    }
+    TaskUpdateContext { emit_api_event: true, ..TaskUpdateContext::default() }
 }
 
 fn set_automation(tasks_dir: &Path, rules: &str) {
@@ -140,9 +132,7 @@ fn set_automation(tasks_dir: &Path, rules: &str) {
 }
 
 fn noop_update(storage: &mut Storage, id: &str, patch: TaskUpdate) -> TaskUpdateReceipt {
-    let receipt =
-        TaskService::update_with_receipt(storage, id, patch, TaskUpdateContext::default())
-            .expect("update must succeed");
+    let receipt = TaskService::update_with_receipt(storage, id, patch, TaskUpdateContext::default()).expect("update must succeed");
     assert!(!receipt.changed, "expected an effective no-op");
     receipt
 }
@@ -153,19 +143,12 @@ fn empty_patch_is_an_effective_noop() {
     let task_path = seed_task(&tasks_dir, "1.yml", RAW_TASK);
     let config_path = seed_project_config(&tasks_dir, "project_name: TEST\nmembers:\n  - alice\n");
     let sprint_path = seed_padded_sprint_member(&tasks_dir);
-    let (task_before, config_before, sprint_before) = (
-        std::fs::read(&task_path).unwrap(),
-        std::fs::read(&config_path).unwrap(),
-        std::fs::read(&sprint_path).unwrap(),
-    );
+    let (task_before, config_before, sprint_before) =
+        (std::fs::read(&task_path).unwrap(), std::fs::read(&config_path).unwrap(), std::fs::read(&sprint_path).unwrap());
     let task_mtime = mtime(&task_path);
 
     let rx = api_events::subscribe();
-    let receipt = noop_update(
-        &mut Storage::new(&tasks_dir),
-        "TEST-1",
-        TaskUpdate::default(),
-    );
+    let receipt = noop_update(&mut Storage::new(&tasks_dir), "TEST-1", TaskUpdate::default());
 
     assert_eq!(std::fs::read(&task_path).unwrap(), task_before);
     assert_eq!(std::fs::read(&config_path).unwrap(), config_before);
@@ -215,10 +198,7 @@ fn normalized_aliases_scalars_and_collections_are_effective_noops() {
     let (_tmp, tasks_dir) = workspace("");
     let task_path = seed_task(&tasks_dir, "1.yml", RAW_TASK);
     let sprint_path = seed_padded_sprint_member(&tasks_dir);
-    let (task_before, sprint_before) = (
-        std::fs::read(&task_path).unwrap(),
-        std::fs::read(&sprint_path).unwrap(),
-    );
+    let (task_before, sprint_before) = (std::fs::read(&task_path).unwrap(), std::fs::read(&sprint_path).unwrap());
     let task_mtime = mtime(&task_path);
 
     // Status spelling normalizes to the configured value, @-prefixed and
@@ -259,10 +239,7 @@ fn reordered_and_changed_collections_are_genuine_changes() {
     let receipt = TaskService::update_with_receipt(
         &mut storage,
         "TEST-1",
-        TaskUpdate {
-            acceptance_criteria: Some(vec!["second".to_string(), "first".to_string()]),
-            ..TaskUpdate::default()
-        },
+        TaskUpdate { acceptance_criteria: Some(vec!["second".to_string(), "first".to_string()]), ..TaskUpdate::default() },
         TaskUpdateContext::default(),
     )
     .expect("update must succeed");
@@ -273,8 +250,7 @@ fn reordered_and_changed_collections_are_genuine_changes() {
 
 #[test]
 fn legacy_sparse_task_is_not_repaired_and_not_auto_assigned_by_noops() {
-    let (_tmp, tasks_dir) =
-        workspace("default.tags: [auto-tag]\nauto.assign_on_status: true\ndefault.status: Todo\n");
+    let (_tmp, tasks_dir) = workspace("default.tags: [auto-tag]\nauto.assign_on_status: true\ndefault.status: Todo\n");
     let task_path = seed_task(&tasks_dir, "1.yml", RAW_LEGACY_TASK);
     let (task_before, task_mtime) = (std::fs::read(&task_path).unwrap(), mtime(&task_path));
 
@@ -289,14 +265,7 @@ fn legacy_sparse_task_is_not_repaired_and_not_auto_assigned_by_noops() {
 
     // Setting the DTO-projection default status explicitly is still a
     // no-op: no status persisted, no auto-assign side effect gained.
-    let receipt = noop_update(
-        &mut storage,
-        "TEST-1",
-        TaskUpdate {
-            status: Some("Todo".to_string()),
-            ..TaskUpdate::default()
-        },
-    );
+    let receipt = noop_update(&mut storage, "TEST-1", TaskUpdate { status: Some("Todo".to_string()), ..TaskUpdate::default() });
     assert_eq!(std::fs::read(&task_path).unwrap(), task_before);
     assert_eq!(mtime(&task_path), task_mtime);
     assert!(receipt.dto.assignee.is_none());
@@ -307,10 +276,7 @@ fn legacy_sparse_task_is_not_repaired_and_not_auto_assigned_by_noops() {
     let receipt = TaskService::update_with_receipt(
         &mut storage,
         "TEST-1",
-        TaskUpdate {
-            status: Some("InProgress".to_string()),
-            ..TaskUpdate::default()
-        },
+        TaskUpdate { status: Some("InProgress".to_string()), ..TaskUpdate::default() },
         TaskUpdateContext::default(),
     )
     .expect("update must succeed");
@@ -346,10 +312,7 @@ fn clearing_absent_fields_is_a_noop_and_clearing_set_fields_is_genuine() {
     let receipt = TaskService::update_with_receipt(
         &mut storage,
         "TEST-2",
-        TaskUpdate {
-            due_date: Some(String::new()),
-            ..TaskUpdate::default()
-        },
+        TaskUpdate { due_date: Some(String::new()), ..TaskUpdate::default() },
         TaskUpdateContext::default(),
     )
     .expect("update must succeed");
@@ -366,20 +329,14 @@ fn genuine_change_writes_history_and_emits_one_event() {
     // Members already cover the task's reporter/assignee so the genuine
     // update stages no config repair here.
     let config_path = seed_project_config(&tasks_dir, "project_name: TEST\nmembers:\n  - alice\n");
-    let (task_before, config_before) = (
-        std::fs::read(&task_path).unwrap(),
-        std::fs::read(&config_path).unwrap(),
-    );
+    let (task_before, config_before) = (std::fs::read(&task_path).unwrap(), std::fs::read(&config_path).unwrap());
     let task_mtime = set_old_mtime(&task_path);
 
     let rx = api_events::subscribe();
     let receipt = TaskService::update_with_receipt(
         &mut Storage::new(&tasks_dir),
         "TEST-1",
-        TaskUpdate {
-            title: Some("Renamed".to_string()),
-            ..TaskUpdate::default()
-        },
+        TaskUpdate { title: Some("Renamed".to_string()), ..TaskUpdate::default() },
         emitting(),
     )
     .expect("update must succeed");
@@ -389,14 +346,8 @@ fn genuine_change_writes_history_and_emits_one_event() {
     assert_ne!(receipt.dto.modified, "2026-01-02T00:00:00Z");
     assert_eq!(receipt.dto.history.len(), 1);
     assert_eq!(receipt.dto.history[0].changes[0].field, "title");
-    assert_eq!(
-        receipt.dto.history[0].changes[0].old.as_deref(),
-        Some("Original title")
-    );
-    assert_eq!(
-        receipt.dto.history[0].changes[0].new.as_deref(),
-        Some("Renamed")
-    );
+    assert_eq!(receipt.dto.history[0].changes[0].old.as_deref(), Some("Original title"));
+    assert_eq!(receipt.dto.history[0].changes[0].new.as_deref(), Some("Renamed"));
     assert_ne!(std::fs::read(&task_path).unwrap(), task_before);
     assert_ne!(mtime(&task_path), task_mtime);
     assert_eq!(std::fs::read(&config_path).unwrap(), config_before);
@@ -408,25 +359,14 @@ fn noop_update_fires_no_automation_and_genuine_update_fires_it() {
     let (_tmp, tasks_dir) = workspace("");
     seed_task(&tasks_dir, "1.yml", RAW_TASK);
     seed_project_config(&tasks_dir, "project_name: TEST\nmembers:\n  - alice\n");
-    set_automation(
-        &tasks_dir,
-        "    - name: stamp\n      on: {updated: {add: {tags: [stamped]}}}\n",
-    );
+    set_automation(&tasks_dir, "    - name: stamp\n      on: {updated: {add: {tags: [stamped]}}}\n");
 
     let mut storage = Storage::new(&tasks_dir);
     noop_update(&mut storage, "TEST-1", TaskUpdate::default());
     let after = TaskService::get(&storage, "TEST-1", None).expect("get");
     assert!(!after.tags.contains(&"stamped".to_string()));
 
-    TaskService::update(
-        &mut storage,
-        "TEST-1",
-        TaskUpdate {
-            title: Some("Renamed".to_string()),
-            ..TaskUpdate::default()
-        },
-    )
-    .expect("genuine update");
+    TaskService::update(&mut storage, "TEST-1", TaskUpdate { title: Some("Renamed".to_string()), ..TaskUpdate::default() }).expect("genuine update");
     let after = TaskService::get(&storage, "TEST-1", None).expect("get");
     assert!(after.tags.contains(&"stamped".to_string()));
 }
@@ -438,26 +378,12 @@ fn invalid_patches_fail_closed_without_writing() {
     let (task_before, task_mtime) = (std::fs::read(&task_path).unwrap(), mtime(&task_path));
 
     for patch in [
-        TaskUpdate {
-            status: Some("Bogus".to_string()),
-            ..TaskUpdate::default()
-        },
-        TaskUpdate {
-            priority: Some("Nope".to_string()),
-            ..TaskUpdate::default()
-        },
-        TaskUpdate {
-            title: Some("   ".to_string()),
-            ..TaskUpdate::default()
-        },
+        TaskUpdate { status: Some("Bogus".to_string()), ..TaskUpdate::default() },
+        TaskUpdate { priority: Some("Nope".to_string()), ..TaskUpdate::default() },
+        TaskUpdate { title: Some("   ".to_string()), ..TaskUpdate::default() },
     ] {
-        let err = TaskService::update_with_receipt(
-            &mut Storage::new(&tasks_dir),
-            "TEST-1",
-            patch,
-            TaskUpdateContext::default(),
-        )
-        .expect_err("invalid patch must fail");
+        let err = TaskService::update_with_receipt(&mut Storage::new(&tasks_dir), "TEST-1", patch, TaskUpdateContext::default())
+            .expect_err("invalid patch must fail");
         assert!(!err.to_string().is_empty());
         assert_eq!(std::fs::read(&task_path).unwrap(), task_before);
         assert_eq!(mtime(&task_path), task_mtime);
@@ -472,18 +398,9 @@ fn pending_journal_refusal_survives_noop_detection() {
     let journal_path = tasks_dir.join(".txn-pending.json");
     std::fs::write(&journal_path, "{not json").unwrap();
 
-    let err = TaskService::update_with_receipt(
-        &mut Storage::new(&tasks_dir),
-        "TEST-1",
-        TaskUpdate::default(),
-        TaskUpdateContext::default(),
-    )
-    .expect_err("pending journal must fail closed");
-    assert!(
-        err.to_string()
-            .contains("Corrupt pending transaction journal"),
-        "unexpected error: {err}"
-    );
+    let err = TaskService::update_with_receipt(&mut Storage::new(&tasks_dir), "TEST-1", TaskUpdate::default(), TaskUpdateContext::default())
+        .expect_err("pending journal must fail closed");
+    assert!(err.to_string().contains("Corrupt pending transaction journal"), "unexpected error: {err}");
     assert_eq!(std::fs::read(&task_path).unwrap(), task_before);
     assert!(journal_path.exists());
 }
@@ -517,9 +434,7 @@ fn storage_edit_keeps_original_bytes_for_semantically_equal_tasks() {
     // A parsed round-trip of the same data is formatting-only: the guard
     // keeps the original bytes including comments and extension layout.
     let parsed = parse_task_yaml_tolerant(RAW_TASK).expect("parse raw task");
-    Storage::new(&tasks_dir)
-        .edit("TEST-1", &parsed)
-        .expect("edit must succeed");
+    Storage::new(&tasks_dir).edit("TEST-1", &parsed).expect("edit must succeed");
     assert_eq!(std::fs::read(&task_path).unwrap(), task_before);
     assert_eq!(mtime(&task_path), task_mtime);
     assert!(task_before.starts_with(b"# User-owned header comment"));
@@ -532,13 +447,8 @@ fn storage_edit_still_writes_changed_references() {
     let task_mtime = set_old_mtime(&task_path);
 
     let mut parsed = parse_task_yaml_tolerant(RAW_TASK).expect("parse raw task");
-    parsed.references.push(ReferenceEntry {
-        link: Some("https://example.com/changed".to_string()),
-        ..ReferenceEntry::default()
-    });
-    Storage::new(&tasks_dir)
-        .edit("TEST-1", &parsed)
-        .expect("edit must succeed");
+    parsed.references.push(ReferenceEntry { link: Some("https://example.com/changed".to_string()), ..ReferenceEntry::default() });
+    Storage::new(&tasks_dir).edit("TEST-1", &parsed).expect("edit must succeed");
 
     let raw = std::fs::read_to_string(&task_path).unwrap();
     assert!(raw.contains("https://example.com/changed"));
@@ -551,15 +461,11 @@ fn comment_edit_receipt_reports_genuine_and_idempotent_changes() {
     let task_path = seed_task(&tasks_dir, "1.yml", RAW_TASK);
     let mut storage = Storage::new(&tasks_dir);
     TaskService::add_comment(&mut storage, "TEST-1", "note").expect("comment");
-    let (bytes_before, mtime_before) = (
-        std::fs::read(&task_path).unwrap(),
-        set_old_mtime(&task_path),
-    );
+    let (bytes_before, mtime_before) = (std::fs::read(&task_path).unwrap(), set_old_mtime(&task_path));
 
     // Same-text edit: idempotent no-op, receipt reports changed == false,
     // and nothing is written.
-    let receipt =
-        TaskService::update_comment_with_receipt(&mut storage, "TEST-1", 0, "note").expect("edit");
+    let receipt = TaskService::update_comment_with_receipt(&mut storage, "TEST-1", 0, "note").expect("edit");
     assert!(!receipt.changed);
     assert_eq!(receipt.dto.comments[0].text, "note");
     assert_eq!(std::fs::read(&task_path).unwrap(), bytes_before);
@@ -567,17 +473,10 @@ fn comment_edit_receipt_reports_genuine_and_idempotent_changes() {
 
     // Genuine edit: changed == true, comment#1 history recorded, file
     // rewritten.
-    let receipt = TaskService::update_comment_with_receipt(&mut storage, "TEST-1", 0, "renamed")
-        .expect("edit");
+    let receipt = TaskService::update_comment_with_receipt(&mut storage, "TEST-1", 0, "renamed").expect("edit");
     assert!(receipt.changed);
     assert_eq!(receipt.dto.comments[0].text, "renamed");
-    assert!(
-        receipt
-            .dto
-            .history
-            .iter()
-            .any(|entry| entry.changes.iter().any(|c| c.field == "comment#1"))
-    );
+    assert!(receipt.dto.history.iter().any(|entry| entry.changes.iter().any(|c| c.field == "comment#1")));
     assert_ne!(std::fs::read(&task_path).unwrap(), bytes_before);
     assert_ne!(mtime(&task_path), mtime_before);
 }
@@ -591,59 +490,38 @@ fn soft_delete_receipt_distinguishes_genuine_from_idempotent() {
 
     // Missing targets keep failing closed through the receipt variant.
     for hard in [false, true] {
-        let err = TaskService::delete_with_receipt(&mut storage, "TEST-404", None, hard)
-            .expect_err("missing task must fail");
+        let err = TaskService::delete_with_receipt(&mut storage, "TEST-404", None, hard).expect_err("missing task must fail");
         assert!(matches!(err, lotar::LoTaRError::TaskNotFound(_)));
     }
 
     // First soft delete is a genuine lifecycle change: tombstone written,
     // `deleted` history appended, `modified` deliberately preserved.
-    let (response, changed) =
-        TaskService::delete_with_receipt(&mut storage, "TEST-1", None, false).expect("delete");
+    let (response, changed) = TaskService::delete_with_receipt(&mut storage, "TEST-1", None, false).expect("delete");
     assert!(response.deleted);
     assert!(!response.hard);
     assert!(changed);
-    let (bytes_after_delete, mtime_after_delete) =
-        (std::fs::read(&task_path).unwrap(), mtime(&task_path));
-    assert!(
-        std::fs::read_to_string(&task_path)
-            .unwrap()
-            .contains("deleted_at:")
-    );
+    let (bytes_after_delete, mtime_after_delete) = (std::fs::read(&task_path).unwrap(), mtime(&task_path));
+    assert!(std::fs::read_to_string(&task_path).unwrap().contains("deleted_at:"));
     let deleted = TaskService::get_including_deleted(&storage, "TEST-1", None).expect("dto");
     assert!(deleted.deleted_at.is_some());
     assert_eq!(deleted.modified, "2026-01-02T00:00:00Z");
-    assert_eq!(
-        deleted
-            .history
-            .iter()
-            .filter(|entry| entry.changes.iter().any(|c| c.field == "deleted"))
-            .count(),
-        1
-    );
+    assert_eq!(deleted.history.iter().filter(|entry| entry.changes.iter().any(|c| c.field == "deleted")).count(), 1);
 
     // Repeated soft delete keeps the state-after body (`deleted: true`)
     // but reports changed == false without writing.
-    let (response, changed) =
-        TaskService::delete_with_receipt(&mut storage, "TEST-1", None, false).expect("delete");
+    let (response, changed) = TaskService::delete_with_receipt(&mut storage, "TEST-1", None, false).expect("delete");
     assert!(response.deleted);
     assert!(!changed);
     assert_eq!(std::fs::read(&task_path).unwrap(), bytes_after_delete);
     assert_eq!(mtime(&task_path), mtime_after_delete);
 
     // Tombstones stay read-only for regular updates.
-    let err = TaskService::update_with_receipt(
-        &mut storage,
-        "TEST-1",
-        TaskUpdate::default(),
-        TaskUpdateContext::default(),
-    )
-    .expect_err("tombstone must refuse updates");
+    let err = TaskService::update_with_receipt(&mut storage, "TEST-1", TaskUpdate::default(), TaskUpdateContext::default())
+        .expect_err("tombstone must refuse updates");
     assert!(err.to_string().contains("restore it before modifying it"));
 
     // Hard deletion is always genuine: file removed, changed == true.
-    let (response, changed) =
-        TaskService::delete_with_receipt(&mut storage, "TEST-2", None, true).expect("hard delete");
+    let (response, changed) = TaskService::delete_with_receipt(&mut storage, "TEST-2", None, true).expect("hard delete");
     assert!(response.deleted && response.hard);
     assert!(changed);
     assert!(!other_path.exists());
@@ -672,18 +550,8 @@ fn restore_receipt_distinguishes_active_noop_from_genuine_restore() {
     assert!(receipt.changed);
     assert!(receipt.dto.deleted_at.is_none());
     assert_eq!(receipt.dto.modified, "2026-01-02T00:00:00Z");
-    assert!(
-        receipt
-            .dto
-            .history
-            .iter()
-            .any(|entry| entry.changes.iter().any(|c| c.field == "restored"))
-    );
-    assert!(
-        !std::fs::read_to_string(&task_path)
-            .unwrap()
-            .contains("deleted_at:")
-    );
+    assert!(receipt.dto.history.iter().any(|entry| entry.changes.iter().any(|c| c.field == "restored")));
+    assert!(!std::fs::read_to_string(&task_path).unwrap().contains("deleted_at:"));
 }
 
 #[test]
@@ -691,10 +559,7 @@ fn member_config_repair_is_not_persisted_by_a_noop_but_fires_on_genuine_changes(
     let (_tmp, tasks_dir) = workspace("members: [alice]\nauto.populate_members: true\n");
     let task_path = seed_task(&tasks_dir, "1.yml", RAW_BOB_TASK);
     let config_path = seed_project_config(&tasks_dir, "project_name: TEST\nmembers:\n  - alice\n");
-    let (task_before, config_before) = (
-        std::fs::read(&task_path).unwrap(),
-        std::fs::read(&config_path).unwrap(),
-    );
+    let (task_before, config_before) = (std::fs::read(&task_path).unwrap(), std::fs::read(&config_path).unwrap());
     let task_mtime = mtime(&task_path);
 
     // The task's assignee `bob` is missing from the members, so the update
@@ -708,25 +573,10 @@ fn member_config_repair_is_not_persisted_by_a_noop_but_fires_on_genuine_changes(
 
     // A genuine change keeps the existing member side effect: the config
     // repair is staged and published alongside it.
-    TaskService::update(
-        &mut storage,
-        "TEST-1",
-        TaskUpdate {
-            title: Some("Renamed".to_string()),
-            ..TaskUpdate::default()
-        },
-    )
-    .expect("genuine update");
+    TaskService::update(&mut storage, "TEST-1", TaskUpdate { title: Some("Renamed".to_string()), ..TaskUpdate::default() }).expect("genuine update");
     let config_after = std::fs::read_to_string(&config_path).unwrap();
-    assert!(
-        config_after.contains("bob"),
-        "config repair expected: {config_after}"
-    );
-    assert!(
-        std::fs::read_to_string(&task_path)
-            .unwrap()
-            .contains("Renamed")
-    );
+    assert!(config_after.contains("bob"), "config repair expected: {config_after}");
+    assert!(std::fs::read_to_string(&task_path).unwrap().contains("Renamed"));
 }
 
 #[test]
@@ -740,34 +590,20 @@ fn agent_directive_assignment_changes_are_genuine() {
     // distinct, so the switch is written, not suppressed as a no-op, and
     // the public event surface observes exactly one task_updated.
     let rx = api_events::subscribe();
-    let receipt = TaskService::update_with_receipt(
-        &mut storage,
-        "TEST-1",
-        TaskUpdate {
-            assignee: Some("@copilot".to_string()),
-            ..TaskUpdate::default()
-        },
-        emitting(),
-    )
-    .expect("agent assignment");
+    let receipt =
+        TaskService::update_with_receipt(&mut storage, "TEST-1", TaskUpdate { assignee: Some("@copilot".to_string()), ..TaskUpdate::default() }, emitting())
+            .expect("agent assignment");
     assert!(receipt.changed);
     assert_eq!(receipt.dto.assignee.as_deref(), Some("@copilot"));
     assert_eq!(updated_events(&rx), 1);
-    assert!(
-        std::fs::read_to_string(&task_path)
-            .unwrap()
-            .contains("assignee: '@copilot'")
-    );
+    assert!(std::fs::read_to_string(&task_path).unwrap().contains("assignee: '@copilot'"));
 
     // Same-value agent assignment is a byte-exact no-op.
     let (bytes, modified) = (std::fs::read(&task_path).unwrap(), mtime(&task_path));
     let receipt = TaskService::update_with_receipt(
         &mut storage,
         "TEST-1",
-        TaskUpdate {
-            assignee: Some("@copilot".to_string()),
-            ..TaskUpdate::default()
-        },
+        TaskUpdate { assignee: Some("@copilot".to_string()), ..TaskUpdate::default() },
         TaskUpdateContext::default(),
     )
     .expect("same agent assignment");
@@ -780,10 +616,7 @@ fn agent_directive_assignment_changes_are_genuine() {
     let receipt = TaskService::update_with_receipt(
         &mut storage,
         "TEST-1",
-        TaskUpdate {
-            assignee: Some("copilot".to_string()),
-            ..TaskUpdate::default()
-        },
+        TaskUpdate { assignee: Some("copilot".to_string()), ..TaskUpdate::default() },
         TaskUpdateContext::default(),
     )
     .expect("human assignment");
@@ -797,10 +630,7 @@ fn agent_directive_assignment_changes_are_genuine() {
     let receipt = TaskService::update_with_receipt(
         &mut storage,
         "TEST-1",
-        TaskUpdate {
-            assignee: Some("copilot".to_string()),
-            ..TaskUpdate::default()
-        },
+        TaskUpdate { assignee: Some("copilot".to_string()), ..TaskUpdate::default() },
         TaskUpdateContext::default(),
     )
     .expect("same human assignment");
@@ -821,10 +651,7 @@ fn human_member_aliases_and_me_resolution_remain_noops() {
         let receipt = TaskService::update_with_receipt(
             &mut storage,
             "TEST-1",
-            TaskUpdate {
-                assignee: Some(alias.to_string()),
-                ..TaskUpdate::default()
-            },
+            TaskUpdate { assignee: Some(alias.to_string()), ..TaskUpdate::default() },
             TaskUpdateContext::default(),
         )
         .expect("alias assignment");
@@ -834,17 +661,13 @@ fn human_member_aliases_and_me_resolution_remain_noops() {
     }
 
     // "@me" resolving to the already-assigned current user is a no-op.
-    let me = lotar::utils::identity::resolve_me_alias("@me", Some(&tasks_dir))
-        .expect("identity resolution");
+    let me = lotar::utils::identity::resolve_me_alias("@me", Some(&tasks_dir)).expect("identity resolution");
     let me_path = seed_task(&tasks_dir, "2.yml", &raw_task_with_assignee(&me));
     let (bytes, modified) = (std::fs::read(&me_path).unwrap(), mtime(&me_path));
     let receipt = TaskService::update_with_receipt(
         &mut storage,
         "TEST-2",
-        TaskUpdate {
-            assignee: Some("@me".to_string()),
-            ..TaskUpdate::default()
-        },
+        TaskUpdate { assignee: Some("@me".to_string()), ..TaskUpdate::default() },
         TaskUpdateContext::default(),
     )
     .expect("me assignment");
@@ -865,10 +688,7 @@ fn review_owner_guard_blocks_agent_identity_switches() {
     let err = TaskService::update_with_receipt(
         &mut storage,
         "TEST-1",
-        TaskUpdate {
-            assignee: Some("copilot".to_string()),
-            ..TaskUpdate::default()
-        },
+        TaskUpdate { assignee: Some("copilot".to_string()), ..TaskUpdate::default() },
         TaskUpdateContext::default(),
     )
     .expect_err("identity switch must be review-guarded");
@@ -879,10 +699,7 @@ fn review_owner_guard_blocks_agent_identity_switches() {
     let receipt = TaskService::update_with_receipt(
         &mut storage,
         "TEST-1",
-        TaskUpdate {
-            assignee: Some("@copilot".to_string()),
-            ..TaskUpdate::default()
-        },
+        TaskUpdate { assignee: Some("@copilot".to_string()), ..TaskUpdate::default() },
         TaskUpdateContext::default(),
     )
     .expect("same assignment under review");
@@ -892,10 +709,7 @@ fn review_owner_guard_blocks_agent_identity_switches() {
 
 fn other_identity_workspace() -> (tempfile::TempDir, PathBuf) {
     let (tmp, tasks_dir) = workspace("auto.identity: false\n");
-    seed_project_config(
-        &tasks_dir,
-        "project_name: TEST\ndefault.reporter: test-user\n",
-    );
+    seed_project_config(&tasks_dir, "project_name: TEST\ndefault.reporter: test-user\n");
     std::fs::create_dir_all(tasks_dir.join("OTHER")).unwrap();
     std::fs::write(
         tasks_dir.join("OTHER/config.yml"),
@@ -914,18 +728,13 @@ issue.states: [Todo, InProgress, NeedsReview, Done]\nmembers: [alice, test-user,
 #[test]
 fn other_project_review_owner_can_transition_despite_different_default_identity() {
     let (_tmp, tasks_dir) = other_identity_workspace();
-    let raw = RAW_TASK
-        .replace("status: Todo", "status: NeedsReview")
-        .replace("reporter: alice", "reporter: other-user");
+    let raw = RAW_TASK.replace("status: Todo", "status: NeedsReview").replace("reporter: alice", "reporter: other-user");
     std::fs::write(tasks_dir.join("OTHER/1.yml"), raw).unwrap();
 
     let receipt = TaskService::update_with_receipt(
         &mut Storage::new(&tasks_dir),
         "OTHER-1",
-        TaskUpdate {
-            status: Some("InProgress".to_string()),
-            ..TaskUpdate::default()
-        },
+        TaskUpdate { status: Some("InProgress".to_string()), ..TaskUpdate::default() },
         TaskUpdateContext::default(),
     )
     .expect("OTHER identity owns review, regardless of the configured default project");
@@ -940,9 +749,7 @@ fn other_project_review_owner_can_transition_despite_different_default_identity(
 fn other_project_review_guard_does_not_authorize_default_project_identity() {
     let (_tmp, tasks_dir) = other_identity_workspace();
     let task_path = tasks_dir.join("OTHER/1.yml");
-    let raw = RAW_TASK
-        .replace("status: Todo", "status: NeedsReview")
-        .replace("reporter: alice", "reporter: test-user");
+    let raw = RAW_TASK.replace("status: Todo", "status: NeedsReview").replace("reporter: alice", "reporter: test-user");
     std::fs::write(&task_path, raw).unwrap();
     let bytes = std::fs::read(&task_path).unwrap();
     let modified = set_old_mtime(&task_path);
@@ -950,10 +757,7 @@ fn other_project_review_guard_does_not_authorize_default_project_identity() {
     let error = TaskService::update_with_receipt(
         &mut Storage::new(&tasks_dir),
         "OTHER-1",
-        TaskUpdate {
-            status: Some("InProgress".to_string()),
-            ..TaskUpdate::default()
-        },
+        TaskUpdate { status: Some("InProgress".to_string()), ..TaskUpdate::default() },
         TaskUpdateContext::default(),
     )
     .expect_err("TEST identity must not impersonate the reporter for an OTHER task");
@@ -967,23 +771,14 @@ fn other_project_review_guard_does_not_authorize_default_project_identity() {
 fn other_project_me_assignment_under_review_is_a_byte_exact_noop() {
     let (_tmp, tasks_dir) = other_identity_workspace();
     let task_path = tasks_dir.join("OTHER/1.yml");
-    let raw = RAW_TASK
-        .replace("status: Todo", "status: NeedsReview")
-        .replace("assignee: alice", "assignee: other-user");
+    let raw = RAW_TASK.replace("status: Todo", "status: NeedsReview").replace("assignee: alice", "assignee: other-user");
     std::fs::write(&task_path, raw).unwrap();
     let bytes = std::fs::read(&task_path).unwrap();
     let modified = set_old_mtime(&task_path);
 
     // Neither project's identity owns this review. Resolving @me against
     // OTHER must recognize the unchanged assignee before owner enforcement.
-    let receipt = noop_update(
-        &mut Storage::new(&tasks_dir),
-        "OTHER-1",
-        TaskUpdate {
-            assignee: Some("@me".to_string()),
-            ..TaskUpdate::default()
-        },
-    );
+    let receipt = noop_update(&mut Storage::new(&tasks_dir), "OTHER-1", TaskUpdate { assignee: Some("@me".to_string()), ..TaskUpdate::default() });
 
     assert_eq!(receipt.dto.assignee.as_deref(), Some("other-user"));
     assert_eq!(receipt.dto.status.as_str(), "NeedsReview");
@@ -996,52 +791,27 @@ fn other_project_me_assignment_under_review_is_a_byte_exact_noop() {
 #[test]
 fn configured_reviewers_resolve_agent_unknown_and_missing_reporters() {
     for actor in ["reviewer-user", "reviewer@example.com"] {
-        for reporter in [
-            Some("bot"),
-            Some("departed-user"),
-            Some("@retired-agent"),
-            None,
-        ] {
-            let (_tmp, tasks_dir) = workspace(&format!(
-                "default.reporter: {actor}\nauto.identity: false\nauto.populate_members: false\nagents:\n  bot: command\n",
-            ));
-            seed_project_config(
-                &tasks_dir,
-                &format!(
-                    "project_name: TEST\nreview:\n  reviewers: [{}]\n",
-                    actor.to_ascii_uppercase()
-                ),
-            );
+        for reporter in [Some("bot"), Some("departed-user"), Some("@retired-agent"), None] {
+            let (_tmp, tasks_dir) =
+                workspace(&format!("default.reporter: {actor}\nauto.identity: false\nauto.populate_members: false\nagents:\n  bot: command\n",));
+            seed_project_config(&tasks_dir, &format!("project_name: TEST\nreview:\n  reviewers: [{}]\n", actor.to_ascii_uppercase()));
             let raw = RAW_TASK.replace("status: Todo", "status: NeedsReview");
             let raw = match reporter {
-                Some(reporter) => raw.replace(
-                    "reporter: alice",
-                    &format!("reporter: {}", serde_json::to_string(reporter).unwrap()),
-                ),
+                Some(reporter) => raw.replace("reporter: alice", &format!("reporter: {}", serde_json::to_string(reporter).unwrap())),
                 None => raw.replace("reporter: alice\n", ""),
             };
             let path = seed_task(&tasks_dir, "1.yml", &raw);
             if reporter == Some("@retired-agent") {
                 let before = std::fs::read(&path).unwrap();
                 let stamp = set_old_mtime(&path);
-                noop_update(
-                    &mut Storage::new(&tasks_dir),
-                    "TEST-1",
-                    TaskUpdate {
-                        assignee: Some("alice".into()),
-                        ..Default::default()
-                    },
-                );
+                noop_update(&mut Storage::new(&tasks_dir), "TEST-1", TaskUpdate { assignee: Some("alice".into()), ..Default::default() });
                 assert_eq!(std::fs::read(&path).unwrap(), before);
                 assert_eq!(mtime(&path), stamp);
             }
             let receipt = TaskService::update_with_receipt(
                 &mut Storage::new(&tasks_dir),
                 "TEST-1",
-                TaskUpdate {
-                    status: Some("Done".into()),
-                    ..Default::default()
-                },
+                TaskUpdate { status: Some("Done".into()), ..Default::default() },
                 TaskUpdateContext::default(),
             )
             .expect("configured reviewer must recover unavailable reporter reviews");
@@ -1050,37 +820,22 @@ fn configured_reviewers_resolve_agent_unknown_and_missing_reporters() {
             assert_eq!(receipt.dto.reporter.as_deref(), reporter);
             assert_eq!(receipt.dto.history.len(), 1);
             assert_eq!(receipt.dto.history[0].actor.as_deref(), Some(actor));
-            assert!(
-                receipt.dto.history[0]
-                    .changes
-                    .iter()
-                    .all(|change| change.field != "reporter")
-            );
+            assert!(receipt.dto.history[0].changes.iter().all(|change| change.field != "reporter"));
         }
     }
 }
 
 #[test]
 fn configured_reviewer_can_reassign_review_without_changing_reporter() {
-    let (_tmp, tasks_dir) = workspace(
-        "default.reporter: reviewer-user\nauto.populate_members: false\nagents:\n  bot: command\n",
-    );
-    seed_project_config(
-        &tasks_dir,
-        "project_name: TEST\nreview.reviewers: [reviewer-user]\n",
-    );
-    let raw = RAW_TASK
-        .replace("status: Todo", "status: NeedsReview")
-        .replace("reporter: alice", "reporter: bot")
-        .replace("assignee: alice", "assignee: '@bot'");
+    let (_tmp, tasks_dir) = workspace("default.reporter: reviewer-user\nauto.populate_members: false\nagents:\n  bot: command\n");
+    seed_project_config(&tasks_dir, "project_name: TEST\nreview.reviewers: [reviewer-user]\n");
+    let raw =
+        RAW_TASK.replace("status: Todo", "status: NeedsReview").replace("reporter: alice", "reporter: bot").replace("assignee: alice", "assignee: '@bot'");
     seed_task(&tasks_dir, "1.yml", &raw);
     let receipt = TaskService::update_with_receipt(
         &mut Storage::new(&tasks_dir),
         "TEST-1",
-        TaskUpdate {
-            assignee: Some("alice".into()),
-            ..Default::default()
-        },
+        TaskUpdate { assignee: Some("alice".into()), ..Default::default() },
         TaskUpdateContext::default(),
     )
     .expect("reviewer may change the review assignment");
@@ -1088,36 +843,22 @@ fn configured_reviewer_can_reassign_review_without_changing_reporter() {
     assert_eq!(receipt.dto.status.as_str(), "NeedsReview");
     assert_eq!(receipt.dto.assignee.as_deref(), Some("alice"));
     assert_eq!(receipt.dto.reporter.as_deref(), Some("bot"));
-    assert_eq!(
-        receipt.dto.history[0].actor.as_deref(),
-        Some("reviewer-user")
-    );
+    assert_eq!(receipt.dto.history[0].actor.as_deref(), Some("reviewer-user"));
 }
 
 #[test]
 fn unlisted_review_actors_are_denied_with_recovery_help_and_no_writes() {
-    for reviewers in [
-        "",
-        "review.reviewers: []\n",
-        "review.reviewers: [someone-else]\n",
-        "review.reviewers: ['@me', '@reviewer-user', '*']\n",
-    ] {
-        let (_tmp, tasks_dir) =
-            workspace("default.reporter: reviewer-user\nreview.reviewers: [reviewer-user]\n");
+    for reviewers in ["", "review.reviewers: []\n", "review.reviewers: [someone-else]\n", "review.reviewers: ['@me', '@reviewer-user', '*']\n"] {
+        let (_tmp, tasks_dir) = workspace("default.reporter: reviewer-user\nreview.reviewers: [reviewer-user]\n");
         seed_project_config(&tasks_dir, &format!("project_name: TEST\n{reviewers}"));
-        let raw = RAW_TASK
-            .replace("status: Todo", "status: NeedsReview")
-            .replace("reporter: alice", "reporter: departed-user");
+        let raw = RAW_TASK.replace("status: Todo", "status: NeedsReview").replace("reporter: alice", "reporter: departed-user");
         let task = seed_task(&tasks_dir, "1.yml", &raw);
         let stamp = set_old_mtime(&task);
         let before = std::fs::read(&task).unwrap();
         let error = TaskService::update_with_receipt(
             &mut Storage::new(&tasks_dir),
             "TEST-1",
-            TaskUpdate {
-                status: Some("Done".into()),
-                ..Default::default()
-            },
+            TaskUpdate { status: Some("Done".into()), ..Default::default() },
             TaskUpdateContext::default(),
         )
         .expect_err("neither absent, empty, unrelated nor global reviewer settings grant access");
@@ -1136,26 +877,14 @@ fn unlisted_review_actors_are_denied_with_recovery_help_and_no_writes() {
 
 #[test]
 fn reporter_retains_review_authority_with_no_delegates() {
-    for reviewers in [
-        "",
-        "review.reviewers: []\n",
-        "review.reviewers: [bob@example.com]\n",
-    ] {
-        let (_tmp, tasks_dir) =
-            workspace("default.reporter: alice\nauto.populate_members: false\n");
+    for reviewers in ["", "review.reviewers: []\n", "review.reviewers: [bob@example.com]\n"] {
+        let (_tmp, tasks_dir) = workspace("default.reporter: alice\nauto.populate_members: false\n");
         seed_project_config(&tasks_dir, &format!("project_name: TEST\n{reviewers}"));
-        seed_task(
-            &tasks_dir,
-            "1.yml",
-            &RAW_TASK.replace("status: Todo", "status: NeedsReview"),
-        );
+        seed_task(&tasks_dir, "1.yml", &RAW_TASK.replace("status: Todo", "status: NeedsReview"));
         let receipt = TaskService::update_with_receipt(
             &mut Storage::new(&tasks_dir),
             "TEST-1",
-            TaskUpdate {
-                status: Some("Done".into()),
-                ..Default::default()
-            },
+            TaskUpdate { status: Some("Done".into()), ..Default::default() },
             TaskUpdateContext::default(),
         )
         .expect("reporter remains authorized by default");
@@ -1167,26 +896,21 @@ fn reporter_retains_review_authority_with_no_delegates() {
 
 #[test]
 fn cli_configured_reviewer_can_resolve_an_agent_reported_review() {
-    let (tmp, tasks_dir) =
-        workspace("default.reporter: reviewer-user\nauto.populate_members: false\n");
+    let (tmp, tasks_dir) = workspace("default.reporter: reviewer-user\nauto.populate_members: false\n");
     let project = seed_project_config(&tasks_dir, "project_name: TEST\n");
     let before = std::fs::read(&project).unwrap();
     for dry_run in [true, false] {
         let mut command = common::lotar_cmd().unwrap();
-        command
-            .current_dir(tmp.path())
-            .env("HOME", tmp.path())
-            .env_remove("LOTAR_DEFAULT_REPORTER")
-            .args([
-                "--tasks-dir",
-                tasks_dir.to_str().unwrap(),
-                "config",
-                "set",
-                "review.reviewers",
-                "reviewer-user",
-                "--project",
-                "TEST",
-            ]);
+        command.current_dir(tmp.path()).env("HOME", tmp.path()).env_remove("LOTAR_DEFAULT_REPORTER").args([
+            "--tasks-dir",
+            tasks_dir.to_str().unwrap(),
+            "config",
+            "set",
+            "review.reviewers",
+            "reviewer-user",
+            "--project",
+            "TEST",
+        ]);
         if dry_run {
             command.arg("--dry-run");
         }
@@ -1195,25 +919,13 @@ fn cli_configured_reviewer_can_resolve_an_agent_reported_review() {
             assert_eq!(std::fs::read(&project).unwrap(), before);
         }
     }
-    let task = seed_task(
-        &tasks_dir,
-        "1.yml",
-        &RAW_TASK
-            .replace("status: Todo", "status: NeedsReview")
-            .replace("reporter: alice", "reporter: bot"),
-    );
+    let task = seed_task(&tasks_dir, "1.yml", &RAW_TASK.replace("status: Todo", "status: NeedsReview").replace("reporter: alice", "reporter: bot"));
     common::lotar_cmd()
         .unwrap()
         .current_dir(tmp.path())
         .env("HOME", tmp.path())
         .env_remove("LOTAR_DEFAULT_REPORTER")
-        .args([
-            "--tasks-dir",
-            tasks_dir.to_str().unwrap(),
-            "status",
-            "TEST-1",
-            "Done",
-        ])
+        .args(["--tasks-dir", tasks_dir.to_str().unwrap(), "status", "TEST-1", "Done"])
         .assert()
         .success();
     let persisted = parse_task_yaml_tolerant(&std::fs::read_to_string(task).unwrap()).unwrap();
@@ -1234,10 +946,7 @@ fn markdown_description_whitespace_changes_are_genuine() {
     let receipt = TaskService::update_with_receipt(
         &mut storage,
         "TEST-1",
-        TaskUpdate {
-            description: Some(original.to_string()),
-            ..TaskUpdate::default()
-        },
+        TaskUpdate { description: Some(original.to_string()), ..TaskUpdate::default() },
         TaskUpdateContext::default(),
     )
     .expect("same description");
@@ -1251,44 +960,29 @@ fn markdown_description_whitespace_changes_are_genuine() {
     let receipt = TaskService::update_with_receipt(
         &mut storage,
         "TEST-1",
-        TaskUpdate {
-            description: Some("sort(items)\nthen prose\n".to_string()),
-            ..TaskUpdate::default()
-        },
+        TaskUpdate { description: Some("sort(items)\nthen prose\n".to_string()), ..TaskUpdate::default() },
         TaskUpdateContext::default(),
     )
     .expect("dedented description");
     assert!(receipt.changed);
-    assert_eq!(
-        receipt.dto.description.as_deref(),
-        Some("sort(items)\nthen prose\n")
-    );
+    assert_eq!(receipt.dto.description.as_deref(), Some("sort(items)\nthen prose\n"));
 
     // Adding/removing trailing newlines is genuine, not trimmed away.
     let receipt = TaskService::update_with_receipt(
         &mut storage,
         "TEST-1",
-        TaskUpdate {
-            description: Some("sort(items)\nthen prose".to_string()),
-            ..TaskUpdate::default()
-        },
+        TaskUpdate { description: Some("sort(items)\nthen prose".to_string()), ..TaskUpdate::default() },
         TaskUpdateContext::default(),
     )
     .expect("trailing-newline change");
     assert!(receipt.changed);
-    assert_eq!(
-        receipt.dto.description.as_deref(),
-        Some("sort(items)\nthen prose")
-    );
+    assert_eq!(receipt.dto.description.as_deref(), Some("sort(items)\nthen prose"));
 
     // An exact empty string still clears (and equals an absent field).
     let receipt = TaskService::update_with_receipt(
         &mut storage,
         "TEST-1",
-        TaskUpdate {
-            description: Some(String::new()),
-            ..TaskUpdate::default()
-        },
+        TaskUpdate { description: Some(String::new()), ..TaskUpdate::default() },
         TaskUpdateContext::default(),
     )
     .expect("clear description");

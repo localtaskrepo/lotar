@@ -45,10 +45,7 @@ pub struct DetectContext<'a> {
 
 impl DetectContext<'_> {
     fn config(&self) -> Option<crate::config::types::ResolvedConfig> {
-        let root = self
-            .tasks_root
-            .map(Path::to_path_buf)
-            .unwrap_or_else(|| crate::utils::paths::tasks_root_from(Path::new(".")));
+        let root = self.tasks_root.map(Path::to_path_buf).unwrap_or_else(|| crate::utils::paths::tasks_root_from(Path::new(".")));
         crate::config::resolution::config_for_project(&root, self.project).ok()
     }
 }
@@ -67,38 +64,21 @@ impl IdentityDetector for ConfigDefaultReporterDetector {
         let rep = cfg.default_reporter.and_then(|s| {
             let t = s.trim().to_string();
             // "@me" is a self-referential placeholder, never a usable identity
-            if t.is_empty() || t.eq_ignore_ascii_case("@me") {
-                None
-            } else {
-                Some(t)
-            }
+            if t.is_empty() || t.eq_ignore_ascii_case("@me") { None } else { Some(t) }
         })?;
 
-        let root = ctx
-            .tasks_root
-            .map(Path::to_path_buf)
-            .unwrap_or_else(|| crate::utils::paths::tasks_root_from(Path::new(".")));
+        let root = ctx.tasks_root.map(Path::to_path_buf).unwrap_or_else(|| crate::utils::paths::tasks_root_from(Path::new(".")));
         let project_reporter = ctx
             .project
-            .and_then(|project| {
-                crate::config::persistence::load_project_config_from_dir(project, &root).ok()
-            })
+            .and_then(|project| crate::config::persistence::load_project_config_from_dir(project, &root).ok())
             .and_then(|config| config.default_reporter);
         let scope = if crate::config::resolution::active_cli_reporter_override().is_some() {
             "CLI".to_string()
         } else if project_reporter.is_some() {
             format!("project {}", ctx.project?)
-        } else if crate::config::env_overrides::capture_env_override_snapshot()
-            .global
-            .default_reporter
-            .is_some()
-        {
+        } else if crate::config::env_overrides::capture_env_override_snapshot().global.default_reporter.is_some() {
             "environment".to_string()
-        } else if crate::config::persistence::load_home_config()
-            .ok()
-            .and_then(|config| config.default_reporter)
-            .is_some()
-        {
+        } else if crate::config::persistence::load_home_config().ok().and_then(|config| config.default_reporter).is_some() {
             "home".to_string()
         } else {
             "workspace".to_string()
@@ -117,9 +97,7 @@ pub struct GitConfigDetector;
 
 impl GitConfigDetector {
     fn git_context(tasks_root: Option<&Path>) -> Option<(PathBuf, PathBuf)> {
-        let start = tasks_root
-            .and_then(|root| root.parent().map(|p| p.to_path_buf()))
-            .or_else(|| std::env::current_dir().ok())?;
+        let start = tasks_root.and_then(|root| root.parent().map(|p| p.to_path_buf())).or_else(|| std::env::current_dir().ok())?;
         let repo_root = crate::utils::git::find_repo_root(&start)?;
         let (_, common_dir) = crate::utils::git::metadata_dirs(&repo_root.join(".git"))?;
         let config = common_dir.join("config");
@@ -151,20 +129,10 @@ impl IdentityDetector for GitConfigDetector {
         };
         let user = git_config_user_section(&contents);
         if let Some(name) = user.name {
-            return Some(IdentityDetection {
-                user: name,
-                source: IdentitySource::GitUserName,
-                confidence: 85,
-                details: Some(details()),
-            });
+            return Some(IdentityDetection { user: name, source: IdentitySource::GitUserName, confidence: 85, details: Some(details()) });
         }
         if let Some(email) = user.email {
-            return Some(IdentityDetection {
-                user: email,
-                source: IdentitySource::GitUserEmail,
-                confidence: 80,
-                details: Some(details()),
-            });
+            return Some(IdentityDetection { user: email, source: IdentitySource::GitUserEmail, confidence: 80, details: Some(details()) });
         }
         None
     }
@@ -288,12 +256,7 @@ impl IdentityDetector for EnvUserDetector {
         if let Ok(user) = std::env::var("USER") {
             let t = user.trim();
             if !t.is_empty() {
-                return Some(IdentityDetection {
-                    user: t.to_string(),
-                    source: IdentitySource::EnvUser,
-                    confidence: 60,
-                    details: Some("$USER".to_string()),
-                });
+                return Some(IdentityDetection { user: t.to_string(), source: IdentitySource::EnvUser, confidence: 60, details: Some("$USER".to_string()) });
             }
         }
         if let Ok(user) = std::env::var("USERNAME") {
@@ -331,8 +294,7 @@ pub fn detect_identity(ctx: &DetectContext) -> Option<IdentityDetection> {
     // Precedence: configured default > git identity > OS user > manifest author.
     // The manifest author is a static guess and must never outrank the actual
     // git/system identity when stamping tasks as the current user.
-    let mut detectors: Vec<Box<dyn IdentityDetector>> =
-        vec![Box::new(ConfigDefaultReporterDetector)];
+    let mut detectors: Vec<Box<dyn IdentityDetector>> = vec![Box::new(ConfigDefaultReporterDetector)];
     // Optionally include git based on toggle
     if cfg.as_ref().map(|c| c.auto_identity_git).unwrap_or(true) {
         detectors.push(Box::new(GitConfigDetector));
@@ -355,10 +317,7 @@ impl ProjectManifestDetector {
     fn search_roots(tasks_root: Option<&Path>) -> Vec<PathBuf> {
         let mut roots = Vec::new();
         // Prefer repo root if available
-        if let Some(start) = tasks_root
-            .and_then(|root| root.parent().map(|p| p.to_path_buf()))
-            .or_else(|| std::env::current_dir().ok())
-        {
+        if let Some(start) = tasks_root.and_then(|root| root.parent().map(|p| p.to_path_buf())).or_else(|| std::env::current_dir().ok()) {
             if let Some(repo) = crate::utils::git::find_repo_root(&start) {
                 roots.push(repo);
             }
@@ -495,16 +454,7 @@ mod git_config_tests {
     #[test]
     fn only_the_user_section_counts() {
         let config = "[merge \"npm-merge-driver\"]\n\tname = automatically merge npm lockfiles\n[user]\n\tname=\"Real Person\" # me\n\temail = real@example.com ; work\n";
-        assert_eq!(
-            git_config_user_section(config),
-            GitUserConfig {
-                name: Some("Real Person".into()),
-                email: Some("real@example.com".into()),
-            }
-        );
-        assert_eq!(
-            git_config_user_section("[core]\n\tname = x\n"),
-            GitUserConfig::default()
-        );
+        assert_eq!(git_config_user_section(config), GitUserConfig { name: Some("Real Person".into()), email: Some("real@example.com".into()) });
+        assert_eq!(git_config_user_section("[core]\n\tname = x\n"), GitUserConfig::default());
     }
 }

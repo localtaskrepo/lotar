@@ -11,13 +11,7 @@ fn mk_req(method: &str, path: &str, query: &[(&str, &str)], body: Value) -> Http
     for (k, v) in query {
         q.insert((*k).to_string(), (*v).to_string());
     }
-    HttpRequest {
-        method: method.to_string(),
-        path: path.to_string(),
-        query: q,
-        headers: HashMap::new(),
-        body: serde_json::to_vec(&body).unwrap(),
-    }
+    HttpRequest { method: method.to_string(), path: path.to_string(), query: q, headers: HashMap::new(), body: serde_json::to_vec(&body).unwrap() }
 }
 
 struct Dev54Fixture {
@@ -33,12 +27,7 @@ fn isolated_workspace() -> Dev54Fixture {
     let tasks_dir = tmp.path().join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();
     let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
-    Dev54Fixture {
-        _tmp: tmp,
-        tasks_dir,
-        _guard_tasks,
-        _guard_fast,
-    }
+    Dev54Fixture { _tmp: tmp, tasks_dir, _guard_tasks, _guard_fast }
 }
 
 fn seed_project_config(tasks_dir: &std::path::Path, project: &str, yaml: &str) {
@@ -64,8 +53,7 @@ fn count_task_files(tasks_dir: &std::path::Path, project: &str) -> usize {
 fn read_task_yaml(tasks_dir: &std::path::Path, id: &str) -> String {
     let project = id.split('-').next().unwrap();
     let numeric = id.split('-').nth(1).unwrap();
-    std::fs::read_to_string(tasks_dir.join(project).join(format!("{numeric}.yml")))
-        .unwrap_or_else(|_| panic!("task file for {id} should exist"))
+    std::fs::read_to_string(tasks_dir.join(project).join(format!("{numeric}.yml"))).unwrap_or_else(|_| panic!("task file for {id} should exist"))
 }
 
 fn server() -> ApiServer {
@@ -89,12 +77,7 @@ fn rest_create_uses_project_scoped_enum_validation() {
     let api = server();
 
     // Explicit project-only status is accepted and persisted atomically.
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/add",
-        &[],
-        json!({"title": "Alpha review", "project": "ALPHA", "status": "Review"}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/add", &[], json!({"title": "Alpha review", "project": "ALPHA", "status": "Review"})));
     assert_eq!(resp.status, 201, "create with project status");
     let created = body_of(&resp);
     let id = created["data"]["id"].as_str().unwrap().to_string();
@@ -102,20 +85,9 @@ fn rest_create_uses_project_scoped_enum_validation() {
     assert!(read_task_yaml(&fx.tasks_dir, &id).contains("status: Review"));
 
     // A status that exists globally but not for ALPHA must be rejected.
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/add",
-        &[],
-        json!({"title": "Alpha todo", "project": "ALPHA", "status": "Todo"}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/add", &[], json!({"title": "Alpha todo", "project": "ALPHA", "status": "Todo"})));
     assert_eq!(resp.status, 400, "global-only status rejected for ALPHA");
-    assert!(
-        body_of(&resp)["error"]["message"]
-            .as_str()
-            .unwrap()
-            .contains("Queued"),
-        "error should list project statuses"
-    );
+    assert!(body_of(&resp)["error"]["message"].as_str().unwrap().contains("Queued"), "error should list project statuses");
     assert_eq!(count_task_files(&fx.tasks_dir, "ALPHA"), 1);
 }
 
@@ -126,67 +98,33 @@ fn rest_update_honors_status_with_project_scoped_validation() {
     seed_project_config(&fx.tasks_dir, "BETA", BETA_STATES);
     let api = server();
 
-    let alpha = body_of(&api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/add",
-        &[],
-        json!({"title": "A", "project": "ALPHA", "status": "Queued"}),
-    )))["data"]["id"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    let beta = body_of(&api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/add",
-        &[],
-        json!({"title": "B", "project": "BETA"}),
-    )))["data"]["id"]
+    let alpha =
+        body_of(&api.handle_request(&mk_req("POST", "/api/tasks/add", &[], json!({"title": "A", "project": "ALPHA", "status": "Queued"}))))["data"]["id"]
+            .as_str()
+            .unwrap()
+            .to_string();
+    let beta = body_of(&api.handle_request(&mk_req("POST", "/api/tasks/add", &[], json!({"title": "B", "project": "BETA"}))))["data"]["id"]
         .as_str()
         .unwrap()
         .to_string();
 
     // /api/tasks/update now applies status changes with project validation.
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/update",
-        &[],
-        json!({"id": alpha, "status": "Complete"}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/update", &[], json!({"id": alpha, "status": "Complete"})));
     assert_eq!(resp.status, 200, "update alpha to Complete");
     assert_eq!(body_of(&resp)["data"]["status"], "Complete");
 
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/update",
-        &[],
-        json!({"id": alpha, "status": "InProgress"}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/update", &[], json!({"id": alpha, "status": "InProgress"})));
     assert_eq!(resp.status, 400, "BETA-only status rejected on ALPHA");
 
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/update",
-        &[],
-        json!({"id": beta, "status": "InProgress"}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/update", &[], json!({"id": beta, "status": "InProgress"})));
     assert_eq!(resp.status, 200, "update beta to InProgress");
     assert_eq!(body_of(&resp)["data"]["status"], "InProgress");
 
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/update",
-        &[],
-        json!({"id": beta, "status": "Review"}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/update", &[], json!({"id": beta, "status": "Review"})));
     assert_eq!(resp.status, 400, "ALPHA-only status rejected on BETA");
 
     // /api/tasks/status shares the same project-aware validation.
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/status",
-        &[],
-        json!({"id": alpha, "status": "Active"}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/status", &[], json!({"id": alpha, "status": "Active"})));
     assert_eq!(resp.status, 200, "status route alpha to Active");
     assert_eq!(body_of(&resp)["data"]["status"], "Active");
 }
@@ -214,22 +152,11 @@ fn rest_update_nullable_and_empty_clears() {
         }),
     )));
     assert_eq!(created["data"]["custom_fields"]["team"], "infra");
-    assert_eq!(
-        created["data"]["acceptance_criteria"]
-            .as_array()
-            .unwrap()
-            .len(),
-        2
-    );
+    assert_eq!(created["data"]["acceptance_criteria"].as_array().unwrap().len(), 2);
     let id = created["data"]["id"].as_str().unwrap().to_string();
 
     // Omitted fields stay unchanged.
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/update",
-        &[],
-        json!({"id": id, "title": "Clearable renamed"}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/update", &[], json!({"id": id, "title": "Clearable renamed"})));
     assert_eq!(resp.status, 200);
     let data = body_of(&resp)["data"].clone();
     assert_eq!(data["assignee"], "bob");
@@ -261,33 +188,17 @@ fn rest_update_nullable_and_empty_clears() {
     assert!(data["effort"].is_null());
     assert!(data["description"].is_null());
     assert!(data.get("tags").is_none() || data["tags"].as_array().unwrap().is_empty());
-    assert!(
-        data.get("custom_fields").is_none()
-            || data["custom_fields"].as_object().unwrap().is_empty()
-    );
-    assert!(
-        data.get("acceptance_criteria").is_none()
-            || data["acceptance_criteria"].as_array().unwrap().is_empty()
-    );
+    assert!(data.get("custom_fields").is_none() || data["custom_fields"].as_object().unwrap().is_empty());
+    assert!(data.get("acceptance_criteria").is_none() || data["acceptance_criteria"].as_array().unwrap().is_empty());
 
     // Historical empty-string clears remain supported.
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/update",
-        &[],
-        json!({"id": id, "assignee": "", "effort": ""}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/update", &[], json!({"id": id, "assignee": "", "effort": ""})));
     assert_eq!(resp.status, 200);
     assert!(body_of(&resp)["data"]["assignee"].is_null());
     assert!(body_of(&resp)["data"]["effort"].is_null());
 
     // GET agrees with the cleared state.
-    let resp = api.handle_request(&mk_req(
-        "GET",
-        "/api/tasks/get",
-        &[("id", id.as_str())],
-        json!({}),
-    ));
+    let resp = api.handle_request(&mk_req("GET", "/api/tasks/get", &[("id", id.as_str())], json!({})));
     assert_eq!(resp.status, 200);
     assert!(body_of(&resp)["data"]["assignee"].is_null());
 }
@@ -332,36 +243,16 @@ fn rest_custom_fields_and_acceptance_criteria_roundtrip() {
     let fields = data["custom_fields"].as_object().unwrap();
     assert_eq!(fields.len(), 1);
     assert_eq!(fields["severity"], "low");
-    assert_eq!(
-        data["acceptance_criteria"].as_array().unwrap().len(),
-        1,
-        "criteria replace the whole list"
-    );
+    assert_eq!(data["acceptance_criteria"].as_array().unwrap().len(), 1, "criteria replace the whole list");
 
-    let fetched = body_of(&api.handle_request(&mk_req(
-        "GET",
-        "/api/tasks/get",
-        &[("id", id.as_str())],
-        json!({}),
-    )));
+    let fetched = body_of(&api.handle_request(&mk_req("GET", "/api/tasks/get", &[("id", id.as_str())], json!({}))));
     assert_eq!(fetched["data"]["custom_fields"]["severity"], "low");
-    assert_eq!(
-        fetched["data"]["acceptance_criteria"][0],
-        "single criterion"
-    );
+    assert_eq!(fetched["data"]["acceptance_criteria"][0], "single criterion");
 
     // Legacy fields kv payloads still work on update.
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/update",
-        &[],
-        json!({"id": id, "fields": {"severity": "medium"}}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/update", &[], json!({"id": id, "fields": {"severity": "medium"}})));
     assert_eq!(resp.status, 200);
-    assert_eq!(
-        body_of(&resp)["data"]["custom_fields"]["severity"],
-        "medium"
-    );
+    assert_eq!(body_of(&resp)["data"]["custom_fields"]["severity"], "medium");
 }
 
 #[test]
@@ -370,32 +261,17 @@ fn rest_invalid_create_leaves_no_task_files() {
     seed_project_config(&fx.tasks_dir, "ORPH", "issue_states: [Todo, Done]\n");
     let api = server();
 
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/add",
-        &[],
-        json!({"title": "bad status", "project": "ORPH", "status": "NotAStatus"}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/add", &[], json!({"title": "bad status", "project": "ORPH", "status": "NotAStatus"})));
     assert_eq!(resp.status, 400);
     assert_eq!(count_task_files(&fx.tasks_dir, "ORPH"), 0);
 
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/add",
-        &[],
-        json!({"title": "bad priority", "project": "ORPH", "priority": "Ultra"}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/add", &[], json!({"title": "bad priority", "project": "ORPH", "priority": "Ultra"})));
     assert_eq!(resp.status, 400);
     assert_eq!(count_task_files(&fx.tasks_dir, "ORPH"), 0);
 
     // Invalid sprint reference is rejected before the task file is written
     // (typed NOT_FOUND since DEV-58).
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/add",
-        &[],
-        json!({"title": "bad sprint", "project": "ORPH", "sprints": [424242]}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/add", &[], json!({"title": "bad sprint", "project": "ORPH", "sprints": [424242]})));
     assert_eq!(resp.status, 404);
     assert_eq!(count_task_files(&fx.tasks_dir, "ORPH"), 0);
 }
@@ -404,67 +280,31 @@ fn rest_invalid_create_leaves_no_task_files() {
 fn cli_add_status_flag_is_project_validated() {
     use crate::common::lotar_cmd;
     let fx = isolated_workspace();
-    seed_project_config(
-        &fx.tasks_dir,
-        "CLIA",
-        "issue_states: [Queued, Active, Review, Complete]\n",
-    );
+    seed_project_config(&fx.tasks_dir, "CLIA", "issue_states: [Queued, Active, Review, Complete]\n");
 
     let ok = lotar_cmd()
         .unwrap()
         .env("LOTAR_TEST_SILENT", "1")
-        .args([
-            "--tasks-dir",
-            fx.tasks_dir.to_str().unwrap(),
-            "add",
-            "CLI atomic status",
-            "-p",
-            "CLIA",
-            "--status",
-            "Review",
-        ])
+        .args(["--tasks-dir", fx.tasks_dir.to_str().unwrap(), "add", "CLI atomic status", "-p", "CLIA", "--status", "Review"])
         .output()
         .unwrap();
-    assert!(
-        ok.status.success(),
-        "add --status failed: {}",
-        String::from_utf8_lossy(&ok.stderr)
-    );
+    assert!(ok.status.success(), "add --status failed: {}", String::from_utf8_lossy(&ok.stderr));
     let stdout = String::from_utf8_lossy(&ok.stdout).to_string();
     let id = common::extract_task_id_from_output(&stdout).expect("task id in output");
     assert!(id.starts_with("CLIA-"), "unexpected id {id}");
     let yaml = read_task_yaml(&fx.tasks_dir, &id);
-    assert!(
-        yaml.contains("status: Review"),
-        "yaml missing status: {yaml}"
-    );
+    assert!(yaml.contains("status: Review"), "yaml missing status: {yaml}");
 
     let bad = lotar_cmd()
         .unwrap()
         .env("LOTAR_TEST_SILENT", "1")
-        .args([
-            "--tasks-dir",
-            fx.tasks_dir.to_str().unwrap(),
-            "add",
-            "CLI bad status",
-            "-p",
-            "CLIA",
-            "--status",
-            "Todo",
-        ])
+        .args(["--tasks-dir", fx.tasks_dir.to_str().unwrap(), "add", "CLI bad status", "-p", "CLIA", "--status", "Todo"])
         .output()
         .unwrap();
-    assert!(
-        !bad.status.success(),
-        "out-of-project status must be rejected"
-    );
+    assert!(!bad.status.success(), "out-of-project status must be rejected");
     let stderr = String::from_utf8_lossy(&bad.stderr).to_string();
     assert!(stderr.contains("Valid statuses"), "stderr: {stderr}");
-    assert_eq!(
-        count_task_files(&fx.tasks_dir, "CLIA"),
-        1,
-        "rejected creation must not leave a task file"
-    );
+    assert_eq!(count_task_files(&fx.tasks_dir, "CLIA"), 1, "rejected creation must not leave a task file");
 }
 
 #[test]
@@ -472,44 +312,19 @@ fn rest_update_empty_title_rejected() {
     let _fx = isolated_workspace();
     let api = server();
 
-    let id = body_of(&api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/add",
-        &[],
-        json!({"title": "Original", "project": "TITL"}),
-    )))["data"]["id"]
+    let id = body_of(&api.handle_request(&mk_req("POST", "/api/tasks/add", &[], json!({"title": "Original", "project": "TITL"}))))["data"]["id"]
         .as_str()
         .unwrap()
         .to_string();
 
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/update",
-        &[],
-        json!({"id": id, "title": ""}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/update", &[], json!({"id": id, "title": ""})));
     assert_eq!(resp.status, 400, "blank title must be rejected");
-    assert!(
-        body_of(&resp)["error"]["message"]
-            .as_str()
-            .unwrap()
-            .contains("Title cannot be empty")
-    );
+    assert!(body_of(&resp)["error"]["message"].as_str().unwrap().contains("Title cannot be empty"));
 
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/update",
-        &[],
-        json!({"id": id, "title": "   "}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/update", &[], json!({"id": id, "title": "   "})));
     assert_eq!(resp.status, 400, "whitespace-only title must be rejected");
 
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/add",
-        &[],
-        json!({"title": "   ", "project": "TITL"}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/add", &[], json!({"title": "   ", "project": "TITL"})));
     assert_eq!(resp.status, 400, "blank create title must be rejected");
     assert_eq!(count_task_files(&_fx.tasks_dir, "TITL"), 1);
 }
@@ -520,70 +335,26 @@ fn rest_explicit_tags_clear_does_not_reapply_default_tags() {
     seed_project_config(&fx.tasks_dir, "DEFT", "default_tags: [team-x]\n");
     let api = server();
 
-    let created = body_of(&api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/add",
-        &[],
-        json!({"title": "Defaults", "project": "DEFT"}),
-    )));
+    let created = body_of(&api.handle_request(&mk_req("POST", "/api/tasks/add", &[], json!({"title": "Defaults", "project": "DEFT"}))));
     let id = created["data"]["id"].as_str().unwrap().to_string();
-    assert_eq!(
-        created["data"]["tags"],
-        json!(["team-x"]),
-        "creation without tags applies configured defaults"
-    );
+    assert_eq!(created["data"]["tags"], json!(["team-x"]), "creation without tags applies configured defaults");
 
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/update",
-        &[],
-        json!({"id": id, "tags": null}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/update", &[], json!({"id": id, "tags": null})));
     assert_eq!(resp.status, 200);
     let data = body_of(&resp)["data"].clone();
-    assert!(
-        data.get("tags").is_none() || data["tags"].as_array().unwrap().is_empty(),
-        "explicit null clear must not resurrect default_tags: {data}"
-    );
+    assert!(data.get("tags").is_none() || data["tags"].as_array().unwrap().is_empty(), "explicit null clear must not resurrect default_tags: {data}");
 
-    let fetched = body_of(&api.handle_request(&mk_req(
-        "GET",
-        "/api/tasks/get",
-        &[("id", id.as_str())],
-        json!({}),
-    )));
-    assert!(
-        fetched["data"].get("tags").is_none()
-            || fetched["data"]["tags"].as_array().unwrap().is_empty(),
-        "reads must show the persisted clear"
-    );
+    let fetched = body_of(&api.handle_request(&mk_req("GET", "/api/tasks/get", &[("id", id.as_str())], json!({}))));
+    assert!(fetched["data"].get("tags").is_none() || fetched["data"]["tags"].as_array().unwrap().is_empty(), "reads must show the persisted clear");
     let yaml = read_task_yaml(&fx.tasks_dir, &id);
-    assert!(
-        !yaml
-            .lines()
-            .any(|line| line.trim_start().starts_with("tags:")),
-        "cleared tags must not be persisted: {yaml}"
-    );
+    assert!(!yaml.lines().any(|line| line.trim_start().starts_with("tags:")), "cleared tags must not be persisted: {yaml}");
 
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/update",
-        &[],
-        json!({"id": id, "tags": []}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/update", &[], json!({"id": id, "tags": []})));
     assert_eq!(resp.status, 200);
     let data = body_of(&resp)["data"].clone();
-    assert!(
-        data.get("tags").is_none() || data["tags"].as_array().unwrap().is_empty(),
-        "explicit empty-list clear stays cleared: {data}"
-    );
+    assert!(data.get("tags").is_none() || data["tags"].as_array().unwrap().is_empty(), "explicit empty-list clear stays cleared: {data}");
 
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/update",
-        &[],
-        json!({"id": id, "tags": ["manual"]}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/update", &[], json!({"id": id, "tags": ["manual"]})));
     assert_eq!(resp.status, 200);
     assert_eq!(body_of(&resp)["data"]["tags"], json!(["manual"]));
 }
@@ -591,11 +362,7 @@ fn rest_explicit_tags_clear_does_not_reapply_default_tags() {
 #[test]
 fn rest_custom_fields_legacy_keys_survive_config_removal() {
     let fx = isolated_workspace();
-    seed_project_config(
-        &fx.tasks_dir,
-        "CFGT",
-        "custom:\n  fields: [severity, legacy_note]\n",
-    );
+    seed_project_config(&fx.tasks_dir, "CFGT", "custom:\n  fields: [severity, legacy_note]\n");
     let api = server();
 
     let created = body_of(&api.handle_request(&mk_req(
@@ -612,34 +379,16 @@ fn rest_custom_fields_legacy_keys_survive_config_removal() {
 
     // Replace-all echo that includes the unchanged legacy key must succeed
     // and preserve it.
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/update",
-        &[],
-        json!({"id": id, "custom_fields": {"severity": "low", "legacy_note": "keep"}}),
-    ));
-    assert_eq!(
-        resp.status,
-        200,
-        "unchanged legacy key must survive config removal: {:?}",
-        String::from_utf8_lossy(&resp.body)
-    );
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/update", &[], json!({"id": id, "custom_fields": {"severity": "low", "legacy_note": "keep"}})));
+    assert_eq!(resp.status, 200, "unchanged legacy key must survive config removal: {:?}", String::from_utf8_lossy(&resp.body));
     let data = body_of(&resp)["data"].clone();
     assert_eq!(data["custom_fields"]["legacy_note"], "keep");
     assert_eq!(data["custom_fields"]["severity"], "low");
 
     // Editing the legacy value is still permitted (existing data).
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/update",
-        &[],
-        json!({"id": id, "custom_fields": {"severity": "low", "legacy_note": "changed"}}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/update", &[], json!({"id": id, "custom_fields": {"severity": "low", "legacy_note": "changed"}})));
     assert_eq!(resp.status, 200);
-    assert_eq!(
-        body_of(&resp)["data"]["custom_fields"]["legacy_note"],
-        "changed"
-    );
+    assert_eq!(body_of(&resp)["data"]["custom_fields"]["legacy_note"], "changed");
 
     // Brand-new undeclared keys are rejected under the restricted config.
     let resp = api.handle_request(&mk_req(
@@ -648,25 +397,14 @@ fn rest_custom_fields_legacy_keys_survive_config_removal() {
         &[],
         json!({"id": id, "custom_fields": {"severity": "low", "legacy_note": "changed", "brand_new": "x"}}),
     ));
-    assert_eq!(
-        resp.status, 400,
-        "new undeclared custom field must be rejected"
-    );
+    assert_eq!(resp.status, 400, "new undeclared custom field must be rejected");
 
     // Configured keys canonicalize: case variants fold to the configured
     // spelling instead of creating a duplicate entry.
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/update",
-        &[],
-        json!({"id": id, "custom_fields": {"Severity": "critical", "legacy_note": "changed"}}),
-    ));
+    let resp =
+        api.handle_request(&mk_req("POST", "/api/tasks/update", &[], json!({"id": id, "custom_fields": {"Severity": "critical", "legacy_note": "changed"}})));
     assert_eq!(resp.status, 200);
     let fields = body_of(&resp)["data"]["custom_fields"].clone();
-    assert_eq!(
-        fields.as_object().unwrap().len(),
-        2,
-        "case variant must fold into the configured key: {fields}"
-    );
+    assert_eq!(fields.as_object().unwrap().len(), 2, "case variant must fold into the configured key: {fields}");
     assert_eq!(fields["severity"], "critical");
 }

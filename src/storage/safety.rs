@@ -11,8 +11,7 @@ use std::time::{Duration, Instant};
 const SPRINT_LOCK_NAME: &str = "sprints";
 const MAX_PROJECT_PREFIX_LEN: usize = 64;
 
-static REPORTED_CORRUPT_FILES: LazyLock<Mutex<HashSet<PathBuf>>> =
-    LazyLock::new(|| Mutex::new(HashSet::new()));
+static REPORTED_CORRUPT_FILES: LazyLock<Mutex<HashSet<PathBuf>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
 static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 pub fn is_valid_project_prefix(name: &str) -> bool {
@@ -24,41 +23,29 @@ pub fn is_valid_project_prefix(name: &str) -> bool {
         Some(c) if c.is_alphanumeric() => {}
         _ => return false,
     }
-    name.chars()
-        .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+    name.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-')
 }
 
 pub fn validate_project_prefix(name: &str) -> Result<(), String> {
     if is_valid_project_prefix(name) {
         Ok(())
     } else {
-        Err(format!(
-            "Invalid project prefix '{name}': must be 1-64 alphanumeric characters (or '_'/'-'), without path separators"
-        ))
+        Err(format!("Invalid project prefix '{name}': must be 1-64 alphanumeric characters (or '_'/'-'), without path separators"))
     }
 }
 
 pub fn warn_corrupt_once(path: &Path, reason: &str) {
-    let should_report = REPORTED_CORRUPT_FILES
-        .lock()
-        .map(|mut seen| seen.insert(path.to_path_buf()))
-        .unwrap_or(false);
+    let should_report = REPORTED_CORRUPT_FILES.lock().map(|mut seen| seen.insert(path.to_path_buf())).unwrap_or(false);
     if should_report {
-        OutputRenderer::new(OutputFormat::Text, LogLevel::Warn).log_warn(format_args!(
-            "Skipping unreadable task file {} ({reason}); fix or remove it to restore the item",
-            path.display()
-        ));
+        OutputRenderer::new(OutputFormat::Text, LogLevel::Warn)
+            .log_warn(format_args!("Skipping unreadable task file {} ({reason}); fix or remove it to restore the item", path.display()));
     }
 }
 
 /// Warn once per process that a task ID is stored in more than one file.
 pub fn warn_duplicate_once(id: &str) {
-    static REPORTED: LazyLock<Mutex<HashSet<String>>> =
-        LazyLock::new(|| Mutex::new(HashSet::new()));
-    let should_report = REPORTED
-        .lock()
-        .map(|mut seen| seen.insert(id.to_string()))
-        .unwrap_or(false);
+    static REPORTED: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
+    let should_report = REPORTED.lock().map(|mut seen| seen.insert(id.to_string())).unwrap_or(false);
     if should_report {
         OutputRenderer::new(OutputFormat::Text, LogLevel::Warn).log_warn(format_args!(
             "Task {id} is stored in more than one file; listing one of them. `lotar show {id}` names the files; delete the extra copy or give it a new number with `lotar task renumber {id} --file <path>`. Changes to {id} are refused until then"
@@ -71,8 +58,7 @@ pub fn sprint_lock_name() -> &'static str {
 }
 
 fn is_lock_contention(error: &std::io::Error, native_code: Option<i32>) -> bool {
-    error.kind() == std::io::ErrorKind::WouldBlock
-        || native_code.is_some_and(|code| error.raw_os_error() == Some(code))
+    error.kind() == std::io::ErrorKind::WouldBlock || native_code.is_some_and(|code| error.raw_os_error() == Some(code))
 }
 
 /// Acquire an exclusive advisory directory lock, retrying contention for up
@@ -85,11 +71,7 @@ pub fn acquire_storage_lock(target_dir: &Path, lock_name: &str) -> std::io::Resu
 }
 
 /// [`acquire_storage_lock`] with its own wait for a busy lock.
-pub fn acquire_storage_lock_within(
-    target_dir: &Path,
-    lock_name: &str,
-    wait: Duration,
-) -> std::io::Result<File> {
+pub fn acquire_storage_lock_within(target_dir: &Path, lock_name: &str, wait: Duration) -> std::io::Result<File> {
     let lock_path = target_dir.join(format!(".{lock_name}.lock"));
     // Task, sprint and finding locks live one level below the tasks root (a
     // project folder, `@sprints`); give the root its runtime .gitignore (DEV-271).
@@ -99,11 +81,12 @@ pub fn acquire_storage_lock_within(
     {
         crate::storage::manager::ensure_runtime_gitignore(root);
     }
-    let file = File::options().write(true).create(true).truncate(false)
-        .open(&lock_path).map_err(|e| std::io::Error::new(e.kind(), format!(
-            "Cannot open storage lock {}: {e}; check the directory and permissions; mutation was not run",
-            lock_path.display()
-        )))?;
+    let file = File::options().write(true).create(true).truncate(false).open(&lock_path).map_err(|e| {
+        std::io::Error::new(
+            e.kind(),
+            format!("Cannot open storage lock {}: {e}; check the directory and permissions; mutation was not run", lock_path.display()),
+        )
+    })?;
     let start = Instant::now();
     let contention_code = fs2::lock_contended_error().raw_os_error();
     loop {
@@ -126,10 +109,7 @@ pub fn acquire_storage_lock_within(
             Err(e) => {
                 return Err(std::io::Error::new(
                     e.kind(),
-                    format!(
-                        "Cannot acquire storage lock {}: {e}; check filesystem locking support and permissions; mutation was not run",
-                        lock_path.display()
-                    ),
+                    format!("Cannot acquire storage lock {}: {e}; check filesystem locking support and permissions; mutation was not run", lock_path.display()),
                 ));
             }
         }
@@ -141,11 +121,7 @@ pub fn acquire_storage_lock_within(
 /// lock on success, error, or panic; the lock file itself must not be removed.
 /// Do not sweep atomic-write temp files here: other writers need not hold this
 /// lock, so even an exclusive lock does not prove that their temp files are orphaned.
-pub fn with_storage_lock<T, E: From<std::io::Error>>(
-    target_dir: &Path,
-    lock_name: &str,
-    f: impl FnOnce() -> Result<T, E>,
-) -> Result<T, E> {
+pub fn with_storage_lock<T, E: From<std::io::Error>>(target_dir: &Path, lock_name: &str, f: impl FnOnce() -> Result<T, E>) -> Result<T, E> {
     let _file = acquire_storage_lock(target_dir, lock_name)?;
     refuse_under_pending_transaction(target_dir)?;
     f()
@@ -223,25 +199,15 @@ fn atomic_write_file_with_io(
     prepare: impl FnOnce(&mut File) -> std::io::Result<()>,
     publish: impl FnOnce(&Path, &Path) -> std::io::Result<()>,
 ) -> std::io::Result<()> {
-    let dir = path
-        .parent()
-        .ok_or_else(|| std::io::Error::other("target path has no parent directory"))?;
-    let file_name = path
-        .file_name()
-        .and_then(|n| n.to_str())
-        .ok_or_else(|| std::io::Error::other("target path has no file name"))?;
+    let dir = path.parent().ok_or_else(|| std::io::Error::other("target path has no parent directory"))?;
+    let file_name = path.file_name().and_then(|n| n.to_str()).ok_or_else(|| std::io::Error::other("target path has no file name"))?;
     let permissions = match fs::metadata(path) {
         Ok(metadata) => Some(metadata.permissions()),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
         Err(error) => return Err(error),
     };
     let unique = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
-    let tmp_path = dir.join(format!(
-        ".{}.tmp-{}-{}",
-        file_name,
-        std::process::id(),
-        unique
-    ));
+    let tmp_path = dir.join(format!(".{}.tmp-{}-{}", file_name, std::process::id(), unique));
     // Exclusive creation means failure cleanup can only remove our own temp.
     let mut options = File::options();
     options.write(true).create_new(true);
@@ -252,9 +218,7 @@ fn atomic_write_file_with_io(
         options.mode(permissions.mode());
     }
     let mut file = options.open(&tmp_path)?;
-    let prepared = permissions
-        .map_or(Ok(()), |permissions| file.set_permissions(permissions))
-        .and_then(|()| prepare(&mut file));
+    let prepared = permissions.map_or(Ok(()), |permissions| file.set_permissions(permissions)).and_then(|()| prepare(&mut file));
     drop(file);
     let result = prepared.and_then(|()| publish(&tmp_path, path));
     if result.is_err() {
@@ -289,19 +253,10 @@ mod tests {
         )
         .unwrap();
         assert_eq!(fs::read_to_string(&target).unwrap(), "new private value");
-        assert_eq!(
-            fs::metadata(&target).unwrap().permissions().mode() & 0o777,
-            0o600
-        );
+        assert_eq!(fs::metadata(&target).unwrap().permissions().mode() & 0o777, 0o600);
         atomic_write_file(&target, "replacement private value").unwrap();
-        assert_eq!(
-            fs::read_to_string(&target).unwrap(),
-            "replacement private value"
-        );
-        assert_eq!(
-            fs::metadata(&target).unwrap().permissions().mode() & 0o777,
-            0o600
-        );
+        assert_eq!(fs::read_to_string(&target).unwrap(), "replacement private value");
+        assert_eq!(fs::metadata(&target).unwrap().permissions().mode() & 0o777, 0o600);
     }
 
     #[cfg(unix)]
@@ -314,10 +269,7 @@ mod tests {
         let target = dir.path().join("new.yml");
         fs::write(&normal, "normal").unwrap();
         atomic_write_file(&target, "new").unwrap();
-        assert_eq!(
-            fs::metadata(&target).unwrap().permissions().mode() & 0o777,
-            fs::metadata(&normal).unwrap().permissions().mode() & 0o777
-        );
+        assert_eq!(fs::metadata(&target).unwrap().permissions().mode() & 0o777, fs::metadata(&normal).unwrap().permissions().mode() & 0o777);
     }
 
     #[cfg(unix)]
@@ -373,19 +325,10 @@ mod tests {
     fn contention_matches_only_would_block_or_the_platform_native_code() {
         let platform = fs2::lock_contended_error();
         assert!(is_lock_contention(&platform, platform.raw_os_error()));
-        assert!(is_lock_contention(
-            &std::io::Error::new(std::io::ErrorKind::WouldBlock, "busy"),
-            None,
-        ));
-        assert!(!is_lock_contention(
-            &std::io::Error::new(std::io::ErrorKind::PermissionDenied, "denied"),
-            Some(33),
-        ));
+        assert!(is_lock_contention(&std::io::Error::new(std::io::ErrorKind::WouldBlock, "busy"), None,));
+        assert!(!is_lock_contention(&std::io::Error::new(std::io::ErrorKind::PermissionDenied, "denied"), Some(33),));
         assert!(!is_lock_contention(&std::io::Error::other("unknown"), None));
-        assert!(!is_lock_contention(
-            &std::io::Error::from_raw_os_error(5),
-            Some(33)
-        ));
+        assert!(!is_lock_contention(&std::io::Error::from_raw_os_error(5), Some(33)));
     }
 
     #[test]
@@ -417,9 +360,7 @@ mod tests {
     #[test]
     fn storage_lock_releases_on_error_and_panic() {
         let dir = tempfile::tempdir().unwrap();
-        let result = with_storage_lock(dir.path(), "task", || {
-            Err::<(), _>(std::io::Error::other("mutation failed"))
-        });
+        let result = with_storage_lock(dir.path(), "task", || Err::<(), _>(std::io::Error::other("mutation failed")));
         assert!(result.is_err());
         let probe = File::open(dir.path().join(".task.lock")).unwrap();
         probe.try_lock_exclusive().unwrap();
@@ -445,22 +386,7 @@ mod tests {
 
     #[test]
     fn rejects_traversal_and_reserved_prefixes() {
-        for bad in [
-            "..",
-            ".",
-            "../evil",
-            "../../etc",
-            "/tmp/abs",
-            "/abs",
-            "a/b",
-            "a\\b",
-            "a b",
-            "@sprints",
-            ".hidden",
-            "-flag",
-            "",
-            "a..b",
-        ] {
+        for bad in ["..", ".", "../evil", "../../etc", "/tmp/abs", "/abs", "a/b", "a\\b", "a b", "@sprints", ".hidden", "-flag", "", "a..b"] {
             assert!(!is_valid_project_prefix(bad), "expected invalid: {bad}");
         }
     }
@@ -474,16 +400,8 @@ mod tests {
         assert_eq!(fs::read_to_string(&target).unwrap(), "first");
         atomic_write_file(&target, "second").unwrap();
         assert_eq!(fs::read_to_string(&target).unwrap(), "second");
-        let leftovers: Vec<_> = fs::read_dir(&dir)
-            .unwrap()
-            .filter_map(|e| e.ok())
-            .filter(|e| {
-                e.file_name()
-                    .to_str()
-                    .map(|n| n.contains(".tmp-"))
-                    .unwrap_or(false)
-            })
-            .collect();
+        let leftovers: Vec<_> =
+            fs::read_dir(&dir).unwrap().filter_map(|e| e.ok()).filter(|e| e.file_name().to_str().map(|n| n.contains(".tmp-")).unwrap_or(false)).collect();
         assert!(leftovers.is_empty(), "temp files left behind");
         let _ = fs::remove_dir_all(&dir);
     }
@@ -504,10 +422,7 @@ mod tests {
             |temp, destination| {
                 assert_eq!(fs::read_to_string(temp)?, "new journal");
                 assert_eq!(fs::read_to_string(destination)?, "old journal");
-                Err(std::io::Error::new(
-                    std::io::ErrorKind::PermissionDenied,
-                    "publish denied",
-                ))
+                Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "publish denied"))
             },
         )
         .unwrap_err();
@@ -570,11 +485,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         for file_name in ["config.yml", "7.yml", "other.yml"] {
             let target = dir.path().join(file_name);
-            let temp = dir.path().join(format!(
-                ".{file_name}.tmp-{}-{}",
-                std::process::id(),
-                TMP_COUNTER.fetch_add(1, Ordering::Relaxed)
-            ));
+            let temp = dir.path().join(format!(".{file_name}.tmp-{}-{}", std::process::id(), TMP_COUNTER.fetch_add(1, Ordering::Relaxed)));
             fs::write(&target, "previous value").unwrap();
             // Deterministically pause an atomic writer between write and rename.
             fs::write(&temp, "active writer value").unwrap();

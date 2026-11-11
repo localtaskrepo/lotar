@@ -13,16 +13,8 @@ pub struct SprintStatusWarningPayload {
     pub message: String,
 }
 
-pub fn to_status_warning_payloads(
-    warnings: &[SprintStatusWarning],
-) -> Vec<SprintStatusWarningPayload> {
-    warnings
-        .iter()
-        .map(|warning| SprintStatusWarningPayload {
-            code: warning.code(),
-            message: warning.message(),
-        })
-        .collect()
+pub fn to_status_warning_payloads(warnings: &[SprintStatusWarning]) -> Vec<SprintStatusWarningPayload> {
+    warnings.iter().map(|warning| SprintStatusWarningPayload { code: warning.code(), message: warning.message() }).collect()
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -86,25 +78,12 @@ impl SprintSummary {
 
         let label = plan.and_then(|p| p.label.clone());
         let goal = plan.and_then(|p| p.goal.clone());
-        let starts_at = actual
-            .and_then(|a| a.started_at.clone())
-            .or_else(|| plan.and_then(|p| p.starts_at.clone()));
-        let ends_at = plan
-            .and_then(|p| p.ends_at.clone())
-            .or_else(|| lifecycle.computed_end.as_ref().map(|dt| dt.to_rfc3339()));
+        let starts_at = actual.and_then(|a| a.started_at.clone()).or_else(|| plan.and_then(|p| p.starts_at.clone()));
+        let ends_at = plan.and_then(|p| p.ends_at.clone()).or_else(|| lifecycle.computed_end.as_ref().map(|dt| dt.to_rfc3339()));
         let computed_end = lifecycle.computed_end.as_ref().map(|dt| dt.to_rfc3339());
         let has_warnings = !lifecycle.warnings.is_empty();
 
-        Self {
-            id: record.id,
-            label,
-            status: lifecycle.label().to_string(),
-            goal,
-            starts_at,
-            ends_at,
-            computed_end,
-            has_warnings,
-        }
+        Self { id: record.id, label, status: lifecycle.label().to_string(), goal, starts_at, ends_at, computed_end, has_warnings }
     }
 }
 
@@ -131,11 +110,7 @@ pub struct SprintDetail {
 }
 
 impl SprintDetail {
-    pub fn from_record(
-        record: &SprintRecord,
-        summary: &SprintSummary,
-        lifecycle: &SprintLifecycleStatus,
-    ) -> Self {
+    pub fn from_record(record: &SprintRecord, summary: &SprintSummary, lifecycle: &SprintLifecycleStatus) -> Self {
         let computed_end = lifecycle.computed_end.as_ref().map(|dt| dt.to_rfc3339());
         let status_warnings = to_status_warning_payloads(&lifecycle.warnings);
 

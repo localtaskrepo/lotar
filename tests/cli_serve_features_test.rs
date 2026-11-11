@@ -33,11 +33,7 @@ struct ServeChild {
 /// Outcome of starting a serve child that may legitimately fail to start.
 enum ServeStart {
     Ready(ServeChild),
-    Failed {
-        status: std::process::ExitStatus,
-        stdout: String,
-        stderr: String,
-    },
+    Failed { status: std::process::ExitStatus, stdout: String, stderr: String },
 }
 
 /// Spawn a serve child that is expected to reach readiness; panics with the
@@ -45,13 +41,7 @@ enum ServeStart {
 fn spawn_serve(cwd: &std::path::Path, extra_args: &[&str]) -> ServeChild {
     match try_spawn_serve(cwd, extra_args) {
         ServeStart::Ready(serve) => serve,
-        ServeStart::Failed {
-            status,
-            stdout,
-            stderr,
-        } => panic!(
-            "serve exited before a readiness banner ({status}); stdout:\n{stdout}\nstderr:\n{stderr}"
-        ),
+        ServeStart::Failed { status, stdout, stderr } => panic!("serve exited before a readiness banner ({status}); stdout:\n{stdout}\nstderr:\n{stderr}"),
     }
 }
 
@@ -113,15 +103,7 @@ fn try_spawn_serve(cwd: &std::path::Path, extra_args: &[&str]) -> ServeStart {
         drop(stderr_done);
     });
 
-    let mut serve = ServeChild {
-        child: Some(child),
-        host: String::new(),
-        port: 0,
-        lines: rx,
-        stdout_dump,
-        stderr_dump,
-        output_done,
-    };
+    let mut serve = ServeChild { child: Some(child), host: String::new(), port: 0, lines: rx, stdout_dump, stderr_dump, output_done };
     let deadline = Instant::now() + READY_TIMEOUT;
     match serve.wait_for_banner(deadline) {
         Ok(()) => ServeStart::Ready(serve),
@@ -129,11 +111,7 @@ fn try_spawn_serve(cwd: &std::path::Path, extra_args: &[&str]) -> ServeStart {
             Some(mut child) => {
                 let status = child.wait().expect("reap failed serve child");
                 serve.finish_output_capture(deadline);
-                ServeStart::Failed {
-                    status,
-                    stdout: serve.stdout_snapshot(),
-                    stderr: serve.stderr_snapshot(),
-                }
+                ServeStart::Failed { status, stdout: serve.stdout_snapshot(), stderr: serve.stderr_snapshot() }
             }
             None => panic!("serve child ownership lost"),
         },
@@ -146,30 +124,22 @@ impl ServeChild {
         loop {
             let remaining = deadline.saturating_duration_since(Instant::now());
             if remaining.is_zero() {
-                self.fail_with_output(format!(
-                    "serve did not advertise readiness within {READY_TIMEOUT:?}; stdout so far:\n{seen}"
-                ));
+                self.fail_with_output(format!("serve did not advertise readiness within {READY_TIMEOUT:?}; stdout so far:\n{seen}"));
             }
             match self.lines.recv_timeout(remaining) {
                 Ok(line) => {
                     seen.push_str(&line);
                     seen.push('\n');
                     if let Some(rest) = line.strip_prefix("   URL: http://") {
-                        let (host, port) = rest
-                            .rsplit_once(':')
-                            .unwrap_or_else(|| panic!("malformed readiness banner: {line}"));
-                        let port: u16 = port.trim().parse().unwrap_or_else(|_| {
-                            panic!("non-numeric port in readiness banner: {line}")
-                        });
+                        let (host, port) = rest.rsplit_once(':').unwrap_or_else(|| panic!("malformed readiness banner: {line}"));
+                        let port: u16 = port.trim().parse().unwrap_or_else(|_| panic!("non-numeric port in readiness banner: {line}"));
                         self.host = host.to_string();
                         self.port = port;
                         return Ok(());
                     }
                 }
                 Err(mpsc::RecvTimeoutError::Timeout) => {
-                    self.fail_with_output(format!(
-                        "serve did not advertise readiness within {READY_TIMEOUT:?}; stdout so far:\n{seen}"
-                    ));
+                    self.fail_with_output(format!("serve did not advertise readiness within {READY_TIMEOUT:?}; stdout so far:\n{seen}"));
                 }
                 Err(mpsc::RecvTimeoutError::Disconnected) => {
                     return Err(());
@@ -179,26 +149,17 @@ impl ServeChild {
     }
 
     fn stdout_snapshot(&self) -> String {
-        self.stdout_dump
-            .lock()
-            .map(|s| s.clone())
-            .unwrap_or_default()
+        self.stdout_dump.lock().map(|s| s.clone()).unwrap_or_default()
     }
 
     fn stderr_snapshot(&self) -> String {
-        self.stderr_dump
-            .lock()
-            .map(|s| s.clone())
-            .unwrap_or_default()
+        self.stderr_dump.lock().map(|s| s.clone()).unwrap_or_default()
     }
 
     fn finish_output_capture(&self, deadline: Instant) {
         // Each reader holds a sender until all its output is captured. Child
         // exit or a stdout banner alone does not synchronize the stderr reader.
-        match self
-            .output_done
-            .recv_timeout(deadline.saturating_duration_since(Instant::now()))
-        {
+        match self.output_done.recv_timeout(deadline.saturating_duration_since(Instant::now())) {
             Err(mpsc::RecvTimeoutError::Disconnected) => {}
             result => self.fail_with_output(format!("output capture did not finish: {result:?}")),
         }
@@ -209,21 +170,15 @@ impl ServeChild {
     }
 
     fn connect(&self) -> TcpStream {
-        TcpStream::connect((self.host.as_str(), self.port))
-            .unwrap_or_else(|e| panic!("connect to {}:{} failed: {e}", self.host, self.port))
+        TcpStream::connect((self.host.as_str(), self.port)).unwrap_or_else(|e| panic!("connect to {}:{} failed: {e}", self.host, self.port))
     }
 
     fn http_request(&self, method: &str, path: &str, body: Option<&str>) -> (u16, Vec<u8>) {
         let mut stream = self.connect();
-        stream
-            .set_read_timeout(Some(Duration::from_millis(1_500)))
-            .unwrap();
+        stream.set_read_timeout(Some(Duration::from_millis(1_500))).unwrap();
         let payload = body.unwrap_or("");
-        let req = format!(
-            "{method} {path} HTTP/1.1\r\nHost: {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{payload}",
-            self.host,
-            payload.len()
-        );
+        let req =
+            format!("{method} {path} HTTP/1.1\r\nHost: {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{payload}", self.host, payload.len());
         stream.write_all(req.as_bytes()).unwrap();
         stream.flush().unwrap();
 
@@ -238,18 +193,11 @@ impl ServeChild {
             if let Some(pos) = header_buf.windows(4).position(|w| w == b"\r\n\r\n") {
                 let body_leftover = header_buf.split_off(pos + 4);
                 let headers_text = String::from_utf8_lossy(&header_buf);
-                let status = headers_text
-                    .lines()
-                    .next()
-                    .and_then(|line| line.split_whitespace().nth(1))
-                    .and_then(|value| value.parse::<u16>().ok())
-                    .unwrap_or(0);
+                let status =
+                    headers_text.lines().next().and_then(|line| line.split_whitespace().nth(1)).and_then(|value| value.parse::<u16>().ok()).unwrap_or(0);
                 let content_length = headers_text
                     .lines()
-                    .filter_map(|line| {
-                        line.split_once(':')
-                            .map(|(key, value)| (key.trim(), value.trim()))
-                    })
+                    .filter_map(|line| line.split_once(':').map(|(key, value)| (key.trim(), value.trim())))
                     .find(|(key, _)| key.eq_ignore_ascii_case("Content-Length"))
                     .and_then(|(_, value)| value.parse::<usize>().ok())
                     .unwrap_or(0);
@@ -322,12 +270,8 @@ fn reserve_ephemeral_port() -> u16 {
 }
 
 fn sorted_titles(payload: &serde_json::Value) -> Vec<String> {
-    let mut titles: Vec<String> = payload["data"]["tasks"]
-        .as_array()
-        .expect("data.tasks array")
-        .iter()
-        .map(|task| task["title"].as_str().expect("title").to_string())
-        .collect();
+    let mut titles: Vec<String> =
+        payload["data"]["tasks"].as_array().expect("data.tasks array").iter().map(|task| task["title"].as_str().expect("title").to_string()).collect();
     titles.sort();
     titles
 }
@@ -366,10 +310,7 @@ fn completed_output_waits_for_stderr_after_stdout_readiness() {
 #[test]
 fn serve_ephemeral_port_is_advertised_and_api_answers() {
     let fixtures = TestFixtures::new();
-    let mut serve = spawn_serve(
-        fixtures.temp_dir.path(),
-        &["serve", "--host", "127.0.0.1", "--port", "0"],
-    );
+    let mut serve = spawn_serve(fixtures.temp_dir.path(), &["serve", "--host", "127.0.0.1", "--port", "0"]);
 
     assert!(serve.port != 0, "port 0 must be replaced by the bound port");
     assert_eq!(serve.host, "127.0.0.1");
@@ -378,27 +319,17 @@ fn serve_ephemeral_port_is_advertised_and_api_answers() {
     assert_eq!(status, 200, "body: {}", String::from_utf8_lossy(&body));
     let payload: serde_json::Value = serde_json::from_slice(&body).expect("task list JSON payload");
     assert!(payload["data"].is_object(), "payload: {payload}");
-    assert_eq!(
-        payload["data"]["tasks"].as_array().map_or(0, Vec::len),
-        0,
-        "empty workspace must serve an empty task list: {payload}"
-    );
+    assert_eq!(payload["data"]["tasks"].as_array().map_or(0, Vec::len), 0, "empty workspace must serve an empty task list: {payload}");
 
     let exit = serve.stop();
-    assert!(
-        exit.success(),
-        "serve must exit cleanly after the stop endpoint, got {exit}"
-    );
+    assert!(exit.success(), "serve must exit cleanly after the stop endpoint, got {exit}");
 }
 
 #[test]
 fn serve_reports_requested_port_exactly() {
     let fixtures = TestFixtures::new();
     let port = reserve_ephemeral_port();
-    let mut serve = spawn_serve(
-        fixtures.temp_dir.path(),
-        &["serve", "--host", "127.0.0.1", "--port", &port.to_string()],
-    );
+    let mut serve = spawn_serve(fixtures.temp_dir.path(), &["serve", "--host", "127.0.0.1", "--port", &port.to_string()]);
 
     assert_eq!(serve.port, port, "banner must report the requested port");
     let (status, _) = serve.get("/api/tasks/list");
@@ -411,10 +342,7 @@ fn serve_reports_requested_port_exactly() {
 fn serve_short_port_flag_sets_requested_port() {
     let fixtures = TestFixtures::new();
     let port = reserve_ephemeral_port();
-    let mut serve = spawn_serve(
-        fixtures.temp_dir.path(),
-        &["serve", "-p", &port.to_string()],
-    );
+    let mut serve = spawn_serve(fixtures.temp_dir.path(), &["serve", "-p", &port.to_string()]);
 
     assert_eq!(serve.port, port, "-p must set the serve port");
     let (status, _) = serve.get("/api/tasks/list");
@@ -426,10 +354,7 @@ fn serve_short_port_flag_sets_requested_port() {
 #[test]
 fn serve_wildcard_host_accepts_loopback_connections() {
     let fixtures = TestFixtures::new();
-    let mut serve = spawn_serve(
-        fixtures.temp_dir.path(),
-        &["serve", "--host", "0.0.0.0", "--port", "0"],
-    );
+    let mut serve = spawn_serve(fixtures.temp_dir.path(), &["serve", "--host", "0.0.0.0", "--port", "0"]);
 
     assert_eq!(serve.host, "0.0.0.0");
     let (status, _) = serve.get("/api/tasks/list");
@@ -441,10 +366,7 @@ fn serve_wildcard_host_accepts_loopback_connections() {
 #[test]
 fn serve_localhost_host_answers_on_advertised_host() {
     let fixtures = TestFixtures::new();
-    let mut serve = spawn_serve(
-        fixtures.temp_dir.path(),
-        &["serve", "--host", "localhost", "--port", "0"],
-    );
+    let mut serve = spawn_serve(fixtures.temp_dir.path(), &["serve", "--host", "localhost", "--port", "0"]);
 
     assert_eq!(serve.host, "localhost");
     let (status, _) = serve.get("/api/tasks/list");
@@ -456,18 +378,7 @@ fn serve_localhost_host_answers_on_advertised_host() {
 #[test]
 fn serve_verbose_and_json_format_flags_keep_server_ready() {
     let fixtures = TestFixtures::new();
-    let mut serve = spawn_serve(
-        fixtures.temp_dir.path(),
-        &[
-            "--format=json",
-            "serve",
-            "--host",
-            "127.0.0.1",
-            "--port",
-            "0",
-            "--verbose",
-        ],
-    );
+    let mut serve = spawn_serve(fixtures.temp_dir.path(), &["--format=json", "serve", "--host", "127.0.0.1", "--port", "0", "--verbose"]);
 
     let (status, _) = serve.get("/api/tasks/list");
     assert_eq!(status, 200);
@@ -481,27 +392,13 @@ fn serve_creates_missing_tasks_dir_and_serves_empty_list() {
     let missing_dir = fixtures.temp_dir.path().join("created-by-serve");
     assert!(!missing_dir.exists());
 
-    let mut serve = spawn_serve(
-        fixtures.temp_dir.path(),
-        &[
-            "--tasks-dir",
-            &missing_dir.to_string_lossy(),
-            "serve",
-            "--host",
-            "127.0.0.1",
-            "--port",
-            "0",
-        ],
-    );
+    let mut serve = spawn_serve(fixtures.temp_dir.path(), &["--tasks-dir", &missing_dir.to_string_lossy(), "serve", "--host", "127.0.0.1", "--port", "0"]);
 
     let (status, body) = serve.get("/api/tasks/list");
     assert_eq!(status, 200, "body: {}", String::from_utf8_lossy(&body));
 
     assert!(serve.stop().success());
-    assert!(
-        missing_dir.is_dir(),
-        "serve must materialize the requested tasks directory"
-    );
+    assert!(missing_dir.is_dir(), "serve must materialize the requested tasks directory");
 }
 
 #[test]
@@ -518,9 +415,7 @@ fn serve_invalid_port_value_fails_with_argument_error() {
 
     assert!(!output.status.success());
     assert!(
-        String::from_utf8_lossy(&output.stderr)
-            .to_lowercase()
-            .contains("error"),
+        String::from_utf8_lossy(&output.stderr).to_lowercase().contains("error"),
         "stderr should report the argument error: {}",
         String::from_utf8_lossy(&output.stderr)
     );
@@ -537,27 +432,15 @@ fn serve_held_port_fails_before_readiness_banner() {
         .env_remove("LOTAR_TASKS_DIR")
         .env("LOTAR_IGNORE_HOME_CONFIG", "1")
         .env("LOTAR_TEST_SILENT", "1")
-        .args([
-            "serve",
-            "--host",
-            "127.0.0.1",
-            "--port",
-            &held_port.to_string(),
-        ])
+        .args(["serve", "--host", "127.0.0.1", "--port", &held_port.to_string()])
         .output()
         .expect("run serve against a held port");
 
     assert!(!output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(
-        !stdout.contains("URL: http"),
-        "no readiness banner may precede a failed bind: {stdout}"
-    );
+    assert!(!stdout.contains("URL: http"), "no readiness banner may precede a failed bind: {stdout}");
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        stderr.contains("Failed to bind"),
-        "bind failure must be reported on stderr: {stderr}"
-    );
+    assert!(stderr.contains("Failed to bind"), "bind failure must be reported on stderr: {stderr}");
 }
 
 #[test]
@@ -576,10 +459,7 @@ fn serve_help_documents_bind_options() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("--port"), "help must document --port");
     assert!(stdout.contains("--host"), "help must document --host");
-    assert!(
-        stdout.contains("8080"),
-        "help must document the default port"
-    );
+    assert!(stdout.contains("8080"), "help must document the default port");
 }
 
 #[test]
@@ -588,23 +468,8 @@ fn serve_with_project_data_lists_exact_tasks() {
     let temp_dir = fixtures.temp_dir.path();
 
     for args in [
-        vec![
-            "task",
-            "add",
-            "Web UI Test Task",
-            "--project=test-project",
-            "--type=feature",
-            "--priority=high",
-            "--assignee=test@example.com",
-        ],
-        vec![
-            "task",
-            "add",
-            "API Test Task",
-            "--project=test-project",
-            "--type=bug",
-            "--priority=high",
-        ],
+        vec!["task", "add", "Web UI Test Task", "--project=test-project", "--type=feature", "--priority=high", "--assignee=test@example.com"],
+        vec!["task", "add", "API Test Task", "--project=test-project", "--type=bug", "--priority=high"],
     ] {
         let out = Command::new(env!("CARGO_BIN_EXE_lotar"))
             .current_dir(temp_dir)
@@ -614,11 +479,7 @@ fn serve_with_project_data_lists_exact_tasks() {
             .args(&args)
             .output()
             .expect("seed task");
-        assert!(
-            out.status.success(),
-            "seed failed: {}",
-            String::from_utf8_lossy(&out.stderr)
-        );
+        assert!(out.status.success(), "seed failed: {}", String::from_utf8_lossy(&out.stderr));
     }
     let out = Command::new(env!("CARGO_BIN_EXE_lotar"))
         .current_dir(temp_dir)
@@ -628,39 +489,23 @@ fn serve_with_project_data_lists_exact_tasks() {
         .args(["status", "2", "in_progress", "--project=test-project"])
         .output()
         .expect("set status");
-    assert!(
-        out.status.success(),
-        "status update failed: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
+    assert!(out.status.success(), "status update failed: {}", String::from_utf8_lossy(&out.stderr));
 
     let mut serve = spawn_serve(temp_dir, &["serve", "--host", "127.0.0.1", "--port", "0"]);
     let (status, body) = serve.get("/api/tasks/list");
     assert_eq!(status, 200, "body: {}", String::from_utf8_lossy(&body));
     let payload: serde_json::Value = serde_json::from_slice(&body).expect("task list JSON payload");
 
-    assert_eq!(
-        sorted_titles(&payload),
-        vec!["API Test Task", "Web UI Test Task"],
-        "served task list must match the seeded data exactly"
-    );
+    assert_eq!(sorted_titles(&payload), vec!["API Test Task", "Web UI Test Task"], "served task list must match the seeded data exactly");
     let statuses: Vec<(String, String)> = payload["data"]["tasks"]
         .as_array()
         .expect("data.tasks array")
         .iter()
-        .map(|task| {
-            (
-                task["title"].as_str().unwrap_or_default().to_string(),
-                task["status"].as_str().unwrap_or_default().to_string(),
-            )
-        })
+        .map(|task| (task["title"].as_str().unwrap_or_default().to_string(), task["status"].as_str().unwrap_or_default().to_string()))
         .collect();
     assert_eq!(
         statuses,
-        vec![
-            ("API Test Task".to_string(), "InProgress".to_string()),
-            ("Web UI Test Task".to_string(), "Todo".to_string()),
-        ],
+        vec![("API Test Task".to_string(), "InProgress".to_string()), ("Web UI Test Task".to_string(), "Todo".to_string()),],
         "served statuses must match the seeded transitions exactly"
     );
 
@@ -679,37 +524,14 @@ fn serve_honors_explicit_tasks_dir_for_api_requests() {
     )
     .unwrap();
 
-    let mut serve = spawn_serve(
-        temp_dir,
-        &[
-            "--tasks-dir",
-            &custom_tasks_dir.to_string_lossy(),
-            "serve",
-            "--host",
-            "127.0.0.1",
-            "--port",
-            "0",
-        ],
-    );
+    let mut serve = spawn_serve(temp_dir, &["--tasks-dir", &custom_tasks_dir.to_string_lossy(), "serve", "--host", "127.0.0.1", "--port", "0"]);
 
-    let (status, body) =
-        serve.post_json("/api/tasks/add?project=SAN", r#"{"title":"Sandbox task"}"#);
+    let (status, body) = serve.post_json("/api/tasks/add?project=SAN", r#"{"title":"Sandbox task"}"#);
     let exit = serve.stop();
 
-    assert_eq!(
-        status,
-        201,
-        "unexpected response: {}",
-        String::from_utf8_lossy(&body)
-    );
-    assert!(
-        custom_tasks_dir.join("SAN").join("1.yml").exists(),
-        "task should be created in explicit tasks dir"
-    );
-    assert!(
-        !temp_dir.join(".tasks").join("SAN").join("1.yml").exists(),
-        "task should not be created under cwd/.tasks when --tasks-dir is set"
-    );
+    assert_eq!(status, 201, "unexpected response: {}", String::from_utf8_lossy(&body));
+    assert!(custom_tasks_dir.join("SAN").join("1.yml").exists(), "task should be created in explicit tasks dir");
+    assert!(!temp_dir.join(".tasks").join("SAN").join("1.yml").exists(), "task should not be created under cwd/.tasks when --tasks-dir is set");
     assert!(exit.success());
 }
 
@@ -726,19 +548,10 @@ fn serve_implicit_default_port_falls_back_when_busy_and_serves_workspace() {
         .env_remove("LOTAR_SERVER_PORT")
         .env("LOTAR_IGNORE_HOME_CONFIG", "1")
         .env("LOTAR_TEST_SILENT", "1")
-        .args([
-            "task",
-            "add",
-            "Fallback Serves This Workspace",
-            "--project=fall",
-        ])
+        .args(["task", "add", "Fallback Serves This Workspace", "--project=fall"])
         .output()
         .expect("seed task");
-    assert!(
-        out.status.success(),
-        "seed failed: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
+    assert!(out.status.success(), "seed failed: {}", String::from_utf8_lossy(&out.stderr));
 
     // This case owns the default port when available. nextest runs every
     // test as its own process, so the two 8080-touching tests in this
@@ -756,10 +569,7 @@ fn serve_implicit_default_port_falls_back_when_busy_and_serves_workspace() {
     if owned {
         // Deterministic contract: the untouched built-in default moves once
         // to an OS-assigned port and says so.
-        assert_ne!(
-            serve.port, 8080,
-            "implicit default must fall back when 8080 is held"
-        );
+        assert_ne!(serve.port, 8080, "implicit default must fall back when 8080 is held");
         assert!(
             stderr.contains("8080") && stderr.contains(&serve.port.to_string()),
             "fallback warning must name preferred 8080 and actual {}: {stderr}",
@@ -771,10 +581,7 @@ fn serve_implicit_default_port_falls_back_when_busy_and_serves_workspace() {
         // the default itself (holder released; no move) or we moved away
         // with a warning naming both ports.
         if serve.port == 8080 {
-            assert!(
-                !stderr.contains("serving on port"),
-                "no fallback warning when the default was free: {stderr}"
-            );
+            assert!(!stderr.contains("serving on port"), "no fallback warning when the default was free: {stderr}");
         } else {
             assert!(
                 stderr.contains("8080") && stderr.contains(&serve.port.to_string()),
@@ -787,26 +594,13 @@ fn serve_implicit_default_port_falls_back_when_busy_and_serves_workspace() {
     // Banner integrity: the Port and URL lines agree, stay plain (piped
     // stdout must never carry ANSI), and the URL line keeps its exact
     // machine-parseable shape.
-    assert!(
-        stdout.contains(&format!("   Port: {}", serve.port)),
-        "Port line must report the actual port plainly: {stdout}"
-    );
-    assert!(
-        stdout.contains(&format!("   URL: http://127.0.0.1:{}", serve.port)),
-        "URL line must stay plain and match the actual port: {stdout}"
-    );
-    assert!(
-        !stdout.contains('\u{1b}'),
-        "piped stdout must not contain ANSI escapes: {stdout}"
-    );
+    assert!(stdout.contains(&format!("   Port: {}", serve.port)), "Port line must report the actual port plainly: {stdout}");
+    assert!(stdout.contains(&format!("   URL: http://127.0.0.1:{}", serve.port)), "URL line must stay plain and match the actual port: {stdout}");
+    assert!(!stdout.contains('\u{1b}'), "piped stdout must not contain ANSI escapes: {stdout}");
 
     assert_eq!(status, 200, "body: {}", String::from_utf8_lossy(&body));
     let payload: serde_json::Value = serde_json::from_slice(&body).expect("task list JSON payload");
-    assert_eq!(
-        sorted_titles(&payload),
-        vec!["Fallback Serves This Workspace"],
-        "server on the fallback port must serve this workspace's tasks: {payload}"
-    );
+    assert_eq!(sorted_titles(&payload), vec!["Fallback Serves This Workspace"], "server on the fallback port must serve this workspace's tasks: {payload}");
 
     assert!(exit.success());
     drop(holder);
@@ -832,48 +626,24 @@ fn serve_explicit_default_port_is_strict_when_held() {
             .output()
             .expect("run serve with explicit 8080 against a held port");
 
-        assert!(
-            !output.status.success(),
-            "explicit --port 8080 must not fall back"
-        );
+        assert!(!output.status.success(), "explicit --port 8080 must not fall back");
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
-        assert!(
-            !stdout.contains("URL: http"),
-            "no readiness banner may precede a failed bind: {stdout}"
-        );
-        assert!(
-            stderr.contains("Failed to bind"),
-            "bind failure must be reported: {stderr}"
-        );
-        assert!(
-            !stderr.contains("serving on port"),
-            "no fallback notice for an explicit port: {stderr}"
-        );
+        assert!(!stdout.contains("URL: http"), "no readiness banner may precede a failed bind: {stdout}");
+        assert!(stderr.contains("Failed to bind"), "bind failure must be reported: {stderr}");
+        assert!(!stderr.contains("serving on port"), "no fallback notice for an explicit port: {stderr}");
     } else {
         // Foreign holder: keep the assertion honest — the explicit port must
         // either fail strictly or bind 8080 itself (holder released). It
         // must never silently move to another port.
-        match try_spawn_serve(
-            fixtures.temp_dir.path(),
-            &["serve", "--host", "127.0.0.1", "--port", "8080"],
-        ) {
+        match try_spawn_serve(fixtures.temp_dir.path(), &["serve", "--host", "127.0.0.1", "--port", "8080"]) {
             ServeStart::Ready(mut serve) => {
-                assert_eq!(
-                    serve.port, 8080,
-                    "explicit 8080 must bind exactly 8080, never move"
-                );
-                assert!(
-                    !serve.stderr_snapshot().contains("serving on port"),
-                    "no fallback notice for an explicit port"
-                );
+                assert_eq!(serve.port, 8080, "explicit 8080 must bind exactly 8080, never move");
+                assert!(!serve.stderr_snapshot().contains("serving on port"), "no fallback notice for an explicit port");
                 assert!(serve.stop().success());
             }
             ServeStart::Failed { stderr, stdout, .. } => {
-                assert!(
-                    stderr.contains("Failed to bind"),
-                    "strict failure must report the bind error: {stderr}"
-                );
+                assert!(stderr.contains("Failed to bind"), "strict failure must report the bind error: {stderr}");
                 assert!(
                     !stdout.contains("URL: http") && !stderr.contains("serving on port"),
                     "no banner, no fallback notice for an explicit port: {stdout} / {stderr}"

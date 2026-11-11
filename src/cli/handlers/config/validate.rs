@@ -16,8 +16,9 @@ impl ConfigHandler {
         let global_config_path = crate::utils::paths::global_config_path(&resolver.path);
         let global_config = if global_config_path.exists() {
             match std::fs::read_to_string(&global_config_path) {
-                Ok(content) => crate::config::normalization::parse_global_from_yaml_str(&content)
-                    .map_err(|e| format!("Failed to parse global config: {}", e))?,
+                Ok(content) => {
+                    crate::config::normalization::parse_global_from_yaml_str(&content).map_err(|e| format!("Failed to parse global config: {}", e))?
+                }
                 Err(e) => {
                     return Err(format!("Failed to read global config file: {}", e));
                 }
@@ -30,16 +31,14 @@ impl ConfigHandler {
         let mut all_results = Vec::new();
         let mut has_errors = false;
 
-        let resolved_base =
-            match crate::config::resolution::load_and_merge_configs(Some(&resolver.path)) {
-                Ok(cfg) => Some(cfg),
-                Err(e) => {
-                    renderer
-                        .emit_error(format_args!("Failed to load resolved configuration: {}", e));
-                    has_errors = true;
-                    None
-                }
-            };
+        let resolved_base = match crate::config::resolution::load_and_merge_configs(Some(&resolver.path)) {
+            Ok(cfg) => Some(cfg),
+            Err(e) => {
+                renderer.emit_error(format_args!("Failed to load resolved configuration: {}", e));
+                has_errors = true;
+                None
+            }
+        };
 
         if global || project.is_none() {
             renderer.emit_info("Validating global configuration");
@@ -58,91 +57,58 @@ impl ConfigHandler {
         }
 
         if let Some(project_name) = project {
-            let project_display_name = crate::utils::project::project_display_name_from_config(
-                &resolver.path,
-                &project_name,
-            );
-            let project_label = crate::utils::project::format_project_label(
-                &project_name,
-                project_display_name.as_deref(),
-            );
-            renderer.emit_info(format_args!(
-                "Validating project configuration for '{}'",
-                project_label
-            ));
+            let project_display_name = crate::utils::project::project_display_name_from_config(&resolver.path, &project_name);
+            let project_label = crate::utils::project::format_project_label(&project_name, project_display_name.as_deref());
+            renderer.emit_info(format_args!("Validating project configuration for '{}'", project_label));
 
-            let project_config_path =
-                crate::utils::paths::project_config_path(&resolver.path, &project_name);
+            let project_config_path = crate::utils::paths::project_config_path(&resolver.path, &project_name);
 
             if project_config_path.exists() {
                 match std::fs::read_to_string(&project_config_path) {
-                    Ok(config_content) => {
-                        match crate::config::normalization::parse_project_from_yaml_str(
-                            &project_name,
-                            &config_content,
-                        ) {
-                            Ok(project_config) => {
-                                let result = validator.validate_project_config(&project_config);
-                                let prefix = &project_name;
-                                let conflict_result =
-                                    validator.check_prefix_conflicts_for_existing(prefix);
+                    Ok(config_content) => match crate::config::normalization::parse_project_from_yaml_str(&project_name, &config_content) {
+                        Ok(project_config) => {
+                            let result = validator.validate_project_config(&project_config);
+                            let prefix = &project_name;
+                            let conflict_result = validator.check_prefix_conflicts_for_existing(prefix);
 
-                                let mut combined_result = result;
-                                combined_result.merge(conflict_result);
+                            let mut combined_result = result;
+                            combined_result.merge(conflict_result);
 
-                                if let Some(base_resolved) = resolved_base.as_ref() {
-                                    match crate::config::resolution::get_project_config(
-                                        base_resolved,
-                                        &project_name,
-                                        &resolver.path,
-                                    ) {
-                                        Ok(project_resolved) => {
-                                            combined_result.merge(
-                                                validator
-                                                    .validate_resolved_config(&project_resolved),
-                                            );
-                                        }
-                                        Err(e) => {
-                                            renderer.emit_error(format_args!(
-                                                "Failed to resolve project configuration '{}': {}",
-                                                project_label, e
-                                            ));
-                                            has_errors = true;
-                                        }
+                            if let Some(base_resolved) = resolved_base.as_ref() {
+                                match crate::config::resolution::get_project_config(base_resolved, &project_name, &resolver.path) {
+                                    Ok(project_resolved) => {
+                                        combined_result.merge(validator.validate_resolved_config(&project_resolved));
+                                    }
+                                    Err(e) => {
+                                        renderer.emit_error(format_args!("Failed to resolve project configuration '{}': {}", project_label, e));
+                                        has_errors = true;
                                     }
                                 }
-
-                                if combined_result.has_errors() || combined_result.has_warnings() {
-                                    has_errors |= combined_result.has_errors();
-                                    all_results.push((
-                                        ValidationScope::Project(project_name.clone()),
-                                        format!("Project Config ({})", project_label),
-                                        combined_result,
-                                    ));
-                                } else {
-                                    renderer.emit_success("Project configuration is valid");
-                                }
                             }
-                            Err(e) => {
-                                renderer.emit_error(format_args!(
-                                    "Could not parse project config YAML: {}",
-                                    e
+
+                            if combined_result.has_errors() || combined_result.has_warnings() {
+                                has_errors |= combined_result.has_errors();
+                                all_results.push((
+                                    ValidationScope::Project(project_name.clone()),
+                                    format!("Project Config ({})", project_label),
+                                    combined_result,
                                 ));
-                                has_errors = true;
+                            } else {
+                                renderer.emit_success("Project configuration is valid");
                             }
                         }
-                    }
+                        Err(e) => {
+                            renderer.emit_error(format_args!("Could not parse project config YAML: {}", e));
+                            has_errors = true;
+                        }
+                    },
                     Err(e) => {
-                        renderer
-                            .emit_error(format_args!("Could not read project config file: {}", e));
+                        renderer.emit_error(format_args!("Could not read project config file: {}", e));
                         has_errors = true;
                     }
                 }
             } else {
-                renderer.emit_error(format_args!(
-                    "Project config file not found: {}",
-                    project_config_path.display()
-                ));
+                renderer.emit_error(format_args!("Project config file not found: {}", project_config_path.display()));
                 has_errors = true;
             }
         }
@@ -175,8 +141,7 @@ impl ConfigHandler {
 
             if fix {
                 renderer.emit_warning("Auto-fix functionality not yet implemented");
-                renderer
-                    .emit_info("Please review the suggestions above and make manual corrections");
+                renderer.emit_info("Please review the suggestions above and make manual corrections");
             }
 
             return Err("Configuration validation failed".to_string());
@@ -218,15 +183,13 @@ fn cli_hint_for_field(scope: &ValidationScope, error: &ValidationError) -> Optio
             "Fix the colours with `lotar config set tag_properties 'ui=#0ea5e9, backend=teal'{flag}` or clear them via `lotar config set tag_properties ''{flag}`",
             flag = scope_flag,
         )),
-        "branch_status_aliases" | "branch_type_aliases" | "branch_priority_aliases" => {
-            Some(format!(
-                "Update {} with `lotar config set {} '<alias:Target,...>'{flag}` or clear it via `lotar config set {} ''{flag}`",
-                field,
-                field,
-                field,
-                flag = scope_flag,
-            ))
-        }
+        "branch_status_aliases" | "branch_type_aliases" | "branch_priority_aliases" => Some(format!(
+            "Update {} with `lotar config set {} '<alias:Target,...>'{flag}` or clear it via `lotar config set {} ''{flag}`",
+            field,
+            field,
+            field,
+            flag = scope_flag,
+        )),
         "default_priority" => Some(format!(
             "Align priorities via `lotar config set issue_priorities '<comma-separated list>'{flag}` or pick a new default with `lotar config set default_priority <value>{flag}`",
             flag = scope_flag,

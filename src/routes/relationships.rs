@@ -1,16 +1,10 @@
 use super::*;
-use crate::api_types::{
-    RelationshipGraphRequest, RelationshipMutationRequest, RelationshipRepairRequest,
-};
+use crate::api_types::{RelationshipGraphRequest, RelationshipMutationRequest, RelationshipRepairRequest};
 use crate::services::relationships;
 use crate::storage::manager::Storage;
 
 fn storage() -> Result<Storage, HttpResponse> {
-    TasksDirectoryResolver::resolve_read_only(None, None)
-        .map(|resolver| Storage {
-            root_path: resolver.path,
-        })
-        .map_err(internal_error)
+    TasksDirectoryResolver::resolve_read_only(None, None).map(|resolver| Storage { root_path: resolver.path }).map_err(internal_error)
 }
 
 fn query_text(req: &HttpRequest, key: &str) -> Result<Option<String>, HttpResponse> {
@@ -18,23 +12,13 @@ fn query_text(req: &HttpRequest, key: &str) -> Result<Option<String>, HttpRespon
         .get(key)
         .map(|value| {
             let value = value.trim();
-            if value.is_empty() {
-                Err(bad_request(format!("{key} must not be blank")))
-            } else {
-                Ok(value.to_string())
-            }
+            if value.is_empty() { Err(bad_request(format!("{key} must not be blank"))) } else { Ok(value.to_string()) }
         })
         .transpose()
 }
 
 fn query_number(req: &HttpRequest, key: &str) -> Result<Option<usize>, HttpResponse> {
-    query_text(req, key)?
-        .map(|value| {
-            value
-                .parse::<usize>()
-                .map_err(|_| bad_request(format!("{key} must be a non-negative integer")))
-        })
-        .transpose()
+    query_text(req, key)?.map(|value| value.parse::<usize>().map_err(|_| bad_request(format!("{key} must be a non-negative integer")))).transpose()
 }
 
 pub(super) fn register(api_server: &mut ApiServer) {
@@ -55,9 +39,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                         raw.split(',')
                             .map(|kind| {
                                 serde_json::from_value(serde_json::Value::String(kind.to_string()))
-                                    .map_err(|_| {
-                                        bad_request(format!("Invalid relationship kind: {kind}"))
-                                    })
+                                    .map_err(|_| bad_request(format!("Invalid relationship kind: {kind}")))
                             })
                             .collect::<Result<Vec<_>, _>>()
                     })
@@ -74,10 +56,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                 filters: req
                     .query
                     .get("filters")
-                    .map(|raw| {
-                        serde_json::from_str(raw)
-                            .map_err(|error| bad_request(format!("Invalid graph filters: {error}")))
-                    })
+                    .map(|raw| serde_json::from_str(raw).map_err(|error| bad_request(format!("Invalid graph filters: {error}"))))
                     .transpose()?
                     .unwrap_or_default(),
             })

@@ -9,51 +9,29 @@ pub struct Page {
 /// Strict variant used by the task query endpoints (DEV-57): a present
 /// `limit` outside `1..=max_limit` is an error instead of being clamped, so
 /// clients learn their page size was not honored.
-pub fn parse_page_strict(
-    query: &HashMap<String, String>,
-    default_limit: usize,
-    max_limit: usize,
-) -> Result<Page, String> {
+pub fn parse_page_strict(query: &HashMap<String, String>, default_limit: usize, max_limit: usize) -> Result<Page, String> {
     let page = parse_page(query, default_limit, max_limit)?;
-    let requested = query
-        .get("limit")
-        .or_else(|| query.get("page_size"))
-        .or_else(|| query.get("per_page"));
+    let requested = query.get("limit").or_else(|| query.get("page_size")).or_else(|| query.get("per_page"));
     if let Some(raw) = requested
         && let Ok(value) = raw.trim().parse::<usize>()
         && !(1..=max_limit).contains(&value)
     {
-        return Err(format!(
-            "Invalid limit: {raw} (must be between 1 and {max_limit})"
-        ));
+        return Err(format!("Invalid limit: {raw} (must be between 1 and {max_limit})"));
     }
     Ok(page)
 }
 
-pub fn parse_page(
-    query: &HashMap<String, String>,
-    default_limit: usize,
-    max_limit: usize,
-) -> Result<Page, String> {
-    let limit_raw = query
-        .get("limit")
-        .or_else(|| query.get("page_size"))
-        .or_else(|| query.get("per_page"));
+pub fn parse_page(query: &HashMap<String, String>, default_limit: usize, max_limit: usize) -> Result<Page, String> {
+    let limit_raw = query.get("limit").or_else(|| query.get("page_size")).or_else(|| query.get("per_page"));
     let offset_raw = query.get("offset");
 
     let limit = match limit_raw {
-        Some(v) if !v.trim().is_empty() => v
-            .trim()
-            .parse::<usize>()
-            .map_err(|_| format!("Invalid limit: {v}"))?,
+        Some(v) if !v.trim().is_empty() => v.trim().parse::<usize>().map_err(|_| format!("Invalid limit: {v}"))?,
         _ => default_limit,
     };
 
     let offset = match offset_raw {
-        Some(v) if !v.trim().is_empty() => v
-            .trim()
-            .parse::<usize>()
-            .map_err(|_| format!("Invalid offset: {v}"))?,
+        Some(v) if !v.trim().is_empty() => v.trim().parse::<usize>().map_err(|_| format!("Invalid offset: {v}"))?,
         _ => 0,
     };
 

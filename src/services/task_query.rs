@@ -104,9 +104,7 @@ pub enum HasFlag {
 }
 
 /// Extensions treated as images by the `has:image` filter and the web UI.
-pub const IMAGE_EXTENSIONS: &[&str] = &[
-    "png", "jpg", "jpeg", "gif", "webp", "svg", "avif", "bmp", "ico", "heic", "heif", "tif", "tiff",
-];
+pub const IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "svg", "avif", "bmp", "ico", "heic", "heif", "tif", "tiff"];
 
 /// Advertised `soon` window in days (docs/help + openapi vocabulary).
 pub const SOON_WINDOW_DAYS: i64 = 7;
@@ -143,10 +141,7 @@ pub struct SortRanks {
 fn compare_ranked(order: &[String], a: &str, b: &str) -> Ordering {
     let rank = |value: &str| {
         let key = crate::types::canonical_key(value);
-        order
-            .iter()
-            .position(|known| crate::types::canonical_key(known) == key)
-            .unwrap_or(order.len())
+        order.iter().position(|known| crate::types::canonical_key(known) == key).unwrap_or(order.len())
     };
     rank(a).cmp(&rank(b)).then_with(|| a.cmp(b))
 }
@@ -203,9 +198,7 @@ pub fn parse_sort_by(raw: &str) -> Result<SortSpec, String> {
         if let Some(rest) = lower.strip_prefix(prefix) {
             let name = rest.trim();
             if name.is_empty() {
-                return Err(format!(
-                    "sort_by prefix '{prefix}' requires a field name (sort_by='{raw}')"
-                ));
+                return Err(format!("sort_by prefix '{prefix}' requires a field name (sort_by='{raw}')"));
             }
             // Keep the original spelling for case-insensitive field lookup.
             let original = &trimmed[trimmed.len() - name.len()..];
@@ -234,17 +227,14 @@ pub fn parse_due(raw: &str) -> Result<DueFilter, String> {
         "soon" => Ok(DueFilter::Soon),
         "later" => Ok(DueFilter::Later),
         "overdue" => Ok(DueFilter::Overdue),
-        other => Err(format!(
-            "Invalid due: '{other}' (expected today, soon, later, or overdue)"
-        )),
+        other => Err(format!("Invalid due: '{other}' (expected today, soon, later, or overdue)")),
     }
 }
 
 /// `recent`: a positive number of days or weeks, `14d` or `2w`.
 pub fn parse_recent(raw: &str) -> Result<RecentFilter, String> {
     let value = raw.trim().to_ascii_lowercase();
-    let invalid =
-        || format!("Invalid recent: '{value}' (expected days or weeks, e.g. 7d, 30d, 2w)");
+    let invalid = || format!("Invalid recent: '{value}' (expected days or weeks, e.g. 7d, 30d, 2w)");
     let (number, unit_days) = if let Some(n) = value.strip_suffix('d') {
         (n, 1)
     } else if let Some(n) = value.strip_suffix('w') {
@@ -253,29 +243,18 @@ pub fn parse_recent(raw: &str) -> Result<RecentFilter, String> {
         return Err(invalid());
     };
     match number.parse::<u32>() {
-        Ok(n) if n > 0 => n
-            .checked_mul(unit_days)
-            .map(|days| RecentFilter { days })
-            .ok_or_else(invalid),
+        Ok(n) if n > 0 => n.checked_mul(unit_days).map(|days| RecentFilter { days }).ok_or_else(invalid),
         _ => Err(invalid()),
     }
 }
 
 /// `due_within`: a whole number of days (0 means due today).
 pub fn parse_due_within(raw: &str) -> Result<u32, String> {
-    raw.trim().parse::<u32>().map_err(|_| {
-        format!(
-            "Invalid due_within: '{}' (expected a number of days)",
-            raw.trim()
-        )
-    })
+    raw.trim().parse::<u32>().map_err(|_| format!("Invalid due_within: '{}' (expected a number of days)", raw.trim()))
 }
 
 /// `effort_min` / `effort_max`: an effort such as `2h`, `1d 4h` or `5pt`.
-pub fn parse_effort_bound(
-    name: &str,
-    raw: &str,
-) -> Result<crate::utils::effort::EffortParsed, String> {
+pub fn parse_effort_bound(name: &str, raw: &str) -> Result<crate::utils::effort::EffortParsed, String> {
     crate::utils::effort::parse_effort(raw).map_err(|e| format!("Invalid {name}: {e}"))
 }
 
@@ -284,10 +263,7 @@ pub fn parse_effort_bound(
 pub fn parse_needs(raw: &str) -> Result<BTreeSet<NeedsFlag>, String> {
     let mut out = BTreeSet::new();
     if raw.trim().is_empty() {
-        return Err(
-            "Invalid needs: must not be blank (omit the parameter or supply effort, due)"
-                .to_string(),
-        );
+        return Err("Invalid needs: must not be blank (omit the parameter or supply effort, due)".to_string());
     }
     for token in raw.split(',') {
         let token = token.trim();
@@ -302,9 +278,7 @@ pub fn parse_needs(raw: &str) -> Result<BTreeSet<NeedsFlag>, String> {
                 return Err("Invalid needs: empty entry (expected CSV of effort, due)".to_string());
             }
             other => {
-                return Err(format!(
-                    "Invalid needs entry: '{other}' (expected effort or due)"
-                ));
+                return Err(format!("Invalid needs entry: '{other}' (expected effort or due)"));
             }
         }
     }
@@ -314,10 +288,7 @@ pub fn parse_needs(raw: &str) -> Result<BTreeSet<NeedsFlag>, String> {
 /// Strict `has` CSV parser: attachment, image or link.
 pub fn parse_has(raw: &str) -> Result<BTreeSet<HasFlag>, String> {
     if raw.trim().is_empty() {
-        return Err(
-            "Invalid has: must not be blank (omit the parameter or supply attachment, image, link, tag)"
-                .to_string(),
-        );
+        return Err("Invalid has: must not be blank (omit the parameter or supply attachment, image, link, tag)".to_string());
     }
     let mut out = BTreeSet::new();
     for token in raw.split(',') {
@@ -327,15 +298,10 @@ pub fn parse_has(raw: &str) -> Result<BTreeSet<HasFlag>, String> {
             "link" | "links" => HasFlag::Link,
             "tag" | "tags" => HasFlag::Tag,
             "" => {
-                return Err(
-                    "Invalid has: empty entry (expected CSV of attachment, image, link, tag)"
-                        .to_string(),
-                );
+                return Err("Invalid has: empty entry (expected CSV of attachment, image, link, tag)".to_string());
             }
             other => {
-                return Err(format!(
-                    "Invalid has entry: '{other}' (expected attachment, image, link or tag)"
-                ));
+                return Err(format!("Invalid has entry: '{other}' (expected attachment, image, link or tag)"));
             }
         };
         out.insert(flag);
@@ -403,8 +369,7 @@ impl TaskSortFields for TaskDTO {
         self.modified.as_str()
     }
     fn custom_field_value(&self, name: &str) -> Option<String> {
-        crate::utils::custom_fields::extract_value_strings(&self.custom_fields, name)
-            .and_then(|values| values.into_iter().next())
+        crate::utils::custom_fields::extract_value_strings(&self.custom_fields, name).and_then(|values| values.into_iter().next())
     }
 }
 
@@ -467,15 +432,11 @@ pub fn parse_stored_datetime_to_utc(raw: &str) -> Option<DateTime<Utc>> {
 fn earliest_local_instant(date: NaiveDate) -> Option<DateTime<Utc>> {
     for minute in 0..=240u32 {
         let (h, m) = (minute / 60, minute % 60);
-        if let Some(dt) = Local
-            .with_ymd_and_hms(date.year(), date.month(), date.day(), h, m, 0)
-            .single()
-        {
+        if let Some(dt) = Local.with_ymd_and_hms(date.year(), date.month(), date.day(), h, m, 0).single() {
             return Some(dt.with_timezone(&Utc));
         }
     }
-    date.and_hms_opt(0, 0, 0)
-        .map(|naive| DateTime::from_naive_utc_and_offset(naive, Utc))
+    date.and_hms_opt(0, 0, 0).map(|naive| DateTime::from_naive_utc_and_offset(naive, Utc))
 }
 
 /// The local calendar date an instant falls on.
@@ -557,31 +518,20 @@ fn task_matches_needs(task: &TaskDTO, needs: &BTreeSet<NeedsFlag>) -> bool {
 }
 
 fn is_image_name(name: &str) -> bool {
-    name.rsplit_once('.').is_some_and(|(_, ext)| {
-        IMAGE_EXTENSIONS
-            .iter()
-            .any(|known| known.eq_ignore_ascii_case(ext))
-    })
+    name.rsplit_once('.').is_some_and(|(_, ext)| IMAGE_EXTENSIONS.iter().any(|known| known.eq_ignore_ascii_case(ext)))
 }
 
 fn task_matches_has(task: &TaskDTO, has: &BTreeSet<HasFlag>) -> bool {
     has.iter().all(|flag| match flag {
         HasFlag::Tag => !task.tags.is_empty(),
         HasFlag::Attachment => task.references.iter().any(|r| r.attachment.is_some()),
-        HasFlag::Image => task
-            .references
-            .iter()
-            .any(|r| r.attachment.as_deref().is_some_and(is_image_name)),
+        HasFlag::Image => task.references.iter().any(|r| r.attachment.as_deref().is_some_and(is_image_name)),
         HasFlag::Link => task.references.iter().any(|r| r.link.is_some()),
     })
 }
 
 /// Apply the smart filters (`due`, `recent`, `needs`, `has`) in place.
-pub fn apply_smart_filters(
-    tasks: &mut Vec<(String, TaskDTO)>,
-    options: &TaskQueryOptions,
-    now: DateTime<Utc>,
-) {
+pub fn apply_smart_filters(tasks: &mut Vec<(String, TaskDTO)>, options: &TaskQueryOptions, now: DateTime<Utc>) {
     if options.due.is_none()
         && options.due_within_days.is_none()
         && options.recent.is_none()
@@ -595,12 +545,8 @@ pub fn apply_smart_filters(
     let today = today_local(now);
     let cutoff = options.recent.map(|filter| recent_cutoff(now, filter));
     tasks.retain(|(_, task)| {
-        options
-            .due
-            .is_none_or(|filter| task_matches_due(task, filter, today))
-            && options.due_within_days.is_none_or(|days| {
-                due_raw_within_window(task.due_date.as_deref(), today, i64::from(days))
-            })
+        options.due.is_none_or(|filter| task_matches_due(task, filter, today))
+            && options.due_within_days.is_none_or(|days| due_raw_within_window(task.due_date.as_deref(), today, i64::from(days)))
             && cutoff.is_none_or(|cutoff| task_matches_recent(task, cutoff))
             && task_matches_needs(task, &options.needs)
             && task_matches_has(task, &options.has)
@@ -614,35 +560,18 @@ fn task_matches_effort(task: &TaskDTO, options: &TaskQueryOptions) -> bool {
     if options.effort_min.is_none() && options.effort_max.is_none() {
         return true;
     }
-    let Some(effort) = task
-        .effort
-        .as_deref()
-        .and_then(|raw| crate::utils::effort::parse_effort(raw).ok())
-    else {
+    let Some(effort) = task.effort.as_deref().and_then(|raw| crate::utils::effort::parse_effort(raw).ok()) else {
         return false;
     };
-    options
-        .effort_min
-        .as_ref()
-        .is_none_or(|min| effort.total_cmp_ge(min))
-        && options
-            .effort_max
-            .as_ref()
-            .is_none_or(|max| effort.total_cmp_le(max))
+    options.effort_min.as_ref().is_none_or(|min| effort.total_cmp_ge(min)) && options.effort_max.as_ref().is_none_or(|max| effort.total_cmp_le(max))
 }
 
 fn compare_effort(a: Option<&str>, b: Option<&str>) -> Ordering {
     let parse = |raw: Option<&str>| raw.and_then(|s| crate::utils::effort::parse_effort(s).ok());
     match (parse(a), parse(b)) {
         (Some(x), Some(y)) => match (&x.kind, &y.kind) {
-            (
-                crate::utils::effort::EffortKind::TimeHours(av),
-                crate::utils::effort::EffortKind::TimeHours(bv),
-            ) => av.partial_cmp(bv).unwrap_or(Ordering::Equal),
-            (
-                crate::utils::effort::EffortKind::Points(av),
-                crate::utils::effort::EffortKind::Points(bv),
-            ) => av.partial_cmp(bv).unwrap_or(Ordering::Equal),
+            (crate::utils::effort::EffortKind::TimeHours(av), crate::utils::effort::EffortKind::TimeHours(bv)) => av.partial_cmp(bv).unwrap_or(Ordering::Equal),
+            (crate::utils::effort::EffortKind::Points(av), crate::utils::effort::EffortKind::Points(bv)) => av.partial_cmp(bv).unwrap_or(Ordering::Equal),
             _ => x.canonical.cmp(&y.canonical),
         },
         // Missing/unparseable effort sorts after present values (CLI parity).
@@ -673,25 +602,14 @@ fn compare_parsed_instant(a: &str, b: &str) -> Ordering {
 }
 
 fn project_prefix_of(id: &str) -> String {
-    crate::storage::TaskId::parse(id)
-        .map(|parsed| parsed.project)
-        .unwrap_or_default()
+    crate::storage::TaskId::parse(id).map(|parsed| parsed.project).unwrap_or_default()
 }
 
 /// Compare two tasks by the resolved sort spec (ascending semantics).
-fn compare_by_spec<T: TaskSortFields + ?Sized>(
-    id_a: &str,
-    a: &T,
-    id_b: &str,
-    b: &T,
-    spec: &SortSpec,
-    ranks: &SortRanks,
-) -> Ordering {
+fn compare_by_spec<T: TaskSortFields + ?Sized>(id_a: &str, a: &T, id_b: &str, b: &T, spec: &SortSpec, ranks: &SortRanks) -> Ordering {
     match spec {
         SortSpec::Builtin(key) => match key {
-            SortKey::Priority => {
-                compare_ranked(&ranks.priority, &a.priority_str(), &b.priority_str())
-            }
+            SortKey::Priority => compare_ranked(&ranks.priority, &a.priority_str(), &b.priority_str()),
             SortKey::Status => compare_ranked(&ranks.status, &a.status_str(), &b.status_str()),
             SortKey::Effort => compare_effort(a.effort(), b.effort()),
             SortKey::DueDate => compare_optional_due(a.due_date(), b.due_date()),
@@ -719,24 +637,11 @@ pub fn sort_tasks<T: TaskSortFields>(tasks: &mut [(String, T)], spec: &SortSpec,
 }
 
 /// [`sort_tasks`] with the configured priority and status order.
-pub fn sort_tasks_ranked<T: TaskSortFields>(
-    tasks: &mut [(String, T)],
-    spec: &SortSpec,
-    order: SortOrder,
-    ranks: &SortRanks,
-) {
+pub fn sort_tasks_ranked<T: TaskSortFields>(tasks: &mut [(String, T)], spec: &SortSpec, order: SortOrder, ranks: &SortRanks) {
     tasks.sort_by(|(id_a, a), (id_b, b)| {
         let primary = compare_by_spec(id_a, a, id_b, b, spec, ranks);
-        let primary = if order.is_desc() {
-            primary.reverse()
-        } else {
-            primary
-        };
-        if primary == Ordering::Equal {
-            crate::storage::compare_task_ids(id_a, id_b)
-        } else {
-            primary
-        }
+        let primary = if order.is_desc() { primary.reverse() } else { primary };
+        if primary == Ordering::Equal { crate::storage::compare_task_ids(id_a, id_b) } else { primary }
     });
 }
 
@@ -754,11 +659,7 @@ pub fn apply(tasks: &mut Vec<(String, TaskDTO)>, options: &TaskQueryOptions, now
 /// Order by search relevance: descending puts the best match first. Ties,
 /// and every task when there is no search, fall back to the default order
 /// (modified desc, then canonical ID asc).
-pub fn sort_by_relevance<T: TaskSortFields + Searchable>(
-    tasks: &mut [(String, T)],
-    search: Option<&SearchQuery>,
-    order: SortOrder,
-) {
+pub fn sort_by_relevance<T: TaskSortFields + Searchable>(tasks: &mut [(String, T)], search: Option<&SearchQuery>, order: SortOrder) {
     let scores: std::collections::HashMap<String, u32> = match search {
         Some(query) if !query.is_empty() => tasks
             .iter()
@@ -772,14 +673,8 @@ pub fn sort_by_relevance<T: TaskSortFields + Searchable>(
     tasks.sort_by(|(id_a, a), (id_b, b)| {
         let score_a = scores.get(id_a).copied().unwrap_or(0);
         let score_b = scores.get(id_b).copied().unwrap_or(0);
-        let by_score = if order.is_desc() {
-            score_b.cmp(&score_a)
-        } else {
-            score_a.cmp(&score_b)
-        };
-        by_score
-            .then_with(|| compare_parsed_instant(b.modified(), a.modified()))
-            .then_with(|| crate::storage::compare_task_ids(id_a, id_b))
+        let by_score = if order.is_desc() { score_b.cmp(&score_a) } else { score_a.cmp(&score_b) };
+        by_score.then_with(|| compare_parsed_instant(b.modified(), a.modified())).then_with(|| crate::storage::compare_task_ids(id_a, id_b))
     });
 }
 
@@ -789,30 +684,12 @@ mod tests {
 
     #[test]
     fn parse_sort_by_accepts_builtins_and_prefixes() {
-        assert_eq!(
-            parse_sort_by("modified"),
-            Ok(SortSpec::Builtin(SortKey::Modified))
-        );
-        assert_eq!(
-            parse_sort_by(" Due-Date "),
-            Ok(SortSpec::Builtin(SortKey::DueDate))
-        );
-        assert_eq!(
-            parse_sort_by("due"),
-            Ok(SortSpec::Builtin(SortKey::DueDate))
-        );
-        assert_eq!(
-            parse_sort_by("effort"),
-            Ok(SortSpec::Builtin(SortKey::Effort))
-        );
-        assert_eq!(
-            parse_sort_by("custom:MyField"),
-            Ok(SortSpec::Custom("MyField".to_string()))
-        );
-        assert_eq!(
-            parse_sort_by("FIELD:other"),
-            Ok(SortSpec::Custom("other".to_string()))
-        );
+        assert_eq!(parse_sort_by("modified"), Ok(SortSpec::Builtin(SortKey::Modified)));
+        assert_eq!(parse_sort_by(" Due-Date "), Ok(SortSpec::Builtin(SortKey::DueDate)));
+        assert_eq!(parse_sort_by("due"), Ok(SortSpec::Builtin(SortKey::DueDate)));
+        assert_eq!(parse_sort_by("effort"), Ok(SortSpec::Builtin(SortKey::Effort)));
+        assert_eq!(parse_sort_by("custom:MyField"), Ok(SortSpec::Custom("MyField".to_string())));
+        assert_eq!(parse_sort_by("FIELD:other"), Ok(SortSpec::Custom("other".to_string())));
     }
 
     #[test]
@@ -840,25 +717,16 @@ mod tests {
         assert!(parse_needs("effort,size").is_err());
         let has = parse_has("image, link").unwrap();
         assert!(has.contains(&HasFlag::Image) && has.contains(&HasFlag::Link));
-        assert!(
-            parse_has("").is_err() && parse_has("image,").is_err() && parse_has("pdf").is_err()
-        );
+        assert!(parse_has("").is_err() && parse_has("image,").is_err() && parse_has("pdf").is_err());
         assert!(parse_needs("effort,,due").is_err());
-        assert!(
-            parse_needs("").is_err(),
-            "blank needs must be an explicit error"
-        );
+        assert!(parse_needs("").is_err(), "blank needs must be an explicit error");
     }
 
     #[test]
     fn due_buckets_cover_boundaries_without_overlap() {
         let today = NaiveDate::from_ymd_opt(2026, 3, 8).unwrap(); // US DST spring-forward day
         let mk = |y, m, d| NaiveDate::from_ymd_opt(y, m, d).unwrap();
-        assert!(due_bucket_matches(
-            mk(2026, 3, 7),
-            today,
-            DueFilter::Overdue
-        ));
+        assert!(due_bucket_matches(mk(2026, 3, 7), today, DueFilter::Overdue));
         assert!(due_bucket_matches(today, today, DueFilter::Today));
         assert!(due_bucket_matches(mk(2026, 3, 9), today, DueFilter::Soon));
         assert!(due_bucket_matches(mk(2026, 3, 15), today, DueFilter::Soon));
@@ -866,15 +734,8 @@ mod tests {
         // No overlaps: each boundary date matches exactly one bucket.
         for offset in -2..=10 {
             let d = today + Duration::days(offset);
-            let matched: Vec<DueFilter> = [
-                DueFilter::Today,
-                DueFilter::Soon,
-                DueFilter::Later,
-                DueFilter::Overdue,
-            ]
-            .into_iter()
-            .filter(|f| due_bucket_matches(d, today, *f))
-            .collect();
+            let matched: Vec<DueFilter> =
+                [DueFilter::Today, DueFilter::Soon, DueFilter::Later, DueFilter::Overdue].into_iter().filter(|f| due_bucket_matches(d, today, *f)).collect();
             assert_eq!(matched.len(), 1, "date {d} matched {matched:?}");
         }
     }
@@ -896,8 +757,7 @@ mod tests {
         assert_eq!(parse_stored_due("2026-11-01"), Some(StoredDue::Date(date)));
         // The sortable instant resolves even where midnight is ambiguous and
         // maps back onto the same local date.
-        let instant = parse_stored_datetime_to_utc("2026-11-01")
-            .expect("date-only must resolve to a sortable instant");
+        let instant = parse_stored_datetime_to_utc("2026-11-01").expect("date-only must resolve to a sortable instant");
         assert_eq!(local_date_of(instant), date);
     }
 
@@ -906,16 +766,8 @@ mod tests {
         let today = NaiveDate::from_ymd_opt(2026, 6, 10).unwrap();
         let due = |d: i64| Some((today + Duration::days(d)).format("%Y-%m-%d").to_string());
         // Overdue bucket: strictly before today.
-        assert!(due_raw_matches_bucket(
-            due(-1).as_deref(),
-            DueFilter::Overdue,
-            today
-        ));
-        assert!(!due_raw_matches_bucket(
-            due(0).as_deref(),
-            DueFilter::Overdue,
-            today
-        ));
+        assert!(due_raw_matches_bucket(due(-1).as_deref(), DueFilter::Overdue, today));
+        assert!(!due_raw_matches_bucket(due(0).as_deref(), DueFilter::Overdue, today));
         // Window predicate (CLI --due-soon): inclusive today..=today+N.
         assert!(due_raw_within_window(due(0).as_deref(), today, 3));
         assert!(due_raw_within_window(due(3).as_deref(), today, 3));
@@ -959,37 +811,22 @@ mod tests {
     fn sort_tasks_orders_custom_values_with_id_tiebreak() {
         let with_value = |id: &str, value: &str, modified: &str| {
             let mut t = dto(id, modified);
-            t.custom_fields
-                .insert("size".to_string(), crate::types::custom_value_string(value));
+            t.custom_fields.insert("size".to_string(), crate::types::custom_value_string(value));
             t
         };
         let mut tasks = vec![
-            (
-                "B-2".to_string(),
-                with_value("B-2", "large", "2026-01-01T00:00:00Z"),
-            ),
+            ("B-2".to_string(), with_value("B-2", "large", "2026-01-01T00:00:00Z")),
             ("A-10".to_string(), dto("A-10", "2026-01-01T00:00:00Z")),
-            (
-                "A-2".to_string(),
-                with_value("A-2", "small", "2026-01-01T00:00:00Z"),
-            ),
+            ("A-2".to_string(), with_value("A-2", "small", "2026-01-01T00:00:00Z")),
             ("C-1".to_string(), dto("C-1", "2026-01-01T00:00:00Z")),
         ];
-        sort_tasks(
-            &mut tasks,
-            &SortSpec::Custom("size".to_string()),
-            SortOrder::Asc,
-        );
+        sort_tasks(&mut tasks, &SortSpec::Custom("size".to_string()), SortOrder::Asc);
         let ids: Vec<&str> = tasks.iter().map(|(id, _)| id.as_str()).collect();
         // Missing custom values sort first (empty-string semantics, CLI
         // parity); equal values tie on natural ID order asc.
         assert_eq!(ids, vec!["A-10", "C-1", "B-2", "A-2"]);
 
-        sort_tasks(
-            &mut tasks,
-            &SortSpec::Custom("size".to_string()),
-            SortOrder::Desc,
-        );
+        sort_tasks(&mut tasks, &SortSpec::Custom("size".to_string()), SortOrder::Desc);
         let ids: Vec<&str> = tasks.iter().map(|(id, _)| id.as_str()).collect();
         // Desc flips the primary order only; the tiebreak stays ID asc.
         assert_eq!(ids, vec!["A-2", "B-2", "A-10", "C-1"]);
@@ -1002,11 +839,7 @@ mod tests {
             ("B-1".to_string(), dto("B-1", "2026-03-01T00:00:00Z")),
             ("C-1".to_string(), dto("C-1", "2026-02-01T00:00:00Z")),
         ];
-        sort_tasks(
-            &mut tasks,
-            &SortSpec::Builtin(SortKey::Modified),
-            SortOrder::Desc,
-        );
+        sort_tasks(&mut tasks, &SortSpec::Builtin(SortKey::Modified), SortOrder::Desc);
         let ids: Vec<&str> = tasks.iter().map(|(id, _)| id.as_str()).collect();
         assert_eq!(ids, vec!["B-1", "C-1", "A-1"]);
     }
@@ -1020,11 +853,7 @@ mod tests {
             ),
             ("B-1".to_string(), dto("B-1", "2026-06-15T22:00:00Z")),
         ];
-        sort_tasks(
-            &mut tasks,
-            &SortSpec::Builtin(SortKey::Modified),
-            SortOrder::Asc,
-        );
+        sort_tasks(&mut tasks, &SortSpec::Builtin(SortKey::Modified), SortOrder::Asc);
         let ids: Vec<&str> = tasks.iter().map(|(id, _)| id.as_str()).collect();
         assert_eq!(ids, vec!["A-1", "B-1"]);
     }
@@ -1042,54 +871,24 @@ mod tests {
             t
         };
         let mut tasks = vec![
-            (
-                "A-1".to_string(),
-                with_tags("A-1", &["alpha"], "2026-01-01T00:00:00Z"),
-            ),
-            (
-                "B-1".to_string(),
-                with_tags("B-1", &[], "2026-01-01T00:00:00Z"),
-            ),
-            (
-                "C-1".to_string(),
-                with_tags("C-1", &["alpha", "beta"], "2026-01-01T00:00:00Z"),
-            ),
+            ("A-1".to_string(), with_tags("A-1", &["alpha"], "2026-01-01T00:00:00Z")),
+            ("B-1".to_string(), with_tags("B-1", &[], "2026-01-01T00:00:00Z")),
+            ("C-1".to_string(), with_tags("C-1", &["alpha", "beta"], "2026-01-01T00:00:00Z")),
         ];
-        sort_tasks(
-            &mut tasks,
-            &SortSpec::Builtin(SortKey::Tags),
-            SortOrder::Asc,
-        );
+        sort_tasks(&mut tasks, &SortSpec::Builtin(SortKey::Tags), SortOrder::Asc);
         let ids: Vec<&str> = tasks.iter().map(|(id, _)| id.as_str()).collect();
         // Empty vec first; then array-lex ([alpha] < [alpha, beta]).
         assert_eq!(ids, vec!["B-1", "A-1", "C-1"]);
-        sort_tasks(
-            &mut tasks,
-            &SortSpec::Builtin(SortKey::Tags),
-            SortOrder::Desc,
-        );
+        sort_tasks(&mut tasks, &SortSpec::Builtin(SortKey::Tags), SortOrder::Desc);
         let ids: Vec<&str> = tasks.iter().map(|(id, _)| id.as_str()).collect();
         assert_eq!(ids, vec!["C-1", "A-1", "B-1"]);
 
         let mut tasks = vec![
-            (
-                "A-1".to_string(),
-                with_sprints("A-1", &[9], "2026-01-01T00:00:00Z"),
-            ),
-            (
-                "B-1".to_string(),
-                with_sprints("B-1", &[], "2026-01-01T00:00:00Z"),
-            ),
-            (
-                "C-1".to_string(),
-                with_sprints("C-1", &[2, 3], "2026-01-01T00:00:00Z"),
-            ),
+            ("A-1".to_string(), with_sprints("A-1", &[9], "2026-01-01T00:00:00Z")),
+            ("B-1".to_string(), with_sprints("B-1", &[], "2026-01-01T00:00:00Z")),
+            ("C-1".to_string(), with_sprints("C-1", &[2, 3], "2026-01-01T00:00:00Z")),
         ];
-        sort_tasks(
-            &mut tasks,
-            &SortSpec::Builtin(SortKey::Sprints),
-            SortOrder::Asc,
-        );
+        sort_tasks(&mut tasks, &SortSpec::Builtin(SortKey::Sprints), SortOrder::Asc);
         let ids: Vec<&str> = tasks.iter().map(|(id, _)| id.as_str()).collect();
         // Numeric vec-lex: [] < [2,3] < [9].
         assert_eq!(ids, vec!["B-1", "C-1", "A-1"]);
@@ -1104,58 +903,29 @@ mod tests {
             t
         };
         let mut tasks = vec![
-            (
-                "A-1".to_string(),
-                with("A-1", "Beta", Some("zoe"), "2026-01-01T00:00:00Z"),
-            ),
-            (
-                "B-1".to_string(),
-                with("B-1", "alpha", None, "2026-01-01T00:00:00Z"),
-            ),
+            ("A-1".to_string(), with("A-1", "Beta", Some("zoe"), "2026-01-01T00:00:00Z")),
+            ("B-1".to_string(), with("B-1", "alpha", None, "2026-01-01T00:00:00Z")),
         ];
-        sort_tasks(
-            &mut tasks,
-            &SortSpec::Builtin(SortKey::Title),
-            SortOrder::Asc,
-        );
+        sort_tasks(&mut tasks, &SortSpec::Builtin(SortKey::Title), SortOrder::Asc);
         let ids: Vec<&str> = tasks.iter().map(|(id, _)| id.as_str()).collect();
         // Case-sensitive lexical: "Beta" < "alpha" (B < a in ASCII).
         assert_eq!(ids, vec!["A-1", "B-1"]);
 
-        sort_tasks(
-            &mut tasks,
-            &SortSpec::Builtin(SortKey::Reporter),
-            SortOrder::Asc,
-        );
+        sort_tasks(&mut tasks, &SortSpec::Builtin(SortKey::Reporter), SortOrder::Asc);
         let ids: Vec<&str> = tasks.iter().map(|(id, _)| id.as_str()).collect();
-        assert_eq!(
-            ids,
-            vec!["B-1", "A-1"],
-            "None reporter sorts first asc, like assignee"
-        );
+        assert_eq!(ids, vec!["B-1", "A-1"], "None reporter sorts first asc, like assignee");
     }
 
     #[test]
     fn smart_filters_match_needs_and_recent_boundaries() {
-        let now = DateTime::parse_from_rfc3339("2026-06-15T12:00:00Z")
-            .unwrap()
-            .with_timezone(&Utc);
+        let now = DateTime::parse_from_rfc3339("2026-06-15T12:00:00Z").unwrap().with_timezone(&Utc);
         let cutoff = recent_cutoff(now, RecentFilter { days: 7 });
         let t_exact = dto("A-1", cutoff.to_rfc3339().as_str());
-        let t_older = dto(
-            "B-1",
-            (cutoff - chrono::Duration::seconds(1))
-                .to_rfc3339()
-                .as_str(),
-        );
+        let t_older = dto("B-1", (cutoff - chrono::Duration::seconds(1)).to_rfc3339().as_str());
         let mut needs_both = dto("C-1", now.to_rfc3339().as_str());
         needs_both.effort = None;
         needs_both.due_date = None;
-        let mut tasks = vec![
-            ("A-1".to_string(), t_exact),
-            ("B-1".to_string(), t_older),
-            ("C-1".to_string(), needs_both),
-        ];
+        let mut tasks = vec![("A-1".to_string(), t_exact), ("B-1".to_string(), t_older), ("C-1".to_string(), needs_both)];
         let options = TaskQueryOptions {
             recent: Some(RecentFilter { days: 7 }),
             needs: [NeedsFlag::Effort, NeedsFlag::Due].into_iter().collect(),
@@ -1179,10 +949,7 @@ mod tests {
         tagged.tags = vec!["ui".to_string()];
         let untagged = dto("B-1", now.to_rfc3339().as_str());
         let mut tasks = vec![("A-1".to_string(), tagged), ("B-1".to_string(), untagged)];
-        let options = TaskQueryOptions {
-            has,
-            ..TaskQueryOptions::default()
-        };
+        let options = TaskQueryOptions { has, ..TaskQueryOptions::default() };
         apply_smart_filters(&mut tasks, &options, now);
         let ids: Vec<&str> = tasks.iter().map(|(id, _)| id.as_str()).collect();
         assert_eq!(ids, vec!["A-1"]);

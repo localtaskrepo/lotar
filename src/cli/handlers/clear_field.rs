@@ -38,35 +38,22 @@ pub fn clear_task_field(
 ) -> Result<(), String> {
     let mut ctx = TaskCommandContext::new(resolver, project, Some(id))?;
     let full_id = ctx.resolve_full_task_id(id, project)?;
-    let task = crate::services::task_service::TaskService::get(&ctx.storage, &full_id, None)
-        .map_err(|e| e.to_string())?;
+    let task = crate::services::task_service::TaskService::get(&ctx.storage, &full_id, None).map_err(|e| e.to_string())?;
     let current = match field {
         ClearableField::DueDate => task.due_date.clone(),
         ClearableField::Assignee => task.assignee.clone(),
     }
     .filter(|value| !value.trim().is_empty());
     if field == ClearableField::Assignee
-        && let Some(job) =
-            crate::cli::handlers::agent::running_job_for_ticket(&ctx.tasks_dir.path, &full_id)
+        && let Some(job) = crate::cli::handlers::agent::running_job_for_ticket(&ctx.tasks_dir.path, &full_id)
         && !job.takes_ticket_changes(&ctx.tasks_dir.path, &full_id)
     {
-        return Err(format!(
-            "Ticket '{full_id}' has an active agent job (pid {}). Cancel it before changing assignee.",
-            job.pid
-        ));
+        return Err(format!("Ticket '{full_id}' has an active agent job (pid {}). Cancel it before changing assignee.", job.pid));
     }
     let label = field.label();
     let (status, message, changed) = match (&current, dry_run) {
-        (None, _) => (
-            "success",
-            format!("Task {full_id} has no {label}; no changes"),
-            false,
-        ),
-        (Some(old), true) => (
-            "preview",
-            format!("DRY RUN: would clear the {label} of {full_id} (now {old})"),
-            false,
-        ),
+        (None, _) => ("success", format!("Task {full_id} has no {label}; no changes"), false),
+        (Some(old), true) => ("preview", format!("DRY RUN: would clear the {label} of {full_id} (now {old})"), false),
         (Some(_), false) => {
             let mut patch = crate::api_types::TaskUpdate::default();
             match field {

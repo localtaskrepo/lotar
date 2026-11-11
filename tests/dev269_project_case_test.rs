@@ -11,11 +11,7 @@ fn workspace_with(projects: &[(&str, Option<&str>)]) -> tempfile::TempDir {
         let dir = tmp.path().join(prefix);
         std::fs::create_dir_all(&dir).unwrap();
         if let Some(name) = name {
-            std::fs::write(
-                dir.join("config.yml"),
-                format!("project:\n  name: {name}\n"),
-            )
-            .unwrap();
+            std::fs::write(dir.join("config.yml"), format!("project:\n  name: {name}\n")).unwrap();
         }
     }
     tmp
@@ -43,29 +39,12 @@ fn generated_prefixes_do_not_merge_differently_named_projects() {
 #[test]
 fn task_ids_only_match_the_exact_folder_case() {
     let fixtures = common::TestFixtures::new();
-    common::lotar_cmd()
-        .unwrap()
-        .current_dir(fixtures.get_temp_path())
-        .args(["add", "one", "--project", "DEMO"])
-        .assert()
-        .success();
-    let located = lotar::storage::TaskId::parse("demo-1")
-        .unwrap()
-        .locate(&fixtures.tasks_root);
-    assert!(
-        located.is_empty(),
-        "demo-1 must not alias DEMO-1: {located:?}"
-    );
-    let located = lotar::storage::TaskId::parse("DEMO-1")
-        .unwrap()
-        .locate(&fixtures.tasks_root);
+    common::lotar_cmd().unwrap().current_dir(fixtures.get_temp_path()).args(["add", "one", "--project", "DEMO"]).assert().success();
+    let located = lotar::storage::TaskId::parse("demo-1").unwrap().locate(&fixtures.tasks_root);
+    assert!(located.is_empty(), "demo-1 must not alias DEMO-1: {located:?}");
+    let located = lotar::storage::TaskId::parse("DEMO-1").unwrap().locate(&fixtures.tasks_root);
     assert_eq!(located.len(), 1);
 
-    let output = common::lotar_cmd()
-        .unwrap()
-        .current_dir(fixtures.get_temp_path())
-        .args(["add", "two", "--project", "demo"])
-        .output()
-        .unwrap();
+    let output = common::lotar_cmd().unwrap().current_dir(fixtures.get_temp_path()).args(["add", "two", "--project", "demo"]).output().unwrap();
     assert!(String::from_utf8_lossy(&output.stdout).contains("DEMO-2"));
 }

@@ -13,12 +13,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
 
     // GET /api/branding/{image} -> the configured logo, dark logo or icon.
     api_server.register_prefix_handler("GET", "/api/branding/{image}", |req: &HttpRequest| {
-        let slug = req
-            .path
-            .trim_end_matches('/')
-            .rsplit('/')
-            .next()
-            .unwrap_or_default();
+        let slug = req.path.trim_end_matches('/').rsplit('/').next().unwrap_or_default();
         if slug == "theme.css" {
             return serve_skin(req);
         }
@@ -42,17 +37,9 @@ pub(super) fn register(api_server: &mut ApiServer) {
             ("ETag".to_string(), etag.clone()),
             ("X-Content-Type-Options".to_string(), "nosniff".to_string()),
         ];
-        let matches = req.headers.get("if-none-match").is_some_and(|value| {
-            value
-                .split(',')
-                .any(|tag| tag.trim().trim_start_matches("W/") == etag)
-        });
+        let matches = req.headers.get("if-none-match").is_some_and(|value| value.split(',').any(|tag| tag.trim().trim_start_matches("W/") == etag));
         if matches {
-            return HttpResponse {
-                status: 304,
-                headers,
-                body: Vec::new(),
-            };
+            return HttpResponse { status: 304, headers, body: Vec::new() };
         }
         let format = crate::services::attachment_metadata::sniff_image_format(&bytes).unwrap_or("");
         let content_type = match format {
@@ -68,16 +55,9 @@ pub(super) fn register(api_server: &mut ApiServer) {
         headers.push(("Content-Type".to_string(), content_type.to_string()));
         if format == "svg" {
             // Opened on its own, an SVG is a document; never let it run script.
-            headers.push((
-                "Content-Security-Policy".to_string(),
-                "default-src 'none'; img-src data:; style-src 'unsafe-inline'; sandbox".to_string(),
-            ));
+            headers.push(("Content-Security-Policy".to_string(), "default-src 'none'; img-src data:; style-src 'unsafe-inline'; sandbox".to_string()));
         }
-        HttpResponse {
-            status: 200,
-            headers,
-            body: bytes,
-        }
+        HttpResponse { status: 200, headers, body: bytes }
     });
 
     // POST /api/branding/upload {image, filename, content_base64} -> {path}
@@ -101,11 +81,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Err(_) => return bad_request("Invalid base64 content".into()),
         };
         if bytes.len() as u64 > branding_service::MAX_BRANDING_BYTES {
-            return bad_request(format!(
-                "Image too large: {} bytes (at most {} KiB)",
-                bytes.len(),
-                branding_service::MAX_BRANDING_BYTES / 1024
-            ));
+            return bad_request(format!("Image too large: {} bytes (at most {} KiB)", bytes.len(), branding_service::MAX_BRANDING_BYTES / 1024));
         }
         if crate::services::attachment_metadata::sniff_image_format(&bytes).is_none() {
             return bad_request(format!("{} is not an image", payload.filename.trim()));
@@ -138,15 +114,10 @@ pub(super) fn register(api_server: &mut ApiServer) {
         let relative = match target.strip_prefix(&root) {
             Ok(relative) => relative.to_string_lossy().replace('\\', "/"),
             Err(_) => {
-                return bad_request(
-                    "The tasks folder is outside the repository; set the path in the config instead".into(),
-                );
+                return bad_request("The tasks folder is outside the repository; set the path in the config instead".into());
             }
         };
-        ok_json(
-            200,
-            json!({"data": crate::api_types::BrandingUploadResponse { path: relative }}),
-        )
+        ok_json(200, json!({"data": crate::api_types::BrandingUploadResponse { path: relative }}))
     });
 }
 
@@ -159,67 +130,38 @@ fn serve_skin(req: &HttpRequest) -> HttpResponse {
         let config = load_merged_config(&resolver).ok()?;
         let relative = config.ui.theme_file.as_deref()?;
         let root = branding_service::workspace_root(&resolver.path);
-        crate::services::theme_file::read_skin(&root, relative)
-            .ok()
-            .map(|(_, skin)| skin.css)
+        crate::services::theme_file::read_skin(&root, relative).ok().map(|(_, skin)| skin.css)
     })()
     .unwrap_or_default();
     let etag = format!("\"{}\"", &blake3::hash(css.as_bytes()).to_hex()[..32]);
     let headers = vec![
-        (
-            "Content-Type".to_string(),
-            "text/css; charset=utf-8".to_string(),
-        ),
+        ("Content-Type".to_string(), "text/css; charset=utf-8".to_string()),
         ("Cache-Control".to_string(), "no-cache".to_string()),
         ("ETag".to_string(), etag.clone()),
         ("X-Content-Type-Options".to_string(), "nosniff".to_string()),
     ];
-    let matches = req.headers.get("if-none-match").is_some_and(|value| {
-        value
-            .split(',')
-            .any(|tag| tag.trim().trim_start_matches("W/") == etag)
-    });
-    HttpResponse {
-        status: if matches { 304 } else { 200 },
-        headers,
-        body: if matches {
-            Vec::new()
-        } else {
-            css.into_bytes()
-        },
-    }
+    let matches = req.headers.get("if-none-match").is_some_and(|value| value.split(',').any(|tag| tag.trim().trim_start_matches("W/") == etag));
+    HttpResponse { status: if matches { 304 } else { 200 }, headers, body: if matches { Vec::new() } else { css.into_bytes() } }
 }
 
 /// Store an uploaded skin as <tasks>/@branding/theme.css.
 fn upload_skin(payload: &crate::api_types::BrandingUploadRequest) -> HttpResponse {
     use base64::Engine;
-    if !payload
-        .filename
-        .trim()
-        .to_ascii_lowercase()
-        .ends_with(".css")
-    {
+    if !payload.filename.trim().to_ascii_lowercase().ends_with(".css") {
         return bad_request(format!("{} is not a CSS file", payload.filename.trim()));
     }
-    let bytes =
-        match base64::engine::general_purpose::STANDARD.decode(payload.content_base64.trim()) {
-            Ok(bytes) => bytes,
-            Err(_) => return bad_request("Invalid base64 content".into()),
-        };
+    let bytes = match base64::engine::general_purpose::STANDARD.decode(payload.content_base64.trim()) {
+        Ok(bytes) => bytes,
+        Err(_) => return bad_request("Invalid base64 content".into()),
+    };
     if bytes.len() as u64 > crate::services::theme_file::MAX_SKIN_BYTES {
-        return bad_request(format!(
-            "Skin too large: {} bytes (at most {} KiB)",
-            bytes.len(),
-            crate::services::theme_file::MAX_SKIN_BYTES / 1024
-        ));
+        return bad_request(format!("Skin too large: {} bytes (at most {} KiB)", bytes.len(), crate::services::theme_file::MAX_SKIN_BYTES / 1024));
     }
     let Ok(text) = String::from_utf8(bytes) else {
         return bad_request("The skin must be a UTF-8 text file".into());
     };
     if crate::services::theme_file::sanitize(&text, "upload").kept == 0 {
-        return bad_request(
-            "No theme variables found; a skin sets variables like --color-accent: #c0392b;".into(),
-        );
+        return bad_request("No theme variables found; a skin sets variables like --color-accent: #c0392b;".into());
     }
     let resolver = try_response!(resolve_tasks_dir());
     let dir = resolver.path.join(branding_service::UPLOAD_DIR);
@@ -232,13 +174,8 @@ fn upload_skin(payload: &crate::api_types::BrandingUploadRequest) -> HttpRespons
     }
     let root = branding_service::workspace_root(&resolver.path);
     match target.strip_prefix(&root) {
-        Ok(relative) => ok_json(
-            200,
-            json!({"data": crate::api_types::BrandingUploadResponse { path: relative.to_string_lossy().replace('\\', "/") }}),
-        ),
-        Err(_) => bad_request(
-            "The tasks folder is outside the repository; set the path in the config instead".into(),
-        ),
+        Ok(relative) => ok_json(200, json!({"data": crate::api_types::BrandingUploadResponse { path: relative.to_string_lossy().replace('\\', "/") }})),
+        Err(_) => bad_request("The tasks folder is outside the repository; set the path in the config instead".into()),
     }
 }
 
@@ -251,18 +188,12 @@ fn problem_text(image: BrandingImage, relative: &str, err: &BrandingFileError) -
     match err {
         BrandingFileError::Invalid(message) => format!("{what}: {message}"),
         BrandingFileError::Missing => format!("{what}: {relative} was not found in the repository"),
-        BrandingFileError::TooLarge => format!(
-            "{what}: {relative} is larger than {} KiB",
-            branding_service::MAX_BRANDING_BYTES / 1024
-        ),
+        BrandingFileError::TooLarge => format!("{what}: {relative} is larger than {} KiB", branding_service::MAX_BRANDING_BYTES / 1024),
         BrandingFileError::NotAnImage => format!("{what}: {relative} is not an image"),
     }
 }
 
-fn branding_response(
-    resolver: &crate::workspace::TasksDirectoryResolver,
-    config: &crate::config::types::ResolvedConfig,
-) -> crate::api_types::BrandingResponse {
+fn branding_response(resolver: &crate::workspace::TasksDirectoryResolver, config: &crate::config::types::ResolvedConfig) -> crate::api_types::BrandingResponse {
     let root = branding_service::workspace_root(&resolver.path);
     let mut problems = Vec::new();
     // The repository skin: usable when it has at least one theme variable.
@@ -285,10 +216,9 @@ fn branding_response(
             Err(crate::services::theme_file::SkinError::Missing) => {
                 problems.push(format!("Skin: {relative} was not found in the repository"));
             }
-            Err(crate::services::theme_file::SkinError::TooLarge) => problems.push(format!(
-                "Skin: {relative} is larger than {} KiB",
-                crate::services::theme_file::MAX_SKIN_BYTES / 1024
-            )),
+            Err(crate::services::theme_file::SkinError::TooLarge) => {
+                problems.push(format!("Skin: {relative} is larger than {} KiB", crate::services::theme_file::MAX_SKIN_BYTES / 1024))
+            }
             Err(crate::services::theme_file::SkinError::NotText) => {
                 problems.push(format!("Skin: {relative} is not a UTF-8 text file"));
             }
@@ -298,11 +228,7 @@ fn branding_response(
         let relative = image.configured(config)?;
         match branding_service::read_image(&root, relative) {
             // The version makes a changed file a new URL for the <img> tags.
-            Ok((_, bytes)) => Some(format!(
-                "/api/branding/{}?v={}",
-                image.slug(),
-                &blake3::hash(&bytes).to_hex()[..12]
-            )),
+            Ok((_, bytes)) => Some(format!("/api/branding/{}?v={}", image.slug(), &blake3::hash(&bytes).to_hex()[..12])),
             Err(err) => {
                 problems.push(problem_text(image, relative, &err));
                 None
@@ -312,44 +238,23 @@ fn branding_response(
     let logo = url_for(BrandingImage::Logo);
     let logo_dark = url_for(BrandingImage::LogoDark);
     let icon = url_for(BrandingImage::Icon);
-    let theme = config
-        .ui
-        .theme
-        .clone()
-        .filter(|theme| branding_service::is_valid_ui_theme(theme));
+    let theme = config.ui.theme.clone().filter(|theme| branding_service::is_valid_ui_theme(theme));
     // ~/.lotar overrides the repository's config.yml (see resolution.rs).
-    let valid =
-        |theme: Option<String>| theme.filter(|theme| branding_service::is_valid_ui_theme(theme));
-    let home_theme = valid(
-        crate::config::persistence::load_home_config()
-            .ok()
-            .and_then(|home| home.ui_theme),
-    );
-    let repository_theme = valid(
-        crate::config::persistence::load_global_config(Some(resolver.path.as_path()))
-            .ok()
-            .and_then(|global| global.ui_theme),
-    );
+    let valid = |theme: Option<String>| theme.filter(|theme| branding_service::is_valid_ui_theme(theme));
+    let home_theme = valid(crate::config::persistence::load_home_config().ok().and_then(|home| home.ui_theme));
+    let repository_theme = valid(crate::config::persistence::load_global_config(Some(resolver.path.as_path())).ok().and_then(|global| global.ui_theme));
     let theme_source = match (&theme, &home_theme, &repository_theme) {
         (Some(theme), Some(home), _) if theme == home => Some("home".to_string()),
         (Some(theme), _, Some(repo)) if theme == repo => Some("repository".to_string()),
         _ => None,
     };
-    let repository_theme = if theme_source.as_deref() == Some("home") {
-        repository_theme
-    } else {
-        None
-    };
+    let repository_theme = if theme_source.as_deref() == Some("home") { repository_theme } else { None };
     crate::api_types::BrandingResponse {
         theme,
         theme_source,
         repository_theme,
         theme_file,
-        name: config
-            .ui
-            .name
-            .clone()
-            .filter(|name| !name.trim().is_empty()),
+        name: config.ui.name.clone().filter(|name| !name.trim().is_empty()),
         logo,
         logo_dark,
         icon,

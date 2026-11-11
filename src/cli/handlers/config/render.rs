@@ -37,11 +37,7 @@ pub(super) fn emit_config_yaml(
         let sources_payload: HashMap<String, String> = if options.include_defaults {
             sources.clone()
         } else {
-            sources
-                .iter()
-                .filter(|(_, label)| options.allows(Some(*label)))
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect()
+            sources.iter().filter(|(_, label)| options.allows(Some(*label))).map(|(k, v)| (k.clone(), v.clone())).collect()
         };
         let mut payload = serde_json::json!({
             "status": "success",
@@ -87,218 +83,74 @@ pub(super) fn emit_config_yaml(
     renderer.emit_raw_stdout(yaml.trim_end());
 }
 
-fn render_resolved_config_yaml(
-    resolved: &ResolvedConfig,
-    sources: &HashMap<String, String>,
-    options: &YamlRenderOptions,
-) -> String {
+fn render_resolved_config_yaml(resolved: &ResolvedConfig, sources: &HashMap<String, String>, options: &YamlRenderOptions) -> String {
     let mut sections: Vec<String> = Vec::new();
 
     let mut server_body = String::new();
-    if write_scalar_line(
-        &mut server_body,
-        2,
-        "port",
-        &yaml_scalar(&resolved.server_port),
-        sources.get("server.port"),
-        options,
-    ) {
+    if write_scalar_line(&mut server_body, 2, "port", &yaml_scalar(&resolved.server_port), sources.get("server.port"), options) {
         sections.push(format!("server:\n{}", server_body));
     }
 
     let mut default_body = String::new();
     let mut default_written = false;
     if !resolved.default_project.is_empty() {
-        default_written |= write_scalar_line(
-            &mut default_body,
-            2,
-            "project",
-            &yaml_scalar(&resolved.default_project),
-            sources.get("default.project"),
-            options,
-        );
+        default_written |= write_scalar_line(&mut default_body, 2, "project", &yaml_scalar(&resolved.default_project), sources.get("default.project"), options);
     }
     if let Some(assignee) = &resolved.default_assignee {
-        default_written |= write_scalar_line(
-            &mut default_body,
-            2,
-            "assignee",
-            &yaml_scalar(assignee),
-            sources.get("default.assignee"),
-            options,
-        );
+        default_written |= write_scalar_line(&mut default_body, 2, "assignee", &yaml_scalar(assignee), sources.get("default.assignee"), options);
     }
     if let Some(reporter) = &resolved.default_reporter {
-        default_written |= write_scalar_line(
-            &mut default_body,
-            2,
-            "reporter",
-            &yaml_scalar(reporter),
-            sources.get("default.reporter"),
-            options,
-        );
+        default_written |= write_scalar_line(&mut default_body, 2, "reporter", &yaml_scalar(reporter), sources.get("default.reporter"), options);
     }
-    default_written |= write_sequence(
-        &mut default_body,
-        2,
-        "tags",
-        &resolved.default_tags,
-        sources.get("default.tags"),
-        options,
-    );
-    default_written |= write_scalar_line(
-        &mut default_body,
-        2,
-        "strict-members",
-        &yaml_scalar(&resolved.strict_members),
-        sources.get("default.strict-members"),
-        options,
-    );
-    default_written |= write_scalar_line(
-        &mut default_body,
-        2,
-        "priority",
-        &yaml_scalar(&resolved.default_priority),
-        sources.get("default.priority"),
-        options,
-    );
+    default_written |= write_sequence(&mut default_body, 2, "tags", &resolved.default_tags, sources.get("default.tags"), options);
+    default_written |=
+        write_scalar_line(&mut default_body, 2, "strict-members", &yaml_scalar(&resolved.strict_members), sources.get("default.strict-members"), options);
+    default_written |= write_scalar_line(&mut default_body, 2, "priority", &yaml_scalar(&resolved.default_priority), sources.get("default.priority"), options);
     if let Some(status) = &resolved.default_status {
-        default_written |= write_scalar_line(
-            &mut default_body,
-            2,
-            "status",
-            &yaml_scalar(status),
-            sources.get("default.status"),
-            options,
-        );
+        default_written |= write_scalar_line(&mut default_body, 2, "status", &yaml_scalar(status), sources.get("default.status"), options);
     }
     if default_written {
         sections.push(format!("default:\n{}", default_body));
     }
 
     let mut members_body = String::new();
-    if write_sequence(
-        &mut members_body,
-        0,
-        "members",
-        &resolved.members,
-        sources.get("members"),
-        options,
-    ) {
+    if write_sequence(&mut members_body, 0, "members", &resolved.members, sources.get("members"), options) {
         sections.push(members_body);
     }
 
     let mut issue_body = String::new();
     let mut issue_written = false;
-    issue_written |= write_sequence(
-        &mut issue_body,
-        2,
-        "states",
-        &resolved.issue_states.values,
-        sources.get("issue.states"),
-        options,
-    );
+    issue_written |= write_sequence(&mut issue_body, 2, "states", &resolved.issue_states.values, sources.get("issue.states"), options);
     // Presence-based explicit terminal states (DEV-21); inferred policies
     // render nothing here — config show reports them as computed fields.
     if let Some(done) = &resolved.issue_done_states {
-        issue_written |= write_sequence(
-            &mut issue_body,
-            2,
-            "done-states",
-            &done.values,
-            sources.get("issue.done_states"),
-            options,
-        );
+        issue_written |= write_sequence(&mut issue_body, 2, "done-states", &done.values, sources.get("issue.done_states"), options);
     }
-    issue_written |= write_sequence(
-        &mut issue_body,
-        2,
-        "types",
-        &resolved.issue_types.values,
-        sources.get("issue.types"),
-        options,
-    );
-    issue_written |= write_sequence(
-        &mut issue_body,
-        2,
-        "priorities",
-        &resolved.issue_priorities.values,
-        sources.get("issue.priorities"),
-        options,
-    );
-    issue_written |= write_sequence(
-        &mut issue_body,
-        2,
-        "tags",
-        &resolved.tags.values,
-        sources.get("issue.tags"),
-        options,
-    );
+    issue_written |= write_sequence(&mut issue_body, 2, "types", &resolved.issue_types.values, sources.get("issue.types"), options);
+    issue_written |= write_sequence(&mut issue_body, 2, "priorities", &resolved.issue_priorities.values, sources.get("issue.priorities"), options);
+    issue_written |= write_sequence(&mut issue_body, 2, "tags", &resolved.tags.values, sources.get("issue.tags"), options);
     // Tag properties (DEV-20) as one flow mapping per tag.
-    let tag_properties: Vec<(String, String)> = resolved
-        .tag_properties
-        .iter()
-        .map(|(name, props)| {
-            (
-                name.clone(),
-                serde_json::to_string(props).unwrap_or_else(|_| "{}".to_string()),
-            )
-        })
-        .collect();
+    let tag_properties: Vec<(String, String)> =
+        resolved.tag_properties.iter().map(|(name, props)| (name.clone(), serde_json::to_string(props).unwrap_or_else(|_| "{}".to_string()))).collect();
     if !tag_properties.is_empty() {
-        issue_written |= write_mapping_entries(
-            &mut issue_body,
-            2,
-            "tag-properties",
-            &tag_properties,
-            sources.get("issue.tag-properties"),
-            options,
-        );
+        issue_written |= write_mapping_entries(&mut issue_body, 2, "tag-properties", &tag_properties, sources.get("issue.tag-properties"), options);
     }
     if issue_written {
         sections.push(format!("issue:\n{}", issue_body));
     }
 
     let mut custom_body = String::new();
-    if write_sequence(
-        &mut custom_body,
-        2,
-        "fields",
-        &resolved.custom_fields.values,
-        sources.get("custom.fields"),
-        options,
-    ) {
+    if write_sequence(&mut custom_body, 2, "fields", &resolved.custom_fields.values, sources.get("custom.fields"), options) {
         sections.push(format!("custom:\n{}", custom_body));
     }
 
     let mut scan_body = String::new();
     let mut scan_written = false;
-    scan_written |= write_sequence(
-        &mut scan_body,
-        2,
-        "signal-words",
-        &resolved.scan_signal_words,
-        sources.get("scan.signal-words"),
-        options,
-    );
+    scan_written |= write_sequence(&mut scan_body, 2, "signal-words", &resolved.scan_signal_words, sources.get("scan.signal-words"), options);
     if let Some(patterns) = &resolved.scan_ticket_patterns {
-        scan_written |= write_sequence(
-            &mut scan_body,
-            2,
-            "ticket-patterns",
-            patterns,
-            sources.get("scan.ticket-patterns"),
-            options,
-        );
+        scan_written |= write_sequence(&mut scan_body, 2, "ticket-patterns", patterns, sources.get("scan.ticket-patterns"), options);
     } else {
-        scan_written |= write_scalar_line(
-            &mut scan_body,
-            2,
-            "ticket-patterns",
-            "null",
-            sources.get("scan.ticket-patterns"),
-            options,
-        );
+        scan_written |= write_scalar_line(&mut scan_body, 2, "ticket-patterns", "null", sources.get("scan.ticket-patterns"), options);
     }
     scan_written |= write_scalar_line(
         &mut scan_body,
@@ -308,44 +160,19 @@ fn render_resolved_config_yaml(
         sources.get("scan.enable-ticket-words"),
         options,
     );
-    scan_written |= write_scalar_line(
-        &mut scan_body,
-        2,
-        "enable-mentions",
-        &yaml_scalar(&resolved.scan_enable_mentions),
-        sources.get("scan.enable-mentions"),
-        options,
-    );
-    scan_written |= write_scalar_line(
-        &mut scan_body,
-        2,
-        "strip-attributes",
-        &yaml_scalar(&resolved.scan_strip_attributes),
-        sources.get("scan.strip-attributes"),
-        options,
-    );
+    scan_written |=
+        write_scalar_line(&mut scan_body, 2, "enable-mentions", &yaml_scalar(&resolved.scan_enable_mentions), sources.get("scan.enable-mentions"), options);
+    scan_written |=
+        write_scalar_line(&mut scan_body, 2, "strip-attributes", &yaml_scalar(&resolved.scan_strip_attributes), sources.get("scan.strip-attributes"), options);
     if scan_written {
         sections.push(format!("scan:\n{}", scan_body));
     }
 
     let mut auto_body = String::new();
     let mut auto_written = false;
-    auto_written |= write_scalar_line(
-        &mut auto_body,
-        2,
-        "populate-members",
-        &yaml_scalar(&resolved.auto_populate_members),
-        sources.get("auto.populate-members"),
-        options,
-    );
-    auto_written |= write_scalar_line(
-        &mut auto_body,
-        2,
-        "set-reporter",
-        &yaml_scalar(&resolved.auto_set_reporter),
-        sources.get("auto.set-reporter"),
-        options,
-    );
+    auto_written |=
+        write_scalar_line(&mut auto_body, 2, "populate-members", &yaml_scalar(&resolved.auto_populate_members), sources.get("auto.populate-members"), options);
+    auto_written |= write_scalar_line(&mut auto_body, 2, "set-reporter", &yaml_scalar(&resolved.auto_set_reporter), sources.get("auto.set-reporter"), options);
     auto_written |= write_scalar_line(
         &mut auto_body,
         2,
@@ -354,22 +181,10 @@ fn render_resolved_config_yaml(
         sources.get("auto.reciprocal-relationships"),
         options,
     );
-    auto_written |= write_scalar_line(
-        &mut auto_body,
-        2,
-        "link-mentions",
-        &yaml_scalar(&resolved.auto_link_mentions),
-        sources.get("auto.link-mentions"),
-        options,
-    );
-    auto_written |= write_scalar_line(
-        &mut auto_body,
-        2,
-        "assign-on-status",
-        &yaml_scalar(&resolved.auto_assign_on_status),
-        sources.get("auto.assign-on-status"),
-        options,
-    );
+    auto_written |=
+        write_scalar_line(&mut auto_body, 2, "link-mentions", &yaml_scalar(&resolved.auto_link_mentions), sources.get("auto.link-mentions"), options);
+    auto_written |=
+        write_scalar_line(&mut auto_body, 2, "assign-on-status", &yaml_scalar(&resolved.auto_assign_on_status), sources.get("auto.assign-on-status"), options);
     auto_written |= write_scalar_line(
         &mut auto_body,
         2,
@@ -378,14 +193,8 @@ fn render_resolved_config_yaml(
         sources.get("auto.codeowners-assign"),
         options,
     );
-    auto_written |= write_scalar_line(
-        &mut auto_body,
-        2,
-        "tags-from-path",
-        &yaml_scalar(&resolved.auto_tags_from_path),
-        sources.get("auto.tags-from-path"),
-        options,
-    );
+    auto_written |=
+        write_scalar_line(&mut auto_body, 2, "tags-from-path", &yaml_scalar(&resolved.auto_tags_from_path), sources.get("auto.tags-from-path"), options);
     auto_written |= write_scalar_line(
         &mut auto_body,
         2,
@@ -410,36 +219,15 @@ fn render_resolved_config_yaml(
         sources.get("auto.branch-infer-priority"),
         options,
     );
-    auto_written |= write_scalar_line(
-        &mut auto_body,
-        2,
-        "identity",
-        &yaml_scalar(&resolved.auto_identity),
-        sources.get("auto.identity"),
-        options,
-    );
-    auto_written |= write_scalar_line(
-        &mut auto_body,
-        2,
-        "identity-git",
-        &yaml_scalar(&resolved.auto_identity_git),
-        sources.get("auto.identity-git"),
-        options,
-    );
+    auto_written |= write_scalar_line(&mut auto_body, 2, "identity", &yaml_scalar(&resolved.auto_identity), sources.get("auto.identity"), options);
+    auto_written |= write_scalar_line(&mut auto_body, 2, "identity-git", &yaml_scalar(&resolved.auto_identity_git), sources.get("auto.identity-git"), options);
     if auto_written {
         sections.push(format!("auto:\n{}", auto_body));
     }
 
     let mut attachments_body = String::new();
     let mut attachments_written = false;
-    attachments_written |= write_scalar_line(
-        &mut attachments_body,
-        2,
-        "dir",
-        &yaml_scalar(&resolved.attachments_dir),
-        sources.get("attachments.dir"),
-        options,
-    );
+    attachments_written |= write_scalar_line(&mut attachments_body, 2, "dir", &yaml_scalar(&resolved.attachments_dir), sources.get("attachments.dir"), options);
     attachments_written |= write_scalar_line(
         &mut attachments_body,
         2,
@@ -456,50 +244,24 @@ fn render_resolved_config_yaml(
     // context files: present in the JSON output, missing here before DEV-300.
     if !resolved.review_reviewers.is_empty() {
         let mut review_body = String::new();
-        if write_sequence(
-            &mut review_body,
-            2,
-            "reviewers",
-            &resolved.review_reviewers,
-            sources.get("review.reviewers"),
-            options,
-        ) {
+        if write_sequence(&mut review_body, 2, "reviewers", &resolved.review_reviewers, sources.get("review.reviewers"), options) {
             sections.push(format!("review:\n{}", review_body));
         }
     }
 
     let mut sync_body = String::new();
     let mut sync_written = false;
-    sync_written |= write_scalar_line(
-        &mut sync_body,
-        2,
-        "reports_dir",
-        &yaml_scalar(&resolved.sync_reports_dir),
-        sources.get("sync.reports_dir"),
-        options,
-    );
-    sync_written |= write_scalar_line(
-        &mut sync_body,
-        2,
-        "write_reports",
-        &yaml_scalar(&resolved.sync_write_reports),
-        sources.get("sync.write_reports"),
-        options,
-    );
+    sync_written |= write_scalar_line(&mut sync_body, 2, "reports_dir", &yaml_scalar(&resolved.sync_reports_dir), sources.get("sync.reports_dir"), options);
+    sync_written |=
+        write_scalar_line(&mut sync_body, 2, "write_reports", &yaml_scalar(&resolved.sync_write_reports), sources.get("sync.write_reports"), options);
     if sync_written {
         sections.push(format!("sync:\n{}", sync_body));
     }
 
     let mut agent_body = String::new();
     let mut agent_written = false;
-    agent_written |= write_scalar_line(
-        &mut agent_body,
-        2,
-        "context_enabled",
-        &yaml_scalar(&resolved.agent_context_enabled),
-        sources.get("agent.context-enabled"),
-        options,
-    );
+    agent_written |=
+        write_scalar_line(&mut agent_body, 2, "context_enabled", &yaml_scalar(&resolved.agent_context_enabled), sources.get("agent.context-enabled"), options);
     agent_written |= write_scalar_line(
         &mut agent_body,
         2,
@@ -521,33 +283,14 @@ fn render_resolved_config_yaml(
     {
         let sprint_defaults_source = resolve_section_source(
             sources,
-            &[
-                "sprints.defaults.capacity_points",
-                "sprints.defaults.capacity_hours",
-                "sprints.defaults.length",
-                "sprints.defaults.overdue_after",
-            ],
+            &["sprints.defaults.capacity_points", "sprints.defaults.capacity_hours", "sprints.defaults.length", "sprints.defaults.overdue_after"],
         );
-        sprint_written |= write_scalar_line(
-            &mut sprint_body,
-            2,
-            "defaults",
-            &yaml_scalar(&resolved.sprint_defaults),
-            sprint_defaults_source,
-            options,
-        );
+        sprint_written |= write_scalar_line(&mut sprint_body, 2, "defaults", &yaml_scalar(&resolved.sprint_defaults), sprint_defaults_source, options);
     }
     if resolved.sprint_notifications.enabled != SprintNotificationsConfig::default().enabled {
-        let sprint_notifications_source =
-            resolve_section_source(sources, &["sprints.notifications.enabled"]);
-        sprint_written |= write_scalar_line(
-            &mut sprint_body,
-            2,
-            "notifications",
-            &yaml_scalar(&resolved.sprint_notifications),
-            sprint_notifications_source,
-            options,
-        );
+        let sprint_notifications_source = resolve_section_source(sources, &["sprints.notifications.enabled"]);
+        sprint_written |=
+            write_scalar_line(&mut sprint_body, 2, "notifications", &yaml_scalar(&resolved.sprint_notifications), sprint_notifications_source, options);
     }
     if sprint_written {
         sections.push(format!("sprints:\n{}", sprint_body));
@@ -555,30 +298,10 @@ fn render_resolved_config_yaml(
 
     let mut branch_body = String::new();
     let mut branch_written = false;
-    branch_written |= write_alias_map(
-        &mut branch_body,
-        2,
-        "type-aliases",
-        &resolved.branch_type_aliases,
-        sources.get("branch.type-aliases"),
-        options,
-    );
-    branch_written |= write_alias_map(
-        &mut branch_body,
-        2,
-        "status-aliases",
-        &resolved.branch_status_aliases,
-        sources.get("branch.status-aliases"),
-        options,
-    );
-    branch_written |= write_alias_map(
-        &mut branch_body,
-        2,
-        "priority-aliases",
-        &resolved.branch_priority_aliases,
-        sources.get("branch.priority-aliases"),
-        options,
-    );
+    branch_written |= write_alias_map(&mut branch_body, 2, "type-aliases", &resolved.branch_type_aliases, sources.get("branch.type-aliases"), options);
+    branch_written |= write_alias_map(&mut branch_body, 2, "status-aliases", &resolved.branch_status_aliases, sources.get("branch.status-aliases"), options);
+    branch_written |=
+        write_alias_map(&mut branch_body, 2, "priority-aliases", &resolved.branch_priority_aliases, sources.get("branch.priority-aliases"), options);
     if branch_written {
         sections.push(format!("branch:\n{}", branch_body));
     }
@@ -627,14 +350,7 @@ fn yaml_comment(source: Option<&String>, options: &YamlRenderOptions) -> String 
     format!(" {COMMENT_COLOR}# ({source}){RESET}")
 }
 
-fn write_scalar_line(
-    buf: &mut String,
-    indent: usize,
-    key: &str,
-    value: &str,
-    source: Option<&String>,
-    options: &YamlRenderOptions,
-) -> bool {
+fn write_scalar_line(buf: &mut String, indent: usize, key: &str, value: &str, source: Option<&String>, options: &YamlRenderOptions) -> bool {
     if !options.allows(source) {
         return false;
     }
@@ -644,14 +360,7 @@ fn write_scalar_line(
     true
 }
 
-fn write_sequence<T: Serialize>(
-    buf: &mut String,
-    indent: usize,
-    key: &str,
-    values: &[T],
-    source: Option<&String>,
-    options: &YamlRenderOptions,
-) -> bool {
+fn write_sequence<T: Serialize>(buf: &mut String, indent: usize, key: &str, values: &[T], source: Option<&String>, options: &YamlRenderOptions) -> bool {
     if !options.allows(source) {
         return false;
     }
@@ -704,17 +413,11 @@ fn write_alias_map<T: Serialize>(
     }
     let mut entries: Vec<_> = aliases.iter().collect();
     entries.sort_by(|a, b| a.0.cmp(b.0));
-    let formatted: Vec<(String, String)> = entries
-        .into_iter()
-        .map(|(name, value)| (name.clone(), yaml_scalar(value)))
-        .collect();
+    let formatted: Vec<(String, String)> = entries.into_iter().map(|(name, value)| (name.clone(), yaml_scalar(value))).collect();
     write_mapping_entries(buf, indent, key, &formatted, source, options)
 }
 
-fn resolve_section_source<'a>(
-    sources: &'a HashMap<String, String>,
-    keys: &[&str],
-) -> Option<&'a String> {
+fn resolve_section_source<'a>(sources: &'a HashMap<String, String>, keys: &[&str]) -> Option<&'a String> {
     let mut best: Option<&String> = None;
     let mut best_rank = -1;
     for key in keys {
@@ -750,43 +453,18 @@ mod tests {
 
         let mut buf = String::new();
         let source_label = "global".to_string();
-        let options = YamlRenderOptions {
-            include_defaults: true,
-            include_comments: true,
-            colorize_comments: false,
-            allowed_sources: None,
-        };
+        let options = YamlRenderOptions { include_defaults: true, include_comments: true, colorize_comments: false, allowed_sources: None };
 
-        let rendered = write_alias_map(
-            &mut buf,
-            2,
-            "aliases",
-            &aliases,
-            Some(&source_label),
-            &options,
-        );
+        let rendered = write_alias_map(&mut buf, 2, "aliases", &aliases, Some(&source_label), &options);
 
         assert!(rendered);
-        assert_eq!(
-            buf,
-            "  aliases: # (global)\n    alpha: first\n    beta: second\n"
-        );
+        assert_eq!(buf, "  aliases: # (global)\n    alpha: first\n    beta: second\n");
 
         let mut filtered_buf = String::new();
         let allowed_only_project = ["project"];
-        let filtered_options = YamlRenderOptions {
-            allowed_sources: Some(&allowed_only_project),
-            ..options
-        };
+        let filtered_options = YamlRenderOptions { allowed_sources: Some(&allowed_only_project), ..options };
 
-        let filtered = write_alias_map(
-            &mut filtered_buf,
-            2,
-            "aliases",
-            &aliases,
-            Some(&source_label),
-            &filtered_options,
-        );
+        let filtered = write_alias_map(&mut filtered_buf, 2, "aliases", &aliases, Some(&source_label), &filtered_options);
 
         assert!(!filtered);
         assert!(filtered_buf.is_empty());

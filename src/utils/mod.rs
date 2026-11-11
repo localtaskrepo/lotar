@@ -22,7 +22,4 @@ pub mod time;
 pub mod workspace_labels;
 
 // Back-compat re-exports used across the codebase
-pub use project::{
-    generate_project_prefix, generate_unique_project_prefix, resolve_project_input,
-    validate_explicit_prefix,
-};
+pub use project::{generate_project_prefix, generate_unique_project_prefix, resolve_project_input, validate_explicit_prefix};

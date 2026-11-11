@@ -33,24 +33,13 @@ pub(crate) fn execute(
             search.push_str("archived=yes ");
         }
         if let Some(prefix) = project {
-            search.push_str(&format!(
-                "project={} ",
-                ctx.project_prefix_for(Some(prefix))
-            ));
+            search.push_str(&format!("project={} ", ctx.project_prefix_for(Some(prefix))));
         }
         search.push_str(select);
-        let selected = crate::services::task_list::select_ids(
-            &ctx.storage,
-            &ctx.config,
-            ctx.storage_root(),
-            &search,
-        )
-        .map_err(|e| e.cli_message())?;
+        let selected = crate::services::task_list::select_ids(&ctx.storage, &ctx.config, ctx.storage_root(), &search).map_err(|e| e.cli_message())?;
         ids.extend(selected);
     } else if ids.is_empty() {
-        return Err(format!(
-            "Name the tasks to {verb}: task IDs, or --select '<query>' (e.g. --select 'status:done -recent:30d')"
-        ));
+        return Err(format!("Name the tasks to {verb}: task IDs, or --select '<query>' (e.g. --select 'status:done -recent:30d')"));
     }
     let mut seen = std::collections::HashSet::new();
     ids.retain(|id| seen.insert(id.clone()));
@@ -60,9 +49,7 @@ pub(crate) fn execute(
     let mut failed: Vec<(String, String)> = Vec::new();
     for id in &ids {
         if args.dry_run {
-            let prefix = crate::storage::TaskId::parse(id)
-                .map(|parsed| parsed.project)
-                .unwrap_or_default();
+            let prefix = crate::storage::TaskId::parse(id).map(|parsed| parsed.project).unwrap_or_default();
             match ctx.storage.get(id, &prefix) {
                 Some(task) if task.archived != archive => changed.push(id.clone()),
                 Some(_) => unchanged.push(id.clone()),
@@ -112,9 +99,5 @@ pub(crate) fn execute(
             }
         }
     }
-    if failed.is_empty() {
-        Ok(())
-    } else {
-        Err(format!("{} task(s) could not be {verb}d", failed.len()))
-    }
+    if failed.is_empty() { Ok(()) } else { Err(format!("{} task(s) could not be {verb}d", failed.len())) }
 }

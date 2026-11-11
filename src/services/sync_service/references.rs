@@ -9,10 +9,7 @@ pub(super) enum ReferenceState {
     None,
 }
 
-pub(super) fn determine_reference_state(
-    remote: &SyncRemoteConfig,
-    task: &TaskDTO,
-) -> ReferenceState {
+pub(super) fn determine_reference_state(remote: &SyncRemoteConfig, task: &TaskDTO) -> ReferenceState {
     let mut provider_reference = None;
     let mut other_reference = None;
 
@@ -45,10 +42,7 @@ pub(super) fn determine_reference_state(
     }
 }
 
-pub(super) fn normalize_reference_for_remote(
-    remote: &SyncRemoteConfig,
-    value: &str,
-) -> Option<String> {
+pub(super) fn normalize_reference_for_remote(remote: &SyncRemoteConfig, value: &str) -> Option<String> {
     match remote.provider {
         SyncProvider::Jira => {
             let normalized = normalize_jira_reference(value)?;
@@ -79,17 +73,10 @@ pub(super) fn normalize_jira_reference(value: &str) -> Option<String> {
     if rest.trim().is_empty() {
         return None;
     }
-    Some(format!(
-        "{}-{}",
-        prefix.trim().to_ascii_uppercase(),
-        rest.trim()
-    ))
+    Some(format!("{}-{}", prefix.trim().to_ascii_uppercase(), rest.trim()))
 }
 
-pub(super) fn parse_github_reference(
-    value: &str,
-    default_repo: Option<&str>,
-) -> Option<(String, u64)> {
+pub(super) fn parse_github_reference(value: &str, default_repo: Option<&str>) -> Option<(String, u64)> {
     let trimmed = trim_platform_prefix(value, "github");
     if let Some((repo, number)) = trimmed.split_once('#') {
         let repo_trimmed = repo.trim();
@@ -113,17 +100,10 @@ pub(super) fn trim_platform_prefix(value: &str, prefix: &str) -> String {
     let trimmed = value.trim();
     let lower = trimmed.to_ascii_lowercase();
     let needle = format!("{}:", prefix.to_ascii_lowercase());
-    if lower.starts_with(&needle) {
-        trimmed[needle.len()..].trim().to_string()
-    } else {
-        trimmed.to_string()
-    }
+    if lower.starts_with(&needle) { trimmed[needle.len()..].trim().to_string() } else { trimmed.to_string() }
 }
 
-pub(super) fn build_reference_index(
-    remote: &SyncRemoteConfig,
-    tasks: &[(String, TaskDTO)],
-) -> HashMap<String, String> {
+pub(super) fn build_reference_index(remote: &SyncRemoteConfig, tasks: &[(String, TaskDTO)]) -> HashMap<String, String> {
     let mut index = HashMap::new();
     for (_id, task) in tasks {
         for reference in &task.references {
@@ -141,15 +121,9 @@ pub(super) fn build_reference_index(
     index
 }
 
-pub(super) fn issue_reference_for_remote(
-    remote: &SyncRemoteConfig,
-    issue: &JsonValue,
-) -> Option<String> {
+pub(super) fn issue_reference_for_remote(remote: &SyncRemoteConfig, issue: &JsonValue) -> Option<String> {
     match remote.provider {
-        SyncProvider::Jira => issue
-            .get("key")
-            .and_then(|v| v.as_str())
-            .and_then(|key| normalize_reference_for_remote(remote, key)),
+        SyncProvider::Jira => issue.get("key").and_then(|v| v.as_str()).and_then(|key| normalize_reference_for_remote(remote, key)),
         SyncProvider::Github => {
             let repo = remote.repo.as_deref()?;
             let number = issue.get("number").and_then(|v| v.as_u64())?;

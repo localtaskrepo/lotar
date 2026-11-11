@@ -59,27 +59,20 @@ pub fn allow_archived_writes(force: bool) -> ArchivedWriteGuard {
 
 /// Fail closed when `file` is an archived task and no force guard is open.
 pub(crate) fn ensure_writable(project_path: &Path, file: &Path, id: &str) -> LoTaRResult<()> {
-    archived_refusal(project_path, file, id)
-        .map_or(Ok(()), |message| Err(LoTaRError::ValidationError(message)))
+    archived_refusal(project_path, file, id).map_or(Ok(()), |message| Err(LoTaRError::ValidationError(message)))
 }
 
 /// The refusal message for writing an archived task, if it applies.
 fn archived_refusal(project_path: &Path, file: &Path, id: &str) -> Option<String> {
-    (crate::storage::layout::is_archived(project_path, file)
-        && !ARCHIVED_WRITES_ALLOWED.with(|cell| cell.get()))
-    .then(|| {
-        format!(
-            "Task '{id}' is archived and read-only; unarchive it first, or force the change (--force-archived, or force_archived: true over REST/MCP)"
-        )
+    (crate::storage::layout::is_archived(project_path, file) && !ARCHIVED_WRITES_ALLOWED.with(|cell| cell.get())).then(|| {
+        format!("Task '{id}' is archived and read-only; unarchive it first, or force the change (--force-archived, or force_archived: true over REST/MCP)")
     })
 }
 
 /// The refusal for writing a move stub (DEV-183): its task lives on under
 /// the new ID, which callers resolve before writing.
 fn stub_refusal(task: &Task, id: &str) -> Option<String> {
-    task.moved_to
-        .as_ref()
-        .map(|target| format!("Task '{id}' was moved to '{target}'; change '{target}' instead"))
+    task.moved_to.as_ref().map(|target| format!("Task '{id}' was moved to '{target}'; change '{target}' instead"))
 }
 
 /// Core CRUD operations for task storage
@@ -87,12 +80,7 @@ pub struct StorageOperations;
 
 impl StorageOperations {
     /// Add a new task to storage
-    pub fn add(
-        root_path: &Path,
-        task: &Task,
-        project_prefix: &str,
-        original_project_name: Option<&str>,
-    ) -> Result<String, Box<dyn std::error::Error>> {
+    pub fn add(root_path: &Path, task: &Task, project_prefix: &str, original_project_name: Option<&str>) -> Result<String, Box<dyn std::error::Error>> {
         if let Err(e) = validate_project_prefix(project_prefix) {
             return Err(e.into());
         }
@@ -102,49 +90,29 @@ impl StorageOperations {
 
         with_storage_lock(&project_path, "task", || {
             // Create project config.yml if it doesn't exist and we have a project name
-            let config_file_path =
-                crate::utils::paths::project_config_path(root_path, project_prefix);
+            let config_file_path = crate::utils::paths::project_config_path(root_path, project_prefix);
             if let Some(original_name) = original_project_name {
                 let normalized_name = original_name.trim();
                 if config_file_path.exists() {
-                    match crate::config::persistence::load_project_config_from_dir(
-                        project_prefix,
-                        root_path,
-                    ) {
+                    match crate::config::persistence::load_project_config_from_dir(project_prefix, root_path) {
                         Ok(mut existing) => {
                             let current_name = existing.project_name.trim();
-                            if current_name.is_empty()
-                                || current_name.eq_ignore_ascii_case(project_prefix)
-                            {
+                            if current_name.is_empty() || current_name.eq_ignore_ascii_case(project_prefix) {
                                 existing.project_name = normalized_name.to_string();
-                                if let Err(e) = ConfigManager::save_project_config(
-                                    root_path,
-                                    project_prefix,
-                                    &existing,
-                                ) {
+                                if let Err(e) = ConfigManager::save_project_config(root_path, project_prefix, &existing) {
                                     OutputRenderer::new(OutputFormat::Text, LogLevel::Warn)
-                                        .log_warn(format_args!(
-                                            "Failed to update project config with detected name: {}",
-                                            e
-                                        ));
+                                        .log_warn(format_args!("Failed to update project config with detected name: {}", e));
                                 }
                             }
                         }
                         Err(e) => {
-                            OutputRenderer::new(OutputFormat::Text, LogLevel::Warn).log_warn(
-                                format_args!("Failed to load existing project config: {}", e),
-                            );
+                            OutputRenderer::new(OutputFormat::Text, LogLevel::Warn).log_warn(format_args!("Failed to load existing project config: {}", e));
                         }
                     }
                 } else {
                     let project_config = ProjectConfig::new(normalized_name.to_string());
-                    if let Err(e) = ConfigManager::save_project_config(
-                        root_path,
-                        project_prefix,
-                        &project_config,
-                    ) {
-                        OutputRenderer::new(OutputFormat::Text, LogLevel::Warn)
-                            .log_warn(format_args!("Failed to create project config: {}", e));
+                    if let Err(e) = ConfigManager::save_project_config(root_path, project_prefix, &project_config) {
+                        OutputRenderer::new(OutputFormat::Text, LogLevel::Warn).log_warn(format_args!("Failed to create project config: {}", e));
                     }
                 }
             }
@@ -187,11 +155,7 @@ impl StorageOperations {
 
         // SECURITY: Enforce project isolation - verify the project prefix from
         // the canonical ID parse matches the provided project
-        let project_name: &str = if project.trim().is_empty() {
-            "default"
-        } else {
-            project
-        };
+        let project_name: &str = if project.trim().is_empty() { "default" } else { project };
         if !Self::is_safe_folder_name(project_name) {
             return None;
         }
@@ -203,12 +167,10 @@ impl StorageOperations {
         match locations.len() {
             0 => None,
             // Route through the content-validated parse cache shared with search
-            1 => crate::storage::search::StorageSearch::load_task_file(&locations[0].file).map(
-                |mut task| {
-                    task.archived = locations[0].archived;
-                    task
-                },
-            ),
+            1 => crate::storage::search::StorageSearch::load_task_file(&locations[0].file).map(|mut task| {
+                task.archived = locations[0].archived;
+                task
+            }),
             // Duplicate ID across roots: identity is ambiguous, never guess.
             _ => None,
         }
@@ -222,11 +184,7 @@ impl StorageOperations {
             Ok(parsed) => parsed,
             Err(_) => return None,
         };
-        let project_name: &str = if project.trim().is_empty() {
-            "default"
-        } else {
-            project
-        };
+        let project_name: &str = if project.trim().is_empty() { "default" } else { project };
         if !Self::is_safe_folder_name(project_name) {
             return None;
         }
@@ -235,22 +193,17 @@ impl StorageOperations {
         }
         let project_path = root_path.join(&parsed.project);
         match crate::storage::layout::find(&project_path, parsed.number).as_slice() {
-            [file] => {
-                crate::storage::search::StorageSearch::load_task_file(&file.path).map(|mut task| {
-                    task.archived = file.archived;
-                    task
-                })
-            }
+            [file] => crate::storage::search::StorageSearch::load_task_file(&file.path).map(|mut task| {
+                task.archived = file.archived;
+                task
+            }),
             _ => None,
         }
     }
 
     /// Resolve a task ID to its single storage location across candidate
     /// roots, with fail-closed ambiguity diagnostics.
-    pub fn resolve(
-        root_path: &Path,
-        id: &str,
-    ) -> Result<TaskLocation, crate::storage::identity::TaskLookupError> {
+    pub fn resolve(root_path: &Path, id: &str) -> Result<TaskLocation, crate::storage::identity::TaskLookupError> {
         crate::storage::identity::resolve(root_path, id)
     }
 
@@ -260,11 +213,7 @@ impl StorageOperations {
     /// stored in a sibling workspace root is refused before any side effect
     /// (edit it from inside that workspace), and an ID duplicated across
     /// roots is refused rather than guessed.
-    pub fn edit(
-        root_path: &Path,
-        id: &str,
-        new_task: &Task,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn edit(root_path: &Path, id: &str, new_task: &Task) -> Result<(), Box<dyn std::error::Error>> {
         // Extract the project folder from the canonical task ID parse
         let project_folder = match Self::get_project_for_task(id) {
             Some(folder) => folder,
@@ -327,14 +276,11 @@ impl StorageOperations {
         let project_folder = match Self::get_project_for_task(id) {
             Some(folder) => folder,
             None => {
-                return Err(LoTaRError::ValidationError(
-                    "Invalid task ID format".to_string(),
-                ));
+                return Err(LoTaRError::ValidationError("Invalid task ID format".to_string()));
             }
         };
 
-        Self::refuse_cross_root(root_path, id)
-            .map_err(|err| LoTaRError::ValidationError(err.to_string()))?;
+        Self::refuse_cross_root(root_path, id).map_err(|err| LoTaRError::ValidationError(err.to_string()))?;
 
         let project_path = root_path.join(&project_folder);
 
@@ -344,35 +290,23 @@ impl StorageOperations {
             let file_path = match Self::get_file_path_for_id(&project_path, id) {
                 Some(path) => path,
                 None => {
-                    return Err(LoTaRError::ValidationError(
-                        "Task file not found".to_string(),
-                    ));
+                    return Err(LoTaRError::ValidationError("Task file not found".to_string()));
                 }
             };
             ensure_writable(&project_path, &file_path, id)?;
             let content = fs::read_to_string(&file_path)?;
             let before = crate::storage::task::parse_task_file_tolerant(&file_path, &content)
-                .ok_or_else(|| {
-                    LoTaRError::ValidationError(
-                        "Cannot safely edit malformed task YAML; repair the task file first"
-                            .to_string(),
-                    )
-                })?;
+                .ok_or_else(|| LoTaRError::ValidationError("Cannot safely edit malformed task YAML; repair the task file first".to_string()))?;
             if let Some(message) = stub_refusal(&before, id) {
                 return Err(LoTaRError::ValidationError(message));
             }
             let mut after = before.clone();
             let changed = mutation(&mut after)?;
             if changed {
-                let file_string = serde_yaml_ng::to_string(&after)
-                    .map_err(|err| LoTaRError::SerializationError(err.to_string()))?;
+                let file_string = serde_yaml_ng::to_string(&after).map_err(|err| LoTaRError::SerializationError(err.to_string()))?;
                 atomic_write_file(&file_path, &file_string)?;
             }
-            Ok(TaskMutationOutcome {
-                before,
-                after,
-                changed,
-            })
+            Ok(TaskMutationOutcome { before, after, changed })
         })
     }
 
@@ -380,11 +314,7 @@ impl StorageOperations {
     /// Re-reads the current file (merging user-owned YAML extensions) so the
     /// result is safe to stage inside a coordinated transaction that already
     /// holds the project task lock (DEV-55).
-    pub(crate) fn prepare_task_edit(
-        project_path: &Path,
-        id: &str,
-        new_task: &Task,
-    ) -> Result<(PathBuf, String), Box<dyn std::error::Error>> {
+    pub(crate) fn prepare_task_edit(project_path: &Path, id: &str, new_task: &Task) -> Result<(PathBuf, String), Box<dyn std::error::Error>> {
         // Use filesystem-based file path resolution
         let file_path = match Self::get_file_path_for_id(project_path, id) {
             Some(path) => path,
@@ -397,8 +327,8 @@ impl StorageOperations {
         // Read fresh rather than using a potentially stale caller snapshot.
         // DTO-based replacements do not carry YAML extensions.
         let content = fs::read_to_string(&file_path)?;
-        let old_task = crate::storage::task::parse_task_file_tolerant(&file_path, &content)
-            .ok_or("Cannot safely edit malformed task YAML; repair the task file first")?;
+        let old_task =
+            crate::storage::task::parse_task_file_tolerant(&file_path, &content).ok_or("Cannot safely edit malformed task YAML; repair the task file first")?;
         if let Some(message) = stub_refusal(&old_task, id) {
             return Err(message.into());
         }
@@ -424,11 +354,7 @@ impl StorageOperations {
     ///
     /// Like [`Self::edit`], deletion is locked to the issuing tasks root and
     /// refuses cross-root or ambiguous targets before any side effect.
-    pub fn delete(
-        root_path: &Path,
-        id: &str,
-        project: &str,
-    ) -> Result<bool, Box<dyn std::error::Error>> {
+    pub fn delete(root_path: &Path, id: &str, project: &str) -> Result<bool, Box<dyn std::error::Error>> {
         if let Err(e) = validate_project_prefix(project) {
             return Err(e.into());
         }
@@ -442,11 +368,7 @@ impl StorageOperations {
             Err(err) => return Err(format!("Invalid task ID '{id}': {err}").into()),
         };
         if parsed.project != project {
-            return Err(format!(
-                "Task ID '{id}' belongs to project '{}', not '{project}'; refusing to cross projects",
-                parsed.project
-            )
-            .into());
+            return Err(format!("Task ID '{id}' belongs to project '{}', not '{project}'; refusing to cross projects", parsed.project).into());
         }
 
         Self::refuse_cross_root(root_path, id)?;
@@ -484,15 +406,9 @@ impl StorageOperations {
     /// path, or `None` when the task already is where it should be. Locked
     /// to the issuing root like [`Self::edit`]; refuses duplicates and an
     /// occupied target instead of overwriting anything.
-    pub fn move_archive(
-        root_path: &Path,
-        id: &str,
-        archive: bool,
-    ) -> LoTaRResult<Option<(PathBuf, PathBuf)>> {
-        let parsed =
-            TaskId::parse(id).map_err(|err| LoTaRError::InvalidTaskId(format!("{id}: {err}")))?;
-        Self::refuse_cross_root(root_path, id)
-            .map_err(|err| LoTaRError::ValidationError(err.to_string()))?;
+    pub fn move_archive(root_path: &Path, id: &str, archive: bool) -> LoTaRResult<Option<(PathBuf, PathBuf)>> {
+        let parsed = TaskId::parse(id).map_err(|err| LoTaRError::InvalidTaskId(format!("{id}: {err}")))?;
+        Self::refuse_cross_root(root_path, id).map_err(|err| LoTaRError::ValidationError(err.to_string()))?;
         let project_path = root_path.join(&parsed.project);
         with_storage_lock(&project_path, "task", || {
             let file = match crate::storage::layout::find(&project_path, parsed.number).as_slice() {
@@ -505,17 +421,11 @@ impl StorageOperations {
                     )));
                 }
             };
-            let Some(target) =
-                crate::storage::layout::archive_target(&project_path, &file, archive)
-            else {
+            let Some(target) = crate::storage::layout::archive_target(&project_path, &file, archive) else {
                 return Ok(None);
             };
             if fs::symlink_metadata(&target).is_ok() {
-                return Err(LoTaRError::ValidationError(format!(
-                    "Cannot move '{}': {} already exists",
-                    parsed.canonical(),
-                    target.display()
-                )));
+                return Err(LoTaRError::ValidationError(format!("Cannot move '{}': {} already exists", parsed.canonical(), target.display())));
             }
             if let Some(parent) = target.parent() {
                 fs::create_dir_all(parent)?;
@@ -557,10 +467,7 @@ impl StorageOperations {
         let (Some(root), Some(project)) = (project_path.parent(), project_path.file_name()) else {
             return local;
         };
-        Self::related_task_roots(root)
-            .into_iter()
-            .map(|other| crate::storage::layout::max_number(&other.join(project)))
-            .fold(local, u64::max)
+        Self::related_task_roots(root).into_iter().map(|other| crate::storage::layout::max_number(&other.join(project))).fold(local, u64::max)
     }
 
     /// Every tasks root whose reads can include `root`'s tasks, or whose
@@ -568,18 +475,9 @@ impl StorageOperations {
     fn related_task_roots(root: &Path) -> Vec<std::path::PathBuf> {
         let mut roots = crate::storage::locator::StorageLocator::candidate_task_roots(root);
         // `<parent>/<workspace>/.tasks` is a sibling root of `<parent>/.tasks`.
-        let absolute = root
-            .canonicalize()
-            .or_else(|_| std::path::absolute(root))
-            .unwrap_or_else(|_| root.to_path_buf());
-        if let Some(parent_root) = absolute
-            .parent()
-            .and_then(Path::parent)
-            .map(|dir| dir.join(".tasks"))
-            .filter(|dir| dir.is_dir())
-        {
-            for other in crate::storage::locator::StorageLocator::candidate_task_roots(&parent_root)
-            {
+        let absolute = root.canonicalize().or_else(|_| std::path::absolute(root)).unwrap_or_else(|_| root.to_path_buf());
+        if let Some(parent_root) = absolute.parent().and_then(Path::parent).map(|dir| dir.join(".tasks")).filter(|dir| dir.is_dir()) {
+            for other in crate::storage::locator::StorageLocator::candidate_task_roots(&parent_root) {
                 if !roots.contains(&other) {
                     roots.push(other);
                 }
@@ -621,26 +519,19 @@ impl StorageOperations {
             many => Err(format!(
                 "Task ID '{}' matches multiple storage locations ({}); refusing to modify an arbitrary task",
                 id,
-                many.iter()
-                    .map(|location| location.file.display().to_string())
-                    .collect::<Vec<_>>()
-                    .join("; ")
+                many.iter().map(|location| location.file.display().to_string()).collect::<Vec<_>>().join("; ")
             )
             .into()),
         }
     }
 
     fn is_safe_folder_name(name: &str) -> bool {
-        crate::storage::safety::is_valid_project_prefix(name)
-            || name.eq_ignore_ascii_case("default")
+        crate::storage::safety::is_valid_project_prefix(name) || name.eq_ignore_ascii_case("default")
     }
 
     /// Get or create a project prefix, ensuring it's unique and consistent
     #[cfg(test)]
-    pub fn get_or_create_project_prefix(
-        root_path: &Path,
-        project_name: &str,
-    ) -> Result<String, String> {
+    pub fn get_or_create_project_prefix(root_path: &Path, project_name: &str) -> Result<String, String> {
         // Check if we already have a folder for this exact project name
         let direct_path = root_path.join(project_name);
         if direct_path.exists() && direct_path.is_dir() {
@@ -657,8 +548,7 @@ impl StorageOperations {
             let config_path = crate::utils::paths::project_config_path(root_path, &expected_prefix);
             if config_path.exists()
                 && let Ok(content) = fs::read_to_string(&config_path)
-                && let Ok(config) =
-                    serde_yaml_ng::from_str::<crate::config::types::ProjectConfig>(&content)
+                && let Ok(config) = serde_yaml_ng::from_str::<crate::config::types::ProjectConfig>(&content)
             {
                 // Check if the project name in config matches (either exact or prefix)
                 if config.project_name == project_name || config.project_name == expected_prefix {
@@ -673,10 +563,7 @@ impl StorageOperations {
 
     /// Generate a unique folder name (prefix) for a project
     #[cfg(test)]
-    pub fn generate_unique_folder_prefix(
-        root_path: &Path,
-        project_name: &str,
-    ) -> Result<String, String> {
+    pub fn generate_unique_folder_prefix(root_path: &Path, project_name: &str) -> Result<String, String> {
         // Generate candidate prefix using the shared utility
         let candidate = generate_project_prefix(project_name);
 
@@ -687,21 +574,14 @@ impl StorageOperations {
 
         // If collision, try variations with numbers
         for i in 1..=99 {
-            let candidate_with_number = if candidate.len() >= 4 {
-                format!("{}{:02}", &candidate[..2], i)
-            } else {
-                format!("{}{}", candidate, i)
-            };
+            let candidate_with_number = if candidate.len() >= 4 { format!("{}{:02}", &candidate[..2], i) } else { format!("{}{}", candidate, i) };
 
             if !root_path.join(&candidate_with_number).exists() {
                 return Ok(candidate_with_number);
             }
         }
 
-        Err(format!(
-            "Could not generate unique prefix for project '{}'",
-            project_name
-        ))
+        Err(format!("Could not generate unique prefix for project '{}'", project_name))
     }
 }
 
@@ -733,11 +613,7 @@ pub(crate) mod before_task_write {
         HOOK.with(|slot| {
             let mut slot = slot.borrow_mut();
             assert!(slot.is_none(), "task-write hook already installed");
-            *slot = Some(Hook {
-                root: root.to_path_buf(),
-                id: id.to_string(),
-                callback: Box::new(callback),
-            });
+            *slot = Some(Hook { root: root.to_path_buf(), id: id.to_string(), callback: Box::new(callback) });
         });
         Guard
     }
@@ -745,14 +621,7 @@ pub(crate) mod before_task_write {
     pub(super) fn run(root: &Path, id: &str) {
         let hook = HOOK.with(|slot| {
             let mut slot = slot.borrow_mut();
-            if slot
-                .as_ref()
-                .is_some_and(|hook| hook.root == root && hook.id == id)
-            {
-                slot.take()
-            } else {
-                None
-            }
+            if slot.as_ref().is_some_and(|hook| hook.root == root && hook.id == id) { slot.take() } else { None }
         });
         // Consume the hook and release its borrow before the editor uses storage.
         if let Some(hook) = hook {

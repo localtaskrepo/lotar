@@ -12,12 +12,7 @@ fn run(cmd: &mut Command, temp_dir: &TempDir, args: &[&str]) -> assert_cmd::asse
 fn comment_shortcut_adds_comment() {
     let temp = crate::common::temp_dir();
     // Create a task
-    run(
-        &mut crate::common::lotar_cmd().unwrap(),
-        &temp,
-        &["task", "add", "A"],
-    )
-    .success();
+    run(&mut crate::common::lotar_cmd().unwrap(), &temp, &["task", "add", "A"]).success();
 
     // Resolve created ID by listing
     let out = crate::common::lotar_cmd()

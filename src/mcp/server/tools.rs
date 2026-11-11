@@ -66,18 +66,10 @@ impl Hint {
 }
 
 /// Field hints for `(field, list, accepts_multiple)` entries; empty without hints.
-fn enum_field_hints(
-    enum_hints: Option<&EnumHints>,
-    fields: &[(&str, Hint, bool)],
-) -> JsonMap<String, Value> {
+fn enum_field_hints(enum_hints: Option<&EnumHints>, fields: &[(&str, Hint, bool)]) -> JsonMap<String, Value> {
     let mut field_hints = JsonMap::new();
     for (field, list, multiple) in fields {
-        insert_field_hint(
-            &mut field_hints,
-            field,
-            enum_hints.map(|h| list.values(h)),
-            *multiple,
-        );
+        insert_field_hint(&mut field_hints, field, enum_hints.map(|h| list.values(h)), *multiple);
     }
     field_hints
 }
@@ -85,19 +77,14 @@ fn enum_field_hints(
 /// Append "Available <label>: ..." sentences for `lists` to the tool description.
 fn describe_enum_hints(tool: &mut Value, enum_hints: Option<&EnumHints>, lists: &[Hint]) {
     if let Some(hints) = enum_hints {
-        let sections: Vec<(&[String], &str)> = lists
-            .iter()
-            .map(|list| (list.values(hints), list.label()))
-            .collect();
+        let sections: Vec<(&[String], &str)> = lists.iter().map(|list| (list.values(hints), list.label())).collect();
         append_hint_descriptions(tool, &sections);
     }
 }
 
 /// Reference kinds accepted by the reference tools.
 fn reference_kinds() -> Vec<String> {
-    ["link", "file", "code", "jira", "github", "attachment"]
-        .map(String::from)
-        .to_vec()
+    ["link", "file", "code", "jira", "github", "attachment"].map(String::from).to_vec()
 }
 
 /// Tools that write task files; they accept `force_archived` (DEV-4).
@@ -122,15 +109,8 @@ pub(crate) const FORCE_ARCHIVED_TOOLS: &[&str] = &[
 pub(super) fn build_tool_definitions(enum_hints: Option<&EnumHints>) -> Vec<Value> {
     let mut tools = all_tool_definitions(enum_hints);
     for tool in &mut tools {
-        let is_writer = tool
-            .get("name")
-            .and_then(Value::as_str)
-            .is_some_and(|name| FORCE_ARCHIVED_TOOLS.contains(&name));
-        if is_writer
-            && let Some(properties) = tool
-                .pointer_mut("/inputSchema/properties")
-                .and_then(Value::as_object_mut)
-        {
+        let is_writer = tool.get("name").and_then(Value::as_str).is_some_and(|name| FORCE_ARCHIVED_TOOLS.contains(&name));
+        if is_writer && let Some(properties) = tool.pointer_mut("/inputSchema/properties").and_then(Value::as_object_mut) {
             properties.insert(
                 "force_archived".into(),
                 json!({
@@ -335,10 +315,7 @@ fn make_task_create_tool(enum_hints: Option<&EnumHints>) -> Value {
     properties.insert("assignee".into(), json!({"type": ["string", "null"]}));
     properties.insert("due_date".into(), json!({"type": ["string", "null"]}));
     properties.insert("effort".into(), json!({"type": ["string", "null"]}));
-    properties.insert(
-        "tags".into(),
-        json!({"type": "array", "items": {"type": "string"}}),
-    );
+    properties.insert("tags".into(), json!({"type": "array", "items": {"type": "string"}}));
     properties.insert(
         "acceptance_criteria".into(),
         json!({
@@ -399,19 +376,7 @@ fn make_task_create_tool(enum_hints: Option<&EnumHints>) -> Value {
         ),
     );
 
-    describe_enum_hints(
-        &mut tool,
-        enum_hints,
-        &[
-            Hint::Projects,
-            Hint::Statuses,
-            Hint::Priorities,
-            Hint::Types,
-            Hint::Members,
-            Hint::Tags,
-            Hint::CustomFields,
-        ],
-    );
+    describe_enum_hints(&mut tool, enum_hints, &[Hint::Projects, Hint::Statuses, Hint::Priorities, Hint::Types, Hint::Members, Hint::Tags, Hint::CustomFields]);
 
     tool
 }
@@ -435,10 +400,7 @@ fn make_task_get_tool(enum_hints: Option<&EnumHints>) -> Value {
         }
     });
 
-    attach_field_hints(
-        &mut tool,
-        enum_field_hints(enum_hints, &[("project", Hint::Projects, false)]),
-    );
+    attach_field_hints(&mut tool, enum_field_hints(enum_hints, &[("project", Hint::Projects, false)]));
 
     describe_enum_hints(&mut tool, enum_hints, &[Hint::Projects]);
 
@@ -449,14 +411,8 @@ fn make_task_update_tool(enum_hints: Option<&EnumHints>) -> Value {
     let description = "Patch an existing task. Provide fields inside patch. Tri-state semantics: omitted properties stay unchanged, null clears (where clearing is allowed), and a value sets. status/priority/type are validated against the task's project configuration; their null means no-op. reporter/assignee accept '@me' and clear with null or empty string. tags/acceptance_criteria replace the list (null or [] clears). relationships and custom_fields replace the whole value (null or empty clears).".to_string();
 
     let mut patch_properties = JsonMap::new();
-    patch_properties.insert(
-        "title".into(),
-        json!({"type": ["string", "null"], "description": "null is treated as omitted."}),
-    );
-    patch_properties.insert(
-        "description".into(),
-        json!({"type": ["string", "null"], "description": "null or empty string clears."}),
-    );
+    patch_properties.insert("title".into(), json!({"type": ["string", "null"], "description": "null is treated as omitted."}));
+    patch_properties.insert("description".into(), json!({"type": ["string", "null"], "description": "null or empty string clears."}));
     patch_properties.insert(
         "status".into(),
         json!({
@@ -464,14 +420,8 @@ fn make_task_update_tool(enum_hints: Option<&EnumHints>) -> Value {
             "description": "Validated against the task's project issue_states; null is treated as omitted."
         }),
     );
-    patch_properties.insert(
-        "priority".into(),
-        json!({"type": ["string", "null"], "description": "null is treated as omitted."}),
-    );
-    patch_properties.insert(
-        "type".into(),
-        json!({"type": ["string", "null"], "description": "null is treated as omitted."}),
-    );
+    patch_properties.insert("priority".into(), json!({"type": ["string", "null"], "description": "null is treated as omitted."}));
+    patch_properties.insert("type".into(), json!({"type": ["string", "null"], "description": "null is treated as omitted."}));
     patch_properties.insert(
         "task_type".into(),
         json!({
@@ -479,22 +429,10 @@ fn make_task_update_tool(enum_hints: Option<&EnumHints>) -> Value {
             "description": "Alias for 'type'; 'type' wins when both are provided and null means omitted."
         }),
     );
-    patch_properties.insert(
-        "reporter".into(),
-        json!({"type": ["string", "null"], "description": "null or empty string clears."}),
-    );
-    patch_properties.insert(
-        "assignee".into(),
-        json!({"type": ["string", "null"], "description": "null or empty string clears."}),
-    );
-    patch_properties.insert(
-        "due_date".into(),
-        json!({"type": ["string", "null"], "description": "null or empty string clears."}),
-    );
-    patch_properties.insert(
-        "effort".into(),
-        json!({"type": ["string", "null"], "description": "null or empty string clears."}),
-    );
+    patch_properties.insert("reporter".into(), json!({"type": ["string", "null"], "description": "null or empty string clears."}));
+    patch_properties.insert("assignee".into(), json!({"type": ["string", "null"], "description": "null or empty string clears."}));
+    patch_properties.insert("due_date".into(), json!({"type": ["string", "null"], "description": "null or empty string clears."}));
+    patch_properties.insert("effort".into(), json!({"type": ["string", "null"], "description": "null or empty string clears."}));
     patch_properties.insert(
         "tags".into(),
         json!({
@@ -511,10 +449,7 @@ fn make_task_update_tool(enum_hints: Option<&EnumHints>) -> Value {
             "description": "Replaces the list; null or [] clears."
         }),
     );
-    patch_properties.insert(
-        "relationships".into(),
-        json!({"type": ["object", "null"], "description": "Replaces the map; null or {} clears."}),
-    );
+    patch_properties.insert("relationships".into(), json!({"type": ["object", "null"], "description": "Replaces the map; null or {} clears."}));
     patch_properties.insert(
         "custom_fields".into(),
         json!({
@@ -565,18 +500,7 @@ fn make_task_update_tool(enum_hints: Option<&EnumHints>) -> Value {
         ),
     );
 
-    describe_enum_hints(
-        &mut tool,
-        enum_hints,
-        &[
-            Hint::Statuses,
-            Hint::Priorities,
-            Hint::Types,
-            Hint::Members,
-            Hint::Tags,
-            Hint::CustomFields,
-        ],
-    );
+    describe_enum_hints(&mut tool, enum_hints, &[Hint::Statuses, Hint::Priorities, Hint::Types, Hint::Members, Hint::Tags, Hint::CustomFields]);
 
     tool
 }
@@ -600,10 +524,7 @@ fn make_task_delete_tool(enum_hints: Option<&EnumHints>) -> Value {
         }
     });
 
-    attach_field_hints(
-        &mut tool,
-        enum_field_hints(enum_hints, &[("project", Hint::Projects, false)]),
-    );
+    attach_field_hints(&mut tool, enum_field_hints(enum_hints, &[("project", Hint::Projects, false)]));
 
     describe_enum_hints(&mut tool, enum_hints, &[Hint::Projects]);
 
@@ -625,10 +546,7 @@ fn make_task_restore_tool(enum_hints: Option<&EnumHints>) -> Value {
         }
     });
 
-    attach_field_hints(
-        &mut tool,
-        enum_field_hints(enum_hints, &[("project", Hint::Projects, false)]),
-    );
+    attach_field_hints(&mut tool, enum_field_hints(enum_hints, &[("project", Hint::Projects, false)]));
 
     describe_enum_hints(&mut tool, enum_hints, &[Hint::Projects]);
 
@@ -660,10 +578,7 @@ fn make_task_archive_tool(enum_hints: Option<&EnumHints>, archive: bool) -> Valu
             "additionalProperties": false
         }
     });
-    attach_field_hints(
-        &mut tool,
-        enum_field_hints(enum_hints, &[("project", Hint::Projects, false)]),
-    );
+    attach_field_hints(&mut tool, enum_field_hints(enum_hints, &[("project", Hint::Projects, false)]));
     describe_enum_hints(&mut tool, enum_hints, &[Hint::Projects]);
     tool
 }
@@ -689,10 +604,7 @@ fn make_task_move_tool(enum_hints: Option<&EnumHints>) -> Value {
             "additionalProperties": false
         }
     });
-    attach_field_hints(
-        &mut tool,
-        enum_field_hints(enum_hints, &[("project", Hint::Projects, false)]),
-    );
+    attach_field_hints(&mut tool, enum_field_hints(enum_hints, &[("project", Hint::Projects, false)]));
     describe_enum_hints(&mut tool, enum_hints, &[Hint::Projects]);
     tool
 }
@@ -870,18 +782,7 @@ fn make_task_list_tool(enum_hints: Option<&EnumHints>) -> Value {
         ),
     );
 
-    describe_enum_hints(
-        &mut tool,
-        enum_hints,
-        &[
-            Hint::Projects,
-            Hint::Statuses,
-            Hint::Priorities,
-            Hint::Types,
-            Hint::Tags,
-            Hint::Members,
-        ],
-    );
+    describe_enum_hints(&mut tool, enum_hints, &[Hint::Projects, Hint::Statuses, Hint::Priorities, Hint::Types, Hint::Tags, Hint::Members]);
 
     tool
 }
@@ -939,10 +840,7 @@ fn make_task_comment_update_tool(_enum_hints: Option<&EnumHints>) -> Value {
 fn make_task_bulk_update_tool(enum_hints: Option<&EnumHints>) -> Value {
     let mut patch_properties = JsonMap::new();
     patch_properties.insert("title".into(), json!({"type": ["string", "null"]}));
-    patch_properties.insert(
-        "description".into(),
-        json!({"type": ["string", "null"], "description": "null or empty string clears."}),
-    );
+    patch_properties.insert("description".into(), json!({"type": ["string", "null"], "description": "null or empty string clears."}));
     patch_properties.insert(
         "status".into(),
         json!({
@@ -952,22 +850,10 @@ fn make_task_bulk_update_tool(enum_hints: Option<&EnumHints>) -> Value {
     );
     patch_properties.insert("priority".into(), json!({"type": ["string", "null"]}));
     patch_properties.insert("type".into(), json!({"type": ["string", "null"]}));
-    patch_properties.insert(
-        "reporter".into(),
-        json!({"type": ["string", "null"], "description": "null or empty string clears."}),
-    );
-    patch_properties.insert(
-        "assignee".into(),
-        json!({"type": ["string", "null"], "description": "null or empty string clears."}),
-    );
-    patch_properties.insert(
-        "due_date".into(),
-        json!({"type": ["string", "null"], "description": "null or empty string clears."}),
-    );
-    patch_properties.insert(
-        "effort".into(),
-        json!({"type": ["string", "null"], "description": "null or empty string clears."}),
-    );
+    patch_properties.insert("reporter".into(), json!({"type": ["string", "null"], "description": "null or empty string clears."}));
+    patch_properties.insert("assignee".into(), json!({"type": ["string", "null"], "description": "null or empty string clears."}));
+    patch_properties.insert("due_date".into(), json!({"type": ["string", "null"], "description": "null or empty string clears."}));
+    patch_properties.insert("effort".into(), json!({"type": ["string", "null"], "description": "null or empty string clears."}));
     patch_properties.insert(
         "tags".into(),
         json!({
@@ -984,22 +870,10 @@ fn make_task_bulk_update_tool(enum_hints: Option<&EnumHints>) -> Value {
             "description": "Replaces the list; null or [] clears."
         }),
     );
-    patch_properties.insert(
-        "relationships".into(),
-        json!({"type": ["object", "null"], "description": "Replaces the map; null or {} clears."}),
-    );
-    patch_properties.insert(
-        "custom_fields".into(),
-        json!({"type": ["object", "null"], "description": "Set/clear custom_fields. Null clears all."}),
-    );
-    patch_properties.insert(
-        "sprints".into(),
-        json!({"type": ["array", "null"], "items": {"type": "integer", "minimum": 1}}),
-    );
-    patch_properties.insert(
-        "task_type".into(),
-        json!({"type": ["string", "null"], "description": "Alias for 'type'; 'type' wins when both are provided."}),
-    );
+    patch_properties.insert("relationships".into(), json!({"type": ["object", "null"], "description": "Replaces the map; null or {} clears."}));
+    patch_properties.insert("custom_fields".into(), json!({"type": ["object", "null"], "description": "Set/clear custom_fields. Null clears all."}));
+    patch_properties.insert("sprints".into(), json!({"type": ["array", "null"], "items": {"type": "integer", "minimum": 1}}));
+    patch_properties.insert("task_type".into(), json!({"type": ["string", "null"], "description": "Alias for 'type'; 'type' wins when both are provided."}));
 
     let mut tool = json!({
         "name": "task_bulk_update",
@@ -1338,14 +1212,8 @@ fn make_sprint_backlog_tool(enum_hints: Option<&EnumHints>) -> Value {
             "description": "Filters and search text in the web search-box syntax (same as task_list query)."
         }),
     );
-    properties.insert(
-        "limit".into(),
-        json!({"type": ["number", "null"], "minimum": 1, "maximum": 100}),
-    );
-    properties.insert(
-        "cleanup_missing".into(),
-        json!({"type": ["boolean", "null"]}),
-    );
+    properties.insert("limit".into(), json!({"type": ["number", "null"], "minimum": 1, "maximum": 100}));
+    properties.insert("cleanup_missing".into(), json!({"type": ["boolean", "null"]}));
     properties.insert(
         "cursor".into(),
         json!({
@@ -1375,20 +1243,11 @@ fn make_sprint_backlog_tool(enum_hints: Option<&EnumHints>) -> Value {
         &mut tool,
         enum_field_hints(
             enum_hints,
-            &[
-                ("project", Hint::Projects, false),
-                ("status", Hint::Statuses, true),
-                ("tag", Hint::Tags, true),
-                ("assignee", Hint::Members, false),
-            ],
+            &[("project", Hint::Projects, false), ("status", Hint::Statuses, true), ("tag", Hint::Tags, true), ("assignee", Hint::Members, false)],
         ),
     );
 
-    describe_enum_hints(
-        &mut tool,
-        enum_hints,
-        &[Hint::Projects, Hint::Statuses, Hint::Tags, Hint::Members],
-    );
+    describe_enum_hints(&mut tool, enum_hints, &[Hint::Projects, Hint::Statuses, Hint::Tags, Hint::Members]);
 
     tool
 }
@@ -1446,10 +1305,7 @@ fn make_project_stats_tool(enum_hints: Option<&EnumHints>) -> Value {
         }
     });
 
-    attach_field_hints(
-        &mut tool,
-        enum_field_hints(enum_hints, &[("name", Hint::Projects, false)]),
-    );
+    attach_field_hints(&mut tool, enum_field_hints(enum_hints, &[("name", Hint::Projects, false)]));
 
     describe_enum_hints(&mut tool, enum_hints, &[Hint::Projects]);
 
@@ -1470,10 +1326,7 @@ fn make_config_show_tool(enum_hints: Option<&EnumHints>) -> Value {
         }
     });
 
-    attach_field_hints(
-        &mut tool,
-        enum_field_hints(enum_hints, &[("project", Hint::Projects, false)]),
-    );
+    attach_field_hints(&mut tool, enum_field_hints(enum_hints, &[("project", Hint::Projects, false)]));
 
     describe_enum_hints(&mut tool, enum_hints, &[Hint::Projects]);
 
@@ -1496,10 +1349,7 @@ fn make_config_set_tool(enum_hints: Option<&EnumHints>) -> Value {
         }
     });
 
-    attach_field_hints(
-        &mut tool,
-        enum_field_hints(enum_hints, &[("project", Hint::Projects, false)]),
-    );
+    attach_field_hints(&mut tool, enum_field_hints(enum_hints, &[("project", Hint::Projects, false)]));
 
     describe_enum_hints(&mut tool, enum_hints, &[Hint::Projects]);
 
@@ -1530,10 +1380,7 @@ fn make_sync_pull_tool(enum_hints: Option<&EnumHints>) -> Value {
         }
     });
 
-    attach_field_hints(
-        &mut tool,
-        enum_field_hints(enum_hints, &[("project", Hint::Projects, false)]),
-    );
+    attach_field_hints(&mut tool, enum_field_hints(enum_hints, &[("project", Hint::Projects, false)]));
     tool
 }
 
@@ -1561,10 +1408,7 @@ fn make_sync_push_tool(enum_hints: Option<&EnumHints>) -> Value {
         }
     });
 
-    attach_field_hints(
-        &mut tool,
-        enum_field_hints(enum_hints, &[("project", Hint::Projects, false)]),
-    );
+    attach_field_hints(&mut tool, enum_field_hints(enum_hints, &[("project", Hint::Projects, false)]));
     tool
 }
 

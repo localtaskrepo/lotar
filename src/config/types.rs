@@ -218,10 +218,7 @@ pub enum AgentProfileConfig {
 impl AgentProfileConfig {
     pub fn to_detail(&self) -> AgentProfileDetail {
         match self {
-            AgentProfileConfig::Runner(runner) => AgentProfileDetail {
-                runner: runner.clone(),
-                ..Default::default()
-            },
+            AgentProfileConfig::Runner(runner) => AgentProfileDetail { runner: runner.clone(), ..Default::default() },
             AgentProfileConfig::Detailed(detail) => (**detail).clone(),
         }
     }
@@ -337,10 +334,7 @@ where
     }
 }
 
-impl<T> ConfigurableField<T> where
-    T: Clone + PartialEq + std::fmt::Debug + for<'de> serde::Deserialize<'de>
-{
-}
+impl<T> ConfigurableField<T> where T: Clone + PartialEq + std::fmt::Debug + for<'de> serde::Deserialize<'de> {}
 
 // Specialized implementation for String fields that support wildcard
 // This will serialize as a direct array without the "values" wrapper
@@ -389,8 +383,7 @@ impl TagProperties {
 
 /// Named tag colours; the web UI maps each to a theme-friendly hex value.
 pub const TAG_COLOR_NAMES: &[&str] = &[
-    "red", "orange", "amber", "yellow", "lime", "green", "teal", "cyan", "sky", "blue", "indigo",
-    "violet", "purple", "pink", "rose", "brown", "gray", "grey",
+    "red", "orange", "amber", "yellow", "lime", "green", "teal", "cyan", "sky", "blue", "indigo", "violet", "purple", "pink", "rose", "brown", "gray", "grey",
 ];
 
 /// Whether `value` is a tag colour LoTaR understands.
@@ -404,9 +397,7 @@ pub fn is_valid_tag_color(value: &str) -> bool {
 
 impl StringConfigField {
     pub fn new_wildcard() -> Self {
-        Self {
-            values: vec!["*".to_string()],
-        }
+        Self { values: vec!["*".to_string()] }
     }
 
     pub fn new_strict(values: Vec<String>) -> Self {
@@ -886,12 +877,7 @@ impl ResolvedConfig {
         }
 
         let configured = self.default_priority.clone();
-        if self
-            .issue_priorities
-            .values
-            .iter()
-            .any(|value| value.eq_ignore_case(configured.as_str()))
-        {
+        if self.issue_priorities.values.iter().any(|value| value.eq_ignore_case(configured.as_str())) {
             return Some(configured);
         }
 
@@ -914,10 +900,7 @@ pub fn normalize_review_reviewers(values: &[String]) -> Result<Vec<String>, Conf
     for value in values {
         let value = value.trim();
         if value.is_empty() || value.starts_with('@') || value.contains('*') {
-            return Err(ConfigError::PolicyError(
-                "review.reviewers must contain nonblank named identities, not @ directives or wildcards"
-                    .to_string(),
-            ));
+            return Err(ConfigError::PolicyError("review.reviewers must contain nonblank named identities, not @ directives or wildcards".to_string()));
         }
         if seen.insert(value.to_lowercase()) {
             normalized.push(value.to_string());
@@ -964,34 +947,15 @@ fn default_priority() -> Priority {
 }
 
 fn default_issue_states() -> ConfigurableField<TaskStatus> {
-    ConfigurableField {
-        values: vec![
-            TaskStatus::from("Todo"),
-            TaskStatus::from("InProgress"),
-            TaskStatus::from("NeedsReview"),
-            TaskStatus::from("Done"),
-        ],
-    }
+    ConfigurableField { values: vec![TaskStatus::from("Todo"), TaskStatus::from("InProgress"), TaskStatus::from("NeedsReview"), TaskStatus::from("Done")] }
 }
 
 fn default_issue_types() -> ConfigurableField<TaskType> {
-    ConfigurableField {
-        values: vec![
-            TaskType::from("Feature"),
-            TaskType::from("Bug"),
-            TaskType::from("Chore"),
-        ],
-    }
+    ConfigurableField { values: vec![TaskType::from("Feature"), TaskType::from("Bug"), TaskType::from("Chore")] }
 }
 
 fn default_issue_priorities() -> ConfigurableField<Priority> {
-    ConfigurableField {
-        values: vec![
-            Priority::from("Low"),
-            Priority::from("Medium"),
-            Priority::from("High"),
-        ],
-    }
+    ConfigurableField { values: vec![Priority::from("Low"), Priority::from("Medium"), Priority::from("High")] }
 }
 
 fn default_tags() -> StringConfigField {
@@ -1003,13 +967,7 @@ fn default_custom_fields() -> StringConfigField {
 }
 
 fn default_scan_signal_words() -> Vec<String> {
-    vec![
-        "TODO".to_string(),
-        "FIXME".to_string(),
-        "HACK".to_string(),
-        "BUG".to_string(),
-        "NOTE".to_string(),
-    ]
+    vec!["TODO".to_string(), "FIXME".to_string(), "HACK".to_string(), "BUG".to_string(), "NOTE".to_string()]
 }
 
 fn default_attachments_dir() -> String {

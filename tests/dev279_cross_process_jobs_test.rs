@@ -41,17 +41,9 @@ fn jobs_in_another_process_are_seen_guarded_and_cancelled() {
     // Another process sees the job with its id and ticket.
     let deadline = Instant::now() + Duration::from_secs(15);
     let job_id = loop {
-        let out = cmd()
-            .args(["--format", "json", "agent", "list-running"])
-            .output()
-            .unwrap();
-        let json: serde_json::Value =
-            serde_json::from_slice(&out.stdout).unwrap_or(serde_json::Value::Null);
-        if let Some(id) = json["jobs"]
-            .as_array()
-            .and_then(|jobs| jobs.iter().find(|job| job["ticket_id"] == "TEST-1"))
-            .and_then(|job| job["job_id"].as_str())
-        {
+        let out = cmd().args(["--format", "json", "agent", "list-running"]).output().unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap_or(serde_json::Value::Null);
+        if let Some(id) = json["jobs"].as_array().and_then(|jobs| jobs.iter().find(|job| job["ticket_id"] == "TEST-1")).and_then(|job| job["job_id"].as_str()) {
             break id.to_string();
         }
         assert!(Instant::now() < deadline, "job never showed up: {json}");
@@ -63,8 +55,7 @@ fn jobs_in_another_process_are_seen_guarded_and_cancelled() {
     let status = cmd().args(["status", "TEST-1", "Done"]).output().unwrap();
     assert!(status.status.success());
     assert!(
-        String::from_utf8_lossy(&status.stdout)
-            .contains(&format!("Done will be set when job {job_id} ends")),
+        String::from_utf8_lossy(&status.stdout).contains(&format!("Done will be set when job {job_id} ends")),
         "{}",
         String::from_utf8_lossy(&status.stdout)
     );

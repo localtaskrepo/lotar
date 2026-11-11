@@ -15,20 +15,11 @@ impl CommandHandler for RestoreHandler {
     type Args = TaskRestoreArgs;
     type Result = Result<(), String>;
 
-    fn execute(
-        args: Self::Args,
-        project: Option<&str>,
-        resolver: &TasksDirectoryResolver,
-        renderer: &crate::output::OutputRenderer,
-    ) -> Self::Result {
+    fn execute(args: Self::Args, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &crate::output::OutputRenderer) -> Self::Result {
         renderer.log_info("restore: begin");
         let TaskRestoreArgs { id, dry_run } = args;
         let mut ctx = TaskCommandContext::new(resolver, project, Some(id.as_str()))?;
-        let LoadedDeletedAwareTask {
-            full_id,
-            project_prefix,
-            task,
-        } = load_task_including_deleted(&mut ctx, &id, project)?;
+        let LoadedDeletedAwareTask { full_id, project_prefix, task } = load_task_including_deleted(&mut ctx, &id, project)?;
 
         if dry_run {
             // Mirror `TaskService::restore`'s fail-closed gate without
@@ -39,16 +30,9 @@ impl CommandHandler for RestoreHandler {
             if let Some(deleted_at) = task.deleted_at.as_deref() {
                 let raw_task = ctx.storage.get(&full_id, &project_prefix);
                 if let Some(raw) = raw_task.as_ref()
-                    && let Err(e) = validate_restore_preconditions(
-                        ctx.storage_root(),
-                        project_prefix.as_str(),
-                        raw,
-                    )
+                    && let Err(e) = validate_restore_preconditions(ctx.storage_root(), project_prefix.as_str(), raw)
                 {
-                    return Err(format!(
-                        "Restore preview for '{}' (deleted_at {}) would fail: {}",
-                        id, deleted_at, e
-                    ));
+                    return Err(format!("Restore preview for '{}' (deleted_at {}) would fail: {}", id, deleted_at, e));
                 }
             }
             match renderer.format {
@@ -71,10 +55,7 @@ impl CommandHandler for RestoreHandler {
                             task.deleted_at.as_deref().unwrap_or("unknown")
                         ));
                     } else {
-                        renderer.emit_info(format_args!(
-                            "DRY RUN: Task '{}' from project {} is not soft-deleted; nothing to restore",
-                            id, project_prefix
-                        ));
+                        renderer.emit_info(format_args!("DRY RUN: Task '{}' from project {} is not soft-deleted; nothing to restore", id, project_prefix));
                     }
                 }
             }
@@ -85,11 +66,7 @@ impl CommandHandler for RestoreHandler {
         let was_deleted = task.deleted_at.is_some();
         match TaskService::restore(&mut ctx.storage, &full_id, Some(project_prefix.as_str())) {
             Ok(restored) => {
-                let message = if was_deleted {
-                    format!("Task '{}' restored", full_id)
-                } else {
-                    format!("Task '{}' is not deleted; no changes", full_id)
-                };
+                let message = if was_deleted { format!("Task '{}' restored", full_id) } else { format!("Task '{}' is not deleted; no changes", full_id) };
                 match renderer.format {
                     crate::output::OutputFormat::Json => {
                         let obj = serde_json::json!({
@@ -118,36 +95,22 @@ impl CommandHandler for RestoreHandler {
 /// parsers the service calls. Nothing is mutated; a stored value the
 /// current config rejects blocks the preview exactly as it would block
 /// the real restore.
-fn validate_restore_preconditions(
-    storage_root: &std::path::Path,
-    project_prefix: &str,
-    task: &crate::storage::task::Task,
-) -> Result<(), String> {
-    let config = TaskService::restore_config(storage_root, project_prefix)
-        .map_err(|e| format!("failed to resolve project config: {e}"))?;
+fn validate_restore_preconditions(storage_root: &std::path::Path, project_prefix: &str, task: &crate::storage::task::Task) -> Result<(), String> {
+    let config = TaskService::restore_config(storage_root, project_prefix).map_err(|e| format!("failed to resolve project config: {e}"))?;
     if !task.status.is_empty()
-        && let Err(e) =
-            crate::services::task_validation::parse_status(task.status.as_str(), &config)
+        && let Err(e) = crate::services::task_validation::parse_status(task.status.as_str(), &config)
     {
-        return Err(format!(
-            "stored status is invalid under the current config: {e}"
-        ));
+        return Err(format!("stored status is invalid under the current config: {e}"));
     }
     if !task.priority.is_empty()
-        && let Err(e) =
-            crate::services::task_validation::parse_priority(task.priority.as_str(), &config)
+        && let Err(e) = crate::services::task_validation::parse_priority(task.priority.as_str(), &config)
     {
-        return Err(format!(
-            "stored priority is invalid under the current config: {e}"
-        ));
+        return Err(format!("stored priority is invalid under the current config: {e}"));
     }
     if !task.task_type.is_empty()
-        && let Err(e) =
-            crate::services::task_validation::parse_task_type(task.task_type.as_str(), &config)
+        && let Err(e) = crate::services::task_validation::parse_task_type(task.task_type.as_str(), &config)
     {
-        return Err(format!(
-            "stored task type is invalid under the current config: {e}"
-        ));
+        return Err(format!("stored task type is invalid under the current config: {e}"));
     }
     Ok(())
 }
@@ -161,21 +124,12 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let tasks_dir = tmp.path().join(".tasks");
         std::fs::create_dir_all(&tasks_dir).unwrap();
-        std::fs::write(
-            tasks_dir.join("config.yml"),
-            format!(
-                "default:\n  project: MCP\nmembers:\n  - alice\nissue:\n  states: [{states}]\n"
-            ),
-        )
-        .unwrap();
+        std::fs::write(tasks_dir.join("config.yml"), format!("default:\n  project: MCP\nmembers:\n  - alice\nissue:\n  states: [{states}]\n")).unwrap();
         tmp
     }
 
     fn stored_task() -> crate::storage::task::Task {
-        parse_task_yaml_tolerant(
-            "title: t\nstatus: Todo\npriority: Low\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\n",
-        )
-        .expect("fixture task YAML parses")
+        parse_task_yaml_tolerant("title: t\nstatus: Todo\npriority: Low\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\n").expect("fixture task YAML parses")
     }
 
     #[test]
@@ -191,11 +145,7 @@ mod tests {
         // admits it: the preview must fail closed like the real restore.
         let tmp = seeded_root("Open, Closed");
         let root = tmp.path().join(".tasks");
-        let err = validate_restore_preconditions(root.as_path(), "MCP", &stored_task())
-            .expect_err("config-invalid stored status must block the preview");
-        assert!(
-            err.contains("stored status"),
-            "error should name the offending field: {err}"
-        );
+        let err = validate_restore_preconditions(root.as_path(), "MCP", &stored_task()).expect_err("config-invalid stored status must block the preview");
+        assert!(err.contains("stored status"), "error should name the offending field: {err}");
     }
 }

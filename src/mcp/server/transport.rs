@@ -86,10 +86,7 @@ pub(super) fn read_ndjson_line<R: BufRead + ?Sized>(reader: &mut R) -> NdjsonLin
 }
 /// Read one framed message, given the already-consumed first header line
 /// (which contained a case-insensitive `Content-Length:` prefix).
-pub(super) fn read_framed_message<R: BufRead + ?Sized>(
-    reader: &mut R,
-    first_header_line: &str,
-) -> FramedReadOutcome {
+pub(super) fn read_framed_message<R: BufRead + ?Sized>(reader: &mut R, first_header_line: &str) -> FramedReadOutcome {
     let mut content_length: Option<usize> = None;
     if let Some(value) = header_value(first_header_line) {
         content_length = value.parse::<usize>().ok();
@@ -118,9 +115,7 @@ pub(super) fn read_framed_message<R: BufRead + ?Sized>(
     };
     if length > MAX_MCP_FRAME_BYTES {
         drain_framed_body(reader, length);
-        return FramedReadOutcome::Malformed(
-            "Content-Length exceeds maximum frame size".to_string(),
-        );
+        return FramedReadOutcome::Malformed("Content-Length exceeds maximum frame size".to_string());
     }
 
     let mut buffer = vec![0u8; length];
@@ -135,11 +130,7 @@ pub(super) fn read_framed_message<R: BufRead + ?Sized>(
 
 fn header_value(line: &str) -> Option<&str> {
     let (name, value) = line.split_once(':')?;
-    if name.trim().eq_ignore_ascii_case("content-length") {
-        Some(value.trim())
-    } else {
-        None
-    }
+    if name.trim().eq_ignore_ascii_case("content-length") { Some(value.trim()) } else { None }
 }
 
 #[cfg(test)]
@@ -157,11 +148,7 @@ mod tests {
 
     impl ChunkedReader {
         fn new(data: Vec<u8>, chunk: usize) -> Self {
-            Self {
-                data,
-                chunk,
-                position: 0,
-            }
+            Self { data, chunk, position: 0 }
         }
     }
 
@@ -214,10 +201,7 @@ mod tests {
         for chunk in 1..=7 {
             let mut reader = std::io::BufReader::new(ChunkedReader::new(bytes.clone(), chunk));
             match read_framed_message(&mut reader, &first) {
-                FramedReadOutcome::Body(decoded) => assert_eq!(
-                    decoded, body,
-                    "chunk size {chunk} must reassemble the full UTF-8 body"
-                ),
+                FramedReadOutcome::Body(decoded) => assert_eq!(decoded, body, "chunk size {chunk} must reassemble the full UTF-8 body"),
                 other => panic!("chunk {chunk}: expected body, got {other:?}"),
             }
         }
@@ -226,12 +210,7 @@ mod tests {
     #[test]
     fn later_content_length_header_wins() {
         let body = r#"{"a":1}"#;
-        let bytes = format!(
-            "Content-Length: 999\r\nSome-Header: x\r\nContent-Length: {}\r\n\r\n{}",
-            body.len(),
-            body
-        )
-        .into_bytes();
+        let bytes = format!("Content-Length: 999\r\nSome-Header: x\r\nContent-Length: {}\r\n\r\n{}", body.len(), body).into_bytes();
         let mut cursor = Cursor::new(bytes);
         match read_framed_message(&mut cursor, "Content-Length: 999") {
             FramedReadOutcome::Body(decoded) => assert_eq!(decoded, body),
@@ -314,10 +293,7 @@ mod tests {
         // After the drain, the next line must be intact.
         let mut line = String::new();
         buffered.read_line(&mut line).unwrap();
-        assert!(
-            line.contains("\"ping\""),
-            "stream must stay in sync, got: {line}"
-        );
+        assert!(line.contains("\"ping\""), "stream must stay in sync, got: {line}");
     }
 
     #[test]
@@ -422,8 +398,7 @@ mod tests {
         // Hostile peer sends an oversized line then closes mid-line: the
         // bounded reader must terminate instead of looping or allocating.
         let over_limit = "a".repeat(MAX_MCP_FRAME_BYTES + 5);
-        let mut reader =
-            std::io::BufReader::new(ChunkedReader::new(over_limit.into_bytes(), 64 * 1024));
+        let mut reader = std::io::BufReader::new(ChunkedReader::new(over_limit.into_bytes(), 64 * 1024));
         match read_ndjson_line(&mut reader) {
             NdjsonLineOutcome::Overlong => {}
             other => panic!("expected overlong, got {other:?}"),

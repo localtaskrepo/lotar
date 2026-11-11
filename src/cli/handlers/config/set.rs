@@ -8,10 +8,7 @@ use crate::utils::project::resolve_project_input;
 use crate::workspace::TasksDirectoryResolver;
 
 impl ConfigHandler {
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "one parameter per CLI flag; this handler forwards them unchanged"
-    )]
+    #[expect(clippy::too_many_arguments, reason = "one parameter per CLI flag; this handler forwards them unchanged")]
     pub(super) fn handle_config_set(
         resolver: &TasksDirectoryResolver,
         renderer: &OutputRenderer,
@@ -27,24 +24,17 @@ impl ConfigHandler {
         // Fields that exist only in the global configuration — including
         // their dotted canonical aliases such as `server.port` — are applied
         // to the global scope automatically.
-        if !global
-            && let Some(canonical) =
-                crate::config::operations::is_global_only_field_name(trimmed_field)
-        {
+        if !global && let Some(canonical) = crate::config::operations::is_global_only_field_name(trimmed_field) {
             global = true;
             if !dry_run {
-                renderer.emit_info(format_args!(
-                    "Automatically treating '{}' (-> {}) as global configuration field",
-                    trimmed_field, canonical
-                ));
+                renderer.emit_info(format_args!("Automatically treating '{}' (-> {}) as global configuration field", trimmed_field, canonical));
             }
         }
 
         // Validate the name for the resolved scope up front so an unknown
         // field never falls back to default-project resolution or writes
         // anything, in dry-run and forced runs alike.
-        let canonical = canonicalize_field_name(trimmed_field, global)
-            .map_err(|e| format!("Validation error: {}", e))?;
+        let canonical = canonicalize_field_name(trimmed_field, global).map_err(|e| format!("Validation error: {}", e))?;
 
         // Determine the project scope without bootstrapping configuration:
         // read-only resolution plus a read-only prefix auto-detection pass.
@@ -53,30 +43,19 @@ impl ConfigHandler {
         } else {
             let explicit = project.and_then(|p| {
                 let trimmed = p.trim();
-                if trimmed.is_empty() {
-                    None
-                } else {
-                    Some(resolve_project_input(trimmed, &resolver.path))
-                }
+                if trimmed.is_empty() { None } else { Some(resolve_project_input(trimmed, &resolver.path)) }
             });
             let prefix = match explicit {
                 Some(prefix) => prefix,
                 None => {
-                    let readonly =
-                        ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path)
-                            .map_err(|e| format!("Failed to load config: {}", e))?;
+                    let readonly = ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path).map_err(|e| format!("Failed to load config: {}", e))?;
                     let default_project = readonly.get_resolved_config().default_project.clone();
                     if !default_project.is_empty() {
                         default_project
-                    } else if let Some(detected) =
-                        crate::config::persistence::auto_detect_prefix(&resolver.path)
-                    {
+                    } else if let Some(detected) = crate::config::persistence::auto_detect_prefix(&resolver.path) {
                         detected
                     } else {
-                        return Err(
-                            "No default project set. Use --global flag or set a default project first."
-                                .to_string(),
-                        );
+                        return Err("No default project set. Use --global flag or set a default project first.".to_string());
                     }
                 }
             };
@@ -88,20 +67,11 @@ impl ConfigHandler {
         let result = candidate::apply_config_set(
             &resolver.path,
             &scope,
-            &ConfigSetRequest {
-                entries: vec![(trimmed_field.to_string(), value.to_string())],
-                force,
-                dry_run,
-            },
+            &ConfigSetRequest { entries: vec![(trimmed_field.to_string(), value.to_string())], force, dry_run },
         )
         .map_err(|e| format!("Configuration change rejected: {}", e))?;
 
-        let warnings: Vec<String> = result
-            .validation
-            .warnings
-            .iter()
-            .map(|w| w.to_string())
-            .collect();
+        let warnings: Vec<String> = result.validation.warnings.iter().map(|w| w.to_string()).collect();
 
         if dry_run {
             renderer.emit_info(format_args!("DRY RUN: Would set {} = {}", canonical, value));
@@ -111,28 +81,21 @@ impl ConfigHandler {
                     renderer.emit_warning(warning);
                 }
             }
-            renderer.emit_success(
-                "Dry run completed. Use the same command without --dry-run to apply.",
-            );
+            renderer.emit_success("Dry run completed. Use the same command without --dry-run to apply.");
             return Ok(());
         }
 
         if !result.updated {
             // DEV-134: no-op requests skip the write; say so instead of
             // claiming an update.
-            renderer.emit_info(format_args!(
-                "{} is already set to {}; nothing changed",
-                canonical, value
-            ));
+            renderer.emit_info(format_args!("{} is already set to {}; nothing changed", canonical, value));
             for warning in &warnings {
                 renderer.emit_warning(warning);
             }
             return Ok(());
         }
 
-        if matches!(scope, ConfigScope::Project(_))
-            && Self::check_matches_global_default(&canonical, value, &resolver.path)
-        {
+        if matches!(scope, ConfigScope::Project(_)) && Self::check_matches_global_default(&canonical, value, &resolver.path) {
             renderer.emit_info(
                 "Note: This project setting matches the global default. This project will now use this explicit value and won't inherit future global changes to this field.",
             );

@@ -55,14 +55,10 @@ issue.priorities: [Low, Medium, High]
         }),
         ..Sprint::default()
     };
-    let active_created =
-        SprintService::create(&mut storage, active, None).expect("create active sprint");
+    let active_created = SprintService::create(&mut storage, active, None).expect("create active sprint");
     let active_id = active_created.record.id;
     let mut active_doc = active_created.record.sprint;
-    active_doc.actual = Some(SprintActual {
-        started_at: Some(active_start.to_rfc3339()),
-        ..SprintActual::default()
-    });
+    active_doc.actual = Some(SprintActual { started_at: Some(active_start.to_rfc3339()), ..SprintActual::default() });
     SprintService::update(&mut storage, active_id, active_doc).expect("activate sprint");
 
     // Completed sprint
@@ -76,14 +72,10 @@ issue.priorities: [Low, Medium, High]
         }),
         ..Sprint::default()
     };
-    let completed_created =
-        SprintService::create(&mut storage, completed, None).expect("create completed sprint");
+    let completed_created = SprintService::create(&mut storage, completed, None).expect("create completed sprint");
     let completed_id = completed_created.record.id;
     let mut completed_doc = completed_created.record.sprint;
-    completed_doc.actual = Some(SprintActual {
-        started_at: Some(completed_start.to_rfc3339()),
-        closed_at: Some(completed_end.to_rfc3339()),
-    });
+    completed_doc.actual = Some(SprintActual { started_at: Some(completed_start.to_rfc3339()), closed_at: Some(completed_end.to_rfc3339()) });
     SprintService::update(&mut storage, completed_id, completed_doc).expect("close sprint");
 
     let broken = Sprint {
@@ -98,19 +90,7 @@ issue.priorities: [Low, Medium, High]
     SprintService::create(&mut storage, broken, None).expect("create broken sprint");
 
     let mut cmd = common::cargo_bin_in(&fixtures);
-    let output = cmd
-        .args([
-            "--format",
-            "json",
-            "sprint",
-            "calendar",
-            "--include-complete",
-        ])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
+    let output = cmd.args(["--format", "json", "sprint", "calendar", "--include-complete"]).assert().success().get_output().stdout.clone();
 
     let payload: Value = serde_json::from_slice(&output).expect("parse calendar json");
 
@@ -122,61 +102,23 @@ issue.priorities: [Low, Medium, High]
     let entries = payload["sprints"].as_array().expect("sprints array");
     assert_eq!(entries.len(), 4);
 
-    let upcoming_entry = entries
-        .iter()
-        .find(|entry| entry["summary"]["label"].as_str() == Some("Upcoming Sprint"))
-        .expect("find upcoming sprint");
-    assert!(
-        upcoming_entry["relative"]
-            .as_str()
-            .unwrap()
-            .contains("starts"),
-        "expected upcoming sprint relative status to mention start"
-    );
+    let upcoming_entry = entries.iter().find(|entry| entry["summary"]["label"].as_str() == Some("Upcoming Sprint")).expect("find upcoming sprint");
+    assert!(upcoming_entry["relative"].as_str().unwrap().contains("starts"), "expected upcoming sprint relative status to mention start");
 
-    let current_entry = entries
-        .iter()
-        .find(|entry| entry["summary"]["label"].as_str() == Some("Current Sprint"))
-        .expect("find current sprint");
+    let current_entry = entries.iter().find(|entry| entry["summary"]["label"].as_str() == Some("Current Sprint")).expect("find current sprint");
     assert!(
-        current_entry["relative"]
-            .as_str()
-            .unwrap()
-            .contains("overdue")
-            || current_entry["relative"].as_str().unwrap().contains("ends"),
+        current_entry["relative"].as_str().unwrap().contains("overdue") || current_entry["relative"].as_str().unwrap().contains("ends"),
         "expected active sprint relative status to mention progress"
     );
 
-    let completed_entry = entries
-        .iter()
-        .find(|entry| entry["summary"]["label"].as_str() == Some("September Sprint"))
-        .expect("find completed sprint");
-    assert!(
-        completed_entry["relative"]
-            .as_str()
-            .unwrap()
-            .contains("ended"),
-        "expected completed sprint relative status to mention completion"
-    );
+    let completed_entry = entries.iter().find(|entry| entry["summary"]["label"].as_str() == Some("September Sprint")).expect("find completed sprint");
+    assert!(completed_entry["relative"].as_str().unwrap().contains("ended"), "expected completed sprint relative status to mention completion");
 
-    let broken_entry = entries
-        .iter()
-        .find(|entry| entry["summary"]["label"].as_str() == Some("Broken Sprint"))
-        .expect("find broken sprint");
-    assert_eq!(
-        broken_entry["summary"]["has_warnings"].as_bool(),
-        Some(true)
-    );
+    let broken_entry = entries.iter().find(|entry| entry["summary"]["label"].as_str() == Some("Broken Sprint")).expect("find broken sprint");
+    assert_eq!(broken_entry["summary"]["has_warnings"].as_bool(), Some(true));
     assert_eq!(broken_entry["has_warnings"].as_bool(), Some(true));
-    let warnings = broken_entry["status_warnings"]
-        .as_array()
-        .expect("warnings array");
-    assert!(
-        warnings
-            .iter()
-            .any(|warning| warning["code"].as_str() == Some("unparseable_timestamp")),
-        "expected unparseable timestamp warning"
-    );
+    let warnings = broken_entry["status_warnings"].as_array().expect("warnings array");
+    assert!(warnings.iter().any(|warning| warning["code"].as_str() == Some("unparseable_timestamp")), "expected unparseable timestamp warning");
     assert!(broken_entry["window"].as_str().is_some());
 }
 

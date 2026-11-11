@@ -31,14 +31,7 @@ const REPORT_PREFIX: &str = "Reported again by ";
 
 /// Status names that mean "decided not to do" (compared without case,
 /// spaces, `-`, `_` and `'`).
-const WONT_DO_NAMES: &[&str] = &[
-    "wontdo",
-    "wontfix",
-    "cancelled",
-    "canceled",
-    "rejected",
-    "declined",
-];
+const WONT_DO_NAMES: &[&str] = &["wontdo", "wontfix", "cancelled", "canceled", "rejected", "declined"];
 
 /// A busy finding lock is waited for this long: the holder only checks the
 /// project and writes one ticket or comment.
@@ -49,22 +42,10 @@ impl FindingReport {
     pub fn describe(&self, key: &str) -> String {
         match self.state {
             FindingState::New => format!("Created {} for finding {key}", self.id),
-            FindingState::Recurred => format!(
-                "Created {} for finding {key}; it was fixed before and came back",
-                self.id
-            ),
-            FindingState::Open if self.commented => format!(
-                "{} already reports finding {key}; added this report as a comment",
-                self.id
-            ),
-            FindingState::Open => format!(
-                "{} already reports finding {key}; seen again with nothing new, no comment added",
-                self.id
-            ),
-            FindingState::Suppressed => format!(
-                "{} reported finding {key} and was closed as won't do; nothing created",
-                self.id
-            ),
+            FindingState::Recurred => format!("Created {} for finding {key}; it was fixed before and came back", self.id),
+            FindingState::Open if self.commented => format!("{} already reports finding {key}; added this report as a comment", self.id),
+            FindingState::Open => format!("{} already reports finding {key}; seen again with nothing new, no comment added", self.id),
+            FindingState::Suppressed => format!("{} reported finding {key} and was closed as won't do; nothing created", self.id),
         }
     }
 }
@@ -85,46 +66,32 @@ impl FindingService {
     pub fn validate_key(raw: &str) -> LoTaRResult<String> {
         let key = raw.trim();
         if key.is_empty() {
-            return Err(LoTaRError::ValidationError(
-                "The finding key is empty".to_string(),
-            ));
+            return Err(LoTaRError::ValidationError("The finding key is empty".to_string()));
         }
         if key.chars().count() > 200 || key.chars().any(char::is_control) {
-            return Err(LoTaRError::ValidationError(format!(
-                "Invalid finding key '{key}': use one line of at most 200 characters"
-            )));
+            return Err(LoTaRError::ValidationError(format!("Invalid finding key '{key}': use one line of at most 200 characters")));
         }
         Ok(key.to_string())
     }
 
     /// Hold the project's finding lock while checking and writing.
     pub fn lock(tasks_root: &Path, project: &str) -> LoTaRResult<std::fs::File> {
-        crate::storage::safety::validate_project_prefix(project)
-            .map_err(LoTaRError::ValidationError)?;
+        crate::storage::safety::validate_project_prefix(project).map_err(LoTaRError::ValidationError)?;
         let dir = tasks_root.join(project);
         std::fs::create_dir_all(&dir)?;
-        Ok(crate::storage::safety::acquire_storage_lock_within(
-            &dir, "finding", LOCK_WAIT,
-        )?)
+        Ok(crate::storage::safety::acquire_storage_lock_within(&dir, "finding", LOCK_WAIT)?)
     }
 
     /// The newest ticket of `project` with this key (archived ones count,
     /// deleted ones don't).
     pub fn prior(storage: &Storage, project: &str, key: &str, config: &ResolvedConfig) -> Prior {
-        let filter = TaskFilter {
-            project: Some(project.to_string()),
-            archived: ArchiveFilter::All,
-            ..Default::default()
-        };
+        let filter = TaskFilter { project: Some(project.to_string()), archived: ArchiveFilter::All, ..Default::default() };
         let newest = storage
             .search(&filter)
             .into_iter()
             .filter(|(_, task)| {
-                crate::utils::custom_fields::extract_value_strings(
-                    &task.custom_fields,
-                    FINDING_FIELD,
-                )
-                .is_some_and(|values| values.iter().any(|value| value.trim() == key))
+                crate::utils::custom_fields::extract_value_strings(&task.custom_fields, FINDING_FIELD)
+                    .is_some_and(|values| values.iter().any(|value| value.trim() == key))
             })
             .max_by_key(|(id, _)| TaskId::parse(id).map(|id| id.number).unwrap_or(0));
         let Some((id, task)) = newest else {
@@ -134,11 +101,7 @@ impl FindingService {
             return Prior::Suppressed(id);
         }
         let done = crate::services::completion::effective_done_statuses(config);
-        if done.contains(&task.status.as_str().to_ascii_lowercase()) {
-            Prior::Done(id)
-        } else {
-            Prior::Open(id)
-        }
+        if done.contains(&task.status.as_str().to_ascii_lowercase()) { Prior::Done(id) } else { Prior::Open(id) }
     }
 
     /// Record a repeated report on the open ticket. A report with news (a
@@ -146,12 +109,7 @@ impl FindingService {
     /// comment's) becomes a comment; one without only updates the
     /// `finding_seen` date (DEV-321), so a daily check adds no daily comment.
     /// Returns the ticket and whether a comment was added.
-    pub fn record_repeat(
-        storage: &mut Storage,
-        id: &str,
-        reporter: Option<&str>,
-        description: Option<&str>,
-    ) -> LoTaRResult<(TaskDTO, bool)> {
+    pub fn record_repeat(storage: &mut Storage, id: &str, reporter: Option<&str>, description: Option<&str>) -> LoTaRResult<(TaskDTO, bool)> {
         let description = description.map(str::trim).filter(|d| !d.is_empty());
         let task = TaskService::get(storage, id, None)?;
         let Some(description) = description.filter(|text| !already_reported(&task, text)) else {
@@ -161,21 +119,12 @@ impl FindingService {
             .map(str::trim)
             .filter(|value| !value.is_empty())
             .map(str::to_string)
-            .or_else(|| {
-                crate::utils::identity::resolve_current_user(Some(storage.root_path.as_path()))
-            })
+            .or_else(|| crate::utils::identity::resolve_current_user(Some(storage.root_path.as_path())))
             .unwrap_or_else(|| "unknown".to_string());
         let date = chrono::Local::now().format("%Y-%m-%d");
         let text = format!("{REPORT_PREFIX}{reporter} on {date}.\n\n{description}");
-        let task = TaskService::add_comment_with_context(
-            storage,
-            &task.id,
-            &text,
-            CommentContext {
-                actor_override: Some(reporter),
-                ..CommentContext::default()
-            },
-        )?;
+        let task =
+            TaskService::add_comment_with_context(storage, &task.id, &text, CommentContext { actor_override: Some(reporter), ..CommentContext::default() })?;
         Ok((task, true))
     }
 
@@ -188,8 +137,7 @@ impl FindingService {
             if task.custom_fields.get(FINDING_SEEN_FIELD) == Some(&value) {
                 return Ok(false);
             }
-            task.custom_fields
-                .insert(FINDING_SEEN_FIELD.to_string(), value);
+            task.custom_fields.insert(FINDING_SEEN_FIELD.to_string(), value);
             Ok(true)
         })?;
         TaskService::get(storage, id, None)
@@ -197,11 +145,7 @@ impl FindingService {
 
     /// Report a finding through the shared create path (REST and MCP).
     /// Returns the outcome and the ticket it names.
-    pub fn report(
-        storage: &mut Storage,
-        mut req: TaskCreate,
-        key: &str,
-    ) -> LoTaRResult<(FindingReport, TaskDTO)> {
+    pub fn report(storage: &mut Storage, mut req: TaskCreate, key: &str) -> LoTaRResult<(FindingReport, TaskDTO)> {
         let key = Self::validate_key(key)?;
         let project = TaskService::resolve_create_project(&storage.root_path, req.project.clone());
         req.project = Some(project.clone());
@@ -210,29 +154,14 @@ impl FindingService {
         let lock = Self::lock(&storage.root_path, &project)?;
         let (outcome, task) = match Self::prior(storage, &project, &key, &config) {
             Prior::Open(id) => {
-                let (task, commented) = Self::record_repeat(
-                    storage,
-                    &id,
-                    req.reporter.as_deref(),
-                    req.description.as_deref(),
-                )?;
-                let outcome = FindingReport {
-                    created: false,
-                    state: FindingState::Open,
-                    id,
-                    commented,
-                };
+                let (task, commented) = Self::record_repeat(storage, &id, req.reporter.as_deref(), req.description.as_deref())?;
+                let outcome = FindingReport { created: false, state: FindingState::Open, id, commented };
                 return Ok((outcome, task));
             }
             Prior::Suppressed(id) => {
                 drop(lock);
                 let task = TaskService::get(storage, &id, None)?;
-                let outcome = FindingReport {
-                    created: false,
-                    state: FindingState::Suppressed,
-                    id,
-                    commented: false,
-                };
+                let outcome = FindingReport { created: false, state: FindingState::Suppressed, id, commented: false };
                 return Ok((outcome, task));
             }
             Prior::Done(old) => {
@@ -241,27 +170,11 @@ impl FindingService {
                     relationships.related.push(old);
                 }
                 let task = Self::create_locked(storage, req, &key)?;
-                (
-                    FindingReport {
-                        created: true,
-                        state: FindingState::Recurred,
-                        id: task.id.clone(),
-                        commented: false,
-                    },
-                    task,
-                )
+                (FindingReport { created: true, state: FindingState::Recurred, id: task.id.clone(), commented: false }, task)
             }
             Prior::None => {
                 let task = Self::create_locked(storage, req, &key)?;
-                (
-                    FindingReport {
-                        created: true,
-                        state: FindingState::New,
-                        id: task.id.clone(),
-                        commented: false,
-                    },
-                    task,
-                )
+                (FindingReport { created: true, state: FindingState::New, id: task.id.clone(), commented: false }, task)
             }
         };
         drop(lock);
@@ -274,14 +187,7 @@ impl FindingService {
     }
 
     fn create_locked(storage: &mut Storage, req: TaskCreate, key: &str) -> LoTaRResult<TaskDTO> {
-        TaskService::create_with(
-            storage,
-            req,
-            CreateOptions {
-                finding: Some(key.to_string()),
-                skip_automation: true,
-            },
-        )
+        TaskService::create_with(storage, req, CreateOptions { finding: Some(key.to_string()), skip_automation: true })
     }
 }
 
@@ -290,21 +196,16 @@ fn already_reported(task: &TaskDTO, text: &str) -> bool {
     if task.description.as_deref().map(str::trim) == Some(text) {
         return true;
     }
-    let last_report = task.comments.iter().rev().find_map(|comment| {
-        comment
-            .text
-            .strip_prefix(REPORT_PREFIX)
-            .map(|rest| rest.split_once("\n\n").map_or("", |(_, body)| body).trim())
-    });
+    let last_report = task
+        .comments
+        .iter()
+        .rev()
+        .find_map(|comment| comment.text.strip_prefix(REPORT_PREFIX).map(|rest| rest.split_once("\n\n").map_or("", |(_, body)| body).trim()));
     last_report == Some(text)
 }
 
 fn is_wont_do(status: &str) -> bool {
-    let normalized: String = status
-        .chars()
-        .filter(|ch| ch.is_alphanumeric())
-        .flat_map(char::to_lowercase)
-        .collect();
+    let normalized: String = status.chars().filter(|ch| ch.is_alphanumeric()).flat_map(char::to_lowercase).collect();
     WONT_DO_NAMES.contains(&normalized.as_str())
 }
 
@@ -314,14 +215,7 @@ mod tests {
 
     #[test]
     fn wont_do_states_are_recognised_by_name() {
-        for status in [
-            "WontDo",
-            "Won't do",
-            "wont-fix",
-            "Cancelled",
-            "Canceled",
-            "Rejected",
-        ] {
+        for status in ["WontDo", "Won't do", "wont-fix", "Cancelled", "Canceled", "Rejected"] {
             assert!(is_wont_do(status), "{status}");
         }
         for status in ["Done", "Todo", "Blocked", "Won"] {
@@ -331,10 +225,7 @@ mod tests {
 
     #[test]
     fn finding_keys_are_one_short_line() {
-        assert_eq!(
-            FindingService::validate_key("  worktrees:lotar  ").unwrap_or_default(),
-            "worktrees:lotar"
-        );
+        assert_eq!(FindingService::validate_key("  worktrees:lotar  ").unwrap_or_default(), "worktrees:lotar");
         assert!(FindingService::validate_key(" ").is_err());
         assert!(FindingService::validate_key("a\nb").is_err());
         assert!(FindingService::validate_key(&"x".repeat(201)).is_err());

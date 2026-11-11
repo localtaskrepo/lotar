@@ -51,37 +51,24 @@ pub(crate) fn emit_subcommand_overview(renderer: &OutputRenderer, command_path: 
     let display = command_path.join(" ");
     match collect_subcommand_names(command_path) {
         Some(names) if !names.is_empty() => {
-            renderer.emit_notice(format_args!(
-                "Available {} subcommands: {}",
-                display,
-                names.join(", ")
-            ));
+            renderer.emit_notice(format_args!("Available {} subcommands: {}", display, names.join(", ")));
         }
         _ => {
             renderer.emit_notice(format_args!("No subcommands registered for {}.", display));
         }
     }
-    renderer.emit_info(format_args!(
-        "Run `lotar help {}` for usage details.",
-        display
-    ));
+    renderer.emit_info(format_args!("Run `lotar help {}` for usage details.", display));
 }
 
 fn collect_subcommand_names(path: &[&str]) -> Option<Vec<String>> {
     let mut command = crate::cli::base_command();
 
     for segment in path {
-        let next = command
-            .get_subcommands()
-            .find(|sub| sub.get_name() == *segment)
-            .cloned()?;
+        let next = command.get_subcommands().find(|sub| sub.get_name() == *segment).cloned()?;
         command = next;
     }
 
-    let names: Vec<String> = command
-        .get_subcommands()
-        .map(|sub| sub.get_name().to_string())
-        .collect();
+    let names: Vec<String> = command.get_subcommands().map(|sub| sub.get_name().to_string()).collect();
     Some(names)
 }
 
@@ -90,12 +77,7 @@ pub trait CommandHandler {
     type Args;
     type Result;
 
-    fn execute(
-        args: Self::Args,
-        project: Option<&str>,
-        resolver: &TasksDirectoryResolver,
-        renderer: &OutputRenderer,
-    ) -> Self::Result;
+    fn execute(args: Self::Args, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Self::Result;
 }
 
 /// Handler for adding tasks with the new CLI
@@ -105,12 +87,7 @@ impl CommandHandler for AddHandler {
     type Args = AddArgs;
     type Result = Result<String, String>;
 
-    fn execute(
-        args: Self::Args,
-        project: Option<&str>,
-        resolver: &TasksDirectoryResolver,
-        renderer: &OutputRenderer,
-    ) -> Self::Result {
+    fn execute(args: Self::Args, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Self::Result {
         Self::execute_with_finding(args, project, resolver, renderer).map(|added| added.task_id)
     }
 }
@@ -129,36 +106,21 @@ impl AddHandler {
         resolver: &TasksDirectoryResolver,
         renderer: &OutputRenderer,
     ) -> Result<AddedTask, String> {
-        use crate::services::finding_service::{
-            FINDING_FIELD, FindingReport, FindingService, FindingState, Prior,
-        };
+        use crate::services::finding_service::{FINDING_FIELD, FindingReport, FindingService, FindingState, Prior};
         renderer.log_info("add: begin validation and project resolution");
         // Like REST and MCP: no task without a title (DEV-285).
         if args.title.trim().is_empty() {
             return Err("Title cannot be empty.".to_string());
         }
-        let finding_key = args
-            .finding
-            .as_deref()
-            .map(FindingService::validate_key)
-            .transpose()
-            .map_err(|e| e.to_string())?;
+        let finding_key = args.finding.as_deref().map(FindingService::validate_key).transpose().map_err(|e| e.to_string())?;
         // Create project resolver and validator
-        let mut project_resolver = ProjectResolver::new(resolver)
-            .map_err(|e| format!("Failed to initialize project resolver: {}", e))?;
-        let had_configured_default_project = !project_resolver
-            .get_config()
-            .default_project
-            .trim()
-            .is_empty();
+        let mut project_resolver = ProjectResolver::new(resolver).map_err(|e| format!("Failed to initialize project resolver: {}", e))?;
+        let had_configured_default_project = !project_resolver.get_config().default_project.trim().is_empty();
 
         // Resolve project first (needed for project-specific config)
         // A dry run must not save a detected default project.
-        let resolved = if args.dry_run && project.is_none() {
-            Ok(project_resolver.preview_default_project())
-        } else {
-            project_resolver.resolve_project("", project)
-        };
+        let resolved =
+            if args.dry_run && project.is_none() { Ok(project_resolver.preview_default_project()) } else { project_resolver.resolve_project("", project) };
         let effective_project = match resolved {
             Ok(project) => {
                 if project.is_empty() {
@@ -176,9 +138,7 @@ impl AddHandler {
 
         // Get appropriate configuration (project-specific or global)
         let mut config = match &effective_project {
-            Some(project_name) => project_resolver
-                .get_project_config(project_name)
-                .map_err(|e| format!("Failed to get project configuration: {}", e))?,
+            Some(project_name) => project_resolver.get_project_config(project_name).map_err(|e| format!("Failed to get project configuration: {}", e))?,
             None => {
                 // Use global config
                 project_resolver.get_config().clone()
@@ -192,9 +152,7 @@ impl AddHandler {
 
         // Process and validate arguments
         let validated_type = match args.task_type {
-            Some(task_type) => validator
-                .validate_task_type(&task_type)
-                .map_err(|e| format!("Task type validation failed: {}", e))?,
+            Some(task_type) => validator.validate_task_type(&task_type).map_err(|e| format!("Task type validation failed: {}", e))?,
             None => {
                 if let Some(t) = crate::utils::task_intel::infer_task_type_from_branch(&config) {
                     t
@@ -212,20 +170,13 @@ impl AddHandler {
 
         // Priority
         let validated_priority = match args.priority {
-            Some(priority) => validator
-                .validate_priority(&priority)
-                .map_err(|e| format!("Priority validation failed: {}", e))?,
-            None => crate::utils::task_intel::infer_priority_from_branch(&config)
-                .unwrap_or_else(|| Self::get_default_priority(&config)),
+            Some(priority) => validator.validate_priority(&priority).map_err(|e| format!("Priority validation failed: {}", e))?,
+            None => crate::utils::task_intel::infer_priority_from_branch(&config).unwrap_or_else(|| Self::get_default_priority(&config)),
         };
 
         // Validate assignee if provided
         let validated_assignee = if let Some(ref assignee) = args.assignee {
-            let result = if autop_members_enabled {
-                validator.validate_assignee_allow_unknown(assignee)
-            } else {
-                validator.validate_assignee(assignee)
-            };
+            let result = if autop_members_enabled { validator.validate_assignee_allow_unknown(assignee) } else { validator.validate_assignee(assignee) };
             Some(result.map_err(|e| format!("Assignee validation failed: {}", e))?)
         } else {
             config.default_assignee.clone()
@@ -233,11 +184,7 @@ impl AddHandler {
 
         // Validate reporter if provided
         let explicit_reporter = if let Some(ref reporter) = args.reporter {
-            let result = if autop_members_enabled {
-                validator.validate_reporter_allow_unknown(reporter)
-            } else {
-                validator.validate_reporter(reporter)
-            };
+            let result = if autop_members_enabled { validator.validate_reporter_allow_unknown(reporter) } else { validator.validate_reporter(reporter) };
             Some(result.map_err(|e| format!("Reporter validation failed: {}", e))?)
         } else {
             None
@@ -245,11 +192,7 @@ impl AddHandler {
 
         // Validate due date if provided
         let validated_due_date = if let Some(ref due_date) = args.due {
-            Some(
-                validator
-                    .parse_due_date(due_date)
-                    .map_err(|e| format!("Due date validation failed: {}", e))?,
-            )
+            Some(validator.parse_due_date(due_date).map_err(|e| format!("Due date validation failed: {}", e))?)
         } else {
             // No default due date
             None
@@ -257,11 +200,7 @@ impl AddHandler {
 
         // Validate effort if provided
         let validated_effort = if let Some(ref effort) = args.effort {
-            Some(
-                validator
-                    .validate_effort(effort)
-                    .map_err(|e| format!("Effort validation failed: {}", e))?,
-            )
+            Some(validator.validate_effort(effort).map_err(|e| format!("Effort validation failed: {}", e))?)
         } else {
             None
         };
@@ -271,9 +210,7 @@ impl AddHandler {
         let base_tags = if args.tags.is_empty() {
             let mut defaults = config.default_tags.clone();
             if let Some(label) = crate::utils::task_intel::auto_tag_from_path(&config)
-                && !defaults
-                    .iter()
-                    .any(|existing| existing.eq_ignore_ascii_case(&label))
+                && !defaults.iter().any(|existing| existing.eq_ignore_ascii_case(&label))
             {
                 defaults.push(label);
             }
@@ -282,27 +219,16 @@ impl AddHandler {
             vec![]
         };
         for tag in args.tags.iter().chain(base_tags.iter()) {
-            let validated_tag = validator
-                .validate_tag(tag)
-                .map_err(|e| format!("Tag validation failed for '{}': {}", tag, e))?;
+            let validated_tag = validator.validate_tag(tag).map_err(|e| format!("Tag validation failed for '{}': {}", tag, e))?;
             validated_tags.push(validated_tag);
         }
 
-        let choice = Self::choose_project(
-            project,
-            effective_project.as_deref(),
-            had_configured_default_project,
-            resolver.path.as_path(),
-        );
+        let choice = Self::choose_project(project, effective_project.as_deref(), had_configured_default_project, resolver.path.as_path());
         let project_for_storage = choice.prefix.clone();
         let original_project_name = choice.name.clone();
         let project_explanation = format!("project {} from {}", choice.prefix, choice.source);
         if choice.detected && !project_folder_exists(resolver.path.as_path(), &choice.prefix) {
-            let verb = if args.dry_run {
-                "would create"
-            } else {
-                "creates"
-            };
+            let verb = if args.dry_run { "would create" } else { "creates" };
             renderer.emit_warning(format_args!(
                 "No default project is set, so this {verb} a new project {} (from {}). \
                  Pass --project, or set default.project, to use another.",
@@ -322,21 +248,13 @@ impl AddHandler {
         // Set validated properties
         task.task_type = validated_type;
         if std::env::var("LOTAR_DEBUG_ADD").ok().as_deref() == Some("1")
-            && let Ok(mut f) = std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open("/tmp/lotar_add_debug.log")
+            && let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/lotar_add_debug.log")
         {
             let _ = writeln!(f, "[ADD] chosen_type={}", task.task_type);
         }
         // Resolve @me if present so previews and persisted task show actual identity
-        task.assignee = validated_assignee.and_then(|a| {
-            crate::utils::identity::resolve_me_alias_for_project(
-                &a,
-                Some(resolver.path.as_path()),
-                Some(&project_for_storage),
-            )
-        });
+        task.assignee = validated_assignee
+            .and_then(|a| crate::utils::identity::resolve_me_alias_for_project(&a, Some(resolver.path.as_path()), Some(&project_for_storage)));
         task.due_date = validated_due_date;
         // Normalize effort on write to canonical form (e.g., hours with 2 decimals or Npt)
         task.effort = if let Some(e) = validated_effort {
@@ -352,31 +270,18 @@ impl AddHandler {
 
         // Determine reporter using explicit argument first, then config defaults and identity detection
         task.reporter = if let Some(reporter) = explicit_reporter {
-            crate::utils::identity::resolve_me_alias_for_project(
-                &reporter,
-                Some(resolver.path.as_path()),
-                Some(&project_for_storage),
-            )
+            crate::utils::identity::resolve_me_alias_for_project(&reporter, Some(resolver.path.as_path()), Some(&project_for_storage))
         } else if config.auto_set_reporter {
             let from_config = config.default_reporter.as_deref().and_then(|raw| {
                 let trimmed = raw.trim();
                 if trimmed.is_empty() {
                     None
                 } else {
-                    crate::utils::identity::resolve_me_alias_for_project(
-                        trimmed,
-                        Some(resolver.path.as_path()),
-                        Some(&project_for_storage),
-                    )
+                    crate::utils::identity::resolve_me_alias_for_project(trimmed, Some(resolver.path.as_path()), Some(&project_for_storage))
                 }
             });
 
-            from_config.or_else(|| {
-                crate::utils::identity::resolve_current_user_for_project(
-                    Some(resolver.path.as_path()),
-                    Some(&project_for_storage),
-                )
-            })
+            from_config.or_else(|| crate::utils::identity::resolve_current_user_for_project(Some(resolver.path.as_path()), Some(&project_for_storage)))
         } else {
             None
         };
@@ -384,32 +289,21 @@ impl AddHandler {
         // Handle arbitrary fields with validation
         for (key, value) in args.fields {
             // Validate the custom field name and value
-            let (validated_key, validated_value) = validator
-                .validate_custom_field(&key, &value)
-                .map_err(|e| format!("Custom field validation failed for '{}': {}", key, e))?;
+            let (validated_key, validated_value) =
+                validator.validate_custom_field(&key, &value).map_err(|e| format!("Custom field validation failed for '{}': {}", key, e))?;
 
             // Store as custom fields using feature-aware value constructor
-            task.custom_fields.insert(
-                validated_key,
-                crate::types::custom_value_string(validated_value),
-            );
+            task.custom_fields.insert(validated_key, crate::types::custom_value_string(validated_value));
         }
 
-        #[expect(
-            clippy::drop_non_drop,
-            reason = "marks where the validator's borrow ends before the configuration is used again"
-        )]
+        #[expect(clippy::drop_non_drop, reason = "marks where the validator's borrow ends before the configuration is used again")]
         drop(validator);
 
         // Determine storage roots and project identifiers prior to any mutation of the config
         let write_root = resolver.path.clone();
 
-        if original_project_name.is_some()
-            && effective_project.as_deref() != Some(project_for_storage.as_str())
-        {
-            config = project_resolver
-                .get_project_config(&project_for_storage)
-                .unwrap_or(config);
+        if original_project_name.is_some() && effective_project.as_deref() != Some(project_for_storage.as_str()) {
+            config = project_resolver.get_project_config(&project_for_storage).unwrap_or(config);
         }
 
         // Pending members are computed with the CLI rules, merged in memory
@@ -430,11 +324,7 @@ impl AddHandler {
                     if !seen.insert(lower) {
                         return;
                     }
-                    if !config
-                        .members
-                        .iter()
-                        .any(|existing| existing.eq_ignore_ascii_case(trimmed))
-                    {
+                    if !config.members.iter().any(|existing| existing.eq_ignore_ascii_case(trimmed)) {
                         pending.push(trimmed.to_string());
                     }
                 }
@@ -447,10 +337,7 @@ impl AddHandler {
         if !pending.is_empty() {
             let mut merged = config.members.clone();
             for candidate in pending.iter() {
-                if !merged
-                    .iter()
-                    .any(|existing| existing.eq_ignore_ascii_case(candidate))
-                {
+                if !merged.iter().any(|existing| existing.eq_ignore_ascii_case(candidate)) {
                     merged.push(candidate.clone());
                 }
             }
@@ -459,16 +346,12 @@ impl AddHandler {
         }
 
         let validator = CliValidator::new(&config);
-        validator
-            .ensure_task_membership(&task)
-            .map_err(|e| format!("Member validation failed: {}", e))?;
+        validator.ensure_task_membership(&task).map_err(|e| format!("Member validation failed: {}", e))?;
 
         // Explicit initial status is validated against the final project
         // configuration so creation persists it atomically.
         if let Some(status_arg) = args.status {
-            let validated = validator
-                .validate_status(&status_arg)
-                .map_err(|e| format!("Status validation failed: {}", e))?;
+            let validated = validator.validate_status(&status_arg).map_err(|e| format!("Status validation failed: {}", e))?;
             task.status = validated;
         }
 
@@ -491,14 +374,10 @@ impl AddHandler {
                     });
                     // Optional debug fields to help diagnose config-driven defaults in tests
                     if std::env::var("LOTAR_DEBUG_ADD").ok().as_deref() == Some("1") {
-                        obj["debug_auto_branch_infer_type"] =
-                            serde_json::Value::Bool(config.auto_branch_infer_type);
-                        obj["debug_issue_types"] = serde_json::to_value(&config.issue_types.values)
-                            .unwrap_or(serde_json::Value::Null);
-                        obj["debug_tasks_dir"] =
-                            serde_json::Value::String(resolver.path.to_string_lossy().to_string());
-                        obj["debug_effective_project"] =
-                            serde_json::Value::String(project_for_storage.clone());
+                        obj["debug_auto_branch_infer_type"] = serde_json::Value::Bool(config.auto_branch_infer_type);
+                        obj["debug_issue_types"] = serde_json::to_value(&config.issue_types.values).unwrap_or(serde_json::Value::Null);
+                        obj["debug_tasks_dir"] = serde_json::Value::String(resolver.path.to_string_lossy().to_string());
+                        obj["debug_effective_project"] = serde_json::Value::String(project_for_storage.clone());
                     }
                     if let Some(a) = &task.assignee {
                         obj["assignee"] = serde_json::Value::String(a.clone());
@@ -513,8 +392,7 @@ impl AddHandler {
                         obj["tags"] = serde_json::json!(task.tags);
                     }
                     if !task.custom_fields.is_empty() {
-                        obj["custom_fields"] = serde_json::to_value(&task.custom_fields)
-                            .unwrap_or(serde_json::Value::Null);
+                        obj["custom_fields"] = serde_json::to_value(&task.custom_fields).unwrap_or(serde_json::Value::Null);
                     }
                     if args.explain {
                         obj["explain"] = serde_json::Value::String(format!(
@@ -530,23 +408,18 @@ impl AddHandler {
                         project_for_storage, task.title, task.priority
                     ));
                     if args.explain {
-                        renderer.emit_info(format_args!("Explanation: {project_explanation}; default status and priority chosen via smart defaults; reporter/assignee per config/defaults."));
+                        renderer.emit_info(format_args!(
+                            "Explanation: {project_explanation}; default status and priority chosen via smart defaults; reporter/assignee per config/defaults."
+                        ));
                     }
                 }
             }
-            return Ok(AddedTask {
-                task_id: format!("{}-PREVIEW", project_for_storage),
-                finding: None,
-            });
+            return Ok(AddedTask { task_id: format!("{}-PREVIEW", project_for_storage), finding: None });
         }
 
         // Created only now: opening storage bootstraps the workspace config,
         // which a dry run must not do.
-        let global_context = original_project_name
-            .as_deref()
-            .or(effective_project.as_deref())
-            .map(|name| name.trim())
-            .filter(|name| !name.is_empty());
+        let global_context = original_project_name.as_deref().or(effective_project.as_deref()).map(|name| name.trim()).filter(|name| !name.is_empty());
 
         let mut storage = if let Some(context) = global_context {
             // Prefer the human-readable project name for smart default prefix generation
@@ -557,54 +430,26 @@ impl AddHandler {
             Storage::new_with_context(&write_root, context.as_deref())
         };
 
-        renderer.log_info(format_args!(
-            "add: writing task to storage project={} original={:?}",
-            project_for_storage, original_project_name
-        ));
+        renderer.log_info(format_args!("add: writing task to storage project={} original={:?}", project_for_storage, original_project_name));
         if std::env::var("LOTAR_DEBUG_STATUS").is_ok() {
-            eprintln!(
-                "[lotar][debug] add storing project={} original={:?}",
-                project_for_storage, original_project_name
-            );
+            eprintln!("[lotar][debug] add storing project={} original={:?}", project_for_storage, original_project_name);
         }
         // Report once (DEV-317): check and write under the finding lock, so
         // two reporters of one key create one ticket.
         let mut finding_state = None;
         let finding_lock = match finding_key.as_deref() {
             Some(key) => {
-                let lock = FindingService::lock(&write_root, &project_for_storage)
-                    .map_err(|e| e.to_string())?;
+                let lock = FindingService::lock(&write_root, &project_for_storage).map_err(|e| e.to_string())?;
                 match FindingService::prior(&storage, &project_for_storage, key, &config) {
                     Prior::Open(id) => {
-                        let (_, commented) = FindingService::record_repeat(
-                            &mut storage,
-                            &id,
-                            task.reporter.as_deref(),
-                            task.description.as_deref(),
-                        )
-                        .map_err(|e| e.to_string())?;
-                        let outcome = FindingReport {
-                            created: false,
-                            state: FindingState::Open,
-                            id: id.clone(),
-                            commented,
-                        };
-                        return Ok(AddedTask {
-                            task_id: id,
-                            finding: Some((key.to_string(), outcome)),
-                        });
+                        let (_, commented) = FindingService::record_repeat(&mut storage, &id, task.reporter.as_deref(), task.description.as_deref())
+                            .map_err(|e| e.to_string())?;
+                        let outcome = FindingReport { created: false, state: FindingState::Open, id: id.clone(), commented };
+                        return Ok(AddedTask { task_id: id, finding: Some((key.to_string(), outcome)) });
                     }
                     Prior::Suppressed(id) => {
-                        let outcome = FindingReport {
-                            created: false,
-                            state: FindingState::Suppressed,
-                            id: id.clone(),
-                            commented: false,
-                        };
-                        return Ok(AddedTask {
-                            task_id: id,
-                            finding: Some((key.to_string(), outcome)),
-                        });
+                        let outcome = FindingReport { created: false, state: FindingState::Suppressed, id: id.clone(), commented: false };
+                        return Ok(AddedTask { task_id: id, finding: Some((key.to_string(), outcome)) });
                     }
                     Prior::Done(old) => {
                         if !task.relationships.related.contains(&old) {
@@ -614,10 +459,7 @@ impl AddHandler {
                     }
                     Prior::None => finding_state = Some(FindingState::New),
                 }
-                task.custom_fields.insert(
-                    FINDING_FIELD.to_string(),
-                    crate::types::custom_value_string(key),
-                );
+                task.custom_fields.insert(FINDING_FIELD.to_string(), crate::types::custom_value_string(key));
                 Some(lock)
             }
             None => None,
@@ -644,33 +486,15 @@ impl AddHandler {
         // Skipped under RUST_TEST_THREADS to avoid interference with integration
         // tests that share the workspace's .tasks directory.
         if std::env::var("RUST_TEST_THREADS").is_err()
-            && let Ok(dto) = crate::services::task_service::TaskService::get(
-                &storage,
-                &task_id,
-                Some(&project_for_storage),
-            )
-            && let Err(err) =
-                crate::services::automation_service::AutomationService::apply_task_update(
-                    &mut storage,
-                    None,
-                    &dto,
-                    &config,
-                )
+            && let Ok(dto) = crate::services::task_service::TaskService::get(&storage, &task_id, Some(&project_for_storage))
+            && let Err(err) = crate::services::automation_service::AutomationService::apply_task_update(&mut storage, None, &dto, &config)
             && std::env::var("LOTAR_DEBUG_STATUS").is_ok()
         {
-            eprintln!(
-                "[lotar][debug] add automation apply failed for {}: {}",
-                task_id, err
-            );
+            eprintln!("[lotar][debug] add automation apply failed for {}: {}", task_id, err);
         }
 
         let finding = finding_key.zip(finding_state).map(|(key, state)| {
-            let outcome = FindingReport {
-                created: true,
-                state,
-                id: task_id.clone(),
-                commented: false,
-            };
+            let outcome = FindingReport { created: true, state, id: task_id.clone(), commented: false };
             (key, outcome)
         });
         Ok(AddedTask { task_id, finding })
@@ -678,10 +502,7 @@ impl AddHandler {
 }
 
 /// `created`, `state` and `id` of a finding report on the JSON of a created task.
-fn add_finding_fields(
-    response: &mut serde_json::Value,
-    finding: Option<&(String, crate::services::finding_service::FindingReport)>,
-) {
+fn add_finding_fields(response: &mut serde_json::Value, finding: Option<&(String, crate::services::finding_service::FindingReport)>) {
     if let Some((key, outcome)) = finding {
         response["created"] = serde_json::json!(outcome.created);
         response["state"] = serde_json::json!(outcome.state);
@@ -701,9 +522,7 @@ struct ProjectChoice {
 }
 
 fn project_folder_exists(tasks_dir: &std::path::Path, prefix: &str) -> bool {
-    crate::utils::filesystem::list_visible_subdirs(tasks_dir)
-        .iter()
-        .any(|(name, _)| name.eq_ignore_ascii_case(prefix))
+    crate::utils::filesystem::list_visible_subdirs(tasks_dir).iter().any(|(name, _)| name.eq_ignore_ascii_case(prefix))
 }
 
 impl AddHandler {
@@ -711,12 +530,7 @@ impl AddHandler {
     /// or `LOTAR_PROJECT`), then an existing project, and only then a name
     /// detected from the checkout. A manifest name never overrides a
     /// configured default (DEV-311).
-    fn choose_project(
-        explicit: Option<&str>,
-        resolved: Option<&str>,
-        configured_default: bool,
-        tasks_dir: &std::path::Path,
-    ) -> ProjectChoice {
+    fn choose_project(explicit: Option<&str>, resolved: Option<&str>, configured_default: bool, tasks_dir: &std::path::Path) -> ProjectChoice {
         if let Some(explicit) = explicit {
             return ProjectChoice {
                 prefix: resolve_project_input(explicit, tasks_dir),
@@ -726,27 +540,14 @@ impl AddHandler {
             };
         }
         if configured_default && let Some(value) = resolved {
-            let env_var = ["LOTAR_PROJECT", "LOTAR_DEFAULT_PROJECT"]
-                .into_iter()
-                .find(|var| std::env::var(var).is_ok_and(|v| !v.trim().is_empty()));
+            let env_var = ["LOTAR_PROJECT", "LOTAR_DEFAULT_PROJECT"].into_iter().find(|var| std::env::var(var).is_ok_and(|v| !v.trim().is_empty()));
             // The environment may hold a project name; the configured
             // default is a prefix, kept as written unless it names an
             // existing project (`default.project: HOMEWS` stays HOMEWS).
             let mapped = resolve_project_input(value, tasks_dir);
-            let prefix = if env_var.is_some() || project_folder_exists(tasks_dir, &mapped) {
-                mapped
-            } else {
-                value.to_string()
-            };
-            let source = env_var
-                .map(|var| format!("the {var} environment variable"))
-                .unwrap_or_else(|| "default.project in the configuration".to_string());
-            return ProjectChoice {
-                name: (prefix != value).then(|| value.to_string()),
-                prefix,
-                source,
-                detected: false,
-            };
+            let prefix = if env_var.is_some() || project_folder_exists(tasks_dir, &mapped) { mapped } else { value.to_string() };
+            let source = env_var.map(|var| format!("the {var} environment variable")).unwrap_or_else(|| "default.project in the configuration".to_string());
+            return ProjectChoice { name: (prefix != value).then(|| value.to_string()), prefix, source, detected: false };
         }
         if let Some(value) = resolved
             && project_folder_exists(tasks_dir, value)
@@ -758,57 +559,29 @@ impl AddHandler {
                 detected: false,
             };
         }
-        let (name, from) = crate::project::detect_project_name_with_source()
-            .unwrap_or_else(|| ("default".to_string(), "the built-in fallback".to_string()));
-        ProjectChoice {
-            prefix: resolved
-                .map(str::to_string)
-                .unwrap_or_else(|| generate_project_prefix(&name)),
-            name: Some(name),
-            source: from,
-            detected: true,
-        }
+        let (name, from) = crate::project::detect_project_name_with_source().unwrap_or_else(|| ("default".to_string(), "the built-in fallback".to_string()));
+        ProjectChoice { prefix: resolved.map(str::to_string).unwrap_or_else(|| generate_project_prefix(&name)), name: Some(name), source: from, detected: true }
     }
 
     // Internal helper: create a warn logger that auto-silences during tests or when LOTAR_TEST_SILENT=1
     fn warn_logger() -> OutputRenderer {
-        let test_silent = cfg!(test)
-            || std::env::var("LOTAR_TEST_SILENT").unwrap_or_default() == "1"
-            || std::env::var("RUST_TEST_THREADS").is_ok();
-        let level = if test_silent {
-            LogLevel::Off
-        } else {
-            LogLevel::Warn
-        };
+        let test_silent = cfg!(test) || std::env::var("LOTAR_TEST_SILENT").unwrap_or_default() == "1" || std::env::var("RUST_TEST_THREADS").is_ok();
+        let level = if test_silent { LogLevel::Off } else { LogLevel::Warn };
         OutputRenderer::new(OutputFormat::Text, level)
     }
 
     /// Render what `add` did: the created task, or with `--finding` the
     /// existing ticket that already reports it (DEV-317).
-    pub fn render_add_result(
-        added: &AddedTask,
-        cli_project: Option<&str>,
-        resolver: &TasksDirectoryResolver,
-        renderer: &OutputRenderer,
-    ) {
+    pub fn render_add_result(added: &AddedTask, cli_project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) {
         let Some((key, outcome)) = added.finding.as_ref().filter(|(_, o)| !o.created) else {
-            Self::render_add_success(
-                &added.task_id,
-                added.finding.as_ref(),
-                cli_project,
-                resolver,
-                renderer,
-            );
+            Self::render_add_success(&added.task_id, added.finding.as_ref(), cli_project, resolver, renderer);
             return;
         };
         let message = outcome.describe(key);
         match renderer.format {
             OutputFormat::Json => {
                 let task = Storage::try_open(&resolver.path)
-                    .and_then(|storage| {
-                        crate::services::task_service::TaskService::get(&storage, &outcome.id, None)
-                            .ok()
-                    })
+                    .and_then(|storage| crate::services::task_service::TaskService::get(&storage, &outcome.id, None).ok())
                     .and_then(|dto| serde_json::to_value(dto).ok())
                     .unwrap_or(serde_json::Value::Null);
                 renderer.emit_json(&serde_json::json!({
@@ -838,41 +611,35 @@ impl AddHandler {
         let read_root = resolver.path.clone();
 
         if let Some(storage) = Storage::try_open(&read_root) {
-            let project_prefix = cli_project
-                .map(|name| resolve_project_input(name, resolver.path.as_path()))
-                .unwrap_or_else(|| {
-                    // Canonical project prefix from the ID's final numeric
-                    // suffix (e.g., "TTF-1" -> "TTF", "ABC-OPS-12" -> "ABC-OPS")
-                    crate::storage::TaskId::parse(task_id)
-                        .map(|parsed| parsed.project)
-                        .unwrap_or_else(|_| crate::project::get_effective_project_name(resolver))
-                });
+            let project_prefix = cli_project.map(|name| resolve_project_input(name, resolver.path.as_path())).unwrap_or_else(|| {
+                // Canonical project prefix from the ID's final numeric
+                // suffix (e.g., "TTF-1" -> "TTF", "ABC-OPS-12" -> "ABC-OPS")
+                crate::storage::TaskId::parse(task_id).map(|parsed| parsed.project).unwrap_or_else(|_| crate::project::get_effective_project_name(resolver))
+            });
 
             if let Some(task) = storage.get(task_id, &project_prefix) {
                 match renderer.format {
                     OutputFormat::Json => {
                         // The same task object `show` and `list` return, tags,
                         // effort and custom fields included (DEV-283).
-                        let task_json = crate::services::task_service::TaskService::get(
-                            &storage, task_id, None,
-                        )
-                        .ok()
-                        .and_then(|dto| serde_json::to_value(dto).ok())
-                        .unwrap_or_else(|| {
-                            serde_json::json!({
-                                "id": task_id,
-                                "title": task.title,
-                                "status": task.status.to_string(),
-                                "priority": task.priority.to_string(),
-                                "task_type": task.task_type.to_string(),
-                                "reporter": task.reporter,
-                                "assignee": task.assignee,
-                                "due_date": task.due_date,
-                                "description": task.description,
-                                "created": task.created,
-                                "modified": task.modified
-                            })
-                        });
+                        let task_json = crate::services::task_service::TaskService::get(&storage, task_id, None)
+                            .ok()
+                            .and_then(|dto| serde_json::to_value(dto).ok())
+                            .unwrap_or_else(|| {
+                                serde_json::json!({
+                                    "id": task_id,
+                                    "title": task.title,
+                                    "status": task.status.to_string(),
+                                    "priority": task.priority.to_string(),
+                                    "task_type": task.task_type.to_string(),
+                                    "reporter": task.reporter,
+                                    "assignee": task.assignee,
+                                    "due_date": task.due_date,
+                                    "description": task.description,
+                                    "created": task.created,
+                                    "modified": task.modified
+                                })
+                            });
                         let mut response = serde_json::json!({
                             "status": "success",
                             "message": format!("Created task: {}", task_id),
@@ -900,8 +667,7 @@ impl AddHandler {
                         if let Some(description) = &task.description
                             && !description.is_empty()
                         {
-                            renderer
-                                .emit_raw_stdout(format_args!("  Description: {}", description));
+                            renderer.emit_raw_stdout(format_args!("  Description: {}", description));
                         }
                         if let Some((key, outcome)) = finding {
                             renderer.emit_raw_stdout(format_args!("  {}", outcome.describe(key)));
@@ -951,21 +717,13 @@ impl AddHandler {
     /// 2. Global default (if valid in project values)
     /// 3. First in project values
     /// 4. Crash if empty (user configuration error)
-    fn get_smart_default<T>(
-        project_explicit: Option<&T>,
-        global_default: &T,
-        project_values: &[T],
-        field_name: &str,
-    ) -> Result<T, String>
+    fn get_smart_default<T>(project_explicit: Option<&T>, global_default: &T, project_values: &[T], field_name: &str) -> Result<T, String>
     where
         T: Clone + PartialEq + std::fmt::Debug + std::fmt::Display,
     {
         // Error if project has no values configured (user configuration error)
         if project_values.is_empty() {
-            return Err(format!(
-                "Project configuration error: {} list is empty. Please configure at least one {} value.",
-                field_name, field_name
-            ));
+            return Err(format!("Project configuration error: {} list is empty. Please configure at least one {} value.", field_name, field_name));
         }
 
         // 1. Use project explicit default if set and valid in project values
@@ -974,11 +732,7 @@ impl AddHandler {
                 return Ok(explicit.clone());
             } else {
                 // Emit warning unless silenced for tests
-                let formatted_values = project_values
-                    .iter()
-                    .map(|value| value.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ");
+                let formatted_values = project_values.iter().map(|value| value.to_string()).collect::<Vec<_>>().join(", ");
                 Self::warn_logger().log_warn(format_args!(
                     "Warning: Project default {} '{}' is not in configured {} list [{}]. Using smart fallback.",
                     field_name, explicit, field_name, formatted_values
@@ -991,11 +745,7 @@ impl AddHandler {
             return Ok(global_default.clone());
         } else {
             // Emit warning unless silenced for tests
-            let formatted_values = project_values
-                .iter()
-                .map(|value| value.to_string())
-                .collect::<Vec<_>>()
-                .join(", ");
+            let formatted_values = project_values.iter().map(|value| value.to_string()).collect::<Vec<_>>().join(", ");
             Self::warn_logger().log_warn(format_args!(
                 "Warning: Global default {} '{}' is not in project {} list [{}]. Using first configured value.",
                 field_name, global_default, field_name, formatted_values
@@ -1018,8 +768,7 @@ impl AddHandler {
         ) {
             Ok(priority) => priority,
             Err(e) => {
-                OutputRenderer::new(OutputFormat::Text, LogLevel::Error)
-                    .log_error(format_args!("Error: {}", e));
+                OutputRenderer::new(OutputFormat::Text, LogLevel::Error).log_error(format_args!("Error: {}", e));
                 std::process::exit(1);
             }
         }
@@ -1029,9 +778,8 @@ impl AddHandler {
     fn get_default_status(config: &ResolvedConfig) -> TaskStatus {
         // Error if project has no status values configured (user configuration error)
         if config.issue_states.values.is_empty() {
-            OutputRenderer::new(OutputFormat::Text, LogLevel::Error).log_error(
-                "Project configuration error: status list is empty. Please configure at least one status value.",
-            );
+            OutputRenderer::new(OutputFormat::Text, LogLevel::Error)
+                .log_error("Project configuration error: status list is empty. Please configure at least one status value.");
             std::process::exit(1);
         }
 
@@ -1041,13 +789,7 @@ impl AddHandler {
                 return explicit.clone();
             } else {
                 // Emit warning unless silenced for tests
-                let formatted_values = config
-                    .issue_states
-                    .values
-                    .iter()
-                    .map(|value| value.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ");
+                let formatted_values = config.issue_states.values.iter().map(|value| value.to_string()).collect::<Vec<_>>().join(", ");
                 Self::warn_logger().log_warn(format_args!(
                     "Warning: Project default status '{}' is not in configured status list [{}]. Using smart fallback.",
                     explicit, formatted_values

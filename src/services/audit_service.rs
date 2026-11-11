@@ -25,19 +25,9 @@ impl BlobBatch {
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .spawn()?;
-        let stdin = child
-            .stdin
-            .take()
-            .ok_or_else(|| std::io::Error::other("no stdin"))?;
-        let stdout = child
-            .stdout
-            .take()
-            .ok_or_else(|| std::io::Error::other("no stdout"))?;
-        Ok(Self {
-            child,
-            stdin,
-            stdout: std::io::BufReader::new(stdout),
-        })
+        let stdin = child.stdin.take().ok_or_else(|| std::io::Error::other("no stdin"))?;
+        let stdout = child.stdout.take().ok_or_else(|| std::io::Error::other("no stdout"))?;
+        Ok(Self { child, stdin, stdout: std::io::BufReader::new(stdout) })
     }
 
     /// The blob at `rev:path`, `Ok(None)` when it does not exist there (a
@@ -193,19 +183,12 @@ fn history_signature(entry: &TaskChangeLogEntry) -> String {
     key
 }
 
-fn extract_new_history_entries(
-    previous: &[TaskChangeLogEntry],
-    current: &[TaskChangeLogEntry],
-) -> Vec<TaskChangeLogEntry> {
+fn extract_new_history_entries(previous: &[TaskChangeLogEntry], current: &[TaskChangeLogEntry]) -> Vec<TaskChangeLogEntry> {
     let mut seen: HashSet<String> = HashSet::new();
     for entry in previous {
         seen.insert(history_signature(entry));
     }
-    current
-        .iter()
-        .filter(|entry| !seen.contains(&history_signature(entry)))
-        .cloned()
-        .collect()
+    current.iter().filter(|entry| !seen.contains(&history_signature(entry))).cloned().collect()
 }
 
 fn to_feed_history_entry(entry: TaskChangeLogEntry) -> ActivityFeedHistoryEntry {
@@ -217,12 +200,7 @@ fn to_feed_history_entry(entry: TaskChangeLogEntry) -> ActivityFeedHistoryEntry 
             .into_iter()
             .map(|change: TaskChange| {
                 let TaskChange { field, old, new } = change;
-                ActivityFeedChange {
-                    kind: classify_change(&field).to_string(),
-                    field,
-                    old,
-                    new,
-                }
+                ActivityFeedChange { kind: classify_change(&field).to_string(), field, old, new }
             })
             .collect(),
     }
@@ -252,10 +230,7 @@ impl AuditService {
     /// Resolve an optional HTTP-provided `project` filter to a pathspec under
     /// `tasks_rel`. Rejects traversal and non-directory values so the filter
     /// cannot widen the git log scope outside the tasks directory.
-    fn resolve_project_pathspec(
-        tasks_rel: &Path,
-        project: Option<&str>,
-    ) -> Result<PathBuf, String> {
+    fn resolve_project_pathspec(tasks_rel: &Path, project: Option<&str>) -> Result<PathBuf, String> {
         let Some(project) = project else {
             return Ok(tasks_rel.to_path_buf());
         };
@@ -263,11 +238,7 @@ impl AuditService {
         if trimmed.is_empty() {
             return Ok(tasks_rel.to_path_buf());
         }
-        if trimmed.contains(['/', '\\', '\u{0}'])
-            || trimmed == "."
-            || trimmed == ".."
-            || trimmed.split('/').any(|part| part == "..")
-        {
+        if trimmed.contains(['/', '\\', '\u{0}']) || trimmed == "." || trimmed == ".." || trimmed.split('/').any(|part| part == "..") {
             return Err(format!("Invalid project filter: '{}'", trimmed));
         }
         let dir = tasks_rel.join(trimmed);
@@ -290,9 +261,7 @@ impl AuditService {
         if parts.len() < 4 {
             return None;
         }
-        let date = chrono::DateTime::parse_from_rfc3339(parts[3])
-            .ok()?
-            .with_timezone(&Utc);
+        let date = chrono::DateTime::parse_from_rfc3339(parts[3]).ok()?.with_timezone(&Utc);
         Some(CommitHeader {
             sha: parts[0].to_string(),
             author: parts[1].to_string(),
@@ -338,20 +307,14 @@ impl AuditService {
             cmd.arg(Self::git_path_arg(path));
         }
 
-        let output = cmd
-            .output()
-            .map_err(|e| format!("Failed to run git: {}", e))?;
+        let output = cmd.output().map_err(|e| format!("Failed to run git: {}", e))?;
         if !output.status.success() {
             // A repository without commits yet (fresh `git init`) has no
             // history; that is an empty result, not an error (DEV-217).
             if !Self::has_commits(repo_root) {
                 return Ok(String::new());
             }
-            return Err(format!(
-                "git log failed (status {}): {}",
-                output.status,
-                String::from_utf8_lossy(&output.stderr)
-            ));
+            return Err(format!("git log failed (status {}): {}", output.status, String::from_utf8_lossy(&output.stderr)));
         }
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
@@ -369,10 +332,7 @@ impl AuditService {
     /// Reject commit references that git would parse as command-line options
     /// (leading `-`, e.g. `--output=<path>`) or that carry control characters.
     pub fn ensure_safe_git_rev(rev: &str) -> Result<(), String> {
-        if rev.is_empty()
-            || rev.starts_with('-')
-            || rev.chars().any(|c| c.is_whitespace() || c.is_control())
-        {
+        if rev.is_empty() || rev.starts_with('-') || rev.chars().any(|c| c.is_whitespace() || c.is_control()) {
             return Err(format!("Invalid commit reference '{}'", rev));
         }
         Ok(())
@@ -382,10 +342,7 @@ impl AuditService {
     /// newest first. Follows renames, so a task moved into a subfolder or the
     /// archive keeps its earlier history; each event carries the file's path
     /// in that commit (DEV-4).
-    pub fn list_commits_for_file(
-        repo_root: &Path,
-        file_rel: &Path,
-    ) -> Result<Vec<FileCommitEvent>, String> {
+    pub fn list_commits_for_file(repo_root: &Path, file_rel: &Path) -> Result<Vec<FileCommitEvent>, String> {
         let output = crate::utils::git::git_command(repo_root)
             .args(["log", "--no-merges", "--follow", "--name-status"])
             .arg("--pretty=format:%H%x00%an%x00%ae%x00%cI%x00%s")
@@ -397,11 +354,7 @@ impl AuditService {
             if !Self::has_commits(repo_root) {
                 return Ok(Vec::new());
             }
-            return Err(format!(
-                "git log failed (status {}): {}",
-                output.status,
-                String::from_utf8_lossy(&output.stderr)
-            ));
+            return Err(format!("git log failed (status {}): {}", output.status, String::from_utf8_lossy(&output.stderr)));
         }
         let stdout = String::from_utf8_lossy(&output.stdout);
 
@@ -439,11 +392,7 @@ impl AuditService {
     /// the files it had under earlier IDs before it moved to another project
     /// (DEV-183, `moved_from`). Newest first; a commit touching both files
     /// (the move itself) is listed once, with the task's own path.
-    pub fn list_commits_for_task(
-        repo_root: &Path,
-        tasks_root: &Path,
-        file_rel: &Path,
-    ) -> Result<Vec<FileCommitEvent>, String> {
+    pub fn list_commits_for_task(repo_root: &Path, tasks_root: &Path, file_rel: &Path) -> Result<Vec<FileCommitEvent>, String> {
         let mut events = Self::list_commits_for_file(repo_root, file_rel)?;
         let moved_from = std::fs::read_to_string(repo_root.join(file_rel))
             .ok()
@@ -453,10 +402,8 @@ impl AuditService {
         if moved_from.is_empty() {
             return Ok(events);
         }
-        let tasks_rel = crate::utils::git::repo_relative_path(repo_root, tasks_root)
-            .unwrap_or_else(|| tasks_root.to_path_buf());
-        let mut seen: std::collections::HashSet<String> =
-            events.iter().map(|event| event.commit.clone()).collect();
+        let tasks_rel = crate::utils::git::repo_relative_path(repo_root, tasks_root).unwrap_or_else(|| tasks_root.to_path_buf());
+        let mut seen: std::collections::HashSet<String> = events.iter().map(|event| event.commit.clone()).collect();
         for old in moved_from {
             let Ok(location) = crate::storage::identity::resolve(tasks_root, &old) else {
                 continue;
@@ -477,16 +424,10 @@ impl AuditService {
 
     /// The file's path in `commit`, from a [`Self::list_commits_for_file`]
     /// result; the current path when the commit is not in the list.
-    pub fn path_at_commit<'a>(
-        events: &'a [FileCommitEvent],
-        commit: &str,
-        current: &'a Path,
-    ) -> &'a Path {
+    pub fn path_at_commit<'a>(events: &'a [FileCommitEvent], commit: &str, current: &'a Path) -> &'a Path {
         events
             .iter()
-            .find(|event| {
-                event.commit == commit || (commit.len() >= 4 && event.commit.starts_with(commit))
-            })
+            .find(|event| event.commit == commit || (commit.len() >= 4 && event.commit.starts_with(commit)))
             .map(|event| event.path.as_path())
             .unwrap_or(current)
     }
@@ -502,12 +443,10 @@ impl AuditService {
         let tasks_root_abs = repo_root.join(tasks_rel);
         let tasks_tracked = Self::tasks_are_tracked(repo_root, tasks_rel);
         let resolved_project_path = match project_filter {
-            Some(project) => {
-                match Self::resolve_project_path(&tasks_root_abs, tasks_rel, project) {
-                    Some(path) => Some(path),
-                    None => return Err(format!("Unknown project: '{}'", project)),
-                }
-            }
+            Some(project) => match Self::resolve_project_path(&tasks_root_abs, tasks_rel, project) {
+                Some(path) => Some(path),
+                None => return Err(format!("Unknown project: '{}'", project)),
+            },
             None => None,
         };
 
@@ -523,25 +462,12 @@ impl AuditService {
             None
         };
 
-        let commits = Self::collect_commits(
-            repo_root,
-            since,
-            until,
-            max_commits,
-            path_filters.as_deref().unwrap_or_default(),
-        )?;
+        let commits = Self::collect_commits(repo_root, since, until, max_commits, path_filters.as_deref().unwrap_or_default())?;
 
         if tasks_tracked {
             Self::build_tracked_activity_feed(repo_root, tasks_rel, commits, project_filter)
         } else {
-            Self::build_untracked_activity_feed(
-                &tasks_root_abs,
-                tasks_rel,
-                commits,
-                since,
-                until,
-                project_filter,
-            )
+            Self::build_untracked_activity_feed(&tasks_root_abs, tasks_rel, commits, since, until, project_filter)
         }
     }
 
@@ -555,11 +481,7 @@ impl AuditService {
         }
     }
 
-    fn resolve_project_path(
-        tasks_root_abs: &Path,
-        tasks_rel: &Path,
-        project_filter: &str,
-    ) -> Option<PathBuf> {
+    fn resolve_project_path(tasks_root_abs: &Path, tasks_rel: &Path, project_filter: &str) -> Option<PathBuf> {
         if let Ok(entries) = fs::read_dir(tasks_root_abs) {
             for entry in entries.flatten() {
                 let path = entry.path();
@@ -585,15 +507,7 @@ impl AuditService {
         max_commits: usize,
         path_filters: &[PathBuf],
     ) -> Result<Vec<ParsedCommit>, String> {
-        let stdout = Self::run_git_log(
-            repo_root,
-            Some(since),
-            Some(until),
-            true,
-            true,
-            max_commits,
-            path_filters,
-        )?;
+        let stdout = Self::run_git_log(repo_root, Some(since), Some(until), true, true, max_commits, path_filters)?;
 
         let mut commits: Vec<ParsedCommit> = Vec::new();
         let mut current: Option<ParsedCommit> = None;
@@ -615,14 +529,7 @@ impl AuditService {
                 let Some(message) = header.message else {
                     continue;
                 };
-                current = Some(ParsedCommit {
-                    sha: header.sha,
-                    author: header.author,
-                    email: header.email,
-                    date: header.date,
-                    message,
-                    files: Vec::new(),
-                });
+                current = Some(ParsedCommit { sha: header.sha, author: header.author, email: header.email, date: header.date, message, files: Vec::new() });
                 continue;
             }
             if let Some(commit) = current.as_mut() {
@@ -668,55 +575,35 @@ impl AuditService {
                     continue;
                 }
 
-                let current_task =
-                    Self::load_task_version_batched(&mut blobs, repo_root, &commit.sha, file_rel);
-                let previous_task = Self::load_task_version_batched(
-                    &mut blobs,
-                    repo_root,
-                    &format!("{}^", commit.sha),
-                    file_rel,
-                );
+                let current_task = Self::load_task_version_batched(&mut blobs, repo_root, &commit.sha, file_rel);
+                let previous_task = Self::load_task_version_batched(&mut blobs, repo_root, &format!("{}^", commit.sha), file_rel);
 
-                let current_history = current_task
-                    .as_ref()
-                    .map(|task| task.history.clone())
-                    .unwrap_or_default();
-                let previous_history = previous_task
-                    .as_ref()
-                    .map(|task| task.history.clone())
-                    .unwrap_or_default();
+                let current_history = current_task.as_ref().map(|task| task.history.clone()).unwrap_or_default();
+                let previous_history = previous_task.as_ref().map(|task| task.history.clone()).unwrap_or_default();
 
-                let mut new_entries =
-                    extract_new_history_entries(&previous_history, &current_history);
+                let mut new_entries = extract_new_history_entries(&previous_history, &current_history);
                 if new_entries.is_empty() {
                     continue;
                 }
                 new_entries.sort_by(|a, b| a.at.cmp(&b.at));
 
-                let title = current_task
-                    .as_ref()
-                    .or(previous_task.as_ref())
-                    .map(|task| task.title.clone());
+                let title = current_task.as_ref().or(previous_task.as_ref()).map(|task| task.title.clone());
 
-                let entry = per_task
-                    .entry(task_id.clone())
-                    .or_insert_with(|| ActivityFeedItem {
-                        commit: commit.sha.clone(),
-                        author: commit.author.clone(),
-                        email: commit.email.clone(),
-                        date: commit.date,
-                        message: commit.message.clone(),
-                        task_id: task_id.clone(),
-                        task_title: title.clone(),
-                        history: Vec::new(),
-                    });
+                let entry = per_task.entry(task_id.clone()).or_insert_with(|| ActivityFeedItem {
+                    commit: commit.sha.clone(),
+                    author: commit.author.clone(),
+                    email: commit.email.clone(),
+                    date: commit.date,
+                    message: commit.message.clone(),
+                    task_id: task_id.clone(),
+                    task_title: title.clone(),
+                    history: Vec::new(),
+                });
                 if entry.task_title.is_none() {
                     entry.task_title = title;
                 }
 
-                entry
-                    .history
-                    .extend(new_entries.into_iter().map(to_feed_history_entry));
+                entry.history.extend(new_entries.into_iter().map(to_feed_history_entry));
             }
 
             for mut item in per_task.into_values() {
@@ -727,12 +614,7 @@ impl AuditService {
             }
         }
 
-        feed.sort_by(|a, b| {
-            b.date
-                .cmp(&a.date)
-                .then_with(|| b.commit.cmp(&a.commit))
-                .then_with(|| b.task_id.cmp(&a.task_id))
-        });
+        feed.sort_by(|a, b| b.date.cmp(&a.date).then_with(|| b.commit.cmp(&a.commit)).then_with(|| b.task_id.cmp(&a.task_id)));
 
         Ok(feed)
     }
@@ -753,13 +635,7 @@ impl AuditService {
         let mut feed: HashMap<(String, String), ActivityFeedItem> = HashMap::new();
         let project_filter_lower = project_filter.map(|p| p.to_string());
 
-        let projects = fs::read_dir(tasks_root_abs).map_err(|e| {
-            format!(
-                "Failed to read tasks directory {}: {}",
-                tasks_root_abs.display(),
-                e
-            )
-        })?;
+        let projects = fs::read_dir(tasks_root_abs).map_err(|e| format!("Failed to read tasks directory {}: {}", tasks_root_abs.display(), e))?;
 
         for project_entry in projects.flatten() {
             let project_path = project_entry.path();
@@ -776,13 +652,7 @@ impl AuditService {
                 continue;
             }
 
-            fs::read_dir(&project_path).map_err(|e| {
-                format!(
-                    "Failed to read project directory {}: {}",
-                    project_path.display(),
-                    e
-                )
-            })?;
+            fs::read_dir(&project_path).map_err(|e| format!("Failed to read project directory {}: {}", project_path.display(), e))?;
 
             for file_path in Self::all_task_files(tasks_root_abs, Some(&project_name)) {
                 let rel = match file_path.strip_prefix(tasks_root_abs) {
@@ -790,8 +660,7 @@ impl AuditService {
                     Err(_) => continue,
                 };
                 let repo_rel = tasks_rel.join(rel);
-                let (task_id, _project_prefix) = match Self::task_id_from_path(tasks_rel, &repo_rel)
-                {
+                let (task_id, _project_prefix) = match Self::task_id_from_path(tasks_rel, &repo_rel) {
                     Some(info) => info,
                     None => continue,
                 };
@@ -825,30 +694,18 @@ impl AuditService {
                         None => continue,
                     };
                     let actor = entry.actor.clone();
-                    let matched_commit = Self::match_commit_for_entry(
-                        &commit_refs,
-                        &aliases,
-                        entry_time,
-                        actor.as_deref(),
-                    );
-                    let (commit_id, author, email, message, date) =
-                        if let Some(commit) = matched_commit {
-                            (
-                                commit.sha.clone(),
-                                commit.author.clone(),
-                                commit.email.clone(),
-                                commit.message.clone(),
-                                commit.date,
-                            )
-                        } else {
-                            (
-                                format!("history-{}-{}", task_id, entry_time.timestamp()),
-                                actor.unwrap_or_else(|| "Unknown".to_string()),
-                                String::new(),
-                                format!("Task update for {}", task_id),
-                                entry_time,
-                            )
-                        };
+                    let matched_commit = Self::match_commit_for_entry(&commit_refs, &aliases, entry_time, actor.as_deref());
+                    let (commit_id, author, email, message, date) = if let Some(commit) = matched_commit {
+                        (commit.sha.clone(), commit.author.clone(), commit.email.clone(), commit.message.clone(), commit.date)
+                    } else {
+                        (
+                            format!("history-{}-{}", task_id, entry_time.timestamp()),
+                            actor.unwrap_or_else(|| "Unknown".to_string()),
+                            String::new(),
+                            format!("Task update for {}", task_id),
+                            entry_time,
+                        )
+                    };
 
                     let key = (commit_id.clone(), task_id.clone());
                     let item = feed.entry(key).or_insert_with(|| ActivityFeedItem {
@@ -877,20 +734,13 @@ impl AuditService {
             })
             .collect();
 
-        items.sort_by(|a, b| {
-            b.date
-                .cmp(&a.date)
-                .then_with(|| b.commit.cmp(&a.commit))
-                .then_with(|| b.task_id.cmp(&a.task_id))
-        });
+        items.sort_by(|a, b| b.date.cmp(&a.date).then_with(|| b.commit.cmp(&a.commit)).then_with(|| b.task_id.cmp(&a.task_id)));
 
         Ok(items)
     }
 
     fn parse_history_timestamp(entry: &TaskChangeLogEntry) -> Option<DateTime<Utc>> {
-        chrono::DateTime::parse_from_rfc3339(entry.at.as_str())
-            .map(|dt| dt.with_timezone(&Utc))
-            .ok()
+        chrono::DateTime::parse_from_rfc3339(entry.at.as_str()).map(|dt| dt.with_timezone(&Utc)).ok()
     }
 
     fn match_commit_for_entry<'a>(
@@ -924,9 +774,7 @@ impl AuditService {
             for commit in commits {
                 if commit.author.to_lowercase().contains(&actor_lower) {
                     let diff = (commit.date - entry_time).num_seconds().abs();
-                    if diff <= Duration::minutes(10).num_seconds()
-                        && best_actor.is_none_or(|(_, best_diff)| diff < best_diff)
-                    {
+                    if diff <= Duration::minutes(10).num_seconds() && best_actor.is_none_or(|(_, best_diff)| diff < best_diff) {
                         best_actor = Some((commit, diff));
                     }
                 }
@@ -939,9 +787,7 @@ impl AuditService {
         let mut best_time: Option<(&ParsedCommit, i64)> = None;
         for commit in commits {
             let diff = (commit.date - entry_time).num_seconds().abs();
-            if diff <= Duration::minutes(5).num_seconds()
-                && best_time.is_none_or(|(_, best_diff)| diff < best_diff)
-            {
+            if diff <= Duration::minutes(5).num_seconds() && best_time.is_none_or(|(_, best_diff)| diff < best_diff) {
                 best_time = Some((commit, diff));
             }
         }
@@ -965,9 +811,7 @@ impl AuditService {
         };
         projects
             .into_iter()
-            .flat_map(|(_, dir)| {
-                crate::storage::layout::task_files(&dir, crate::storage::layout::ArchiveFilter::All)
-            })
+            .flat_map(|(_, dir)| crate::storage::layout::task_files(&dir, crate::storage::layout::ArchiveFilter::All))
             .map(|file| file.path)
             .collect()
     }
@@ -978,12 +822,7 @@ impl AuditService {
 
     /// Reads through the shared batch process when it is running, and falls
     /// back to `git show` when it could not start or has failed.
-    fn load_task_version_batched(
-        blobs: &mut Option<BlobBatch>,
-        repo_root: &Path,
-        commit: &str,
-        file_rel: &Path,
-    ) -> Option<Task> {
+    fn load_task_version_batched(blobs: &mut Option<BlobBatch>, repo_root: &Path, commit: &str, file_rel: &Path) -> Option<Task> {
         if let Some(batch) = blobs.as_mut() {
             match batch.read(commit, &Self::git_path_str(file_rel)) {
                 Ok(content) => return content.and_then(|text| Self::parse_task_yaml(&text)),
@@ -1001,11 +840,7 @@ impl AuditService {
     }
 
     /// Compute last change info for each task across full history (no time filter)
-    pub fn list_last_change_per_task(
-        repo_root: &Path,
-        tasks_rel: &Path,
-        project_filter: Option<&str>,
-    ) -> Result<Vec<ChangedTaskSummary>, String> {
+    pub fn list_last_change_per_task(repo_root: &Path, tasks_rel: &Path, project_filter: Option<&str>) -> Result<Vec<ChangedTaskSummary>, String> {
         let tasks_abs = repo_root.join(tasks_rel);
         let files = Self::all_task_files(&tasks_abs, project_filter);
 
@@ -1027,22 +862,11 @@ impl AuditService {
                 continue;
             };
 
-            let log1_out = match Self::run_git_log(
-                repo_root,
-                None,
-                None,
-                false,
-                false,
-                1,
-                std::slice::from_ref(&rel_path),
-            ) {
+            let log1_out = match Self::run_git_log(repo_root, None, None, false, false, 1, std::slice::from_ref(&rel_path)) {
                 Ok(out) => out,
                 Err(_) => continue,
             };
-            let Some(header) = log1_out
-                .lines()
-                .find_map(|l| Self::parse_commit_header(l.trim()))
-            else {
+            let Some(header) = log1_out.lines().find_map(|l| Self::parse_commit_header(l.trim())) else {
                 continue;
             };
             let last_commit = header.sha;
@@ -1057,25 +881,12 @@ impl AuditService {
                 rev.arg("--");
                 rev.arg(&rel_path);
                 match rev.output() {
-                    Ok(output) if output.status.success() => {
-                        String::from_utf8_lossy(&output.stdout)
-                            .trim()
-                            .parse::<usize>()
-                            .unwrap_or(1)
-                    }
+                    Ok(output) if output.status.success() => String::from_utf8_lossy(&output.stdout).trim().parse::<usize>().unwrap_or(1),
                     _ => 1,
                 }
             };
 
-            items.push(ChangedTaskSummary {
-                id,
-                project,
-                file: rel_path.to_string_lossy().to_string(),
-                last_commit,
-                last_author,
-                last_date,
-                commits,
-            });
+            items.push(ChangedTaskSummary { id, project, file: rel_path.to_string_lossy().to_string(), last_commit, last_author, last_date, commits });
         }
         items.sort_by_key(|item| std::cmp::Reverse(item.last_date));
         Ok(items)
@@ -1085,27 +896,15 @@ impl AuditService {
     pub fn show_file_at(repo_root: &Path, commit: &str, file_rel: &Path) -> Result<String, String> {
         Self::ensure_safe_git_rev(commit)?;
         let spec = format!("{}:{}", commit, Self::git_path_str(file_rel));
-        let output = crate::utils::git::git_command(repo_root)
-            .arg("show")
-            .arg(spec)
-            .output()
-            .map_err(|e| format!("Failed to run git: {}", e))?;
+        let output = crate::utils::git::git_command(repo_root).arg("show").arg(spec).output().map_err(|e| format!("Failed to run git: {}", e))?;
         if !output.status.success() {
-            return Err(format!(
-                "git show failed (status {}): {}",
-                output.status,
-                String::from_utf8_lossy(&output.stderr)
-            ));
+            return Err(format!("git show failed (status {}): {}", output.status, String::from_utf8_lossy(&output.stderr)));
         }
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
 
     /// Get raw patch for a specific commit restricted to file
-    pub fn show_file_diff(
-        repo_root: &Path,
-        commit: &str,
-        file_rel: &Path,
-    ) -> Result<String, String> {
+    pub fn show_file_diff(repo_root: &Path, commit: &str, file_rel: &Path) -> Result<String, String> {
         Self::ensure_safe_git_rev(commit)?;
         let output = crate::utils::git::git_command(repo_root)
             .arg("show")
@@ -1115,11 +914,7 @@ impl AuditService {
             .output()
             .map_err(|e| format!("Failed to run git: {}", e))?;
         if !output.status.success() {
-            return Err(format!(
-                "git show failed (status {}): {}",
-                output.status,
-                String::from_utf8_lossy(&output.stderr)
-            ));
+            return Err(format!("git show failed (status {}): {}", output.status, String::from_utf8_lossy(&output.stderr)));
         }
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
@@ -1145,15 +940,7 @@ impl AuditService {
             }
         }
 
-        let stdout = Self::run_git_log(
-            repo_root,
-            Some(since),
-            Some(until),
-            false,
-            true,
-            0,
-            &[tasks_rel.to_path_buf()],
-        )?;
+        let stdout = Self::run_git_log(repo_root, Some(since), Some(until), false, true, 0, &[tasks_rel.to_path_buf()])?;
 
         let mut summaries: HashMap<String, ChangedTaskSummary> = HashMap::new();
         let mut current_commit: Option<(String, String, String, DateTime<Utc>)> = None; // (sha, author, email, date)
@@ -1170,9 +957,7 @@ impl AuditService {
                 // If author filter provided, skip this commit if it doesn't match
                 if let Some(filter) = author_filter {
                     let f = filter.to_lowercase();
-                    if !header.author.to_lowercase().contains(&f)
-                        && !header.email.to_lowercase().contains(&f)
-                    {
+                    if !header.author.to_lowercase().contains(&f) && !header.email.to_lowercase().contains(&f) {
                         current_commit = None;
                         continue;
                     }
@@ -1203,17 +988,15 @@ impl AuditService {
                     continue;
                 };
 
-                let entry = summaries
-                    .entry(id.clone())
-                    .or_insert_with(|| ChangedTaskSummary {
-                        id: id.clone(),
-                        project: project.clone(),
-                        file: rel_path.to_string_lossy().to_string(),
-                        last_commit: sha.clone(),
-                        last_author: author.clone(),
-                        last_date: date,
-                        commits: 0,
-                    });
+                let entry = summaries.entry(id.clone()).or_insert_with(|| ChangedTaskSummary {
+                    id: id.clone(),
+                    project: project.clone(),
+                    file: rel_path.to_string_lossy().to_string(),
+                    last_commit: sha.clone(),
+                    last_author: author.clone(),
+                    last_date: date,
+                    commits: 0,
+                });
                 // Update last info if newer
                 if date > entry.last_date {
                     entry.last_date = date;
@@ -1238,15 +1021,7 @@ impl AuditService {
         project_filter: Option<&str>,
     ) -> Result<Vec<AuthorActivity>, String> {
         let pathspec = Self::resolve_project_pathspec(tasks_rel, project_filter)?;
-        let stdout = Self::run_git_log(
-            repo_root,
-            Some(since),
-            Some(until),
-            false,
-            false,
-            0,
-            &[pathspec],
-        )?;
+        let stdout = Self::run_git_log(repo_root, Some(since), Some(until), false, false, 0, &[pathspec])?;
 
         let mut map: HashMap<(String, String), AuthorActivity> = HashMap::new();
         for line in stdout.lines() {
@@ -1270,11 +1045,7 @@ impl AuditService {
         }
 
         let mut items: Vec<AuthorActivity> = map.into_values().collect();
-        items.sort_by(|a, b| {
-            b.commits
-                .cmp(&a.commits)
-                .then(b.last_date.cmp(&a.last_date))
-        });
+        items.sort_by(|a, b| b.commits.cmp(&a.commits).then(b.last_date.cmp(&a.last_date)));
         Ok(items)
     }
 
@@ -1290,20 +1061,10 @@ impl AuditService {
         // If grouping by project we need file names; otherwise headers suffice
         let name_only = matches!(group_by, GroupBy::Project);
         let pathspec = Self::resolve_project_pathspec(tasks_rel, project_filter)?;
-        let stdout = Self::run_git_log(
-            repo_root,
-            Some(since),
-            Some(until),
-            false,
-            name_only,
-            0,
-            &[pathspec],
-        )?;
-        let mut map: std::collections::HashMap<String, ActivityItem> =
-            std::collections::HashMap::new();
+        let stdout = Self::run_git_log(repo_root, Some(since), Some(until), false, name_only, 0, &[pathspec])?;
+        let mut map: std::collections::HashMap<String, ActivityItem> = std::collections::HashMap::new();
         let mut current: Option<(String, String, String, DateTime<Utc>)> = None;
-        let mut touched_projects: std::collections::HashSet<String> =
-            std::collections::HashSet::new();
+        let mut touched_projects: std::collections::HashSet<String> = std::collections::HashSet::new();
 
         for line in stdout.lines() {
             let trimmed = line.trim();
@@ -1313,11 +1074,7 @@ impl AuditService {
                     && let Some((_, _, _, date)) = &current
                 {
                     for proj in touched_projects.drain() {
-                        let entry = map.entry(proj.clone()).or_insert_with(|| ActivityItem {
-                            key: proj.clone(),
-                            count: 0,
-                            last_date: *date,
-                        });
+                        let entry = map.entry(proj.clone()).or_insert_with(|| ActivityItem { key: proj.clone(), count: 0, last_date: *date });
                         entry.count += 1;
                         if *date > entry.last_date {
                             entry.last_date = *date;
@@ -1349,11 +1106,7 @@ impl AuditService {
                     match group_by {
                         GroupBy::Author => {
                             let key = author.clone();
-                            let entry = map.entry(key.clone()).or_insert_with(|| ActivityItem {
-                                key: key.clone(),
-                                count: 0,
-                                last_date: *date,
-                            });
+                            let entry = map.entry(key.clone()).or_insert_with(|| ActivityItem { key: key.clone(), count: 0, last_date: *date });
                             entry.count += 1;
                             if *date > entry.last_date {
                                 entry.last_date = *date;
@@ -1361,11 +1114,7 @@ impl AuditService {
                         }
                         GroupBy::Day => {
                             let key = date.format("%Y-%m-%d").to_string();
-                            let entry = map.entry(key.clone()).or_insert_with(|| ActivityItem {
-                                key: key.clone(),
-                                count: 0,
-                                last_date: *date,
-                            });
+                            let entry = map.entry(key.clone()).or_insert_with(|| ActivityItem { key: key.clone(), count: 0, last_date: *date });
                             entry.count += 1;
                             if *date > entry.last_date {
                                 entry.last_date = *date;
@@ -1375,11 +1124,7 @@ impl AuditService {
                             // ISO week key: YYYY-Www
                             let iso_week = date.iso_week();
                             let key = format!("{}-W{:02}", iso_week.year(), iso_week.week());
-                            let entry = map.entry(key.clone()).or_insert_with(|| ActivityItem {
-                                key: key.clone(),
-                                count: 0,
-                                last_date: *date,
-                            });
+                            let entry = map.entry(key.clone()).or_insert_with(|| ActivityItem { key: key.clone(), count: 0, last_date: *date });
                             entry.count += 1;
                             if *date > entry.last_date {
                                 entry.last_date = *date;
@@ -1397,10 +1142,7 @@ impl AuditService {
                 // collect project from file path lines
                 let rel_path = std::path::Path::new(trimmed);
                 if rel_path.extension().and_then(|e| e.to_str()) == Some("yml")
-                    && let Some(project) = rel_path
-                        .parent()
-                        .and_then(|p| p.file_name())
-                        .and_then(|s| s.to_str())
+                    && let Some(project) = rel_path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str())
                 {
                     touched_projects.insert(project.to_string());
                 }
@@ -1412,11 +1154,7 @@ impl AuditService {
             && let Some((_, _, _, date)) = &current
         {
             for proj in touched_projects.drain() {
-                let entry = map.entry(proj.clone()).or_insert_with(|| ActivityItem {
-                    key: proj.clone(),
-                    count: 0,
-                    last_date: *date,
-                });
+                let entry = map.entry(proj.clone()).or_insert_with(|| ActivityItem { key: proj.clone(), count: 0, last_date: *date });
                 entry.count += 1;
                 if *date > entry.last_date {
                     entry.last_date = *date;

@@ -5,36 +5,19 @@ use crate::common;
 use common::TestFixtures;
 
 fn run(fixtures: &TestFixtures, args: &[&str]) -> std::process::Output {
-    common::lotar_cmd()
-        .unwrap()
-        .current_dir(fixtures.get_temp_path())
-        .args(args)
-        .output()
-        .unwrap()
+    common::lotar_cmd().unwrap().current_dir(fixtures.get_temp_path()).args(args).output().unwrap()
 }
 
 fn text(out: &std::process::Output) -> String {
-    format!(
-        "{}{}",
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr)
-    )
+    format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr))
 }
 
 #[test]
 fn help_and_version_words_are_values() {
     let fixtures = TestFixtures::new();
-    for args in [
-        &["add", "version", "-p", "ALPH"][..],
-        &["add", "Bump", "--tag", "version"],
-        &["add", "help"],
-    ] {
+    for args in [&["add", "version", "-p", "ALPH"][..], &["add", "Bump", "--tag", "version"], &["add", "help"]] {
         let out = run(&fixtures, args);
-        assert!(
-            text(&out).contains("Created task"),
-            "{args:?}: {}",
-            text(&out)
-        );
+        assert!(text(&out).contains("Created task"), "{args:?}: {}", text(&out));
     }
     let out = run(&fixtures, &["comment", "ALPH-1", "-m", "help"]);
     assert!(text(&out).contains("Comment added"), "{}", text(&out));
@@ -55,11 +38,7 @@ fn help_and_version_words_are_values() {
 #[test]
 fn dash_leading_values_are_not_global_flags() {
     let fixtures = TestFixtures::new();
-    assert!(
-        run(&fixtures, &["add", "one", "-p", "ALPH"])
-            .status
-            .success()
-    );
+    assert!(run(&fixtures, &["add", "one", "-p", "ALPH"]).status.success());
     for args in [
         &["comment", "ALPH-1", "-m", "-lower the timeout"][..],
         &["comment", "ALPH-1", "-m", "-fix: flaky test"],
@@ -70,9 +49,5 @@ fn dash_leading_values_are_not_global_flags() {
         assert!(out.status.success(), "{args:?}: {}", text(&out));
     }
     let out = run(&fixtures, &["-fjson", "list"]);
-    assert!(
-        String::from_utf8_lossy(&out.stdout)
-            .trim_start()
-            .starts_with('{')
-    );
+    assert!(String::from_utf8_lossy(&out.stdout).trim_start().starts_with('{'));
 }

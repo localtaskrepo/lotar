@@ -18,25 +18,16 @@ const UNDOCUMENTED_BY_DESIGN: &[&str] = &[];
 /// Routes served outside the ApiServer handler map (SSE streams handled in
 /// the connection loop, the spec document itself) that are documented and
 /// therefore legitimate parts of the surface.
-const SERVED_OUTSIDE_HANDLER_MAP: &[&str] = &[
-    "GET /api/events",
-    "GET /api/tasks/stream",
-    "GET /api/openapi.json",
-];
+const SERVED_OUTSIDE_HANDLER_MAP: &[&str] = &["GET /api/events", "GET /api/tasks/stream", "GET /api/openapi.json"];
 
 fn server_routes() -> BTreeSet<String> {
     let mut server = ApiServer::new();
     routes::initialize(&mut server);
-    server
-        .registered_routes()
-        .into_iter()
-        .map(|(method, path)| format!("{} {}", method, path))
-        .collect()
+    server.registered_routes().into_iter().map(|(method, path)| format!("{} {}", method, path)).collect()
 }
 
 fn documented_routes() -> BTreeSet<String> {
-    let spec_raw = fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/docs/openapi.json"))
-        .expect("docs/openapi.json must be readable");
+    let spec_raw = fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/docs/openapi.json")).expect("docs/openapi.json must be readable");
     let spec: Value = serde_json::from_str(&spec_raw).expect("openapi.json must be valid JSON");
 
     let mut documented = BTreeSet::new();

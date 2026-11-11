@@ -34,10 +34,7 @@ issue.priorities: [Low, Medium, High]
             goal: Some("Generate burndown insights".to_string()),
             ..SprintPlan::default()
         }),
-        actual: Some(SprintActual {
-            started_at: Some("2024-05-01T09:00:00Z".to_string()),
-            closed_at: Some("2024-05-08T17:00:00Z".to_string()),
-        }),
+        actual: Some(SprintActual { started_at: Some("2024-05-01T09:00:00Z".to_string()), closed_at: Some("2024-05-08T17:00:00Z".to_string()) }),
         ..Sprint::default()
     };
 
@@ -90,30 +87,11 @@ issue.priorities: [Low, Medium, High]
     )
     .expect("create task");
 
-    TaskService::update(
-        &mut storage,
-        &hours_task.id,
-        TaskUpdate {
-            status: Some("InProgress".to_string()),
-            ..TaskUpdate::default()
-        },
-    )
-    .expect("update task status");
+    TaskService::update(&mut storage, &hours_task.id, TaskUpdate { status: Some("InProgress".to_string()), ..TaskUpdate::default() })
+        .expect("update task status");
 
     let mut json_cmd = common::cargo_bin_in(&fixtures);
-    let output = json_cmd
-        .args([
-            "--format",
-            "json",
-            "sprint",
-            "burndown",
-            sprint_id_arg.as_str(),
-        ])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
+    let output = json_cmd.args(["--format", "json", "sprint", "burndown", sprint_id_arg.as_str()]).assert().success().get_output().stdout.clone();
 
     let payload: Value = serde_json::from_slice(&output).expect("parse burndown json");
 
@@ -162,10 +140,7 @@ issue.priorities: [Low, High]
             ends_at: Some("2024-06-08T17:00:00Z".to_string()),
             ..SprintPlan::default()
         }),
-        actual: Some(SprintActual {
-            started_at: Some("2024-06-01T09:00:00Z".to_string()),
-            closed_at: Some("2024-06-08T17:00:00Z".to_string()),
-        }),
+        actual: Some(SprintActual { started_at: Some("2024-06-01T09:00:00Z".to_string()), closed_at: Some("2024-06-08T17:00:00Z".to_string()) }),
         ..Sprint::default()
     };
 
@@ -201,42 +176,17 @@ issue.priorities: [Low, High]
     )
     .expect("create task");
 
-    TaskService::update(
-        &mut storage,
-        &task_one.id,
-        TaskUpdate {
-            status: Some("InProgress".to_string()),
-            ..TaskUpdate::default()
-        },
-    )
-    .expect("update task status");
+    TaskService::update(&mut storage, &task_one.id, TaskUpdate { status: Some("InProgress".to_string()), ..TaskUpdate::default() })
+        .expect("update task status");
 
-    TaskService::update(
-        &mut storage,
-        &task_two.id,
-        TaskUpdate {
-            status: Some("Todo".to_string()),
-            ..TaskUpdate::default()
-        },
-    )
-    .expect("update task status");
+    TaskService::update(&mut storage, &task_two.id, TaskUpdate { status: Some("Todo".to_string()), ..TaskUpdate::default() }).expect("update task status");
 
     let mut cmd = common::cargo_bin_in(&fixtures);
-    cmd.args([
-        "sprint",
-        "burndown",
-        "--metric",
-        "points",
-        sprint_id_arg.as_str(),
-    ])
-    .assert()
-    .success()
-    .stdout(predicate::str::contains(format!(
-        "Sprint burndown for #{sprint_id} (Fallback Sprint)."
-    )))
-    .stdout(predicate::str::contains("Total tasks: 2"))
-    .stdout(predicate::str::contains("Ideal horizon"))
-    .stderr(predicate::str::contains(
-        "No point estimates recorded for this sprint; falling back to tasks.",
-    ));
+    cmd.args(["sprint", "burndown", "--metric", "points", sprint_id_arg.as_str()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(format!("Sprint burndown for #{sprint_id} (Fallback Sprint).")))
+        .stdout(predicate::str::contains("Total tasks: 2"))
+        .stdout(predicate::str::contains("Ideal horizon"))
+        .stderr(predicate::str::contains("No point estimates recorded for this sprint; falling back to tasks."));
 }

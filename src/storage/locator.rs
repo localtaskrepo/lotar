@@ -42,10 +42,6 @@ impl StorageLocator {
     pub fn project_folders_for_name(root_path: &Path, project_name: &str) -> Vec<String> {
         let resolved = crate::utils::project::resolve_project_input(project_name, root_path);
         let candidate = root_path.join(&resolved);
-        if candidate.exists() {
-            vec![resolved]
-        } else {
-            Vec::new()
-        }
+        if candidate.exists() { vec![resolved] } else { Vec::new() }
     }
 }

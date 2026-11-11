@@ -15,11 +15,7 @@ fn fast_net() -> bool {
 }
 
 fn net_timeout() -> std::time::Duration {
-    if fast_net() {
-        std::time::Duration::from_millis(500)
-    } else {
-        std::time::Duration::from_millis(1500)
-    }
+    if fast_net() { std::time::Duration::from_millis(500) } else { std::time::Duration::from_millis(1500) }
 }
 
 fn mk_req(method: &str, path: &str, query: &[(&str, &str)], body: Value) -> HttpRequest {
@@ -27,13 +23,7 @@ fn mk_req(method: &str, path: &str, query: &[(&str, &str)], body: Value) -> Http
     for (k, v) in query {
         q.insert((*k).to_string(), (*v).to_string());
     }
-    HttpRequest {
-        method: method.to_string(),
-        path: path.to_string(),
-        query: q,
-        headers: HashMap::new(),
-        body: serde_json::to_vec(&body).unwrap(),
-    }
+    HttpRequest { method: method.to_string(), path: path.to_string(), query: q, headers: HashMap::new(), body: serde_json::to_vec(&body).unwrap() }
 }
 
 // Test server fixture owning its listener for the whole lifecycle.
@@ -54,8 +44,7 @@ fn start_server() -> TestServer {
 }
 
 fn start_server_on(port: u16) -> Result<TestServer, String> {
-    let listener = TcpListener::bind(("127.0.0.1", port))
-        .map_err(|e| format!("bind 127.0.0.1:{port} failed: {e}"))?;
+    let listener = TcpListener::bind(("127.0.0.1", port)).map_err(|e| format!("bind 127.0.0.1:{port} failed: {e}"))?;
     let port = listener.local_addr().unwrap().port();
 
     // Enable fast IO/heartbeat paths inside the server during tests, plus
@@ -70,20 +59,12 @@ fn start_server_on(port: u16) -> Result<TestServer, String> {
     let handle = thread::spawn(move || {
         let mut api = ApiServer::new();
         routes::initialize(&mut api);
-        lotar::web_server::serve_listener(
-            &api,
-            &listener,
-            &lotar::web_server::WebServerConfig::default(),
-        );
+        lotar::web_server::serve_listener(&api, &listener, &lotar::web_server::WebServerConfig::default());
         let _ = done_tx.send(());
     });
 
     wait_for_server_ready(port, Duration::from_millis(750))?;
-    Ok(TestServer {
-        port,
-        handle: Some(handle),
-        done: done_rx,
-    })
+    Ok(TestServer { port, handle: Some(handle), done: done_rx })
 }
 
 fn wait_for_server_ready(port: u16, max_wait: Duration) -> Result<(), String> {
@@ -93,9 +74,7 @@ fn wait_for_server_ready(port: u16, max_wait: Duration) -> Result<(), String> {
             Ok(_) => return Ok(()),
             Err(e) => {
                 if start.elapsed() > max_wait {
-                    return Err(format!(
-                        "server on port {port} never became reachable within {max_wait:?}: {e}"
-                    ));
+                    return Err(format!("server on port {port} never became reachable within {max_wait:?}: {e}"));
                 }
                 std::thread::sleep(Duration::from_millis(5));
             }
@@ -113,10 +92,7 @@ impl TestServer {
         // Join the accept-loop thread with a bound so a broken teardown fails
         // the test deterministically instead of leaking the thread.
         if self.done.recv_timeout(Duration::from_secs(5)).is_err() {
-            panic!(
-                "server thread on port {} did not exit after stop request",
-                self.port
-            );
+            panic!("server thread on port {} did not exit after stop request", self.port);
         }
         if let Some(handle) = self.handle.take() {
             let _ = handle.join();
@@ -155,17 +131,10 @@ fn http_post_json(port: u16, path_and_query: &str, body: &str) -> (u16, Vec<u8>)
     http_post_json_with_origin(port, path_and_query, body, None)
 }
 
-fn http_post_json_with_origin(
-    port: u16,
-    path_and_query: &str,
-    body: &str,
-    origin: Option<&str>,
-) -> (u16, Vec<u8>) {
+fn http_post_json_with_origin(port: u16, path_and_query: &str, body: &str, origin: Option<&str>) -> (u16, Vec<u8>) {
     let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
     stream.set_read_timeout(Some(net_timeout())).unwrap();
-    let origin_header = origin
-        .map(|o| format!("Origin: {o}\r\n"))
-        .unwrap_or_default();
+    let origin_header = origin.map(|o| format!("Origin: {o}\r\n")).unwrap_or_default();
     let req = format!(
         "POST {} HTTP/1.1\r\nHost: 127.0.0.1\r\n{}Content-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
         path_and_query,
@@ -189,12 +158,7 @@ fn http_post_json_with_origin(
             // Split headers and leftover body bytes
             let body_leftover = header_buf.split_off(pos + 4);
             let headers_text = String::from_utf8_lossy(&header_buf);
-            let status = headers_text
-                .lines()
-                .next()
-                .and_then(|l| l.split_whitespace().nth(1))
-                .and_then(|s| s.parse::<u16>().ok())
-                .unwrap_or(0);
+            let status = headers_text.lines().next().and_then(|l| l.split_whitespace().nth(1)).and_then(|s| s.parse::<u16>().ok()).unwrap_or(0);
             let content_length = headers_text
                 .lines()
                 .find_map(|l| l.split_once(":").map(|(k, v)| (k.trim(), v.trim())))
@@ -247,12 +211,7 @@ fn http_get_bytes(port: u16, path: &str) -> (u16, HashMap<String, String>, Vec<u
             let body_leftover = header_buf.split_off(pos + 4);
             let headers_text = String::from_utf8_lossy(&header_buf);
             // Parse status
-            let status = headers_text
-                .lines()
-                .next()
-                .and_then(|l| l.split_whitespace().nth(1))
-                .and_then(|s| s.parse::<u16>().ok())
-                .unwrap_or(0);
+            let status = headers_text.lines().next().and_then(|l| l.split_whitespace().nth(1)).and_then(|s| s.parse::<u16>().ok()).unwrap_or(0);
             // Collect headers map
             for line in headers_text.lines().skip(1) {
                 if line.trim().is_empty() {
@@ -262,10 +221,7 @@ fn http_get_bytes(port: u16, path: &str) -> (u16, HashMap<String, String>, Vec<u
                     headers.insert(k.trim().to_string(), v.trim().to_string());
                 }
             }
-            let content_length = headers
-                .get("Content-Length")
-                .and_then(|v| v.parse::<usize>().ok())
-                .unwrap_or(0);
+            let content_length = headers.get("Content-Length").and_then(|v| v.parse::<usize>().ok()).unwrap_or(0);
             // Read exact remaining bytes for body
             let mut body_bytes = body_leftover;
             while body_bytes.len() < content_length {
@@ -310,11 +266,7 @@ fn rest_create_and_update_supports_me_alias() {
         "project": "REST",
         "assignee": "@me"
     });
-    let (status, body) = http_post_json(
-        port,
-        "/api/tasks/add?project=REST",
-        &create_body.to_string(),
-    );
+    let (status, body) = http_post_json(port, "/api/tasks/add?project=REST", &create_body.to_string());
     assert_eq!(status, 201, "create should succeed");
     let env: serde_json::Value = serde_json::from_slice(&body).unwrap();
     let data = env.get("data").cloned().unwrap_or(json!({}));
@@ -354,44 +306,24 @@ fn api_sprint_assignment_and_backlog() {
 
     let mut storage = lotar::storage::manager::Storage::new(&tasks_dir.clone());
     let mut sprint = lotar::storage::sprint::Sprint::default();
-    sprint.plan = Some(lotar::storage::sprint::SprintPlan {
-        label: Some("Iteration 1".into()),
-        ..Default::default()
-    });
-    sprint.actual = Some(lotar::storage::sprint::SprintActual {
-        started_at: Some(Utc::now().to_rfc3339()),
-        ..Default::default()
-    });
-    let created =
-        lotar::services::sprint_service::SprintService::create(&mut storage, sprint, None)
-            .expect("create sprint");
+    sprint.plan = Some(lotar::storage::sprint::SprintPlan { label: Some("Iteration 1".into()), ..Default::default() });
+    sprint.actual = Some(lotar::storage::sprint::SprintActual { started_at: Some(Utc::now().to_rfc3339()), ..Default::default() });
+    let created = lotar::services::sprint_service::SprintService::create(&mut storage, sprint, None).expect("create sprint");
     let sprint_id = created.record.id;
 
     let task_a = lotar::services::task_service::TaskService::create(
         &mut storage,
-        lotar::api_types::TaskCreate {
-            title: "Sprint API A".into(),
-            project: Some("API".into()),
-            ..lotar::api_types::TaskCreate::default()
-        },
+        lotar::api_types::TaskCreate { title: "Sprint API A".into(), project: Some("API".into()), ..lotar::api_types::TaskCreate::default() },
     )
     .expect("task a");
     let task_b = lotar::services::task_service::TaskService::create(
         &mut storage,
-        lotar::api_types::TaskCreate {
-            title: "Sprint API B".into(),
-            project: Some("API".into()),
-            ..lotar::api_types::TaskCreate::default()
-        },
+        lotar::api_types::TaskCreate { title: "Sprint API B".into(), project: Some("API".into()), ..lotar::api_types::TaskCreate::default() },
     )
     .expect("task b");
     let task_c = lotar::services::task_service::TaskService::create(
         &mut storage,
-        lotar::api_types::TaskCreate {
-            title: "Sprint API Backlog".into(),
-            project: Some("API".into()),
-            ..lotar::api_types::TaskCreate::default()
-        },
+        lotar::api_types::TaskCreate { title: "Sprint API Backlog".into(), project: Some("API".into()), ..lotar::api_types::TaskCreate::default() },
     )
     .expect("task c");
     drop(storage);
@@ -404,30 +336,13 @@ fn api_sprint_assignment_and_backlog() {
     assert_eq!(list_resp.status, 200, "list should succeed");
     let list_json: serde_json::Value = serde_json::from_slice(&list_resp.body).unwrap();
     let list_data = list_json.get("data").expect("list data");
-    assert_eq!(
-        list_data.get("count").and_then(|v| v.as_u64()),
-        Some(1),
-        "should report one sprint"
-    );
-    let sprints = list_data
-        .get("sprints")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    assert_eq!(list_data.get("count").and_then(|v| v.as_u64()), Some(1), "should report one sprint");
+    let sprints = list_data.get("sprints").and_then(|v| v.as_array()).cloned().unwrap_or_default();
     assert_eq!(sprints.len(), 1, "expected single sprint in list");
     let sprint_entry = &sprints[0];
-    assert_eq!(
-        sprint_entry.get("id").and_then(|v| v.as_u64()),
-        Some(sprint_id as u64)
-    );
-    assert_eq!(
-        sprint_entry.get("display_name").and_then(|v| v.as_str()),
-        Some("Iteration 1")
-    );
-    assert_eq!(
-        sprint_entry.get("state").and_then(|v| v.as_str()),
-        Some("active")
-    );
+    assert_eq!(sprint_entry.get("id").and_then(|v| v.as_u64()), Some(sprint_id as u64));
+    assert_eq!(sprint_entry.get("display_name").and_then(|v| v.as_str()), Some("Iteration 1"));
+    assert_eq!(sprint_entry.get("state").and_then(|v| v.as_str()), Some("active"));
 
     let add_body = json!({
         "sprint": sprint_id,
@@ -438,42 +353,23 @@ fn api_sprint_assignment_and_backlog() {
     assert_eq!(add_resp.status, 200);
     let add_json: serde_json::Value = serde_json::from_slice(&add_resp.body).unwrap();
     let add_data = add_json.get("data").unwrap();
-    let modified = add_data
-        .get("modified")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    let modified = add_data.get("modified").and_then(|v| v.as_array()).cloned().unwrap_or_default();
     assert_eq!(modified.len(), 2);
 
     let storage = lotar::storage::manager::Storage::new(&tasks_dir.clone());
-    let assigned_a = lotar::services::task_service::TaskService::get(&storage, &task_a.id, None)
-        .expect("task a assigned");
+    let assigned_a = lotar::services::task_service::TaskService::get(&storage, &task_a.id, None).expect("task a assigned");
     assert_eq!(assigned_a.sprints, vec![sprint_id]);
-    let assigned_b = lotar::services::task_service::TaskService::get(&storage, &task_b.id, None)
-        .expect("task b assigned");
+    let assigned_b = lotar::services::task_service::TaskService::get(&storage, &task_b.id, None).expect("task b assigned");
     assert_eq!(assigned_b.sprints, vec![sprint_id]);
     drop(storage);
 
-    let backlog_req = mk_req(
-        "GET",
-        "/api/sprints/backlog",
-        &[("project", "API")],
-        json!({}),
-    );
+    let backlog_req = mk_req("GET", "/api/sprints/backlog", &[("project", "API")], json!({}));
     let backlog_resp = api.handle_request(&backlog_req);
     assert_eq!(backlog_resp.status, 200);
     let backlog_json: serde_json::Value = serde_json::from_slice(&backlog_resp.body).unwrap();
-    let backlog_tasks = backlog_json
-        .get("data")
-        .and_then(|d| d.get("tasks"))
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    let backlog_tasks = backlog_json.get("data").and_then(|d| d.get("tasks")).and_then(|v| v.as_array()).cloned().unwrap_or_default();
     assert_eq!(backlog_tasks.len(), 1);
-    assert_eq!(
-        backlog_tasks[0].get("id").and_then(|v| v.as_str()),
-        Some(task_c.id.as_str())
-    );
+    assert_eq!(backlog_tasks[0].get("id").and_then(|v| v.as_str()), Some(task_c.id.as_str()));
 
     let remove_body = json!({
         "sprint": sprint_id,
@@ -483,28 +379,18 @@ fn api_sprint_assignment_and_backlog() {
     let remove_resp = api.handle_request(&remove_req);
     assert_eq!(remove_resp.status, 200);
     let remove_json: serde_json::Value = serde_json::from_slice(&remove_resp.body).unwrap();
-    let removed = remove_json
-        .get("data")
-        .and_then(|d| d.get("modified"))
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    let removed = remove_json.get("data").and_then(|d| d.get("modified")).and_then(|v| v.as_array()).cloned().unwrap_or_default();
     assert_eq!(removed, vec![serde_json::Value::String(task_a.id.clone())]);
 
     let storage = lotar::storage::manager::Storage::new(&tasks_dir);
-    let updated_a = lotar::services::task_service::TaskService::get(&storage, &task_a.id, None)
-        .expect("task a after remove");
+    let updated_a = lotar::services::task_service::TaskService::get(&storage, &task_a.id, None).expect("task a after remove");
     assert!(updated_a.sprints.is_empty());
 }
 
 fn open_sse(port: u16, query: &str) -> (TcpStream, Vec<u8>) {
     let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
     stream.set_read_timeout(Some(net_timeout())).unwrap();
-    let suffix = if query.is_empty() {
-        String::new()
-    } else {
-        format!("?{query}")
-    };
+    let suffix = if query.is_empty() { String::new() } else { format!("?{query}") };
     let path = format!("/api/events{suffix}");
     let req = format!("GET {path} HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n");
     stream.write_all(req.as_bytes()).unwrap();
@@ -525,12 +411,7 @@ fn open_sse(port: u16, query: &str) -> (TcpStream, Vec<u8>) {
     (stream, Vec::new())
 }
 
-fn read_sse_events(
-    stream: &mut TcpStream,
-    max_events: usize,
-    timeout: Duration,
-    mut buf: Vec<u8>,
-) -> Vec<(String, String)> {
+fn read_sse_events(stream: &mut TcpStream, max_events: usize, timeout: Duration, mut buf: Vec<u8>) -> Vec<(String, String)> {
     let start = Instant::now();
     let mut events = Vec::new();
     while events.len() < max_events && start.elapsed() < timeout {
@@ -539,10 +420,7 @@ fn read_sse_events(
             Ok(0) => break,
             Ok(n) => {
                 buf.extend_from_slice(&tmp[..n]);
-                while let Some(pos) = buf
-                    .windows(2)
-                    .position(|w| w == b"\n\n" || w == b"\r\n\r\n")
-                {
+                while let Some(pos) = buf.windows(2).position(|w| w == b"\n\n" || w == b"\r\n\r\n") {
                     let chunk = buf.drain(..pos + 2).collect::<Vec<u8>>();
                     let text = String::from_utf8_lossy(&chunk);
                     let mut kind = String::new();
@@ -561,9 +439,7 @@ fn read_sse_events(
                 }
             }
             Err(e) => {
-                if e.kind() == std::io::ErrorKind::WouldBlock
-                    || e.kind() == std::io::ErrorKind::TimedOut
-                {
+                if e.kind() == std::io::ErrorKind::WouldBlock || e.kind() == std::io::ErrorKind::TimedOut {
                     std::thread::sleep(Duration::from_millis(10));
                     continue;
                 } else {
@@ -577,11 +453,7 @@ fn read_sse_events(
 
 fn http_options(port: u16, path: &str) -> (u16, HashMap<String, String>) {
     let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
-    let to = if fast_net() {
-        Duration::from_millis(400)
-    } else {
-        Duration::from_millis(1000)
-    };
+    let to = if fast_net() { Duration::from_millis(400) } else { Duration::from_millis(1000) };
     stream.set_read_timeout(Some(to)).unwrap();
     let req = format!("OPTIONS {path} HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n");
     stream.write_all(req.as_bytes()).unwrap();
@@ -601,11 +473,7 @@ fn http_options(port: u16, path: &str) -> (u16, HashMap<String, String>) {
     }
     let resp = String::from_utf8_lossy(&header_buf);
     let mut lines = resp.lines();
-    let status = lines
-        .next()
-        .and_then(|l| l.split_whitespace().nth(1))
-        .and_then(|s| s.parse::<u16>().ok())
-        .unwrap_or(0);
+    let status = lines.next().and_then(|l| l.split_whitespace().nth(1)).and_then(|s| s.parse::<u16>().ok()).unwrap_or(0);
     let mut headers = HashMap::new();
     for line in lines {
         if line.trim().is_empty() {
@@ -635,12 +503,7 @@ fn non_ascii_query_values_match_over_http() {
 
     let mut server = start_server();
     let port = server.port();
-    for query in [
-        "q=Caf%C3%A9",
-        "assignee=Jos%C3%A9",
-        "tags=%C3%BCber",
-        "query=assignee%3AJos%C3%A9",
-    ] {
+    for query in ["q=Caf%C3%A9", "assignee=Jos%C3%A9", "tags=%C3%BCber", "query=assignee%3AJos%C3%A9"] {
         let (status, _headers, body) = http_get_bytes(port, &format!("/api/tasks/list?{query}"));
         assert_eq!(status, 200, "{query}");
         let json: Value = serde_json::from_slice(&body).unwrap();
@@ -668,28 +531,14 @@ fn api_list_reflects_external_file_edits_immediately() {
     routes::initialize(&mut api);
 
     let list_titles = |api: &ApiServer| -> Vec<String> {
-        let resp = api.handle_request(&mk_req(
-            "GET",
-            "/api/tasks/list",
-            &[],
-            serde_json::Value::Null,
-        ));
+        let resp = api.handle_request(&mk_req("GET", "/api/tasks/list", &[], serde_json::Value::Null));
         assert_eq!(resp.status, 200);
         let body: serde_json::Value = serde_json::from_slice(&resp.body).unwrap();
-        body["data"]["tasks"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|t| t["title"].as_str().unwrap_or_default().to_string())
-            .collect()
+        body["data"]["tasks"].as_array().unwrap().iter().map(|t| t["title"].as_str().unwrap_or_default().to_string()).collect()
     };
 
     // Prime every cache with a couple of identical reads.
-    assert_eq!(
-        list_titles(&api),
-        vec!["before external edit".to_string()],
-        "first read must see the on-disk task"
-    );
+    assert_eq!(list_titles(&api), vec!["before external edit".to_string()], "first read must see the on-disk task");
     assert_eq!(list_titles(&api), vec!["before external edit".to_string()]);
 
     // Edit the file behind the server's back, then read again immediately.
@@ -700,11 +549,7 @@ fn api_list_reflects_external_file_edits_immediately() {
     )
     .unwrap();
 
-    assert_eq!(
-        list_titles(&api),
-        vec!["after external edit".to_string()],
-        "external edits must be visible on the very next request, with no TTL window"
-    );
+    assert_eq!(list_titles(&api), vec!["after external edit".to_string()], "external edits must be visible on the very next request, with no TTL window");
 }
 
 #[test]
@@ -724,15 +569,8 @@ fn task_creation_waits_for_fragmented_body_with_case_insensitive_content_length(
         })
         .to_string();
         let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
-        stream
-            .set_read_timeout(Some(Duration::from_millis(100)))
-            .unwrap();
-        write!(
-            stream,
-            "POST /api/tasks/add HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\n{header}: {}\r\n\r\n",
-            body.len()
-        )
-        .unwrap();
+        stream.set_read_timeout(Some(Duration::from_millis(100))).unwrap();
+        write!(stream, "POST /api/tasks/add HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\n{header}: {}\r\n\r\n", body.len()).unwrap();
         // A response before the body arrives means the declared length was ignored.
         let mut byte = [0u8; 1];
         let early = stream.read(&mut byte);
@@ -774,12 +612,7 @@ fn api_add_list_get_delete_roundtrip() {
         "tags": ["api", "test"],
         "fields": {"foo": "bar"}
     });
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/add",
-        &[("project", "TEST")],
-        add_body,
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/add", &[("project", "TEST")], add_body));
     assert_eq!(resp.status, 201, "add status");
     let added: Value = serde_json::from_slice(&resp.body).unwrap();
     let id = added["data"]["id"].as_str().unwrap().to_string();
@@ -791,25 +624,13 @@ fn api_add_list_get_delete_roundtrip() {
     let mut yml_count = 0;
     if let Ok(entries) = std::fs::read_dir(&project_dir) {
         for e in entries.flatten() {
-            if e.path()
-                .extension()
-                .and_then(|s| s.to_str())
-                .is_some_and(|ext| ext == "yml")
-            {
+            if e.path().extension().and_then(|s| s.to_str()).is_some_and(|ext| ext == "yml") {
                 yml_count += 1;
             }
         }
     }
-    assert!(
-        yml_count >= 1,
-        "expected at least one yml in {project_dir:?}"
-    );
-    let resp = api.handle_request(&mk_req(
-        "GET",
-        "/api/tasks/list",
-        &[("project", &prefix)],
-        json!({}),
-    ));
+    assert!(yml_count >= 1, "expected at least one yml in {project_dir:?}");
+    let resp = api.handle_request(&mk_req("GET", "/api/tasks/list", &[("project", &prefix)], json!({})));
     assert_eq!(resp.status, 200, "list status");
     let listed: Value = serde_json::from_slice(&resp.body).unwrap();
     assert!(listed["data"]["tasks"].is_array());
@@ -853,56 +674,27 @@ fn api_comment_update_edits_existing_comment() {
     let id = created["data"]["id"].as_str().unwrap().to_string();
 
     // Add initial comment
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/comment",
-        &[],
-        json!({ "id": id, "text": "Initial note" }),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/comment", &[], json!({ "id": id, "text": "Initial note" })));
     assert_eq!(resp.status, 200, "add comment status");
     let with_comment: Value = serde_json::from_slice(&resp.body).unwrap();
-    let comment_text = with_comment["data"]["comments"][0]["text"]
-        .as_str()
-        .unwrap();
+    let comment_text = with_comment["data"]["comments"][0]["text"].as_str().unwrap();
     assert_eq!(comment_text, "Initial note");
 
     // Edit the comment
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/comment/update",
-        &[],
-        json!({ "id": id, "index": 0, "text": " Edited note " }),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/comment/update", &[], json!({ "id": id, "index": 0, "text": " Edited note " })));
     assert_eq!(resp.status, 200, "edit comment status");
     let updated: Value = serde_json::from_slice(&resp.body).unwrap();
     let updated_text = updated["data"]["comments"][0]["text"].as_str().unwrap();
-    assert_eq!(
-        updated_text, "Edited note",
-        "comment text should be trimmed and updated"
-    );
-    let history = updated["data"]["history"]
-        .as_array()
-        .cloned()
-        .unwrap_or_default();
+    assert_eq!(updated_text, "Edited note", "comment text should be trimmed and updated");
+    let history = updated["data"]["history"].as_array().cloned().unwrap_or_default();
     let last_change = history.last().expect("history entry for comment edit");
     let change_field = last_change["changes"][0]["field"].as_str().unwrap();
     assert_eq!(change_field, "comment#1");
-    assert_eq!(
-        last_change["changes"][0]["old"].as_str().unwrap(),
-        "Initial note"
-    );
-    assert_eq!(
-        last_change["changes"][0]["new"].as_str().unwrap(),
-        "Edited note"
-    );
+    assert_eq!(last_change["changes"][0]["old"].as_str().unwrap(), "Initial note");
+    assert_eq!(last_change["changes"][0]["new"].as_str().unwrap(), "Edited note");
 
     // Invalid index should be rejected
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/comment/update",
-        &[],
-        json!({ "id": id, "index": 5, "text": "Nope" }),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/comment/update", &[], json!({ "id": id, "index": 5, "text": "Nope" })));
     assert_eq!(resp.status, 400, "invalid index should fail");
 }
 
@@ -943,22 +735,10 @@ fn api_options_preflight_returns_204_and_cors_headers() {
     let port = server.port();
     let (status, headers) = http_options(port, "/api/tasks/list");
     assert_eq!(status, 204);
-    assert_eq!(
-        headers
-            .get("Access-Control-Allow-Origin")
-            .map(|s| s.as_str()),
-        None,
-        "wildcard CORS must not be advertised"
-    );
-    let methods = headers
-        .get("Access-Control-Allow-Methods")
-        .cloned()
-        .unwrap_or_default();
+    assert_eq!(headers.get("Access-Control-Allow-Origin").map(|s| s.as_str()), None, "wildcard CORS must not be advertised");
+    let methods = headers.get("Access-Control-Allow-Methods").cloned().unwrap_or_default();
     assert!(methods.contains("GET") && methods.contains("POST") && methods.contains("OPTIONS"));
-    let allow_headers = headers
-        .get("Access-Control-Allow-Headers")
-        .cloned()
-        .unwrap_or_default();
+    let allow_headers = headers.get("Access-Control-Allow-Headers").cloned().unwrap_or_default();
     assert!(allow_headers.to_ascii_lowercase().contains("content-type"));
     server.stop();
 }
@@ -967,12 +747,7 @@ fn api_options_preflight_returns_204_and_cors_headers() {
 fn mutating_requests_with_foreign_origin_are_rejected() {
     let mut server = start_server();
     let port = server.port();
-    let (status, _body) = http_post_json_with_origin(
-        port,
-        "/api/tasks/add?project=DEMO",
-        r#"{"title":"drive-by"}"#,
-        Some("https://evil.example"),
-    );
+    let (status, _body) = http_post_json_with_origin(port, "/api/tasks/add?project=DEMO", r#"{"title":"drive-by"}"#, Some("https://evil.example"));
     assert_eq!(status, 403, "cross-origin mutation must be rejected");
     server.stop();
 }
@@ -996,12 +771,7 @@ fn raw_request(port: u16, request: &str) -> (u16, String) {
         }
     }
     let text = String::from_utf8_lossy(&buf).to_string();
-    let status = text
-        .lines()
-        .next()
-        .and_then(|l| l.split_whitespace().nth(1))
-        .and_then(|s| s.parse::<u16>().ok())
-        .unwrap_or(0);
+    let status = text.lines().next().and_then(|l| l.split_whitespace().nth(1)).and_then(|s| s.parse::<u16>().ok()).unwrap_or(0);
     (status, text.to_ascii_lowercase())
 }
 
@@ -1027,10 +797,7 @@ fn rebound_host_headers_are_rejected_for_every_route() {
     }
 
     for host in ["localhost", "127.0.0.1", "[::1]"] {
-        let (status, _) = raw_request(
-            port,
-            &format!("GET /api/openapi.json HTTP/1.1\r\nHost: {host}:{port}\r\n\r\n"),
-        );
+        let (status, _) = raw_request(port, &format!("GET /api/openapi.json HTTP/1.1\r\nHost: {host}:{port}\r\n\r\n"));
         assert_eq!(status, 200, "loopback host {host} must be served");
     }
     server.stop();
@@ -1040,16 +807,10 @@ fn rebound_host_headers_are_rejected_for_every_route() {
 fn responses_forbid_cross_site_framing() {
     let mut server = start_server();
     let port = server.port();
-    let (_, headers) = raw_request(
-        port,
-        "GET /api/tasks/list HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
-    );
+    let (_, headers) = raw_request(port, "GET /api/tasks/list HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n");
     assert!(headers.contains("x-frame-options: sameorigin"), "{headers}");
     assert!(headers.contains("frame-ancestors 'self'"), "{headers}");
-    assert!(
-        headers.contains("x-content-type-options: nosniff"),
-        "{headers}"
-    );
+    assert!(headers.contains("x-content-type-options: nosniff"), "{headers}");
     server.stop();
 }
 
@@ -1066,14 +827,9 @@ fn chunked_bodies_get_411_and_overload_gets_503() {
     assert_eq!(status, 411);
 
     // Hold the connection limit with idle sockets, then ask once more.
-    let idle: Vec<TcpStream> = (0..64)
-        .map(|_| TcpStream::connect(("127.0.0.1", port)).unwrap())
-        .collect();
+    let idle: Vec<TcpStream> = (0..64).map(|_| TcpStream::connect(("127.0.0.1", port)).unwrap()).collect();
     std::thread::sleep(Duration::from_millis(200));
-    let (status, headers) = raw_request(
-        port,
-        "GET /api/openapi.json HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
-    );
+    let (status, headers) = raw_request(port, "GET /api/openapi.json HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n");
     assert_eq!(status, 503, "{headers}");
     assert!(headers.contains("retry-after"), "{headers}");
     drop(idle);
@@ -1102,10 +858,7 @@ fn shutdown_endpoint_is_not_exposed() {
                 buf.extend_from_slice(&tmp[..n]);
             }
             let text = String::from_utf8_lossy(&buf);
-            assert!(
-                !text.contains("stopping"),
-                "{path} must not stop the server without LOTAR_ALLOW_TEST_STOP=1"
-            );
+            assert!(!text.contains("stopping"), "{path} must not stop the server without LOTAR_ALLOW_TEST_STOP=1");
         }
     }
     server.stop();
@@ -1123,10 +876,7 @@ fn sse_initial_retry_hint_is_sent() {
         leftover.extend_from_slice(&tmp);
     }
     let text = String::from_utf8_lossy(&leftover);
-    assert!(
-        text.contains("retry: 1000"),
-        "leftover did not contain retry hint: {text}"
-    );
+    assert!(text.contains("retry: 1000"), "leftover did not contain retry hint: {text}");
     server.stop();
 }
 
@@ -1134,11 +884,7 @@ fn sse_initial_retry_hint_is_sent() {
 fn static_files_reject_dot_segment_traversal() {
     let mut server = start_server();
     let port = server.port();
-    for path in [
-        "/../../Cargo.toml",
-        "/assets/../../../../Cargo.toml",
-        "/a/../../web/index.html",
-    ] {
+    for path in ["/../../Cargo.toml", "/assets/../../../../Cargo.toml", "/a/../../web/index.html"] {
         let (status, _headers, body) = http_get_bytes(port, path);
         let text = String::from_utf8_lossy(&body);
         assert_eq!(status, 404, "dot-segment path {path} must not resolve");
@@ -1153,12 +899,7 @@ fn sse_headers_do_not_allow_cross_origin() {
     let port = server.port();
     let (_stream, leftover) = open_sse(port, "");
     let text = String::from_utf8_lossy(&leftover);
-    assert!(
-        !text
-            .to_ascii_lowercase()
-            .contains("access-control-allow-origin"),
-        "SSE response advertises wildcard CORS: {text}"
-    );
+    assert!(!text.to_ascii_lowercase().contains("access-control-allow-origin"), "SSE response advertises wildcard CORS: {text}");
     server.stop();
 }
 
@@ -1171,35 +912,22 @@ fn commit_diff_rejects_option_style_commit() {
     let _ = std::fs::remove_file(&evil_file);
     let commit_arg = format!("--output={}", evil_file.display());
 
-    let result =
-        AuditService::show_file_diff(Path::new("."), &commit_arg, Path::new(".tasks/DEV/1.yml"));
+    let result = AuditService::show_file_diff(Path::new("."), &commit_arg, Path::new(".tasks/DEV/1.yml"));
     match result {
         Ok(diff) => panic!("option-style commit must not succeed: {diff}"),
-        Err(message) => assert!(
-            message.contains("Invalid commit reference"),
-            "expected explicit rejection, got: {message}"
-        ),
+        Err(message) => assert!(message.contains("Invalid commit reference"), "expected explicit rejection, got: {message}"),
     }
-    assert!(
-        !evil_file.exists(),
-        "git wrote attacker-controlled output file"
-    );
+    assert!(!evil_file.exists(), "git wrote attacker-controlled output file");
 
     let mut server = start_server();
     let port = server.port();
-    let path = format!(
-        "/api/tasks/commit_diff?id=DEV-1&commit={}",
-        url_encode(&commit_arg)
-    );
+    let path = format!("/api/tasks/commit_diff?id=DEV-1&commit={}", url_encode(&commit_arg));
     let (status, _headers, body) = http_get_bytes(port, &path);
     server.stop();
 
     let text = String::from_utf8_lossy(&body);
     assert_ne!(status, 200, "route must not serve option-style commits");
-    assert!(
-        !evil_file.exists(),
-        "no output file may be created via the API"
-    );
+    assert!(!evil_file.exists(), "no output file may be created via the API");
     assert!(!text.contains("[package]"));
 }
 
@@ -1207,9 +935,7 @@ fn url_encode(value: &str) -> String {
     let mut out = String::new();
     for byte in value.bytes() {
         match byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                out.push(byte as char)
-            }
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => out.push(byte as char),
             _ => out.push_str(&format!("%{byte:02X}")),
         }
     }
@@ -1233,10 +959,7 @@ fn openapi_spec_served() {
     let port = server.port();
     let (status, headers, body) = http_get_bytes(port, "/api/openapi.json");
     assert_eq!(status, 200);
-    assert_eq!(
-        headers.get("Content-Type").map(|s| s.as_str()),
-        Some("application/json")
-    );
+    assert_eq!(headers.get("Content-Type").map(|s| s.as_str()), Some("application/json"));
     let resp_body = String::from_utf8_lossy(&body);
     // Check that a couple of known paths are present
     assert!(resp_body.contains("\"/api/tasks/add\""));
@@ -1270,86 +993,40 @@ fn api_list_accepts_plain_custom_field_filters_and_me() {
         })
     };
 
-    let r1 = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/add",
-        &[],
-        add("TEST", "A", Some("alice"), "W35"),
-    ));
+    let r1 = api.handle_request(&mk_req("POST", "/api/tasks/add", &[], add("TEST", "A", Some("alice"), "W35")));
     assert_eq!(r1.status, 201);
-    let r2 = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/add",
-        &[],
-        add("TEST", "B", Some("bob"), "W36"),
-    ));
+    let r2 = api.handle_request(&mk_req("POST", "/api/tasks/add", &[], add("TEST", "B", Some("bob"), "W36")));
     assert_eq!(r2.status, 201);
-    let r3 = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/add",
-        &[],
-        add("OTHER", "C", Some("alice"), "w35"),
-    ));
+    let r3 = api.handle_request(&mk_req("POST", "/api/tasks/add", &[], add("OTHER", "C", Some("alice"), "w35")));
     assert_eq!(r3.status, 201);
 
     let created_a: Value = serde_json::from_slice(&r1.body).unwrap();
     let task_a_id = created_a["data"]["id"].as_str().unwrap().to_string();
-    let status_resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/status",
-        &[],
-        json!({"id": task_a_id, "status": "InProgress"}),
-    ));
+    let status_resp = api.handle_request(&mk_req("POST", "/api/tasks/status", &[], json!({"id": task_a_id, "status": "InProgress"})));
     assert_eq!(status_resp.status, 200);
 
-    let resp = api.handle_request(&mk_req(
-        "GET",
-        "/api/tasks/list",
-        &[("project", "TEST"), ("status", "InProgress")],
-        json!({}),
-    ));
+    let resp = api.handle_request(&mk_req("GET", "/api/tasks/list", &[("project", "TEST"), ("status", "InProgress")], json!({})));
     assert_eq!(resp.status, 200, "filtering by InProgress should succeed");
     let filtered: Value = serde_json::from_slice(&resp.body).unwrap();
     assert_eq!(filtered["data"]["total"].as_u64().unwrap_or(0), 1);
-    assert_eq!(
-        filtered["data"]["tasks"]
-            .as_array()
-            .map(|a| a.len())
-            .unwrap_or(0),
-        1
-    );
+    assert_eq!(filtered["data"]["tasks"].as_array().map(|a| a.len()).unwrap_or(0), 1);
 
     // List by custom field directly: ?sprint=W35 should match case-insensitively
-    let resp = api.handle_request(&mk_req(
-        "GET",
-        "/api/tasks/list",
-        &[("project", "TEST"), ("sprint", "W35")],
-        json!({}),
-    ));
+    let resp = api.handle_request(&mk_req("GET", "/api/tasks/list", &[("project", "TEST"), ("sprint", "W35")], json!({})));
     assert_eq!(resp.status, 200);
     let list: Value = serde_json::from_slice(&resp.body).unwrap();
     let count = list["data"]["total"].as_u64().unwrap_or(0);
     assert_eq!(count, 1, "expected one TEST task with sprint W35");
 
     // CSV and fuzzy matching: W35 should match w-35 via normalization
-    let resp = api.handle_request(&mk_req(
-        "GET",
-        "/api/tasks/list",
-        &[("project", "TEST"), ("sprint", "W35,w-99")],
-        json!({}),
-    ));
+    let resp = api.handle_request(&mk_req("GET", "/api/tasks/list", &[("project", "TEST"), ("sprint", "W35,w-99")], json!({})));
     assert_eq!(resp.status, 200);
     let list2: Value = serde_json::from_slice(&resp.body).unwrap();
     assert_eq!(list2["data"]["total"].as_u64().unwrap_or(0), 1);
 
     // Assignee @me resolution: set default reporter/assignee identity to alice by creating config
     // We'll simulate identity resolution falling back to system username by setting assignee explicitly and querying @me
-    let resp = api.handle_request(&mk_req(
-        "GET",
-        "/api/tasks/list",
-        &[("project", "TEST"), ("assignee", "@me")],
-        json!({}),
-    ));
+    let resp = api.handle_request(&mk_req("GET", "/api/tasks/list", &[("project", "TEST"), ("assignee", "@me")], json!({})));
     // We can't control identity in this unit test; ensure it doesn't 500 and returns a list
     assert_eq!(resp.status, 200);
     let _ = serde_json::from_slice::<Value>(&resp.body).unwrap();
@@ -1375,9 +1052,7 @@ fn api_list_supports_fuzzy_tag_filters() {
         })
     };
 
-    let add_one = |title: &str, tags: &[&str]| {
-        api.handle_request(&mk_req("POST", "/api/tasks/add", &[], add(title, tags)))
-    };
+    let add_one = |title: &str, tags: &[&str]| api.handle_request(&mk_req("POST", "/api/tasks/add", &[], add(title, tags)));
 
     let r1 = add_one("DevOps upgrade", &["DevOps", "backend"]);
     assert_eq!(r1.status, 201);
@@ -1387,43 +1062,23 @@ fn api_list_supports_fuzzy_tag_filters() {
     assert_eq!(r3.status, 201);
 
     let ids_from = |resp: &serde_json::Value| -> Vec<String> {
-        resp["data"]["tasks"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter_map(|v| v["id"].as_str().map(|s| s.to_string()))
-            .collect()
+        resp["data"]["tasks"].as_array().into_iter().flatten().filter_map(|v| v["id"].as_str().map(|s| s.to_string())).collect()
     };
 
-    let resp_ops = api.handle_request(&mk_req(
-        "GET",
-        "/api/tasks/list",
-        &[("project", "TEST"), ("tags", "ops")],
-        json!({}),
-    ));
+    let resp_ops = api.handle_request(&mk_req("GET", "/api/tasks/list", &[("project", "TEST"), ("tags", "ops")], json!({})));
     assert_eq!(resp_ops.status, 200);
     let parsed_ops: Value = serde_json::from_slice(&resp_ops.body).unwrap();
     let ops_ids = ids_from(&parsed_ops);
     assert_eq!(parsed_ops["data"]["total"].as_u64().unwrap_or(0), 1);
     assert!(ops_ids.iter().any(|id| id.starts_with("TEST-")));
 
-    let resp_case = api.handle_request(&mk_req(
-        "GET",
-        "/api/tasks/list",
-        &[("project", "TEST"), ("tags", "DEVOPS")],
-        json!({}),
-    ));
+    let resp_case = api.handle_request(&mk_req("GET", "/api/tasks/list", &[("project", "TEST"), ("tags", "DEVOPS")], json!({})));
     assert_eq!(resp_case.status, 200);
     let parsed_case: Value = serde_json::from_slice(&resp_case.body).unwrap();
     let case_ids = ids_from(&parsed_case);
     assert_eq!(case_ids, ops_ids);
 
-    let resp_partial = api.handle_request(&mk_req(
-        "GET",
-        "/api/tasks/list",
-        &[("project", "TEST"), ("tags", "front")],
-        json!({}),
-    ));
+    let resp_partial = api.handle_request(&mk_req("GET", "/api/tasks/list", &[("project", "TEST"), ("tags", "front")], json!({})));
     assert_eq!(resp_partial.status, 200);
     let parsed_partial: Value = serde_json::from_slice(&resp_partial.body).unwrap();
     assert_eq!(parsed_partial["data"]["total"].as_u64().unwrap_or(0), 1);
@@ -1445,38 +1100,18 @@ fn sse_events_with_kinds_and_project_filter() {
     let mut server = start_server();
     let port = server.port();
 
-    let (mut sse, leftover) = open_sse(
-        port,
-        "debounce_ms=10&kinds=task_created&project=TEST&ready=1",
-    );
+    let (mut sse, leftover) = open_sse(port, "debounce_ms=10&kinds=task_created&project=TEST&ready=1");
 
-    let (status, body) = http_post_json(
-        port,
-        "/api/tasks/add?project=TEST",
-        &json!({"title": "A", "priority": "High"}).to_string(),
-    );
+    let (status, body) = http_post_json(port, "/api/tasks/add?project=TEST", &json!({"title": "A", "priority": "High"}).to_string());
     assert_eq!(status, 201, "TEST task creation must succeed");
     let created_task: Value = serde_json::from_slice(&body).expect("created task JSON");
-    let expected_id = created_task["data"]["id"]
-        .as_str()
-        .expect("created task ID");
-    let (status, _) = http_post_json(
-        port,
-        "/api/tasks/add?project=OTHER",
-        &json!({"title": "B", "priority": "Low"}).to_string(),
-    );
+    let expected_id = created_task["data"]["id"].as_str().expect("created task ID");
+    let (status, _) = http_post_json(port, "/api/tasks/add?project=OTHER", &json!({"title": "B", "priority": "Low"}).to_string());
     assert_eq!(status, 201, "OTHER task creation must succeed");
 
     let events = read_sse_events(&mut sse, 3, Duration::from_millis(800), leftover);
-    let created: Vec<_> = events
-        .into_iter()
-        .filter(|(k, _)| k == "task_created")
-        .collect();
-    assert_eq!(
-        created.len(),
-        1,
-        "only the TEST event should pass: {created:?}"
-    );
+    let created: Vec<_> = events.into_iter().filter(|(k, _)| k == "task_created").collect();
+    assert_eq!(created.len(), 1, "only the TEST event should pass: {created:?}");
     let event: Value = serde_json::from_str(&created[0].1).expect("task_created event JSON");
     assert_eq!(event["id"], expected_id);
 
@@ -1497,10 +1132,7 @@ fn sse_debounce_emits_all_events() {
     let mut server = start_server();
     let port = server.port();
 
-    let (mut sse, leftover) = open_sse(
-        port,
-        "debounce_ms=25&kinds=task_created&project=TEST&ready=1",
-    );
+    let (mut sse, leftover) = open_sse(port, "debounce_ms=25&kinds=task_created&project=TEST&ready=1");
 
     for i in 0..3 {
         let body = format!("{{\"title\":\"T{i}\",\"priority\":\"High\"}}");
@@ -1508,15 +1140,8 @@ fn sse_debounce_emits_all_events() {
     }
 
     let events = read_sse_events(&mut sse, 4, Duration::from_millis(1200), leftover);
-    let created: Vec<_> = events
-        .into_iter()
-        .filter(|(k, _)| k == "task_created")
-        .collect();
-    assert_eq!(
-        created.len(),
-        3,
-        "expected 3 created events, got {created:?}"
-    );
+    let created: Vec<_> = events.into_iter().filter(|(k, _)| k == "task_created").collect();
+    assert_eq!(created.len(), 3, "expected 3 created events, got {created:?}");
 
     // Restored by guard
     server.stop();
@@ -1539,10 +1164,7 @@ fn sse_includes_triggered_by_identity() {
     let mut server = start_server();
     let port = server.port();
 
-    let (mut sse, mut leftover) = open_sse(
-        port,
-        "debounce_ms=10&kinds=task_created&project=TEST&ready=1",
-    );
+    let (mut sse, mut leftover) = open_sse(port, "debounce_ms=10&kinds=task_created&project=TEST&ready=1");
     // Drain until the ready event
     let events = read_sse_events(&mut sse, 1, Duration::from_millis(400), leftover);
     if events.is_empty() {
@@ -1553,17 +1175,9 @@ fn sse_includes_triggered_by_identity() {
     }
 
     // Send two creates to reduce chance of missing the first due to a race
-    let (st1, _b1) = http_post_json(
-        port,
-        "/api/tasks/add?project=TEST",
-        r#"{"title":"SSE actor"}"#,
-    );
+    let (st1, _b1) = http_post_json(port, "/api/tasks/add?project=TEST", r#"{"title":"SSE actor"}"#);
     assert_eq!(st1, 201, "first add should succeed");
-    let (st2, _b2) = http_post_json(
-        port,
-        "/api/tasks/add?project=TEST",
-        r#"{"title":"SSE actor 2"}"#,
-    );
+    let (st2, _b2) = http_post_json(port, "/api/tasks/add?project=TEST", r#"{"title":"SSE actor 2"}"#);
     assert_eq!(st2, 201, "second add should succeed");
 
     // We only need the first created event to validate triggered_by; collect up to 2 with a tighter timeout
@@ -1576,15 +1190,8 @@ fn sse_includes_triggered_by_identity() {
             Ok(v) => v,
             Err(_) => continue,
         };
-        if json
-            .get("id")
-            .and_then(|v| v.as_str())
-            .is_some_and(|id| id.starts_with("TEST-"))
-        {
-            assert_eq!(
-                json.get("triggered_by").and_then(|v| v.as_str()),
-                Some("alice")
-            );
+        if json.get("id").and_then(|v| v.as_str()).is_some_and(|id| id.starts_with("TEST-")) {
+            assert_eq!(json.get("triggered_by").and_then(|v| v.as_str()), Some("alice"));
             found = true;
             break;
         }
@@ -1613,18 +1220,10 @@ fn api_get_missing_and_unknown_id_errors() {
     assert_eq!(body["error"]["code"].as_str(), Some("INVALID_ARGUMENT"));
 
     // Unknown id
-    let resp = api.handle_request(&mk_req(
-        "GET",
-        "/api/tasks/get",
-        &[("id", "TEST-999")],
-        json!({}),
-    ));
+    let resp = api.handle_request(&mk_req("GET", "/api/tasks/get", &[("id", "TEST-999")], json!({})));
     assert_eq!(resp.status, 404);
     let body: Value = serde_json::from_slice(&resp.body).unwrap();
-    let msg = body["error"]["message"]
-        .as_str()
-        .unwrap_or("")
-        .to_lowercase();
+    let msg = body["error"]["message"].as_str().unwrap_or("").to_lowercase();
     assert!(msg.contains("not found") || msg.contains("invalid"));
 
     // Restored by guard
@@ -1643,34 +1242,18 @@ fn api_add_invalid_priority_and_type_rejected() {
 
     // Invalid priority
     let add_body = json!({ "title": "X", "priority": "NOT_A_PRIORITY" });
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/add",
-        &[("project", "TEST")],
-        add_body,
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/add", &[("project", "TEST")], add_body));
     assert_eq!(resp.status, 400);
     let body: Value = serde_json::from_slice(&resp.body).unwrap();
-    let msg = body["error"]["message"]
-        .as_str()
-        .unwrap_or("")
-        .to_lowercase();
+    let msg = body["error"]["message"].as_str().unwrap_or("").to_lowercase();
     assert!(msg.contains("priority"));
 
     // Invalid type
     let add_body = json!({ "title": "X", "type": "NOT_A_TYPE" });
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/add",
-        &[("project", "TEST")],
-        add_body,
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/add", &[("project", "TEST")], add_body));
     assert_eq!(resp.status, 400);
     let body: Value = serde_json::from_slice(&resp.body).unwrap();
-    let msg = body["error"]["message"]
-        .as_str()
-        .unwrap_or("")
-        .to_lowercase();
+    let msg = body["error"]["message"].as_str().unwrap_or("").to_lowercase();
     assert!(msg.contains("type"));
 
     // Restored by guard
@@ -1691,30 +1274,12 @@ fn sse_debounce_zero_and_invalid_kind_handling() {
     let (mut sse, leftover) = open_sse(port, "debounce_ms=0&kinds=invalid_kind");
     let (mut control, control_leftover) = open_sse(port, "debounce_ms=0&kinds=task_created");
     // Create a task -> would generate task_created, but our kind filter excludes it
-    let (status, body) = http_post_json(
-        port,
-        "/api/tasks/add?project=TEST",
-        &json!({"title": "Z"}).to_string(),
-    );
-    assert_eq!(
-        status, 201,
-        "task creation must succeed before testing filters"
-    );
+    let (status, body) = http_post_json(port, "/api/tasks/add?project=TEST", &json!({"title": "Z"}).to_string());
+    assert_eq!(status, 201, "task creation must succeed before testing filters");
     let created_task: Value = serde_json::from_slice(&body).expect("created task JSON");
-    let expected_id = created_task["data"]["id"]
-        .as_str()
-        .expect("created task ID");
-    let control_events = read_sse_events(
-        &mut control,
-        1,
-        Duration::from_millis(1000),
-        control_leftover,
-    );
-    assert_eq!(
-        control_events.len(),
-        1,
-        "positive control must receive the event"
-    );
+    let expected_id = created_task["data"]["id"].as_str().expect("created task ID");
+    let control_events = read_sse_events(&mut control, 1, Duration::from_millis(1000), control_leftover);
+    assert_eq!(control_events.len(), 1, "positive control must receive the event");
     assert_eq!(control_events[0].0, "task_created");
     let event: Value = serde_json::from_str(&control_events[0].1).expect("control event JSON");
     assert_eq!(event["id"], expected_id);
@@ -1747,10 +1312,7 @@ fn sse_project_changed_emitted_on_fs_change() {
     let port = server.port();
 
     // Open SSE stream with project filter and kinds=project_changed
-    let (mut sse, leftover) = open_sse(
-        port,
-        "debounce_ms=0&kinds=project_changed&project=DEMO&ready=1",
-    );
+    let (mut sse, leftover) = open_sse(port, "debounce_ms=0&kinds=project_changed&project=DEMO&ready=1");
     // Drain the ready event if present
     let _ = read_sse_events(&mut sse, 1, Duration::from_millis(500), leftover);
 
@@ -1764,10 +1326,7 @@ fn sse_project_changed_emitted_on_fs_change() {
 
     // Read one project_changed event
     let events = read_sse_events(&mut sse, 1, Duration::from_millis(2000), Vec::new());
-    assert!(
-        !events.is_empty(),
-        "expected a project_changed event from watcher, got: {events:?}"
-    );
+    assert!(!events.is_empty(), "expected a project_changed event from watcher, got: {events:?}");
     let (kind, data) = &events[0];
     assert_eq!(kind, "project_changed", "unexpected event kind: {kind}");
     // Data should be JSON with { name: "DEMO" }
@@ -1793,24 +1352,15 @@ fn sse_delivers_during_a_steady_stream_of_events() {
     let started = Instant::now();
     let emitter = std::thread::spawn(|| {
         for n in 0..40 {
-            lotar::api_events::emit(&lotar::api_events::ApiEvent {
-                kind: "task_updated".into(),
-                data: json!({"id": format!("STR-{n}")}),
-            });
+            lotar::api_events::emit(&lotar::api_events::ApiEvent { kind: "task_updated".into(), data: json!({"id": format!("STR-{n}")}) });
             std::thread::sleep(Duration::from_millis(50));
         }
     });
     let first = read_sse_events(&mut sse, 1, Duration::from_millis(1500), Vec::new());
     let first_at = started.elapsed();
     emitter.join().unwrap();
-    assert!(
-        !first.is_empty(),
-        "nothing delivered while events kept coming"
-    );
-    assert!(
-        first_at < Duration::from_millis(1500),
-        "first event took {first_at:?}; the stream lasts ~2 s"
-    );
+    assert!(!first.is_empty(), "nothing delivered while events kept coming");
+    assert!(first_at < Duration::from_millis(1500), "first event took {first_at:?}; the stream lasts ~2 s");
     server.stop();
 }
 
@@ -1839,11 +1389,7 @@ fn watcher_reports_config_edits_and_ignores_internal_files() {
 
     std::fs::write(tasks.join(".txn-pending.json"), "{}").unwrap();
     std::fs::write(tasks.join("notes.txt"), "x").unwrap();
-    std::fs::write(
-        tasks.join("config.yml"),
-        "default:\n  project: DEMO\n  priority: High\n",
-    )
-    .unwrap();
+    std::fs::write(tasks.join("config.yml"), "default:\n  project: DEMO\n  priority: High\n").unwrap();
     std::fs::write(
         tasks.join("DEMO").join("1.yml"),
         "title: Watched\nstatus: Todo\npriority: Low\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-01-01T00:00:00Z\n",
@@ -1854,23 +1400,10 @@ fn watcher_reports_config_edits_and_ignores_internal_files() {
     server.stop();
     std::env::set_current_dir(prev_cwd).unwrap();
 
-    let named: Vec<String> = events
-        .iter()
-        .filter(|(kind, _)| kind == "project_changed")
-        .map(|(_, data)| data.clone())
-        .collect();
-    assert!(
-        named.iter().all(|data| data.contains("\"DEMO\"")),
-        "only real projects: {named:?}"
-    );
-    assert!(
-        events.iter().any(|(kind, _)| kind == "config_updated"),
-        "external config edit must emit config_updated: {events:?}"
-    );
-    let task_events = events
-        .iter()
-        .filter(|(kind, data)| kind == "task_updated" && data.contains("DEMO-1"))
-        .count();
+    let named: Vec<String> = events.iter().filter(|(kind, _)| kind == "project_changed").map(|(_, data)| data.clone()).collect();
+    assert!(named.iter().all(|data| data.contains("\"DEMO\"")), "only real projects: {named:?}");
+    assert!(events.iter().any(|(kind, _)| kind == "config_updated"), "external config edit must emit config_updated: {events:?}");
+    let task_events = events.iter().filter(|(kind, data)| kind == "task_updated" && data.contains("DEMO-1")).count();
     assert_eq!(task_events, 1, "one event per changed task: {events:?}");
 }
 
@@ -1897,37 +1430,20 @@ fn sprint_changes_announce_the_sprint_and_its_tasks() {
 
     let mut server = start_server();
     let port = server.port();
-    let (mut sse, leftover) = open_sse(
-        port,
-        "debounce_ms=0&kinds=sprint_changed,task_updated&ready=1",
-    );
+    let (mut sse, leftover) = open_sse(port, "debounce_ms=0&kinds=sprint_changed,task_updated&ready=1");
     let _ = read_sse_events(&mut sse, 1, Duration::from_millis(500), leftover);
     std::thread::sleep(Duration::from_millis(600));
 
     let (status, body) = http_post_json(port, "/api/sprints/create", r#"{"label":"S1"}"#);
     assert!(status < 300, "{}", String::from_utf8_lossy(&body));
-    let (status, body) = http_post_json(
-        port,
-        "/api/sprints/add",
-        r#"{"sprint":1,"tasks":["DEMO-1"]}"#,
-    );
+    let (status, body) = http_post_json(port, "/api/sprints/add", r#"{"sprint":1,"tasks":["DEMO-1"]}"#);
     assert!(status < 300, "{}", String::from_utf8_lossy(&body));
 
     let events = read_sse_events(&mut sse, 20, Duration::from_millis(2500), Vec::new());
     server.stop();
     std::env::set_current_dir(prev_cwd).unwrap();
-    assert!(
-        events
-            .iter()
-            .any(|(kind, data)| kind == "sprint_changed" && data.contains("\"id\":1")),
-        "{events:?}"
-    );
-    assert!(
-        events
-            .iter()
-            .any(|(kind, data)| kind == "task_updated" && data.contains("DEMO-1")),
-        "membership change must announce the task: {events:?}"
-    );
+    assert!(events.iter().any(|(kind, data)| kind == "sprint_changed" && data.contains("\"id\":1")), "{events:?}");
+    assert!(events.iter().any(|(kind, data)| kind == "task_updated" && data.contains("DEMO-1")), "membership change must announce the task: {events:?}");
 }
 
 // --- DEV-76: fixture lifecycle and readiness acceptance ---
@@ -1939,10 +1455,7 @@ fn server_fixture_fails_deterministically_on_occupied_port() {
     let held_port = holder.local_addr().unwrap().port();
 
     let err = start_server_on(held_port).expect_err("binding a held port must fail");
-    assert!(
-        err.contains(&held_port.to_string()),
-        "error should name the occupied port: {err}"
-    );
+    assert!(err.contains(&held_port.to_string()), "error should name the occupied port: {err}");
 
     // The failed start must not poison the process: a healthy server still
     // starts (bind happens before any thread is spawned, so the failure path
@@ -1976,17 +1489,10 @@ fn server_fixture_readiness_fails_promptly_when_nothing_listens() {
     drop(probe);
 
     let start = Instant::now();
-    let err = wait_for_server_ready(port, Duration::from_millis(300))
-        .expect_err("readiness wait must fail when nothing listens");
+    let err = wait_for_server_ready(port, Duration::from_millis(300)).expect_err("readiness wait must fail when nothing listens");
     let elapsed = start.elapsed();
-    assert!(
-        err.contains(&port.to_string()),
-        "error should name the port: {err}"
-    );
+    assert!(err.contains(&port.to_string()), "error should name the port: {err}");
     // Bounded wait: fails within the bound (plus scheduling slack), not by
     // hanging until the test timeout.
-    assert!(
-        elapsed < Duration::from_secs(3),
-        "readiness failure took too long: {elapsed:?}"
-    );
+    assert!(elapsed < Duration::from_secs(3), "readiness failure took too long: {elapsed:?}");
 }

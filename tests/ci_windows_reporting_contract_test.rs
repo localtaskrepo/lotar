@@ -1,41 +1,17 @@
 #[test]
 fn attempted_windows_smoke_runs_still_require_a_report_but_skipped_runs_do_not() {
-    let workflow: serde_yaml_ng::Value =
-        serde_yaml_ng::from_str(include_str!("../.github/workflows/ci.yml")).unwrap();
+    let workflow: serde_yaml_ng::Value = serde_yaml_ng::from_str(include_str!("../.github/workflows/ci.yml")).unwrap();
     let jobs = workflow["jobs"].as_mapping().unwrap();
     let steps = jobs
         .values()
         .filter_map(|job| job["steps"].as_sequence())
-        .find(|steps| {
-            steps.iter().any(|step| {
-                step["name"].as_str()
-                    == Some("Run portable agent + automation smoke selection (browser-free)")
-            })
-        })
+        .find(|steps| steps.iter().any(|step| step["name"].as_str() == Some("Run portable agent + automation smoke selection (browser-free)")))
         .expect("Windows portable smoke job");
-    let run = steps
-        .iter()
-        .find(|step| {
-            step["name"].as_str()
-                == Some("Run portable agent + automation smoke selection (browser-free)")
-        })
-        .unwrap();
-    let rust_run = steps
-        .iter()
-        .find(|step| {
-            step["run"]
-                .as_str()
-                .is_some_and(|run| run.contains("cargo nextest run"))
-        })
-        .expect("Windows native Rust regressions");
-    let rust_list = steps
-        .iter()
-        .find(|step| {
-            step["run"]
-                .as_str()
-                .is_some_and(|run| run.contains("cargo nextest list"))
-        })
-        .expect("Windows selected-test manifest");
+    let run = steps.iter().find(|step| step["name"].as_str() == Some("Run portable agent + automation smoke selection (browser-free)")).unwrap();
+    let rust_run =
+        steps.iter().find(|step| step["run"].as_str().is_some_and(|run| run.contains("cargo nextest run"))).expect("Windows native Rust regressions");
+    let rust_list =
+        steps.iter().find(|step| step["run"].as_str().is_some_and(|run| run.contains("cargo nextest list"))).expect("Windows selected-test manifest");
     let compile_check = steps
         .iter()
         .find(|step| step["name"].as_str() == Some("Compile-check all Windows targets"))
@@ -44,16 +20,7 @@ fn attempted_windows_smoke_runs_still_require_a_report_but_skipped_runs_do_not()
     assert!(compile_command.contains("cargo check --profile ci --all-targets --all-features"));
     assert!(compile_command.contains("if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }"));
     assert!(compile_check["continue-on-error"].is_null());
-    assert!(
-        steps
-            .iter()
-            .position(|step| std::ptr::eq(step, compile_check))
-            .unwrap()
-            < steps
-                .iter()
-                .position(|step| std::ptr::eq(step, rust_run))
-                .unwrap()
-    );
+    assert!(steps.iter().position(|step| std::ptr::eq(step, compile_check)).unwrap() < steps.iter().position(|step| std::ptr::eq(step, rust_run)).unwrap());
     for step in [rust_run, rust_list] {
         let command = step["run"].as_str().unwrap();
         assert!(command.contains("--lib --bin lotar-agent-wrapper"));
@@ -69,66 +36,32 @@ fn attempted_windows_smoke_runs_still_require_a_report_but_skipped_runs_do_not()
         "test(services::automation_service::async_run_monitor_tests::)",
     ] {
         for step in [rust_run, rust_list] {
-            assert!(
-                step["run"].as_str().unwrap().contains(selector),
-                "Windows run and coverage manifest must include {selector}"
-            );
+            assert!(step["run"].as_str().unwrap().contains(selector), "Windows run and coverage manifest must include {selector}");
         }
     }
     assert!(rust_run["run"].as_str().unwrap().contains("--retries 0"));
-    assert!(
-        rust_run["run"]
-            .as_str()
-            .unwrap()
-            .contains("--failure-output=immediate-final")
-    );
-    let upload = steps
-        .iter()
-        .find(|step| step["name"].as_str() == Some("Upload Windows portable smoke report"))
-        .unwrap();
-    let id = run["id"]
-        .as_str()
-        .expect("report guard requires a named test step");
+    assert!(rust_run["run"].as_str().unwrap().contains("--failure-output=immediate-final"));
+    let upload = steps.iter().find(|step| step["name"].as_str() == Some("Upload Windows portable smoke report")).unwrap();
+    let id = run["id"].as_str().expect("report guard requires a named test step");
     let condition = upload["if"].as_str().unwrap();
-    for spec in [
-        "fixtures.agent",
-        "harness.agent-launcher",
-        "api.agent-jobs",
-        "cli.automation",
-        "api.automation",
-    ] {
+    for spec in ["fixtures.agent", "harness.agent-launcher", "api.agent-jobs", "cli.automation", "api.automation"] {
         assert!(
-            run["run"]
-                .as_str()
-                .unwrap()
-                .contains(&format!("smoke/tests/{spec}.smoke.spec.ts")),
+            run["run"].as_str().unwrap().contains(&format!("smoke/tests/{spec}.smoke.spec.ts")),
             "portable process regressions must also execute on Windows: {spec}"
         );
     }
     assert_eq!(run["env"]["LOTAR_SMOKE_REQUIRE_GIT"].as_str(), Some("1"));
-    assert!(
-        condition.contains("always()"),
-        "reports must survive a failed test run"
-    );
+    assert!(condition.contains("always()"), "reports must survive a failed test run");
     assert!(condition.contains(&format!("steps.{id}.outcome != 'skipped'")));
     assert!(condition.contains(&format!("steps.{id}.outcome != ''")));
     assert_eq!(upload["with"]["if-no-files-found"].as_str(), Some("error"));
-    assert!(
-        run["continue-on-error"].is_null(),
-        "smoke failures remain failures"
-    );
-    assert!(
-        run["run"]
-            .as_str()
-            .unwrap()
-            .contains("if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }")
-    );
+    assert!(run["continue-on-error"].is_null(), "smoke failures remain failures");
+    assert!(run["run"].as_str().unwrap().contains("if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }"));
 }
 
 #[test]
 fn ci_uses_the_pinned_toolchain_and_keeps_profile_caches_independent() {
-    let workflow: serde_yaml_ng::Value =
-        serde_yaml_ng::from_str(include_str!("../.github/workflows/ci.yml")).unwrap();
+    let workflow: serde_yaml_ng::Value = serde_yaml_ng::from_str(include_str!("../.github/workflows/ci.yml")).unwrap();
     let channel = include_str!("../rust-toolchain.toml")
         .lines()
         .filter_map(|line| line.split_once('='))
@@ -139,30 +72,17 @@ fn ci_uses_the_pinned_toolchain_and_keeps_profile_caches_independent() {
     for job in workflow["jobs"].as_mapping().unwrap().values() {
         for step in job["steps"].as_sequence().unwrap() {
             if action(step) == Some("dtolnay/rust-toolchain") {
-                assert_eq!(
-                    step["with"]["toolchain"].as_str(),
-                    Some("${{ env.RUST_TOOLCHAIN }}")
-                );
+                assert_eq!(step["with"]["toolchain"].as_str(), Some("${{ env.RUST_TOOLCHAIN }}"));
             }
             if action(step) == Some("Swatinem/rust-cache") {
-                assert!(
-                    step["with"]["shared-key"]
-                        .as_str()
-                        .unwrap()
-                        .contains("github.job")
-                );
+                assert!(step["with"]["shared-key"].as_str().unwrap().contains("github.job"));
                 assert_eq!(step["with"]["cache-on-failure"].as_bool(), Some(true));
             }
             if step["name"].as_str() == Some("Restore sccache") {
                 let key = step["with"]["key"].as_str().unwrap();
                 assert!(key.contains("github.job"));
                 assert!(key.contains("github.run_id"));
-                assert!(
-                    step["with"]["restore-keys"]
-                        .as_str()
-                        .unwrap()
-                        .contains("github.job")
-                );
+                assert!(step["with"]["restore-keys"].as_str().unwrap().contains("github.job"));
             }
         }
     }
@@ -177,151 +97,70 @@ fn ci_uses_the_pinned_toolchain_and_keeps_profile_caches_independent() {
             assert_eq!(wrapper, Some("sccache"));
             assert_eq!(job["env"]["SCCACHE_CACHE_SIZE"].as_str(), Some("1G"));
             let steps = job["steps"].as_sequence().unwrap();
-            let save = steps
-                .iter()
-                .find(|step| step["name"].as_str() == Some("Save sccache"))
-                .expect("windows_checks saves sccache");
+            let save = steps.iter().find(|step| step["name"].as_str() == Some("Save sccache")).expect("windows_checks saves sccache");
             let condition = save["if"].as_str().unwrap();
-            assert!(
-                condition.contains("github.event_name == 'push'"),
-                "{condition}"
-            );
+            assert!(condition.contains("github.event_name == 'push'"), "{condition}");
             assert!(condition.contains("refs/heads/main"), "{condition}");
-            assert!(
-                steps
-                    .iter()
-                    .all(|step| step["name"].as_str() != Some("Cache sccache")),
-                "use separate restore/save steps"
-            );
+            assert!(steps.iter().all(|step| step["name"].as_str() != Some("Cache sccache")), "use separate restore/save steps");
         } else {
             assert_eq!(wrapper, None, "{name} must not use sccache");
         }
     }
-    let linux = workflow["jobs"]["rust_checks"]["steps"]
-        .as_sequence()
-        .unwrap();
-    let full = linux
-        .iter()
-        .find(|step| {
-            step["run"]
-                .as_str()
-                .is_some_and(|run| run.contains("cargo nextest run"))
-        })
-        .unwrap();
-    assert!(
-        full["run"]
-            .as_str()
-            .unwrap()
-            .contains("--lib --bins --tests")
-    );
+    let linux = workflow["jobs"]["rust_checks"]["steps"].as_sequence().unwrap();
+    let full = linux.iter().find(|step| step["run"].as_str().is_some_and(|run| run.contains("cargo nextest run"))).unwrap();
+    assert!(full["run"].as_str().unwrap().contains("--lib --bins --tests"));
 }
 
 #[test]
 fn smoke_job_caches_the_headless_browser_per_playwright_version() {
-    let workflow: serde_yaml_ng::Value =
-        serde_yaml_ng::from_str(include_str!("../.github/workflows/ci.yml")).unwrap();
-    let steps = workflow["jobs"]["smoke_tests"]["steps"]
-        .as_sequence()
-        .unwrap();
-    let step = |name: &str| {
-        steps
-            .iter()
-            .find(|step| step["name"].as_str() == Some(name))
-            .unwrap_or_else(|| panic!("smoke_tests is missing step {name:?}"))
-    };
+    let workflow: serde_yaml_ng::Value = serde_yaml_ng::from_str(include_str!("../.github/workflows/ci.yml")).unwrap();
+    let steps = workflow["jobs"]["smoke_tests"]["steps"].as_sequence().unwrap();
+    let step = |name: &str| steps.iter().find(|step| step["name"].as_str() == Some(name)).unwrap_or_else(|| panic!("smoke_tests is missing step {name:?}"));
     let cache = step("Restore Playwright browsers");
     assert_eq!(action(cache), Some("actions/cache/restore"));
-    assert_eq!(
-        cache["with"]["path"].as_str(),
-        Some("~/.cache/ms-playwright")
-    );
-    assert!(
-        cache["with"]["key"]
-            .as_str()
-            .unwrap()
-            .contains("steps.playwright_version.outputs.version")
-    );
+    assert_eq!(cache["with"]["path"].as_str(), Some("~/.cache/ms-playwright"));
+    assert!(cache["with"]["key"].as_str().unwrap().contains("steps.playwright_version.outputs.version"));
     // Saved right after the download, so a failing smoke run keeps the cache.
     let save = step("Save Playwright browsers");
     assert_eq!(action(save), Some("actions/cache/save"));
-    assert_eq!(
-        save["with"]["key"].as_str(),
-        Some("${{ steps.playwright_cache.outputs.cache-primary-key }}")
-    );
+    assert_eq!(save["with"]["key"].as_str(), Some("${{ steps.playwright_cache.outputs.cache-primary-key }}"));
     let position = |name: &str| steps.iter().position(|s| s["name"].as_str() == Some(name));
     assert!(position("Save Playwright browsers") < position("Run smoke suite"));
     let install = step("Install Playwright browser");
-    assert_eq!(
-        install["if"].as_str(),
-        Some("steps.playwright_cache.outputs.cache-hit != 'true'")
-    );
+    assert_eq!(install["if"].as_str(), Some("steps.playwright_cache.outputs.cache-hit != 'true'"));
     assert!(install["run"].as_str().unwrap().contains("--only-shell"));
-    assert!(
-        step("Install Playwright system dependencies")["run"]
-            .as_str()
-            .unwrap()
-            .contains("install-deps")
-    );
+    assert!(step("Install Playwright system dependencies")["run"].as_str().unwrap().contains("install-deps"));
 }
 
 #[test]
 fn ui_job_typechecks_lints_and_format_checks_the_frontend() {
-    let workflow: serde_yaml_ng::Value =
-        serde_yaml_ng::from_str(include_str!("../.github/workflows/ci.yml")).unwrap();
-    let runs: Vec<&str> = workflow["jobs"]["ui_tests"]["steps"]
-        .as_sequence()
-        .unwrap()
-        .iter()
-        .filter_map(|step| step["run"].as_str())
-        .collect();
+    let workflow: serde_yaml_ng::Value = serde_yaml_ng::from_str(include_str!("../.github/workflows/ci.yml")).unwrap();
+    let runs: Vec<&str> = workflow["jobs"]["ui_tests"]["steps"].as_sequence().unwrap().iter().filter_map(|step| step["run"].as_str()).collect();
     for (script, purpose) in [
         ("npm run lint:frontend", "the vue-tsc and smoke typecheck"),
         ("npm run lint:js", "oxlint and ESLint"),
         ("npm run fmt:js:check", "the Prettier check"),
         ("npm run test:hooks", "the git hook tests"),
     ] {
-        assert!(
-            runs.iter().any(|run| run.contains(script)),
-            "ui_tests must run {purpose}: {runs:?}"
-        );
+        assert!(runs.iter().any(|run| run.contains(script)), "ui_tests must run {purpose}: {runs:?}");
     }
 }
 
 /// Action name of a step's `uses:` reference, without the pinned revision.
 fn action(step: &serde_yaml_ng::Value) -> Option<&str> {
-    step["uses"]
-        .as_str()
-        .and_then(|uses| uses.split('@').next())
+    step["uses"].as_str().and_then(|uses| uses.split('@').next())
 }
 
 #[test]
 fn every_workflow_action_is_pinned_to_a_commit_sha() {
     let workflows = [
         ("ci.yml", include_str!("../.github/workflows/ci.yml")),
-        (
-            "codeql.yml",
-            include_str!("../.github/workflows/codeql.yml"),
-        ),
-        (
-            "coverage.yml",
-            include_str!("../.github/workflows/coverage.yml"),
-        ),
-        (
-            "homebrew-verify.yml",
-            include_str!("../.github/workflows/homebrew-verify.yml"),
-        ),
-        (
-            "performance.yml",
-            include_str!("../.github/workflows/performance.yml"),
-        ),
-        (
-            "release.yml",
-            include_str!("../.github/workflows/release.yml"),
-        ),
-        (
-            "scoop-verify.yml",
-            include_str!("../.github/workflows/scoop-verify.yml"),
-        ),
+        ("codeql.yml", include_str!("../.github/workflows/codeql.yml")),
+        ("coverage.yml", include_str!("../.github/workflows/coverage.yml")),
+        ("homebrew-verify.yml", include_str!("../.github/workflows/homebrew-verify.yml")),
+        ("performance.yml", include_str!("../.github/workflows/performance.yml")),
+        ("release.yml", include_str!("../.github/workflows/release.yml")),
+        ("scoop-verify.yml", include_str!("../.github/workflows/scoop-verify.yml")),
     ];
     for (name, source) in workflows {
         let workflow: serde_yaml_ng::Value = serde_yaml_ng::from_str(source).unwrap();
@@ -341,10 +180,7 @@ fn every_workflow_action_is_pinned_to_a_commit_sha() {
                 // dtolnay/rust-toolchain derives the toolchain from its ref;
                 // pinned to a SHA it needs the input explicitly.
                 if action(step) == Some("dtolnay/rust-toolchain") {
-                    assert!(
-                        step["with"]["toolchain"].as_str().is_some(),
-                        "{name} job {job_name:?}: pinned rust-toolchain needs a toolchain input"
-                    );
+                    assert!(step["with"]["toolchain"].as_str().is_some(), "{name} job {job_name:?}: pinned rust-toolchain needs a toolchain input");
                 }
             }
         }
@@ -356,8 +192,7 @@ fn release_signing_stays_on_cosign_v2() {
     // The release signs with --output-signature/--output-certificate (.sig
     // and .pem assets); Cosign v3 needs --bundle instead, so the installer
     // must not fall back to its default Cosign version (DEV-171).
-    let workflow: serde_yaml_ng::Value =
-        serde_yaml_ng::from_str(include_str!("../.github/workflows/release.yml")).unwrap();
+    let workflow: serde_yaml_ng::Value = serde_yaml_ng::from_str(include_str!("../.github/workflows/release.yml")).unwrap();
     let installers: Vec<&serde_yaml_ng::Value> = workflow["jobs"]
         .as_mapping()
         .unwrap()
@@ -368,9 +203,6 @@ fn release_signing_stays_on_cosign_v2() {
     assert!(!installers.is_empty(), "release.yml installs cosign");
     for step in installers {
         let release = step["with"]["cosign-release"].as_str().unwrap_or("");
-        assert!(
-            release.starts_with("v2."),
-            "cosign-release must pin the v2 line, got {release:?}"
-        );
+        assert!(release.starts_with("v2."), "cosign-release must pin the v2 line, got {release:?}");
     }
 }

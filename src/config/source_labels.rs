@@ -13,13 +13,7 @@ pub struct ConfigSourceEntry {
 static CONFIG_SOURCE_ENTRIES: LazyLock<Vec<ConfigSourceEntry>> = LazyLock::new(|| {
     crate::config::fields::CONFIG_FIELDS
         .iter()
-        .filter_map(|meta| {
-            meta.source.map(|(path, label_key)| ConfigSourceEntry {
-                path,
-                label_key,
-                inspect_key: meta.flat,
-            })
-        })
+        .filter_map(|meta| meta.source.map(|(path, label_key)| ConfigSourceEntry { path, label_key, inspect_key: meta.flat }))
         .collect()
 });
 
@@ -37,12 +31,7 @@ where
     }
 }
 
-fn scope_for_global_value<T>(
-    resolved_value: &T,
-    home_value: Option<&T>,
-    global_value: Option<&T>,
-    default_value: &T,
-) -> &'static str
+fn scope_for_global_value<T>(resolved_value: &T, home_value: Option<&T>, global_value: Option<&T>, default_value: &T) -> &'static str
 where
     T: PartialEq,
 {
@@ -75,47 +64,19 @@ impl<'a> GlobalScopeContext<'a> {
         env_applied: &'a HashSet<&'static str>,
         global_port_explicit: bool,
     ) -> Self {
-        Self {
-            base_config,
-            global_cfg,
-            home_cfg,
-            env_resolved,
-            env_applied,
-            global_port_explicit,
-        }
+        Self { base_config, global_cfg, home_cfg, env_resolved, env_applied, global_port_explicit }
     }
 
     fn global_label(&self, key: &str) -> &'static str {
-        source_label_for_global(
-            self.base_config,
-            self.global_cfg,
-            self.home_cfg,
-            self.env_resolved,
-            self.env_applied,
-            self.global_port_explicit,
-            key,
-        )
+        source_label_for_global(self.base_config, self.global_cfg, self.home_cfg, self.env_resolved, self.env_applied, self.global_port_explicit, key)
     }
 }
 
-fn project_scope_with_global(
-    key: &str,
-    has_project_override: bool,
-    values_differ: bool,
-    context: &GlobalScopeContext<'_>,
-) -> String {
-    if has_project_override || values_differ {
-        "project".to_string()
-    } else {
-        context.global_label(key).to_string()
-    }
+fn project_scope_with_global(key: &str, has_project_override: bool, values_differ: bool, context: &GlobalScopeContext<'_>) -> String {
+    if has_project_override || values_differ { "project".to_string() } else { context.global_label(key).to_string() }
 }
 
-pub fn build_global_source_labels(
-    resolved: &ResolvedConfig,
-    global_cfg: &Option<GlobalConfig>,
-    home_cfg: &Option<GlobalConfig>,
-) -> HashMap<String, String> {
+pub fn build_global_source_labels(resolved: &ResolvedConfig, global_cfg: &Option<GlobalConfig>, home_cfg: &Option<GlobalConfig>) -> HashMap<String, String> {
     build_global_source_labels_with_port(resolved, global_cfg, home_cfg, false)
 }
 
@@ -134,16 +95,7 @@ pub fn build_global_source_labels_with_port(
     let env_applied = snapshot.applied_keys();
     let mut labels = HashMap::new();
     populate_source_labels(&mut labels, |entry| {
-        GlobalScopeContext::new(
-            resolved,
-            global_cfg,
-            home_cfg,
-            env_resolved,
-            env_applied,
-            global_port_explicit,
-        )
-        .global_label(entry.label_key)
-        .to_string()
+        GlobalScopeContext::new(resolved, global_cfg, home_cfg, env_resolved, env_applied, global_port_explicit).global_label(entry.label_key).to_string()
     });
     labels
 }
@@ -155,14 +107,7 @@ pub fn build_project_source_labels(
     global_cfg: &Option<GlobalConfig>,
     home_cfg: &Option<GlobalConfig>,
 ) -> HashMap<String, String> {
-    build_project_source_labels_with_port(
-        resolved_project,
-        base_config,
-        project_cfg,
-        global_cfg,
-        home_cfg,
-        false,
-    )
+    build_project_source_labels_with_port(resolved_project, base_config, project_cfg, global_cfg, home_cfg, false)
 }
 
 /// Like [`build_project_source_labels`], with global-file `server.port`
@@ -179,18 +124,9 @@ pub fn build_project_source_labels_with_port(
     let snapshot = capture_env_override_snapshot();
     let env_resolved = &snapshot.resolved;
     let env_applied = snapshot.applied_keys();
-    let context = GlobalScopeContext::new(
-        base_config,
-        global_cfg,
-        home_cfg,
-        env_resolved,
-        env_applied,
-        global_port_explicit,
-    );
+    let context = GlobalScopeContext::new(base_config, global_cfg, home_cfg, env_resolved, env_applied, global_port_explicit);
     let mut labels = HashMap::new();
-    populate_source_labels(&mut labels, |entry| {
-        source_label_for_project(entry.label_key, resolved_project, project_cfg, &context)
-    });
+    populate_source_labels(&mut labels, |entry| source_label_for_project(entry.label_key, resolved_project, project_cfg, &context));
     labels
 }
 
@@ -256,9 +192,7 @@ fn source_label_for_global(
         // requesting layer, and a default-valued parsed field from a file
         // that does not set the key must not steal credit.
         "server_port" => {
-            if let Some(home_port) = crate::config::persistence::home_config_server_port()
-                .ok()
-                .flatten()
+            if let Some(home_port) = crate::config::persistence::home_config_server_port().ok().flatten()
                 && home_port == resolved.server_port
             {
                 return "home";
@@ -266,14 +200,10 @@ fn source_label_for_global(
             if global_port_explicit {
                 return "global";
             }
-            if home.is_some_and(|cfg| cfg.server_port == resolved.server_port)
-                && resolved.server_port != defaults.server_port
-            {
+            if home.is_some_and(|cfg| cfg.server_port == resolved.server_port) && resolved.server_port != defaults.server_port {
                 return "home";
             }
-            if global.is_some_and(|cfg| cfg.server_port == resolved.server_port)
-                && resolved.server_port != defaults.server_port
-            {
+            if global.is_some_and(|cfg| cfg.server_port == resolved.server_port) && resolved.server_port != defaults.server_port {
                 return "global";
             }
             "default"
@@ -438,12 +368,7 @@ fn env_value_matches(resolved: &ResolvedConfig, env_resolved: &ResolvedConfig, k
     }
 }
 
-fn source_label_for_project(
-    key: &str,
-    resolved_project: &ResolvedConfig,
-    project_cfg: Option<&ProjectConfig>,
-    context: &GlobalScopeContext<'_>,
-) -> String {
+fn source_label_for_project(key: &str, resolved_project: &ResolvedConfig, project_cfg: Option<&ProjectConfig>, context: &GlobalScopeContext<'_>) -> String {
     let base_config = context.base_config;
     let global_cfg = context.global_cfg;
     let home_cfg = context.home_cfg;
@@ -466,37 +391,27 @@ fn source_label_for_project(
             }
         }
         "default_assignee" => {
-            let has_override = project_cfg
-                .and_then(|pc| pc.default_assignee.as_ref())
-                .is_some();
+            let has_override = project_cfg.and_then(|pc| pc.default_assignee.as_ref()).is_some();
             let diff = resolved_project.default_assignee != base_config.default_assignee;
             project_scope!("default_assignee", has_override, diff)
         }
         "default_reporter" => {
-            let has_override = project_cfg
-                .and_then(|pc| pc.default_reporter.as_ref())
-                .is_some();
+            let has_override = project_cfg.and_then(|pc| pc.default_reporter.as_ref()).is_some();
             let diff = resolved_project.default_reporter != base_config.default_reporter;
             project_scope!("default_reporter", has_override, diff)
         }
         "default_priority" => {
-            let has_override = project_cfg
-                .and_then(|pc| pc.default_priority.as_ref())
-                .is_some();
+            let has_override = project_cfg.and_then(|pc| pc.default_priority.as_ref()).is_some();
             let diff = resolved_project.default_priority != base_config.default_priority;
             project_scope!("default_priority", has_override, diff)
         }
         "default_status" => {
-            let has_override = project_cfg
-                .and_then(|pc| pc.default_status.as_ref())
-                .is_some();
+            let has_override = project_cfg.and_then(|pc| pc.default_status.as_ref()).is_some();
             let diff = resolved_project.default_status != base_config.default_status;
             project_scope!("default_status", has_override, diff)
         }
         "default_tags" => {
-            let has_override = project_cfg
-                .and_then(|pc| pc.default_tags.as_ref())
-                .is_some();
+            let has_override = project_cfg.and_then(|pc| pc.default_tags.as_ref()).is_some();
             let diff = resolved_project.default_tags != base_config.default_tags;
             project_scope!("default_tags", has_override, diff)
         }
@@ -511,31 +426,23 @@ fn source_label_for_project(
             project_scope!("strict_members", has_override, diff)
         }
         "auto_populate_members" => {
-            let has_override = project_cfg
-                .and_then(|pc| pc.auto_populate_members)
-                .is_some();
+            let has_override = project_cfg.and_then(|pc| pc.auto_populate_members).is_some();
             let diff = resolved_project.auto_populate_members != base_config.auto_populate_members;
             project_scope!("auto_populate_members", has_override, diff)
         }
         "custom_fields" => {
-            let has_override = project_cfg
-                .and_then(|pc| pc.custom_fields.as_ref())
-                .map(|fields| fields.values == resolved_project.custom_fields.values)
-                .unwrap_or(false);
+            let has_override =
+                project_cfg.and_then(|pc| pc.custom_fields.as_ref()).map(|fields| fields.values == resolved_project.custom_fields.values).unwrap_or(false);
             let diff = resolved_project.custom_fields.values != base_config.custom_fields.values;
             project_scope!("custom_fields", has_override, diff)
         }
         "issue_states" => {
-            let has_override = project_cfg
-                .and_then(|pc| pc.issue_states.as_ref())
-                .is_some();
+            let has_override = project_cfg.and_then(|pc| pc.issue_states.as_ref()).is_some();
             let diff = resolved_project.issue_states.values != base_config.issue_states.values;
             project_scope!("issue_states", has_override, diff)
         }
         "issue_done_states" => {
-            let has_override = project_cfg
-                .and_then(|pc| pc.issue_done_states.as_ref())
-                .is_some();
+            let has_override = project_cfg.and_then(|pc| pc.issue_done_states.as_ref()).is_some();
             let diff = resolved_project.issue_done_states != base_config.issue_done_states;
             project_scope!("issue_done_states", has_override, diff)
         }
@@ -545,41 +452,28 @@ fn source_label_for_project(
             project_scope!("issue_types", has_override, diff)
         }
         "issue_priorities" => {
-            let has_override = project_cfg
-                .and_then(|pc| pc.issue_priorities.as_ref())
-                .is_some();
-            let diff =
-                resolved_project.issue_priorities.values != base_config.issue_priorities.values;
+            let has_override = project_cfg.and_then(|pc| pc.issue_priorities.as_ref()).is_some();
+            let diff = resolved_project.issue_priorities.values != base_config.issue_priorities.values;
             project_scope!("issue_priorities", has_override, diff)
         }
         "issue_tags" => {
-            let has_override = project_cfg
-                .and_then(|pc| pc.tags.as_ref())
-                .map(|tags| tags.values == resolved_project.tags.values)
-                .unwrap_or(false);
+            let has_override = project_cfg.and_then(|pc| pc.tags.as_ref()).map(|tags| tags.values == resolved_project.tags.values).unwrap_or(false);
             let diff = resolved_project.tags.values != base_config.tags.values;
             project_scope!("issue_tags", has_override, diff)
         }
         "scan_signal_words" => {
-            let has_override = project_cfg
-                .and_then(|pc| pc.scan_signal_words.as_ref())
-                .is_some();
+            let has_override = project_cfg.and_then(|pc| pc.scan_signal_words.as_ref()).is_some();
             let diff = resolved_project.scan_signal_words != base_config.scan_signal_words;
             project_scope!("scan_signal_words", has_override, diff)
         }
         "scan_ticket_patterns" => {
-            let has_override = project_cfg
-                .and_then(|pc| pc.scan_ticket_patterns.as_ref())
-                .is_some();
+            let has_override = project_cfg.and_then(|pc| pc.scan_ticket_patterns.as_ref()).is_some();
             let diff = resolved_project.scan_ticket_patterns != base_config.scan_ticket_patterns;
             project_scope!("scan_ticket_patterns", has_override, diff)
         }
         "scan_enable_ticket_words" => {
-            let has_override = project_cfg
-                .and_then(|pc| pc.scan_enable_ticket_words)
-                .is_some();
-            let diff =
-                resolved_project.scan_enable_ticket_words != base_config.scan_enable_ticket_words;
+            let has_override = project_cfg.and_then(|pc| pc.scan_enable_ticket_words).is_some();
+            let diff = resolved_project.scan_enable_ticket_words != base_config.scan_enable_ticket_words;
             project_scope!("scan_enable_ticket_words", has_override, diff)
         }
         "scan_enable_mentions" => {
@@ -588,9 +482,7 @@ fn source_label_for_project(
             project_scope!("scan_enable_mentions", has_override, diff)
         }
         "scan_strip_attributes" => {
-            let has_override = project_cfg
-                .and_then(|pc| pc.scan_strip_attributes)
-                .is_some();
+            let has_override = project_cfg.and_then(|pc| pc.scan_strip_attributes).is_some();
             let diff = resolved_project.scan_strip_attributes != base_config.scan_strip_attributes;
             project_scope!("scan_strip_attributes", has_override, diff)
         }
@@ -600,11 +492,8 @@ fn source_label_for_project(
             project_scope!("auto_set_reporter", has_override, diff)
         }
         "auto_reciprocal_relationships" => {
-            let has_override = project_cfg
-                .and_then(|pc| pc.auto_reciprocal_relationships)
-                .is_some();
-            let diff = resolved_project.auto_reciprocal_relationships
-                != base_config.auto_reciprocal_relationships;
+            let has_override = project_cfg.and_then(|pc| pc.auto_reciprocal_relationships).is_some();
+            let diff = resolved_project.auto_reciprocal_relationships != base_config.auto_reciprocal_relationships;
             project_scope!("auto_reciprocal_relationships", has_override, diff)
         }
         "auto_link_mentions" => {
@@ -613,9 +502,7 @@ fn source_label_for_project(
             project_scope!("auto_link_mentions", has_override, diff)
         }
         "auto_assign_on_status" => {
-            let has_override = project_cfg
-                .and_then(|pc| pc.auto_assign_on_status)
-                .is_some();
+            let has_override = project_cfg.and_then(|pc| pc.auto_assign_on_status).is_some();
             let diff = resolved_project.auto_assign_on_status != base_config.auto_assign_on_status;
             project_scope!("auto_assign_on_status", has_override, diff)
         }
@@ -630,79 +517,51 @@ fn source_label_for_project(
         | "sprints_defaults_capacity_hours"
         | "sprints_defaults_length"
         | "sprints_defaults_overdue_after"
-        | "sprints_notifications_enabled" => source_label_for_global(
-            base_config,
-            global_cfg,
-            home_cfg,
-            env_resolved,
-            env_applied,
-            context.global_port_explicit,
-            key,
-        )
-        .to_string(),
+        | "sprints_notifications_enabled" => {
+            source_label_for_global(base_config, global_cfg, home_cfg, env_resolved, env_applied, context.global_port_explicit, key).to_string()
+        }
         "branch_type_aliases" => {
-            let has_override = project_cfg
-                .and_then(|pc| pc.branch_type_aliases.as_ref())
-                .is_some();
+            let has_override = project_cfg.and_then(|pc| pc.branch_type_aliases.as_ref()).is_some();
             let diff = resolved_project.branch_type_aliases != base_config.branch_type_aliases;
             project_scope!("branch_type_aliases", has_override, diff)
         }
         "tag_properties" => {
-            let has_override = project_cfg
-                .and_then(|pc| pc.tag_properties.as_ref())
-                .is_some();
+            let has_override = project_cfg.and_then(|pc| pc.tag_properties.as_ref()).is_some();
             let diff = resolved_project.tag_properties != base_config.tag_properties;
             project_scope!("tag_properties", has_override, diff)
         }
         "branch_status_aliases" => {
-            let has_override = project_cfg
-                .and_then(|pc| pc.branch_status_aliases.as_ref())
-                .is_some();
+            let has_override = project_cfg.and_then(|pc| pc.branch_status_aliases.as_ref()).is_some();
             let diff = resolved_project.branch_status_aliases != base_config.branch_status_aliases;
             project_scope!("branch_status_aliases", has_override, diff)
         }
         "branch_priority_aliases" => {
-            let has_override = project_cfg
-                .and_then(|pc| pc.branch_priority_aliases.as_ref())
-                .is_some();
-            let diff =
-                resolved_project.branch_priority_aliases != base_config.branch_priority_aliases;
+            let has_override = project_cfg.and_then(|pc| pc.branch_priority_aliases.as_ref()).is_some();
+            let diff = resolved_project.branch_priority_aliases != base_config.branch_priority_aliases;
             project_scope!("branch_priority_aliases", has_override, diff)
         }
         "attachments_dir" => {
-            let has_override = project_cfg
-                .and_then(|pc| pc.attachments_dir.as_ref())
-                .is_some();
+            let has_override = project_cfg.and_then(|pc| pc.attachments_dir.as_ref()).is_some();
             let diff = resolved_project.attachments_dir != base_config.attachments_dir;
             project_scope!("attachments_dir", has_override, diff)
         }
         "attachments_max_upload_mb" => {
-            let has_override = project_cfg
-                .and_then(|pc| pc.attachments_max_upload_mb)
-                .is_some();
-            let diff =
-                resolved_project.attachments_max_upload_mb != base_config.attachments_max_upload_mb;
+            let has_override = project_cfg.and_then(|pc| pc.attachments_max_upload_mb).is_some();
+            let diff = resolved_project.attachments_max_upload_mb != base_config.attachments_max_upload_mb;
             project_scope!("attachments_max_upload_mb", has_override, diff)
         }
         "agent_context_enabled" => {
-            let has_override = project_cfg
-                .and_then(|pc| pc.agent_context_enabled)
-                .is_some();
+            let has_override = project_cfg.and_then(|pc| pc.agent_context_enabled).is_some();
             let diff = resolved_project.agent_context_enabled != base_config.agent_context_enabled;
             project_scope!("agent_context_enabled", has_override, diff)
         }
         "agent_context_extension" => {
-            let has_override = project_cfg
-                .and_then(|pc| pc.agent_context_extension.as_ref())
-                .is_some();
-            let diff =
-                resolved_project.agent_context_extension != base_config.agent_context_extension;
+            let has_override = project_cfg.and_then(|pc| pc.agent_context_extension.as_ref()).is_some();
+            let diff = resolved_project.agent_context_extension != base_config.agent_context_extension;
             project_scope!("agent_context_extension", has_override, diff)
         }
         "sync_reports_dir" => {
-            let has_override = project_cfg
-                .and_then(|pc| pc.sync_reports_dir.as_ref())
-                .is_some();
+            let has_override = project_cfg.and_then(|pc| pc.sync_reports_dir.as_ref()).is_some();
             let diff = resolved_project.sync_reports_dir != base_config.sync_reports_dir;
             project_scope!("sync_reports_dir", has_override, diff)
         }
@@ -712,9 +571,7 @@ fn source_label_for_project(
             project_scope!("sync_write_reports", has_override, diff)
         }
         "agent_instructions" => {
-            let has_override = project_cfg
-                .and_then(|pc| pc.agent_instructions.as_ref())
-                .is_some();
+            let has_override = project_cfg.and_then(|pc| pc.agent_instructions.as_ref()).is_some();
             let diff = resolved_project.agent_instructions != base_config.agent_instructions;
             project_scope!("agent_instructions", has_override, diff)
         }
@@ -727,32 +584,12 @@ fn source_label_for_project(
         | "agent_worktree_cleanup_on_cancel"
         | "agent_worktree_cleanup_delete_branches"
         | "agent_worktree_cleanup_ignored_files" => {
-            let has_override = project_cfg
-                .and_then(|pc| pc.agent_worktree.as_ref())
-                .is_some();
+            let has_override = project_cfg.and_then(|pc| pc.agent_worktree.as_ref()).is_some();
             let diff = resolved_project.agent_worktree != base_config.agent_worktree;
             project_scope!("agent_worktree", has_override, diff)
         }
-        "server_port" => source_label_for_global(
-            base_config,
-            global_cfg,
-            home_cfg,
-            env_resolved,
-            env_applied,
-            context.global_port_explicit,
-            key,
-        )
-        .to_string(),
-        _ => source_label_for_global(
-            base_config,
-            global_cfg,
-            home_cfg,
-            env_resolved,
-            env_applied,
-            context.global_port_explicit,
-            key,
-        )
-        .to_string(),
+        "server_port" => source_label_for_global(base_config, global_cfg, home_cfg, env_resolved, env_applied, context.global_port_explicit, key).to_string(),
+        _ => source_label_for_global(base_config, global_cfg, home_cfg, env_resolved, env_applied, context.global_port_explicit, key).to_string(),
     }
 }
 

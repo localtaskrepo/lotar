@@ -26,11 +26,7 @@ fn install() -> Install {
     let link = root.join("bin/lotar");
     std::os::unix::fs::symlink(version.join("lotar"), &link).unwrap();
     std::fs::create_dir_all(root.join("ws/.tasks")).unwrap();
-    Install {
-        _dir: dir,
-        root,
-        link,
-    }
+    Install { _dir: dir, root, link }
 }
 
 /// Install `0.2.0` and point the symlink at it, as `brew upgrade` does.
@@ -119,8 +115,5 @@ fn serve_keeps_running_after_an_upgrade_by_default() {
     let exited = wait_exit(&mut child, Duration::from_millis(1500));
     let _ = child.kill();
     let _ = child.wait();
-    assert!(
-        exited.is_none(),
-        "exited without --exit-on-upgrade: {exited:?}"
-    );
+    assert!(exited.is_none(), "exited without --exit-on-upgrade: {exited:?}");
 }

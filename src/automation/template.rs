@@ -23,10 +23,7 @@ struct ListItem {
 
 impl ListItem {
     fn plain(value: impl Into<String>) -> Self {
-        Self {
-            value: value.into(),
-            fields: HashMap::new(),
-        }
+        Self { value: value.into(), fields: HashMap::new() }
     }
 }
 
@@ -82,19 +79,9 @@ impl TemplateContext {
         }
 
         let plain = |values: &[String]| values.iter().cloned().map(ListItem::plain).collect();
-        self.lists
-            .insert(format!("{prefix}.tags"), plain(&task.tags));
-        self.lists.insert(
-            format!("{prefix}.acceptance_criteria"),
-            plain(&task.acceptance_criteria),
-        );
-        self.lists.insert(
-            format!("{prefix}.sprints"),
-            task.sprints
-                .iter()
-                .map(|id| ListItem::plain(id.to_string()))
-                .collect(),
-        );
+        self.lists.insert(format!("{prefix}.tags"), plain(&task.tags));
+        self.lists.insert(format!("{prefix}.acceptance_criteria"), plain(&task.acceptance_criteria));
+        self.lists.insert(format!("{prefix}.sprints"), task.sprints.iter().map(|id| ListItem::plain(id.to_string())).collect());
         let relationships = &task.relationships;
         for (name, values) in [
             ("depends_on", &relationships.depends_on),
@@ -103,8 +90,7 @@ impl TemplateContext {
             ("children", &relationships.children),
             ("fixes", &relationships.fixes),
         ] {
-            self.lists
-                .insert(format!("{prefix}.relationships.{name}"), plain(values));
+            self.lists.insert(format!("{prefix}.relationships.{name}"), plain(values));
         }
         if let Some(ref parent) = relationships.parent {
             self.set(&format!("{prefix}.relationships.parent"), parent);
@@ -118,10 +104,7 @@ impl TemplateContext {
                 .iter()
                 .map(|comment| ListItem {
                     value: comment.text.clone(),
-                    fields: HashMap::from([
-                        ("text", comment.text.clone()),
-                        ("date", comment.date.clone()),
-                    ]),
+                    fields: HashMap::from([("text", comment.text.clone()), ("date", comment.date.clone())]),
                 })
                 .collect(),
         );
@@ -141,10 +124,7 @@ impl TemplateContext {
                     .into_iter()
                     .filter_map(|(name, value)| value.clone().map(|value| (name, value)))
                     .collect();
-                    let value = ["code", "link", "file", "attachment", "jira", "github"]
-                        .iter()
-                        .find_map(|name| fields.get(name).cloned())
-                        .unwrap_or_default();
+                    let value = ["code", "link", "file", "attachment", "jira", "github"].iter().find_map(|name| fields.get(name).cloned()).unwrap_or_default();
                     ListItem { value, fields }
                 })
                 .collect(),
@@ -176,11 +156,7 @@ impl TemplateContext {
             return Some(values.join(", "));
         }
         let index: i64 = selector.parse().ok()?;
-        let position = if index < 0 {
-            list.len().checked_sub(index.unsigned_abs() as usize)?
-        } else {
-            index as usize
-        };
+        let position = if index < 0 { list.len().checked_sub(index.unsigned_abs() as usize)? } else { index as usize };
         list.get(position).and_then(read)
     }
 
@@ -384,10 +360,7 @@ fn custom_field_to_string(value: &crate::types::CustomFieldValue) -> String {
         serde_yaml_ng::Value::Bool(v) => v.to_string(),
         serde_yaml_ng::Value::Number(v) => v.to_string(),
         serde_yaml_ng::Value::Null => String::new(),
-        other => serde_yaml_ng::to_string(other)
-            .unwrap_or_default()
-            .trim()
-            .to_string(),
+        other => serde_yaml_ng::to_string(other).unwrap_or_default().trim().to_string(),
     }
 }
 
@@ -404,9 +377,7 @@ fn custom_field_to_string(value: &crate::types::CustomFieldValue) -> String {
 
 /// Template keys provided by the triggering event rather than the task.
 fn is_event_only_key(key: &str) -> bool {
-    ["previous.", "comment.", "agent."]
-        .iter()
-        .any(|prefix| key.starts_with(prefix))
+    ["previous.", "comment.", "agent."].iter().any(|prefix| key.starts_with(prefix))
 }
 
 #[cfg(test)]
@@ -444,34 +415,15 @@ mod tests {
         let ctx = TemplateContext::from_task(&task_with_lists());
         assert_eq!(ctx.expand("${{ticket.tags[*]}}"), "ui, agents");
         assert_eq!(ctx.expand("${{ticket.tags[0]}}"), "ui");
-        assert_eq!(
-            ctx.expand("${{ticket.tags}}"),
-            "ui,agents",
-            "scalar form unchanged"
-        );
-        assert_eq!(
-            ctx.expand("${{ticket.references[*].link}}"),
-            "https://example.com/spec, https://example.com/design"
-        );
-        assert_eq!(
-            ctx.expand("${{ticket.references[*]}}"),
-            "https://example.com/spec, src/app.rs#L10, https://example.com/design"
-        );
-        assert_eq!(
-            ctx.expand("${{ticket.references[1].code}}"),
-            "src/app.rs#L10"
-        );
+        assert_eq!(ctx.expand("${{ticket.tags}}"), "ui,agents", "scalar form unchanged");
+        assert_eq!(ctx.expand("${{ticket.references[*].link}}"), "https://example.com/spec, https://example.com/design");
+        assert_eq!(ctx.expand("${{ticket.references[*]}}"), "https://example.com/spec, src/app.rs#L10, https://example.com/design");
+        assert_eq!(ctx.expand("${{ticket.references[1].code}}"), "src/app.rs#L10");
         assert_eq!(ctx.expand("${{ticket.comments[-1].text}}"), "Latest note");
         assert_eq!(ctx.expand("${{ticket.comments[-1].date}}"), "2026-10-02");
-        assert_eq!(
-            ctx.expand("${{ticket.relationships.depends_on[*]}}"),
-            "WEB-1, WEB-2"
-        );
+        assert_eq!(ctx.expand("${{ticket.relationships.depends_on[*]}}"), "WEB-1, WEB-2");
         assert_eq!(ctx.expand("${{ticket.relationships.parent}}"), "WEB-0");
-        assert_eq!(
-            ctx.expand("${{ticket.acceptance_criteria[*]}}"),
-            "Shows the cost, Works offline"
-        );
+        assert_eq!(ctx.expand("${{ticket.acceptance_criteria[*]}}"), "Shows the cost, Works offline");
         assert_eq!(ctx.expand("${{ticket.sprints[*]}}"), "3");
         // Out of range, unknown fields and malformed selectors expand to nothing.
         assert_eq!(ctx.expand("[${{ticket.tags[5]}}]"), "[]");
@@ -481,10 +433,7 @@ mod tests {
         // Shell expansion passes the joined value as one variable.
         let shell = ctx.expand_for_shell("echo ${{ticket.tags[*]}}");
         assert_eq!(shell.script, "echo \"${LOTAR_TEMPLATE_1}\"");
-        assert_eq!(
-            shell.env,
-            vec![("LOTAR_TEMPLATE_1".to_string(), "ui, agents".to_string())]
-        );
+        assert_eq!(shell.env, vec![("LOTAR_TEMPLATE_1".to_string(), "ui, agents".to_string())]);
     }
 
     #[test]
@@ -504,14 +453,8 @@ mod tests {
             }),
         };
         let ctx = TemplateContext::new().with_job(Some(&job));
-        assert_eq!(
-            ctx.expand("${{agent.cost_usd}} / ${{agent.input_tokens}} / ${{agent.output_tokens}} / ${{agent.turns}}"),
-            "0.0123 / 1200 / 300 / 3"
-        );
-        assert_eq!(
-            ctx.expand("${{agent.usage}}"),
-            "1,200 tokens in, 300 out · $0.0123 · 3 turns"
-        );
+        assert_eq!(ctx.expand("${{agent.cost_usd}} / ${{agent.input_tokens}} / ${{agent.output_tokens}} / ${{agent.turns}}"), "0.0123 / 1200 / 300 / 3");
+        assert_eq!(ctx.expand("${{agent.usage}}"), "1,200 tokens in, 300 out · $0.0123 · 3 turns");
     }
 
     #[test]
@@ -519,10 +462,7 @@ mod tests {
         let mut ctx = TemplateContext::new();
         ctx.set("ticket.id", "PROJ-1");
         ctx.set("ticket.title", "Fix bug");
-        assert_eq!(
-            ctx.expand("Working on ${{ticket.id}}: ${{ticket.title}}"),
-            "Working on PROJ-1: Fix bug"
-        );
+        assert_eq!(ctx.expand("Working on ${{ticket.id}}: ${{ticket.title}}"), "Working on PROJ-1: Fix bug");
     }
 
     #[test]
@@ -554,10 +494,7 @@ mod tests {
     fn expand_multiple_same_variable() {
         let mut ctx = TemplateContext::new();
         ctx.set("ticket.id", "X-1");
-        assert_eq!(
-            ctx.expand("${{ticket.id}} and ${{ticket.id}}"),
-            "X-1 and X-1"
-        );
+        assert_eq!(ctx.expand("${{ticket.id}} and ${{ticket.id}}"), "X-1 and X-1");
     }
 
     #[test]
@@ -565,12 +502,8 @@ mod tests {
         let mut ctx = TemplateContext::new();
         ctx.set("ticket.title", "Hello $(touch INJECTED) '; echo x #");
         ctx.set("ticket.id", "X-1");
-        let unquoted =
-            ctx.expand_for_shell("echo ${{ticket.title}} ${{ticket.id}} ${{ticket.title}}");
-        assert_eq!(
-            unquoted.script,
-            "echo \"${LOTAR_TEMPLATE_1}\" \"${LOTAR_TEMPLATE_2}\" \"${LOTAR_TEMPLATE_1}\""
-        );
+        let unquoted = ctx.expand_for_shell("echo ${{ticket.title}} ${{ticket.id}} ${{ticket.title}}");
+        assert_eq!(unquoted.script, "echo \"${LOTAR_TEMPLATE_1}\" \"${LOTAR_TEMPLATE_2}\" \"${LOTAR_TEMPLATE_1}\"");
         assert_eq!(unquoted.env.len(), 2, "one variable per distinct key");
         assert!(!unquoted.script.contains("touch"));
 
@@ -578,10 +511,7 @@ mod tests {
         assert_eq!(double.script, "echo \"New: ${LOTAR_TEMPLATE_1}\"");
 
         let nested = ctx.expand_for_shell("sh -c 'echo New task: ${{ticket.title}} >> log'");
-        assert_eq!(
-            nested.script,
-            "sh -c 'echo New task: ${LOTAR_TEMPLATE_1} >> log'"
-        );
+        assert_eq!(nested.script, "sh -c 'echo New task: ${LOTAR_TEMPLATE_1} >> log'");
 
         let escaped = ctx.expand_for_shell("echo \\' ${{ticket.id}}");
         assert_eq!(escaped.script, "echo \\' \"${LOTAR_TEMPLATE_1}\"");

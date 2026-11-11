@@ -63,23 +63,14 @@ impl StorageSearch {
             if cache.len() >= TASK_CACHE_MAX_ENTRIES {
                 cache.clear();
             }
-            cache.insert(
-                cache_key,
-                CachedTask {
-                    content,
-                    task: Arc::new(task.clone()),
-                },
-            );
+            cache.insert(cache_key, CachedTask { content, task: Arc::new(task.clone()) });
         }
         Some(task)
     }
 
     /// Search for tasks based on filter criteria
     pub fn search(root_path: &Path, filter: &TaskFilter) -> Vec<(String, Task)> {
-        Self::search_located(root_path, filter)
-            .into_iter()
-            .map(|(id, task, _root)| (id, task))
-            .collect()
+        Self::search_located(root_path, filter).into_iter().map(|(id, task, _root)| (id, task)).collect()
     }
 
     /// Like [`Self::search`], plus the tasks root each match was read from,
@@ -93,14 +84,10 @@ impl StorageSearch {
         // If we have a specific project filter, search only that project
         if let Some(project) = &filter.project {
             for candidate_root in StorageLocator::candidate_task_roots(root_path) {
-                let project_folders =
-                    StorageLocator::project_folders_for_name(&candidate_root, project);
+                let project_folders = StorageLocator::project_folders_for_name(&candidate_root, project);
                 for project_folder in project_folders {
                     let project_path = candidate_root.join(&project_folder);
-                    let files = crate::storage::layout::unique_numbers(
-                        &project_folder,
-                        crate::storage::layout::task_files(&project_path, filter.archived),
-                    );
+                    let files = crate::storage::layout::unique_numbers(&project_folder, crate::storage::layout::task_files(&project_path, filter.archived));
 
                     #[cfg(feature = "parallel")]
                     let mut partial: Vec<(String, Task, PathBuf)> = files
@@ -109,11 +96,7 @@ impl StorageSearch {
                             let task_id = format!("{}-{}", project_folder, file.number);
                             let mut task = Self::load_task_file(&file.path)?;
                             task.archived = file.archived;
-                            if Self::task_matches_filter(&task_id, &task, filter) {
-                                Some((task_id, task, candidate_root.clone()))
-                            } else {
-                                None
-                            }
+                            if Self::task_matches_filter(&task_id, &task, filter) { Some((task_id, task, candidate_root.clone())) } else { None }
                         })
                         .collect();
 
@@ -124,11 +107,7 @@ impl StorageSearch {
                             let task_id = format!("{}-{}", project_folder, file.number);
                             let mut task = Self::load_task_file(&file.path)?;
                             task.archived = file.archived;
-                            if Self::task_matches_filter(&task_id, &task, filter) {
-                                Some((task_id, task, candidate_root.clone()))
-                            } else {
-                                None
-                            }
+                            if Self::task_matches_filter(&task_id, &task, filter) { Some((task_id, task, candidate_root.clone())) } else { None }
                         })
                         .collect();
 
@@ -139,25 +118,16 @@ impl StorageSearch {
             // Search across all projects of every candidate root (primary +
             // sibling workspaces), matching the project-filtered branch so
             // unfiltered queries discover the same nested-root tasks.
-            let subdirs = StorageLocator::candidate_task_roots(root_path)
-                .into_iter()
-                .flat_map(|candidate_root| {
-                    crate::utils::filesystem::list_visible_subdirs(&candidate_root)
-                        .into_iter()
-                        .map(move |(project_folder, dir_path)| {
-                            (project_folder, dir_path, candidate_root.clone())
-                        })
-                });
+            let subdirs = StorageLocator::candidate_task_roots(root_path).into_iter().flat_map(|candidate_root| {
+                crate::utils::filesystem::list_visible_subdirs(&candidate_root)
+                    .into_iter()
+                    .map(move |(project_folder, dir_path)| (project_folder, dir_path, candidate_root.clone()))
+            });
             let all_files: Vec<(String, crate::storage::layout::TaskFile, PathBuf)> = subdirs
                 .into_iter()
                 .flat_map(|(project_folder, dir_path, root)| {
-                    let files = crate::storage::layout::unique_numbers(
-                        &project_folder,
-                        crate::storage::layout::task_files(&dir_path, filter.archived),
-                    );
-                    files
-                        .into_iter()
-                        .map(move |file| (project_folder.clone(), file, root.clone()))
+                    let files = crate::storage::layout::unique_numbers(&project_folder, crate::storage::layout::task_files(&dir_path, filter.archived));
+                    files.into_iter().map(move |file| (project_folder.clone(), file, root.clone()))
                 })
                 .collect();
 
@@ -169,11 +139,7 @@ impl StorageSearch {
                         let task_id = format!("{}-{}", project_folder, file.number);
                         let mut task = Self::load_task_file(&file.path)?;
                         task.archived = file.archived;
-                        if Self::task_matches_filter(&task_id, &task, filter) {
-                            Some((task_id, task, root.clone()))
-                        } else {
-                            None
-                        }
+                        if Self::task_matches_filter(&task_id, &task, filter) { Some((task_id, task, root.clone())) } else { None }
                     })
                     .collect();
             }
@@ -185,11 +151,7 @@ impl StorageSearch {
                         let task_id = format!("{}-{}", project_folder, file.number);
                         let mut task = Self::load_task_file(&file.path)?;
                         task.archived = file.archived;
-                        if Self::task_matches_filter(&task_id, &task, filter) {
-                            Some((task_id, task, root.clone()))
-                        } else {
-                            None
-                        }
+                        if Self::task_matches_filter(&task_id, &task, filter) { Some((task_id, task, root.clone())) } else { None }
                     })
                     .collect();
             }
@@ -231,11 +193,8 @@ impl StorageSearch {
 
         // Check tag filters (OR logic - match any of the specified tags)
         if !filter.tags.is_empty() {
-            let task_has_matching_tag = filter.tags.iter().any(|filter_tag| {
-                task.tags
-                    .iter()
-                    .any(|task_tag| crate::utils::fuzzy_match::fuzzy_contains(task_tag, filter_tag))
-            });
+            let task_has_matching_tag =
+                filter.tags.iter().any(|filter_tag| task.tags.iter().any(|task_tag| crate::utils::fuzzy_match::fuzzy_contains(task_tag, filter_tag)));
             if !task_has_matching_tag {
                 return false;
             }
@@ -243,14 +202,10 @@ impl StorageSearch {
 
         if !filter.custom_fields.is_empty() {
             for (name, allowed) in &filter.custom_fields {
-                let Some(values) =
-                    crate::utils::custom_fields::extract_value_strings(&task.custom_fields, name)
-                else {
+                let Some(values) = crate::utils::custom_fields::extract_value_strings(&task.custom_fields, name) else {
                     return false;
                 };
-                if values.is_empty()
-                    || !crate::utils::fuzzy_match::fuzzy_set_match(&values, allowed)
-                {
+                if values.is_empty() || !crate::utils::fuzzy_match::fuzzy_set_match(&values, allowed) {
                     return false;
                 }
             }

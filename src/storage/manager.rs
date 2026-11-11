@@ -58,9 +58,7 @@ impl Storage {
     /// directory simply holds no tasks (DEV-267: `lotar list` in a stray
     /// folder used to create a workspace there).
     pub fn open_read_only(root_path: &Path) -> Self {
-        Self {
-            root_path: root_path.to_path_buf(),
-        }
+        Self { root_path: root_path.to_path_buf() }
     }
 
     /// Try to open existing storage without creating directories
@@ -70,19 +68,11 @@ impl Storage {
             return None;
         }
 
-        Some(Self {
-            root_path: root_path.to_path_buf(),
-        })
+        Some(Self { root_path: root_path.to_path_buf() })
     }
 
-    pub fn add(
-        &mut self,
-        task: &Task,
-        project_prefix: &str,
-        original_project_name: Option<&str>,
-    ) -> LoTaRResult<String> {
-        StorageOperations::add(&self.root_path, task, project_prefix, original_project_name)
-            .map_err(map_storage_error)
+    pub fn add(&mut self, task: &Task, project_prefix: &str, original_project_name: Option<&str>) -> LoTaRResult<String> {
+        StorageOperations::add(&self.root_path, task, project_prefix, original_project_name).map_err(map_storage_error)
     }
 
     pub fn get(&self, id: &str, project: &str) -> Option<Task> {
@@ -101,15 +91,9 @@ impl Storage {
     pub fn resolve_numeric_id(&self, numeric_id: &str) -> Result<(String, Task), TaskLookupError> {
         let location = identity::resolve_numeric(&self.root_path, numeric_id)?;
         if std::env::var("LOTAR_DEBUG_STATUS").is_ok() {
-            eprintln!(
-                "[lotar][debug]   matched numeric={} as {} under {}",
-                numeric_id,
-                location.full_id(),
-                location.root.display()
-            );
+            eprintln!("[lotar][debug]   matched numeric={} as {} under {}", numeric_id, location.full_id(), location.root.display());
         }
-        let task = StorageSearch::load_task_file(&location.file)
-            .ok_or_else(|| TaskLookupError::NotFound(location.full_id()))?;
+        let task = StorageSearch::load_task_file(&location.file).ok_or_else(|| TaskLookupError::NotFound(location.full_id()))?;
         Ok((location.full_id(), task))
     }
 

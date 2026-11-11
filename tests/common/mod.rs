@@ -1,9 +1,6 @@
 // Shared helpers compiled into every integration test binary; each binary
 // uses a different subset, so unused items are expected per binary.
-#![allow(
-    dead_code,
-    reason = "each test binary uses a different subset of these helpers"
-)]
+#![allow(dead_code, reason = "each test binary uses a different subset of these helpers")]
 
 use assert_cmd::Command;
 use assert_cmd::cargo::{CargoError, cargo_bin_cmd};
@@ -61,10 +58,7 @@ unsafe fn init_lotar_test_environment() {
 /// `EnvVarGuard` scopes in negative tests still run AFTER this scrub and
 /// keep working exactly as before.
 pub fn scrub_repository_routing_env() {
-    let offenders: Vec<String> = std::env::vars()
-        .map(|(key, _)| key)
-        .filter(|key| lotar::utils::git::is_repository_routing_key(key))
-        .collect();
+    let offenders: Vec<String> = std::env::vars().map(|(key, _)| key).filter(|key| lotar::utils::git::is_repository_routing_key(key)).collect();
     for key in offenders {
         let _guard = env_mutex::lock_var(&key);
         // Manipulating process-wide env vars requires `unsafe`. Keep scope
@@ -107,14 +101,8 @@ fn isolate_tmpdir_under_owned_scratch() {
     }
     let base = std::env::temp_dir().join(SCRATCH_BASE_NAME);
     sweep_scratches_of_dead_owners(&base);
-    let scratch = base.join(format!(
-        "{}-{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_nanos())
-            .unwrap_or(0),
-    ));
+    let scratch =
+        base.join(format!("{}-{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0),));
     // Retry: a finishing process removes the base once it is empty, which can
     // happen between creating the base and the scratch inside it.
     if !(0..3).any(|_| std::fs::create_dir_all(&scratch).is_ok()) {
@@ -142,19 +130,14 @@ fn sweep_scratches_of_dead_owners(base: &std::path::Path) {
         let Some(name) = entry.file_name().to_str().map(str::to_string) else {
             continue;
         };
-        let Some(owner) = name
-            .split('-')
-            .next()
-            .and_then(|pid| pid.parse::<u32>().ok())
-        else {
+        let Some(owner) = name.split('-').next().and_then(|pid| pid.parse::<u32>().ok()) else {
             continue;
         };
         if owner == own_pid {
             continue;
         }
         // Signal 0 probes existence only; ESRCH means the owner is gone.
-        let dead = unsafe { libc::kill(owner as i32, 0) == -1 }
-            && std::io::Error::last_os_error().raw_os_error() == Some(libc::ESRCH);
+        let dead = unsafe { libc::kill(owner as i32, 0) == -1 } && std::io::Error::last_os_error().raw_os_error() == Some(libc::ESRCH);
         if dead {
             let _ = std::fs::remove_dir_all(entry.path());
         }
@@ -194,12 +177,7 @@ const AUTOMATION_STATE_NAME: &str = "automation-state";
 ///   must not already hold an `EnvVarGuard`/`lock_var` for any listed
 ///   variable.
 pub fn reset_lotar_test_environment() {
-    for var in [
-        "LOTAR_TASKS_DIR",
-        "LOTAR_HOME",
-        "LOTAR_TEST_SILENT",
-        "LOTAR_IGNORE_ENV_TASKS_DIR",
-    ] {
+    for var in ["LOTAR_TASKS_DIR", "LOTAR_HOME", "LOTAR_TEST_SILENT", "LOTAR_IGNORE_ENV_TASKS_DIR"] {
         let _guard = env_mutex::lock_var(var);
         // Manipulating process-wide env vars requires `unsafe`. Keep scope tiny.
         unsafe {
@@ -221,11 +199,7 @@ pub fn reset_lotar_test_environment() {
     // tests' out of the user's cache directory, in the process scratch that
     // the destructor removes. Entries are keyed by tasks directory, so tests
     // sharing the file don't see each other's.
-    let state_dir = OWNED_SCRATCH
-        .get()
-        .cloned()
-        .unwrap_or_else(std::env::temp_dir)
-        .join(AUTOMATION_STATE_NAME);
+    let state_dir = OWNED_SCRATCH.get().cloned().unwrap_or_else(std::env::temp_dir).join(AUTOMATION_STATE_NAME);
     let _guard = env_mutex::lock_var("LOTAR_AUTOMATION_STATE_DIR");
     unsafe {
         std::env::set_var("LOTAR_AUTOMATION_STATE_DIR", state_dir);
@@ -251,10 +225,7 @@ impl TestFixtures {
         let tasks_root = temp_dir.path().join(".tasks");
         fs::create_dir_all(&tasks_root).expect("Failed to create tasks directory");
 
-        Self {
-            temp_dir,
-            tasks_root,
-        }
+        Self { temp_dir, tasks_root }
     }
 
     pub fn create_storage(&self) -> Storage {
@@ -270,35 +241,21 @@ impl TestFixtures {
         // Create a basic Cargo.toml if it doesn't exist for project detection
         let cargo_toml_path = self.temp_dir.path().join("Cargo.toml");
         if !cargo_toml_path.exists() {
-            std::fs::write(
-                &cargo_toml_path,
-                "[package]\nname = \"test-project\"\nversion = \"0.1.0\"\nedition = \"2021\"",
-            )?;
+            std::fs::write(&cargo_toml_path, "[package]\nname = \"test-project\"\nversion = \"0.1.0\"\nedition = \"2021\"")?;
 
             // Create src directory and main.rs for a valid Rust project
             let src_dir = self.temp_dir.path().join("src");
             std::fs::create_dir_all(&src_dir)?;
-            std::fs::write(
-                src_dir.join("main.rs"),
-                "fn main() { println!(\"Hello, world!\"); }",
-            )?;
+            std::fs::write(src_dir.join("main.rs"), "fn main() { println!(\"Hello, world!\"); }")?;
         }
 
         let mut cmd = lotar_cmd().map_err(|e| -> Box<dyn std::error::Error> { Box::new(e) })?;
-        let output = cmd
-            .env("LOTAR_TEST_SILENT", "1")
-            .args(args)
-            .current_dir(self.temp_dir.path())
-            .output()?;
+        let output = cmd.env("LOTAR_TEST_SILENT", "1").args(args).current_dir(self.temp_dir.path()).output()?;
 
         if output.status.success() {
             Ok(String::from_utf8_lossy(&output.stdout).to_string())
         } else {
-            Err(format!(
-                "Command failed: {}",
-                String::from_utf8_lossy(&output.stderr)
-            )
-            .into())
+            Err(format!("Command failed: {}", String::from_utf8_lossy(&output.stderr)).into())
         }
     }
 
@@ -313,10 +270,7 @@ impl TestFixtures {
 pub fn extract_task_id_from_output(output: &str) -> Option<String> {
     // JSON payloads may nest the task ID within "task" or expose "task_id" directly.
     if let Ok(json) = serde_json::from_str::<Value>(output) {
-        if let Some(id) = json
-            .get("task")
-            .and_then(|task| task.get("id").and_then(Value::as_str))
-        {
+        if let Some(id) = json.get("task").and_then(|task| task.get("id").and_then(Value::as_str)) {
             return Some(id.to_string());
         }
         if let Some(id) = json.get("task_id").and_then(Value::as_str) {
@@ -326,11 +280,7 @@ pub fn extract_task_id_from_output(output: &str) -> Option<String> {
 
     // Prefer explicit creation messages when present.
     for line in output.lines() {
-        if let Some(id) = line
-            .split("Created task: ")
-            .nth(1)
-            .and_then(|rest| rest.split_whitespace().next())
-        {
+        if let Some(id) = line.split("Created task: ").nth(1).and_then(|rest| rest.split_whitespace().next()) {
             return Some(id.to_string());
         }
     }
@@ -405,25 +355,15 @@ pub fn git_capability() -> &'static GitProbe {
 #[track_caller]
 pub fn require_git() {
     let probe = git_capability();
-    let reason = if probe.reason.is_empty() {
-        "unknown reason"
-    } else {
-        &probe.reason
-    };
-    assert!(
-        probe.available,
-        "this test requires Git, but the runtime capability probe failed: {reason}. Failing closed instead of passing silently (DEV-79)"
-    );
+    let reason = if probe.reason.is_empty() { "unknown reason" } else { &probe.reason };
+    assert!(probe.available, "this test requires Git, but the runtime capability probe failed: {reason}. Failing closed instead of passing silently (DEV-79)");
 }
 
 /// Probe Git with the environment-resolved `git` binary in a fresh temp dir.
 pub fn probe_git_with_binary(git_binary: Option<&std::path::Path>) -> GitProbe {
     match tempfile::tempdir() {
         Ok(tmp) => probe_git_in(tmp.path(), git_binary),
-        Err(err) => GitProbe {
-            available: false,
-            reason: format!("cannot create probe directory: {err}"),
-        },
+        Err(err) => GitProbe { available: false, reason: format!("cannot create probe directory: {err}") },
     }
 }
 
@@ -443,11 +383,7 @@ fn apply_windows_bootstrap_env(command: &mut std::process::Command, owned_root: 
 }
 
 #[cfg(not(windows))]
-fn apply_windows_bootstrap_env(
-    _command: &mut std::process::Command,
-    _owned_root: &std::path::Path,
-) {
-}
+fn apply_windows_bootstrap_env(_command: &mut std::process::Command, _owned_root: &std::path::Path) {}
 
 /// Run the real Git capability probe inside `probe_root`.
 ///
@@ -455,23 +391,14 @@ fn apply_windows_bootstrap_env(
 /// cached capability uses) or a path to a controlled executable, which lets
 /// the probe's own tests drive failure and missing-binary outcomes
 /// deterministically on any platform.
-pub fn probe_git_in(
-    probe_root: &std::path::Path,
-    git_binary: Option<&std::path::Path>,
-) -> GitProbe {
+pub fn probe_git_in(probe_root: &std::path::Path, git_binary: Option<&std::path::Path>) -> GitProbe {
     let repo = probe_root.join("repo");
     if let Err(err) = fs::create_dir(&repo) {
-        return GitProbe {
-            available: false,
-            reason: format!("cannot prepare probe repository directory: {err}"),
-        };
+        return GitProbe { available: false, reason: format!("cannot prepare probe repository directory: {err}") };
     }
     let gitconfig = probe_root.join("gitconfig");
     if let Err(err) = fs::write(&gitconfig, "") {
-        return GitProbe {
-            available: false,
-            reason: format!("cannot prepare probe gitconfig: {err}"),
-        };
+        return GitProbe { available: false, reason: format!("cannot prepare probe gitconfig: {err}") };
     }
     let program = git_binary.unwrap_or_else(|| std::path::Path::new("git"));
     let mut command = std::process::Command::new(program);
@@ -498,31 +425,15 @@ pub fn probe_git_in(
     match output {
         Ok(output) if output.status.success() => {
             if repo.join(".git").exists() {
-                GitProbe {
-                    available: true,
-                    reason: String::new(),
-                }
+                GitProbe { available: true, reason: String::new() }
             } else {
-                GitProbe {
-                    available: false,
-                    reason: format!(
-                        "`git init` exited successfully but left no .git artifact in {}",
-                        repo.display()
-                    ),
-                }
+                GitProbe { available: false, reason: format!("`git init` exited successfully but left no .git artifact in {}", repo.display()) }
             }
         }
         Ok(output) => GitProbe {
             available: false,
-            reason: format!(
-                "`git init` failed with status {}: {}",
-                output.status,
-                String::from_utf8_lossy(&output.stderr).trim()
-            ),
+            reason: format!("`git init` failed with status {}: {}", output.status, String::from_utf8_lossy(&output.stderr).trim()),
         },
-        Err(err) => GitProbe {
-            available: false,
-            reason: format!("cannot run git: {err}"),
-        },
+        Err(err) => GitProbe { available: false, reason: format!("cannot run git: {err}") },
     }
 }

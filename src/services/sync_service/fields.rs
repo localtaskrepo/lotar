@@ -21,16 +21,9 @@ impl FieldValue {
         match self {
             FieldValue::String(value) => {
                 let trimmed = value.trim();
-                if trimmed.is_empty() {
-                    None
-                } else {
-                    Some(trimmed.to_string())
-                }
+                if trimmed.is_empty() { None } else { Some(trimmed.to_string()) }
             }
-            FieldValue::List(values) => values
-                .iter()
-                .find(|v| !v.trim().is_empty())
-                .map(|v| v.trim().to_string()),
+            FieldValue::List(values) => values.iter().find(|v| !v.trim().is_empty()).map(|v| v.trim().to_string()),
         }
     }
 
@@ -38,28 +31,15 @@ impl FieldValue {
         match self {
             FieldValue::String(value) => {
                 let trimmed = value.trim();
-                if trimmed.is_empty() {
-                    Vec::new()
-                } else {
-                    vec![trimmed.to_string()]
-                }
+                if trimmed.is_empty() { Vec::new() } else { vec![trimmed.to_string()] }
             }
-            FieldValue::List(values) => values
-                .iter()
-                .map(|v| v.trim().to_string())
-                .filter(|v| !v.is_empty())
-                .collect(),
+            FieldValue::List(values) => values.iter().map(|v| v.trim().to_string()).filter(|v| !v.is_empty()).collect(),
         }
     }
 }
 
 pub(super) fn normalize_field_values(value: &FieldValue) -> Vec<String> {
-    let mut values = value
-        .to_list_value()
-        .into_iter()
-        .map(|item| item.trim().to_ascii_lowercase())
-        .filter(|item| !item.is_empty())
-        .collect::<Vec<_>>();
+    let mut values = value.to_list_value().into_iter().map(|item| item.trim().to_ascii_lowercase()).filter(|item| !item.is_empty()).collect::<Vec<_>>();
     values.sort();
     values.dedup();
     values
@@ -98,10 +78,7 @@ pub(super) fn dedupe_list(values: Vec<String>) -> Vec<String> {
     out
 }
 
-pub(super) fn merge_custom_fields(
-    existing: Option<&CustomFields>,
-    updates: CustomFields,
-) -> CustomFields {
+pub(super) fn merge_custom_fields(existing: Option<&CustomFields>, updates: CustomFields) -> CustomFields {
     let mut merged = existing.cloned().unwrap_or_default();
     for (key, value) in updates {
         if custom_field_value_is_null(&value) {
@@ -193,10 +170,7 @@ pub(super) fn custom_field_value_to_field_value(value: &CustomFieldValue) -> Opt
             serde_json::Value::Number(n) => Some(FieldValue::String(n.to_string())),
             serde_json::Value::Bool(b) => Some(FieldValue::String(b.to_string())),
             serde_json::Value::Array(items) => {
-                let list = items
-                    .iter()
-                    .filter_map(|item| item.as_str().map(|s| s.to_string()))
-                    .collect::<Vec<_>>();
+                let list = items.iter().filter_map(|item| item.as_str().map(|s| s.to_string())).collect::<Vec<_>>();
                 Some(FieldValue::List(list))
             }
             _ => None,
@@ -210,10 +184,7 @@ pub(super) fn custom_field_value_to_field_value(value: &CustomFieldValue) -> Opt
             serde_yaml_ng::Value::Number(n) => Some(FieldValue::String(n.to_string())),
             serde_yaml_ng::Value::Bool(b) => Some(FieldValue::String(b.to_string())),
             serde_yaml_ng::Value::Sequence(items) => {
-                let list = items
-                    .iter()
-                    .filter_map(|item| item.as_str().map(|s| s.to_string()))
-                    .collect::<Vec<_>>();
+                let list = items.iter().filter_map(|item| item.as_str().map(|s| s.to_string())).collect::<Vec<_>>();
                 Some(FieldValue::List(list))
             }
             _ => None,
@@ -235,12 +206,7 @@ pub(super) fn custom_value_list(values: Vec<String>) -> CustomFieldValue {
     }
     #[cfg(not(feature = "schema"))]
     {
-        serde_yaml_ng::Value::Sequence(
-            values
-                .into_iter()
-                .map(serde_yaml_ng::Value::String)
-                .collect(),
-        )
+        serde_yaml_ng::Value::Sequence(values.into_iter().map(serde_yaml_ng::Value::String).collect())
     }
 }
 

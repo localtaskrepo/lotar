@@ -1,7 +1,4 @@
-use crate::config::types::{
-    GlobalConfig, ProjectConfig, ResolvedConfig, StringConfigField, SyncAuthProfile, SyncProvider,
-    SyncRemoteConfig,
-};
+use crate::config::types::{GlobalConfig, ProjectConfig, ResolvedConfig, StringConfigField, SyncAuthProfile, SyncProvider, SyncRemoteConfig};
 use crate::config::validation::conflicts::PrefixConflictDetector;
 use crate::config::validation::errors::{ValidationError, ValidationResult};
 use std::collections::HashSet;
@@ -16,9 +13,7 @@ const LONG_PREFIX_WARNING_THRESHOLD: usize = 12;
 
 impl ConfigValidator {
     pub fn new(tasks_dir: &Path) -> Self {
-        Self {
-            tasks_dir: tasks_dir.to_path_buf(),
-        }
+        Self { tasks_dir: tasks_dir.to_path_buf() }
     }
 
     pub fn validate_project_config(&self, config: &ProjectConfig) -> ValidationResult {
@@ -36,10 +31,7 @@ impl ConfigValidator {
         if let Some(reviewers) = &config.review_reviewers
             && let Err(error) = crate::config::types::normalize_review_reviewers(reviewers)
         {
-            result.add_error(ValidationError::error(
-                Some("review.reviewers".to_string()),
-                error.to_string(),
-            ));
+            result.add_error(ValidationError::error(Some("review.reviewers".to_string()), error.to_string()));
         }
 
         // Note: Project prefix validation is done separately as it's not stored in ProjectConfig
@@ -47,72 +39,38 @@ impl ConfigValidator {
         if let Some(states) = &config.issue_states {
             if states.values.is_empty() {
                 result.add_error(
-                    ValidationError::error(
-                        Some("issue_states".to_string()),
-                        "Issue states override cannot be empty".to_string(),
-                    )
-                    .with_fix(
-                        "Remove the override to inherit global statuses or add at least one state"
-                            .to_string(),
-                    ),
+                    ValidationError::error(Some("issue_states".to_string()), "Issue states override cannot be empty".to_string())
+                        .with_fix("Remove the override to inherit global statuses or add at least one state".to_string()),
                 );
             } else {
-                self.warn_on_duplicate_values(
-                    "issue_states",
-                    states.values.iter().map(|v| v.as_str()),
-                    &mut result,
-                );
+                self.warn_on_duplicate_values("issue_states", states.values.iter().map(|v| v.as_str()), &mut result);
             }
         }
 
         // An explicit done-states override must be non-empty; the subset
         // check runs against the project's own states when both are set and
         // otherwise defers to resolved-config validation.
-        self.validate_issue_done_states_optional(
-            config.issue_done_states.as_ref(),
-            config.issue_states.as_ref(),
-            &mut result,
-        );
+        self.validate_issue_done_states_optional(config.issue_done_states.as_ref(), config.issue_states.as_ref(), &mut result);
 
         if let Some(types) = &config.issue_types {
             if types.values.is_empty() {
                 result.add_error(
-                    ValidationError::error(
-                        Some("issue_types".to_string()),
-                        "Issue types override cannot be empty".to_string(),
-                    )
-                    .with_fix(
-                        "Remove the override to inherit global types or add at least one type"
-                            .to_string(),
-                    ),
+                    ValidationError::error(Some("issue_types".to_string()), "Issue types override cannot be empty".to_string())
+                        .with_fix("Remove the override to inherit global types or add at least one type".to_string()),
                 );
             } else {
-                self.warn_on_duplicate_values(
-                    "issue_types",
-                    types.values.iter().map(|v| v.as_str()),
-                    &mut result,
-                );
+                self.warn_on_duplicate_values("issue_types", types.values.iter().map(|v| v.as_str()), &mut result);
             }
         }
 
         if let Some(priorities) = &config.issue_priorities {
             if priorities.values.is_empty() {
                 result.add_error(
-                    ValidationError::error(
-                        Some("issue_priorities".to_string()),
-                        "Issue priorities override cannot be empty".to_string(),
-                    )
-                    .with_fix(
-                        "Remove the override to inherit global priorities or add at least one priority"
-                            .to_string(),
-                    ),
+                    ValidationError::error(Some("issue_priorities".to_string()), "Issue priorities override cannot be empty".to_string())
+                        .with_fix("Remove the override to inherit global priorities or add at least one priority".to_string()),
                 );
             } else {
-                self.warn_on_duplicate_values(
-                    "issue_priorities",
-                    priorities.values.iter().map(|v| v.as_str()),
-                    &mut result,
-                );
+                self.warn_on_duplicate_values("issue_priorities", priorities.values.iter().map(|v| v.as_str()), &mut result);
             }
         }
 
@@ -135,26 +93,16 @@ impl ConfigValidator {
             && !Self::members_list_has_entries(members)
         {
             result.add_error(
-                ValidationError::error(
-                    Some("members".to_string()),
-                    "strict_members is enabled but no members are configured".to_string(),
-                )
-                .with_fix("Add at least one member entry or disable strict_members".to_string()),
+                ValidationError::error(Some("members".to_string()), "strict_members is enabled but no members are configured".to_string())
+                    .with_fix("Add at least one member entry or disable strict_members".to_string()),
             );
         }
 
         if let (Some(default_tags), Some(tags)) = (&config.default_tags, &config.tags) {
-            self.validate_default_tags_subset(
-                "default_tags",
-                default_tags,
-                tags,
-                "issue.tags",
-                &mut result,
-            );
+            self.validate_default_tags_subset("default_tags", default_tags, tags, "issue.tags", &mut result);
         }
 
-        if let (Some(aliases), Some(states)) = (&config.branch_status_aliases, &config.issue_states)
-        {
+        if let (Some(aliases), Some(states)) = (&config.branch_status_aliases, &config.issue_states) {
             self.validate_alias_targets(
                 "branch_status_aliases",
                 "issue_states",
@@ -176,9 +124,7 @@ impl ConfigValidator {
             );
         }
 
-        if let (Some(aliases), Some(priorities)) =
-            (&config.branch_priority_aliases, &config.issue_priorities)
-        {
+        if let (Some(aliases), Some(priorities)) = (&config.branch_priority_aliases, &config.issue_priorities) {
             self.validate_alias_targets(
                 "branch_priority_aliases",
                 "issue_priorities",
@@ -189,12 +135,7 @@ impl ConfigValidator {
             );
         }
 
-        self.validate_remote_config(
-            &config.remotes,
-            &config.auth_profiles,
-            "project",
-            &mut result,
-        );
+        self.validate_remote_config(&config.remotes, &config.auth_profiles, "project", &mut result);
 
         result
     }
@@ -209,14 +150,8 @@ impl ConfigValidator {
         // Validate server port
         if config.server_port < 1024 {
             result.add_error(
-                ValidationError::warning(
-                    Some("server_port".to_string()),
-                    format!(
-                        "Port {} may require elevated privileges",
-                        config.server_port
-                    ),
-                )
-                .with_fix("Consider using a port >= 1024".to_string()),
+                ValidationError::warning(Some("server_port".to_string()), format!("Port {} may require elevated privileges", config.server_port))
+                    .with_fix("Consider using a port >= 1024".to_string()),
             );
         }
 
@@ -227,139 +162,65 @@ impl ConfigValidator {
             self.validate_prefix(&config.default_project, &mut result);
         }
 
-        self.warn_on_duplicate_values(
-            "issue_states",
-            config.issue_states.values.iter().map(|v| v.as_str()),
-            &mut result,
-        );
-        self.validate_issue_done_states(
-            config.issue_done_states.as_ref(),
-            &config.issue_states,
-            &mut result,
-        );
-        self.warn_on_duplicate_values(
-            "issue_types",
-            config.issue_types.values.iter().map(|v| v.as_str()),
-            &mut result,
-        );
-        self.warn_on_duplicate_values(
-            "issue_priorities",
-            config.issue_priorities.values.iter().map(|v| v.as_str()),
-            &mut result,
-        );
-        self.warn_on_duplicate_values(
-            "default_tags",
-            config.default_tags.iter().map(|v| v.as_str()),
-            &mut result,
-        );
-        self.warn_on_duplicate_values(
-            "scan_signal_words",
-            config.scan_signal_words.iter().map(|v| v.as_str()),
-            &mut result,
-        );
-        self.warn_on_duplicate_values(
-            "tags",
-            config.tags.values.iter().map(|v| v.as_str()),
-            &mut result,
-        );
-        self.warn_on_duplicate_values(
-            "custom_fields",
-            config.custom_fields.values.iter().map(|v| v.as_str()),
-            &mut result,
-        );
+        self.warn_on_duplicate_values("issue_states", config.issue_states.values.iter().map(|v| v.as_str()), &mut result);
+        self.validate_issue_done_states(config.issue_done_states.as_ref(), &config.issue_states, &mut result);
+        self.warn_on_duplicate_values("issue_types", config.issue_types.values.iter().map(|v| v.as_str()), &mut result);
+        self.warn_on_duplicate_values("issue_priorities", config.issue_priorities.values.iter().map(|v| v.as_str()), &mut result);
+        self.warn_on_duplicate_values("default_tags", config.default_tags.iter().map(|v| v.as_str()), &mut result);
+        self.warn_on_duplicate_values("scan_signal_words", config.scan_signal_words.iter().map(|v| v.as_str()), &mut result);
+        self.warn_on_duplicate_values("tags", config.tags.values.iter().map(|v| v.as_str()), &mut result);
+        self.warn_on_duplicate_values("custom_fields", config.custom_fields.values.iter().map(|v| v.as_str()), &mut result);
 
         if config.strict_members && !Self::members_list_has_entries(&config.members) {
             result.add_error(
-                ValidationError::error(
-                    Some("members".to_string()),
-                    "strict_members is enabled globally but no members are configured".to_string(),
-                )
-                .with_fix("Add entries under members or disable strict_members".to_string()),
+                ValidationError::error(Some("members".to_string()), "strict_members is enabled globally but no members are configured".to_string())
+                    .with_fix("Add entries under members or disable strict_members".to_string()),
             );
         }
 
-        self.validate_default_tags_subset(
-            "default_tags",
-            &config.default_tags,
-            &config.tags,
-            "issue.tags",
-            &mut result,
-        );
+        self.validate_default_tags_subset("default_tags", &config.default_tags, &config.tags, "issue.tags", &mut result);
 
         // Validate that lists are not empty
         if config.issue_states.values.is_empty() {
             result.add_error(
-                ValidationError::error(
-                    Some("issue_states".to_string()),
-                    "Issue states list cannot be empty".to_string(),
-                )
-                .with_fix("Add at least one status like 'todo', 'in_progress', 'done'".to_string()),
+                ValidationError::error(Some("issue_states".to_string()), "Issue states list cannot be empty".to_string())
+                    .with_fix("Add at least one status like 'todo', 'in_progress', 'done'".to_string()),
             );
         }
 
         if config.issue_types.values.is_empty() {
             result.add_error(
-                ValidationError::error(
-                    Some("issue_types".to_string()),
-                    "Issue types list cannot be empty".to_string(),
-                )
-                .with_fix("Add at least one type like 'feature', 'bug', 'chore'".to_string()),
+                ValidationError::error(Some("issue_types".to_string()), "Issue types list cannot be empty".to_string())
+                    .with_fix("Add at least one type like 'feature', 'bug', 'chore'".to_string()),
             );
         }
 
         if config.issue_priorities.values.is_empty() {
             result.add_error(
-                ValidationError::error(
-                    Some("issue_priorities".to_string()),
-                    "Issue priorities list cannot be empty".to_string(),
-                )
-                .with_fix("Add at least one priority like 'low', 'medium', 'high'".to_string()),
+                ValidationError::error(Some("issue_priorities".to_string()), "Issue priorities list cannot be empty".to_string())
+                    .with_fix("Add at least one priority like 'low', 'medium', 'high'".to_string()),
             );
         }
 
-        self.validate_remote_config(
-            &config.remotes,
-            &config.auth_profiles,
-            "global",
-            &mut result,
-        );
+        self.validate_remote_config(&config.remotes, &config.auth_profiles, "global", &mut result);
 
         // Validate default values exist in lists
         if let Some(default_status) = &config.default_status
             && !config.issue_states.values.contains(default_status)
         {
             result.add_error(
-                ValidationError::warning(
-                    Some("default_status".to_string()),
-                    format!(
-                        "Default status '{}' not found in issue_states list",
-                        default_status
-                    ),
-                )
-                .with_fix(
-                    "Add the status to issue_states or choose a different default".to_string(),
-                ),
+                ValidationError::warning(Some("default_status".to_string()), format!("Default status '{}' not found in issue_states list", default_status))
+                    .with_fix("Add the status to issue_states or choose a different default".to_string()),
             );
         }
 
-        if !config
-            .issue_priorities
-            .values
-            .iter()
-            .any(|priority| priority.eq_ignore_case(config.default_priority.as_str()))
-        {
+        if !config.issue_priorities.values.iter().any(|priority| priority.eq_ignore_case(config.default_priority.as_str())) {
             result.add_error(
                 ValidationError::warning(
                     Some("default_priority".to_string()),
-                    format!(
-                        "Default priority '{}' not found in issue_priorities list",
-                        config.default_priority
-                    ),
+                    format!("Default priority '{}' not found in issue_priorities list", config.default_priority),
                 )
-                .with_fix(
-                    "Add the priority to issue_priorities or choose a different default"
-                        .to_string(),
-                ),
+                .with_fix("Add the priority to issue_priorities or choose a different default".to_string()),
             );
         }
 
@@ -390,11 +251,7 @@ impl ConfigValidator {
 
         // Validate scan.ticket_patterns (if present)
         if let Some(patterns) = &config.scan_ticket_patterns {
-            self.warn_on_duplicate_values(
-                "scan.ticket_patterns",
-                patterns.iter().map(|v| v.as_str()),
-                &mut result,
-            );
+            self.warn_on_duplicate_values("scan.ticket_patterns", patterns.iter().map(|v| v.as_str()), &mut result);
             self.validate_ticket_patterns(patterns, &mut result);
         }
 
@@ -402,25 +259,15 @@ impl ConfigValidator {
         // set; an already-saved malformed value stays readable and only warns.
         let defaults = &config.sprints.defaults;
         for (field, value, parse) in [
-            (
-                "sprints.defaults.length",
-                defaults.length.as_deref(),
-                crate::utils::time::parse_sprint_length as fn(&str) -> Result<_, String>,
-            ),
-            (
-                "sprints.defaults.overdue_after",
-                defaults.overdue_after.as_deref(),
-                crate::utils::time::parse_sprint_overdue_after,
-            ),
+            ("sprints.defaults.length", defaults.length.as_deref(), crate::utils::time::parse_sprint_length as fn(&str) -> Result<_, String>),
+            ("sprints.defaults.overdue_after", defaults.overdue_after.as_deref(), crate::utils::time::parse_sprint_overdue_after),
         ] {
             if let Some(raw) = value.filter(|raw| !raw.trim().is_empty())
                 && let Err(err) = parse(raw)
             {
                 result.add_error(
-                    ValidationError::warning(Some(field.to_string()), err).with_fix(format!(
-                        "Set a valid value or clear it: lotar config set {} \"\" --global",
-                        field.replace('.', "_")
-                    )),
+                    ValidationError::warning(Some(field.to_string()), err)
+                        .with_fix(format!("Set a valid value or clear it: lotar config set {} \"\" --global", field.replace('.', "_"))),
                 );
             }
         }
@@ -430,9 +277,7 @@ impl ConfigValidator {
 
     pub fn validate_home_config(&self, config: &GlobalConfig) -> ValidationResult {
         let mut result = self.validate_global_config(config);
-        result
-            .warnings
-            .retain(|warning| warning.field.as_deref() != Some("auth_profiles"));
+        result.warnings.retain(|warning| warning.field.as_deref() != Some("auth_profiles"));
         result
     }
 
@@ -442,64 +287,35 @@ impl ConfigValidator {
         // This validates the final resolved configuration for consistency
         // Similar validations as global config but for the resolved state
 
-        self.validate_issue_done_states(
-            config.issue_done_states.as_ref(),
-            &config.issue_states,
-            &mut result,
-        );
+        self.validate_issue_done_states(config.issue_done_states.as_ref(), &config.issue_states, &mut result);
 
         if !config.issue_states.values.is_empty()
             && let Some(default_status) = config.default_status.as_ref()
-            && !config
-                .issue_states
-                .values
-                .iter()
-                .any(|state| state.eq_ignore_case(default_status.as_str()))
+            && !config.issue_states.values.iter().any(|state| state.eq_ignore_case(default_status.as_str()))
         {
             result.add_error(
-                ValidationError::warning(
-                    Some("default_status".to_string()),
-                    "Resolved default status not found in resolved issue states".to_string(),
-                )
-                .with_fix("Add the status to issue.states or adjust default_status".to_string()),
+                ValidationError::warning(Some("default_status".to_string()), "Resolved default status not found in resolved issue states".to_string())
+                    .with_fix("Add the status to issue.states or adjust default_status".to_string()),
             );
         }
 
         if !config.issue_priorities.values.is_empty()
-            && !config
-                .issue_priorities
-                .values
-                .iter()
-                .any(|priority| priority.eq_ignore_case(config.default_priority.as_str()))
+            && !config.issue_priorities.values.iter().any(|priority| priority.eq_ignore_case(config.default_priority.as_str()))
         {
             result.add_error(
-                ValidationError::warning(
-                    Some("default_priority".to_string()),
-                    "Resolved default priority not found in resolved issue priorities".to_string(),
-                )
-                .with_fix(
-                    "Add the priority to issue.priorities or pick a different default".to_string(),
-                ),
+                ValidationError::warning(Some("default_priority".to_string()), "Resolved default priority not found in resolved issue priorities".to_string())
+                    .with_fix("Add the priority to issue.priorities or pick a different default".to_string()),
             );
         }
 
         if config.strict_members && !Self::members_list_has_entries(&config.members) {
             result.add_error(
-                ValidationError::error(
-                    Some("members".to_string()),
-                    "strict_members is enabled but no members remain after resolution".to_string(),
-                )
-                .with_fix("Add entries under members or disable strict_members".to_string()),
+                ValidationError::error(Some("members".to_string()), "strict_members is enabled but no members remain after resolution".to_string())
+                    .with_fix("Add entries under members or disable strict_members".to_string()),
             );
         }
 
-        self.validate_default_tags_subset(
-            "default_tags",
-            &config.default_tags,
-            &config.tags,
-            "issue.tags",
-            &mut result,
-        );
+        self.validate_default_tags_subset("default_tags", &config.default_tags, &config.tags, "issue.tags", &mut result);
 
         self.validate_alias_targets(
             "branch_status_aliases",
@@ -534,10 +350,7 @@ impl ConfigValidator {
             Ok(detector) => detector.check_conflicts(prefix),
             Err(e) => {
                 let mut result = ValidationResult::new();
-                result.add_error(ValidationError::warning(
-                    None,
-                    format!("Could not check for prefix conflicts: {}", e),
-                ));
+                result.add_error(ValidationError::warning(None, format!("Could not check for prefix conflicts: {}", e)));
                 result
             }
         }
@@ -551,10 +364,7 @@ impl ConfigValidator {
             Ok(detector) => detector.check_conflicts_excluding(prefix, Some(prefix)),
             Err(e) => {
                 let mut result = ValidationResult::new();
-                result.add_error(ValidationError::warning(
-                    None,
-                    format!("Could not check for prefix conflicts: {}", e),
-                ));
+                result.add_error(ValidationError::warning(None, format!("Could not check for prefix conflicts: {}", e)));
                 result
             }
         }
@@ -569,19 +379,13 @@ impl ConfigValidator {
     fn validate_project_name(&self, name: &str, result: &mut ValidationResult) {
         let trimmed = name.trim();
         if trimmed.is_empty() {
-            result.add_error(ValidationError::error(
-                Some("project_name".to_string()),
-                "Project name cannot be empty".to_string(),
-            ));
+            result.add_error(ValidationError::error(Some("project_name".to_string()), "Project name cannot be empty".to_string()));
         }
 
         if trimmed.len() > 100 {
             result.add_error(
-                ValidationError::warning(
-                    Some("project_name".to_string()),
-                    "Project name is very long (>100 characters)".to_string(),
-                )
-                .with_fix("Consider using a shorter, more descriptive name".to_string()),
+                ValidationError::warning(Some("project_name".to_string()), "Project name is very long (>100 characters)".to_string())
+                    .with_fix("Consider using a shorter, more descriptive name".to_string()),
             );
         }
     }
@@ -599,40 +403,24 @@ impl ConfigValidator {
             result.add_error(
                 ValidationError::error(
                     Some("default_project".to_string()),
-                    format!(
-                        "Prefix is too long ({} characters); maximum supported length is {}",
-                        prefix.len(),
-                        MAX_PREFIX_LENGTH
-                    ),
+                    format!("Prefix is too long ({} characters); maximum supported length is {}", prefix.len(), MAX_PREFIX_LENGTH),
                 )
-                .with_fix(format!(
-                    "Use a shorter prefix of at most {} characters",
-                    MAX_PREFIX_LENGTH
-                )),
+                .with_fix(format!("Use a shorter prefix of at most {} characters", MAX_PREFIX_LENGTH)),
             );
             return;
         }
 
         if prefix.len() > LONG_PREFIX_WARNING_THRESHOLD {
             result.add_error(
-                ValidationError::warning(
-                    Some("default_project".to_string()),
-                    "Prefix is quite long, shorter prefixes are more practical".to_string(),
-                )
-                .with_fix("Consider using a 2-4 character prefix".to_string()),
+                ValidationError::warning(Some("default_project".to_string()), "Prefix is quite long, shorter prefixes are more practical".to_string())
+                    .with_fix("Consider using a 2-4 character prefix".to_string()),
             );
         }
 
-        if !prefix
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
-        {
+        if !prefix.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') {
             result.add_error(
-                ValidationError::error(
-                    Some("default_project".to_string()),
-                    "Prefix contains invalid characters".to_string(),
-                )
-                .with_fix("Use only letters, numbers, underscores, and hyphens".to_string()),
+                ValidationError::error(Some("default_project".to_string()), "Prefix contains invalid characters".to_string())
+                    .with_fix("Use only letters, numbers, underscores, and hyphens".to_string()),
             );
         }
     }
@@ -652,46 +440,25 @@ impl ConfigValidator {
         };
         if done.values.is_empty() {
             result.add_error(
-                ValidationError::error(
-                    Some("issue_done_states".to_string()),
-                    "issue_done_states cannot be empty".to_string(),
-                )
-                .with_fix(
-                    "List at least one terminal status or remove issue.done_states to use the inferred completion policy"
-                        .to_string(),
-                ),
+                ValidationError::error(Some("issue_done_states".to_string()), "issue_done_states cannot be empty".to_string())
+                    .with_fix("List at least one terminal status or remove issue.done_states to use the inferred completion policy".to_string()),
             );
             return;
         }
-        self.warn_on_duplicate_values(
-            "issue_done_states",
-            done.values.iter().map(|v| v.as_str()),
-            result,
-        );
+        self.warn_on_duplicate_values("issue_done_states", done.values.iter().map(|v| v.as_str()), result);
         let invalid: Vec<String> = done
             .values
             .iter()
-            .filter(|value| {
-                !states
-                    .values
-                    .iter()
-                    .any(|state| state.eq_ignore_case(value.as_str()))
-            })
+            .filter(|value| !states.values.iter().any(|state| state.eq_ignore_case(value.as_str())))
             .map(|value| value.as_str().to_string())
             .collect();
         if !invalid.is_empty() {
             result.add_error(
                 ValidationError::error(
                     Some("issue_done_states".to_string()),
-                    format!(
-                        "issue_done_states contains values not present in issue_states: {}",
-                        invalid.join(", ")
-                    ),
+                    format!("issue_done_states contains values not present in issue_states: {}", invalid.join(", ")),
                 )
-                .with_fix(
-                    "Add the statuses to issue_states or remove them from issue_done_states"
-                        .to_string(),
-                ),
+                .with_fix("Add the statuses to issue_states or remove them from issue_done_states".to_string()),
             );
         }
     }
@@ -713,21 +480,11 @@ impl ConfigValidator {
             None => {
                 if done.values.is_empty() {
                     result.add_error(
-                        ValidationError::error(
-                            Some("issue_done_states".to_string()),
-                            "Issue done states override cannot be empty".to_string(),
-                        )
-                        .with_fix(
-                            "Remove the override to inherit the global policy or add at least one terminal status"
-                                .to_string(),
-                        ),
+                        ValidationError::error(Some("issue_done_states".to_string()), "Issue done states override cannot be empty".to_string())
+                            .with_fix("Remove the override to inherit the global policy or add at least one terminal status".to_string()),
                     );
                 } else {
-                    self.warn_on_duplicate_values(
-                        "issue_done_states",
-                        done.values.iter().map(|v| v.as_str()),
-                        result,
-                    );
+                    self.warn_on_duplicate_values("issue_done_states", done.values.iter().map(|v| v.as_str()), result);
                 }
             }
         }
@@ -735,41 +492,25 @@ impl ConfigValidator {
 
     fn validate_defaults_consistency(&self, config: &ProjectConfig, result: &mut ValidationResult) {
         // Check if default status exists in issue states
-        if let (Some(default_status), Some(issue_states)) =
-            (&config.default_status, &config.issue_states)
+        if let (Some(default_status), Some(issue_states)) = (&config.default_status, &config.issue_states)
             && !issue_states.values.contains(default_status)
         {
             result.add_error(
-                ValidationError::warning(
-                    Some("default_status".to_string()),
-                    format!(
-                        "Default status '{}' not found in issue_states",
-                        default_status
-                    ),
-                )
-                .with_fix("Add the status to issue_states or remove default_status".to_string()),
+                ValidationError::warning(Some("default_status".to_string()), format!("Default status '{}' not found in issue_states", default_status))
+                    .with_fix("Add the status to issue_states or remove default_status".to_string()),
             );
         }
 
         // Check if default priority exists in issue priorities
-        if let (Some(default_priority), Some(issue_priorities)) =
-            (&config.default_priority, &config.issue_priorities)
-            && !issue_priorities
-                .values
-                .iter()
-                .any(|priority| priority.eq_ignore_case(default_priority.as_str()))
+        if let (Some(default_priority), Some(issue_priorities)) = (&config.default_priority, &config.issue_priorities)
+            && !issue_priorities.values.iter().any(|priority| priority.eq_ignore_case(default_priority.as_str()))
         {
             result.add_error(
                 ValidationError::warning(
                     Some("default_priority".to_string()),
-                    format!(
-                        "Default priority '{}' not found in issue_priorities",
-                        default_priority
-                    ),
+                    format!("Default priority '{}' not found in issue_priorities", default_priority),
                 )
-                .with_fix(
-                    "Add the priority to issue_priorities or remove default_priority".to_string(),
-                ),
+                .with_fix("Add the priority to issue_priorities or remove default_priority".to_string()),
             );
         }
     }
@@ -786,11 +527,8 @@ impl ConfigValidator {
             && !self.is_valid_email_or_username(assignee)
         {
             result.add_error(
-                ValidationError::warning(
-                    Some("default_assignee".to_string()),
-                    "Assignee format doesn't look like an email or @username".to_string(),
-                )
-                .with_fix("Use email format (user@domain.com) or @username format".to_string()),
+                ValidationError::warning(Some("default_assignee".to_string()), "Assignee format doesn't look like an email or @username".to_string())
+                    .with_fix("Use email format (user@domain.com) or @username format".to_string()),
             );
         }
 
@@ -799,11 +537,8 @@ impl ConfigValidator {
             && !self.is_valid_email_or_username(reporter)
         {
             result.add_error(
-                ValidationError::warning(
-                    Some("default_reporter".to_string()),
-                    "Reporter format doesn't look like an email or @username".to_string(),
-                )
-                .with_fix("Use email format (user@domain.com) or @username format".to_string()),
+                ValidationError::warning(Some("default_reporter".to_string()), "Reporter format doesn't look like an email or @username".to_string())
+                    .with_fix("Use email format (user@domain.com) or @username format".to_string()),
             );
         }
 
@@ -812,19 +547,11 @@ impl ConfigValidator {
         }
 
         if let Some(signal_words) = &config.scan_signal_words {
-            self.warn_on_duplicate_values(
-                "scan_signal_words",
-                signal_words.iter().map(|v| v.as_str()),
-                result,
-            );
+            self.warn_on_duplicate_values("scan_signal_words", signal_words.iter().map(|v| v.as_str()), result);
         }
 
         if let Some(patterns) = &config.scan_ticket_patterns {
-            self.warn_on_duplicate_values(
-                "scan.ticket_patterns",
-                patterns.iter().map(|v| v.as_str()),
-                result,
-            );
+            self.warn_on_duplicate_values("scan.ticket_patterns", patterns.iter().map(|v| v.as_str()), result);
         }
 
         if let Some(tags) = &config.tags {
@@ -832,11 +559,7 @@ impl ConfigValidator {
         }
 
         if let Some(custom_fields) = &config.custom_fields {
-            self.warn_on_duplicate_values(
-                "custom_fields",
-                custom_fields.values.iter().map(|v| v.as_str()),
-                result,
-            );
+            self.warn_on_duplicate_values("custom_fields", custom_fields.values.iter().map(|v| v.as_str()), result);
         }
     }
 
@@ -847,43 +570,24 @@ impl ConfigValidator {
             match regex::Regex::new(p) {
                 Ok(r) => compiled.push((p.clone(), r)),
                 Err(e) => result.add_error(
-                    ValidationError::error(
-                        Some(format!("scan.ticket_patterns[{}]", i)),
-                        format!("Invalid regex: {}", e),
-                    )
-                    .with_fix("Ensure the pattern is a valid Rust regex".to_string()),
+                    ValidationError::error(Some(format!("scan.ticket_patterns[{}]", i)), format!("Invalid regex: {}", e))
+                        .with_fix("Ensure the pattern is a valid Rust regex".to_string()),
                 ),
             }
         }
 
         // Check for ambiguous overlaps by testing representative samples
         // Heuristic: if two patterns can both match the same simple key formats, warn
-        let samples = vec![
-            "DEMO-123",
-            "ABC_99",
-            "[ticket=DEMO-1]",
-            "feat/PROJ-42",
-            "#123",
-        ];
+        let samples = vec!["DEMO-123", "ABC_99", "[ticket=DEMO-1]", "feat/PROJ-42", "#123"];
         for s in samples {
-            let matches: Vec<&str> = compiled
-                .iter()
-                .filter(|(_, re)| re.is_match(s))
-                .map(|(p, _)| p.as_str())
-                .collect();
+            let matches: Vec<&str> = compiled.iter().filter(|(_, re)| re.is_match(s)).map(|(p, _)| p.as_str()).collect();
             if matches.len() > 1 {
                 result.add_error(
                     ValidationError::warning(
                         Some("scan.ticket_patterns".to_string()),
-                        format!(
-                            "Multiple patterns match sample '{}': {}",
-                            s,
-                            matches.join(", ")
-                        ),
+                        format!("Multiple patterns match sample '{}': {}", s, matches.join(", ")),
                     )
-                    .with_fix(
-                        "Consider making patterns mutually exclusive or ordering them".to_string(),
-                    ),
+                    .with_fix("Consider making patterns mutually exclusive or ordering them".to_string()),
                 );
             }
         }
@@ -902,34 +606,22 @@ impl ConfigValidator {
 
         if !auth_profiles.is_empty() {
             let message = match scope {
-                "project" => {
-                    "auth_profiles should live in home config and are ignored in project configs"
-                }
+                "project" => "auth_profiles should live in home config and are ignored in project configs",
                 _ => "auth_profiles should live in home config (avoid committing secrets)",
             };
-            result.add_error(ValidationError::warning(
-                Some("auth_profiles".to_string()),
-                message.to_string(),
-            ));
+            result.add_error(ValidationError::warning(Some("auth_profiles".to_string()), message.to_string()));
         }
 
         for (name, remote) in remotes {
             let trimmed = name.trim();
             if trimmed.is_empty() {
-                result.add_error(ValidationError::error(
-                    Some("remotes".to_string()),
-                    "Remote name cannot be empty".to_string(),
-                ));
+                result.add_error(ValidationError::error(Some("remotes".to_string()), "Remote name cannot be empty".to_string()));
                 continue;
             }
 
             match remote.provider {
                 SyncProvider::Jira => {
-                    let missing = remote
-                        .project
-                        .as_ref()
-                        .map(|v| v.trim().is_empty())
-                        .unwrap_or(true);
+                    let missing = remote.project.as_ref().map(|v| v.trim().is_empty()).unwrap_or(true);
                     if missing {
                         result.add_error(ValidationError::warning(
                             Some(format!("remotes.{trimmed}.project")),
@@ -955,15 +647,10 @@ impl ConfigValidator {
                     for (local, mapping) in &remote.mapping {
                         let target = match mapping {
                             crate::config::types::SyncFieldMapping::Simple(field) => field.clone(),
-                            crate::config::types::SyncFieldMapping::Detailed(detail) => {
-                                detail.field.clone().unwrap_or_else(|| local.clone())
-                            }
+                            crate::config::types::SyncFieldMapping::Detailed(detail) => detail.field.clone().unwrap_or_else(|| local.clone()),
                         };
                         let target = target.trim().to_ascii_lowercase();
-                        if !target.is_empty()
-                            && !crate::services::sync_service::GITHUB_PUSH_FIELDS
-                                .contains(&target.as_str())
-                        {
+                        if !target.is_empty() && !crate::services::sync_service::GITHUB_PUSH_FIELDS.contains(&target.as_str()) {
                             result.add_error(ValidationError::warning(
                                 Some(format!("remotes.{trimmed}.mapping.{local}")),
                                 format!(
@@ -981,10 +668,7 @@ impl ConfigValidator {
     fn is_valid_email_or_username(&self, value: &str) -> bool {
         // Simple validation for email or @username format
         if let Some(stripped) = value.strip_prefix('@') {
-            return value.len() > 1
-                && stripped
-                    .chars()
-                    .all(|c| c.is_alphanumeric() || c == '_' || c == '-');
+            return value.len() > 1 && stripped.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-');
         }
 
         // Basic email validation
@@ -1004,11 +688,8 @@ impl ConfigValidator {
             let key = value.to_ascii_lowercase();
             if !seen.insert(key) {
                 result.add_error(
-                    ValidationError::warning(
-                        Some(field.to_string()),
-                        format!("Duplicate value '{}' found in {}", value, field),
-                    )
-                    .with_fix("Remove duplicate entries to avoid ambiguity".to_string()),
+                    ValidationError::warning(Some(field.to_string()), format!("Duplicate value '{}' found in {}", value, field))
+                        .with_fix("Remove duplicate entries to avoid ambiguity".to_string()),
                 );
                 break;
             }
@@ -1037,11 +718,7 @@ impl ConfigValidator {
             if trimmed.is_empty() {
                 continue;
             }
-            if !allowed
-                .values
-                .iter()
-                .any(|candidate| candidate.eq_ignore_ascii_case(trimmed))
-            {
+            if !allowed.values.iter().any(|candidate| candidate.eq_ignore_ascii_case(trimmed)) {
                 invalid.push(trimmed.to_string());
             }
         }
@@ -1050,17 +727,9 @@ impl ConfigValidator {
             result.add_error(
                 ValidationError::error(
                     Some(field_name.to_string()),
-                    format!(
-                        "{} contains values not present in {}: {}",
-                        field_name,
-                        allowed_field_label,
-                        invalid.join(", ")
-                    ),
+                    format!("{} contains values not present in {}: {}", field_name, allowed_field_label, invalid.join(", ")),
                 )
-                .with_fix(format!(
-                    "Add the missing values to {} or remove them from {}",
-                    allowed_field_label, field_name
-                )),
+                .with_fix(format!("Add the missing values to {} or remove them from {}", allowed_field_label, field_name)),
             );
         }
     }
@@ -1078,14 +747,8 @@ impl ConfigValidator {
                 && !crate::config::types::is_valid_tag_color(color)
             {
                 result.add_error(
-                    ValidationError::warning(
-                        Some("tag_properties".to_string()),
-                        format!("Tag '{name}' has an unknown colour '{color}'; it is ignored"),
-                    )
-                    .with_fix(format!(
-                        "Use #rgb, #rrggbb or one of {}",
-                        crate::config::types::TAG_COLOR_NAMES.join(", ")
-                    )),
+                    ValidationError::warning(Some("tag_properties".to_string()), format!("Tag '{name}' has an unknown colour '{color}'; it is ignored"))
+                        .with_fix(format!("Use #rgb, #rrggbb or one of {}", crate::config::types::TAG_COLOR_NAMES.join(", "))),
                 );
             }
             if let Some(tags) = tags
@@ -1093,13 +756,8 @@ impl ConfigValidator {
                 && !tags.values.iter().any(|tag| tag.eq_ignore_ascii_case(name))
             {
                 result.add_error(
-                    ValidationError::warning(
-                        Some("tag_properties".to_string()),
-                        format!("Tag '{name}' has properties but is not in the tag list"),
-                    )
-                    .with_fix(format!(
-                        "Add '{name}' to issue.tags or remove its properties"
-                    )),
+                    ValidationError::warning(Some("tag_properties".to_string()), format!("Tag '{name}' has properties but is not in the tag list"))
+                        .with_fix(format!("Add '{name}' to issue.tags or remove its properties")),
                 );
             }
         }
@@ -1128,15 +786,9 @@ impl ConfigValidator {
             result.add_error(
                 ValidationError::error(
                     Some(alias_field.to_string()),
-                    format!(
-                        "Alias '{}' maps to '{}' which is not present in {}",
-                        alias, target, allowed_field
-                    ),
+                    format!("Alias '{}' maps to '{}' which is not present in {}", alias, target, allowed_field),
                 )
-                .with_fix(format!(
-                    "Add '{}' to {} or change the alias target",
-                    target, allowed_field
-                )),
+                .with_fix(format!("Add '{}' to {} or change the alias target", target, allowed_field)),
             );
         }
     }
@@ -1152,26 +804,15 @@ fn retired_agent_automation_warning(legacy: &crate::types::CustomFieldValue) -> 
          and reassignment are automation rules now"
             .to_string(),
     )
-    .with_fix(format!(
-        "Remove agent.automation and add this rule to automation.yml if you want the behaviour:\n{}",
-        legacy_agent_automation_rule(legacy)
-    ))
+    .with_fix(format!("Remove agent.automation and add this rule to automation.yml if you want the behaviour:\n{}", legacy_agent_automation_rule(legacy)))
 }
 
 /// The automation rule equivalent to a legacy `agent.automation` block.
 pub fn legacy_agent_automation_rule(legacy: &crate::types::CustomFieldValue) -> String {
-    const EVENTS: [(&str, &str); 4] = [
-        ("on_start", "job_started"),
-        ("on_success", "job_completed"),
-        ("on_failure", "job_failed"),
-        ("on_cancel", "job_cancelled"),
-    ];
+    const EVENTS: [(&str, &str); 4] =
+        [("on_start", "job_started"), ("on_success", "job_completed"), ("on_failure", "job_failed"), ("on_cancel", "job_cancelled")];
     let text = |value: Option<&crate::types::CustomFieldValue>| {
-        value
-            .and_then(|value| value.as_str())
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .map(str::to_string)
+        value.and_then(|value| value.as_str()).map(str::trim).filter(|value| !value.is_empty()).map(str::to_string)
     };
     let mut events = String::new();
     for (old, event) in EVENTS {
@@ -1180,15 +821,8 @@ pub fn legacy_agent_automation_rule(legacy: &crate::types::CustomFieldValue) -> 
         };
         let status = text(action.get("set_status"));
         let assignee = text(action.get("reassign_to")).map(|who| {
-            let keyword = matches!(
-                who.as_str(),
-                "assignee" | "reporter" | "assignee_or_reporter" | "me"
-            );
-            if keyword {
-                format!("\"@{who}\"")
-            } else {
-                format!("\"{who}\"")
-            }
+            let keyword = matches!(who.as_str(), "assignee" | "reporter" | "assignee_or_reporter" | "me");
+            if keyword { format!("\"@{who}\"") } else { format!("\"{who}\"") }
         });
         if status.is_none() && assignee.is_none() {
             continue;
@@ -1204,8 +838,5 @@ pub fn legacy_agent_automation_rule(legacy: &crate::types::CustomFieldValue) -> 
     if events.is_empty() {
         return "  (the block sets nothing, so no rule is needed)".to_string();
     }
-    format!(
-        "automation:\n  rules:\n    - name: Agent lifecycle\n      when:\n        assignee: \"@agent\"\n      on:\n{}",
-        events.trim_end()
-    )
+    format!("automation:\n  rules:\n    - name: Agent lifecycle\n      when:\n        assignee: \"@agent\"\n      on:\n{}", events.trim_end())
 }

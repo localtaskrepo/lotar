@@ -10,11 +10,7 @@ fn run_git(repo: &std::path::Path, args: &[&str], envs: &[(&str, &str)]) {
     }
     let out = cmd.output().expect("failed to run git");
     if !out.status.success() {
-        panic!(
-            "git {:?} failed: {}",
-            args,
-            String::from_utf8_lossy(&out.stderr)
-        );
+        panic!("git {:?} failed: {}", args, String::from_utf8_lossy(&out.stderr));
     }
 }
 
@@ -51,22 +47,13 @@ mod git_required {
 
         // `stats changed` lists the last change per task from git history
         // (`stats stale` uses each task's modified time since DEV-3).
-        let out = crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(root)
-            .args([
-                "--format", "json", "stats", "changed", "--global", "--limit", "10",
-            ])
-            .output()
-            .unwrap();
+        let out =
+            crate::common::lotar_cmd().unwrap().current_dir(root).args(["--format", "json", "stats", "changed", "--global", "--limit", "10"]).output().unwrap();
         assert!(out.status.success());
         let v: Value = serde_json::from_slice(&out.stdout).unwrap();
         assert_eq!(v["status"], "ok");
         let items = v["items"].as_array().unwrap();
-        let ids: Vec<String> = items
-            .iter()
-            .map(|i| i["id"].as_str().unwrap().to_string())
-            .collect();
+        let ids: Vec<String> = items.iter().map(|i| i["id"].as_str().unwrap().to_string()).collect();
         assert!(ids.contains(&"ABC-1".to_string()));
         assert!(ids.contains(&"ABC-2".to_string()));
     }

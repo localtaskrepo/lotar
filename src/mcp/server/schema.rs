@@ -18,17 +18,7 @@ use serde_json::Value;
 /// Annotation keywords that carry no validation semantics.
 const ANNOTATION_KEYWORDS: &[&str] = &["description", "title", "default", "examples"];
 /// Validation keywords this module enforces.
-const SUPPORTED_KEYWORDS: &[&str] = &[
-    "type",
-    "properties",
-    "required",
-    "additionalProperties",
-    "items",
-    "enum",
-    "oneOf",
-    "minimum",
-    "maximum",
-];
+const SUPPORTED_KEYWORDS: &[&str] = &["type", "properties", "required", "additionalProperties", "items", "enum", "oneOf", "minimum", "maximum"];
 
 /// Recursively verify that `schema` only uses keywords this validator
 /// enforces (or annotations). Returns every unsupported keyword location.
@@ -48,9 +38,7 @@ fn check_supported(schema: &Value, pointer: &str, issues: &mut Vec<String>) {
             continue;
         }
         if !SUPPORTED_KEYWORDS.contains(&key.as_str()) {
-            issues.push(format!(
-                "{pointer}: unsupported schema keyword '{key}' (validator fails closed)"
-            ));
+            issues.push(format!("{pointer}: unsupported schema keyword '{key}' (validator fails closed)"));
             continue;
         }
         match key.as_str() {
@@ -98,20 +86,13 @@ fn validate_value(schema: &Value, instance: &Value, pointer: &str, issues: &mut 
     if let Some(types) = object.get("type")
         && !type_matches(types, instance)
     {
-        issues.push(format!(
-            "{pointer}: expected type {}, found {}",
-            describe_types(types),
-            json_type_name(instance)
-        ));
+        issues.push(format!("{pointer}: expected type {}, found {}", describe_types(types), json_type_name(instance)));
     }
 
     if let Some(enum_value) = object.get("enum") {
         match enum_value.as_array() {
             Some(allowed) if allowed.contains(instance) => {}
-            Some(_) => issues.push(format!(
-                "{pointer}: value {} is not one of the allowed enum values",
-                preview(instance)
-            )),
+            Some(_) => issues.push(format!("{pointer}: value {} is not one of the allowed enum values", preview(instance))),
             None => {
                 issues.push(format!("{pointer}: schema enum must be an array"));
                 return;
@@ -123,28 +104,19 @@ fn validate_value(schema: &Value, instance: &Value, pointer: &str, issues: &mut 
         && let Some(number) = instance.as_f64()
         && number < minimum
     {
-        issues.push(format!(
-            "{pointer}: value {number} is below the minimum {minimum}"
-        ));
+        issues.push(format!("{pointer}: value {number} is below the minimum {minimum}"));
     }
     if let Some(maximum) = object.get("maximum").and_then(Value::as_f64)
         && let Some(number) = instance.as_f64()
         && number > maximum
     {
-        issues.push(format!(
-            "{pointer}: value {number} is above the maximum {maximum}"
-        ));
+        issues.push(format!("{pointer}: value {number} is above the maximum {maximum}"));
     }
 
     if let Some(branches) = object.get("oneOf").and_then(Value::as_array) {
-        let matches = branches
-            .iter()
-            .filter(|branch| validate_instance(branch, instance).is_empty())
-            .count();
+        let matches = branches.iter().filter(|branch| validate_instance(branch, instance).is_empty()).count();
         if matches != 1 {
-            issues.push(format!(
-                "{pointer}: value must match exactly one allowed variant (matched {matches})"
-            ));
+            issues.push(format!("{pointer}: value must match exactly one allowed variant (matched {matches})"));
         }
     }
 
@@ -166,29 +138,16 @@ fn validate_value(schema: &Value, instance: &Value, pointer: &str, issues: &mut 
             }
         }
         if let Some(additional) = object.get("additionalProperties") {
-            let declared: Vec<&String> = object
-                .get("properties")
-                .and_then(Value::as_object)
-                .map(|properties| properties.keys().collect())
-                .unwrap_or_default();
+            let declared: Vec<&String> = object.get("properties").and_then(Value::as_object).map(|properties| properties.keys().collect()).unwrap_or_default();
             for (name, field) in fields {
-                if declared
-                    .iter()
-                    .any(|declared| declared.as_str() == name.as_str())
-                {
+                if declared.iter().any(|declared| declared.as_str() == name.as_str()) {
                     continue;
                 }
                 match additional {
-                    Value::Bool(false) => issues.push(format!(
-                        "{pointer}: unknown property '{name}' is not allowed"
-                    )),
+                    Value::Bool(false) => issues.push(format!("{pointer}: unknown property '{name}' is not allowed")),
                     Value::Bool(true) => {}
-                    schema @ Value::Object(_) => {
-                        validate_value(schema, field, &format!("{pointer}/{name}"), issues)
-                    }
-                    _ => issues.push(format!(
-                        "{pointer}: unsupported additionalProperties form for '{name}'"
-                    )),
+                    schema @ Value::Object(_) => validate_value(schema, field, &format!("{pointer}/{name}"), issues),
+                    _ => issues.push(format!("{pointer}: unsupported additionalProperties form for '{name}'")),
                 }
             }
         }
@@ -206,10 +165,7 @@ fn validate_value(schema: &Value, instance: &Value, pointer: &str, issues: &mut 
 fn type_matches(types: &Value, instance: &Value) -> bool {
     match types {
         Value::String(name) => single_type_matches(name, instance),
-        Value::Array(names) => names
-            .iter()
-            .filter_map(Value::as_str)
-            .any(|name| single_type_matches(name, instance)),
+        Value::Array(names) => names.iter().filter_map(Value::as_str).any(|name| single_type_matches(name, instance)),
         _ => false,
     }
 }
@@ -231,11 +187,7 @@ fn describe_types(types: &Value) -> String {
     match types {
         Value::String(name) => name.clone(),
         Value::Array(names) => {
-            let rendered: Vec<String> = names
-                .iter()
-                .filter_map(Value::as_str)
-                .map(|name| name.to_string())
-                .collect();
+            let rendered: Vec<String> = names.iter().filter_map(Value::as_str).map(|name| name.to_string()).collect();
             format!("one of [{}]", rendered.join(", "))
         }
         _ => "valid JSON type".to_string(),
@@ -368,9 +320,7 @@ mod tests {
         });
         assert!(validate_instance(&schema, &json!({"limit": 50})).is_empty());
         assert!(validate_instance(&schema, &json!({"limit": 0}))[0].contains("below the minimum"));
-        assert!(
-            validate_instance(&schema, &json!({"limit": 201}))[0].contains("above the maximum")
-        );
+        assert!(validate_instance(&schema, &json!({"limit": 201}))[0].contains("above the maximum"));
         assert!(validate_instance(&schema, &json!({"limit": null})).is_empty());
     }
 

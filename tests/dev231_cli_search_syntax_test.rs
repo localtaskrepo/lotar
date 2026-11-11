@@ -22,31 +22,14 @@ fn workspace() -> Workspace {
         let modified = format!("2026-01-01T00:00:0{num}Z");
         std::fs::write(
             tasks_dir.join("CP").join(format!("{num}.yml")),
-            format!(
-                "title: {title}\nstatus: {status}\npriority: {priority}\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\nmodified: {modified}\n{extra}"
-            ),
+            format!("title: {title}\nstatus: {status}\npriority: {priority}\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\nmodified: {modified}\n{extra}"),
         )
         .unwrap();
     };
-    task(
-        1,
-        "Login redirect loop",
-        "P0",
-        "In Progress",
-        "tags: [auth]\ncustom_fields:\n  area: billing\n",
-    );
-    task(
-        2,
-        "Billing export",
-        "P1",
-        "Todo",
-        "custom_fields:\n  area: billing\n",
-    );
+    task(1, "Login redirect loop", "P0", "In Progress", "tags: [auth]\ncustom_fields:\n  area: billing\n");
+    task(2, "Billing export", "P1", "Todo", "custom_fields:\n  area: billing\n");
     task(3, "Docs title fix", "P2", "Done", "tags: [docs]\n");
-    Workspace {
-        _tmp: tmp,
-        tasks_dir,
-    }
+    Workspace { _tmp: tmp, tasks_dir }
 }
 
 fn run(ws: &Workspace, args: &[&str]) -> Result<Vec<String>, String> {
@@ -57,22 +40,10 @@ fn run(ws: &Workspace, args: &[&str]) -> Result<Vec<String>, String> {
     cmd.args(args);
     let out = cmd.output().map_err(|e| e.to_string())?;
     if !out.status.success() {
-        return Err(format!(
-            "{}{}",
-            String::from_utf8_lossy(&out.stdout),
-            String::from_utf8_lossy(&out.stderr)
-        ));
+        return Err(format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr)));
     }
     let payload: Value = serde_json::from_slice(&out.stdout).map_err(|e| e.to_string())?;
-    Ok(payload["tasks"]
-        .as_array()
-        .map(|tasks| {
-            tasks
-                .iter()
-                .map(|t| t["id"].as_str().unwrap().to_string())
-                .collect()
-        })
-        .unwrap_or_default())
+    Ok(payload["tasks"].as_array().map(|tasks| tasks.iter().map(|t| t["id"].as_str().unwrap().to_string()).collect()).unwrap_or_default())
 }
 
 fn ids(nums: &[u32]) -> Vec<String> {
@@ -96,58 +67,30 @@ fn configured_values_work_in_the_query_and_the_flags() {
 #[test]
 fn query_mixes_filters_custom_fields_and_search_text() {
     let ws = workspace();
-    assert_eq!(
-        run(&ws, &["area=billing", "status:todo"]).unwrap(),
-        ids(&[2])
-    );
-    assert_eq!(
-        run(&ws, &["field:area=billing", "login"]).unwrap(),
-        ids(&[1])
-    );
+    assert_eq!(run(&ws, &["area=billing", "status:todo"]).unwrap(), ids(&[2]));
+    assert_eq!(run(&ws, &["field:area=billing", "login"]).unwrap(), ids(&[1]));
     // Repeated list filters add up; flags add to the query.
-    assert_eq!(
-        run(&ws, &["status:todo status:done"]).unwrap(),
-        ids(&[3, 2])
-    );
-    assert_eq!(
-        run(&ws, &["tag:auth", "--tag", "docs"]).unwrap(),
-        ids(&[3, 1])
-    );
+    assert_eq!(run(&ws, &["status:todo status:done"]).unwrap(), ids(&[3, 2]));
+    assert_eq!(run(&ws, &["tag:auth", "--tag", "docs"]).unwrap(), ids(&[3, 1]));
     // Unknown keys stay search text (here a title scope).
     assert_eq!(run(&ws, &["title:docs"]).unwrap(), ids(&[3]));
     // Sorting in the query.
-    assert_eq!(
-        run(&ws, &["sort_by=title", "order=asc"]).unwrap(),
-        ids(&[2, 3, 1])
-    );
+    assert_eq!(run(&ws, &["sort_by=title", "order=asc"]).unwrap(), ids(&[2, 3, 1]));
 }
 
 #[test]
 fn malformed_terms_and_removed_shortcuts_are_errors() {
     let ws = workspace();
     let err = run(&ws, &["--stauts", "todo"]).unwrap_err();
-    assert!(
-        err.contains("a similar argument exists: '--status'"),
-        "{err}"
-    );
+    assert!(err.contains("a similar argument exists: '--status'"), "{err}");
     let err = run(&ws, &["owner="]).unwrap_err();
     assert!(err.contains("Add a value for"), "{err}");
     let err = run(&ws, &["status:\"unclosed"]).unwrap_err();
     assert!(err.contains("Unmatched quote"), "{err}");
-    for removed in [
-        "--high",
-        "--critical",
-        "--mine",
-        "--overdue",
-        "--due-soon",
-        "--unassigned",
-    ] {
+    for removed in ["--high", "--critical", "--mine", "--overdue", "--due-soon", "--unassigned"] {
         let err = run(&ws, &[removed]).unwrap_err();
         // The error names the flag (DEV-237) and says what to write instead.
-        assert!(
-            err.contains(&format!("unexpected argument '{removed}'")),
-            "{removed}: {err}"
-        );
+        assert!(err.contains(&format!("unexpected argument '{removed}'")), "{removed}: {err}");
         assert!(err.contains("was removed; write"), "{removed}: {err}");
     }
 }
@@ -168,10 +111,7 @@ fn one_query_string_works_on_every_interface() {
         let resp = api.handle_request(&HttpRequest {
             method: "GET".into(),
             path: path.into(),
-            query: params
-                .iter()
-                .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
-                .collect::<HashMap<_, _>>(),
+            query: params.iter().map(|(k, v)| ((*k).to_string(), (*v).to_string())).collect::<HashMap<_, _>>(),
             headers: HashMap::new(),
             body: Vec::new(),
         });
@@ -193,34 +133,18 @@ fn one_query_string_works_on_every_interface() {
         let (status, body) = rest("/api/tasks/list", &[("query", text)]);
         assert_eq!(status, 200, "{body}");
         let body: Value = serde_json::from_str(&body).unwrap();
-        let rest_ids: Vec<String> = body["data"]["tasks"]
-            .as_array()
-            .map(|t| {
-                t.iter()
-                    .map(|t| t["id"].as_str().unwrap().to_string())
-                    .collect()
-            })
-            .unwrap_or_default();
+        let rest_ids: Vec<String> =
+            body["data"]["tasks"].as_array().map(|t| t.iter().map(|t| t["id"].as_str().unwrap().to_string()).collect()).unwrap_or_default();
         assert_eq!(rest_ids, expected, "rest {text}");
 
         let (status, csv) = rest("/api/tasks/export", &[("query", text)]);
         assert_eq!(status, 200, "{csv}");
-        let export_ids: Vec<String> = csv
-            .lines()
-            .skip(1)
-            .map(|line| line.split(',').next().unwrap().to_string())
-            .collect();
+        let export_ids: Vec<String> = csv.lines().skip(1).map(|line| line.split(',').next().unwrap().to_string()).collect();
         assert_eq!(export_ids, expected, "export {text}");
 
         let resp = mcp(json!({"query": text}));
-        let payload: Value =
-            serde_json::from_str(resp["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
-        let mcp_ids: Vec<String> = payload["tasks"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|t| t["id"].as_str().unwrap().to_string())
-            .collect();
+        let payload: Value = serde_json::from_str(resp["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
+        let mcp_ids: Vec<String> = payload["tasks"].as_array().unwrap().iter().map(|t| t["id"].as_str().unwrap().to_string()).collect();
         assert_eq!(mcp_ids, expected, "mcp {text}");
     }
 
@@ -239,18 +163,8 @@ fn excluded_filters_work_everywhere() {
     let ws = workspace();
     // Bare exclusions work as CLI arguments, before or after flags.
     assert_eq!(run(&ws, &["-status:done"]).unwrap(), ids(&[2, 1]));
-    assert_eq!(
-        run(
-            &ws,
-            &["--page-size", "5", "-prio:P0", "-field:area=billing"]
-        )
-        .unwrap(),
-        ids(&[3])
-    );
-    assert_eq!(
-        run(&ws, &["-status:done", "-status:todo"]).unwrap(),
-        ids(&[1])
-    );
+    assert_eq!(run(&ws, &["--page-size", "5", "-prio:P0", "-field:area=billing"]).unwrap(), ids(&[3]));
+    assert_eq!(run(&ws, &["-status:done", "-status:todo"]).unwrap(), ids(&[1]));
     // Short flags keep working; -word stays a search-text exclusion.
     assert_eq!(run(&ws, &["-s", "Todo"]).unwrap(), ids(&[2]));
     assert_eq!(run(&ws, &["billing -login"]).unwrap(), ids(&[2]));
@@ -264,32 +178,16 @@ fn excluded_filters_work_everywhere() {
     let resp = api.handle_request(&lotar::api_server::HttpRequest {
         method: "GET".into(),
         path: "/api/tasks/list".into(),
-        query: [(
-            "query".to_string(),
-            "-prio:P0 -field:area=billing".to_string(),
-        )]
-        .into(),
+        query: [("query".to_string(), "-prio:P0 -field:area=billing".to_string())].into(),
         headers: Default::default(),
         body: Vec::new(),
     });
     let body: Value = serde_json::from_slice(&resp.body).unwrap();
-    let rest: Vec<String> = body["data"]["tasks"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|t| t["id"].as_str().unwrap().to_string())
-        .collect();
+    let rest: Vec<String> = body["data"]["tasks"].as_array().unwrap().iter().map(|t| t["id"].as_str().unwrap().to_string()).collect();
     assert_eq!(rest, ids(&[3]));
     let line = json!({"jsonrpc": "2.0", "id": 1, "method": "task/list", "params": {"query": "-status:done"}});
-    let resp: Value =
-        serde_json::from_str(&lotar::mcp::server::handle_json_line(&line.to_string())).unwrap();
-    let payload: Value =
-        serde_json::from_str(resp["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
-    let mcp: Vec<String> = payload["tasks"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|t| t["id"].as_str().unwrap().to_string())
-        .collect();
+    let resp: Value = serde_json::from_str(&lotar::mcp::server::handle_json_line(&line.to_string())).unwrap();
+    let payload: Value = serde_json::from_str(resp["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
+    let mcp: Vec<String> = payload["tasks"].as_array().unwrap().iter().map(|t| t["id"].as_str().unwrap().to_string()).collect();
     assert_eq!(mcp, ids(&[2, 1]));
 }

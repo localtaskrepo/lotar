@@ -35,59 +35,28 @@ mod global_config {
 
         // Run config show command, which should NOT create any files (read-only operation)
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        let output = cmd
-            .current_dir(temp_dir)
-            .arg("config")
-            .arg("show")
-            .assert()
-            .success()
-            .get_output()
-            .stdout
-            .clone();
+        let output = cmd.current_dir(temp_dir).arg("config").arg("show").assert().success().get_output().stdout.clone();
         let stdout = String::from_utf8_lossy(&output);
-        assert!(
-            stdout.contains("Global configuration – canonical YAML:"),
-            "config show should render global heading\n{stdout}"
-        );
+        assert!(stdout.contains("Global configuration – canonical YAML:"), "config show should render global heading\n{stdout}");
 
         // Verify no files were created by the read-only operation
-        assert!(
-            !tasks_dir.exists(),
-            "Config show should not create any directories"
-        );
+        assert!(!tasks_dir.exists(), "Config show should not create any directories");
 
         // Now test that write operations DO create config files when needed
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("task")
-            .arg("add")
-            .arg("Test task")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("task").arg("add").arg("Test task").assert().success();
 
         // Now verify the config was created by the write operation
         let global_config_path = tasks_dir.join("config.yml");
-        assert!(
-            global_config_path.exists(),
-            "Task creation should create global config"
-        );
+        assert!(global_config_path.exists(), "Task creation should create global config");
 
         // Verify the config content doesn't contain null values
         let config_content = fs::read_to_string(&global_config_path).unwrap();
         assert!(!config_content.contains("null"));
         // Defaults should collapse to minimal YAML without redundant sections
-        assert!(
-            config_content.contains("default:\n  project:"),
-            "Default global config should record project prefix"
-        );
-        assert!(
-            !config_content.contains("server:"),
-            "Default global config should omit server section"
-        );
-        assert!(
-            !config_content.contains("issue:"),
-            "Default global config should omit issue taxonomy"
-        );
+        assert!(config_content.contains("default:\n  project:"), "Default global config should record project prefix");
+        assert!(!config_content.contains("server:"), "Default global config should omit server section");
+        assert!(!config_content.contains("issue:"), "Default global config should omit issue taxonomy");
     }
 
     #[test]
@@ -114,21 +83,10 @@ mod global_config {
 
         // Test config show displays the updated value
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        let output = cmd
-            .current_dir(temp_dir)
-            .arg("config")
-            .arg("show")
-            .assert()
-            .success()
-            .get_output()
-            .stdout
-            .clone();
+        let output = cmd.current_dir(temp_dir).arg("config").arg("show").assert().success().get_output().stdout.clone();
 
         let stdout = String::from_utf8_lossy(&output);
-        assert!(
-            stdout.contains("server:\n  port: 9000"),
-            "global config show should surface overridden port in YAML\n{stdout}"
-        );
+        assert!(stdout.contains("server:\n  port: 9000"), "global config show should surface overridden port in YAML\n{stdout}");
     }
 
     #[test]
@@ -138,30 +96,12 @@ mod global_config {
 
         let _guard = EnvVarGuard::set("LOTAR_DEFAULT_REPORTER", "env.reporter@example.com");
 
-        let output = crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(temp_dir)
-            .arg("config")
-            .arg("show")
-            .assert()
-            .success()
-            .get_output()
-            .stdout
-            .clone();
+        let output = crate::common::lotar_cmd().unwrap().current_dir(temp_dir).arg("config").arg("show").assert().success().get_output().stdout.clone();
 
         let stdout = String::from_utf8_lossy(&output);
-        assert!(
-            stdout.contains("Global configuration – canonical YAML:"),
-            "config show should emit canonical heading\n{stdout}"
-        );
-        assert!(
-            stdout.contains("reporter: env.reporter@example.com"),
-            "env override should appear in output\n{stdout}"
-        );
-        assert!(
-            !stdout.contains("# (env)"),
-            "non-explain output should omit inline source comments\n{stdout}"
-        );
+        assert!(stdout.contains("Global configuration – canonical YAML:"), "config show should emit canonical heading\n{stdout}");
+        assert!(stdout.contains("reporter: env.reporter@example.com"), "env override should appear in output\n{stdout}");
+        assert!(!stdout.contains("# (env)"), "non-explain output should omit inline source comments\n{stdout}");
     }
 
     #[test]
@@ -171,62 +111,27 @@ mod global_config {
 
         // Prime a project prefix so the YAML includes it
         let mut add_cmd = crate::common::lotar_cmd().unwrap();
-        add_cmd
-            .current_dir(temp_dir)
-            .arg("task")
-            .arg("add")
-            .arg("Prime prefix")
-            .assert()
-            .success();
+        add_cmd.current_dir(temp_dir).arg("task").arg("add").arg("Prime prefix").assert().success();
 
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        let output = cmd
-            .current_dir(temp_dir)
-            .arg("config")
-            .arg("show")
-            .arg("--full")
-            .assert()
-            .success()
-            .get_output()
-            .stdout
-            .clone();
+        let output = cmd.current_dir(temp_dir).arg("config").arg("show").arg("--full").assert().success().get_output().stdout.clone();
 
         let stdout = String::from_utf8_lossy(&output);
         assert!(stdout.contains("Effective Global configuration – canonical YAML:"));
-        assert!(
-            stdout.contains("  port: 8080"),
-            "server port should appear in canonical YAML\n{stdout}"
-        );
-        assert!(
-            stdout.contains("codeowners-assign: true"),
-            "automation toggles should surface in canonical YAML\n{stdout}"
-        );
-        assert!(
-            !stdout.contains("# ("),
-            "--full output should omit inline provenance without --explain\n{stdout}"
-        );
+        assert!(stdout.contains("  port: 8080"), "server port should appear in canonical YAML\n{stdout}");
+        assert!(stdout.contains("codeowners-assign: true"), "automation toggles should surface in canonical YAML\n{stdout}");
+        assert!(!stdout.contains("# ("), "--full output should omit inline provenance without --explain\n{stdout}");
 
-        let (_, yaml_block) = stdout
-            .split_once("canonical YAML:\n")
-            .expect("full config should include canonical YAML block");
-        let doc: serde_json::Value =
-            serde_yaml_ng::from_str(yaml_block).expect("canonical YAML should deserialize");
-        assert!(
-            !yaml_block.contains("# ("),
-            "full canonical YAML should omit provenance comments without --explain\n{yaml_block}"
-        );
+        let (_, yaml_block) = stdout.split_once("canonical YAML:\n").expect("full config should include canonical YAML block");
+        let doc: serde_json::Value = serde_yaml_ng::from_str(yaml_block).expect("canonical YAML should deserialize");
+        assert!(!yaml_block.contains("# ("), "full canonical YAML should omit provenance comments without --explain\n{yaml_block}");
 
         let states = doc["issue"]["states"].as_array().expect("states array");
         let states_as_str: Vec<&str> = states.iter().filter_map(|v| v.as_str()).collect();
-        assert_eq!(
-            states_as_str,
-            vec!["Todo", "InProgress", "NeedsReview", "Done"]
-        );
+        assert_eq!(states_as_str, vec!["Todo", "InProgress", "NeedsReview", "Done"]);
 
         assert_eq!(doc["auto"]["identity"], serde_json::Value::Bool(true));
-        let custom_fields = doc["custom"]["fields"]
-            .as_array()
-            .expect("custom fields array");
+        let custom_fields = doc["custom"]["fields"].as_array().expect("custom fields array");
         assert!(custom_fields.iter().any(|v| v.as_str() == Some("*")));
     }
 
@@ -236,14 +141,7 @@ mod global_config {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Ensure predictable defaults
-        crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(temp_dir)
-            .arg("task")
-            .arg("add")
-            .arg("Seed default project")
-            .assert()
-            .success();
+        crate::common::lotar_cmd().unwrap().current_dir(temp_dir).arg("task").arg("add").arg("Seed default project").assert().success();
 
         let output = crate::common::lotar_cmd()
             .unwrap()
@@ -259,26 +157,14 @@ mod global_config {
             .clone();
 
         let stdout = String::from_utf8_lossy(&output);
-        assert!(
-            stdout.contains("Effective Global configuration – canonical YAML:"),
-            "combined output should include canonical heading\n{stdout}"
-        );
+        assert!(stdout.contains("Effective Global configuration – canonical YAML:"), "combined output should include canonical heading\n{stdout}");
 
-        let (_, yaml_block) = stdout
-            .split_once("canonical YAML:\n")
-            .expect("combined output should include canonical YAML block");
-        assert!(
-            yaml_block.starts_with("---\n"),
-            "YAML block should begin with document separator when explain is active"
-        );
+        let (_, yaml_block) = stdout.split_once("canonical YAML:\n").expect("combined output should include canonical YAML block");
+        assert!(yaml_block.starts_with("---\n"), "YAML block should begin with document separator when explain is active");
 
         let yaml_body = yaml_block.trim_start_matches("---\n");
-        serde_yaml_ng::from_str::<serde_json::Value>(yaml_body)
-            .expect("YAML block should remain parseable");
-        assert!(
-            yaml_block.contains("codeowners-assign: true # (default)"),
-            "explain output should reuse canonical YAML comments\n{yaml_block}"
-        );
+        serde_yaml_ng::from_str::<serde_json::Value>(yaml_body).expect("YAML block should remain parseable");
+        assert!(yaml_block.contains("codeowners-assign: true # (default)"), "explain output should reuse canonical YAML comments\n{yaml_block}");
     }
 
     #[test]
@@ -312,10 +198,7 @@ mod global_config {
             .clone();
 
         let stdout = String::from_utf8_lossy(&output);
-        assert!(
-            stdout.contains("assign-on-status: false # (global)"),
-            "global overrides should be marked accordingly in canonical YAML\n{stdout}"
-        );
+        assert!(stdout.contains("assign-on-status: false # (global)"), "global overrides should be marked accordingly in canonical YAML\n{stdout}");
     }
 }
 
@@ -343,9 +226,7 @@ mod project_config {
             .arg("--project=MyVeryLongProjectName")
             .assert()
             .success()
-            .stdout(predicate::str::contains(
-                "Project 'MyVeryLongProjectName' initialized at:",
-            ))
+            .stdout(predicate::str::contains("Project 'MyVeryLongProjectName' initialized at:"))
             .stdout(path_contains(".tasks/MYVE/config.yml"));
 
         // Verify the project folder was created with the correct prefix
@@ -405,26 +286,14 @@ mod project_config {
 
         // Test underscored project name
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("config")
-            .arg("init")
-            .arg("--project=my_cool_project")
-            .assert()
-            .success()
-            .stdout(path_contains(".tasks/MCP/config.yml"));
+        cmd.current_dir(temp_dir).arg("config").arg("init").arg("--project=my_cool_project").assert().success().stdout(path_contains(".tasks/MCP/config.yml"));
 
         let underscore_dir = temp_dir.join(".tasks").join("MCP");
         assert!(underscore_dir.exists());
 
         // Test short project name (should remain unchanged)
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("config")
-            .arg("init")
-            .arg("--project=ABC")
-            .assert()
-            .success()
-            .stdout(path_contains(".tasks/ABC/config.yml"));
+        cmd.current_dir(temp_dir).arg("config").arg("init").arg("--project=ABC").assert().success().stdout(path_contains(".tasks/ABC/config.yml"));
 
         let short_dir = temp_dir.join(".tasks").join("ABC");
         assert!(short_dir.exists());
@@ -448,14 +317,7 @@ mod project_config {
             .success();
 
         // Initialize project and set a project-specific override
-        crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(temp_dir)
-            .arg("config")
-            .arg("init")
-            .arg("--project=SourceProject")
-            .assert()
-            .success();
+        crate::common::lotar_cmd().unwrap().current_dir(temp_dir).arg("config").arg("init").arg("--project=SourceProject").assert().success();
 
         crate::common::lotar_cmd()
             .unwrap()
@@ -483,18 +345,9 @@ mod project_config {
             .clone();
 
         let stdout = String::from_utf8_lossy(&output);
-        assert!(
-            stdout.contains("Project configuration (SourceProject"),
-            "project show should include heading with label\n{stdout}"
-        );
-        assert!(
-            stdout.contains("assignee: project.assignee@example.com # (project)"),
-            "project overrides should be labeled with project provenance\n{stdout}"
-        );
-        assert!(
-            stdout.contains("priority: High # (global)"),
-            "inherited global values should retain provenance in project explain\n{stdout}"
-        );
+        assert!(stdout.contains("Project configuration (SourceProject"), "project show should include heading with label\n{stdout}");
+        assert!(stdout.contains("assignee: project.assignee@example.com # (project)"), "project overrides should be labeled with project provenance\n{stdout}");
+        assert!(stdout.contains("priority: High # (global)"), "inherited global values should retain provenance in project explain\n{stdout}");
     }
 }
 
@@ -584,22 +437,11 @@ mod config_operations {
 
         // First initialize a project
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("config")
-            .arg("init")
-            .arg("--project=SetTestProject")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("config").arg("init").arg("--project=SetTestProject").assert().success();
 
         // Ensure default project is set for project-scoped operations
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("config")
-            .arg("set")
-            .arg("default_project")
-            .arg("SetTestProject")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("config").arg("set").arg("default_project").arg("SetTestProject").assert().success();
 
         // Set issue states
         let mut cmd = crate::common::lotar_cmd().unwrap();
@@ -611,9 +453,7 @@ mod config_operations {
             .arg("--project=SetTestProject")
             .assert()
             .success()
-            .stdout(predicate::str::contains(
-                "Successfully updated issue_states",
-            ));
+            .stdout(predicate::str::contains("Successfully updated issue_states"));
 
         // Set default priority
         let mut cmd = crate::common::lotar_cmd().unwrap();
@@ -625,9 +465,7 @@ mod config_operations {
             .arg("--project=SetTestProject")
             .assert()
             .success()
-            .stdout(predicate::str::contains(
-                "Successfully updated default_priority",
-            ));
+            .stdout(predicate::str::contains("Successfully updated default_priority"));
 
         // Verify the project config was updated
         let config_path = temp_dir.join(".tasks").join("SETT").join("config.yml");
@@ -645,13 +483,7 @@ mod config_operations {
 
         // Initialize a project with custom settings
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("config")
-            .arg("init")
-            .arg("--template=default")
-            .arg("--project=ShowTest")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("config").arg("init").arg("--template=default").arg("--project=ShowTest").assert().success();
 
         // Show the configuration
         let mut cmd = crate::common::lotar_cmd().unwrap();
@@ -661,9 +493,7 @@ mod config_operations {
             .arg("--project=ShowTest")
             .assert()
             .success()
-            .stdout(predicate::str::contains(
-                "Project configuration (ShowTest (SHOW)) – canonical YAML:",
-            ))
+            .stdout(predicate::str::contains("Project configuration (ShowTest (SHOW)) – canonical YAML:"))
             .stdout(predicate::str::contains("canonical YAML:"))
             .stdout(predicate::str::contains("---"))
             .stdout(predicate::str::contains("project:"));
@@ -694,9 +524,7 @@ mod custom_tasks_directory {
             .arg("show")
             .assert()
             .success()
-            .stdout(predicate::str::contains(
-                "Global configuration – canonical YAML:",
-            ));
+            .stdout(predicate::str::contains("Global configuration – canonical YAML:"));
 
         // Verify the custom directory was created
         assert!(custom_tasks_dir.exists());
@@ -742,9 +570,7 @@ mod custom_tasks_directory {
             .arg("env-project")
             .assert()
             .success()
-            .stdout(predicate::str::contains(
-                "Successfully updated default_project",
-            ));
+            .stdout(predicate::str::contains("Successfully updated default_project"));
 
         // Verify config.yml was created in environment-specified directory
         let env_config_path = env_tasks_dir.join("config.yml");
@@ -768,7 +594,11 @@ mod custom_tasks_directory {
 
         // Create a config file in the parent tasks directory
         let parent_config_path = parent_tasks_dir.join("config.yml");
-        fs::write(&parent_config_path, "server.port: 7777\n# task_file_extension and tasks_folder are legacy/no-op in current model\ndefault.project: parent-project\n").unwrap();
+        fs::write(
+            &parent_config_path,
+            "server.port: 7777\n# task_file_extension and tasks_folder are legacy/no-op in current model\ndefault.project: parent-project\n",
+        )
+        .unwrap();
 
         // Create a subdirectory
         let sub_dir = temp_dir.join("subdir");
@@ -782,9 +612,7 @@ mod custom_tasks_directory {
             .assert()
             .success()
             .stdout(predicate::str::contains("server:\n  port: 7777"))
-            .stdout(predicate::str::contains(
-                "default:\n  project: parent-project",
-            ));
+            .stdout(predicate::str::contains("default:\n  project: parent-project"));
     }
 
     #[test]
@@ -818,18 +646,11 @@ mod custom_tasks_directory {
             .unwrap()
             .filter_map(|entry| {
                 let entry = entry.ok()?;
-                if entry.file_type().ok()?.is_dir() {
-                    Some(entry.file_name().to_string_lossy().to_string())
-                } else {
-                    None
-                }
+                if entry.file_type().ok()?.is_dir() { Some(entry.file_name().to_string_lossy().to_string()) } else { None }
             })
             .collect();
 
-        assert!(
-            !project_dirs.is_empty(),
-            "At least one project directory should be created"
-        );
+        assert!(!project_dirs.is_empty(), "At least one project directory should be created");
     }
 }
 
@@ -847,70 +668,28 @@ mod inheritance {
 
         // Create global config first
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("config")
-            .arg("set")
-            .arg("server_port")
-            .arg("9000")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("config").arg("set").arg("server_port").arg("9000").assert().success();
 
         // Set a default project
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("config")
-            .arg("set")
-            .arg("default_project")
-            .arg("InheritanceTest")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("config").arg("set").arg("default_project").arg("InheritanceTest").assert().success();
 
         // Create a project config
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("config")
-            .arg("init")
-            .arg("--project=InheritanceTest")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("config").arg("init").arg("--project=InheritanceTest").assert().success();
 
         // Set project-specific configuration
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("config")
-            .arg("set")
-            .arg("default_priority")
-            .arg("HIGH")
-            .arg("--project=InheritanceTest")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("config").arg("set").arg("default_priority").arg("HIGH").arg("--project=InheritanceTest").assert().success();
 
         // Show config should display project settings (not server settings)
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        let output = cmd
-            .current_dir(temp_dir)
-            .arg("config")
-            .arg("show")
-            .arg("--project=InheritanceTest")
-            .assert()
-            .success()
-            .get_output()
-            .stdout
-            .clone();
+        let output = cmd.current_dir(temp_dir).arg("config").arg("show").arg("--project=InheritanceTest").assert().success().get_output().stdout.clone();
 
         let stdout = String::from_utf8_lossy(&output);
-        assert!(
-            stdout.contains("Project configuration (InheritanceTest"),
-            "project show should include canonical heading with display name\n{stdout}"
-        );
-        assert!(
-            stdout.contains("priority: HIGH"),
-            "project override should surface in YAML\n{stdout}"
-        );
-        assert!(
-            !stdout.contains("server:"),
-            "project-scoped show should omit unrelated server settings\n{stdout}"
-        );
+        assert!(stdout.contains("Project configuration (InheritanceTest"), "project show should include canonical heading with display name\n{stdout}");
+        assert!(stdout.contains("priority: HIGH"), "project override should surface in YAML\n{stdout}");
+        assert!(!stdout.contains("server:"), "project-scoped show should omit unrelated server settings\n{stdout}");
     }
 }
 
@@ -950,9 +729,7 @@ mod error_handling {
             .arg("config")
             .assert()
             .success()
-            .stdout(predicate::str::contains(
-                "Manage project and global configuration settings",
-            ))
+            .stdout(predicate::str::contains("Manage project and global configuration settings"))
             .stdout(predicate::str::contains("Usage"))
             .stdout(predicate::str::contains("Actions"))
             .stdout(predicate::str::contains("show"))

@@ -1,16 +1,11 @@
 use super::super::{JsonRpcRequest, JsonRpcResponse, domain_service_error, err, ok};
-use crate::api_types::{
-    RelationshipGraphRequest, RelationshipMutationRequest, RelationshipRepairRequest,
-};
+use crate::api_types::{RelationshipGraphRequest, RelationshipMutationRequest, RelationshipRepairRequest};
 use crate::services::relationships;
 use crate::storage::manager::Storage;
 use crate::workspace::TasksDirectoryResolver;
 use serde_json::{Value, json};
 
-fn respond<T: serde::Serialize>(
-    id: Option<Value>,
-    result: crate::errors::LoTaRResult<T>,
-) -> JsonRpcResponse {
+fn respond<T: serde::Serialize>(id: Option<Value>, result: crate::errors::LoTaRResult<T>) -> JsonRpcResponse {
     match result {
         Ok(response) => match serde_json::to_string(&response) {
             Ok(text) => ok(id, json!({"content": [{"type": "text", "text": text}]})),
@@ -21,9 +16,7 @@ fn respond<T: serde::Serialize>(
 }
 
 fn storage() -> Result<Storage, String> {
-    TasksDirectoryResolver::resolve_read_only(None, None).map(|resolver| Storage {
-        root_path: resolver.path,
-    })
+    TasksDirectoryResolver::resolve_read_only(None, None).map(|resolver| Storage { root_path: resolver.path })
 }
 
 pub(crate) fn handle_relationship_graph(req: JsonRpcRequest) -> JsonRpcResponse {

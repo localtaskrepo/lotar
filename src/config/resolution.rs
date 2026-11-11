@@ -1,6 +1,4 @@
-use crate::config::operations::{
-    apply_field_to_global_config, canonicalize_field_name, validate_field_value,
-};
+use crate::config::operations::{apply_field_to_global_config, canonicalize_field_name, validate_field_value};
 use crate::config::types::*;
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
@@ -32,9 +30,7 @@ fn config_fingerprint(tasks_dir: Option<&Path>, project: Option<&str>) -> String
         Some(p) => p.to_path_buf(),
         None => crate::utils::paths::tasks_root_from(Path::new(".")),
     };
-    let mut parts = vec![file_fingerprint(&crate::utils::paths::global_config_path(
-        &root,
-    ))];
+    let mut parts = vec![file_fingerprint(&crate::utils::paths::global_config_path(&root))];
     if crate::config::persistence::home_config_honored()
         && let Some(home_dir) = dirs::home_dir()
     {
@@ -45,9 +41,7 @@ fn config_fingerprint(tasks_dir: Option<&Path>, project: Option<&str>) -> String
     if let Some(prefix) = project
         && !prefix.trim().is_empty()
     {
-        parts.push(file_fingerprint(&crate::utils::paths::project_config_path(
-            &root, prefix,
-        )));
+        parts.push(file_fingerprint(&crate::utils::paths::project_config_path(&root, prefix)));
     }
     parts.join("|")
 }
@@ -78,11 +72,7 @@ fn cache_key_for(tasks_dir: Option<&Path>) -> String {
         Some(p) => p.to_path_buf(),
         None => crate::utils::paths::tasks_root_from(Path::new(".")),
     };
-    let root_str = root
-        .canonicalize()
-        .unwrap_or(root)
-        .to_string_lossy()
-        .to_string();
+    let root_str = root.canonicalize().unwrap_or(root).to_string_lossy().to_string();
     // Include relevant env overrides in the cache key so runtime env changes create a new entry
     let env_signature = crate::config::env_overrides::env_signature();
     let cli_signature = cli_override_signature();
@@ -91,11 +81,7 @@ fn cache_key_for(tasks_dir: Option<&Path>) -> String {
 
 /// Share configuration freshness with consumers that cache derived values.
 pub(crate) fn config_cache_signature(tasks_dir: Option<&Path>, project: Option<&str>) -> String {
-    format!(
-        "{}|FILES={}",
-        cache_key_for(tasks_dir),
-        config_fingerprint(tasks_dir, project)
-    )
+    format!("{}|FILES={}", cache_key_for(tasks_dir), config_fingerprint(tasks_dir, project))
 }
 
 /// Root portion of a cache key, shared by base and per-project entries.
@@ -104,25 +90,15 @@ fn cache_root_for(tasks_dir: Option<&Path>) -> String {
         Some(p) => p.to_path_buf(),
         None => crate::utils::paths::tasks_root_from(Path::new(".")),
     };
-    root.canonicalize()
-        .unwrap_or(root)
-        .to_string_lossy()
-        .to_string()
+    root.canonicalize().unwrap_or(root).to_string_lossy().to_string()
 }
 
 fn cli_override_signature() -> String {
-    cli_override_state()
-        .read()
-        .ok()
-        .and_then(|guard| guard.as_ref().map(|layer| layer.signature.clone()))
-        .unwrap_or_else(|| "NONE".to_string())
+    cli_override_state().read().ok().and_then(|guard| guard.as_ref().map(|layer| layer.signature.clone())).unwrap_or_else(|| "NONE".to_string())
 }
 
 fn active_cli_override_layer() -> Option<CliOverrideLayer> {
-    cli_override_state()
-        .read()
-        .ok()
-        .and_then(|guard| guard.as_ref().cloned())
+    cli_override_state().read().ok().and_then(|guard| guard.as_ref().cloned())
 }
 
 fn clear_all_cached_configs() {
@@ -152,9 +128,7 @@ pub fn configure_cli_overrides(pairs: &[(String, String)]) -> Result<(), ConfigE
     for (raw_key, raw_value) in pairs {
         let key = raw_key.trim();
         if key.is_empty() {
-            return Err(ConfigError::ParseError(
-                "CLI config override keys cannot be empty".to_string(),
-            ));
+            return Err(ConfigError::ParseError("CLI config override keys cannot be empty".to_string()));
         }
         // Shared DEV-71 canonicalization: the long-only `--config` flag
         // accepts the same flat and dotted field names as `config set`
@@ -164,12 +138,7 @@ pub fn configure_cli_overrides(pairs: &[(String, String)]) -> Result<(), ConfigE
         if let Some(existing) = normalized.get(&canonical)
             && existing != raw_value.trim()
         {
-            return Err(ConfigError::ParseError(format!(
-                "Conflicting values for config override '{}': '{}' vs '{}'",
-                canonical,
-                existing,
-                raw_value.trim()
-            )));
+            return Err(ConfigError::ParseError(format!("Conflicting values for config override '{}': '{}' vs '{}'", canonical, existing, raw_value.trim())));
         }
         normalized.insert(canonical, raw_value.trim().to_string());
     }
@@ -180,26 +149,15 @@ pub fn configure_cli_overrides(pairs: &[(String, String)]) -> Result<(), ConfigE
         apply_field_to_global_config(&mut overlay, key, value)?;
     }
 
-    let signature = normalized
-        .iter()
-        .map(|(k, v)| format!("{k}={v}"))
-        .collect::<Vec<_>>()
-        .join("|");
+    let signature = normalized.iter().map(|(k, v)| format!("{k}={v}")).collect::<Vec<_>>().join("|");
 
     // Presence-aware port provenance: the normalized map key is the
     // authority (already validated by validate_field_value above), so a
     // `--config server.port=8080` equal to the built-in default stays
     // distinguishable from "not requested".
-    let port_override = normalized
-        .get("server_port")
-        .and_then(|value| value.parse::<u16>().ok());
+    let port_override = normalized.get("server_port").and_then(|value| value.parse::<u16>().ok());
 
-    set_cli_override_layer(Some(CliOverrideLayer {
-        config: overlay,
-        keys: LayerKeys::from_fields(normalized.keys().cloned()),
-        signature,
-        port_override,
-    }));
+    set_cli_override_layer(Some(CliOverrideLayer { config: overlay, keys: LayerKeys::from_fields(normalized.keys().cloned()), signature, port_override }));
 
     Ok(())
 }
@@ -270,25 +228,10 @@ impl ServerPortLayers {
 /// (value overlay) rather than the on-disk file.
 pub(crate) fn server_port_layers(global_file: Option<&Path>) -> ServerPortLayers {
     let snapshot = crate::config::env_overrides::capture_env_override_snapshot();
-    let env = snapshot
-        .report
-        .applied_keys
-        .contains("server_port")
-        .then_some(snapshot.resolved.server_port);
-    let home = crate::config::persistence::home_config_server_port()
-        .ok()
-        .flatten();
-    let global = global_file.and_then(|path| {
-        crate::config::persistence::config_file_server_port(path, "global config")
-            .ok()
-            .flatten()
-    });
-    ServerPortLayers {
-        cli_override: active_cli_port_override(),
-        env,
-        home,
-        global,
-    }
+    let env = snapshot.report.applied_keys.contains("server_port").then_some(snapshot.resolved.server_port);
+    let home = crate::config::persistence::home_config_server_port().ok().flatten();
+    let global = global_file.and_then(|path| crate::config::persistence::config_file_server_port(path, "global config").ok().flatten());
+    ServerPortLayers { cli_override: active_cli_port_override(), env, home, global }
 }
 
 /// Presence-aware server-port correction for a resolved config (server_port
@@ -333,10 +276,7 @@ pub fn preview_base_resolved(global_layer: &GlobalConfig) -> ResolvedConfig {
 /// defaults -> candidate global layer -> home -> env -> candidate project
 /// config -> CLI overrides. Same precedence as [`get_project_config`], pure
 /// with respect to the cache and the filesystem.
-pub fn preview_project_resolved(
-    global_layer: &GlobalConfig,
-    project_config: &ProjectConfig,
-) -> ResolvedConfig {
+pub fn preview_project_resolved(global_layer: &GlobalConfig, project_config: &ProjectConfig) -> ResolvedConfig {
     let mut base_global = GlobalConfig::default();
     merge_global_config(&mut base_global, global_layer.clone());
     let mut resolved = ResolvedConfig::from_global(base_global);
@@ -373,13 +313,7 @@ pub fn validate_effective_done_policy(config: &ResolvedConfig) -> Result<(), Con
     let invalid: Vec<String> = done
         .values
         .iter()
-        .filter(|value| {
-            !config
-                .issue_states
-                .values
-                .iter()
-                .any(|state| state.eq_ignore_case(value.as_str()))
-        })
+        .filter(|value| !config.issue_states.values.iter().any(|state| state.eq_ignore_case(value.as_str())))
         .map(|value| value.as_str().to_string())
         .collect();
     if !invalid.is_empty() {
@@ -414,13 +348,7 @@ pub fn load_and_merge_configs(tasks_dir: Option<&Path>) -> Result<ResolvedConfig
     // candidate pipeline, which loads raw configs and revalidates.
     validate_effective_done_policy(&resolved)?;
     if let Ok(mut guard) = config_cache().write() {
-        guard.insert(
-            key,
-            CachedConfig {
-                resolved: resolved.clone(),
-                fingerprint,
-            },
-        );
+        guard.insert(key, CachedConfig { resolved: resolved.clone(), fingerprint });
     }
     Ok(resolved)
 }
@@ -435,9 +363,7 @@ fn load_merged_global_chain(tasks_dir: Option<&Path>) -> ResolvedConfig {
 
     // 4. Global config (.tasks/config.yml or custom dir) - lowest priority (after defaults)
     let tasks_dir_buf = tasks_dir.map(|p| p.to_path_buf());
-    if let Ok(global_config) =
-        crate::config::persistence::load_global_config(tasks_dir_buf.as_deref())
-    {
+    if let Ok(global_config) = crate::config::persistence::load_global_config(tasks_dir_buf.as_deref()) {
         merge_global_config(&mut config, global_config);
     }
 
@@ -462,11 +388,7 @@ fn load_merged_global_chain(tasks_dir: Option<&Path>) -> ResolvedConfig {
     // value. Every other field keeps the existing merge semantics.
     let global_file = tasks_dir
         .map(crate::utils::paths::global_config_path)
-        .unwrap_or_else(|| {
-            crate::utils::paths::global_config_path(&crate::utils::paths::tasks_root_from(
-                Path::new("."),
-            ))
-        });
+        .unwrap_or_else(|| crate::utils::paths::global_config_path(&crate::utils::paths::tasks_root_from(Path::new("."))));
     apply_server_port_presence(&mut resolved, Some(&global_file));
     resolved
 }
@@ -476,10 +398,7 @@ fn load_merged_global_chain(tasks_dir: Option<&Path>) -> ResolvedConfig {
 /// Precedence: CLI > project > env > home > global > defaults.
 /// Uses the same in-process cache as [`load_and_merge_configs`]; falls back to
 /// the merged base config when the project config cannot be loaded.
-pub fn config_for_project(
-    tasks_dir: &Path,
-    project: Option<&str>,
-) -> Result<ResolvedConfig, ConfigError> {
+pub fn config_for_project(tasks_dir: &Path, project: Option<&str>) -> Result<ResolvedConfig, ConfigError> {
     let base = load_and_merge_configs(Some(tasks_dir))?;
     let Some(prefix) = project.map(str::trim).filter(|p| !p.is_empty()) else {
         return Ok(base);
@@ -498,39 +417,26 @@ pub fn config_for_project(
 /// [`config_for_project`] for writes: a config file that exists but does not
 /// parse is an error instead of being skipped (DEV-265: a typo used to turn
 /// off status/type/priority validation for REST and MCP writes).
-pub fn config_for_project_strict(
-    tasks_dir: &Path,
-    project: Option<&str>,
-) -> Result<ResolvedConfig, ConfigError> {
+pub fn config_for_project_strict(tasks_dir: &Path, project: Option<&str>) -> Result<ResolvedConfig, ConfigError> {
     let check = |result: Result<_, ConfigError>, what: &str| match result {
         Ok(_) | Err(ConfigError::FileNotFound(_)) => Ok(()),
-        Err(ConfigError::ParseError(detail)) => {
-            Err(ConfigError::ParseError(format!("{what}: {detail}")))
-        }
+        Err(ConfigError::ParseError(detail)) => Err(ConfigError::ParseError(format!("{what}: {detail}"))),
         Err(err) => Err(ConfigError::ParseError(format!("{what}: {err}"))),
     };
-    check(
-        crate::config::persistence::load_global_config(Some(tasks_dir)),
-        "Invalid global config (.tasks/config.yml)",
-    )?;
+    check(crate::config::persistence::load_global_config(Some(tasks_dir)), "Invalid global config (.tasks/config.yml)")?;
     if crate::config::persistence::home_config_honored() {
-        check(
-            crate::config::persistence::load_home_config(),
-            "Invalid home config (~/.lotar)",
-        )?;
+        check(crate::config::persistence::load_home_config(), "Invalid home config (~/.lotar)")?;
     }
     if let Some(prefix) = project.map(str::trim).filter(|p| !p.is_empty())
         && crate::utils::paths::project_config_path(tasks_dir, prefix).exists()
     {
-        crate::config::persistence::load_project_config_from_dir(prefix, tasks_dir).map_err(
-            |err| {
-                let detail = match err {
-                    ConfigError::ParseError(detail) => detail,
-                    other => other.to_string(),
-                };
-                ConfigError::ParseError(format!("Invalid project config for {prefix}: {detail}"))
-            },
-        )?;
+        crate::config::persistence::load_project_config_from_dir(prefix, tasks_dir).map_err(|err| {
+            let detail = match err {
+                ConfigError::ParseError(detail) => detail,
+                other => other.to_string(),
+            };
+            ConfigError::ParseError(format!("Invalid project config for {prefix}: {detail}"))
+        })?;
     }
     config_for_project(tasks_dir, project)
 }
@@ -567,19 +473,11 @@ impl LayerKeys {
         if self.0.contains(field) {
             return true;
         }
-        matches!(field, "agent_worktree" | "sprints")
-            && self.0.iter().any(|key| {
-                key.strip_prefix(field)
-                    .is_some_and(|rest| rest.starts_with('_'))
-            })
+        matches!(field, "agent_worktree" | "sprints") && self.0.iter().any(|key| key.strip_prefix(field).is_some_and(|rest| rest.starts_with('_')))
     }
 }
 
-fn collect_layer_keys(
-    value: &serde_yaml_ng::Value,
-    prefix: &str,
-    keys: &mut std::collections::HashSet<String>,
-) {
+fn collect_layer_keys(value: &serde_yaml_ng::Value, prefix: &str, keys: &mut std::collections::HashSet<String>) {
     let Some(map) = value.as_mapping() else {
         return;
     };
@@ -587,11 +485,7 @@ fn collect_layer_keys(
         let Some(key) = key.as_str() else {
             continue;
         };
-        let path = if prefix.is_empty() {
-            key.to_string()
-        } else {
-            format!("{prefix}.{key}")
-        };
+        let path = if prefix.is_empty() { key.to_string() } else { format!("{prefix}.{key}") };
         if let Some(flat) = crate::config::fields::flat_for_alias(&path) {
             keys.insert(flat.to_string());
             continue;
@@ -611,9 +505,7 @@ fn home_layer_keys() -> LayerKeys {
     if !crate::config::persistence::home_config_honored() {
         return LayerKeys::default();
     }
-    dirs::home_dir()
-        .map(|home| LayerKeys::from_file(&home.join(".lotar")))
-        .unwrap_or_default()
+    dirs::home_dir().map(|home| LayerKeys::from_file(&home.join(".lotar"))).unwrap_or_default()
 }
 
 fn env_layer_keys(snapshot: &crate::config::env_overrides::EnvOverrideSnapshot) -> LayerKeys {
@@ -629,11 +521,7 @@ pub fn merge_global_config(base: &mut GlobalConfig, override_config: GlobalConfi
 /// Like [`merge_global_config`], but a field the layer explicitly set
 /// (listed in `keys`) wins even when it equals the built-in default
 /// (DEV-265: `LOTAR_AUTO_SET_REPORTER=true` over a global `false`).
-pub fn merge_global_config_with(
-    base: &mut GlobalConfig,
-    override_config: GlobalConfig,
-    keys: &LayerKeys,
-) {
+pub fn merge_global_config_with(base: &mut GlobalConfig, override_config: GlobalConfig, keys: &LayerKeys) {
     let defaults = GlobalConfig::default();
 
     if keys.has("server_port") || override_config.server_port != defaults.server_port {
@@ -644,9 +532,7 @@ pub fn merge_global_config_with(
     }
 
     // For configurable fields, we do full replacement if they differ
-    if keys.has("issue_states")
-        || override_config.issue_states.values != defaults.issue_states.values
-    {
+    if keys.has("issue_states") || override_config.issue_states.values != defaults.issue_states.values {
         base.issue_states = override_config.issue_states;
     }
     // issue.done_states is presence-based: an explicit override wins even
@@ -654,13 +540,10 @@ pub fn merge_global_config_with(
     if override_config.issue_done_states.is_some() {
         base.issue_done_states = override_config.issue_done_states;
     }
-    if keys.has("issue_types") || override_config.issue_types.values != defaults.issue_types.values
-    {
+    if keys.has("issue_types") || override_config.issue_types.values != defaults.issue_types.values {
         base.issue_types = override_config.issue_types;
     }
-    if keys.has("issue_priorities")
-        || override_config.issue_priorities.values != defaults.issue_priorities.values
-    {
+    if keys.has("issue_priorities") || override_config.issue_priorities.values != defaults.issue_priorities.values {
         base.issue_priorities = override_config.issue_priorities;
     }
     if keys.has("tags") || override_config.tags.values != defaults.tags.values {
@@ -685,94 +568,62 @@ pub fn merge_global_config_with(
     if keys.has("strict_members") || override_config.strict_members != defaults.strict_members {
         base.strict_members = override_config.strict_members;
     }
-    if keys.has("auto_populate_members")
-        || override_config.auto_populate_members != defaults.auto_populate_members
-    {
+    if keys.has("auto_populate_members") || override_config.auto_populate_members != defaults.auto_populate_members {
         base.auto_populate_members = override_config.auto_populate_members;
     }
-    if keys.has("auto_set_reporter")
-        || override_config.auto_set_reporter != defaults.auto_set_reporter
-    {
+    if keys.has("auto_set_reporter") || override_config.auto_set_reporter != defaults.auto_set_reporter {
         base.auto_set_reporter = override_config.auto_set_reporter;
     }
-    if keys.has("auto_reciprocal_relationships")
-        || override_config.auto_reciprocal_relationships != defaults.auto_reciprocal_relationships
-    {
+    if keys.has("auto_reciprocal_relationships") || override_config.auto_reciprocal_relationships != defaults.auto_reciprocal_relationships {
         base.auto_reciprocal_relationships = override_config.auto_reciprocal_relationships;
     }
-    if keys.has("auto_link_mentions")
-        || override_config.auto_link_mentions != defaults.auto_link_mentions
-    {
+    if keys.has("auto_link_mentions") || override_config.auto_link_mentions != defaults.auto_link_mentions {
         base.auto_link_mentions = override_config.auto_link_mentions;
     }
-    if keys.has("auto_assign_on_status")
-        || override_config.auto_assign_on_status != defaults.auto_assign_on_status
-    {
+    if keys.has("auto_assign_on_status") || override_config.auto_assign_on_status != defaults.auto_assign_on_status {
         base.auto_assign_on_status = override_config.auto_assign_on_status;
     }
-    if keys.has("auto_codeowners_assign")
-        || override_config.auto_codeowners_assign != defaults.auto_codeowners_assign
-    {
+    if keys.has("auto_codeowners_assign") || override_config.auto_codeowners_assign != defaults.auto_codeowners_assign {
         base.auto_codeowners_assign = override_config.auto_codeowners_assign;
     }
-    if keys.has("auto_tags_from_path")
-        || override_config.auto_tags_from_path != defaults.auto_tags_from_path
-    {
+    if keys.has("auto_tags_from_path") || override_config.auto_tags_from_path != defaults.auto_tags_from_path {
         base.auto_tags_from_path = override_config.auto_tags_from_path;
     }
-    if keys.has("auto_branch_infer_type")
-        || override_config.auto_branch_infer_type != defaults.auto_branch_infer_type
-    {
+    if keys.has("auto_branch_infer_type") || override_config.auto_branch_infer_type != defaults.auto_branch_infer_type {
         base.auto_branch_infer_type = override_config.auto_branch_infer_type;
     }
-    if keys.has("auto_branch_infer_status")
-        || override_config.auto_branch_infer_status != defaults.auto_branch_infer_status
-    {
+    if keys.has("auto_branch_infer_status") || override_config.auto_branch_infer_status != defaults.auto_branch_infer_status {
         base.auto_branch_infer_status = override_config.auto_branch_infer_status;
     }
-    if keys.has("auto_branch_infer_priority")
-        || override_config.auto_branch_infer_priority != defaults.auto_branch_infer_priority
-    {
+    if keys.has("auto_branch_infer_priority") || override_config.auto_branch_infer_priority != defaults.auto_branch_infer_priority {
         base.auto_branch_infer_priority = override_config.auto_branch_infer_priority;
     }
-    if keys.has("default_priority") || override_config.default_priority != defaults.default_priority
-    {
+    if keys.has("default_priority") || override_config.default_priority != defaults.default_priority {
         base.default_priority = override_config.default_priority;
     }
     if keys.has("default_status") || override_config.default_status != defaults.default_status {
         base.default_status = override_config.default_status;
     }
-    if keys.has("custom_fields")
-        || override_config.custom_fields.values != defaults.custom_fields.values
-    {
+    if keys.has("custom_fields") || override_config.custom_fields.values != defaults.custom_fields.values {
         base.custom_fields = override_config.custom_fields;
     }
 
     if keys.has("attachments_dir") || override_config.attachments_dir != defaults.attachments_dir {
         base.attachments_dir = override_config.attachments_dir;
     }
-    if keys.has("attachments_max_upload_mb")
-        || override_config.attachments_max_upload_mb != defaults.attachments_max_upload_mb
-    {
+    if keys.has("attachments_max_upload_mb") || override_config.attachments_max_upload_mb != defaults.attachments_max_upload_mb {
         base.attachments_max_upload_mb = override_config.attachments_max_upload_mb;
     }
-    if keys.has("sync_reports_dir") || override_config.sync_reports_dir != defaults.sync_reports_dir
-    {
+    if keys.has("sync_reports_dir") || override_config.sync_reports_dir != defaults.sync_reports_dir {
         base.sync_reports_dir = override_config.sync_reports_dir;
     }
-    if keys.has("sync_write_reports")
-        || override_config.sync_write_reports != defaults.sync_write_reports
-    {
+    if keys.has("sync_write_reports") || override_config.sync_write_reports != defaults.sync_write_reports {
         base.sync_write_reports = override_config.sync_write_reports;
     }
-    if keys.has("agent_context_enabled")
-        || override_config.agent_context_enabled != defaults.agent_context_enabled
-    {
+    if keys.has("agent_context_enabled") || override_config.agent_context_enabled != defaults.agent_context_enabled {
         base.agent_context_enabled = override_config.agent_context_enabled;
     }
-    if keys.has("agent_context_extension")
-        || override_config.agent_context_extension != defaults.agent_context_extension
-    {
+    if keys.has("agent_context_extension") || override_config.agent_context_extension != defaults.agent_context_extension {
         base.agent_context_extension = override_config.agent_context_extension;
     }
     if override_config.agent_logs_dir.is_some() {
@@ -802,34 +653,25 @@ pub fn merge_global_config_with(
     if !override_config.agents.is_empty() {
         base.agents.extend(override_config.agents);
     }
-    if keys.has("agent_automation") || override_config.agent_automation != defaults.agent_automation
-    {
+    if keys.has("agent_automation") || override_config.agent_automation != defaults.agent_automation {
         base.agent_automation = override_config.agent_automation;
     }
     if keys.has("agent_worktree") || override_config.agent_worktree != defaults.agent_worktree {
         base.agent_worktree = override_config.agent_worktree;
     }
-    if keys.has("scan_signal_words")
-        || override_config.scan_signal_words != defaults.scan_signal_words
-    {
+    if keys.has("scan_signal_words") || override_config.scan_signal_words != defaults.scan_signal_words {
         base.scan_signal_words = override_config.scan_signal_words;
     }
-    if keys.has("scan_strip_attributes")
-        || override_config.scan_strip_attributes != defaults.scan_strip_attributes
-    {
+    if keys.has("scan_strip_attributes") || override_config.scan_strip_attributes != defaults.scan_strip_attributes {
         base.scan_strip_attributes = override_config.scan_strip_attributes;
     }
     if override_config.scan_ticket_patterns.is_some() {
         base.scan_ticket_patterns = override_config.scan_ticket_patterns;
     }
-    if keys.has("scan_enable_ticket_words")
-        || override_config.scan_enable_ticket_words != defaults.scan_enable_ticket_words
-    {
+    if keys.has("scan_enable_ticket_words") || override_config.scan_enable_ticket_words != defaults.scan_enable_ticket_words {
         base.scan_enable_ticket_words = override_config.scan_enable_ticket_words;
     }
-    if keys.has("scan_enable_mentions")
-        || override_config.scan_enable_mentions != defaults.scan_enable_mentions
-    {
+    if keys.has("scan_enable_mentions") || override_config.scan_enable_mentions != defaults.scan_enable_mentions {
         base.scan_enable_mentions = override_config.scan_enable_mentions;
     }
     if keys.has("sprints") || override_config.sprints != defaults.sprints {
@@ -847,9 +689,7 @@ pub fn merge_global_config_with(
     if keys.has("auto_identity") || override_config.auto_identity != defaults.auto_identity {
         base.auto_identity = override_config.auto_identity;
     }
-    if keys.has("auto_identity_git")
-        || override_config.auto_identity_git != defaults.auto_identity_git
-    {
+    if keys.has("auto_identity_git") || override_config.auto_identity_git != defaults.auto_identity_git {
         base.auto_identity_git = override_config.auto_identity_git;
     }
 
@@ -870,11 +710,7 @@ pub fn overlay_global_into_resolved(resolved: &mut ResolvedConfig, override_conf
 
 /// [`overlay_global_into_resolved`] with explicitly set keys winning by
 /// presence (see [`merge_global_config_with`]).
-pub fn overlay_global_into_resolved_with(
-    resolved: &mut ResolvedConfig,
-    override_config: GlobalConfig,
-    keys: &LayerKeys,
-) {
+pub fn overlay_global_into_resolved_with(resolved: &mut ResolvedConfig, override_config: GlobalConfig, keys: &LayerKeys) {
     let defaults = GlobalConfig::default();
 
     if keys.has("server_port") || override_config.server_port != defaults.server_port {
@@ -884,30 +720,23 @@ pub fn overlay_global_into_resolved_with(
         resolved.default_project = override_config.default_project;
     }
 
-    if keys.has("issue_states")
-        || override_config.issue_states.values != defaults.issue_states.values
-    {
+    if keys.has("issue_states") || override_config.issue_states.values != defaults.issue_states.values {
         resolved.issue_states = override_config.issue_states;
     }
     // Presence-based optional override (see merge_global_config).
     if override_config.issue_done_states.is_some() {
         resolved.issue_done_states = override_config.issue_done_states;
     }
-    if keys.has("issue_types") || override_config.issue_types.values != defaults.issue_types.values
-    {
+    if keys.has("issue_types") || override_config.issue_types.values != defaults.issue_types.values {
         resolved.issue_types = override_config.issue_types;
     }
-    if keys.has("issue_priorities")
-        || override_config.issue_priorities.values != defaults.issue_priorities.values
-    {
+    if keys.has("issue_priorities") || override_config.issue_priorities.values != defaults.issue_priorities.values {
         resolved.issue_priorities = override_config.issue_priorities;
     }
     if keys.has("tags") || override_config.tags.values != defaults.tags.values {
         resolved.tags = override_config.tags;
     }
-    resolved
-        .tag_properties
-        .extend(override_config.tag_properties);
+    resolved.tag_properties.extend(override_config.tag_properties);
 
     if override_config.default_assignee.is_some() {
         resolved.default_assignee = override_config.default_assignee;
@@ -924,94 +753,62 @@ pub fn overlay_global_into_resolved_with(
     if keys.has("strict_members") || override_config.strict_members != defaults.strict_members {
         resolved.strict_members = override_config.strict_members;
     }
-    if keys.has("auto_populate_members")
-        || override_config.auto_populate_members != defaults.auto_populate_members
-    {
+    if keys.has("auto_populate_members") || override_config.auto_populate_members != defaults.auto_populate_members {
         resolved.auto_populate_members = override_config.auto_populate_members;
     }
-    if keys.has("auto_set_reporter")
-        || override_config.auto_set_reporter != defaults.auto_set_reporter
-    {
+    if keys.has("auto_set_reporter") || override_config.auto_set_reporter != defaults.auto_set_reporter {
         resolved.auto_set_reporter = override_config.auto_set_reporter;
     }
-    if keys.has("auto_reciprocal_relationships")
-        || override_config.auto_reciprocal_relationships != defaults.auto_reciprocal_relationships
-    {
+    if keys.has("auto_reciprocal_relationships") || override_config.auto_reciprocal_relationships != defaults.auto_reciprocal_relationships {
         resolved.auto_reciprocal_relationships = override_config.auto_reciprocal_relationships;
     }
-    if keys.has("auto_link_mentions")
-        || override_config.auto_link_mentions != defaults.auto_link_mentions
-    {
+    if keys.has("auto_link_mentions") || override_config.auto_link_mentions != defaults.auto_link_mentions {
         resolved.auto_link_mentions = override_config.auto_link_mentions;
     }
-    if keys.has("auto_assign_on_status")
-        || override_config.auto_assign_on_status != defaults.auto_assign_on_status
-    {
+    if keys.has("auto_assign_on_status") || override_config.auto_assign_on_status != defaults.auto_assign_on_status {
         resolved.auto_assign_on_status = override_config.auto_assign_on_status;
     }
-    if keys.has("auto_codeowners_assign")
-        || override_config.auto_codeowners_assign != defaults.auto_codeowners_assign
-    {
+    if keys.has("auto_codeowners_assign") || override_config.auto_codeowners_assign != defaults.auto_codeowners_assign {
         resolved.auto_codeowners_assign = override_config.auto_codeowners_assign;
     }
-    if keys.has("auto_tags_from_path")
-        || override_config.auto_tags_from_path != defaults.auto_tags_from_path
-    {
+    if keys.has("auto_tags_from_path") || override_config.auto_tags_from_path != defaults.auto_tags_from_path {
         resolved.auto_tags_from_path = override_config.auto_tags_from_path;
     }
-    if keys.has("auto_branch_infer_type")
-        || override_config.auto_branch_infer_type != defaults.auto_branch_infer_type
-    {
+    if keys.has("auto_branch_infer_type") || override_config.auto_branch_infer_type != defaults.auto_branch_infer_type {
         resolved.auto_branch_infer_type = override_config.auto_branch_infer_type;
     }
-    if keys.has("auto_branch_infer_status")
-        || override_config.auto_branch_infer_status != defaults.auto_branch_infer_status
-    {
+    if keys.has("auto_branch_infer_status") || override_config.auto_branch_infer_status != defaults.auto_branch_infer_status {
         resolved.auto_branch_infer_status = override_config.auto_branch_infer_status;
     }
-    if keys.has("auto_branch_infer_priority")
-        || override_config.auto_branch_infer_priority != defaults.auto_branch_infer_priority
-    {
+    if keys.has("auto_branch_infer_priority") || override_config.auto_branch_infer_priority != defaults.auto_branch_infer_priority {
         resolved.auto_branch_infer_priority = override_config.auto_branch_infer_priority;
     }
-    if keys.has("default_priority") || override_config.default_priority != defaults.default_priority
-    {
+    if keys.has("default_priority") || override_config.default_priority != defaults.default_priority {
         resolved.default_priority = override_config.default_priority;
     }
     if keys.has("default_status") || override_config.default_status != defaults.default_status {
         resolved.default_status = override_config.default_status;
     }
-    if keys.has("custom_fields")
-        || override_config.custom_fields.values != defaults.custom_fields.values
-    {
+    if keys.has("custom_fields") || override_config.custom_fields.values != defaults.custom_fields.values {
         resolved.custom_fields = override_config.custom_fields;
     }
 
     if keys.has("attachments_dir") || override_config.attachments_dir != defaults.attachments_dir {
         resolved.attachments_dir = override_config.attachments_dir;
     }
-    if keys.has("attachments_max_upload_mb")
-        || override_config.attachments_max_upload_mb != defaults.attachments_max_upload_mb
-    {
+    if keys.has("attachments_max_upload_mb") || override_config.attachments_max_upload_mb != defaults.attachments_max_upload_mb {
         resolved.attachments_max_upload_mb = override_config.attachments_max_upload_mb;
     }
-    if keys.has("sync_reports_dir") || override_config.sync_reports_dir != defaults.sync_reports_dir
-    {
+    if keys.has("sync_reports_dir") || override_config.sync_reports_dir != defaults.sync_reports_dir {
         resolved.sync_reports_dir = override_config.sync_reports_dir;
     }
-    if keys.has("sync_write_reports")
-        || override_config.sync_write_reports != defaults.sync_write_reports
-    {
+    if keys.has("sync_write_reports") || override_config.sync_write_reports != defaults.sync_write_reports {
         resolved.sync_write_reports = override_config.sync_write_reports;
     }
-    if keys.has("agent_context_enabled")
-        || override_config.agent_context_enabled != defaults.agent_context_enabled
-    {
+    if keys.has("agent_context_enabled") || override_config.agent_context_enabled != defaults.agent_context_enabled {
         resolved.agent_context_enabled = override_config.agent_context_enabled;
     }
-    if keys.has("agent_context_extension")
-        || override_config.agent_context_extension != defaults.agent_context_extension
-    {
+    if keys.has("agent_context_extension") || override_config.agent_context_extension != defaults.agent_context_extension {
         resolved.agent_context_extension = override_config.agent_context_extension;
     }
     if override_config.agent_logs_dir.is_some() {
@@ -1039,37 +836,24 @@ pub fn overlay_global_into_resolved_with(
         resolved.agent_instructions = override_config.agent_instructions;
     }
     if !override_config.agents.is_empty() {
-        resolved.agent_profiles.extend(
-            override_config
-                .agents
-                .into_iter()
-                .map(|(k, v)| (k, v.to_detail())),
-        );
+        resolved.agent_profiles.extend(override_config.agents.into_iter().map(|(k, v)| (k, v.to_detail())));
     }
     if keys.has("agent_worktree") || override_config.agent_worktree != defaults.agent_worktree {
         resolved.agent_worktree = override_config.agent_worktree;
     }
-    if keys.has("scan_signal_words")
-        || override_config.scan_signal_words != defaults.scan_signal_words
-    {
+    if keys.has("scan_signal_words") || override_config.scan_signal_words != defaults.scan_signal_words {
         resolved.scan_signal_words = override_config.scan_signal_words;
     }
-    if keys.has("scan_strip_attributes")
-        || override_config.scan_strip_attributes != defaults.scan_strip_attributes
-    {
+    if keys.has("scan_strip_attributes") || override_config.scan_strip_attributes != defaults.scan_strip_attributes {
         resolved.scan_strip_attributes = override_config.scan_strip_attributes;
     }
     if override_config.scan_ticket_patterns.is_some() {
         resolved.scan_ticket_patterns = override_config.scan_ticket_patterns;
     }
-    if keys.has("scan_enable_ticket_words")
-        || override_config.scan_enable_ticket_words != defaults.scan_enable_ticket_words
-    {
+    if keys.has("scan_enable_ticket_words") || override_config.scan_enable_ticket_words != defaults.scan_enable_ticket_words {
         resolved.scan_enable_ticket_words = override_config.scan_enable_ticket_words;
     }
-    if keys.has("scan_enable_mentions")
-        || override_config.scan_enable_mentions != defaults.scan_enable_mentions
-    {
+    if keys.has("scan_enable_mentions") || override_config.scan_enable_mentions != defaults.scan_enable_mentions {
         resolved.scan_enable_mentions = override_config.scan_enable_mentions;
     }
     if keys.has("sprints") || override_config.sprints != defaults.sprints {
@@ -1088,9 +872,7 @@ pub fn overlay_global_into_resolved_with(
     if keys.has("auto_identity") || override_config.auto_identity != defaults.auto_identity {
         resolved.auto_identity = override_config.auto_identity;
     }
-    if keys.has("auto_identity_git")
-        || override_config.auto_identity_git != defaults.auto_identity_git
-    {
+    if keys.has("auto_identity_git") || override_config.auto_identity_git != defaults.auto_identity_git {
         resolved.auto_identity_git = override_config.auto_identity_git;
     }
 
@@ -1100,11 +882,7 @@ pub fn overlay_global_into_resolved_with(
 }
 
 /// Get project-specific configuration by merging with global config
-pub fn get_project_config(
-    _resolved_config: &ResolvedConfig,
-    project_name: &str,
-    tasks_dir: &std::path::Path,
-) -> Result<ResolvedConfig, ConfigError> {
+pub fn get_project_config(_resolved_config: &ResolvedConfig, project_name: &str, tasks_dir: &std::path::Path) -> Result<ResolvedConfig, ConfigError> {
     // Fast path: per-project entries share the base cache map (keyed with a
     // PROJ suffix) so they are invalidated together with the base entries.
     // Only real project directories are cached — the project name arrives from
@@ -1148,8 +926,7 @@ pub fn get_project_config(
     overlay_global_into_resolved_with(&mut resolved, env_snapshot.global.clone(), &env_keys);
 
     // 4) Apply project-specific config last so it overrides env/home/global
-    let project_config =
-        crate::config::persistence::load_project_config_from_dir(project_name, tasks_dir)?;
+    let project_config = crate::config::persistence::load_project_config_from_dir(project_name, tasks_dir)?;
     apply_project_config_overrides(&mut resolved, project_config);
     apply_cli_overrides(&mut resolved);
 
@@ -1163,13 +940,7 @@ pub fn get_project_config(
         if guard.len() >= 256 {
             guard.clear();
         }
-        guard.insert(
-            cache_key,
-            CachedConfig {
-                resolved: resolved.clone(),
-                fingerprint,
-            },
-        );
+        guard.insert(cache_key, CachedConfig { resolved: resolved.clone(), fingerprint });
     }
     Ok(resolved)
 }
@@ -1209,11 +980,8 @@ fn apply_project_config_overrides(resolved: &mut ResolvedConfig, project_config:
         resolved.members = members;
     }
     // Never inherit review authority, and fail closed for invalid programmatic overrides.
-    resolved.review_reviewers = project_config
-        .review_reviewers
-        .as_deref()
-        .and_then(|values| crate::config::types::normalize_review_reviewers(values).ok())
-        .unwrap_or_default();
+    resolved.review_reviewers =
+        project_config.review_reviewers.as_deref().and_then(|values| crate::config::types::normalize_review_reviewers(values).ok()).unwrap_or_default();
     if let Some(strict_members) = project_config.strict_members {
         resolved.strict_members = strict_members;
     }
@@ -1325,14 +1093,12 @@ fn apply_project_config_overrides(resolved: &mut ResolvedConfig, project_config:
     if let Some(m) = project_config.branch_status_aliases
         && !m.is_empty()
     {
-        resolved.branch_status_aliases =
-            m.into_iter().map(|(k, v)| (k.to_lowercase(), v)).collect();
+        resolved.branch_status_aliases = m.into_iter().map(|(k, v)| (k.to_lowercase(), v)).collect();
     }
     if let Some(m) = project_config.branch_priority_aliases
         && !m.is_empty()
     {
-        resolved.branch_priority_aliases =
-            m.into_iter().map(|(k, v)| (k.to_lowercase(), v)).collect();
+        resolved.branch_priority_aliases = m.into_iter().map(|(k, v)| (k.to_lowercase(), v)).collect();
     }
     if !project_config.remotes.is_empty() {
         resolved.remotes.extend(project_config.remotes);
@@ -1340,10 +1106,7 @@ fn apply_project_config_overrides(resolved: &mut ResolvedConfig, project_config:
     // Smart toggles for branch/codeowners remain global/home/env scoped for now.
 }
 
-fn apply_agent_worktree_override(
-    target: &mut crate::config::types::AgentWorktreeConfig,
-    override_config: crate::config::types::AgentWorktreeConfigOverride,
-) {
+fn apply_agent_worktree_override(target: &mut crate::config::types::AgentWorktreeConfig, override_config: crate::config::types::AgentWorktreeConfigOverride) {
     if let Some(enabled) = override_config.enabled {
         target.enabled = enabled;
     }
@@ -1432,11 +1195,7 @@ impl ResolvedConfig {
             agent_context_extension: global.agent_context_extension,
             agent_logs_dir: global.agent_logs_dir,
             agent_instructions: global.agent_instructions,
-            agent_profiles: global
-                .agents
-                .into_iter()
-                .map(|(k, v)| (k, v.to_detail()))
-                .collect(),
+            agent_profiles: global.agents.into_iter().map(|(k, v)| (k, v.to_detail())).collect(),
             agent_worktree: global.agent_worktree,
             remotes: global.remotes,
             ui: crate::config::types::UiSettings {

@@ -10,11 +10,7 @@ fn run_git(repo: &std::path::Path, args: &[&str], envs: &[(&str, &str)]) {
     }
     let out = cmd.output().expect("failed to run git");
     if !out.status.success() {
-        panic!(
-            "git {:?} failed: {}",
-            args,
-            String::from_utf8_lossy(&out.stderr)
-        );
+        panic!("git {:?} failed: {}", args, String::from_utf8_lossy(&out.stderr));
     }
 }
 
@@ -32,13 +28,7 @@ fn write_file(root: &std::path::Path, rel: &str, content: &str) {
     std::fs::write(&path, content).unwrap();
 }
 
-fn add_and_commit(
-    repo: &std::path::Path,
-    rel: &str,
-    author: (&str, &str),
-    date_rfc3339: &str,
-    msg: &str,
-) {
+fn add_and_commit(repo: &std::path::Path, rel: &str, author: (&str, &str), date_rfc3339: &str, msg: &str) {
     run_git(repo, &["add", rel], &[]);
     let envs = [
         ("GIT_AUTHOR_NAME", author.0),
@@ -65,38 +55,13 @@ mod git_required {
         init_repo(&temp);
 
         write_file(root, ".tasks/TEST/config.yml", "project_name: TEST\n");
-        write_file(
-            root,
-            ".tasks/TEST/1.yml",
-            "title: One\nstatus: TODO\nmodified: 2025-08-01T10:00:00Z\n",
-        );
-        add_and_commit(
-            root,
-            ".tasks/TEST/1.yml",
-            ("A", "a@example.com"),
-            "2025-08-01T10:00:00Z",
-            "add 1",
-        );
-        write_file(
-            root,
-            ".tasks/TEST/1.yml",
-            "title: One2\nstatus: IN_PROGRESS\nmodified: 2025-08-02T09:00:00Z\n",
-        );
-        add_and_commit(
-            root,
-            ".tasks/TEST/1.yml",
-            ("B", "b@example.com"),
-            "2025-08-02T09:00:00Z",
-            "edit 1",
-        );
+        write_file(root, ".tasks/TEST/1.yml", "title: One\nstatus: TODO\nmodified: 2025-08-01T10:00:00Z\n");
+        add_and_commit(root, ".tasks/TEST/1.yml", ("A", "a@example.com"), "2025-08-01T10:00:00Z", "add 1");
+        write_file(root, ".tasks/TEST/1.yml", "title: One2\nstatus: IN_PROGRESS\nmodified: 2025-08-02T09:00:00Z\n");
+        add_and_commit(root, ".tasks/TEST/1.yml", ("B", "b@example.com"), "2025-08-02T09:00:00Z", "edit 1");
 
         // History JSON
-        let out = crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(root)
-            .args(["--format", "json", "task", "history", "TEST-1", "-L", "5"])
-            .output()
-            .unwrap();
+        let out = crate::common::lotar_cmd().unwrap().current_dir(root).args(["--format", "json", "task", "history", "TEST-1", "-L", "5"]).output().unwrap();
         assert!(out.status.success());
         let v: Value = serde_json::from_slice(&out.stdout).unwrap();
         assert_eq!(v["status"], "ok");
@@ -104,12 +69,7 @@ mod git_required {
         assert!(items.len() >= 2);
 
         // Diff JSON (latest)
-        let out = crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(root)
-            .args(["--format", "json", "task", "diff", "TEST-1"])
-            .output()
-            .unwrap();
+        let out = crate::common::lotar_cmd().unwrap().current_dir(root).args(["--format", "json", "task", "diff", "TEST-1"]).output().unwrap();
         assert!(out.status.success());
         let v: Value = serde_json::from_slice(&out.stdout).unwrap();
         assert!(v["patch"].as_str().unwrap().contains("diff"));
@@ -117,12 +77,7 @@ mod git_required {
         // At JSON (first commit)
         // Extract last item commit (oldest) from history
         let first_commit = items.last().unwrap()["commit"].as_str().unwrap();
-        let out = crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(root)
-            .args(["--format", "json", "task", "at", "TEST-1", first_commit])
-            .output()
-            .unwrap();
+        let out = crate::common::lotar_cmd().unwrap().current_dir(root).args(["--format", "json", "task", "at", "TEST-1", first_commit]).output().unwrap();
         assert!(out.status.success());
         let v: Value = serde_json::from_slice(&out.stdout).unwrap();
         assert!(v["content"].as_str().unwrap().contains("title: One"));
@@ -137,23 +92,10 @@ mod git_required {
         let root = temp.path();
         init_repo(&temp);
         write_file(root, ".tasks/TEST/config.yml", "project_name: TEST\n");
-        write_file(
-            root,
-            ".tasks/TEST/1.yml",
-            "title: One\nstatus: TODO\nmodified: 2025-08-01T10:00:00Z\n",
-        );
+        write_file(root, ".tasks/TEST/1.yml", "title: One\nstatus: TODO\nmodified: 2025-08-01T10:00:00Z\n");
 
-        let out = crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(root)
-            .args(["--format", "json", "task", "history", "TEST-1"])
-            .output()
-            .unwrap();
-        assert!(
-            out.status.success(),
-            "{}",
-            String::from_utf8_lossy(&out.stderr)
-        );
+        let out = crate::common::lotar_cmd().unwrap().current_dir(root).args(["--format", "json", "task", "history", "TEST-1"]).output().unwrap();
+        assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
         let v: Value = serde_json::from_slice(&out.stdout).unwrap();
         assert_eq!(v["status"], "ok");
         assert_eq!(v["items"].as_array().unwrap().len(), 0);
@@ -181,13 +123,7 @@ mod symlinked_workspace {
             init_repo(&temp);
             write_file(&repo, ".tasks/TEST/config.yml", "project_name: TEST\n");
             write_file(&repo, ".tasks/TEST/1.yml", "title: One\nstatus: TODO\n");
-            add_and_commit(
-                &repo,
-                ".tasks/TEST/1.yml",
-                ("A", "a@example.com"),
-                "2025-08-01T10:00:00Z",
-                "add 1",
-            );
+            add_and_commit(&repo, ".tasks/TEST/1.yml", ("A", "a@example.com"), "2025-08-01T10:00:00Z", "add 1");
 
             // Reach the same workspace through a symlink, as with /tmp on macOS.
             let link_parent = crate::common::temp_dir();
@@ -202,18 +138,9 @@ mod symlinked_workspace {
                 .args(["--format", "json", "task", "history", "TEST-1"])
                 .output()
                 .unwrap();
-            assert!(
-                cli.status.success(),
-                "CLI history failed: {}",
-                String::from_utf8_lossy(&cli.stderr)
-            );
+            assert!(cli.status.success(), "CLI history failed: {}", String::from_utf8_lossy(&cli.stderr));
             let cli_json: Value = serde_json::from_slice(&cli.stdout).unwrap();
-            let cli_commits: Vec<String> = cli_json["items"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .map(|item| item["commit"].as_str().unwrap().to_string())
-                .collect();
+            let cli_commits: Vec<String> = cli_json["items"].as_array().unwrap().iter().map(|item| item["commit"].as_str().unwrap().to_string()).collect();
             assert_eq!(cli_commits.len(), 1, "CLI output: {cli_json}");
 
             // The server derives the repo root from its (canonical) working
@@ -226,23 +153,13 @@ mod symlinked_workspace {
             lotar::routes::initialize(&mut api);
             let mut query = HashMap::new();
             query.insert("id".to_string(), "TEST-1".to_string());
-            let resp = api.handle_request(&HttpRequest {
-                method: "GET".into(),
-                path: "/api/tasks/history".into(),
-                query,
-                headers: HashMap::new(),
-                body: Vec::new(),
-            });
+            let resp =
+                api.handle_request(&HttpRequest { method: "GET".into(), path: "/api/tasks/history".into(), query, headers: HashMap::new(), body: Vec::new() });
             std::env::set_current_dir(prev_cwd).unwrap();
 
             let body: Value = serde_json::from_slice(&resp.body).unwrap();
             assert_eq!(resp.status, 200, "REST history failed: {body}");
-            let rest_commits: Vec<String> = body["data"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .map(|item| item["commit"].as_str().unwrap().to_string())
-                .collect();
+            let rest_commits: Vec<String> = body["data"].as_array().unwrap().iter().map(|item| item["commit"].as_str().unwrap().to_string()).collect();
             assert_eq!(rest_commits, cli_commits);
         }
     }

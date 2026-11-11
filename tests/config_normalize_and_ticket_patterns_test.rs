@@ -85,12 +85,7 @@ issue_priorities: [Low, Medium]
     // Run validate --global and expect failure due to invalid regex, with a warning for overlap
     run_lotar(tmp.path(), &["config", "validate", "--global"]) // errors cause non-zero in our handler
         .failure()
-        .stdout(
-            predicate::str::contains("Invalid regex").and(
-                predicate::str::contains("overlap")
-                    .or(predicate::str::contains("Multiple patterns match")),
-            ),
-        );
+        .stdout(predicate::str::contains("Invalid regex").and(predicate::str::contains("overlap").or(predicate::str::contains("Multiple patterns match"))));
 }
 
 #[test]
@@ -100,11 +95,7 @@ fn validation_reports_invalid_ticket_patterns_project() {
     fs::create_dir_all(&tasks).unwrap();
 
     // Create minimal valid global to appease defaults
-    fs::write(
-        tasks.join("config.yml"),
-        "issue_states: [Todo]\nissue_types: [Feature]\nissue_priorities: [Low, Medium]\n",
-    )
-    .unwrap();
+    fs::write(tasks.join("config.yml"), "issue_states: [Todo]\nissue_types: [Feature]\nissue_priorities: [Low, Medium]\n").unwrap();
 
     // Project config
     let proj = tasks.join("DEMO");

@@ -25,12 +25,7 @@ mod crud_operations {
 
         // Initialize project
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("config")
-            .arg("init")
-            .arg("--project=CrudTest")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("config").arg("init").arg("--project=CrudTest").assert().success();
 
         // Create a task using modern syntax
         let mut cmd = crate::common::lotar_cmd().unwrap();
@@ -46,12 +41,7 @@ mod crud_operations {
 
         // Verify task exists
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("list")
-            .arg("--project=CrudTest")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("Test task creation"));
+        cmd.current_dir(temp_dir).arg("list").arg("--project=CrudTest").assert().success().stdout(predicate::str::contains("Test task creation"));
     }
 
     #[test]
@@ -61,12 +51,7 @@ mod crud_operations {
 
         // Initialize project and create task
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("config")
-            .arg("init")
-            .arg("--project=RetrievalTest")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("config").arg("init").arg("--project=RetrievalTest").assert().success();
 
         let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
@@ -96,12 +81,7 @@ mod crud_operations {
 
         // Initialize project
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("config")
-            .arg("init")
-            .arg("--project=UpdateTest")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("config").arg("init").arg("--project=UpdateTest").assert().success();
 
         // Create a task
         let mut cmd = crate::common::lotar_cmd().unwrap();
@@ -116,22 +96,11 @@ mod crud_operations {
 
         // Update task status (task ID should be UPDA-1 based on project prefix)
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("status")
-            .arg("UPDA-1")
-            .arg("in_progress")
-            .arg("--project=UpdateTest")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("status").arg("UPDA-1").arg("in_progress").arg("--project=UpdateTest").assert().success();
 
         // Verify update
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("list")
-            .arg("--project=UpdateTest")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("[InProgress]"));
+        cmd.current_dir(temp_dir).arg("list").arg("--project=UpdateTest").assert().success().stdout(predicate::str::contains("[InProgress]"));
     }
 
     #[test]
@@ -141,39 +110,18 @@ mod crud_operations {
 
         // Initialize project and create task
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("config")
-            .arg("init")
-            .arg("--project=CompleteTest")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("config").arg("init").arg("--project=CompleteTest").assert().success();
 
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("add")
-            .arg("Task to complete")
-            .arg("--project=CompleteTest")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("add").arg("Task to complete").arg("--project=CompleteTest").assert().success();
 
         // Mark task as completed (task ID should be COMP-1 based on project prefix)
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("status")
-            .arg("COMP-1")
-            .arg("done")
-            .arg("--project=CompleteTest")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("status").arg("COMP-1").arg("done").arg("--project=CompleteTest").assert().success();
 
         // Verify task is marked as complete
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("list")
-            .arg("--project=CompleteTest")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("[Done]"));
+        cmd.current_dir(temp_dir).arg("list").arg("--project=CompleteTest").assert().success().stdout(predicate::str::contains("[Done]"));
     }
 }
 
@@ -191,37 +139,17 @@ mod multi_project {
 
         // Initialize two projects with distinct names to avoid conflicts
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("config")
-            .arg("init")
-            .arg("--project=Alpha")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("config").arg("init").arg("--project=Alpha").assert().success();
 
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("config")
-            .arg("init")
-            .arg("--project=Beta")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("config").arg("init").arg("--project=Beta").assert().success();
 
         // Add tasks to each project
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("add")
-            .arg("Task in Alpha")
-            .arg("--project=Alpha")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("add").arg("Task in Alpha").arg("--project=Alpha").assert().success();
 
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("add")
-            .arg("Task in Beta")
-            .arg("--project=Beta")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("add").arg("Task in Beta").arg("--project=Beta").assert().success();
 
         // Verify project isolation
         let mut cmd = crate::common::lotar_cmd().unwrap();
@@ -250,48 +178,23 @@ mod multi_project {
 
         // Initialize projects with completely distinct names
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("config")
-            .arg("init")
-            .arg("--project=Gamma")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("config").arg("init").arg("--project=Gamma").assert().success();
 
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("config")
-            .arg("init")
-            .arg("--project=Delta")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("config").arg("init").arg("--project=Delta").assert().success();
 
         // Add tasks to both projects
         for i in 1..=3 {
             let mut cmd = crate::common::lotar_cmd().unwrap();
-            cmd.current_dir(temp_dir)
-                .arg("add")
-                .arg(format!("Gamma Task {i}"))
-                .arg("--project=Gamma")
-                .assert()
-                .success();
+            cmd.current_dir(temp_dir).arg("add").arg(format!("Gamma Task {i}")).arg("--project=Gamma").assert().success();
 
             let mut cmd = crate::common::lotar_cmd().unwrap();
-            cmd.current_dir(temp_dir)
-                .arg("add")
-                .arg(format!("Delta Task {i}"))
-                .arg("--project=Delta")
-                .assert()
-                .success();
+            cmd.current_dir(temp_dir).arg("add").arg(format!("Delta Task {i}")).arg("--project=Delta").assert().success();
         }
 
         // List all tasks across projects
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("list")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("Gamma Task"))
-            .stdout(predicate::str::contains("Delta Task"));
+        cmd.current_dir(temp_dir).arg("list").assert().success().stdout(predicate::str::contains("Gamma Task")).stdout(predicate::str::contains("Delta Task"));
 
         // Verify individual project listings
         let mut cmd = crate::common::lotar_cmd().unwrap();
@@ -330,12 +233,7 @@ mod validation_and_serialization {
 
         // Initialize project
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("config")
-            .arg("init")
-            .arg("--project=ValidationTest")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("config").arg("init").arg("--project=ValidationTest").assert().success();
 
         // Test valid task creation
         let mut cmd = crate::common::lotar_cmd().unwrap();
@@ -376,12 +274,7 @@ mod validation_and_serialization {
 
         // Initialize project
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("config")
-            .arg("init")
-            .arg("--project=SerializationTest")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("config").arg("init").arg("--project=SerializationTest").assert().success();
 
         // Create task with complex data
         let mut cmd = crate::common::lotar_cmd().unwrap();

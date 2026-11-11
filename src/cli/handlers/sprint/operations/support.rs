@@ -17,27 +17,19 @@ pub(crate) struct SprintRecordsContext {
     pub(crate) records: Vec<SprintRecord>,
 }
 
-pub(crate) fn resolve_sprint_records_context(
-    tasks_root: &Path,
-    action_label: &str,
-) -> Result<SprintRecordsContext, String> {
+pub(crate) fn resolve_sprint_records_context(tasks_root: &Path, action_label: &str) -> Result<SprintRecordsContext, String> {
     let missing_message = format!("No sprints found. Create one before {}.", action_label);
 
     let storage = Storage::try_open(tasks_root).ok_or_else(|| missing_message.clone())?;
 
-    let resolved_config = crate::config::resolution::load_and_merge_configs(Some(tasks_root))
-        .map_err(|err| err.to_string())?;
+    let resolved_config = crate::config::resolution::load_and_merge_configs(Some(tasks_root)).map_err(|err| err.to_string())?;
 
     let records = SprintService::list(&storage).map_err(|err| err.to_string())?;
     if records.is_empty() {
         return Err(missing_message);
     }
 
-    Ok(SprintRecordsContext {
-        storage,
-        resolved_config,
-        records,
-    })
+    Ok(SprintRecordsContext { storage, resolved_config, records })
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -48,10 +40,7 @@ pub(super) enum SprintOperationKind {
     Close,
 }
 
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "the caller hands this value over and does not use it afterwards"
-)]
+#[expect(clippy::needless_pass_by_value, reason = "the caller hands this value over and does not use it afterwards")]
 pub(super) fn render_operation_response(
     kind: SprintOperationKind,
     record: SprintRecord,
@@ -64,16 +53,8 @@ pub(super) fn render_operation_response(
     let lifecycle = sprint_status::derive_status(&record.sprint, Utc::now());
     let summary = SprintSummary::from_record(&record, &lifecycle);
     let detail = SprintDetail::from_record(&record, &summary, &lifecycle);
-    let actual_started_at = record
-        .sprint
-        .actual
-        .as_ref()
-        .and_then(|actual| actual.started_at.clone());
-    let mut canonical_warnings = if warnings_enabled {
-        warnings
-    } else {
-        Vec::new()
-    };
+    let actual_started_at = record.sprint.actual.as_ref().and_then(|actual| actual.started_at.clone());
+    let mut canonical_warnings = if warnings_enabled { warnings } else { Vec::new() };
 
     match renderer.format {
         OutputFormat::Json => {
@@ -87,13 +68,7 @@ pub(super) fn render_operation_response(
                 },
                 sprint: detail,
                 applied_defaults: applied_defaults.clone(),
-                warnings: canonical_warnings
-                    .iter()
-                    .map(|warning| SprintWarningPayload {
-                        code: warning.code(),
-                        message: warning.message(),
-                    })
-                    .collect(),
+                warnings: canonical_warnings.iter().map(|warning| SprintWarningPayload { code: warning.code(), message: warning.message() }).collect(),
             };
             renderer.emit_json(&payload);
         }
@@ -109,11 +84,7 @@ pub(super) fn render_operation_response(
                 "{} sprint #{}{}.",
                 verb,
                 record.id,
-                summary
-                    .label
-                    .as_ref()
-                    .map(|label| format!(" ({})", label))
-                    .unwrap_or_default()
+                summary.label.as_ref().map(|label| format!(" ({})", label)).unwrap_or_default()
             ));
 
             if !applied_defaults.is_empty() {
@@ -143,11 +114,7 @@ pub(super) fn render_operation_response(
                 renderer.emit_info(format_args!("Started at: {}", started_at));
             }
             if matches!(kind, SprintOperationKind::Close)
-                && let Some(closed_at) = record
-                    .sprint
-                    .actual
-                    .as_ref()
-                    .and_then(|actual| actual.closed_at.clone())
+                && let Some(closed_at) = record.sprint.actual.as_ref().and_then(|actual| actual.closed_at.clone())
             {
                 renderer.emit_info(format_args!("Closed at: {}", closed_at));
             }

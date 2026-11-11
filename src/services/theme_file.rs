@@ -27,20 +27,12 @@ pub fn validate_path(value: &str) -> Result<(), String> {
     }
     let path = Path::new(value);
     if path.is_absolute() || value.starts_with('~') {
-        return Err(format!(
-            "'{value}' must be a path relative to the repository (for example assets/lotar-theme.css)"
-        ));
+        return Err(format!("'{value}' must be a path relative to the repository (for example assets/lotar-theme.css)"));
     }
-    if path
-        .components()
-        .any(|component| !matches!(component, Component::Normal(_) | Component::CurDir))
-    {
+    if path.components().any(|component| !matches!(component, Component::Normal(_) | Component::CurDir)) {
         return Err(format!("'{value}' must stay inside the repository"));
     }
-    let is_css = path
-        .extension()
-        .and_then(|ext| ext.to_str())
-        .is_some_and(|ext| ext.eq_ignore_ascii_case("css"));
+    let is_css = path.extension().and_then(|ext| ext.to_str()).is_some_and(|ext| ext.eq_ignore_ascii_case("css"));
     if !is_css {
         return Err(format!("'{value}' is not a CSS file (expected .css)"));
     }
@@ -111,20 +103,14 @@ fn blocks(css: &str) -> Vec<(String, String)> {
                 }
                 depth -= 1;
                 if depth == 0 {
-                    out.push((
-                        std::mem::take(&mut prelude).trim().to_string(),
-                        std::mem::take(&mut body),
-                    ));
+                    out.push((std::mem::take(&mut prelude).trim().to_string(), std::mem::take(&mut body)));
                 } else {
                     body.push(c);
                 }
             }
             // A statement like `@import …;` outside any block.
             ';' if depth == 0 => {
-                out.push((
-                    std::mem::take(&mut prelude).trim().to_string(),
-                    String::new(),
-                ));
+                out.push((std::mem::take(&mut prelude).trim().to_string(), String::new()));
             }
             _ => {
                 if depth > 0 {
@@ -159,39 +145,20 @@ fn declarations(body: &str) -> Vec<String> {
         }
     }
     out.push(current);
-    out.into_iter()
-        .map(|decl| decl.trim().to_string())
-        .filter(|decl| !decl.is_empty())
-        .collect()
+    out.into_iter().map(|decl| decl.trim().to_string()).filter(|decl| !decl.is_empty()).collect()
 }
 
 fn safe_declaration(decl: &str) -> Option<(String, String)> {
     let (name, value) = decl.split_once(':')?;
     let name = name.trim();
     let value = value.trim().trim_end_matches("!important").trim();
-    let name_ok = name.len() > 2
-        && name.len() <= 64
-        && name.starts_with("--")
-        && name[2..]
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+    let name_ok = name.len() > 2 && name.len() <= 64 && name.starts_with("--") && name[2..].chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
     if !name_ok || value.is_empty() || value.chars().count() > MAX_VALUE_CHARS {
         return None;
     }
     let lower = value.to_ascii_lowercase();
-    let forbidden = [
-        "url(",
-        "image(",
-        "image-set(",
-        "element(",
-        "expression(",
-        "javascript:",
-    ];
-    if forbidden.iter().any(|needle| lower.contains(needle))
-        || value
-            .chars()
-            .any(|c| matches!(c, '{' | '}' | ';' | '<' | '>' | '\\' | '@') || c.is_control())
-    {
+    let forbidden = ["url(", "image(", "image-set(", "element(", "expression(", "javascript:"];
+    if forbidden.iter().any(|needle| lower.contains(needle)) || value.chars().any(|c| matches!(c, '{' | '}' | ';' | '<' | '>' | '\\' | '@') || c.is_control()) {
         return None;
     }
     Some((name.to_string(), value.to_string()))
@@ -272,17 +239,12 @@ pub enum SkinError {
 pub fn read_skin(root: &Path, relative: &str) -> Result<(PathBuf, Skin), SkinError> {
     validate_path(relative).map_err(SkinError::Invalid)?;
     let root = root.canonicalize().map_err(|_| SkinError::Missing)?;
-    let path = root
-        .join(relative)
-        .canonicalize()
-        .map_err(|_| SkinError::Missing)?;
+    let path = root.join(relative).canonicalize().map_err(|_| SkinError::Missing)?;
     // Symlinks may point anywhere; only files really inside the workspace count.
     if !path.starts_with(&root) || !path.is_file() {
         return Err(SkinError::Missing);
     }
-    let size = std::fs::metadata(&path)
-        .map_err(|_| SkinError::Missing)?
-        .len();
+    let size = std::fs::metadata(&path).map_err(|_| SkinError::Missing)?.len();
     if size > MAX_SKIN_BYTES {
         return Err(SkinError::TooLarge);
     }
@@ -308,9 +270,7 @@ mod tests {
         );
         assert_eq!(skin.kept, 4);
         assert_eq!(skin.dropped, 1, "plain properties are dropped");
-        assert!(skin.css.contains(
-            "[data-theme-name='custom'] {\n  --color-accent: #c0392b;\n  --font-heading: \"Avenir Next\", sans-serif;\n}"
-        ));
+        assert!(skin.css.contains("[data-theme-name='custom'] {\n  --color-accent: #c0392b;\n  --font-heading: \"Avenir Next\", sans-serif;\n}"));
         assert!(skin.css.contains("[data-theme-name='custom'][data-mode='dark'] {\n  --color-bg: #111;\n  --color-fg: #eee;\n}"));
     }
 
@@ -335,10 +295,7 @@ mod tests {
         assert!(!skin.css.contains("@import"));
         assert!(!skin.css.contains("display"));
         assert!(!skin.css.contains("image-set"));
-        assert!(
-            skin.css
-                .contains("--ok: linear-gradient(90deg, #000, #fff);")
-        );
+        assert!(skin.css.contains("--ok: linear-gradient(90deg, #000, #fff);"));
         assert!(skin.dropped >= 5, "{skin:?}");
     }
 
@@ -356,22 +313,14 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("repo");
         std::fs::create_dir_all(root.join("assets")).unwrap();
-        std::fs::write(
-            root.join("assets/skin.css"),
-            ":root { --color-accent: #123456; }",
-        )
-        .unwrap();
+        std::fs::write(root.join("assets/skin.css"), ":root { --color-accent: #123456; }").unwrap();
         let (_, skin) = read_skin(&root, "assets/skin.css").unwrap();
         assert_eq!(skin.kept, 1);
         assert_eq!(read_skin(&root, "assets/none.css"), Err(SkinError::Missing));
         std::fs::write(tmp.path().join("outside.css"), ":root { --x: 1; }").unwrap();
         #[cfg(unix)]
         {
-            std::os::unix::fs::symlink(
-                tmp.path().join("outside.css"),
-                root.join("assets/link.css"),
-            )
-            .unwrap();
+            std::os::unix::fs::symlink(tmp.path().join("outside.css"), root.join("assets/link.css")).unwrap();
             assert_eq!(read_skin(&root, "assets/link.css"), Err(SkinError::Missing));
         }
     }

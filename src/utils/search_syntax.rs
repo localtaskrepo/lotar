@@ -43,25 +43,15 @@ pub const SEARCH_KEYS: &[SearchKey] = &[
     key("due_within", &["due_within", "duewithin"]),
     key("effort_min", &["effort_min", "effortmin"]),
     key("effort_max", &["effort_max", "effortmax"]),
-    SearchKey {
-        key: "mine",
-        aliases: &["mine", "me"],
-        flag: true,
-    },
+    SearchKey { key: "mine", aliases: &["mine", "me"], flag: true },
 ];
 
 const fn key(key: &'static str, aliases: &'static [&'static str]) -> SearchKey {
-    SearchKey {
-        key,
-        aliases,
-        flag: false,
-    }
+    SearchKey { key, aliases, flag: false }
 }
 
 /// Multi-select keys: repeated `key:value` tokens add up.
-pub const LIST_KEYS: &[&str] = &[
-    "status", "priority", "type", "sprints", "tags", "needs", "has",
-];
+pub const LIST_KEYS: &[&str] = &["status", "priority", "type", "sprints", "tags", "needs", "has"];
 
 /// Routing keys a leading minus cannot exclude.
 const UNNEGATABLE_KEYS: &[&str] = &["q", "order", "sort_by", "deletion", "archived"];
@@ -69,18 +59,12 @@ const UNNEGATABLE_KEYS: &[&str] = &["q", "order", "sort_by", "deletion", "archiv
 /// The search key for an alias, ignoring case.
 pub fn find_key(token: &str) -> Option<&'static SearchKey> {
     let lower = token.to_lowercase();
-    SEARCH_KEYS
-        .iter()
-        .find(|meta| meta.aliases.contains(&lower.as_str()))
+    SEARCH_KEYS.iter().find(|meta| meta.aliases.contains(&lower.as_str()))
 }
 
 /// Builtin target of a `field:<name>` reserved name, if any.
 fn reserved_field_alias(name: &str) -> Option<&'static str> {
-    let normalized: String = name
-        .to_lowercase()
-        .chars()
-        .filter(|ch| !matches!(ch, '-' | '_') && !ch.is_whitespace())
-        .collect();
+    let normalized: String = name.to_lowercase().chars().filter(|ch| !matches!(ch, '-' | '_') && !ch.is_whitespace()).collect();
     match normalized.as_str() {
         "q" | "query" | "text" | "textquery" | "search" => return Some("q"),
         "order" | "sort" => return Some("order"),
@@ -106,17 +90,9 @@ struct Segment {
 fn unquote(raw: &str) -> Segment {
     let chars: Vec<char> = raw.chars().collect();
     let Some(&quote) = chars.first().filter(|c| matches!(c, '"' | '\'')) else {
-        return Segment {
-            value: raw.to_string(),
-            quoted: false,
-            ok: true,
-        };
+        return Segment { value: raw.to_string(), quoted: false, ok: true };
     };
-    let not_ok = || Segment {
-        value: raw.to_string(),
-        quoted: false,
-        ok: false,
-    };
+    let not_ok = || Segment { value: raw.to_string(), quoted: false, ok: false };
     let mut value = String::new();
     let mut i = 1;
     while i < chars.len() {
@@ -127,15 +103,7 @@ fn unquote(raw: &str) -> Segment {
             continue;
         }
         if ch == quote {
-            return if i == chars.len() - 1 {
-                Segment {
-                    value,
-                    quoted: true,
-                    ok: true,
-                }
-            } else {
-                not_ok()
-            };
+            return if i == chars.len() - 1 { Segment { value, quoted: true, ok: true } } else { not_ok() };
         }
         value.push(ch);
         i += 1;
@@ -220,9 +188,7 @@ fn is_url_like(raw: &str) -> bool {
         return false;
     }
     let rest: String = chars.collect();
-    let scheme_end = rest
-        .find(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '+' | '.' | '-')))
-        .unwrap_or(rest.len());
+    let scheme_end = rest.find(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '+' | '.' | '-'))).unwrap_or(rest.len());
     rest[scheme_end..].starts_with("://")
 }
 
@@ -275,79 +241,45 @@ impl Parser {
         let key_seg = unquote(&before(raw, eq));
         let value_seg = unquote(&after(raw, eq));
         if !key_seg.ok || !value_seg.ok {
-            self.parsed
-                .errors
-                .push(format!("Unmatched quote in \"{raw}\""));
+            self.parsed.errors.push(format!("Unmatched quote in \"{raw}\""));
             return;
         }
-        let key_text = if key_seg.quoted {
-            key_seg.value
-        } else {
-            key_seg.value.trim().to_string()
-        };
-        let value = if value_seg.quoted {
-            value_seg.value
-        } else {
-            value_seg.value.trim().to_string()
-        };
+        let key_text = if key_seg.quoted { key_seg.value } else { key_seg.value.trim().to_string() };
+        let value = if value_seg.quoted { value_seg.value } else { value_seg.value.trim().to_string() };
         let display = {
             let head = before(raw, eq);
             let head = head.trim();
-            if head.is_empty() {
-                raw.to_string()
-            } else {
-                head.to_string()
-            }
+            if head.is_empty() { raw.to_string() } else { head.to_string() }
         };
 
         if is_field_key(&key_text) {
             let name_raw = key_text[key_text.find(':').unwrap_or(0) + 1..].trim();
             let name_seg = unquote(name_raw);
             if !name_seg.ok {
-                self.parsed
-                    .errors
-                    .push(format!("Unmatched quote in \"{raw}\""));
+                self.parsed.errors.push(format!("Unmatched quote in \"{raw}\""));
                 return;
             }
-            let name = if name_seg.quoted {
-                name_seg.value.clone()
-            } else {
-                name_seg.value.trim().to_string()
-            };
+            let name = if name_seg.quoted { name_seg.value.clone() } else { name_seg.value.trim().to_string() };
             if name.is_empty() {
-                self.parsed
-                    .errors
-                    .push(format!("Invalid filter name \"{display}\""));
+                self.parsed.errors.push(format!("Invalid filter name \"{display}\""));
                 return;
             }
             if value.is_empty() {
-                self.parsed
-                    .errors
-                    .push(format!("Add a value for \"{display}\""));
+                self.parsed.errors.push(format!("Add a value for \"{display}\""));
                 return;
             }
-            let builtin = if name_seg.quoted {
-                None
-            } else {
-                reserved_field_alias(&name)
-            };
-            let key = builtin
-                .map(str::to_string)
-                .unwrap_or_else(|| format!("field:{}", name.to_lowercase()));
+            let builtin = if name_seg.quoted { None } else { reserved_field_alias(&name) };
+            let key = builtin.map(str::to_string).unwrap_or_else(|| format!("field:{}", name.to_lowercase()));
             self.set(key, value, true);
             return;
         }
 
         if key_text.is_empty() {
-            self.parsed
-                .errors
-                .push("Missing key before \"=\"".to_string());
+            self.parsed.errors.push("Missing key before \"=\"".to_string());
             return;
         }
         if value.is_empty() {
-            self.parsed
-                .errors
-                .push(format!("Add a value for \"{key_text}\""));
+            self.parsed.errors.push(format!("Add a value for \"{key_text}\""));
             return;
         }
         // Bare equality never maps aliases: `owner=ops` stays a custom
@@ -358,9 +290,7 @@ impl Parser {
     fn colon(&mut self, raw: &str, colon: usize) {
         let key_seg = unquote(&before(raw, colon));
         if !key_seg.ok {
-            self.parsed
-                .errors
-                .push(format!("Unmatched quote in \"{raw}\""));
+            self.parsed.errors.push(format!("Unmatched quote in \"{raw}\""));
             return;
         }
         let Some(meta) = find_key(key_seg.value.trim()) else {
@@ -369,16 +299,10 @@ impl Parser {
         };
         let value_seg = unquote(&after(raw, colon));
         if !value_seg.ok {
-            self.parsed
-                .errors
-                .push(format!("Unmatched quote in \"{raw}\""));
+            self.parsed.errors.push(format!("Unmatched quote in \"{raw}\""));
             return;
         }
-        let value = if value_seg.quoted {
-            value_seg.value
-        } else {
-            value_seg.value.trim().to_string()
-        };
+        let value = if value_seg.quoted { value_seg.value } else { value_seg.value.trim().to_string() };
         if value.is_empty() {
             self.words.push(raw.to_string());
             return;
@@ -395,11 +319,7 @@ impl Parser {
     /// Parse `raw` (starting with `-`) as an excluded filter; false when the
     /// rest is not a single filter, so the token stays search text.
     fn negation(&mut self, raw: &str) -> bool {
-        let mut inner = Parser {
-            parsed: ParsedSearch::default(),
-            words: Vec::new(),
-            assigned: BTreeMap::new(),
-        };
+        let mut inner = Parser { parsed: ParsedSearch::default(), words: Vec::new(), assigned: BTreeMap::new() };
         inner.token(&raw[1..]);
         if !inner.parsed.errors.is_empty() {
             self.parsed.errors.append(&mut inner.parsed.errors);
@@ -410,9 +330,7 @@ impl Parser {
         }
         let (key, value) = inner.parsed.filters.into_iter().next().expect("one filter");
         if UNNEGATABLE_KEYS.contains(&key.as_str()) {
-            self.parsed
-                .errors
-                .push(format!("\"{raw}\" cannot be excluded"));
+            self.parsed.errors.push(format!("\"{raw}\" cannot be excluded"));
             return true;
         }
         let negated = format!("-{key}");
@@ -434,11 +352,7 @@ impl Parser {
         // so it is searched as one phrase.
         let whole = unquote(raw);
         if whole.quoted {
-            self.words.push(if whole.value.contains('"') {
-                whole.value
-            } else {
-                format!("\"{}\"", whole.value)
-            });
+            self.words.push(if whole.value.contains('"') { whole.value } else { format!("\"{}\"", whole.value) });
             return;
         }
         // URLs and `/regex/` terms are search text even with `=` or `:`.
@@ -470,15 +384,8 @@ impl Parser {
 
 /// Parse a search-box query.
 pub fn parse(input: &str) -> ParsedSearch {
-    let mut parser = Parser {
-        parsed: ParsedSearch::default(),
-        words: Vec::new(),
-        assigned: BTreeMap::new(),
-    };
-    for raw in split_top_level(input, char::is_whitespace)
-        .into_iter()
-        .filter(|t| !t.is_empty())
-    {
+    let mut parser = Parser { parsed: ParsedSearch::default(), words: Vec::new(), assigned: BTreeMap::new() };
+    for raw in split_top_level(input, char::is_whitespace).into_iter().filter(|t| !t.is_empty()) {
         for token in split_comma_expressions(&raw) {
             parser.token(&token);
         }
@@ -503,10 +410,7 @@ mod tests {
     /// The cases the web UI parser is checked against too.
     #[test]
     fn matches_the_shared_cases() {
-        let cases: Vec<Case> = serde_json::from_str(include_str!(
-            "../../tests/fixtures/search_syntax_cases.json"
-        ))
-        .unwrap();
+        let cases: Vec<Case> = serde_json::from_str(include_str!("../../tests/fixtures/search_syntax_cases.json")).unwrap();
         assert!(cases.len() > 20);
         for case in cases {
             let parsed = parse(&case.input);

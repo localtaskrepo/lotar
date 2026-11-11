@@ -17,8 +17,7 @@ impl PrefixConflictDetector {
                 // Try to load config to get actual prefix
                 let config_path = crate::utils::paths::project_config_path(tasks_dir, &dir_name);
                 if config_path.exists()
-                    && let Ok(config_manager) =
-                        ConfigManager::new_manager_with_tasks_dir_readonly(tasks_dir)
+                    && let Ok(config_manager) = ConfigManager::new_manager_with_tasks_dir_readonly(tasks_dir)
                     && let Ok(project_config) = config_manager.get_project_config(&dir_name)
                 {
                     existing_prefixes.insert(project_config.default_project.to_uppercase());
@@ -39,25 +38,16 @@ impl PrefixConflictDetector {
     /// Like [`check_conflicts`] but ignores an existing prefix when building the
     /// conflict set. Used when validating an already-persisted project where the
     /// prefix is expected to match its own directory.
-    pub fn check_conflicts_excluding(
-        &self,
-        new_prefix: &str,
-        self_prefix: Option<&str>,
-    ) -> ValidationResult {
+    pub fn check_conflicts_excluding(&self, new_prefix: &str, self_prefix: Option<&str>) -> ValidationResult {
         let mut result = ValidationResult::new();
         let new_prefix_upper = new_prefix.to_uppercase();
         let self_upper = self_prefix.map(|s| s.to_uppercase());
 
         // Exact match check
-        if self.existing_prefixes.contains(&new_prefix_upper)
-            && self_upper.as_deref() != Some(new_prefix_upper.as_str())
-        {
+        if self.existing_prefixes.contains(&new_prefix_upper) && self_upper.as_deref() != Some(new_prefix_upper.as_str()) {
             result.add_error(
-                ValidationError::error(
-                    Some("default_project".to_string()),
-                    format!("Project prefix '{}' already exists", new_prefix),
-                )
-                .with_fix("Choose a different prefix or use --force to override".to_string()),
+                ValidationError::error(Some("default_project".to_string()), format!("Project prefix '{}' already exists", new_prefix))
+                    .with_fix("Choose a different prefix or use --force to override".to_string()),
             );
             return result;
         }
@@ -71,14 +61,9 @@ impl PrefixConflictDetector {
                 result.add_error(
                     ValidationError::warning(
                         Some("default_project".to_string()),
-                        format!(
-                            "Project prefix '{}' conflicts with existing prefix '{}'",
-                            new_prefix, existing
-                        ),
+                        format!("Project prefix '{}' conflicts with existing prefix '{}'", new_prefix, existing),
                     )
-                    .with_fix(
-                        "Consider using a more distinct prefix to avoid confusion".to_string(),
-                    ),
+                    .with_fix("Consider using a more distinct prefix to avoid confusion".to_string()),
                 );
             }
         }
@@ -92,10 +77,7 @@ impl PrefixConflictDetector {
                 result.add_error(
                     ValidationError::warning(
                         Some("default_project".to_string()),
-                        format!(
-                            "Project prefix '{}' is very similar to existing prefix '{}'",
-                            new_prefix, existing
-                        ),
+                        format!("Project prefix '{}' is very similar to existing prefix '{}'", new_prefix, existing),
                     )
                     .with_fix("Consider using a more distinct prefix".to_string()),
                 );

@@ -55,13 +55,7 @@ fn status_and_assignee_set_during_a_job_win_over_the_job_completed_rule() {
             .env("LOTAR_TEST_SILENT", "1");
         cmd
     };
-    assert!(
-        cmd()
-            .args(["add", "needs a decision"])
-            .status()
-            .unwrap()
-            .success()
-    );
+    assert!(cmd().args(["add", "needs a decision"]).status().unwrap().success());
 
     let runner = cmd()
         .args(["agent", "run", "OUTC-1", "go", "--agent", "fix", "--wait"])
@@ -69,67 +63,37 @@ fn status_and_assignee_set_during_a_job_win_over_the_job_completed_rule() {
         .stderr(std::process::Stdio::null())
         .spawn()
         .unwrap();
-    let mut job = Finish {
-        go: go.clone(),
-        runner,
-    };
+    let mut job = Finish { go: go.clone(), runner };
 
     let deadline = Instant::now() + Duration::from_secs(15);
     let job_id = loop {
-        let out = cmd()
-            .args(["--format", "json", "agent", "list-running"])
-            .output()
-            .unwrap();
-        let json: serde_json::Value =
-            serde_json::from_slice(&out.stdout).unwrap_or(serde_json::Value::Null);
-        if let Some(id) = json["jobs"]
-            .as_array()
-            .and_then(|jobs| jobs.iter().find(|job| job["ticket_id"] == "OUTC-1"))
-            .and_then(|job| job["job_id"].as_str())
-        {
+        let out = cmd().args(["--format", "json", "agent", "list-running"]).output().unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap_or(serde_json::Value::Null);
+        if let Some(id) = json["jobs"].as_array().and_then(|jobs| jobs.iter().find(|job| job["ticket_id"] == "OUTC-1")).and_then(|job| job["job_id"].as_str()) {
             break id.to_string();
         }
         assert!(Instant::now() < deadline, "job never showed up: {json}");
         std::thread::sleep(Duration::from_millis(200));
     };
     let show = |field: &str| {
-        let out = cmd()
-            .args(["--format", "json", "list", "OUTC-1"])
-            .output()
-            .unwrap();
+        let out = cmd().args(["--format", "json", "list", "OUTC-1"]).output().unwrap();
         let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
         json["tasks"][0][field].clone()
     };
     let status_before = show("status");
 
     // The agent hands the ticket back: both commands succeed and say when.
-    let status = cmd()
-        .args(["status", "OUTC-1", "HelpNeeded"])
-        .output()
-        .unwrap();
+    let status = cmd().args(["status", "OUTC-1", "HelpNeeded"]).output().unwrap();
+    assert!(status.status.success(), "{}", String::from_utf8_lossy(&status.stderr));
     assert!(
-        status.status.success(),
-        "{}",
-        String::from_utf8_lossy(&status.stderr)
-    );
-    assert!(
-        String::from_utf8_lossy(&status.stdout)
-            .contains(&format!("HelpNeeded will be set when job {job_id} ends")),
+        String::from_utf8_lossy(&status.stdout).contains(&format!("HelpNeeded will be set when job {job_id} ends")),
         "{}",
         String::from_utf8_lossy(&status.stdout)
     );
-    let assignee = cmd()
-        .args(["assignee", "OUTC-1", "owner"])
-        .output()
-        .unwrap();
+    let assignee = cmd().args(["assignee", "OUTC-1", "owner"]).output().unwrap();
+    assert!(assignee.status.success(), "{}", String::from_utf8_lossy(&assignee.stderr));
     assert!(
-        assignee.status.success(),
-        "{}",
-        String::from_utf8_lossy(&assignee.stderr)
-    );
-    assert!(
-        String::from_utf8_lossy(&assignee.stdout)
-            .contains(&format!("owner will be assigned when job {job_id} ends")),
+        String::from_utf8_lossy(&assignee.stdout).contains(&format!("owner will be assigned when job {job_id} ends")),
         "{}",
         String::from_utf8_lossy(&assignee.stdout)
     );
@@ -147,10 +111,7 @@ fn status_and_assignee_set_during_a_job_win_over_the_job_completed_rule() {
     assert_eq!(show("status"), "HelpNeeded");
     assert_eq!(show("assignee"), "owner");
     let stored = std::fs::read_to_string(fixtures.tasks_root.join("OUTC/1.yml")).unwrap();
-    assert!(
-        stored.contains(&format!("Job {job_id} finished")),
-        "{stored}"
-    );
+    assert!(stored.contains(&format!("Job {job_id} finished")), "{stored}");
 }
 
 /// REST and MCP get the same treatment, and the job's end applies what they
@@ -160,18 +121,12 @@ fn rest_and_mcp_changes_during_a_job_wait_for_its_end() {
     use crate::common::env_mutex::EnvVarGuard;
     use lotar::api_server::{ApiServer, HttpRequest};
     use lotar::services::agent_active_jobs::{self, ActiveJob};
-    use lotar::services::automation_service::{
-        AutomationEvent, AutomationJobContext, AutomationService,
-    };
+    use lotar::services::automation_service::{AutomationEvent, AutomationJobContext, AutomationService};
     use serde_json::{Value, json};
 
     let fixtures = TestFixtures::new();
     let tasks_dir = fixtures.tasks_root.clone();
-    std::fs::write(
-        tasks_dir.join("config.yml"),
-        "default:\n  project: OUTR\nissue:\n  states: [Todo, InProgress, HelpNeeded, Done]\n",
-    )
-    .unwrap();
+    std::fs::write(tasks_dir.join("config.yml"), "default:\n  project: OUTR\nissue:\n  states: [Todo, InProgress, HelpNeeded, Done]\n").unwrap();
     std::fs::write(
         tasks_dir.join("automation.yml"),
         "automation:\n  rules:\n    - name: Finish\n      on:\n        job_completed:\n          set:\n            status: Done\n            tags: [finished]\n          comment: finished\n",
@@ -180,18 +135,12 @@ fn rest_and_mcp_changes_during_a_job_wait_for_its_end() {
     let _env = [
         EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_str().unwrap()),
         EnvVarGuard::set("LOTAR_IGNORE_HOME_CONFIG", "1"),
-        EnvVarGuard::set(
-            "LOTAR_AGENT_QUEUE_DIR",
-            fixtures.get_temp_path().join("queue").to_str().unwrap(),
-        ),
+        EnvVarGuard::set("LOTAR_AGENT_QUEUE_DIR", fixtures.get_temp_path().join("queue").to_str().unwrap()),
     ];
     let mut storage = fixtures.create_storage();
     lotar::services::task_service::TaskService::create(
         &mut storage,
-        lotar::api_types::TaskCreate {
-            title: "Waits for the owner".into(),
-            ..Default::default()
-        },
+        lotar::api_types::TaskCreate { title: "Waits for the owner".into(), ..Default::default() },
     )
     .unwrap();
     // A job another (live) process runs for the ticket.
@@ -220,10 +169,7 @@ fn rest_and_mcp_changes_during_a_job_wait_for_its_end() {
     let body: Value = serde_json::from_slice(&response.body).unwrap();
     assert_eq!(response.status, 200, "{body}");
     assert_eq!(body["data"]["status"], json!("Todo"));
-    assert_eq!(
-        body["deferred"],
-        json!({"job_id": "job-elsewhere", "status": "InProgress"})
-    );
+    assert_eq!(body["deferred"], json!({"job_id": "job-elsewhere", "status": "InProgress"}));
 
     let request = json!({
         "jsonrpc": "2.0",
@@ -234,26 +180,14 @@ fn rest_and_mcp_changes_during_a_job_wait_for_its_end() {
             "patch": {"status": "HelpNeeded", "assignee": "ravi", "description": "Needs the owner"}
         }}
     });
-    let response: Value = serde_json::from_str(&lotar::mcp::server::handle_json_line(
-        &serde_json::to_string(&request).unwrap(),
-    ))
-    .unwrap();
+    let response: Value = serde_json::from_str(&lotar::mcp::server::handle_json_line(&serde_json::to_string(&request).unwrap())).unwrap();
     assert!(response.get("error").is_none(), "{response}");
-    let task: Value =
-        serde_json::from_str(response["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
+    let task: Value = serde_json::from_str(response["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
     // Other fields apply now; status and assignee wait (the later status wins).
     assert_eq!(task["description"], json!("Needs the owner"));
     assert_eq!(task["status"], json!("Todo"));
-    assert_eq!(
-        task["deferred"],
-        json!({"job_id": "job-elsewhere", "status": "HelpNeeded", "assignee": "ravi"})
-    );
-    assert_eq!(
-        task["message"],
-        json!(
-            "HelpNeeded will be set when job job-elsewhere ends; ravi will be assigned when job job-elsewhere ends"
-        )
-    );
+    assert_eq!(task["deferred"], json!({"job_id": "job-elsewhere", "status": "HelpNeeded", "assignee": "ravi"}));
+    assert_eq!(task["message"], json!("HelpNeeded will be set when job job-elsewhere ends; ravi will be assigned when job job-elsewhere ends"));
 
     AutomationService::apply_job_event(
         &tasks_dir,
@@ -272,11 +206,7 @@ fn rest_and_mcp_changes_during_a_job_wait_for_its_end() {
     let task = lotar::services::task_service::TaskService::get(&storage, "OUTR-1", None).unwrap();
     assert_eq!(task.status.as_str(), "HelpNeeded");
     assert_eq!(task.assignee.as_deref(), Some("ravi"));
-    assert_eq!(
-        task.tags,
-        vec!["finished".to_string()],
-        "the rest of the set ran"
-    );
+    assert_eq!(task.tags, vec!["finished".to_string()], "the rest of the set ran");
     assert_eq!(task.comments.len(), 1, "the rule's comment ran");
     // The job's guard ended with it: changes apply directly again.
     assert!(agent_active_jobs::find(&tasks_dir, "job-elsewhere").is_none());

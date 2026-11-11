@@ -24,11 +24,7 @@ pub struct AgentContextFile {
 pub struct AgentContextService;
 
 impl AgentContextService {
-    pub fn load(
-        tasks_dir: &Path,
-        config: &ResolvedConfig,
-        ticket_id: &str,
-    ) -> LoTaRResult<Option<AgentContextFile>> {
+    pub fn load(tasks_dir: &Path, config: &ResolvedConfig, ticket_id: &str) -> LoTaRResult<Option<AgentContextFile>> {
         if !config.agent_context_enabled {
             return Ok(None);
         }
@@ -45,9 +41,8 @@ impl AgentContextService {
             return Ok(None);
         }
         let payload = fs::read_to_string(&path)?;
-        let parsed = serde_json::from_str::<AgentContextFile>(&payload).map_err(|err| {
-            LoTaRError::SerializationError(format!("Invalid context payload: {}", err))
-        })?;
+        let parsed =
+            serde_json::from_str::<AgentContextFile>(&payload).map_err(|err| LoTaRError::SerializationError(format!("Invalid context payload: {}", err)))?;
         Ok(Some(parsed))
     }
 
@@ -92,28 +87,18 @@ impl AgentContextService {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
-        let payload = serde_json::to_string_pretty(&context).map_err(|err| {
-            LoTaRError::SerializationError(format!("Failed to serialize context: {}", err))
-        })?;
+        let payload = serde_json::to_string_pretty(&context).map_err(|err| LoTaRError::SerializationError(format!("Failed to serialize context: {}", err)))?;
         fs::write(&path, payload)?;
         Ok(())
     }
 }
 
 pub fn build_user_message(content: &str) -> AgentContextMessage {
-    AgentContextMessage {
-        role: "user".to_string(),
-        content: content.to_string(),
-        at: Utc::now().to_rfc3339(),
-    }
+    AgentContextMessage { role: "user".to_string(), content: content.to_string(), at: Utc::now().to_rfc3339() }
 }
 
 pub fn build_assistant_message(content: &str) -> AgentContextMessage {
-    AgentContextMessage {
-        role: "assistant".to_string(),
-        content: content.to_string(),
-        at: Utc::now().to_rfc3339(),
-    }
+    AgentContextMessage { role: "assistant".to_string(), content: content.to_string(), at: Utc::now().to_rfc3339() }
 }
 
 /// The tasks root that actually holds `ticket_id`, when it differs from
@@ -121,22 +106,14 @@ pub fn build_assistant_message(content: &str) -> AgentContextMessage {
 /// cannot be found, or is ambiguous (no root is guessed).
 fn actual_context_root(tasks_dir: &Path, ticket_id: &str) -> Option<PathBuf> {
     let location = crate::storage::identity::resolve(tasks_dir, ticket_id.trim()).ok()?;
-    if location.is_in_root(tasks_dir) {
-        None
-    } else {
-        Some(location.root)
-    }
+    if location.is_in_root(tasks_dir) { None } else { Some(location.root) }
 }
 
 /// Resolve the context file path.
 /// Context files are stored at `<tasks_dir>/<PROJECT>/<TICKET_ID><extension>`,
 /// right next to the task file itself. This makes the relationship clear
 /// and allows easy filtering via gitignore.
-fn resolve_context_path(
-    tasks_dir: &Path,
-    ticket_id: &str,
-    extension: &str,
-) -> LoTaRResult<PathBuf> {
+fn resolve_context_path(tasks_dir: &Path, ticket_id: &str, extension: &str) -> LoTaRResult<PathBuf> {
     let trimmed = ticket_id.trim();
     if trimmed.is_empty() {
         return Err(LoTaRError::ValidationError("Missing ticket id".to_string()));
@@ -144,10 +121,7 @@ fn resolve_context_path(
     if trimmed.contains('/') || trimmed.contains('\\') {
         return Err(LoTaRError::ValidationError("Invalid ticket id".to_string()));
     }
-    if trimmed
-        .chars()
-        .any(|c| !(c.is_ascii_alphanumeric() || c == '-' || c == '_'))
-    {
+    if trimmed.chars().any(|c| !(c.is_ascii_alphanumeric() || c == '-' || c == '_')) {
         return Err(LoTaRError::ValidationError("Invalid ticket id".to_string()));
     }
 
@@ -155,9 +129,7 @@ fn resolve_context_path(
     // "DICE-1" -> "DICE", "abc-ops-12" -> "abc-ops"). Prefixes are exact
     // case: no upper-case folding, so context files land in the project
     // directory that actually exists on disk.
-    let project_prefix = crate::storage::TaskId::parse(trimmed)
-        .map_err(|err| LoTaRError::ValidationError(format!("Invalid ticket id: {err}")))?
-        .project;
+    let project_prefix = crate::storage::TaskId::parse(trimmed).map_err(|err| LoTaRError::ValidationError(format!("Invalid ticket id: {err}")))?.project;
 
     // Build path: <tasks_dir>/<PROJECT>/<TICKET_ID><extension>
     let project_dir = tasks_dir.join(&project_prefix);
@@ -165,9 +137,7 @@ fn resolve_context_path(
     let path = project_dir.join(&filename);
 
     if path.components().any(|c| matches!(c, Component::ParentDir)) {
-        return Err(LoTaRError::ValidationError(
-            "Invalid context path".to_string(),
-        ));
+        return Err(LoTaRError::ValidationError("Invalid context path".to_string()));
     }
 
     Ok(path)

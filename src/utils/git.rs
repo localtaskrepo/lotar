@@ -29,10 +29,7 @@ pub fn clear_repository_env(command: &mut Command) {
     let config_keys: Vec<_> = std::env::vars_os()
         .map(|(key, _)| key)
         .chain(command.get_envs().map(|(key, _)| key.to_os_string()))
-        .filter(|key| {
-            key.to_str()
-                .is_some_and(|key| key.to_ascii_uppercase().starts_with("GIT_CONFIG"))
-        })
+        .filter(|key| key.to_str().is_some_and(|key| key.to_ascii_uppercase().starts_with("GIT_CONFIG")))
         .collect();
     for key in REPOSITORY_ROUTING_KEYS {
         command.env_remove(key);
@@ -56,38 +53,22 @@ pub fn git_command(root: &Path) -> Command {
 /// author/committer) are deliberately NOT routing keys. Matching is
 /// case-insensitive so Windows env folds cannot slip a variant through.
 pub fn is_repository_routing_key(key: &str) -> bool {
-    REPOSITORY_ROUTING_KEYS
-        .iter()
-        .any(|routing| routing.eq_ignore_ascii_case(key))
-        || key.to_ascii_uppercase().starts_with("GIT_CONFIG")
+    REPOSITORY_ROUTING_KEYS.iter().any(|routing| routing.eq_ignore_ascii_case(key)) || key.to_ascii_uppercase().starts_with("GIT_CONFIG")
 }
 
 /// Verify discovery did not select a parent/foreign checkout and identify its repo.
 pub fn verified_common_dir(root: &Path) -> std::io::Result<PathBuf> {
     let root = fs::canonicalize(root)?;
-    let output = git_command(&root)
-        .args([
-            "rev-parse",
-            "--path-format=absolute",
-            "--show-toplevel",
-            "--git-common-dir",
-        ])
-        .output()?;
+    let output = git_command(&root).args(["rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir"]).output()?;
     if !output.status.success() {
         return Err(std::io::Error::other("Cannot verify Git working directory"));
     }
     let text = String::from_utf8(output.stdout).map_err(std::io::Error::other)?;
     let mut lines = text.lines();
-    let top = lines
-        .next()
-        .ok_or_else(|| std::io::Error::other("Missing Git top-level"))?;
-    let common = lines
-        .next()
-        .ok_or_else(|| std::io::Error::other("Missing Git common directory"))?;
+    let top = lines.next().ok_or_else(|| std::io::Error::other("Missing Git top-level"))?;
+    let common = lines.next().ok_or_else(|| std::io::Error::other("Missing Git common directory"))?;
     if lines.next().is_some() || fs::canonicalize(top)? != root {
-        return Err(std::io::Error::other(
-            "Git top-level differs from intended checkout",
-        ));
+        return Err(std::io::Error::other("Git top-level differs from intended checkout"));
     }
     fs::canonicalize(common)
 }
@@ -124,10 +105,7 @@ pub fn repo_relative_path(repo_root: &Path, path: &Path) -> Option<PathBuf> {
     }
     let root_real = fs::canonicalize(repo_root).ok()?;
     let path_real = fs::canonicalize(path).ok()?;
-    path_real
-        .strip_prefix(&root_real)
-        .ok()
-        .map(Path::to_path_buf)
+    path_real.strip_prefix(&root_real).ok().map(Path::to_path_buf)
 }
 
 /// Read the checkout's own HEAD, including gitdir-file linked worktrees.
@@ -140,11 +118,7 @@ fn read_branch_at(git_entry: &Path) -> Option<String> {
     let head = git_dir.join("HEAD");
     let line = metadata_line(&head)?;
     let branch = line.strip_prefix("ref: refs/heads/")?;
-    if branch.is_empty()
-        || branch
-            .chars()
-            .any(|c| c.is_ascii_whitespace() || c.is_ascii_control())
-    {
+    if branch.is_empty() || branch.chars().any(|c| c.is_ascii_whitespace() || c.is_ascii_control()) {
         return None;
     }
     Some(branch.to_string())
@@ -214,12 +188,7 @@ fn metadata_directory(value: &str, base: &Path) -> Option<PathBuf> {
         return None;
     }
     let path = Path::new(value);
-    let directory = fs::canonicalize(if path.is_absolute() {
-        path.to_path_buf()
-    } else {
-        base.join(path)
-    })
-    .ok()?;
+    let directory = fs::canonicalize(if path.is_absolute() { path.to_path_buf() } else { base.join(path) }).ok()?;
     directory.is_dir().then_some(directory)
 }
 
@@ -236,10 +205,7 @@ mod routing_tests {
     #[test]
     fn lib_test_baseline_has_no_repository_routing_env() {
         for (key, _) in std::env::vars() {
-            assert!(
-                !is_repository_routing_key(&key),
-                "routing variable {key} survived the lib-test baseline"
-            );
+            assert!(!is_repository_routing_key(&key), "routing variable {key} survived the lib-test baseline");
         }
     }
 }

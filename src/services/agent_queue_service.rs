@@ -46,44 +46,28 @@ pub struct AgentQueueEntry {
 pub struct AgentQueueService;
 
 impl AgentQueueService {
-    #[expect(
-        clippy::needless_pass_by_value,
-        reason = "the caller hands this value over and does not use it afterwards"
-    )]
+    #[expect(clippy::needless_pass_by_value, reason = "the caller hands this value over and does not use it afterwards")]
     pub fn enqueue(tasks_dir: &Path, req: AgentJobCreateRequest) -> LoTaRResult<bool> {
-        let runner = req
-            .runner
-            .as_deref()
-            .map(str::trim)
-            .filter(|runner| !runner.is_empty())
-            .map(str::to_string);
+        let runner = req.runner.as_deref().map(str::trim).filter(|runner| !runner.is_empty()).map(str::to_string);
         let agent = match req.agent.clone() {
             Some(agent) => agent,
             None if runner.is_some() => String::new(),
             None => {
-                return Err(LoTaRError::ValidationError(
-                    "Agent profile or runner required".to_string(),
-                ));
+                return Err(LoTaRError::ValidationError("Agent profile or runner required".to_string()));
             }
         };
         let ticket_id = req.ticket_id.trim().to_string();
         if ticket_id.is_empty() {
-            return Err(LoTaRError::ValidationError(
-                "Ticket id is required".to_string(),
-            ));
+            return Err(LoTaRError::ValidationError("Ticket id is required".to_string()));
         }
         // Canonicalize at the queue boundary so dequeued starts and duplicate
         // checks share one identity with the job registry.
         let ticket_id = crate::storage::TaskId::parse(&ticket_id)
-            .map_err(|err| {
-                LoTaRError::ValidationError(format!("Invalid ticket id '{ticket_id}': {err}"))
-            })?
+            .map_err(|err| LoTaRError::ValidationError(format!("Invalid ticket id '{ticket_id}': {err}")))?
             .canonical();
         let prompt = req.prompt.trim().to_string();
         if prompt.is_empty() {
-            return Err(LoTaRError::ValidationError(
-                "Prompt cannot be empty".to_string(),
-            ));
+            return Err(LoTaRError::ValidationError("Prompt cannot be empty".to_string()));
         }
 
         let entry = AgentQueueEntry {
@@ -102,11 +86,11 @@ impl AgentQueueService {
         with_locked_queue(tasks_dir, |state| {
             // Alias-aware duplicate check: legacy padded entries already in
             // the persisted queue denote the same ticket.
-            if state.pending.iter().any(|item| {
-                crate::storage::identity::aliases_match(&item.ticket_id, &ticket_id)
-                    && item.agent == agent
-                    && item.runner == runner
-            }) {
+            if state
+                .pending
+                .iter()
+                .any(|item| crate::storage::identity::aliases_match(&item.ticket_id, &ticket_id) && item.agent == agent && item.runner == runner)
+            {
                 return;
             }
             state.pending.push(entry.clone());
@@ -185,13 +169,7 @@ impl AgentQueueService {
             if let Some(parent) = lock_path.parent() {
                 std::fs::create_dir_all(parent).map_err(LoTaRError::IoError)?;
             }
-            let file = OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create(true)
-                .truncate(false)
-                .open(&lock_path)
-                .map_err(LoTaRError::IoError)?;
+            let file = OpenOptions::new().read(true).write(true).create(true).truncate(false).open(&lock_path).map_err(LoTaRError::IoError)?;
 
             if file.try_lock_exclusive().is_ok() {
                 let _ = file.unlock();
@@ -208,13 +186,7 @@ impl AgentQueueService {
         if let Some(parent) = lock_path.parent() {
             std::fs::create_dir_all(parent).map_err(LoTaRError::IoError)?;
         }
-        let lock_file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .truncate(false)
-            .open(&lock_path)
-            .map_err(LoTaRError::IoError)?;
+        let lock_file = OpenOptions::new().read(true).write(true).create(true).truncate(false).open(&lock_path).map_err(LoTaRError::IoError)?;
 
         if lock_file.try_lock_exclusive().is_err() {
             return Ok(());
@@ -289,8 +261,7 @@ fn start_entry(tasks_dir: &Path, entry: AgentQueueEntry) -> LoTaRResult<()> {
         effort: entry.effort,
         provider: entry.provider,
     };
-    let _ =
-        AgentJobService::start_job_with_tasks_dir_mode(req, tasks_dir, JobStartMode::Immediate)?;
+    let _ = AgentJobService::start_job_with_tasks_dir_mode(req, tasks_dir, JobStartMode::Immediate)?;
     Ok(())
 }
 
@@ -301,11 +272,7 @@ fn is_ticket_busy(err: &LoTaRError) -> bool {
 /// Put an entry back without counting an attempt.
 fn requeue_entry_unchanged(tasks_dir: &Path, entry: &AgentQueueEntry) -> LoTaRResult<()> {
     with_locked_queue(tasks_dir, |state| {
-        if !state.pending.iter().any(|item| {
-            item.ticket_id == entry.ticket_id
-                && item.agent == entry.agent
-                && item.runner == entry.runner
-        }) {
+        if !state.pending.iter().any(|item| item.ticket_id == entry.ticket_id && item.agent == entry.agent && item.runner == entry.runner) {
             state.pending.push(entry.clone());
         }
     })
@@ -318,11 +285,7 @@ fn requeue_entry(tasks_dir: &Path, mut entry: AgentQueueEntry) -> LoTaRResult<bo
     }
 
     with_locked_queue(tasks_dir, |state| {
-        if !state.pending.iter().any(|item| {
-            item.ticket_id == entry.ticket_id
-                && item.agent == entry.agent
-                && item.runner == entry.runner
-        }) {
+        if !state.pending.iter().any(|item| item.ticket_id == entry.ticket_id && item.agent == entry.agent && item.runner == entry.runner) {
             state.pending.push(entry.clone());
         }
     })?;
@@ -356,13 +319,7 @@ where
         std::fs::create_dir_all(parent).map_err(LoTaRError::IoError)?;
     }
 
-    let mut file = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .truncate(false)
-        .open(&queue_path)
-        .map_err(LoTaRError::IoError)?;
+    let mut file = OpenOptions::new().read(true).write(true).create(true).truncate(false).open(&queue_path).map_err(LoTaRError::IoError)?;
 
     file.lock_exclusive().map_err(LoTaRError::IoError)?;
     let mut state = load_state(&mut file, tasks_dir)?;
@@ -384,8 +341,7 @@ fn load_state(file: &mut File, tasks_dir: &Path) -> LoTaRResult<AgentQueueState>
             pending: Vec::new(),
         });
     }
-    let mut state: AgentQueueState =
-        serde_json::from_str(&buf).map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
+    let mut state: AgentQueueState = serde_json::from_str(&buf).map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
     if state.version != QUEUE_VERSION {
         state.version = QUEUE_VERSION;
     }
@@ -395,32 +351,23 @@ fn load_state(file: &mut File, tasks_dir: &Path) -> LoTaRResult<AgentQueueState>
 fn save_state(file: &mut File, state: &AgentQueueState) -> LoTaRResult<()> {
     let mut state = state.clone();
     state.updated_at = Utc::now().to_rfc3339();
-    let payload = serde_json::to_string_pretty(&state)
-        .map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
+    let payload = serde_json::to_string_pretty(&state).map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
     file.set_len(0).map_err(LoTaRError::IoError)?;
     file.seek(SeekFrom::Start(0)).map_err(LoTaRError::IoError)?;
-    file.write_all(payload.as_bytes())
-        .map_err(LoTaRError::IoError)?;
+    file.write_all(payload.as_bytes()).map_err(LoTaRError::IoError)?;
     file.flush().map_err(LoTaRError::IoError)?;
     Ok(())
 }
 
 fn resolve_max_parallel(tasks_dir: &Path) -> LoTaRResult<Option<usize>> {
-    let cfg_mgr = ConfigManager::new_manager_with_tasks_dir_readonly(tasks_dir)
-        .map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
-    Ok(cfg_mgr
-        .get_resolved_config()
-        .agent_worktree
-        .max_parallel_jobs)
+    let cfg_mgr = ConfigManager::new_manager_with_tasks_dir_readonly(tasks_dir).map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
+    Ok(cfg_mgr.get_resolved_config().agent_worktree.max_parallel_jobs)
 }
 
 fn spawn_worker(tasks_dir: &Path) -> LoTaRResult<()> {
     let exe = std::env::current_exe().map_err(LoTaRError::IoError)?;
     let mut cmd = Command::new(exe);
-    cmd.arg("--tasks-dir")
-        .arg(tasks_dir)
-        .arg("agent")
-        .arg("worker");
+    cmd.arg("--tasks-dir").arg(tasks_dir).arg("agent").arg("worker");
     cmd.env("LOTAR_TASKS_DIR", tasks_dir);
     cmd.stdin(Stdio::null());
 
@@ -533,10 +480,7 @@ mod tests {
         assert_eq!(entries[0].effort.as_deref(), Some("low"));
 
         // Entries written before these fields existed still load.
-        let legacy: AgentQueueEntry = serde_json::from_str(
-            r#"{"ticket_id":"TEST-2","agent":"a","prompt":"p","queued_at":"now","attempts":0}"#,
-        )
-        .unwrap();
+        let legacy: AgentQueueEntry = serde_json::from_str(r#"{"ticket_id":"TEST-2","agent":"a","prompt":"p","queued_at":"now","attempts":0}"#).unwrap();
         assert!(legacy.model.is_none() && legacy.effort.is_none());
     }
 
@@ -614,10 +558,7 @@ mod tests {
             },
         )
         .unwrap();
-        assert!(
-            !inserted,
-            "canonical spelling deduplicated against padded legacy entry"
-        );
+        assert!(!inserted, "canonical spelling deduplicated against padded legacy entry");
         assert_eq!(pending_count(&tasks_dir).unwrap(), 1);
     }
 

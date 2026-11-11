@@ -3,12 +3,7 @@
 
 use super::*;
 
-pub(super) fn map_issue_to_local_fields(
-    provider: SyncProvider,
-    remote: &SyncRemoteConfig,
-    issue: &JsonValue,
-    existing: Option<&TaskDTO>,
-) -> LocalFieldValues {
+pub(super) fn map_issue_to_local_fields(provider: SyncProvider, remote: &SyncRemoteConfig, issue: &JsonValue, existing: Option<&TaskDTO>) -> LocalFieldValues {
     let mut out = LocalFieldValues::default();
 
     // Collect label values consumed by scalar field mappings (type, priority, status)
@@ -19,10 +14,7 @@ pub(super) fn map_issue_to_local_fields(
             continue;
         }
         let detail = normalize_mapping_detail(local_key, mapping);
-        let remote_field = detail
-            .field
-            .clone()
-            .unwrap_or_else(|| local_key.to_string());
+        let remote_field = detail.field.clone().unwrap_or_else(|| local_key.to_string());
         // Only track consumption from labels field
         if !matches!(remote_field.to_ascii_lowercase().as_str(), "labels") {
             continue;
@@ -35,25 +27,18 @@ pub(super) fn map_issue_to_local_fields(
 
     for (local_key, mapping) in &remote.mapping {
         let detail = normalize_mapping_detail(local_key, mapping);
-        let remote_field = detail
-            .field
-            .clone()
-            .unwrap_or_else(|| local_key.to_string());
+        let remote_field = detail.field.clone().unwrap_or_else(|| local_key.to_string());
         let remote_value = read_remote_value(provider, issue, &remote_field);
         let existing_value = existing.and_then(|task| local_value_for_field(task, local_key));
 
         // When mapping tags from labels, filter out consumed label values
-        let remote_value = if local_key == "tags"
-            && matches!(remote_field.to_ascii_lowercase().as_str(), "labels")
-            && !consumed_labels.is_empty()
-        {
+        let remote_value = if local_key == "tags" && matches!(remote_field.to_ascii_lowercase().as_str(), "labels") && !consumed_labels.is_empty() {
             remote_value.map(|v| filter_consumed_labels(v, &consumed_labels))
         } else {
             remote_value
         };
 
-        let mapped =
-            apply_mapping_for_pull(local_key, &detail, remote_value, existing_value.as_ref());
+        let mapped = apply_mapping_for_pull(local_key, &detail, remote_value, existing_value.as_ref());
         if let Some(value) = mapped {
             apply_local_value(&mut out, local_key, value);
         }
@@ -63,30 +48,15 @@ pub(super) fn map_issue_to_local_fields(
 
 pub(super) fn filter_consumed_labels(value: FieldValue, consumed: &HashSet<String>) -> FieldValue {
     match value {
-        FieldValue::List(values) => FieldValue::List(
-            values
-                .into_iter()
-                .filter(|v| !consumed.contains(&v.to_ascii_lowercase()))
-                .collect(),
-        ),
+        FieldValue::List(values) => FieldValue::List(values.into_iter().filter(|v| !consumed.contains(&v.to_ascii_lowercase())).collect()),
         other => other,
     }
 }
 
-pub(super) fn default_title_from_issue(
-    provider: SyncProvider,
-    issue: &JsonValue,
-) -> Option<String> {
+pub(super) fn default_title_from_issue(provider: SyncProvider, issue: &JsonValue) -> Option<String> {
     match provider {
-        SyncProvider::Jira => issue
-            .get("fields")
-            .and_then(|v| v.get("summary"))
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string()),
-        SyncProvider::Github => issue
-            .get("title")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string()),
+        SyncProvider::Jira => issue.get("fields").and_then(|v| v.get("summary")).and_then(|v| v.as_str()).map(|s| s.to_string()),
+        SyncProvider::Github => issue.get("title").and_then(|v| v.as_str()).map(|s| s.to_string()),
     }
 }
 
@@ -129,22 +99,13 @@ pub(super) fn apply_local_value(out: &mut LocalFieldValues, key: &str, value: Fi
 pub(super) fn field_value_to_string_allow_empty(value: &FieldValue) -> Option<String> {
     match value {
         FieldValue::String(raw) => Some(raw.clone()),
-        FieldValue::List(values) => values
-            .iter()
-            .find(|v| !v.trim().is_empty())
-            .map(|v| v.trim().to_string()),
+        FieldValue::List(values) => values.iter().find(|v| !v.trim().is_empty()).map(|v| v.trim().to_string()),
     }
 }
 
-pub(super) fn normalize_mapping_detail(
-    local_key: &str,
-    mapping: &SyncFieldMapping,
-) -> SyncFieldMappingDetail {
+pub(super) fn normalize_mapping_detail(local_key: &str, mapping: &SyncFieldMapping) -> SyncFieldMappingDetail {
     match mapping {
-        SyncFieldMapping::Simple(field) => SyncFieldMappingDetail {
-            field: Some(field.clone()),
-            ..Default::default()
-        },
+        SyncFieldMapping::Simple(field) => SyncFieldMappingDetail { field: Some(field.clone()), ..Default::default() },
         SyncFieldMapping::Detailed(detail) => {
             let mut out = detail.clone();
             if out.field.is_none() {
@@ -179,15 +140,8 @@ pub(super) fn apply_mapping_for_pull(
     Some(value)
 }
 
-pub(super) fn clear_value_for_pull(
-    local_key: &str,
-    remote_value: &Option<FieldValue>,
-) -> FieldValue {
-    if local_key == "tags" || matches!(remote_value, Some(FieldValue::List(_))) {
-        FieldValue::List(Vec::new())
-    } else {
-        FieldValue::String(String::new())
-    }
+pub(super) fn clear_value_for_pull(local_key: &str, remote_value: &Option<FieldValue>) -> FieldValue {
+    if local_key == "tags" || matches!(remote_value, Some(FieldValue::List(_))) { FieldValue::List(Vec::new()) } else { FieldValue::String(String::new()) }
 }
 
 pub(super) fn map_remote_value_for_pull(
@@ -198,20 +152,14 @@ pub(super) fn map_remote_value_for_pull(
 ) -> FieldValue {
     let mut reverse: HashMap<String, Vec<String>> = HashMap::new();
     for (local, remote) in &detail.values {
-        reverse
-            .entry(remote.to_ascii_lowercase())
-            .or_default()
-            .push(local.clone());
+        reverse.entry(remote.to_ascii_lowercase()).or_default().push(local.clone());
     }
 
     let existing_scalar = existing_value.and_then(|value| value.to_string_value());
     let pick_candidate = |candidates: &[String]| {
         if let Some(existing) = existing_scalar.as_ref() {
             let existing_norm = existing.to_ascii_lowercase();
-            if let Some(found) = candidates
-                .iter()
-                .find(|candidate| candidate.to_ascii_lowercase() == existing_norm)
-            {
+            if let Some(found) = candidates.iter().find(|candidate| candidate.to_ascii_lowercase() == existing_norm) {
                 return found.clone();
             }
         }
@@ -221,11 +169,7 @@ pub(super) fn map_remote_value_for_pull(
     match value {
         FieldValue::String(raw) => {
             let lookup = raw.to_ascii_lowercase();
-            if let Some(candidates) = reverse.get(&lookup) {
-                FieldValue::String(pick_candidate(candidates))
-            } else {
-                FieldValue::String(raw)
-            }
+            if let Some(candidates) = reverse.get(&lookup) { FieldValue::String(pick_candidate(candidates)) } else { FieldValue::String(raw) }
         }
         FieldValue::List(values) => {
             if is_scalar_local_field(local_key) {
@@ -235,21 +179,14 @@ pub(super) fn map_remote_value_for_pull(
                         return FieldValue::String(pick_candidate(candidates));
                     }
                 }
-                if let Some(existing) = existing_scalar {
-                    FieldValue::String(existing)
-                } else {
-                    FieldValue::String(String::new())
-                }
+                if let Some(existing) = existing_scalar { FieldValue::String(existing) } else { FieldValue::String(String::new()) }
             } else {
                 FieldValue::List(
                     values
                         .into_iter()
                         .map(|raw| {
                             let lookup = raw.to_ascii_lowercase();
-                            reverse
-                                .get(&lookup)
-                                .and_then(|candidates| candidates.first().cloned())
-                                .unwrap_or(raw)
+                            reverse.get(&lookup).and_then(|candidates| candidates.first().cloned()).unwrap_or(raw)
                         })
                         .collect(),
                 )
@@ -259,17 +196,7 @@ pub(super) fn map_remote_value_for_pull(
 }
 
 pub(super) fn is_scalar_local_field(local_key: &str) -> bool {
-    matches!(
-        local_key,
-        "title"
-            | "description"
-            | "status"
-            | "task_type"
-            | "type"
-            | "priority"
-            | "assignee"
-            | "reporter"
-    )
+    matches!(local_key, "title" | "description" | "status" | "task_type" | "type" | "priority" | "assignee" | "reporter")
 }
 
 pub(super) fn apply_mapping_for_push(
@@ -294,11 +221,7 @@ pub(super) fn apply_mapping_for_push(
     let empty = value.as_ref().map(|v| v.is_empty()).unwrap_or(true);
     if empty {
         return match detail.when_empty {
-            Some(SyncWhenEmpty::Clear) => Some(if is_list {
-                FieldValue::List(Vec::new())
-            } else {
-                FieldValue::String(String::new())
-            }),
+            Some(SyncWhenEmpty::Clear) => Some(if is_list { FieldValue::List(Vec::new()) } else { FieldValue::String(String::new()) }),
             Some(SyncWhenEmpty::Skip) | None => None,
         };
     }
@@ -317,29 +240,17 @@ pub(super) fn apply_mapping_for_push(
 
 pub(super) fn map_local_value(detail: &SyncFieldMappingDetail, value: FieldValue) -> FieldValue {
     match value {
-        FieldValue::String(raw) => {
-            FieldValue::String(lookup_mapping_value(&detail.values, &raw).unwrap_or(raw))
-        }
-        FieldValue::List(values) => FieldValue::List(
-            values
-                .into_iter()
-                .map(|raw| lookup_mapping_value(&detail.values, &raw).unwrap_or(raw))
-                .collect(),
-        ),
+        FieldValue::String(raw) => FieldValue::String(lookup_mapping_value(&detail.values, &raw).unwrap_or(raw)),
+        FieldValue::List(values) => FieldValue::List(values.into_iter().map(|raw| lookup_mapping_value(&detail.values, &raw).unwrap_or(raw)).collect()),
     }
 }
 
-pub(super) fn lookup_mapping_value(
-    map: &std::collections::BTreeMap<String, String>,
-    value: &str,
-) -> Option<String> {
+pub(super) fn lookup_mapping_value(map: &std::collections::BTreeMap<String, String>, value: &str) -> Option<String> {
     if let Some(found) = map.get(value) {
         return Some(found.clone());
     }
     let target = value.to_ascii_lowercase();
-    map.iter()
-        .find(|(key, _)| key.to_ascii_lowercase() == target)
-        .map(|(_, val)| val.clone())
+    map.iter().find(|(key, _)| key.to_ascii_lowercase() == target).map(|(_, val)| val.clone())
 }
 
 pub(super) fn field_expects_list(provider: SyncProvider, remote_field: &str) -> bool {
@@ -353,42 +264,22 @@ pub(super) fn field_expects_list(provider: SyncProvider, remote_field: &str) -> 
 pub(super) fn local_value_for_field(task: &TaskDTO, field: &str) -> Option<FieldValue> {
     match field {
         "title" => Some(FieldValue::String(task.title.clone())),
-        "description" => task
-            .description
-            .as_ref()
-            .map(|value| FieldValue::String(value.clone())),
+        "description" => task.description.as_ref().map(|value| FieldValue::String(value.clone())),
         "status" => Some(FieldValue::String(task.status.to_string())),
         "task_type" | "type" => Some(FieldValue::String(task.task_type.to_string())),
         "priority" => Some(FieldValue::String(task.priority.to_string())),
-        "assignee" => task
-            .assignee
-            .as_ref()
-            .map(|value| FieldValue::String(value.clone())),
-        "reporter" => task
-            .reporter
-            .as_ref()
-            .map(|value| FieldValue::String(value.clone())),
+        "assignee" => task.assignee.as_ref().map(|value| FieldValue::String(value.clone())),
+        "reporter" => task.reporter.as_ref().map(|value| FieldValue::String(value.clone())),
         "tags" => Some(FieldValue::List(task.tags.clone())),
-        other => task
-            .custom_fields
-            .get(other)
-            .and_then(custom_field_value_to_field_value),
+        other => task.custom_fields.get(other).and_then(custom_field_value_to_field_value),
     }
 }
 
 pub(super) fn format_field_list(fields: &[String]) -> Option<String> {
-    let mut values = fields
-        .iter()
-        .map(|field| field.trim().to_string())
-        .filter(|field| !field.is_empty())
-        .collect::<Vec<_>>();
+    let mut values = fields.iter().map(|field| field.trim().to_string()).filter(|field| !field.is_empty()).collect::<Vec<_>>();
     values.sort();
     values.dedup();
-    if values.is_empty() {
-        None
-    } else {
-        Some(values.join(", "))
-    }
+    if values.is_empty() { None } else { Some(values.join(", ")) }
 }
 
 #[cfg(test)]
@@ -489,10 +380,7 @@ mod sync_mapping_tests {
             "priority".to_string(),
             SyncFieldMapping::Detailed(SyncFieldMappingDetail {
                 field: Some("labels".to_string()),
-                values: std::collections::BTreeMap::from([(
-                    String::from("Medium"),
-                    String::from("priority:medium"),
-                )]),
+                values: std::collections::BTreeMap::from([(String::from("Medium"), String::from("priority:medium"))]),
                 ..Default::default()
             }),
         );
@@ -523,10 +411,7 @@ mod sync_mapping_tests {
             "status".to_string(),
             SyncFieldMapping::Detailed(SyncFieldMappingDetail {
                 field: Some("state".to_string()),
-                values: std::collections::BTreeMap::from([
-                    (String::from("Todo"), String::from("open")),
-                    (String::from("InProgress"), String::from("open")),
-                ]),
+                values: std::collections::BTreeMap::from([(String::from("Todo"), String::from("open")), (String::from("InProgress"), String::from("open"))]),
                 ..Default::default()
             }),
         );
@@ -535,8 +420,7 @@ mod sync_mapping_tests {
         let mut existing = sample_task();
         existing.status = TaskStatus::from("Todo");
 
-        let update =
-            build_task_update_from_issue(SyncProvider::Github, &remote, &issue, Some(&existing));
+        let update = build_task_update_from_issue(SyncProvider::Github, &remote, &issue, Some(&existing));
         assert!(update.status.is_none());
     }
 
@@ -545,11 +429,7 @@ mod sync_mapping_tests {
         let tmp = tempfile::tempdir().unwrap();
         let tasks_dir = tmp.path().join(".tasks");
         std::fs::create_dir_all(tasks_dir.join("SYNC")).unwrap();
-        std::fs::write(
-            tasks_dir.join("SYNC").join("config.yml"),
-            "issue_states: [Todo, Done]\n",
-        )
-        .unwrap();
+        std::fs::write(tasks_dir.join("SYNC").join("config.yml"), "issue_states: [Todo, Done]\n").unwrap();
 
         let mut remote = SyncRemoteConfig {
             provider: SyncProvider::Github,
@@ -572,40 +452,22 @@ mod sync_mapping_tests {
         );
 
         let issue = json!({"state": "open", "title": "Sync enum mismatch", "number": 1});
-        let create =
-            build_task_create_from_issue(SyncProvider::Github, &remote, &issue, "SYNC").unwrap();
+        let create = build_task_create_from_issue(SyncProvider::Github, &remote, &issue, "SYNC").unwrap();
         assert_eq!(create.status.as_deref(), Some("Bogus"));
 
         let mut storage = crate::storage::manager::Storage::new(&tasks_dir);
-        let err = TaskService::create(&mut storage, create)
-            .expect_err("status outside project enums must fail");
+        let err = TaskService::create(&mut storage, create).expect_err("status outside project enums must fail");
         match err {
             LoTaRError::ValidationError(msg) => {
-                assert!(
-                    msg.contains("not enabled") && msg.contains("Todo, Done"),
-                    "unexpected message: {msg}"
-                );
+                assert!(msg.contains("not enabled") && msg.contains("Todo, Done"), "unexpected message: {msg}");
             }
             other => panic!("expected validation error, got {other:?}"),
         }
         let task_files = std::fs::read_dir(tasks_dir.join("SYNC"))
             .unwrap()
-            .filter(|entry| {
-                entry
-                    .as_ref()
-                    .ok()
-                    .and_then(|e| {
-                        e.file_name()
-                            .to_str()
-                            .map(|n| n.ends_with(".yml") && n != "config.yml")
-                    })
-                    .unwrap_or(false)
-            })
+            .filter(|entry| entry.as_ref().ok().and_then(|e| e.file_name().to_str().map(|n| n.ends_with(".yml") && n != "config.yml")).unwrap_or(false))
             .count();
-        assert_eq!(
-            task_files, 0,
-            "failed sync create must not leave a task file"
-        );
+        assert_eq!(task_files, 0, "failed sync create must not leave a task file");
     }
 
     #[test]
@@ -619,10 +481,7 @@ mod sync_mapping_tests {
             mapping: std::collections::BTreeMap::new(),
         };
         let mut task = sample_task();
-        task.references.push(ReferenceEntry {
-            jira: Some("LTS-1".to_string()),
-            ..Default::default()
-        });
+        task.references.push(ReferenceEntry { jira: Some("LTS-1".to_string()), ..Default::default() });
 
         match determine_reference_state(&remote, &task) {
             ReferenceState::ProviderOnly(value) => assert_eq!(value, "LTS-1"),

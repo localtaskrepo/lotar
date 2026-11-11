@@ -10,11 +10,7 @@ fn run_git(repo: &std::path::Path, args: &[&str], envs: &[(&str, &str)]) {
     }
     let out = cmd.output().expect("failed to run git");
     if !out.status.success() {
-        panic!(
-            "git {:?} failed: {}",
-            args,
-            String::from_utf8_lossy(&out.stderr)
-        );
+        panic!("git {:?} failed: {}", args, String::from_utf8_lossy(&out.stderr));
     }
 }
 
@@ -32,13 +28,7 @@ fn write_file(root: &std::path::Path, rel: &str, content: &str) {
     std::fs::write(&path, content).unwrap();
 }
 
-fn add_and_commit(
-    repo: &std::path::Path,
-    rel: &str,
-    author: (&str, &str),
-    date_rfc3339: &str,
-    msg: &str,
-) {
+fn add_and_commit(repo: &std::path::Path, rel: &str, author: (&str, &str), date_rfc3339: &str, msg: &str) {
     run_git(repo, &["add", rel], &[]);
     let envs = [
         ("GIT_AUTHOR_NAME", author.0),
@@ -66,31 +56,11 @@ mod git_required {
 
         // Create two tasks: one very old, one recent
         write_file(root, ".tasks/TEST/config.yml", "project_name: TEST\n");
-        write_file(
-            root,
-            ".tasks/TEST/1.yml",
-            "title: Old\nstatus: TODO\ncreated: 2000-01-01T00:00:00Z\nmodified: 2000-01-01T00:00:00Z\n",
-        );
-        add_and_commit(
-            root,
-            ".tasks/TEST/1.yml",
-            ("Old", "old@example.com"),
-            "2000-01-01T00:00:00Z",
-            "old",
-        );
+        write_file(root, ".tasks/TEST/1.yml", "title: Old\nstatus: TODO\ncreated: 2000-01-01T00:00:00Z\nmodified: 2000-01-01T00:00:00Z\n");
+        add_and_commit(root, ".tasks/TEST/1.yml", ("Old", "old@example.com"), "2000-01-01T00:00:00Z", "old");
 
-        write_file(
-            root,
-            ".tasks/TEST/2.yml",
-            "title: New\nstatus: TODO\ncreated: 2025-08-18T00:00:00Z\nmodified: 2025-08-18T00:00:00Z\n",
-        );
-        add_and_commit(
-            root,
-            ".tasks/TEST/2.yml",
-            ("New", "new@example.com"),
-            "2025-08-18T00:00:00Z",
-            "new",
-        );
+        write_file(root, ".tasks/TEST/2.yml", "title: New\nstatus: TODO\ncreated: 2025-08-18T00:00:00Z\nmodified: 2025-08-18T00:00:00Z\n");
+        add_and_commit(root, ".tasks/TEST/2.yml", ("New", "new@example.com"), "2025-08-18T00:00:00Z", "new");
 
         // Threshold 7000d should include the old task but not the new; stale
         // reads each task's `modified` time (DEV-3), which here matches git.
@@ -100,15 +70,7 @@ mod git_required {
             .env("LOTAR_IGNORE_HOME_CONFIG", "1")
             .env("LOTAR_IGNORE_ENV_TASKS_DIR", "1")
             .env("LOTAR_TEST_MODE", "1")
-            .args([
-                "--format",
-                "json",
-                "stats",
-                "stale",
-                "--threshold",
-                "7000d",
-                "--global",
-            ])
+            .args(["--format", "json", "stats", "stale", "--threshold", "7000d", "--global"])
             .output()
             .unwrap();
         assert!(out.status.success());

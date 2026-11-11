@@ -8,8 +8,7 @@ pub use detectors_mod::{DetectContext, IdentityDetection, IdentitySource};
 // Detection cache keyed by configuration contents/layers + project + Git metadata.
 // A single cache backs both resolve_current_user and resolve_current_user_explain
 // so the two APIs can never disagree.
-static IDENTITY_CACHE: OnceLock<RwLock<HashMap<String, Option<IdentityDetection>>>> =
-    OnceLock::new();
+static IDENTITY_CACHE: OnceLock<RwLock<HashMap<String, Option<IdentityDetection>>>> = OnceLock::new();
 
 fn identity_cache() -> &'static RwLock<HashMap<String, Option<IdentityDetection>>> {
     IDENTITY_CACHE.get_or_init(|| RwLock::new(HashMap::new()))
@@ -19,9 +18,7 @@ fn cache_key(tasks_root: Option<&Path>, project: Option<&str>) -> String {
     let config = crate::config::resolution::config_cache_signature(tasks_root, project);
 
     // Include git config and HEAD mtimes so the key changes on updates/branch switches
-    let start = tasks_root
-        .and_then(|r| r.parent().map(|p| p.to_path_buf()))
-        .or_else(|| std::env::current_dir().ok());
+    let start = tasks_root.and_then(|r| r.parent().map(|p| p.to_path_buf())).or_else(|| std::env::current_dir().ok());
     let git_stamp = if let Some(start) = start
         && let Some(repo_root) = crate::utils::git::find_repo_root(&start)
     {
@@ -37,19 +34,12 @@ pub(crate) fn git_cache_fingerprint(git_entry: &Path) -> String {
     let Some((git_dir, common_dir)) = super::git::metadata_dirs(git_entry) else {
         return String::new();
     };
-    let mtime_of = |path: &Path| {
-        std::fs::metadata(path)
-            .and_then(|metadata| metadata.modified())
-            .ok()
-    };
+    let mtime_of = |path: &Path| std::fs::metadata(path).and_then(|metadata| metadata.modified()).ok();
     let config_modified = mtime_of(&common_dir.join("config"));
     let head_modified = mtime_of(&git_dir.join("HEAD"));
     // Include target paths as well as stable timestamps: routing can change
     // without a timestamp change, and file age must not churn cache keys.
-    format!(
-        "{:?}",
-        (git_dir, common_dir, config_modified, head_modified)
-    )
+    format!("{:?}", (git_dir, common_dir, config_modified, head_modified))
 }
 
 /// Resolve current user identity used for reporter/assignee detection.
@@ -67,36 +57,22 @@ pub fn resolve_current_user_explain(tasks_root: Option<&Path>) -> Option<Identit
 /// Select an explicit project or the configured default, accepting names or prefixes.
 /// This lookup never initializes configuration or a project.
 pub fn effective_project(tasks_root: Option<&Path>, project: Option<&str>) -> Option<String> {
-    let selected = project
-        .map(str::trim)
-        .filter(|p| !p.is_empty())
-        .map(str::to_owned)
-        .or_else(|| {
-            let base = crate::config::resolution::load_and_merge_configs(tasks_root).ok()?;
-            let project = base.default_project.trim();
-            (!project.is_empty()).then(|| project.to_string())
-        })?;
-    let root = tasks_root
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| crate::utils::paths::tasks_root_from(Path::new(".")));
-    Some(crate::utils::project::resolve_project_input(
-        &selected, &root,
-    ))
+    let selected = project.map(str::trim).filter(|p| !p.is_empty()).map(str::to_owned).or_else(|| {
+        let base = crate::config::resolution::load_and_merge_configs(tasks_root).ok()?;
+        let project = base.default_project.trim();
+        (!project.is_empty()).then(|| project.to_string())
+    })?;
+    let root = tasks_root.map(Path::to_path_buf).unwrap_or_else(|| crate::utils::paths::tasks_root_from(Path::new(".")));
+    Some(crate::utils::project::resolve_project_input(&selected, &root))
 }
 
 /// Resolve identity in an explicit project, or the configured default when omitted.
-pub fn resolve_current_user_for_project(
-    tasks_root: Option<&Path>,
-    project: Option<&str>,
-) -> Option<String> {
+pub fn resolve_current_user_for_project(tasks_root: Option<&Path>, project: Option<&str>) -> Option<String> {
     resolve_current_user_explain_for_project(tasks_root, project).map(|d| d.user)
 }
 
 /// Explain identity using the same effective project and cache as ordinary resolution.
-pub fn resolve_current_user_explain_for_project(
-    tasks_root: Option<&Path>,
-    project: Option<&str>,
-) -> Option<IdentityDetection> {
+pub fn resolve_current_user_explain_for_project(tasks_root: Option<&Path>, project: Option<&str>) -> Option<IdentityDetection> {
     let project = effective_project(tasks_root, project);
     let key = cache_key(tasks_root, project.as_deref());
     if let Ok(guard) = identity_cache().read()
@@ -105,10 +81,7 @@ pub fn resolve_current_user_explain_for_project(
         return cached.clone();
     }
 
-    let ctx = DetectContext {
-        tasks_root,
-        project: project.as_deref(),
-    };
+    let ctx = DetectContext { tasks_root, project: project.as_deref() };
     let found = detectors_mod::detect_identity(&ctx);
     if let Ok(mut guard) = identity_cache().write() {
         if guard.len() >= 256 {
@@ -126,16 +99,8 @@ pub fn resolve_me_alias(input: &str, tasks_root: Option<&Path>) -> Option<String
 }
 
 /// Expand @me in the same project scope as the task or query using it.
-pub fn resolve_me_alias_for_project(
-    input: &str,
-    tasks_root: Option<&Path>,
-    project: Option<&str>,
-) -> Option<String> {
-    if input == "@me" {
-        resolve_current_user_for_project(tasks_root, project)
-    } else {
-        Some(input.to_string())
-    }
+pub fn resolve_me_alias_for_project(input: &str, tasks_root: Option<&Path>, project: Option<&str>) -> Option<String> {
+    if input == "@me" { resolve_current_user_for_project(tasks_root, project) } else { Some(input.to_string()) }
 }
 
 /// Invalidate cached identity (clear all entries; conservative and safe)
@@ -161,20 +126,9 @@ mod tests {
         std::fs::write(&path, "auto.identity_git: true \n").unwrap();
         let stamp = std::fs::metadata(&path).unwrap().modified().unwrap();
         let before = super::cache_key(Some(&tasks), Some("TEST"));
-        assert!(
-            before == super::cache_key(Some(&tasks), Some("TEST")),
-            "unchanged configuration must keep a stable cache key"
-        );
+        assert!(before == super::cache_key(Some(&tasks), Some("TEST")), "unchanged configuration must keep a stable cache key");
         std::fs::write(&path, "auto.identity_git: false\n").unwrap();
-        std::fs::File::options()
-            .write(true)
-            .open(&path)
-            .unwrap()
-            .set_modified(stamp)
-            .unwrap();
-        assert!(
-            before != super::cache_key(Some(&tasks), Some("TEST")),
-            "identity cache key ignored a configuration change"
-        );
+        std::fs::File::options().write(true).open(&path).unwrap().set_modified(stamp).unwrap();
+        assert!(before != super::cache_key(Some(&tasks), Some("TEST")), "identity cache key ignored a configuration change");
     }
 }

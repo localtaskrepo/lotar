@@ -6,23 +6,14 @@ use predicates::prelude::*;
 #[test]
 fn agent_check_flags_in_progress_tasks() {
     let fixtures = TestFixtures::new();
-    let _tasks = EnvVarGuard::set(
-        "LOTAR_TASKS_DIR",
-        fixtures.tasks_root.to_string_lossy().as_ref(),
-    );
+    let _tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", fixtures.tasks_root.to_string_lossy().as_ref());
     let _silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
 
     let mut cmd = crate::common::lotar_cmd().unwrap();
-    cmd.current_dir(fixtures.get_temp_path())
-        .args(["add", "Check task", "--project=TEST"])
-        .assert()
-        .success();
+    cmd.current_dir(fixtures.get_temp_path()).args(["add", "Check task", "--project=TEST"]).assert().success();
 
     let mut cmd = crate::common::lotar_cmd().unwrap();
-    cmd.current_dir(fixtures.get_temp_path())
-        .args(["status", "TEST-1", "InProgress"])
-        .assert()
-        .success();
+    cmd.current_dir(fixtures.get_temp_path()).args(["status", "TEST-1", "InProgress"]).assert().success();
 
     // Explicit --status since there's no default automation configured
     let mut cmd = crate::common::lotar_cmd().unwrap();
@@ -36,30 +27,18 @@ fn agent_check_flags_in_progress_tasks() {
 #[test]
 fn agent_check_passes_when_no_match() {
     let fixtures = TestFixtures::new();
-    let _tasks = EnvVarGuard::set(
-        "LOTAR_TASKS_DIR",
-        fixtures.tasks_root.to_string_lossy().as_ref(),
-    );
+    let _tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", fixtures.tasks_root.to_string_lossy().as_ref());
     let _silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
 
     let mut cmd = crate::common::lotar_cmd().unwrap();
-    cmd.current_dir(fixtures.get_temp_path())
-        .args(["add", "Done task", "--project=TEST"])
-        .assert()
-        .success();
+    cmd.current_dir(fixtures.get_temp_path()).args(["add", "Done task", "--project=TEST"]).assert().success();
 
     let mut cmd = crate::common::lotar_cmd().unwrap();
-    cmd.current_dir(fixtures.get_temp_path())
-        .args(["status", "TEST-1", "Done"])
-        .assert()
-        .success();
+    cmd.current_dir(fixtures.get_temp_path()).args(["status", "TEST-1", "Done"]).assert().success();
 
     // Explicit --status since there's no default automation configured
     let mut cmd = crate::common::lotar_cmd().unwrap();
-    cmd.current_dir(fixtures.get_temp_path())
-        .args(["-p", "TEST", "agent", "check", "--status", "InProgress"])
-        .assert()
-        .success();
+    cmd.current_dir(fixtures.get_temp_path()).args(["-p", "TEST", "agent", "check", "--status", "InProgress"]).assert().success();
 }
 
 /// `lotar agent run --model/--effort` overrides the profile for that run;
@@ -69,10 +48,7 @@ fn agent_check_passes_when_no_match() {
 fn agent_run_takes_model_and_effort() {
     let fixtures = TestFixtures::new();
     let root = fixtures.get_temp_path();
-    let _tasks = EnvVarGuard::set(
-        "LOTAR_TASKS_DIR",
-        fixtures.tasks_root.to_string_lossy().as_ref(),
-    );
+    let _tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", fixtures.tasks_root.to_string_lossy().as_ref());
     let _silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
     let seen = root.join("settings.txt");
     fixtures.create_config_in_dir(
@@ -82,25 +58,12 @@ fn agent_run_takes_model_and_effort() {
             seen.display()
         ),
     );
-    crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(root)
-        .args(["add", "Run settings"])
-        .assert()
-        .success();
+    crate::common::lotar_cmd().unwrap().current_dir(root).args(["add", "Run settings"]).assert().success();
 
     crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
-        .args([
-            "agent",
-            "run",
-            "TEST-1",
-            "go",
-            "--agent",
-            "stub",
-            "--model=--yolo",
-        ])
+        .args(["agent", "run", "TEST-1", "go", "--agent", "stub", "--model=--yolo"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("Invalid agent model"));
@@ -109,16 +72,11 @@ fn agent_run_takes_model_and_effort() {
     crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
-        .args([
-            "agent", "run", "TEST-1", "go", "--agent", "stub", "--effort", "high", "--wait",
-        ])
+        .args(["agent", "run", "TEST-1", "go", "--agent", "stub", "--effort", "high", "--wait"])
         .assert()
         .success()
         .stdout(predicate::str::contains("model profile-model, effort high"));
-    assert_eq!(
-        std::fs::read_to_string(&seen).unwrap(),
-        "profile-model|high"
-    );
+    assert_eq!(std::fs::read_to_string(&seen).unwrap(), "profile-model|high");
 }
 
 /// Without --wait the command exits at once, so the job must run in the
@@ -128,15 +86,9 @@ fn agent_run_takes_model_and_effort() {
 fn agent_run_without_wait_still_runs_the_job() {
     let fixtures = TestFixtures::new();
     let root = fixtures.get_temp_path();
-    let _tasks = EnvVarGuard::set(
-        "LOTAR_TASKS_DIR",
-        fixtures.tasks_root.to_string_lossy().as_ref(),
-    );
+    let _tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", fixtures.tasks_root.to_string_lossy().as_ref());
     let queue_dir = root.join("queue");
-    let _queue = EnvVarGuard::set(
-        "LOTAR_AGENT_QUEUE_DIR",
-        queue_dir.to_string_lossy().as_ref(),
-    );
+    let _queue = EnvVarGuard::set("LOTAR_AGENT_QUEUE_DIR", queue_dir.to_string_lossy().as_ref());
     let _silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
     let done = root.join("AGENT_DONE");
     fixtures.create_config_in_dir(
@@ -146,12 +98,7 @@ fn agent_run_without_wait_still_runs_the_job() {
             done.display()
         ),
     );
-    crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(root)
-        .args(["add", "Background job"])
-        .assert()
-        .success();
+    crate::common::lotar_cmd().unwrap().current_dir(root).args(["add", "Background job"]).assert().success();
 
     crate::common::lotar_cmd()
         .unwrap()
@@ -173,10 +120,7 @@ fn agent_run_without_wait_still_runs_the_job() {
     while !done.exists() && std::time::Instant::now() < deadline {
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
-    assert!(
-        done.exists(),
-        "the queued job never ran after the CLI exited"
-    );
+    assert!(done.exists(), "the queued job never ran after the CLI exited");
 }
 
 /// Agents call the CLI themselves; the job tells them which build started it
@@ -185,10 +129,7 @@ fn agent_run_without_wait_still_runs_the_job() {
 fn agent_jobs_get_the_running_lotar_binary() {
     let fixtures = TestFixtures::new();
     let root = fixtures.get_temp_path();
-    let _tasks = EnvVarGuard::set(
-        "LOTAR_TASKS_DIR",
-        fixtures.tasks_root.to_string_lossy().as_ref(),
-    );
+    let _tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", fixtures.tasks_root.to_string_lossy().as_ref());
     let _silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
     let seen = root.join("bin.txt");
     fixtures.create_config_in_dir(
@@ -198,28 +139,14 @@ fn agent_jobs_get_the_running_lotar_binary() {
             seen.display()
         ),
     );
-    crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(root)
-        .args(["add", "Which binary"])
-        .assert()
-        .success();
-    crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(root)
-        .args(["agent", "run", "TEST-1", "go", "--agent", "stub", "--wait"])
-        .assert()
-        .success();
+    crate::common::lotar_cmd().unwrap().current_dir(root).args(["add", "Which binary"]).assert().success();
+    crate::common::lotar_cmd().unwrap().current_dir(root).args(["agent", "run", "TEST-1", "go", "--agent", "stub", "--wait"]).assert().success();
     let seen = std::fs::read_to_string(&seen).unwrap();
     let parts: Vec<&str> = seen.split('|').collect();
     let expected = std::fs::canonicalize(env!("CARGO_BIN_EXE_lotar")).unwrap();
     assert_eq!(std::fs::canonicalize(parts[0]).unwrap(), expected);
     assert_eq!(parts[1], "TEST");
-    assert_eq!(
-        std::fs::canonicalize(parts[2]).unwrap(),
-        expected.parent().unwrap(),
-        "the running build's directory comes first on PATH"
-    );
+    assert_eq!(std::fs::canonicalize(parts[2]).unwrap(), expected.parent().unwrap(), "the running build's directory comes first on PATH");
 }
 
 /// The runner's final answer is the job summary even when a note (denied
@@ -229,10 +156,7 @@ fn agent_jobs_get_the_running_lotar_binary() {
 fn agent_job_summary_is_the_final_answer() {
     let fixtures = TestFixtures::new();
     let root = fixtures.get_temp_path();
-    let _tasks = EnvVarGuard::set(
-        "LOTAR_TASKS_DIR",
-        fixtures.tasks_root.to_string_lossy().as_ref(),
-    );
+    let _tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", fixtures.tasks_root.to_string_lossy().as_ref());
     let _silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
     let stub = root.join("claude-stub.sh");
     std::fs::write(
@@ -249,17 +173,9 @@ echo '{"type":"result","subtype":"success","is_error":false,"result":"Fixed it."
     std::fs::set_permissions(&stub, std::fs::Permissions::from_mode(0o755)).unwrap();
     fixtures.create_config_in_dir(
         &fixtures.tasks_root,
-        &format!(
-            "default:\n  project: TEST\nagents:\n  fixer:\n    runner: claude\n    command: \"{}\"\n",
-            stub.display()
-        ),
+        &format!("default:\n  project: TEST\nagents:\n  fixer:\n    runner: claude\n    command: \"{}\"\n", stub.display()),
     );
-    crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(root)
-        .args(["add", "Summary"])
-        .assert()
-        .success();
+    crate::common::lotar_cmd().unwrap().current_dir(root).args(["add", "Summary"]).assert().success();
     crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
@@ -276,43 +192,20 @@ echo '{"type":"result","subtype":"success","is_error":false,"result":"Fixed it."
 fn finished_jobs_can_be_read_back_without_configuring_logs() {
     let fixtures = TestFixtures::new();
     let root = fixtures.get_temp_path();
-    let _tasks = EnvVarGuard::set(
-        "LOTAR_TASKS_DIR",
-        fixtures.tasks_root.to_string_lossy().as_ref(),
-    );
+    let _tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", fixtures.tasks_root.to_string_lossy().as_ref());
     let _silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
     fixtures.create_config_in_dir(
         &fixtures.tasks_root,
         "default:\n  project: TEST\nagents:\n  stub:\n    runner: command\n    command: sh\n    args: ['-c', 'echo done']\n",
     );
-    crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(root)
-        .args(["add", "Logged job"])
-        .assert()
-        .success();
-    let run = crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(root)
-        .args(["agent", "run", "TEST-1", "go", "--agent", "stub", "--wait"])
-        .output()
-        .unwrap();
+    crate::common::lotar_cmd().unwrap().current_dir(root).args(["add", "Logged job"]).assert().success();
+    let run = crate::common::lotar_cmd().unwrap().current_dir(root).args(["agent", "run", "TEST-1", "go", "--agent", "stub", "--wait"]).output().unwrap();
     assert!(run.status.success());
     let stdout = String::from_utf8_lossy(&run.stdout);
-    let job_id = stdout
-        .split_whitespace()
-        .find(|word| word.starts_with("job-"))
-        .expect("job id in output")
-        .to_string();
+    let job_id = stdout.split_whitespace().find(|word| word.starts_with("job-")).expect("job id in output").to_string();
 
     let logs = fixtures.tasks_root.join("@agent-logs");
     assert!(logs.join(format!("{job_id}.jsonl")).exists());
     assert!(logs.join(".gitignore").exists());
-    crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(root)
-        .args(["agent", "status", &job_id])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("completed"));
+    crate::common::lotar_cmd().unwrap().current_dir(root).args(["agent", "status", &job_id]).assert().success().stdout(predicate::str::contains("completed"));
 }

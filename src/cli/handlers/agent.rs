@@ -1,8 +1,7 @@
 use crate::api_types::AgentJobCreateRequest;
 use crate::automation::types::AutomationFile;
 use crate::cli::args::{
-    AgentAction, AgentCheckArgs, AgentListJobsArgs, AgentQueueAction, AgentQueueArgs, AgentRunArgs,
-    AgentWorkerArgs, WorktreeAction, WorktreeCleanupArgs,
+    AgentAction, AgentCheckArgs, AgentListJobsArgs, AgentQueueAction, AgentQueueArgs, AgentRunArgs, AgentWorkerArgs, WorktreeAction, WorktreeCleanupArgs,
 };
 use crate::config::manager::ConfigManager;
 use crate::output::{OutputFormat, OutputRenderer};
@@ -22,19 +21,10 @@ use sysinfo::{ProcessesToUpdate, System};
 /// Get the logs directory and workspace root from config.
 /// Returns (workspace_root, logs_dir) where logs_dir is None when logging is off.
 fn get_logs_config(resolver: &TasksDirectoryResolver) -> (std::path::PathBuf, Option<String>) {
-    let workspace_root = resolver
-        .path
-        .parent()
-        .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| resolver.path.clone());
+    let workspace_root = resolver.path.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| resolver.path.clone());
 
-    let configured = ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path)
-        .ok()
-        .and_then(|cfg| cfg.get_resolved_config().agent_logs_dir.clone());
-    let logs_dir = crate::services::agent_log_service::effective_logs_dir(
-        &resolver.path,
-        configured.as_deref(),
-    );
+    let configured = ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path).ok().and_then(|cfg| cfg.get_resolved_config().agent_logs_dir.clone());
+    let logs_dir = crate::services::agent_log_service::effective_logs_dir(&resolver.path, configured.as_deref());
 
     (workspace_root, logs_dir)
 }
@@ -42,12 +32,7 @@ fn get_logs_config(resolver: &TasksDirectoryResolver) -> (std::path::PathBuf, Op
 pub struct AgentHandler;
 
 impl AgentHandler {
-    pub fn execute(
-        action: AgentAction,
-        project: Option<&str>,
-        resolver: &TasksDirectoryResolver,
-        renderer: &OutputRenderer,
-    ) -> Result<(), String> {
+    pub fn execute(action: AgentAction, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
         match action {
             AgentAction::Run(args) => Self::run(args, resolver, renderer),
             AgentAction::Status { id } => Self::status(&id, resolver, renderer),
@@ -59,19 +44,13 @@ impl AgentHandler {
             AgentAction::Queue(args) => Self::queue(args, resolver, renderer),
             AgentAction::Worktree(args) => match args.action {
                 WorktreeAction::List => Self::worktree_list(resolver, renderer),
-                WorktreeAction::Cleanup(cleanup_args) => {
-                    Self::worktree_cleanup(&cleanup_args, resolver, renderer)
-                }
+                WorktreeAction::Cleanup(cleanup_args) => Self::worktree_cleanup(&cleanup_args, resolver, renderer),
             },
             AgentAction::Worker(args) => Self::worker(args, resolver),
         }
     }
 
-    fn run(
-        args: AgentRunArgs,
-        resolver: &TasksDirectoryResolver,
-        renderer: &OutputRenderer,
-    ) -> Result<(), String> {
+    fn run(args: AgentRunArgs, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
         let req = AgentJobCreateRequest {
             ticket_id: args.ticket,
             prompt: args.prompt,
@@ -100,42 +79,20 @@ impl AgentHandler {
             }
         }
 
-        let finished = wait_for_job_completion(
-            &job.id,
-            args.follow && !json,
-            args.timeout_seconds,
-            renderer,
-        )?;
+        let finished = wait_for_job_completion(&job.id, args.follow && !json, args.timeout_seconds, renderer)?;
         if json {
             renderer.emit_json(&serde_json::json!({ "job": finished }));
         }
-        if finished.status.eq_ignore_ascii_case("completed") {
-            Ok(())
-        } else {
-            Err(format!(
-                "Job '{}' ended with status {}",
-                finished.id, finished.status
-            ))
-        }
+        if finished.status.eq_ignore_ascii_case("completed") { Ok(()) } else { Err(format!("Job '{}' ended with status {}", finished.id, finished.status)) }
     }
 
     /// Without `--wait`, the job cannot run on a thread of this process: the
     /// command exits right away and takes the thread with it (DEV-257).
     /// Validate it here, then hand it to the detached queue worker.
-    fn queue_run(
-        req: AgentJobCreateRequest,
-        resolver: &TasksDirectoryResolver,
-        renderer: &OutputRenderer,
-    ) -> Result<(), String> {
+    fn queue_run(req: AgentJobCreateRequest, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
         AgentJobService::preflight(&req, &resolver.path).map_err(|e| e.to_string())?;
-        let ticket = crate::storage::TaskId::parse(req.ticket_id.trim())
-            .map(|id| id.canonical())
-            .unwrap_or_else(|_| req.ticket_id.trim().to_string());
-        let who = req
-            .agent
-            .clone()
-            .or_else(|| req.runner.clone())
-            .unwrap_or_default();
+        let ticket = crate::storage::TaskId::parse(req.ticket_id.trim()).map(|id| id.canonical()).unwrap_or_else(|_| req.ticket_id.trim().to_string());
+        let who = req.agent.clone().or_else(|| req.runner.clone()).unwrap_or_default();
         let queued = AgentQueueService::enqueue(&resolver.path, req).map_err(|e| e.to_string())?;
 
         if matches!(renderer.format, OutputFormat::Json) {
@@ -147,23 +104,15 @@ impl AgentHandler {
             return Ok(());
         }
         if queued {
-            renderer.emit_success(format!(
-                "Queued {ticket} for {who}; a background worker starts the job"
-            ));
+            renderer.emit_success(format!("Queued {ticket} for {who}; a background worker starts the job"));
         } else {
             renderer.emit_notice(format!("{ticket} is already queued for {who}"));
         }
-        renderer.emit_info(
-            "Check progress with `lotar agent queue` and `lotar agent list-jobs`, or pass --wait to run it in this terminal.",
-        );
+        renderer.emit_info("Check progress with `lotar agent queue` and `lotar agent list-jobs`, or pass --wait to run it in this terminal.");
         Ok(())
     }
 
-    fn status(
-        id: &str,
-        resolver: &TasksDirectoryResolver,
-        renderer: &OutputRenderer,
-    ) -> Result<(), String> {
+    fn status(id: &str, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
         // Try in-memory registry first
         if let Some(job) = AgentJobService::get_job(id) {
             if matches!(renderer.format, OutputFormat::Json) {
@@ -193,10 +142,7 @@ impl AgentHandler {
                     "owner_pid": active.owner_pid,
                 }}));
             } else {
-                renderer.emit_success(format!(
-                    "Job {}: running (in process {})",
-                    active.job_id, active.owner_pid
-                ));
+                renderer.emit_success(format!("Job {}: running (in process {})", active.job_id, active.owner_pid));
                 renderer.emit_info(format!("Ticket: {}", active.ticket_id));
             }
             return Ok(());
@@ -208,12 +154,10 @@ impl AgentHandler {
             return Err(format!("Job '{}' not found (agent logging is off)", id));
         };
 
-        let header = AgentLogService::load_header(&workspace_root, &logs_dir, id)
-            .map_err(|e| e.to_string())?
-            .ok_or_else(|| format!("Job '{}' not found", id))?;
+        let header =
+            AgentLogService::load_header(&workspace_root, &logs_dir, id).map_err(|e| e.to_string())?.ok_or_else(|| format!("Job '{}' not found", id))?;
 
-        let status = AgentLogService::load_status(&workspace_root, &logs_dir, id)
-            .map_err(|e| e.to_string())?;
+        let status = AgentLogService::load_status(&workspace_root, &logs_dir, id).map_err(|e| e.to_string())?;
 
         if matches!(renderer.format, OutputFormat::Json) {
             let job = serde_json::json!({
@@ -234,10 +178,7 @@ impl AgentHandler {
             return Ok(());
         }
 
-        let status_str = status
-            .as_ref()
-            .map(|s| s.status.as_str())
-            .unwrap_or("unknown");
+        let status_str = status.as_ref().map(|s| s.status.as_str()).unwrap_or("unknown");
         renderer.emit_success(format!("Job {}: {}", header.job_id, status_str));
         renderer.emit_info(format!("Ticket: {}", header.ticket_id));
         renderer.emit_info(format!("Runner: {}", header.runner));
@@ -258,11 +199,7 @@ impl AgentHandler {
         Ok(())
     }
 
-    fn logs(
-        id: &str,
-        resolver: &TasksDirectoryResolver,
-        renderer: &OutputRenderer,
-    ) -> Result<(), String> {
+    fn logs(id: &str, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
         // Try in-memory registry first
         let events = AgentJobService::events_for(id);
         if !events.is_empty() {
@@ -287,8 +224,7 @@ impl AgentHandler {
             return Ok(());
         };
 
-        let log_events = AgentLogService::load_events(&workspace_root, &logs_dir, id)
-            .map_err(|e| e.to_string())?;
+        let log_events = AgentLogService::load_events(&workspace_root, &logs_dir, id).map_err(|e| e.to_string())?;
 
         if matches!(renderer.format, OutputFormat::Json) {
             renderer.emit_json(&serde_json::json!({ "events": log_events }));
@@ -310,31 +246,22 @@ impl AgentHandler {
         Ok(())
     }
 
-    fn cancel(
-        id: &str,
-        resolver: &TasksDirectoryResolver,
-        renderer: &OutputRenderer,
-    ) -> Result<(), String> {
+    fn cancel(id: &str, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
         let mut job = AgentJobService::cancel_job(id).map_err(|e| e.to_string())?;
         // Jobs run by another process (server, queue worker, MCP session):
         // ask that process to cancel and wait for it to finish (DEV-279).
         if job.is_none() && crate::services::agent_active_jobs::request_cancel(&resolver.path, id) {
             let deadline = Instant::now() + Duration::from_secs(15);
-            while crate::services::agent_active_jobs::find(&resolver.path, id).is_some()
-                && Instant::now() < deadline
-            {
+            while crate::services::agent_active_jobs::find(&resolver.path, id).is_some() && Instant::now() < deadline {
                 thread::sleep(Duration::from_millis(200));
             }
-            let still_running =
-                crate::services::agent_active_jobs::find(&resolver.path, id).is_some();
+            let still_running = crate::services::agent_active_jobs::find(&resolver.path, id).is_some();
             if matches!(renderer.format, OutputFormat::Json) {
                 renderer.emit_json(&serde_json::json!({
                     "job": { "id": id, "status": if still_running { "cancelling" } else { "cancelled" } }
                 }));
             } else if still_running {
-                renderer.emit_warning(format!(
-                    "Asked the process running job {id} to cancel it; it has not stopped yet"
-                ));
+                renderer.emit_warning(format!("Asked the process running job {id} to cancel it; it has not stopped yet"));
             } else {
                 renderer.emit_success(format!("Job {id}: cancelled"));
             }
@@ -353,10 +280,7 @@ impl AgentHandler {
         Ok(())
     }
 
-    fn list_running(
-        resolver: &TasksDirectoryResolver,
-        renderer: &OutputRenderer,
-    ) -> Result<(), String> {
+    fn list_running(resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
         let jobs = list_running_jobs(Some(&resolver.path));
         if matches!(renderer.format, OutputFormat::Json) {
             renderer.emit_json(&serde_json::json!({ "jobs": jobs }));
@@ -381,11 +305,7 @@ impl AgentHandler {
         Ok(())
     }
 
-    fn list_jobs(
-        args: &AgentListJobsArgs,
-        resolver: &TasksDirectoryResolver,
-        renderer: &OutputRenderer,
-    ) -> Result<(), String> {
+    fn list_jobs(args: &AgentListJobsArgs, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
         let (workspace_root, logs_dir) = get_logs_config(resolver);
         let Some(logs_dir) = logs_dir else {
             if matches!(renderer.format, OutputFormat::Json) {
@@ -396,8 +316,7 @@ impl AgentHandler {
             return Ok(());
         };
 
-        let job_ids =
-            AgentLogService::list_logs(&workspace_root, &logs_dir).map_err(|e| e.to_string())?;
+        let job_ids = AgentLogService::list_logs(&workspace_root, &logs_dir).map_err(|e| e.to_string())?;
 
         if job_ids.is_empty() {
             if matches!(renderer.format, OutputFormat::Json) {
@@ -414,9 +333,7 @@ impl AgentHandler {
                 Ok(Some(h)) => h,
                 _ => continue,
             };
-            let status = AgentLogService::load_status(&workspace_root, &logs_dir, job_id)
-                .ok()
-                .flatten();
+            let status = AgentLogService::load_status(&workspace_root, &logs_dir, job_id).ok().flatten();
 
             jobs.push(serde_json::json!({
                 "id": header.job_id,
@@ -449,11 +366,7 @@ impl AgentHandler {
         Ok(())
     }
 
-    fn queue(
-        args: AgentQueueArgs,
-        resolver: &TasksDirectoryResolver,
-        renderer: &OutputRenderer,
-    ) -> Result<(), String> {
+    fn queue(args: AgentQueueArgs, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
         let tasks_dir = &resolver.path;
 
         match args.action {
@@ -469,8 +382,7 @@ impl AgentHandler {
                 Ok(())
             }
             Some(AgentQueueAction::Remove { ticket }) => {
-                let removed =
-                    AgentQueueService::remove(tasks_dir, &ticket).map_err(|e| e.to_string())?;
+                let removed = AgentQueueService::remove(tasks_dir, &ticket).map_err(|e| e.to_string())?;
                 if matches!(renderer.format, OutputFormat::Json) {
                     renderer.emit_json(&serde_json::json!({
                         "ticket": ticket,
@@ -485,14 +397,11 @@ impl AgentHandler {
             }
             None => {
                 // Default: list pending entries + worker status
-                let pending =
-                    AgentQueueService::list_pending(tasks_dir).map_err(|e| e.to_string())?;
+                let pending = AgentQueueService::list_pending(tasks_dir).map_err(|e| e.to_string())?;
                 let worker_running = AgentQueueService::is_worker_running(tasks_dir);
                 let mut stats = AgentJobService::queue_stats();
                 // Count jobs other processes run too (DEV-279).
-                stats.running = stats
-                    .running
-                    .max(crate::services::agent_active_jobs::list(tasks_dir).len());
+                stats.running = stats.running.max(crate::services::agent_active_jobs::list(tasks_dir).len());
 
                 if matches!(renderer.format, OutputFormat::Json) {
                     let entries: Vec<_> = pending
@@ -527,10 +436,7 @@ impl AgentHandler {
                 } else {
                     renderer.emit_raw_stdout(format_args!("ticket\tagent\tqueued_at\tattempts"));
                     for entry in &pending {
-                        renderer.emit_raw_stdout(format_args!(
-                            "{}\t{}\t{}\t{}",
-                            entry.ticket_id, entry.agent, entry.queued_at, entry.attempts
-                        ));
+                        renderer.emit_raw_stdout(format_args!("{}\t{}\t{}\t{}", entry.ticket_id, entry.agent, entry.queued_at, entry.attempts));
                     }
                 }
                 Ok(())
@@ -539,24 +445,15 @@ impl AgentHandler {
     }
 
     fn worker(_args: AgentWorkerArgs, resolver: &TasksDirectoryResolver) -> Result<(), String> {
-        AgentJobService::set_orchestrator_mode(
-            crate::services::agent_job_service::AgentOrchestratorMode::Worker,
-        );
+        AgentJobService::set_orchestrator_mode(crate::services::agent_job_service::AgentOrchestratorMode::Worker);
         AgentQueueService::run_worker(resolver.path.as_path()).map_err(|e| e.to_string())
     }
 
-    fn check(
-        args: &AgentCheckArgs,
-        project: Option<&str>,
-        resolver: &TasksDirectoryResolver,
-        renderer: &OutputRenderer,
-    ) -> Result<(), String> {
-        let config = crate::config::resolution::config_for_project(&resolver.path, project)
-            .map_err(|e| e.to_string())?;
+    fn check(args: &AgentCheckArgs, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
+        let config = crate::config::resolution::config_for_project(&resolver.path, project).map_err(|e| e.to_string())?;
 
         let statuses = if args.statuses.is_empty() {
-            let derived = derive_default_statuses(resolver.path.as_path(), project, &config)
-                .map_err(|e| e.to_string())?;
+            let derived = derive_default_statuses(resolver.path.as_path(), project, &config).map_err(|e| e.to_string())?;
             if derived.is_empty() {
                 return Err("No automation status configured; pass --status to check.".to_string());
             }
@@ -564,32 +461,20 @@ impl AgentHandler {
         } else {
             let mut parsed = Vec::new();
             for raw in &args.statuses {
-                let status = crate::types::TaskStatus::parse_with_config(raw, &config)
-                    .map_err(|e| e.to_string())?;
+                let status = crate::types::TaskStatus::parse_with_config(raw, &config).map_err(|e| e.to_string())?;
                 parsed.push(status);
             }
             parsed
         };
 
-        let filter = crate::api_types::TaskListFilter {
-            status: statuses.clone(),
-            project: project.map(|p| p.to_string()),
-            ..Default::default()
-        };
+        let filter = crate::api_types::TaskListFilter { status: statuses.clone(), project: project.map(|p| p.to_string()), ..Default::default() };
         let storage = crate::storage::manager::Storage::new(&resolver.path.clone());
-        let mut matches: Vec<crate::api_types::TaskDTO> = TaskService::list(&storage, &filter)
-            .into_iter()
-            .map(|(_, task)| task)
-            .collect();
+        let mut matches: Vec<crate::api_types::TaskDTO> = TaskService::list(&storage, &filter).into_iter().map(|(_, task)| task).collect();
 
         if let Some(target) = args.assignee.as_deref() {
             let trimmed = target.trim();
             if !trimmed.is_empty() {
-                matches.retain(|task| {
-                    task.assignee
-                        .as_deref()
-                        .is_some_and(|val| val.eq_ignore_ascii_case(trimmed))
-                });
+                matches.retain(|task| task.assignee.as_deref().is_some_and(|val| val.eq_ignore_ascii_case(trimmed)));
             }
         }
 
@@ -613,21 +498,11 @@ impl AgentHandler {
                 "statuses": statuses,
             }));
         } else {
-            renderer.emit_warning(format!(
-                "Found {} task(s) matching the check criteria.",
-                matches.len()
-            ));
+            renderer.emit_warning(format!("Found {} task(s) matching the check criteria.", matches.len()));
             renderer.emit_raw_stdout(format_args!("id\tstatus\tassignee\ttitle"));
             for task in &matches {
                 let mut line = String::new();
-                let _ = write!(
-                    &mut line,
-                    "{}\t{}\t{}\t{}",
-                    task.id,
-                    task.status,
-                    task.assignee.as_deref().unwrap_or("-"),
-                    task.title
-                );
+                let _ = write!(&mut line, "{}\t{}\t{}\t{}", task.id, task.status, task.assignee.as_deref().unwrap_or("-"), task.title);
                 renderer.emit_raw_stdout(format_args!("{}", line));
             }
         }
@@ -642,8 +517,7 @@ fn derive_default_statuses(
     config: &crate::config::types::ResolvedConfig,
 ) -> Result<Vec<crate::types::TaskStatus>, String> {
     let inspect = AutomationService::inspect(tasks_dir, project).map_err(|e| e.to_string())?;
-    let file: AutomationFile = serde_yaml_ng::from_str(&inspect.effective_yaml)
-        .map_err(|e| format!("Invalid automation YAML: {}", e))?;
+    let file: AutomationFile = serde_yaml_ng::from_str(&inspect.effective_yaml).map_err(|e| format!("Invalid automation YAML: {}", e))?;
     let mut statuses = Vec::new();
     for rule in file.automation.rules() {
         let action = rule.on.job_started.as_ref().or(rule.on.start.as_ref());
@@ -651,9 +525,7 @@ fn derive_default_statuses(
             && let Some(set) = action.set.as_ref()
             && let Some(value) = set.status.as_ref()
             && let Ok(status) = crate::types::TaskStatus::parse_with_config(value, config)
-            && !statuses
-                .iter()
-                .any(|entry: &crate::types::TaskStatus| entry.eq_ignore_case(status.as_str()))
+            && !statuses.iter().any(|entry: &crate::types::TaskStatus| entry.eq_ignore_case(status.as_str()))
         {
             statuses.push(status);
         }
@@ -676,12 +548,8 @@ struct WorktreeInfo {
 }
 
 impl AgentHandler {
-    fn worktree_list(
-        resolver: &TasksDirectoryResolver,
-        renderer: &OutputRenderer,
-    ) -> Result<(), String> {
-        let config_manager = ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path)
-            .map_err(|e| e.to_string())?;
+    fn worktree_list(resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
+        let config_manager = ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path).map_err(|e| e.to_string())?;
         let config = config_manager.get_resolved_config();
 
         let worktrees = list_agent_worktrees(resolver, config)?;
@@ -705,21 +573,13 @@ impl AgentHandler {
             } else {
                 ""
             };
-            renderer.emit_raw_stdout(format_args!(
-                "  {} -> {} [{}]{}",
-                wt.ticket_id, wt.branch, wt.path, status
-            ));
+            renderer.emit_raw_stdout(format_args!("  {} -> {} [{}]{}", wt.ticket_id, wt.branch, wt.path, status));
         }
         Ok(())
     }
 
-    fn worktree_cleanup(
-        args: &WorktreeCleanupArgs,
-        resolver: &TasksDirectoryResolver,
-        renderer: &OutputRenderer,
-    ) -> Result<(), String> {
-        let config_manager = ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path)
-            .map_err(|e| e.to_string())?;
+    fn worktree_cleanup(args: &WorktreeCleanupArgs, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
+        let config_manager = ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path).map_err(|e| e.to_string())?;
         let config = config_manager.get_resolved_config();
 
         let worktrees = list_agent_worktrees(resolver, config)?;
@@ -747,44 +607,29 @@ impl AgentHandler {
             return Ok(());
         }
 
-        let repo_root = crate::utils::git::find_repo_root(&resolver.path)
-            .ok_or_else(|| "Git repository not found".to_string())?;
+        let repo_root = crate::utils::git::find_repo_root(&resolver.path).ok_or_else(|| "Git repository not found".to_string())?;
 
         let mut removed = Vec::new();
         let mut errors = Vec::new();
 
         for wt in &to_remove {
-            let done_state = crate::services::agent_job_service::ticket_done_state(
-                &resolver.path,
-                &wt.ticket_id,
-            );
+            let done_state = crate::services::agent_job_service::ticket_done_state(&resolver.path, &wt.ticket_id);
             if done_state.is_none()
                 || (!args.all && done_state != Some(true))
                 || AgentJobService::has_active_job(&wt.ticket_id)
                 || running_job_for_ticket(&resolver.path, &wt.ticket_id).is_some()
             {
-                errors.push(format!(
-                    "{}: ticket state changed or a job is active",
-                    wt.ticket_id
-                ));
+                errors.push(format!("{}: ticket state changed or a job is active", wt.ticket_id));
                 continue;
             }
             let allow_ignored = wt
                 .ticket_id
                 .rsplit_once('-')
-                .and_then(|(project, _)| {
-                    crate::config::resolution::config_for_project(&resolver.path, Some(project))
-                        .ok()
-                })
-                .map_or(config.agent_worktree.cleanup_ignored_files, |c| {
-                    c.agent_worktree.cleanup_ignored_files
-                });
-            if let Err(err) = crate::services::agent_job_service::check_worktree_cleanup(
-                &repo_root,
-                std::path::Path::new(&wt.path),
-                Some(&wt.branch),
-                allow_ignored,
-            ) {
+                .and_then(|(project, _)| crate::config::resolution::config_for_project(&resolver.path, Some(project)).ok())
+                .map_or(config.agent_worktree.cleanup_ignored_files, |c| c.agent_worktree.cleanup_ignored_files);
+            if let Err(err) =
+                crate::services::agent_job_service::check_worktree_cleanup(&repo_root, std::path::Path::new(&wt.path), Some(&wt.branch), allow_ignored)
+            {
                 errors.push(format!("{}: {}", wt.ticket_id, err));
                 renderer.emit_warning(format!("Preserving worktree {}: {}", wt.ticket_id, err));
                 continue;
@@ -796,22 +641,15 @@ impl AgentHandler {
             }
 
             // Remove worktree
-            let worktree_result = git_command(&repo_root)
-                .args(["worktree", "remove", &wt.path])
-                .current_dir(&repo_root)
-                .output();
+            let worktree_result = git_command(&repo_root).args(["worktree", "remove", &wt.path]).current_dir(&repo_root).output();
 
             match worktree_result {
                 Ok(output) if output.status.success() => {
-                    renderer
-                        .emit_success(format!("Removed worktree: {} ({})", wt.ticket_id, wt.path));
+                    renderer.emit_success(format!("Removed worktree: {} ({})", wt.ticket_id, wt.path));
 
                     // Optionally delete the branch
                     if args.delete_branches {
-                        let branch_result = git_command(&repo_root)
-                            .args(["branch", "-d", &wt.branch])
-                            .current_dir(&repo_root)
-                            .output();
+                        let branch_result = git_command(&repo_root).args(["branch", "-d", &wt.branch]).current_dir(&repo_root).output();
 
                         match branch_result {
                             Ok(out) if out.status.success() => {
@@ -820,18 +658,11 @@ impl AgentHandler {
                             Ok(out) => {
                                 let stderr = String::from_utf8_lossy(&out.stderr);
                                 errors.push(format!("{}: {}", wt.branch, stderr.trim()));
-                                renderer.emit_warning(format!(
-                                    "Failed to delete branch {}: {}",
-                                    wt.branch,
-                                    stderr.trim()
-                                ));
+                                renderer.emit_warning(format!("Failed to delete branch {}: {}", wt.branch, stderr.trim()));
                             }
                             Err(e) => {
                                 errors.push(format!("{}: {}", wt.branch, e));
-                                renderer.emit_warning(format!(
-                                    "Failed to delete branch {}: {}",
-                                    wt.branch, e
-                                ));
+                                renderer.emit_warning(format!("Failed to delete branch {}: {}", wt.branch, e));
                             }
                         }
                     }
@@ -840,16 +671,11 @@ impl AgentHandler {
                 Ok(output) => {
                     let stderr = String::from_utf8_lossy(&output.stderr);
                     errors.push(format!("{}: {}", wt.ticket_id, stderr.trim()));
-                    renderer.emit_error(format!(
-                        "Failed to remove worktree {}: {}",
-                        wt.ticket_id,
-                        stderr.trim()
-                    ));
+                    renderer.emit_error(format!("Failed to remove worktree {}: {}", wt.ticket_id, stderr.trim()));
                 }
                 Err(e) => {
                     errors.push(format!("{}: {}", wt.ticket_id, e));
-                    renderer
-                        .emit_error(format!("Failed to remove worktree {}: {}", wt.ticket_id, e));
+                    renderer.emit_error(format!("Failed to remove worktree {}: {}", wt.ticket_id, e));
                 }
             }
         }
@@ -862,25 +688,15 @@ impl AgentHandler {
                 "delete_branches": args.delete_branches
             }));
         } else if !args.dry_run {
-            renderer.emit_success(format!(
-                "Cleanup complete: {} worktree(s) removed",
-                removed.len()
-            ));
+            renderer.emit_success(format!("Cleanup complete: {} worktree(s) removed", removed.len()));
         }
 
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err("Some worktrees were preserved because cleanup was unsafe or failed".into())
-        }
+        if errors.is_empty() { Ok(()) } else { Err("Some worktrees were preserved because cleanup was unsafe or failed".into()) }
     }
 }
 
 /// List all agent worktrees
-fn list_agent_worktrees(
-    resolver: &TasksDirectoryResolver,
-    config: &crate::config::types::ResolvedConfig,
-) -> Result<Vec<WorktreeInfo>, String> {
+fn list_agent_worktrees(resolver: &TasksDirectoryResolver, config: &crate::config::types::ResolvedConfig) -> Result<Vec<WorktreeInfo>, String> {
     let repo_root = match crate::utils::git::find_repo_root(&resolver.path) {
         Some(root) => root,
         None => return Ok(Vec::new()),
@@ -911,19 +727,10 @@ fn list_agent_worktrees(
             continue;
         }
         let ticket_id = extract_ticket_from_branch(&branch, branch_prefix);
-        let done_state =
-            crate::services::agent_job_service::ticket_done_state(&resolver.path, &ticket_id);
-        let has_active_job = AgentJobService::has_active_job(&ticket_id)
-            || running_job_for_ticket(&resolver.path, &ticket_id).is_some();
+        let done_state = crate::services::agent_job_service::ticket_done_state(&resolver.path, &ticket_id);
+        let has_active_job = AgentJobService::has_active_job(&ticket_id) || running_job_for_ticket(&resolver.path, &ticket_id).is_some();
 
-        results.push(WorktreeInfo {
-            path,
-            branch,
-            ticket_id,
-            is_done: done_state == Some(true),
-            task_known: done_state.is_some(),
-            has_active_job,
-        });
+        results.push(WorktreeInfo { path, branch, ticket_id, is_done: done_state == Some(true), task_known: done_state.is_some(), has_active_job });
     }
 
     Ok(results)
@@ -968,11 +775,7 @@ fn parse_git_worktree_list(output: &str, branch_prefix: &str) -> Vec<(String, St
 
 /// Extract ticket ID from branch name
 fn extract_ticket_from_branch(branch: &str, prefix: &str) -> String {
-    branch
-        .strip_prefix(prefix)
-        .unwrap_or(branch)
-        .trim_start_matches('/')
-        .to_string()
+    branch.strip_prefix(prefix).unwrap_or(branch).trim_start_matches('/').to_string()
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -987,11 +790,7 @@ impl RunningAgentJob {
     /// Whether a status/assignee change for this job's ticket can wait for
     /// its end (DEV-320) or is part of its lifecycle. Only a
     /// lotar-agent-wrapper process without a job record can do neither.
-    pub(crate) fn takes_ticket_changes(
-        &self,
-        tasks_dir: &std::path::Path,
-        ticket_id: &str,
-    ) -> bool {
+    pub(crate) fn takes_ticket_changes(&self, tasks_dir: &std::path::Path, ticket_id: &str) -> bool {
         self.job_id.as_deref().is_some_and(|job_id| {
             crate::services::agent_active_jobs::find(tasks_dir, job_id).is_some()
                 || crate::services::task_service::TaskService::is_job_lifecycle(job_id, ticket_id)
@@ -1005,19 +804,12 @@ pub(crate) fn running_job_matches(job_ticket: &str, needle: &str) -> bool {
     crate::storage::identity::aliases_match(job_ticket, needle)
 }
 
-pub(crate) fn running_job_for_ticket(
-    tasks_dir: &std::path::Path,
-    ticket_id: &str,
-) -> Option<RunningAgentJob> {
+pub(crate) fn running_job_for_ticket(tasks_dir: &std::path::Path, ticket_id: &str) -> Option<RunningAgentJob> {
     let needle = ticket_id.trim();
     if needle.is_empty() {
         return None;
     }
-    list_running_jobs(Some(tasks_dir)).into_iter().find(|job| {
-        job.ticket_id
-            .as_deref()
-            .is_some_and(|value| running_job_matches(value, needle))
-    })
+    list_running_jobs(Some(tasks_dir)).into_iter().find(|job| job.ticket_id.as_deref().is_some_and(|value| running_job_matches(value, needle)))
 }
 
 /// Running jobs: the shared records of this tasks directory (any process,
@@ -1027,12 +819,7 @@ fn list_running_jobs(tasks_dir: Option<&std::path::Path>) -> Vec<RunningAgentJob
         .map(crate::services::agent_active_jobs::list)
         .unwrap_or_default()
         .into_iter()
-        .map(|job| RunningAgentJob {
-            pid: job.child_pid,
-            job_id: Some(job.job_id),
-            ticket_id: Some(job.ticket_id),
-            runner: Some(job.runner),
-        })
+        .map(|job| RunningAgentJob { pid: job.child_pid, job_id: Some(job.job_id), ticket_id: Some(job.ticket_id), runner: Some(job.runner) })
         .collect();
     for wrapper in list_wrapper_processes() {
         let known = wrapper.job_id.is_some() && jobs.iter().any(|job| job.job_id == wrapper.job_id);
@@ -1054,9 +841,7 @@ fn list_wrapper_processes() -> Vec<RunningAgentJob> {
     system.refresh_processes_specifics(
         ProcessesToUpdate::All,
         true,
-        sysinfo::ProcessRefreshKind::nothing()
-            .with_cmd(sysinfo::UpdateKind::Always)
-            .with_exe(sysinfo::UpdateKind::OnlyIfNotSet),
+        sysinfo::ProcessRefreshKind::nothing().with_cmd(sysinfo::UpdateKind::Always).with_exe(sysinfo::UpdateKind::OnlyIfNotSet),
     );
 
     system
@@ -1069,30 +854,16 @@ fn list_wrapper_processes() -> Vec<RunningAgentJob> {
             if is_zombie_process(process) {
                 return None;
             }
-            let cmd: Vec<String> = process
-                .cmd()
-                .iter()
-                .filter_map(|s| s.to_str().map(String::from))
-                .collect();
+            let cmd: Vec<String> = process.cmd().iter().filter_map(|s| s.to_str().map(String::from)).collect();
             let (job_id, ticket_id, runner) = parse_wrapper_metadata(&cmd);
-            Some(RunningAgentJob {
-                pid: pid.as_u32(),
-                job_id,
-                ticket_id,
-                runner,
-            })
+            Some(RunningAgentJob { pid: pid.as_u32(), job_id, ticket_id, runner })
         })
         .collect()
 }
 
 /// Poll until the job is terminal and return it. Text output (follow
 /// events and the final status lines) is skipped in JSON mode.
-fn wait_for_job_completion(
-    job_id: &str,
-    follow: bool,
-    timeout_seconds: Option<u64>,
-    renderer: &OutputRenderer,
-) -> Result<crate::api_types::AgentJob, String> {
+fn wait_for_job_completion(job_id: &str, follow: bool, timeout_seconds: Option<u64>, renderer: &OutputRenderer) -> Result<crate::api_types::AgentJob, String> {
     let text = !matches!(renderer.format, OutputFormat::Json);
     let start = Instant::now();
     let mut last_event_count = 0usize;
@@ -1141,13 +912,7 @@ fn wait_for_job_completion(
             return Err(format!("Timed out waiting for job '{}'", job_id));
         }
 
-        thread::sleep(Duration::from_millis(
-            if job_is_terminal(job.status.as_str()) {
-                50
-            } else {
-                500
-            },
-        ));
+        thread::sleep(Duration::from_millis(if job_is_terminal(job.status.as_str()) { 50 } else { 500 }));
     }
 }
 
@@ -1155,9 +920,7 @@ fn wait_for_job_completion(
 /// DEV-21 to avoid conflation with the task completion policy's terminal
 /// statuses; sprint lifecycle states are a third, separate notion.
 fn job_is_terminal(status: &str) -> bool {
-    status.eq_ignore_ascii_case("completed")
-        || status.eq_ignore_ascii_case("failed")
-        || status.eq_ignore_ascii_case("cancelled")
+    status.eq_ignore_ascii_case("completed") || status.eq_ignore_ascii_case("failed") || status.eq_ignore_ascii_case("cancelled")
 }
 
 fn is_zombie_process(process: &sysinfo::Process) -> bool {
@@ -1172,18 +935,13 @@ fn is_wrapper_process(process: &sysinfo::Process) -> bool {
     {
         return true;
     }
-    if let Some(exe_name) = process
-        .exe()
-        .and_then(|path| path.file_name())
-        .and_then(|name| name.to_str())
+    if let Some(exe_name) = process.exe().and_then(|path| path.file_name()).and_then(|name| name.to_str())
         && is_wrapper_name(exe_name)
     {
         return true;
     }
     if let Some(cmd0) = process.cmd().first()
-        && let Some(base) = std::path::Path::new(cmd0)
-            .file_name()
-            .and_then(|name| name.to_str())
+        && let Some(base) = std::path::Path::new(cmd0).file_name().and_then(|name| name.to_str())
         && is_wrapper_name(base)
     {
         return true;
@@ -1291,18 +1049,9 @@ branch refs/heads/my-agent/TEST-1
 
     #[test]
     fn extracts_ticket_from_branch() {
-        assert_eq!(
-            extract_ticket_from_branch("agent/TEST-1", "agent/"),
-            "TEST-1"
-        );
-        assert_eq!(
-            extract_ticket_from_branch("agent/PROJ-42", "agent/"),
-            "PROJ-42"
-        );
-        assert_eq!(
-            extract_ticket_from_branch("custom-prefix/ABC-1", "custom-prefix/"),
-            "ABC-1"
-        );
+        assert_eq!(extract_ticket_from_branch("agent/TEST-1", "agent/"), "TEST-1");
+        assert_eq!(extract_ticket_from_branch("agent/PROJ-42", "agent/"), "PROJ-42");
+        assert_eq!(extract_ticket_from_branch("custom-prefix/ABC-1", "custom-prefix/"), "ABC-1");
         // Edge case: no match falls back to full branch name
         assert_eq!(extract_ticket_from_branch("main", "agent/"), "main");
     }

@@ -11,11 +11,7 @@ fn run_git(repo: &std::path::Path, args: &[&str], envs: &[(&str, &str)]) {
     }
     let out = cmd.output().expect("failed to run git");
     if !out.status.success() {
-        panic!(
-            "git {:?} failed: {}",
-            args,
-            String::from_utf8_lossy(&out.stderr)
-        );
+        panic!("git {:?} failed: {}", args, String::from_utf8_lossy(&out.stderr));
     }
 }
 
@@ -34,13 +30,7 @@ fn write_file(root: &std::path::Path, rel: &str, content: &str) {
     std::fs::write(&path, content).unwrap();
 }
 
-fn add_and_commit(
-    repo: &std::path::Path,
-    rel: &str,
-    author: (&str, &str),
-    date_rfc3339: &str,
-    msg: &str,
-) {
+fn add_and_commit(repo: &std::path::Path, rel: &str, author: (&str, &str), date_rfc3339: &str, msg: &str) {
     run_git(repo, &["add", rel], &[]);
     let envs = [
         ("GIT_AUTHOR_NAME", author.0),
@@ -68,18 +58,8 @@ mod git_required {
 
         write_file(root, ".tasks/TEST/config.yml", "project_name: TEST\n");
         // Initial task
-        write_file(
-            root,
-            ".tasks/TEST/2.yml",
-            "title: Two\nstatus: TODO\ncreated: 2025-08-01T10:00:00Z\nmodified: 2025-08-01T10:00:00Z\n",
-        );
-        add_and_commit(
-            root,
-            ".tasks/TEST/2.yml",
-            ("A", "a@example.com"),
-            "2025-08-01T10:00:00Z",
-            "add 2",
-        );
+        write_file(root, ".tasks/TEST/2.yml", "title: Two\nstatus: TODO\ncreated: 2025-08-01T10:00:00Z\nmodified: 2025-08-01T10:00:00Z\n");
+        add_and_commit(root, ".tasks/TEST/2.yml", ("A", "a@example.com"), "2025-08-01T10:00:00Z", "add 2");
 
         // Edit with tags and reporter
         write_file(
@@ -87,59 +67,28 @@ mod git_required {
             ".tasks/TEST/2.yml",
             "title: Two\nstatus: TODO\ncreated: 2025-08-01T10:00:00Z\nmodified: 2025-08-02T09:00:00Z\ntags: [feat]\nreporter: alice\n",
         );
-        add_and_commit(
-            root,
-            ".tasks/TEST/2.yml",
-            ("B", "b@example.com"),
-            "2025-08-02T09:00:00Z",
-            "edit 2",
-        );
+        add_and_commit(root, ".tasks/TEST/2.yml", ("B", "b@example.com"), "2025-08-02T09:00:00Z", "edit 2");
 
         // JSON structured fields diff on latest
-        let out = crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(root)
-            .args(["--format", "json", "task", "diff", "TEST-2", "--fields"])
-            .output()
-            .unwrap();
+        let out = crate::common::lotar_cmd().unwrap().current_dir(root).args(["--format", "json", "task", "diff", "TEST-2", "--fields"]).output().unwrap();
         assert!(out.status.success());
         eprintln!("STDOUT: {}", String::from_utf8_lossy(&out.stdout));
         // Debug: fetch history and snapshots first for visibility
-        let out = crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(root)
-            .args(["--format", "json", "task", "history", "TEST-2", "-L", "5"])
-            .output()
-            .unwrap();
+        let out = crate::common::lotar_cmd().unwrap().current_dir(root).args(["--format", "json", "task", "history", "TEST-2", "-L", "5"]).output().unwrap();
         eprintln!("HISTORY: {}", String::from_utf8_lossy(&out.stdout));
         let hv: Value = serde_json::from_slice(&out.stdout).unwrap();
         let items = hv["items"].as_array().unwrap();
         let newest = items.first().unwrap()["commit"].as_str().unwrap();
         let oldest = items.last().unwrap()["commit"].as_str().unwrap();
-        let out_new = crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(root)
-            .args(["--format", "json", "task", "at", "TEST-2", newest])
-            .output()
-            .unwrap();
+        let out_new = crate::common::lotar_cmd().unwrap().current_dir(root).args(["--format", "json", "task", "at", "TEST-2", newest]).output().unwrap();
         eprintln!("AT newest: {}", String::from_utf8_lossy(&out_new.stdout));
-        let out_old = crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(root)
-            .args(["--format", "json", "task", "at", "TEST-2", oldest])
-            .output()
-            .unwrap();
+        let out_old = crate::common::lotar_cmd().unwrap().current_dir(root).args(["--format", "json", "task", "at", "TEST-2", oldest]).output().unwrap();
         eprintln!("AT oldest: {}", String::from_utf8_lossy(&out_old.stdout));
 
         // Now parse the diff and do sanity checks
         let v: Value = serde_json::from_slice(&out.stdout).unwrap();
         assert_eq!(v["status"], "ok");
-        let diff_out = crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(root)
-            .args(["--format", "json", "task", "diff", "TEST-2", "--fields"])
-            .output()
-            .unwrap();
+        let diff_out = crate::common::lotar_cmd().unwrap().current_dir(root).args(["--format", "json", "task", "diff", "TEST-2", "--fields"]).output().unwrap();
         let v: Value = serde_json::from_slice(&diff_out.stdout).unwrap();
         assert_eq!(v["action"], "task.diff");
         assert_eq!(v["mode"], "fields");
@@ -154,31 +103,15 @@ mod git_required {
         init_repo(&temp);
 
         write_file(root, ".tasks/TEST/config.yml", "project_name: TEST\n");
-        write_file(
-            root,
-            ".tasks/TEST/2.yml",
-            "title: Two\nstatus: TODO\ncreated: 2025-08-01T10:00:00Z\nmodified: 2025-08-01T10:00:00Z\n",
-        );
-        add_and_commit(
-            root,
-            ".tasks/TEST/2.yml",
-            ("A", "a@example.com"),
-            "2025-08-01T10:00:00Z",
-            "add 2",
-        );
+        write_file(root, ".tasks/TEST/2.yml", "title: Two\nstatus: TODO\ncreated: 2025-08-01T10:00:00Z\nmodified: 2025-08-01T10:00:00Z\n");
+        add_and_commit(root, ".tasks/TEST/2.yml", ("A", "a@example.com"), "2025-08-01T10:00:00Z", "add 2");
 
         write_file(
             root,
             ".tasks/TEST/2.yml",
             "title: Two\nstatus: TODO\ncreated: 2025-08-01T10:00:00Z\nmodified: 2025-08-02T09:00:00Z\ntags: [feat]\nreporter: alice\n",
         );
-        add_and_commit(
-            root,
-            ".tasks/TEST/2.yml",
-            ("B", "b@example.com"),
-            "2025-08-02T09:00:00Z",
-            "edit 2",
-        );
+        add_and_commit(root, ".tasks/TEST/2.yml", ("B", "b@example.com"), "2025-08-02T09:00:00Z", "edit 2");
 
         crate::common::lotar_cmd()
             .unwrap()

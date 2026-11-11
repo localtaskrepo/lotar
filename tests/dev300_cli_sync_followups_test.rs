@@ -62,22 +62,12 @@ fn sync_workspace(token_env: &str, api_url: &str) -> TestFixtures {
     .unwrap();
     std::fs::write(
         root.join(".lotar"),
-        format!(
-            "auth_profiles:\n  fixture:\n    provider: github\n    method: token\n    token_env: {token_env}\n    api_url: {api_url}\n"
-        ),
+        format!("auth_profiles:\n  fixture:\n    provider: github\n    method: token\n    token_env: {token_env}\n    api_url: {api_url}\n"),
     )
     .unwrap();
-    std::fs::set_permissions(
-        root.join(".lotar"),
-        std::os::unix::fs::PermissionsExt::from_mode(0o600),
-    )
-    .unwrap();
+    std::fs::set_permissions(root.join(".lotar"), std::os::unix::fs::PermissionsExt::from_mode(0o600)).unwrap();
     let out = run(root, &["add", "push me", "-p", "GH"], root);
-    assert!(
-        out.status.success(),
-        "{}",
-        String::from_utf8_lossy(&out.stderr)
-    );
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     fixtures
 }
 
@@ -86,29 +76,11 @@ fn config_show_prints_reviewers_and_sync_settings() {
     let fixtures = TestFixtures::new();
     let root = fixtures.get_temp_path();
     run(root, &["add", "a", "-p", "REV"], root);
-    let set = run(
-        root,
-        &[
-            "config",
-            "set",
-            "review.reviewers",
-            "alice,bob",
-            "--project",
-            "REV",
-        ],
-        root,
-    );
-    assert!(
-        set.status.success(),
-        "{}",
-        String::from_utf8_lossy(&set.stderr)
-    );
+    let set = run(root, &["config", "set", "review.reviewers", "alice,bob", "--project", "REV"], root);
+    assert!(set.status.success(), "{}", String::from_utf8_lossy(&set.stderr));
     let shown = run(root, &["config", "show", "--project", "REV"], root);
     let text = String::from_utf8_lossy(&shown.stdout);
-    assert!(
-        text.contains("review:\n  reviewers:\n    - alice\n    - bob"),
-        "{text}"
-    );
+    assert!(text.contains("review:\n  reviewers:\n    - alice\n    - bob"), "{text}");
 
     let full = run(root, &["config", "show", "--full"], root);
     let text = String::from_utf8_lossy(&full.stdout);
@@ -123,10 +95,7 @@ fn an_unset_variable_name_is_not_sent_as_the_token() {
     let out = run(root, &["push", "origin"], root);
     assert!(!out.status.success());
     let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(
-        stderr.contains("Environment variable 'LOTAR_DEV300_UNSET_TOKEN' is not set"),
-        "{stderr}"
-    );
+    assert!(stderr.contains("Environment variable 'LOTAR_DEV300_UNSET_TOKEN' is not set"), "{stderr}");
 }
 
 #[test]
@@ -138,10 +107,7 @@ fn a_sync_with_failed_items_exits_non_zero() {
     let out = run(root, &["push", "origin", "--format", "json"], root);
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(!out.status.success(), "{stdout}");
-    let json_line = stdout
-        .lines()
-        .find(|line| line.contains("\"summary\""))
-        .unwrap_or_else(|| panic!("{stdout}"));
+    let json_line = stdout.lines().find(|line| line.contains("\"summary\"")).unwrap_or_else(|| panic!("{stdout}"));
     let value: serde_json::Value = serde_json::from_str(json_line).unwrap();
     assert_eq!(value["status"], "partial", "{value}");
     assert_eq!(value["summary"]["failed"], 1, "{value}");
@@ -152,9 +118,5 @@ fn a_sync_with_failed_items_exits_non_zero() {
     let root = fixtures.get_temp_path();
     let text = run(root, &["push", "origin"], root);
     assert_eq!(text.status.code(), Some(1));
-    assert!(
-        String::from_utf8_lossy(&text.stderr).contains("1 failed item"),
-        "{}",
-        String::from_utf8_lossy(&text.stderr)
-    );
+    assert!(String::from_utf8_lossy(&text.stderr).contains("1 failed item"), "{}", String::from_utf8_lossy(&text.stderr));
 }

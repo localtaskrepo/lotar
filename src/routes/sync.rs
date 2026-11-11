@@ -1,10 +1,7 @@
 use super::*;
 
 pub(super) fn register(api_server: &mut ApiServer) {
-    for (path, direction) in [
-        ("/api/sync/pull", SyncDirection::Pull),
-        ("/api/sync/push", SyncDirection::Push),
-    ] {
+    for (path, direction) in [("/api/sync/pull", SyncDirection::Pull), ("/api/sync/push", SyncDirection::Push)] {
         api_server.register_handler("POST", path, move |req: &HttpRequest| {
             let resolver = try_response!(resolve_tasks_dir());
             let payload: SyncRequest = try_response!(parse_body_or_empty(req));
@@ -22,13 +19,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
 
         let payload: SyncValidateRequest = try_response!(parse_body_or_empty(req));
 
-        match SyncService::validate(
-            &resolver,
-            payload.project.as_deref(),
-            payload.remote.as_deref(),
-            payload.remote_config,
-            payload.auth_profile.as_deref(),
-        ) {
+        match SyncService::validate(&resolver, payload.project.as_deref(), payload.remote.as_deref(), payload.remote_config, payload.auth_profile.as_deref()) {
             Ok(result) => ok_json(200, json!({"data": result})),
             Err(err) => map_lotar_error(err),
         }
@@ -42,47 +33,23 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Ok(mgr) => mgr,
             Err(err) => return internal_error(format!("Failed to load config: {err}")),
         };
-        let project = req
-            .query
-            .get("project")
-            .cloned()
-            .filter(|p| !p.trim().is_empty());
+        let project = req.query.get("project").cloned().filter(|p| !p.trim().is_empty());
         let resolved = if let Some(prefix) = project.as_deref() {
             match mgr.get_project_config(prefix) {
                 Ok(cfg) => cfg,
                 Err(err) => {
-                    return bad_request(format!(
-                        "Failed to load project config '{}': {}",
-                        prefix, err
-                    ));
+                    return bad_request(format!("Failed to load project config '{}': {}", prefix, err));
                 }
             }
         } else {
             mgr.get_resolved_config().clone()
         };
 
-        let limit: usize = req
-            .query
-            .get("limit")
-            .and_then(|s| s.parse::<usize>().ok())
-            .unwrap_or(20)
-            .clamp(1, 200);
-        let offset: usize = req
-            .query
-            .get("offset")
-            .and_then(|s| s.parse::<usize>().ok())
-            .unwrap_or(0);
+        let limit: usize = req.query.get("limit").and_then(|s| s.parse::<usize>().ok()).unwrap_or(20).clamp(1, 200);
+        let offset: usize = req.query.get("offset").and_then(|s| s.parse::<usize>().ok()).unwrap_or(0);
 
-        let filter = crate::services::sync_report_service::SyncReportListFilter {
-            project,
-            limit,
-            offset,
-        };
-        match crate::services::sync_report_service::SyncReportService::list_reports(
-            &resolver.path,
-            &resolved,
-            filter,
-        ) {
+        let filter = crate::services::sync_report_service::SyncReportListFilter { project, limit, offset };
+        match crate::services::sync_report_service::SyncReportService::list_reports(&resolver.path, &resolved, filter) {
             Ok(payload) => ok_json(200, json!({"data": payload})),
             Err(err) => bad_request(err.to_string()),
         }
@@ -100,30 +67,19 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Ok(mgr) => mgr,
             Err(err) => return internal_error(format!("Failed to load config: {err}")),
         };
-        let project = req
-            .query
-            .get("project")
-            .cloned()
-            .filter(|p| !p.trim().is_empty());
+        let project = req.query.get("project").cloned().filter(|p| !p.trim().is_empty());
         let resolved = if let Some(prefix) = project.as_deref() {
             match mgr.get_project_config(prefix) {
                 Ok(cfg) => cfg,
                 Err(err) => {
-                    return bad_request(format!(
-                        "Failed to load project config '{}': {}",
-                        prefix, err
-                    ));
+                    return bad_request(format!("Failed to load project config '{}': {}", prefix, err));
                 }
             }
         } else {
             mgr.get_resolved_config().clone()
         };
 
-        match crate::services::sync_report_service::SyncReportService::read_report(
-            &resolver.path,
-            &resolved,
-            &rel,
-        ) {
+        match crate::services::sync_report_service::SyncReportService::read_report(&resolver.path, &resolved, &rel) {
             Ok(report) => ok_json(200, json!({"data": report})),
             Err(err) => bad_request(err.to_string()),
         }

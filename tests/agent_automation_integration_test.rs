@@ -4,9 +4,7 @@ use crate::common;
 use common::TestFixtures;
 use lotar::api_types::{AgentJobCreateRequest, TaskCreate, TaskUpdate};
 use lotar::services::agent_job_service::{AgentJobService, AgentOrchestratorMode};
-use lotar::services::automation_service::{
-    AutomationEvent, AutomationJobContext, AutomationService,
-};
+use lotar::services::automation_service::{AutomationEvent, AutomationJobContext, AutomationService};
 use lotar::services::sprint_service::SprintService;
 use lotar::services::task_service::{TaskService, TaskUpdateContext};
 use lotar::storage::sprint::{Sprint, SprintActual};
@@ -30,9 +28,7 @@ use std::time::{Duration, Instant};
 fn write_stub_agent_script(dir: &Path, name: &str, body: &str) -> PathBuf {
     let path = dir.join(name);
     fs::write(&path, body).expect("write stub agent script");
-    let mut perms = fs::metadata(&path)
-        .expect("stat stub agent script")
-        .permissions();
+    let mut perms = fs::metadata(&path).expect("stat stub agent script").permissions();
     perms.set_mode(0o755);
     fs::set_permissions(&path, perms).expect("chmod stub agent script");
     path
@@ -54,88 +50,44 @@ fn enable_server_mode() {
 fn init_git_repository(root: &Path) {
     fs::write(root.join("README.md"), "test repo\n").expect("write repo file");
 
-    let status = Command::new("git")
-        .arg("init")
-        .current_dir(root)
-        .status()
-        .expect("git init");
+    let status = Command::new("git").arg("init").current_dir(root).status().expect("git init");
     assert!(status.success(), "git init should succeed");
 
-    for args in [
-        &["config", "user.name", "Agent Tests"][..],
-        &["config", "user.email", "agent-tests@example.com"][..],
-        &["config", "commit.gpgsign", "false"][..],
-    ] {
-        let status = Command::new("git")
-            .args(args)
-            .current_dir(root)
-            .status()
-            .expect("git config");
+    for args in
+        [&["config", "user.name", "Agent Tests"][..], &["config", "user.email", "agent-tests@example.com"][..], &["config", "commit.gpgsign", "false"][..]]
+    {
+        let status = Command::new("git").args(args).current_dir(root).status().expect("git config");
         assert!(status.success(), "git config should succeed: {:?}", args);
     }
 
-    let add_status = Command::new("git")
-        .args(["add", "."])
-        .current_dir(root)
-        .status()
-        .expect("git add");
+    let add_status = Command::new("git").args(["add", "."]).current_dir(root).status().expect("git add");
     assert!(add_status.success(), "git add should succeed");
 
-    let commit_status = Command::new("git")
-        .args(["commit", "-m", "Initial commit"])
-        .current_dir(root)
-        .status()
-        .expect("git commit");
+    let commit_status = Command::new("git").args(["commit", "-m", "Initial commit"]).current_dir(root).status().expect("git commit");
     assert!(commit_status.success(), "git commit should succeed");
 }
 
 /// Set up a project the way users do, with `lotar init --template`, then
 /// point each agent profile at a stub script.
 #[cfg(unix)]
-fn install_template_workflow(
-    fixtures: &TestFixtures,
-    prefix: &str,
-    template: &str,
-    agent_commands: &[(&str, &Path)],
-) {
+fn install_template_workflow(fixtures: &TestFixtures, prefix: &str, template: &str, agent_commands: &[(&str, &Path)]) {
     let output = common::lotar_cmd()
         .expect("lotar cmd")
         .current_dir(fixtures.get_temp_path())
         .env("LOTAR_TEST_SILENT", "1")
-        .args([
-            "init",
-            "--yes",
-            &format!("--project={prefix}"),
-            &format!("--prefix={prefix}"),
-            &format!("--template={template}"),
-        ])
+        .args(["init", "--yes", &format!("--project={prefix}"), &format!("--prefix={prefix}"), &format!("--template={template}")])
         .output()
         .expect("run lotar init");
-    assert!(
-        output.status.success(),
-        "init failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
+    assert!(output.status.success(), "init failed: {}", String::from_utf8_lossy(&output.stderr));
 
     let config_path = fixtures.tasks_root.join(prefix).join("config.yml");
-    let mut config: YamlValue =
-        serde_yaml_ng::from_str(&fs::read_to_string(&config_path).expect("read config"))
-            .expect("parse config");
+    let mut config: YamlValue = serde_yaml_ng::from_str(&fs::read_to_string(&config_path).expect("read config")).expect("parse config");
     for (agent_name, command_path) in agent_commands {
-        let profile = config["agents"]
-            .get_mut(*agent_name)
-            .and_then(YamlValue::as_mapping_mut)
-            .unwrap_or_else(|| panic!("template defines agent {agent_name}"));
-        profile.insert(
-            YamlValue::String("command".to_string()),
-            YamlValue::String(command_path.to_string_lossy().to_string()),
-        );
+        let profile =
+            config["agents"].get_mut(*agent_name).and_then(YamlValue::as_mapping_mut).unwrap_or_else(|| panic!("template defines agent {agent_name}"));
+        profile.insert(YamlValue::String("command".to_string()), YamlValue::String(command_path.to_string_lossy().to_string()));
     }
-    fs::write(
-        &config_path,
-        serde_yaml_ng::to_string(&config).expect("serialize config"),
-    )
-    .expect("write config");
+    fs::write(&config_path, serde_yaml_ng::to_string(&config).expect("serialize config")).expect("write config");
 }
 
 #[cfg(unix)]
@@ -147,10 +99,7 @@ fn automation_yaml_for(agent: &str) -> String {
 
 #[cfg(unix)]
 fn job_for_ticket(ticket_id: &str) -> lotar::api_types::AgentJob {
-    AgentJobService::list_jobs()
-        .into_iter()
-        .find(|job| job.ticket_id == ticket_id)
-        .expect("job queued")
+    AgentJobService::list_jobs().into_iter().find(|job| job.ticket_id == ticket_id).expect("job queued")
 }
 
 #[cfg(unix)]
@@ -175,12 +124,7 @@ fn wait_for_job_status(job_id: &str, status: &str, timeout_ms: u64) -> bool {
 /// a wrong or missing terminal value fails diagnosably instead of as an
 /// empty read.
 #[cfg(unix)]
-fn wait_for_file_content(
-    path: &Path,
-    deadline: Instant,
-    awaited: &str,
-    is_complete: impl Fn(&str) -> bool,
-) -> Result<String, String> {
+fn wait_for_file_content(path: &Path, deadline: Instant, awaited: &str, is_complete: impl Fn(&str) -> bool) -> Result<String, String> {
     let start = Instant::now();
     loop {
         if let Ok(content) = fs::read_to_string(path)
@@ -190,8 +134,7 @@ fn wait_for_file_content(
         }
         if Instant::now() >= deadline {
             let exists = path.exists();
-            let current =
-                fs::read_to_string(path).unwrap_or_else(|err| format!("<unreadable: {err}>"));
+            let current = fs::read_to_string(path).unwrap_or_else(|err| format!("<unreadable: {err}>"));
             return Err(format!(
                 "timed out after {:.1}s waiting for {} at {}: file exists: {exists}, content: {:?}",
                 start.elapsed().as_secs_f64(),
@@ -205,18 +148,11 @@ fn wait_for_file_content(
 }
 
 #[cfg(unix)]
-fn wait_for_completed_jobs(
-    ticket_id: &str,
-    expected: usize,
-    timeout_ms: u64,
-) -> Vec<lotar::api_types::AgentJob> {
+fn wait_for_completed_jobs(ticket_id: &str, expected: usize, timeout_ms: u64) -> Vec<lotar::api_types::AgentJob> {
     let start = Instant::now();
     let mut latest = Vec::new();
     while start.elapsed() < Duration::from_millis(timeout_ms) {
-        let jobs: Vec<_> = AgentJobService::list_jobs()
-            .into_iter()
-            .filter(|job| job.ticket_id == ticket_id)
-            .collect();
+        let jobs: Vec<_> = AgentJobService::list_jobs().into_iter().filter(|job| job.ticket_id == ticket_id).collect();
         if jobs.len() == expected && jobs.iter().all(|job| job.status == "completed") {
             return jobs;
         }
@@ -227,21 +163,14 @@ fn wait_for_completed_jobs(
 }
 
 #[cfg(unix)]
-fn wait_for_ticket_jobs<F>(
-    ticket_id: &str,
-    timeout_ms: u64,
-    predicate: F,
-) -> Vec<lotar::api_types::AgentJob>
+fn wait_for_ticket_jobs<F>(ticket_id: &str, timeout_ms: u64, predicate: F) -> Vec<lotar::api_types::AgentJob>
 where
     F: Fn(&[lotar::api_types::AgentJob]) -> bool,
 {
     let start = Instant::now();
     let mut latest = Vec::new();
     while start.elapsed() < Duration::from_millis(timeout_ms) {
-        let jobs: Vec<_> = AgentJobService::list_jobs()
-            .into_iter()
-            .filter(|job| job.ticket_id == ticket_id)
-            .collect();
+        let jobs: Vec<_> = AgentJobService::list_jobs().into_iter().filter(|job| job.ticket_id == ticket_id).collect();
         if predicate(&jobs) {
             return jobs;
         }
@@ -252,12 +181,7 @@ where
 }
 
 #[cfg(unix)]
-fn wait_for_task_status(
-    storage: &lotar::Storage,
-    ticket_id: &str,
-    status: &str,
-    timeout_ms: u64,
-) -> bool {
+fn wait_for_task_status(storage: &lotar::Storage, ticket_id: &str, status: &str, timeout_ms: u64) -> bool {
     let start = Instant::now();
     while start.elapsed() < Duration::from_millis(timeout_ms) {
         if let Ok(task) = TaskService::get(storage, ticket_id, None)
@@ -271,13 +195,7 @@ fn wait_for_task_status(
 }
 
 #[cfg(unix)]
-fn wait_for_task_state(
-    storage: &lotar::Storage,
-    ticket_id: &str,
-    status: &str,
-    assignee: Option<&str>,
-    timeout_ms: u64,
-) -> Option<lotar::api_types::TaskDTO> {
+fn wait_for_task_state(storage: &lotar::Storage, ticket_id: &str, status: &str, assignee: Option<&str>, timeout_ms: u64) -> Option<lotar::api_types::TaskDTO> {
     let start = Instant::now();
     while start.elapsed() < Duration::from_millis(timeout_ms) {
         if let Ok(task) = TaskService::get(storage, ticket_id, None)
@@ -306,13 +224,8 @@ echo '{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"stub-1\"}'\n\
 echo '{\"type\":\"assistant\",\"message\":{\"content\":[{\"text\":\"stubbed success\"}]},\"session_id\":\"stub-1\"}'\n\
 exit 0\n",
     );
-    fixtures.create_config_in_dir(
-        &fixtures.tasks_root,
-        &format!(
-            "agents:\n  {agent_name}:\n    runner: claude\n    command: \"{}\"\n",
-            script.to_string_lossy()
-        ),
-    );
+    fixtures
+        .create_config_in_dir(&fixtures.tasks_root, &format!("agents:\n  {agent_name}:\n    runner: claude\n    command: \"{}\"\n", script.to_string_lossy()));
     // Automation rules define lifecycle actions - agent job is queued implicitly on assignment
     let automation_yaml = automation_yaml_for(agent_name);
     AutomationService::set(&fixtures.tasks_root, None, &automation_yaml).expect("set automation");
@@ -330,47 +243,23 @@ exit 0\n",
     )
     .expect("create task");
 
-    let _updated = TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            assignee: Some(format!("@{}", agent_name)),
-            ..Default::default()
-        },
-    )
-    .expect("update assignee");
+    let _updated = TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some(format!("@{}", agent_name)), ..Default::default() })
+        .expect("update assignee");
 
     let job = job_for_ticket(&created.id);
-    assert!(
-        wait_for_job_status(&job.id, "completed", 2000),
-        "job did not complete in time"
-    );
+    assert!(wait_for_job_status(&job.id, "completed", 2000), "job did not complete in time");
 
     let completed = AgentJobService::get_job(&job.id).expect("job still exists");
-    assert!(
-        completed
-            .summary
-            .as_deref()
-            .is_some_and(|v| v.contains("stubbed success")),
-        "expected summary from stub agent"
-    );
+    assert!(completed.summary.as_deref().is_some_and(|v| v.contains("stubbed success")), "expected summary from stub agent");
 
     // Task post-processing lags job completion: poll for the final task state
     // instead of asserting immediately after the job wait (raced under load).
-    assert!(
-        wait_for_task_status(&storage, &created.id, "NeedsReview", 10_000),
-        "task did not reach NeedsReview after job completion"
-    );
+    assert!(wait_for_task_status(&storage, &created.id, "NeedsReview", 10_000), "task did not reach NeedsReview after job completion");
 
     let refreshed = TaskService::get(&storage, &created.id, None).expect("get task");
     assert_eq!(refreshed.status.as_str(), "NeedsReview");
     assert_eq!(refreshed.assignee.as_deref(), Some("sam"));
-    assert!(
-        refreshed
-            .tags
-            .iter()
-            .any(|tag| tag.eq_ignore_ascii_case("agent-success"))
-    );
+    assert!(refreshed.tags.iter().any(|tag| tag.eq_ignore_ascii_case("agent-success")));
 }
 
 #[cfg(unix)]
@@ -387,13 +276,8 @@ fn auto_queue_assignment_handles_failure_action() {
 echo '{\"type\":\"assistant\",\"message\":{\"content\":[{\"text\":\"stubbed failure\"}]}}'\n\
 exit 1\n",
     );
-    fixtures.create_config_in_dir(
-        &fixtures.tasks_root,
-        &format!(
-            "agents:\n  {agent_name}:\n    runner: claude\n    command: \"{}\"\n",
-            script.to_string_lossy()
-        ),
-    );
+    fixtures
+        .create_config_in_dir(&fixtures.tasks_root, &format!("agents:\n  {agent_name}:\n    runner: claude\n    command: \"{}\"\n", script.to_string_lossy()));
     let automation_yaml = automation_yaml_for(agent_name);
     AutomationService::set(&fixtures.tasks_root, None, &automation_yaml).expect("set automation");
 
@@ -410,32 +294,16 @@ exit 1\n",
     )
     .expect("create task");
 
-    TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            assignee: Some(format!("@{}", agent_name)),
-            ..Default::default()
-        },
-    )
-    .expect("update assignee");
+    TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some(format!("@{}", agent_name)), ..Default::default() }).expect("update assignee");
 
     let job = job_for_ticket(&created.id);
-    assert!(
-        wait_for_job_status(&job.id, "failed", 2000),
-        "job did not fail in time"
-    );
+    assert!(wait_for_job_status(&job.id, "failed", 2000), "job did not fail in time");
 
     // Failure automation updates the task after the job status becomes visible.
-    let refreshed = wait_for_task_state(&storage, &created.id, "InProgress", Some("sam"), 10_000)
-        .expect("failure automation did not return the task to its reporter");
+    let refreshed =
+        wait_for_task_state(&storage, &created.id, "InProgress", Some("sam"), 10_000).expect("failure automation did not return the task to its reporter");
     assert_eq!(refreshed.assignee.as_deref(), Some("sam"));
-    assert!(
-        refreshed
-            .tags
-            .iter()
-            .any(|tag| tag.eq_ignore_ascii_case("agent-error"))
-    );
+    assert!(refreshed.tags.iter().any(|tag| tag.eq_ignore_ascii_case("agent-error")));
 }
 
 #[cfg(unix)]
@@ -452,13 +320,8 @@ fn auto_queue_assignment_handles_cancel_action() {
 echo '{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"stub-cancel\"}'\n\
 sleep 5\n",
     );
-    fixtures.create_config_in_dir(
-        &fixtures.tasks_root,
-        &format!(
-            "agents:\n  {agent_name}:\n    runner: claude\n    command: \"{}\"\n",
-            script.to_string_lossy()
-        ),
-    );
+    fixtures
+        .create_config_in_dir(&fixtures.tasks_root, &format!("agents:\n  {agent_name}:\n    runner: claude\n    command: \"{}\"\n", script.to_string_lossy()));
     let automation_yaml = automation_yaml_for(agent_name);
     AutomationService::set(&fixtures.tasks_root, None, &automation_yaml).expect("set automation");
 
@@ -475,20 +338,10 @@ sleep 5\n",
     )
     .expect("create task");
 
-    TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            assignee: Some(format!("@{}", agent_name)),
-            ..Default::default()
-        },
-    )
-    .expect("update assignee");
+    TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some(format!("@{}", agent_name)), ..Default::default() }).expect("update assignee");
 
     let job = job_for_ticket(&created.id);
-    let cancelled = AgentJobService::cancel_job(&job.id)
-        .expect("cancel job")
-        .expect("job exists");
+    let cancelled = AgentJobService::cancel_job(&job.id).expect("cancel job").expect("job exists");
     assert_eq!(cancelled.status, "cancelled");
     let job_after = AgentJobService::get_job(&job.id).expect("job still exists");
     assert_eq!(job_after.status, "cancelled");
@@ -502,12 +355,7 @@ sleep 5\n",
 
     let refreshed = TaskService::get(&storage, &created.id, None).expect("get task");
     assert_eq!(refreshed.assignee.as_deref(), Some("sam"));
-    assert!(
-        refreshed
-            .tags
-            .iter()
-            .any(|tag| tag.eq_ignore_ascii_case("agent-cancel"))
-    );
+    assert!(refreshed.tags.iter().any(|tag| tag.eq_ignore_ascii_case("agent-cancel")));
 }
 
 #[cfg(unix)]
@@ -576,43 +424,23 @@ printf '%s|%s' \"$LOTAR_TICKET_ID\" \"$LOTAR_AGENT_PROFILE\" > \"{}\"\n",
     )
     .expect("create task");
 
-    TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            assignee: Some(format!("@{}", implement_agent)),
-            ..Default::default()
-        },
-    )
-    .expect("update assignee");
+    TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some(format!("@{}", implement_agent)), ..Default::default() })
+        .expect("update assignee");
 
     // Both process launches and the intervening automation run need headroom under suite load.
     let deadline = Instant::now() + Duration::from_secs(10);
     let jobs = wait_for_completed_jobs(&created.id, 2, 10_000);
-    assert!(
-        jobs.len() == 2 && jobs.iter().all(|job| job.status == "completed"),
-        "expected two completed jobs before timeout; last observed jobs: {jobs:?}"
-    );
+    assert!(jobs.len() == 2 && jobs.iter().all(|job| job.status == "completed"), "expected two completed jobs before timeout; last observed jobs: {jobs:?}");
 
-    let implement_job = jobs
-        .iter()
-        .find(|job| job.agent.as_deref() == Some(implement_agent))
-        .expect("implement job recorded");
+    let implement_job = jobs.iter().find(|job| job.agent.as_deref() == Some(implement_agent)).expect("implement job recorded");
     assert_eq!(implement_job.status, "completed");
 
-    let test_job = jobs
-        .iter()
-        .find(|job| job.agent.as_deref() == Some(test_agent))
-        .expect("test job recorded");
+    let test_job = jobs.iter().find(|job| job.agent.as_deref() == Some(test_agent)).expect("test job recorded");
     assert_eq!(test_job.status, "completed");
 
     // The async command can finish after both jobs; keep the original wait budget.
     let expected_output = format!("{}|{implement_agent}", created.id);
-    let run_output =
-        wait_for_file_content(&run_log, deadline, "automation run output", |content| {
-            content == expected_output
-        })
-        .expect("read completed run log");
+    let run_output = wait_for_file_content(&run_log, deadline, "automation run output", |content| content == expected_output).expect("read completed run log");
     assert!(run_output.contains(&created.id));
     assert!(run_output.contains(implement_agent));
 
@@ -671,31 +499,15 @@ echo '{{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\
     let mut storage = fixtures.create_storage();
     let created = TaskService::create(
         &mut storage,
-        TaskCreate {
-            title: "Per-phase settings".to_string(),
-            project: Some("PIPE".to_string()),
-            reporter: Some("sam".to_string()),
-            ..Default::default()
-        },
+        TaskCreate { title: "Per-phase settings".to_string(), project: Some("PIPE".to_string()), reporter: Some("sam".to_string()), ..Default::default() },
     )
     .expect("create task");
-    TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            assignee: Some("@implement".to_string()),
-            ..Default::default()
-        },
-    )
-    .expect("assign implement agent");
+    TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some("@implement".to_string()), ..Default::default() })
+        .expect("assign implement agent");
 
     let jobs = wait_for_completed_jobs(&created.id, 2, 10_000);
     assert_eq!(jobs.len(), 2, "both phases ran: {jobs:?}");
-    let job = |agent: &str| {
-        jobs.iter()
-            .find(|job| job.agent.as_deref() == Some(agent))
-            .unwrap_or_else(|| panic!("{agent} job: {jobs:?}"))
-    };
+    let job = |agent: &str| jobs.iter().find(|job| job.agent.as_deref() == Some(agent)).unwrap_or_else(|| panic!("{agent} job: {jobs:?}"));
     assert_eq!(job("implement").model.as_deref(), Some("sonnet"));
     assert_eq!(job("implement").effort, None);
     assert_eq!(job("test").model.as_deref(), Some("haiku"));
@@ -705,15 +517,9 @@ echo '{{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\
     assert!(args.contains("--model\nhaiku\n--effort\nlow\n"), "{args}");
     assert!(!args.contains("opus"), "{args}");
     let implement_args = fs::read_to_string(root.join("implement.args")).unwrap();
-    assert!(
-        implement_args.contains("--model\nsonnet\n"),
-        "{implement_args}"
-    );
+    assert!(implement_args.contains("--model\nsonnet\n"), "{implement_args}");
     let prompt = fs::read_to_string(root.join("test.stdin")).unwrap();
-    assert!(
-        prompt.contains(&format!("Run the tests for {}", created.id)),
-        "{prompt}"
-    );
+    assert!(prompt.contains(&format!("Run the tests for {}", created.id)), "{prompt}");
 }
 
 /// DEV-316: a rule can take the model and effort from the ticket; a ticket
@@ -755,14 +561,8 @@ echo '{{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\
 
     let mut storage = fixtures.create_storage();
     let mut fields = lotar::types::CustomFields::new();
-    fields.insert(
-        "model".to_string(),
-        lotar::types::custom_value_string("opus"),
-    );
-    fields.insert(
-        "reasoning".to_string(),
-        lotar::types::custom_value_string("high"),
-    );
+    fields.insert("model".to_string(), lotar::types::custom_value_string("opus"));
+    fields.insert("reasoning".to_string(), lotar::types::custom_value_string("high"));
     let picked = TaskService::create(
         &mut storage,
         TaskCreate {
@@ -781,12 +581,7 @@ echo '{{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\
 
     let plain = TaskService::create(
         &mut storage,
-        TaskCreate {
-            title: "Ticket without fields".to_string(),
-            project: Some("FIX".to_string()),
-            reporter: Some("sam".to_string()),
-            ..Default::default()
-        },
+        TaskCreate { title: "Ticket without fields".to_string(), project: Some("FIX".to_string()), reporter: Some("sam".to_string()), ..Default::default() },
     )
     .expect("create task without fields");
     let plain_jobs = wait_for_completed_jobs(&plain.id, 1, 10_000);
@@ -797,14 +592,8 @@ echo '{{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\
     let args = fs::read_to_string(&args_file).unwrap();
     let runs: Vec<&str> = args.split("--\n").filter(|run| !run.is_empty()).collect();
     assert_eq!(runs.len(), 2, "{args}");
-    assert!(
-        runs[0].contains("--model\nopus\n--effort\nhigh\n"),
-        "{args}"
-    );
-    assert!(
-        runs[1].contains("--model\nsonnet\n--effort\nmedium\n"),
-        "{args}"
-    );
+    assert!(runs[0].contains("--model\nopus\n--effort\nhigh\n"), "{args}");
+    assert!(runs[1].contains("--model\nsonnet\n--effort\nmedium\n"), "{args}");
 }
 
 // ---------- New feature tests ----------
@@ -818,19 +607,10 @@ fn command_runner_captures_output_and_completes() {
     let fixtures = TestFixtures::new();
 
     let agent_name = "lint-cmd";
-    let script = write_stub_agent_script(
-        fixtures.get_temp_path(),
-        "cmd-runner.sh",
-        "#!/bin/sh\necho 'lint passed'\nexit 0\n",
-    );
+    let script = write_stub_agent_script(fixtures.get_temp_path(), "cmd-runner.sh", "#!/bin/sh\necho 'lint passed'\nexit 0\n");
 
-    fixtures.create_config_in_dir(
-        &fixtures.tasks_root,
-        &format!(
-            "agents:\n  {agent_name}:\n    runner: command\n    command: \"{}\"\n",
-            script.to_string_lossy()
-        ),
-    );
+    fixtures
+        .create_config_in_dir(&fixtures.tasks_root, &format!("agents:\n  {agent_name}:\n    runner: command\n    command: \"{}\"\n", script.to_string_lossy()));
     let automation_yaml = format!(
         "automation:\n  rules:\n    - name: Command runner lifecycle\n      when:\n        assignee: \"@{agent_name}\"\n      on:\n        job_completed:\n          set:\n            status: Done\n            assignee: \"@reporter\"\n"
     );
@@ -849,30 +629,16 @@ fn command_runner_captures_output_and_completes() {
     )
     .expect("create task");
 
-    TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            assignee: Some(format!("@{agent_name}")),
-            ..Default::default()
-        },
-    )
-    .expect("update assignee");
+    TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some(format!("@{agent_name}")), ..Default::default() }).expect("update assignee");
 
     let job = job_for_ticket(&created.id);
     assert_eq!(job.runner, "command");
-    assert!(
-        wait_for_job_status(&job.id, "completed", 3000),
-        "command runner job did not complete in time"
-    );
+    assert!(wait_for_job_status(&job.id, "completed", 3000), "command runner job did not complete in time");
 
     let completed = AgentJobService::get_job(&job.id).expect("job exists");
     assert_eq!(completed.exit_code, Some(0));
 
-    assert!(
-        wait_for_task_status(&storage, &created.id, "Done", 10_000),
-        "task did not reach Done after command job completed"
-    );
+    assert!(wait_for_task_status(&storage, &created.id, "Done", 10_000), "task did not reach Done after command job completed");
 
     let refreshed = TaskService::get(&storage, &created.id, None).expect("get task");
     assert_eq!(refreshed.status.as_str(), "Done");
@@ -888,19 +654,10 @@ fn command_runner_failure_fires_job_failed() {
     let fixtures = TestFixtures::new();
 
     let agent_name = "fail-cmd";
-    let script = write_stub_agent_script(
-        fixtures.get_temp_path(),
-        "cmd-fail.sh",
-        "#!/bin/sh\necho 'build failed'\nexit 1\n",
-    );
+    let script = write_stub_agent_script(fixtures.get_temp_path(), "cmd-fail.sh", "#!/bin/sh\necho 'build failed'\nexit 1\n");
 
-    fixtures.create_config_in_dir(
-        &fixtures.tasks_root,
-        &format!(
-            "agents:\n  {agent_name}:\n    runner: command\n    command: \"{}\"\n",
-            script.to_string_lossy()
-        ),
-    );
+    fixtures
+        .create_config_in_dir(&fixtures.tasks_root, &format!("agents:\n  {agent_name}:\n    runner: command\n    command: \"{}\"\n", script.to_string_lossy()));
     let automation_yaml = format!(
         "automation:\n  rules:\n    - name: Fail lifecycle\n      when:\n        assignee: \"@{agent_name}\"\n      on:\n        job_failed:\n          set:\n            assignee: \"@reporter\"\n          add:\n            tags: [cmd-error]\n"
     );
@@ -919,21 +676,10 @@ fn command_runner_failure_fires_job_failed() {
     )
     .expect("create task");
 
-    TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            assignee: Some(format!("@{agent_name}")),
-            ..Default::default()
-        },
-    )
-    .expect("update assignee");
+    TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some(format!("@{agent_name}")), ..Default::default() }).expect("update assignee");
 
     let job = job_for_ticket(&created.id);
-    assert!(
-        wait_for_job_status(&job.id, "failed", 3000),
-        "command runner job did not fail in time"
-    );
+    assert!(wait_for_job_status(&job.id, "failed", 3000), "command runner job did not fail in time");
 
     // Wait for the automation job_failed hook to reset assignee + add tag.
     let start = Instant::now();
@@ -943,10 +689,7 @@ fn command_runner_failure_fires_job_failed() {
             break task;
         }
         if start.elapsed() > Duration::from_millis(3000) {
-            panic!(
-                "automation job_failed hook did not update task in time: assignee={:?} tags={:?}",
-                task.assignee, task.tags
-            );
+            panic!("automation job_failed hook did not update task in time: assignee={:?} tags={:?}", task.assignee, task.tags);
         }
         sleep(Duration::from_millis(50));
     };
@@ -1007,19 +750,11 @@ fn template_expansion_in_run_action() {
     let run_script = write_stub_agent_script(
         fixtures.get_temp_path(),
         "tmpl-run.sh",
-        &format!(
-            "#!/bin/sh\nprintf '%s\\n' \"$1|$2\" > \"{log}.part\" && mv \"{log}.part\" \"{log}\"\n",
-            log = run_log.to_string_lossy()
-        ),
+        &format!("#!/bin/sh\nprintf '%s\\n' \"$1|$2\" > \"{log}.part\" && mv \"{log}.part\" \"{log}\"\n", log = run_log.to_string_lossy()),
     );
 
-    fixtures.create_config_in_dir(
-        &fixtures.tasks_root,
-        &format!(
-            "agents:\n  {agent_name}:\n    runner: claude\n    command: \"{}\"\n",
-            script.to_string_lossy()
-        ),
-    );
+    fixtures
+        .create_config_in_dir(&fixtures.tasks_root, &format!("agents:\n  {agent_name}:\n    runner: claude\n    command: \"{}\"\n", script.to_string_lossy()));
     let automation_yaml = format!(
         "automation:\n  rules:\n    - name: Template test\n      when:\n        assignee: \"@{agent_name}\"\n      on:\n        job_completed:\n          run:\n            command: \"{}\"\n            args:\n              - \"${{{{ticket.id}}}}\"\n              - \"${{{{ticket.title}}}}\"\n",
         run_script.to_string_lossy()
@@ -1027,46 +762,25 @@ fn template_expansion_in_run_action() {
     AutomationService::set(&fixtures.tasks_root, None, &automation_yaml).expect("set automation");
 
     let mut storage = fixtures.create_storage();
-    let created = TaskService::create(
-        &mut storage,
-        TaskCreate {
-            title: title.to_string(),
-            project: Some("TMPL".to_string()),
-            status: None,
-            ..Default::default()
-        },
-    )
-    .expect("create task");
+    let created =
+        TaskService::create(&mut storage, TaskCreate { title: title.to_string(), project: Some("TMPL".to_string()), status: None, ..Default::default() })
+            .expect("create task");
 
     // The shared deadline precedes the trigger: the assignee update below
     // starts the pipeline, and every wait in this test — job queueing and
     // the artifact — is bounded by this one instant, 10s out.
     let deadline = Instant::now() + Duration::from_secs(10);
 
-    TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            assignee: Some(format!("@{agent_name}")),
-            ..Default::default()
-        },
-    )
-    .expect("update assignee");
+    TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some(format!("@{agent_name}")), ..Default::default() }).expect("update assignee");
 
     // Pre-dispatch phase: the job must appear while the same deadline
     // still holds. No separate budget, no retries.
     let job = loop {
-        if let Some(job) = AgentJobService::list_jobs()
-            .into_iter()
-            .find(|job| job.ticket_id == created.id)
-        {
+        if let Some(job) = AgentJobService::list_jobs().into_iter().find(|job| job.ticket_id == created.id) {
             break job;
         }
         if Instant::now() >= deadline {
-            panic!(
-                "agent job for ticket {} was never queued within the shared budget",
-                created.id
-            );
+            panic!("agent job for ticket {} was never queued within the shared budget", created.id);
         }
         sleep(Duration::from_millis(50));
     };
@@ -1074,17 +788,12 @@ fn template_expansion_in_run_action() {
     // The barrier: the artifact holding BOTH expansions. The run command
     // runs after the job status already reads `completed` (see mechanism
     // above), so only this wait proves the subject action finished.
-    let run_output = match wait_for_file_content(
-        &run_log,
-        deadline,
-        &format!("run log with ticket id {} and expanded title", created.id),
-        |content| content.contains(&created.id) && content.contains(title),
-    ) {
+    let run_output = match wait_for_file_content(&run_log, deadline, &format!("run log with ticket id {} and expanded title", created.id), |content| {
+        content.contains(&created.id) && content.contains(title)
+    }) {
         Ok(content) => content,
         Err(wait_failure) => {
-            let job_state = AgentJobService::get_job(&job.id)
-                .map(|job| job.status)
-                .unwrap_or_else(|| "<job record missing>".to_string());
+            let job_state = AgentJobService::get_job(&job.id).map(|job| job.status).unwrap_or_else(|| "<job record missing>".to_string());
             let sentinel_state = match fs::read_to_string(&started_sentinel) {
                 Ok(content) => format!("started ({content:?})"),
                 Err(_) => "absent — the agent child never started".to_string(),
@@ -1096,26 +805,14 @@ fn template_expansion_in_run_action() {
         }
     };
 
-    assert!(
-        run_output.contains(&created.id),
-        "expected ticket id in run output, got: {}",
-        run_output
-    );
-    assert!(
-        run_output.contains(title),
-        "expected ticket title in run output, got: {}",
-        run_output
-    );
+    assert!(run_output.contains(&created.id), "expected ticket id in run output, got: {}", run_output);
+    assert!(run_output.contains(title), "expected ticket title in run output, got: {}", run_output);
 
     // Independent actual state, asserted after the barrier rather than
     // polled as one: the status published before the run command ran, so
     // it must read `completed` by now.
-    let finalized = AgentJobService::get_job(&job.id)
-        .unwrap_or_else(|| panic!("job record {} disappeared after the artifact", job.id));
-    assert_eq!(
-        finalized.status, "completed",
-        "job must be completed once the run artifact exists"
-    );
+    let finalized = AgentJobService::get_job(&job.id).unwrap_or_else(|| panic!("job record {} disappeared after the artifact", job.id));
+    assert_eq!(finalized.status, "completed", "job must be completed once the run artifact exists");
 }
 
 /// Event hooks: `on.assigned` fires when assignee changes, `on.start` (legacy) also fires.
@@ -1129,22 +826,10 @@ fn event_hooks_assigned_and_legacy_start_both_fire() {
     let assigned_log = fixtures.get_temp_path().join("assigned.log");
     let start_log = fixtures.get_temp_path().join("start.log");
 
-    let assigned_script = write_stub_agent_script(
-        fixtures.get_temp_path(),
-        "hook-assigned.sh",
-        &format!(
-            "#!/bin/sh\necho assigned > \"{}\"\n",
-            assigned_log.to_string_lossy()
-        ),
-    );
-    let start_script = write_stub_agent_script(
-        fixtures.get_temp_path(),
-        "hook-start.sh",
-        &format!(
-            "#!/bin/sh\necho start > \"{}\"\n",
-            start_log.to_string_lossy()
-        ),
-    );
+    let assigned_script =
+        write_stub_agent_script(fixtures.get_temp_path(), "hook-assigned.sh", &format!("#!/bin/sh\necho assigned > \"{}\"\n", assigned_log.to_string_lossy()));
+    let start_script =
+        write_stub_agent_script(fixtures.get_temp_path(), "hook-start.sh", &format!("#!/bin/sh\necho start > \"{}\"\n", start_log.to_string_lossy()));
 
     fixtures.create_config_in_dir(&fixtures.tasks_root, "");
     let automation_yaml = format!(
@@ -1155,36 +840,15 @@ fn event_hooks_assigned_and_legacy_start_both_fire() {
     AutomationService::set(&fixtures.tasks_root, None, &automation_yaml).expect("set automation");
 
     let mut storage = fixtures.create_storage();
-    let created = TaskService::create(
-        &mut storage,
-        TaskCreate {
-            title: "Hook test".to_string(),
-            project: Some("HOOK".to_string()),
-            status: None,
-            ..Default::default()
-        },
-    )
-    .expect("create task");
+    let created =
+        TaskService::create(&mut storage, TaskCreate { title: "Hook test".to_string(), project: Some("HOOK".to_string()), status: None, ..Default::default() })
+            .expect("create task");
 
-    TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            assignee: Some("alice".to_string()),
-            ..Default::default()
-        },
-    )
-    .expect("update assignee");
+    TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some("alice".to_string()), ..Default::default() }).expect("update assignee");
 
     // Both hooks should have fired
-    assert!(
-        assigned_log.exists(),
-        "assigned hook did not fire — log file not created"
-    );
-    assert!(
-        start_log.exists(),
-        "legacy start hook did not fire — log file not created"
-    );
+    assert!(assigned_log.exists(), "assigned hook did not fire — log file not created");
+    assert!(start_log.exists(), "legacy start hook did not fire — log file not created");
 }
 
 /// Event hooks: `on.created` fires only on task creation, not on update.
@@ -1196,20 +860,12 @@ fn event_hook_created_fires_only_on_create() {
     let fixtures = TestFixtures::new();
 
     let created_log = fixtures.get_temp_path().join("created-hook.log");
-    let created_script = write_stub_agent_script(
-        fixtures.get_temp_path(),
-        "hook-created.sh",
-        &format!(
-            "#!/bin/sh\necho created >> \"{}\"\n",
-            created_log.to_string_lossy()
-        ),
-    );
+    let created_script =
+        write_stub_agent_script(fixtures.get_temp_path(), "hook-created.sh", &format!("#!/bin/sh\necho created >> \"{}\"\n", created_log.to_string_lossy()));
 
     fixtures.create_config_in_dir(&fixtures.tasks_root, "");
-    let automation_yaml = format!(
-        "automation:\n  rules:\n    - name: Created hook\n      on:\n        created:\n          run: \"{}\"\n",
-        created_script.to_string_lossy()
-    );
+    let automation_yaml =
+        format!("automation:\n  rules:\n    - name: Created hook\n      on:\n        created:\n          run: \"{}\"\n", created_script.to_string_lossy());
     AutomationService::set(&fixtures.tasks_root, None, &automation_yaml).expect("set automation");
 
     let mut storage = fixtures.create_storage();
@@ -1218,19 +874,11 @@ fn event_hook_created_fires_only_on_create() {
     // which fires the Created event and automation hooks.
     let created = TaskService::create(
         &mut storage,
-        TaskCreate {
-            title: "Created hook test".to_string(),
-            project: Some("CRHK".to_string()),
-            status: None,
-            ..Default::default()
-        },
+        TaskCreate { title: "Created hook test".to_string(), project: Some("CRHK".to_string()), status: None, ..Default::default() },
     )
     .expect("create task");
 
-    assert!(
-        created_log.exists(),
-        "created hook did not fire on task creation"
-    );
+    assert!(created_log.exists(), "created hook did not fire on task creation");
     let content = fs::read_to_string(&created_log).expect("read created log");
     let fire_count = content.lines().filter(|l| l.trim() == "created").count();
     assert_eq!(fire_count, 1, "created hook should fire exactly once");
@@ -1238,26 +886,12 @@ fn event_hook_created_fires_only_on_create() {
     // Now update the task — `TaskService::update` also calls apply_task_update
     // internally with previous=Some(...), producing an Updated event.
     // The created hook should NOT fire again.
-    TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            assignee: Some("bob".to_string()),
-            ..Default::default()
-        },
-    )
-    .expect("update task");
+    TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some("bob".to_string()), ..Default::default() }).expect("update task");
 
     // Re-read the file — should still have only 1 "created" line
     let content_after = fs::read_to_string(&created_log).expect("read created log again");
-    let fire_count_after = content_after
-        .lines()
-        .filter(|l| l.trim() == "created")
-        .count();
-    assert_eq!(
-        fire_count_after, 1,
-        "created hook should NOT fire on update"
-    );
+    let fire_count_after = content_after.lines().filter(|l| l.trim() == "created").count();
+    assert_eq!(fire_count_after, 1, "created hook should NOT fire on update");
 }
 
 /// Template expansion: `${{previous.assignee}}` is available on `updated` event.
@@ -1269,14 +903,8 @@ fn previous_template_vars_in_updated_hook() {
     let fixtures = TestFixtures::new();
 
     let prev_log = fixtures.get_temp_path().join("prev.log");
-    let prev_script = write_stub_agent_script(
-        fixtures.get_temp_path(),
-        "prev-hook.sh",
-        &format!(
-            "#!/bin/sh\necho \"$1\" > \"{}\"\n",
-            prev_log.to_string_lossy()
-        ),
-    );
+    let prev_script =
+        write_stub_agent_script(fixtures.get_temp_path(), "prev-hook.sh", &format!("#!/bin/sh\necho \"$1\" > \"{}\"\n", prev_log.to_string_lossy()));
 
     fixtures.create_config_in_dir(&fixtures.tasks_root, "");
     let automation_yaml = format!(
@@ -1301,24 +929,11 @@ fn previous_template_vars_in_updated_hook() {
     // Update assignee from alice to bob — TaskService::update calls
     // apply_task_update(Some(prev), new) internally, which fires the Updated
     // event with ${{previous.assignee}} = alice.
-    TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            assignee: Some("bob".to_string()),
-            ..Default::default()
-        },
-    )
-    .expect("update assignee");
+    TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some("bob".to_string()), ..Default::default() }).expect("update assignee");
 
     assert!(prev_log.exists(), "updated hook did not fire");
     let content = fs::read_to_string(&prev_log).expect("read prev log");
-    assert_eq!(
-        content.trim(),
-        "alice",
-        "expected previous.assignee=alice, got: {}",
-        content.trim()
-    );
+    assert_eq!(content.trim(), "alice", "expected previous.assignee=alice, got: {}", content.trim());
 }
 
 /// LOTAR_* env vars: command runner receives ticket context via env vars.
@@ -1340,62 +955,28 @@ fn command_runner_receives_lotar_env_vars() {
         ),
     );
 
-    fixtures.create_config_in_dir(
-        &fixtures.tasks_root,
-        &format!(
-            "agents:\n  {agent_name}:\n    runner: command\n    command: \"{}\"\n",
-            script.to_string_lossy()
-        ),
-    );
+    fixtures
+        .create_config_in_dir(&fixtures.tasks_root, &format!("agents:\n  {agent_name}:\n    runner: command\n    command: \"{}\"\n", script.to_string_lossy()));
     // No automation rules needed — we're testing that the runner process itself gets LOTAR_* vars
-    AutomationService::set(&fixtures.tasks_root, None, "automation:\n  rules: []\n")
-        .expect("set automation");
+    AutomationService::set(&fixtures.tasks_root, None, "automation:\n  rules: []\n").expect("set automation");
 
     let mut storage = fixtures.create_storage();
     let created = TaskService::create(
         &mut storage,
-        TaskCreate {
-            title: "Env vars test".to_string(),
-            project: Some("ENV".to_string()),
-            status: None,
-            ..Default::default()
-        },
+        TaskCreate { title: "Env vars test".to_string(), project: Some("ENV".to_string()), status: None, ..Default::default() },
     )
     .expect("create task");
 
-    TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            assignee: Some(format!("@{agent_name}")),
-            ..Default::default()
-        },
-    )
-    .expect("update assignee");
+    TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some(format!("@{agent_name}")), ..Default::default() }).expect("update assignee");
 
     let job = job_for_ticket(&created.id);
-    assert!(
-        wait_for_job_status(&job.id, "completed", 3000),
-        "job did not complete in time"
-    );
+    assert!(wait_for_job_status(&job.id, "completed", 3000), "job did not complete in time");
 
     assert!(env_log.exists(), "env log file not created");
     let content = fs::read_to_string(&env_log).expect("read env log");
-    assert!(
-        content.contains(&format!("id={}", created.id)),
-        "LOTAR_TICKET_ID missing in env output: {}",
-        content
-    );
-    assert!(
-        content.contains("title=Env vars test"),
-        "LOTAR_TICKET_TITLE missing in env output: {}",
-        content
-    );
-    assert!(
-        content.contains("runner=command"),
-        "LOTAR_AGENT_RUNNER missing in env output: {}",
-        content
-    );
+    assert!(content.contains(&format!("id={}", created.id)), "LOTAR_TICKET_ID missing in env output: {}", content);
+    assert!(content.contains("title=Env vars test"), "LOTAR_TICKET_TITLE missing in env output: {}", content);
+    assert!(content.contains("runner=command"), "LOTAR_AGENT_RUNNER missing in env output: {}", content);
 }
 
 /// Comment action appends a template-expanded comment to the task.
@@ -1417,42 +998,18 @@ automation:
     let mut storage = fixtures.create_storage();
     let created = TaskService::create(
         &mut storage,
-        TaskCreate {
-            title: "Comment test".to_string(),
-            project: Some("CMT".to_string()),
-            status: None,
-            ..Default::default()
-        },
+        TaskCreate { title: "Comment test".to_string(), project: Some("CMT".to_string()), status: None, ..Default::default() },
     )
     .expect("create task");
 
-    TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            assignee: Some("alice".to_string()),
-            ..Default::default()
-        },
-    )
-    .expect("update assignee");
+    TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some("alice".to_string()), ..Default::default() }).expect("update assignee");
 
     let refreshed = TaskService::get(&storage, &created.id, None).expect("get task");
-    assert!(
-        !refreshed.comments.is_empty(),
-        "expected at least one comment, got none"
-    );
+    assert!(!refreshed.comments.is_empty(), "expected at least one comment, got none");
     let comment = &refreshed.comments[0];
-    assert!(
-        comment.text.contains("alice"),
-        "expected 'alice' in comment, got: {}",
-        comment.text
-    );
+    assert!(comment.text.contains("alice"), "expected 'alice' in comment, got: {}", comment.text);
     // previous.assignee should be empty since there was no prior assignee
-    assert!(
-        comment.text.contains("Assigned to alice"),
-        "expected 'Assigned to alice' in comment, got: {}",
-        comment.text
-    );
+    assert!(comment.text.contains("Assigned to alice"), "expected 'Assigned to alice' in comment, got: {}", comment.text);
 }
 
 /// Max-iterations safety net: after reaching the limit, no more jobs are queued
@@ -1474,13 +1031,8 @@ echo '{\"type\":\"assistant\",\"message\":{\"content\":[{\"text\":\"done\"}]},\"
 exit 0\n",
     );
 
-    fixtures.create_config_in_dir(
-        &fixtures.tasks_root,
-        &format!(
-            "agents:\n  {agent_name}:\n    runner: claude\n    command: \"{}\"\n",
-            script.to_string_lossy()
-        ),
-    );
+    fixtures
+        .create_config_in_dir(&fixtures.tasks_root, &format!("agents:\n  {agent_name}:\n    runner: claude\n    command: \"{}\"\n", script.to_string_lossy()));
     // max_iterations: 1 — after first completed job, further assignments should be blocked
     let automation_yaml = format!(
         "automation:\n  max_iterations: 1\n  rules:\n    - name: Iter lifecycle\n      when:\n        assignee: \"@{agent_name}\"\n      on:\n        job_completed:\n          set:\n            status: NeedsReview\n"
@@ -1490,71 +1042,29 @@ exit 0\n",
     let mut storage = fixtures.create_storage();
     let created = TaskService::create(
         &mut storage,
-        TaskCreate {
-            title: "Max iterations test".to_string(),
-            project: Some("ITER".to_string()),
-            status: None,
-            ..Default::default()
-        },
+        TaskCreate { title: "Max iterations test".to_string(), project: Some("ITER".to_string()), status: None, ..Default::default() },
     )
     .expect("create task");
 
     // First assignment → first job
-    TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            assignee: Some(format!("@{agent_name}")),
-            ..Default::default()
-        },
-    )
-    .expect("update assignee");
+    TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some(format!("@{agent_name}")), ..Default::default() }).expect("update assignee");
 
     let job = job_for_ticket(&created.id);
-    assert!(
-        wait_for_job_status(&job.id, "completed", 3000),
-        "first job did not complete in time"
-    );
+    assert!(wait_for_job_status(&job.id, "completed", 3000), "first job did not complete in time");
     sleep(Duration::from_millis(200));
 
     // Unassign, then reassign to trigger a second job attempt
-    TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            assignee: Some("nobody".to_string()),
-            ..Default::default()
-        },
-    )
-    .expect("unassign");
+    TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some("nobody".to_string()), ..Default::default() }).expect("unassign");
 
-    TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            assignee: Some(format!("@{agent_name}")),
-            ..Default::default()
-        },
-    )
-    .expect("reassign to agent");
+    TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some(format!("@{agent_name}")), ..Default::default() }).expect("reassign to agent");
 
     sleep(Duration::from_millis(300));
 
     let refreshed = TaskService::get(&storage, &created.id, None).expect("get task");
-    assert!(
-        refreshed
-            .tags
-            .iter()
-            .any(|t| t == "automation-limit-reached"),
-        "expected automation-limit-reached tag, got: {:?}",
-        refreshed.tags
-    );
+    assert!(refreshed.tags.iter().any(|t| t == "automation-limit-reached"), "expected automation-limit-reached tag, got: {:?}", refreshed.tags);
 
     // Verify only 1 job was created (second was blocked by max_iterations)
-    let jobs: Vec<_> = AgentJobService::list_jobs()
-        .into_iter()
-        .filter(|j| j.ticket_id == created.id)
-        .collect();
+    let jobs: Vec<_> = AgentJobService::list_jobs().into_iter().filter(|j| j.ticket_id == created.id).collect();
     assert_eq!(jobs.len(), 1, "expected exactly 1 job, got {}", jobs.len());
 }
 
@@ -1579,66 +1089,24 @@ automation:
     AutomationService::set(&fixtures.tasks_root, None, yaml).expect("set automation");
 
     let mut storage = fixtures.create_storage();
-    let created = TaskService::create(
-        &mut storage,
-        TaskCreate {
-            title: "Cooldown test".into(),
-            project: Some("COOL".into()),
-            status: None,
-            ..Default::default()
-        },
-    )
-    .expect("create task");
+    let created =
+        TaskService::create(&mut storage, TaskCreate { title: "Cooldown test".into(), project: Some("COOL".into()), status: None, ..Default::default() })
+            .expect("create task");
 
     // First update — rule should fire
-    TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            priority: Some("High".into()),
-            ..Default::default()
-        },
-    )
-    .expect("update 1");
+    TaskService::update(&mut storage, &created.id, TaskUpdate { priority: Some("High".into()), ..Default::default() }).expect("update 1");
     let after1 = TaskService::get(&storage, &created.id, None).expect("get after update 1");
-    assert!(
-        after1.tags.iter().any(|t| t == "auto-tagged"),
-        "first update should add tag, got: {:?}",
-        after1.tags
-    );
+    assert!(after1.tags.iter().any(|t| t == "auto-tagged"), "first update should add tag, got: {:?}", after1.tags);
 
     // Remove the tag so we can detect if the rule fires again
-    TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            tags: Some(vec![]),
-            ..Default::default()
-        },
-    )
-    .expect("update 2 - remove tag");
+    TaskService::update(&mut storage, &created.id, TaskUpdate { tags: Some(vec![]), ..Default::default() }).expect("update 2 - remove tag");
     let after2 = TaskService::get(&storage, &created.id, None).expect("get after update 2");
-    assert!(
-        !after2.tags.iter().any(|t| t == "auto-tagged"),
-        "tag should be removed"
-    );
+    assert!(!after2.tags.iter().any(|t| t == "auto-tagged"), "tag should be removed");
 
     // Second update within cooldown — rule should NOT fire
-    TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            priority: Some("High".into()),
-            ..Default::default()
-        },
-    )
-    .expect("update 3");
+    TaskService::update(&mut storage, &created.id, TaskUpdate { priority: Some("High".into()), ..Default::default() }).expect("update 3");
     let after3 = TaskService::get(&storage, &created.id, None).expect("get after update 3");
-    assert!(
-        !after3.tags.iter().any(|t| t == "auto-tagged"),
-        "second update within cooldown should NOT add tag, got: {:?}",
-        after3.tags
-    );
+    assert!(!after3.tags.iter().any(|t| t == "auto-tagged"), "second update within cooldown should NOT add tag, got: {:?}", after3.tags);
 }
 
 /// Verify that cooldown expires and the rule fires again after the window.
@@ -1664,62 +1132,26 @@ automation:
     let mut storage = fixtures.create_storage();
     let created = TaskService::create(
         &mut storage,
-        TaskCreate {
-            title: "Short cooldown test".into(),
-            project: Some("COOL2".into()),
-            status: None,
-            ..Default::default()
-        },
+        TaskCreate { title: "Short cooldown test".into(), project: Some("COOL2".into()), status: None, ..Default::default() },
     )
     .expect("create task");
 
     // First update — rule should fire
-    TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            priority: Some("High".into()),
-            ..Default::default()
-        },
-    )
-    .expect("update 1");
+    TaskService::update(&mut storage, &created.id, TaskUpdate { priority: Some("High".into()), ..Default::default() }).expect("update 1");
     let after1 = TaskService::get(&storage, &created.id, None).expect("get after update 1");
-    assert!(
-        after1.tags.iter().any(|t| t == "short-cd"),
-        "first update should add tag"
-    );
+    assert!(after1.tags.iter().any(|t| t == "short-cd"), "first update should add tag");
 
     // Remove tag
-    TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            tags: Some(vec![]),
-            ..Default::default()
-        },
-    )
-    .expect("remove tag");
+    TaskService::update(&mut storage, &created.id, TaskUpdate { tags: Some(vec![]), ..Default::default() }).expect("remove tag");
 
     // Wait for cooldown to expire
     sleep(Duration::from_millis(1100));
 
     // A genuine third update after expiry should fire again; repeating High
     // would be a no-op and must not dispatch automation.
-    TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            priority: Some("Low".into()),
-            ..Default::default()
-        },
-    )
-    .expect("update 3 after cooldown");
+    TaskService::update(&mut storage, &created.id, TaskUpdate { priority: Some("Low".into()), ..Default::default() }).expect("update 3 after cooldown");
     let after3 = TaskService::get(&storage, &created.id, None).expect("get after update 3");
-    assert!(
-        after3.tags.iter().any(|t| t == "short-cd"),
-        "update after cooldown expiry should add tag again, got: {:?}",
-        after3.tags
-    );
+    assert!(after3.tags.iter().any(|t| t == "short-cd"), "update after cooldown expiry should add tag again, got: {:?}", after3.tags);
 }
 
 /// Simulation returns matching rule and actions without modifying the task.
@@ -1746,30 +1178,16 @@ automation:
     let mut storage = fixtures.create_storage();
     let created = TaskService::create(
         &mut storage,
-        TaskCreate {
-            title: "Simulate test".into(),
-            project: Some("SIM".into()),
-            status: None,
-            task_type: Some("Bug".into()),
-            ..Default::default()
-        },
+        TaskCreate { title: "Simulate test".into(), project: Some("SIM".into()), status: None, task_type: Some("Bug".into()), ..Default::default() },
     )
     .expect("create task");
 
-    let result =
-        AutomationService::simulate(&fixtures.tasks_root, &created.id, AutomationEvent::Updated)
-            .expect("simulate");
+    let result = AutomationService::simulate(&fixtures.tasks_root, &created.id, AutomationEvent::Updated).expect("simulate");
 
     assert!(result.matched, "rule should match");
     assert_eq!(result.rule_name.as_deref(), Some("Auto-tag bugs"));
-    assert!(
-        result.actions.iter().any(|a| a.action == "set_priority"),
-        "expected set_priority action"
-    );
-    assert!(
-        result.actions.iter().any(|a| a.action == "add_tags"),
-        "expected add_tags action"
-    );
+    assert!(result.actions.iter().any(|a| a.action == "set_priority"), "expected set_priority action");
+    assert!(result.actions.iter().any(|a| a.action == "add_tags"), "expected add_tags action");
 
     // Task should be unchanged
     let unchanged = TaskService::get(&storage, &created.id, None).expect("get task");
@@ -1801,45 +1219,16 @@ fn agent_assignee_does_not_leak_into_members() {
     .expect("create task");
 
     // Assign to an @-prefixed agent profile name
-    TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            assignee: Some("@implement".to_string()),
-            ..Default::default()
-        },
-    )
-    .expect("update assignee");
+    TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some("@implement".to_string()), ..Default::default() }).expect("update assignee");
 
     // Read the config back and verify the agent profile name is NOT in the members list
-    let cfg_mgr = lotar::config::manager::ConfigManager::new_manager_with_tasks_dir_readonly(
-        &fixtures.tasks_root,
-    )
-    .expect("load config");
-    let config = cfg_mgr
-        .get_project_config("LEAK")
-        .unwrap_or_else(|_| cfg_mgr.get_resolved_config().clone());
-    let lower_members: Vec<String> = config
-        .members
-        .iter()
-        .map(|m| m.to_ascii_lowercase())
-        .collect();
-    assert!(
-        !lower_members.contains(&"implement".to_string()),
-        "agent profile name '@implement' should not appear in members: {:?}",
-        config.members
-    );
-    assert!(
-        !lower_members.iter().any(|m| m.starts_with('@')),
-        "no @-prefixed names should appear in members: {:?}",
-        config.members
-    );
+    let cfg_mgr = lotar::config::manager::ConfigManager::new_manager_with_tasks_dir_readonly(&fixtures.tasks_root).expect("load config");
+    let config = cfg_mgr.get_project_config("LEAK").unwrap_or_else(|_| cfg_mgr.get_resolved_config().clone());
+    let lower_members: Vec<String> = config.members.iter().map(|m| m.to_ascii_lowercase()).collect();
+    assert!(!lower_members.contains(&"implement".to_string()), "agent profile name '@implement' should not appear in members: {:?}", config.members);
+    assert!(!lower_members.iter().any(|m| m.starts_with('@')), "no @-prefixed names should appear in members: {:?}", config.members);
     // alice (the reporter) SHOULD be in members since she's a real person
-    assert!(
-        lower_members.contains(&"alice".to_string()),
-        "real reporter 'alice' should be auto-populated: {:?}",
-        config.members
-    );
+    assert!(lower_members.contains(&"alice".to_string()), "real reporter 'alice' should be auto-populated: {:?}", config.members);
 }
 
 /// Async `run` with `wait: false` should spawn in the background and let the update
@@ -1893,26 +1282,13 @@ fn async_run_action_does_not_block() {
     let mut storage = fixtures.create_storage();
     let created = TaskService::create(
         &mut storage,
-        TaskCreate {
-            title: "Async run test".to_string(),
-            project: Some("ASYN".to_string()),
-            status: None,
-            ..Default::default()
-        },
+        TaskCreate { title: "Async run test".to_string(), project: Some("ASYN".to_string()), status: None, ..Default::default() },
     )
     .expect("create task");
 
     // Update returns immediately while the child is still gated.
     let update_start = std::time::Instant::now();
-    TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            assignee: Some("bob".to_string()),
-            ..Default::default()
-        },
-    )
-    .expect("update should not block");
+    TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some("bob".to_string()), ..Default::default() }).expect("update should not block");
     let update_elapsed = update_start.elapsed();
 
     // Only this test writes the release file, and it has not been written
@@ -1940,22 +1316,16 @@ fn async_run_action_does_not_block() {
     // M empty before writing, which an exists-only poll can mistake for
     // the child having finished and then read as empty.
     std::fs::write(&release, "release\n").unwrap();
-    let final_state = wait_for_file_content(
-        &marker,
-        Instant::now() + Duration::from_secs(10),
-        "the gated child's terminal marker (done or bail)",
-        |content| matches!(content.trim(), "done" | "bail"),
-    )
+    let final_state = wait_for_file_content(&marker, Instant::now() + Duration::from_secs(10), "the gated child's terminal marker (done or bail)", |content| {
+        matches!(content.trim(), "done" | "bail")
+    })
     .expect("gated child should record a terminal marker after release");
     assert!(
         final_state.trim() != "bail",
         "gated child bailed: its ~30s bound expired before it saw the release gate (update took {:.1}s)",
         update_elapsed.as_secs_f64()
     );
-    assert!(
-        final_state.trim() == "done",
-        "async run command should complete via the gate after release, got {final_state:?}"
-    );
+    assert!(final_state.trim() == "done", "async run command should complete via the gate after release, got {final_state:?}");
 }
 
 /// Deterministic regression for the marker partial-write window: a shell
@@ -1993,10 +1363,7 @@ fn wait_for_file_content_rejects_empty_partial_write_window() {
         sleep(Duration::from_millis(50));
     }
     let legacy_read = fs::read_to_string(&marker).expect("legacy wait should read the marker");
-    assert!(
-        legacy_read.is_empty(),
-        "control: the exists-only wait must observe the forced empty window, got {legacy_read:?}"
-    );
+    assert!(legacy_read.is_empty(), "control: the exists-only wait must observe the forced empty window, got {legacy_read:?}");
 
     // Stage the content behind handshakes: nothing can write the marker
     // until this test signals, so every refusal below holds by
@@ -2015,28 +1382,18 @@ fn wait_for_file_content_rejects_empty_partial_write_window() {
     });
     let waiter_marker = marker.clone();
     let waiter = std::thread::spawn(move || {
-        let result = wait_for_file_content(
-            &waiter_marker,
-            Instant::now() + Duration::from_secs(10),
-            "marker content staged behind handshakes",
-            |content| {
-                let _ = observed_tx.send(content.to_string());
-                content.contains("done")
-            },
-        );
+        let result = wait_for_file_content(&waiter_marker, Instant::now() + Duration::from_secs(10), "marker content staged behind handshakes", |content| {
+            let _ = observed_tx.send(content.to_string());
+            content.contains("done")
+        });
         let _ = result_tx.send(result);
     });
 
     // 2. The wait must evaluate the empty marker and refuse it: the first
     //    observation is the empty window itself, and the wait is still
     //    running when that observation arrives.
-    let first = observed_rx
-        .recv_timeout(Duration::from_secs(2))
-        .expect("content wait should evaluate the empty marker");
-    assert_eq!(
-        first, "",
-        "first evaluated content must be the forced empty window"
-    );
+    let first = observed_rx.recv_timeout(Duration::from_secs(2)).expect("content wait should evaluate the empty marker");
+    assert_eq!(first, "", "first evaluated content must be the forced empty window");
     if let Ok(premature) = result_rx.try_recv() {
         panic!("content wait completed on empty content, got {premature:?}");
     }
@@ -2046,13 +1403,8 @@ fn wait_for_file_content_rejects_empty_partial_write_window() {
     stage_tx.send("do\n").expect("stage partial fragment");
     staged_rx.recv().expect("partial fragment staged");
     loop {
-        let observed = observed_rx
-            .recv_timeout(Duration::from_secs(2))
-            .expect("content wait should evaluate the staged content");
-        assert!(
-            observed.is_empty() || observed == "do\n",
-            "unexpected intermediate content: {observed:?}"
-        );
+        let observed = observed_rx.recv_timeout(Duration::from_secs(2)).expect("content wait should evaluate the staged content");
+        assert!(observed.is_empty() || observed == "do\n", "unexpected intermediate content: {observed:?}");
         if observed == "do\n" {
             break;
         }
@@ -2078,24 +1430,15 @@ fn wait_for_file_content_rejects_empty_partial_write_window() {
     // 4. Never-completing waits fail with diagnostics naming the observed
     //    file state, so real-site failures are self-explanatory.
     let absent = fixtures.get_temp_path().join("never_written_marker.txt");
-    let refusal = wait_for_file_content(
-        &absent,
-        Instant::now() + Duration::from_millis(25),
-        "a marker that is never written",
-        |content| content.contains("done"),
-    )
-    .expect_err("never-written marker must time out");
-    assert!(
-        refusal.contains("file exists: false"),
-        "diagnostics should state that the file is absent, got: {refusal}"
-    );
-    let stale_refusal = wait_for_file_content(
-        &marker,
-        Instant::now() + Duration::from_millis(25),
-        "a marker that never gains the awaited content",
-        |content| content.contains("finished"),
-    )
-    .expect_err("marker without the awaited content must time out");
+    let refusal =
+        wait_for_file_content(&absent, Instant::now() + Duration::from_millis(25), "a marker that is never written", |content| content.contains("done"))
+            .expect_err("never-written marker must time out");
+    assert!(refusal.contains("file exists: false"), "diagnostics should state that the file is absent, got: {refusal}");
+    let stale_refusal =
+        wait_for_file_content(&marker, Instant::now() + Duration::from_millis(25), "a marker that never gains the awaited content", |content| {
+            content.contains("finished")
+        })
+        .expect_err("marker without the awaited content must time out");
     assert!(
         stale_refusal.contains("file exists: true") && stale_refusal.contains("done"),
         "diagnostics should state the existing file and its content, got: {stale_refusal}"
@@ -2139,12 +1482,8 @@ fn shared_artifact_deadline_covers_delayed_post_status_dispatch() {
     let start = clock.get();
     let mut now = || clock.get();
     let mut tick = || clock.set(clock.get() + TICK);
-    let mut status_probe =
-        || (clock.get().duration_since(start) >= STATUS_FLIP).then_some("completed");
-    let mut artifact_probe = || {
-        (clock.get().duration_since(start) >= ARTIFACT_READY)
-            .then_some("TMPL-1|Template expansion test")
-    };
+    let mut status_probe = || (clock.get().duration_since(start) >= STATUS_FLIP).then_some("completed");
+    let mut artifact_probe = || (clock.get().duration_since(start) >= ARTIFACT_READY).then_some("TMPL-1|Template expansion test");
 
     // The real waits' decision order: probe first, then deadline, then
     // wait one interval. The injected clock makes it deterministic.
@@ -2169,61 +1508,31 @@ fn shared_artifact_deadline_covers_delayed_post_status_dispatch() {
     // Old phase 1 (control): the status barrier succeeds the moment the
     // status publishes — while the artifact is still absent. That instant
     // IS the split window: status observable, subject action unfinished.
-    let (status, _seen_at) = synthetic_poll(
-        clock.get() + OLD_PHASE_BUDGET,
-        &mut status_probe,
-        &mut now,
-        &mut tick,
-    )
-    .expect("status barrier observes the synthetic status flip");
+    let (status, _seen_at) =
+        synthetic_poll(clock.get() + OLD_PHASE_BUDGET, &mut status_probe, &mut now, &mut tick).expect("status barrier observes the synthetic status flip");
     assert_eq!(status, "completed");
-    assert!(
-        artifact_probe().is_none(),
-        "split window: artifact must be absent when the status barrier returns"
-    );
+    assert!(artifact_probe().is_none(), "split window: artifact must be absent when the status barrier returns");
 
     // Old phase 2 (control): the artifact wait gets a fresh phase budget
     // starting at the status flip, so it expires before the artifact even
     // though the combined budget is far from spent.
-    let old_artifact = synthetic_poll(
-        clock.get() + OLD_PHASE_BUDGET,
-        &mut artifact_probe,
-        &mut now,
-        &mut tick,
-    );
-    assert!(
-        old_artifact.is_none(),
-        "old split budgets must miss the delayed post-status artifact"
-    );
+    let old_artifact = synthetic_poll(clock.get() + OLD_PHASE_BUDGET, &mut artifact_probe, &mut now, &mut tick);
+    assert!(old_artifact.is_none(), "old split budgets must miss the delayed post-status artifact");
     let old_failed_after = clock.get().duration_since(start);
-    assert!(
-        old_failed_after < SHARED_BUDGET,
-        "old pattern must fail with combined budget remaining, failed after {old_failed_after:?}"
-    );
+    assert!(old_failed_after < SHARED_BUDGET, "old pattern must fail with combined budget remaining, failed after {old_failed_after:?}");
 
     // New pattern: reset to the trigger instant and run the whole
     // pipeline under ONE shared absolute deadline — no status barrier; the
     // artifact (both expansions) is the completion predicate.
     clock.set(start);
-    let (artifact, artifact_at) = synthetic_poll(
-        clock.get() + SHARED_BUDGET,
-        &mut artifact_probe,
-        &mut now,
-        &mut tick,
-    )
-    .expect("shared deadline covers the delayed post-status dispatch");
+    let (artifact, artifact_at) =
+        synthetic_poll(clock.get() + SHARED_BUDGET, &mut artifact_probe, &mut now, &mut tick).expect("shared deadline covers the delayed post-status dispatch");
     assert_eq!(artifact, "TMPL-1|Template expansion test");
-    assert!(
-        artifact_at.duration_since(start) <= SHARED_BUDGET,
-        "artifact completes within the shared budget"
-    );
+    assert!(artifact_at.duration_since(start) <= SHARED_BUDGET, "artifact completes within the shared budget");
 
     // Post-barrier independent state: the status published earlier and
     // stays published — read as actual state, never polled as a barrier.
-    assert_eq!(
-        status_probe().expect("status stays published after the artifact"),
-        "completed"
-    );
+    assert_eq!(status_probe().expect("status stays published after the artifact"), "completed");
 }
 
 /// Date condition operators: `before`, `within`, `older_than` on due_date field.
@@ -2264,22 +1573,10 @@ automation:
     .expect("create task");
 
     // Update to trigger automation
-    TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            assignee: Some("bob".to_string()),
-            ..Default::default()
-        },
-    )
-    .expect("update");
+    TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some("bob".to_string()), ..Default::default() }).expect("update");
 
     let refreshed = TaskService::get(&storage, &created.id, None).expect("get task");
-    assert!(
-        refreshed.tags.iter().any(|t| t == "overdue"),
-        "overdue task should be tagged: {:?}",
-        refreshed.tags
-    );
+    assert!(refreshed.tags.iter().any(|t| t == "overdue"), "overdue task should be tagged: {:?}", refreshed.tags);
 
     // Create task with a future due date — should NOT match
     let future_task = TaskService::create(
@@ -2294,22 +1591,10 @@ automation:
     )
     .expect("create future task");
 
-    TaskService::update(
-        &mut storage,
-        &future_task.id,
-        TaskUpdate {
-            assignee: Some("alice".to_string()),
-            ..Default::default()
-        },
-    )
-    .expect("update future");
+    TaskService::update(&mut storage, &future_task.id, TaskUpdate { assignee: Some("alice".to_string()), ..Default::default() }).expect("update future");
 
     let future_refreshed = TaskService::get(&storage, &future_task.id, None).expect("get task");
-    assert!(
-        !future_refreshed.tags.iter().any(|t| t == "overdue"),
-        "future task should NOT be tagged overdue: {:?}",
-        future_refreshed.tags
-    );
+    assert!(!future_refreshed.tags.iter().any(|t| t == "overdue"), "future task should NOT be tagged overdue: {:?}", future_refreshed.tags);
 }
 
 /// Date condition: `older_than` matches tasks created more than N days ago.
@@ -2337,23 +1622,13 @@ automation:
     // Create a task (it will have created=now, which is NOT older than 30d)
     let created = TaskService::create(
         &mut storage,
-        TaskCreate {
-            title: "Recent task".to_string(),
-            project: Some("STALE".to_string()),
-            status: None,
-            ..Default::default()
-        },
+        TaskCreate { title: "Recent task".to_string(), project: Some("STALE".to_string()), status: None, ..Default::default() },
     )
     .expect("create task");
 
     // Simulate: rule should NOT match (task created just now)
-    let result =
-        AutomationService::simulate(&fixtures.tasks_root, &created.id, AutomationEvent::Updated)
-            .expect("simulate");
-    assert!(
-        !result.matched,
-        "recent task should not match older_than:30d"
-    );
+    let result = AutomationService::simulate(&fixtures.tasks_root, &created.id, AutomationEvent::Updated).expect("simulate");
+    assert!(!result.matched, "recent task should not match older_than:30d");
 }
 
 /// Assignment strategies: `@round_robin` rotates through project members.
@@ -2364,10 +1639,7 @@ fn assignment_strategy_round_robin() {
     enable_server_mode();
     let fixtures = TestFixtures::new();
 
-    fixtures.create_config_in_dir(
-        &fixtures.tasks_root,
-        "default:\n  members:\n    - alice\n    - bob\n    - carol\n",
-    );
+    fixtures.create_config_in_dir(&fixtures.tasks_root, "default:\n  members:\n    - alice\n    - bob\n    - carol\n");
     let automation_yaml = r#"
 automation:
   rules:
@@ -2387,12 +1659,7 @@ automation:
     for i in 0..6 {
         let created = TaskService::create(
             &mut storage,
-            TaskCreate {
-                title: format!("Round robin {i}"),
-                project: Some("RR".to_string()),
-                status: None,
-                ..Default::default()
-            },
+            TaskCreate { title: format!("Round robin {i}"), project: Some("RR".to_string()), status: None, ..Default::default() },
         )
         .expect("create task");
         // Re-read: automation changes happen inside create but aren't reflected in the return value
@@ -2403,21 +1670,9 @@ automation:
     }
 
     // All three members should appear at least once in 6 assignments
-    assert!(
-        assignees.iter().any(|a| a == "alice"),
-        "alice should appear: {:?}",
-        assignees
-    );
-    assert!(
-        assignees.iter().any(|a| a == "bob"),
-        "bob should appear: {:?}",
-        assignees
-    );
-    assert!(
-        assignees.iter().any(|a| a == "carol"),
-        "carol should appear: {:?}",
-        assignees
-    );
+    assert!(assignees.iter().any(|a| a == "alice"), "alice should appear: {:?}", assignees);
+    assert!(assignees.iter().any(|a| a == "bob"), "bob should appear: {:?}", assignees);
+    assert!(assignees.iter().any(|a| a == "carol"), "carol should appear: {:?}", assignees);
 }
 
 /// Assignment strategy: `@least_busy` picks member with fewest active tasks.
@@ -2428,10 +1683,7 @@ fn assignment_strategy_least_busy() {
     enable_server_mode();
     let fixtures = TestFixtures::new();
 
-    fixtures.create_config_in_dir(
-        &fixtures.tasks_root,
-        "default:\n  members:\n    - alice\n    - bob\n",
-    );
+    fixtures.create_config_in_dir(&fixtures.tasks_root, "default:\n  members:\n    - alice\n    - bob\n");
     let automation_yaml = r#"
 automation:
   rules:
@@ -2461,35 +1713,18 @@ automation:
         )
         .expect("create alice task");
         // Ensure they're active — set status to InProgress
-        TaskService::update(
-            &mut storage,
-            &t.id,
-            TaskUpdate {
-                status: Some("InProgress".into()),
-                ..Default::default()
-            },
-        )
-        .expect("set in-progress");
+        TaskService::update(&mut storage, &t.id, TaskUpdate { status: Some("InProgress".into()), ..Default::default() }).expect("set in-progress");
     }
 
     // Create a task without assignee — automation should pick bob (least busy)
     let new_task = TaskService::create(
         &mut storage,
-        TaskCreate {
-            title: "Least busy test".to_string(),
-            project: Some("LB".to_string()),
-            status: None,
-            ..Default::default()
-        },
+        TaskCreate { title: "Least busy test".to_string(), project: Some("LB".to_string()), status: None, ..Default::default() },
     )
     .expect("create unassigned task");
 
     let refreshed = TaskService::get(&storage, &new_task.id, None).expect("get task");
-    assert_eq!(
-        refreshed.assignee.as_deref(),
-        Some("bob"),
-        "should assign to least busy member (bob has 0 active tasks, alice has 3)"
-    );
+    assert_eq!(refreshed.assignee.as_deref(), Some("bob"), "should assign to least busy member (bob has 0 active tasks, alice has 3)");
 }
 
 /// Sprint condition: `sprint: { exists: false }` matches tasks not in any sprint.
@@ -2519,56 +1754,31 @@ automation:
     let mut storage = fixtures.create_storage();
 
     // Create an active sprint
-    let sprint = Sprint {
-        actual: Some(SprintActual {
-            started_at: Some(chrono::Utc::now().to_rfc3339()),
-            closed_at: None,
-        }),
-        ..Default::default()
-    };
+    let sprint = Sprint { actual: Some(SprintActual { started_at: Some(chrono::Utc::now().to_rfc3339()), closed_at: None }), ..Default::default() };
     let outcome = SprintService::create(&mut storage, sprint, None).expect("create sprint");
     let sprint_id = outcome.record.id;
 
     // Create a task — automation should add it to the active sprint
     let created = TaskService::create(
         &mut storage,
-        TaskCreate {
-            title: "Sprint auto-add".to_string(),
-            project: Some("SP".to_string()),
-            status: None,
-            ..Default::default()
-        },
+        TaskCreate { title: "Sprint auto-add".to_string(), project: Some("SP".to_string()), status: None, ..Default::default() },
     )
     .expect("create task");
 
     // Re-read task to see automation effects
     let refreshed = TaskService::get(&storage, &created.id, None).expect("get task");
-    assert!(
-        refreshed.sprints.contains(&sprint_id),
-        "task should be in sprint #{}: sprints={:?}",
-        sprint_id,
-        refreshed.sprints
-    );
+    assert!(refreshed.sprints.contains(&sprint_id), "task should be in sprint #{}: sprints={:?}", sprint_id, refreshed.sprints);
 
     // Create a second task that's already in a sprint — rule should NOT match
     let second = TaskService::create(
         &mut storage,
-        TaskCreate {
-            title: "Already in sprint".to_string(),
-            project: Some("SP".to_string()),
-            status: None,
-            sprints: vec![sprint_id],
-            ..Default::default()
-        },
+        TaskCreate { title: "Already in sprint".to_string(), project: Some("SP".to_string()), status: None, sprints: vec![sprint_id], ..Default::default() },
     )
     .expect("create second task");
 
     let refreshed2 = TaskService::get(&storage, &second.id, None).expect("get second task");
     // Should still be in the sprint (was already there)
-    assert!(
-        refreshed2.sprints.contains(&sprint_id),
-        "second task should keep sprint membership"
-    );
+    assert!(refreshed2.sprints.contains(&sprint_id), "second task should keep sprint membership");
 }
 
 #[test]
@@ -2594,46 +1804,18 @@ automation:
     let mut storage = fixtures.create_storage();
 
     // Create first task (RL-1) — this one will be the target of relationships
-    let _t1 = TaskService::create(
-        &mut storage,
-        TaskCreate {
-            title: "First task".to_string(),
-            project: Some("RL".to_string()),
-            status: None,
-            ..Default::default()
-        },
-    )
-    .expect("create first task");
+    let _t1 =
+        TaskService::create(&mut storage, TaskCreate { title: "First task".to_string(), project: Some("RL".to_string()), status: None, ..Default::default() })
+            .expect("create first task");
 
     // Create second task (RL-2) — automation should add relationships
-    let t2 = TaskService::create(
-        &mut storage,
-        TaskCreate {
-            title: "Second task".to_string(),
-            project: Some("RL".to_string()),
-            status: None,
-            ..Default::default()
-        },
-    )
-    .expect("create second task");
+    let t2 =
+        TaskService::create(&mut storage, TaskCreate { title: "Second task".to_string(), project: Some("RL".to_string()), status: None, ..Default::default() })
+            .expect("create second task");
 
     let refreshed = TaskService::get(&storage, &t2.id, None).expect("get second task");
-    assert!(
-        refreshed
-            .relationships
-            .depends_on
-            .contains(&"RL-1".to_string()),
-        "should have depends_on: RL-1, got {:?}",
-        refreshed.relationships.depends_on
-    );
-    assert!(
-        refreshed
-            .relationships
-            .related
-            .contains(&"RL-1".to_string()),
-        "should have related: RL-1, got {:?}",
-        refreshed.relationships.related
-    );
+    assert!(refreshed.relationships.depends_on.contains(&"RL-1".to_string()), "should have depends_on: RL-1, got {:?}", refreshed.relationships.depends_on);
+    assert!(refreshed.relationships.related.contains(&"RL-1".to_string()), "should have related: RL-1, got {:?}", refreshed.relationships.related);
 
     // Now update automation to remove the depends_on on update
     let yaml2 = r#"
@@ -2650,34 +1832,12 @@ automation:
     AutomationService::set(&fixtures.tasks_root, Some("RL"), yaml2).expect("set automation 2");
 
     // Update the second task status to InProgress
-    let _updated = TaskService::update(
-        &mut storage,
-        &t2.id,
-        TaskUpdate {
-            status: Some("InProgress".to_string()),
-            ..Default::default()
-        },
-    )
-    .expect("update task");
+    let _updated = TaskService::update(&mut storage, &t2.id, TaskUpdate { status: Some("InProgress".to_string()), ..Default::default() }).expect("update task");
 
     let refreshed2 = TaskService::get(&storage, &t2.id, None).expect("get second task after");
-    assert!(
-        !refreshed2
-            .relationships
-            .depends_on
-            .contains(&"RL-1".to_string()),
-        "depends_on should be removed, got {:?}",
-        refreshed2.relationships.depends_on
-    );
+    assert!(!refreshed2.relationships.depends_on.contains(&"RL-1".to_string()), "depends_on should be removed, got {:?}", refreshed2.relationships.depends_on);
     // related was not removed so should still be there
-    assert!(
-        refreshed2
-            .relationships
-            .related
-            .contains(&"RL-1".to_string()),
-        "related should still be there, got {:?}",
-        refreshed2.relationships.related
-    );
+    assert!(refreshed2.relationships.related.contains(&"RL-1".to_string()), "related should still be there, got {:?}", refreshed2.relationships.related);
 }
 
 #[cfg(unix)]
@@ -2709,11 +1869,7 @@ fn review_transitions_require_reporter_identity() {
     TaskService::update_with_context(
         &mut storage,
         &created.id,
-        TaskUpdate {
-            status: Some("Review".to_string()),
-            assignee: Some("sam".to_string()),
-            ..Default::default()
-        },
+        TaskUpdate { status: Some("Review".to_string()), assignee: Some("sam".to_string()), ..Default::default() },
         TaskUpdateContext::automation_disabled(),
     )
     .expect("set task to review");
@@ -2721,18 +1877,11 @@ fn review_transitions_require_reporter_identity() {
     let err = TaskService::update(
         &mut storage,
         &created.id,
-        TaskUpdate {
-            status: Some("InProgress".to_string()),
-            assignee: Some("implement".to_string()),
-            ..Default::default()
-        },
+        TaskUpdate { status: Some("InProgress".to_string()), assignee: Some("implement".to_string()), ..Default::default() },
     )
     .expect_err("non-reporter should be blocked");
 
-    assert!(
-        err.to_string().contains("Only reporter 'sam'"),
-        "unexpected error: {err}"
-    );
+    assert!(err.to_string().contains("Only reporter 'sam'"), "unexpected error: {err}");
 }
 
 #[cfg(unix)]
@@ -2764,11 +1913,7 @@ fn reporter_can_advance_review_ticket() {
     TaskService::update_with_context(
         &mut storage,
         &created.id,
-        TaskUpdate {
-            status: Some("Review".to_string()),
-            assignee: Some("sam".to_string()),
-            ..Default::default()
-        },
+        TaskUpdate { status: Some("Review".to_string()), assignee: Some("sam".to_string()), ..Default::default() },
         TaskUpdateContext::automation_disabled(),
     )
     .expect("set task to review");
@@ -2776,11 +1921,7 @@ fn reporter_can_advance_review_ticket() {
     let updated = TaskService::update(
         &mut storage,
         &created.id,
-        TaskUpdate {
-            status: Some("InProgress".to_string()),
-            assignee: Some("implement".to_string()),
-            ..Default::default()
-        },
+        TaskUpdate { status: Some("InProgress".to_string()), assignee: Some("implement".to_string()), ..Default::default() },
     )
     .expect("reporter should be allowed to advance review");
 
@@ -2816,24 +1957,13 @@ fn clarification_handoff_to_reporter_survives_job_failure() {
     )
     .expect("create task");
 
-    TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            assignee: Some("@implement".to_string()),
-            ..Default::default()
-        },
-    )
-    .expect("assign implement agent");
+    TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some("@implement".to_string()), ..Default::default() })
+        .expect("assign implement agent");
 
     TaskService::update_with_context(
         &mut storage,
         &created.id,
-        TaskUpdate {
-            status: Some("HelpNeeded".to_string()),
-            assignee: Some("sam".to_string()),
-            ..Default::default()
-        },
+        TaskUpdate { status: Some("HelpNeeded".to_string()), assignee: Some("sam".to_string()), ..Default::default() },
         TaskUpdateContext::automation_disabled(),
     )
     .expect("agent hands ticket back to reporter");
@@ -2856,11 +1986,7 @@ fn clarification_handoff_to_reporter_survives_job_failure() {
     let refreshed = TaskService::get(&storage, &created.id, None).expect("get task");
     assert_eq!(refreshed.status.as_str(), "HelpNeeded");
     assert_eq!(refreshed.assignee.as_deref(), Some("sam"));
-    assert!(
-        !refreshed.tags.iter().any(|tag| tag == "agent-error"),
-        "clarification handoff should prevent fallback error automation: {:?}",
-        refreshed.tags
-    );
+    assert!(!refreshed.tags.iter().any(|tag| tag == "agent-error"), "clarification handoff should prevent fallback error automation: {:?}", refreshed.tags);
 }
 
 #[cfg(unix)]
@@ -2910,43 +2036,23 @@ exit 1\n",
     )
     .expect("create task");
 
-    TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            assignee: Some("@implement".to_string()),
-            ..Default::default()
-        },
-    )
-    .expect("assign implement agent");
+    TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some("@implement".to_string()), ..Default::default() })
+        .expect("assign implement agent");
 
     let job = job_for_ticket(&created.id);
-    assert!(
-        wait_for_job_status(&job.id, "failed", 3000),
-        "clarification job did not fail in time"
-    );
+    assert!(wait_for_job_status(&job.id, "failed", 3000), "clarification job did not fail in time");
 
-    assert!(
-        wait_for_task_status(&storage, &created.id, "HelpNeeded", 10_000),
-        "task did not reach HelpNeeded after failure handling"
-    );
+    assert!(wait_for_task_status(&storage, &created.id, "HelpNeeded", 10_000), "task did not reach HelpNeeded after failure handling");
 
     let refreshed = TaskService::get(&storage, &created.id, None).expect("get task");
     assert_eq!(refreshed.status.as_str(), "HelpNeeded");
     assert_eq!(refreshed.assignee.as_deref(), Some("sam@example.com"));
     assert!(
-        refreshed
-            .comments
-            .iter()
-            .any(|comment| comment.text.contains("Need clarification:")),
+        refreshed.comments.iter().any(|comment| comment.text.contains("Need clarification:")),
         "expected clarification comment, got {:?}",
         refreshed.comments
     );
-    assert!(
-        !refreshed.tags.iter().any(|tag| tag == "agent-error"),
-        "self-handoff should avoid fallback error automation: {:?}",
-        refreshed.tags
-    );
+    assert!(!refreshed.tags.iter().any(|tag| tag == "agent-error"), "self-handoff should avoid fallback error automation: {:?}", refreshed.tags);
 }
 
 #[cfg(unix)]
@@ -2988,11 +2094,7 @@ exit 0\n",
     TaskService::update_with_context(
         &mut storage,
         &created.id,
-        TaskUpdate {
-            status: Some("Merging".to_string()),
-            assignee: Some("merge".to_string()),
-            ..Default::default()
-        },
+        TaskUpdate { status: Some("Merging".to_string()), assignee: Some("merge".to_string()), ..Default::default() },
         TaskUpdateContext::automation_disabled(),
     )
     .expect("set task to merging");
@@ -3009,10 +2111,7 @@ exit 0\n",
     )
     .expect_err("merge job should require worktrees");
 
-    assert!(
-        err.to_string().contains("agent.worktree.enabled=true"),
-        "unexpected error: {err}"
-    );
+    assert!(err.to_string().contains("agent.worktree.enabled=true"), "unexpected error: {err}");
 }
 
 /// Tests that need a real Git repository (see `common::require_git`).
@@ -3054,11 +2153,7 @@ exit 0
             &fixtures,
             "PIP",
             "agent-pipeline",
-            &[
-                ("implement", agent_script.as_path()),
-                ("test", agent_script.as_path()),
-                ("merge", agent_script.as_path()),
-            ],
+            &[("implement", agent_script.as_path()), ("test", agent_script.as_path()), ("merge", agent_script.as_path())],
         );
 
         let mut storage = fixtures.create_storage();
@@ -3074,23 +2169,13 @@ exit 0
         )
         .expect("create task");
 
-        TaskService::update(
-            &mut storage,
-            &created.id,
-            TaskUpdate {
-                assignee: Some("@implement".to_string()),
-                ..Default::default()
-            },
-        )
-        .expect("assign implementation agent");
+        TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some("@implement".to_string()), ..Default::default() })
+            .expect("assign implementation agent");
 
         let jobs = wait_for_completed_jobs(&created.id, 3, 6000);
         assert_eq!(jobs.len(), 3, "expected implement, test, and merge jobs");
 
-        assert!(
-            wait_for_task_status(&storage, &created.id, "Done", 10_000),
-            "task did not reach Done after pipeline completed"
-        );
+        assert!(wait_for_task_status(&storage, &created.id, "Done", 10_000), "task did not reach Done after pipeline completed");
 
         let refreshed = TaskService::get(&storage, &created.id, None).expect("get final task");
         assert_eq!(refreshed.status.as_str(), "Done");
@@ -3101,19 +2186,9 @@ exit 0
         assert_eq!(phases, vec!["PIP-1|implement", "PIP-1|test", "PIP-1|merge"]);
         // The stubs neither commit nor merge (as a sandboxed agent can't);
         // LoTaR committed the change and fast-forwarded main after the merge job.
-        assert!(
-            fixtures.get_temp_path().join("feature.txt").exists(),
-            "the implement change should reach the main checkout through the merge"
-        );
-        let log = Command::new("git")
-            .args(["log", "--format=%s", "-n", "1"])
-            .current_dir(fixtures.get_temp_path())
-            .output()
-            .expect("git log");
-        assert_eq!(
-            String::from_utf8_lossy(&log.stdout).trim(),
-            "PIP-1: changes from the implement agent"
-        );
+        assert!(fixtures.get_temp_path().join("feature.txt").exists(), "the implement change should reach the main checkout through the merge");
+        let log = Command::new("git").args(["log", "--format=%s", "-n", "1"]).current_dir(fixtures.get_temp_path()).output().expect("git log");
+        assert_eq!(String::from_utf8_lossy(&log.stdout).trim(), "PIP-1: changes from the implement agent");
     }
 
     /// When LoTaR can't commit what the agent left behind, the job fails and
@@ -3144,11 +2219,7 @@ exit 0
             &fixtures,
             "LEF",
             "agent-pipeline",
-            &[
-                ("implement", agent_script.as_path()),
-                ("test", agent_script.as_path()),
-                ("merge", agent_script.as_path()),
-            ],
+            &[("implement", agent_script.as_path()), ("test", agent_script.as_path()), ("merge", agent_script.as_path())],
         );
 
         let mut storage = fixtures.create_storage();
@@ -3162,33 +2233,14 @@ exit 0
             },
         )
         .expect("create task");
-        TaskService::update(
-            &mut storage,
-            &created.id,
-            TaskUpdate {
-                assignee: Some("@implement".to_string()),
-                ..Default::default()
-            },
-        )
-        .expect("assign implementation agent");
+        TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some("@implement".to_string()), ..Default::default() })
+            .expect("assign implementation agent");
 
-        let task = wait_for_task_state(
-            &storage,
-            &created.id,
-            "HelpNeeded",
-            Some("Agent Tests"),
-            10_000,
-        )
-        .expect("failed commit should hand the ticket back");
+        let task = wait_for_task_state(&storage, &created.id, "HelpNeeded", Some("Agent Tests"), 10_000).expect("failed commit should hand the ticket back");
         assert!(task.tags.contains(&"agent-failed".to_string()));
         let job = job_for_ticket(&created.id);
         assert_eq!(job.status, "failed");
-        assert!(
-            job.last_message
-                .as_deref()
-                .is_some_and(|m| m.contains("could not commit") && m.contains("hook says no")),
-            "{job:?}"
-        );
+        assert!(job.last_message.as_deref().is_some_and(|m| m.contains("could not commit") && m.contains("hook says no")), "{job:?}");
     }
 
     /// A merge job whose branch can't reach main (main moved on and nobody
@@ -3221,11 +2273,7 @@ exit 0
             &fixtures,
             "UNM",
             "agent-pipeline",
-            &[
-                ("implement", agent_script.as_path()),
-                ("test", agent_script.as_path()),
-                ("merge", agent_script.as_path()),
-            ],
+            &[("implement", agent_script.as_path()), ("test", agent_script.as_path()), ("merge", agent_script.as_path())],
         );
 
         let mut storage = fixtures.create_storage();
@@ -3239,36 +2287,16 @@ exit 0
             },
         )
         .expect("create task");
-        TaskService::update(
-            &mut storage,
-            &created.id,
-            TaskUpdate {
-                assignee: Some("@implement".to_string()),
-                ..Default::default()
-            },
-        )
-        .expect("assign implementation agent");
+        TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some("@implement".to_string()), ..Default::default() })
+            .expect("assign implementation agent");
 
-        let task = wait_for_task_state(
-            &storage,
-            &created.id,
-            "HelpNeeded",
-            Some("Agent Tests"),
-            10_000,
-        )
-        .expect("unmerged merge should hand the ticket back");
+        let task = wait_for_task_state(&storage, &created.id, "HelpNeeded", Some("Agent Tests"), 10_000).expect("unmerged merge should hand the ticket back");
         assert!(task.tags.contains(&"agent-failed".to_string()));
-        let merge_job = AgentJobService::list_jobs()
-            .into_iter()
-            .find(|job| job.ticket_id == created.id && job.agent.as_deref() == Some("merge"))
-            .expect("merge job");
+        let merge_job =
+            AgentJobService::list_jobs().into_iter().find(|job| job.ticket_id == created.id && job.agent.as_deref() == Some("merge")).expect("merge job");
         assert_eq!(merge_job.status, "failed");
         assert!(
-            merge_job
-                .last_message
-                .as_deref()
-                .is_some_and(|m| m.contains("agent/UNM-1 is not merged")
-                    && m.contains("can't be fast-forwarded")),
+            merge_job.last_message.as_deref().is_some_and(|m| m.contains("agent/UNM-1 is not merged") && m.contains("can't be fast-forwarded")),
             "{merge_job:?}"
         );
         assert!(!fixtures.get_temp_path().join("feature.txt").exists());
@@ -3338,11 +2366,7 @@ exit 0
             &fixtures,
             "REV",
             "agent-reviewed",
-            &[
-                ("implement", ok_script.as_path()),
-                ("test", test_script.as_path()),
-                ("merge", ok_script.as_path()),
-            ],
+            &[("implement", ok_script.as_path()), ("test", test_script.as_path()), ("merge", ok_script.as_path())],
         );
         lotar::utils::identity::invalidate_identity_cache(Some(fixtures.tasks_root.as_path()));
 
@@ -3359,87 +2383,39 @@ exit 0
         )
         .expect("create task");
         let assign = |storage: &mut lotar::Storage, assignee: &str| {
-            TaskService::update(
-                storage,
-                &created.id,
-                TaskUpdate {
-                    assignee: Some(assignee.to_string()),
-                    ..Default::default()
-                },
-            )
-            .unwrap_or_else(|err| panic!("assign {assignee}: {err}"))
+            TaskService::update(storage, &created.id, TaskUpdate { assignee: Some(assignee.to_string()), ..Default::default() })
+                .unwrap_or_else(|err| panic!("assign {assignee}: {err}"))
         };
 
         // The test agent hands the ticket back; automation leaves it there.
         assign(&mut storage, "@implement");
         let jobs = wait_for_ticket_jobs(&created.id, 6000, |jobs| {
-            jobs.iter().any(|job| {
-                job.agent.as_deref() == Some("test")
-                    && matches!(job.status.as_str(), "completed" | "failed")
-            })
+            jobs.iter().any(|job| job.agent.as_deref() == Some("test") && matches!(job.status.as_str(), "completed" | "failed"))
         });
-        assert!(
-            jobs.iter()
-                .any(|job| job.agent.as_deref() == Some("test") && job.status == "completed"),
-            "hand-back run should complete normally: {jobs:?}"
-        );
-        let handed_back = wait_for_task_state(
-            &storage,
-            &created.id,
-            "HelpNeeded",
-            Some("Agent Tests"),
-            6000,
-        )
-        .expect("agent hand-back should stick");
-        assert!(
-            handed_back
-                .comments
-                .iter()
-                .any(|c| c.text.contains("Need a decision"))
-        );
+        assert!(jobs.iter().any(|job| job.agent.as_deref() == Some("test") && job.status == "completed"), "hand-back run should complete normally: {jobs:?}");
+        let handed_back = wait_for_task_state(&storage, &created.id, "HelpNeeded", Some("Agent Tests"), 6000).expect("agent hand-back should stick");
+        assert!(handed_back.comments.iter().any(|c| c.text.contains("Need a decision")));
         assert!(!handed_back.tags.contains(&"agent-failed".to_string()));
 
         // A runner failure goes back to the reporter instead of looping.
         assign(&mut storage, "@test");
-        let failed = wait_for_task_state(
-            &storage,
-            &created.id,
-            "HelpNeeded",
-            Some("Agent Tests"),
-            6000,
-        )
-        .and_then(|task| {
-            task.tags
-                .contains(&"agent-failed".to_string())
-                .then_some(task)
-        });
+        let failed = wait_for_task_state(&storage, &created.id, "HelpNeeded", Some("Agent Tests"), 6000)
+            .and_then(|task| task.tags.contains(&"agent-failed".to_string()).then_some(task));
         assert!(failed.is_some(), "runner failure should tag agent-failed");
 
         // Passing tests hand over for review, and review hands over to merge.
         assign(&mut storage, "@test");
         let review_task =
-            wait_for_task_state(&storage, &created.id, "Review", Some("Agent Tests"), 6000)
-                .expect("task should hand back to reporter for review");
+            wait_for_task_state(&storage, &created.id, "Review", Some("Agent Tests"), 6000).expect("task should hand back to reporter for review");
         assert!(review_task.tags.iter().any(|tag| tag == "ready-for-review"));
 
         assign(&mut storage, "@merge");
-        let final_task =
-            wait_for_task_state(&storage, &created.id, "Done", Some("Agent Tests"), 6000)
-                .expect("task should complete after merge");
+        let final_task = wait_for_task_state(&storage, &created.id, "Done", Some("Agent Tests"), 6000).expect("task should complete after merge");
         assert!(!final_task.tags.iter().any(|tag| tag == "ready-for-review"));
 
         let run_output = fs::read_to_string(&run_log).expect("read reviewed run log");
         let phases: Vec<_> = run_output.lines().collect();
-        assert_eq!(
-            phases,
-            vec![
-                "REV-1|implement",
-                "REV-1|test",
-                "REV-1|test",
-                "REV-1|test",
-                "REV-1|merge",
-            ]
-        );
+        assert_eq!(phases, vec!["REV-1|implement", "REV-1|test", "REV-1|test", "REV-1|test", "REV-1|merge",]);
     }
 
     /// Backward compatibility: old YAML keys (job_start, complete, error, cancel) still work.
@@ -3463,17 +2439,13 @@ exit 0\n",
 
         fixtures.create_config_in_dir(
             &fixtures.tasks_root,
-            &format!(
-                "agents:\n  {agent_name}:\n    runner: claude\n    command: \"{}\"\n",
-                script.to_string_lossy()
-            ),
+            &format!("agents:\n  {agent_name}:\n    runner: claude\n    command: \"{}\"\n", script.to_string_lossy()),
         );
         // Use OLD YAML key names: job_start, complete (not job_started, job_completed)
         let automation_yaml = format!(
             "automation:\n  rules:\n    - name: Backward compat\n      when:\n        assignee: \"@{agent_name}\"\n      on:\n        job_start:\n          set:\n            status: InProgress\n        complete:\n          set:\n            status: Done\n            assignee: \"@reporter\"\n          add:\n            tags: [compat-success]\n"
         );
-        AutomationService::set(&fixtures.tasks_root, None, &automation_yaml)
-            .expect("set automation");
+        AutomationService::set(&fixtures.tasks_root, None, &automation_yaml).expect("set automation");
 
         let mut storage = fixtures.create_storage();
         let created = TaskService::create(
@@ -3488,35 +2460,17 @@ exit 0\n",
         )
         .expect("create task");
 
-        TaskService::update(
-            &mut storage,
-            &created.id,
-            TaskUpdate {
-                assignee: Some(format!("@{agent_name}")),
-                ..Default::default()
-            },
-        )
-        .expect("update assignee");
+        TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some(format!("@{agent_name}")), ..Default::default() }).expect("update assignee");
 
         let job = job_for_ticket(&created.id);
-        assert!(
-            wait_for_job_status(&job.id, "completed", 3000),
-            "job did not complete in time (backward compat)"
-        );
+        assert!(wait_for_job_status(&job.id, "completed", 3000), "job did not complete in time (backward compat)");
 
-        assert!(
-            wait_for_task_status(&storage, &created.id, "Done", 10_000),
-            "task did not reach Done (backward compat)"
-        );
+        assert!(wait_for_task_status(&storage, &created.id, "Done", 10_000), "task did not reach Done (backward compat)");
 
         let refreshed = TaskService::get(&storage, &created.id, None).expect("get task");
         assert_eq!(refreshed.status.as_str(), "Done");
         assert_eq!(refreshed.assignee.as_deref(), Some("reporter-user"));
-        assert!(
-            refreshed.tags.iter().any(|t| t == "compat-success"),
-            "expected compat-success tag, got tags: {:?}",
-            refreshed.tags
-        );
+        assert!(refreshed.tags.iter().any(|t| t == "compat-success"), "expected compat-success tag, got tags: {:?}", refreshed.tags);
     }
 
     #[cfg(unix)]
@@ -3574,11 +2528,7 @@ exit 0\n",
             TaskService::update_with_context(
                 &mut storage,
                 ticket_id,
-                TaskUpdate {
-                    status: Some("Merging".to_string()),
-                    assignee: Some("merge".to_string()),
-                    ..Default::default()
-                },
+                TaskUpdate { status: Some("Merging".to_string()), assignee: Some("merge".to_string()), ..Default::default() },
                 TaskUpdateContext::automation_disabled(),
             )
             .expect("set task to merging");
@@ -3646,39 +2596,16 @@ exit 0
     )
     .unwrap();
     let mut storage = fixtures.create_storage();
-    let created = TaskService::create(
-        &mut storage,
-        TaskCreate {
-            title: "Error result".to_string(),
-            project: Some("ERR".to_string()),
-            ..Default::default()
-        },
-    )
-    .unwrap();
-    TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            assignee: Some("@worker".to_string()),
-            ..Default::default()
-        },
-    )
-    .unwrap();
+    let created =
+        TaskService::create(&mut storage, TaskCreate { title: "Error result".to_string(), project: Some("ERR".to_string()), ..Default::default() }).unwrap();
+    TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some("@worker".to_string()), ..Default::default() }).unwrap();
 
     let job = job_for_ticket(&created.id);
-    assert!(
-        wait_for_job_status(&job.id, "failed", 6000),
-        "job should fail"
-    );
+    assert!(wait_for_job_status(&job.id, "failed", 6000), "job should fail");
     let job = AgentJobService::get_job(&job.id).unwrap();
     assert_eq!(job.exit_code, Some(0));
     assert_eq!(job.last_message.as_deref(), Some("API Error: overloaded"));
-    assert!(wait_for_task_status(
-        &storage,
-        &created.id,
-        "HelpNeeded",
-        6000
-    ));
+    assert!(wait_for_task_status(&storage, &created.id, "HelpNeeded", 6000));
     // The rule's comment can land just after its status change; wait for it.
     let start = Instant::now();
     let commented = loop {
@@ -3718,21 +2645,11 @@ printf '{"type":"result","subtype":"success","is_error":false,"result":"got %s",
     );
     fixtures.create_config_in_dir(
         &fixtures.tasks_root,
-        &format!(
-            "default:\n  project: MSG\nagents:\n  talker:\n    runner: claude\n    command: \"{}\"\n",
-            script.display()
-        ),
+        &format!("default:\n  project: MSG\nagents:\n  talker:\n    runner: claude\n    command: \"{}\"\n", script.display()),
     );
     let mut storage = fixtures.create_storage();
-    let created = TaskService::create(
-        &mut storage,
-        TaskCreate {
-            title: "Messages".to_string(),
-            project: Some("MSG".to_string()),
-            ..Default::default()
-        },
-    )
-    .unwrap();
+    let created =
+        TaskService::create(&mut storage, TaskCreate { title: "Messages".to_string(), project: Some("MSG".to_string()), ..Default::default() }).unwrap();
     let job = AgentJobService::start_job_with_tasks_dir(
         AgentJobCreateRequest {
             ticket_id: created.id.clone(),
@@ -3745,11 +2662,7 @@ printf '{"type":"result","subtype":"success","is_error":false,"result":"got %s",
     .unwrap();
     assert!(wait_for_job_status(&job.id, "running", 6000));
     let deadline = Instant::now() + Duration::from_secs(6);
-    while AgentJobService::get_job(&job.id)
-        .and_then(|j| j.last_message)
-        .as_deref()
-        != Some("waiting")
-    {
+    while AgentJobService::get_job(&job.id).and_then(|j| j.last_message).as_deref() != Some("waiting") {
         assert!(Instant::now() < deadline, "agent never started waiting");
         sleep(Duration::from_millis(25));
     }
@@ -3758,11 +2671,7 @@ printf '{"type":"result","subtype":"success","is_error":false,"result":"got %s",
     let job = AgentJobService::get_job(&job.id).unwrap();
     assert_eq!(job.last_message.as_deref(), Some("got pineapple"));
     let events = AgentJobService::events_for(&job.id);
-    assert!(
-        events
-            .iter()
-            .any(|e| e.kind == "agent_job_input" && e.message.as_deref() == Some("pineapple"))
-    );
+    assert!(events.iter().any(|e| e.kind == "agent_job_input" && e.message.as_deref() == Some("pineapple")));
 }
 
 /// DEV-202: cancelling a job also stops commands the agent started in their
@@ -3790,28 +2699,13 @@ sleep 300
     );
     fixtures.create_config_in_dir(
         &fixtures.tasks_root,
-        &format!(
-            "default:\n  project: CAN\nagents:\n  worker:\n    runner: claude\n    command: \"{}\"\n",
-            script.display()
-        ),
+        &format!("default:\n  project: CAN\nagents:\n  worker:\n    runner: claude\n    command: \"{}\"\n", script.display()),
     );
     let mut storage = fixtures.create_storage();
-    let created = TaskService::create(
-        &mut storage,
-        TaskCreate {
-            title: "Cancel tree".to_string(),
-            project: Some("CAN".to_string()),
-            ..Default::default()
-        },
-    )
-    .unwrap();
+    let created =
+        TaskService::create(&mut storage, TaskCreate { title: "Cancel tree".to_string(), project: Some("CAN".to_string()), ..Default::default() }).unwrap();
     let job = AgentJobService::start_job_with_tasks_dir(
-        AgentJobCreateRequest {
-            ticket_id: created.id.clone(),
-            prompt: "go".to_string(),
-            agent: Some("worker".to_string()),
-            ..Default::default()
-        },
+        AgentJobCreateRequest { ticket_id: created.id.clone(), prompt: "go".to_string(), agent: Some("worker".to_string()), ..Default::default() },
         fixtures.tasks_root.as_path(),
     )
     .unwrap();
@@ -3859,28 +2753,13 @@ exit 0
     );
     fixtures.create_config_in_dir(
         &fixtures.tasks_root,
-        &format!(
-            "default:\n  project: PIPE\nagents:\n  deaf:\n    runner: claude\n    command: \"{}\"\n",
-            script.display()
-        ),
+        &format!("default:\n  project: PIPE\nagents:\n  deaf:\n    runner: claude\n    command: \"{}\"\n", script.display()),
     );
     let mut storage = fixtures.create_storage();
-    let created = TaskService::create(
-        &mut storage,
-        TaskCreate {
-            title: "Unread prompt".to_string(),
-            project: Some("PIPE".to_string()),
-            ..Default::default()
-        },
-    )
-    .unwrap();
+    let created =
+        TaskService::create(&mut storage, TaskCreate { title: "Unread prompt".to_string(), project: Some("PIPE".to_string()), ..Default::default() }).unwrap();
     let job = AgentJobService::start_job_with_tasks_dir(
-        AgentJobCreateRequest {
-            ticket_id: created.id.clone(),
-            prompt: "x".repeat(256 * 1024),
-            agent: Some("deaf".to_string()),
-            ..Default::default()
-        },
+        AgentJobCreateRequest { ticket_id: created.id.clone(), prompt: "x".repeat(256 * 1024), agent: Some("deaf".to_string()), ..Default::default() },
         fixtures.tasks_root.as_path(),
     )
     .unwrap();
@@ -3893,9 +2772,5 @@ exit 0
         assert!(Instant::now() < deadline, "job never finished");
         sleep(Duration::from_millis(25));
     };
-    assert_eq!(
-        job.status, "completed",
-        "job ended as {} ({:?})",
-        job.status, job.last_message
-    );
+    assert_eq!(job.status, "completed", "job ended as {} ({:?})", job.status, job.last_message);
 }

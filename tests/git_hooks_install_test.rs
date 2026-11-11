@@ -5,11 +5,7 @@ use std::process::Command;
 use tempfile::TempDir;
 
 fn copy_dir_all(src: &Path, dst: &Path) {
-    assert!(
-        src.exists(),
-        "source directory '{}' does not exist",
-        src.display()
-    );
+    assert!(src.exists(), "source directory '{}' does not exist", src.display());
 
     fs::create_dir_all(dst).expect("failed to create destination directory");
     for entry in fs::read_dir(src).expect("failed to read source directory") {
@@ -41,11 +37,7 @@ mod git_required {
 
         copy_dir_all(&hooks_src, &hooks_dest);
 
-        let status = Command::new("git")
-            .current_dir(temp.path())
-            .args(["init", "."])
-            .status()
-            .expect("failed to run git init");
+        let status = Command::new("git").current_dir(temp.path()).args(["init", "."]).status().expect("failed to run git init");
         assert!(status.success(), "git init failed");
 
         let mut cmd = crate::common::lotar_cmd().expect("binary not built");
@@ -56,11 +48,8 @@ mod git_required {
             .success()
             .stdout(predicate::str::contains("core.hooksPath"));
 
-        let output = Command::new("git")
-            .current_dir(temp.path())
-            .args(["config", "--local", "--get", "core.hooksPath"])
-            .output()
-            .expect("failed to read git config");
+        let output =
+            Command::new("git").current_dir(temp.path()).args(["config", "--local", "--get", "core.hooksPath"]).output().expect("failed to read git config");
         assert!(output.status.success(), "git config --get failed");
         let value = String::from_utf8_lossy(&output.stdout).trim().to_string();
         assert_eq!(value, ".githooks");
@@ -81,11 +70,7 @@ mod git_required {
 
             let script_path = temp.path().join(".githooks").join("pre-commit");
             let metadata = fs::metadata(&script_path).expect("missing pre-commit script");
-            assert_ne!(
-                metadata.permissions().mode() & 0o111,
-                0,
-                "script should be executable"
-            );
+            assert_ne!(metadata.permissions().mode() & 0o111, 0, "script should be executable");
         }
     }
 }

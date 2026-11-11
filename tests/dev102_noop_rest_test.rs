@@ -34,12 +34,7 @@ impl Fixture {
         ];
         let mut api = ApiServer::new();
         routes::initialize(&mut api);
-        Self {
-            _temp: temp,
-            _env: env,
-            root,
-            api,
-        }
+        Self { _temp: temp, _env: env, root, api }
     }
 
     fn post(&self, route: &str, body: Value) -> Value {
@@ -50,55 +45,31 @@ impl Fixture {
             headers: HashMap::new(),
             body: serde_json::to_vec(&body).unwrap(),
         });
-        assert!(
-            (200..300).contains(&response.status),
-            "{route}: {}",
-            String::from_utf8_lossy(&response.body)
-        );
+        assert!((200..300).contains(&response.status), "{route}: {}", String::from_utf8_lossy(&response.body));
         serde_json::from_slice::<Value>(&response.body).unwrap()["data"].clone()
     }
 
     fn create(&self) -> (String, PathBuf) {
-        let task = self.post(
-            "/api/tasks/add",
-            json!({"project":"NP","title":"No-op REST fixture"}),
-        );
+        let task = self.post("/api/tasks/add", json!({"project":"NP","title":"No-op REST fixture"}));
         let id = task["id"].as_str().unwrap().to_string();
-        let file = self
-            .root
-            .join("NP")
-            .join(format!("{}.yml", id.rsplit('-').next().unwrap()));
+        let file = self.root.join("NP").join(format!("{}.yml", id.rsplit('-').next().unwrap()));
         (id, file)
     }
 }
 
 fn pin_file(path: &Path) -> (Vec<u8>, SystemTime) {
     let time = SystemTime::UNIX_EPOCH + Duration::from_secs(1_650_000_000);
-    std::fs::File::options()
-        .write(true)
-        .open(path)
-        .unwrap()
-        .set_times(std::fs::FileTimes::new().set_modified(time))
-        .unwrap();
-    (
-        std::fs::read(path).unwrap(),
-        std::fs::metadata(path).unwrap().modified().unwrap(),
-    )
+    std::fs::File::options().write(true).open(path).unwrap().set_times(std::fs::FileTimes::new().set_modified(time)).unwrap();
+    (std::fs::read(path).unwrap(), std::fs::metadata(path).unwrap().modified().unwrap())
 }
 
 fn assert_stable(path: &Path, before: &(Vec<u8>, SystemTime)) {
     assert_eq!(std::fs::read(path).unwrap(), before.0);
-    assert_eq!(
-        std::fs::metadata(path).unwrap().modified().unwrap(),
-        before.1
-    );
+    assert_eq!(std::fs::metadata(path).unwrap().modified().unwrap(), before.1);
 }
 
 fn task_events(receiver: &mpsc::Receiver<ApiEvent>) -> Vec<ApiEvent> {
-    receiver
-        .try_iter()
-        .filter(|event| event.kind.starts_with("task_"))
-        .collect()
+    receiver.try_iter().filter(|event| event.kind.starts_with("task_")).collect()
 }
 
 #[test]
@@ -132,22 +103,13 @@ fn rest_empty_repeated_clear_and_same_status_patches_are_silent() {
 fn rest_same_comment_edit_is_silent_but_duplicate_append_is_real() {
     let fixture = Fixture::new();
     let (id, file) = fixture.create();
-    fixture.post(
-        "/api/tasks/comment",
-        json!({"id":id,"text":"Same explicit comment"}),
-    );
+    fixture.post("/api/tasks/comment", json!({"id":id,"text":"Same explicit comment"}));
     let before = pin_file(&file);
     let events = api_events::subscribe();
-    fixture.post(
-        "/api/tasks/comment/update",
-        json!({"id":id,"index":0,"text":"Same explicit comment"}),
-    );
+    fixture.post("/api/tasks/comment/update", json!({"id":id,"index":0,"text":"Same explicit comment"}));
     assert_stable(&file, &before);
     assert!(task_events(&events).is_empty());
-    let after = fixture.post(
-        "/api/tasks/comment",
-        json!({"id":id,"text":"Same explicit comment"}),
-    );
+    let after = fixture.post("/api/tasks/comment", json!({"id":id,"text":"Same explicit comment"}));
     assert_eq!(after["comments"].as_array().unwrap().len(), 2);
     assert_ne!(std::fs::read(&file).unwrap(), before.0);
     assert_eq!(task_events(&events).len(), 1);

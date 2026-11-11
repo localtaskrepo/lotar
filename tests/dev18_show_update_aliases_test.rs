@@ -7,14 +7,7 @@ fn run(dir: &std::path::Path, args: &[&str]) -> (bool, String) {
     cmd.env("LOTAR_IGNORE_HOME_CONFIG", "1");
     cmd.current_dir(dir);
     let out = cmd.args(args).output().unwrap();
-    (
-        out.status.success(),
-        format!(
-            "{}{}",
-            String::from_utf8_lossy(&out.stdout),
-            String::from_utf8_lossy(&out.stderr)
-        ),
-    )
+    (out.status.success(), format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr)))
 }
 
 #[test]
@@ -23,56 +16,24 @@ fn show_prints_the_whole_task_and_update_edits_it() {
     let dir = tmp.path();
     assert!(run(dir, &["add", "First task", "-p", "SH"]).0);
     assert!(run(dir, &["add", "Second task", "-p", "SH"]).0);
-    let (ok, out) = run(
-        dir,
-        &[
-            "task",
-            "relationships",
-            "add",
-            "SH-1",
-            "SH-2",
-            "--kind",
-            "depends-on",
-        ],
-    );
+    let (ok, out) = run(dir, &["task", "relationships", "add", "SH-1", "SH-2", "--kind", "depends-on"]);
     assert!(ok, "{out}");
     assert!(run(dir, &["comment", "SH-1", "-m", "Looked into it"]).0);
 
-    let (ok, out) = run(
-        dir,
-        &[
-            "update",
-            "SH-1",
-            "--description",
-            "Line one\nLine two",
-            "--tag",
-            "ui",
-        ],
-    );
+    let (ok, out) = run(dir, &["update", "SH-1", "--description", "Line one\nLine two", "--tag", "ui"]);
     assert!(ok, "{out}");
     let (ok, out) = run(dir, &["edit", "SH-1", "--priority", "High"]);
     assert!(ok, "{out}");
 
     let (ok, out) = run(dir, &["show", "SH-1"]);
     assert!(ok, "{out}");
-    for expected in [
-        "SH-1  First task",
-        "Priority: High",
-        "Tags: ui",
-        "Depends on: SH-2",
-        "  Line one\n  Line two",
-        "Comments (1)",
-        "Looked into it",
-    ] {
+    for expected in ["SH-1  First task", "Priority: High", "Tags: ui", "Depends on: SH-2", "  Line one\n  Line two", "Comments (1)", "Looked into it"] {
         assert!(out.contains(expected), "missing {expected:?} in:\n{out}");
     }
 
     // Short IDs, the `view` alias, `task show` and JSON all reach the same task.
     let (ok, out) = run(dir, &["view", "2", "-p", "SH"]);
-    assert!(
-        ok && out.contains("SH-2  Second task") && out.contains("Blocks: SH-1"),
-        "{out}"
-    );
+    assert!(ok && out.contains("SH-2  Second task") && out.contains("Blocks: SH-1"), "{out}");
     let (ok, out) = run(dir, &["task", "show", "SH-2"]);
     assert!(ok && out.contains("SH-2  Second task"), "{out}");
     let (ok, out) = run(dir, &["--format", "json", "show", "SH-1"]);

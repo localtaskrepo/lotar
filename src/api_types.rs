@@ -267,10 +267,7 @@ pub struct TaskDTO {
     pub acceptance_criteria: Vec<String>,
     #[serde(default)]
     pub sprints: Vec<u32>,
-    #[serde(
-        skip_serializing_if = "crate::api_types::btreemap_u32_is_empty",
-        default
-    )]
+    #[serde(skip_serializing_if = "crate::api_types::btreemap_u32_is_empty", default)]
     pub sprint_order: BTreeMap<u32, u32>,
     #[serde(default)]
     pub history: Vec<crate::types::TaskChangeLogEntry>,
@@ -414,20 +411,11 @@ impl JobOutcome {
     pub fn describe(&self) -> Vec<String> {
         let mut lines = Vec::new();
         if let Some(status) = self.status.as_deref() {
-            lines.push(format!(
-                "{status} will be set when job {} ends",
-                self.job_id
-            ));
+            lines.push(format!("{status} will be set when job {} ends", self.job_id));
         }
         match self.assignee.as_deref() {
-            Some("") => lines.push(format!(
-                "The assignee will be cleared when job {} ends",
-                self.job_id
-            )),
-            Some(assignee) => lines.push(format!(
-                "{assignee} will be assigned when job {} ends",
-                self.job_id
-            )),
+            Some("") => lines.push(format!("The assignee will be cleared when job {} ends", self.job_id)),
+            Some(assignee) => lines.push(format!("{assignee} will be assigned when job {} ends", self.job_id)),
             None => {}
         }
         lines
@@ -649,27 +637,13 @@ impl AgentJobUsage {
             parts.push(format!("${cost:.4}"));
         }
         if let Some(turns) = self.turns {
-            parts.push(format!(
-                "{turns} {}",
-                if turns == 1 { "turn" } else { "turns" }
-            ));
+            parts.push(format!("{turns} {}", if turns == 1 { "turn" } else { "turns" }));
         }
         if let Some(requests) = self.premium_requests {
-            parts.push(format!(
-                "{requests} premium {}",
-                if requests == 1.0 {
-                    "request"
-                } else {
-                    "requests"
-                }
-            ));
+            parts.push(format!("{requests} premium {}", if requests == 1.0 { "request" } else { "requests" }));
         }
         if self.lines_added.is_some() || self.lines_removed.is_some() {
-            parts.push(format!(
-                "+{} −{} lines",
-                self.lines_added.unwrap_or(0),
-                self.lines_removed.unwrap_or(0)
-            ));
+            parts.push(format!("+{} −{} lines", self.lines_added.unwrap_or(0), self.lines_removed.unwrap_or(0)));
         }
         parts.join(" · ")
     }
@@ -1410,33 +1384,17 @@ pub struct SprintUpdateRequest {
     pub ends_at: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub starts_at: Option<String>,
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        default,
-        deserialize_with = "crate::api_types::deserialize_double_option"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", default, deserialize_with = "crate::api_types::deserialize_double_option")]
     pub capacity_points: Option<Option<u32>>,
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        default,
-        deserialize_with = "crate::api_types::deserialize_double_option"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", default, deserialize_with = "crate::api_types::deserialize_double_option")]
     pub capacity_hours: Option<Option<u32>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub overdue_after: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub notes: Option<String>,
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        default,
-        deserialize_with = "crate::api_types::deserialize_double_option"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", default, deserialize_with = "crate::api_types::deserialize_double_option")]
     pub actual_started_at: Option<Option<String>>,
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        default,
-        deserialize_with = "crate::api_types::deserialize_double_option"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", default, deserialize_with = "crate::api_types::deserialize_double_option")]
     pub actual_closed_at: Option<Option<String>>,
 }
 

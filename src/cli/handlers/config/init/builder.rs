@@ -26,11 +26,7 @@ pub struct InitOverrides {
 /// "default" returns a config with only the project name set so the written
 /// YAML is minimal (the canonicalizer prunes everything that matches the
 /// built-in global defaults).
-pub fn build_project_config(
-    project_name: &str,
-    workflow: WorkflowPreset,
-    overrides: &InitOverrides,
-) -> ProjectConfig {
+pub fn build_project_config(project_name: &str, workflow: WorkflowPreset, overrides: &InitOverrides) -> ProjectConfig {
     let mut cfg = ProjectConfig::new(project_name.to_string());
 
     match workflow {
@@ -39,48 +35,20 @@ pub fn build_project_config(
         }
         WorkflowPreset::Agile => {
             cfg.issue_states = Some(ConfigurableField {
-                values: vec![
-                    TaskStatus::from("Todo"),
-                    TaskStatus::from("InProgress"),
-                    TaskStatus::from("Verify"),
-                    TaskStatus::from("Done"),
-                ],
+                values: vec![TaskStatus::from("Todo"), TaskStatus::from("InProgress"), TaskStatus::from("Verify"), TaskStatus::from("Done")],
             });
             cfg.issue_types = Some(ConfigurableField {
-                values: vec![
-                    TaskType::from("Epic"),
-                    TaskType::from("Feature"),
-                    TaskType::from("Bug"),
-                    TaskType::from("Spike"),
-                    TaskType::from("Chore"),
-                ],
+                values: vec![TaskType::from("Epic"), TaskType::from("Feature"), TaskType::from("Bug"), TaskType::from("Spike"), TaskType::from("Chore")],
             });
-            cfg.issue_priorities = Some(ConfigurableField {
-                values: vec![
-                    Priority::from("Low"),
-                    Priority::from("Medium"),
-                    Priority::from("High"),
-                    Priority::from("Critical"),
-                ],
-            });
+            cfg.issue_priorities =
+                Some(ConfigurableField { values: vec![Priority::from("Low"), Priority::from("Medium"), Priority::from("High"), Priority::from("Critical")] });
         }
         WorkflowPreset::Kanban => {
             cfg.issue_states = Some(ConfigurableField {
-                values: vec![
-                    TaskStatus::from("Todo"),
-                    TaskStatus::from("InProgress"),
-                    TaskStatus::from("Verify"),
-                    TaskStatus::from("Done"),
-                ],
+                values: vec![TaskStatus::from("Todo"), TaskStatus::from("InProgress"), TaskStatus::from("Verify"), TaskStatus::from("Done")],
             });
-            cfg.issue_types = Some(ConfigurableField {
-                values: vec![
-                    TaskType::from("Feature"),
-                    TaskType::from("Bug"),
-                    TaskType::from("Epic"),
-                    TaskType::from("Chore"),
-                ],
-            });
+            cfg.issue_types =
+                Some(ConfigurableField { values: vec![TaskType::from("Feature"), TaskType::from("Bug"), TaskType::from("Epic"), TaskType::from("Chore")] });
         }
     }
 
@@ -90,59 +58,27 @@ pub fn build_project_config(
 
 /// Build / update a `GlobalConfig` for `--global` init. `default_project` is
 /// applied separately by the orchestrator.
-pub fn build_global_config(
-    base: Option<GlobalConfig>,
-    workflow: WorkflowPreset,
-    overrides: &InitOverrides,
-) -> GlobalConfig {
+pub fn build_global_config(base: Option<GlobalConfig>, workflow: WorkflowPreset, overrides: &InitOverrides) -> GlobalConfig {
     let mut cfg = base.unwrap_or_default();
 
     match workflow {
         WorkflowPreset::Default => {}
         WorkflowPreset::Agile => {
             cfg.issue_states = ConfigurableField {
-                values: vec![
-                    TaskStatus::from("Todo"),
-                    TaskStatus::from("InProgress"),
-                    TaskStatus::from("Verify"),
-                    TaskStatus::from("Done"),
-                ],
+                values: vec![TaskStatus::from("Todo"), TaskStatus::from("InProgress"), TaskStatus::from("Verify"), TaskStatus::from("Done")],
             };
             cfg.issue_types = ConfigurableField {
-                values: vec![
-                    TaskType::from("Epic"),
-                    TaskType::from("Feature"),
-                    TaskType::from("Bug"),
-                    TaskType::from("Spike"),
-                    TaskType::from("Chore"),
-                ],
+                values: vec![TaskType::from("Epic"), TaskType::from("Feature"), TaskType::from("Bug"), TaskType::from("Spike"), TaskType::from("Chore")],
             };
-            cfg.issue_priorities = ConfigurableField {
-                values: vec![
-                    Priority::from("Low"),
-                    Priority::from("Medium"),
-                    Priority::from("High"),
-                    Priority::from("Critical"),
-                ],
-            };
+            cfg.issue_priorities =
+                ConfigurableField { values: vec![Priority::from("Low"), Priority::from("Medium"), Priority::from("High"), Priority::from("Critical")] };
         }
         WorkflowPreset::Kanban => {
             cfg.issue_states = ConfigurableField {
-                values: vec![
-                    TaskStatus::from("Todo"),
-                    TaskStatus::from("InProgress"),
-                    TaskStatus::from("Verify"),
-                    TaskStatus::from("Done"),
-                ],
+                values: vec![TaskStatus::from("Todo"), TaskStatus::from("InProgress"), TaskStatus::from("Verify"), TaskStatus::from("Done")],
             };
-            cfg.issue_types = ConfigurableField {
-                values: vec![
-                    TaskType::from("Feature"),
-                    TaskType::from("Bug"),
-                    TaskType::from("Epic"),
-                    TaskType::from("Chore"),
-                ],
-            };
+            cfg.issue_types =
+                ConfigurableField { values: vec![TaskType::from("Feature"), TaskType::from("Bug"), TaskType::from("Epic"), TaskType::from("Chore")] };
         }
     }
 
@@ -153,11 +89,7 @@ pub fn build_global_config(
 /// Merge an agent template's statuses, vocabularies, agent profiles and
 /// worktree settings into a project config. Explicit `--states`/`--types`/
 /// `--priorities`/`--tags` flags still win.
-pub fn apply_agent_template_project(
-    cfg: &mut ProjectConfig,
-    template: ProjectConfig,
-    o: &InitOverrides,
-) {
+pub fn apply_agent_template_project(cfg: &mut ProjectConfig, template: ProjectConfig, o: &InitOverrides) {
     if o.states.is_none() && template.issue_states.is_some() {
         cfg.issue_states = template.issue_states;
     }
@@ -179,11 +111,7 @@ pub fn apply_agent_template_project(
 }
 
 /// Global-config counterpart of [`apply_agent_template_project`].
-pub fn apply_agent_template_global(
-    cfg: &mut GlobalConfig,
-    template: GlobalConfig,
-    o: &InitOverrides,
-) {
+pub fn apply_agent_template_global(cfg: &mut GlobalConfig, template: GlobalConfig, o: &InitOverrides) {
     if o.states.is_none() {
         cfg.issue_states = template.issue_states;
     }
@@ -268,10 +196,7 @@ impl WorkflowPreset {
             "default" | "" => Ok(Self::Default),
             "agile" => Ok(Self::Agile),
             "kanban" => Ok(Self::Kanban),
-            other => Err(format!(
-                "Unknown workflow preset '{}'. Expected: default, agile, kanban.",
-                other
-            )),
+            other => Err(format!("Unknown workflow preset '{}'. Expected: default, agile, kanban.", other)),
         }
     }
 

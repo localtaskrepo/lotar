@@ -1,6 +1,4 @@
-use lotar::config::types::{
-    ConfigurableField, GlobalConfig, ProjectConfig, ResolvedConfig, StringConfigField,
-};
+use lotar::config::types::{ConfigurableField, GlobalConfig, ProjectConfig, ResolvedConfig, StringConfigField};
 use lotar::config::validation::errors::{ValidationError, ValidationResult};
 use lotar::config::validation::{ConfigValidator, ValidationSeverity};
 use lotar::types::{Priority, TaskStatus, TaskType};
@@ -8,23 +6,14 @@ use tempfile::TempDir;
 // No CLI invocations here; keep this module self-contained
 
 fn base_global_config() -> GlobalConfig {
-    GlobalConfig {
-        default_project: "TEST".to_string(),
-        ..GlobalConfig::default()
-    }
+    GlobalConfig { default_project: "TEST".to_string(), ..GlobalConfig::default() }
 }
 
 fn base_project_config() -> ProjectConfig {
     let mut config = ProjectConfig::new("Test Project".to_string());
-    config.issue_states = Some(ConfigurableField {
-        values: vec![TaskStatus::from("Todo"), TaskStatus::from("InProgress")],
-    });
-    config.issue_types = Some(ConfigurableField {
-        values: vec![TaskType::from("Feature"), TaskType::from("Bug")],
-    });
-    config.issue_priorities = Some(ConfigurableField {
-        values: vec![Priority::from("Low"), Priority::from("High")],
-    });
+    config.issue_states = Some(ConfigurableField { values: vec![TaskStatus::from("Todo"), TaskStatus::from("InProgress")] });
+    config.issue_types = Some(ConfigurableField { values: vec![TaskType::from("Feature"), TaskType::from("Bug")] });
+    config.issue_priorities = Some(ConfigurableField { values: vec![Priority::from("Low"), Priority::from("High")] });
     config.agent_context_enabled = Some(true);
     config.agent_instructions = None;
     config.agents = None;
@@ -41,24 +30,10 @@ fn test_global_config_validation_valid() {
     let config = GlobalConfig {
         server_port: 8080,
         default_project: "TEST".to_string(),
-        issue_states: ConfigurableField {
-            values: vec![
-                TaskStatus::from("Todo"),
-                TaskStatus::from("InProgress"),
-                TaskStatus::from("Done"),
-            ],
-        },
+        issue_states: ConfigurableField { values: vec![TaskStatus::from("Todo"), TaskStatus::from("InProgress"), TaskStatus::from("Done")] },
         issue_done_states: None,
-        issue_types: ConfigurableField {
-            values: vec![TaskType::from("Feature"), TaskType::from("Bug")],
-        },
-        issue_priorities: ConfigurableField {
-            values: vec![
-                Priority::from("Low"),
-                Priority::from("Medium"),
-                Priority::from("High"),
-            ],
-        },
+        issue_types: ConfigurableField { values: vec![TaskType::from("Feature"), TaskType::from("Bug")] },
+        issue_priorities: ConfigurableField { values: vec![Priority::from("Low"), Priority::from("Medium"), Priority::from("High")] },
         tags: StringConfigField::new_wildcard(),
         tag_properties: Default::default(),
         default_assignee: None,
@@ -74,13 +49,7 @@ fn test_global_config_validation_valid() {
         default_priority: Priority::from("Medium"),
         default_status: Some(TaskStatus::from("Todo")),
         custom_fields: StringConfigField::new_wildcard(),
-        scan_signal_words: vec![
-            "TODO".to_string(),
-            "FIXME".to_string(),
-            "HACK".to_string(),
-            "BUG".to_string(),
-            "NOTE".to_string(),
-        ],
+        scan_signal_words: vec!["TODO".to_string(), "FIXME".to_string(), "HACK".to_string(), "BUG".to_string(), "NOTE".to_string()],
         scan_ticket_patterns: None,
         scan_enable_ticket_words: false,
         scan_enable_mentions: true,
@@ -131,16 +100,10 @@ fn test_global_config_validation_privileged_port_warning() {
     let config = GlobalConfig {
         server_port: 80, // Privileged port should trigger warning
         default_project: "TEST".to_string(),
-        issue_states: ConfigurableField {
-            values: vec![TaskStatus::from("Todo")],
-        },
+        issue_states: ConfigurableField { values: vec![TaskStatus::from("Todo")] },
         issue_done_states: None,
-        issue_types: ConfigurableField {
-            values: vec![TaskType::from("Feature")],
-        },
-        issue_priorities: ConfigurableField {
-            values: vec![Priority::from("Medium")],
-        },
+        issue_types: ConfigurableField { values: vec![TaskType::from("Feature")] },
+        issue_priorities: ConfigurableField { values: vec![Priority::from("Medium")] },
         tags: StringConfigField::new_wildcard(),
         tag_properties: Default::default(),
         default_assignee: None,
@@ -156,13 +119,7 @@ fn test_global_config_validation_privileged_port_warning() {
         default_priority: Priority::from("Medium"),
         default_status: Some(TaskStatus::from("Todo")),
         custom_fields: StringConfigField::new_wildcard(),
-        scan_signal_words: vec![
-            "TODO".to_string(),
-            "FIXME".to_string(),
-            "HACK".to_string(),
-            "BUG".to_string(),
-            "NOTE".to_string(),
-        ],
+        scan_signal_words: vec!["TODO".to_string(), "FIXME".to_string(), "HACK".to_string(), "BUG".to_string(), "NOTE".to_string()],
         scan_ticket_patterns: None,
         scan_enable_ticket_words: false,
         scan_enable_mentions: true,
@@ -208,18 +165,8 @@ fn test_global_config_validation_privileged_port_warning() {
     assert_eq!(result.warnings.len(), 1);
     let warning = &result.warnings[0];
     assert_eq!(warning.severity, ValidationSeverity::Warning);
-    assert!(
-        warning
-            .message
-            .contains("Port 80 may require elevated privileges")
-    );
-    assert!(
-        warning
-            .fix_suggestion
-            .as_ref()
-            .unwrap()
-            .contains("port >= 1024")
-    );
+    assert!(warning.message.contains("Port 80 may require elevated privileges"));
+    assert!(warning.fix_suggestion.as_ref().unwrap().contains("port >= 1024"));
 }
 
 #[test]
@@ -255,13 +202,7 @@ fn test_global_config_validation_empty_lists_error() {
         default_priority: Priority::from("Medium"),
         default_status: None,
         custom_fields: StringConfigField::new_wildcard(),
-        scan_signal_words: vec![
-            "TODO".to_string(),
-            "FIXME".to_string(),
-            "HACK".to_string(),
-            "BUG".to_string(),
-            "NOTE".to_string(),
-        ],
+        scan_signal_words: vec!["TODO".to_string(), "FIXME".to_string(), "HACK".to_string(), "BUG".to_string(), "NOTE".to_string()],
         scan_ticket_patterns: None,
         scan_enable_ticket_words: false,
         scan_enable_mentions: true,
@@ -306,21 +247,9 @@ fn test_global_config_validation_empty_lists_error() {
     assert!(result.errors.len() >= 3);
 
     let error_messages: Vec<&str> = result.errors.iter().map(|e| e.message.as_str()).collect();
-    assert!(
-        error_messages
-            .iter()
-            .any(|msg| msg.contains("Issue states list cannot be empty"))
-    );
-    assert!(
-        error_messages
-            .iter()
-            .any(|msg| msg.contains("Issue types list cannot be empty"))
-    );
-    assert!(
-        error_messages
-            .iter()
-            .any(|msg| msg.contains("Issue priorities list cannot be empty"))
-    );
+    assert!(error_messages.iter().any(|msg| msg.contains("Issue states list cannot be empty")));
+    assert!(error_messages.iter().any(|msg| msg.contains("Issue types list cannot be empty")));
+    assert!(error_messages.iter().any(|msg| msg.contains("Issue priorities list cannot be empty")));
 }
 
 #[test]
@@ -331,13 +260,9 @@ fn test_global_config_validation_invalid_defaults() {
     let config = GlobalConfig {
         server_port: 8080,
         default_project: "TEST".to_string(),
-        issue_states: ConfigurableField {
-            values: vec![TaskStatus::from("Todo"), TaskStatus::from("InProgress")],
-        },
+        issue_states: ConfigurableField { values: vec![TaskStatus::from("Todo"), TaskStatus::from("InProgress")] },
         issue_done_states: None,
-        issue_types: ConfigurableField {
-            values: vec![TaskType::from("Feature")],
-        },
+        issue_types: ConfigurableField { values: vec![TaskType::from("Feature")] },
         issue_priorities: ConfigurableField {
             values: vec![Priority::from("Low")], // Default priority is Medium but only Low is in list
         },
@@ -353,16 +278,10 @@ fn test_global_config_validation_invalid_defaults() {
         auto_reciprocal_relationships: true,
         auto_link_mentions: true,
         auto_assign_on_status: true,
-        default_priority: Priority::from("Medium"), // This should cause an error
+        default_priority: Priority::from("Medium"),     // This should cause an error
         default_status: Some(TaskStatus::from("Done")), // This should cause an error (Done not in states)
         custom_fields: StringConfigField::new_wildcard(),
-        scan_signal_words: vec![
-            "TODO".to_string(),
-            "FIXME".to_string(),
-            "HACK".to_string(),
-            "BUG".to_string(),
-            "NOTE".to_string(),
-        ],
+        scan_signal_words: vec!["TODO".to_string(), "FIXME".to_string(), "HACK".to_string(), "BUG".to_string(), "NOTE".to_string()],
         scan_ticket_patterns: None,
         scan_enable_ticket_words: false,
         scan_enable_mentions: true,
@@ -405,16 +324,8 @@ fn test_global_config_validation_invalid_defaults() {
     assert!(result.has_warnings());
 
     let warning_messages: Vec<&str> = result.warnings.iter().map(|w| w.message.as_str()).collect();
-    assert!(
-        warning_messages
-            .iter()
-            .any(|msg| msg.contains("Default priority 'Medium' not found"))
-    );
-    assert!(
-        warning_messages
-            .iter()
-            .any(|msg| msg.contains("Default status 'Done' not found"))
-    );
+    assert!(warning_messages.iter().any(|msg| msg.contains("Default priority 'Medium' not found")));
+    assert!(warning_messages.iter().any(|msg| msg.contains("Default status 'Done' not found")));
 }
 
 #[test]
@@ -425,16 +336,10 @@ fn test_global_config_duplicate_entries_warning() {
     let config = GlobalConfig {
         server_port: 8080,
         default_project: "TEST".to_string(),
-        issue_states: ConfigurableField {
-            values: vec![TaskStatus::from("Todo"), TaskStatus::from("todo")],
-        },
+        issue_states: ConfigurableField { values: vec![TaskStatus::from("Todo"), TaskStatus::from("todo")] },
         issue_done_states: None,
-        issue_types: ConfigurableField {
-            values: vec![TaskType::from("Feature"), TaskType::from("feature")],
-        },
-        issue_priorities: ConfigurableField {
-            values: vec![Priority::from("Low"), Priority::from("Medium")],
-        },
+        issue_types: ConfigurableField { values: vec![TaskType::from("Feature"), TaskType::from("feature")] },
+        issue_priorities: ConfigurableField { values: vec![Priority::from("Low"), Priority::from("Medium")] },
         tags: StringConfigField::new_wildcard(),
         tag_properties: Default::default(),
         default_assignee: None,
@@ -491,11 +396,7 @@ fn test_global_config_duplicate_entries_warning() {
     let result = validator.validate_global_config(&config);
     assert!(result.has_warnings());
     let warning_messages: Vec<&str> = result.warnings.iter().map(|w| w.message.as_str()).collect();
-    assert!(
-        warning_messages
-            .iter()
-            .any(|msg| msg.contains("Duplicate value 'todo'"))
-    );
+    assert!(warning_messages.iter().any(|msg| msg.contains("Duplicate value 'todo'")));
 }
 
 #[test]
@@ -504,17 +405,12 @@ fn test_global_config_rejects_default_tags_outside_allowed_list() {
     let validator = ConfigValidator::new(temp_dir.path());
 
     let mut config = base_global_config();
-    config.tags = StringConfigField {
-        values: vec!["frontend".to_string(), "backend".to_string()],
-    };
+    config.tags = StringConfigField { values: vec!["frontend".to_string(), "backend".to_string()] };
     config.default_tags = vec!["frontend".to_string(), "ops".to_string()];
 
     let result = validator.validate_global_config(&config);
     assert!(result.has_errors());
-    assert!(result.errors.iter().any(|err| {
-        err.message
-            .contains("default_tags contains values not present")
-    }));
+    assert!(result.errors.iter().any(|err| { err.message.contains("default_tags contains values not present") }));
 }
 
 #[test]
@@ -523,17 +419,12 @@ fn test_project_config_rejects_default_tags_outside_override() {
     let validator = ConfigValidator::new(temp_dir.path());
 
     let mut config = base_project_config();
-    config.tags = Some(StringConfigField {
-        values: vec!["frontend".to_string()],
-    });
+    config.tags = Some(StringConfigField { values: vec!["frontend".to_string()] });
     config.default_tags = Some(vec!["backend".to_string()]);
 
     let result = validator.validate_project_config(&config);
     assert!(result.has_errors());
-    assert!(result.errors.iter().any(|err| {
-        err.message
-            .contains("default_tags contains values not present")
-    }));
+    assert!(result.errors.iter().any(|err| { err.message.contains("default_tags contains values not present") }));
 }
 
 #[test]
@@ -542,19 +433,14 @@ fn test_resolved_config_rejects_default_tags_outside_allowed_list() {
     let validator = ConfigValidator::new(temp_dir.path());
 
     let mut global = base_global_config();
-    global.tags = StringConfigField {
-        values: vec!["frontend".to_string()],
-    };
+    global.tags = StringConfigField { values: vec!["frontend".to_string()] };
     global.default_tags = vec!["frontend".to_string()];
     let mut resolved = ResolvedConfig::from_global(global);
     resolved.default_tags = vec!["ops".to_string()];
 
     let result = validator.validate_resolved_config(&resolved);
     assert!(result.has_errors());
-    assert!(result.errors.iter().any(|err| {
-        err.message
-            .contains("default_tags contains values not present")
-    }));
+    assert!(result.errors.iter().any(|err| { err.message.contains("default_tags contains values not present") }));
 }
 
 #[test]
@@ -568,12 +454,7 @@ fn test_global_config_requires_members_when_strict() {
 
     let result = validator.validate_global_config(&config);
     assert!(result.has_errors());
-    assert!(
-        result
-            .errors
-            .iter()
-            .any(|err| err.message.contains("strict_members is enabled globally"))
-    );
+    assert!(result.errors.iter().any(|err| err.message.contains("strict_members is enabled globally")));
 }
 
 #[test]
@@ -587,12 +468,7 @@ fn test_project_config_requires_members_when_strict_and_empty() {
 
     let result = validator.validate_project_config(&config);
     assert!(result.has_errors());
-    assert!(
-        result
-            .errors
-            .iter()
-            .any(|err| err.message.contains("strict_members is enabled"))
-    );
+    assert!(result.errors.iter().any(|err| err.message.contains("strict_members is enabled")));
 }
 
 #[test]
@@ -606,10 +482,7 @@ fn test_resolved_config_requires_members_when_strict() {
 
     let result = validator.validate_resolved_config(&resolved);
     assert!(result.has_errors());
-    assert!(result.errors.iter().any(|err| {
-        err.message
-            .contains("strict_members is enabled but no members remain")
-    }));
+    assert!(result.errors.iter().any(|err| { err.message.contains("strict_members is enabled but no members remain") }));
 }
 
 #[test]
@@ -618,21 +491,14 @@ fn test_global_config_alias_targets_must_exist() {
     let validator = ConfigValidator::new(temp_dir.path());
 
     let mut config = base_global_config();
-    config.issue_states = ConfigurableField {
-        values: vec![TaskStatus::from("Todo")],
-    };
+    config.issue_states = ConfigurableField { values: vec![TaskStatus::from("Todo")] };
     let mut aliases = std::collections::BTreeMap::new();
     aliases.insert("wip".to_string(), TaskStatus::from("InProgress"));
     config.branch_status_aliases = aliases;
 
     let result = validator.validate_global_config(&config);
     assert!(result.has_errors());
-    assert!(
-        result
-            .errors
-            .iter()
-            .any(|err| err.message.contains("Alias 'wip' maps to 'InProgress'"))
-    );
+    assert!(result.errors.iter().any(|err| err.message.contains("Alias 'wip' maps to 'InProgress'")));
 }
 
 #[test]
@@ -641,21 +507,12 @@ fn test_resolved_config_alias_targets_must_exist() {
     let validator = ConfigValidator::new(temp_dir.path());
 
     let mut resolved = ResolvedConfig::from_global(base_global_config());
-    resolved.issue_types = ConfigurableField {
-        values: vec![TaskType::from("Feature")],
-    };
-    resolved
-        .branch_type_aliases
-        .insert("chore".to_string(), TaskType::from("Chore"));
+    resolved.issue_types = ConfigurableField { values: vec![TaskType::from("Feature")] };
+    resolved.branch_type_aliases.insert("chore".to_string(), TaskType::from("Chore"));
 
     let result = validator.validate_resolved_config(&resolved);
     assert!(result.has_errors());
-    assert!(
-        result
-            .errors
-            .iter()
-            .any(|err| err.message.contains("Alias 'chore' maps to 'Chore'"))
-    );
+    assert!(result.errors.iter().any(|err| err.message.contains("Alias 'chore' maps to 'Chore'")));
 }
 
 #[test]
@@ -664,20 +521,8 @@ fn test_project_config_validation_valid() {
     let validator = ConfigValidator::new(temp_dir.path());
 
     let mut config = base_project_config();
-    config.issue_states = Some(ConfigurableField {
-        values: vec![
-            TaskStatus::from("Todo"),
-            TaskStatus::from("InProgress"),
-            TaskStatus::from("Done"),
-        ],
-    });
-    config.issue_priorities = Some(ConfigurableField {
-        values: vec![
-            Priority::from("Low"),
-            Priority::from("Medium"),
-            Priority::from("High"),
-        ],
-    });
+    config.issue_states = Some(ConfigurableField { values: vec![TaskStatus::from("Todo"), TaskStatus::from("InProgress"), TaskStatus::from("Done")] });
+    config.issue_priorities = Some(ConfigurableField { values: vec![Priority::from("Low"), Priority::from("Medium"), Priority::from("High")] });
     config.default_assignee = Some("user@example.com".to_string());
     config.default_priority = Some(Priority::from("Medium"));
     config.default_status = Some(TaskStatus::from("Todo"));
@@ -694,35 +539,21 @@ fn test_project_config_duplicate_overrides_warning() {
 
     let mut config = base_project_config();
     config.project_name = "Demo".to_string();
-    config.issue_states = Some(ConfigurableField {
-        values: vec![TaskStatus::from("Todo"), TaskStatus::from("todo")],
-    });
-    config.issue_types = Some(ConfigurableField {
-        values: vec![TaskType::from("Feature"), TaskType::from("feature")],
-    });
-    config.issue_priorities = Some(ConfigurableField {
-        values: vec![Priority::from("Low"), Priority::from("low")],
-    });
-    config.tags = Some(StringConfigField {
-        values: vec!["UI".to_string(), "ui".to_string()],
-    });
+    config.issue_states = Some(ConfigurableField { values: vec![TaskStatus::from("Todo"), TaskStatus::from("todo")] });
+    config.issue_types = Some(ConfigurableField { values: vec![TaskType::from("Feature"), TaskType::from("feature")] });
+    config.issue_priorities = Some(ConfigurableField { values: vec![Priority::from("Low"), Priority::from("low")] });
+    config.tags = Some(StringConfigField { values: vec!["UI".to_string(), "ui".to_string()] });
     config.default_tags = Some(vec!["tag".to_string(), "TAG".to_string()]);
     config.default_priority = Some(Priority::from("Low"));
     config.default_status = Some(TaskStatus::from("Todo"));
-    config.custom_fields = Some(StringConfigField {
-        values: vec!["field".to_string(), "Field".to_string()],
-    });
+    config.custom_fields = Some(StringConfigField { values: vec!["field".to_string(), "Field".to_string()] });
     config.scan_signal_words = Some(vec!["TODO".to_string(), "todo".to_string()]);
     config.scan_ticket_patterns = Some(vec!["PROJ-[0-9]+".to_string(), "proj-[0-9]+".to_string()]);
 
     let result = validator.validate_project_config(&config);
     assert!(result.has_warnings());
     let warning_messages: Vec<&str> = result.warnings.iter().map(|w| w.message.as_str()).collect();
-    assert!(
-        warning_messages
-            .iter()
-            .any(|msg| msg.contains("Duplicate value 'todo'"))
-    );
+    assert!(warning_messages.iter().any(|msg| msg.contains("Duplicate value 'todo'")));
 }
 
 #[test]
@@ -739,21 +570,9 @@ fn test_project_config_empty_override_errors() {
     let result = validator.validate_project_config(&config);
     assert!(result.has_errors());
     let messages: Vec<&str> = result.errors.iter().map(|e| e.message.as_str()).collect();
-    assert!(
-        messages
-            .iter()
-            .any(|msg| msg.contains("Issue states override cannot be empty"))
-    );
-    assert!(
-        messages
-            .iter()
-            .any(|msg| msg.contains("Issue types override cannot be empty"))
-    );
-    assert!(
-        messages
-            .iter()
-            .any(|msg| msg.contains("Issue priorities override cannot be empty"))
-    );
+    assert!(messages.iter().any(|msg| msg.contains("Issue states override cannot be empty")));
+    assert!(messages.iter().any(|msg| msg.contains("Issue types override cannot be empty")));
+    assert!(messages.iter().any(|msg| msg.contains("Issue priorities override cannot be empty")));
 }
 
 #[test]
@@ -768,11 +587,7 @@ fn test_project_config_validation_empty_project_name() {
     assert!(result.has_errors());
 
     let error_messages: Vec<&str> = result.errors.iter().map(|e| e.message.as_str()).collect();
-    assert!(
-        error_messages
-            .iter()
-            .any(|msg| msg.contains("Project name cannot be empty"))
-    );
+    assert!(error_messages.iter().any(|msg| msg.contains("Project name cannot be empty")));
 }
 
 #[test]
@@ -787,11 +602,7 @@ fn test_project_config_validation_whitespace_project_name() {
     assert!(result.has_errors());
 
     let messages: Vec<&str> = result.errors.iter().map(|e| e.message.as_str()).collect();
-    assert!(
-        messages
-            .iter()
-            .any(|msg| msg.contains("Project name cannot be empty"))
-    );
+    assert!(messages.iter().any(|msg| msg.contains("Project name cannot be empty")));
 }
 
 #[test]
@@ -807,11 +618,7 @@ fn test_project_config_validation_long_project_name() {
     assert!(result.has_warnings());
 
     let warning_messages: Vec<&str> = result.warnings.iter().map(|e| e.message.as_str()).collect();
-    assert!(
-        warning_messages
-            .iter()
-            .any(|msg| msg.contains("Project name is very long"))
-    );
+    assert!(warning_messages.iter().any(|msg| msg.contains("Project name is very long")));
 }
 
 #[test]
@@ -828,16 +635,8 @@ fn test_project_config_validation_invalid_defaults() {
     assert!(result.has_warnings());
 
     let warning_messages: Vec<&str> = result.warnings.iter().map(|w| w.message.as_str()).collect();
-    assert!(
-        warning_messages
-            .iter()
-            .any(|msg| msg.contains("Default priority 'Medium' not found"))
-    );
-    assert!(
-        warning_messages
-            .iter()
-            .any(|msg| msg.contains("Default status 'Done' not found"))
-    );
+    assert!(warning_messages.iter().any(|msg| msg.contains("Default priority 'Medium' not found")));
+    assert!(warning_messages.iter().any(|msg| msg.contains("Default status 'Done' not found")));
 }
 
 #[test]
@@ -858,16 +657,8 @@ fn test_project_config_validation_invalid_email_format() {
     assert!(result.has_warnings());
 
     let warning_messages: Vec<&str> = result.warnings.iter().map(|e| e.message.as_str()).collect();
-    assert!(
-        warning_messages
-            .iter()
-            .any(|msg| msg.contains("Assignee format doesn't look like an email"))
-    );
-    assert!(
-        warning_messages
-            .iter()
-            .any(|msg| msg.contains("Reporter format doesn't look like an email"))
-    );
+    assert!(warning_messages.iter().any(|msg| msg.contains("Assignee format doesn't look like an email")));
+    assert!(warning_messages.iter().any(|msg| msg.contains("Reporter format doesn't look like an email")));
 }
 
 #[test]
@@ -917,11 +708,7 @@ fn test_prefix_conflict_detection() {
     assert!(result.has_errors());
 
     let error_messages: Vec<&str> = result.errors.iter().map(|e| e.message.as_str()).collect();
-    assert!(
-        error_messages
-            .iter()
-            .any(|msg| msg.contains("already exists"))
-    );
+    assert!(error_messages.iter().any(|msg| msg.contains("already exists")));
 }
 
 #[test]
@@ -929,19 +716,10 @@ fn test_validation_result_display() {
     let mut result = ValidationResult::new();
 
     // Add an error
-    result.add_error(ValidationError::error(
-        Some("test_field".to_string()),
-        "Test error message".to_string(),
-    ));
+    result.add_error(ValidationError::error(Some("test_field".to_string()), "Test error message".to_string()));
 
     // Add a warning
-    result.add_error(
-        ValidationError::warning(
-            Some("other_field".to_string()),
-            "Test warning message".to_string(),
-        )
-        .with_fix("Fix suggestion".to_string()),
-    );
+    result.add_error(ValidationError::warning(Some("other_field".to_string()), "Test warning message".to_string()).with_fix("Fix suggestion".to_string()));
 
     // Test display formatting
     let display_string = format!("{result}");
@@ -957,16 +735,10 @@ fn test_validation_result_merge() {
     use lotar::config::validation::errors::{ValidationError, ValidationResult};
 
     let mut result1 = ValidationResult::new();
-    result1.add_error(ValidationError::error(
-        Some("field1".to_string()),
-        "Error 1".to_string(),
-    ));
+    result1.add_error(ValidationError::error(Some("field1".to_string()), "Error 1".to_string()));
 
     let mut result2 = ValidationResult::new();
-    result2.add_error(ValidationError::warning(
-        Some("field2".to_string()),
-        "Warning 1".to_string(),
-    ));
+    result2.add_error(ValidationError::warning(Some("field2".to_string()), "Warning 1".to_string()));
 
     result1.merge(result2);
 
@@ -987,14 +759,10 @@ fn config_custom_fields_collision_rejected_global_and_project() {
     save_global_config(tasks_dir, &global).unwrap();
 
     // Global: attempt to set custom_fields with a reserved name
-    let err = update_config_field(tasks_dir, "custom_fields", "status,foo,bar", None)
-        .expect_err("expected collision error");
+    let err = update_config_field(tasks_dir, "custom_fields", "status,foo,bar", None).expect_err("expected collision error");
     match err {
         lotar::config::types::ConfigError::ParseError(msg) => {
-            assert!(
-                msg.contains("collides with built-in"),
-                "unexpected msg: {msg}"
-            );
+            assert!(msg.contains("collides with built-in"), "unexpected msg: {msg}");
         }
         other => panic!("unexpected error type: {other:?}"),
     }
@@ -1003,19 +771,10 @@ fn config_custom_fields_collision_rejected_global_and_project() {
     let project_prefix = "DEMO";
     let proj = ProjectConfig::new("Demo".into());
     save_project_config(tasks_dir, project_prefix, &proj).unwrap();
-    let err = update_config_field(
-        tasks_dir,
-        "custom_fields",
-        "Due_Date,baz",
-        Some(project_prefix),
-    )
-    .expect_err("expected collision error");
+    let err = update_config_field(tasks_dir, "custom_fields", "Due_Date,baz", Some(project_prefix)).expect_err("expected collision error");
     match err {
         lotar::config::types::ConfigError::ParseError(msg) => {
-            assert!(
-                msg.contains("collides with built-in"),
-                "unexpected msg: {msg}"
-            );
+            assert!(msg.contains("collides with built-in"), "unexpected msg: {msg}");
         }
         other => panic!("unexpected error type: {other:?}"),
     }

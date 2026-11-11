@@ -25,10 +25,7 @@ created: 2025-08-01T10:00:00Z
 modified: 2025-08-01T10:00:00Z
 "#;
     let t: Result<lotar::Task, _> = serde_yaml_ng::from_str(yml);
-    assert!(
-        t.is_ok(),
-        "Uppercase status should parse successfully into Task"
-    );
+    assert!(t.is_ok(), "Uppercase status should parse successfully into Task");
 }
 
 #[test]
@@ -42,10 +39,7 @@ created: 2025-08-01T10:00:00Z
 modified: 2025-08-01T10:00:00Z
 "#;
     let t: Result<lotar::Task, _> = serde_yaml_ng::from_str(yml);
-    assert!(
-        t.is_ok(),
-        "Uppercase priority should parse successfully into Task"
-    );
+    assert!(t.is_ok(), "Uppercase priority should parse successfully into Task");
 }
 
 #[test]
@@ -69,15 +63,9 @@ type: Feature
 created: 2025-08-01T10:00:00Z
 "#;
     let t2: Result<lotar::Task, _> = serde_yaml_ng::from_str(missing_modified);
-    assert!(
-        t2.is_ok(),
-        "Missing 'modified' should be allowed to deserialize"
-    );
+    assert!(t2.is_ok(), "Missing 'modified' should be allowed to deserialize");
     let t2 = t2.unwrap();
-    assert!(
-        t2.modified.is_empty(),
-        "Modified should default to empty when absent"
-    );
+    assert!(t2.modified.is_empty(), "Modified should default to empty when absent");
 }
 
 #[test]

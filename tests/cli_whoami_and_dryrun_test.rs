@@ -44,12 +44,7 @@ fn identity_refreshes_after_external_config_edits_and_removals() {
     let changed = before.replace("alice", "bruce");
     assert_eq!(before.len(), changed.len());
     std::fs::write(&global, changed).unwrap();
-    std::fs::File::options()
-        .write(true)
-        .open(&global)
-        .unwrap()
-        .set_modified(stamp)
-        .unwrap();
+    std::fs::File::options().write(true).open(&global).unwrap().set_modified(stamp).unwrap();
     assert_eq!(resolve_current_user(Some(&tasks)).as_deref(), Some("bruce"));
 
     let project = tasks.join("TEST/config.yml");
@@ -60,16 +55,8 @@ fn identity_refreshes_after_external_config_edits_and_removals() {
     let stamp = std::fs::metadata(&project).unwrap().modified().unwrap();
     let replacement = tasks.join("TEST/replacement.yml");
     std::fs::write(&replacement, "default.reporter: carol\n").unwrap();
-    std::fs::File::options()
-        .write(true)
-        .open(&replacement)
-        .unwrap()
-        .set_modified(stamp)
-        .unwrap();
-    assert_eq!(
-        std::fs::metadata(&project).unwrap().len(),
-        std::fs::metadata(&replacement).unwrap().len()
-    );
+    std::fs::File::options().write(true).open(&replacement).unwrap().set_modified(stamp).unwrap();
+    assert_eq!(std::fs::metadata(&project).unwrap().len(), std::fs::metadata(&replacement).unwrap().len());
     std::fs::rename(&replacement, &project).unwrap();
     assert_eq!(resolve_current_user(Some(&tasks)).as_deref(), Some("carol"));
     std::fs::write(&project, "default: [\n").unwrap();
@@ -85,22 +72,11 @@ fn identity_refreshes_after_external_config_edits_and_removals() {
     let changed = before.replace("default.project: TEST", "default.project: NEXT");
     assert_eq!(before.len(), changed.len());
     std::fs::write(&global, changed).unwrap();
-    std::fs::File::options()
-        .write(true)
-        .open(&global)
-        .unwrap()
-        .set_modified(stamp)
-        .unwrap();
+    std::fs::File::options().write(true).open(&global).unwrap().set_modified(stamp).unwrap();
     assert_eq!(resolve_current_user(Some(&tasks)).as_deref(), Some("alice"));
     std::fs::remove_file(&global).unwrap();
-    assert_eq!(
-        resolve_current_user(Some(&tasks)).as_deref(),
-        Some("fallback-user")
-    );
-    assert!(
-        !global.exists(),
-        "identity lookup must not recreate configuration"
-    );
+    assert_eq!(resolve_current_user(Some(&tasks)).as_deref(), Some("fallback-user"));
+    assert!(!global.exists(), "identity lookup must not recreate configuration");
 }
 
 #[test]
@@ -118,22 +94,13 @@ fn identity_refreshes_cached_misses_and_detector_toggle_changes() {
     write_minimal_config(&tasks, "auto.identity: false\n");
     assert!(resolve_current_user(Some(&tasks)).is_none());
     write_minimal_config(&tasks, "auto.identity: true\nauto.identity_git: false\n");
-    assert_eq!(
-        resolve_current_user(Some(&tasks)).as_deref(),
-        Some("manifest-user")
-    );
+    assert_eq!(resolve_current_user(Some(&tasks)).as_deref(), Some("manifest-user"));
     write_minimal_config(&tasks, "auto.identity: true\nauto.identity_git: true\n");
-    assert_eq!(
-        resolve_current_user(Some(&tasks)).as_deref(),
-        Some("manifest-user")
-    );
+    assert_eq!(resolve_current_user(Some(&tasks)).as_deref(), Some("manifest-user"));
     std::fs::write(tasks.join("TEST/config.yml"), "auto.identity: false\n").unwrap();
     assert!(resolve_current_user(Some(&tasks)).is_none());
     std::fs::remove_file(tasks.join("TEST/config.yml")).unwrap();
-    assert_eq!(
-        resolve_current_user(Some(&tasks)).as_deref(),
-        Some("manifest-user")
-    );
+    assert_eq!(resolve_current_user(Some(&tasks)).as_deref(), Some("manifest-user"));
 }
 
 #[test]
@@ -155,10 +122,7 @@ fn identity_refreshes_after_environment_detector_toggle_changes() {
     unsafe {
         std::env::set_var("LOTAR_AUTO_IDENTITY", "true");
     }
-    assert_eq!(
-        resolve_current_user(Some(&tasks)).as_deref(),
-        Some("manifest-user")
-    );
+    assert_eq!(resolve_current_user(Some(&tasks)).as_deref(), Some("manifest-user"));
 }
 
 #[test]
@@ -178,11 +142,7 @@ fn identity_refreshes_after_cli_override_changes_without_manual_invalidation() {
     std::fs::create_dir_all(&tasks).unwrap();
     write_minimal_config(&tasks, "default.reporter: alice\n");
     assert_eq!(resolve_current_user(Some(&tasks)).as_deref(), Some("alice"));
-    lotar::config::resolution::configure_cli_overrides(&[(
-        "default.reporter".into(),
-        "bruce".into(),
-    )])
-    .unwrap();
+    lotar::config::resolution::configure_cli_overrides(&[("default.reporter".into(), "bruce".into())]).unwrap();
     assert_eq!(resolve_current_user(Some(&tasks)).as_deref(), Some("bruce"));
     lotar::config::resolution::clear_cli_overrides();
     assert_eq!(resolve_current_user(Some(&tasks)).as_deref(), Some("alice"));
@@ -205,11 +165,7 @@ fn identity_refreshes_after_home_config_edits() {
     write_minimal_config(&tasks, "default.reporter: alice\n");
     assert_eq!(resolve_current_user(Some(&tasks)).as_deref(), Some("alice"));
     std::fs::write(temp.path().join(".lotar"), "default.reporter: bruce\n").unwrap();
-    std::fs::set_permissions(
-        temp.path().join(".lotar"),
-        std::fs::Permissions::from_mode(0o600),
-    )
-    .unwrap();
+    std::fs::set_permissions(temp.path().join(".lotar"), std::fs::Permissions::from_mode(0o600)).unwrap();
     assert_eq!(resolve_current_user(Some(&tasks)).as_deref(), Some("bruce"));
     std::fs::write(temp.path().join(".lotar"), "default.reporter: carol\n").unwrap();
     assert_eq!(resolve_current_user(Some(&tasks)).as_deref(), Some("carol"));
@@ -234,34 +190,19 @@ fn whoami_honors_default_and_explicit_project_identity() {
         std::fs::create_dir_all(tasks.join(project)).unwrap();
     }
     write_minimal_config(&tasks, "");
-    std::fs::write(
-        tasks.join("TEST/config.yml"),
-        "project.name: Test Project\ndefault.reporter: alice\nauto.identity: false\n",
-    )
-    .unwrap();
-    std::fs::write(
-        tasks.join("OTHER/config.yml"),
-        "default.reporter: bob\nauto.identity_git: false\n",
-    )
-    .unwrap();
-    for (project, expected, identity, git) in [
-        (None, "alice", false, true),
-        (Some("Test Project"), "alice", false, true),
-        (Some("OTHER"), "bob", true, false),
-    ] {
+    std::fs::write(tasks.join("TEST/config.yml"), "project.name: Test Project\ndefault.reporter: alice\nauto.identity: false\n").unwrap();
+    std::fs::write(tasks.join("OTHER/config.yml"), "default.reporter: bob\nauto.identity_git: false\n").unwrap();
+    for (project, expected, identity, git) in [(None, "alice", false, true), (Some("Test Project"), "alice", false, true), (Some("OTHER"), "bob", true, false)]
+    {
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp.path())
-            .env("HOME", temp.path())
-            .env("USER", "fallback-user")
-            .env_remove("LOTAR_DEFAULT_REPORTER")
-            .args([
-                "--tasks-dir",
-                tasks.to_str().unwrap(),
-                "whoami",
-                "--explain",
-                "--format",
-                "json",
-            ]);
+        cmd.current_dir(temp.path()).env("HOME", temp.path()).env("USER", "fallback-user").env_remove("LOTAR_DEFAULT_REPORTER").args([
+            "--tasks-dir",
+            tasks.to_str().unwrap(),
+            "whoami",
+            "--explain",
+            "--format",
+            "json",
+        ]);
         if let Some(project) = project {
             cmd.args(["--project", project]);
         }
@@ -271,74 +212,37 @@ fn whoami_honors_default_and_explicit_project_identity() {
         assert_eq!(value["source"], "config.default_reporter");
         assert_eq!(value["auto_identity"], identity);
         assert_eq!(value["auto_identity_git"], git);
-        assert!(
-            value["details"]
-                .as_str()
-                .unwrap()
-                .contains(if expected == "alice" {
-                    "project TEST"
-                } else {
-                    "project OTHER"
-                })
-        );
+        assert!(value["details"].as_str().unwrap().contains(if expected == "alice" { "project TEST" } else { "project OTHER" }));
     }
 }
 
 #[test]
 fn project_identity_cache_is_scoped_and_precedence_is_preserved() {
-    use lotar::utils::identity::{
-        resolve_current_user, resolve_current_user_explain_for_project,
-        resolve_current_user_for_project,
-    };
+    use lotar::utils::identity::{resolve_current_user, resolve_current_user_explain_for_project, resolve_current_user_for_project};
     let temp = TempDir::new().unwrap();
     let _home = EnvVarGuard::set("HOME", temp.path().to_str().unwrap());
     let _env = EnvVarGuard::set("LOTAR_DEFAULT_REPORTER", "environment-user");
     let _user = EnvVarGuard::set("USER", "fallback-user");
     let tasks = temp.path().join("workspace/.tasks");
-    for (project, reporter) in [
-        ("TEST", "alice"),
-        ("OTHER", "bob"),
-        ("INHERIT", ""),
-        ("SELF", "\"@me\""),
-    ] {
+    for (project, reporter) in [("TEST", "alice"), ("OTHER", "bob"), ("INHERIT", ""), ("SELF", "\"@me\"")] {
         std::fs::create_dir_all(tasks.join(project)).unwrap();
         std::fs::write(
             tasks.join(project).join("config.yml"),
-            if reporter.is_empty() {
-                String::new()
-            } else {
-                format!("default.reporter: {reporter}\nauto.identity: false\n")
-            },
+            if reporter.is_empty() { String::new() } else { format!("default.reporter: {reporter}\nauto.identity: false\n") },
         )
         .unwrap();
     }
     write_minimal_config(&tasks, "default.reporter: workspace-user\n");
     assert_eq!(resolve_current_user(Some(&tasks)).as_deref(), Some("alice"));
-    for (project, expected) in [
-        ("OTHER", "bob"),
-        ("TEST", "alice"),
-        ("INHERIT", "environment-user"),
-        ("SELF", "fallback-user"),
-        ("OTHER", "bob"),
-    ] {
-        assert_eq!(
-            resolve_current_user_for_project(Some(&tasks), Some(project)).as_deref(),
-            Some(expected)
-        );
+    for (project, expected) in [("OTHER", "bob"), ("TEST", "alice"), ("INHERIT", "environment-user"), ("SELF", "fallback-user"), ("OTHER", "bob")] {
+        assert_eq!(resolve_current_user_for_project(Some(&tasks), Some(project)).as_deref(), Some(expected));
     }
     let second = temp.path().join("second/.tasks");
     std::fs::create_dir_all(second.join("OTHER")).unwrap();
     std::fs::write(second.join("OTHER/config.yml"), "default.reporter: carol\n").unwrap();
-    assert_eq!(
-        resolve_current_user_for_project(Some(&second), Some("OTHER")).as_deref(),
-        Some("carol")
-    );
+    assert_eq!(resolve_current_user_for_project(Some(&second), Some("OTHER")).as_deref(), Some("carol"));
 
-    lotar::config::resolution::configure_cli_overrides(&[(
-        "default.reporter".into(),
-        "cli-user".into(),
-    )])
-    .unwrap();
+    lotar::config::resolution::configure_cli_overrides(&[("default.reporter".into(), "cli-user".into())]).unwrap();
     let found = resolve_current_user_explain_for_project(Some(&tasks), Some("OTHER"));
     lotar::config::resolution::clear_cli_overrides();
     let found = found.unwrap();
@@ -444,11 +348,7 @@ fn status_dry_run_explain_previews_and_does_not_write() {
     let mut storage = Storage::new(&tasks_dir);
     let created = TaskService::create(
         &mut storage,
-        TaskCreate {
-            title: "Preview status change".to_string(),
-            project: Some("TEST".to_string()),
-            ..TaskCreate::default()
-        },
+        TaskCreate { title: "Preview status change".to_string(), project: Some("TEST".to_string()), ..TaskCreate::default() },
     )
     .expect("create task");
 
@@ -494,13 +394,7 @@ fn add_dry_run_explain_creates_no_task_files() {
     // Run add in dry-run mode
     let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp.path())
-        .args([
-            "add",
-            "Dry run task",
-            "--project=TEST",
-            "--dry-run",
-            "--explain",
-        ])
+        .args(["add", "Dry run task", "--project=TEST", "--dry-run", "--explain"])
         .assert()
         .success()
         .stdout(predicate::str::contains("DRY RUN: Would create task"))
@@ -508,10 +402,7 @@ fn add_dry_run_explain_creates_no_task_files() {
 
     // No new YAML files should be written
     let after_count = count_task_yaml_files(&tasks_dir);
-    assert_eq!(
-        before_count, after_count,
-        "dry-run should not write task files"
-    );
+    assert_eq!(before_count, after_count, "dry-run should not write task files");
 
     // restored by _guard drop
 }
@@ -532,12 +423,7 @@ fn add_sets_reporter_via_me_alias_default() {
 
     lotar::utils::identity::invalidate_identity_cache(Some(&tasks_dir));
 
-    crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(temp.path())
-        .args(["add", "Alias reporter task", "--project=TEST"])
-        .assert()
-        .success();
+    crate::common::lotar_cmd().unwrap().current_dir(temp.path()).args(["add", "Alias reporter task", "--project=TEST"]).assert().success();
 
     let task_path = tasks_dir.join("TEST").join("1.yml");
     let contents = std::fs::read_to_string(task_path).unwrap();

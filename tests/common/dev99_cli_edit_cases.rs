@@ -43,58 +43,27 @@ fn edit_args(id: &str, title: Option<&str>, reporter: Option<&str>) -> TaskEditA
 fn edit_midpublish_failure_rolls_back_config_and_task_bytes() {
     let tmp = tempfile::tempdir().unwrap();
     let tasks_dir = tmp.path().join(".tasks");
-    write_global_config(
-        &tasks_dir,
-        "members: [alice]\nauto.populate_members: true\n",
-    );
+    write_global_config(&tasks_dir, "members: [alice]\nauto.populate_members: true\n");
 
     let project_dir = tasks_dir.join("TEST");
     std::fs::create_dir_all(&project_dir).unwrap();
-    std::fs::write(
-        project_dir.join("1.yml"),
-        "title: Seed\nstatus: Todo\npriority: Medium\ntype: Feature\nreporter: alice\ncreated: 2026-01-01T00:00:00Z\n",
-    )
-    .unwrap();
-    std::fs::write(
-        project_dir.join("config.yml"),
-        "project_name: TEST\nmembers:\n  - alice\n",
-    )
-    .unwrap();
+    std::fs::write(project_dir.join("1.yml"), "title: Seed\nstatus: Todo\npriority: Medium\ntype: Feature\nreporter: alice\ncreated: 2026-01-01T00:00:00Z\n")
+        .unwrap();
+    std::fs::write(project_dir.join("config.yml"), "project_name: TEST\nmembers:\n  - alice\n").unwrap();
     let config_path = project_dir.join("config.yml");
     let task_path = project_dir.join("1.yml");
     let config_before = std::fs::read(&config_path).unwrap();
     let task_before = std::fs::read(&task_path).unwrap();
 
-    let resolver =
-        TasksDirectoryResolver::resolve(Some(tasks_dir.to_str().unwrap()), None).unwrap();
+    let resolver = TasksDirectoryResolver::resolve(Some(tasks_dir.to_str().unwrap()), None).unwrap();
     let renderer = crate::output::OutputRenderer::new(OutputFormat::Text, LogLevel::Error);
 
     fault::fail_publish_at(1);
-    let err = EditHandler::execute(
-        edit_args("TEST-1", Some("Renamed"), Some("bob")),
-        Some("TEST"),
-        &resolver,
-        &renderer,
-    )
-    .expect_err("mid-publish failure must fail the edit");
+    let err = EditHandler::execute(edit_args("TEST-1", Some("Renamed"), Some("bob")), Some("TEST"), &resolver, &renderer)
+        .expect_err("mid-publish failure must fail the edit");
 
-    assert!(
-        err.contains("injected publish failure"),
-        "unexpected error: {err}"
-    );
-    assert_eq!(
-        std::fs::read(&config_path).unwrap(),
-        config_before,
-        "config bytes must be unchanged after the failed edit"
-    );
-    assert_eq!(
-        std::fs::read(&task_path).unwrap(),
-        task_before,
-        "task bytes must be unchanged after the failed edit"
-    );
-    assert!(
-        !tasks_dir
-            .join(crate::storage::transaction::JOURNAL_FILE_NAME)
-            .exists()
-    );
+    assert!(err.contains("injected publish failure"), "unexpected error: {err}");
+    assert_eq!(std::fs::read(&config_path).unwrap(), config_before, "config bytes must be unchanged after the failed edit");
+    assert_eq!(std::fs::read(&task_path).unwrap(), task_before, "task bytes must be unchanged after the failed edit");
+    assert!(!tasks_dir.join(crate::storage::transaction::JOURNAL_FILE_NAME).exists());
 }

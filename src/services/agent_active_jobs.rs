@@ -30,21 +30,12 @@ pub struct ActiveJob {
 pub type JobOutcome = crate::api_types::JobOutcome;
 
 fn dir(tasks_dir: &Path) -> PathBuf {
-    let canonical = tasks_dir
-        .canonicalize()
-        .unwrap_or_else(|_| tasks_dir.to_path_buf());
-    crate::services::agent_queue_service::queue_dir().join(format!(
-        "active-{}",
-        crate::services::agent_queue_service::queue_hash(&canonical)
-    ))
+    let canonical = tasks_dir.canonicalize().unwrap_or_else(|_| tasks_dir.to_path_buf());
+    crate::services::agent_queue_service::queue_dir().join(format!("active-{}", crate::services::agent_queue_service::queue_hash(&canonical)))
 }
 
 fn safe_name(job_id: &str) -> Option<&str> {
-    (!job_id.is_empty()
-        && job_id
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.')))
-    .then_some(job_id)
+    (!job_id.is_empty() && job_id.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))).then_some(job_id)
 }
 
 pub fn process_alive(pid: u32) -> bool {
@@ -98,23 +89,13 @@ pub fn unregister(tasks_dir: &Path, job_id: &str) {
 /// Later values replace earlier ones per field. Returns the merged outcome.
 pub fn record_outcome(tasks_dir: &Path, outcome: &JobOutcome) -> std::io::Result<JobOutcome> {
     let Some(name) = safe_name(&outcome.job_id) else {
-        return Err(std::io::Error::other(format!(
-            "invalid job id '{}'",
-            outcome.job_id
-        )));
+        return Err(std::io::Error::other(format!("invalid job id '{}'", outcome.job_id)));
     };
     let dir = dir(tasks_dir);
     std::fs::create_dir_all(&dir)?;
-    let _lock = crate::storage::safety::acquire_storage_lock_within(
-        &dir,
-        &format!("{name}.outcome"),
-        std::time::Duration::from_secs(5),
-    )?;
+    let _lock = crate::storage::safety::acquire_storage_lock_within(&dir, &format!("{name}.outcome"), std::time::Duration::from_secs(5))?;
     let path = dir.join(format!("{name}.outcome.json"));
-    let mut merged = read_outcome(&path).unwrap_or_else(|| JobOutcome {
-        job_id: outcome.job_id.clone(),
-        ..JobOutcome::default()
-    });
+    let mut merged = read_outcome(&path).unwrap_or_else(|| JobOutcome { job_id: outcome.job_id.clone(), ..JobOutcome::default() });
     if outcome.status.is_some() {
         merged.status = outcome.status.clone();
     }
@@ -148,9 +129,7 @@ pub fn end_and_take_outcome(tasks_dir: &Path, job_id: &str) -> Option<JobOutcome
 }
 
 fn read_outcome(path: &Path) -> Option<JobOutcome> {
-    std::fs::read_to_string(path)
-        .ok()
-        .and_then(|text| serde_json::from_str(&text).ok())
+    std::fs::read_to_string(path).ok().and_then(|text| serde_json::from_str(&text).ok())
 }
 
 /// Live records; stale ones (owner gone) are removed on the way.
@@ -162,17 +141,11 @@ pub fn list(tasks_dir: &Path) -> Vec<ActiveJob> {
     let mut jobs = Vec::new();
     for entry in entries.flatten() {
         let path = entry.path();
-        let is_record = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .is_some_and(|n| n.ends_with(".json") && !n.ends_with(".outcome.json"));
+        let is_record = path.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.ends_with(".json") && !n.ends_with(".outcome.json"));
         if !is_record {
             continue;
         }
-        let Some(job) = std::fs::read_to_string(&path)
-            .ok()
-            .and_then(|text| serde_json::from_str::<ActiveJob>(&text).ok())
-        else {
+        let Some(job) = std::fs::read_to_string(&path).ok().and_then(|text| serde_json::from_str::<ActiveJob>(&text).ok()) else {
             continue;
         };
         if process_alive(job.owner_pid) {
@@ -186,18 +159,13 @@ pub fn list(tasks_dir: &Path) -> Vec<ActiveJob> {
 }
 
 pub fn for_ticket(tasks_dir: &Path, ticket_id: &str) -> Option<ActiveJob> {
-    list(tasks_dir)
-        .into_iter()
-        .find(|job| crate::storage::identity::aliases_match(&job.ticket_id, ticket_id))
+    list(tasks_dir).into_iter().find(|job| crate::storage::identity::aliases_match(&job.ticket_id, ticket_id))
 }
 
 /// A job another process runs for this ticket. This process's own jobs are
 /// tracked in memory, which knows when one is finishing.
 pub fn for_ticket_elsewhere(tasks_dir: &Path, ticket_id: &str) -> Option<ActiveJob> {
-    list(tasks_dir).into_iter().find(|job| {
-        job.owner_pid != std::process::id()
-            && crate::storage::identity::aliases_match(&job.ticket_id, ticket_id)
-    })
+    list(tasks_dir).into_iter().find(|job| job.owner_pid != std::process::id() && crate::storage::identity::aliases_match(&job.ticket_id, ticket_id))
 }
 
 pub fn find(tasks_dir: &Path, job_id: &str) -> Option<ActiveJob> {
@@ -247,11 +215,7 @@ mod tests {
         assert!(list(tasks.path()).is_empty());
         assert!(!cancel_requested(tasks.path(), "job-1"));
 
-        let stale = ActiveJob {
-            job_id: "job-2".into(),
-            owner_pid: 0,
-            ..job
-        };
+        let stale = ActiveJob { job_id: "job-2".into(), owner_pid: 0, ..job };
         register(tasks.path(), &stale);
         assert!(list(tasks.path()).is_empty(), "dead owner is stale");
         unsafe { std::env::remove_var("LOTAR_AGENT_QUEUE_DIR") };

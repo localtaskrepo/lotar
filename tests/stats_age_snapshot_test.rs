@@ -3,10 +3,7 @@ use serde_json::Value;
 use tempfile::TempDir;
 
 fn run(cmd: &mut Command, temp_dir: &TempDir, args: &[&str]) -> assert_cmd::assert::Assert {
-    cmd.current_dir(temp_dir.path())
-        .env("LOTAR_TEST_SILENT", "1")
-        .args(args)
-        .assert()
+    cmd.current_dir(temp_dir.path()).env("LOTAR_TEST_SILENT", "1").args(args).assert()
 }
 
 #[test]
@@ -26,15 +23,7 @@ fn stats_age_day_distribution_snapshot() {
         .unwrap()
         .current_dir(temp.path())
         .env("LOTAR_TEST_SILENT", "1")
-        .args([
-            "--format",
-            "json",
-            "stats",
-            "age",
-            "--distribution",
-            "day",
-            "--global",
-        ])
+        .args(["--format", "json", "stats", "age", "--distribution", "day", "--global"])
         .output()
         .unwrap();
     assert!(out.status.success());

@@ -24,31 +24,14 @@ fn handle_sync(req: JsonRpcRequest, direction: SyncDirection) -> JsonRpcResponse
     // fails closed on) so this handler never widens a targeted scope.
     let task_id = req.params.get("task_id").and_then(|v| v.as_str());
     let auth_profile = req.params.get("auth_profile").and_then(|v| v.as_str());
-    let dry_run = req
-        .params
-        .get("dry_run")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
-    let include_report = req
-        .params
-        .get("include_report")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
+    let dry_run = req.params.get("dry_run").and_then(|v| v.as_bool()).unwrap_or(false);
+    let include_report = req.params.get("include_report").and_then(|v| v.as_bool()).unwrap_or(false);
     let write_report = req.params.get("write_report").and_then(|v| v.as_bool());
     let client_run_id = req.params.get("client_run_id").and_then(|v| v.as_str());
 
     let resolver = try_rpc!(resolve_tasks_dir(&req.id));
 
-    let options = SyncOptions {
-        remote: &remote,
-        project,
-        dry_run,
-        auth_profile,
-        task_id,
-        write_report,
-        include_report,
-        client_run_id,
-    };
+    let options = SyncOptions { remote: &remote, project, dry_run, auth_profile, task_id, write_report, include_report, client_run_id };
     let outcome = SyncService::run(&resolver, direction, options);
 
     match outcome {
@@ -66,12 +49,7 @@ fn handle_sync(req: JsonRpcRequest, direction: SyncDirection) -> JsonRpcResponse
                 LoTaRError::ValidationError(_) => -32602,
                 _ => -32000,
             };
-            err(
-                req.id,
-                code,
-                "Sync failed",
-                Some(json!({"message": sync_error.to_string()})),
-            )
+            err(req.id, code, "Sync failed", Some(json!({"message": sync_error.to_string()})))
         }
     }
 }

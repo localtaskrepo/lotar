@@ -29,19 +29,12 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Ok(body) => body,
             Err(response) => return response,
         };
-        let values = body
-            .get("values")
-            .and_then(|v| v.as_object())
-            .cloned()
-            .unwrap_or_default();
+        let values = body.get("values").and_then(|v| v.as_object()).cloned().unwrap_or_default();
         let mut map = std::collections::BTreeMap::new();
         for (k, v) in values.iter() {
             map.insert(k.clone(), v.as_str().unwrap_or(&v.to_string()).to_string());
         }
-        let global = body
-            .get("global")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
+        let global = body.get("global").and_then(|v| v.as_bool()).unwrap_or(false);
         let project = body.get("project").and_then(|v| v.as_str());
         match ConfigService::set(&resolver, &map, global, project) {
             Ok(outcome) => config_write_response(&resolver, outcome.updated, &outcome.validation),

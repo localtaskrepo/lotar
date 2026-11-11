@@ -14,8 +14,7 @@ use std::sync::{Arc, LazyLock, Mutex, Weak};
 use std::time::Duration;
 
 static STATIC_FILES: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/target/web-embed");
-static STOP_FLAGS: LazyLock<Mutex<HashMap<u16, bool>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
+static STOP_FLAGS: LazyLock<Mutex<HashMap<u16, bool>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 const MAX_REQUEST_BODY_BYTES: usize = 16 * 1024 * 1024;
 const SOCKET_TIMEOUT: Duration = Duration::from_secs(30);
@@ -54,15 +53,9 @@ fn write_forbidden(mut stream: &TcpStream, body: &str) {
 }
 
 fn reject_oversized_body(mut stream: &TcpStream, limit: usize) {
-    let body = format!(
-        "{{\"error\":{{\"code\":\"PAYLOAD_TOO_LARGE\",\"message\":\"Request body exceeds the {} MiB limit\"}}}}",
-        limit / (1024 * 1024)
-    );
-    let response = format!(
-        "HTTP/1.1 413 Content Too Large\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-        body.len(),
-        body
-    );
+    let body = format!("{{\"error\":{{\"code\":\"PAYLOAD_TOO_LARGE\",\"message\":\"Request body exceeds the {} MiB limit\"}}}}", limit / (1024 * 1024));
+    let response =
+        format!("HTTP/1.1 413 Content Too Large\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}", body.len(), body);
     let _ = stream.write_all(response.as_bytes());
     let _ = stream.flush();
 }
@@ -78,9 +71,8 @@ fn request_body_limit(path: &str) -> usize {
     if path != "/api/tasks/attachments/upload" {
         return MAX_REQUEST_BODY_BYTES;
     }
-    let configured = resolve_server_tasks_dir()
-        .and_then(|dir| crate::config::resolution::load_and_merge_configs(Some(&dir)).ok())
-        .map(|cfg| cfg.attachments_max_upload_mb);
+    let configured =
+        resolve_server_tasks_dir().and_then(|dir| crate::config::resolution::load_and_merge_configs(Some(&dir)).ok()).map(|cfg| cfg.attachments_max_upload_mb);
     match configured {
         Some(-1) => MAX_UPLOAD_BODY_BYTES,
         Some(mb) if mb > 0 => {
@@ -115,10 +107,7 @@ impl WebServerConfig {
         if self.embedded_only {
             return None;
         }
-        self.web_ui_path
-            .as_ref()
-            .filter(|p| p.is_dir())
-            .map(|p| p.as_path())
+        self.web_ui_path.as_ref().filter(|p| p.is_dir()).map(|p| p.as_path())
     }
 }
 
@@ -126,17 +115,11 @@ pub fn serve_with_host(api_server: &api_server::ApiServer, host: &str, port: u16
     serve_with_config(api_server, host, port, &WebServerConfig::default())
 }
 
-pub fn serve_with_config(
-    api_server: &api_server::ApiServer,
-    host: &str,
-    port: u16,
-    config: &WebServerConfig,
-) {
+pub fn serve_with_config(api_server: &api_server::ApiServer, host: &str, port: u16, config: &WebServerConfig) {
     let listeners = match bind_host(host, port) {
         Ok(listeners) => listeners,
         Err(e) => {
-            OutputRenderer::new(OutputFormat::Text, LogLevel::Error)
-                .log_error(format_args!("Failed to bind to {}:{}: {}", host, port, e));
+            OutputRenderer::new(OutputFormat::Text, LogLevel::Error).log_error(format_args!("Failed to bind to {}:{}: {}", host, port, e));
             return;
         }
     };
@@ -175,28 +158,17 @@ pub fn bind_host(host: &str, port: u16) -> std::io::Result<Vec<TcpListener>> {
 /// actual local address, so a listener bound to port 0 (OS-assigned) is
 /// keyed and torn down correctly. Callers should advertise the actual port
 /// from `listener.local_addr()` only after the bind has succeeded.
-pub fn serve_listener(
-    api_server: &api_server::ApiServer,
-    listener: &TcpListener,
-    config: &WebServerConfig,
-) {
+pub fn serve_listener(api_server: &api_server::ApiServer, listener: &TcpListener, config: &WebServerConfig) {
     serve_listeners(api_server, &[listener], config);
 }
 
 /// Serve on several already-bound listeners that share one port (the IPv4
 /// and IPv6 loopback sockets of `localhost`), one accept loop each.
-pub fn serve_listeners(
-    api_server: &api_server::ApiServer,
-    listeners: &[&TcpListener],
-    config: &WebServerConfig,
-) {
+pub fn serve_listeners(api_server: &api_server::ApiServer, listeners: &[&TcpListener], config: &WebServerConfig) {
     let Some(first) = listeners.first() else {
         return;
     };
-    let port = first
-        .local_addr()
-        .map(|addr| addr.port())
-        .unwrap_or_default();
+    let port = first.local_addr().map(|addr| addr.port()).unwrap_or_default();
 
     // Register this server instance in a global stop registry (used only by tests)
     if let Ok(mut map) = STOP_FLAGS.lock() {
@@ -246,12 +218,7 @@ fn accept_loop<'scope, 'env>(
     let _ = listener.set_nonblocking(true);
     loop {
         // Check for test-initiated shutdown before handling the next connection
-        if STOP_FLAGS
-            .lock()
-            .ok()
-            .and_then(|m| m.get(&port).copied())
-            .unwrap_or(false)
-        {
+        if STOP_FLAGS.lock().ok().and_then(|m| m.get(&port).copied()).unwrap_or(false) {
             break;
         }
 
@@ -298,8 +265,7 @@ fn accept_loop<'scope, 'env>(
                 std::thread::sleep(ACCEPT_POLL_INTERVAL);
             }
             Err(e) => {
-                OutputRenderer::new(OutputFormat::Text, LogLevel::Warn)
-                    .log_warn(format_args!("Connection error: {}", e));
+                OutputRenderer::new(OutputFormat::Text, LogLevel::Warn).log_warn(format_args!("Connection error: {}", e));
             }
         }
     }
@@ -337,11 +303,7 @@ fn handle_connection(
                 break;
             }
         }
-        let header_end = head_buf
-            .windows(4)
-            .position(|w| w == b"\r\n\r\n")
-            .map(|i| i + 4)
-            .unwrap_or(head_buf.len());
+        let header_end = head_buf.windows(4).position(|w| w == b"\r\n\r\n").map(|i| i + 4).unwrap_or(head_buf.len());
         let (head_part, body_bytes) = head_buf.split_at(header_end);
         let request_head = String::from_utf8_lossy(head_part);
         let request_line = match request_head.lines().next() {
@@ -366,10 +328,7 @@ fn handle_connection(
         }
         // Bodies are read by Content-Length only; a chunked body used to be
         // treated as empty and fail with a misleading error (DEV-276).
-        if headers
-            .get("transfer-encoding")
-            .is_some_and(|value| !value.trim().eq_ignore_ascii_case("identity"))
-        {
+        if headers.get("transfer-encoding").is_some_and(|value| !value.trim().eq_ignore_ascii_case("identity")) {
             let body = "{\"error\":{\"code\":\"LENGTH_REQUIRED\",\"message\":\"Chunked request bodies are not supported; send Content-Length\"}}";
             let response = format!(
                 "HTTP/1.1 411 Length Required\r\nContent-Type: application/json\r\n{}Content-Length: {}\r\nConnection: close\r\n\r\n{}",
@@ -383,9 +342,7 @@ fn handle_connection(
         }
         let body_limit = request_body_limit(&path);
         let mut body: Vec<u8> = body_bytes.to_vec();
-        let declared_length: Option<usize> = headers
-            .get("content-length")
-            .and_then(|v| v.parse::<usize>().ok());
+        let declared_length: Option<usize> = headers.get("content-length").and_then(|v| v.parse::<usize>().ok());
         if declared_length.is_some_and(|cl| cl > body_limit) || body.len() > body_limit {
             reject_oversized_body(stream, body_limit);
             return;
@@ -426,8 +383,7 @@ fn handle_connection(
     // SSE endpoints
     if path == "/api/events" || path == "/api/tasks/stream" {
         handle_sse_connection(stream, &query);
-    } else if path == "/__test/stop" && std::env::var("LOTAR_ALLOW_TEST_STOP").as_deref() == Ok("1")
-    {
+    } else if path == "/__test/stop" && std::env::var("LOTAR_ALLOW_TEST_STOP").as_deref() == Ok("1") {
         if let Ok(mut map) = STOP_FLAGS.lock() {
             map.insert(port, true);
         }
@@ -443,27 +399,17 @@ fn handle_connection(
             // Embedded gzip-compressed by build.rs (DEV-221); sent as is to
             // clients that accept gzip, decompressed for the rest.
             static SPEC_GZ: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/openapi.json.gz"));
-            let accepts_gzip = headers.get("accept-encoding").is_some_and(|value| {
-                value
-                    .split(',')
-                    .any(|part| part.trim().eq_ignore_ascii_case("gzip"))
-            });
+            let accepts_gzip = headers.get("accept-encoding").is_some_and(|value| value.split(',').any(|part| part.trim().eq_ignore_ascii_case("gzip")));
             let (body, encoding) = if accepts_gzip {
-                (
-                    SPEC_GZ.to_vec(),
-                    "Content-Encoding: gzip\r\nVary: Accept-Encoding\r\n",
-                )
+                (SPEC_GZ.to_vec(), "Content-Encoding: gzip\r\nVary: Accept-Encoding\r\n")
             } else {
                 use std::io::Read;
                 let mut text = Vec::new();
                 let _ = flate2::read::GzDecoder::new(SPEC_GZ).read_to_end(&mut text);
                 (text, "Vary: Accept-Encoding\r\n")
             };
-            let response = format!(
-                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n{}Content-Length: {}\r\nConnection: close\r\n\r\n",
-                encoding,
-                body.len()
-            );
+            let response =
+                format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n{}Content-Length: {}\r\nConnection: close\r\n\r\n", encoding, body.len());
             let _ = stream.write_all(response.as_bytes());
             let _ = stream.write_all(&body);
             let _ = stream.flush();
@@ -485,70 +431,32 @@ fn handle_connection(
         // HEAD answers like GET without the body (link checkers, download
         // managers and caches probe attachments this way).
         let head = method.eq_ignore_ascii_case("HEAD");
-        let req = HttpRequest {
-            method: if head { "GET".to_string() } else { method },
-            path: path.clone(),
-            query,
-            headers,
-            body,
-        };
+        let req = HttpRequest { method: if head { "GET".to_string() } else { method }, path: path.clone(), query, headers, body };
         let mut resp = api_server.handle_request(&req);
-        resp.headers.push((
-            "Access-Control-Allow-Methods".into(),
-            "GET,POST,OPTIONS".into(),
-        ));
-        resp.headers
-            .push(("Access-Control-Allow-Headers".into(), "Content-Type".into()));
+        resp.headers.push(("Access-Control-Allow-Methods".into(), "GET,POST,OPTIONS".into()));
+        resp.headers.push(("Access-Control-Allow-Headers".into(), "Content-Type".into()));
         // A 304 has no body, and browsers may copy its headers onto the
         // cached response, so it must not claim a JSON body.
         let not_modified = resp.status == 304;
-        if !not_modified
-            && !resp
-                .headers
-                .iter()
-                .any(|(k, _)| k.eq_ignore_ascii_case("Content-Type"))
-        {
-            resp.headers
-                .push(("Content-Type".into(), "application/json".into()));
+        if !not_modified && !resp.headers.iter().any(|(k, _)| k.eq_ignore_ascii_case("Content-Type")) {
+            resp.headers.push(("Content-Type".into(), "application/json".into()));
         }
         // The socket serves exactly one request and then closes; say so.
-        if !resp
-            .headers
-            .iter()
-            .any(|(k, _)| k.eq_ignore_ascii_case("Connection"))
-        {
+        if !resp.headers.iter().any(|(k, _)| k.eq_ignore_ascii_case("Connection")) {
             resp.headers.push(("Connection".into(), "close".into()));
         }
-        let headers_str = resp
-            .headers
-            .iter()
-            .map(|(k, v)| format!("{}: {}\r\n", k, v))
-            .collect::<String>();
-        let content_length = if not_modified {
-            String::new()
-        } else {
-            format!("Content-Length: {}\r\n", resp.body.len())
-        };
+        let headers_str = resp.headers.iter().map(|(k, v)| format!("{}: {}\r\n", k, v)).collect::<String>();
+        let content_length = if not_modified { String::new() } else { format!("Content-Length: {}\r\n", resp.body.len()) };
         // Routes may set some of these themselves (attachments send
         // nosniff); never send a header twice.
         let security_headers: String = SECURITY_HEADERS
             .split_inclusive("\r\n")
             .filter(|line| {
                 let name = line.split(':').next().unwrap_or_default();
-                !resp
-                    .headers
-                    .iter()
-                    .any(|(k, _)| k.eq_ignore_ascii_case(name))
+                !resp.headers.iter().any(|(k, _)| k.eq_ignore_ascii_case(name))
             })
             .collect();
-        let response = format!(
-            "HTTP/1.1 {} {}\r\n{}{}{}\r\n",
-            resp.status,
-            reason_phrase(resp.status),
-            headers_str,
-            security_headers,
-            content_length
-        );
+        let response = format!("HTTP/1.1 {} {}\r\n{}{}{}\r\n", resp.status, reason_phrase(resp.status), headers_str, security_headers, content_length);
         let _ = stream.write_all(response.as_bytes());
         if !head {
             let _ = stream.write_all(&resp.body);
@@ -558,14 +466,7 @@ fn handle_connection(
         let request_path = if path == "/" { "/index.html" } else { &path };
         let rel_path = request_path.trim_start_matches('/');
         let external_path = config.effective_web_ui_path();
-        let accepts_gzip = headers
-            .get("accept-encoding")
-            .map(|value| {
-                value
-                    .split(',')
-                    .any(|part| part.trim().eq_ignore_ascii_case("gzip"))
-            })
-            .unwrap_or(false);
+        let accepts_gzip = headers.get("accept-encoding").map(|value| value.split(',').any(|part| part.trim().eq_ignore_ascii_case("gzip"))).unwrap_or(false);
         let mut served = try_serve_static(rel_path, stream, external_path, accepts_gzip);
         if !served && should_fallback_to_index(&path) {
             served = try_serve_static("index.html", stream, external_path, accepts_gzip);
@@ -634,12 +535,7 @@ pub fn serve(api_server: &api_server::ApiServer, port: u16) {
 /// 2. Try embedded pre-compressed assets (`<path>.gz`, bundled at compile time)
 /// 3. Try raw embedded assets (non-text binaries are embedded byte-exact)
 /// 4. Fallback to `target/web` on the filesystem (for development)
-fn try_serve_static(
-    rel_path: &str,
-    stream: &TcpStream,
-    external_path: Option<&Path>,
-    accepts_gzip: bool,
-) -> bool {
+fn try_serve_static(rel_path: &str, stream: &TcpStream, external_path: Option<&Path>, accepts_gzip: bool) -> bool {
     if !is_safe_rel_path(rel_path) {
         return false;
     }
@@ -660,12 +556,7 @@ fn try_serve_static(
             return serve_bytes(rel_path, file.contents(), stream, true);
         }
         let mut decompressed = Vec::with_capacity(file.contents().len() * 4);
-        if std::io::Read::read_to_end(
-            &mut flate2::read::GzDecoder::new(file.contents()),
-            &mut decompressed,
-        )
-        .is_ok()
-        {
+        if std::io::Read::read_to_end(&mut flate2::read::GzDecoder::new(file.contents()), &mut decompressed).is_ok() {
             return serve_bytes(rel_path, &decompressed, stream, false);
         }
     }
@@ -692,11 +583,7 @@ fn serve_bytes(rel_path: &str, bytes: &[u8], mut stream: &TcpStream, gzipped: bo
     let content_type = content_type_for(rel_path);
     // Vite emits content-hashed filenames under assets/, so those can be
     // cached immutably; the HTML entry points must always revalidate.
-    let cache_control = if rel_path.starts_with("assets/") {
-        "public, max-age=31536000, immutable"
-    } else {
-        "no-cache"
-    };
+    let cache_control = if rel_path.starts_with("assets/") { "public, max-age=31536000, immutable" } else { "no-cache" };
     // The extra trailing \r\n below terminates the header block; the encoding
     // lines are formatted with their own line endings. The socket closes
     // after this single response, so the connection is advertised as closed.
@@ -706,11 +593,7 @@ fn serve_bytes(rel_path: &str, bytes: &[u8], mut stream: &TcpStream, gzipped: bo
         bytes.len(),
         cache_control,
         SECURITY_HEADERS,
-        if gzipped {
-            "Content-Encoding: gzip\r\nVary: Accept-Encoding\r\n"
-        } else {
-            ""
-        },
+        if gzipped { "Content-Encoding: gzip\r\nVary: Accept-Encoding\r\n" } else { "" },
     );
     let _ = stream.write_all(header.as_bytes());
     let _ = stream.write_all(bytes);
@@ -731,23 +614,14 @@ fn is_safe_rel_path(rel_path: &str) -> bool {
     if rel_path.contains(':') || rel_path.starts_with(['/', '\\']) {
         return false;
     }
-    if rel_path
-        .split(['/', '\\'])
-        .any(|segment| segment == "." || segment == "..")
-    {
+    if rel_path.split(['/', '\\']).any(|segment| segment == "." || segment == "..") {
         return false;
     }
-    Path::new(rel_path)
-        .components()
-        .all(|component| matches!(component, std::path::Component::Normal(_)))
+    Path::new(rel_path).components().all(|component| matches!(component, std::path::Component::Normal(_)))
 }
 
 fn content_type_for(path: &str) -> &'static str {
-    match Path::new(path)
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-    {
+    match Path::new(path).extension().and_then(|e| e.to_str()).unwrap_or("") {
         "html" => "text/html",
         "ico" => "image/x-icon",
         "jpg" | "jpeg" => "image/jpeg",
@@ -766,19 +640,10 @@ fn handle_sse_connection(mut stream: &TcpStream, query: &HashMap<String, String>
     let debounce_ms = query
         .get("debounce_ms")
         .and_then(|s| s.parse::<u64>().ok())
-        .or_else(|| {
-            std::env::var("LOTAR_SSE_DEBOUNCE_MS")
-                .ok()
-                .and_then(|s| s.parse::<u64>().ok())
-        })
+        .or_else(|| std::env::var("LOTAR_SSE_DEBOUNCE_MS").ok().and_then(|s| s.parse::<u64>().ok()))
         .unwrap_or(100);
     let kinds_filter: Option<Vec<String>> =
-        query.get("kinds").or_else(|| query.get("topic")).map(|s| {
-            s.split(',')
-                .filter(|p| !p.is_empty())
-                .map(|p| p.trim().to_string())
-                .collect()
-        });
+        query.get("kinds").or_else(|| query.get("topic")).map(|s| s.split(',').filter(|p| !p.is_empty()).map(|p| p.trim().to_string()).collect());
     let project_filter: Option<String> = query.get("project").cloned();
 
     let rx = crate::api_events::subscribe();
@@ -794,12 +659,7 @@ fn handle_sse_connection(mut stream: &TcpStream, query: &HashMap<String, String>
 
     // Optional readiness event for tests
     let allow_ready = std::env::var("LOTAR_SSE_READY").ok().as_deref() == Some("1");
-    if allow_ready
-        && query
-            .get("ready")
-            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
-            .unwrap_or(false)
-    {
+    if allow_ready && query.get("ready").map(|v| v == "1" || v.eq_ignore_ascii_case("true")).unwrap_or(false) {
         let _ = stream.write_all(b"event: ready\ndata: {}\n\n");
         let _ = stream.flush();
 
@@ -808,9 +668,7 @@ fn handle_sse_connection(mut stream: &TcpStream, query: &HashMap<String, String>
         if let Some(proj_name) = project_filter.as_ref() {
             let wants_project_changed = match &kinds_filter {
                 None => true,
-                Some(kinds) => kinds
-                    .iter()
-                    .any(|k| k.eq_ignore_ascii_case("project_changed")),
+                Some(kinds) => kinds.iter().any(|k| k.eq_ignore_ascii_case("project_changed")),
             };
             if wants_project_changed
                 && let Some(tasks_dir) = resolve_server_tasks_dir()
@@ -826,8 +684,7 @@ fn handle_sse_connection(mut stream: &TcpStream, query: &HashMap<String, String>
                     });
                     let inline = format!(
                         "event: project_changed\ndata: {}\n\n",
-                        serde_json::to_string(&serde_json::json!({ "name": proj_name }))
-                            .unwrap_or_else(|_| "{}".to_string())
+                        serde_json::to_string(&serde_json::json!({ "name": proj_name })).unwrap_or_else(|_| "{}".to_string())
                     );
                     let _ = stream.write_all(inline.as_bytes());
                     let _ = stream.flush();
@@ -843,25 +700,13 @@ fn handle_sse_connection(mut stream: &TcpStream, query: &HashMap<String, String>
     std::thread::spawn(move || {
         let mut buffer: Vec<crate::api_events::ApiEvent> = Vec::new();
         let mut deadline: Option<Instant> = None;
-        let debounce = Duration::from_millis(if fast {
-            debounce_ms.min(20)
-        } else {
-            debounce_ms
-        });
-        let heartbeat_every = if fast {
-            Duration::from_secs(2)
-        } else {
-            Duration::from_secs(15)
-        };
+        let debounce = Duration::from_millis(if fast { debounce_ms.min(20) } else { debounce_ms });
+        let heartbeat_every = if fast { Duration::from_secs(2) } else { Duration::from_secs(15) };
         loop {
             let timeout = match deadline {
                 Some(d) => {
                     let now = Instant::now();
-                    if d <= now {
-                        Duration::from_millis(0)
-                    } else {
-                        d - now
-                    }
+                    if d <= now { Duration::from_millis(0) } else { d - now }
                 }
                 None => heartbeat_every,
             };
@@ -876,19 +721,10 @@ fn handle_sse_connection(mut stream: &TcpStream, query: &HashMap<String, String>
                     if let Some(ref pf) = project_filter {
                         let matches_project = match evt.kind.as_str() {
                             // Filesystem watcher emits { name: <PROJECT> }
-                            "project_changed" => evt
-                                .data
-                                .get("name")
-                                .and_then(|v| v.as_str())
-                                .map(|name| name == pf)
-                                .unwrap_or(false),
+                            "project_changed" => evt.data.get("name").and_then(|v| v.as_str()).map(|name| name == pf).unwrap_or(false),
                             // Sync events include { project: <PREFIX> }
                             "sync_started" | "sync_progress" | "sync_completed" | "sync_failed" => {
-                                evt.data
-                                    .get("project")
-                                    .and_then(|v| v.as_str())
-                                    .map(|name| name == pf)
-                                    .unwrap_or(false)
+                                evt.data.get("project").and_then(|v| v.as_str()).map(|name| name == pf).unwrap_or(false)
                             }
                             // Agent jobs carry the ticket they work on.
                             kind if kind.starts_with("agent_job_") => evt
@@ -900,11 +736,7 @@ fn handle_sse_connection(mut stream: &TcpStream, query: &HashMap<String, String>
                             // Config changes name their project, or none for
                             // workspace-wide config, which concerns every
                             // project. Order and sprint changes span projects.
-                            "config_updated" => evt
-                                .data
-                                .get("project")
-                                .and_then(|v| v.as_str())
-                                .is_none_or(|name| name == pf),
+                            "config_updated" => evt.data.get("project").and_then(|v| v.as_str()).is_none_or(|name| name == pf),
                             "task_order_changed" | "sprint_changed" => true,
                             // Task events include { id: "PREFIX-N" }; compare
                             // against the canonical ID prefix (final numeric
@@ -935,11 +767,7 @@ fn handle_sse_connection(mut stream: &TcpStream, query: &HashMap<String, String>
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
                     if !buffer.is_empty() {
                         for evt in buffer.drain(..) {
-                            let line = format!(
-                                "event: {}\ndata: {}\n\n",
-                                evt.kind,
-                                serde_json::to_string(&evt.data).unwrap_or("null".to_string())
-                            );
+                            let line = format!("event: {}\ndata: {}\n\n", evt.kind, serde_json::to_string(&evt.data).unwrap_or("null".to_string()));
                             if stream_clone.write_all(line.as_bytes()).is_err() {
                                 return;
                             }
@@ -976,11 +804,9 @@ fn coalesce_into(buffer: &mut Vec<crate::api_events::ApiEvent>, evt: crate::api_
         }
     };
     let key = evt.data.get(key_field).and_then(|v| v.as_str());
-    let Some(existing) = buffer.iter_mut().find(|queued| {
-        queued.kind == evt.kind
-            && queued.data.get(key_field).and_then(|v| v.as_str()) == key
-            && key.is_some()
-    }) else {
+    let Some(existing) =
+        buffer.iter_mut().find(|queued| queued.kind == evt.kind && queued.data.get(key_field).and_then(|v| v.as_str()) == key && key.is_some())
+    else {
         buffer.push(evt);
         return;
     };
@@ -991,26 +817,17 @@ fn coalesce_into(buffer: &mut Vec<crate::api_events::ApiEvent>, evt: crate::api_
 }
 
 fn is_mutating_method(method: &str) -> bool {
-    !method.eq_ignore_ascii_case("GET")
-        && !method.eq_ignore_ascii_case("HEAD")
-        && !method.eq_ignore_ascii_case("OPTIONS")
+    !method.eq_ignore_ascii_case("GET") && !method.eq_ignore_ascii_case("HEAD") && !method.eq_ignore_ascii_case("OPTIONS")
 }
 
 fn header_value<'a>(headers: &'a HashMap<String, String>, name: &str) -> Option<&'a str> {
-    headers
-        .iter()
-        .find(|(k, _)| k.eq_ignore_ascii_case(name))
-        .map(|(_, v)| v.as_str())
+    headers.iter().find(|(k, _)| k.eq_ignore_ascii_case(name)).map(|(_, v)| v.as_str())
 }
 
 fn origin_authority(origin: &str) -> Option<String> {
     let rest = origin.split_once("://").map(|(_, r)| r).unwrap_or(origin);
     let authority = rest.split(['/', '?', '#']).next()?;
-    if authority.is_empty() {
-        None
-    } else {
-        Some(authority.to_string())
-    }
+    if authority.is_empty() { None } else { Some(authority.to_string()) }
 }
 
 /// Whether a `Host` header names this server rather than a rebound domain.
@@ -1026,10 +843,7 @@ fn host_is_allowed(host_header: &str, allowed: &[String]) -> bool {
     let name = if let Some(rest) = host_header.strip_prefix('[') {
         // Bracketed IPv6 literal, with an optional port after `]`.
         return match rest.split_once(']') {
-            Some((literal, tail)) => {
-                literal.parse::<std::net::Ipv6Addr>().is_ok()
-                    && (tail.is_empty() || tail.starts_with(':'))
-            }
+            Some((literal, tail)) => literal.parse::<std::net::Ipv6Addr>().is_ok() && (tail.is_empty() || tail.starts_with(':')),
             None => false,
         };
     } else {
@@ -1043,41 +857,22 @@ fn host_is_allowed(host_header: &str, allowed: &[String]) -> bool {
     if name.is_empty() {
         return false;
     }
-    if name.parse::<std::net::Ipv4Addr>().is_ok()
-        || name == "localhost"
-        || name.ends_with(".localhost")
-    {
+    if name.parse::<std::net::Ipv4Addr>().is_ok() || name == "localhost" || name.ends_with(".localhost") {
         return true;
     }
-    allowed.iter().any(|entry| {
-        entry
-            .trim()
-            .trim_end_matches('.')
-            .eq_ignore_ascii_case(&name)
-    })
+    allowed.iter().any(|entry| entry.trim().trim_end_matches('.').eq_ignore_ascii_case(&name))
 }
 
 fn validate_request_origin(headers: &HashMap<String, String>) -> Result<(), String> {
-    let Some(origin) = header_value(headers, "Origin")
-        .map(str::trim)
-        .filter(|o| !o.is_empty())
-    else {
+    let Some(origin) = header_value(headers, "Origin").map(str::trim).filter(|o| !o.is_empty()) else {
         return Ok(());
     };
-    let Some(host) = header_value(headers, "Host")
-        .map(str::trim)
-        .filter(|h| !h.is_empty())
-    else {
-        return Err(
-            "{\"error\":{\"code\":\"FORBIDDEN\",\"message\":\"Missing Host header\"}}".to_string(),
-        );
+    let Some(host) = header_value(headers, "Host").map(str::trim).filter(|h| !h.is_empty()) else {
+        return Err("{\"error\":{\"code\":\"FORBIDDEN\",\"message\":\"Missing Host header\"}}".to_string());
     };
     match origin_authority(origin) {
         Some(authority) if authority.eq_ignore_ascii_case(host) => Ok(()),
-        _ => Err(
-            "{\"error\":{\"code\":\"FORBIDDEN\",\"message\":\"Cross-origin request rejected (Origin does not match Host)\"}}"
-                .to_string(),
-        ),
+        _ => Err("{\"error\":{\"code\":\"FORBIDDEN\",\"message\":\"Cross-origin request rejected (Origin does not match Host)\"}}".to_string()),
     }
 }
 
@@ -1133,14 +928,11 @@ fn url_decode(s: &str) -> String {
             }
         }
     }
-    String::from_utf8(out)
-        .unwrap_or_else(|err| String::from_utf8_lossy(err.as_bytes()).into_owned())
+    String::from_utf8(out).unwrap_or_else(|err| String::from_utf8_lossy(err.as_bytes()).into_owned())
 }
 
 fn resolve_server_tasks_dir() -> Option<PathBuf> {
-    TasksDirectoryResolver::resolve(None, None)
-        .ok()
-        .and_then(|resolver| resolver.absolute_path().ok())
+    TasksDirectoryResolver::resolve(None, None).ok().and_then(|resolver| resolver.absolute_path().ok())
 }
 
 // Lightweight watcher that monitors the resolved tasks directory and emits project_changed
@@ -1176,18 +968,11 @@ fn start_tasks_watcher() {
             return;
         }
 
-        let enable_poll = std::env::var("LOTAR_ENABLE_POLL_WATCH")
-            .map(|v| v != "0")
-            .unwrap_or_else(
-                |_| matches!(std::env::var("LOTAR_TEST_FAST_IO"), Ok(ref v) if v == "1"),
-            );
+        let enable_poll =
+            std::env::var("LOTAR_ENABLE_POLL_WATCH").map(|v| v != "0").unwrap_or_else(|_| matches!(std::env::var("LOTAR_TEST_FAST_IO"), Ok(ref v) if v == "1"));
         let mut poll_watcher: Option<PollWatcher> = None;
         if enable_poll {
-            let interval = std::env::var("LOTAR_POLL_WATCH_INTERVAL_MS")
-                .ok()
-                .and_then(|s| s.parse::<u64>().ok())
-                .map(|ms| ms.max(50))
-                .unwrap_or(200);
+            let interval = std::env::var("LOTAR_POLL_WATCH_INTERVAL_MS").ok().and_then(|s| s.parse::<u64>().ok()).map(|ms| ms.max(50)).unwrap_or(200);
             let cfg = NotifyConfig::default().with_poll_interval(Duration::from_millis(interval));
             if let Ok(mut poller) = PollWatcher::new(
                 {
@@ -1205,18 +990,14 @@ fn start_tasks_watcher() {
 
         drop(tx);
 
-        let order_storage = crate::storage::manager::Storage {
-            root_path: tasks_dir.clone(),
-        };
+        let order_storage = crate::storage::manager::Storage { root_path: tasks_dir.clone() };
         let mut order_snapshots = HashMap::new();
         if let Ok(order) = crate::services::task_order::get_order(&order_storage, None) {
             order_snapshots.insert(None, order.tasks);
         }
         if let Ok(records) = crate::services::sprint_service::SprintService::list(&order_storage) {
             for record in records {
-                if let Ok(order) =
-                    crate::services::task_order::get_order(&order_storage, Some(record.id))
-                {
+                if let Ok(order) = crate::services::task_order::get_order(&order_storage, Some(record.id)) {
                     order_snapshots.insert(Some(record.id), order.tasks);
                 }
             }
@@ -1225,10 +1006,8 @@ fn start_tasks_watcher() {
         // Changes arrive in bursts (one write is a temp file, a rename and
         // a lock); handle them in short batches so each task, project and
         // sprint is announced once per burst (DEV-273).
-        let mut sprint_members: HashMap<Option<u32>, HashSet<String>> = order_snapshots
-            .iter()
-            .map(|(id, tasks)| (*id, tasks.iter().cloned().collect()))
-            .collect();
+        let mut sprint_members: HashMap<Option<u32>, HashSet<String>> =
+            order_snapshots.iter().map(|(id, tasks)| (*id, tasks.iter().cloned().collect())).collect();
         // Content last announced per file: the native and the poll watcher
         // (and repeated notifications) report one change several times.
         let mut announced: HashMap<PathBuf, u64> = HashMap::new();
@@ -1236,10 +1015,7 @@ fn start_tasks_watcher() {
             let mut paths: Vec<PathBuf> = Vec::new();
             let mut collect = |res: notify::Result<notify::Event>| {
                 if let Ok(event) = res
-                    && matches!(
-                        event.kind,
-                        EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)
-                    )
+                    && matches!(event.kind, EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_))
                 {
                     for path in event.paths {
                         if !paths.contains(&path) {
@@ -1256,13 +1032,7 @@ fn start_tasks_watcher() {
                     Err(_) => break,
                 }
             }
-            process_watch_batch(
-                &tasks_dir,
-                &paths,
-                &mut order_snapshots,
-                &mut sprint_members,
-                &mut announced,
-            );
+            process_watch_batch(&tasks_dir, &paths, &mut order_snapshots, &mut sprint_members, &mut announced);
         }
 
         drop(poll_watcher);
@@ -1290,11 +1060,7 @@ fn process_watch_batch(
     // match the canonical tasks directory as well.
     let canonical = tasks_dir.canonicalize().ok();
     for path in paths {
-        let Some(relative) = path.strip_prefix(tasks_dir).ok().or_else(|| {
-            canonical
-                .as_deref()
-                .and_then(|dir| path.strip_prefix(dir).ok())
-        }) else {
+        let Some(relative) = path.strip_prefix(tasks_dir).ok().or_else(|| canonical.as_deref().and_then(|dir| path.strip_prefix(dir).ok())) else {
             continue;
         };
         let parts: Vec<&str> = relative
@@ -1325,11 +1091,7 @@ fn process_watch_batch(
             [_] => continue, // other root files are not projects
             ["@sprints", file] => {
                 if let Some(stem) = file.strip_suffix(".yml") {
-                    let container = if stem == "backlog" {
-                        Some(None)
-                    } else {
-                        stem.parse::<u32>().ok().filter(|id| *id > 0).map(Some)
-                    };
+                    let container = if stem == "backlog" { Some(None) } else { stem.parse::<u32>().ok().filter(|id| *id > 0).map(Some) };
                     if let Some(container) = container
                         && !sprints.contains(&container)
                     {
@@ -1380,10 +1142,7 @@ fn process_watch_batch(
         }
     }
     for project in projects {
-        crate::api_events::emit(&crate::api_events::ApiEvent {
-            kind: "project_changed".to_string(),
-            data: serde_json::json!({ "name": project }),
-        });
+        crate::api_events::emit(&crate::api_events::ApiEvent { kind: "project_changed".to_string(), data: serde_json::json!({ "name": project }) });
     }
 }
 
@@ -1407,23 +1166,15 @@ fn file_fingerprint(path: &Path) -> u64 {
 /// already announced with a full DTO is not repeated.
 fn emit_watched_task(tasks_dir: &Path, id: &str, path: &Path) {
     let emit = |kind: &str| {
-        crate::api_events::emit(&crate::api_events::ApiEvent {
-            kind: kind.to_string(),
-            data: serde_json::json!({ "id": id }),
-        });
+        crate::api_events::emit(&crate::api_events::ApiEvent { kind: kind.to_string(), data: serde_json::json!({ "id": id }) });
     };
     let content = match fs::read_to_string(path) {
         Ok(content) => content,
         Err(_) => {
             // Moved into or out of `@archive` (or another folder): still
             // stored somewhere means updated, not deleted.
-            let still_stored = crate::storage::TaskId::parse(id)
-                .is_ok_and(|parsed| !parsed.locate(tasks_dir).is_empty());
-            emit(if still_stored {
-                "task_updated"
-            } else {
-                "task_deleted"
-            });
+            let still_stored = crate::storage::TaskId::parse(id).is_ok_and(|parsed| !parsed.locate(tasks_dir).is_empty());
+            emit(if still_stored { "task_updated" } else { "task_deleted" });
             return;
         }
     };
@@ -1450,12 +1201,8 @@ fn emit_watched_sprint(
     order_snapshots: &mut HashMap<Option<u32>, Vec<String>>,
     sprint_members: &mut HashMap<Option<u32>, HashSet<String>>,
 ) {
-    let storage = crate::storage::manager::Storage {
-        root_path: tasks_dir.to_path_buf(),
-    };
-    let order = crate::services::task_order::get_order(&storage, container)
-        .ok()
-        .map(|order| order.tasks);
+    let storage = crate::storage::manager::Storage { root_path: tasks_dir.to_path_buf() };
+    let order = crate::services::task_order::get_order(&storage, container).ok().map(|order| order.tasks);
     if let Some(tasks) = order.as_ref()
         && order_snapshots.get(&container) != Some(tasks)
     {
@@ -1479,10 +1226,7 @@ fn emit_watched_sprint(
     let mut changed: Vec<&String> = before.symmetric_difference(&now).collect();
     changed.sort();
     for id in changed {
-        crate::api_events::emit(&crate::api_events::ApiEvent {
-            kind: "task_updated".into(),
-            data: serde_json::json!({ "id": id }),
-        });
+        crate::api_events::emit(&crate::api_events::ApiEvent { kind: "task_updated".into(), data: serde_json::json!({ "id": id }) });
     }
     match order {
         Some(tasks) => {
@@ -1497,10 +1241,7 @@ fn emit_watched_sprint(
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        content_type_for, host_is_allowed, is_safe_rel_path, parse_path_and_query, reason_phrase,
-        url_decode,
-    };
+    use super::{content_type_for, host_is_allowed, is_safe_rel_path, parse_path_and_query, reason_phrase, url_decode};
 
     #[test]
     fn query_values_decode_as_utf8() {
@@ -1520,55 +1261,17 @@ mod tests {
     #[test]
     fn sse_buffer_merges_repeated_task_and_project_events() {
         use crate::api_events::ApiEvent;
-        let event = |kind: &str, data: serde_json::Value| ApiEvent {
-            kind: kind.into(),
-            data,
-        };
+        let event = |kind: &str, data: serde_json::Value| ApiEvent { kind: kind.into(), data };
         let mut buffer = Vec::new();
-        super::coalesce_into(
-            &mut buffer,
-            event(
-                "task_updated",
-                serde_json::json!({"id": "A-1", "title": "full"}),
-            ),
-        );
-        super::coalesce_into(
-            &mut buffer,
-            event("task_updated", serde_json::json!({"id": "A-1"})),
-        );
-        super::coalesce_into(
-            &mut buffer,
-            event("project_changed", serde_json::json!({"name": "A"})),
-        );
-        super::coalesce_into(
-            &mut buffer,
-            event("project_changed", serde_json::json!({"name": "A"})),
-        );
-        super::coalesce_into(
-            &mut buffer,
-            event("task_deleted", serde_json::json!({"id": "A-1"})),
-        );
-        super::coalesce_into(
-            &mut buffer,
-            event(
-                "task_updated",
-                serde_json::json!({"id": "A-2", "title": "x"}),
-            ),
-        );
+        super::coalesce_into(&mut buffer, event("task_updated", serde_json::json!({"id": "A-1", "title": "full"})));
+        super::coalesce_into(&mut buffer, event("task_updated", serde_json::json!({"id": "A-1"})));
+        super::coalesce_into(&mut buffer, event("project_changed", serde_json::json!({"name": "A"})));
+        super::coalesce_into(&mut buffer, event("project_changed", serde_json::json!({"name": "A"})));
+        super::coalesce_into(&mut buffer, event("task_deleted", serde_json::json!({"id": "A-1"})));
+        super::coalesce_into(&mut buffer, event("task_updated", serde_json::json!({"id": "A-2", "title": "x"})));
         let kinds: Vec<&str> = buffer.iter().map(|e| e.kind.as_str()).collect();
-        assert_eq!(
-            kinds,
-            [
-                "task_updated",
-                "project_changed",
-                "task_deleted",
-                "task_updated"
-            ]
-        );
-        assert_eq!(
-            buffer[0].data["title"], "full",
-            "id-only echo keeps the DTO"
-        );
+        assert_eq!(kinds, ["task_updated", "project_changed", "task_deleted", "task_updated"]);
+        assert_eq!(buffer[0].data["title"], "full", "id-only echo keeps the DTO");
     }
 
     #[test]
@@ -1613,16 +1316,7 @@ mod tests {
     #[test]
     fn loopback_names_and_ip_literals_are_accepted() {
         let none: Vec<String> = Vec::new();
-        for host in [
-            "localhost:8080",
-            "LOCALHOST",
-            "localhost.:8080",
-            "app.localhost:8080",
-            "127.0.0.1:8080",
-            "192.168.1.20:8080",
-            "[::1]:8080",
-            "[fe80::1]",
-        ] {
+        for host in ["localhost:8080", "LOCALHOST", "localhost.:8080", "app.localhost:8080", "127.0.0.1:8080", "192.168.1.20:8080", "[::1]:8080", "[fe80::1]"] {
             assert!(host_is_allowed(host, &none), "{host} should be allowed");
         }
     }
@@ -1640,16 +1334,7 @@ mod tests {
     fn static_paths_cannot_escape_the_asset_root() {
         assert!(is_safe_rel_path("index.html"));
         assert!(is_safe_rel_path("assets/index-abc.js"));
-        for path in [
-            "../secret",
-            "assets/../../secret",
-            "./index.html",
-            "C:/Windows/win.ini",
-            "C:foo",
-            "/etc/passwd",
-            "\\\\server\\share",
-            "assets\\..\\x",
-        ] {
+        for path in ["../secret", "assets/../../secret", "./index.html", "C:/Windows/win.ini", "C:foo", "/etc/passwd", "\\\\server\\share", "assets\\..\\x"] {
             assert!(!is_safe_rel_path(path), "{path} should be rejected");
         }
     }
@@ -1666,57 +1351,30 @@ mod tests {
     fn text_assets_keep_their_documented_mime_types() {
         assert_eq!(content_type_for("index.html"), "text/html");
         assert_eq!(content_type_for("assets/index-sGbZQYYd.css"), "text/css");
-        assert_eq!(
-            content_type_for("assets/index-BtHy0XNw.js"),
-            "application/javascript"
-        );
-        assert_eq!(
-            content_type_for("assets/favicon-C8vPI8o9.svg"),
-            "image/svg+xml"
-        );
+        assert_eq!(content_type_for("assets/index-BtHy0XNw.js"), "application/javascript");
+        assert_eq!(content_type_for("assets/favicon-C8vPI8o9.svg"), "image/svg+xml");
     }
 
     #[test]
     fn embedded_branding_binaries_have_concrete_mime_types() {
-        assert_eq!(
-            content_type_for("assets/favicon-B3xkQ9.ico"),
-            "image/x-icon"
-        );
+        assert_eq!(content_type_for("assets/favicon-B3xkQ9.ico"), "image/x-icon");
         assert_eq!(content_type_for("assets/lotar-logo.webp"), "image/webp");
-        assert_eq!(
-            content_type_for("assets/branding/favicon.ico"),
-            "image/x-icon"
-        );
+        assert_eq!(content_type_for("assets/branding/favicon.ico"), "image/x-icon");
     }
 
     #[test]
     fn raster_images_map_to_image_mime_types() {
-        assert_eq!(
-            content_type_for("assets/lotar-logo-2296x608.png"),
-            "image/png"
-        );
-        assert_eq!(
-            content_type_for("assets/lotar-logo-white-1148x304.jpg"),
-            "image/jpeg"
-        );
+        assert_eq!(content_type_for("assets/lotar-logo-2296x608.png"), "image/png");
+        assert_eq!(content_type_for("assets/lotar-logo-white-1148x304.jpg"), "image/jpeg");
         assert_eq!(content_type_for("assets/photo.jpeg"), "image/jpeg");
     }
 
     #[test]
     fn unknown_extensions_fall_back_to_octet_stream() {
-        assert_eq!(
-            content_type_for("assets/inter-variable.woff2"),
-            "application/octet-stream"
-        );
-        assert_eq!(
-            content_type_for("assets/manifest"),
-            "application/octet-stream"
-        );
+        assert_eq!(content_type_for("assets/inter-variable.woff2"), "application/octet-stream");
+        assert_eq!(content_type_for("assets/manifest"), "application/octet-stream");
         // Extension matching is case-sensitive, matching Vite's lowercase
         // output; anything else must not claim a type it cannot prove.
-        assert_eq!(
-            content_type_for("assets/UPPER.SVG"),
-            "application/octet-stream"
-        );
+        assert_eq!(content_type_for("assets/UPPER.SVG"), "application/octet-stream");
     }
 }

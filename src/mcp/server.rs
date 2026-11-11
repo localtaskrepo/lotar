@@ -95,43 +95,21 @@ const MCP_MAX_BACKLOG_LIMIT: usize = 100;
 const MCP_MAX_CURSOR: usize = 5000;
 
 fn ok(id: Option<Value>, v: Value) -> JsonRpcResponse {
-    JsonRpcResponse {
-        jsonrpc: "2.0".into(),
-        id,
-        result: Some(v),
-        error: None,
-    }
+    JsonRpcResponse { jsonrpc: "2.0".into(), id, result: Some(v), error: None }
 }
 
 fn err(id: Option<Value>, code: i64, message: &str, data: Option<Value>) -> JsonRpcResponse {
-    JsonRpcResponse {
-        jsonrpc: "2.0".into(),
-        id,
-        result: None,
-        error: Some(JsonRpcError {
-            code,
-            message: message.into(),
-            data,
-        }),
-    }
+    JsonRpcResponse { jsonrpc: "2.0".into(), id, result: None, error: Some(JsonRpcError { code, message: message.into(), data }) }
 }
 
 /// `-32603 Internal error`, with the cause in `data.message`.
 fn internal_error(id: Option<Value>, message: impl std::fmt::Display) -> JsonRpcResponse {
-    err(
-        id,
-        -32603,
-        "Internal error",
-        Some(json!({"message": message.to_string()})),
-    )
+    err(id, -32603, "Internal error", Some(json!({"message": message.to_string()})))
 }
 
 /// Resolve the tasks directory, or the standard internal-error response.
-fn resolve_tasks_dir(
-    id: &Option<Value>,
-) -> Result<crate::workspace::TasksDirectoryResolver, JsonRpcResponse> {
-    crate::workspace::TasksDirectoryResolver::resolve(None, None)
-        .map_err(|e| internal_error(id.clone(), e))
+fn resolve_tasks_dir(id: &Option<Value>) -> Result<crate::workspace::TasksDirectoryResolver, JsonRpcResponse> {
+    crate::workspace::TasksDirectoryResolver::resolve(None, None).map_err(|e| internal_error(id.clone(), e))
 }
 
 /// Tool result whose single text content is `payload` as pretty JSON.
@@ -157,27 +135,14 @@ fn normalize_method(name: &str) -> String {
 static USE_FRAMED_OUTPUT: AtomicBool = AtomicBool::new(false);
 
 /// The log levels MCP defines (RFC 5424 severities).
-const MCP_LOG_LEVELS: [&str; 8] = [
-    "debug",
-    "info",
-    "notice",
-    "warning",
-    "error",
-    "critical",
-    "alert",
-    "emergency",
-];
+const MCP_LOG_LEVELS: [&str; 8] = ["debug", "info", "notice", "warning", "error", "critical", "alert", "emergency"];
 
 /// Classify a domain-service error for MCP tool responses: expected domain
 /// failures (validation, not-found, invalid references) use the custom
 /// -32000 code the registry converts into `isError` tool results, while
 /// genuine internal failures (I/O, serialization) keep the reserved
 /// -32603 protocol error.
-fn domain_service_error(
-    id: Option<Value>,
-    envelope: &str,
-    error: &crate::errors::LoTaRError,
-) -> JsonRpcResponse {
+fn domain_service_error(id: Option<Value>, envelope: &str, error: &crate::errors::LoTaRError) -> JsonRpcResponse {
     use crate::errors::LoTaRError;
     match error {
         LoTaRError::ValidationError(_)
@@ -186,27 +151,15 @@ fn domain_service_error(
         | LoTaRError::InvalidTaskId(_)
         | LoTaRError::ProjectNotFound(_)
         | LoTaRError::IndexError(_)
-        | LoTaRError::Conflict(_) => err(
-            id,
-            -32000,
-            envelope,
-            Some(json!({ "message": error.to_string() })),
-        ),
-        _ => err(
-            id,
-            -32603,
-            envelope,
-            Some(json!({ "message": error.to_string() })),
-        ),
+        | LoTaRError::Conflict(_) => err(id, -32000, envelope, Some(json!({ "message": error.to_string() }))),
+        _ => err(id, -32603, envelope, Some(json!({ "message": error.to_string() }))),
     }
 }
 
 /// Sprint integrity diagnostics for MCP payloads; the same structure the
 /// REST API returns (DEV-173).
 fn integrity_value(check: &crate::services::sprint_integrity::IntegrityCheck) -> Option<Value> {
-    check
-        .diagnostics()
-        .and_then(|diagnostics| serde_json::to_value(diagnostics).ok())
+    check.diagnostics().and_then(|diagnostics| serde_json::to_value(diagnostics).ok())
 }
 
 fn enable_framed_output() {
@@ -229,12 +182,7 @@ fn respond_parse_error(stdout: &Arc<Mutex<io::Stdout>>, details: &str) {
 }
 
 fn parse_error_response(details: &str) -> JsonRpcResponse {
-    err(
-        Some(Value::Null),
-        -32700,
-        "Parse error",
-        Some(json!({ "details": details })),
-    )
+    err(Some(Value::Null), -32700, "Parse error", Some(json!({ "details": details })))
 }
 
 fn invalid_request_response(id: Value, message: &str) -> JsonRpcResponse {
@@ -272,14 +220,8 @@ enum WireOutcome {
 
 /// A syntactically valid JSON-RPC message with a validated envelope.
 enum Incoming {
-    Request {
-        id: Value,
-        method: String,
-        params: Value,
-    },
-    Notification {
-        method: String,
-    },
+    Request { id: Value, method: String, params: Value },
+    Notification { method: String },
 }
 
 /// Parse and validate one raw message (NDJSON line or framed body).
@@ -298,30 +240,21 @@ fn parse_incoming(raw: &str) -> Result<Incoming, JsonRpcResponse> {
     let object = match value {
         Value::Object(object) => object,
         _ => {
-            return Err(invalid_request_response(
-                Value::Null,
-                "request must be a JSON object",
-            ));
+            return Err(invalid_request_response(Value::Null, "request must be a JSON object"));
         }
     };
 
     match object.get("jsonrpc") {
         Some(Value::String(version)) if version == "2.0" => {}
         _ => {
-            return Err(invalid_request_response(
-                Value::Null,
-                "jsonrpc must be exactly \"2.0\"",
-            ));
+            return Err(invalid_request_response(Value::Null, "jsonrpc must be exactly \"2.0\""));
         }
     }
 
     let method = match object.get("method") {
         Some(Value::String(method)) => method.clone(),
         _ => {
-            return Err(invalid_request_response(
-                Value::Null,
-                "method must be a string",
-            ));
+            return Err(invalid_request_response(Value::Null, "method must be a string"));
         }
     };
 
@@ -329,10 +262,7 @@ fn parse_incoming(raw: &str) -> Result<Incoming, JsonRpcResponse> {
         None => None,
         Some(id) if is_valid_request_id(id) => Some(id.clone()),
         Some(_) => {
-            return Err(invalid_request_response(
-                Value::Null,
-                "id must be a string or a number",
-            ));
+            return Err(invalid_request_response(Value::Null, "id must be a string or a number"));
         }
     };
 
@@ -378,30 +308,18 @@ fn route_message(session: Option<&McpSession>, message: Incoming) -> WireOutcome
             }
             WireOutcome::Silent
         }
-        Incoming::Request { id, method, params } => {
-            WireOutcome::Respond(route_request(session, id, &method, params))
-        }
+        Incoming::Request { id, method, params } => WireOutcome::Respond(route_request(session, id, &method, params)),
     }
 }
 
-fn route_request(
-    session: Option<&McpSession>,
-    id: Value,
-    method: &str,
-    params: Value,
-) -> JsonRpcResponse {
+fn route_request(session: Option<&McpSession>, id: Value, method: &str, params: Value) -> JsonRpcResponse {
     let method_key = normalize_method(method);
 
     // Lifecycle-exempt methods: initialize and ping answer in every state.
     match method_key.as_str() {
         "initialize" => {
             if let Err(issues) = validate_initialize_params(&params) {
-                return err(
-                    Some(id),
-                    -32602,
-                    "Invalid params",
-                    Some(json!({ "tool": "initialize", "issues": issues })),
-                );
+                return err(Some(id), -32602, "Invalid params", Some(json!({ "tool": "initialize", "issues": issues })));
             }
             if let Some(session) = session {
                 // A second initialize never resets a live session.
@@ -418,12 +336,7 @@ fn route_request(
     if let Some(session) = session
         && !session.is_ready()
     {
-        return err(
-            Some(id),
-            MCP_NOT_INITIALIZED,
-            "Server not initialized",
-            None,
-        );
+        return err(Some(id), MCP_NOT_INITIALIZED, "Server not initialized", None);
     }
 
     match method_key.as_str() {
@@ -431,11 +344,7 @@ fn route_request(
         "tools/list" => {
             let enum_hints = gather_enum_hints();
             let mut tools = build_tool_definitions(enum_hints.as_ref());
-            tools.retain(|tool| {
-                tool.get("name")
-                    .and_then(|v| v.as_str())
-                    .is_some_and(tool_allowed)
-            });
+            tools.retain(|tool| tool.get("name").and_then(|v| v.as_str()).is_some_and(tool_allowed));
             ok(Some(id), json!({ "tools": tools }))
         }
         // tools/call -> resolve the tool in the registry, validate arguments
@@ -461,12 +370,7 @@ fn route_request(
         _ => match registry::find_tool_by_method(&method_key) {
             // Direct method calls obey LOTAR_MCP_TOOLS like tools/call does
             // (DEV-277: `task/delete` used to bypass the allow-list).
-            Some(spec) if !tool_allowed(spec.name) => err(
-                Some(id),
-                -32601,
-                &format!("Tool '{}' is not available in this session", spec.name),
-                None,
-            ),
+            Some(spec) if !tool_allowed(spec.name) => err(Some(id), -32601, &format!("Tool '{}' is not available in this session", spec.name), None),
             Some(spec) => {
                 let (response, _domain_error) = registry::invoke_tool(spec, Some(id), params);
                 response
@@ -501,11 +405,7 @@ fn validate_initialize_params(params: &Value) -> Result<(), Vec<String>> {
         }
         _ => issues.push("clientInfo must be an object with name and version strings".to_string()),
     }
-    if issues.is_empty() {
-        Ok(())
-    } else {
-        Err(issues)
-    }
+    if issues.is_empty() { Ok(()) } else { Err(issues) }
 }
 
 fn initialize_response(id: Value) -> JsonRpcResponse {
@@ -539,21 +439,14 @@ pub(crate) fn tools_restricted() -> bool {
 /// ticket but not, say, start other agents. Unset means every tool.
 pub(crate) fn tool_allowed(name: &str) -> bool {
     match std::env::var("LOTAR_MCP_TOOLS") {
-        Ok(list) if !list.trim().is_empty() => list
-            .split(',')
-            .any(|allowed| allowed.trim().eq_ignore_ascii_case(name)),
+        Ok(list) if !list.trim().is_empty() => list.split(',').any(|allowed| allowed.trim().eq_ignore_ascii_case(name)),
         _ => true,
     }
 }
 
 fn handle_tools_call(id: Value, params: &Value) -> JsonRpcResponse {
     let Some(name) = params.get("name").and_then(|v| v.as_str()) else {
-        return err(
-            Some(id),
-            -32602,
-            "Invalid params",
-            Some(json!({ "tool": null, "issues": ["params.name must be a string"] })),
-        );
+        return err(Some(id), -32602, "Invalid params", Some(json!({ "tool": null, "issues": ["params.name must be a string"] })));
     };
     // Resolve aliases (`task/get`) first, then check the canonical name.
     let spec = match registry::find_tool_for_call(name) {
@@ -561,12 +454,7 @@ fn handle_tools_call(id: Value, params: &Value) -> JsonRpcResponse {
         Err(message) => return err(Some(id), -32602, &message, None),
     };
     if !tool_allowed(spec.name) {
-        return err(
-            Some(id),
-            -32602,
-            &format!("Tool '{name}' is not available in this session"),
-            None,
-        );
+        return err(Some(id), -32602, &format!("Tool '{name}' is not available in this session"), None);
     }
     let arguments = match params.get("arguments") {
         None | Some(Value::Null) => json!({}),
@@ -591,22 +479,9 @@ fn handle_schema_discover(id: Value, params: &Value) -> JsonRpcResponse {
     let enum_hints = gather_enum_hints();
     let mut tools = build_tool_definitions(enum_hints.as_ref());
     // Only the tools this session may run, like tools/list.
-    tools.retain(|tool| {
-        tool.get("name")
-            .and_then(|v| v.as_str())
-            .is_some_and(tool_allowed)
-    });
-    if let Some(filter) = params
-        .get("tool")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_ascii_lowercase())
-    {
-        tools.retain(|tool| {
-            tool.get("name")
-                .and_then(|v| v.as_str())
-                .map(|name| name.to_ascii_lowercase() == filter)
-                .unwrap_or(false)
-        });
+    tools.retain(|tool| tool.get("name").and_then(|v| v.as_str()).is_some_and(tool_allowed));
+    if let Some(filter) = params.get("tool").and_then(|v| v.as_str()).map(|s| s.to_ascii_lowercase()) {
+        tools.retain(|tool| tool.get("name").and_then(|v| v.as_str()).map(|name| name.to_ascii_lowercase() == filter).unwrap_or(false));
     }
 
     let payload = json!({
@@ -644,10 +519,7 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
 }
 
 pub fn run_stdio_server() {
-    let autoreload_enabled = std::env::var("LOTAR_MCP_AUTORELOAD")
-        .ok()
-        .map(|v| v != "0")
-        .unwrap_or(true);
+    let autoreload_enabled = std::env::var("LOTAR_MCP_AUTORELOAD").ok().map(|v| v != "0").unwrap_or(true);
     if autoreload_enabled {
         // Watches the path lotar was started from, so Homebrew upgrades
         // (a new Cellar path behind the same symlink) are noticed (DEV-305).
@@ -713,8 +585,7 @@ fn write_wire_outcome(stdout: &Arc<Mutex<io::Stdout>>, session: &McpSession, out
         WireOutcome::Respond(response) => write_serialized_response(stdout, &response),
         WireOutcome::FlushDeferred => {
             if session.take_deferred_list_changed()
-                && let Ok(payload) =
-                    serde_json::to_string(&watchers::build_tools_changed_notification(&[]))
+                && let Ok(payload) = serde_json::to_string(&watchers::build_tools_changed_notification(&[]))
             {
                 write_json_message(stdout, &payload);
             }
@@ -727,10 +598,7 @@ fn parse_limit_value(value: Option<&Value>, default: usize) -> Result<usize, &'s
     match value {
         None | Some(Value::Null) => Ok(default),
         Some(Value::Number(num)) if let Some(n) = num.as_u64() => Ok(n as usize),
-        Some(Value::String(text)) => text
-            .trim()
-            .parse::<usize>()
-            .map_err(|_| "limit must be a positive integer"),
+        Some(Value::String(text)) => text.trim().parse::<usize>().map_err(|_| "limit must be a positive integer"),
         _ => Err("limit must be a positive integer"),
     }
 }
@@ -739,10 +607,7 @@ fn parse_cursor_value(value: Option<&Value>) -> Result<usize, &'static str> {
     match value {
         None | Some(Value::Null) => Ok(0),
         Some(Value::Number(num)) if let Some(n) = num.as_u64() => Ok(n as usize),
-        Some(Value::String(text)) => text
-            .trim()
-            .parse::<usize>()
-            .map_err(|_| "cursor must be a positive integer"),
+        Some(Value::String(text)) => text.trim().parse::<usize>().map_err(|_| "cursor must be a positive integer"),
         _ => Err("cursor must be a positive integer"),
     }
 }
@@ -756,12 +621,7 @@ fn write_raw_json(stdout: &Arc<Mutex<io::Stdout>>, line: &str) {
 
 fn write_framed_json(stdout: &Arc<Mutex<io::Stdout>>, payload: &str) {
     if let Ok(mut guard) = stdout.lock() {
-        let _ = write!(
-            &mut *guard,
-            "Content-Length: {}\r\n\r\n{}",
-            payload.len(),
-            payload
-        );
+        let _ = write!(&mut *guard, "Content-Length: {}\r\n\r\n{}", payload.len(), payload);
         let _ = guard.flush();
     }
 }
@@ -787,16 +647,11 @@ pub fn handle_json_line(line: &str) -> String {
     match parse_incoming(line) {
         Err(error_response) => serde_json::to_string(&error_response).unwrap_or_else(|_| {
             // Fall back to a minimal, valid JSON-RPC error line
-            "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,\"message\":\"Serialization error\"},\"id\":null}"
-                .to_string()
+            "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,\"message\":\"Serialization error\"},\"id\":null}".to_string()
         }),
         Ok(message) => match route_message(None, message) {
-            WireOutcome::Respond(response) => serde_json::to_string(&response).unwrap_or_else(
-                |_| {
-                    "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,\"message\":\"Serialization error\"},\"id\":null}"
-                        .to_string()
-                },
-            ),
+            WireOutcome::Respond(response) => serde_json::to_string(&response)
+                .unwrap_or_else(|_| "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,\"message\":\"Serialization error\"},\"id\":null}".to_string()),
             WireOutcome::FlushDeferred | WireOutcome::Silent => String::new(),
         },
     }
@@ -810,8 +665,7 @@ pub(crate) mod test_env {
     use std::path::Path;
     use std::sync::{LazyLock, Mutex, MutexGuard};
 
-    static ENV_LOCKS: LazyLock<Mutex<HashMap<&'static str, &'static Mutex<()>>>> =
-        LazyLock::new(|| Mutex::new(HashMap::new()));
+    static ENV_LOCKS: LazyLock<Mutex<HashMap<&'static str, &'static Mutex<()>>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
     pub(crate) fn lock_var(var: &'static str) -> MutexGuard<'static, ()> {
         let lock: &'static Mutex<()> = {

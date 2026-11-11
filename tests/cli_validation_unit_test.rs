@@ -9,28 +9,10 @@ fn cfg() -> ResolvedConfig {
         review_reviewers: vec![],
         server_port: 8080,
         default_project: "TEST".to_string(),
-        issue_states: ConfigurableField {
-            values: vec![
-                TaskStatus::from("Todo"),
-                TaskStatus::from("InProgress"),
-                TaskStatus::from("Done"),
-            ],
-        },
+        issue_states: ConfigurableField { values: vec![TaskStatus::from("Todo"), TaskStatus::from("InProgress"), TaskStatus::from("Done")] },
         issue_done_states: None,
-        issue_types: ConfigurableField {
-            values: vec![
-                TaskType::from("Feature"),
-                TaskType::from("Bug"),
-                TaskType::from("Epic"),
-            ],
-        },
-        issue_priorities: ConfigurableField {
-            values: vec![
-                Priority::from("Low"),
-                Priority::from("Medium"),
-                Priority::from("High"),
-            ],
-        },
+        issue_types: ConfigurableField { values: vec![TaskType::from("Feature"), TaskType::from("Bug"), TaskType::from("Epic")] },
+        issue_priorities: ConfigurableField { values: vec![Priority::from("Low"), Priority::from("Medium"), Priority::from("High")] },
         tags: StringConfigField::new_wildcard(),
         tag_properties: Default::default(),
         default_assignee: None,
@@ -47,13 +29,7 @@ fn cfg() -> ResolvedConfig {
         default_priority: Priority::from("Medium"),
         default_status: None,
         custom_fields: StringConfigField::new_wildcard(),
-        scan_signal_words: vec![
-            "TODO".to_string(),
-            "FIXME".to_string(),
-            "HACK".to_string(),
-            "BUG".to_string(),
-            "NOTE".to_string(),
-        ],
+        scan_signal_words: vec!["TODO".to_string(), "FIXME".to_string(), "HACK".to_string(), "BUG".to_string(), "NOTE".to_string()],
         scan_strip_attributes: true,
         scan_ticket_patterns: None,
         scan_enable_ticket_words: false,
@@ -110,10 +86,7 @@ fn validate_assignee_formats() {
     // Bare usernames are now accepted
     assert_eq!(validator.validate_assignee("alice").unwrap(), "alice");
     assert_eq!(validator.validate_assignee("john.doe").unwrap(), "john.doe");
-    assert_eq!(
-        validator.validate_assignee("not-an-email").unwrap(),
-        "not-an-email"
-    );
+    assert_eq!(validator.validate_assignee("not-an-email").unwrap(), "not-an-email");
     assert!(validator.validate_assignee("@").is_err());
     assert!(validator.validate_assignee("john@").is_err());
 }
@@ -126,9 +99,7 @@ fn validate_assignee_enforces_members_when_strict() {
     let validator = CliValidator::new(&conf);
 
     assert!(validator.validate_assignee("allowed@example.com").is_ok());
-    let err = validator
-        .validate_assignee("someone@example.com")
-        .unwrap_err();
+    let err = validator.validate_assignee("someone@example.com").unwrap_err();
     assert!(err.contains("not in configured members"));
 }
 
@@ -142,10 +113,7 @@ fn validate_reporter_formats() {
     assert!(validator.validate_reporter("john@example.com").is_ok());
     // Bare usernames are now accepted
     assert_eq!(validator.validate_reporter("alice").unwrap(), "alice");
-    assert_eq!(
-        validator.validate_reporter("not-an-email").unwrap(),
-        "not-an-email"
-    );
+    assert_eq!(validator.validate_reporter("not-an-email").unwrap(), "not-an-email");
     assert!(validator.validate_reporter("@").is_err());
     assert!(validator.validate_reporter("john@").is_err());
 }
@@ -172,9 +140,7 @@ fn validate_reporter_enforces_members_when_strict() {
     let validator = CliValidator::new(&conf);
 
     assert!(validator.validate_reporter("allowed@example.com").is_ok());
-    let err = validator
-        .validate_reporter("someone@example.com")
-        .unwrap_err();
+    let err = validator.validate_reporter("someone@example.com").unwrap_err();
     assert!(err.contains("not in configured members"));
 }
 
@@ -217,10 +183,7 @@ fn custom_field_collision_is_rejected() {
     let validator = CliValidator::new(&conf);
     // Built-in names should be rejected as custom fields (case/sep insensitive)
     for bad in ["status", "Status", "due-date", "Due_Date", "TAGS", "effort"] {
-        assert!(
-            validator.validate_custom_field_name(bad).is_err(),
-            "expected collision for {bad}"
-        );
+        assert!(validator.validate_custom_field_name(bad).is_err(), "expected collision for {bad}");
     }
 }
 
@@ -228,16 +191,9 @@ fn custom_field_collision_is_rejected() {
 fn ensure_task_membership_allows_listed_members() {
     let mut conf = cfg();
     conf.strict_members = true;
-    conf.members = vec![
-        "alice@example.com".to_string(),
-        "bob@example.com".to_string(),
-    ];
+    conf.members = vec!["alice@example.com".to_string(), "bob@example.com".to_string()];
     let validator = CliValidator::new(&conf);
-    let mut task = Task::new(
-        PathBuf::from("."),
-        "demo".to_string(),
-        Priority::from("Medium"),
-    );
+    let mut task = Task::new(PathBuf::from("."), "demo".to_string(), Priority::from("Medium"));
     task.reporter = Some("alice@example.com".to_string());
     task.assignee = Some("bob@example.com".to_string());
 
@@ -250,11 +206,7 @@ fn ensure_task_membership_rejects_unlisted_member() {
     conf.strict_members = true;
     conf.members = vec!["alice@example.com".to_string()];
     let validator = CliValidator::new(&conf);
-    let mut task = Task::new(
-        PathBuf::from("."),
-        "demo".to_string(),
-        Priority::from("Medium"),
-    );
+    let mut task = Task::new(PathBuf::from("."), "demo".to_string(), Priority::from("Medium"));
     task.reporter = Some("bob@example.com".to_string());
 
     let err = validator.ensure_task_membership(&task).unwrap_err();
@@ -267,11 +219,7 @@ fn ensure_task_membership_requires_configured_members() {
     conf.strict_members = true;
     conf.members.clear();
     let validator = CliValidator::new(&conf);
-    let task = Task::new(
-        PathBuf::from("."),
-        "demo".to_string(),
-        Priority::from("Medium"),
-    );
+    let task = Task::new(PathBuf::from("."), "demo".to_string(), Priority::from("Medium"));
 
     let err = validator.ensure_task_membership(&task).unwrap_err();
     assert!(err.contains("Strict members are enabled"));

@@ -1,6 +1,4 @@
-use crate::api_types::{
-    DeletionFilter, TaskCreate, TaskDTO, TaskDeleteResponse, TaskListFilter, TaskUpdate,
-};
+use crate::api_types::{DeletionFilter, TaskCreate, TaskDTO, TaskDeleteResponse, TaskListFilter, TaskUpdate};
 use crate::config::types::{GlobalConfig, ResolvedConfig};
 use crate::errors::{LoTaRError, LoTaRResult};
 use crate::services::agent_job_service::AgentJobService;
@@ -74,25 +72,13 @@ pub struct TaskUpdateContext {
 
 impl TaskUpdateContext {
     pub fn automation_disabled() -> Self {
-        Self {
-            expected_modified: None,
-            allow_agent_automation: false,
-            bypass_active_job_lock: true,
-            enforce_review_owner: false,
-            emit_api_event: true,
-        }
+        Self { expected_modified: None, allow_agent_automation: false, bypass_active_job_lock: true, enforce_review_owner: false, emit_api_event: true }
     }
 }
 
 impl Default for TaskUpdateContext {
     fn default() -> Self {
-        Self {
-            expected_modified: None,
-            allow_agent_automation: true,
-            bypass_active_job_lock: false,
-            enforce_review_owner: true,
-            emit_api_event: false,
-        }
+        Self { expected_modified: None, allow_agent_automation: true, bypass_active_job_lock: false, enforce_review_owner: true, emit_api_event: false }
     }
 }
 
@@ -137,10 +123,7 @@ pub struct CommentContext {
 
 impl Default for CommentContext {
     fn default() -> Self {
-        Self {
-            actor_override: None,
-            fire_commented: true,
-        }
+        Self { actor_override: None, fire_commented: true }
     }
 }
 
@@ -148,10 +131,7 @@ impl CommentContext {
     /// Context for comments written by automation: recorded under the
     /// `automation` actor, never re-dispatching `on.commented` rules.
     pub fn automation() -> Self {
-        Self {
-            actor_override: Some("automation".to_string()),
-            fire_commented: false,
-        }
+        Self { actor_override: Some("automation".to_string()), fire_commented: false }
     }
 }
 
@@ -208,8 +188,7 @@ impl TaskService {
     /// folder name.
     pub(crate) fn resolve_create_project(tasks_root: &Path, project: Option<String>) -> String {
         project.unwrap_or_else(|| {
-            if let Ok(config) = crate::config::resolution::load_and_merge_configs(Some(tasks_root))
-            {
+            if let Ok(config) = crate::config::resolution::load_and_merge_configs(Some(tasks_root)) {
                 let default = config.default_project.trim();
                 if !default.is_empty() {
                     return crate::utils::project::resolve_project_input(default, tasks_root);
@@ -234,11 +213,7 @@ impl TaskService {
     }
 
     /// [`Self::create`] with the extras a finding report needs (DEV-317).
-    pub(crate) fn create_with(
-        storage: &mut Storage,
-        req: TaskCreate,
-        options: CreateOptions,
-    ) -> LoTaRResult<TaskDTO> {
+    pub(crate) fn create_with(storage: &mut Storage, req: TaskCreate, options: CreateOptions) -> LoTaRResult<TaskDTO> {
         let TaskCreate {
             title,
             project,
@@ -257,9 +232,7 @@ impl TaskService {
             sprints,
         } = req;
         if title.trim().is_empty() {
-            return Err(LoTaRError::ValidationError(
-                "Title cannot be empty.".to_string(),
-            ));
+            return Err(LoTaRError::ValidationError("Title cannot be empty.".to_string()));
         }
         let normalized_sprints = Self::normalize_sprint_ids(&sprints);
 
@@ -305,20 +278,14 @@ impl TaskService {
         t.task_type = resolved_type;
         t.status = parsed_status
             .or_else(|| {
-                crate::utils::task_intel::infer_status_from_branch(&config).filter(|status| {
-                    TaskStatus::parse_with_config(status.as_str(), &config).is_ok()
-                })
+                crate::utils::task_intel::infer_status_from_branch(&config).filter(|status| TaskStatus::parse_with_config(status.as_str(), &config).is_ok())
             })
             .or_else(|| config.effective_default_status())
             .unwrap_or_else(|| TaskStatus::from("Todo"));
         let auto = config.auto_set_reporter;
         let explicit_reporter = reporter.as_ref().and_then(|rep| {
             let trimmed = rep.trim();
-            if trimmed.is_empty() {
-                None
-            } else {
-                resolve_me_alias_for_project(trimmed, Some(&storage.root_path), Some(&project))
-            }
+            if trimmed.is_empty() { None } else { resolve_me_alias_for_project(trimmed, Some(&storage.root_path), Some(&project)) }
         });
         t.reporter = if let Some(rep) = explicit_reporter {
             Some(rep)
@@ -326,11 +293,7 @@ impl TaskService {
             // Prefer configured default_reporter, then fall back
             if let Some(rep) = config.default_reporter.clone().and_then(|s| {
                 let trimmed = s.trim();
-                if trimmed.is_empty() {
-                    None
-                } else {
-                    resolve_me_alias_for_project(trimmed, Some(&storage.root_path), Some(&project))
-                }
+                if trimmed.is_empty() { None } else { resolve_me_alias_for_project(trimmed, Some(&storage.root_path), Some(&project)) }
             }) {
                 Some(rep)
             } else {
@@ -344,45 +307,26 @@ impl TaskService {
             .as_ref()
             .and_then(|a| {
                 let trimmed = a.trim();
-                if trimmed.is_empty() {
-                    None
-                } else {
-                    resolve_me_alias_for_project(trimmed, Some(&storage.root_path), Some(&project))
-                }
+                if trimmed.is_empty() { None } else { resolve_me_alias_for_project(trimmed, Some(&storage.root_path), Some(&project)) }
             })
             .or_else(|| {
                 config.default_assignee.as_ref().and_then(|raw| {
                     let trimmed = raw.trim();
-                    if trimmed.is_empty() {
-                        None
-                    } else {
-                        resolve_me_alias_for_project(
-                            trimmed,
-                            Some(&storage.root_path),
-                            Some(&project),
-                        )
-                    }
+                    if trimmed.is_empty() { None } else { resolve_me_alias_for_project(trimmed, Some(&storage.root_path), Some(&project)) }
                 })
             });
         t.due_date = due_date.filter(|v| !v.trim().is_empty());
 
         // Normalize member values: strip @ from non-directive usernames.
         let is_agent = |name: &str| config.agent_profiles.contains_key(name);
-        t.reporter = t
-            .reporter
-            .map(|v| crate::utils::member::normalize_member_value(&v, is_agent));
-        t.assignee = t
-            .assignee
-            .map(|v| crate::utils::member::normalize_member_value(&v, is_agent));
+        t.reporter = t.reporter.map(|v| crate::utils::member::normalize_member_value(&v, is_agent));
+        t.assignee = t.assignee.map(|v| crate::utils::member::normalize_member_value(&v, is_agent));
 
         // Normalize effort on write
-        t.effort =
-            effort.filter(|e| !e.trim().is_empty()).map(
-                |e| match crate::utils::effort::parse_effort(&e) {
-                    Ok(parsed) => parsed.canonical,
-                    Err(_) => e,
-                },
-            );
+        t.effort = effort.filter(|e| !e.trim().is_empty()).map(|e| match crate::utils::effort::parse_effort(&e) {
+            Ok(parsed) => parsed.canonical,
+            Err(_) => e,
+        });
         t.description = description.filter(|v| !v.is_empty());
         let mut normalized_tags = normalize_tags(tags);
         if normalized_tags.is_empty() {
@@ -390,9 +334,7 @@ impl TaskService {
                 normalized_tags.extend(config.default_tags.clone());
             }
             if let Some(label) = crate::utils::task_intel::auto_tag_from_path(&config)
-                && !normalized_tags
-                    .iter()
-                    .any(|existing| existing.eq_ignore_ascii_case(&label))
+                && !normalized_tags.iter().any(|existing| existing.eq_ignore_ascii_case(&label))
             {
                 normalized_tags.push(label);
             }
@@ -407,16 +349,9 @@ impl TaskService {
         // LoTaR's own field, so it is stored even where the project limits
         // custom fields; later edits keep it as an existing field.
         if let Some(key) = options.finding {
-            t.custom_fields.insert(
-                crate::services::finding_service::FINDING_FIELD.to_string(),
-                crate::types::custom_value_string(key),
-            );
+            t.custom_fields.insert(crate::services::finding_service::FINDING_FIELD.to_string(), crate::types::custom_value_string(key));
         }
-        t.acceptance_criteria = acceptance_criteria
-            .into_iter()
-            .map(|item| item.trim().to_string())
-            .filter(|item| !item.is_empty())
-            .collect();
+        t.acceptance_criteria = acceptance_criteria.into_iter().map(|item| item.trim().to_string()).filter(|item| !item.is_empty()).collect();
 
         Self::ensure_task_defaults(&mut t, &config, true);
 
@@ -426,45 +361,21 @@ impl TaskService {
         // before or during publication leaves every affected file unchanged
         // (rollback failure retains the journal and fails closed); automation
         // and events run only after the commit.
-        crate::storage::safety::validate_project_prefix(&project)
-            .map_err(LoTaRError::ValidationError)?;
+        crate::storage::safety::validate_project_prefix(&project).map_err(LoTaRError::ValidationError)?;
         let project_path = storage.root_path.join(&project);
         let config_path = crate::utils::paths::project_config_path(&storage.root_path, &project);
         let desired_set: BTreeSet<u32> = normalized_sprints.iter().copied().collect();
 
-        let relationship_context = if t.relationships.is_empty() {
-            None
-        } else {
-            Some(crate::services::relationships::external_locks(storage)?)
-        };
+        let relationship_context = if t.relationships.is_empty() { None } else { Some(crate::services::relationships::external_locks(storage)?) };
         let mut txn = if t.relationships.is_empty() {
             MultiFileTransaction::begin(&storage.root_path, std::slice::from_ref(&project))?
         } else {
             MultiFileTransaction::begin_all(&storage.root_path, std::slice::from_ref(&project))?
         };
-        let (id, config, config_populated) = Self::stage_create(
-            &mut txn,
-            storage,
-            &project_path,
-            &config_path,
-            &project,
-            &t,
-            &desired_set,
-            config,
-        )?;
-        let counterparts = crate::services::relationships::stage_task_change(
-            &mut txn,
-            storage,
-            &id,
-            &Default::default(),
-            &t.relationships,
-            relationship_context.as_ref(),
-        )?;
-        txn.commit_checked(|| {
-            relationship_context
-                .as_ref()
-                .map_or(Ok(()), |guard| guard.verify(storage))
-        })?;
+        let (id, config, config_populated) = Self::stage_create(&mut txn, storage, &project_path, &config_path, &project, &t, &desired_set, config)?;
+        let counterparts =
+            crate::services::relationships::stage_task_change(&mut txn, storage, &id, &Default::default(), &t.relationships, relationship_context.as_ref())?;
+        txn.commit_checked(|| relationship_context.as_ref().map_or(Ok(()), |guard| guard.verify(storage)))?;
         drop(relationship_context);
         crate::services::relationships::emit_counterparts(storage, &counterparts);
         if config_populated {
@@ -493,10 +404,7 @@ impl TaskService {
     /// new task file itself. Returns the allocated task ID. Any error here
     /// leaves the workspace untouched, except the fail-closed case where the
     /// transaction's own rollback cannot complete (journal retained).
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "independent inputs from the single caller; bundling them only for this lint would not clarify the call"
-    )]
+    #[expect(clippy::too_many_arguments, reason = "independent inputs from the single caller; bundling them only for this lint would not clarify the call")]
     fn stage_create(
         txn: &mut MultiFileTransaction,
         storage: &Storage,
@@ -507,27 +415,16 @@ impl TaskService {
         desired_set: &BTreeSet<u32>,
         config: ResolvedConfig,
     ) -> LoTaRResult<(String, ResolvedConfig, bool)> {
-        let (config, config_yaml) =
-            Self::plan_auto_populate_members(&storage.root_path, project, t, config)?;
+        let (config, config_yaml) = Self::plan_auto_populate_members(&storage.root_path, project, t, config)?;
         Self::enforce_membership(t, &config, project)?;
 
         let mut records = SprintService::list(storage)?;
         let next_numeric_id = StorageOperations::get_current_id(project_path) + 1;
         let id = format!("{}-{}", project, next_numeric_id);
-        let touched = Self::apply_memberships_to_records(
-            &storage.root_path,
-            records.as_mut_slice(),
-            &id,
-            desired_set,
-        )?;
+        let touched = Self::apply_memberships_to_records(&storage.root_path, records.as_mut_slice(), &id, desired_set)?;
         for record in &records {
             if touched.contains(&record.id) {
-                SprintService::stage_update(
-                    txn,
-                    &storage.root_path,
-                    record.id,
-                    record.sprint.clone(),
-                )?;
+                SprintService::stage_update(txn, &storage.root_path, record.id, record.sprint.clone())?;
             }
         }
         let config_populated = config_yaml.is_some();
@@ -535,8 +432,7 @@ impl TaskService {
             txn.stage(config_path, yaml)?;
         }
 
-        let file_path =
-            StorageOperations::get_file_path(project, next_numeric_id, &storage.root_path);
+        let file_path = StorageOperations::get_file_path(project, next_numeric_id, &storage.root_path);
         if std::env::var("LOTAR_DEBUG_STATUS").is_ok() {
             eprintln!("[lotar][debug] writing task file {}", file_path.display());
         }
@@ -552,52 +448,23 @@ impl TaskService {
     /// or during publication leaves every affected file unchanged. Returns
     /// the allocated task ID; automation and events stay with the caller so
     /// the CLI keeps firing them exactly once after the commit.
-    #[expect(
-        clippy::needless_pass_by_value,
-        reason = "the caller hands this value over and does not use it afterwards"
-    )]
-    pub fn commit_prepared_create(
-        storage: &Storage,
-        prepared: PreparedTaskCreate<'_>,
-    ) -> LoTaRResult<String> {
-        let PreparedTaskCreate {
-            task,
-            project,
-            original_project_name,
-            validation_config,
-            base_members,
-            pending_members,
-        } = prepared;
+    #[expect(clippy::needless_pass_by_value, reason = "the caller hands this value over and does not use it afterwards")]
+    pub fn commit_prepared_create(storage: &Storage, prepared: PreparedTaskCreate<'_>) -> LoTaRResult<String> {
+        let PreparedTaskCreate { task, project, original_project_name, validation_config, base_members, pending_members } = prepared;
 
-        crate::storage::safety::validate_project_prefix(project)
-            .map_err(LoTaRError::ValidationError)?;
+        crate::storage::safety::validate_project_prefix(project).map_err(LoTaRError::ValidationError)?;
         let project_path = storage.root_path.join(project);
         let config_path = crate::utils::paths::project_config_path(&storage.root_path, project);
 
-        let relationship_context = if task.relationships.is_empty() {
-            None
-        } else {
-            Some(crate::services::relationships::external_locks(storage)?)
-        };
+        let relationship_context = if task.relationships.is_empty() { None } else { Some(crate::services::relationships::external_locks(storage)?) };
         let mut txn = if task.relationships.is_empty() {
-            MultiFileTransaction::begin(
-                &storage.root_path,
-                std::slice::from_ref(&project.to_string()),
-            )?
+            MultiFileTransaction::begin(&storage.root_path, std::slice::from_ref(&project.to_string()))?
         } else {
-            MultiFileTransaction::begin_all(
-                &storage.root_path,
-                std::slice::from_ref(&project.to_string()),
-            )?
+            MultiFileTransaction::begin_all(&storage.root_path, std::slice::from_ref(&project.to_string()))?
         };
 
-        let (config_yaml, planned_members) = Self::plan_prepared_project_config(
-            &storage.root_path,
-            project,
-            original_project_name,
-            base_members,
-            pending_members,
-        )?;
+        let (config_yaml, planned_members) =
+            Self::plan_prepared_project_config(&storage.root_path, project, original_project_name, base_members, pending_members)?;
         let config_staged = config_yaml.is_some();
 
         // Full-candidate membership recheck under the coordinated locks,
@@ -616,26 +483,15 @@ impl TaskService {
             txn.stage(&config_path, yaml)?;
         }
 
-        let file_path =
-            StorageOperations::get_file_path(project, next_numeric_id, &storage.root_path);
+        let file_path = StorageOperations::get_file_path(project, next_numeric_id, &storage.root_path);
         if std::env::var("LOTAR_DEBUG_STATUS").is_ok() {
             eprintln!("[lotar][debug] writing task file {}", file_path.display());
         }
         let file_string = serde_yaml_ng::to_string(task)?;
         txn.stage(&file_path, file_string)?;
-        let counterparts = crate::services::relationships::stage_task_change(
-            &mut txn,
-            storage,
-            &id,
-            &Default::default(),
-            &task.relationships,
-            relationship_context.as_ref(),
-        )?;
-        txn.commit_checked(|| {
-            relationship_context
-                .as_ref()
-                .map_or(Ok(()), |guard| guard.verify(storage))
-        })?;
+        let counterparts =
+            crate::services::relationships::stage_task_change(&mut txn, storage, &id, &Default::default(), &task.relationships, relationship_context.as_ref())?;
+        txn.commit_checked(|| relationship_context.as_ref().map_or(Ok(()), |guard| guard.verify(storage)))?;
         drop(relationship_context);
         crate::services::relationships::emit_counterparts(storage, &counterparts);
         if config_staged {
@@ -659,33 +515,20 @@ impl TaskService {
         base_members: &[String],
         pending_members: &[String],
     ) -> LoTaRResult<(Option<String>, Option<Vec<String>>)> {
-        let needs_name = original_project_name
-            .map(str::trim)
-            .is_some_and(|name| !name.is_empty());
+        let needs_name = original_project_name.map(str::trim).is_some_and(|name| !name.is_empty());
         if !needs_name && pending_members.is_empty() {
             return Ok((None, None));
         }
 
-        let mut project_config = crate::config::persistence::load_project_config_from_dir(
-            project, tasks_root,
-        )
-        .map_err(|err| {
-            LoTaRError::ValidationError(format!(
-                "Failed to load project config for project '{}': {}",
-                project, err
-            ))
-        })?;
+        let mut project_config = crate::config::persistence::load_project_config_from_dir(project, tasks_root)
+            .map_err(|err| LoTaRError::ValidationError(format!("Failed to load project config for project '{}': {}", project, err)))?;
         let mut changed = false;
 
-        if let Some(original_name) = original_project_name
-            .map(str::trim)
-            .filter(|n| !n.is_empty())
-        {
+        if let Some(original_name) = original_project_name.map(str::trim).filter(|n| !n.is_empty()) {
             // Legacy `StorageOperations::add` rule: record the human-readable
             // name whenever the config is created, or still carries the
             // prefix (or nothing) as its name.
-            let config_exists =
-                crate::utils::paths::project_config_path(tasks_root, project).is_file();
+            let config_exists = crate::utils::paths::project_config_path(tasks_root, project).is_file();
             let current = project_config.project_name.trim();
             if !config_exists || current.is_empty() || current.eq_ignore_ascii_case(project) {
                 if current != original_name {
@@ -699,11 +542,7 @@ impl TaskService {
         if !pending_members.is_empty() {
             let mut effective = match project_config.members.clone() {
                 Some(existing) => existing,
-                None => base_members
-                    .iter()
-                    .map(|value| value.trim().to_string())
-                    .filter(|value| !value.is_empty())
-                    .collect(),
+                None => base_members.iter().map(|value| value.trim().to_string()).filter(|value| !value.is_empty()).collect(),
             };
             let mut members_changed = false;
             for candidate in pending_members {
@@ -711,9 +550,7 @@ impl TaskService {
                 if trimmed.is_empty() {
                     continue;
                 }
-                let already_present = effective
-                    .iter()
-                    .any(|existing| existing.eq_ignore_ascii_case(trimmed));
+                let already_present = effective.iter().any(|existing| existing.eq_ignore_ascii_case(trimmed));
                 if !already_present {
                     effective.push(trimmed.to_string());
                     members_changed = true;
@@ -750,18 +587,12 @@ impl TaskService {
     /// named the old ID's project follows along. Anything else passes through
     /// unchanged, so the caller's own lookup reports unknown or malformed IDs
     /// exactly as before. A chain that ends nowhere is reported as missing.
-    pub(crate) fn follow_moves(
-        storage: &Storage,
-        id: &str,
-        project: Option<&str>,
-    ) -> LoTaRResult<(String, Option<String>)> {
+    pub(crate) fn follow_moves(storage: &Storage, id: &str, project: Option<&str>) -> LoTaRResult<(String, Option<String>)> {
         match crate::storage::moves::follow(&storage.root_path, id) {
             Ok(Some(current)) => {
                 let original = TaskId::parse(id.trim()).map(|parsed| parsed.project).ok();
                 let project = match project {
-                    Some(explicit) if Some(explicit) == original.as_deref() => {
-                        TaskId::parse(&current).ok().map(|parsed| parsed.project)
-                    }
+                    Some(explicit) if Some(explicit) == original.as_deref() => TaskId::parse(&current).ok().map(|parsed| parsed.project),
                     other => other.map(str::to_string),
                 };
                 Ok((current, project))
@@ -774,26 +605,16 @@ impl TaskService {
     /// Fetch a task including its soft-deletion tombstone state (DEV-92).
     /// Returns the DTO with `deleted_at` set for deleted tasks instead of
     /// the default `TaskNotFound` projection.
-    pub fn get_including_deleted(
-        storage: &Storage,
-        id: &str,
-        project: Option<&str>,
-    ) -> LoTaRResult<TaskDTO> {
+    pub fn get_including_deleted(storage: &Storage, id: &str, project: Option<&str>) -> LoTaRResult<TaskDTO> {
         Self::get_with_deletion(storage, id, project, true)
     }
 
-    fn get_with_deletion(
-        storage: &Storage,
-        id: &str,
-        project: Option<&str>,
-        include_deleted: bool,
-    ) -> LoTaRResult<TaskDTO> {
+    fn get_with_deletion(storage: &Storage, id: &str, project: Option<&str>, include_deleted: bool) -> LoTaRResult<TaskDTO> {
         let (id, project) = Self::follow_moves(storage, id, project)?;
         let (id, project) = (id.as_str(), project.as_deref());
         // Canonical parse: the project prefix is everything before the FINAL
         // numeric suffix (ABCD-1 -> ABCD, ABC-OPS-12 -> ABC-OPS).
-        let parsed =
-            TaskId::parse(id).map_err(|err| LoTaRError::InvalidTaskId(format!("{id}: {err}")))?;
+        let parsed = TaskId::parse(id).map_err(|err| LoTaRError::InvalidTaskId(format!("{id}: {err}")))?;
         let p = project.unwrap_or(&parsed.project).to_string();
         match storage.get(id, &p) {
             Some(mut t) => {
@@ -819,13 +640,7 @@ impl TaskService {
                 let sprint_lookup = Self::load_sprint_lookup(storage);
                 // Padded aliases (TP-001) surface the canonical spelling (TP-1)
                 // so all transports agree on the task identity.
-                Ok(Self::to_dto(
-                    &parsed.canonical(),
-                    t,
-                    Some(&sprint_lookup),
-                    &config,
-                    chrono::Utc::now(),
-                ))
+                Ok(Self::to_dto(&parsed.canonical(), t, Some(&sprint_lookup), &config, chrono::Utc::now()))
             }
             None => Err(LoTaRError::TaskNotFound(id.to_string())),
         }
@@ -835,9 +650,7 @@ impl TaskService {
     /// tombstone is read-only until restored (DEV-92).
     pub(crate) fn ensure_not_deleted(task: &Task, id: &str) -> LoTaRResult<()> {
         if task.deleted_at.is_some() {
-            return Err(LoTaRError::ValidationError(format!(
-                "Task '{id}' is deleted; restore it before modifying it"
-            )));
+            return Err(LoTaRError::ValidationError(format!("Task '{id}' is deleted; restore it before modifying it")));
         }
         Ok(())
     }
@@ -854,16 +667,10 @@ impl TaskService {
     /// automation behavior. The comment append and its history entry are
     /// applied to the freshest persisted state under the project task lock,
     /// so concurrent reference (or other) writes can never be lost.
-    pub fn add_comment_with_context(
-        storage: &mut Storage,
-        id: &str,
-        text: &str,
-        context: CommentContext,
-    ) -> LoTaRResult<TaskDTO> {
+    pub fn add_comment_with_context(storage: &mut Storage, id: &str, text: &str, context: CommentContext) -> LoTaRResult<TaskDTO> {
         let (id, _) = Self::follow_moves(storage, id, None)?;
         let id = id.as_str();
-        let parsed =
-            TaskId::parse(id).map_err(|err| LoTaRError::InvalidTaskId(format!("{id}: {err}")))?;
+        let parsed = TaskId::parse(id).map_err(|err| LoTaRError::InvalidTaskId(format!("{id}: {err}")))?;
         let canonical = parsed.canonical();
         Self::ensure_local_task(storage, id)?;
 
@@ -874,25 +681,15 @@ impl TaskService {
             // Lifecycle guard (DEV-92): no comments on a tombstone.
             Self::ensure_not_deleted(task, &canonical_guard)?;
             let now = chrono::Utc::now().to_rfc3339();
-            let actor = context.actor_override.clone().or_else(|| {
-                resolve_current_user_for_project(Some(root_path.as_path()), Some(&identity_project))
-            });
-            task.comments.push(crate::types::TaskComment {
-                extra: Default::default(),
-                date: now.clone(),
-                text: text.to_string(),
-            });
+            let actor = context.actor_override.clone().or_else(|| resolve_current_user_for_project(Some(root_path.as_path()), Some(&identity_project)));
+            task.comments.push(crate::types::TaskComment { extra: Default::default(), date: now.clone(), text: text.to_string() });
             // Record that a comment was added without copying the body into
             // the changelog (the comment itself is the audit trail).
             task.history.push(TaskChangeLogEntry {
                 extra: Default::default(),
                 at: now.clone(),
                 actor,
-                changes: vec![TaskChange {
-                    field: "comment_added".into(),
-                    old: None,
-                    new: None,
-                }],
+                changes: vec![TaskChange { field: "comment_added".into(), old: None, new: None }],
             });
             task.modified = now;
             Ok(true)
@@ -900,13 +697,7 @@ impl TaskService {
 
         let config = Self::resolve_config_for_project(storage.root_path.as_path(), &parsed.project);
         let sprint_lookup = Self::load_sprint_lookup(storage);
-        let mut dto = Self::to_dto(
-            &canonical,
-            outcome.after,
-            Some(&sprint_lookup),
-            &config,
-            chrono::Utc::now(),
-        );
+        let mut dto = Self::to_dto(&canonical, outcome.after, Some(&sprint_lookup), &config, chrono::Utc::now());
         if Self::link_mentions(storage, &canonical, Some(text), None) {
             dto = Self::get(storage, &canonical, Some(&parsed.project)).unwrap_or(dto);
         }
@@ -921,12 +712,7 @@ impl TaskService {
     /// the unchanged task (no write, no history, no timestamp churn) when
     /// the new text equals the old one. Comment edits deliberately do not
     /// fire `on.commented`; that trigger belongs to new comments only.
-    pub fn update_comment(
-        storage: &mut Storage,
-        id: &str,
-        index: usize,
-        text: &str,
-    ) -> LoTaRResult<TaskDTO> {
+    pub fn update_comment(storage: &mut Storage, id: &str, index: usize, text: &str) -> LoTaRResult<TaskDTO> {
         Self::update_comment_with_receipt(storage, id, index, text).map(|receipt| receipt.dto)
     }
 
@@ -935,16 +721,10 @@ impl TaskService {
     /// genuine, so transport layers can gate SSE/automation on it without
     /// DTO or timestamp comparisons. The response body contract is
     /// unchanged.
-    pub fn update_comment_with_receipt(
-        storage: &mut Storage,
-        id: &str,
-        index: usize,
-        text: &str,
-    ) -> LoTaRResult<TaskUpdateReceipt> {
+    pub fn update_comment_with_receipt(storage: &mut Storage, id: &str, index: usize, text: &str) -> LoTaRResult<TaskUpdateReceipt> {
         let (id, _) = Self::follow_moves(storage, id, None)?;
         let id = id.as_str();
-        let parsed =
-            TaskId::parse(id).map_err(|err| LoTaRError::InvalidTaskId(format!("{id}: {err}")))?;
+        let parsed = TaskId::parse(id).map_err(|err| LoTaRError::InvalidTaskId(format!("{id}: {err}")))?;
         let canonical = parsed.canonical();
         Self::ensure_local_task(storage, id)?;
 
@@ -955,9 +735,7 @@ impl TaskService {
             // Lifecycle guard (DEV-92): tombstones are read-only.
             Self::ensure_not_deleted(task, &canonical_guard)?;
             if index >= task.comments.len() {
-                return Err(LoTaRError::ValidationError(format!(
-                    "Invalid comment index {index}"
-                )));
+                return Err(LoTaRError::ValidationError(format!("Invalid comment index {index}")));
             }
 
             let previous = task.comments[index].text.clone();
@@ -969,44 +747,21 @@ impl TaskService {
             task.history.push(TaskChangeLogEntry {
                 extra: Default::default(),
                 at: now.clone(),
-                actor: resolve_current_user_for_project(
-                    Some(root_path.as_path()),
-                    Some(&identity_project),
-                ),
-                changes: vec![TaskChange {
-                    field: format!("comment#{}", index + 1),
-                    old: Some(previous),
-                    new: Some(text.to_string()),
-                }],
+                actor: resolve_current_user_for_project(Some(root_path.as_path()), Some(&identity_project)),
+                changes: vec![TaskChange { field: format!("comment#{}", index + 1), old: Some(previous), new: Some(text.to_string()) }],
             });
             task.modified = now;
             Ok(true)
         })?;
 
-        let previous_text = outcome
-            .before
-            .comments
-            .get(index)
-            .map(|comment| comment.text.clone());
+        let previous_text = outcome.before.comments.get(index).map(|comment| comment.text.clone());
         let config = Self::resolve_config_for_project(storage.root_path.as_path(), &parsed.project);
         let sprint_lookup = Self::load_sprint_lookup(storage);
-        let mut dto = Self::to_dto(
-            &canonical,
-            outcome.after,
-            Some(&sprint_lookup),
-            &config,
-            chrono::Utc::now(),
-        );
-        if outcome.changed
-            && Self::link_mentions(storage, &canonical, Some(text), previous_text.as_deref())
-        {
+        let mut dto = Self::to_dto(&canonical, outcome.after, Some(&sprint_lookup), &config, chrono::Utc::now());
+        if outcome.changed && Self::link_mentions(storage, &canonical, Some(text), previous_text.as_deref()) {
             dto = Self::get(storage, &canonical, Some(&parsed.project)).unwrap_or(dto);
         }
-        Ok(TaskUpdateReceipt {
-            dto,
-            changed: outcome.changed,
-            deferred: None,
-        })
+        Ok(TaskUpdateReceipt { dto, changed: outcome.changed, deferred: None })
     }
 
     /// Fail fast for comment/reference mutations addressed to a task that
@@ -1017,14 +772,12 @@ impl TaskService {
     /// message.
     pub(crate) fn ensure_local_task(storage: &Storage, id: &str) -> LoTaRResult<()> {
         match storage.resolve_task_location(id) {
-            Ok(location) if !location.is_in_root(&storage.root_path) => {
-                Err(LoTaRError::ValidationError(format!(
-                    "Task '{}' is stored in workspace tasks root {} and cannot be modified from {}; run the command inside that workspace",
-                    location.full_id(),
-                    location.root.display(),
-                    storage.root_path.display()
-                )))
-            }
+            Ok(location) if !location.is_in_root(&storage.root_path) => Err(LoTaRError::ValidationError(format!(
+                "Task '{}' is stored in workspace tasks root {} and cannot be modified from {}; run the command inside that workspace",
+                location.full_id(),
+                location.root.display(),
+                storage.root_path.display()
+            ))),
             Ok(_) => Ok(()),
             Err(_) => Err(LoTaRError::TaskNotFound(id.to_string())),
         }
@@ -1033,22 +786,12 @@ impl TaskService {
     /// DEV-7: add `related` links for task IDs newly mentioned in `text`.
     /// Best effort: the change it follows is already saved, so a failure here
     /// is reported on stderr in debug runs and otherwise ignored.
-    fn link_mentions(
-        storage: &Storage,
-        id: &str,
-        text: Option<&str>,
-        previous: Option<&str>,
-    ) -> bool {
+    fn link_mentions(storage: &Storage, id: &str, text: Option<&str>, previous: Option<&str>) -> bool {
         let text = text.unwrap_or_default();
         if text.is_empty() || MENTION_LINKING_PAUSED.with(|paused| paused.get()) {
             return false;
         }
-        match crate::services::relationships::link_mentions(
-            storage,
-            id,
-            text,
-            previous.unwrap_or_default(),
-        ) {
+        match crate::services::relationships::link_mentions(storage, id, text, previous.unwrap_or_default()) {
             Ok(changed) => changed,
             Err(error) => {
                 if std::env::var("LOTAR_DEBUG").is_ok() {
@@ -1065,19 +808,10 @@ impl TaskService {
 
     /// `modified` as task responses show it: `created` when the file has none.
     fn shown_modified(task: &Task) -> String {
-        if task.modified.is_empty() {
-            task.created.clone()
-        } else {
-            task.modified.clone()
-        }
+        if task.modified.is_empty() { task.created.clone() } else { task.modified.clone() }
     }
 
-    pub fn update_with_context(
-        storage: &mut Storage,
-        id: &str,
-        patch: TaskUpdate,
-        context: TaskUpdateContext,
-    ) -> LoTaRResult<TaskDTO> {
+    pub fn update_with_context(storage: &mut Storage, id: &str, patch: TaskUpdate, context: TaskUpdateContext) -> LoTaRResult<TaskDTO> {
         Self::update_with_receipt(storage, id, patch, context).map(|receipt| receipt.dto)
     }
 
@@ -1087,19 +821,8 @@ impl TaskService {
     /// accurate events and responses without any public DTO shape change.
     /// Effective no-ops write nothing, never touch `modified` or history,
     /// and fire no API events or automation.
-    pub fn update_with_receipt(
-        storage: &mut Storage,
-        id: &str,
-        patch: TaskUpdate,
-        context: TaskUpdateContext,
-    ) -> LoTaRResult<TaskUpdateReceipt> {
-        Self::update_composed(
-            storage,
-            id,
-            patch,
-            context,
-            None::<fn(&mut crate::types::TaskRelationships)>,
-        )
+    pub fn update_with_receipt(storage: &mut Storage, id: &str, patch: TaskUpdate, context: TaskUpdateContext) -> LoTaRResult<TaskUpdateReceipt> {
+        Self::update_composed(storage, id, patch, context, None::<fn(&mut crate::types::TaskRelationships)>)
     }
 
     /// Internal collection deltas compose against the task read under the same
@@ -1124,14 +847,7 @@ impl TaskService {
         relationship_delta: Option<F>,
     ) -> LoTaRResult<TaskUpdateReceipt> {
         let mut deferred = None;
-        let mut receipt = Self::update_composed_inner(
-            storage,
-            id,
-            patch,
-            context,
-            relationship_delta,
-            &mut deferred,
-        )?;
+        let mut receipt = Self::update_composed_inner(storage, id, patch, context, relationship_delta, &mut deferred)?;
         if let Some(outcome) = deferred {
             crate::services::agent_active_jobs::record_outcome(&storage.root_path, &outcome)?;
             receipt.deferred = Some(outcome);
@@ -1154,8 +870,7 @@ impl TaskService {
         // suffix) to locate the task. `canonical` (padded aliases collapsed,
         // e.g. TP-001 -> TP-1) is the single identity used for every
         // comparison, staged write, event, automation run, and DTO response.
-        let parsed =
-            TaskId::parse(id).map_err(|err| LoTaRError::InvalidTaskId(format!("{id}: {err}")))?;
+        let parsed = TaskId::parse(id).map_err(|err| LoTaRError::InvalidTaskId(format!("{id}: {err}")))?;
         let derived = parsed.project.clone();
         let canonical = parsed.canonical();
         // Cheap unlocked location check keeps TaskNotFound lock-free and
@@ -1182,19 +897,13 @@ impl TaskService {
         // together under the sprints + project locks. Errors leave every
         // affected file unchanged; automation runs strictly post-commit.
         let changes_relationships = patch.relationships.is_some() || relationship_delta.is_some();
-        let relationship_context = if changes_relationships {
-            Some(crate::services::relationships::external_locks(storage)?)
-        } else {
-            None
-        };
+        let relationship_context = if changes_relationships { Some(crate::services::relationships::external_locks(storage)?) } else { None };
         let mut txn = if changes_relationships {
             MultiFileTransaction::begin_all(&storage.root_path, std::slice::from_ref(&derived))?
         } else {
             MultiFileTransaction::begin(&storage.root_path, std::slice::from_ref(&derived))?
         };
-        let existing = storage
-            .get(id, &derived)
-            .ok_or_else(|| LoTaRError::TaskNotFound(id.to_string()))?;
+        let existing = storage.get(id, &derived).ok_or_else(|| LoTaRError::TaskNotFound(id.to_string()))?;
         // Lifecycle guard (DEV-92): a tombstone is read-only until restored.
         Self::ensure_not_deleted(&existing, id)?;
         // Optimistic precondition (DEV-301), checked under the transaction's
@@ -1209,10 +918,7 @@ impl TaskService {
             )));
         }
         if let Some(delta) = relationship_delta {
-            let mut relationships = patch
-                .relationships
-                .take()
-                .unwrap_or_else(|| existing.relationships.clone());
+            let mut relationships = patch.relationships.take().unwrap_or_else(|| existing.relationships.clone());
             delta(&mut relationships);
             patch.relationships = Some(relationships);
         }
@@ -1235,24 +941,12 @@ impl TaskService {
             None => None,
         };
         let resolved_custom_fields = match patch.custom_fields.as_ref() {
-            Some(cf) => Some(validation::resolve_custom_fields(
-                cf,
-                &config,
-                Some(&existing.custom_fields),
-            )?),
+            Some(cf) => Some(validation::resolve_custom_fields(cf, &config, Some(&existing.custom_fields))?),
             None => None,
         };
 
         if context.enforce_review_owner {
-            Self::enforce_review_owner_transition(
-                storage,
-                &derived,
-                id,
-                &existing,
-                parsed_status.as_ref(),
-                patch.assignee.as_deref(),
-                &config,
-            )?;
+            Self::enforce_review_owner_transition(storage, &derived, id, &existing, parsed_status.as_ref(), patch.assignee.as_deref(), &config)?;
         }
 
         // A running agent job owns the ticket's status and assignee
@@ -1260,22 +954,13 @@ impl TaskService {
         // actions carrying the job's id) is held back and recorded as the
         // job's outcome, applied when the job ends. Other fields stay
         // editable so people can still talk to the agent.
-        if let Some(job_id) =
-            Self::running_job_id(storage.root_path.as_path(), &canonical).filter(|job_id| {
-                !context.bypass_active_job_lock && !Self::is_job_lifecycle(job_id, &canonical)
-            })
+        if let Some(job_id) = Self::running_job_id(storage.root_path.as_path(), &canonical)
+            .filter(|job_id| !context.bypass_active_job_lock && !Self::is_job_lifecycle(job_id, &canonical))
         {
-            let mut outcome = crate::api_types::JobOutcome {
-                job_id,
-                ..Default::default()
-            };
+            let mut outcome = crate::api_types::JobOutcome { job_id, ..Default::default() };
             if let Some(next) = patch.assignee.take() {
                 let trimmed = next.trim();
-                let next_value = if trimmed.is_empty() {
-                    None
-                } else {
-                    resolve_me_alias_for_project(trimmed, Some(&storage.root_path), Some(&derived))
-                };
+                let next_value = if trimmed.is_empty() { None } else { resolve_me_alias_for_project(trimmed, Some(&storage.root_path), Some(&derived)) };
                 // Assignment-aware identity (DEV-102): a registered agent
                 // directive ("@copilot") and the bare human spelling
                 // ("copilot") are DIFFERENT assignees.
@@ -1311,19 +996,13 @@ impl TaskService {
         let mut changes: Vec<TaskChange> = Vec::new();
         let mut record_change = |field: &str, old: Option<String>, new: Option<String>| {
             if old != new {
-                changes.push(TaskChange {
-                    field: field.to_string(),
-                    old,
-                    new,
-                });
+                changes.push(TaskChange { field: field.to_string(), old, new });
             }
         };
 
         if let Some(v) = patch.title {
             if v.trim().is_empty() {
-                return Err(LoTaRError::ValidationError(
-                    "Title cannot be empty.".to_string(),
-                ));
+                return Err(LoTaRError::ValidationError("Title cannot be empty.".to_string()));
             }
             let previous = t.title.clone();
             if previous != v {
@@ -1335,11 +1014,7 @@ impl TaskService {
             let old_status = t.status.clone();
             let new_status = v;
             if old_status != new_status {
-                record_change(
-                    "status",
-                    Some(old_status.to_string()),
-                    Some(new_status.to_string()),
-                );
+                record_change("status", Some(old_status.to_string()), Some(new_status.to_string()));
             }
             t.status = new_status.clone();
             let auto = config.auto_assign_on_status;
@@ -1348,21 +1023,14 @@ impl TaskService {
             // DTO-projection default and spelling-only differences
             // (todo vs Todo) are not transitions, so a no-op status
             // patch cannot gain an assignee as a side effect.
-            let effective_old_status = if old_status.is_empty() {
-                config
-                    .effective_default_status()
-                    .unwrap_or_else(|| old_status.clone())
-            } else {
-                old_status.clone()
-            };
-            let effective_transition =
-                !crate::types::enum_token_eq(effective_old_status.as_str(), new_status.as_str());
+            let effective_old_status =
+                if old_status.is_empty() { config.effective_default_status().unwrap_or_else(|| old_status.clone()) } else { old_status.clone() };
+            let effective_transition = !crate::types::enum_token_eq(effective_old_status.as_str(), new_status.as_str());
             let is_first_change = effective_transition && t.assignee.is_none();
             if auto
                 && is_first_change
                 && !explicit_assignee
-                && let Some(me) =
-                    resolve_current_user_for_project(Some(&storage.root_path), Some(&derived))
+                && let Some(me) = resolve_current_user_for_project(Some(&storage.root_path), Some(&derived))
             {
                 let previous_assignee = t.assignee.clone();
                 if previous_assignee.as_deref() != Some(me.as_str()) {
@@ -1390,13 +1058,8 @@ impl TaskService {
             let new_value = if trimmed.is_empty() {
                 None
             } else {
-                resolve_me_alias_for_project(trimmed, Some(&storage.root_path), Some(&derived)).map(
-                    |resolved| {
-                        crate::utils::member::normalize_member_value(&resolved, |name| {
-                            config.agent_profiles.contains_key(name)
-                        })
-                    },
-                )
+                resolve_me_alias_for_project(trimmed, Some(&storage.root_path), Some(&derived))
+                    .map(|resolved| crate::utils::member::normalize_member_value(&resolved, |name| config.agent_profiles.contains_key(name)))
             };
             let previous = t.reporter.clone();
             if previous != new_value {
@@ -1409,13 +1072,8 @@ impl TaskService {
             let new_value = if trimmed.is_empty() {
                 None
             } else {
-                resolve_me_alias_for_project(trimmed, Some(&storage.root_path), Some(&derived)).map(
-                    |resolved| {
-                        crate::utils::member::normalize_member_value(&resolved, |name| {
-                            config.agent_profiles.contains_key(name)
-                        })
-                    },
-                )
+                resolve_me_alias_for_project(trimmed, Some(&storage.root_path), Some(&derived))
+                    .map(|resolved| crate::utils::member::normalize_member_value(&resolved, |name| config.agent_profiles.contains_key(name)))
             };
             let previous = t.assignee.clone();
             if previous != new_value {
@@ -1425,11 +1083,7 @@ impl TaskService {
         }
         if let Some(v) = patch.due_date {
             let trimmed = v.trim();
-            let new_value = if trimmed.is_empty() {
-                None
-            } else {
-                Some(v.clone())
-            };
+            let new_value = if trimmed.is_empty() { None } else { Some(v.clone()) };
             let previous = t.due_date.clone();
             if previous != new_value {
                 record_change("due_date", previous, new_value.clone());
@@ -1460,18 +1114,10 @@ impl TaskService {
             }
         }
         if let Some(v) = patch.acceptance_criteria {
-            let new_criteria: Vec<String> = v
-                .into_iter()
-                .map(|item| item.trim().to_string())
-                .filter(|item| !item.is_empty())
-                .collect();
+            let new_criteria: Vec<String> = v.into_iter().map(|item| item.trim().to_string()).filter(|item| !item.is_empty()).collect();
             let previous = t.acceptance_criteria.clone();
             if previous != new_criteria {
-                record_change(
-                    "acceptance_criteria",
-                    Some(previous.join("\n")),
-                    Some(new_criteria.join("\n")),
-                );
+                record_change("acceptance_criteria", Some(previous.join("\n")), Some(new_criteria.join("\n")));
                 t.acceptance_criteria = new_criteria;
             }
         }
@@ -1503,9 +1149,7 @@ impl TaskService {
 
         let mut sprint_change: Option<(Vec<SprintRecord>, BTreeSet<u32>)> = None;
         if let Some(sprint_ids) = patch.sprints.clone() {
-            let desired_set: BTreeSet<u32> = Self::normalize_sprint_ids(&sprint_ids)
-                .into_iter()
-                .collect();
+            let desired_set: BTreeSet<u32> = Self::normalize_sprint_ids(&sprint_ids).into_iter().collect();
             let records = SprintService::list(storage)?;
             let moves = crate::storage::moves::MoveResolver::new(&storage.root_path);
             let current_set: BTreeSet<u32> = records
@@ -1513,11 +1157,7 @@ impl TaskService {
                 .filter(|record| {
                     // Canonical match: legacy padded spellings (TP-001) count
                     // as membership of the same task (TP-1).
-                    record
-                        .sprint
-                        .tasks
-                        .iter()
-                        .any(|entry| entry_matches_task(&moves, &entry.id, &canonical))
+                    record.sprint.tasks.iter().any(|entry| entry_matches_task(&moves, &entry.id, &canonical))
                 })
                 .map(|record| record.id)
                 .collect();
@@ -1544,8 +1184,7 @@ impl TaskService {
             effective_existing.reporter.clone_from(&existing.reporter);
         }
 
-        let (config, config_yaml) =
-            Self::plan_auto_populate_members(&storage.root_path, &derived, &t, config)?;
+        let (config, config_yaml) = Self::plan_auto_populate_members(&storage.root_path, &derived, &t, config)?;
         Self::enforce_membership(&t, &config, &derived)?;
 
         // DEV-102 shared effective-no-op boundary: when the patch leaves
@@ -1558,63 +1197,34 @@ impl TaskService {
         // Validation above (enum parsing, strict members, journal recovery,
         // review-owner and active-job checks) still ran in full, so invalid
         // patches and pending-journal refusals keep failing closed.
-        if sprint_change.is_none()
-            && Self::tasks_effectively_equal(&effective_existing, &t, &config, explicit_tags)
-        {
+        if sprint_change.is_none() && Self::tasks_effectively_equal(&effective_existing, &t, &config, explicit_tags) {
             let sprint_lookup = Self::load_sprint_lookup(storage);
-            let dto = Self::to_dto(
-                &canonical,
-                effective_existing,
-                Some(&sprint_lookup),
-                &config,
-                chrono::Utc::now(),
-            );
-            return Ok(TaskUpdateReceipt {
-                dto,
-                changed: false,
-                deferred: None,
-            });
+            let dto = Self::to_dto(&canonical, effective_existing, Some(&sprint_lookup), &config, chrono::Utc::now());
+            return Ok(TaskUpdateReceipt { dto, changed: false, deferred: None });
         }
 
         let modified = chrono::Utc::now().to_rfc3339();
         t.modified = modified.clone();
 
         if !changes.is_empty() {
-            let history_actor =
-                resolve_current_user_for_project(Some(&storage.root_path), Some(&derived));
-            t.history.push(TaskChangeLogEntry {
-                extra: Default::default(),
-                at: modified,
-                actor: history_actor,
-                changes,
-            });
+            let history_actor = resolve_current_user_for_project(Some(&storage.root_path), Some(&derived));
+            t.history.push(TaskChangeLogEntry { extra: Default::default(), at: modified, actor: history_actor, changes });
         }
 
         t.sprints.clear();
 
         // Stage in deterministic order: sprints, config, task file.
         if let Some((mut records, desired_set)) = sprint_change {
-            let touched = Self::apply_memberships_to_records(
-                &storage.root_path,
-                records.as_mut_slice(),
-                &canonical,
-                &desired_set,
-            )?;
+            let touched = Self::apply_memberships_to_records(&storage.root_path, records.as_mut_slice(), &canonical, &desired_set)?;
             for record in &records {
                 if touched.contains(&record.id) {
-                    SprintService::stage_update(
-                        &mut txn,
-                        &storage.root_path,
-                        record.id,
-                        record.sprint.clone(),
-                    )?;
+                    SprintService::stage_update(&mut txn, &storage.root_path, record.id, record.sprint.clone())?;
                 }
             }
         }
         let config_populated = config_yaml.is_some();
         if let Some(yaml) = config_yaml {
-            let config_path =
-                crate::utils::paths::project_config_path(&storage.root_path, &derived);
+            let config_path = crate::utils::paths::project_config_path(&storage.root_path, &derived);
             txn.stage(&config_path, yaml)?;
         }
         let counterparts = crate::services::relationships::stage_task_change(
@@ -1627,26 +1237,16 @@ impl TaskService {
         )?;
         let project_path = storage.root_path.join(&derived);
         let (file_path, file_string) =
-            StorageOperations::prepare_task_edit(&project_path, &canonical, &t)
-                .map_err(crate::storage::manager::map_storage_error)?;
+            StorageOperations::prepare_task_edit(&project_path, &canonical, &t).map_err(crate::storage::manager::map_storage_error)?;
         txn.stage(&file_path, file_string)?;
-        txn.commit_checked(|| {
-            relationship_context
-                .as_ref()
-                .map_or(Ok(()), |guard| guard.verify(storage))
-        })?;
+        txn.commit_checked(|| relationship_context.as_ref().map_or(Ok(()), |guard| guard.verify(storage)))?;
         drop(relationship_context);
         crate::services::relationships::emit_counterparts(storage, &counterparts);
         if config_populated {
             Self::invalidate_config_caches(storage.root_path.as_path());
         }
 
-        let linked = Self::link_mentions(
-            storage,
-            &canonical,
-            t.description.as_deref(),
-            existing.description.as_deref(),
-        );
+        let linked = Self::link_mentions(storage, &canonical, t.description.as_deref(), existing.description.as_deref());
         let sprint_lookup = Self::load_sprint_lookup(storage);
         let now = chrono::Utc::now();
         let previous_dto = Self::to_dto(&canonical, existing, Some(&sprint_lookup), &config, now);
@@ -1656,21 +1256,15 @@ impl TaskService {
         }
 
         if context.emit_api_event {
-            let actor =
-                resolve_current_user_for_project(Some(storage.root_path.as_path()), Some(&derived));
+            let actor = resolve_current_user_for_project(Some(storage.root_path.as_path()), Some(&derived));
             crate::api_events::emit_task_updated(&dto, actor.as_deref());
         }
 
         if context.allow_agent_automation {
-            let _ =
-                AutomationService::apply_task_update(storage, Some(&previous_dto), &dto, &config);
+            let _ = AutomationService::apply_task_update(storage, Some(&previous_dto), &dto, &config);
         }
 
-        Ok(TaskUpdateReceipt {
-            dto,
-            changed: true,
-            deferred: None,
-        })
+        Ok(TaskUpdateReceipt { dto, changed: true, deferred: None })
     }
 
     /// DEV-102 effective-equality between the projected existing state and
@@ -1687,12 +1281,7 @@ impl TaskService {
     /// references, custom fields, user extensions, lifecycle state,
     /// history) must match exactly so the guard can never mask real data
     /// differences.
-    fn tasks_effectively_equal(
-        a: &Task,
-        b: &Task,
-        config: &ResolvedConfig,
-        tags_relevant: bool,
-    ) -> bool {
+    fn tasks_effectively_equal(a: &Task, b: &Task, config: &ResolvedConfig, tags_relevant: bool) -> bool {
         a.title == b.title
             && crate::types::enum_token_eq(a.status.as_str(), b.status.as_str())
             && crate::types::enum_token_eq(a.priority.as_str(), b.priority.as_str())
@@ -1719,18 +1308,10 @@ impl TaskService {
     /// ("@copilot") and their bare spelling ("copilot") stay DISTINCT, so
     /// agent/human reassignment is never suppressed as a no-op.
     /// Whitespace-only values count as absent.
-    fn member_opt_effectively_equal(
-        a: &Option<String>,
-        b: &Option<String>,
-        config: &ResolvedConfig,
-    ) -> bool {
+    fn member_opt_effectively_equal(a: &Option<String>, b: &Option<String>, config: &ResolvedConfig) -> bool {
         let is_agent = |name: &str| config.agent_profiles.contains_key(name);
         let norm = |value: &Option<String>| {
-            value
-                .as_deref()
-                .map(str::trim)
-                .filter(|v| !v.is_empty())
-                .map(|v| crate::utils::member::member_for_assignment_comparison(v, is_agent))
+            value.as_deref().map(str::trim).filter(|v| !v.is_empty()).map(|v| crate::utils::member::member_for_assignment_comparison(v, is_agent))
         };
         match (norm(a), norm(b)) {
             (Some(a), Some(b)) => a == b,
@@ -1771,31 +1352,20 @@ impl TaskService {
     }
 
     fn canonical_effort(value: &str) -> String {
-        crate::utils::effort::parse_effort(value)
-            .map(|parsed| parsed.canonical)
-            .unwrap_or_else(|_| value.trim().to_string())
+        crate::utils::effort::parse_effort(value).map(|parsed| parsed.canonical).unwrap_or_else(|_| value.trim().to_string())
     }
 
     /// Acceptance-criteria equality after the update contract's trim and
     /// empty-item filtering, preserving order.
     fn criteria_effectively_equal(a: &[String], b: &[String]) -> bool {
-        let norm = |values: &[String]| -> Vec<String> {
-            values
-                .iter()
-                .map(|item| item.trim().to_string())
-                .filter(|item| !item.is_empty())
-                .collect()
-        };
+        let norm = |values: &[String]| -> Vec<String> { values.iter().map(|item| item.trim().to_string()).filter(|item| !item.is_empty()).collect() };
         norm(a) == norm(b)
     }
 
     /// The agent job running (or queued) for the ticket: in this process,
     /// or in another one for the same tasks directory (DEV-279).
     fn running_job_id(tasks_root: &Path, id: &str) -> Option<String> {
-        AgentJobService::active_job_id(id).or_else(|| {
-            crate::services::agent_active_jobs::for_ticket_elsewhere(tasks_root, id)
-                .map(|job| job.job_id)
-        })
+        AgentJobService::active_job_id(id).or_else(|| crate::services::agent_active_jobs::for_ticket_elsewhere(tasks_root, id).map(|job| job.job_id))
     }
 
     /// Whether this process is part of the job's lifecycle: an automation
@@ -1806,8 +1376,7 @@ impl TaskService {
         let env = |name: &str| std::env::var(name).ok().map(|v| v.trim().to_string());
         // Canonical alias comparison: padded aliases of the ticket match;
         // unparseable values never do.
-        env("LOTAR_AGENT_JOB_ID").is_some_and(|env_job| env_job == job_id)
-            && env("LOTAR_TICKET_ID").is_some_and(|ticket| ticket_alias_matches(&ticket, id))
+        env("LOTAR_AGENT_JOB_ID").is_some_and(|env_job| env_job == job_id) && env("LOTAR_TICKET_ID").is_some_and(|ticket| ticket_alias_matches(&ticket, id))
     }
 
     fn enforce_review_owner_transition(
@@ -1831,15 +1400,10 @@ impl TaskService {
         let is_agent = |name: &str| config.agent_profiles.contains_key(name);
         let assignee_changed = patch_assignee.is_some_and(|next| {
             let trimmed = next.trim();
-            let next_value = if trimmed.is_empty() {
-                None
-            } else {
-                resolve_me_alias_for_project(trimmed, Some(&storage.root_path), Some(project))
-            };
+            let next_value = if trimmed.is_empty() { None } else { resolve_me_alias_for_project(trimmed, Some(&storage.root_path), Some(project)) };
             match (&existing.assignee, &next_value) {
                 (Some(a), Some(b)) => {
-                    crate::utils::member::member_for_assignment_comparison(a, is_agent)
-                        != crate::utils::member::member_for_assignment_comparison(b, is_agent)
+                    crate::utils::member::member_for_assignment_comparison(a, is_agent) != crate::utils::member::member_for_assignment_comparison(b, is_agent)
                 }
                 (None, None) => false,
                 _ => true,
@@ -1850,25 +1414,13 @@ impl TaskService {
             return Ok(());
         }
 
-        let actor =
-            resolve_current_user_for_project(Some(storage.root_path.as_path()), Some(project));
+        let actor = resolve_current_user_for_project(Some(storage.root_path.as_path()), Some(project));
         let reporter = existing.reporter.as_deref();
-        let is_reporter = actor
-            .as_deref()
-            .zip(reporter)
-            .is_some_and(|(current, reporter)| current.eq_ignore_ascii_case(reporter));
+        let is_reporter = actor.as_deref().zip(reporter).is_some_and(|(current, reporter)| current.eq_ignore_ascii_case(reporter));
         // Only literal identities delegate authority, even for hand-edited files.
-        let reviewers: Vec<&str> = config
-            .review_reviewers
-            .iter()
-            .map(|name| name.trim())
-            .filter(|name| !name.is_empty() && !name.starts_with('@') && *name != "*")
-            .collect();
-        let is_reviewer = actor.as_deref().is_some_and(|current| {
-            reviewers
-                .iter()
-                .any(|reviewer| current.trim().eq_ignore_ascii_case(reviewer))
-        });
+        let reviewers: Vec<&str> =
+            config.review_reviewers.iter().map(|name| name.trim()).filter(|name| !name.is_empty() && !name.starts_with('@') && *name != "*").collect();
+        let is_reviewer = actor.as_deref().is_some_and(|current| reviewers.iter().any(|reviewer| current.trim().eq_ignore_ascii_case(reviewer)));
 
         if is_reporter || is_reviewer {
             return Ok(());
@@ -1876,21 +1428,14 @@ impl TaskService {
 
         let authority = match reporter {
             Some(reporter) if reviewers.is_empty() => format!("Only reporter '{}'", reporter),
-            Some(reporter) => format!(
-                "Only reporter '{}' or configured reviewers [{}]",
-                reporter,
-                reviewers.join(", ")
-            ),
+            Some(reporter) => format!("Only reporter '{}' or configured reviewers [{}]", reporter, reviewers.join(", ")),
             None if reviewers.is_empty() => {
                 return Err(LoTaRError::ValidationError(format!(
                     "Ticket '{}' is awaiting review, but it has no reporter to authorize review transitions. Configure review.reviewers for project '{}' to delegate review resolution.",
                     id, project
                 )));
             }
-            None => format!(
-                "Only configured reviewers [{}] (this ticket has no reporter)",
-                reviewers.join(", ")
-            ),
+            None => format!("Only configured reviewers [{}] (this ticket has no reporter)", reviewers.join(", ")),
         };
         Err(LoTaRError::ValidationError(format!(
             "Ticket '{}' is awaiting review. {} can change status or assignee until review is resolved. Configure review.reviewers for project '{}' to delegate review resolution.",
@@ -1915,13 +1460,8 @@ impl TaskService {
     /// Shared preflight for every deletion surface: canonical identity,
     /// project isolation, cross-root refusal, and existence (including
     /// tombstones, which can be deleted again or hard-deleted).
-    fn ensure_deletable(
-        storage: &Storage,
-        id: &str,
-        project: Option<&str>,
-    ) -> LoTaRResult<(String, String)> {
-        let parsed =
-            TaskId::parse(id).map_err(|err| LoTaRError::InvalidTaskId(format!("{id}: {err}")))?;
+    fn ensure_deletable(storage: &Storage, id: &str, project: Option<&str>) -> LoTaRResult<(String, String)> {
+        let parsed = TaskId::parse(id).map_err(|err| LoTaRError::InvalidTaskId(format!("{id}: {err}")))?;
         if let Some(explicit) = project
             && explicit != parsed.project
         {
@@ -1932,19 +1472,16 @@ impl TaskService {
         }
         // An old ID of a moved task acts on the task it became (DEV-183).
         let (current, _) = Self::follow_moves(storage, id, None)?;
-        let parsed = TaskId::parse(&current)
-            .map_err(|err| LoTaRError::InvalidTaskId(format!("{current}: {err}")))?;
+        let parsed = TaskId::parse(&current).map_err(|err| LoTaRError::InvalidTaskId(format!("{current}: {err}")))?;
         let derived = parsed.project.clone();
         let canonical = parsed.canonical();
         match storage.resolve_task_location(&canonical) {
-            Ok(location) if !location.is_in_root(&storage.root_path) => {
-                Err(LoTaRError::ValidationError(format!(
-                    "Task '{}' is stored in workspace tasks root {} and cannot be modified from {}; run the command inside that workspace",
-                    location.full_id(),
-                    location.root.display(),
-                    storage.root_path.display()
-                )))
-            }
+            Ok(location) if !location.is_in_root(&storage.root_path) => Err(LoTaRError::ValidationError(format!(
+                "Task '{}' is stored in workspace tasks root {} and cannot be modified from {}; run the command inside that workspace",
+                location.full_id(),
+                location.root.display(),
+                storage.root_path.display()
+            ))),
             Ok(_) => Ok((canonical, derived)),
             Err(TaskLookupError::NotFound(_)) => Err(LoTaRError::TaskNotFound(canonical.clone())),
             Err(err) => Err(LoTaRError::ValidationError(err.to_string())),
@@ -1957,26 +1494,15 @@ impl TaskService {
     /// hard previews (retained attachment blobs with stored paths and
     /// incoming relationships with canonical dependent IDs) and empty for
     /// soft previews.
-    pub fn preview_delete(
-        storage: &Storage,
-        id: &str,
-        project: Option<&str>,
-        hard: bool,
-    ) -> LoTaRResult<TaskDeleteResponse> {
+    pub fn preview_delete(storage: &Storage, id: &str, project: Option<&str>, hard: bool) -> LoTaRResult<TaskDeleteResponse> {
         let (canonical, derived) = Self::ensure_deletable(storage, id, project)?;
         let warnings = if hard {
-            let task = storage
-                .get(&canonical, &derived)
-                .ok_or_else(|| LoTaRError::TaskNotFound(canonical.clone()))?;
+            let task = storage.get(&canonical, &derived).ok_or_else(|| LoTaRError::TaskNotFound(canonical.clone()))?;
             Self::hard_delete_warnings(storage, &canonical, &task)
         } else {
             Vec::new()
         };
-        Ok(TaskDeleteResponse {
-            deleted: false,
-            hard,
-            warnings,
-        })
+        Ok(TaskDeleteResponse { deleted: false, hard, warnings })
     }
 
     /// Delete a task (DEV-92). Soft deletion (default) writes an in-place
@@ -1987,12 +1513,7 @@ impl TaskService {
     /// physical for rollback paths), preserves attachment blobs, and returns
     /// warnings describing retained blobs and incoming relationships
     /// detected across stored tasks (including other tombstones).
-    pub fn delete_with_options(
-        storage: &mut Storage,
-        id: &str,
-        project: Option<&str>,
-        hard: bool,
-    ) -> LoTaRResult<TaskDeleteResponse> {
+    pub fn delete_with_options(storage: &mut Storage, id: &str, project: Option<&str>, hard: bool) -> LoTaRResult<TaskDeleteResponse> {
         Self::delete_with_receipt(storage, id, project, hard).map(|(response, _)| response)
     }
 
@@ -2005,18 +1526,11 @@ impl TaskService {
     /// deletions either remove the file (`changed == true`) or fail with
     /// the existing missing-task error; `modified` stays untouched and
     /// tombstones stay read-only exactly as before.
-    pub fn delete_with_receipt(
-        storage: &mut Storage,
-        id: &str,
-        project: Option<&str>,
-        hard: bool,
-    ) -> LoTaRResult<(TaskDeleteResponse, bool)> {
+    pub fn delete_with_receipt(storage: &mut Storage, id: &str, project: Option<&str>, hard: bool) -> LoTaRResult<(TaskDeleteResponse, bool)> {
         let (canonical, derived) = Self::ensure_deletable(storage, id, project)?;
 
         if hard {
-            let task = storage
-                .get(&canonical, &derived)
-                .ok_or_else(|| LoTaRError::TaskNotFound(canonical.clone()))?;
+            let task = storage.get(&canonical, &derived).ok_or_else(|| LoTaRError::TaskNotFound(canonical.clone()))?;
             let mut warnings = Self::hard_delete_warnings(storage, &canonical, &task);
             let removed = storage.delete(&canonical, &derived)?;
             if !removed {
@@ -2024,40 +1538,23 @@ impl TaskService {
             }
             // DEV-270: a later task can take this number again; it must not
             // inherit the deleted task's sprint plans.
-            match crate::services::sprint_service::SprintService::remove_task_memberships(
-                storage, &canonical,
-            ) {
+            match crate::services::sprint_service::SprintService::remove_task_memberships(storage, &canonical) {
                 Ok(sprints) if !sprints.is_empty() => {
-                    let list = sprints
-                        .iter()
-                        .map(|id| format!("#{id}"))
-                        .collect::<Vec<_>>()
-                        .join(", ");
+                    let list = sprints.iter().map(|id| format!("#{id}")).collect::<Vec<_>>().join(", ");
                     warnings.push(format!("removed from sprint(s) {list}"));
                 }
                 Ok(_) => {}
-                Err(err) => warnings.push(format!(
-                    "could not remove the task from its sprints ({err}); edit the sprint files by hand"
-                )),
+                Err(err) => warnings.push(format!("could not remove the task from its sprints ({err}); edit the sprint files by hand")),
             }
             if let Ok(parsed) = TaskId::parse(&canonical)
-                && crate::storage::operations::StorageOperations::get_current_id(
-                    &storage.root_path.join(&parsed.project),
-                ) < parsed.number
+                && crate::storage::operations::StorageOperations::get_current_id(&storage.root_path.join(&parsed.project)) < parsed.number
             {
                 warnings.push(format!(
                     "{canonical} was the highest number in {}; the next new task there gets this ID again (soft delete keeps it reserved)",
                     parsed.project
                 ));
             }
-            return Ok((
-                TaskDeleteResponse {
-                    deleted: true,
-                    hard: true,
-                    warnings,
-                },
-                true,
-            ));
+            return Ok((TaskDeleteResponse { deleted: true, hard: true, warnings }, true));
         }
 
         // Soft delete: locked read-modify-write over the freshest state so a
@@ -2074,24 +1571,13 @@ impl TaskService {
                 extra: Default::default(),
                 at: now.clone(),
                 actor: resolve_current_user_for_project(Some(root_path.as_path()), Some(&derived)),
-                changes: vec![TaskChange {
-                    field: "deleted".into(),
-                    old: None,
-                    new: Some(now.clone()),
-                }],
+                changes: vec![TaskChange { field: "deleted".into(), old: None, new: Some(now.clone()) }],
             });
             task.deleted_at = Some(now);
             Ok(true)
         })?;
 
-        Ok((
-            TaskDeleteResponse {
-                deleted: true,
-                hard: false,
-                warnings: Vec::new(),
-            },
-            outcome.changed,
-        ))
+        Ok((TaskDeleteResponse { deleted: true, hard: false, warnings: Vec::new() }, outcome.changed))
     }
 
     /// Warnings for a hard deletion: every managed attachment blob that
@@ -2104,10 +1590,7 @@ impl TaskService {
         // DEV-183: old IDs redirect here through their stubs; without this
         // file they lead nowhere.
         if !task.moved_from.is_empty() {
-            warnings.push(format!(
-                "old ID(s) {} redirect to this task and will no longer resolve",
-                task.moved_from.join(", ")
-            ));
+            warnings.push(format!("old ID(s) {} redirect to this task and will no longer resolve", task.moved_from.join(", ")));
         }
 
         let parsed = TaskId::parse(canonical).ok();
@@ -2129,76 +1612,38 @@ impl TaskService {
                 Some(root) => root.join(&name).display().to_string(),
                 None => name.clone(),
             };
-            warnings.push(format!(
-                "retained attachment '{name}' ({location}); blob preserved, no cleanup performed"
-            ));
+            warnings.push(format!("retained attachment '{name}' ({location}); blob preserved, no cleanup performed"));
         }
 
-        for (id, other) in storage.search(&crate::storage::TaskFilter {
-            deletion: DeletionFilter::All,
-            ..Default::default()
-        }) {
+        for (id, other) in storage.search(&crate::storage::TaskFilter { deletion: DeletionFilter::All, ..Default::default() }) {
             let mut fields: Vec<&str> = Vec::new();
             let rel = &other.relationships;
-            if rel
-                .depends_on
-                .iter()
-                .any(|v| entry_matches_task(&moves, v, canonical))
-            {
+            if rel.depends_on.iter().any(|v| entry_matches_task(&moves, v, canonical)) {
                 fields.push("depends_on");
             }
-            if rel
-                .blocks
-                .iter()
-                .any(|v| entry_matches_task(&moves, v, canonical))
-            {
+            if rel.blocks.iter().any(|v| entry_matches_task(&moves, v, canonical)) {
                 fields.push("blocks");
             }
-            if rel
-                .related
-                .iter()
-                .any(|v| entry_matches_task(&moves, v, canonical))
-            {
+            if rel.related.iter().any(|v| entry_matches_task(&moves, v, canonical)) {
                 fields.push("related");
             }
-            if rel
-                .parent
-                .as_deref()
-                .is_some_and(|v| entry_matches_task(&moves, v, canonical))
-            {
+            if rel.parent.as_deref().is_some_and(|v| entry_matches_task(&moves, v, canonical)) {
                 fields.push("parent");
             }
-            if rel
-                .children
-                .iter()
-                .any(|v| entry_matches_task(&moves, v, canonical))
-            {
+            if rel.children.iter().any(|v| entry_matches_task(&moves, v, canonical)) {
                 fields.push("children");
             }
-            if rel
-                .fixes
-                .iter()
-                .any(|v| entry_matches_task(&moves, v, canonical))
-            {
+            if rel.fixes.iter().any(|v| entry_matches_task(&moves, v, canonical)) {
                 fields.push("fixes");
             }
-            if rel
-                .duplicate_of
-                .as_deref()
-                .is_some_and(|v| entry_matches_task(&moves, v, canonical))
-            {
+            if rel.duplicate_of.as_deref().is_some_and(|v| entry_matches_task(&moves, v, canonical)) {
                 fields.push("duplicate_of");
             }
             if fields.is_empty() {
                 continue;
             }
-            let dependent = TaskId::parse(&id)
-                .map(|parsed| parsed.canonical())
-                .unwrap_or(id);
-            warnings.push(format!(
-                "task '{dependent}' references the deleted task via {}; left unchanged",
-                fields.join(", ")
-            ));
+            let dependent = TaskId::parse(&id).map(|parsed| parsed.canonical()).unwrap_or(id);
+            warnings.push(format!("task '{dependent}' references the deleted task via {}; left unchanged", fields.join(", ")));
         }
 
         warnings
@@ -2219,11 +1664,7 @@ impl TaskService {
     /// can gate `task_updated` SSE on it. `modified` stays untouched,
     /// stored enums are still validated against the current config, and
     /// the response body contract is unchanged.
-    pub fn restore_with_receipt(
-        storage: &mut Storage,
-        id: &str,
-        project: Option<&str>,
-    ) -> LoTaRResult<TaskUpdateReceipt> {
+    pub fn restore_with_receipt(storage: &mut Storage, id: &str, project: Option<&str>) -> LoTaRResult<TaskUpdateReceipt> {
         let (canonical, derived) = Self::ensure_deletable(storage, id, project)?;
 
         let config = Self::restore_config(storage.root_path.as_path(), &derived)?;
@@ -2245,22 +1686,14 @@ impl TaskService {
                 extra: Default::default(),
                 at: now.clone(),
                 actor: resolve_current_user_for_project(Some(root_path.as_path()), Some(&derived)),
-                changes: vec![TaskChange {
-                    field: "restored".into(),
-                    old: Some(deleted_at),
-                    new: None,
-                }],
+                changes: vec![TaskChange { field: "restored".into(), old: Some(deleted_at), new: None }],
             });
             task.deleted_at = None;
             Ok(true)
         })?;
 
         let dto = Self::dto_from_task(storage, &canonical, outcome.after);
-        Ok(TaskUpdateReceipt {
-            dto,
-            changed: outcome.changed,
-            deferred: None,
-        })
+        Ok(TaskUpdateReceipt { dto, changed: outcome.changed, deferred: None })
     }
 
     /// Archive a task, or bring it back (`archive == false`), DEV-4: the file
@@ -2269,25 +1702,17 @@ impl TaskService {
     /// stay as they are. Works for soft-deleted tasks too. Bringing a task
     /// back validates its stored values against the current config, like
     /// [`Self::restore`]. Already in the requested place: no-op, unchanged.
-    pub fn archive_with_receipt(
-        storage: &mut Storage,
-        id: &str,
-        project: Option<&str>,
-        archive: bool,
-    ) -> LoTaRResult<TaskUpdateReceipt> {
+    pub fn archive_with_receipt(storage: &mut Storage, id: &str, project: Option<&str>, archive: bool) -> LoTaRResult<TaskUpdateReceipt> {
         let (canonical, derived) = Self::ensure_deletable(storage, id, project)?;
         if !archive {
             let config = Self::restore_config(storage.root_path.as_path(), &derived)?;
-            let stored = storage
-                .get(&canonical, &derived)
-                .ok_or_else(|| LoTaRError::TaskNotFound(canonical.clone()))?;
+            let stored = storage.get(&canonical, &derived).ok_or_else(|| LoTaRError::TaskNotFound(canonical.clone()))?;
             if stored.archived {
                 Self::validate_stored_enums(&stored, &config, &canonical, "unarchive")?;
             }
         }
 
-        let moved =
-            StorageOperations::move_archive(storage.root_path.as_path(), &canonical, archive)?;
+        let moved = StorageOperations::move_archive(storage.root_path.as_path(), &canonical, archive)?;
         let changed = moved.is_some();
         let task = if changed {
             // The history entry lands in the moved file, archived or not.
@@ -2299,31 +1724,18 @@ impl TaskService {
                     task.history.push(TaskChangeLogEntry {
                         extra: Default::default(),
                         at: chrono::Utc::now().to_rfc3339(),
-                        actor: resolve_current_user_for_project(
-                            Some(root_path.as_path()),
-                            Some(&derived),
-                        ),
-                        changes: vec![TaskChange {
-                            field: field.into(),
-                            old: None,
-                            new: None,
-                        }],
+                        actor: resolve_current_user_for_project(Some(root_path.as_path()), Some(&derived)),
+                        changes: vec![TaskChange { field: field.into(), old: None, new: None }],
                     });
                     Ok(true)
                 })?
                 .after
         } else {
-            storage
-                .get(&canonical, &derived)
-                .ok_or_else(|| LoTaRError::TaskNotFound(canonical.clone()))?
+            storage.get(&canonical, &derived).ok_or_else(|| LoTaRError::TaskNotFound(canonical.clone()))?
         };
         let mut task = task;
         task.archived = archive;
-        Ok(TaskUpdateReceipt {
-            dto: Self::dto_from_task(storage, &canonical, task),
-            changed,
-            deferred: None,
-        })
+        Ok(TaskUpdateReceipt { dto: Self::dto_from_task(storage, &canonical, task), changed, deferred: None })
     }
 
     /// Restoration and its preview must not silently skip unreadable layers.
@@ -2331,73 +1743,44 @@ impl TaskService {
         use crate::config::{persistence, types::ConfigError};
         let validate_layer = |result: Result<(), ConfigError>| match result {
             Ok(()) | Err(ConfigError::FileNotFound(_)) => Ok(()),
-            Err(error) => Err(LoTaRError::ValidationError(format!(
-                "cannot restore: invalid current configuration: {error}"
-            ))),
+            Err(error) => Err(LoTaRError::ValidationError(format!("cannot restore: invalid current configuration: {error}"))),
         };
         validate_layer(persistence::load_global_config(Some(root)).map(|_| ()))?;
         validate_layer(persistence::load_project_config_from_dir(project, root).map(|_| ()))?;
         if persistence::home_config_honored() {
             validate_layer(persistence::load_home_config().map(|_| ()))?;
         }
-        crate::config::resolution::config_for_project(root, Some(project)).map_err(|error| {
-            LoTaRError::ValidationError(format!(
-                "cannot restore: invalid current configuration: {error}"
-            ))
-        })
+        crate::config::resolution::config_for_project(root, Some(project))
+            .map_err(|error| LoTaRError::ValidationError(format!("cannot restore: invalid current configuration: {error}")))
     }
 
     /// Enum validation of already-stored values against a resolved config:
     /// canonicalizes nothing and mutates nothing, it only fails closed with
     /// a field-specific message.
-    fn validate_stored_enums(
-        task: &Task,
-        config: &ResolvedConfig,
-        id: &str,
-        action: &str,
-    ) -> LoTaRResult<()> {
+    fn validate_stored_enums(task: &Task, config: &ResolvedConfig, id: &str, action: &str) -> LoTaRResult<()> {
         if !task.status.is_empty() {
-            validation::parse_status(task.status.as_str(), config).map_err(|err| {
-                LoTaRError::ValidationError(format!(
-                    "cannot {action} '{id}': stored status is invalid under the current config: {err}"
-                ))
-            })?;
+            validation::parse_status(task.status.as_str(), config)
+                .map_err(|err| LoTaRError::ValidationError(format!("cannot {action} '{id}': stored status is invalid under the current config: {err}")))?;
         }
         if !task.priority.is_empty() {
-            validation::parse_priority(task.priority.as_str(), config).map_err(|err| {
-                LoTaRError::ValidationError(format!(
-                    "cannot {action} '{id}': stored priority is invalid under the current config: {err}"
-                ))
-            })?;
+            validation::parse_priority(task.priority.as_str(), config)
+                .map_err(|err| LoTaRError::ValidationError(format!("cannot {action} '{id}': stored priority is invalid under the current config: {err}")))?;
         }
         if !task.task_type.is_empty() {
-            validation::parse_task_type(task.task_type.as_str(), config).map_err(|err| {
-                LoTaRError::ValidationError(format!(
-                    "cannot {action} '{id}': stored task type is invalid under the current config: {err}"
-                ))
-            })?;
+            validation::parse_task_type(task.task_type.as_str(), config)
+                .map_err(|err| LoTaRError::ValidationError(format!("cannot {action} '{id}': stored task type is invalid under the current config: {err}")))?;
         }
         Ok(())
     }
 
     /// Lookup suggestions are always relevance-ranked; ordinary task lists
     /// only when `sort_by=relevance` is requested.
-    pub fn suggest(
-        storage: &Storage,
-        query: &str,
-        project: Option<String>,
-        limit: usize,
-    ) -> Vec<(String, TaskDTO)> {
+    pub fn suggest(storage: &Storage, query: &str, project: Option<String>, limit: usize) -> Vec<(String, TaskDTO)> {
         let query = query.trim();
         let full_id = TaskId::parse(query).ok();
-        let number = (!query.is_empty() && query.bytes().all(|b| b.is_ascii_digit()))
-            .then(|| query.parse::<u64>().ok())
-            .flatten();
+        let number = (!query.is_empty() && query.bytes().all(|b| b.is_ascii_digit())).then(|| query.parse::<u64>().ok()).flatten();
         let search = crate::utils::text_search::SearchQuery::parse(query);
-        let filter = TaskListFilter {
-            project,
-            ..Default::default()
-        };
+        let filter = TaskListFilter { project, ..Default::default() };
         // Do not prefilter by substring: padded aliases must reach the ranker.
         // ID matches rank first; text matches follow, best score first, with
         // the same rules as list search (all words, phrases, typos).
@@ -2406,13 +1789,8 @@ impl TaskService {
             .filter_map(|(id, task)| {
                 let parsed = TaskId::parse(&id).ok()?;
                 // An old ID of a moved task counts as an exact match (DEV-183).
-                let was = full_id.as_ref().is_some_and(|wanted| {
-                    task.moved_from
-                        .iter()
-                        .any(|old| TaskId::parse(old).is_ok_and(|old| &old == wanted))
-                });
-                let (rank, score) = if query.is_empty() || full_id.as_ref() == Some(&parsed) || was
-                {
+                let was = full_id.as_ref().is_some_and(|wanted| task.moved_from.iter().any(|old| TaskId::parse(old).is_ok_and(|old| &old == wanted)));
+                let (rank, score) = if query.is_empty() || full_id.as_ref() == Some(&parsed) || was {
                     (0, 0)
                 } else if number == Some(parsed.number) {
                     (1, 0)
@@ -2424,24 +1802,11 @@ impl TaskService {
                     use crate::utils::text_search::Searchable;
                     (4, search.score(&task.search_document(&id))?)
                 };
-                Some((
-                    (
-                        rank,
-                        std::cmp::Reverse(score),
-                        parsed.project,
-                        parsed.number,
-                        id.clone(),
-                    ),
-                    (id, task),
-                ))
+                Some(((rank, std::cmp::Reverse(score), parsed.project, parsed.number, id.clone()), (id, task)))
             })
             .collect::<Vec<_>>();
         ranked.sort_unstable_by(|a, b| a.0.cmp(&b.0));
-        ranked
-            .into_iter()
-            .take(limit)
-            .map(|(_, task)| task)
-            .collect()
+        ranked.into_iter().take(limit).map(|(_, task)| task).collect()
     }
 
     /// Tasks matching `filter`. Move stubs (DEV-183) are left out of every
@@ -2454,18 +1819,11 @@ impl TaskService {
     /// [`Self::list`] including move stubs, for scans that must recognize
     /// them (sync pulls match a remote issue to its stub and skip it instead
     /// of importing it again).
-    pub(crate) fn list_with_moved(
-        storage: &Storage,
-        filter: &TaskListFilter,
-    ) -> Vec<(String, TaskDTO)> {
+    pub(crate) fn list_with_moved(storage: &Storage, filter: &TaskListFilter) -> Vec<(String, TaskDTO)> {
         Self::list_matching(storage, filter, true)
     }
 
-    fn list_matching(
-        storage: &Storage,
-        filter: &TaskListFilter,
-        include_moved: bool,
-    ) -> Vec<(String, TaskDTO)> {
+    fn list_matching(storage: &Storage, filter: &TaskListFilter, include_moved: bool) -> Vec<(String, TaskDTO)> {
         // Map API filter to storage filter
         let storage_filter = crate::storage::TaskFilter {
             status: filter.status.clone(),
@@ -2483,8 +1841,7 @@ impl TaskService {
         // DEV-21 review F1: cache keyed by (actual root, prefix). A
         // prefix-only (or primary-root) key misclassifies DTO policies when
         // two different IDs share one prefix across sibling roots.
-        let mut config_cache: HashMap<(std::path::PathBuf, String), ResolvedConfig> =
-            HashMap::new();
+        let mut config_cache: HashMap<(std::path::PathBuf, String), ResolvedConfig> = HashMap::new();
 
         let sprint_lookup = Self::load_sprint_lookup(storage);
         let requested_sprints: HashSet<u32> = filter.sprints.iter().copied().collect();
@@ -2496,32 +1853,18 @@ impl TaskService {
                 if requested_sprints.is_empty() {
                     return true;
                 }
-                sprint_lookup
-                    .get(id)
-                    .map(|orders| {
-                        orders
-                            .keys()
-                            .any(|sprint_id| requested_sprints.contains(sprint_id))
-                    })
-                    .unwrap_or(false)
+                sprint_lookup.get(id).map(|orders| orders.keys().any(|sprint_id| requested_sprints.contains(sprint_id))).unwrap_or(false)
             })
             .map(|(id, mut t, config_root)| {
-                let project_prefix = TaskId::parse(&id)
-                    .map(|parsed| parsed.project)
-                    .unwrap_or_default();
+                let project_prefix = TaskId::parse(&id).map(|parsed| parsed.project).unwrap_or_default();
                 // Config comes from the root the search read the task from
                 // (nested/sibling workspaces). Locating every result again
                 // walked the project tree per task (DEV-255).
                 let config = config_cache
                     .entry((config_root.clone(), project_prefix.clone()))
-                    .or_insert_with(|| {
-                        Self::resolve_config_for_project(config_root.as_path(), &project_prefix)
-                    });
+                    .or_insert_with(|| Self::resolve_config_for_project(config_root.as_path(), &project_prefix));
                 Self::ensure_task_defaults(&mut t, config, false);
-                (
-                    id.clone(),
-                    Self::to_dto(&id, t, Some(&sprint_lookup), config, chrono::Utc::now()),
-                )
+                (id.clone(), Self::to_dto(&id, t, Some(&sprint_lookup), config, chrono::Utc::now()))
             })
             .collect();
 
@@ -2532,11 +1875,7 @@ impl TaskService {
     /// Shared member matching for task-list and locked graph projections;
     /// identity tokens such as @me have already been resolved by the parser.
     pub(crate) fn filter_assignees(results: &mut Vec<(String, TaskDTO)>, filter: &TaskListFilter) {
-        let assignee_targets: Vec<String> = filter
-            .assignee
-            .iter()
-            .map(|a| crate::utils::fuzzy_match::member_key(a))
-            .collect();
+        let assignee_targets: Vec<String> = filter.assignee.iter().map(|a| crate::utils::fuzzy_match::member_key(a)).collect();
         if filter.assignee_none {
             results.retain(|(_, t)| t.assignee.as_deref().unwrap_or("").trim().is_empty());
         } else if !assignee_targets.is_empty() {
@@ -2555,9 +1894,7 @@ impl TaskService {
     /// previous/current receipt pair of locked reference mutations so both
     /// DTOs describe one linearized mutation.
     pub(crate) fn dto_from_task(storage: &Storage, canonical_id: &str, task: Task) -> TaskDTO {
-        let project = TaskId::parse(canonical_id)
-            .map(|parsed| parsed.project)
-            .unwrap_or_default();
+        let project = TaskId::parse(canonical_id).map(|parsed| parsed.project).unwrap_or_default();
         let config_root = match storage.resolve_task_location(canonical_id) {
             Ok(location) => location.root.clone(),
             Err(_) => storage.root_path.clone(),
@@ -2566,13 +1903,7 @@ impl TaskService {
         let mut task = task;
         Self::ensure_task_defaults(&mut task, &config, false);
         let sprint_lookup = Self::load_sprint_lookup(storage);
-        Self::to_dto(
-            canonical_id,
-            task,
-            Some(&sprint_lookup),
-            &config,
-            chrono::Utc::now(),
-        )
+        Self::to_dto(canonical_id, task, Some(&sprint_lookup), &config, chrono::Utc::now())
     }
 
     pub(crate) fn to_dto(
@@ -2583,17 +1914,9 @@ impl TaskService {
         now: chrono::DateTime<chrono::Utc>,
     ) -> TaskDTO {
         let modified = Self::shown_modified(&task);
-        let sprint_order = sprint_lookup
-            .and_then(|lookup| lookup.get(id))
-            .cloned()
-            .unwrap_or_default();
+        let sprint_order = sprint_lookup.and_then(|lookup| lookup.get(id)).cloned().unwrap_or_default();
         let sprints: Vec<u32> = sprint_order.keys().copied().collect();
-        let task_state = Some(crate::services::completion::compute_task_state(
-            &task.status,
-            task.due_date.as_deref(),
-            config,
-            now,
-        ));
+        let task_state = Some(crate::services::completion::compute_task_state(&task.status, task.due_date.as_deref(), config, now));
         TaskDTO {
             id: id.to_string(),
             title: task.title,
@@ -2631,17 +1954,12 @@ impl TaskService {
         // nested-root tasks resolve memberships from the root that actually
         // holds them. Primary-root entries win when both roots mention the
         // same task ID.
-        let primary = storage
-            .root_path
-            .canonicalize()
-            .unwrap_or_else(|_| storage.root_path.clone());
+        let primary = storage.root_path.canonicalize().unwrap_or_else(|_| storage.root_path.clone());
         for candidate in StorageLocator::candidate_task_roots(&storage.root_path) {
             if candidate == primary {
                 continue;
             }
-            let sibling = Storage {
-                root_path: candidate,
-            };
+            let sibling = Storage { root_path: candidate };
             for (task_id, orders) in Self::sprint_lookup_for_root(&sibling) {
                 map.entry(task_id).or_insert(orders);
             }
@@ -2687,13 +2005,7 @@ impl TaskService {
         if values.is_empty() {
             return None;
         }
-        Some(
-            values
-                .iter()
-                .map(|id| id.to_string())
-                .collect::<Vec<_>>()
-                .join(", "),
-        )
+        Some(values.iter().map(|id| id.to_string()).collect::<Vec<_>>().join(", "))
     }
 
     pub(crate) fn normalize_sprint_ids(ids: &[u32]) -> Vec<u32> {
@@ -2705,12 +2017,7 @@ impl TaskService {
     /// Returns the updated config (for validation and automation) plus the
     /// exact config bytes to stage inside the transaction, so a validation or
     /// publish failure can never leave a mutated config behind (DEV-55).
-    fn plan_auto_populate_members(
-        tasks_root: &Path,
-        project: &str,
-        task: &Task,
-        mut config: ResolvedConfig,
-    ) -> LoTaRResult<(ResolvedConfig, Option<String>)> {
+    fn plan_auto_populate_members(tasks_root: &Path, project: &str, task: &Task, mut config: ResolvedConfig) -> LoTaRResult<(ResolvedConfig, Option<String>)> {
         if project.trim().is_empty() || !config.auto_populate_members {
             return Ok((config, None));
         }
@@ -2720,18 +2027,8 @@ impl TaskService {
             return Ok((config, None));
         }
 
-        let plan = crate::config::operations::plan_auto_populated_project_config(
-            tasks_root,
-            project,
-            &config.members,
-            &missing,
-        )
-        .map_err(|err| {
-            LoTaRError::ValidationError(format!(
-                "Failed to auto-populate members for project '{}': {}",
-                project, err
-            ))
-        })?;
+        let plan = crate::config::operations::plan_auto_populated_project_config(tasks_root, project, &config.members, &missing)
+            .map_err(|err| LoTaRError::ValidationError(format!("Failed to auto-populate members for project '{}': {}", project, err)))?;
 
         match plan {
             Some((project_config, effective)) => {
@@ -2743,12 +2040,7 @@ impl TaskService {
         }
     }
 
-    pub(crate) fn apply_memberships_to_records(
-        root: &Path,
-        records: &mut [SprintRecord],
-        task_id: &str,
-        desired: &BTreeSet<u32>,
-    ) -> LoTaRResult<HashSet<u32>> {
+    pub(crate) fn apply_memberships_to_records(root: &Path, records: &mut [SprintRecord], task_id: &str, desired: &BTreeSet<u32>) -> LoTaRResult<HashSet<u32>> {
         let moves = crate::storage::moves::MoveResolver::new(root);
         let mut touched: HashSet<u32> = HashSet::new();
         let mut found: BTreeSet<u32> = BTreeSet::new();
@@ -2757,29 +2049,18 @@ impl TaskService {
             // Canonical matching: legacy padded spellings (TP-001) are the
             // same member as the canonical id (TP-1), so no duplicate
             // entries are created and removal drops every spelling.
-            let contains = record
-                .sprint
-                .tasks
-                .iter()
-                .any(|entry| entry_matches_task(&moves, &entry.id, task_id));
+            let contains = record.sprint.tasks.iter().any(|entry| entry_matches_task(&moves, &entry.id, task_id));
             let should_have = desired.contains(&record.id);
 
             if contains && !should_have {
-                record
-                    .sprint
-                    .tasks
-                    .retain(|entry| !entry_matches_task(&moves, &entry.id, task_id));
+                record.sprint.tasks.retain(|entry| !entry_matches_task(&moves, &entry.id, task_id));
                 touched.insert(record.id);
             }
 
             if should_have {
                 found.insert(record.id);
                 if !contains {
-                    record.sprint.tasks.push(SprintTaskEntry {
-                        extra: Default::default(),
-                        id: task_id.to_string(),
-                        order: None,
-                    });
+                    record.sprint.tasks.push(SprintTaskEntry { extra: Default::default(), id: task_id.to_string(), order: None });
                     touched.insert(record.id);
                 }
             }
@@ -2839,10 +2120,7 @@ impl TaskService {
             if !seen.insert(lower.clone()) {
                 continue;
             }
-            let already_present = config
-                .members
-                .iter()
-                .any(|existing| existing.eq_ignore_ascii_case(&candidate));
+            let already_present = config.members.iter().any(|existing| existing.eq_ignore_ascii_case(&candidate));
             if !already_present {
                 missing.push(candidate);
             }
@@ -2851,42 +2129,29 @@ impl TaskService {
         missing
     }
 
-    pub(crate) fn resolve_config_for_project(
-        tasks_root: &Path,
-        project_prefix: &str,
-    ) -> ResolvedConfig {
-        crate::config::resolution::config_for_project(tasks_root, Some(project_prefix))
-            .unwrap_or_else(|error| {
-                let mut fallback = ResolvedConfig::from_global(GlobalConfig::default());
-                crate::config::resolution::apply_cli_overrides(&mut fallback);
-                // Read-only DTO paths retain legacy defaults on load errors,
-                // but an invalid explicit completion policy must never become
-                // the built-in Done policy. Config show/inspect report the
-                // policy error; these projections conservatively finish none.
-                if matches!(error, crate::config::types::ConfigError::PolicyError(_)) {
-                    fallback.issue_done_states =
-                        Some(crate::config::types::ConfigurableField { values: Vec::new() });
-                }
-                fallback
-            })
+    pub(crate) fn resolve_config_for_project(tasks_root: &Path, project_prefix: &str) -> ResolvedConfig {
+        crate::config::resolution::config_for_project(tasks_root, Some(project_prefix)).unwrap_or_else(|error| {
+            let mut fallback = ResolvedConfig::from_global(GlobalConfig::default());
+            crate::config::resolution::apply_cli_overrides(&mut fallback);
+            // Read-only DTO paths retain legacy defaults on load errors,
+            // but an invalid explicit completion policy must never become
+            // the built-in Done policy. Config show/inspect report the
+            // policy error; these projections conservatively finish none.
+            if matches!(error, crate::config::types::ConfigError::PolicyError(_)) {
+                fallback.issue_done_states = Some(crate::config::types::ConfigurableField { values: Vec::new() });
+            }
+            fallback
+        })
     }
 
     /// Config for validating a write: unlike
     /// [`Self::resolve_config_for_project`], a broken config file fails the
     /// write instead of validating against built-in defaults (DEV-265).
-    pub(crate) fn resolve_config_for_mutation(
-        tasks_root: &Path,
-        project_prefix: &str,
-    ) -> LoTaRResult<ResolvedConfig> {
-        crate::config::resolution::config_for_project_strict(tasks_root, Some(project_prefix))
-            .map_err(|err| LoTaRError::ValidationError(err.to_string()))
+    pub(crate) fn resolve_config_for_mutation(tasks_root: &Path, project_prefix: &str) -> LoTaRResult<ResolvedConfig> {
+        crate::config::resolution::config_for_project_strict(tasks_root, Some(project_prefix)).map_err(|err| LoTaRError::ValidationError(err.to_string()))
     }
 
-    pub(crate) fn ensure_task_defaults(
-        task: &mut Task,
-        config: &ResolvedConfig,
-        apply_default_tags: bool,
-    ) {
+    pub(crate) fn ensure_task_defaults(task: &mut Task, config: &ResolvedConfig, apply_default_tags: bool) {
         if task.status.is_empty()
             && let Some(default_status) = config.effective_default_status()
         {
@@ -2926,21 +2191,12 @@ impl TaskService {
         }
     }
 
-    pub(crate) fn enforce_membership(
-        task: &Task,
-        config: &ResolvedConfig,
-        project: &str,
-    ) -> LoTaRResult<()> {
+    pub(crate) fn enforce_membership(task: &Task, config: &ResolvedConfig, project: &str) -> LoTaRResult<()> {
         if !config.strict_members {
             return Ok(());
         }
 
-        let allowed: Vec<String> = config
-            .members
-            .iter()
-            .map(|member| member.trim().to_string())
-            .filter(|member| !member.is_empty())
-            .collect();
+        let allowed: Vec<String> = config.members.iter().map(|member| member.trim().to_string()).filter(|member| !member.is_empty()).collect();
 
         if allowed.is_empty() {
             return Err(LoTaRError::ValidationError(format!(
@@ -2960,36 +2216,21 @@ impl TaskService {
         Ok(())
     }
 
-    fn enforce_member_value(
-        field_label: &str,
-        value: &str,
-        allowed: &[String],
-        project: &str,
-    ) -> LoTaRResult<()> {
+    fn enforce_member_value(field_label: &str, value: &str, allowed: &[String], project: &str) -> LoTaRResult<()> {
         let trimmed = value.trim();
         if trimmed.is_empty() {
             return Ok(());
         }
 
         let norm_val = crate::utils::member::member_for_comparison(trimmed);
-        let permitted = allowed
-            .iter()
-            .any(|candidate| crate::utils::member::member_for_comparison(candidate) == norm_val);
+        let permitted = allowed.iter().any(|candidate| crate::utils::member::member_for_comparison(candidate) == norm_val);
 
         if permitted {
             return Ok(());
         }
 
         let preview_count = allowed.len();
-        let preview = if preview_count <= 10 {
-            allowed.join(", ")
-        } else {
-            format!(
-                "{} ... (+{} more)",
-                allowed[..10].join(", "),
-                preview_count - 10
-            )
-        };
+        let preview = if preview_count <= 10 { allowed.join(", ") } else { format!("{} ... (+{} more)", allowed[..10].join(", "), preview_count - 10) };
 
         Err(LoTaRError::ValidationError(format!(
             "{} '{}' is not in configured members for project '{}'. Allowed members: {}.",
@@ -3001,15 +2242,8 @@ impl TaskService {
 /// Canonical membership comparison: two sprint entry ids denote the same
 /// member when their canonical parses agree. Unparseable ids compare
 /// verbatim so malformed legacy entries are still matched exactly.
-fn entry_matches_task(
-    moves: &crate::storage::moves::MoveResolver,
-    entry_id: &str,
-    task_id: &str,
-) -> bool {
-    match (
-        TaskId::parse(entry_id.trim()),
-        TaskId::parse(task_id.trim()),
-    ) {
+fn entry_matches_task(moves: &crate::storage::moves::MoveResolver, entry_id: &str, task_id: &str) -> bool {
+    match (TaskId::parse(entry_id.trim()), TaskId::parse(task_id.trim())) {
         // Padded spellings and old IDs of moved tasks (DEV-183) name the
         // same task.
         (Ok(entry), Ok(task)) => entry == task || moves.same(entry_id, task_id),

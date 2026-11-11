@@ -6,9 +6,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Some(v) if !v.trim().is_empty() => v.trim().to_string(),
             _ => return bad_request("Missing code reference".into()),
         };
-        let parse_ctx = |key: &str| -> Option<usize> {
-            req.query.get(key).and_then(|s| s.parse::<usize>().ok())
-        };
+        let parse_ctx = |key: &str| -> Option<usize> { req.query.get(key).and_then(|s| s.parse::<usize>().ok()) };
         let normalize = |value: usize| -> usize {
             match value {
                 0 => 1,
@@ -17,22 +15,14 @@ pub(super) fn register(api_server: &mut ApiServer) {
             }
         };
         let default_context = parse_ctx("context").map(normalize).unwrap_or(6);
-        let before = parse_ctx("before")
-            .map(normalize)
-            .unwrap_or(default_context);
+        let before = parse_ctx("before").map(normalize).unwrap_or(default_context);
         let after = parse_ctx("after").map(normalize).unwrap_or(default_context);
         let resolver = try_response!(resolve_tasks_dir());
         let repo_root = match crate::utils::git::find_repo_root(&resolver.path) {
             Some(root) => root,
             None => return bad_request("Unable to locate git repository".into()),
         };
-        match ReferenceService::snippet_for_code_guarded(
-            &resolver.path,
-            &repo_root,
-            &code,
-            before,
-            after,
-        ) {
+        match ReferenceService::snippet_for_code_guarded(&resolver.path, &repo_root, &code, before, after) {
             Ok(snippet) => ok_json(200, json!({"data": snippet})),
             Err(msg) => bad_request(msg),
         }
@@ -47,11 +37,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             return ok_json(200, json!({"data": Vec::<String>::new()}));
         }
 
-        let limit: usize = req
-            .query
-            .get("limit")
-            .and_then(|s| s.parse::<usize>().ok())
-            .unwrap_or(20);
+        let limit: usize = req.query.get("limit").and_then(|s| s.parse::<usize>().ok()).unwrap_or(20);
         let limit = limit.clamp(1, 200);
 
         let resolver = try_response!(resolve_tasks_dir());

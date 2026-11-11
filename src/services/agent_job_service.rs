@@ -1,18 +1,13 @@
 use crate::api_types::{AgentJob, AgentJobCreateRequest};
 use crate::config::types::{AgentInstructionsConfig, AgentProfileDetail, ResolvedConfig};
 use crate::errors::{LoTaRError, LoTaRResult};
-use crate::services::agent_context_service::{
-    AgentContextService, build_assistant_message, build_user_message,
-};
+use crate::services::agent_context_service::{AgentContextService, build_assistant_message, build_user_message};
 use crate::services::agent_log_service::AgentLogService;
 use crate::services::agent_runner::{
-    AgentRunnerKind, RunnerEventKind, T3Launch, T3Worktree, build_runner_command, build_t3_command,
-    format_stdin_message, is_t3_noise, parse_runner_line, supports_stdin, t3_thread_id,
-    validate_runner_command,
+    AgentRunnerKind, RunnerEventKind, T3Launch, T3Worktree, build_runner_command, build_t3_command, format_stdin_message, is_t3_noise, parse_runner_line,
+    supports_stdin, t3_thread_id, validate_runner_command,
 };
-use crate::services::automation_service::{
-    AutomationEvent, AutomationJobContext, AutomationService, build_lotar_env,
-};
+use crate::services::automation_service::{AutomationEvent, AutomationJobContext, AutomationService, build_lotar_env};
 use crate::services::sprint_metrics::determine_done_statuses_from_config;
 use crate::services::task_service::TaskService;
 use crate::storage::manager::Storage;
@@ -34,8 +29,7 @@ const EVENT_LOG_LIMIT: usize = 200;
 const DEFAULT_AGENT_INSTRUCTIONS: &str = include_str!("../../docs/help/agent-instructions.md");
 
 static JOB_COUNTER: AtomicU64 = AtomicU64::new(1);
-static ORCHESTRATOR_MODE: LazyLock<Mutex<AgentOrchestratorMode>> =
-    LazyLock::new(|| Mutex::new(AgentOrchestratorMode::Standalone));
+static ORCHESTRATOR_MODE: LazyLock<Mutex<AgentOrchestratorMode>> = LazyLock::new(|| Mutex::new(AgentOrchestratorMode::Standalone));
 static JOB_REGISTRY: LazyLock<Mutex<JobRegistry>> = LazyLock::new(|| {
     Mutex::new(JobRegistry {
         jobs: HashMap::new(),
@@ -170,23 +164,14 @@ impl AgentJobService {
     }
 
     pub fn orchestrator_mode() -> AgentOrchestratorMode {
-        ORCHESTRATOR_MODE
-            .lock()
-            .map(|guard| *guard)
-            .unwrap_or(AgentOrchestratorMode::Standalone)
+        ORCHESTRATOR_MODE.lock().map(|guard| *guard).unwrap_or(AgentOrchestratorMode::Standalone)
     }
 
-    pub fn start_job(
-        req: AgentJobCreateRequest,
-        resolver: &TasksDirectoryResolver,
-    ) -> LoTaRResult<AgentJob> {
+    pub fn start_job(req: AgentJobCreateRequest, resolver: &TasksDirectoryResolver) -> LoTaRResult<AgentJob> {
         Self::start_job_with_tasks_dir(req, &resolver.path)
     }
 
-    pub fn start_job_with_tasks_dir(
-        req: AgentJobCreateRequest,
-        tasks_dir: &std::path::Path,
-    ) -> LoTaRResult<AgentJob> {
+    pub fn start_job_with_tasks_dir(req: AgentJobCreateRequest, tasks_dir: &std::path::Path) -> LoTaRResult<AgentJob> {
         Self::start_job_with_tasks_dir_mode(req, tasks_dir, JobStartMode::RespectLimits)
     }
 
@@ -197,49 +182,33 @@ impl AgentJobService {
     pub fn preflight(req: &AgentJobCreateRequest, tasks_dir: &std::path::Path) -> LoTaRResult<()> {
         let ticket_id = req.ticket_id.trim().to_string();
         if ticket_id.is_empty() {
-            return Err(LoTaRError::ValidationError(
-                "Ticket id is required".to_string(),
-            ));
+            return Err(LoTaRError::ValidationError("Ticket id is required".to_string()));
         }
         if req.prompt.trim().is_empty() {
-            return Err(LoTaRError::ValidationError(
-                "Prompt cannot be empty".to_string(),
-            ));
+            return Err(LoTaRError::ValidationError("Prompt cannot be empty".to_string()));
         }
         let ticket_id = match crate::storage::moves::follow(tasks_dir, &ticket_id) {
             Ok(Some(current)) => current,
             _ => ticket_id,
         };
-        let parsed_ticket = crate::storage::TaskId::parse(&ticket_id).map_err(|err| {
-            LoTaRError::ValidationError(format!("Invalid ticket id '{ticket_id}': {err}"))
-        })?;
+        let parsed_ticket =
+            crate::storage::TaskId::parse(&ticket_id).map_err(|err| LoTaRError::ValidationError(format!("Invalid ticket id '{ticket_id}': {err}")))?;
         let config =
-            crate::config::resolution::config_for_project(tasks_dir, Some(&parsed_ticket.project))
-                .map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
+            crate::config::resolution::config_for_project(tasks_dir, Some(&parsed_ticket.project)).map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
         let profile = resolve_profile(&config, req)?;
         ensure_profile_trusted(tasks_dir, req)?;
         profile.runner.parse::<AgentRunnerKind>().map_err(|_| {
-            LoTaRError::ValidationError(format!(
-                "Unsupported runner '{}'. Expected {}",
-                profile.runner,
-                crate::config::operations::AGENT_RUNNERS.join(", ")
-            ))
+            LoTaRError::ValidationError(format!("Unsupported runner '{}'. Expected {}", profile.runner, crate::config::operations::AGENT_RUNNERS.join(", ")))
         })?;
         let storage = Storage::new(tasks_dir);
         TaskService::get(&storage, &parsed_ticket.canonical(), None)?;
         Ok(())
     }
 
-    pub fn start_job_with_tasks_dir_mode(
-        req: AgentJobCreateRequest,
-        tasks_dir: &std::path::Path,
-        mode: JobStartMode,
-    ) -> LoTaRResult<AgentJob> {
+    pub fn start_job_with_tasks_dir_mode(req: AgentJobCreateRequest, tasks_dir: &std::path::Path, mode: JobStartMode) -> LoTaRResult<AgentJob> {
         let ticket_id = req.ticket_id.trim().to_string();
         if ticket_id.is_empty() {
-            return Err(LoTaRError::ValidationError(
-                "Ticket id is required".to_string(),
-            ));
+            return Err(LoTaRError::ValidationError("Ticket id is required".to_string()));
         }
         // A job started on an old ID of a moved task works on the task it
         // became, under its current ID (DEV-183).
@@ -248,9 +217,8 @@ impl AgentJobService {
             _ => ticket_id,
         };
 
-        let parsed_ticket = crate::storage::TaskId::parse(&ticket_id).map_err(|err| {
-            LoTaRError::ValidationError(format!("Invalid ticket id '{ticket_id}': {err}"))
-        })?;
+        let parsed_ticket =
+            crate::storage::TaskId::parse(&ticket_id).map_err(|err| LoTaRError::ValidationError(format!("Invalid ticket id '{ticket_id}': {err}")))?;
         let project_prefix = parsed_ticket.project.clone();
         // Canonicalize ONCE at this creation boundary: the registry key, the
         // persisted record, the pending queue entry, the spawned runner env,
@@ -258,18 +226,12 @@ impl AgentJobService {
         // started through a padded alias (TP-001) locks the canonical ticket
         // (TP-1) and duplicate alias jobs cannot be registered.
         let ticket_id = parsed_ticket.canonical();
-        let config =
-            crate::config::resolution::config_for_project(tasks_dir, Some(&project_prefix))
-                .map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
+        let config = crate::config::resolution::config_for_project(tasks_dir, Some(&project_prefix)).map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
 
         let profile = resolve_profile(&config, &req)?;
         ensure_profile_trusted(tasks_dir, &req)?;
         let runner_kind = profile.runner.parse::<AgentRunnerKind>().map_err(|_| {
-            LoTaRError::ValidationError(format!(
-                "Unsupported runner '{}'. Expected {}",
-                profile.runner,
-                crate::config::operations::AGENT_RUNNERS.join(", ")
-            ))
+            LoTaRError::ValidationError(format!("Unsupported runner '{}'. Expected {}", profile.runner, crate::config::operations::AGENT_RUNNERS.join(", ")))
         })?;
 
         let storage = Storage::new(tasks_dir);
@@ -288,62 +250,32 @@ impl AgentJobService {
             }
             Ok(_) => {}
             Err(err) => {
-                return Err(LoTaRError::ValidationError(format!(
-                    "Ticket '{ticket_id}' could not be uniquely resolved in this workspace: {err}"
-                )));
+                return Err(LoTaRError::ValidationError(format!("Ticket '{ticket_id}' could not be uniquely resolved in this workspace: {err}")));
             }
         }
         let is_merge_job = is_merge_job_candidate(&task, req.agent.as_deref());
 
         if is_merge_job && !config.agent_worktree.enabled {
-            return Err(LoTaRError::ValidationError(
-                "Merge agent jobs require agent.worktree.enabled=true so merges run on isolated branches."
-                    .to_string(),
-            ));
+            return Err(LoTaRError::ValidationError("Merge agent jobs require agent.worktree.enabled=true so merges run on isolated branches.".to_string()));
         }
 
         let job_id = make_job_id();
         let context = AgentContextService::load(tasks_dir, &config, &ticket_id)?;
-        let template = instruction_template(
-            tasks_dir,
-            &config,
-            &task,
-            &job_id,
-            runner_kind,
-            req.agent.as_deref(),
-        );
-        let instructions = resolve_agent_instructions(tasks_dir, &config, &profile)?
-            .map(|text| template.expand(&text));
+        let template = instruction_template(tasks_dir, &config, &task, &job_id, runner_kind, req.agent.as_deref());
+        let instructions = resolve_agent_instructions(tasks_dir, &config, &profile)?.map(|text| template.expand(&text));
         let user_prompt = req.prompt.trim().to_string();
         if user_prompt.is_empty() {
-            return Err(LoTaRError::ValidationError(
-                "Prompt cannot be empty".to_string(),
-            ));
+            return Err(LoTaRError::ValidationError("Prompt cannot be empty".to_string()));
         }
         // A T3 Code thread runs in its project's runtime mode, whatever the
         // profile's permissions say.
-        let read_only = runner_kind != AgentRunnerKind::T3
-            && profile.permissions == Some(crate::config::types::AgentPermissions::ReadOnly);
-        let lotar_mcp = profile.mcp.as_ref().is_some_and(|mcp| mcp.lotar)
-            && crate::services::agent_runner::supports_lotar_mcp(runner_kind);
-        let mut notes = job_notes(
-            tasks_dir,
-            &config,
-            &ticket_id,
-            is_merge_job,
-            read_only,
-            lotar_mcp,
-        );
+        let read_only = runner_kind != AgentRunnerKind::T3 && profile.permissions == Some(crate::config::types::AgentPermissions::ReadOnly);
+        let lotar_mcp = profile.mcp.as_ref().is_some_and(|mcp| mcp.lotar) && crate::services::agent_runner::supports_lotar_mcp(runner_kind);
+        let mut notes = job_notes(tasks_dir, &config, &ticket_id, is_merge_job, read_only, lotar_mcp);
         if runner_kind == AgentRunnerKind::T3 {
             notes.push_str(&t3_tasks_dir_note(tasks_dir));
         }
-        let prompt = build_prompt(
-            &task,
-            &user_prompt,
-            context.as_ref(),
-            instructions.as_deref(),
-            Some(&notes),
-        );
+        let prompt = build_prompt(&task, &user_prompt, context.as_ref(), instructions.as_deref(), Some(&notes));
 
         let created_at = Utc::now().to_rfc3339();
         let tasks_dir_buf = tasks_dir.to_path_buf();
@@ -351,40 +283,24 @@ impl AgentJobService {
 
         let should_queue: bool;
         {
-            let mut registry = JOB_REGISTRY
-                .lock()
-                .map_err(|_| LoTaRError::ValidationError("Job registry unavailable".to_string()))?;
+            let mut registry = JOB_REGISTRY.lock().map_err(|_| LoTaRError::ValidationError("Job registry unavailable".to_string()))?;
 
-            if registry.active_by_ticket.contains_key(&ticket_id)
-                || crate::services::agent_active_jobs::for_ticket_elsewhere(tasks_dir, &ticket_id)
-                    .is_some()
-            {
-                return Err(LoTaRError::ValidationError(format!(
-                    "Ticket '{}' already has an active job",
-                    ticket_id
-                )));
+            if registry.active_by_ticket.contains_key(&ticket_id) || crate::services::agent_active_jobs::for_ticket_elsewhere(tasks_dir, &ticket_id).is_some() {
+                return Err(LoTaRError::ValidationError(format!("Ticket '{}' already has an active job", ticket_id)));
             }
 
             // Update max_parallel_jobs from config (allows runtime changes)
             registry.max_parallel_jobs = config.agent_worktree.max_parallel_jobs;
 
-            let parallel_limit_reached = registry
-                .max_parallel_jobs
-                .is_some_and(|max| registry.running_count >= max);
+            let parallel_limit_reached = registry.max_parallel_jobs.is_some_and(|max| registry.running_count >= max);
             let merge_slot_busy = is_merge_job && has_active_merge_job(&registry);
 
-            should_queue = matches!(mode, JobStartMode::RespectLimits)
-                && (parallel_limit_reached || merge_slot_busy);
+            should_queue = matches!(mode, JobStartMode::RespectLimits) && (parallel_limit_reached || merge_slot_busy);
 
             // Compute workspace root (parent of tasks_dir)
-            let workspace_root = tasks_dir_buf
-                .parent()
-                .map(|p| p.to_path_buf())
-                .unwrap_or_else(|| tasks_dir_buf.clone());
+            let workspace_root = tasks_dir_buf.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| tasks_dir_buf.clone());
 
-            registry
-                .active_by_ticket
-                .insert(ticket_id.clone(), job_id.clone());
+            registry.active_by_ticket.insert(ticket_id.clone(), job_id.clone());
             prune_finished_jobs(&mut registry);
             registry.jobs.insert(
                 job_id.clone(),
@@ -394,10 +310,7 @@ impl AgentJobService {
                         ticket_id: ticket_id.clone(),
                         tasks_dir: tasks_dir_buf.clone(),
                         workspace_root,
-                        agent_logs_dir: crate::services::agent_log_service::effective_logs_dir(
-                            tasks_dir,
-                            config.agent_logs_dir.as_deref(),
-                        ),
+                        agent_logs_dir: crate::services::agent_log_service::effective_logs_dir(tasks_dir, config.agent_logs_dir.as_deref()),
                         runner: runner_kind.as_str().to_string(),
                         runner_kind,
                         agent_profile: req.agent.clone(),
@@ -450,16 +363,7 @@ impl AgentJobService {
             let job_id_clone = job_id.clone();
             let user_prompt_clone = user_prompt.clone();
             thread::spawn(move || {
-                run_job(
-                    job_id_clone,
-                    runner_kind,
-                    profile,
-                    tasks_dir_buf,
-                    ticket_id,
-                    prompt,
-                    user_prompt_clone,
-                    config,
-                );
+                run_job(job_id_clone, runner_kind, profile, tasks_dir_buf, ticket_id, prompt, user_prompt_clone, config);
             });
         }
 
@@ -487,11 +391,7 @@ impl AgentJobService {
     pub fn list_jobs() -> Vec<AgentJob> {
         let registry = JOB_REGISTRY.lock();
         if let Ok(registry) = registry {
-            return registry
-                .jobs
-                .values()
-                .map(|state| state.record.to_dto())
-                .collect();
+            return registry.jobs.values().map(|state| state.record.to_dto()).collect();
         }
         Vec::new()
     }
@@ -505,32 +405,20 @@ impl AgentJobService {
                 max_parallel: registry.max_parallel_jobs,
             }
         } else {
-            crate::api_types::AgentQueueStats {
-                running: 0,
-                queued: 0,
-                max_parallel: None,
-            }
+            crate::api_types::AgentQueueStats { running: 0, queued: 0, max_parallel: None }
         }
     }
 
     /// The job this process runs (or queues) for the ticket.
     pub fn active_job_id(ticket_id: &str) -> Option<String> {
-        JOB_REGISTRY
-            .lock()
-            .ok()
-            .and_then(|registry| registry.active_by_ticket.get(ticket_id).cloned())
+        JOB_REGISTRY.lock().ok().and_then(|registry| registry.active_by_ticket.get(ticket_id).cloned())
     }
 
     /// Whether no worker of this process still works on the job: its end
     /// automation has run (DEV-322). A job that never got a worker (queued,
     /// then cancelled) is settled too.
     pub fn job_settled(job_id: &str) -> bool {
-        JOB_REGISTRY.lock().map_or(true, |registry| {
-            registry
-                .jobs
-                .get(job_id)
-                .is_none_or(|state| !state.worker_running)
-        })
+        JOB_REGISTRY.lock().map_or(true, |registry| registry.jobs.get(job_id).is_none_or(|state| !state.worker_running))
     }
 
     pub fn has_active_job(ticket_id: &str) -> bool {
@@ -543,9 +431,7 @@ impl AgentJobService {
     /// [`Self::has_active_job`], plus jobs other processes run for this
     /// tasks directory (DEV-279).
     pub fn has_active_job_in(tasks_dir: &std::path::Path, ticket_id: &str) -> bool {
-        Self::has_active_job(ticket_id)
-            || crate::services::agent_active_jobs::for_ticket_elsewhere(tasks_dir, ticket_id)
-                .is_some()
+        Self::has_active_job(ticket_id) || crate::services::agent_active_jobs::for_ticket_elsewhere(tasks_dir, ticket_id).is_some()
     }
 
     pub fn get_job(id: &str) -> Option<AgentJob> {
@@ -553,18 +439,13 @@ impl AgentJobService {
     }
 
     pub fn cancel_job(id: &str) -> LoTaRResult<Option<AgentJob>> {
-        let mut registry = JOB_REGISTRY
-            .lock()
-            .map_err(|_| LoTaRError::ValidationError("Job registry unavailable".to_string()))?;
+        let mut registry = JOB_REGISTRY.lock().map_err(|_| LoTaRError::ValidationError("Job registry unavailable".to_string()))?;
         let (job, cancelled, was_pending) = {
             let was_pending = registry.pending_queue.iter().any(|p| p.job_id == id);
             let Some(state) = registry.jobs.get_mut(id) else {
                 return Ok(None);
             };
-            if !matches!(
-                state.record.status,
-                AgentJobStatus::Queued | AgentJobStatus::Running
-            ) {
+            if !matches!(state.record.status, AgentJobStatus::Queued | AgentJobStatus::Running) {
                 return Ok(Some(state.record.to_dto()));
             }
             if let Some(runtime) = state.runtime.as_ref()
@@ -598,19 +479,11 @@ impl AgentJobService {
 
     pub fn cancel_all_jobs() -> LoTaRResult<Vec<AgentJob>> {
         let ids = {
-            let registry = JOB_REGISTRY
-                .lock()
-                .map_err(|_| LoTaRError::ValidationError("Job registry unavailable".to_string()))?;
+            let registry = JOB_REGISTRY.lock().map_err(|_| LoTaRError::ValidationError("Job registry unavailable".to_string()))?;
             registry
                 .jobs
                 .iter()
-                .filter_map(|(id, state)| {
-                    matches!(
-                        state.record.status,
-                        AgentJobStatus::Queued | AgentJobStatus::Running
-                    )
-                    .then_some(id.clone())
-                })
+                .filter_map(|(id, state)| matches!(state.record.status, AgentJobStatus::Queued | AgentJobStatus::Running).then_some(id.clone()))
                 .collect::<Vec<_>>()
         };
 
@@ -653,58 +526,39 @@ impl AgentJobService {
     pub fn send_message(id: &str, message: &str) -> LoTaRResult<AgentJob> {
         let trimmed = message.trim();
         if trimmed.is_empty() {
-            return Err(LoTaRError::ValidationError(
-                "Message cannot be empty".to_string(),
-            ));
+            return Err(LoTaRError::ValidationError("Message cannot be empty".to_string()));
         }
 
-        let mut registry = JOB_REGISTRY
-            .lock()
-            .map_err(|_| LoTaRError::ValidationError("Job registry unavailable".to_string()))?;
+        let mut registry = JOB_REGISTRY.lock().map_err(|_| LoTaRError::ValidationError("Job registry unavailable".to_string()))?;
         let (stdin, runner_kind) = {
             let Some(state) = registry.jobs.get_mut(id) else {
                 return Err(LoTaRError::ValidationError("Job not found".to_string()));
             };
 
             if state.record.status != AgentJobStatus::Running {
-                return Err(LoTaRError::ValidationError(
-                    "Job is not running".to_string(),
-                ));
+                return Err(LoTaRError::ValidationError("Job is not running".to_string()));
             }
 
             let Some(runtime) = state.runtime.as_ref() else {
-                return Err(LoTaRError::ValidationError(
-                    "Job is not accepting messages".to_string(),
-                ));
+                return Err(LoTaRError::ValidationError("Job is not accepting messages".to_string()));
             };
             let Some(stdin) = runtime.stdin.as_ref() else {
-                return Err(LoTaRError::ValidationError(
-                    "Runner does not support messages".to_string(),
-                ));
+                return Err(LoTaRError::ValidationError("Runner does not support messages".to_string()));
             };
 
             (Arc::clone(stdin), state.record.runner_kind)
         };
 
-        let payload = format_stdin_message(runner_kind, trimmed).ok_or_else(|| {
-            LoTaRError::ValidationError(format!(
-                "Runner '{}' does not support stdin messages",
-                runner_kind.as_str()
-            ))
-        })?;
+        let payload = format_stdin_message(runner_kind, trimmed)
+            .ok_or_else(|| LoTaRError::ValidationError(format!("Runner '{}' does not support stdin messages", runner_kind.as_str())))?;
 
         {
-            let mut writer = stdin
-                .lock()
-                .map_err(|_| LoTaRError::ValidationError("Job stdin unavailable".to_string()))?;
+            let mut writer = stdin.lock().map_err(|_| LoTaRError::ValidationError("Job stdin unavailable".to_string()))?;
             writer.write_all(&payload).map_err(LoTaRError::IoError)?;
             writer.flush().map_err(LoTaRError::IoError)?;
         }
 
-        let state = registry
-            .jobs
-            .get_mut(id)
-            .ok_or_else(|| LoTaRError::ValidationError("Job not found".to_string()))?;
+        let state = registry.jobs.get_mut(id).ok_or_else(|| LoTaRError::ValidationError("Job not found".to_string()))?;
         record_and_emit(state, "agent_job_input", Some(trimmed.to_string()));
 
         Ok(state.record.to_dto())
@@ -800,21 +654,14 @@ fn wrap_runner_command(
     ];
     args.extend(command.args.iter().cloned());
 
-    crate::services::agent_runner::RunnerCommand {
-        program: wrapper_program,
-        args,
-        env: command.env,
-        initial_input: command.initial_input,
-    }
+    crate::services::agent_runner::RunnerCommand { program: wrapper_program, args, env: command.env, initial_input: command.initial_input }
 }
 
 fn is_executable_file(path: &std::path::Path) -> bool {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        path.metadata()
-            .map(|m| m.is_file() && (m.permissions().mode() & 0o111 != 0))
-            .unwrap_or(false)
+        path.metadata().map(|m| m.is_file() && (m.permissions().mode() & 0o111 != 0)).unwrap_or(false)
     }
     #[cfg(not(unix))]
     {
@@ -851,11 +698,7 @@ fn resolve_wrapper_program() -> Option<String> {
 }
 
 fn wrapper_executable_name() -> &'static str {
-    if cfg!(windows) {
-        "lotar-agent-wrapper.exe"
-    } else {
-        "lotar-agent-wrapper"
-    }
+    if cfg!(windows) { "lotar-agent-wrapper.exe" } else { "lotar-agent-wrapper" }
 }
 
 /// Stop a runner and everything it started. Some CLIs (Codex, Copilot) run
@@ -903,10 +746,7 @@ fn descendant_pids(root: u32) -> Vec<u32> {
     let mut children: HashMap<u32, Vec<u32>> = HashMap::new();
     for (pid, process) in system.processes() {
         if let Some(parent) = process.parent() {
-            children
-                .entry(parent.as_u32())
-                .or_default()
-                .push(pid.as_u32());
+            children.entry(parent.as_u32()).or_default().push(pid.as_u32());
         }
     }
     let mut found = Vec::new();
@@ -925,45 +765,24 @@ fn descendant_pids(root: u32) -> Vec<u32> {
 /// Agent profiles defined in repository config run programs the
 /// repository chose; they need a trusted workspace (DEV-259). Bare
 /// `--runner` jobs and home-config profiles are the user's own choice.
-fn ensure_profile_trusted(
-    tasks_dir: &std::path::Path,
-    req: &AgentJobCreateRequest,
-) -> LoTaRResult<()> {
+fn ensure_profile_trusted(tasks_dir: &std::path::Path, req: &AgentJobCreateRequest) -> LoTaRResult<()> {
     use crate::services::trust_service::TrustService;
     let Some(name) = req.agent.as_deref() else {
         return Ok(());
     };
-    if TrustService::profile_from_repository(tasks_dir, name)
-        && !TrustService::allows_commands(tasks_dir)
-    {
-        return Err(LoTaRError::ValidationError(
-            TrustService::untrusted_message(tasks_dir, &format!("agent profile '{name}'")),
-        ));
+    if TrustService::profile_from_repository(tasks_dir, name) && !TrustService::allows_commands(tasks_dir) {
+        return Err(LoTaRError::ValidationError(TrustService::untrusted_message(tasks_dir, &format!("agent profile '{name}'"))));
     }
     Ok(())
 }
 
-fn resolve_profile(
-    config: &ResolvedConfig,
-    req: &AgentJobCreateRequest,
-) -> LoTaRResult<AgentProfileDetail> {
+fn resolve_profile(config: &ResolvedConfig, req: &AgentJobCreateRequest) -> LoTaRResult<AgentProfileDetail> {
     let mut profile = if let Some(name) = req.agent.as_deref() {
-        config
-            .agent_profiles
-            .get(name)
-            .ok_or_else(|| {
-                LoTaRError::ValidationError(format!("Unknown agent profile '{}'.", name))
-            })?
-            .clone()
+        config.agent_profiles.get(name).ok_or_else(|| LoTaRError::ValidationError(format!("Unknown agent profile '{}'.", name)))?.clone()
     } else if let Some(runner) = req.runner.as_deref() {
-        AgentProfileDetail {
-            runner: runner.to_string(),
-            ..Default::default()
-        }
+        AgentProfileDetail { runner: runner.to_string(), ..Default::default() }
     } else {
-        return Err(LoTaRError::ValidationError(
-            "Either agent or runner must be provided".to_string(),
-        ));
+        return Err(LoTaRError::ValidationError("Either agent or runner must be provided".to_string()));
     };
 
     // A run's own model and effort win over the profile's, including model
@@ -971,16 +790,9 @@ fn resolve_profile(
     let run_model = non_blank(req.model.as_deref());
     let run_effort = non_blank(req.effort.as_deref());
     if (run_model.is_some() || run_effort.is_some())
-        && let Ok(kind) = profile
-            .runner
-            .parse::<crate::services::agent_runner::AgentRunnerKind>()
+        && let Ok(kind) = profile.runner.parse::<crate::services::agent_runner::AgentRunnerKind>()
     {
-        profile.args = crate::services::agent_runner::drop_overridden_args(
-            kind,
-            &profile.args,
-            run_model.is_some(),
-            run_effort.is_some(),
-        );
+        profile.args = crate::services::agent_runner::drop_overridden_args(kind, &profile.args, run_model.is_some(), run_effort.is_some());
     }
     if let Some(model) = run_model {
         profile.model = Some(model);
@@ -1007,19 +819,12 @@ fn resolve_profile(
 }
 
 fn non_blank(value: Option<&str>) -> Option<String> {
-    value
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(str::to_string)
+    value.map(str::trim).filter(|value| !value.is_empty()).map(str::to_string)
 }
 
 /// The instructions for a job: the base text (`agent.instructions`, or the
 /// built-in default when unset) followed by the profile's own instructions.
-fn resolve_agent_instructions(
-    tasks_dir: &std::path::Path,
-    config: &ResolvedConfig,
-    profile: &AgentProfileDetail,
-) -> LoTaRResult<Option<String>> {
+fn resolve_agent_instructions(tasks_dir: &std::path::Path, config: &ResolvedConfig, profile: &AgentProfileDetail) -> LoTaRResult<Option<String>> {
     let base = match config.agent_instructions.as_ref() {
         Some(configured) => read_instructions(tasks_dir, configured)?,
         None => Some(DEFAULT_AGENT_INSTRUCTIONS.trim().to_string()),
@@ -1029,28 +834,18 @@ fn resolve_agent_instructions(
         None => None,
     };
     Ok(match (base, role) {
-        (Some(base), Some(role)) => Some(format!(
-            "{base}\n\n## Instructions for this agent\n\n{role}"
-        )),
+        (Some(base), Some(role)) => Some(format!("{base}\n\n## Instructions for this agent\n\n{role}")),
         (base, role) => base.or(role),
     })
 }
 
-fn read_instructions(
-    tasks_dir: &std::path::Path,
-    configured: &AgentInstructionsConfig,
-) -> LoTaRResult<Option<String>> {
+fn read_instructions(tasks_dir: &std::path::Path, configured: &AgentInstructionsConfig) -> LoTaRResult<Option<String>> {
     let text = match configured {
         AgentInstructionsConfig::Inline(raw) => raw.clone(),
         AgentInstructionsConfig::File { file } => {
             let path = resolve_agent_instructions_path(tasks_dir, file)?;
-            fs::read_to_string(&path).map_err(|err| {
-                LoTaRError::ValidationError(format!(
-                    "Failed to read agent.instructions file '{}': {}",
-                    path.display(),
-                    err
-                ))
-            })?
+            fs::read_to_string(&path)
+                .map_err(|err| LoTaRError::ValidationError(format!("Failed to read agent.instructions file '{}': {}", path.display(), err)))?
         }
     };
     Ok(non_blank(Some(&text)))
@@ -1069,17 +864,10 @@ fn instruction_template(
     agent: Option<&str>,
 ) -> crate::automation::template::TemplateContext {
     let repo_root = resolve_repo_root(tasks_dir);
-    let branch = config.agent_worktree.enabled.then(|| {
-        build_worktree_branch(
-            &config.agent_worktree.branch_prefix,
-            &sanitize_worktree_token(&task.id),
-        )
-    });
+    let branch = config.agent_worktree.enabled.then(|| build_worktree_branch(&config.agent_worktree.branch_prefix, &sanitize_worktree_token(&task.id)));
     let worktree_path = branch.as_ref().and_then(|_| {
         let root = repo_root.as_ref()?;
-        resolve_worktree_root(root, config.agent_worktree.dir.as_deref())
-            .ok()
-            .map(|dir| dir.join(sanitize_worktree_token(&task.id)))
+        resolve_worktree_root(root, config.agent_worktree.dir.as_deref()).ok().map(|dir| dir.join(sanitize_worktree_token(&task.id)))
     });
     let job = AutomationJobContext {
         job_id: job_id.to_string(),
@@ -1089,16 +877,9 @@ fn instruction_template(
         worktree_branch: branch,
         usage: None,
     };
-    let workspace_root =
-        repo_root.unwrap_or_else(|| tasks_dir.parent().unwrap_or(tasks_dir).to_path_buf());
-    let lotar_bin = current_lotar_binary()
-        .map(|bin| bin.to_string_lossy().to_string())
-        .unwrap_or_else(|| "lotar".to_string());
-    let project = task
-        .id
-        .rsplit_once('-')
-        .map(|(project, _)| project)
-        .unwrap_or_default();
+    let workspace_root = repo_root.unwrap_or_else(|| tasks_dir.parent().unwrap_or(tasks_dir).to_path_buf());
+    let lotar_bin = current_lotar_binary().map(|bin| bin.to_string_lossy().to_string()).unwrap_or_else(|| "lotar".to_string());
+    let project = task.id.rsplit_once('-').map(|(project, _)| project).unwrap_or_default();
     crate::automation::template::TemplateContext::from_task(task)
         .with_job(Some(&job))
         .with_var("ticket.project", project)
@@ -1109,14 +890,7 @@ fn instruction_template(
 /// What LoTaR knows about how this job runs and ends, so the agent neither
 /// leaves work uncommitted in a worktree nor fights automation over the
 /// ticket's status.
-fn job_notes(
-    tasks_dir: &std::path::Path,
-    config: &ResolvedConfig,
-    ticket_id: &str,
-    is_merge_job: bool,
-    read_only: bool,
-    lotar_mcp: bool,
-) -> String {
+fn job_notes(tasks_dir: &std::path::Path, config: &ResolvedConfig, ticket_id: &str, is_merge_job: bool, read_only: bool, lotar_mcp: bool) -> String {
     if read_only {
         return "- This job is read-only: you can read files and search, but not edit files or run commands \
 that change anything, including lotar. Don't try to update the ticket. Put your complete result in your \
@@ -1131,16 +905,10 @@ final answer; LoTaR saves it as the job summary.\n"
         ));
     }
     if let Some(bin) = current_lotar_binary() {
-        notes.push_str(&format!(
-            "- Run the LoTaR CLI as `{}` (the build that started this job).\n",
-            bin.display()
-        ));
+        notes.push_str(&format!("- Run the LoTaR CLI as `{}` (the build that started this job).\n", bin.display()));
     }
     if config.agent_worktree.enabled {
-        let branch = build_worktree_branch(
-            &config.agent_worktree.branch_prefix,
-            &sanitize_worktree_token(ticket_id),
-        );
+        let branch = build_worktree_branch(&config.agent_worktree.branch_prefix, &sanitize_worktree_token(ticket_id));
         notes.push_str(&format!(
             "- You are working in a git worktree on branch `{branch}`, separate from the main checkout. \
 Commit your work to this branch before you finish. If git refuses to commit (for example inside a sandbox), \
@@ -1154,9 +922,7 @@ as long as the branch is rebased onto it.\n",
             );
         }
     } else {
-        notes.push_str(
-            "- You are working in the main checkout. Leave your changes uncommitted unless the ticket or your instructions ask for a commit.\n",
-        );
+        notes.push_str("- You are working in the main checkout. Leave your changes uncommitted unless the ticket or your instructions ask for a commit.\n");
     }
     if AutomationService::handles_job_end(tasks_dir, ticket_id) {
         notes.push_str(
@@ -1174,15 +940,10 @@ set its status to a configured status that fits the result (for example a review
     notes
 }
 
-fn resolve_agent_instructions_path(
-    tasks_dir: &std::path::Path,
-    raw: &str,
-) -> LoTaRResult<std::path::PathBuf> {
+fn resolve_agent_instructions_path(tasks_dir: &std::path::Path, raw: &str) -> LoTaRResult<std::path::PathBuf> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
-        return Err(LoTaRError::ValidationError(
-            "agent.instructions file path cannot be empty".to_string(),
-        ));
+        return Err(LoTaRError::ValidationError("agent.instructions file path cannot be empty".to_string()));
     }
 
     let configured = std::path::Path::new(trimmed);
@@ -1190,13 +951,8 @@ fn resolve_agent_instructions_path(
         return Ok(configured.to_path_buf());
     }
 
-    if configured
-        .components()
-        .any(|component| matches!(component, std::path::Component::ParentDir))
-    {
-        return Err(LoTaRError::ValidationError(
-            "agent.instructions file path cannot contain '..'".to_string(),
-        ));
+    if configured.components().any(|component| matches!(component, std::path::Component::ParentDir)) {
+        return Err(LoTaRError::ValidationError("agent.instructions file path cannot contain '..'".to_string()));
     }
 
     Ok(tasks_dir.join(configured))
@@ -1243,37 +999,22 @@ fn build_prompt(
     if !task.relationships.is_empty() {
         out.push_str("\nRelationships:\n");
         if !task.relationships.depends_on.is_empty() {
-            out.push_str(&format!(
-                "- Depends on: {}\n",
-                task.relationships.depends_on.join(", ")
-            ));
+            out.push_str(&format!("- Depends on: {}\n", task.relationships.depends_on.join(", ")));
         }
         if !task.relationships.blocks.is_empty() {
-            out.push_str(&format!(
-                "- Blocks: {}\n",
-                task.relationships.blocks.join(", ")
-            ));
+            out.push_str(&format!("- Blocks: {}\n", task.relationships.blocks.join(", ")));
         }
         if !task.relationships.related.is_empty() {
-            out.push_str(&format!(
-                "- Related: {}\n",
-                task.relationships.related.join(", ")
-            ));
+            out.push_str(&format!("- Related: {}\n", task.relationships.related.join(", ")));
         }
         if let Some(parent) = task.relationships.parent.as_ref() {
             out.push_str(&format!("- Parent: {}\n", parent));
         }
         if !task.relationships.children.is_empty() {
-            out.push_str(&format!(
-                "- Children: {}\n",
-                task.relationships.children.join(", ")
-            ));
+            out.push_str(&format!("- Children: {}\n", task.relationships.children.join(", ")));
         }
         if !task.relationships.fixes.is_empty() {
-            out.push_str(&format!(
-                "- Fixes: {}\n",
-                task.relationships.fixes.join(", ")
-            ));
+            out.push_str(&format!("- Fixes: {}\n", task.relationships.fixes.join(", ")));
         }
         if let Some(duplicate_of) = task.relationships.duplicate_of.as_ref() {
             out.push_str(&format!("- Duplicate of: {}\n", duplicate_of));
@@ -1307,13 +1048,8 @@ fn current_lotar_binary() -> Option<std::path::PathBuf> {
 /// Directories outside the working directory that a workspace-permission
 /// job may write: the tasks directory and the repository's git data. A merge
 /// job also gets the main checkout, since merging updates it.
-fn extra_writable_dirs(
-    working_dir: &std::path::Path,
-    tasks_dir: &std::path::Path,
-    is_merge_job: bool,
-) -> Vec<std::path::PathBuf> {
-    let canonical =
-        |path: &std::path::Path| path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+fn extra_writable_dirs(working_dir: &std::path::Path, tasks_dir: &std::path::Path, is_merge_job: bool) -> Vec<std::path::PathBuf> {
+    let canonical = |path: &std::path::Path| path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
     let work = canonical(working_dir);
     let mut dirs = vec![canonical(tasks_dir)];
     if let Some(repo_root) = resolve_repo_root(tasks_dir) {
@@ -1335,20 +1071,10 @@ struct WorktreeContext {
     worktree_branch: Option<String>,
 }
 
-fn prepare_worktree(
-    _job_id: &str,
-    tasks_dir: &std::path::Path,
-    ticket_id: &str,
-    config: &ResolvedConfig,
-) -> LoTaRResult<WorktreeContext> {
-    let repo_root = resolve_repo_root(tasks_dir)
-        .ok_or_else(|| LoTaRError::ValidationError("Git repository not found".to_string()))?;
+fn prepare_worktree(_job_id: &str, tasks_dir: &std::path::Path, ticket_id: &str, config: &ResolvedConfig) -> LoTaRResult<WorktreeContext> {
+    let repo_root = resolve_repo_root(tasks_dir).ok_or_else(|| LoTaRError::ValidationError("Git repository not found".to_string()))?;
 
-    let mut context = WorktreeContext {
-        working_dir: repo_root.clone(),
-        worktree_path: None,
-        worktree_branch: None,
-    };
+    let mut context = WorktreeContext { working_dir: repo_root.clone(), worktree_path: None, worktree_branch: None };
 
     if !config.agent_worktree.enabled {
         return Ok(context);
@@ -1371,19 +1097,13 @@ fn prepare_worktree(
     if worktree_path.exists() && worktree_path.join(".git").exists() {
         let actual = fs::canonicalize(&worktree_path).map_err(LoTaRError::IoError)?;
         let root = fs::canonicalize(&repo_root).map_err(LoTaRError::IoError)?;
-        let head = git_command(&actual)
-            .args(["symbolic-ref", "--quiet", "HEAD"])
-            .current_dir(&actual)
-            .output()
-            .map_err(LoTaRError::IoError)?;
+        let head = git_command(&actual).args(["symbolic-ref", "--quiet", "HEAD"]).current_dir(&actual).output().map_err(LoTaRError::IoError)?;
         if actual == root
             || verified_common_dir(&actual).map_err(LoTaRError::IoError)? != repo_common
             || !head.status.success()
             || String::from_utf8_lossy(&head.stdout).trim() != format!("refs/heads/{branch}")
         {
-            return Err(LoTaRError::ValidationError(
-                "Existing worktree is not the isolated ticket branch".into(),
-            ));
+            return Err(LoTaRError::ValidationError("Existing worktree is not the isolated ticket branch".into()));
         }
         // Worktree already set up for this ticket, reuse it
         context.working_dir = worktree_path.clone();
@@ -1395,9 +1115,7 @@ fn prepare_worktree(
     let worktree_arg = worktree_path.to_string_lossy().to_string();
     run_git_command(&repo_root, &["worktree", "add", &worktree_arg, &branch])?;
     if verified_common_dir(&worktree_path).map_err(LoTaRError::IoError)? != repo_common {
-        return Err(LoTaRError::ValidationError(
-            "Worktree belongs to a different repository".into(),
-        ));
+        return Err(LoTaRError::ValidationError("Worktree belongs to a different repository".into()));
     }
 
     context.working_dir = worktree_path.clone();
@@ -1428,29 +1146,14 @@ struct T3ThreadInfo {
 fn parse_t3_thread_show(output: &str) -> Option<T3ThreadInfo> {
     let value: serde_json::Value = serde_json::from_str(output.trim()).ok()?;
     let thread = value.get("thread")?;
-    let text = |key: &str| {
-        thread
-            .get(key)
-            .and_then(|v| v.as_str())
-            .map(str::trim)
-            .filter(|v| !v.is_empty())
-            .map(str::to_string)
-    };
-    Some(T3ThreadInfo {
-        link: text("link"),
-        worktree_path: text("worktreePath"),
-        branch: text("branch"),
-    })
+    let text = |key: &str| thread.get(key).and_then(|v| v.as_str()).map(str::trim).filter(|v| !v.is_empty()).map(str::to_string);
+    Some(T3ThreadInfo { link: text("link"), worktree_path: text("worktreePath"), branch: text("branch") })
 }
 
 impl T3Cli {
     fn thread_info(&self, thread_id: &str) -> Option<T3ThreadInfo> {
         let mut cmd = Command::new(&self.program);
-        cmd.args(["thread", "show", thread_id, "--json", "--messages", "1"])
-            .envs(&self.env)
-            .current_dir(&self.cwd)
-            .stdin(Stdio::null())
-            .stderr(Stdio::null());
+        cmd.args(["thread", "show", thread_id, "--json", "--messages", "1"]).envs(&self.env).current_dir(&self.cwd).stdin(Stdio::null()).stderr(Stdio::null());
         clear_repository_env(&mut cmd);
         let output = cmd.output().ok()?;
         if !output.status.success() {
@@ -1479,9 +1182,7 @@ fn t3_profile_notes(profile: &AgentProfileDetail) -> Vec<&'static str> {
         notes.push("T3 Code's t3 CLI has no effort option; the effort setting is not passed.");
     }
     if profile.permissions.is_some() {
-        notes.push(
-            "T3 Code runs the thread in the project's own runtime mode; permissions don't apply.",
-        );
+        notes.push("T3 Code runs the thread in the project's own runtime mode; permissions don't apply.");
     }
     notes
 }
@@ -1489,55 +1190,24 @@ fn t3_profile_notes(profile: &AgentProfileDetail) -> Vec<&'static str> {
 /// The worktree a t3 job asks T3 Code for: a new ticket branch from the main
 /// checkout's current branch, or the existing ticket branch of an earlier
 /// phase. The job runs `t3` in the main checkout (the T3 project).
-fn plan_t3_worktree(
-    tasks_dir: &std::path::Path,
-    ticket_id: &str,
-    config: &ResolvedConfig,
-) -> LoTaRResult<(WorktreeContext, T3Worktree)> {
-    let repo_root = resolve_repo_root(tasks_dir)
-        .ok_or_else(|| LoTaRError::ValidationError("Git repository not found".to_string()))?;
-    let branch = build_worktree_branch(
-        &config.agent_worktree.branch_prefix,
-        &sanitize_worktree_token(ticket_id),
-    );
+fn plan_t3_worktree(tasks_dir: &std::path::Path, ticket_id: &str, config: &ResolvedConfig) -> LoTaRResult<(WorktreeContext, T3Worktree)> {
+    let repo_root = resolve_repo_root(tasks_dir).ok_or_else(|| LoTaRError::ValidationError("Git repository not found".to_string()))?;
+    let branch = build_worktree_branch(&config.agent_worktree.branch_prefix, &sanitize_worktree_token(ticket_id));
     let plan = if branch_exists(&repo_root, &branch) {
-        T3Worktree {
-            base: branch.clone(),
-            branch: None,
-        }
+        T3Worktree { base: branch.clone(), branch: None }
     } else {
-        let head = git_command(&repo_root)
-            .args(["symbolic-ref", "--quiet", "--short", "HEAD"])
-            .current_dir(&repo_root)
-            .output()
-            .map_err(LoTaRError::IoError)?;
+        let head =
+            git_command(&repo_root).args(["symbolic-ref", "--quiet", "--short", "HEAD"]).current_dir(&repo_root).output().map_err(LoTaRError::IoError)?;
         let base = String::from_utf8_lossy(&head.stdout).trim().to_string();
-        T3Worktree {
-            base: if head.status.success() && !base.is_empty() {
-                base
-            } else {
-                "HEAD".to_string()
-            },
-            branch: Some(branch.clone()),
-        }
+        T3Worktree { base: if head.status.success() && !base.is_empty() { base } else { "HEAD".to_string() }, branch: Some(branch.clone()) }
     };
-    let context = WorktreeContext {
-        working_dir: repo_root,
-        worktree_path: None,
-        worktree_branch: Some(branch),
-    };
+    let context = WorktreeContext { working_dir: repo_root, worktree_path: None, worktree_branch: Some(branch) };
     Ok((context, plan))
 }
 
 /// The thread exists: link it on the ticket so the owner and other agents
 /// find it, and record T3 Code's worktree as the job's.
-fn on_t3_thread_started(
-    cli: &T3Cli,
-    job_id: &str,
-    tasks_dir: &std::path::Path,
-    ticket_id: &str,
-    thread_id: &str,
-) {
+fn on_t3_thread_started(cli: &T3Cli, job_id: &str, tasks_dir: &std::path::Path, ticket_id: &str, thread_id: &str) {
     let info = cli.thread_info(thread_id).unwrap_or_default();
     let reference = info.link.clone().unwrap_or_else(|| thread_id.to_string());
     update_job(job_id, |state| {
@@ -1545,29 +1215,14 @@ fn on_t3_thread_started(
         state.t3_link = Some(reference.clone());
         if let Some(path) = info.worktree_path.as_ref() {
             state.record.worktree_path = Some(path.clone());
-            state.record.worktree_branch =
-                info.branch.clone().or(state.record.worktree_branch.take());
+            state.record.worktree_branch = info.branch.clone().or(state.record.worktree_branch.take());
         }
-        record_and_emit(
-            state,
-            "agent_job_progress",
-            Some(format!("T3 Code thread: {reference}")),
-        );
+        record_and_emit(state, "agent_job_progress", Some(format!("T3 Code thread: {reference}")));
     });
     let mut storage = Storage::new(tasks_dir);
-    if let Err(err) = crate::services::reference_service::ReferenceService::attach_link_reference(
-        &mut storage,
-        ticket_id,
-        &reference,
-    ) {
+    if let Err(err) = crate::services::reference_service::ReferenceService::attach_link_reference(&mut storage, ticket_id, &reference) {
         update_job(job_id, |state| {
-            record_and_emit(
-                state,
-                "agent_job_progress",
-                Some(format!(
-                    "Could not link the T3 Code thread on {ticket_id}: {err}"
-                )),
-            );
+            record_and_emit(state, "agent_job_progress", Some(format!("Could not link the T3 Code thread on {ticket_id}: {err}")));
         });
     }
 }
@@ -1575,18 +1230,8 @@ fn on_t3_thread_started(
 /// The thread waits for an answer: hand the ticket back to its reporter
 /// (status HelpNeeded where the project has it) with the thread's link,
 /// and let the job fail, so `job_completed` rules don't treat it as done.
-fn hand_back_waiting_t3_job(
-    job_id: &str,
-    ticket_id: &str,
-    tasks_dir: &std::path::Path,
-    config: &ResolvedConfig,
-) {
-    let link = JOB_REGISTRY.lock().ok().and_then(|registry| {
-        registry
-            .jobs
-            .get(job_id)
-            .and_then(|state| state.t3_link.clone())
-    });
+fn hand_back_waiting_t3_job(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Path, config: &ResolvedConfig) {
+    let link = JOB_REGISTRY.lock().ok().and_then(|registry| registry.jobs.get(job_id).and_then(|state| state.t3_link.clone()));
     let message = match link.as_deref() {
         Some(link) => format!("The T3 Code thread waits for an answer: {link}"),
         None => "The T3 Code thread waits for an answer.".to_string(),
@@ -1598,18 +1243,8 @@ fn hand_back_waiting_t3_job(
             patch.status = Some(status.to_string());
         }
         patch.assignee = task.reporter.clone();
-        let _ = TaskService::update_with_context(
-            &mut storage,
-            ticket_id,
-            patch,
-            crate::services::task_service::TaskUpdateContext::automation_disabled(),
-        );
-        let _ = TaskService::add_comment_with_context(
-            &mut storage,
-            ticket_id,
-            &message,
-            crate::services::task_service::CommentContext::automation(),
-        );
+        let _ = TaskService::update_with_context(&mut storage, ticket_id, patch, crate::services::task_service::TaskUpdateContext::automation_disabled());
+        let _ = TaskService::add_comment_with_context(&mut storage, ticket_id, &message, crate::services::task_service::CommentContext::automation());
     }
     update_job(job_id, |state| {
         state.record.last_message = Some(message.clone());
@@ -1621,37 +1256,24 @@ fn resolve_repo_root(tasks_dir: &std::path::Path) -> Option<std::path::PathBuf> 
     crate::utils::git::find_repo_root(tasks_dir)
 }
 
-fn resolve_worktree_root(
-    repo_root: &std::path::Path,
-    configured: Option<&str>,
-) -> LoTaRResult<std::path::PathBuf> {
+fn resolve_worktree_root(repo_root: &std::path::Path, configured: Option<&str>) -> LoTaRResult<std::path::PathBuf> {
     let base = repo_root.parent().unwrap_or(repo_root);
     if let Some(raw) = configured {
         let trimmed = raw.trim();
         if trimmed.is_empty() {
-            return Err(LoTaRError::ValidationError(
-                "agent.worktree.dir cannot be empty".to_string(),
-            ));
+            return Err(LoTaRError::ValidationError("agent.worktree.dir cannot be empty".to_string()));
         }
         let path = std::path::Path::new(trimmed);
         if path.is_absolute() {
             return Ok(path.to_path_buf());
         }
-        if path
-            .components()
-            .any(|component| matches!(component, std::path::Component::ParentDir))
-        {
-            return Err(LoTaRError::ValidationError(
-                "agent.worktree.dir cannot contain '..'".to_string(),
-            ));
+        if path.components().any(|component| matches!(component, std::path::Component::ParentDir)) {
+            return Err(LoTaRError::ValidationError("agent.worktree.dir cannot contain '..'".to_string()));
         }
         return Ok(base.join(path));
     }
 
-    let repo_name = repo_root
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or("repo");
+    let repo_name = repo_root.file_name().and_then(|name| name.to_str()).unwrap_or("repo");
     Ok(base.join(".lotar-worktrees").join(repo_name))
 }
 
@@ -1664,20 +1286,12 @@ fn sanitize_worktree_token(raw: &str) -> String {
             out.push('-');
         }
     }
-    if out.is_empty() {
-        "ticket".to_string()
-    } else {
-        out
-    }
+    if out.is_empty() { "ticket".to_string() } else { out }
 }
 
 fn build_worktree_branch(prefix: &str, suffix: &str) -> String {
     let trimmed = prefix.trim();
-    let mut normalized = if trimmed.is_empty() {
-        "agent/".to_string()
-    } else {
-        trimmed.to_string()
-    };
+    let mut normalized = if trimmed.is_empty() { "agent/".to_string() } else { trimmed.to_string() };
     if !normalized.ends_with('/') {
         normalized.push('/');
     }
@@ -1699,22 +1313,14 @@ fn branch_exists(repo_root: &std::path::Path, branch: &str) -> bool {
 }
 
 fn run_git_command(repo_root: &std::path::Path, args: &[&str]) -> LoTaRResult<()> {
-    let output = git_command(repo_root)
-        .args(args)
-        .current_dir(repo_root)
-        .output()
-        .map_err(LoTaRError::IoError)?;
+    let output = git_command(repo_root).args(args).current_dir(repo_root).output().map_err(LoTaRError::IoError)?;
 
     if output.status.success() {
         return Ok(());
     }
 
     let stderr = String::from_utf8_lossy(&output.stderr);
-    Err(LoTaRError::ValidationError(format!(
-        "git {} failed: {}",
-        args.join(" "),
-        stderr.trim()
-    )))
+    Err(LoTaRError::ValidationError(format!("git {} failed: {}", args.join(" "), stderr.trim())))
 }
 
 #[derive(Debug, Clone)]
@@ -1730,17 +1336,12 @@ fn resolve_job_worktree(job_id: &str) -> Option<WorktreeCleanupTarget> {
     if path.is_empty() {
         return None;
     }
-    Some(WorktreeCleanupTarget {
-        path: std::path::PathBuf::from(path),
-        branch: state.record.worktree_branch.clone(),
-    })
+    Some(WorktreeCleanupTarget { path: std::path::PathBuf::from(path), branch: state.record.worktree_branch.clone() })
 }
 
 pub(crate) fn ticket_done_state(tasks_dir: &std::path::Path, ticket_id: &str) -> Option<bool> {
     let (prefix, number) = ticket_id.rsplit_once('-')?;
-    if crate::storage::safety::validate_project_prefix(prefix).is_err()
-        || number.parse::<u64>().is_err()
-    {
+    if crate::storage::safety::validate_project_prefix(prefix).is_err() || number.parse::<u64>().is_err() {
         return None;
     }
     // DEV-21 review F1: classify against the policy of the tasks root that
@@ -1753,106 +1354,52 @@ pub(crate) fn ticket_done_state(tasks_dir: &std::path::Path, ticket_id: &str) ->
         Ok(location) => location.root,
         Err(_) => return None,
     };
-    let config =
-        crate::config::resolution::config_for_project(root.as_path(), Some(prefix)).ok()?;
+    let config = crate::config::resolution::config_for_project(root.as_path(), Some(prefix)).ok()?;
     // Cleanup must not use the tolerant task parser: damaged files are indeterminate.
-    let path = crate::storage::operations::StorageOperations::get_file_path_for_id(
-        &root.join(prefix),
-        ticket_id,
-    )?;
+    let path = crate::storage::operations::StorageOperations::get_file_path_for_id(&root.join(prefix), ticket_id)?;
     let raw = fs::read_to_string(path).ok()?;
     let task = serde_yaml_ng::from_str::<crate::storage::task::Task>(&raw).ok()?;
-    if !config
-        .issue_states
-        .values
-        .iter()
-        .any(|status| status.eq_ignore_case(task.status.as_str()))
-    {
+    if !config.issue_states.values.iter().any(|status| status.eq_ignore_case(task.status.as_str())) {
         return None;
     }
-    Some(
-        determine_done_statuses_from_config(&config)
-            .contains(&task.status.as_str().to_ascii_lowercase()),
-    )
+    Some(determine_done_statuses_from_config(&config).contains(&task.status.as_str().to_ascii_lowercase()))
 }
 
 /// Whether a finished ticket's worktree can be removed safely: it must be a
 /// worktree of this repository, on its own branch, merged into the main
 /// checkout, and hold no untracked or modified files. Git-ignored files
 /// (build output) only keep it when `allow_ignored` is false.
-pub(crate) fn check_worktree_cleanup(
-    repo_root: &std::path::Path,
-    path: &std::path::Path,
-    branch: Option<&str>,
-    allow_ignored: bool,
-) -> LoTaRResult<()> {
+pub(crate) fn check_worktree_cleanup(repo_root: &std::path::Path, path: &std::path::Path, branch: Option<&str>, allow_ignored: bool) -> LoTaRResult<()> {
     let root = fs::canonicalize(repo_root).map_err(LoTaRError::IoError)?;
     let target = fs::canonicalize(path).map_err(LoTaRError::IoError)?;
     if target == root {
-        return Err(LoTaRError::ValidationError(
-            "Refusing to remove the repository checkout".into(),
-        ));
+        return Err(LoTaRError::ValidationError("Refusing to remove the repository checkout".into()));
     }
-    if verified_common_dir(&root).map_err(LoTaRError::IoError)?
-        != verified_common_dir(&target).map_err(LoTaRError::IoError)?
-    {
-        return Err(LoTaRError::ValidationError(
-            "Worktree belongs to a different repository".into(),
-        ));
+    if verified_common_dir(&root).map_err(LoTaRError::IoError)? != verified_common_dir(&target).map_err(LoTaRError::IoError)? {
+        return Err(LoTaRError::ValidationError("Worktree belongs to a different repository".into()));
     }
     let mut status_args = vec!["status", "--porcelain", "--untracked-files=all"];
     if !allow_ignored {
         status_args.push("--ignored");
     }
-    let status = git_command(&target)
-        .args(&status_args)
-        .current_dir(&target)
-        .output()
-        .map_err(LoTaRError::IoError)?;
+    let status = git_command(&target).args(&status_args).current_dir(&target).output().map_err(LoTaRError::IoError)?;
     if !status.status.success() {
-        return Err(LoTaRError::ValidationError(
-            "git status failed in the worktree".into(),
-        ));
+        return Err(LoTaRError::ValidationError("git status failed in the worktree".into()));
     }
     if !status.stdout.is_empty() {
-        let first = String::from_utf8_lossy(&status.stdout)
-            .lines()
-            .next()
-            .unwrap_or_default()
-            .to_string();
+        let first = String::from_utf8_lossy(&status.stdout).lines().next().unwrap_or_default().to_string();
         return Err(LoTaRError::ValidationError(format!(
             "it has uncommitted or {} files (for example `{}`)",
-            if allow_ignored {
-                "untracked"
-            } else {
-                "untracked or ignored"
-            },
+            if allow_ignored { "untracked" } else { "untracked or ignored" },
             first.get(3..).unwrap_or(&first)
         )));
     }
-    let branch =
-        branch.ok_or_else(|| LoTaRError::ValidationError("Worktree branch is unknown".into()))?;
-    let head = git_command(&target)
-        .args(["symbolic-ref", "--quiet", "HEAD"])
-        .current_dir(&target)
-        .output()
-        .map_err(LoTaRError::IoError)?;
-    if !head.status.success()
-        || String::from_utf8_lossy(&head.stdout).trim() != format!("refs/heads/{branch}")
-    {
-        return Err(LoTaRError::ValidationError(
-            "Worktree branch changed or is unknown".into(),
-        ));
+    let branch = branch.ok_or_else(|| LoTaRError::ValidationError("Worktree branch is unknown".into()))?;
+    let head = git_command(&target).args(["symbolic-ref", "--quiet", "HEAD"]).current_dir(&target).output().map_err(LoTaRError::IoError)?;
+    if !head.status.success() || String::from_utf8_lossy(&head.stdout).trim() != format!("refs/heads/{branch}") {
+        return Err(LoTaRError::ValidationError("Worktree branch changed or is unknown".into()));
     }
-    run_git_command(
-        &root,
-        &[
-            "merge-base",
-            "--is-ancestor",
-            &format!("refs/heads/{branch}"),
-            "HEAD",
-        ],
-    )
+    run_git_command(&root, &["merge-base", "--is-ancestor", &format!("refs/heads/{branch}"), "HEAD"])
 }
 
 enum JobOutcome {
@@ -1861,17 +1408,8 @@ enum JobOutcome {
     Cancelled,
 }
 
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "the caller hands this value over and does not use it afterwards"
-)]
-fn maybe_cleanup_worktree(
-    job_id: &str,
-    ticket_id: &str,
-    tasks_dir: &std::path::Path,
-    config: &ResolvedConfig,
-    outcome: JobOutcome,
-) {
+#[expect(clippy::needless_pass_by_value, reason = "the caller hands this value over and does not use it afterwards")]
+fn maybe_cleanup_worktree(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Path, config: &ResolvedConfig, outcome: JobOutcome) {
     let should_cleanup = match outcome {
         JobOutcome::Success => config.agent_worktree.cleanup_on_done,
         JobOutcome::Failure => config.agent_worktree.cleanup_on_failure,
@@ -1891,27 +1429,15 @@ fn maybe_cleanup_worktree(
     let Ok(mut registry) = JOB_REGISTRY.lock() else {
         return;
     };
-    if registry
-        .active_by_ticket
-        .get(ticket_id)
-        .is_some_and(|id| id != job_id)
-    {
+    if registry.active_by_ticket.get(ticket_id).is_some_and(|id| id != job_id) {
         return;
     }
-    if let Err(err) = check_worktree_cleanup(
-        &repo_root,
-        &target.path,
-        target.branch.as_deref(),
-        config.agent_worktree.cleanup_ignored_files,
-    ) {
+    if let Err(err) = check_worktree_cleanup(&repo_root, &target.path, target.branch.as_deref(), config.agent_worktree.cleanup_ignored_files) {
         let reason = match err {
             LoTaRError::ValidationError(reason) => reason,
             other => other.to_string(),
         };
-        let note = format!(
-            "Kept the worktree {}: {reason}. Remove it with `lotar agent worktree cleanup` once it is safe.",
-            target.path.display()
-        );
+        let note = format!("Kept the worktree {}: {reason}. Remove it with `lotar agent worktree cleanup` once it is safe.", target.path.display());
         if let Some(state) = registry.jobs.get_mut(job_id) {
             record_and_emit(state, "agent_job_progress", Some(note));
         }
@@ -1947,11 +1473,7 @@ fn run_job(
     config: ResolvedConfig,
 ) {
     update_job(&job_id, |state| state.worker_running = true);
-    let _slot = RunningJobSlot {
-        job_id: &job_id,
-        ticket_id: &ticket_id,
-        tasks_dir: &tasks_dir,
-    };
+    let _slot = RunningJobSlot { job_id: &job_id, ticket_id: &ticket_id, tasks_dir: &tasks_dir };
     if should_stop_job(&job_id) {
         return;
     }
@@ -1969,10 +1491,7 @@ fn run_job(
     let worktree_context = match prepared {
         Ok(context) => {
             update_job(&job_id, |state| {
-                state.record.worktree_path = context
-                    .worktree_path
-                    .as_ref()
-                    .map(|path| path.to_string_lossy().to_string());
+                state.record.worktree_path = context.worktree_path.as_ref().map(|path| path.to_string_lossy().to_string());
                 state.record.worktree_branch = context.worktree_branch.clone();
             });
             if let Some(path) = context.worktree_path.as_ref() {
@@ -1985,43 +1504,25 @@ fn run_job(
         }
         Err(err) => {
             if config.agent_worktree.enabled {
-                update_job_failure(
-                    &job_id,
-                    &ticket_id,
-                    format!("Worktree setup failed: {err}"),
-                    &tasks_dir,
-                );
+                update_job_failure(&job_id, &ticket_id, format!("Worktree setup failed: {err}"), &tasks_dir);
                 return;
             }
             let msg = format!("Worktree setup skipped: {}", err);
             update_job(&job_id, |state| {
                 record_and_emit(state, "agent_job_progress", Some(msg.clone()));
             });
-            WorktreeContext {
-                working_dir: resolve_repo_root(&tasks_dir).unwrap_or_else(|| tasks_dir.clone()),
-                worktree_path: None,
-                worktree_branch: None,
-            }
+            WorktreeContext { working_dir: resolve_repo_root(&tasks_dir).unwrap_or_else(|| tasks_dir.clone()), worktree_path: None, worktree_branch: None }
         }
     };
 
     let started_at = Utc::now().to_rfc3339();
 
     // Compute workspace root (parent of tasks_dir)
-    let workspace_root = tasks_dir
-        .parent()
-        .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| tasks_dir.clone());
+    let workspace_root = tasks_dir.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| tasks_dir.clone());
 
     // Initialize persistent log file (if logging is enabled)
-    let worktree_path_str = worktree_context
-        .worktree_path
-        .as_ref()
-        .map(|p| p.to_string_lossy().to_string());
-    let logs_dir = crate::services::agent_log_service::effective_logs_dir(
-        &tasks_dir,
-        config.agent_logs_dir.as_deref(),
-    );
+    let worktree_path_str = worktree_context.worktree_path.as_ref().map(|p| p.to_string_lossy().to_string());
+    let logs_dir = crate::services::agent_log_service::effective_logs_dir(&tasks_dir, config.agent_logs_dir.as_deref());
     let _ = AgentLogService::init_log(
         &workspace_root,
         logs_dir.as_deref(),
@@ -2052,35 +1553,19 @@ fn run_job(
         return;
     }
 
-    let _ = AutomationService::apply_job_event(
-        tasks_dir.as_path(),
-        &ticket_id,
-        AutomationEvent::JobStarted,
-        job_context_for(&job_id),
-    );
+    let _ = AutomationService::apply_job_event(tasks_dir.as_path(), &ticket_id, AutomationEvent::JobStarted, job_context_for(&job_id));
 
-    let is_merge_job = JOB_REGISTRY.lock().ok().is_some_and(|registry| {
-        registry
-            .jobs
-            .get(&job_id)
-            .is_some_and(|state| state.record.is_merge_job)
-    });
-    let writable_dirs =
-        extra_writable_dirs(&worktree_context.working_dir, &tasks_dir, is_merge_job);
+    let is_merge_job = JOB_REGISTRY.lock().ok().is_some_and(|registry| registry.jobs.get(&job_id).is_some_and(|state| state.record.is_merge_job));
+    let writable_dirs = extra_writable_dirs(&worktree_context.working_dir, &tasks_dir, is_merge_job);
     let built = if runner_kind == AgentRunnerKind::T3 {
         for note in t3_profile_notes(&profile) {
             update_job(&job_id, |state| {
                 record_and_emit(state, "agent_job_progress", Some(note.to_string()));
             });
         }
-        let title = Storage::try_open(&tasks_dir)
-            .and_then(|storage| TaskService::get(&storage, &ticket_id, None).ok())
-            .map(|task| task.title)
-            .unwrap_or_default();
-        let launch = T3Launch {
-            title: format!("{ticket_id} {title}").trim().to_string(),
-            worktree: t3_worktree.take(),
-        };
+        let title =
+            Storage::try_open(&tasks_dir).and_then(|storage| TaskService::get(&storage, &ticket_id, None).ok()).map(|task| task.title).unwrap_or_default();
+        let launch = T3Launch { title: format!("{ticket_id} {title}").trim().to_string(), worktree: t3_worktree.take() };
         build_t3_command(&profile, &prompt, &launch)
     } else {
         build_runner_command(runner_kind, &profile, &prompt, &writable_dirs)
@@ -2093,19 +1578,9 @@ fn run_job(
         }
     };
     if profile.mcp.as_ref().is_some_and(|mcp| mcp.lotar) {
-        let bin = current_lotar_binary()
-            .map(|bin| bin.to_string_lossy().to_string())
-            .unwrap_or_else(|| "lotar".to_string());
-        if !crate::services::agent_runner::attach_lotar_mcp(
-            &mut command,
-            runner_kind,
-            &bin,
-            &tasks_dir,
-        ) {
-            let note = format!(
-                "The {} runner can't be given LoTaR's MCP server; the agent uses the lotar CLI instead.",
-                runner_kind.as_str()
-            );
+        let bin = current_lotar_binary().map(|bin| bin.to_string_lossy().to_string()).unwrap_or_else(|| "lotar".to_string());
+        if !crate::services::agent_runner::attach_lotar_mcp(&mut command, runner_kind, &bin, &tasks_dir) {
+            let note = format!("The {} runner can't be given LoTaR's MCP server; the agent uses the lotar CLI instead.", runner_kind.as_str());
             update_job(&job_id, |state| {
                 record_and_emit(state, "agent_job_progress", Some(note.clone()));
             });
@@ -2145,14 +1620,10 @@ fn run_job(
             let mut dirs = vec![dir.to_path_buf()];
             dirs.extend(std::env::split_paths(&path));
             if let Ok(joined) = std::env::join_paths(dirs) {
-                command
-                    .env
-                    .insert("PATH".to_string(), joined.to_string_lossy().to_string());
+                command.env.insert("PATH".to_string(), joined.to_string_lossy().to_string());
             }
         }
-        command
-            .env
-            .insert("LOTAR_BIN".to_string(), bin.to_string_lossy().to_string());
+        command.env.insert("LOTAR_BIN".to_string(), bin.to_string_lossy().to_string());
     }
 
     let initial_input = command.initial_input.take();
@@ -2161,11 +1632,7 @@ fn run_job(
         .envs(command.env)
         // Claude reads the prompt and later messages from stdin, t3 only the
         // prompt; the other CLIs get null stdin so none of them waits for input.
-        .stdin(if supports_stdin(runner_kind) || initial_input.is_some() {
-            Stdio::piped()
-        } else {
-            Stdio::null()
-        })
+        .stdin(if supports_stdin(runner_kind) || initial_input.is_some() { Stdio::piped() } else { Stdio::null() })
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
@@ -2189,23 +1656,14 @@ fn run_job(
     let Ok(mut registry) = JOB_REGISTRY.lock() else {
         return;
     };
-    if registry
-        .jobs
-        .get(&job_id)
-        .is_none_or(|state| state.record.status == AgentJobStatus::Cancelled)
-    {
+    if registry.jobs.get(&job_id).is_none_or(|state| state.record.status == AgentJobStatus::Cancelled) {
         return;
     }
     let child = match cmd.spawn() {
         Ok(child) => child,
         Err(err) => {
             drop(registry);
-            update_job_failure(
-                &job_id,
-                &ticket_id,
-                format!("Failed to spawn runner: {}", err),
-                &tasks_dir,
-            );
+            update_job_failure(&job_id, &ticket_id, format!("Failed to spawn runner: {}", err), &tasks_dir);
             return;
         }
     };
@@ -2243,13 +1701,10 @@ fn run_job(
     // DEV-199: Claude reads its first prompt from stdin. Only the runtime
     // keeps the pipe afterwards, so closing it there ends the session.
     if let (Some(bytes), Some(pipe)) = (initial_input.as_ref(), stdin.as_ref()) {
-        let written = pipe
-            .lock()
-            .map_err(|_| std::io::Error::other("stdin lock poisoned"))
-            .and_then(|mut writer| {
-                writer.write_all(bytes)?;
-                writer.flush()
-            });
+        let written = pipe.lock().map_err(|_| std::io::Error::other("stdin lock poisoned")).and_then(|mut writer| {
+            writer.write_all(bytes)?;
+            writer.flush()
+        });
         if let Err(err) = written {
             // A broken pipe means the agent closed its input or already
             // exited without reading the prompt; its exit status decides
@@ -2259,11 +1714,7 @@ fn run_job(
                 if !broken_pipe {
                     state.runner_failed = true;
                 }
-                record_and_emit(
-                    state,
-                    "agent_job_progress",
-                    Some(format!("Could not send the prompt to the agent: {err}")),
-                );
+                record_and_emit(state, "agent_job_progress", Some(format!("Could not send the prompt to the agent: {err}")));
             });
         }
     }
@@ -2284,13 +1735,7 @@ fn run_job(
                         return;
                     }
                     if let Some(thread_id) = t3_thread_id(&msg) {
-                        on_t3_thread_started(
-                            cli,
-                            &job_id_clone,
-                            &tasks_dir,
-                            &ticket_id,
-                            &thread_id,
-                        );
+                        on_t3_thread_started(cli, &job_id_clone, &tasks_dir, &ticket_id, &thread_id);
                         return;
                     }
                 }
@@ -2324,13 +1769,7 @@ fn run_job(
                     reply.push_str(line.trim_end_matches(['\r', '\n']));
                     reply.push('\n');
                 }
-                handle_runner_line(
-                    &job_id_clone,
-                    runner_kind,
-                    line,
-                    &working_dir_prefix,
-                    &mut messages,
-                );
+                handle_runner_line(&job_id_clone, runner_kind, line, &working_dir_prefix, &mut messages);
             });
             (messages, result, reply)
         })
@@ -2349,21 +1788,14 @@ fn run_job(
                 update_job(&job_id, |state| {
                     let note = format!(
                         "Stopped waiting for the T3 Code thread; it keeps running until it is stopped in T3 Code{}",
-                        state
-                            .t3_link
-                            .as_deref()
-                            .map(|link| format!(": {link}"))
-                            .unwrap_or_default()
+                        state.t3_link.as_deref().map(|link| format!(": {link}")).unwrap_or_default()
                     );
                     record_and_emit(state, "agent_job_progress", Some(note));
                 });
             }
             break c.wait();
         }
-        let status = child
-            .lock()
-            .map_err(|_| std::io::Error::other("Job process unavailable"))
-            .and_then(|mut c| c.try_wait());
+        let status = child.lock().map_err(|_| std::io::Error::other("Job process unavailable")).and_then(|mut c| c.try_wait());
         match status {
             Ok(Some(status)) => break Ok(status),
             Ok(None) => {}
@@ -2381,10 +1813,7 @@ fn run_job(
     // Never join while holding the registry or child lock: readers publish events.
     let mut output_error = None;
     if let Some(reader) = stderr_reader {
-        output_error = reader
-            .join()
-            .unwrap_or_else(|_| Err(std::io::Error::other("Stderr reader panicked")))
-            .err();
+        output_error = reader.join().unwrap_or_else(|_| Err(std::io::Error::other("Stderr reader panicked"))).err();
     }
     let mut context_messages = vec![build_user_message(&user_prompt)];
     if let Some(reader) = stdout_reader {
@@ -2408,21 +1837,10 @@ fn run_job(
         }
     }
     if should_stop_job(&job_id) || output_error.is_some() || status.is_err() {
-        let _ = AgentContextService::append_messages(
-            &tasks_dir,
-            &config,
-            &ticket_id,
-            context_messages,
-            None,
-        );
+        let _ = AgentContextService::append_messages(&tasks_dir, &config, &ticket_id, context_messages, None);
         if !should_stop_job(&job_id) {
             let error = output_error.or_else(|| status.err()).expect("job failed");
-            update_job_failure(
-                &job_id,
-                &ticket_id,
-                format!("Runner output/process failed: {error}"),
-                &tasks_dir,
-            );
+            update_job_failure(&job_id, &ticket_id, format!("Runner output/process failed: {error}"), &tasks_dir);
         }
         return;
     }
@@ -2430,14 +1848,7 @@ fn run_job(
     if runner_kind == AgentRunnerKind::T3 && exit_code == Some(T3_WAITS_FOR_ANSWER) {
         hand_back_waiting_t3_job(&job_id, &ticket_id, &tasks_dir, &config);
     }
-    finalize_job(
-        &job_id,
-        &ticket_id,
-        exit_code,
-        &context_messages,
-        &tasks_dir,
-        &config,
-    );
+    finalize_job(&job_id, &ticket_id, exit_code, &context_messages, &tasks_dir, &config);
 }
 
 trait JobOutputPipe: Read {
@@ -2447,18 +1858,10 @@ trait JobOutputPipe: Read {
 #[cfg(unix)]
 impl<T: Read + std::os::fd::AsRawFd> JobOutputPipe for T {
     fn output_ready(&self) -> std::io::Result<bool> {
-        let mut poll = libc::pollfd {
-            fd: self.as_raw_fd(),
-            events: libc::POLLIN,
-            revents: 0,
-        };
+        let mut poll = libc::pollfd { fd: self.as_raw_fd(), events: libc::POLLIN, revents: 0 };
         // One reader owns this pipe; readiness permits a nonblocking-sized read.
         let result = unsafe { libc::poll(&mut poll, 1, 0) };
-        if result < 0 {
-            Err(std::io::Error::last_os_error())
-        } else {
-            Ok(result > 0)
-        }
+        if result < 0 { Err(std::io::Error::last_os_error()) } else { Ok(result > 0) }
     }
 }
 
@@ -2478,33 +1881,16 @@ impl<T: Read + std::os::windows::io::AsRawHandle> JobOutputPipe for T {
             ) -> i32;
         }
         let mut available = 0;
-        let result = unsafe {
-            peek_named_pipe(
-                self.as_raw_handle(),
-                std::ptr::null_mut(),
-                0,
-                std::ptr::null_mut(),
-                &mut available,
-                std::ptr::null_mut(),
-            )
-        };
+        let result = unsafe { peek_named_pipe(self.as_raw_handle(), std::ptr::null_mut(), 0, std::ptr::null_mut(), &mut available, std::ptr::null_mut()) };
         if result != 0 {
             return Ok(available > 0);
         }
         let error = std::io::Error::last_os_error();
-        if error.raw_os_error() == Some(109) {
-            Ok(true)
-        } else {
-            Err(error)
-        }
+        if error.raw_os_error() == Some(109) { Ok(true) } else { Err(error) }
     }
 }
 
-fn read_job_output(
-    mut pipe: impl JobOutputPipe,
-    exited: &AtomicBool,
-    mut on_line: impl FnMut(&str),
-) -> std::io::Result<()> {
+fn read_job_output(mut pipe: impl JobOutputPipe, exited: &AtomicBool, mut on_line: impl FnMut(&str)) -> std::io::Result<()> {
     let mut pending = Vec::new();
     let mut buffer = [0; 8192];
     let mut drain_started = None;
@@ -2513,10 +1899,7 @@ fn read_job_output(
         if process_exited {
             let started = drain_started.get_or_insert_with(Instant::now);
             if started.elapsed() > Duration::from_secs(5) {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::TimedOut,
-                    "Runner output drain exceeded five seconds after exit",
-                ));
+                return Err(std::io::Error::new(std::io::ErrorKind::TimedOut, "Runner output drain exceeded five seconds after exit"));
             }
         }
         match pipe.output_ready() {
@@ -2565,11 +1948,7 @@ impl Drop for RunningJobSlot<'_> {
         finalize_cancelled_job(self.job_id);
         crate::services::agent_active_jobs::unregister(self.tasks_dir, self.job_id);
         if let Ok(mut registry) = JOB_REGISTRY.lock() {
-            if registry
-                .active_by_ticket
-                .get(self.ticket_id)
-                .is_some_and(|id| id == self.job_id)
-            {
+            if registry.active_by_ticket.get(self.ticket_id).is_some_and(|id| id == self.job_id) {
                 registry.active_by_ticket.remove(self.ticket_id);
             }
             if let Some(state) = registry.jobs.get_mut(self.job_id) {
@@ -2598,11 +1977,7 @@ fn finalize_cancelled_job(job_id: &str) {
         state.record.summary = state.record.last_message.clone();
         state.runtime = None;
         let record = state.record.clone();
-        if registry
-            .active_by_ticket
-            .get(&record.ticket_id)
-            .is_some_and(|id| id == job_id)
-        {
+        if registry.active_by_ticket.get(&record.ticket_id).is_some_and(|id| id == job_id) {
             registry.active_by_ticket.remove(&record.ticket_id);
         }
         record
@@ -2616,25 +1991,10 @@ fn finalize_cancelled_job(job_id: &str) {
         record.exit_code,
         record.summary.clone(),
     );
-    let _ = AutomationService::apply_job_event(
-        &record.tasks_dir,
-        &record.ticket_id,
-        AutomationEvent::JobCancelled,
-        job_context_for(job_id),
-    );
-    let prefix = crate::storage::TaskId::parse(&record.ticket_id)
-        .ok()
-        .map(|parsed| parsed.project);
-    if let Ok(config) =
-        crate::config::resolution::config_for_project(&record.tasks_dir, prefix.as_deref())
-    {
-        maybe_cleanup_worktree(
-            job_id,
-            &record.ticket_id,
-            &record.tasks_dir,
-            &config,
-            JobOutcome::Cancelled,
-        );
+    let _ = AutomationService::apply_job_event(&record.tasks_dir, &record.ticket_id, AutomationEvent::JobCancelled, job_context_for(job_id));
+    let prefix = crate::storage::TaskId::parse(&record.ticket_id).ok().map(|parsed| parsed.project);
+    if let Ok(config) = crate::config::resolution::config_for_project(&record.tasks_dir, prefix.as_deref()) {
+        maybe_cleanup_worktree(job_id, &record.ticket_id, &record.tasks_dir, &config, JobOutcome::Cancelled);
     }
 }
 
@@ -2674,11 +2034,7 @@ fn handle_runner_line(
                 });
             }
             RunnerEventKind::Progress => {
-                let message = event.text.clone().map(|text| {
-                    working_dir_prefix
-                        .iter()
-                        .fold(text, |text, prefix| text.replace(prefix.as_str(), ""))
-                });
+                let message = event.text.clone().map(|text| working_dir_prefix.iter().fold(text, |text, prefix| text.replace(prefix.as_str(), "")));
                 update_job(job_id, |state| {
                     if let Some(ref msg) = message {
                         state.record.last_message = Some(msg.clone());
@@ -2703,16 +2059,10 @@ fn handle_runner_line(
                 // The runner's final answer is the job's summary, ahead of any
                 // note (such as denied tools) logged just before it.
                 let final_text = event.text.clone().filter(|text| !text.trim().is_empty());
-                let usage = event.payload.as_ref().and_then(|payload| {
-                    crate::services::agent_runner::usage_from_result(runner_kind, payload)
-                });
+                let usage = event.payload.as_ref().and_then(|payload| crate::services::agent_runner::usage_from_result(runner_kind, payload));
                 update_job(job_id, |state| {
                     if let Some(ref usage) = usage {
-                        state
-                            .record
-                            .usage
-                            .get_or_insert_with(Default::default)
-                            .add(usage);
+                        state.record.usage.get_or_insert_with(Default::default).add(usage);
                     }
                     if let Some(ref text) = final_text {
                         state.record.last_message = Some(text.clone());
@@ -2738,11 +2088,7 @@ fn handle_runner_line(
 fn commit_leftover_work(job_id: &str) -> Result<Option<String>, String> {
     let Some((worktree, ticket_id, profile)) = JOB_REGISTRY.lock().ok().and_then(|registry| {
         let record = &registry.jobs.get(job_id)?.record;
-        Some((
-            record.worktree_path.clone()?,
-            record.ticket_id.clone(),
-            record.agent_profile.clone(),
-        ))
+        Some((record.worktree_path.clone()?, record.ticket_id.clone(), record.agent_profile.clone()))
     }) else {
         return Ok(None);
     };
@@ -2750,21 +2096,13 @@ fn commit_leftover_work(job_id: &str) -> Result<Option<String>, String> {
     if !worktree.is_dir() {
         return Ok(None);
     }
-    let git = |args: &[&str]| {
-        git_command(&worktree)
-            .args(args)
-            .output()
-            .map_err(|err| format!("git {}: {err}", args.join(" ")))
-    };
+    let git = |args: &[&str]| git_command(&worktree).args(args).output().map_err(|err| format!("git {}: {err}", args.join(" ")));
     let status = git(&["status", "--porcelain"])?;
     if !status.status.success() || status.stdout.is_empty() {
         return Ok(None);
     }
     let failed = |output: std::process::Output| {
-        format!(
-            "The agent left uncommitted changes and LoTaR could not commit them: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        )
+        format!("The agent left uncommitted changes and LoTaR could not commit them: {}", String::from_utf8_lossy(&output.stderr).trim())
     };
     let added = git(&["add", "--all"])?;
     if !added.status.success() {
@@ -2778,9 +2116,7 @@ fn commit_leftover_work(job_id: &str) -> Result<Option<String>, String> {
     if !committed.status.success() {
         return Err(failed(committed));
     }
-    Ok(Some(format!(
-        "Committed changes the agent left uncommitted: {message}"
-    )))
+    Ok(Some(format!("Committed changes the agent left uncommitted: {message}")))
 }
 
 /// For a merge job on a worktree branch: make sure the branch is in the
@@ -2788,38 +2124,25 @@ fn commit_leftover_work(job_id: &str) -> Result<Option<String>, String> {
 /// not (a sandbox may keep git metadata read-only). `Ok(Some(note))` when
 /// LoTaR fast-forwarded; `Err` explains why the branch is still unmerged.
 /// Jobs that are not merge jobs, and states git can't judge, pass.
-fn ensure_branch_merged(
-    job_id: &str,
-    tasks_dir: &std::path::Path,
-) -> Result<Option<String>, String> {
-    let Some(branch) = JOB_REGISTRY.lock().ok().and_then(|registry| {
-        registry
-            .jobs
-            .get(job_id)
-            .filter(|state| state.record.is_merge_job)
-            .and_then(|state| state.record.worktree_branch.clone())
-    }) else {
+fn ensure_branch_merged(job_id: &str, tasks_dir: &std::path::Path) -> Result<Option<String>, String> {
+    let Some(branch) = JOB_REGISTRY
+        .lock()
+        .ok()
+        .and_then(|registry| registry.jobs.get(job_id).filter(|state| state.record.is_merge_job).and_then(|state| state.record.worktree_branch.clone()))
+    else {
         return Ok(None);
     };
     let Some(repo_root) = resolve_repo_root(tasks_dir) else {
         return Ok(None);
     };
-    let merged = git_command(&repo_root)
-        .args(["merge-base", "--is-ancestor", &branch, "HEAD"])
-        .status()
-        .map_err(|err| format!("git merge-base: {err}"))?;
+    let merged = git_command(&repo_root).args(["merge-base", "--is-ancestor", &branch, "HEAD"]).status().map_err(|err| format!("git merge-base: {err}"))?;
     // Exit code 1 means "not an ancestor"; anything else is merged or unknown.
     if merged.code() != Some(1) {
         return Ok(None);
     }
-    let output = git_command(&repo_root)
-        .args(["merge", "--ff-only", "--quiet", &branch])
-        .output()
-        .map_err(|err| format!("git merge: {err}"))?;
+    let output = git_command(&repo_root).args(["merge", "--ff-only", "--quiet", &branch]).output().map_err(|err| format!("git merge: {err}"))?;
     if output.status.success() {
-        return Ok(Some(format!(
-            "Fast-forwarded the main checkout to {branch}"
-        )));
+        return Ok(Some(format!("Fast-forwarded the main checkout to {branch}")));
     }
     Err(format!(
         "Merge job finished, but {branch} is not merged into the main checkout's current branch and can't be fast-forwarded: {}",
@@ -2837,11 +2160,7 @@ fn finalize_job(
 ) {
     let now = Utc::now().to_rfc3339();
     // A runner that reported a failure fails the job even when it exits 0.
-    let runner_failed = JOB_REGISTRY
-        .lock()
-        .ok()
-        .and_then(|registry| registry.jobs.get(job_id).map(|state| state.runner_failed))
-        .unwrap_or(false);
+    let runner_failed = JOB_REGISTRY.lock().ok().and_then(|registry| registry.jobs.get(job_id).map(|state| state.runner_failed)).unwrap_or(false);
     let mut success = exit_code.unwrap_or(1) == 0 && !runner_failed;
     // Work an agent leaves uncommitted in its worktree (Codex's sandbox keeps
     // git metadata read-only, signing may be unreachable) is committed here,
@@ -2886,31 +2205,17 @@ fn finalize_job(
         }
         state.record.exit_code = exit_code;
         state.record.finished_at = Some(now.clone());
-        state.record.status = if success {
-            AgentJobStatus::Completed
-        } else {
-            AgentJobStatus::Failed
-        };
+        state.record.status = if success { AgentJobStatus::Completed } else { AgentJobStatus::Failed };
         if let Some(message) = failure_note.as_ref() {
             state.record.last_message = Some(message.clone());
         }
         state.record.summary = state.record.last_message.clone();
         finalized = true;
-        let event_kind = if success {
-            "agent_job_completed"
-        } else {
-            "agent_job_failed"
-        };
+        let event_kind = if success { "agent_job_completed" } else { "agent_job_failed" };
         record_and_emit(state, event_kind, failure_note.clone());
     });
     if !finalized {
-        let _ = AgentContextService::append_messages(
-            tasks_dir,
-            config,
-            ticket_id,
-            context_messages.to_vec(),
-            None,
-        );
+        let _ = AgentContextService::append_messages(tasks_dir, config, ticket_id, context_messages.to_vec(), None);
         return;
     }
 
@@ -2918,12 +2223,7 @@ fn finalize_job(
     let status_str = if success { "completed" } else { "failed" };
     let (summary, workspace_root, logs_dir, usage) = if let Ok(registry) = JOB_REGISTRY.lock() {
         if let Some(state) = registry.jobs.get(job_id) {
-            (
-                state.record.summary.clone(),
-                state.record.workspace_root.clone(),
-                state.record.agent_logs_dir.clone(),
-                state.record.usage.clone(),
-            )
+            (state.record.summary.clone(), state.record.workspace_root.clone(), state.record.agent_logs_dir.clone(), state.record.usage.clone())
         } else {
             (None, tasks_dir.to_path_buf(), None, None)
         }
@@ -2934,13 +2234,7 @@ fn finalize_job(
         &workspace_root,
         logs_dir.as_deref(),
         job_id,
-        crate::services::agent_log_service::JobStatusLine {
-            status: status_str.to_string(),
-            at: Utc::now().to_rfc3339(),
-            exit_code,
-            summary,
-            usage,
-        },
+        crate::services::agent_log_service::JobStatusLine { status: status_str.to_string(), at: Utc::now().to_rfc3339(), exit_code, summary, usage },
     );
 
     let mut job_context = None;
@@ -2956,11 +2250,7 @@ fn finalize_job(
                 usage: state.record.usage.clone(),
             });
         }
-        if registry
-            .active_by_ticket
-            .get(ticket_id)
-            .is_some_and(|id| id == job_id)
-        {
+        if registry.active_by_ticket.get(ticket_id).is_some_and(|id| id == job_id) {
             registry.active_by_ticket.remove(ticket_id);
         }
         if let Some(state) = registry.jobs.get_mut(job_id) {
@@ -2970,43 +2260,20 @@ fn finalize_job(
     drop(registry);
 
     if !should_stop_job(job_id) {
-        let event = if success {
-            AutomationEvent::JobCompleted
-        } else {
-            AutomationEvent::JobFailed
-        };
+        let event = if success { AutomationEvent::JobCompleted } else { AutomationEvent::JobFailed };
         let _ = AutomationService::apply_job_event(tasks_dir, ticket_id, event, job_context);
     }
 
-    let _ = AgentContextService::append_messages(
-        tasks_dir,
-        config,
-        ticket_id,
-        context_messages.to_vec(),
-        None,
-    );
+    let _ = AgentContextService::append_messages(tasks_dir, config, ticket_id, context_messages.to_vec(), None);
 
-    maybe_cleanup_worktree(
-        job_id,
-        ticket_id,
-        tasks_dir,
-        config,
-        if success {
-            JobOutcome::Success
-        } else {
-            JobOutcome::Failure
-        },
-    );
+    maybe_cleanup_worktree(job_id, ticket_id, tasks_dir, config, if success { JobOutcome::Success } else { JobOutcome::Failure });
 }
 
 fn update_job_failure(job_id: &str, ticket_id: &str, message: String, tasks_dir: &std::path::Path) {
     let now = Utc::now().to_rfc3339();
     let mut failed = false;
     update_job(job_id, |state| {
-        if !matches!(
-            state.record.status,
-            AgentJobStatus::Queued | AgentJobStatus::Running
-        ) {
+        if !matches!(state.record.status, AgentJobStatus::Queued | AgentJobStatus::Running) {
             return;
         }
         failed = true;
@@ -3023,42 +2290,23 @@ fn update_job_failure(job_id: &str, ticket_id: &str, message: String, tasks_dir:
     // Write final status to persistent log (if logging is enabled)
     let (workspace_root, logs_dir) = if let Ok(registry) = JOB_REGISTRY.lock() {
         if let Some(state) = registry.jobs.get(job_id) {
-            (
-                state.record.workspace_root.clone(),
-                state.record.agent_logs_dir.clone(),
-            )
+            (state.record.workspace_root.clone(), state.record.agent_logs_dir.clone())
         } else {
             (tasks_dir.to_path_buf(), None)
         }
     } else {
         (tasks_dir.to_path_buf(), None)
     };
-    let _ = AgentLogService::write_status(
-        &workspace_root,
-        logs_dir.as_deref(),
-        job_id,
-        "failed",
-        &now,
-        None,
-        Some(message),
-    );
+    let _ = AgentLogService::write_status(&workspace_root, logs_dir.as_deref(), job_id, "failed", &now, None, Some(message));
 
     let mut registry = JOB_REGISTRY.lock().ok();
     if let Some(ref mut registry) = registry
-        && registry
-            .active_by_ticket
-            .get(ticket_id)
-            .is_some_and(|id| id == job_id)
+        && registry.active_by_ticket.get(ticket_id).is_some_and(|id| id == job_id)
     {
         registry.active_by_ticket.remove(ticket_id);
     }
     drop(registry);
-    let _ = AutomationService::apply_job_event(
-        tasks_dir,
-        ticket_id,
-        AutomationEvent::JobFailed,
-        job_context_for(job_id),
-    );
+    let _ = AutomationService::apply_job_event(tasks_dir, ticket_id, AutomationEvent::JobFailed, job_context_for(job_id));
 }
 
 fn update_job<F>(job_id: &str, mut updater: F)
@@ -3081,19 +2329,14 @@ fn process_pending_queue() {
         };
 
         // Check if we can start another job
-        let can_start = registry
-            .max_parallel_jobs
-            .is_none_or(|max| registry.running_count < max);
+        let can_start = registry.max_parallel_jobs.is_none_or(|max| registry.running_count < max);
 
         if !can_start {
             return;
         }
 
         let running_merge_job = has_running_merge_job(&registry);
-        let next_index = registry
-            .pending_queue
-            .iter()
-            .position(|pending| !(pending.is_merge_job && running_merge_job));
+        let next_index = registry.pending_queue.iter().position(|pending| !(pending.is_merge_job && running_merge_job));
 
         if let Some(index) = next_index {
             let Some(pending) = registry.pending_queue.remove(index) else {
@@ -3124,20 +2367,11 @@ fn process_pending_queue() {
 }
 
 fn has_running_merge_job(registry: &JobRegistry) -> bool {
-    registry
-        .jobs
-        .values()
-        .any(|state| state.record.is_merge_job && state.record.status == AgentJobStatus::Running)
+    registry.jobs.values().any(|state| state.record.is_merge_job && state.record.status == AgentJobStatus::Running)
 }
 
 fn has_active_merge_job(registry: &JobRegistry) -> bool {
-    registry.jobs.values().any(|state| {
-        state.record.is_merge_job
-            && matches!(
-                state.record.status,
-                AgentJobStatus::Queued | AgentJobStatus::Running
-            )
-    })
+    registry.jobs.values().any(|state| state.record.is_merge_job && matches!(state.record.status, AgentJobStatus::Queued | AgentJobStatus::Running))
 }
 
 fn is_merge_job_candidate(task: &crate::api_types::TaskDTO, agent_profile: Option<&str>) -> bool {
@@ -3160,12 +2394,7 @@ fn should_stop_job(job_id: &str) -> bool {
 fn push_event(state: &mut AgentJobState, kind: &str, message: Option<String>) -> AgentJobEvent {
     let at = Utc::now().to_rfc3339();
     state.next_sequence = state.next_sequence.saturating_add(1);
-    let event = AgentJobEvent {
-        kind: kind.to_string(),
-        sequence: state.next_sequence,
-        at: at.clone(),
-        message,
-    };
+    let event = AgentJobEvent { kind: kind.to_string(), sequence: state.next_sequence, at: at.clone(), message };
     state.events.push(event.clone());
     if state.events.len() > EVENT_LOG_LIMIT {
         let start = state.events.len().saturating_sub(EVENT_LOG_LIMIT);
@@ -3204,10 +2433,7 @@ fn emit_job_event(event: &AgentJobEvent, record: &AgentJobRecord) {
         "effort": record.effort,
         "usage": record.usage,
     });
-    crate::api_events::emit(&crate::api_events::ApiEvent {
-        kind: event.kind.clone(),
-        data: payload,
-    });
+    crate::api_events::emit(&crate::api_events::ApiEvent { kind: event.kind.clone(), data: payload });
 }
 
 /// Record-then-stream pair for SSE-visible job events. Log-only kinds
@@ -3220,21 +2446,13 @@ const MAX_FINISHED_JOBS: usize = 500;
 fn prune_finished_jobs(registry: &mut JobRegistry) {
     let cutoff = Utc::now() - chrono::Duration::hours(24);
     let finished_at = |state: &AgentJobState| {
-        state
-            .record
-            .finished_at
-            .as_deref()
-            .and_then(|at| chrono::DateTime::parse_from_rfc3339(at).ok())
-            .map(|at| at.with_timezone(&Utc))
+        state.record.finished_at.as_deref().and_then(|at| chrono::DateTime::parse_from_rfc3339(at).ok()).map(|at| at.with_timezone(&Utc))
     };
     let mut finished: Vec<(chrono::DateTime<Utc>, String)> = registry
         .jobs
         .iter()
         .filter(|(_, state)| {
-            matches!(
-                state.record.status,
-                AgentJobStatus::Completed | AgentJobStatus::Failed | AgentJobStatus::Cancelled
-            ) && state.runtime.is_none()
+            matches!(state.record.status, AgentJobStatus::Completed | AgentJobStatus::Failed | AgentJobStatus::Cancelled) && state.runtime.is_none()
         })
         .filter_map(|(id, state)| finished_at(state).map(|at| (at, id.clone())))
         .collect();
@@ -3247,11 +2465,7 @@ fn prune_finished_jobs(registry: &mut JobRegistry) {
     }
 }
 
-fn record_and_emit(
-    state: &mut AgentJobState,
-    kind: &str,
-    message: Option<String>,
-) -> AgentJobEvent {
+fn record_and_emit(state: &mut AgentJobState, kind: &str, message: Option<String>) -> AgentJobEvent {
     let event = push_event(state, kind, message);
     emit_job_event(&event, &state.record);
     event
@@ -3307,13 +2521,7 @@ mod tests {
     #[test]
     fn build_prompt_includes_instructions() {
         let task = sample_task();
-        let prompt = build_prompt(
-            &task,
-            "ship it",
-            None,
-            Some("Use the tools"),
-            Some("- Commit to the branch."),
-        );
+        let prompt = build_prompt(&task, "ship it", None, Some("Use the tools"), Some("- Commit to the branch."));
         assert!(prompt.contains("Agent instructions:"));
         assert!(prompt.contains("Use the tools"));
         let notes_at = prompt.find("This job:\n- Commit to the branch.").unwrap();
@@ -3327,9 +2535,7 @@ mod tests {
         fs::write(&file_path, "Use the tools").unwrap();
 
         let mut config = ResolvedConfig::from_global(GlobalConfig::default());
-        config.agent_instructions = Some(AgentInstructionsConfig::File {
-            file: "agent-instructions.txt".to_string(),
-        });
+        config.agent_instructions = Some(AgentInstructionsConfig::File { file: "agent-instructions.txt".to_string() });
 
         let profile = AgentProfileConfig::Runner("claude".to_string()).to_detail();
         let resolved = resolve_agent_instructions(dir.path(), &config, &profile).unwrap();
@@ -3340,40 +2546,23 @@ mod tests {
     fn profile_instructions_follow_the_base_instructions() {
         let dir = tempdir().unwrap();
         let mut profile = AgentProfileConfig::Runner("claude".to_string()).to_detail();
-        profile.instructions = Some(AgentInstructionsConfig::Inline(
-            "You are in the TESTING phase.".to_string(),
-        ));
+        profile.instructions = Some(AgentInstructionsConfig::Inline("You are in the TESTING phase.".to_string()));
 
         let config = ResolvedConfig::from_global(GlobalConfig::default());
-        let resolved = resolve_agent_instructions(dir.path(), &config, &profile)
-            .unwrap()
-            .unwrap();
-        assert!(
-            resolved.contains("LoTaR CLI quick reference"),
-            "built-in text kept"
-        );
+        let resolved = resolve_agent_instructions(dir.path(), &config, &profile).unwrap().unwrap();
+        assert!(resolved.contains("LoTaR CLI quick reference"), "built-in text kept");
         assert!(resolved.ends_with("You are in the TESTING phase."));
 
         let mut config = ResolvedConfig::from_global(GlobalConfig::default());
-        config.agent_instructions = Some(AgentInstructionsConfig::Inline(
-            "Follow AGENTS.md.".to_string(),
-        ));
-        let resolved = resolve_agent_instructions(dir.path(), &config, &profile)
-            .unwrap()
-            .unwrap();
+        config.agent_instructions = Some(AgentInstructionsConfig::Inline("Follow AGENTS.md.".to_string()));
+        let resolved = resolve_agent_instructions(dir.path(), &config, &profile).unwrap().unwrap();
         assert!(resolved.starts_with("Follow AGENTS.md."));
         assert!(!resolved.contains("LoTaR CLI quick reference"));
         assert!(resolved.ends_with("You are in the TESTING phase."));
 
-        config.agent_instructions = crate::config::normalization::parse_global_from_yaml_str(
-            "agent:\n  instructions: \"\"\n",
-        )
-        .unwrap()
-        .agent_instructions;
+        config.agent_instructions = crate::config::normalization::parse_global_from_yaml_str("agent:\n  instructions: \"\"\n").unwrap().agent_instructions;
         assert!(config.agent_instructions.is_some(), "empty text is kept");
-        let resolved = resolve_agent_instructions(dir.path(), &config, &profile)
-            .unwrap()
-            .unwrap();
+        let resolved = resolve_agent_instructions(dir.path(), &config, &profile).unwrap().unwrap();
         assert_eq!(resolved, "You are in the TESTING phase.");
     }
 
@@ -3382,11 +2571,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let tasks_dir = dir.path().join(".tasks");
         fs::create_dir_all(&tasks_dir).unwrap();
-        fs::write(
-            tasks_dir.join("config.yml"),
-            "default:\n  project: TPL\nagent:\n  worktree:\n    enabled: true\nagents:\n  merge: claude\n",
-        )
-        .unwrap();
+        fs::write(tasks_dir.join("config.yml"), "default:\n  project: TPL\nagent:\n  worktree:\n    enabled: true\nagents:\n  merge: claude\n").unwrap();
         let mut storage = Storage::new(&tasks_dir);
         let task = crate::services::task_service::TaskService::create(
             &mut storage,
@@ -3398,37 +2583,18 @@ mod tests {
             },
         )
         .unwrap();
-        let config =
-            crate::config::resolution::config_for_project(&tasks_dir, Some("TPL")).unwrap();
-        let template = instruction_template(
-            &tasks_dir,
-            &config,
-            &task,
-            "job-1",
-            AgentRunnerKind::Claude,
-            Some("merge"),
-        );
+        let config = crate::config::resolution::config_for_project(&tasks_dir, Some("TPL")).unwrap();
+        let template = instruction_template(&tasks_dir, &config, &task, "job-1", AgentRunnerKind::Claude, Some("merge"));
 
         let builtin = template.expand(DEFAULT_AGENT_INSTRUCTIONS);
         assert!(!builtin.contains("${{"), "{builtin}");
         assert!(builtin.contains("list TPL-1"), "{builtin}");
         assert!(builtin.contains("--project TPL"), "{builtin}");
-        assert!(
-            builtin.contains("assignee TPL-1 \"Sam Example\""),
-            "{builtin}"
-        );
+        assert!(builtin.contains("assignee TPL-1 \"Sam Example\""), "{builtin}");
 
-        let merge = template.expand(
-            "git -C \"${{workspace.root}}\" merge --ff-only ${{agent.worktree_branch}} (${{agent.profile}})",
-        );
-        assert!(
-            merge.ends_with("merge --ff-only agent/TPL-1 (merge)"),
-            "{merge}"
-        );
-        assert!(
-            !merge.contains("\"\""),
-            "workspace root is filled in: {merge}"
-        );
+        let merge = template.expand("git -C \"${{workspace.root}}\" merge --ff-only ${{agent.worktree_branch}} (${{agent.profile}})");
+        assert!(merge.ends_with("merge --ff-only agent/TPL-1 (merge)"), "{merge}");
+        assert!(!merge.contains("\"\""), "workspace root is filled in: {merge}");
     }
 
     #[test]
@@ -3436,11 +2602,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let tasks_dir = dir.path().join(".tasks");
         fs::create_dir_all(&tasks_dir).unwrap();
-        fs::write(
-            tasks_dir.join("config.yml"),
-            "default:\n  project: NOTE\nagents:\n  implement: claude\n",
-        )
-        .unwrap();
+        fs::write(tasks_dir.join("config.yml"), "default:\n  project: NOTE\nagents:\n  implement: claude\n").unwrap();
         let mut storage = Storage::new(&tasks_dir);
         let task = crate::services::task_service::TaskService::create(
             &mut storage,
@@ -3452,8 +2614,7 @@ mod tests {
             },
         )
         .unwrap();
-        let mut config =
-            crate::config::resolution::config_for_project(&tasks_dir, Some("NOTE")).unwrap();
+        let mut config = crate::config::resolution::config_for_project(&tasks_dir, Some("NOTE")).unwrap();
 
         let notes = job_notes(&tasks_dir, &config, &task.id, false, false, false);
         assert!(notes.contains("main checkout"), "{notes}");
@@ -3468,10 +2629,7 @@ mod tests {
         let notes = job_notes(&tasks_dir, &config, &task.id, false, false, false);
         assert!(notes.contains("branch `agent/NOTE-1`"), "{notes}");
         assert!(notes.contains("Commit your work"), "{notes}");
-        assert!(
-            notes.contains("move this ticket to the next step"),
-            "{notes}"
-        );
+        assert!(notes.contains("move this ticket to the next step"), "{notes}");
         assert!(notes.contains("hand the ticket back"), "{notes}");
 
         let notes = job_notes(&tasks_dir, &config, &task.id, false, true, false);
@@ -3496,10 +2654,7 @@ mod tests {
             r#"{"thread":{"threadId":"t1","link":"https://app.t3.codes/threads/e/t1","worktreePath":"/w/DEV-1","branch":"agent/DEV-1"},"messages":[]}"#,
         )
         .unwrap();
-        assert_eq!(
-            info.link.as_deref(),
-            Some("https://app.t3.codes/threads/e/t1")
-        );
+        assert_eq!(info.link.as_deref(), Some("https://app.t3.codes/threads/e/t1"));
         assert_eq!(info.worktree_path.as_deref(), Some("/w/DEV-1"));
         assert_eq!(info.branch.as_deref(), Some("agent/DEV-1"));
         let root = parse_t3_thread_show(r#"{"thread":{"link":"x","worktreePath":null}}"#).unwrap();
@@ -3535,12 +2690,9 @@ mod tests {
         for idx in 0..30 {
             messages.push(build_user_message(&format!("msg-{idx}")));
         }
-        AgentContextService::append_messages(dir.path(), &config, "TEST-1", messages, Some(5))
-            .unwrap();
+        AgentContextService::append_messages(dir.path(), &config, "TEST-1", messages, Some(5)).unwrap();
 
-        let loaded = AgentContextService::load(dir.path(), &config, "TEST-1")
-            .unwrap()
-            .unwrap();
+        let loaded = AgentContextService::load(dir.path(), &config, "TEST-1").unwrap().unwrap();
         assert_eq!(loaded.messages.len(), 5);
         assert!(loaded.messages.last().unwrap().content.contains("msg-29"));
     }
@@ -3556,15 +2708,7 @@ mod tests {
         .unwrap();
         let mut storage = Storage::new(&tasks_dir);
         storage
-            .add(
-                &crate::storage::task::Task::new(
-                    tasks_dir.clone(),
-                    "Padded job target".to_string(),
-                    crate::types::Priority::from("Medium"),
-                ),
-                "AJB",
-                None,
-            )
+            .add(&crate::storage::task::Task::new(tasks_dir.clone(), "Padded job target".to_string(), crate::types::Priority::from("Medium")), "AJB", None)
             .unwrap();
         (tmp, tasks_dir)
     }
@@ -3631,14 +2775,7 @@ mod tests {
         assert_eq!(first.kind, second.kind);
         assert_eq!(first.message, second.message);
         assert_ne!(first.sequence, second.sequence);
-        assert_eq!(
-            state
-                .events
-                .iter()
-                .map(|event| event.sequence)
-                .collect::<Vec<_>>(),
-            vec![1, 2, 3]
-        );
+        assert_eq!(state.events.iter().map(|event| event.sequence).collect::<Vec<_>>(), vec![1, 2, 3]);
     }
 
     #[test]
@@ -3651,15 +2788,8 @@ mod tests {
 
         assert_eq!(state.events.len(), EVENT_LOG_LIMIT, "snapshot is capped");
         let sequences: Vec<u64> = state.events.iter().map(|event| event.sequence).collect();
-        assert!(
-            sequences.windows(2).all(|pair| pair[0] < pair[1]),
-            "capped snapshot stays strictly monotonic"
-        );
-        assert_eq!(
-            sequences.first(),
-            Some(&((total - EVENT_LOG_LIMIT + 1) as u64)),
-            "oldest entries are trimmed, not renumbered"
-        );
+        assert!(sequences.windows(2).all(|pair| pair[0] < pair[1]), "capped snapshot stays strictly monotonic");
+        assert_eq!(sequences.first(), Some(&((total - EVENT_LOG_LIMIT + 1) as u64)), "oldest entries are trimmed, not renumbered");
         assert_eq!(sequences.last(), Some(&(total as u64)));
 
         // Sequences are never reused after the cap: the next push continues
@@ -3667,21 +2797,13 @@ mod tests {
         let next = push_event(&mut state, "agent_job_progress", Some("after-cap".into()));
         assert_eq!(next.sequence, total as u64 + 1);
         assert_eq!(state.events.len(), EVENT_LOG_LIMIT);
-        assert_eq!(
-            state.events.last().map(|event| event.sequence),
-            Some(next.sequence)
-        );
+        assert_eq!(state.events.last().map(|event| event.sequence), Some(next.sequence));
     }
 
     #[test]
     fn record_and_emit_carries_exact_pushed_sequence_and_at() {
-        static SSE_TEST_COUNTER: std::sync::atomic::AtomicU64 =
-            std::sync::atomic::AtomicU64::new(0);
-        let job_id = format!(
-            "job-dev108-sse-{}-{}",
-            std::process::id(),
-            SSE_TEST_COUNTER.fetch_add(1, Ordering::SeqCst)
-        );
+        static SSE_TEST_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let job_id = format!("job-dev108-sse-{}-{}", std::process::id(), SSE_TEST_COUNTER.fetch_add(1, Ordering::SeqCst));
         let mut state = unit_job_state(&job_id);
         let rx = crate::api_events::subscribe();
 
@@ -3702,33 +2824,17 @@ mod tests {
         assert_eq!(sse.len(), 2, "only the emitted pair reaches SSE");
         for (received, pushed) in sse.iter().zip([&first, &second]) {
             assert_eq!(received.kind, "agent_job_progress");
-            assert_eq!(
-                received.data.get("sequence"),
-                Some(&serde_json::json!(pushed.sequence))
-            );
+            assert_eq!(received.data.get("sequence"), Some(&serde_json::json!(pushed.sequence)));
             assert_eq!(received.data.get("at"), Some(&serde_json::json!(pushed.at)));
-            assert_eq!(
-                received.data.get("message"),
-                Some(&serde_json::json!("same"))
-            );
+            assert_eq!(received.data.get("message"), Some(&serde_json::json!("same")));
         }
         assert_eq!(sse[0].data.get("sequence"), Some(&serde_json::json!(1)));
 
         // REST snapshot parity: the emitted entries are byte-identical members
         // of the stored log, and push-only kinds hold their own sequences.
         assert_eq!(
-            state
-                .events
-                .iter()
-                .map(|event| (event.kind.as_str(), event.sequence))
-                .collect::<Vec<_>>(),
-            vec![
-                ("agent_job_progress", 1),
-                ("agent_job_progress", 2),
-                ("agent_job_raw", 3),
-                ("agent_job_init", 4),
-                ("agent_job_result", 5),
-            ]
+            state.events.iter().map(|event| (event.kind.as_str(), event.sequence)).collect::<Vec<_>>(),
+            vec![("agent_job_progress", 1), ("agent_job_progress", 2), ("agent_job_raw", 3), ("agent_job_init", 4), ("agent_job_result", 5),]
         );
     }
 
@@ -3741,22 +2847,13 @@ mod tests {
 
         // Padded alias start registers the CANONICAL ticket (queue mode via
         // max_parallel_jobs: 0 keeps the job pending, so no runner spawns).
-        let job =
-            AgentJobService::start_job_with_tasks_dir(dev56_job_request("AJB-001"), &tasks_dir)
-                .unwrap();
+        let job = AgentJobService::start_job_with_tasks_dir(dev56_job_request("AJB-001"), &tasks_dir).unwrap();
         assert_eq!(job.ticket_id, "AJB-1", "record carries canonical id");
-        assert!(
-            AgentJobService::has_active_job("AJB-1"),
-            "canonical lookup must see the padded-start registration"
-        );
+        assert!(AgentJobService::has_active_job("AJB-1"), "canonical lookup must see the padded-start registration");
 
         // Duplicate alias jobs are refused.
-        let err = AgentJobService::start_job_with_tasks_dir(dev56_job_request("AJB-1"), &tasks_dir)
-            .unwrap_err();
-        assert!(
-            err.to_string().contains("already has an active job"),
-            "{err}"
-        );
+        let err = AgentJobService::start_job_with_tasks_dir(dev56_job_request("AJB-1"), &tasks_dir).unwrap_err();
+        assert!(err.to_string().contains("already has an active job"), "{err}");
 
         // Canonical and padded status/assignee updates from unrelated callers
         // don't touch the ticket; they become the job's outcome (DEV-320).
@@ -3765,10 +2862,7 @@ mod tests {
             let receipt = crate::services::task_service::TaskService::update_with_receipt(
                 &mut storage,
                 id,
-                crate::api_types::TaskUpdate {
-                    status: Some(status.to_string()),
-                    ..Default::default()
-                },
+                crate::api_types::TaskUpdate { status: Some(status.to_string()), ..Default::default() },
                 crate::services::task_service::TaskUpdateContext::default(),
             )
             .unwrap();
@@ -3778,13 +2872,8 @@ mod tests {
             assert_eq!(deferred.job_id, job.id);
             assert_eq!(deferred.status.as_deref(), Some(status));
         }
-        let recorded =
-            crate::services::agent_active_jobs::peek_outcome(&tasks_dir, &job.id).unwrap();
-        assert_eq!(
-            recorded.status.as_deref(),
-            Some("Done"),
-            "the last change wins"
-        );
+        let recorded = crate::services::agent_active_jobs::peek_outcome(&tasks_dir, &job.id).unwrap();
+        assert_eq!(recorded.status.as_deref(), Some("Done"), "the last change wins");
     }
 
     #[test]
@@ -3794,45 +2883,26 @@ mod tests {
         let workspace = tasks_dir.parent().unwrap().to_path_buf();
         let sibling = workspace.join("sibling").join(".tasks");
         std::fs::create_dir_all(sibling.join("AJB2")).unwrap();
-        std::fs::write(
-            sibling.join("AJB2").join("1.yml"),
-            "title: elsewhere\nstatus: Todo\npriority: Medium\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\n",
-        )
-        .unwrap();
+        std::fs::write(sibling.join("AJB2").join("1.yml"), "title: elsewhere\nstatus: Todo\npriority: Medium\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\n")
+            .unwrap();
 
-        let err =
-            AgentJobService::start_job_with_tasks_dir(dev56_job_request("AJB2-1"), &tasks_dir)
-                .unwrap_err();
+        let err = AgentJobService::start_job_with_tasks_dir(dev56_job_request("AJB2-1"), &tasks_dir).unwrap_err();
         assert!(err.to_string().contains("cannot be managed from"), "{err}");
-        assert!(
-            !AgentJobService::has_active_job("AJB2-1"),
-            "no registration side effect on refusal"
-        );
+        assert!(!AgentJobService::has_active_job("AJB2-1"), "no registration side effect on refusal");
     }
 
     #[test]
     fn running_job_matches_accepts_padded_spellings() {
-        assert!(crate::cli::handlers::agent::running_job_matches(
-            "TP-1", "TP-001"
-        ));
-        assert!(crate::cli::handlers::agent::running_job_matches(
-            "TP-001", "TP-1"
-        ));
-        assert!(!crate::cli::handlers::agent::running_job_matches(
-            "TP-1", "TP-2"
-        ));
-        assert!(!crate::cli::handlers::agent::running_job_matches(
-            "abc", "TP-1"
-        ));
+        assert!(crate::cli::handlers::agent::running_job_matches("TP-1", "TP-001"));
+        assert!(crate::cli::handlers::agent::running_job_matches("TP-001", "TP-1"));
+        assert!(!crate::cli::handlers::agent::running_job_matches("TP-1", "TP-2"));
+        assert!(!crate::cli::handlers::agent::running_job_matches("abc", "TP-1"));
     }
 
     #[test]
     fn resolve_profile_uses_agent_map() {
         let mut config = ResolvedConfig::from_global(GlobalConfig::default());
-        config.agent_profiles.insert(
-            "codex-default".to_string(),
-            AgentProfileConfig::Runner("codex".to_string()).to_detail(),
-        );
+        config.agent_profiles.insert("codex-default".to_string(), AgentProfileConfig::Runner("codex".to_string()).to_detail());
         let req = AgentJobCreateRequest {
             ticket_id: "TEST-1".to_string(),
             prompt: "hello".to_string(),
@@ -3850,13 +2920,7 @@ mod tests {
     fn run_overrides_replace_model_and_effort_in_profile_args() {
         let mut config = ResolvedConfig::from_global(GlobalConfig::default());
         let mut detail = AgentProfileConfig::Runner("claude".to_string()).to_detail();
-        detail.args = vec![
-            "--model".to_string(),
-            "opus".to_string(),
-            "--effort".to_string(),
-            "low".to_string(),
-            "--verbose".to_string(),
-        ];
+        detail.args = vec!["--model".to_string(), "opus".to_string(), "--effort".to_string(), "low".to_string(), "--verbose".to_string()];
         config.agent_profiles.insert("pinned".to_string(), detail);
         let mut req = AgentJobCreateRequest {
             ticket_id: "TEST-1".to_string(),
@@ -3886,9 +2950,7 @@ mod dev21_ticket_done_state_tests {
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(
             dir.join(format!("{num}.yml")),
-            format!(
-                "title: t{num}\nstatus: {status}\npriority: medium\ntype: task\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-01-01T00:00:00Z\ntags: []\n"
-            ),
+            format!("title: t{num}\nstatus: {status}\npriority: medium\ntype: task\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-01-01T00:00:00Z\ntags: []\n"),
         )
         .unwrap();
     }
@@ -3896,11 +2958,7 @@ mod dev21_ticket_done_state_tests {
     fn write_config(root: &std::path::Path, done: &str) {
         let tasks = root.join(".tasks");
         std::fs::create_dir_all(&tasks).unwrap();
-        std::fs::write(
-            tasks.join("config.yml"),
-            format!("issue:\n  states: [Todo, Done, Shipped]\n  done_states: [{done}]\n"),
-        )
-        .unwrap();
+        std::fs::write(tasks.join("config.yml"), format!("issue:\n  states: [Todo, Done, Shipped]\n  done_states: [{done}]\n")).unwrap();
     }
 
     /// DEV-21 review F1: cleanup eligibility classifies against the ticket's

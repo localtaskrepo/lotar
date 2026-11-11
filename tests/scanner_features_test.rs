@@ -15,17 +15,9 @@ mod block_comments {
         let tf = TestFixtures::new();
         let root = tf.temp_dir.path();
 
-        fs::write(
-            root.join("file.js"),
-            "/*\n * TODO: inside block js\n */\n const x = 1;",
-        )
-        .unwrap();
+        fs::write(root.join("file.js"), "/*\n * TODO: inside block js\n */\n const x = 1;").unwrap();
 
-        let _cmd = cargo_bin_in(&tf)
-            .arg("scan")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("Found 1 TODO comment(s):"));
+        let _cmd = cargo_bin_in(&tf).arg("scan").assert().success().stdout(predicate::str::contains("Found 1 TODO comment(s):"));
     }
 
     #[test]
@@ -33,17 +25,9 @@ mod block_comments {
         let tf = TestFixtures::new();
         let root = tf.temp_dir.path();
 
-        fs::write(
-            root.join("file.rs"),
-            "/* TODO: block in rust */\nfn main() {}",
-        )
-        .unwrap();
+        fs::write(root.join("file.rs"), "/* TODO: block in rust */\nfn main() {}").unwrap();
 
-        let _cmd = cargo_bin_in(&tf)
-            .arg("scan")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("Found 1 TODO comment(s):"));
+        let _cmd = cargo_bin_in(&tf).arg("scan").assert().success().stdout(predicate::str::contains("Found 1 TODO comment(s):"));
     }
 }
 
@@ -68,8 +52,7 @@ mod custom_patterns {
         write_file(root, "src/a.rs", "// TODO: BLZ_2025-999 do something");
 
         let patterns = vec![r"\b(BLZ_\d{4}-\d{3})\b".to_string()];
-        let mut scanner =
-            Scanner::new(PathBuf::from(root)).with_ticket_detection(Some(&patterns), false);
+        let mut scanner = Scanner::new(PathBuf::from(root)).with_ticket_detection(Some(&patterns), false);
         let refs = scanner.scan();
         assert_eq!(refs.len(), 1);
         assert_eq!(refs[0].uuid, "BLZ_2025-999");
@@ -82,8 +65,7 @@ mod custom_patterns {
         write_file(root, "src/c.rs", "// TODO: AUTH-321 fix");
 
         let patterns = vec!["[".to_string()];
-        let mut scanner =
-            Scanner::new(PathBuf::from(root)).with_ticket_detection(Some(&patterns), false);
+        let mut scanner = Scanner::new(PathBuf::from(root)).with_ticket_detection(Some(&patterns), false);
         let refs = scanner.scan();
         assert_eq!(refs.len(), 1);
         assert_eq!(refs[0].uuid, "AUTH-321");
@@ -97,8 +79,7 @@ mod custom_patterns {
 
         let patterns = vec![r"\b(BLZ_\d{4}-\d{3})\b".to_string()];
 
-        let mut scanner =
-            Scanner::new(PathBuf::from(root)).with_ticket_detection(Some(&patterns), true);
+        let mut scanner = Scanner::new(PathBuf::from(root)).with_ticket_detection(Some(&patterns), true);
         let refs = scanner.scan();
         // With new semantics, a signal word is required regardless of custom patterns or toggles
         assert_eq!(refs.len(), 0);
@@ -123,25 +104,14 @@ mod inline_effort {
             .filter(|name| !name.starts_with('@') && !name.starts_with('.'))
             .collect::<Vec<_>>();
         projects.sort();
-        assert!(
-            !projects.is_empty(),
-            "expected a project folder under .tasks"
-        );
+        assert!(!projects.is_empty(), "expected a project folder under .tasks");
         let project = &projects[0];
 
         let task_file = tasks_dir.join(project).join("1.yml");
-        assert!(
-            task_file.exists(),
-            "expected {} to exist",
-            task_file.display()
-        );
+        assert!(task_file.exists(), "expected {} to exist", task_file.display());
         let yaml = fs::read_to_string(&task_file).unwrap();
         let parsed: Y = serde_yaml_ng::from_str(&yaml).expect("valid yaml");
-        parsed
-            .get("effort")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string()
+        parsed.get("effort").and_then(|v| v.as_str()).unwrap_or("").to_string()
     }
 
     #[test]
@@ -152,11 +122,7 @@ mod inline_effort {
         let src = r#"// TODO: implement foo [effort=90m]"#;
         fs::write(root.join("main.rs"), src).unwrap();
 
-        let _cmd = cargo_bin_in(&tf)
-            .env("LOTAR_TEST_SILENT", "1")
-            .arg("scan")
-            .assert()
-            .success();
+        let _cmd = cargo_bin_in(&tf).env("LOTAR_TEST_SILENT", "1").arg("scan").assert().success();
 
         let effort = read_task_yaml_effort(root);
         assert_eq!(effort, "1.50h");
@@ -170,11 +136,7 @@ mod inline_effort {
         let src = r#"// TODO: handle bar [effort=1h 30m]"#;
         fs::write(root.join("lib.rs"), src).unwrap();
 
-        let _cmd = cargo_bin_in(&tf)
-            .env("LOTAR_TEST_SILENT", "1")
-            .arg("scan")
-            .assert()
-            .success();
+        let _cmd = cargo_bin_in(&tf).env("LOTAR_TEST_SILENT", "1").arg("scan").assert().success();
 
         let effort = read_task_yaml_effort(root);
         assert_eq!(effort, "1.50h");
@@ -188,11 +150,7 @@ mod inline_effort {
         let src = r#"// TODO: estimate baz [effort=3pt]"#;
         fs::write(root.join("mod.rs"), src).unwrap();
 
-        let _cmd = cargo_bin_in(&tf)
-            .env("LOTAR_TEST_SILENT", "1")
-            .arg("scan")
-            .assert()
-            .success();
+        let _cmd = cargo_bin_in(&tf).env("LOTAR_TEST_SILENT", "1").arg("scan").assert().success();
 
         let effort = read_task_yaml_effort(root);
         assert_eq!(effort, "3pt");
@@ -221,22 +179,12 @@ mod insertion_suggestion {
     fn insert_before_colon_or_dash() {
         let s = Scanner::new(std::path::PathBuf::from("."));
         let line_colon = "// TODO Feature: thing";
-        let edited_colon = s
-            .suggest_insertion_for_line(line_colon, "DEMO-123")
-            .unwrap();
-        assert!(
-            edited_colon.contains("TODO (DEMO-123) Feature:"),
-            "{}",
-            edited_colon
-        );
+        let edited_colon = s.suggest_insertion_for_line(line_colon, "DEMO-123").unwrap();
+        assert!(edited_colon.contains("TODO (DEMO-123) Feature:"), "{}", edited_colon);
 
         let line_dash = "# TODO Chore - tidy";
         let edited_dash = s.suggest_insertion_for_line(line_dash, "DEMO-123").unwrap();
-        assert!(
-            edited_dash.contains("TODO (DEMO-123) Chore -"),
-            "{}",
-            edited_dash
-        );
+        assert!(edited_dash.contains("TODO (DEMO-123) Chore -"), "{}", edited_dash);
     }
 }
 
@@ -289,8 +237,7 @@ mod signal_words {
 ",
         );
 
-        let mut scanner =
-            Scanner::new(std::path::PathBuf::from(root)).with_signal_words(&["bar".into()]);
+        let mut scanner = Scanner::new(std::path::PathBuf::from(root)).with_signal_words(&["bar".into()]);
         let results = scanner.scan();
         assert_eq!(results.len(), 1);
     }
@@ -305,19 +252,10 @@ mod ticket_extraction {
         let tf = TestFixtures::new();
         let root = tf.temp_dir.path();
 
-        std::fs::write(
-            root.join("a.js"),
-            "// TODO [ticket=DEMO-123] implement thing",
-        )
-        .unwrap();
+        std::fs::write(root.join("a.js"), "// TODO [ticket=DEMO-123] implement thing").unwrap();
 
         let mut cmd = cargo_bin_in(&tf);
-        let out = cmd
-            .arg("--format")
-            .arg("json")
-            .arg("scan")
-            .output()
-            .unwrap();
+        let out = cmd.arg("--format").arg("json").arg("scan").output().unwrap();
         assert!(out.status.success());
         let s = String::from_utf8_lossy(&out.stdout);
         assert!(s.contains("DEMO-123"), "expected DEMO-123 in JSON: {s}");
@@ -331,12 +269,7 @@ mod ticket_extraction {
         std::fs::write(root.join("b.rs"), "// TODO DEMO-999: implement more").unwrap();
 
         let mut cmd = cargo_bin_in(&tf);
-        let out = cmd
-            .arg("--format")
-            .arg("json")
-            .arg("scan")
-            .output()
-            .unwrap();
+        let out = cmd.arg("--format").arg("json").arg("scan").output().unwrap();
         assert!(out.status.success());
         let s = String::from_utf8_lossy(&out.stdout);
         assert!(s.contains("DEMO-999"), "expected DEMO-999 in JSON: {s}");
@@ -368,10 +301,7 @@ mod words_toggle {
         let refs = scanner.scan();
         assert_eq!(refs.len(), 0, "expected no detections without toggle");
 
-        assert_eq!(
-            scanner.extract_ticket_key_from_line("// AUTH-123 implement login"),
-            Some("AUTH-123".to_string())
-        );
+        assert_eq!(scanner.extract_ticket_key_from_line("// AUTH-123 implement login"), Some("AUTH-123".to_string()));
     }
 
     #[test]
@@ -380,9 +310,8 @@ mod words_toggle {
         let root = tmp.path();
         write_file(root, "src/lib.rs", "// Feature: implement signup");
 
-        let mut scanner = Scanner::new(PathBuf::from(root))
-            .with_signal_words(&["TODO".into(), "FIXME".into(), "Feature".into()])
-            .with_ticket_detection(None, false);
+        let mut scanner =
+            Scanner::new(PathBuf::from(root)).with_signal_words(&["TODO".into(), "FIXME".into(), "Feature".into()]).with_ticket_detection(None, false);
         let refs = scanner.scan();
         assert_eq!(refs.len(), 1, "expected one detection with issue-type word");
         assert_eq!(refs[0].title.to_lowercase(), "implement signup");
@@ -401,17 +330,9 @@ mod more_languages {
         let tf = TestFixtures::new();
         let root = tf.temp_dir.path();
 
-        fs::write(
-            root.join("index.html"),
-            "<!DOCTYPE html>\n<!-- TODO: fix header layout -->\n<html><head></head><body></body></html>\n",
-        )
-        .unwrap();
+        fs::write(root.join("index.html"), "<!DOCTYPE html>\n<!-- TODO: fix header layout -->\n<html><head></head><body></body></html>\n").unwrap();
 
-        cargo_bin_in(&tf)
-            .arg("scan")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("Found 1 TODO comment(s):"));
+        cargo_bin_in(&tf).arg("scan").assert().success().stdout(predicate::str::contains("Found 1 TODO comment(s):"));
     }
 
     #[test]
@@ -419,17 +340,9 @@ mod more_languages {
         let tf = TestFixtures::new();
         let root = tf.temp_dir.path();
 
-        fs::write(
-            root.join("styles.css"),
-            "/* TODO: replace color palette */\nbody { color: #333; }\n",
-        )
-        .unwrap();
+        fs::write(root.join("styles.css"), "/* TODO: replace color palette */\nbody { color: #333; }\n").unwrap();
 
-        cargo_bin_in(&tf)
-            .arg("scan")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("Found 1 TODO comment(s):"));
+        cargo_bin_in(&tf).arg("scan").assert().success().stdout(predicate::str::contains("Found 1 TODO comment(s):"));
     }
 
     #[test]
@@ -437,17 +350,9 @@ mod more_languages {
         let tf = TestFixtures::new();
         let root = tf.temp_dir.path();
 
-        fs::write(
-            root.join("schema.sql"),
-            "-- TODO: add indexes\nCREATE TABLE t(id INT);\n",
-        )
-        .unwrap();
+        fs::write(root.join("schema.sql"), "-- TODO: add indexes\nCREATE TABLE t(id INT);\n").unwrap();
 
-        cargo_bin_in(&tf)
-            .arg("scan")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("Found 1 TODO comment(s):"));
+        cargo_bin_in(&tf).arg("scan").assert().success().stdout(predicate::str::contains("Found 1 TODO comment(s):"));
     }
 
     #[test]
@@ -455,17 +360,9 @@ mod more_languages {
         let tf = TestFixtures::new();
         let root = tf.temp_dir.path();
 
-        fs::write(
-            root.join("config.ini"),
-            "; TODO: verify defaults\nkey=value\n",
-        )
-        .unwrap();
+        fs::write(root.join("config.ini"), "; TODO: verify defaults\nkey=value\n").unwrap();
 
-        cargo_bin_in(&tf)
-            .arg("scan")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("Found 1 TODO comment(s):"));
+        cargo_bin_in(&tf).arg("scan").assert().success().stdout(predicate::str::contains("Found 1 TODO comment(s):"));
     }
 
     #[test]
@@ -473,17 +370,9 @@ mod more_languages {
         let tf = TestFixtures::new();
         let root = tf.temp_dir.path();
 
-        fs::write(
-            root.join("config.toml"),
-            "# TODO: refine config\nname = \"app\"\n",
-        )
-        .unwrap();
+        fs::write(root.join("config.toml"), "# TODO: refine config\nname = \"app\"\n").unwrap();
 
-        cargo_bin_in(&tf)
-            .arg("scan")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("Found 1 TODO comment(s):"));
+        cargo_bin_in(&tf).arg("scan").assert().success().stdout(predicate::str::contains("Found 1 TODO comment(s):"));
     }
 
     #[test]
@@ -493,11 +382,7 @@ mod more_languages {
 
         fs::write(root.join("infra.hcl"), "# TODO: pin provider versions\n").unwrap();
 
-        cargo_bin_in(&tf)
-            .arg("scan")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("Found 1 TODO comment(s):"));
+        cargo_bin_in(&tf).arg("scan").assert().success().stdout(predicate::str::contains("Found 1 TODO comment(s):"));
     }
 
     #[test]
@@ -507,11 +392,7 @@ mod more_languages {
 
         fs::write(root.join("main.tf"), "# TODO: split modules\n").unwrap();
 
-        cargo_bin_in(&tf)
-            .arg("scan")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("Found 1 TODO comment(s):"));
+        cargo_bin_in(&tf).arg("scan").assert().success().stdout(predicate::str::contains("Found 1 TODO comment(s):"));
     }
 
     #[test]
@@ -521,11 +402,7 @@ mod more_languages {
 
         fs::write(root.join("script.lua"), "-- TODO: optimize loop\n").unwrap();
 
-        cargo_bin_in(&tf)
-            .arg("scan")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("Found 1 TODO comment(s):"));
+        cargo_bin_in(&tf).arg("scan").assert().success().stdout(predicate::str::contains("Found 1 TODO comment(s):"));
     }
 
     #[test]
@@ -535,11 +412,7 @@ mod more_languages {
 
         fs::write(root.join("script.ps1"), "# TODO: handle errors\n").unwrap();
 
-        cargo_bin_in(&tf)
-            .arg("scan")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("Found 1 TODO comment(s):"));
+        cargo_bin_in(&tf).arg("scan").assert().success().stdout(predicate::str::contains("Found 1 TODO comment(s):"));
     }
 
     #[test]
@@ -549,11 +422,7 @@ mod more_languages {
 
         fs::write(root.join("config.yaml"), "# TODO: adjust vars\nkey: val\n").unwrap();
 
-        cargo_bin_in(&tf)
-            .arg("scan")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("Found 1 TODO comment(s):"));
+        cargo_bin_in(&tf).arg("scan").assert().success().stdout(predicate::str::contains("Found 1 TODO comment(s):"));
     }
 
     #[test]
@@ -561,17 +430,9 @@ mod more_languages {
         let tf = TestFixtures::new();
         let root = tf.temp_dir.path();
 
-        fs::write(
-            root.join("App.tsx"),
-            "// TODO: wire props\nexport default function App(){ return null }\n",
-        )
-        .unwrap();
+        fs::write(root.join("App.tsx"), "// TODO: wire props\nexport default function App(){ return null }\n").unwrap();
 
-        cargo_bin_in(&tf)
-            .arg("scan")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("Found 1 TODO comment(s):"));
+        cargo_bin_in(&tf).arg("scan").assert().success().stdout(predicate::str::contains("Found 1 TODO comment(s):"));
     }
 
     #[test]
@@ -579,17 +440,9 @@ mod more_languages {
         let tf = TestFixtures::new();
         let root = tf.temp_dir.path();
 
-        fs::write(
-            root.join("README.md"),
-            "# Doc\n<!-- TODO: refine docs -->\n",
-        )
-        .unwrap();
+        fs::write(root.join("README.md"), "# Doc\n<!-- TODO: refine docs -->\n").unwrap();
 
-        cargo_bin_in(&tf)
-            .arg("scan")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("Found 1 TODO comment(s):"));
+        cargo_bin_in(&tf).arg("scan").assert().success().stdout(predicate::str::contains("Found 1 TODO comment(s):"));
     }
 }
 
@@ -600,35 +453,14 @@ mod more_languages {
 fn dev285_scanner_covers_new_types_and_modified_only_filters() {
     let tmp = tempfile::tempdir().unwrap();
     let root = tmp.path();
-    let git = |args: &[&str]| {
-        std::process::Command::new("git")
-            .current_dir(root)
-            .args(args)
-            .output()
-            .unwrap()
-    };
+    let git = |args: &[&str]| std::process::Command::new("git").current_dir(root).args(args).output().unwrap();
     git(&["init", "-q"]);
     std::fs::write(root.join("tracked.rs"), "fn a() {}\n").unwrap();
     git(&["add", "tracked.rs"]);
-    git(&[
-        "-c",
-        "user.name=t",
-        "-c",
-        "user.email=t@e",
-        "-c",
-        "commit.gpgsign=false",
-        "commit",
-        "-q",
-        "-m",
-        "init",
-    ]);
+    git(&["-c", "user.name=t", "-c", "user.email=t@e", "-c", "commit.gpgsign=false", "commit", "-q", "-m", "init"]);
     std::fs::write(root.join("m.mjs"), "// TODO: module item\n").unwrap();
     std::fs::write(root.join("Makefile"), "# TODO: make item\n").unwrap();
-    std::fs::write(
-        root.join("prose.rs"),
-        "// Note that this is prose\n// NOTE: real\n",
-    )
-    .unwrap();
+    std::fs::write(root.join("prose.rs"), "// Note that this is prose\n// NOTE: real\n").unwrap();
     std::fs::create_dir_all(root.join("feature")).unwrap();
     std::fs::write(root.join("feature/new.rs"), "// TODO: new module\n").unwrap();
     std::fs::write(root.join("b.py"), "# TODO: python\n").unwrap();
@@ -645,9 +477,7 @@ fn dev285_scanner_covers_new_types_and_modified_only_filters() {
     }
     assert!(!found.iter().any(|t| t.contains("prose")), "{found:?}");
 
-    let mut modified = lotar::scanner::Scanner::new(root.to_path_buf())
-        .with_modified_only(true)
-        .with_include_ext(&["rs".to_string()]);
+    let mut modified = lotar::scanner::Scanner::new(root.to_path_buf()).with_modified_only(true).with_include_ext(&["rs".to_string()]);
     let found = titles(&mut modified);
     assert_eq!(found, ["new module", "real"], "{found:?}");
 }

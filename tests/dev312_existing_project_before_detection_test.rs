@@ -13,38 +13,23 @@ use std::path::Path;
 /// named `foundera`, `infra/package.json` named `@foundera/infra`, and
 /// project FND with tickets. `config` is `.tasks/config.yml`, if any.
 fn foundera(config: Option<&str>, project_config: bool) -> tempfile::TempDir {
-    let tmp = tempfile::Builder::new()
-        .prefix("foundera")
-        .tempdir()
-        .unwrap();
+    let tmp = tempfile::Builder::new().prefix("foundera").tempdir().unwrap();
     let root = tmp.path();
     std::fs::create_dir_all(root.join(".git")).unwrap();
     std::fs::create_dir_all(root.join(".tasks/FND")).unwrap();
     std::fs::create_dir_all(root.join(".tasks/@sprints")).unwrap();
     std::fs::create_dir_all(root.join("infra")).unwrap();
     std::fs::write(root.join("package.json"), r#"{"name":"foundera"}"#).unwrap();
-    std::fs::write(
-        root.join("infra/package.json"),
-        r#"{"name":"@foundera/infra"}"#,
-    )
-    .unwrap();
+    std::fs::write(root.join("infra/package.json"), r#"{"name":"@foundera/infra"}"#).unwrap();
     std::fs::write(root.join("pnpm-workspace.yaml"), "packages:\n  - infra\n").unwrap();
     if let Some(config) = config {
         std::fs::write(root.join(".tasks/config.yml"), config).unwrap();
     }
     if project_config {
-        std::fs::write(
-            root.join(".tasks/FND/config.yml"),
-            "project:\n  name: FND\n",
-        )
-        .unwrap();
+        std::fs::write(root.join(".tasks/FND/config.yml"), "project:\n  name: FND\n").unwrap();
     }
     for n in 1..=3 {
-        std::fs::write(
-            root.join(format!(".tasks/FND/{n}.yml")),
-            format!("title: Ticket {n}\nstatus: Todo\npriority: Medium\ntype: Task\n"),
-        )
-        .unwrap();
+        std::fs::write(root.join(format!(".tasks/FND/{n}.yml")), format!("title: Ticket {n}\nstatus: Todo\npriority: Medium\ntype: Task\n")).unwrap();
     }
     tmp
 }
@@ -79,10 +64,7 @@ fn projects(tasks: &Path) -> Vec<String> {
 fn assert_adds_go_to_fnd(root: &Path, source: &str) {
     let out = lotar(root, &["add", "x", "--dry-run", "--explain"]);
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(
-        stdout.contains(&format!("project FND from {source}")),
-        "{stdout}"
-    );
+    assert!(stdout.contains(&format!("project FND from {source}")), "{stdout}");
     for dir in [root.to_path_buf(), root.join("infra")] {
         let out = lotar(&dir, &["add", "Plain title", "--dry-run"]);
         let stdout = String::from_utf8_lossy(&out.stdout);
@@ -124,14 +106,7 @@ fn service_create_without_a_default_uses_the_existing_project() {
         let tmp = foundera(config, false);
         let tasks = tmp.path().join(".tasks");
         let mut storage = lotar::storage::manager::Storage::new(&tasks);
-        let created = TaskService::create(
-            &mut storage,
-            TaskCreate {
-                title: "From MCP".into(),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+        let created = TaskService::create(&mut storage, TaskCreate { title: "From MCP".into(), ..Default::default() }).unwrap();
         assert_eq!(created.id, "FND-4");
         assert_eq!(projects(&tasks), ["FND"]);
     }

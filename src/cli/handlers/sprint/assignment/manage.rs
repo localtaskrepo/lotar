@@ -2,12 +2,8 @@ use std::path::Path;
 
 use serde::Serialize;
 
-use crate::cli::args::sprint::{
-    SprintAddArgs, SprintMoveArgs, SprintRemoveArgs, TaskSelectionArgs,
-};
-use crate::cli::handlers::sprint::shared::{
-    SprintAssignmentIntegrityPayload, build_assignment_integrity,
-};
+use crate::cli::args::sprint::{SprintAddArgs, SprintMoveArgs, SprintRemoveArgs, TaskSelectionArgs};
+use crate::cli::handlers::sprint::shared::{SprintAssignmentIntegrityPayload, build_assignment_integrity};
 use crate::config::manager::ConfigManager;
 use crate::config::types::ResolvedConfig;
 use crate::output::{OutputFormat, OutputRenderer};
@@ -20,57 +16,27 @@ use crate::workspace::{TasksDirectoryResolver, TasksDirectorySource};
 
 use super::context::AssignmentContext;
 
-pub(crate) fn handle_add(
-    add_args: &SprintAddArgs,
-    tasks_root: &Path,
-    renderer: &OutputRenderer,
-) -> Result<(), String> {
+pub(crate) fn handle_add(add_args: &SprintAddArgs, tasks_root: &Path, renderer: &OutputRenderer) -> Result<(), String> {
     let resolver = local_resolver(tasks_root);
     let resolved_config = load_resolved_config(&resolver)?;
     let mut context = AssignmentContext::for_mutation(tasks_root)?;
 
-    let cleanup_summary = context.reconcile_missing(
-        add_args.cleanup_missing,
-        renderer,
-        "assigning sprint memberships",
-    )?;
+    let cleanup_summary = context.reconcile_missing(add_args.cleanup_missing, renderer, "assigning sprint memberships")?;
 
-    let (explicit, mut tasks) = split_assignment_inputs(
-        &context.storage,
-        &context.records,
-        &add_args.sprint,
-        &add_args.items,
-    )?;
+    let (explicit, mut tasks) = split_assignment_inputs(&context.storage, &context.records, &add_args.sprint, &add_args.items)?;
 
-    tasks.extend(select_task_ids(
-        &add_args.select,
-        &context.storage,
-        &resolver,
-        &resolved_config,
-    )?);
+    tasks.extend(select_task_ids(&add_args.select, &context.storage, &resolver, &resolved_config)?);
 
     tasks.sort();
     tasks.dedup();
     if tasks.is_empty() {
-        return Err(
-            "Provide at least one task identifier via arguments or --select filters.".to_string(),
-        );
+        return Err("Provide at least one task identifier via arguments or --select filters.".to_string());
     }
 
-    let outcome = sprint_assignment::assign_tasks(
-        &mut context.storage,
-        &mut context.records,
-        &tasks,
-        explicit.as_deref(),
-        add_args.allow_closed,
-        add_args.force,
-    )?;
+    let outcome =
+        sprint_assignment::assign_tasks(&mut context.storage, &mut context.records, &tasks, explicit.as_deref(), add_args.allow_closed, add_args.force)?;
 
-    let reassignment_messages: Vec<String> = outcome
-        .replaced
-        .iter()
-        .filter_map(|info| info.describe())
-        .collect();
+    let reassignment_messages: Vec<String> = outcome.replaced.iter().filter_map(|info| info.describe()).collect();
 
     match renderer.format {
         OutputFormat::Json => {
@@ -81,20 +47,9 @@ pub(crate) fn handle_add(
                 sprint_label: outcome.sprint_label.clone(),
                 modified: outcome.modified.clone(),
                 unchanged: outcome.unchanged.clone(),
-                replaced: outcome
-                    .replaced
-                    .iter()
-                    .map(|info| SprintReassignment {
-                        task_id: info.task_id.clone(),
-                        previous: info.previous.clone(),
-                    })
-                    .collect(),
+                replaced: outcome.replaced.iter().map(|info| SprintReassignment { task_id: info.task_id.clone(), previous: info.previous.clone() }).collect(),
                 messages: reassignment_messages.clone(),
-                integrity: build_assignment_integrity(
-                    context.baseline_integrity(),
-                    context.integrity(),
-                    cleanup_summary.as_ref(),
-                ),
+                integrity: build_assignment_integrity(context.baseline_integrity(), context.integrity(), cleanup_summary.as_ref()),
             };
             renderer.emit_json(&payload);
         }
@@ -106,15 +61,10 @@ pub(crate) fn handle_add(
                 outcome.modified.len()
             ));
             if !outcome.unchanged.is_empty() {
-                renderer.emit_info(format_args!(
-                    "Already assigned (skipped): {}",
-                    outcome.unchanged.join(", ")
-                ));
+                renderer.emit_info(format_args!("Already assigned (skipped): {}", outcome.unchanged.join(", ")));
             }
             if outcome.modified.is_empty() {
-                renderer.emit_warning(
-                    "No tasks gained the sprint membership; all provided tasks were already assigned.",
-                );
+                renderer.emit_warning("No tasks gained the sprint membership; all provided tasks were already assigned.");
             }
             if add_args.force {
                 for message in &reassignment_messages {
@@ -127,57 +77,26 @@ pub(crate) fn handle_add(
     Ok(())
 }
 
-pub(crate) fn handle_move(
-    move_args: &SprintMoveArgs,
-    tasks_root: &Path,
-    renderer: &OutputRenderer,
-) -> Result<(), String> {
+pub(crate) fn handle_move(move_args: &SprintMoveArgs, tasks_root: &Path, renderer: &OutputRenderer) -> Result<(), String> {
     let resolver = local_resolver(tasks_root);
     let resolved_config = load_resolved_config(&resolver)?;
     let mut context = AssignmentContext::for_mutation(tasks_root)?;
 
-    let cleanup_summary = context.reconcile_missing(
-        move_args.cleanup_missing,
-        renderer,
-        "moving sprint memberships",
-    )?;
+    let cleanup_summary = context.reconcile_missing(move_args.cleanup_missing, renderer, "moving sprint memberships")?;
 
-    let (explicit, mut tasks) = split_assignment_inputs(
-        &context.storage,
-        &context.records,
-        &move_args.sprint,
-        &move_args.items,
-    )?;
+    let (explicit, mut tasks) = split_assignment_inputs(&context.storage, &context.records, &move_args.sprint, &move_args.items)?;
 
-    tasks.extend(select_task_ids(
-        &move_args.select,
-        &context.storage,
-        &resolver,
-        &resolved_config,
-    )?);
+    tasks.extend(select_task_ids(&move_args.select, &context.storage, &resolver, &resolved_config)?);
 
     tasks.sort();
     tasks.dedup();
     if tasks.is_empty() {
-        return Err(
-            "Provide at least one task identifier via arguments or --select filters.".to_string(),
-        );
+        return Err("Provide at least one task identifier via arguments or --select filters.".to_string());
     }
 
-    let outcome = sprint_assignment::assign_tasks(
-        &mut context.storage,
-        &mut context.records,
-        &tasks,
-        explicit.as_deref(),
-        move_args.allow_closed,
-        true,
-    )?;
+    let outcome = sprint_assignment::assign_tasks(&mut context.storage, &mut context.records, &tasks, explicit.as_deref(), move_args.allow_closed, true)?;
 
-    let reassignment_messages: Vec<String> = outcome
-        .replaced
-        .iter()
-        .filter_map(|info| info.describe())
-        .collect();
+    let reassignment_messages: Vec<String> = outcome.replaced.iter().filter_map(|info| info.describe()).collect();
 
     match renderer.format {
         OutputFormat::Json => {
@@ -188,45 +107,24 @@ pub(crate) fn handle_move(
                 sprint_label: outcome.sprint_label.clone(),
                 modified: outcome.modified.clone(),
                 unchanged: outcome.unchanged.clone(),
-                replaced: outcome
-                    .replaced
-                    .iter()
-                    .map(|info| SprintReassignment {
-                        task_id: info.task_id.clone(),
-                        previous: info.previous.clone(),
-                    })
-                    .collect(),
+                replaced: outcome.replaced.iter().map(|info| SprintReassignment { task_id: info.task_id.clone(), previous: info.previous.clone() }).collect(),
                 messages: reassignment_messages.clone(),
-                integrity: build_assignment_integrity(
-                    context.baseline_integrity(),
-                    context.integrity(),
-                    cleanup_summary.as_ref(),
-                ),
+                integrity: build_assignment_integrity(context.baseline_integrity(), context.integrity(), cleanup_summary.as_ref()),
             };
             renderer.emit_json(&payload);
         }
         _ => {
-            renderer.emit_success(format_args!(
-                "Moved {} task(s) to sprint #{} ({}).",
-                outcome.modified.len(),
-                outcome.sprint_id,
-                outcome.sprint_display_name
-            ));
+            renderer.emit_success(format_args!("Moved {} task(s) to sprint #{} ({}).", outcome.modified.len(), outcome.sprint_id, outcome.sprint_display_name));
             if !outcome.replaced.is_empty() {
                 for message in &reassignment_messages {
                     renderer.emit_info(message);
                 }
             }
             if !outcome.unchanged.is_empty() {
-                renderer.emit_info(format_args!(
-                    "Already assigned to target sprint (skipped): {}",
-                    outcome.unchanged.join(", ")
-                ));
+                renderer.emit_info(format_args!("Already assigned to target sprint (skipped): {}", outcome.unchanged.join(", ")));
             }
             if outcome.modified.is_empty() {
-                renderer.emit_warning(
-                    "No tasks changed sprint membership; all provided tasks already belonged to the target sprint.",
-                );
+                renderer.emit_warning("No tasks changed sprint membership; all provided tasks already belonged to the target sprint.");
             }
         }
     }
@@ -234,49 +132,24 @@ pub(crate) fn handle_move(
     Ok(())
 }
 
-pub(crate) fn handle_remove(
-    remove_args: &SprintRemoveArgs,
-    tasks_root: &Path,
-    renderer: &OutputRenderer,
-) -> Result<(), String> {
+pub(crate) fn handle_remove(remove_args: &SprintRemoveArgs, tasks_root: &Path, renderer: &OutputRenderer) -> Result<(), String> {
     let resolver = local_resolver(tasks_root);
     let resolved_config = load_resolved_config(&resolver)?;
     let mut context = AssignmentContext::for_mutation(tasks_root)?;
 
-    let cleanup_summary = context.reconcile_missing(
-        remove_args.cleanup_missing,
-        renderer,
-        "removing sprint memberships",
-    )?;
+    let cleanup_summary = context.reconcile_missing(remove_args.cleanup_missing, renderer, "removing sprint memberships")?;
 
-    let (explicit, mut tasks) = split_assignment_inputs(
-        &context.storage,
-        &context.records,
-        &remove_args.sprint,
-        &remove_args.items,
-    )?;
+    let (explicit, mut tasks) = split_assignment_inputs(&context.storage, &context.records, &remove_args.sprint, &remove_args.items)?;
 
-    tasks.extend(select_task_ids(
-        &remove_args.select,
-        &context.storage,
-        &resolver,
-        &resolved_config,
-    )?);
+    tasks.extend(select_task_ids(&remove_args.select, &context.storage, &resolver, &resolved_config)?);
 
     tasks.sort();
     tasks.dedup();
     if tasks.is_empty() {
-        return Err(
-            "Provide at least one task identifier via arguments or --select filters.".to_string(),
-        );
+        return Err("Provide at least one task identifier via arguments or --select filters.".to_string());
     }
 
-    let outcome = sprint_assignment::remove_tasks(
-        &mut context.storage,
-        &mut context.records,
-        &tasks,
-        explicit.as_deref(),
-    )?;
+    let outcome = sprint_assignment::remove_tasks(&mut context.storage, &mut context.records, &tasks, explicit.as_deref())?;
 
     match renderer.format {
         OutputFormat::Json => {
@@ -289,11 +162,7 @@ pub(crate) fn handle_remove(
                 unchanged: outcome.unchanged.clone(),
                 replaced: Vec::new(),
                 messages: Vec::new(),
-                integrity: build_assignment_integrity(
-                    context.baseline_integrity(),
-                    context.integrity(),
-                    cleanup_summary.as_ref(),
-                ),
+                integrity: build_assignment_integrity(context.baseline_integrity(), context.integrity(), cleanup_summary.as_ref()),
             };
             renderer.emit_json(&payload);
         }
@@ -305,15 +174,10 @@ pub(crate) fn handle_remove(
                 outcome.modified.len()
             ));
             if !outcome.unchanged.is_empty() {
-                renderer.emit_info(format_args!(
-                    "Tasks without that sprint membership: {}",
-                    outcome.unchanged.join(", ")
-                ));
+                renderer.emit_info(format_args!("Tasks without that sprint membership: {}", outcome.unchanged.join(", ")));
             }
             if outcome.modified.is_empty() {
-                renderer.emit_warning(
-                    "No sprint memberships were removed because none of the provided tasks were linked to the sprint.",
-                );
+                renderer.emit_warning("No sprint memberships were removed because none of the provided tasks were linked to the sprint.");
             }
         }
     }
@@ -353,53 +217,32 @@ fn split_assignment_inputs(
 }
 
 fn local_resolver(tasks_root: &Path) -> TasksDirectoryResolver {
-    TasksDirectoryResolver {
-        path: tasks_root.to_path_buf(),
-        source: TasksDirectorySource::CommandLineFlag,
-    }
+    TasksDirectoryResolver { path: tasks_root.to_path_buf(), source: TasksDirectorySource::CommandLineFlag }
 }
 
 fn load_resolved_config(resolver: &TasksDirectoryResolver) -> Result<ResolvedConfig, String> {
-    let manager = ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path)
-        .map_err(|e| format!("Failed to load config: {}", e))?;
+    let manager = ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path).map_err(|e| format!("Failed to load config: {}", e))?;
     Ok(manager.get_resolved_config().clone())
 }
 
 /// Task IDs chosen by the `--select*` flags: the value flags plus a
 /// `--select` query in the web search syntax, run as the shared task query
 /// (DEV-231). Empty when no selection flag is given.
-fn select_task_ids(
-    args: &TaskSelectionArgs,
-    storage: &Storage,
-    resolver: &TasksDirectoryResolver,
-    config: &ResolvedConfig,
-) -> Result<Vec<String>, String> {
+fn select_task_ids(args: &TaskSelectionArgs, storage: &Storage, resolver: &TasksDirectoryResolver, config: &ResolvedConfig) -> Result<Vec<String>, String> {
     if !args.is_active() {
         return Ok(Vec::new());
     }
     let mut input = TaskQueryInput {
-        project: args
-            .project
-            .as_deref()
-            .map(|project| resolve_project_input(project, resolver.path.as_path())),
+        project: args.project.as_deref().map(|project| resolve_project_input(project, resolver.path.as_path())),
         status: args.status.clone(),
         priority: args.priority.clone(),
         task_type: args.task_type.clone(),
         tags: args.tag.clone(),
         ..TaskQueryInput::default()
     };
-    input
-        .add_search(&crate::utils::search_syntax::parse(&args.select.join(" ")))
-        .map_err(|e| e.cli_message())?;
-    let query = input
-        .resolve(config, resolver.path.as_path())
-        .map_err(|e| e.cli_message())?;
-    Ok(
-        crate::services::task_list::run(storage, &query, chrono::Utc::now())
-            .into_iter()
-            .map(|(id, _)| id)
-            .collect(),
-    )
+    input.add_search(&crate::utils::search_syntax::parse(&args.select.join(" "))).map_err(|e| e.cli_message())?;
+    let query = input.resolve(config, resolver.path.as_path()).map_err(|e| e.cli_message())?;
+    Ok(crate::services::task_list::run(storage, &query, chrono::Utc::now()).into_iter().map(|(id, _)| id).collect())
 }
 
 #[derive(Debug, Serialize)]

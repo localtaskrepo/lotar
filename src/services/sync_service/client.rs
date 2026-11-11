@@ -17,14 +17,7 @@ pub(super) struct SyncClient {
 
 impl SyncClient {
     pub(super) fn new(auth: AuthContext) -> Self {
-        Self {
-            agent: ureq::Agent::config_builder()
-                .timeout_global(Some(Duration::from_secs(30)))
-                .http_status_as_error(false)
-                .build()
-                .into(),
-            auth,
-        }
+        Self { agent: ureq::Agent::config_builder().timeout_global(Some(Duration::from_secs(30))).http_status_as_error(false).build().into(), auth }
     }
 }
 
@@ -37,10 +30,7 @@ pub(super) fn build_auth_context(
     let provider = profile.provider.unwrap_or(remote.provider);
 
     if profile.provider.is_some() && provider != remote.provider {
-        warnings.push(format!(
-            "Auth profile '{}' provider does not match remote provider",
-            profile_name
-        ));
+        warnings.push(format!("Auth profile '{}' provider does not match remote provider", profile_name));
     }
 
     let method = profile
@@ -59,32 +49,17 @@ pub(super) fn build_auth_context(
             .as_deref()
             .or(profile.base_url.as_deref())
             .map(strip_trailing_slash)
-            .ok_or_else(|| {
-                LoTaRError::ValidationError(format!(
-                    "Auth profile '{}' must set api_url or base_url",
-                    profile_name
-                ))
-            })?,
-        SyncProvider::Github => profile
-            .api_url
-            .as_deref()
-            .map(strip_trailing_slash)
-            .unwrap_or_else(|| "https://api.github.com".to_string()),
+            .ok_or_else(|| LoTaRError::ValidationError(format!("Auth profile '{}' must set api_url or base_url", profile_name)))?,
+        SyncProvider::Github => profile.api_url.as_deref().map(strip_trailing_slash).unwrap_or_else(|| "https://api.github.com".to_string()),
     };
 
     let auth_header = match method.as_str() {
         "basic" => {
             let email_env = profile.email_env.as_deref().ok_or_else(|| {
-                LoTaRError::ValidationError(format!(
-                    "Auth profile '{}' must set email_env (env var name or literal) for basic auth",
-                    profile_name
-                ))
+                LoTaRError::ValidationError(format!("Auth profile '{}' must set email_env (env var name or literal) for basic auth", profile_name))
             })?;
             let token_env = profile.token_env.as_deref().ok_or_else(|| {
-                LoTaRError::ValidationError(format!(
-                    "Auth profile '{}' must set token_env (env var name or literal) for basic auth",
-                    profile_name
-                ))
+                LoTaRError::ValidationError(format!("Auth profile '{}' must set token_env (env var name or literal) for basic auth", profile_name))
             })?;
             let email = resolve_auth_value(email_env, profile_name, "email")?;
             let token = resolve_auth_value(token_env, profile_name, "token")?;
@@ -92,52 +67,32 @@ pub(super) fn build_auth_context(
             Some(format!("Basic {}", BASE64_STANDARD.encode(raw.as_bytes())))
         }
         "bearer" | "token" | "pat" => {
-            let token_env = profile.token_env.as_deref().ok_or_else(|| {
-                LoTaRError::ValidationError(format!(
-                    "Auth profile '{}' must set token_env (env var name or literal)",
-                    profile_name
-                ))
-            })?;
+            let token_env = profile
+                .token_env
+                .as_deref()
+                .ok_or_else(|| LoTaRError::ValidationError(format!("Auth profile '{}' must set token_env (env var name or literal)", profile_name)))?;
             let token = resolve_auth_value(token_env, profile_name, "token")?;
             Some(format!("Bearer {}", token))
         }
         other => {
-            return Err(LoTaRError::ValidationError(format!(
-                "Unsupported auth method '{}'",
-                other
-            )));
+            return Err(LoTaRError::ValidationError(format!("Unsupported auth method '{}'", other)));
         }
     };
 
-    Ok(AuthContext {
-        provider,
-        api_base,
-        auth_header,
-        user_agent: "lotar".to_string(),
-    })
+    Ok(AuthContext { provider, api_base, auth_header, user_agent: "lotar".to_string() })
 }
 
-pub(super) fn resolve_auth_value(
-    name_or_value: &str,
-    profile_name: &str,
-    label: &str,
-) -> LoTaRResult<String> {
+pub(super) fn resolve_auth_value(name_or_value: &str, profile_name: &str, label: &str) -> LoTaRResult<String> {
     let trimmed = name_or_value.trim();
     if trimmed.is_empty() {
-        return Err(LoTaRError::ValidationError(format!(
-            "Auth profile '{}' {} value is empty",
-            profile_name, label
-        )));
+        return Err(LoTaRError::ValidationError(format!("Auth profile '{}' {} value is empty", profile_name, label)));
     }
 
     match env::var(trimmed) {
         Ok(value) => {
             let resolved = value.trim();
             if resolved.is_empty() {
-                Err(LoTaRError::ValidationError(format!(
-                    "Environment variable '{}' is empty",
-                    trimmed
-                )))
+                Err(LoTaRError::ValidationError(format!("Environment variable '{}' is empty", trimmed)))
             } else {
                 Ok(resolved.to_string())
             }
@@ -153,20 +108,14 @@ pub(super) fn resolve_auth_value(
 }
 
 pub(super) fn looks_like_env_var(value: &str) -> bool {
-    !value.is_empty()
-        && value
-            .chars()
-            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
+    !value.is_empty() && value.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
 }
 
 pub(super) fn strip_trailing_slash(raw: &str) -> String {
     raw.trim_end_matches('/').to_string()
 }
 
-pub(super) fn request_with_headers<B>(
-    client: &SyncClient,
-    req: ureq::RequestBuilder<B>,
-) -> ureq::RequestBuilder<B> {
+pub(super) fn request_with_headers<B>(client: &SyncClient, req: ureq::RequestBuilder<B>) -> ureq::RequestBuilder<B> {
     let mut req = req.header("Accept", "application/json");
     req = req.header("Content-Type", "application/json");
     req = req.header("User-Agent", &client.auth.user_agent);
@@ -180,11 +129,7 @@ pub(super) fn request_with_headers<B>(
     req
 }
 
-pub(super) fn send_json_request(
-    client: &SyncClient,
-    req: ureq::RequestBuilder<ureq::typestate::WithBody>,
-    body: Option<JsonValue>,
-) -> LoTaRResult<JsonValue> {
+pub(super) fn send_json_request(client: &SyncClient, req: ureq::RequestBuilder<ureq::typestate::WithBody>, body: Option<JsonValue>) -> LoTaRResult<JsonValue> {
     let req = request_with_headers(client, req);
     let mut resp = match body {
         Some(payload) => req.send_json(payload),
@@ -194,26 +139,15 @@ pub(super) fn send_json_request(
 
     let code = resp.status().as_u16();
     if code >= 400 {
-        let header = |name: &str| {
-            resp.headers()
-                .get(name)
-                .and_then(|v| v.to_str().ok())
-                .map(str::to_string)
-        };
+        let header = |name: &str| resp.headers().get(name).and_then(|v| v.to_str().ok()).map(str::to_string);
         let retry_after = header("retry-after");
         let remaining = header("x-ratelimit-remaining");
         let reset = header("x-ratelimit-reset");
-        let payload = resp
-            .body_mut()
-            .read_to_string()
-            .unwrap_or_else(|_| String::new());
+        let payload = resp.body_mut().read_to_string().unwrap_or_else(|_| String::new());
         // Rate limits say when to try again instead of a bare HTTP error
         // (DEV-286).
-        let limited = code == 429
-            || (code == 403
-                && (remaining.as_deref() == Some("0")
-                    || retry_after.is_some()
-                    || payload.to_ascii_lowercase().contains("rate limit")));
+        let limited =
+            code == 429 || (code == 403 && (remaining.as_deref() == Some("0") || retry_after.is_some() || payload.to_ascii_lowercase().contains("rate limit")));
         if limited {
             let when = retry_after
                 .and_then(|s| s.trim().parse::<u64>().ok())
@@ -225,16 +159,10 @@ pub(super) fn send_json_request(
                         .map(|at| format!("the limit resets at {}", at.to_rfc3339()))
                 })
                 .unwrap_or_else(|| "retry later".to_string());
-            return Err(LoTaRError::ValidationError(format!(
-                "Remote API rate limit reached (HTTP {code}); {when}. Nothing after this point was synced."
-            )));
+            return Err(LoTaRError::ValidationError(format!("Remote API rate limit reached (HTTP {code}); {when}. Nothing after this point was synced.")));
         }
         let message = payload.trim();
-        let detail = if message.is_empty() {
-            format!("Remote API error (HTTP {})", code)
-        } else {
-            format!("Remote API error (HTTP {}): {}", code, message)
-        };
+        let detail = if message.is_empty() { format!("Remote API error (HTTP {})", code) } else { format!("Remote API error (HTTP {}): {}", code, message) };
         return Err(LoTaRError::ValidationError(detail));
     }
 
@@ -242,12 +170,9 @@ pub(super) fn send_json_request(
 }
 
 pub(super) fn parse_json_response(body: &mut ureq::Body) -> LoTaRResult<JsonValue> {
-    let payload = body.read_to_string().map_err(|e| {
-        LoTaRError::SerializationError(format!("Failed to read response body: {}", e))
-    })?;
+    let payload = body.read_to_string().map_err(|e| LoTaRError::SerializationError(format!("Failed to read response body: {}", e)))?;
     if payload.trim().is_empty() {
         return Ok(JsonValue::Null);
     }
-    serde_json::from_str(&payload)
-        .map_err(|e| LoTaRError::SerializationError(format!("Invalid JSON response: {}", e)))
+    serde_json::from_str(&payload).map_err(|e| LoTaRError::SerializationError(format!("Invalid JSON response: {}", e)))
 }

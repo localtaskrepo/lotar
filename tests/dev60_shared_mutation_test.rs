@@ -60,12 +60,7 @@ fn workspace(project: &str) -> Fixture {
     )
     .unwrap();
     let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
-    Fixture {
-        _tmp: tmp,
-        tasks_dir,
-        _guard_tasks,
-        _guard_fast,
-    }
+    Fixture { _tmp: tmp, tasks_dir, _guard_tasks, _guard_fast }
 }
 
 /// Gitless workspace outside the checkout: plain temp dir with no `.git`
@@ -90,15 +85,8 @@ fn set_automation(tasks_dir: &Path, project: &str, rules: &str) {
 }
 
 fn create_task(storage: &mut Storage, project: &str, title: &str) -> lotar::api_types::TaskDTO {
-    TaskService::create(
-        storage,
-        lotar::api_types::TaskCreate {
-            title: title.to_string(),
-            project: Some(project.to_string()),
-            ..Default::default()
-        },
-    )
-    .expect("create task")
+    TaskService::create(storage, lotar::api_types::TaskCreate { title: title.to_string(), project: Some(project.to_string()), ..Default::default() })
+        .expect("create task")
 }
 
 fn server() -> ApiServer {
@@ -123,40 +111,21 @@ fn mk_req(method: &str, path: &str, body: Value) -> HttpRequest {
 }
 
 fn rest_create(api: &ApiServer, project: &str, title: &str) -> String {
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/add",
-        json!({"title": title, "project": project}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/add", json!({"title": title, "project": project})));
     assert_eq!(resp.status, 201, "{}", String::from_utf8_lossy(&resp.body));
-    serde_json::from_slice::<Value>(&resp.body).unwrap()["data"]["id"]
-        .as_str()
-        .unwrap()
-        .to_string()
+    serde_json::from_slice::<Value>(&resp.body).unwrap()["data"]["id"].as_str().unwrap().to_string()
 }
 
 fn base64_encode(data: &[u8]) -> String {
     const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::new();
     for chunk in data.chunks(3) {
-        let b = [
-            chunk[0],
-            *chunk.get(1).unwrap_or(&0),
-            *chunk.get(2).unwrap_or(&0),
-        ];
+        let b = [chunk[0], *chunk.get(1).unwrap_or(&0), *chunk.get(2).unwrap_or(&0)];
         let n = (u32::from(b[0]) << 16) | (u32::from(b[1]) << 8) | u32::from(b[2]);
         out.push(TABLE[(n >> 18) as usize & 63] as char);
         out.push(TABLE[(n >> 12) as usize & 63] as char);
-        out.push(if chunk.len() > 1 {
-            TABLE[(n >> 6) as usize & 63] as char
-        } else {
-            '='
-        });
-        out.push(if chunk.len() > 2 {
-            TABLE[n as usize & 63] as char
-        } else {
-            '='
-        });
+        out.push(if chunk.len() > 1 { TABLE[(n >> 6) as usize & 63] as char } else { '=' });
+        out.push(if chunk.len() > 2 { TABLE[n as usize & 63] as char } else { '=' });
     }
     out
 }
@@ -170,31 +139,21 @@ fn mcall(name: &str, args: Value) -> Value {
     });
     let resp_line = lotar::mcp::server::handle_json_line(&serde_json::to_string(&req).unwrap());
     let resp: Value = serde_json::from_str(&resp_line).unwrap();
-    let text = resp["result"]["content"][0]["text"]
-        .as_str()
-        .unwrap_or("{}");
+    let text = resp["result"]["content"][0]["text"].as_str().unwrap_or("{}");
     serde_json::from_str(text).unwrap_or(json!({}))
 }
 
 /// True when the tool call failed: JSON-RPC protocol error or recoverable
 /// domain failure surfaced as result.isError (DEV-63).
 fn mcp_failed(resp: &Value) -> bool {
-    resp.get("error").is_some()
-        || resp.get("result").and_then(|result| result.get("isError"))
-            == Some(&serde_json::json!(true))
+    resp.get("error").is_some() || resp.get("result").and_then(|result| result.get("isError")) == Some(&serde_json::json!(true))
 }
 
 /// Explanatory text of a failed tool call across both error shapes.
 fn mcp_failure_text(resp: &Value) -> String {
     if let Some(result) = resp.get("result") {
-        let structured = result
-            .get("functionResponse")
-            .and_then(|fr| fr.get("response"));
-        if let Some(message) = structured
-            .and_then(|r| r.get("data"))
-            .and_then(|data| data.get("message"))
-            .and_then(|m| m.as_str())
-        {
+        let structured = result.get("functionResponse").and_then(|fr| fr.get("response"));
+        if let Some(message) = structured.and_then(|r| r.get("data")).and_then(|data| data.get("message")).and_then(|m| m.as_str()) {
             return message.to_string();
         }
         return result
@@ -205,11 +164,7 @@ fn mcp_failure_text(resp: &Value) -> String {
             .unwrap_or_default()
             .to_string();
     }
-    resp["error"]["data"]["message"]
-        .as_str()
-        .or_else(|| resp["error"]["message"].as_str())
-        .unwrap_or_default()
-        .to_string()
+    resp["error"]["data"]["message"].as_str().or_else(|| resp["error"]["message"].as_str()).unwrap_or_default().to_string()
 }
 
 fn task_file(tasks_dir: &Path, id: &str) -> PathBuf {
@@ -230,13 +185,7 @@ fn count_task_updates(rx: &mpsc::Receiver<ApiEvent>, id_prefix: &str) -> usize {
     let mut matching = 0;
     let deadline = Instant::now() + Duration::from_millis(300);
     while let Ok(event) = rx.recv_timeout(Duration::from_millis(50)) {
-        if event.kind == "task_updated"
-            && event
-                .data
-                .get("id")
-                .and_then(Value::as_str)
-                .is_some_and(|id| id.starts_with(id_prefix))
-        {
+        if event.kind == "task_updated" && event.data.get("id").and_then(Value::as_str).is_some_and(|id| id.starts_with(id_prefix)) {
             matching += 1;
         }
         if Instant::now() > deadline {
@@ -246,15 +195,8 @@ fn count_task_updates(rx: &mpsc::Receiver<ApiEvent>, id_prefix: &str) -> usize {
     matching
 }
 
-fn history_entries<'a>(
-    task: &'a lotar::storage::task::Task,
-    field: &str,
-) -> Vec<&'a lotar::types::TaskChange> {
-    task.history
-        .iter()
-        .flat_map(|entry| entry.changes.iter())
-        .filter(|change| change.field == field)
-        .collect()
+fn history_entries<'a>(task: &'a lotar::storage::task::Task, field: &str) -> Vec<&'a lotar::types::TaskChange> {
+    task.history.iter().flat_map(|entry| entry.changes.iter()).filter(|change| change.field == field).collect()
 }
 
 fn tag_count(task: &lotar::storage::task::Task, tag: &str) -> usize {
@@ -271,41 +213,22 @@ fn bulk_comment_fires_on_commented_exactly_once_per_task() {
     let mut storage = Storage::new(&fx.tasks_dir);
     let one = create_task(&mut storage, "D6A1", "Bulk one");
     let two = create_task(&mut storage, "D6A1", "Bulk two");
-    set_automation(
-        &fx.tasks_dir,
-        "D6A1",
-        "    - name: bulk-seen\n      on: {commented: {add: {tags: [bulk-seen]}}}\n",
-    );
+    set_automation(&fx.tasks_dir, "D6A1", "    - name: bulk-seen\n      on: {commented: {add: {tags: [bulk-seen]}}}\n");
 
-    let payload = mcall(
-        "task_bulk_comment_add",
-        json!({"ids": [one.id, two.id], "text": "bulk note"}),
-    );
+    let payload = mcall("task_bulk_comment_add", json!({"ids": [one.id, two.id], "text": "bulk note"}));
 
     assert_eq!(payload["status"], "ok", "{payload}");
     let updated = payload["updated"].as_array().expect("updated array");
     assert_eq!(updated.len(), 2, "{payload}");
-    assert!(
-        payload["failed"].as_array().unwrap().is_empty(),
-        "{payload}"
-    );
+    assert!(payload["failed"].as_array().unwrap().is_empty(), "{payload}");
 
     for id in [&one.id, &two.id] {
         let task = read_task(&fx.tasks_dir, id);
-        assert_eq!(
-            task.comments.len(),
-            1,
-            "{id}: exactly one comment, got {:?}",
-            task.comments
-        );
+        assert_eq!(task.comments.len(), 1, "{id}: exactly one comment, got {:?}", task.comments);
         assert_eq!(task.comments[0].text, "bulk note");
         let added = history_entries(&task, "comment_added");
         assert_eq!(added.len(), 1, "{id}: one comment_added history entry");
-        assert_eq!(
-            task.modified,
-            task.history.last().map(|e| e.at.clone()).unwrap(),
-            "{id}: modified matches the recorded history timestamp"
-        );
+        assert_eq!(task.modified, task.history.last().map(|e| e.at.clone()).unwrap(), "{id}: modified matches the recorded history timestamp");
         // on.commented fired exactly once: the tag is present exactly once.
         assert_eq!(tag_count(&task, "bulk-seen"), 1, "{id}: {:?}", task.tags);
     }
@@ -320,51 +243,25 @@ fn bulk_comment_per_item_failures_alias_and_stop_on_error() {
 
     // Mixed success: a padded alias canonicalizes, a malformed id fails as
     // its own item, and the batch continues.
-    let payload = mcall(
-        "task_bulk_comment_add",
-        json!({"ids": [format!("{}001", &one.id[..one.id.len()-1]), "garbage", two.id], "text": "mix"}),
-    );
+    let payload = mcall("task_bulk_comment_add", json!({"ids": [format!("{}001", &one.id[..one.id.len()-1]), "garbage", two.id], "text": "mix"}));
     assert_eq!(payload["status"], "ok", "{payload}");
     let updated = payload["updated"].as_array().unwrap();
     assert_eq!(updated.len(), 2, "{payload}");
-    assert_eq!(
-        updated[0]["id"], one.id,
-        "padded alias canonicalizes: {payload}"
-    );
+    assert_eq!(updated[0]["id"], one.id, "padded alias canonicalizes: {payload}");
     assert_eq!(updated[1]["id"], two.id, "{payload}");
     let failed = payload["failed"].as_array().unwrap();
     assert_eq!(failed.len(), 1, "{payload}");
     assert_eq!(failed[0]["id"], "garbage", "{payload}");
-    assert!(
-        failed[0]["error"]
-            .as_str()
-            .unwrap()
-            .contains("Invalid task ID"),
-        "{payload}"
-    );
+    assert!(failed[0]["error"].as_str().unwrap().contains("Invalid task ID"), "{payload}");
 
     // stop_on_error aborts at the first failing item.
-    let payload = mcall(
-        "task_bulk_comment_add",
-        json!({"ids": ["garbage", two.id], "text": "stop", "stop_on_error": true}),
-    );
+    let payload = mcall("task_bulk_comment_add", json!({"ids": ["garbage", two.id], "text": "stop", "stop_on_error": true}));
     assert_eq!(payload["status"], "ok", "{payload}");
-    assert!(
-        payload["updated"].as_array().unwrap().is_empty(),
-        "{payload}"
-    );
+    assert!(payload["updated"].as_array().unwrap().is_empty(), "{payload}");
     assert_eq!(payload["failed"].as_array().unwrap().len(), 1, "{payload}");
     let task = read_task(&fx.tasks_dir, &two.id);
-    assert_eq!(
-        task.comments.len(),
-        1,
-        "stop_on_error leaves later items untouched: {:?}",
-        task.comments
-    );
-    assert_eq!(
-        task.comments[0].text, "mix",
-        "the aborted item never landed"
-    );
+    assert_eq!(task.comments.len(), 1, "stop_on_error leaves later items untouched: {:?}", task.comments);
+    assert_eq!(task.comments[0].text, "mix", "the aborted item never landed");
 }
 
 #[test]
@@ -372,11 +269,7 @@ fn automation_comment_uses_automation_actor_and_never_recurses() {
     let fx = workspace("D6A3");
     let mut storage = Storage::new(&fx.tasks_dir);
     let task = create_task(&mut storage, "D6A3", "Recursion target");
-    set_automation(
-        &fx.tasks_dir,
-        "D6A3",
-        "    - name: auto-note\n      on: {commented: {comment: \"auto note\"}}\n",
-    );
+    set_automation(&fx.tasks_dir, "D6A3", "    - name: auto-note\n      on: {commented: {comment: \"auto note\"}}\n");
 
     TaskService::add_comment(&mut storage, &task.id, "user note").expect("add comment");
 
@@ -393,12 +286,7 @@ fn automation_comment_uses_automation_actor_and_never_recurses() {
         .flat_map(|entry| entry.changes.iter())
         .filter(|change| change.field == "comment_added")
         .collect();
-    assert_eq!(
-        automation_entries.len(),
-        1,
-        "automation actor recorded exactly once: {:?}",
-        stored.history
-    );
+    assert_eq!(automation_entries.len(), 1, "automation actor recorded exactly once: {:?}", stored.history);
 }
 
 #[test]
@@ -406,11 +294,7 @@ fn update_comment_keeps_silent_on_commented_and_noops_byte_equal() {
     let fx = workspace("D6A4");
     let mut storage = Storage::new(&fx.tasks_dir);
     let task = create_task(&mut storage, "D6A4", "Edit target");
-    set_automation(
-        &fx.tasks_dir,
-        "D6A4",
-        "    - name: seen\n      on: {commented: {add: {tags: [seen]}}}\n",
-    );
+    set_automation(&fx.tasks_dir, "D6A4", "    - name: seen\n      on: {commented: {add: {tags: [seen]}}}\n");
     TaskService::add_comment(&mut storage, &task.id, "first").expect("add");
 
     // Editing the comment must NOT fire on.commented again.
@@ -426,10 +310,7 @@ fn update_comment_keeps_silent_on_commented_and_noops_byte_equal() {
     let before = std::fs::read(task_file(&fx.tasks_dir, &task.id)).unwrap();
     TaskService::update_comment(&mut storage, &task.id, 0, "edited").expect("noop edit");
     let after = std::fs::read(task_file(&fx.tasks_dir, &task.id)).unwrap();
-    assert_eq!(
-        before, after,
-        "no-op comment edit must not rewrite the file"
-    );
+    assert_eq!(before, after, "no-op comment edit must not rewrite the file");
     let stored = read_task(&fx.tasks_dir, &task.id);
     assert_eq!(history_entries(&stored, "comment#1").len(), 1);
 }
@@ -446,78 +327,38 @@ fn reference_change_history_timestamp_and_event_exactly_once() {
 
     // Changed op: one event, one history entry, timestamp == entry time.
     let rx = api_events::subscribe();
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/references/link/add",
-        json!({"id": id, "url": "https://example.com/dev60"}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/references/link/add", json!({"id": id, "url": "https://example.com/dev60"})));
     assert_eq!(resp.status, 200, "{}", String::from_utf8_lossy(&resp.body));
-    assert_eq!(
-        count_task_updates(&rx, "D6A5-"),
-        1,
-        "exactly one task_updated"
-    );
+    assert_eq!(count_task_updates(&rx, "D6A5-"), 1, "exactly one task_updated");
     let task = read_task(&fx.tasks_dir, &id);
     let added = history_entries(&task, "reference_added");
     assert_eq!(added.len(), 1, "{:?}", task.history);
     assert_eq!(added[0].old, None);
-    assert_eq!(
-        added[0].new.as_deref(),
-        Some("link:https://example.com/dev60")
-    );
-    let entry_at = task
-        .history
-        .iter()
-        .find(|e| e.changes.iter().any(|c| c.field == "reference_added"))
-        .unwrap()
-        .at
-        .clone();
-    assert_eq!(
-        task.modified, entry_at,
-        "modified bumps with the history entry"
-    );
-    assert!(
-        task.references
-            .iter()
-            .any(|r| r.link.as_deref() == Some("https://example.com/dev60"))
-    );
+    assert_eq!(added[0].new.as_deref(), Some("link:https://example.com/dev60"));
+    let entry_at = task.history.iter().find(|e| e.changes.iter().any(|c| c.field == "reference_added")).unwrap().at.clone();
+    assert_eq!(task.modified, entry_at, "modified bumps with the history entry");
+    assert!(task.references.iter().any(|r| r.link.as_deref() == Some("https://example.com/dev60")));
 
     // No-op op: byte-identical file, zero events, zero history churn.
     let before = std::fs::read(task_file(&fx.tasks_dir, &id)).unwrap();
     let rx = api_events::subscribe();
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/references/link/add",
-        json!({"id": id, "url": "https://example.com/dev60"}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/references/link/add", json!({"id": id, "url": "https://example.com/dev60"})));
     assert_eq!(resp.status, 200, "{}", String::from_utf8_lossy(&resp.body));
-    let added_flag = serde_json::from_slice::<Value>(&resp.body).unwrap()["data"]["added"]
-        .as_bool()
-        .unwrap();
+    let added_flag = serde_json::from_slice::<Value>(&resp.body).unwrap()["data"]["added"].as_bool().unwrap();
     assert!(!added_flag, "no-op attach reports added=false");
     assert_eq!(count_task_updates(&rx, "D6A5-"), 0, "no-op emits no event");
     let after = std::fs::read(task_file(&fx.tasks_dir, &id)).unwrap();
-    assert_eq!(
-        before, after,
-        "no-op reference op must not rewrite the file"
-    );
+    assert_eq!(before, after, "no-op reference op must not rewrite the file");
 
     // Removed op: one history entry with old set, new absent.
     let rx = api_events::subscribe();
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/references/link/remove",
-        json!({"id": id, "url": "https://example.com/dev60"}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/references/link/remove", json!({"id": id, "url": "https://example.com/dev60"})));
     assert_eq!(resp.status, 200, "{}", String::from_utf8_lossy(&resp.body));
     assert_eq!(count_task_updates(&rx, "D6A5-"), 1);
     let task = read_task(&fx.tasks_dir, &id);
     let removed = history_entries(&task, "reference_removed");
     assert_eq!(removed.len(), 1, "{:?}", task.history);
-    assert_eq!(
-        removed[0].old.as_deref(),
-        Some("link:https://example.com/dev60")
-    );
+    assert_eq!(removed[0].old.as_deref(), Some("link:https://example.com/dev60"));
     assert_eq!(removed[0].new, None);
 }
 
@@ -528,17 +369,9 @@ fn reference_failure_emits_no_events_or_history() {
     let _ = rest_create(&api, "D6A6", "Existing");
 
     let rx = api_events::subscribe();
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/references/link/add",
-        json!({"id": "D6A6-99", "url": "https://example.com/missing"}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/references/link/add", json!({"id": "D6A6-99", "url": "https://example.com/missing"})));
     assert_eq!(resp.status, 404, "{}", String::from_utf8_lossy(&resp.body));
-    assert_eq!(
-        count_task_updates(&rx, "D6A6-"),
-        0,
-        "failed op emits nothing"
-    );
+    assert_eq!(count_task_updates(&rx, "D6A6-"), 0, "failed op emits nothing");
 }
 
 #[test]
@@ -555,33 +388,15 @@ fn reference_update_automation_bare_updated_fires_conditioned_stays_silent() {
         "    - name: touch\n      on: {updated: {add: {tags: [touched]}}}\n    - name: on-done\n      when: {changes: {status: {to: Done}}}\n      on: {updated: {add: {tags: [done-tag]}}}\n",
     );
 
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/references/add",
-        json!({"id": id, "kind": "jira", "value": "abc-9"}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/references/add", json!({"id": id, "kind": "jira", "value": "abc-9"})));
     assert_eq!(resp.status, 200, "{}", String::from_utf8_lossy(&resp.body));
 
     let task = read_task(&fx.tasks_dir, &id);
-    assert_eq!(
-        tag_count(&task, "touched"),
-        1,
-        "bare on.updated fired once: {:?}",
-        task.tags
-    );
-    assert_eq!(
-        tag_count(&task, "done-tag"),
-        0,
-        "conditioned rule stayed silent: {:?}",
-        task.tags
-    );
+    assert_eq!(tag_count(&task, "touched"), 1, "bare on.updated fired once: {:?}", task.tags);
+    assert_eq!(tag_count(&task, "done-tag"), 0, "conditioned rule stayed silent: {:?}", task.tags);
 
     // No-op attach does not re-fire.
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/references/add",
-        json!({"id": id, "kind": "jira", "value": "ABC-9"}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/references/add", json!({"id": id, "kind": "jira", "value": "ABC-9"})));
     assert_eq!(resp.status, 200);
     let task = read_task(&fx.tasks_dir, &id);
     assert_eq!(tag_count(&task, "touched"), 1, "{:?}", task.tags);
@@ -606,12 +421,8 @@ fn concurrent_comments_and_references_preserve_all_writes() {
         let id = id.clone();
         handles.push(std::thread::spawn(move || {
             let mut storage = Storage::new(&root);
-            let outcome = ReferenceService::attach_link_reference(
-                &mut storage,
-                &id,
-                &format!("https://example.com/concurrent/{i}"),
-            )
-            .expect("concurrent link attach");
+            let outcome =
+                ReferenceService::attach_link_reference(&mut storage, &id, &format!("https://example.com/concurrent/{i}")).expect("concurrent link attach");
             assert!(outcome.changed, "concurrent attach reports changed");
         }));
     }
@@ -620,8 +431,7 @@ fn concurrent_comments_and_references_preserve_all_writes() {
         let id = id.clone();
         handles.push(std::thread::spawn(move || {
             let mut storage = Storage::new(&root);
-            TaskService::add_comment(&mut storage, &id, &format!("comment {i}"))
-                .expect("concurrent comment");
+            TaskService::add_comment(&mut storage, &id, &format!("comment {i}")).expect("concurrent comment");
         }));
     }
     for handle in handles {
@@ -629,26 +439,12 @@ fn concurrent_comments_and_references_preserve_all_writes() {
     }
 
     let stored = read_task(&tasks_dir, &task.id);
-    let links: Vec<_> = stored
-        .references
-        .iter()
-        .filter_map(|r| r.link.clone())
-        .collect();
+    let links: Vec<_> = stored.references.iter().filter_map(|r| r.link.clone()).collect();
     for i in 0..3 {
-        assert!(
-            links
-                .iter()
-                .any(|l| l == &format!("https://example.com/concurrent/{i}")),
-            "reference {i} survived concurrent writers: {links:?}"
-        );
+        assert!(links.iter().any(|l| l == &format!("https://example.com/concurrent/{i}")), "reference {i} survived concurrent writers: {links:?}");
     }
     assert_eq!(stored.comments.len(), 3, "{:?}", stored.comments);
-    assert_eq!(
-        history_entries(&stored, "reference_added").len(),
-        3,
-        "{:?}",
-        stored.history
-    );
+    assert_eq!(history_entries(&stored, "reference_added").len(), 3, "{:?}", stored.history);
     assert_eq!(history_entries(&stored, "comment_added").len(), 3);
     drop(tmp);
 }
@@ -660,20 +456,14 @@ fn concurrent_comments_and_references_preserve_all_writes() {
 #[test]
 fn gitless_bulk_code_remove_needs_no_repo_root_but_add_does() {
     let (tmp, tasks_dir) = gitless_workspace("D6C2");
-    assert!(
-        lotar::utils::git::find_repo_root(&tasks_dir).is_none(),
-        "fixture precondition: no repo root by ancestry"
-    );
+    assert!(lotar::utils::git::find_repo_root(&tasks_dir).is_none(), "fixture precondition: no repo root by ancestry");
 
     // Seed a code reference through the shared locked primitive.
     let mut storage = Storage::new(&tasks_dir);
     let task = create_task(&mut storage, "D6C2", "Gitless target");
     storage
         .mutate_task(&task.id, |t| {
-            t.references.push(ReferenceEntry {
-                code: Some("src/thing.rs#10-20".to_string()),
-                ..Default::default()
-            });
+            t.references.push(ReferenceEntry { code: Some("src/thing.rs#10-20".to_string()), ..Default::default() });
             Ok(true)
         })
         .expect("seed reference");
@@ -682,61 +472,30 @@ fn gitless_bulk_code_remove_needs_no_repo_root_but_add_does() {
     let _guard_fast = EnvVarGuard::set("LOTAR_TEST_FAST_IO", "1");
 
     // Bulk code REMOVE works without Git (parity with the single handler).
-    let payload = mcall(
-        "task_bulk_reference_remove",
-        json!({"ids": [task.id], "kind": "code", "value": "src/thing.rs#L10-L20"}),
-    );
+    let payload = mcall("task_bulk_reference_remove", json!({"ids": [task.id], "kind": "code", "value": "src/thing.rs#L10-L20"}));
     assert_eq!(payload["status"], "ok", "{payload}");
     let updated = payload["updated"].as_array().unwrap();
     assert_eq!(updated.len(), 1, "{payload}");
     assert_eq!(updated[0]["changed"], true, "{payload}");
-    assert!(
-        payload["failed"].as_array().unwrap().is_empty(),
-        "{payload}"
-    );
+    assert!(payload["failed"].as_array().unwrap().is_empty(), "{payload}");
     let stored = read_task(&tasks_dir, &task.id);
-    assert!(
-        stored.references.iter().all(|r| r.code.is_none()),
-        "{:?}",
-        stored.references
-    );
+    assert!(stored.references.iter().all(|r| r.code.is_none()), "{:?}", stored.references);
     assert_eq!(history_entries(&stored, "reference_removed").len(), 1);
 
     // Bulk code ADD still requires the repo root — as a per-item failure,
     // not a whole-batch abort.
-    let payload = mcall(
-        "task_bulk_reference_add",
-        json!({"ids": [task.id], "kind": "code", "value": "src/thing.rs#10-20"}),
-    );
+    let payload = mcall("task_bulk_reference_add", json!({"ids": [task.id], "kind": "code", "value": "src/thing.rs#10-20"}));
     assert_eq!(payload["status"], "ok", "{payload}");
     let failed = payload["failed"].as_array().unwrap();
     assert_eq!(failed.len(), 1, "{payload}");
-    assert!(
-        failed[0]["error"]
-            .as_str()
-            .unwrap()
-            .contains("Unable to locate git repository"),
-        "{payload}"
-    );
-    assert!(
-        payload["updated"].as_array().unwrap().is_empty(),
-        "{payload}"
-    );
+    assert!(failed[0]["error"].as_str().unwrap().contains("Unable to locate git repository"), "{payload}");
+    assert!(payload["updated"].as_array().unwrap().is_empty(), "{payload}");
 
     // File operations also need the root, per item.
-    let payload = mcall(
-        "task_bulk_reference_remove",
-        json!({"ids": [task.id], "kind": "file", "value": "src/thing.rs"}),
-    );
+    let payload = mcall("task_bulk_reference_remove", json!({"ids": [task.id], "kind": "file", "value": "src/thing.rs"}));
     let failed = payload["failed"].as_array().unwrap();
     assert_eq!(failed.len(), 1, "{payload}");
-    assert!(
-        failed[0]["error"]
-            .as_str()
-            .unwrap()
-            .contains("Unable to locate git repository"),
-        "{payload}"
-    );
+    assert!(failed[0]["error"].as_str().unwrap().contains("Unable to locate git repository"), "{payload}");
     drop(tmp);
 }
 
@@ -747,20 +506,15 @@ fn bulk_reference_per_item_envelopes_and_alias() {
     let one = create_task(&mut storage, "D6C3", "Bulk ref one");
     let two = create_task(&mut storage, "D6C3", "Bulk ref two");
 
-    let payload = mcall(
-        "task_bulk_reference_add",
-        json!({"ids": [format!("{}001", &one.id[..one.id.len()-1]), two.id, "bogus"], "kind": "jira", "value": "XYZ-1"}),
-    );
+    let payload =
+        mcall("task_bulk_reference_add", json!({"ids": [format!("{}001", &one.id[..one.id.len()-1]), two.id, "bogus"], "kind": "jira", "value": "XYZ-1"}));
     assert_eq!(payload["status"], "ok", "{payload}");
     let updated = payload["updated"].as_array().unwrap();
     assert_eq!(updated.len(), 2, "{payload}");
     // The envelope echoes the submitted id (padded alias) while the task
     // DTO carries the canonical spelling — the preexisting bulk contract.
     assert_eq!(updated[0]["id"], "D6C3-001", "{payload}");
-    assert_eq!(
-        updated[0]["task"]["id"], one.id,
-        "canonical task id: {payload}"
-    );
+    assert_eq!(updated[0]["task"]["id"], one.id, "canonical task id: {payload}");
     assert_eq!(updated[0]["changed"], true, "{payload}");
     let failed = payload["failed"].as_array().unwrap();
     assert_eq!(failed.len(), 1, "{payload}");
@@ -772,23 +526,10 @@ fn bulk_reference_per_item_envelopes_and_alias() {
     }
 
     // stop_on_error halts before later items mutate.
-    let payload = mcall(
-        "task_bulk_reference_add",
-        json!({"ids": ["bogus", two.id], "kind": "jira", "value": "XYZ-2", "stop_on_error": true}),
-    );
-    assert!(
-        payload["updated"].as_array().unwrap().is_empty(),
-        "{payload}"
-    );
+    let payload = mcall("task_bulk_reference_add", json!({"ids": ["bogus", two.id], "kind": "jira", "value": "XYZ-2", "stop_on_error": true}));
+    assert!(payload["updated"].as_array().unwrap().is_empty(), "{payload}");
     let stored = read_task(&fx.tasks_dir, &two.id);
-    assert!(
-        stored
-            .references
-            .iter()
-            .all(|r| r.jira.as_deref() != Some("XYZ-2")),
-        "the aborted item's value never landed: {:?}",
-        stored.references
-    );
+    assert!(stored.references.iter().all(|r| r.jira.as_deref() != Some("XYZ-2")), "the aborted item's value never landed: {:?}", stored.references);
 }
 
 // ---------------------------------------------------------------------------
@@ -802,11 +543,7 @@ fn upload_and_attachment_add_run_hooks_after_store_lock_release() {
     let id = rest_create(&api, "D6C5", "Upload hooks target");
     // The rule effect must be countable per firing, so it appends a
     // comment instead of adding a deduping tag.
-    set_automation(
-        &fx.tasks_dir,
-        "D6C5",
-        "    - name: touch\n      on: {updated: {comment: \"hook-fired\"}}\n",
-    );
+    set_automation(&fx.tasks_dir, "D6C5", "    - name: touch\n      on: {updated: {comment: \"hook-fired\"}}\n");
 
     // Real REST upload: if hooks ran under the store lock, the in-process
     // dispatch guard would panic and fail this test; the rule firing proves
@@ -818,27 +555,12 @@ fn upload_and_attachment_add_run_hooks_after_store_lock_release() {
     ));
     assert_eq!(resp.status, 200, "{}", String::from_utf8_lossy(&resp.body));
     let task = read_task(&fx.tasks_dir, &id);
-    assert_eq!(
-        task.comments
-            .iter()
-            .filter(|c| c.text == "hook-fired")
-            .count(),
-        1,
-        "{:?}",
-        task.comments
-    );
+    assert_eq!(task.comments.iter().filter(|c| c.text == "hook-fired").count(), 1, "{:?}", task.comments);
     assert_eq!(history_entries(&task, "reference_added").len(), 1);
 
     // MCP attachment add goes through the same ordering.
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/add",
-        json!({"title": "MCP hooks target", "project": "D6C5"}),
-    ));
-    let second = serde_json::from_slice::<Value>(&resp.body).unwrap()["data"]["id"]
-        .as_str()
-        .unwrap()
-        .to_string();
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/add", json!({"title": "MCP hooks target", "project": "D6C5"})));
+    let second = serde_json::from_slice::<Value>(&resp.body).unwrap()["data"]["id"].as_str().unwrap().to_string();
     let stored_path = {
         let resp = api.handle_request(&mk_req(
             "POST",
@@ -846,31 +568,18 @@ fn upload_and_attachment_add_run_hooks_after_store_lock_release() {
             json!({"id": second, "filename": "mcp.txt", "content_base64": base64_encode(b"mcp-blob")}),
         ));
         assert_eq!(resp.status, 200);
-        serde_json::from_slice::<Value>(&resp.body).unwrap()["data"]["stored_path"]
-            .as_str()
-            .unwrap()
-            .to_string()
+        serde_json::from_slice::<Value>(&resp.body).unwrap()["data"]["stored_path"].as_str().unwrap().to_string()
     };
     // The upload already attached the managed reference (and fired the
     // rule once through the REST path). A changed MCP attachment mutation —
     // the remove — must dispatch its hooks after the per-item store lock:
     // the in-process guard would panic otherwise, and the rule fires again.
-    let payload = mcall(
-        "task_reference_remove",
-        json!({"id": second, "kind": "attachment", "value": stored_path}),
-    );
+    let payload = mcall("task_reference_remove", json!({"id": second, "kind": "attachment", "value": stored_path}));
     assert_eq!(payload["changed"], true, "{payload}");
     let task = read_task(&fx.tasks_dir, &second);
-    assert!(
-        task.references.iter().all(|r| r.attachment.is_none()),
-        "{:?}",
-        task.references
-    );
+    assert!(task.references.iter().all(|r| r.attachment.is_none()), "{:?}", task.references);
     assert_eq!(
-        task.comments
-            .iter()
-            .filter(|c| c.text == "hook-fired")
-            .count(),
+        task.comments.iter().filter(|c| c.text == "hook-fired").count(),
         2,
         "the changed MCP mutation fired the rule again after the lock dropped: {:?}",
         task.comments
@@ -890,11 +599,7 @@ fn upload_noop_attach_is_store_only_and_emits_no_task_event() {
         json!({"id": id, "filename": "dup.txt", "content_base64": base64_encode(b"dup-blob")}),
     ));
     assert_eq!(resp.status, 200, "{}", String::from_utf8_lossy(&resp.body));
-    assert_eq!(
-        count_task_updates(&rx, "D6C6-"),
-        1,
-        "first upload emits once"
-    );
+    assert_eq!(count_task_updates(&rx, "D6C6-"), 1, "first upload emits once");
 
     // Second upload of identical content: the blob dedups and the attach is
     // a no-op (attached=false). The store changed; the task did not — no
@@ -909,26 +614,15 @@ fn upload_noop_attach_is_store_only_and_emits_no_task_event() {
     assert_eq!(resp.status, 200, "{}", String::from_utf8_lossy(&resp.body));
     let data = serde_json::from_slice::<Value>(&resp.body).unwrap()["data"].clone();
     assert_eq!(data["attached"], false, "{data}");
-    assert!(
-        data["stored_path"].as_str().is_some_and(|p| !p.is_empty()),
-        "{data}"
-    );
-    assert_eq!(
-        count_task_updates(&rx, "D6C6-"),
-        0,
-        "store-only change emits no task event"
-    );
+    assert!(data["stored_path"].as_str().is_some_and(|p| !p.is_empty()), "{data}");
+    assert_eq!(count_task_updates(&rx, "D6C6-"), 0, "store-only change emits no task event");
     let after = std::fs::read(task_file(&fx.tasks_dir, &id)).unwrap();
     assert_eq!(before, after, "task bytes untouched by a no-op attach");
 
     // Attachment remove without typed membership fails closed, keeps the
     // store untouched, and emits nothing.
     let rx = api_events::subscribe();
-    let resp = api.handle_request(&mk_req(
-        "POST",
-        "/api/tasks/attachments/remove",
-        json!({"id": id, "stored_path": "no-such-blob.txt"}),
-    ));
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/attachments/remove", json!({"id": id, "stored_path": "no-such-blob.txt"})));
     assert_eq!(resp.status, 400, "{}", String::from_utf8_lossy(&resp.body));
     assert_eq!(count_task_updates(&rx, "D6C6-"), 0);
 }
@@ -946,8 +640,7 @@ fn mcp_single_attachment_add_checks_blob_under_the_store_lock() {
     // ordering proof bounded by the standard 2s lock wait — no sleeps.
     let store_root = fx.tasks_dir.join("@attachments");
     std::fs::create_dir_all(&store_root).unwrap();
-    let guard = lotar::services::attachment_service::AttachmentService::lock_store(&store_root)
-        .expect("independent store lock");
+    let guard = lotar::services::attachment_service::AttachmentService::lock_store(&store_root).expect("independent store lock");
 
     let req = json!({
         "jsonrpc": "2.0", "id": 1, "method": "tools/call",
@@ -958,10 +651,7 @@ fn mcp_single_attachment_add_checks_blob_under_the_store_lock() {
     let resp: Value = serde_json::from_str(&line).unwrap();
     assert!(mcp_failed(&resp), "locked store must refuse: {resp}");
     let message = mcp_failure_text(&resp);
-    assert!(
-        message.contains("attachments-store") && message.contains("busy"),
-        "lock must be acquired before the blob check: {message}"
-    );
+    assert!(message.contains("attachments-store") && message.contains("busy"), "lock must be acquired before the blob check: {message}");
 
     // After release the same call fails on the missing blob (check intact),
     // and nothing was attached.
@@ -970,14 +660,7 @@ fn mcp_single_attachment_add_checks_blob_under_the_store_lock() {
     let resp: Value = serde_json::from_str(&line).unwrap();
     assert!(mcp_failed(&resp), "missing blob must refuse: {resp}");
     let message = mcp_failure_text(&resp);
-    assert!(
-        message.to_lowercase().contains("not found"),
-        "fail-closed missing-blob check still applies: {message}"
-    );
+    assert!(message.to_lowercase().contains("not found"), "fail-closed missing-blob check still applies: {message}");
     let task = read_task(&fx.tasks_dir, &id);
-    assert!(
-        task.references.iter().all(|r| r.attachment.is_none()),
-        "{:?}",
-        task.references
-    );
+    assert!(task.references.iter().all(|r| r.attachment.is_none()), "{:?}", task.references);
 }

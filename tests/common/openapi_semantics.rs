@@ -59,10 +59,8 @@ impl SpecValidator {
     /// Load the published spec relative to the crate root.
     pub fn load_published() -> Self {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("docs/openapi.json");
-        let raw = std::fs::read_to_string(&path)
-            .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-        let root: Value =
-            serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+        let raw = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+        let root: Value = serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
         Self { root }
     }
 
@@ -72,15 +70,12 @@ impl SpecValidator {
 
     /// Resolve a component schema by name (e.g. `EnvelopeTaskList`).
     pub fn component(&self, name: &str) -> &Value {
-        self.root
-            .pointer(&format!("/components/schemas/{name}"))
-            .unwrap_or_else(|| panic!("component {name} missing from published spec"))
+        self.root.pointer(&format!("/components/schemas/{name}")).unwrap_or_else(|| panic!("component {name} missing from published spec"))
     }
 
     /// Validate `value` against a named component schema.
     pub fn validate_component(&self, name: &str, value: &Value) -> Result<(), String> {
-        self.validate(self.component(name), value)
-            .map_err(|e| format!("{name}: {e}"))
+        self.validate(self.component(name), value).map_err(|e| format!("{name}: {e}"))
     }
 
     /// Resolve a local JSON pointer reference (`#/a/b`) against the spec.
@@ -89,10 +84,7 @@ impl SpecValidator {
             return Err(format!("only local refs are supported, got {reference}"));
         };
         let decoded = pointer.replace("~1", "/").replace("~0", "~");
-        self.root
-            .pointer(&decoded)
-            .cloned()
-            .ok_or_else(|| format!("dangling ref {pointer} in published spec"))
+        self.root.pointer(&decoded).cloned().ok_or_else(|| format!("dangling ref {pointer} in published spec"))
     }
 
     pub fn validate(&self, schema: &Value, value: &Value) -> Result<(), String> {
@@ -104,16 +96,9 @@ impl SpecValidator {
             return Err(format!("{path}: schema must be an object, got {schema}"));
         };
 
-        let unsupported: Vec<&String> = obj
-            .keys()
-            .filter(|key| !SUPPORTED_KEYWORDS.contains(&key.as_str()))
-            .collect();
+        let unsupported: Vec<&String> = obj.keys().filter(|key| !SUPPORTED_KEYWORDS.contains(&key.as_str())).collect();
         if let Some((first, rest)) = unsupported.split_first() {
-            let etc = if rest.is_empty() {
-                String::new()
-            } else {
-                format!(" (+{} more)", rest.len())
-            };
+            let etc = if rest.is_empty() { String::new() } else { format!(" (+{} more)", rest.len()) };
             return Err(format!(
                 "{path}: unsupported validation keyword '{first}'{etc}; extend the validator or fix the spec (3.0 'nullable' is inert in 3.1)"
             ));
@@ -122,9 +107,7 @@ impl SpecValidator {
         // $ref composes with siblings: resolve, validate against the target,
         // then fall through to the sibling keywords below.
         if let Some(reference) = obj.get("$ref") {
-            let resolved = self
-                .resolve_ref(reference)
-                .map_err(|e| format!("{path}: {e}"))?;
+            let resolved = self.resolve_ref(reference).map_err(|e| format!("{path}: {e}"))?;
             self.validate_at(&resolved, value, path)?;
         }
 
@@ -141,14 +124,7 @@ impl SpecValidator {
         if let Some(allowed) = obj.get("enum").and_then(Value::as_array)
             && !allowed.contains(value)
         {
-            return Err(format!(
-                "{path}: {value} not in enum [{}]",
-                allowed
-                    .iter()
-                    .map(Value::to_string)
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ));
+            return Err(format!("{path}: {value} not in enum [{}]", allowed.iter().map(Value::to_string).collect::<Vec<_>>().join(", ")));
         }
 
         if let Some(minimum) = obj.get("minimum").and_then(Value::as_f64)
@@ -160,16 +136,9 @@ impl SpecValidator {
         if value.is_object() {
             let object = value.as_object().unwrap();
             if let Some(required) = obj.get("required").and_then(Value::as_array) {
-                let missing: Vec<&str> = required
-                    .iter()
-                    .filter_map(Value::as_str)
-                    .filter(|field| !object.contains_key(*field))
-                    .collect();
+                let missing: Vec<&str> = required.iter().filter_map(Value::as_str).filter(|field| !object.contains_key(*field)).collect();
                 if !missing.is_empty() {
-                    return Err(format!(
-                        "{path}: missing required field(s) {}",
-                        missing.join(", ")
-                    ));
+                    return Err(format!("{path}: missing required field(s) {}", missing.join(", ")));
                 }
             }
             if let Some(properties) = obj.get("properties").and_then(Value::as_object) {
@@ -180,11 +149,8 @@ impl SpecValidator {
                 }
             }
             if let Some(additional) = obj.get("additionalProperties") {
-                let declared: Vec<&str> = obj
-                    .get("properties")
-                    .and_then(Value::as_object)
-                    .map(|props| props.keys().map(String::as_str).collect())
-                    .unwrap_or_default();
+                let declared: Vec<&str> =
+                    obj.get("properties").and_then(Value::as_object).map(|props| props.keys().map(String::as_str).collect()).unwrap_or_default();
                 for (field, member) in object {
                     if declared.contains(&field.as_str()) {
                         continue;
@@ -212,21 +178,14 @@ impl SpecValidator {
             let Some(options) = obj.get(key).and_then(Value::as_array) else {
                 continue;
             };
-            let branches: Vec<Result<(), String>> = options
-                .iter()
-                .map(|sub| self.validate_at(sub, value, path))
-                .collect();
+            let branches: Vec<Result<(), String>> = options.iter().map(|sub| self.validate_at(sub, value, path)).collect();
             let hit = branches.iter().filter(|r| r.is_ok()).count();
             let satisfied = if key == "anyOf" { hit >= 1 } else { hit == 1 };
             if !satisfied {
                 return Err(format!(
                     "{path}: {key} not satisfied ({hit}/{} branches matched: {})",
                     options.len(),
-                    branches
-                        .into_iter()
-                        .filter_map(|r| r.err())
-                        .collect::<Vec<_>>()
-                        .join("; ")
+                    branches.into_iter().filter_map(|r| r.err()).collect::<Vec<_>>().join("; ")
                 ));
             }
         }
@@ -243,17 +202,10 @@ impl SpecValidator {
         if names.is_empty() {
             return Err(format!("{path}: empty type declaration {expected}"));
         }
-        if names
-            .iter()
-            .any(|allowed| json_type_matches(allowed, value))
-        {
+        if names.iter().any(|allowed| json_type_matches(allowed, value)) {
             Ok(())
         } else {
-            Err(format!(
-                "{path}: expected type {}, got {} ({value})",
-                names.join("|"),
-                json_type_name(value)
-            ))
+            Err(format!("{path}: expected type {}, got {} ({value})", names.join("|"), json_type_name(value)))
         }
     }
 }

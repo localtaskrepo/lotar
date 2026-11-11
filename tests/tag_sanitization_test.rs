@@ -39,15 +39,9 @@ fn service_filters_blank_tags_on_create_and_update() {
     let created = TaskService::create(&mut storage, req).expect("create task");
     assert_eq!(created.tags, vec!["api", "backend"]);
 
-    let updated = TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            tags: Some(vec![" new ".into(), "  ".into(), "ops".into()]),
-            ..TaskUpdate::default()
-        },
-    )
-    .expect("update task");
+    let updated =
+        TaskService::update(&mut storage, &created.id, TaskUpdate { tags: Some(vec![" new ".into(), "  ".into(), "ops".into()]), ..TaskUpdate::default() })
+            .expect("update task");
 
     assert_eq!(updated.tags, vec!["new", "ops"]);
 

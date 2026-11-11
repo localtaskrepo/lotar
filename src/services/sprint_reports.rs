@@ -7,16 +7,13 @@ use serde::Serialize;
 use schemars::JsonSchema;
 
 use crate::config::types::ResolvedConfig;
-use crate::services::sprint_analytics::{
-    SprintDetail, SprintReviewLifecyclePayload, SprintStatusWarningPayload, SprintSummary,
-    to_status_warning_payloads,
-};
+use crate::services::sprint_analytics::{SprintDetail, SprintReviewLifecyclePayload, SprintStatusWarningPayload, SprintSummary, to_status_warning_payloads};
 use crate::services::sprint_metrics::{determine_blocked_statuses_from_config, ratio, ratio_usize};
 use crate::services::sprint_service::{SprintRecord, SprintService};
 use crate::services::sprint_status::{self, SprintLifecycleState, SprintLifecycleStatus};
 use crate::services::sprint_timing::{
-    SprintDurations, compute_sprint_durations, duration_to_days, format_calendar_relative,
-    format_calendar_window, resolve_burndown_window, resolve_calendar_end, resolve_calendar_start,
+    SprintDurations, compute_sprint_durations, duration_to_days, format_calendar_relative, format_calendar_window, resolve_burndown_window,
+    resolve_calendar_end, resolve_calendar_start,
 };
 use crate::storage::manager::Storage;
 use crate::storage::task::Task as StoredTask;
@@ -359,22 +356,14 @@ struct StatusAggregate {
     done_count: usize,
 }
 
-pub fn compute_sprint_review(
-    storage: &Storage,
-    record: &SprintRecord,
-    config: &ResolvedConfig,
-    now: DateTime<Utc>,
-) -> SprintReviewContext {
+pub fn compute_sprint_review(storage: &Storage, record: &SprintRecord, config: &ResolvedConfig, now: DateTime<Utc>) -> SprintReviewContext {
     let lifecycle = sprint_status::derive_status(&record.sprint, now);
     let summary = SprintSummary::from_record(record, &lifecycle);
     let detail = SprintDetail::from_record(record, &summary, &lifecycle);
 
     let tasks = SprintService::load_tasks_for_record(storage, record);
 
-    let done_sets = crate::services::completion::resolve_task_done_sets(
-        storage,
-        tasks.iter().map(|(id, _)| id),
-    );
+    let done_sets = crate::services::completion::resolve_task_done_sets(storage, tasks.iter().map(|(id, _)| id));
     let blocked_statuses = determine_blocked_statuses_from_config(config);
     let metrics = summarize_sprint_tasks(&tasks, &done_sets, &blocked_statuses);
 
@@ -391,47 +380,22 @@ pub fn compute_sprint_review(
         remaining_tasks: metrics.remaining_tasks.clone(),
     };
 
-    SprintReviewContext {
-        payload,
-        metrics,
-        summary,
-        lifecycle,
-    }
+    SprintReviewContext { payload, metrics, summary, lifecycle }
 }
 
-pub fn compute_sprint_stats(
-    storage: &Storage,
-    record: &SprintRecord,
-    config: &ResolvedConfig,
-    now: DateTime<Utc>,
-) -> SprintStatsContext {
+pub fn compute_sprint_stats(storage: &Storage, record: &SprintRecord, config: &ResolvedConfig, now: DateTime<Utc>) -> SprintStatsContext {
     let lifecycle = sprint_status::derive_status(&record.sprint, now);
     let summary = SprintSummary::from_record(record, &lifecycle);
     let detail = SprintDetail::from_record(record, &summary, &lifecycle);
 
     let tasks = SprintService::load_tasks_for_record(storage, record);
 
-    let done_sets = crate::services::completion::resolve_task_done_sets(
-        storage,
-        tasks.iter().map(|(id, _)| id),
-    );
+    let done_sets = crate::services::completion::resolve_task_done_sets(storage, tasks.iter().map(|(id, _)| id));
     let blocked_statuses = determine_blocked_statuses_from_config(config);
     let metrics = summarize_sprint_tasks(&tasks, &done_sets, &blocked_statuses);
 
-    let capacity_points = record
-        .sprint
-        .plan
-        .as_ref()
-        .and_then(|plan| plan.capacity.as_ref())
-        .and_then(|capacity| capacity.points)
-        .map(|value| value as f64);
-    let capacity_hours = record
-        .sprint
-        .plan
-        .as_ref()
-        .and_then(|plan| plan.capacity.as_ref())
-        .and_then(|capacity| capacity.hours)
-        .map(|value| value as f64);
+    let capacity_points = record.sprint.plan.as_ref().and_then(|plan| plan.capacity.as_ref()).and_then(|capacity| capacity.points).map(|value| value as f64);
+    let capacity_hours = record.sprint.plan.as_ref().and_then(|plan| plan.capacity.as_ref()).and_then(|capacity| capacity.hours).map(|value| value as f64);
 
     let durations = compute_sprint_durations(record, &lifecycle, now);
 
@@ -448,51 +412,36 @@ pub fn compute_sprint_stats(
         completion_ratio: ratio_usize(metrics.done_tasks, metrics.total_tasks).unwrap_or(0.0),
     };
 
-    let hours_payload = if metrics.total_hours > 0.0
-        || metrics.done_hours > 0.0
-        || metrics.remaining_hours() > 0.0
-        || capacity_hours.is_some()
-    {
+    let hours_payload = if metrics.total_hours > 0.0 || metrics.done_hours > 0.0 || metrics.remaining_hours() > 0.0 || capacity_hours.is_some() {
         Some(SprintStatsEffortPayload {
             committed: metrics.total_hours,
             done: metrics.done_hours,
             remaining: metrics.remaining_hours(),
             completion_ratio: ratio(metrics.done_hours, metrics.total_hours).unwrap_or(0.0),
             capacity: capacity_hours,
-            capacity_commitment_ratio: capacity_hours
-                .and_then(|cap| ratio(metrics.total_hours, cap)),
+            capacity_commitment_ratio: capacity_hours.and_then(|cap| ratio(metrics.total_hours, cap)),
             capacity_consumed_ratio: capacity_hours.and_then(|cap| ratio(metrics.done_hours, cap)),
         })
     } else {
         None
     };
 
-    let points_payload = if metrics.total_points > 0.0
-        || metrics.done_points > 0.0
-        || metrics.remaining_points() > 0.0
-        || capacity_points.is_some()
-    {
+    let points_payload = if metrics.total_points > 0.0 || metrics.done_points > 0.0 || metrics.remaining_points() > 0.0 || capacity_points.is_some() {
         Some(SprintStatsEffortPayload {
             committed: metrics.total_points,
             done: metrics.done_points,
             remaining: metrics.remaining_points(),
             completion_ratio: ratio(metrics.done_points, metrics.total_points).unwrap_or(0.0),
             capacity: capacity_points,
-            capacity_commitment_ratio: capacity_points
-                .and_then(|cap| ratio(metrics.total_points, cap)),
-            capacity_consumed_ratio: capacity_points
-                .and_then(|cap| ratio(metrics.done_points, cap)),
+            capacity_commitment_ratio: capacity_points.and_then(|cap| ratio(metrics.total_points, cap)),
+            capacity_consumed_ratio: capacity_points.and_then(|cap| ratio(metrics.done_points, cap)),
         })
     } else {
         None
     };
 
-    let metrics_payload = SprintStatsMetricsPayload {
-        tasks: tasks_payload,
-        hours: hours_payload,
-        points: points_payload,
-        status_breakdown: metrics.status_breakdown.clone(),
-    };
+    let metrics_payload =
+        SprintStatsMetricsPayload { tasks: tasks_payload, hours: hours_payload, points: points_payload, status_breakdown: metrics.status_breakdown.clone() };
 
     let timeline_payload = SprintStatsTimelinePayload {
         planned_start: lifecycle.planned_start.map(|dt| dt.to_rfc3339()),
@@ -515,48 +464,22 @@ pub fn compute_sprint_stats(
         timeline: timeline_payload,
     };
 
-    SprintStatsContext {
-        payload,
-        metrics,
-        durations,
-        summary,
-        lifecycle,
-    }
+    SprintStatsContext { payload, metrics, durations, summary, lifecycle }
 }
 
-pub fn compute_sprint_summary(
-    storage: &Storage,
-    record: &SprintRecord,
-    config: &ResolvedConfig,
-    now: DateTime<Utc>,
-) -> SprintSummaryContext {
+pub fn compute_sprint_summary(storage: &Storage, record: &SprintRecord, config: &ResolvedConfig, now: DateTime<Utc>) -> SprintSummaryContext {
     let lifecycle = sprint_status::derive_status(&record.sprint, now);
     let summary = SprintSummary::from_record(record, &lifecycle);
     let detail = SprintDetail::from_record(record, &summary, &lifecycle);
 
     let tasks = SprintService::load_tasks_for_record(storage, record);
 
-    let done_sets = crate::services::completion::resolve_task_done_sets(
-        storage,
-        tasks.iter().map(|(id, _)| id),
-    );
+    let done_sets = crate::services::completion::resolve_task_done_sets(storage, tasks.iter().map(|(id, _)| id));
     let blocked_statuses = determine_blocked_statuses_from_config(config);
     let metrics = summarize_sprint_tasks(&tasks, &done_sets, &blocked_statuses);
 
-    let capacity_points = record
-        .sprint
-        .plan
-        .as_ref()
-        .and_then(|plan| plan.capacity.as_ref())
-        .and_then(|capacity| capacity.points)
-        .map(|value| value as f64);
-    let capacity_hours = record
-        .sprint
-        .plan
-        .as_ref()
-        .and_then(|plan| plan.capacity.as_ref())
-        .and_then(|capacity| capacity.hours)
-        .map(|value| value as f64);
+    let capacity_points = record.sprint.plan.as_ref().and_then(|plan| plan.capacity.as_ref()).and_then(|capacity| capacity.points).map(|value| value as f64);
+    let capacity_hours = record.sprint.plan.as_ref().and_then(|plan| plan.capacity.as_ref()).and_then(|capacity| capacity.hours).map(|value| value as f64);
 
     let durations = compute_sprint_durations(record, &lifecycle, now);
 
@@ -573,51 +496,36 @@ pub fn compute_sprint_summary(
         completion_ratio: ratio_usize(metrics.done_tasks, metrics.total_tasks).unwrap_or(0.0),
     };
 
-    let hours_payload = if metrics.total_hours > 0.0
-        || metrics.done_hours > 0.0
-        || metrics.remaining_hours() > 0.0
-        || capacity_hours.is_some()
-    {
+    let hours_payload = if metrics.total_hours > 0.0 || metrics.done_hours > 0.0 || metrics.remaining_hours() > 0.0 || capacity_hours.is_some() {
         Some(SprintStatsEffortPayload {
             committed: metrics.total_hours,
             done: metrics.done_hours,
             remaining: metrics.remaining_hours(),
             completion_ratio: ratio(metrics.done_hours, metrics.total_hours).unwrap_or(0.0),
             capacity: capacity_hours,
-            capacity_commitment_ratio: capacity_hours
-                .and_then(|cap| ratio(metrics.total_hours, cap)),
+            capacity_commitment_ratio: capacity_hours.and_then(|cap| ratio(metrics.total_hours, cap)),
             capacity_consumed_ratio: capacity_hours.and_then(|cap| ratio(metrics.done_hours, cap)),
         })
     } else {
         None
     };
 
-    let points_payload = if metrics.total_points > 0.0
-        || metrics.done_points > 0.0
-        || metrics.remaining_points() > 0.0
-        || capacity_points.is_some()
-    {
+    let points_payload = if metrics.total_points > 0.0 || metrics.done_points > 0.0 || metrics.remaining_points() > 0.0 || capacity_points.is_some() {
         Some(SprintStatsEffortPayload {
             committed: metrics.total_points,
             done: metrics.done_points,
             remaining: metrics.remaining_points(),
             completion_ratio: ratio(metrics.done_points, metrics.total_points).unwrap_or(0.0),
             capacity: capacity_points,
-            capacity_commitment_ratio: capacity_points
-                .and_then(|cap| ratio(metrics.total_points, cap)),
-            capacity_consumed_ratio: capacity_points
-                .and_then(|cap| ratio(metrics.done_points, cap)),
+            capacity_commitment_ratio: capacity_points.and_then(|cap| ratio(metrics.total_points, cap)),
+            capacity_consumed_ratio: capacity_points.and_then(|cap| ratio(metrics.done_points, cap)),
         })
     } else {
         None
     };
 
-    let metrics_payload = SprintSummaryReportMetrics {
-        tasks: tasks_payload,
-        hours: hours_payload,
-        points: points_payload,
-        blocked: metrics.blocked_tasks.len(),
-    };
+    let metrics_payload =
+        SprintSummaryReportMetrics { tasks: tasks_payload, hours: hours_payload, points: points_payload, blocked: metrics.blocked_tasks.len() };
 
     let timeline_payload = SprintStatsTimelinePayload {
         planned_start: lifecycle.planned_start.map(|dt| dt.to_rfc3339()),
@@ -641,13 +549,7 @@ pub fn compute_sprint_summary(
         blocked_tasks: metrics.blocked_tasks.clone(),
     };
 
-    SprintSummaryContext {
-        payload,
-        metrics,
-        durations,
-        summary,
-        lifecycle,
-    }
+    SprintSummaryContext { payload, metrics, durations, summary, lifecycle }
 }
 
 pub fn compute_sprint_burndown(
@@ -662,21 +564,14 @@ pub fn compute_sprint_burndown(
 
     let tasks = SprintService::load_tasks_for_record(storage, record);
 
-    let done_sets = crate::services::completion::resolve_task_done_sets(
-        storage,
-        tasks.iter().map(|(id, _)| id),
-    );
+    let done_sets = crate::services::completion::resolve_task_done_sets(storage, tasks.iter().map(|(id, _)| id));
     let computation = generate_burndown_series(record, &lifecycle, &tasks, &done_sets)?;
 
     let payload = SprintBurndownResponse {
         status: "ok",
         sprint: detail,
         lifecycle: SprintReviewLifecyclePayload::from_status(&lifecycle),
-        totals: SprintBurndownTotalsPayload {
-            tasks: computation.totals.tasks,
-            points: computation.totals.points,
-            hours: computation.totals.hours,
-        },
+        totals: SprintBurndownTotalsPayload { tasks: computation.totals.tasks, points: computation.totals.points, hours: computation.totals.hours },
         series: computation
             .series
             .iter()
@@ -692,20 +587,10 @@ pub fn compute_sprint_burndown(
             .collect(),
     };
 
-    Ok(SprintBurndownContext {
-        payload,
-        computation,
-        summary,
-        lifecycle,
-    })
+    Ok(SprintBurndownContext { payload, computation, summary, lifecycle })
 }
 
-pub fn compute_sprint_calendar(
-    records: &[SprintRecord],
-    include_complete: bool,
-    limit: Option<usize>,
-    now: DateTime<Utc>,
-) -> SprintCalendarContext {
+pub fn compute_sprint_calendar(records: &[SprintRecord], include_complete: bool, limit: Option<usize>, now: DateTime<Utc>) -> SprintCalendarContext {
     let mut entries = Vec::new();
     let mut skipped_complete = false;
 
@@ -726,9 +611,7 @@ pub fn compute_sprint_calendar(
         };
         let relative = format_calendar_relative(&lifecycle, start, end, now);
         let sort_source = start.or(end);
-        let sort_key = sort_source
-            .map(|dt| dt.timestamp())
-            .unwrap_or_else(|| i64::MAX - record.id as i64);
+        let sort_key = sort_source.map(|dt| dt.timestamp()).unwrap_or_else(|| i64::MAX - record.id as i64);
         let warning_payloads = to_status_warning_payloads(&lifecycle.warnings);
 
         entries.push(SprintCalendarEntry {
@@ -746,11 +629,7 @@ pub fn compute_sprint_calendar(
         });
     }
 
-    entries.sort_by(|a, b| {
-        a.sort_key
-            .cmp(&b.sort_key)
-            .then(a.summary.id.cmp(&b.summary.id))
-    });
+    entries.sort_by(|a, b| a.sort_key.cmp(&b.sort_key).then(a.summary.id.cmp(&b.summary.id)));
 
     let mut truncated = false;
     if let Some(limit) = limit
@@ -775,12 +654,8 @@ pub fn compute_sprint_calendar(
                 actual_start: entry.actual_start.map(|dt| dt.to_rfc3339()),
                 actual_end: entry.actual_end.map(|dt| dt.to_rfc3339()),
                 duration_days: entry.duration.map(duration_to_days),
-                time_until_start_days: entry
-                    .start
-                    .map(|dt| duration_to_days(dt.signed_duration_since(now))),
-                time_until_end_days: entry
-                    .end
-                    .map(|dt| duration_to_days(dt.signed_duration_since(now))),
+                time_until_start_days: entry.start.map(|dt| duration_to_days(dt.signed_duration_since(now))),
+                time_until_end_days: entry.end.map(|dt| duration_to_days(dt.signed_duration_since(now))),
                 window: format_calendar_window(entry.start, entry.end, entry.duration),
                 has_warnings: entry.summary.has_warnings,
                 status_warnings: entry.warnings.clone(),
@@ -807,40 +682,19 @@ pub fn summarize_sprint_tasks(
     let mut done_points = 0.0f64;
 
     for (id, task) in tasks.iter() {
-        let label = if task.status.is_empty() {
-            "Unspecified".to_string()
-        } else {
-            task.status.as_str().to_string()
-        };
+        let label = if task.status.is_empty() { "Unspecified".to_string() } else { task.status.as_str().to_string() };
         let key = label.to_ascii_lowercase();
         let is_done = done_sets.is_done(id, &task.status);
-        let is_blocked =
-            blocked_statuses.contains(&key) || label.to_ascii_lowercase().contains("block");
-        let entry = status_counts
-            .entry(key.clone())
-            .or_insert_with(|| StatusAggregate {
-                label: label.clone(),
-                count: 0,
-                done_count: 0,
-            });
+        let is_blocked = blocked_statuses.contains(&key) || label.to_ascii_lowercase().contains("block");
+        let entry = status_counts.entry(key.clone()).or_insert_with(|| StatusAggregate { label: label.clone(), count: 0, done_count: 0 });
         entry.count += 1;
         if is_done {
             entry.done_count += 1;
             done_tasks += 1;
         } else {
-            remaining_tasks.push(SprintReviewTask {
-                id: id.clone(),
-                title: task.title.clone(),
-                status: label.clone(),
-                assignee: task.assignee.clone(),
-            });
+            remaining_tasks.push(SprintReviewTask { id: id.clone(), title: task.title.clone(), status: label.clone(), assignee: task.assignee.clone() });
             if is_blocked {
-                blocked_tasks.push(SprintReviewTask {
-                    id: id.clone(),
-                    title: task.title.clone(),
-                    status: label.clone(),
-                    assignee: task.assignee.clone(),
-                });
+                blocked_tasks.push(SprintReviewTask { id: id.clone(), title: task.title.clone(), status: label.clone(), assignee: task.assignee.clone() });
             }
         }
 
@@ -864,22 +718,13 @@ pub fn summarize_sprint_tasks(
         }
     }
 
-    remaining_tasks.sort_by(|a, b| {
-        a.status
-            .to_ascii_lowercase()
-            .cmp(&b.status.to_ascii_lowercase())
-            .then(a.id.cmp(&b.id))
-    });
+    remaining_tasks.sort_by(|a, b| a.status.to_ascii_lowercase().cmp(&b.status.to_ascii_lowercase()).then(a.id.cmp(&b.id)));
 
     blocked_tasks.sort_by(|a, b| crate::storage::compare_task_ids(&a.id, &b.id));
 
     let status_breakdown: Vec<SprintReviewStatusMetric> = status_counts
         .into_values()
-        .map(|aggregate| SprintReviewStatusMetric {
-            status: aggregate.label,
-            count: aggregate.count,
-            done: aggregate.done_count == aggregate.count,
-        })
+        .map(|aggregate| SprintReviewStatusMetric { status: aggregate.label, count: aggregate.count, done: aggregate.done_count == aggregate.count })
         .collect();
 
     SprintTaskMetrics {
@@ -920,20 +765,10 @@ pub fn generate_burndown_series(
     }
 
     let total_tasks = items.len();
-    let points_available = if total_points > 0.000_1 {
-        Some(total_points)
-    } else {
-        None
-    };
-    let hours_available = if total_hours > 0.000_1 {
-        Some(total_hours)
-    } else {
-        None
-    };
+    let points_available = if total_points > 0.000_1 { Some(total_points) } else { None };
+    let hours_available = if total_hours > 0.000_1 { Some(total_hours) } else { None };
 
-    let start_anchor = start_day
-        .and_hms_opt(0, 0, 0)
-        .expect("valid start midnight");
+    let start_anchor = start_day.and_hms_opt(0, 0, 0).expect("valid start midnight");
     let mut series = Vec::with_capacity(series_len.max(1));
 
     for i in 0..=day_span {
@@ -960,8 +795,7 @@ pub fn generate_burndown_series(
         }
 
         let remaining_tasks = total_tasks.saturating_sub(completed_tasks);
-        let mut remaining_points =
-            points_available.map(|total| (total - completed_points).max(0.0));
+        let mut remaining_points = points_available.map(|total| (total - completed_points).max(0.0));
         let mut remaining_hours = hours_available.map(|total| (total - completed_hours).max(0.0));
 
         if let Some(value) = remaining_points.as_mut()
@@ -975,38 +809,18 @@ pub fn generate_burndown_series(
             *value = 0.0;
         }
 
-        let fraction = if day_span == 0 {
-            if i == 0 { 0.0 } else { 1.0 }
-        } else {
-            i as f64 / day_span as f64
-        };
+        let fraction = if day_span == 0 { if i == 0 { 0.0 } else { 1.0 } } else { i as f64 / day_span as f64 };
 
         let ideal_tasks = (total_tasks as f64) * (1.0 - fraction);
         let ideal_points = points_available.map(|total| total * (1.0 - fraction));
         let ideal_hours = hours_available.map(|total| total * (1.0 - fraction));
 
-        series.push(SprintBurndownPoint {
-            date: day_start,
-            remaining_tasks,
-            ideal_tasks,
-            remaining_points,
-            ideal_points,
-            remaining_hours,
-            ideal_hours,
-        });
+        series.push(SprintBurndownPoint { date: day_start, remaining_tasks, ideal_tasks, remaining_points, ideal_points, remaining_hours, ideal_hours });
     }
 
-    let totals = SprintBurndownTotals {
-        tasks: total_tasks,
-        points: points_available,
-        hours: hours_available,
-    };
+    let totals = SprintBurndownTotals { tasks: total_tasks, points: points_available, hours: hours_available };
 
-    Ok(SprintBurndownComputation {
-        totals,
-        series,
-        day_span,
-    })
+    Ok(SprintBurndownComputation { totals, series, day_span })
 }
 
 fn parse_effort_values(task: &StoredTask) -> (f64, f64) {

@@ -1,9 +1,7 @@
 use crate::cli::TaskEditArgs;
 use crate::cli::handlers::CommandHandler;
 use crate::cli::handlers::task::context::TaskCommandContext;
-use crate::cli::handlers::task::mutation::{
-    LoadedTask, ensure_membership, load_task, plan_auto_populate_members, render_edit_preview,
-};
+use crate::cli::handlers::task::mutation::{LoadedTask, ensure_membership, load_task, plan_auto_populate_members, render_edit_preview};
 use crate::cli::validation::CliValidator;
 use crate::types::custom_value_string;
 use crate::utils::identity::resolve_me_alias_for_project;
@@ -16,35 +14,12 @@ impl CommandHandler for EditHandler {
     type Args = TaskEditArgs;
     type Result = Result<(), String>;
 
-    fn execute(
-        args: Self::Args,
-        project: Option<&str>,
-        resolver: &TasksDirectoryResolver,
-        renderer: &crate::output::OutputRenderer,
-    ) -> Self::Result {
+    fn execute(args: Self::Args, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &crate::output::OutputRenderer) -> Self::Result {
         renderer.log_info("edit: begin");
-        let TaskEditArgs {
-            id,
-            title,
-            task_type,
-            priority,
-            reporter,
-            assignee,
-            effort,
-            due,
-            description,
-            tags,
-            untag,
-            fields,
-            dry_run,
-        } = args;
+        let TaskEditArgs { id, title, task_type, priority, reporter, assignee, effort, due, description, tags, untag, fields, dry_run } = args;
 
         let mut ctx = TaskCommandContext::new(resolver, project, Some(id.as_str()))?;
-        let LoadedTask {
-            full_id,
-            project_prefix,
-            mut task,
-        } = load_task(&mut ctx, &id, project)?;
+        let LoadedTask { full_id, project_prefix, mut task } = load_task(&mut ctx, &id, project)?;
 
         let autop_members_enabled = ctx.config.auto_populate_members;
         let validator = CliValidator::new(&ctx.config);
@@ -58,17 +33,13 @@ impl CommandHandler for EditHandler {
         }
 
         if let Some(task_type) = task_type {
-            let validated = validator
-                .validate_task_type(&task_type)
-                .map_err(|e| format!("Task type validation failed: {}", e))?;
+            let validated = validator.validate_task_type(&task_type).map_err(|e| format!("Task type validation failed: {}", e))?;
             task.task_type = validated.clone();
             patch.task_type = Some(validated.to_string());
         }
 
         if let Some(priority) = priority {
-            let validated = validator
-                .validate_priority(&priority)
-                .map_err(|e| format!("Priority validation failed: {}", e))?;
+            let validated = validator.validate_priority(&priority).map_err(|e| format!("Priority validation failed: {}", e))?;
             task.priority = validated.clone();
             patch.priority = Some(validated.to_string());
         }
@@ -79,18 +50,9 @@ impl CommandHandler for EditHandler {
                 task.reporter = None;
                 patch.reporter = Some(String::new());
             } else {
-                let validation = if autop_members_enabled {
-                    validator.validate_reporter_allow_unknown(trimmed)
-                } else {
-                    validator.validate_reporter(trimmed)
-                };
-                let validated =
-                    validation.map_err(|e| format!("Reporter validation failed: {}", e))?;
-                let resolved = resolve_me_alias_for_project(
-                    &validated,
-                    Some(ctx.tasks_dir.path.as_path()),
-                    Some(&project_prefix),
-                );
+                let validation = if autop_members_enabled { validator.validate_reporter_allow_unknown(trimmed) } else { validator.validate_reporter(trimmed) };
+                let validated = validation.map_err(|e| format!("Reporter validation failed: {}", e))?;
+                let resolved = resolve_me_alias_for_project(&validated, Some(ctx.tasks_dir.path.as_path()), Some(&project_prefix));
                 task.reporter = resolved.clone();
                 patch.reporter = resolved;
             }
@@ -102,18 +64,9 @@ impl CommandHandler for EditHandler {
                 task.assignee = None;
                 patch.assignee = Some(String::new());
             } else {
-                let validation = if autop_members_enabled {
-                    validator.validate_assignee_allow_unknown(trimmed)
-                } else {
-                    validator.validate_assignee(trimmed)
-                };
-                let validated =
-                    validation.map_err(|e| format!("Assignee validation failed: {}", e))?;
-                let resolved = resolve_me_alias_for_project(
-                    &validated,
-                    Some(ctx.tasks_dir.path.as_path()),
-                    Some(&project_prefix),
-                );
+                let validation = if autop_members_enabled { validator.validate_assignee_allow_unknown(trimmed) } else { validator.validate_assignee(trimmed) };
+                let validated = validation.map_err(|e| format!("Assignee validation failed: {}", e))?;
+                let resolved = resolve_me_alias_for_project(&validated, Some(ctx.tasks_dir.path.as_path()), Some(&project_prefix));
                 task.assignee = resolved.clone();
                 patch.assignee = resolved;
             }
@@ -121,17 +74,14 @@ impl CommandHandler for EditHandler {
 
         // Same validation as `add` and `effort` (DEV-282).
         if let Some(effort) = effort {
-            let normalized = crate::utils::effort::parse_effort(&effort)
-                .map(|parsed| parsed.canonical)
-                .map_err(|e| format!("Effort validation failed: {}", e))?;
+            let normalized =
+                crate::utils::effort::parse_effort(&effort).map(|parsed| parsed.canonical).map_err(|e| format!("Effort validation failed: {}", e))?;
             task.effort = Some(normalized.clone());
             patch.effort = Some(normalized);
         }
 
         if let Some(due) = due {
-            let value = validator
-                .parse_due_date(&due)
-                .map_err(|e| format!("Due date validation failed: {}", e))?;
+            let value = validator.parse_due_date(&due).map_err(|e| format!("Due date validation failed: {}", e))?;
             task.due_date = Some(value.clone());
             patch.due_date = Some(value);
         }
@@ -143,9 +93,7 @@ impl CommandHandler for EditHandler {
 
         if !tags.is_empty() {
             for tag in &tags {
-                let tag = validator
-                    .validate_tag(tag)
-                    .map_err(|e| format!("Tag validation failed: {}", e))?;
+                let tag = validator.validate_tag(tag).map_err(|e| format!("Tag validation failed: {}", e))?;
                 if !task.tags.contains(&tag) {
                     task.tags.push(tag);
                 }
@@ -155,30 +103,21 @@ impl CommandHandler for EditHandler {
 
         // `--untag` removes tags (DEV-283); matching ignores case.
         if !untag.is_empty() {
-            task.tags.retain(|tag| {
-                !untag
-                    .iter()
-                    .any(|gone| gone.trim().eq_ignore_ascii_case(tag))
-            });
+            task.tags.retain(|tag| !untag.iter().any(|gone| gone.trim().eq_ignore_ascii_case(tag)));
             patch.tags = Some(task.tags.clone());
         }
 
         if !fields.is_empty() {
             let mut merged = task.custom_fields.clone();
             for (key, value) in &fields {
-                let validated_key = validator
-                    .validate_custom_field_name(key)
-                    .map_err(|e| format!("Custom field validation failed for '{}': {}", key, e))?;
+                let validated_key = validator.validate_custom_field_name(key).map_err(|e| format!("Custom field validation failed for '{}': {}", key, e))?;
                 merged.insert(validated_key, custom_value_string(value.clone()));
             }
             task.custom_fields = merged.clone();
             patch.custom_fields = Some(merged);
         }
 
-        #[expect(
-            clippy::drop_non_drop,
-            reason = "marks where the validator's borrow ends before the configuration is used again"
-        )]
+        #[expect(clippy::drop_non_drop, reason = "marks where the validator's borrow ends before the configuration is used again")]
         drop(validator);
 
         plan_auto_populate_members(&mut ctx, &task);
@@ -190,9 +129,7 @@ impl CommandHandler for EditHandler {
         }
 
         renderer.log_debug("edit: persisting edits via TaskService");
-        let updated =
-            crate::services::task_service::TaskService::update(&mut ctx.storage, &full_id, patch)
-                .map_err(|e| e.to_string())?;
+        let updated = crate::services::task_service::TaskService::update(&mut ctx.storage, &full_id, patch).map_err(|e| e.to_string())?;
         if matches!(renderer.format, crate::output::OutputFormat::Json) {
             renderer.emit_json(&serde_json::json!({
                 "status": "success",

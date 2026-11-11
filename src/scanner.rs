@@ -78,17 +78,7 @@ pub(crate) fn scan_language(path: &Path) -> Option<String> {
         return Some(mapped.to_string());
     }
     let name = path.file_name()?.to_str()?;
-    matches!(
-        name,
-        "Makefile"
-            | "makefile"
-            | "GNUmakefile"
-            | "Dockerfile"
-            | "Containerfile"
-            | "Justfile"
-            | "justfile"
-    )
-    .then(|| "sh".to_string())
+    matches!(name, "Makefile" | "makefile" | "GNUmakefile" | "Dockerfile" | "Containerfile" | "Justfile" | "justfile").then(|| "sh".to_string())
 }
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
@@ -98,10 +88,7 @@ use std::path::{Path, PathBuf};
 
 /// Byte length of the first character; callers only pass the non-empty rest of a line.
 fn first_char_len(rest: &str) -> usize {
-    rest.chars()
-        .next()
-        .expect("the rest of the line is not empty")
-        .len_utf8()
+    rest.chars().next().expect("the rest of the line is not empty").len_utf8()
 }
 
 #[derive(Default)]
@@ -141,11 +128,7 @@ impl CommentLexer {
                     }
                 }
                 ranges.push(start..index);
-                self.block = if depth == 0 {
-                    None
-                } else {
-                    Some((open, close, depth))
-                };
+                self.block = if depth == 0 { None } else { Some((open, close, depth)) };
                 if depth == 0 {
                     index += close.len();
                 }
@@ -153,20 +136,10 @@ impl CommentLexer {
             }
             let tail = &line[index..];
             if let Some((terminator, escapes, _)) = self.quote.as_ref() {
-                if *escapes
-                    && ["${", "#{", "$(", "\\("]
-                        .iter()
-                        .any(|prefix| tail.starts_with(prefix))
-                {
+                if *escapes && ["${", "#{", "$(", "\\("].iter().any(|prefix| tail.starts_with(prefix)) {
                     self.ambiguous = true;
                     break;
-                } else if *escapes
-                    && tail.starts_with(if matches!(extension, "ps1" | "powershell") {
-                        '`'
-                    } else {
-                        '\\'
-                    })
-                {
+                } else if *escapes && tail.starts_with(if matches!(extension, "ps1" | "powershell") { '`' } else { '\\' }) {
                     index += 1;
                     if index < line.len() {
                         index += first_char_len(&line[index..]);
@@ -180,9 +153,7 @@ impl CommentLexer {
                 continue;
             }
             let block = if extension.is_empty() {
-                [("/*", "*/"), ("<!--", "-->")]
-                    .into_iter()
-                    .find(|(open, _)| tail.starts_with(open))
+                [("/*", "*/"), ("<!--", "-->")].into_iter().find(|(open, _)| tail.starts_with(open))
             } else {
                 open.zip(close).filter(|(open, _)| tail.starts_with(open))
             };
@@ -193,10 +164,7 @@ impl CommentLexer {
             }
             let token = single.filter(|token| tail.starts_with(token)).or_else(|| {
                 if extension.is_empty() {
-                    ["//", "#", "--", ";", "%"].into_iter().find(|token| {
-                        tail.starts_with(token)
-                            && (*token != ";" || line[..index].trim().is_empty())
-                    })
+                    ["//", "#", "--", ";", "%"].into_iter().find(|token| tail.starts_with(token) && (*token != ";" || line[..index].trim().is_empty()))
                 } else {
                     None
                 }
@@ -213,13 +181,10 @@ impl CommentLexer {
                     continue;
                 }
             }
-            if ["R\"", "@\"", "@'", "$\"", "f\"", "f'", "F\"", "F'", "<<"]
-                .iter()
-                .any(|prefix| tail.starts_with(prefix))
+            if ["R\"", "@\"", "@'", "$\"", "f\"", "f'", "F\"", "F'", "<<"].iter().any(|prefix| tail.starts_with(prefix))
                 || (matches!(extension, "js" | "ts" | "jsx" | "tsx") && tail.starts_with('/'))
                 || (extension == "lua" && (tail.starts_with("[[") || tail.starts_with("[=")))
-                || (extension == "sql"
-                    && (tail.starts_with('$') || tail.starts_with("E'") || tail.starts_with("e'")))
+                || (extension == "sql" && (tail.starts_with('$') || tail.starts_with("E'") || tail.starts_with("e'")))
                 || (matches!(extension, "yaml" | "yml") && tail.starts_with(['|', '>']))
                 || (matches!(extension, "rb" | "perl") && tail.starts_with(['/', '%']))
                 || (extension == "r" && tail.starts_with("r\""))
@@ -241,24 +206,14 @@ impl CommentLexer {
                 let triple = ch != '`' && tail.starts_with(&ch.to_string().repeat(3));
                 let terminator = ch.to_string().repeat(if triple { 3 } else { 1 });
                 index += terminator.len();
-                let escapes = !matches!(
-                    extension,
-                    "html" | "htm" | "xml" | "vue" | "svelte" | "md" | "markdown" | "sql"
-                ) && !(ch == '\''
-                    && matches!(
-                        extension,
-                        "sh" | "bash" | "toml" | "yaml" | "yml" | "ps1" | "powershell"
-                    ));
+                let escapes = !matches!(extension, "html" | "htm" | "xml" | "vue" | "svelte" | "md" | "markdown" | "sql")
+                    && !(ch == '\'' && matches!(extension, "sh" | "bash" | "toml" | "yaml" | "yml" | "ps1" | "powershell"));
                 self.quote = Some((terminator, escapes, triple || ch == '`'));
             } else {
                 index += ch.len_utf8();
             }
         }
-        if self
-            .quote
-            .as_ref()
-            .is_some_and(|(_, _, multiline)| !multiline)
-        {
+        if self.quote.as_ref().is_some_and(|(_, _, multiline)| !multiline) {
             self.ambiguous = true;
         }
         ranges
@@ -273,10 +228,7 @@ fn rust_char_literal_len(tail: &str) -> Option<usize> {
     if first == '\\' {
         // Escapes are short: '\n', '\'', '\x7f', '\u{10FFFF}'.
         // Offset 2 is the escaped character itself (it may be a quote).
-        return chars
-            .take(12)
-            .find(|(offset, ch)| *ch == '\'' && *offset >= 3)
-            .map(|(offset, _)| offset + 1);
+        return chars.take(12).find(|(offset, ch)| *ch == '\'' && *offset >= 3).map(|(offset, _)| offset + 1);
     }
     if first == '\'' {
         return None;
@@ -290,9 +242,7 @@ fn rust_char_literal_len(tail: &str) -> Option<usize> {
 /// must start with its signal word here, for discovery and editing alike
 /// (DEV-261), so prose that merely mentions "bug" or "todo" is not a finding.
 pub(crate) fn comment_body(segment: &str) -> &str {
-    segment
-        .trim_start_matches(|c: char| c.is_whitespace() || matches!(c, '/' | '!' | '*' | '-'))
-        .trim_end()
+    segment.trim_start_matches(|c: char| c.is_whitespace() || matches!(c, '/' | '!' | '*' | '-')).trim_end()
 }
 
 #[derive(Debug, Clone)]
@@ -319,22 +269,15 @@ pub struct Scanner {
     signal_words: Vec<String>,                     // lowercase tokens like todo, fixme
     custom_ticket_key_regexes: Option<Vec<Regex>>, // configured ticket key patterns
     enable_ticket_words: bool,                     // treat ticket keys as triggers
-    track_mentions: bool, // collect bare known-ticket mentions without signal words
-    modified_only: bool,  // limit scan to git-modified files
+    track_mentions: bool,                          // collect bare known-ticket mentions without signal words
+    modified_only: bool,                           // limit scan to git-modified files
 }
 
 impl Scanner {
     pub fn new(path: PathBuf) -> Self {
         // Default signal words (case-insensitive)
-        let default_words = vec![
-            "todo".to_string(),
-            "fixme".to_string(),
-            "hack".to_string(),
-            "bug".to_string(),
-            "note".to_string(),
-        ];
-        let (signal_regex, uuid_extract_regex, simple_extract_regex) =
-            Self::build_signal_regexes(&default_words);
+        let default_words = vec!["todo".to_string(), "fixme".to_string(), "hack".to_string(), "bug".to_string(), "note".to_string()];
+        let (signal_regex, uuid_extract_regex, simple_extract_regex) = Self::build_signal_regexes(&default_words);
         let (ticket_attr_regex, ticket_key_regex) = Self::build_ticket_regexes();
 
         Self {
@@ -357,11 +300,7 @@ impl Scanner {
 
     fn build_signal_regexes(words: &[String]) -> (Regex, Regex, Regex) {
         // Join words as alternation, escaping handled by assuming simple alphanumerics
-        let joined = words
-            .iter()
-            .map(|w| regex::escape(w))
-            .collect::<Vec<_>>()
-            .join("|");
+        let joined = words.iter().map(|w| regex::escape(w)).collect::<Vec<_>>().join("|");
         // Signal present anywhere in line (word boundary), case-insensitive
         let signal_re = match Regex::new(&format!(r"(?i)\b(?:{})\b", joined)) {
             Ok(r) => r,
@@ -371,15 +310,9 @@ impl Scanner {
             },
         };
         // With id in parens: WORD (<id>): <text>
-        let uuid_re = Regex::new(&format!(
-            r"(?i)\b(?:{})[ \t]*\(([^)]+)\)[ \t]*:?\s*(.*)",
-            joined
-        ))
-        .unwrap_or_else(|_| {
+        let uuid_re = Regex::new(&format!(r"(?i)\b(?:{})[ \t]*\(([^)]+)\)[ \t]*:?\s*(.*)", joined)).unwrap_or_else(|_| {
             Regex::new(r"(?i)\b(?:todo|fixme|hack|bug|note)[ \t]*\(([^)]+)\)[ \t]*:?\s*(.*)")
-                .unwrap_or_else(|_| {
-                    Regex::new(r"\(([^)]+)\)\s*(.*)").expect("regex compile fallback")
-                })
+                .unwrap_or_else(|_| Regex::new(r"\(([^)]+)\)\s*(.*)").expect("regex compile fallback"))
         });
         // Simple form: WORD: <text> (or just WORD <text>)
         let simple_re = match Regex::new(&format!(r"(?i)\b(?:{})[ \t]*:?\s*(.*)", joined)) {
@@ -416,8 +349,7 @@ impl Scanner {
     pub fn with_signal_words(mut self, words: &[String]) -> Self {
         if !words.is_empty() {
             self.signal_words = words.iter().map(|w| w.to_ascii_lowercase()).collect();
-            let (signal_regex, uuid_extract_regex, simple_extract_regex) =
-                Self::build_signal_regexes(&self.signal_words);
+            let (signal_regex, uuid_extract_regex, simple_extract_regex) = Self::build_signal_regexes(&self.signal_words);
             self.signal_regex = signal_regex;
             self.uuid_extract_regex = uuid_extract_regex;
             self.simple_extract_regex = simple_extract_regex;
@@ -426,11 +358,7 @@ impl Scanner {
     }
 
     /// Configure ticket detection patterns and whether ticket keys should act as signal words
-    pub fn with_ticket_detection(
-        mut self,
-        patterns: Option<&[String]>,
-        enable_words: bool,
-    ) -> Self {
+    pub fn with_ticket_detection(mut self, patterns: Option<&[String]>, enable_words: bool) -> Self {
         self.enable_ticket_words = enable_words;
         if let Some(list) = patterns
             && !list.is_empty()
@@ -459,15 +387,12 @@ impl Scanner {
     fn build_ticket_regexes() -> (Regex, Regex) {
         // [ticket=DEMO-123] or [ticket = DEMO-123]; keys may contain hyphenated
         // prefixes (ABC-OPS-12) consistent with the canonical ID grammar.
-        let ticket_attr_regex =
-            Regex::new(r"(?i)\[\s*ticket\s*=\s*([A-Z][A-Z0-9]+(?:-[A-Z0-9]+)*-\d+)\s*\]")
-                .unwrap_or_else(|_| {
-                    Regex::new(r"\[ticket=([A-Z]+-\d+)\]").expect("regex compile fallback")
-                });
+        let ticket_attr_regex = Regex::new(r"(?i)\[\s*ticket\s*=\s*([A-Z][A-Z0-9]+(?:-[A-Z0-9]+)*-\d+)\s*\]")
+            .unwrap_or_else(|_| Regex::new(r"\[ticket=([A-Z]+-\d+)\]").expect("regex compile fallback"));
         // Generic key like DEMO-123; capture the FULL hyphenated key
         // (ABC-OPS-12, ABC-OPS-12-3) instead of the trailing slice (OPS-12).
-        let ticket_key_regex = Regex::new(r"\b([A-Z][A-Z0-9]+(?:-[A-Z0-9]+)*-\d+)\b")
-            .unwrap_or_else(|_| Regex::new(r"([A-Z]+-\d+)").expect("regex compile fallback"));
+        let ticket_key_regex =
+            Regex::new(r"\b([A-Z][A-Z0-9]+(?:-[A-Z0-9]+)*-\d+)\b").unwrap_or_else(|_| Regex::new(r"([A-Z]+-\d+)").expect("regex compile fallback"));
         (ticket_attr_regex, ticket_key_regex)
     }
 
@@ -483,37 +408,21 @@ impl Scanner {
         let files = self.collect_candidate_files(self.path.as_path());
 
         #[cfg(feature = "parallel")]
-        let per_file: Vec<(Vec<Reference>, Vec<Reference>)> = files
-            .par_iter()
-            .map(|path| self.scan_file_collect(path.as_path()))
-            .collect();
+        let per_file: Vec<(Vec<Reference>, Vec<Reference>)> = files.par_iter().map(|path| self.scan_file_collect(path.as_path())).collect();
 
         #[cfg(not(feature = "parallel"))]
-        let per_file: Vec<(Vec<Reference>, Vec<Reference>)> = files
-            .iter()
-            .map(|path| self.scan_file_collect(path.as_path()))
-            .collect();
+        let per_file: Vec<(Vec<Reference>, Vec<Reference>)> = files.iter().map(|path| self.scan_file_collect(path.as_path())).collect();
 
-        let (mut references, mut mentions) = per_file.into_iter().fold(
-            (Vec::new(), Vec::new()),
-            |(mut references, mut mentions), (file_references, file_mentions)| {
+        let (mut references, mut mentions) =
+            per_file.into_iter().fold((Vec::new(), Vec::new()), |(mut references, mut mentions), (file_references, file_mentions)| {
                 references.extend(file_references);
                 mentions.extend(file_mentions);
                 (references, mentions)
-            },
-        );
+            });
 
         // Deterministic ordering by file then line
-        references.sort_by(|a, b| {
-            a.file_path
-                .cmp(&b.file_path)
-                .then(a.line_number.cmp(&b.line_number))
-        });
-        mentions.sort_by(|a, b| {
-            a.file_path
-                .cmp(&b.file_path)
-                .then(a.line_number.cmp(&b.line_number))
-        });
+        references.sort_by(|a, b| a.file_path.cmp(&b.file_path).then(a.line_number.cmp(&b.line_number)));
+        mentions.sort_by(|a, b| a.file_path.cmp(&b.file_path).then(a.line_number.cmp(&b.line_number)));
 
         self.last_scan = references.clone();
         (references, mentions)
@@ -592,11 +501,7 @@ impl Scanner {
                     continue;
                 }
                 // Filters match the file's own extension or its language.
-                let own = path
-                    .extension()
-                    .and_then(|e| e.to_str())
-                    .map(str::to_ascii_lowercase)
-                    .unwrap_or_else(|| language.clone());
+                let own = path.extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase).unwrap_or_else(|| language.clone());
                 let named = |list: &Vec<String>| list.iter().any(|e| *e == own || *e == language);
                 if self.exclude_ext.as_ref().is_some_and(named) {
                     continue;
@@ -644,44 +549,23 @@ impl Scanner {
     }
 
     fn get_comment_token(extension: &str) -> Option<&'static str> {
-        FILE_TYPES
-            .iter()
-            .find(|(file_type, _)| file_type == &extension)
-            .map(|(_, token)| *token)
+        FILE_TYPES.iter().find(|(file_type, _)| file_type == &extension).map(|(_, token)| *token)
     }
 
-    fn scan_file(
-        &self,
-        file_path: &Path,
-        references: &mut Vec<Reference>,
-        mentions: &mut Vec<Reference>,
-    ) {
+    fn scan_file(&self, file_path: &Path, references: &mut Vec<Reference>, mentions: &mut Vec<Reference>) {
         if let Ok(file_contents) = fs::read_to_string(file_path)
             && let Some(ext_str) = scan_language(file_path)
         {
             let mut lexer = CommentLexer::default();
             for (line_number, raw_line) in file_contents.lines().enumerate() {
                 for range in lexer.ranges(raw_line, &ext_str) {
-                    self.process_comment_line(
-                        file_path,
-                        references,
-                        mentions,
-                        line_number + 1,
-                        &raw_line[range],
-                    );
+                    self.process_comment_line(file_path, references, mentions, line_number + 1, &raw_line[range]);
                 }
             }
         }
     }
 
-    fn process_comment_line(
-        &self,
-        file_path: &Path,
-        references: &mut Vec<Reference>,
-        mentions: &mut Vec<Reference>,
-        line_number_1based: usize,
-        line: &str,
-    ) {
+    fn process_comment_line(&self, file_path: &Path, references: &mut Vec<Reference>, mentions: &mut Vec<Reference>, line_number_1based: usize, line: &str) {
         // Signal-word findings require a signal word. Comment lines without one can
         // still carry a bare ticket key: when mention tracking is enabled they are
         // reported separately so the scan consumer can anchor the existing task.
@@ -719,22 +603,14 @@ impl Scanner {
         // Prefer explicit UUID in parens after signal word, then [ticket=...], then generic DEMO-123 pattern
         let (mut uuid, title) = if let Some(c) = self.uuid_extract_regex.captures(trimmed) {
             let uuid = c.get(1).map_or(String::new(), |m| m.as_str().to_string());
-            let title = c
-                .get(2)
-                .map_or(String::new(), |m| m.as_str().trim().to_string());
+            let title = c.get(2).map_or(String::new(), |m| m.as_str().trim().to_string());
             (uuid, title)
         } else if let Some(c) = self.ticket_attr_regex.captures(trimmed) {
             let uuid = c.get(1).map_or(String::new(), |m| m.as_str().to_string());
-            let title = self
-                .simple_extract_regex
-                .captures(trimmed)
-                .and_then(|cap| cap.get(1).map(|m| m.as_str().trim().to_string()))
-                .unwrap_or_default();
+            let title = self.simple_extract_regex.captures(trimmed).and_then(|cap| cap.get(1).map(|m| m.as_str().trim().to_string())).unwrap_or_default();
             (uuid, title)
         } else if let Some(c) = self.simple_extract_regex.captures(trimmed) {
-            let title = c
-                .get(1)
-                .map_or(String::new(), |m| m.as_str().trim().to_string());
+            let title = c.get(1).map_or(String::new(), |m| m.as_str().trim().to_string());
             // Try to find a generic key within the line
             if let Some(k) = self.ticket_key_regex.captures(trimmed) {
                 let uuid = k.get(1).map_or(String::new(), |m| m.as_str().to_string());
@@ -769,13 +645,10 @@ impl Scanner {
         // Provide block comment tokens per language family
         match ext {
             // C-style block comments
-            "rs" | "rust" | "c" | "h" | "hpp" | "cpp" | "cc" | "cxx" | "js" | "ts" | "jsx"
-            | "tsx" | "java" | "cs" | "scala" | "kotlin" | "go" | "dart" | "swift" | "groovy"
-            | "css" | "scss" | "less" => (Some("/*"), Some("*/")),
+            "rs" | "rust" | "c" | "h" | "hpp" | "cpp" | "cc" | "cxx" | "js" | "ts" | "jsx" | "tsx" | "java" | "cs" | "scala" | "kotlin" | "go" | "dart"
+            | "swift" | "groovy" | "css" | "scss" | "less" => (Some("/*"), Some("*/")),
             // HTML/XML/Markdown style block comments
-            "html" | "htm" | "xml" | "vue" | "svelte" | "md" | "markdown" => {
-                (Some("<!--"), Some("-->"))
-            }
+            "html" | "htm" | "xml" | "vue" | "svelte" | "md" | "markdown" => (Some("<!--"), Some("-->")),
             // Others: no block comments
             _ => (None, None),
         }
@@ -786,35 +659,19 @@ impl Scanner {
         self.matched_source_comment_range(&self.path, line, 1)
     }
 
-    pub fn matched_source_comment_range(
-        &self,
-        path: &Path,
-        contents: &str,
-        line_number: usize,
-    ) -> Option<std::ops::Range<usize>> {
+    pub fn matched_source_comment_range(&self, path: &Path, contents: &str, line_number: usize) -> Option<std::ops::Range<usize>> {
         let extension = scan_language(path).unwrap_or_default();
         let mut lexer = CommentLexer::default();
         for (index, line) in contents.lines().enumerate() {
             let ranges = lexer.ranges(line, &extension);
             if index + 1 == line_number {
-                return ranges.into_iter().find(|range| {
-                    self.signal_regex
-                        .find(comment_body(&line[range.clone()]))
-                        .is_some_and(|matched| matched.start() == 0)
-                });
+                return ranges.into_iter().find(|range| self.signal_regex.find(comment_body(&line[range.clone()])).is_some_and(|matched| matched.start() == 0));
             }
         }
         None
     }
 
-    pub fn suggest_source_insertion(
-        &self,
-        path: &Path,
-        contents: &str,
-        line_number: usize,
-        key: &str,
-        strip: bool,
-    ) -> Option<String> {
+    pub fn suggest_source_insertion(&self, path: &Path, contents: &str, line_number: usize, key: &str, strip: bool) -> Option<String> {
         let line = contents.lines().nth(line_number.checked_sub(1)?)?;
         let range = self.matched_source_comment_range(path, contents, line_number)?;
         if strip {
@@ -831,12 +688,7 @@ impl Scanner {
         let Some(range) = self.matched_comment_range(line) else {
             return line.to_string();
         };
-        format!(
-            "{}{}{}",
-            &line[..range.start],
-            crate::utils::scan::strip_bracket_attributes(&line[range.clone()]),
-            &line[range.end..]
-        )
+        format!("{}{}{}", &line[..range.start], crate::utils::scan::strip_bracket_attributes(&line[range.clone()]), &line[range.end..])
     }
 
     /// Suggest an idempotent insertion of ` (KEY)` right after the first signal word on the line.
@@ -846,12 +698,7 @@ impl Scanner {
         self.suggest_insertion_in_range(line, key, self.matched_comment_range(line)?)
     }
 
-    fn suggest_insertion_in_range(
-        &self,
-        line: &str,
-        key: &str,
-        range: std::ops::Range<usize>,
-    ) -> Option<String> {
+    fn suggest_insertion_in_range(&self, line: &str, key: &str, range: std::ops::Range<usize>) -> Option<String> {
         if key.is_empty() {
             return None;
         }
@@ -862,9 +709,7 @@ impl Scanner {
         if let Some(m) = self.signal_regex.find_at(line, range.start) {
             let comment = &line[range.clone()];
             // Compute the absolute index of the first non-decorative char in the comment
-            let trimmed = comment.trim_start_matches(|c: char| {
-                c.is_whitespace() || matches!(c, '/' | '!' | '*' | '-')
-            });
+            let trimmed = comment.trim_start_matches(|c: char| c.is_whitespace() || matches!(c, '/' | '!' | '*' | '-'));
             let offset = comment.len() - trimmed.len();
             let first_token_abs = range.start + offset;
             // Only insert if the match begins exactly at the first token in the comment
@@ -935,11 +780,7 @@ impl Scanner {
         let mut lexer = CommentLexer::default();
         let mut lines = Vec::new();
         for (index, line) in contents.lines().enumerate() {
-            let mentioned = lexer.ranges(line, &extension).iter().any(|range| {
-                self.extract_ticket_key_from_line(&line[range.clone()])
-                    .as_deref()
-                    == Some(key)
-            });
+            let mentioned = lexer.ranges(line, &extension).iter().any(|range| self.extract_ticket_key_from_line(&line[range.clone()]).as_deref() == Some(key));
             if mentioned {
                 lines.push(index + 1);
             }
@@ -963,11 +804,7 @@ mod tests {
     fn scan_with_mentions_separates_bare_keys_from_signal_lines() {
         let dir = tempfile::tempdir().unwrap();
         let file = dir.path().join("sample.rs");
-        std::fs::write(
-            &file,
-            "// TODO ABC-1: signal line\nlet s = \"ABC-2 in string\";\n// ABC-2 bare mention\n",
-        )
-        .unwrap();
+        std::fs::write(&file, "// TODO ABC-1: signal line\nlet s = \"ABC-2 in string\";\n// ABC-2 bare mention\n").unwrap();
         let mut scanner = Scanner::new(dir.path().to_path_buf()).with_mention_tracking(true);
         let (references, mentions) = scanner.scan_with_mentions();
         assert_eq!(references.len(), 1);
@@ -992,33 +829,18 @@ mod tests {
     fn key_mention_lines_cover_signal_and_bare_comments_only() {
         let dir = tempfile::tempdir().unwrap();
         let file = dir.path().join("sample.rs");
-        std::fs::write(
-            &file,
-            "// TODO ABC-1: signal mention\nlet s = \"ABC-1 quoted\";\n// ABC-1 bare mention\nfn plain() {}\n",
-        )
-        .unwrap();
+        std::fs::write(&file, "// TODO ABC-1: signal mention\nlet s = \"ABC-1 quoted\";\n// ABC-1 bare mention\nfn plain() {}\n").unwrap();
         let scanner = Scanner::new(dir.path().to_path_buf());
         let contents = std::fs::read_to_string(&file).unwrap();
-        assert_eq!(
-            scanner.key_mention_lines(&file, &contents, "ABC-1"),
-            vec![1, 3]
-        );
-        assert!(
-            scanner
-                .key_mention_lines(&file, &contents, "ABC-2")
-                .is_empty()
-        );
+        assert_eq!(scanner.key_mention_lines(&file, &contents, "ABC-1"), vec![1, 3]);
+        assert!(scanner.key_mention_lines(&file, &contents, "ABC-2").is_empty());
     }
 
     fn scan_titles(name: &str, source: &str) -> Vec<(usize, String)> {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join(name), source).unwrap();
         let mut scanner = Scanner::new(dir.path().to_path_buf());
-        scanner
-            .scan()
-            .into_iter()
-            .map(|r| (r.line_number, r.title))
-            .collect()
+        scanner.scan().into_iter().map(|r| (r.line_number, r.title)).collect()
     }
 
     #[test]
@@ -1031,25 +853,13 @@ mod tests {
              // This is not a bug, it is intended.\n/// Returns the todo list.\n\
              /// Filter syntax example: status:todo\n",
         );
-        assert_eq!(
-            found,
-            vec![
-                (1, "doc todo".to_string()),
-                (2, "inner doc".to_string()),
-                (3, "bullet".to_string()),
-            ]
-        );
+        assert_eq!(found, vec![(1, "doc todo".to_string()), (2, "inner doc".to_string()), (3, "bullet".to_string()),]);
 
         let dir = tempfile::tempdir().unwrap();
         let file = dir.path().join("lib.rs");
         let contents = "/// TODO: doc todo\n";
         let scanner = Scanner::new(dir.path().to_path_buf());
-        assert_eq!(
-            scanner
-                .suggest_source_insertion(&file, contents, 1, "A-1", false)
-                .as_deref(),
-            Some("/// TODO (A-1): doc todo")
-        );
+        assert_eq!(scanner.suggest_source_insertion(&file, contents, 1, "A-1", false).as_deref(), Some("/// TODO (A-1): doc todo"));
     }
 
     #[test]
@@ -1088,31 +898,18 @@ mod tests {
     fn ticket_key_extraction_captures_full_hyphenated_prefix() {
         let s = Scanner::new(PathBuf::from("."));
         // Hyphenated prefixes capture the FULL key, not the OPS-12 slice.
-        assert_eq!(
-            s.extract_ticket_key_from_line("// TODO fix [ticket=ABC-OPS-12]"),
-            Some("ABC-OPS-12".to_string())
-        );
-        assert_eq!(
-            s.extract_ticket_key_from_line("// TODO: tracked as ABC-OPS-12 later"),
-            Some("ABC-OPS-12".to_string())
-        );
+        assert_eq!(s.extract_ticket_key_from_line("// TODO fix [ticket=ABC-OPS-12]"), Some("ABC-OPS-12".to_string()));
+        assert_eq!(s.extract_ticket_key_from_line("// TODO: tracked as ABC-OPS-12 later"), Some("ABC-OPS-12".to_string()));
         // Multi-segment prefixes keep earlier numeric segments.
-        assert_eq!(
-            s.extract_ticket_key_from_line("ABC-OPS-12-3"),
-            Some("ABC-OPS-12-3".to_string())
-        );
+        assert_eq!(s.extract_ticket_key_from_line("ABC-OPS-12-3"), Some("ABC-OPS-12-3".to_string()));
         // Classic single-segment keys unchanged.
-        assert_eq!(
-            s.extract_ticket_key_from_line("DEMO-123"),
-            Some("DEMO-123".to_string())
-        );
+        assert_eq!(s.extract_ticket_key_from_line("DEMO-123"), Some("DEMO-123".to_string()));
     }
 
     #[test]
     fn insertion_skips_example_comments_not_starting_with_signal() {
         let s = Scanner::new(PathBuf::from("."));
-        let line =
-            "signal_words: Vec<String>,                     // lowercase tokens like todo, fixme";
+        let line = "signal_words: Vec<String>,                     // lowercase tokens like todo, fixme";
         let edited = s.suggest_insertion_for_line(line, "DEMO-1");
         // Should not insert into 'like todo' example
         assert!(edited.is_none());

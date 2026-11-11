@@ -151,19 +151,10 @@ pub struct SprintCreateArgs {
 #[derive(Args, Debug)]
 pub struct SprintUpdateArgs {
     /// Numeric sprint identifier (e.g. 1)
-    #[arg(
-        value_name = "SPRINT_ID",
-        required_unless_present = "sprint",
-        conflicts_with = "sprint"
-    )]
+    #[arg(value_name = "SPRINT_ID", required_unless_present = "sprint", conflicts_with = "sprint")]
     pub sprint_id: Option<u32>,
     /// Numeric sprint identifier (e.g. 1)
-    #[arg(
-        long = "sprint",
-        value_name = "SPRINT_ID",
-        required_unless_present = "sprint_id",
-        conflicts_with = "sprint_id"
-    )]
+    #[arg(long = "sprint", value_name = "SPRINT_ID", required_unless_present = "sprint_id", conflicts_with = "sprint_id")]
     pub sprint: Option<u32>,
     /// Friendly label for the sprint (e.g. "Sprint 42")
     #[arg(long)]
@@ -216,9 +207,7 @@ impl SprintUpdateArgs {
     }
 
     pub fn resolved_sprint_id(&self) -> u32 {
-        self.sprint
-            .or(self.sprint_id)
-            .expect("clap ensures sprint id is provided")
+        self.sprint.or(self.sprint_id).expect("clap ensures sprint id is provided")
     }
 }
 
@@ -402,19 +391,10 @@ pub struct SprintRemoveArgs {
 #[derive(Args, Debug, Default)]
 pub struct SprintDeleteArgs {
     /// Numeric sprint identifier (e.g. 1)
-    #[arg(
-        value_name = "SPRINT_ID",
-        required_unless_present = "sprint",
-        conflicts_with = "sprint"
-    )]
+    #[arg(value_name = "SPRINT_ID", required_unless_present = "sprint", conflicts_with = "sprint")]
     pub sprint_id: Option<u32>,
     /// Numeric sprint identifier (e.g. 1)
-    #[arg(
-        long = "sprint",
-        value_name = "SPRINT_ID",
-        required_unless_present = "sprint_id",
-        conflicts_with = "sprint_id"
-    )]
+    #[arg(long = "sprint", value_name = "SPRINT_ID", required_unless_present = "sprint_id", conflicts_with = "sprint_id")]
     pub sprint: Option<u32>,
     /// Confirm deletion; required with JSON output or non-interactive input
     #[arg(long)]
@@ -426,9 +406,7 @@ pub struct SprintDeleteArgs {
 
 impl SprintDeleteArgs {
     pub fn resolved_sprint_id(&self) -> u32 {
-        self.sprint
-            .or(self.sprint_id)
-            .expect("clap ensures sprint id is provided")
+        self.sprint.or(self.sprint_id).expect("clap ensures sprint id is provided")
     }
 }
 

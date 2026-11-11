@@ -66,33 +66,16 @@ struct ShimDispatch {
 
 const SHIM_MAX_BYTES: u64 = 64 * 1024;
 
-const NPM_CMD_SHIM_HEAD: [&str; 8] = [
-    "@ECHO off",
-    "GOTO start",
-    ":find_dp0",
-    "SET dp0=%~dp0",
-    "EXIT /b",
-    ":start",
-    "SETLOCAL",
-    "CALL :find_dp0",
-];
+const NPM_CMD_SHIM_HEAD: [&str; 8] = ["@ECHO off", "GOTO start", ":find_dp0", "SET dp0=%~dp0", "EXIT /b", ":start", "SETLOCAL", "CALL :find_dp0"];
 
-const NPM_CMD_SHIM_PROG_BLOCK: [&str; 6] = [
-    "IF EXIST \"%dp0%\\node.exe\" (",
-    "  SET \"_prog=%dp0%\\node.exe\"",
-    ") ELSE (",
-    "  SET \"_prog=node\"",
-    "  SET PATHEXT=%PATHEXT:;.JS;=;%",
-    ")",
-];
+const NPM_CMD_SHIM_PROG_BLOCK: [&str; 6] =
+    ["IF EXIST \"%dp0%\\node.exe\" (", "  SET \"_prog=%dp0%\\node.exe\"", ") ELSE (", "  SET \"_prog=node\"", "  SET PATHEXT=%PATHEXT:;.JS;=;%", ")"];
 
 fn build_child_command(cfg: &WrapperConfig) -> Command {
     match resolve_batch_shim(&cfg.child_program) {
         Some(dispatch) => {
             let mut cmd = Command::new(&dispatch.program);
-            cmd.args(&dispatch.leading_args)
-                .args(&cfg.child_args)
-                .args(&dispatch.trailing_args);
+            cmd.args(&dispatch.leading_args).args(&cfg.child_args).args(&dispatch.trailing_args);
             cmd
         }
         None => {
@@ -140,18 +123,10 @@ fn resolve_lotar_forwarder(lines: &[&str]) -> Option<ShimDispatch> {
         trailing_args.push(arg.to_string());
         rest = after;
     }
-    if [program, script]
-        .into_iter()
-        .chain(trailing_args.iter().map(String::as_str))
-        .any(contains_cmd_expansion)
-    {
+    if [program, script].into_iter().chain(trailing_args.iter().map(String::as_str)).any(contains_cmd_expansion) {
         return None;
     }
-    Some(ShimDispatch {
-        program: program.to_string(),
-        leading_args: vec![script.to_string()],
-        trailing_args,
-    })
+    Some(ShimDispatch { program: program.to_string(), leading_args: vec![script.to_string()], trailing_args })
 }
 
 fn contains_cmd_expansion(value: &str) -> bool {
@@ -187,22 +162,12 @@ fn resolve_npm_cmd_shim(shim_path: &Path, lines: &[&str]) -> Option<ShimDispatch
     let dir = shim_path.parent()?;
     let script = dir.join(target.replace('\\', "/"));
     let node_exe = dir.join("node.exe");
-    let program = if node_exe.is_file() {
-        node_exe.to_string_lossy().to_string()
-    } else {
-        "node".to_string()
-    };
-    Some(ShimDispatch {
-        program,
-        leading_args: vec![script.to_string_lossy().to_string()],
-        trailing_args: Vec::new(),
-    })
+    let program = if node_exe.is_file() { node_exe.to_string_lossy().to_string() } else { "node".to_string() };
+    Some(ShimDispatch { program, leading_args: vec![script.to_string_lossy().to_string()], trailing_args: Vec::new() })
 }
 
 fn parse_npm_invocation(line: &str) -> Option<&str> {
-    let rest = line
-        .strip_prefix("endLocal & goto #_undefined_# 2>NUL || ")
-        .unwrap_or(line);
+    let rest = line.strip_prefix("endLocal & goto #_undefined_# 2>NUL || ").unwrap_or(line);
     let rest = rest.strip_prefix("title %COMSPEC% & ").unwrap_or(rest);
     let rest = rest.strip_prefix("\"%_prog%\"  ")?;
     let (target, rest) = take_quoted(rest)?;
@@ -211,12 +176,7 @@ fn parse_npm_invocation(line: &str) -> Option<&str> {
         return None;
     }
     let relative = target.strip_prefix("%dp0%\\")?;
-    if relative.is_empty()
-        || relative.contains('%')
-        || relative
-            .split('\\')
-            .any(|component| component.is_empty() || component == "..")
-    {
+    if relative.is_empty() || relative.contains('%') || relative.split('\\').any(|component| component.is_empty() || component == "..") {
         return None;
     }
     Some(relative)
@@ -250,9 +210,7 @@ fn main() {
     };
 
     let mut cmd = build_child_command(&cfg);
-    cmd.stdin(Stdio::inherit())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit());
+    cmd.stdin(Stdio::inherit()).stdout(Stdio::inherit()).stderr(Stdio::inherit());
 
     if let Some(job_id) = cfg.job_id.as_ref() {
         cmd.env("LOTAR_JOB_ID", job_id);
@@ -307,9 +265,7 @@ mod tests {
     }
 
     fn modern_invocation(target: &str) -> String {
-        format!(
-            "endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & \"%_prog%\"  \"{target}\" %*"
-        )
+        format!("endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & \"%_prog%\"  \"{target}\" %*")
     }
 
     fn write_shim(dir: &std::path::Path, name: &str, content: &str) -> std::path::PathBuf {
@@ -319,11 +275,7 @@ mod tests {
     }
 
     fn parse_invocation(text: &str) -> Option<&str> {
-        parse_npm_invocation(
-            text.lines()
-                .find(|line| line.contains("%_prog%"))
-                .unwrap_or(""),
-        )
+        parse_npm_invocation(text.lines().find(|line| line.contains("%_prog%")).unwrap_or(""))
     }
 
     #[test]
@@ -352,22 +304,10 @@ mod tests {
     fn resolves_modern_npm_cmd_shim_with_spaced_dir() {
         let dir = tempfile::tempdir().unwrap();
         let target = "%dp0%\\node_modules\\@anthropic-ai\\claude-code\\cli.js";
-        let shim = write_shim(
-            dir.path(),
-            "claude.cmd",
-            &npm_shim(&modern_invocation(target), &[]),
-        );
+        let shim = write_shim(dir.path(), "claude.cmd", &npm_shim(&modern_invocation(target), &[]));
         let dispatch = resolve_batch_shim(&shim.to_string_lossy()).expect("resolves");
         assert_eq!(dispatch.program, "node");
-        assert_eq!(
-            dispatch.leading_args,
-            vec![
-                dir.path()
-                    .join("node_modules/@anthropic-ai/claude-code/cli.js")
-                    .to_string_lossy()
-                    .to_string()
-            ]
-        );
+        assert_eq!(dispatch.leading_args, vec![dir.path().join("node_modules/@anthropic-ai/claude-code/cli.js").to_string_lossy().to_string()]);
         assert_eq!(dispatch.trailing_args, Vec::<String>::new());
     }
 
@@ -376,22 +316,10 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let target = "%dp0%\\node_modules\\.bin\\_codex.cjs";
         let invocation = format!("\"%_prog%\"  \"{target}\" %*");
-        let shim = write_shim(
-            dir.path(),
-            "codex.cmd",
-            &npm_shim(&invocation, &["ENDLOCAL"]),
-        );
+        let shim = write_shim(dir.path(), "codex.cmd", &npm_shim(&invocation, &["ENDLOCAL"]));
         let dispatch = resolve_batch_shim(&shim.to_string_lossy()).expect("resolves");
         assert_eq!(dispatch.program, "node");
-        assert_eq!(
-            dispatch.leading_args,
-            vec![
-                dir.path()
-                    .join("node_modules/.bin/_codex.cjs")
-                    .to_string_lossy()
-                    .to_string()
-            ]
-        );
+        assert_eq!(dispatch.leading_args, vec![dir.path().join("node_modules/.bin/_codex.cjs").to_string_lossy().to_string()]);
         assert_eq!(dispatch.trailing_args, Vec::<String>::new());
     }
 
@@ -399,57 +327,33 @@ mod tests {
     fn resolves_npm_shim_to_bundled_node_exe_when_present() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("node.exe"), b"").unwrap();
-        let shim = write_shim(
-            dir.path(),
-            "gemini.cmd",
-            &npm_shim(&modern_invocation("%dp0%\\node_modules\\x\\cli.js"), &[]),
-        );
+        let shim = write_shim(dir.path(), "gemini.cmd", &npm_shim(&modern_invocation("%dp0%\\node_modules\\x\\cli.js"), &[]));
         let dispatch = resolve_batch_shim(&shim.to_string_lossy()).expect("resolves");
-        assert_eq!(
-            dispatch.program,
-            dir.path().join("node.exe").to_string_lossy().to_string()
-        );
+        assert_eq!(dispatch.program, dir.path().join("node.exe").to_string_lossy().to_string());
     }
 
     #[test]
     fn resolves_lotar_fixture_forwarder_with_baked_args() {
         let dir = tempfile::tempdir().unwrap();
-        let content = "@\"C:\\Program Files\\nodejs\\node.exe\" \"C:\\tools dir\\agent.mjs\" %* \"--mode\" \"copilot\" \"--gate-dir\" \"C:\\temp dir\\gate\"\r\n";
+        let content =
+            "@\"C:\\Program Files\\nodejs\\node.exe\" \"C:\\tools dir\\agent.mjs\" %* \"--mode\" \"copilot\" \"--gate-dir\" \"C:\\temp dir\\gate\"\r\n";
         let shim = write_shim(dir.path(), "agent-launcher-1.cmd", content);
         let dispatch = resolve_batch_shim(&shim.to_string_lossy()).expect("resolves");
         assert_eq!(dispatch.program, "C:\\Program Files\\nodejs\\node.exe");
-        assert_eq!(
-            dispatch.leading_args,
-            vec!["C:\\tools dir\\agent.mjs".to_string()]
-        );
-        assert_eq!(
-            dispatch.trailing_args,
-            vec![
-                "--mode".to_string(),
-                "copilot".to_string(),
-                "--gate-dir".to_string(),
-                "C:\\temp dir\\gate".to_string(),
-            ]
-        );
+        assert_eq!(dispatch.leading_args, vec!["C:\\tools dir\\agent.mjs".to_string()]);
+        assert_eq!(dispatch.trailing_args, vec!["--mode".to_string(), "copilot".to_string(), "--gate-dir".to_string(), "C:\\temp dir\\gate".to_string(),]);
     }
 
     #[test]
     fn rejects_forwarder_values_with_cmd_expansion_syntax() {
         let dir = tempfile::tempdir().unwrap();
         for (name, content) in [
-            (
-                "percent-var.cmd",
-                "@\"node\" \"a.mjs\" %* \"--gate-dir\" \"C:\\%TEMP%\\gate\"\r\n",
-            ),
+            ("percent-var.cmd", "@\"node\" \"a.mjs\" %* \"--gate-dir\" \"C:\\%TEMP%\\gate\"\r\n"),
             ("caret.cmd", "@\"node\" \"a^b.mjs\" %*\r\n"),
             ("delayed.cmd", "@\"node\" \"a.mjs\" %* \"label!\"\r\n"),
         ] {
             let shim = write_shim(dir.path(), name, content);
-            assert_eq!(
-                resolve_batch_shim(&shim.to_string_lossy()),
-                None,
-                "{name} must stay unresolved"
-            );
+            assert_eq!(resolve_batch_shim(&shim.to_string_lossy()), None, "{name} must stay unresolved");
         }
     }
 
@@ -469,36 +373,18 @@ mod tests {
         let shim = write_shim(dir.path(), "lowercase.cmd", &crlf_owned(&tampered));
         assert_eq!(resolve_batch_shim(&shim.to_string_lossy()), None);
 
-        let extra_command = npm_shim(
-            &modern_invocation("%dp0%\\node_modules\\x\\cli.js"),
-            &["ENDLOCAL", "echo injected"],
-        );
+        let extra_command = npm_shim(&modern_invocation("%dp0%\\node_modules\\x\\cli.js"), &["ENDLOCAL", "echo injected"]);
         let shim = write_shim(dir.path(), "extra.cmd", &extra_command);
         assert_eq!(resolve_batch_shim(&shim.to_string_lossy()), None);
     }
 
     #[test]
     fn rejects_unsafe_npm_shim_targets_and_invocations() {
-        assert_eq!(
-            parse_invocation("\"%_prog%\"  \"node_modules\\x.js\" %*"),
-            None
-        );
-        assert_eq!(
-            parse_invocation(&modern_invocation("%dp0%\\..\\escape.js")),
-            None
-        );
-        assert_eq!(
-            parse_invocation(&modern_invocation("%dp0%\\node_modules\\%VAR%.js")),
-            None
-        );
-        assert_eq!(
-            parse_invocation("\"%_prog%\" --shebang-arg \"%dp0%\\x.js\" %*"),
-            None
-        );
-        assert_eq!(
-            parse_invocation(&modern_invocation("%dp0%\\x.js").replace(" %*", " %* extra")),
-            None
-        );
+        assert_eq!(parse_invocation("\"%_prog%\"  \"node_modules\\x.js\" %*"), None);
+        assert_eq!(parse_invocation(&modern_invocation("%dp0%\\..\\escape.js")), None);
+        assert_eq!(parse_invocation(&modern_invocation("%dp0%\\node_modules\\%VAR%.js")), None);
+        assert_eq!(parse_invocation("\"%_prog%\" --shebang-arg \"%dp0%\\x.js\" %*"), None);
+        assert_eq!(parse_invocation(&modern_invocation("%dp0%\\x.js").replace(" %*", " %* extra")), None);
     }
 
     #[test]

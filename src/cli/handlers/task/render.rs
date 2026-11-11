@@ -33,11 +33,7 @@ pub struct PropertyExplain {
 
 impl PropertyExplain {
     pub fn new(message: impl Into<String>, placement: ExplainPlacement, level: TextLevel) -> Self {
-        Self {
-            message: message.into(),
-            placement,
-            level,
-        }
+        Self { message: message.into(), placement, level }
     }
 
     pub fn info(message: impl Into<String>, placement: ExplainPlacement) -> Self {
@@ -56,20 +52,8 @@ pub struct PropertyCurrent {
 }
 
 impl PropertyCurrent {
-    pub fn new(
-        task_id: impl Into<String>,
-        field: impl Into<String>,
-        value: Option<String>,
-        text_message: impl Into<String>,
-    ) -> Self {
-        Self {
-            task_id: task_id.into(),
-            field: field.into(),
-            value,
-            text_message: text_message.into(),
-            text_level: TextLevel::Success,
-            explain: None,
-        }
+    pub fn new(task_id: impl Into<String>, field: impl Into<String>, value: Option<String>, text_message: impl Into<String>) -> Self {
+        Self { task_id: task_id.into(), field: field.into(), value, text_message: text_message.into(), text_level: TextLevel::Success, explain: None }
     }
 
     pub fn with_explain(mut self, explain: PropertyExplain) -> Self {
@@ -220,14 +204,7 @@ impl PropertySuccess {
 }
 
 pub fn render_property_current(renderer: &OutputRenderer, payload: PropertyCurrent) {
-    let PropertyCurrent {
-        task_id,
-        field,
-        value,
-        text_message,
-        text_level,
-        explain,
-    } = payload;
+    let PropertyCurrent { task_id, field, value, text_message, text_level, explain } = payload;
 
     match renderer.format {
         OutputFormat::Json => {
@@ -236,18 +213,11 @@ pub fn render_property_current(renderer: &OutputRenderer, payload: PropertyCurre
             root.insert("task_id".to_string(), Value::String(task_id));
             // `status` is the result of the command; a task's status value
             // goes under `task_status` so the two never collide (DEV-283).
-            let field = if field == "status" {
-                "task_status".to_string()
-            } else {
-                field
-            };
+            let field = if field == "status" { "task_status".to_string() } else { field };
             root.insert(field, option_to_value(value));
             root.insert("changed".to_string(), Value::Bool(false));
             if let Some(explain_ref) = explain.as_ref() {
-                root.insert(
-                    "explain".to_string(),
-                    Value::String(explain_ref.message.clone()),
-                );
+                root.insert("explain".to_string(), Value::String(explain_ref.message.clone()));
             }
             let payload = Value::Object(root);
             renderer.emit_json(&payload);
@@ -269,16 +239,7 @@ pub fn render_property_current(renderer: &OutputRenderer, payload: PropertyCurre
 }
 
 pub fn render_property_noop(renderer: &OutputRenderer, payload: PropertyNoop) {
-    let PropertyNoop {
-        task_id,
-        field,
-        value,
-        json_message,
-        text_message,
-        text_level,
-        extra_json,
-        notice,
-    } = payload;
+    let PropertyNoop { task_id, field, value, json_message, text_message, text_level, extra_json, notice } = payload;
 
     match renderer.format {
         OutputFormat::Json => {
@@ -288,11 +249,7 @@ pub fn render_property_noop(renderer: &OutputRenderer, payload: PropertyNoop) {
             root.insert("task_id".to_string(), Value::String(task_id));
             // `status` is the result of the command; a task's status value
             // goes under `task_status` so the two never collide (DEV-283).
-            let field = if field == "status" {
-                "task_status".to_string()
-            } else {
-                field
-            };
+            let field = if field == "status" { "task_status".to_string() } else { field };
             root.insert(field, option_to_value(value));
             root.insert("changed".to_string(), Value::Bool(false));
             for (key, value) in extra_json {
@@ -314,19 +271,7 @@ pub fn render_property_noop(renderer: &OutputRenderer, payload: PropertyNoop) {
 }
 
 pub fn render_property_preview(renderer: &OutputRenderer, payload: PropertyPreview) {
-    let PropertyPreview {
-        task_id,
-        action,
-        old_field,
-        new_field,
-        old_value,
-        new_value,
-        text_message,
-        text_level,
-        json_message,
-        explain,
-        extra_json,
-    } = payload;
+    let PropertyPreview { task_id, action, old_field, new_field, old_value, new_value, text_message, text_level, json_message, explain, extra_json } = payload;
 
     match renderer.format {
         OutputFormat::Json => {
@@ -340,10 +285,7 @@ pub fn render_property_preview(renderer: &OutputRenderer, payload: PropertyPrevi
                 root.insert("message".to_string(), Value::String(message));
             }
             if let Some(explain_ref) = explain.as_ref() {
-                root.insert(
-                    "explain".to_string(),
-                    Value::String(explain_ref.message.clone()),
-                );
+                root.insert("explain".to_string(), Value::String(explain_ref.message.clone()));
             }
             for (key, value) in extra_json {
                 root.insert(key, value);
@@ -368,17 +310,7 @@ pub fn render_property_preview(renderer: &OutputRenderer, payload: PropertyPrevi
 }
 
 pub fn render_property_success(renderer: &OutputRenderer, payload: PropertySuccess) {
-    let PropertySuccess {
-        task_id,
-        json_message,
-        text_message,
-        text_level,
-        old_field,
-        new_field,
-        old_value,
-        new_value,
-        extra_json,
-    } = payload;
+    let PropertySuccess { task_id, json_message, text_message, text_level, old_field, new_field, old_value, new_value, extra_json } = payload;
 
     match renderer.format {
         OutputFormat::Json => {
@@ -410,11 +342,7 @@ fn option_to_value(value: Option<String>) -> Value {
 /// A status/assignee change held back for the ticket's running agent job
 /// (DEV-320): one line per field, `changed: false` and the `deferred`
 /// outcome in JSON.
-pub fn render_job_outcome(
-    renderer: &OutputRenderer,
-    task_id: &str,
-    outcome: &crate::api_types::JobOutcome,
-) {
+pub fn render_job_outcome(renderer: &OutputRenderer, task_id: &str, outcome: &crate::api_types::JobOutcome) {
     let lines = outcome.describe();
     match renderer.format {
         OutputFormat::Json => {

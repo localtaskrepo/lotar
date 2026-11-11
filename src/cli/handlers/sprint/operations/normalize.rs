@@ -9,11 +9,7 @@ use crate::storage::manager::Storage;
 use crate::storage::sprint::Sprint;
 use serde::Serialize;
 
-pub(crate) fn handle_normalize(
-    normalize_args: &SprintNormalizeArgs,
-    tasks_root: &Path,
-    renderer: &OutputRenderer,
-) -> Result<(), String> {
+pub(crate) fn handle_normalize(normalize_args: &SprintNormalizeArgs, tasks_root: &Path, renderer: &OutputRenderer) -> Result<(), String> {
     let mode = resolve_normalize_mode(normalize_args)?;
     let is_json = matches!(renderer.format, OutputFormat::Json);
 
@@ -79,38 +75,26 @@ pub(crate) fn handle_normalize(
     for sprint_id in target_ids {
         let path = Sprint::path_for_id(&storage.root_path, sprint_id);
         if !path.exists() {
-            let message = format!(
-                "Skipping sprint #{}; {} is missing.",
-                sprint_id,
-                path.display()
-            );
+            let message = format!("Skipping sprint #{}; {} is missing.", sprint_id, path.display());
             if is_json {
-                skipped.push(SprintNormalizeSkipPayload {
-                    sprint_id,
-                    reason: message,
-                });
+                skipped.push(SprintNormalizeSkipPayload { sprint_id, reason: message });
             } else {
                 renderer.emit_warning(&message);
             }
             continue;
         }
 
-        let original = fs::read_to_string(&path)
-            .map_err(|err| format!("Failed to read {}: {}", path.display(), err))?;
-        let mut sprint: Sprint = serde_yaml_ng::from_str(&original)
-            .map_err(|err| format!("Failed to parse sprint #{}: {}", sprint_id, err))?;
+        let original = fs::read_to_string(&path).map_err(|err| format!("Failed to read {}: {}", path.display(), err))?;
+        let mut sprint: Sprint = serde_yaml_ng::from_str(&original).map_err(|err| format!("Failed to parse sprint #{}: {}", sprint_id, err))?;
 
         let warnings = sprint.canonicalize();
-        let canonical = sprint
-            .to_yaml()
-            .map_err(|err| format!("Failed to serialize sprint #{}: {}", sprint_id, err))?;
+        let canonical = sprint.to_yaml().map_err(|err| format!("Failed to serialize sprint #{}: {}", sprint_id, err))?;
         let dirty = canonical != original;
 
         match mode {
             SprintNormalizeMode::Write => {
                 if dirty {
-                    fs::write(&path, canonical.as_bytes())
-                        .map_err(|err| format!("Failed to write {}: {}", path.display(), err))?;
+                    fs::write(&path, canonical.as_bytes()).map_err(|err| format!("Failed to write {}: {}", path.display(), err))?;
                     updated += 1;
                     updated_ids.push(sprint_id);
                     if !is_json {
@@ -124,10 +108,7 @@ pub(crate) fn handle_normalize(
                 if dirty {
                     pending_ids.push(sprint_id);
                     if !is_json {
-                        renderer.emit_warning(format_args!(
-                            "Sprint #{} requires normalization (run with --write to update).",
-                            sprint_id
-                        ));
+                        renderer.emit_warning(format_args!("Sprint #{} requires normalization (run with --write to update).", sprint_id));
                     }
                 } else if !is_json {
                     renderer.emit_info(format_args!("Sprint #{} already canonical.", sprint_id));
@@ -138,24 +119,14 @@ pub(crate) fn handle_normalize(
         if !warnings.is_empty() {
             if is_json {
                 for warning in &warnings {
-                    warning_payloads.push(SprintNormalizeWarningPayload {
-                        sprint_id,
-                        code: warning.code(),
-                        message: warning.message(),
-                    });
+                    warning_payloads.push(SprintNormalizeWarningPayload { sprint_id, code: warning.code(), message: warning.message() });
                 }
             } else {
                 for warning in warnings {
                     let warning_message = warning.message();
                     match mode {
-                        SprintNormalizeMode::Write => renderer.emit_info(format_args!(
-                            "Sprint #{} canonicalization notice: {}",
-                            sprint_id, warning_message
-                        )),
-                        SprintNormalizeMode::Check => renderer.emit_warning(format_args!(
-                            "Sprint #{} canonicalization notice: {}",
-                            sprint_id, warning_message
-                        )),
+                        SprintNormalizeMode::Write => renderer.emit_info(format_args!("Sprint #{} canonicalization notice: {}", sprint_id, warning_message)),
+                        SprintNormalizeMode::Check => renderer.emit_warning(format_args!("Sprint #{} canonicalization notice: {}", sprint_id, warning_message)),
                     }
                 }
             }
@@ -192,35 +163,22 @@ pub(crate) fn handle_normalize(
     match mode {
         SprintNormalizeMode::Write => {
             if !is_json {
-                renderer.emit_success(format_args!(
-                    "Normalization complete ({} sprint(s) processed, {} updated).",
-                    processed, updated
-                ));
+                renderer.emit_success(format_args!("Normalization complete ({} sprint(s) processed, {} updated).", processed, updated));
             }
             Ok(())
         }
         SprintNormalizeMode::Check => {
             if pending_ids.is_empty() {
                 if !is_json {
-                    renderer.emit_success(format_args!(
-                        "All {} sprint(s) already canonical.",
-                        processed
-                    ));
+                    renderer.emit_success(format_args!("All {} sprint(s) already canonical.", processed));
                 }
                 Ok(())
             } else {
-                let summary = pending_ids
-                    .iter()
-                    .map(|id| format!("#{}", id))
-                    .collect::<Vec<_>>()
-                    .join(", ");
+                let summary = pending_ids.iter().map(|id| format!("#{}", id)).collect::<Vec<_>>().join(", ");
                 if !is_json {
                     renderer.emit_warning("Sprint normalization required.");
                 }
-                Err(format!(
-                    "Sprint normalization required for: {}. Run with --write to update.",
-                    summary
-                ))
+                Err(format!("Sprint normalization required for: {}. Run with --write to update.", summary))
             }
         }
     }

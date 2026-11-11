@@ -105,10 +105,7 @@ fn select_port(
 /// or an invalid `LOTAR_PORT`) are propagated so serve fails before binding
 /// instead of silently moving ports; a merely missing optional config is the
 /// normal implicit-default case.
-fn resolve_serve_port(
-    cli_port: Option<u16>,
-    tasks_root: &Path,
-) -> Result<ServePortSelection, String> {
+fn resolve_serve_port(cli_port: Option<u16>, tasks_root: &Path) -> Result<ServePortSelection, String> {
     if let Some(port) = cli_port {
         return Ok(select_port(Some(port), None, None, None, None));
     }
@@ -116,36 +113,15 @@ fn resolve_serve_port(
     let config_override = crate::config::resolution::active_cli_port_override();
 
     let env_snapshot = crate::config::env_overrides::capture_env_override_snapshot();
-    if let Some(err) = env_snapshot
-        .report
-        .errors
-        .iter()
-        .find(|err| err.key == "server_port")
-    {
-        return Err(format!(
-            "Invalid port configured in {}: {}",
-            err.env_var, err.message
-        ));
+    if let Some(err) = env_snapshot.report.errors.iter().find(|err| err.key == "server_port") {
+        return Err(format!("Invalid port configured in {}: {}", err.env_var, err.message));
     }
-    let env = env_snapshot
-        .report
-        .applied_keys
-        .contains("server_port")
-        .then_some(env_snapshot.resolved.server_port);
+    let env = env_snapshot.report.applied_keys.contains("server_port").then_some(env_snapshot.resolved.server_port);
 
     let home_config = persistence::home_config_server_port()?;
-    let global_config = persistence::config_file_server_port(
-        &crate::utils::paths::global_config_path(tasks_root),
-        "global config",
-    )?;
+    let global_config = persistence::config_file_server_port(&crate::utils::paths::global_config_path(tasks_root), "global config")?;
 
-    Ok(select_port(
-        cli_port,
-        config_override,
-        env,
-        home_config,
-        global_config,
-    ))
+    Ok(select_port(cli_port, config_override, env, home_config, global_config))
 }
 
 // Config-file port provenance (presence + value + error policy) lives in
@@ -159,20 +135,13 @@ fn resolve_serve_port(
 /// Whether the bind address only accepts connections from this machine.
 fn is_loopback_host(host: &str) -> bool {
     let bare = host.trim().trim_start_matches('[').trim_end_matches(']');
-    bare.eq_ignore_ascii_case("localhost")
-        || bare
-            .parse::<std::net::IpAddr>()
-            .is_ok_and(|ip| ip.is_loopback())
+    bare.eq_ignore_ascii_case("localhost") || bare.parse::<std::net::IpAddr>().is_ok_and(|ip| ip.is_loopback())
 }
 
 /// Host names the server answers to besides loopback names and IP literals:
 /// the `--host` name itself (when it is a name) and every `--allow-host`.
 fn allowed_host_names(host: &str, extra: Vec<String>) -> Vec<String> {
-    let mut names: Vec<String> = extra
-        .into_iter()
-        .map(|name| name.trim().to_string())
-        .filter(|name| !name.is_empty())
-        .collect();
+    let mut names: Vec<String> = extra.into_iter().map(|name| name.trim().to_string()).filter(|name| !name.is_empty()).collect();
     let bare = host.trim().trim_start_matches('[').trim_end_matches(']');
     if bare.parse::<std::net::IpAddr>().is_err() && !bare.is_empty() {
         names.push(bare.to_string());
@@ -181,11 +150,7 @@ fn allowed_host_names(host: &str, extra: Vec<String>) -> Vec<String> {
 }
 
 fn url_host(host: &str) -> String {
-    if host.contains(':') && !host.starts_with('[') {
-        format!("[{}]", host)
-    } else {
-        host.to_string()
-    }
+    if host.contains(':') && !host.starts_with('[') { format!("[{}]", host) } else { host.to_string() }
 }
 
 /// A successfully bound serve socket plus the ports that matter for the
@@ -201,27 +166,14 @@ pub(crate) struct BoundPort {
 }
 
 impl BoundPort {
-    fn new(
-        mut listeners: Vec<TcpListener>,
-        preferred_port: u16,
-        fell_back: bool,
-    ) -> Result<Self, String> {
+    fn new(mut listeners: Vec<TcpListener>, preferred_port: u16, fell_back: bool) -> Result<Self, String> {
         if listeners.is_empty() {
             return Err("No socket was bound".to_string());
         }
         let listener = listeners.remove(0);
         let extra = listeners;
-        let actual_port = listener
-            .local_addr()
-            .map(|addr| addr.port())
-            .map_err(|err| format!("Failed to inspect the bound socket: {}", err))?;
-        Ok(Self {
-            listener,
-            extra,
-            preferred_port,
-            actual_port,
-            fell_back,
-        })
+        let actual_port = listener.local_addr().map(|addr| addr.port()).map_err(|err| format!("Failed to inspect the bound socket: {}", err))?;
+        Ok(Self { listener, extra, preferred_port, actual_port, fell_back })
     }
 }
 
@@ -233,27 +185,15 @@ impl BoundPort {
 /// failure — including permission errors and unresolvable hosts — aborts
 /// with the established `Failed to bind` error prefix. No probe/close dance
 /// happens here: the successful listener itself is kept and served on.
-fn bind_server_socket(
-    host: &str,
-    preferred_port: u16,
-    allow_fallback: bool,
-    source_note: &str,
-) -> Result<BoundPort, String> {
+fn bind_server_socket(host: &str, preferred_port: u16, allow_fallback: bool, source_note: &str) -> Result<BoundPort, String> {
     match web_server::bind_host(host, preferred_port) {
         Ok(listeners) => BoundPort::new(listeners, preferred_port, false),
         Err(err) if allow_fallback && err.kind() == std::io::ErrorKind::AddrInUse => {
-            let listener = web_server::bind_host(host, 0).map_err(|fallback_err| {
-                format!(
-                    "Failed to bind to {}:0 (fallback after port {} was in use): {}",
-                    host, preferred_port, fallback_err
-                )
-            })?;
+            let listener = web_server::bind_host(host, 0)
+                .map_err(|fallback_err| format!("Failed to bind to {}:0 (fallback after port {} was in use): {}", host, preferred_port, fallback_err))?;
             BoundPort::new(listener, preferred_port, true)
         }
-        Err(err) => Err(format!(
-            "Failed to bind to {}:{}{}: {}",
-            host, preferred_port, source_note, err
-        )),
+        Err(err) => Err(format!("Failed to bind to {}:{}{}: {}", host, preferred_port, source_note, err)),
     }
 }
 
@@ -264,29 +204,11 @@ impl CommandHandler for ServeHandler {
     type Args = ServeArgs;
     type Result = Result<(), String>;
 
-    fn execute(
-        args: Self::Args,
-        _project: Option<&str>,
-        resolver: &TasksDirectoryResolver,
-        renderer: &OutputRenderer,
-    ) -> Self::Result {
-        let ServeArgs {
-            port,
-            host,
-            open,
-            web_ui_path,
-            web_ui_embedded,
-            allow_host,
-            exit_on_upgrade,
-            ..
-        } = args;
+    fn execute(args: Self::Args, _project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Self::Result {
+        let ServeArgs { port, host, open, web_ui_path, web_ui_embedded, allow_host, exit_on_upgrade, .. } = args;
 
         // Resolve web_ui_path: CLI/env first, then fall back to global config
-        let effective_web_ui_path = web_ui_path.or_else(|| {
-            persistence::load_global_config(Some(&resolver.path))
-                .ok()
-                .and_then(|cfg| cfg.web_ui_path)
-        });
+        let effective_web_ui_path = web_ui_path.or_else(|| persistence::load_global_config(Some(&resolver.path)).ok().and_then(|cfg| cfg.web_ui_path));
 
         let selection = resolve_serve_port(port, &resolver.path)?;
         renderer.log_info(format_args!(
@@ -311,29 +233,17 @@ impl CommandHandler for ServeHandler {
         // server moves once to an OS-assigned port on the same host and says
         // so; every explicitly configured port keeps DEV-76's strict
         // fail-fast semantics.
-        let bound = bind_server_socket(
-            &host,
-            selection.port,
-            selection.source.allows_fallback(),
-            selection.source.note(),
-        )?;
+        let bound = bind_server_socket(&host, selection.port, selection.source.allows_fallback(), selection.source.note())?;
         let actual_port = bound.actual_port;
 
         if bound.fell_back {
-            renderer.emit_warning(format_args!(
-                "Default port {} is already in use on {}; serving on port {} instead",
-                bound.preferred_port, host, actual_port
-            ));
+            renderer.emit_warning(format_args!("Default port {} is already in use on {}; serving on port {} instead", bound.preferred_port, host, actual_port));
         }
 
         renderer.emit_raw_stdout(format_args!("   Host: {}", host));
         let port_line = format!("   Port: {}", actual_port);
         if crate::output::stdout_styling_enabled(&renderer.format) {
-            let styled = if bound.fell_back {
-                crate::output::ansi_bold_highlight(&port_line)
-            } else {
-                crate::output::ansi_bold(&port_line)
-            };
+            let styled = if bound.fell_back { crate::output::ansi_bold_highlight(&port_line) } else { crate::output::ansi_bold(&port_line) };
             renderer.emit_raw_stdout(format_args!("{}", styled));
         } else {
             renderer.emit_raw_stdout(format_args!("{}", port_line));
@@ -342,10 +252,7 @@ impl CommandHandler for ServeHandler {
         // parse it, so it must never carry ANSI sequences. IPv6 literals are
         // bracketed so the advertised URL is actually navigable.
         let advertised_host = url_host(&host);
-        renderer.emit_raw_stdout(format_args!(
-            "   URL: http://{}:{}",
-            advertised_host, actual_port
-        ));
+        renderer.emit_raw_stdout(format_args!("   URL: http://{}:{}", advertised_host, actual_port));
 
         if !is_loopback_host(&host) {
             renderer.emit_warning(format_args!(
@@ -363,16 +270,11 @@ impl CommandHandler for ServeHandler {
 
         if let Some(ref path) = web_config.web_ui_path {
             if web_config.embedded_only {
-                renderer.emit_raw_stdout(format_args!(
-                    "   UI: embedded (--web-ui-embedded overrides --web-ui-path)"
-                ));
+                renderer.emit_raw_stdout(format_args!("   UI: embedded (--web-ui-embedded overrides --web-ui-path)"));
             } else if path.is_dir() {
                 renderer.emit_raw_stdout(format_args!("   UI: {} (custom)", path.display()));
             } else {
-                renderer.emit_warning(format_args!(
-                    "Custom web UI path '{}' not found, using embedded UI",
-                    path.display()
-                ));
+                renderer.emit_warning(format_args!("Custom web UI path '{}' not found, using embedded UI", path.display()));
             }
         }
 
@@ -393,8 +295,7 @@ impl CommandHandler for ServeHandler {
         if exit_on_upgrade {
             // Same watcher and exit as lotar mcp's default autoreload.
             if !crate::utils::binary_watch::exit_when_replaced() {
-                renderer
-                    .emit_warning("Cannot watch the lotar binary; --exit-on-upgrade has no effect");
+                renderer.emit_warning("Cannot watch the lotar binary; --exit-on-upgrade has no effect");
             }
         }
 
@@ -422,26 +323,17 @@ fn pin_process_tasks_dir(resolver: &TasksDirectoryResolver) -> Result<(), String
 fn open_browser(url: &str) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
-        std::process::Command::new("open")
-            .arg(url)
-            .spawn()
-            .map_err(|e| e.to_string())?;
+        std::process::Command::new("open").arg(url).spawn().map_err(|e| e.to_string())?;
     }
 
     #[cfg(target_os = "linux")]
     {
-        std::process::Command::new("xdg-open")
-            .arg(url)
-            .spawn()
-            .map_err(|e| e.to_string())?;
+        std::process::Command::new("xdg-open").arg(url).spawn().map_err(|e| e.to_string())?;
     }
 
     #[cfg(target_os = "windows")]
     {
-        std::process::Command::new("cmd")
-            .args(&["/c", "start", url])
-            .spawn()
-            .map_err(|e| e.to_string())?;
+        std::process::Command::new("cmd").args(&["/c", "start", url]).spawn().map_err(|e| e.to_string())?;
     }
 
     Ok(())
@@ -462,13 +354,7 @@ mod tests {
     fn select_port_ranks_layers_by_documented_precedence() {
         // Arbitrary port numbers: the decision must never depend on the
         // built-in default value appearing (or not) in a layer.
-        let cli = select_port(
-            Some(11001),
-            Some(11002),
-            Some(11003),
-            Some(11004),
-            Some(11005),
-        );
+        let cli = select_port(Some(11001), Some(11002), Some(11003), Some(11004), Some(11005));
         assert_eq!(cli.port, 11001);
         assert_eq!(cli.source, PortSource::CliFlag);
 
@@ -518,10 +404,7 @@ mod tests {
         let over = select_port(None, Some(0), None, None, None);
         assert_eq!(over.port, 0);
         assert_eq!(over.source, PortSource::ConfigOverride);
-        assert!(
-            !over.source.allows_fallback(),
-            "explicit 0 never falls back"
-        );
+        assert!(!over.source.allows_fallback(), "explicit 0 never falls back");
     }
 
     #[test]
@@ -545,10 +428,7 @@ mod tests {
 
     #[test]
     fn bind_name_is_an_allowed_host() {
-        assert_eq!(
-            allowed_host_names("devbox.lan", vec!["proxy.example".into()]),
-            vec!["proxy.example".to_string(), "devbox.lan".to_string()]
-        );
+        assert_eq!(allowed_host_names("devbox.lan", vec!["proxy.example".into()]), vec!["proxy.example".to_string(), "devbox.lan".to_string()]);
         assert!(allowed_host_names("0.0.0.0", Vec::new()).is_empty());
     }
 
@@ -566,8 +446,7 @@ mod tests {
     #[test]
     fn bind_falls_back_to_os_port_only_when_allowed() {
         let (_holder, held) = held_ephemeral_port();
-        let bound =
-            bind_server_socket("127.0.0.1", held, true, "").expect("fallback bind must succeed");
+        let bound = bind_server_socket("127.0.0.1", held, true, "").expect("fallback bind must succeed");
         assert!(bound.fell_back);
         assert_eq!(bound.preferred_port, held);
         assert_ne!(bound.actual_port, held);
@@ -580,19 +459,10 @@ mod tests {
     #[test]
     fn bind_strict_failure_reports_failed_to_bind_with_note() {
         let (_holder, held) = held_ephemeral_port();
-        let err = bind_server_socket(
-            "127.0.0.1",
-            held,
-            false,
-            " (port set by --config server.port)",
-        )
-        .expect_err("strict bind on a held port must fail");
+        let err = bind_server_socket("127.0.0.1", held, false, " (port set by --config server.port)").expect_err("strict bind on a held port must fail");
         assert!(err.starts_with("Failed to bind"), "prefix preserved: {err}");
         assert!(err.contains(&held.to_string()), "names the port: {err}");
-        assert!(
-            err.contains("(port set by --config server.port)"),
-            "carries source note: {err}"
-        );
+        assert!(err.contains("(port set by --config server.port)"), "carries source note: {err}");
     }
 
     #[test]
@@ -615,8 +485,7 @@ mod tests {
     fn bind_non_addr_in_use_errors_never_fall_back() {
         // An unresolvable host fails for a non-AddrInUse reason; even with
         // fallback allowed the error must surface, not move ports.
-        let err = bind_server_socket("lotar-invalid-host.invalid", DEFAULT_SERVE_PORT, true, "")
-            .expect_err("invalid host must fail");
+        let err = bind_server_socket("lotar-invalid-host.invalid", DEFAULT_SERVE_PORT, true, "").expect_err("invalid host must fail");
         assert!(err.starts_with("Failed to bind"), "prefix preserved: {err}");
     }
 }

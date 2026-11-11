@@ -32,12 +32,7 @@ pub struct ServeArgs {
     /// in `LOTAR_ALLOWED_HOSTS`). Requests whose `Host` header is not
     /// localhost, an IP address, the `--host` name or one of these are
     /// rejected, which blocks DNS rebinding. `*` accepts any host.
-    #[arg(
-        long = "allow-host",
-        value_name = "NAME",
-        env = "LOTAR_ALLOWED_HOSTS",
-        value_delimiter = ','
-    )]
+    #[arg(long = "allow-host", value_name = "NAME", env = "LOTAR_ALLOWED_HOSTS", value_delimiter = ',')]
     pub allow_host: Vec<String>,
 
     /// Open browser automatically

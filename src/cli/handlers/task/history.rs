@@ -4,20 +4,10 @@ use crate::utils::project::resolve_project_input;
 use crate::workspace::TasksDirectoryResolver;
 use std::path::PathBuf;
 
-pub fn handle_history(
-    id: &str,
-    limit: usize,
-    project: Option<&str>,
-    resolver: &TasksDirectoryResolver,
-    renderer: &OutputRenderer,
-) -> Result<(), String> {
+pub fn handle_history(id: &str, limit: usize, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
     let context = resolve_task_file(id, project, resolver)?;
 
-    let commits = crate::services::audit_service::AuditService::list_commits_for_task(
-        &context.repo_root,
-        &resolver.path,
-        &context.file_repo_path,
-    )?;
+    let commits = crate::services::audit_service::AuditService::list_commits_for_task(&context.repo_root, &resolver.path, &context.file_repo_path)?;
     let limited = commits.into_iter().take(limit).collect::<Vec<_>>();
     match renderer.format {
         crate::output::OutputFormat::Json => {
@@ -48,13 +38,7 @@ pub fn handle_history(
                 renderer.emit_success("No history for this task.");
             } else {
                 for c in &limited {
-                    renderer.emit_raw_stdout(format_args!(
-                        "{}  {} <{}>  {}",
-                        c.date.to_rfc3339(),
-                        c.author,
-                        c.email,
-                        c.commit
-                    ));
+                    renderer.emit_raw_stdout(format_args!("{}  {} <{}>  {}", c.date.to_rfc3339(), c.author, c.email, c.commit));
                     if !c.message.is_empty() {
                         renderer.emit_raw_stdout(format_args!("    {}", c.message));
                     }
@@ -75,11 +59,7 @@ pub fn handle_history_by_field(
 ) -> Result<(), String> {
     let context = resolve_task_file(id, project, resolver)?;
 
-    let commits = crate::services::audit_service::AuditService::list_commits_for_task(
-        &context.repo_root,
-        &resolver.path,
-        &context.file_repo_path,
-    )?;
+    let commits = crate::services::audit_service::AuditService::list_commits_for_task(&context.repo_root, &resolver.path, &context.file_repo_path)?;
 
     #[derive(Clone)]
     struct TaskSnapshot {
@@ -91,21 +71,11 @@ pub fn handle_history_by_field(
 
     let mut snapshots: Vec<(String, TaskSnapshot)> = Vec::with_capacity(commits.len());
     for c in &commits {
-        if let Ok(content) = crate::services::audit_service::AuditService::show_file_at(
-            &context.repo_root,
-            &c.commit,
-            &c.path,
-        ) && let Ok(task) = serde_yaml_ng::from_str::<crate::storage::task::Task>(&content)
+        if let Ok(content) = crate::services::audit_service::AuditService::show_file_at(&context.repo_root, &c.commit, &c.path)
+            && let Ok(task) = serde_yaml_ng::from_str::<crate::storage::task::Task>(&content)
         {
-            snapshots.push((
-                c.commit.clone(),
-                TaskSnapshot {
-                    status: Some(task.status),
-                    priority: Some(task.priority),
-                    assignee: task.assignee,
-                    tags: task.tags,
-                },
-            ));
+            snapshots
+                .push((c.commit.clone(), TaskSnapshot { status: Some(task.status), priority: Some(task.priority), assignee: task.assignee, tags: task.tags }));
         }
     }
 
@@ -200,37 +170,18 @@ pub fn handle_diff(
     let context = resolve_task_file(id, project, resolver)?;
 
     use crate::services::audit_service::AuditService;
-    let commits = AuditService::list_commits_for_task(
-        &context.repo_root,
-        &resolver.path,
-        &context.file_repo_path,
-    )?;
-    let commit_sha = if let Some(c) = commit {
-        c
-    } else {
-        commits
-            .first()
-            .map(|c| c.commit.clone())
-            .ok_or_else(|| "No commits for this task file".to_string())?
-    };
-    let path_at = |sha: &str| {
-        AuditService::path_at_commit(&commits, sha, &context.file_repo_path).to_path_buf()
-    };
+    let commits = AuditService::list_commits_for_task(&context.repo_root, &resolver.path, &context.file_repo_path)?;
+    let commit_sha =
+        if let Some(c) = commit { c } else { commits.first().map(|c| c.commit.clone()).ok_or_else(|| "No commits for this task file".to_string())? };
+    let path_at = |sha: &str| AuditService::path_at_commit(&commits, sha, &context.file_repo_path).to_path_buf();
 
     if fields {
         let parent_commit = commits.get(1).map(|c| c.commit.clone());
-        let current =
-            AuditService::show_file_at(&context.repo_root, &commit_sha, &path_at(&commit_sha))?;
-        let prev = if let Some(pc) = parent_commit {
-            AuditService::show_file_at(&context.repo_root, &pc, &path_at(&pc)).ok()
-        } else {
-            None
-        };
+        let current = AuditService::show_file_at(&context.repo_root, &commit_sha, &path_at(&commit_sha))?;
+        let prev = if let Some(pc) = parent_commit { AuditService::show_file_at(&context.repo_root, &pc, &path_at(&pc)).ok() } else { None };
 
         let cur_task: Option<crate::storage::task::Task> = serde_yaml_ng::from_str(&current).ok();
-        let prev_task: Option<crate::storage::task::Task> = prev
-            .as_deref()
-            .and_then(|s| serde_yaml_ng::from_str(s).ok());
+        let prev_task: Option<crate::storage::task::Task> = prev.as_deref().and_then(|s| serde_yaml_ng::from_str(s).ok());
 
         let mut deltas = serde_json::Map::new();
         let mut push_change = |k: &str, old: serde_json::Value, new: serde_json::Value| {
@@ -239,71 +190,19 @@ pub fn handle_diff(
             }
         };
         if let (Some(cur), Some(prev)) = (cur_task.as_ref(), prev_task.as_ref()) {
-            push_change(
-                "title",
-                serde_json::json!(prev.title),
-                serde_json::json!(cur.title),
-            );
-            push_change(
-                "status",
-                serde_json::json!(prev.status.to_string()),
-                serde_json::json!(cur.status.to_string()),
-            );
-            push_change(
-                "priority",
-                serde_json::json!(prev.priority.to_string()),
-                serde_json::json!(cur.priority.to_string()),
-            );
-            push_change(
-                "task_type",
-                serde_json::json!(prev.task_type.to_string()),
-                serde_json::json!(cur.task_type.to_string()),
-            );
-            push_change(
-                "assignee",
-                serde_json::json!(prev.assignee),
-                serde_json::json!(cur.assignee),
-            );
-            push_change(
-                "reporter",
-                serde_json::json!(prev.reporter),
-                serde_json::json!(cur.reporter),
-            );
-            push_change(
-                "due_date",
-                serde_json::json!(prev.due_date),
-                serde_json::json!(cur.due_date),
-            );
-            push_change(
-                "effort",
-                serde_json::json!(prev.effort),
-                serde_json::json!(cur.effort),
-            );
-            push_change(
-                "tags",
-                serde_json::json!(prev.tags),
-                serde_json::json!(cur.tags),
-            );
-            push_change(
-                "description",
-                serde_json::json!(prev.description),
-                serde_json::json!(cur.description),
-            );
-            push_change(
-                "relationships",
-                serde_json::json!(prev.relationships),
-                serde_json::json!(cur.relationships),
-            );
-            push_change(
-                "custom_fields",
-                serde_json::json!(prev.custom_fields),
-                serde_json::json!(cur.custom_fields),
-            );
-            push_change(
-                "sprints",
-                serde_json::json!(prev.sprints),
-                serde_json::json!(cur.sprints),
-            );
+            push_change("title", serde_json::json!(prev.title), serde_json::json!(cur.title));
+            push_change("status", serde_json::json!(prev.status.to_string()), serde_json::json!(cur.status.to_string()));
+            push_change("priority", serde_json::json!(prev.priority.to_string()), serde_json::json!(cur.priority.to_string()));
+            push_change("task_type", serde_json::json!(prev.task_type.to_string()), serde_json::json!(cur.task_type.to_string()));
+            push_change("assignee", serde_json::json!(prev.assignee), serde_json::json!(cur.assignee));
+            push_change("reporter", serde_json::json!(prev.reporter), serde_json::json!(cur.reporter));
+            push_change("due_date", serde_json::json!(prev.due_date), serde_json::json!(cur.due_date));
+            push_change("effort", serde_json::json!(prev.effort), serde_json::json!(cur.effort));
+            push_change("tags", serde_json::json!(prev.tags), serde_json::json!(cur.tags));
+            push_change("description", serde_json::json!(prev.description), serde_json::json!(cur.description));
+            push_change("relationships", serde_json::json!(prev.relationships), serde_json::json!(cur.relationships));
+            push_change("custom_fields", serde_json::json!(prev.custom_fields), serde_json::json!(cur.custom_fields));
+            push_change("sprints", serde_json::json!(prev.sprints), serde_json::json!(cur.sprints));
         }
         let structured_available = cur_task.is_some() && prev_task.is_some();
         let result = serde_json::Value::Object(deltas);
@@ -328,15 +227,11 @@ pub fn handle_diff(
 
                 if let Some(map) = result.as_object() {
                     if map.is_empty() {
-                        renderer
-                            .emit_success("No field-level changes detected between these commits.");
+                        renderer.emit_success("No field-level changes detected between these commits.");
                         return Ok(());
                     }
 
-                    renderer.emit_info(format_args!(
-                        "Field differences for {} @ {}:",
-                        id, commit_sha
-                    ));
+                    renderer.emit_info(format_args!("Field differences for {} @ {}:", id, commit_sha));
 
                     let mut entries: Vec<_> = map.iter().collect();
                     entries.sort_by(|a, b| a.0.cmp(b.0));
@@ -345,14 +240,8 @@ pub fn handle_diff(
                             let old = obj.get("old").unwrap_or(&serde_json::Value::Null);
                             let new = obj.get("new").unwrap_or(&serde_json::Value::Null);
                             renderer.emit_raw_stdout(format_args!("{}:", field));
-                            renderer.emit_raw_stdout(format_args!(
-                                "  - old: {}",
-                                format_diff_value(old)
-                            ));
-                            renderer.emit_raw_stdout(format_args!(
-                                "  + new: {}",
-                                format_diff_value(new)
-                            ));
+                            renderer.emit_raw_stdout(format_args!("  - old: {}", format_diff_value(old)));
+                            renderer.emit_raw_stdout(format_args!("  + new: {}", format_diff_value(new)));
                         }
                     }
                 } else {
@@ -361,8 +250,7 @@ pub fn handle_diff(
             }
         }
     } else {
-        let patch =
-            AuditService::show_file_diff(&context.repo_root, &commit_sha, &path_at(&commit_sha))?;
+        let patch = AuditService::show_file_diff(&context.repo_root, &commit_sha, &path_at(&commit_sha))?;
         match renderer.format {
             crate::output::OutputFormat::Json => {
                 let obj = serde_json::json!({
@@ -408,33 +296,16 @@ fn format_diff_value(value: &serde_json::Value) -> String {
                 buffer
             }
         }
-        serde_json::Value::Object(_) => {
-            serde_json::to_string(value).unwrap_or_else(|_| "{...}".to_string())
-        }
+        serde_json::Value::Object(_) => serde_json::to_string(value).unwrap_or_else(|_| "{...}".to_string()),
     }
 }
 
-pub fn handle_at(
-    id: &str,
-    commit: &str,
-    project: Option<&str>,
-    resolver: &TasksDirectoryResolver,
-    renderer: &OutputRenderer,
-) -> Result<(), String> {
+pub fn handle_at(id: &str, commit: &str, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
     let context = resolve_task_file(id, project, resolver)?;
 
     use crate::services::audit_service::AuditService;
-    let commits = AuditService::list_commits_for_task(
-        &context.repo_root,
-        &resolver.path,
-        &context.file_repo_path,
-    )
-    .unwrap_or_default();
-    let content = AuditService::show_file_at(
-        &context.repo_root,
-        commit,
-        AuditService::path_at_commit(&commits, commit, &context.file_repo_path),
-    )?;
+    let commits = AuditService::list_commits_for_task(&context.repo_root, &resolver.path, &context.file_repo_path).unwrap_or_default();
+    let content = AuditService::show_file_at(&context.repo_root, commit, AuditService::path_at_commit(&commits, commit, &context.file_repo_path))?;
     match renderer.format {
         crate::output::OutputFormat::Json => {
             let obj = serde_json::json!({
@@ -458,21 +329,12 @@ struct TaskFileContext {
     file_repo_path: PathBuf,
 }
 
-fn resolve_task_file(
-    id: &str,
-    project: Option<&str>,
-    resolver: &TasksDirectoryResolver,
-) -> Result<TaskFileContext, String> {
+fn resolve_task_file(id: &str, project: Option<&str>, resolver: &TasksDirectoryResolver) -> Result<TaskFileContext, String> {
     // An old ID of a moved task shows the task it became (DEV-183).
     let current = crate::storage::moves::current_id(&resolver.path, id);
-    let id = if current.contains('-') {
-        current.as_str()
-    } else {
-        id
-    };
-    let default_proj = project
-        .map(|p| resolve_project_input(p, resolver.path.as_path()))
-        .unwrap_or_else(|| crate::project::get_effective_project_name(resolver));
+    let id = if current.contains('-') { current.as_str() } else { id };
+    let default_proj =
+        project.map(|p| resolve_project_input(p, resolver.path.as_path())).unwrap_or_else(|| crate::project::get_effective_project_name(resolver));
     // A bare number means a task of the current project, as everywhere
     // else (DEV-283).
     let qualified;
@@ -482,26 +344,15 @@ fn resolve_task_file(
     } else {
         id
     };
-    let proj_prefix = crate::storage::operations::StorageOperations::get_project_for_task(id)
-        .unwrap_or(default_proj.clone());
-    let file_rel = crate::storage::operations::StorageOperations::get_file_path_for_id(
-        &resolver.path.join(&proj_prefix),
-        id,
-    )
-    .ok_or_else(|| format!("Task '{id}' not found"))?;
+    let proj_prefix = crate::storage::operations::StorageOperations::get_project_for_task(id).unwrap_or(default_proj.clone());
+    let file_rel = crate::storage::operations::StorageOperations::get_file_path_for_id(&resolver.path.join(&proj_prefix), id)
+        .ok_or_else(|| format!("Task '{id}' not found"))?;
 
     let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
-    let repo_root = crate::utils::git::find_repo_root(&cwd)
-        .ok_or_else(|| "Not in a git repository".to_string())?;
+    let repo_root = crate::utils::git::find_repo_root(&cwd).ok_or_else(|| "Not in a git repository".to_string())?;
     let tasks_abs = resolver.path.clone();
-    let tasks_rel = crate::utils::git::repo_relative_path(&repo_root, &tasks_abs)
-        .unwrap_or_else(|| tasks_abs.clone());
-    let file_rel_to_repo =
-        tasks_rel.join(file_rel.strip_prefix(&resolver.path).unwrap_or(&file_rel));
+    let tasks_rel = crate::utils::git::repo_relative_path(&repo_root, &tasks_abs).unwrap_or_else(|| tasks_abs.clone());
+    let file_rel_to_repo = tasks_rel.join(file_rel.strip_prefix(&resolver.path).unwrap_or(&file_rel));
 
-    Ok(TaskFileContext {
-        project_prefix: proj_prefix,
-        repo_root,
-        file_repo_path: file_rel_to_repo,
-    })
+    Ok(TaskFileContext { project_prefix: proj_prefix, repo_root, file_repo_path: file_rel_to_repo })
 }

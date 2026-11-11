@@ -2,19 +2,11 @@ use chrono::{DateTime, Duration, Utc};
 use serde::Serialize;
 
 use crate::config::types::ResolvedConfig;
-use crate::services::sprint_analytics::{
-    SprintReviewLifecyclePayload, SprintStatusWarningPayload, SprintSummary,
-    to_status_warning_payloads,
-};
-use crate::services::sprint_metrics::{
-    SprintBurndownMetric, compute_velocity_totals, metric_label, ratio,
-};
+use crate::services::sprint_analytics::{SprintReviewLifecyclePayload, SprintStatusWarningPayload, SprintSummary, to_status_warning_payloads};
+use crate::services::sprint_metrics::{SprintBurndownMetric, compute_velocity_totals, metric_label, ratio};
 use crate::services::sprint_service::{SprintRecord, SprintService};
 use crate::services::sprint_status::{self, SprintLifecycleState};
-use crate::services::sprint_timing::{
-    duration_to_days, format_calendar_relative, format_calendar_window, resolve_calendar_end,
-    resolve_calendar_start,
-};
+use crate::services::sprint_timing::{duration_to_days, format_calendar_relative, format_calendar_window, resolve_calendar_end, resolve_calendar_start};
 use crate::storage::manager::Storage;
 
 #[cfg(feature = "schema")]
@@ -135,25 +127,14 @@ impl VelocityComputation {
                     end: entry.end.as_ref().map(|dt| dt.to_rfc3339()),
                     actual_start: entry.actual_start.as_ref().map(|dt| dt.to_rfc3339()),
                     actual_end: entry.actual_end.as_ref().map(|dt| dt.to_rfc3339()),
-                    duration_days: entry
-                        .duration
-                        .as_ref()
-                        .map(|duration| duration_to_days(*duration)),
-                    window: Some(format_calendar_window(
-                        entry.start,
-                        entry.end,
-                        entry.duration,
-                    )),
+                    duration_days: entry.duration.as_ref().map(|duration| duration_to_days(*duration)),
+                    window: Some(format_calendar_window(entry.start, entry.end, entry.duration)),
                     committed: entry.committed,
                     completed: entry.completed,
                     completion_ratio: entry.completion_ratio,
                     capacity: entry.capacity,
-                    capacity_commitment_ratio: entry
-                        .capacity
-                        .and_then(|cap| ratio(entry.committed, cap)),
-                    capacity_consumed_ratio: entry
-                        .capacity
-                        .and_then(|cap| ratio(entry.completed, cap)),
+                    capacity_commitment_ratio: entry.capacity.and_then(|cap| ratio(entry.committed, cap)),
+                    capacity_consumed_ratio: entry.capacity.and_then(|cap| ratio(entry.completed, cap)),
                     relative: entry.relative.clone(),
                     status_warnings: entry.warnings.clone(),
                 })
@@ -219,34 +200,17 @@ pub fn compute_velocity(
         let tasks = SprintService::load_tasks_for_record(storage, record);
         // Each record's tasks resolve against their own project completion
         // policy (DEV-21), so the per-task done sets are rebuilt per record.
-        let done_sets = crate::services::completion::resolve_task_done_sets(
-            storage,
-            tasks.iter().map(|(id, _)| id),
-        );
+        let done_sets = crate::services::completion::resolve_task_done_sets(storage, tasks.iter().map(|(id, _)| id));
         let totals = compute_velocity_totals(&tasks, &done_sets);
 
         let (committed, completed, capacity) = match options.metric {
-            SprintBurndownMetric::Tasks => {
-                (totals.total_tasks as f64, totals.done_tasks as f64, None)
-            }
+            SprintBurndownMetric::Tasks => (totals.total_tasks as f64, totals.done_tasks as f64, None),
             SprintBurndownMetric::Points => {
-                let capacity = record
-                    .sprint
-                    .plan
-                    .as_ref()
-                    .and_then(|plan| plan.capacity.as_ref())
-                    .and_then(|cap| cap.points)
-                    .map(|value| value as f64);
+                let capacity = record.sprint.plan.as_ref().and_then(|plan| plan.capacity.as_ref()).and_then(|cap| cap.points).map(|value| value as f64);
                 (totals.total_points, totals.done_points, capacity)
             }
             SprintBurndownMetric::Hours => {
-                let capacity = record
-                    .sprint
-                    .plan
-                    .as_ref()
-                    .and_then(|plan| plan.capacity.as_ref())
-                    .and_then(|cap| cap.hours)
-                    .map(|value| value as f64);
+                let capacity = record.sprint.plan.as_ref().and_then(|plan| plan.capacity.as_ref()).and_then(|cap| cap.hours).map(|value| value as f64);
                 (totals.total_hours, totals.done_hours, capacity)
             }
         };
@@ -255,12 +219,7 @@ pub fn compute_velocity(
         let warnings = to_status_warning_payloads(&lifecycle.warnings);
         let actual_start = lifecycle.actual_start;
         let actual_end = lifecycle.actual_end;
-        let sort_source = actual_end
-            .as_ref()
-            .or(end.as_ref())
-            .or(actual_start.as_ref())
-            .copied()
-            .unwrap_or(now);
+        let sort_source = actual_end.as_ref().or(end.as_ref()).or(actual_start.as_ref()).copied().unwrap_or(now);
 
         entries.push(VelocityEntry {
             sprint_id: record.id,
@@ -293,11 +252,7 @@ pub fn compute_velocity(
         };
     }
 
-    entries.sort_by(|a, b| {
-        b.sort_key
-            .cmp(&a.sort_key)
-            .then(b.sprint_id.cmp(&a.sprint_id))
-    });
+    entries.sort_by(|a, b| b.sort_key.cmp(&a.sort_key).then(b.sprint_id.cmp(&a.sprint_id)));
 
     let total_matching = entries.len();
     let mut truncated = false;
@@ -307,11 +262,7 @@ pub fn compute_velocity(
     }
 
     let count = entries.len();
-    let average_velocity = if count > 0 {
-        Some(entries.iter().map(|entry| entry.completed).sum::<f64>() / count as f64)
-    } else {
-        None
-    };
+    let average_velocity = if count > 0 { Some(entries.iter().map(|entry| entry.completed).sum::<f64>() / count as f64) } else { None };
     let (ratio_sum, ratio_count) = entries.iter().fold((0.0, 0usize), |acc, entry| {
         let (mut sum, mut count) = acc;
         if let Some(r) = entry.completion_ratio {
@@ -320,19 +271,7 @@ pub fn compute_velocity(
         }
         (sum, count)
     });
-    let average_completion_ratio = if ratio_count > 0 {
-        Some(ratio_sum / ratio_count as f64)
-    } else {
-        None
-    };
+    let average_completion_ratio = if ratio_count > 0 { Some(ratio_sum / ratio_count as f64) } else { None };
 
-    VelocityComputation {
-        metric: options.metric,
-        entries,
-        total_matching,
-        truncated,
-        skipped_incomplete,
-        average_velocity,
-        average_completion_ratio,
-    }
+    VelocityComputation { metric: options.metric, entries, total_matching, truncated, skipped_incomplete, average_velocity, average_completion_ratio }
 }

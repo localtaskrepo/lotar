@@ -50,8 +50,7 @@ mod git_required {
         // Enable codeowners-based assignment
         write_minimal_config(&tasks_dir, "auto.codeowners_assign: true\n");
 
-        let _guard_tasks =
-            EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
+        let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
 
         // Create a task with a custom field 'path' that matches CODEOWNERS
         let mut storage = Storage::new(&tasks_dir.clone());
@@ -64,17 +63,11 @@ mod git_required {
                     let mut map = lotar::types::CustomFields::new();
                     #[cfg(not(feature = "schema"))]
                     {
-                        map.insert(
-                            "path".to_string(),
-                            serde_yaml_ng::Value::String("src/main.rs".to_string()),
-                        );
+                        map.insert("path".to_string(), serde_yaml_ng::Value::String("src/main.rs".to_string()));
                     }
                     #[cfg(feature = "schema")]
                     {
-                        map.insert(
-                            "path".to_string(),
-                            serde_json::Value::String("src/main.rs".to_string()),
-                        );
+                        map.insert("path".to_string(), serde_json::Value::String("src/main.rs".to_string()));
                     }
                     map
                 }),
@@ -92,8 +85,7 @@ mod git_required {
 
         // Read back and verify assignee is CODEOWNERS owner 'alice'
         let storage = Storage::new(&tasks_dir);
-        let fetched = lotar::services::task_service::TaskService::get(&storage, &created.id, None)
-            .expect("get task");
+        let fetched = lotar::services::task_service::TaskService::get(&storage, &created.id, None).expect("get task");
         // Path-based matching removed; default owner should be applied
         assert_eq!(fetched.assignee.as_deref(), Some("global"));
 
@@ -112,13 +104,9 @@ mod git_required {
         init_fake_repo_with_codeowners(repo_root, "/src/** @alice\n");
 
         // Disable codeowners and set default.reporter so identity fallback is deterministic
-        write_minimal_config(
-            &tasks_dir,
-            "auto.codeowners_assign: false\ndefault.reporter: bob\n",
-        );
+        write_minimal_config(&tasks_dir, "auto.codeowners_assign: false\ndefault.reporter: bob\n");
 
-        let _guard_tasks =
-            EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
+        let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
 
         let mut storage = Storage::new(&tasks_dir.clone());
         let created = TaskService::create(
@@ -130,17 +118,11 @@ mod git_required {
                     let mut map = lotar::types::CustomFields::new();
                     #[cfg(not(feature = "schema"))]
                     {
-                        map.insert(
-                            "path".to_string(),
-                            serde_yaml_ng::Value::String("src/lib.rs".to_string()),
-                        );
+                        map.insert("path".to_string(), serde_yaml_ng::Value::String("src/lib.rs".to_string()));
                     }
                     #[cfg(feature = "schema")]
                     {
-                        map.insert(
-                            "path".to_string(),
-                            serde_json::Value::String("src/lib.rs".to_string()),
-                        );
+                        map.insert("path".to_string(), serde_json::Value::String("src/lib.rs".to_string()));
                     }
                     map
                 }),
@@ -156,8 +138,7 @@ mod git_required {
             .success();
 
         let storage = Storage::new(&tasks_dir);
-        let fetched = lotar::services::task_service::TaskService::get(&storage, &created.id, None)
-            .expect("get task");
+        let fetched = lotar::services::task_service::TaskService::get(&storage, &created.id, None).expect("get task");
         // Should fall back to identity (default.reporter 'bob')
         assert_eq!(fetched.assignee.as_deref(), Some("bob"));
 
@@ -178,8 +159,7 @@ mod git_required {
 
         write_minimal_config(&tasks_dir, "auto.codeowners_assign: true\n");
 
-        let _guard_tasks =
-            EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
+        let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
 
         let mut storage = Storage::new(&tasks_dir.clone());
         let created = TaskService::create(
@@ -191,17 +171,11 @@ mod git_required {
                     let mut map = lotar::types::CustomFields::new();
                     #[cfg(not(feature = "schema"))]
                     {
-                        map.insert(
-                            "path".to_string(),
-                            serde_yaml_ng::Value::String("src/file.rs".to_string()),
-                        );
+                        map.insert("path".to_string(), serde_yaml_ng::Value::String("src/file.rs".to_string()));
                     }
                     #[cfg(feature = "schema")]
                     {
-                        map.insert(
-                            "path".to_string(),
-                            serde_json::Value::String("src/file.rs".to_string()),
-                        );
+                        map.insert("path".to_string(), serde_json::Value::String("src/file.rs".to_string()));
                     }
                     map
                 }),
@@ -217,8 +191,7 @@ mod git_required {
             .success();
 
         let storage = Storage::new(&tasks_dir);
-        let fetched = lotar::services::task_service::TaskService::get(&storage, &created.id, None)
-            .expect("get task");
+        let fetched = lotar::services::task_service::TaskService::get(&storage, &created.id, None).expect("get task");
         // Should pick the first owner from the default owner rule
         assert_eq!(fetched.assignee.as_deref(), Some("alice"));
 
@@ -238,13 +211,9 @@ mod git_required {
         init_fake_repo_with_codeowners(repo_root, "/docs/** @docs\n");
 
         // Keep codeowners assign enabled; set default.reporter for deterministic fallback
-        write_minimal_config(
-            &tasks_dir,
-            "auto.codeowners_assign: true\ndefault.reporter: bob\n",
-        );
+        write_minimal_config(&tasks_dir, "auto.codeowners_assign: true\ndefault.reporter: bob\n");
 
-        let _guard_tasks =
-            EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
+        let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
 
         let mut storage = Storage::new(&tasks_dir.clone());
         let created = TaskService::create(
@@ -256,17 +225,11 @@ mod git_required {
                     let mut map = lotar::types::CustomFields::new();
                     #[cfg(not(feature = "schema"))]
                     {
-                        map.insert(
-                            "path".to_string(),
-                            serde_yaml_ng::Value::String("src/lib.rs".to_string()),
-                        );
+                        map.insert("path".to_string(), serde_yaml_ng::Value::String("src/lib.rs".to_string()));
                     }
                     #[cfg(feature = "schema")]
                     {
-                        map.insert(
-                            "path".to_string(),
-                            serde_json::Value::String("src/lib.rs".to_string()),
-                        );
+                        map.insert("path".to_string(), serde_json::Value::String("src/lib.rs".to_string()));
                     }
                     map
                 }),
@@ -282,8 +245,7 @@ mod git_required {
             .success();
 
         let storage = Storage::new(&tasks_dir);
-        let fetched = lotar::services::task_service::TaskService::get(&storage, &created.id, None)
-            .expect("get task");
+        let fetched = lotar::services::task_service::TaskService::get(&storage, &created.id, None).expect("get task");
         // With no matching rule and no default owner, should fall back to identity (bob)
         assert_eq!(fetched.assignee.as_deref(), Some("bob"));
 

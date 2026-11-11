@@ -27,18 +27,11 @@ fn workspace() -> Workspace {
     )
     .unwrap();
     std::fs::create_dir_all(tasks.join("WEB")).unwrap();
-    std::fs::write(
-        tasks.join("WEB/config.yml"),
-        "issue:\n  states: [Backlog, Doing, Shipped]\ndefault:\n  status: Backlog\ncustom:\n  fields: [team]\n",
-    )
-    .unwrap();
+    std::fs::write(tasks.join("WEB/config.yml"), "issue:\n  states: [Backlog, Doing, Shipped]\ndefault:\n  status: Backlog\ncustom:\n  fields: [team]\n")
+        .unwrap();
     std::fs::create_dir_all(tasks.join("OPS")).unwrap();
     for num in 1..=3 {
-        write_task(
-            &tasks.join(format!("DEV/{num}.yml")),
-            &format!("Task {num}"),
-            "InProgress",
-        );
+        write_task(&tasks.join(format!("DEV/{num}.yml")), &format!("Task {num}"), "InProgress");
     }
     write_task(&tasks.join("WEB/1.yml"), "Web task", "Backlog");
     Workspace { _tmp: tmp, tasks }
@@ -48,9 +41,7 @@ fn write_task(path: &Path, title: &str, status: &str) {
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     std::fs::write(
         path,
-        format!(
-            "title: {title}\nstatus: {status}\npriority: High\ntype: Bug\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-01-01T00:00:00Z\n"
-        ),
+        format!("title: {title}\nstatus: {status}\npriority: High\ntype: Bug\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-01-01T00:00:00Z\n"),
     )
     .unwrap();
 }
@@ -65,22 +56,14 @@ fn run(ws: &Workspace, args: &[&str]) -> std::process::Output {
 
 fn ok(ws: &Workspace, args: &[&str]) -> String {
     let out = run(ws, args);
-    let text = format!(
-        "{}{}",
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr)
-    );
+    let text = format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
     assert!(out.status.success(), "{args:?}: {text}");
     text
 }
 
 fn fails(ws: &Workspace, args: &[&str]) -> String {
     let out = run(ws, args);
-    let text = format!(
-        "{}{}",
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr)
-    );
+    let text = format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
     assert!(!out.status.success(), "{args:?} should fail: {text}");
     text
 }
@@ -97,12 +80,7 @@ fn yaml(ws: &Workspace, rel: &str) -> serde_yaml_ng::Value {
 }
 
 fn listed(ws: &Workspace) -> Vec<String> {
-    let mut ids: Vec<String> = json_ok(ws, &["list"])["tasks"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|t| t["id"].as_str().unwrap().to_string())
-        .collect();
+    let mut ids: Vec<String> = json_ok(ws, &["list"])["tasks"].as_array().unwrap().iter().map(|t| t["id"].as_str().unwrap().to_string()).collect();
     ids.sort();
     ids
 }
@@ -113,17 +91,9 @@ fn move_leaves_a_stub_and_fits_values_to_the_target() {
     let preview = json_ok(&ws, &["task", "move", "DEV-3", "--to", "WEB", "--dry-run"]);
     assert_eq!(preview["moved"][0]["to"], "WEB-2");
     assert!(ws.tasks.join("DEV/3.yml").exists());
-    assert!(
-        !ws.tasks.join("WEB/2.yml").exists(),
-        "a dry run writes nothing"
-    );
+    assert!(!ws.tasks.join("WEB/2.yml").exists(), "a dry run writes nothing");
 
-    let out = ok(
-        &ws,
-        &[
-            "task", "move", "DEV-3", "--to", "WEB", "--field", "team=web",
-        ],
-    );
+    let out = ok(&ws, &["task", "move", "DEV-3", "--to", "WEB", "--field", "team=web"]);
     assert!(out.contains("Moved DEV-3 to WEB-2"), "{out}");
     // InProgress does not exist in WEB, so it falls back to WEB's default.
     assert!(out.contains("status: InProgress -> Backlog"), "{out}");
@@ -169,18 +139,10 @@ fn moves_are_refused_when_they_cannot_be_done_safely() {
     assert!(out.contains("already in project 'DEV'"), "{out}");
     let out = fails(&ws, &["task", "move", "DEV-1", "--to", "NOPE"]);
     assert!(out.contains("does not exist"), "{out}");
-    let out = fails(
-        &ws,
-        &[
-            "task", "move", "DEV-1", "--to", "WEB", "--field", "owner=me",
-        ],
-    );
+    let out = fails(&ws, &["task", "move", "DEV-1", "--to", "WEB", "--field", "owner=me"]);
     assert!(out.contains("Custom field 'owner' is not allowed"), "{out}");
     assert!(out.contains("--field name="), "{out}");
-    let out = fails(
-        &ws,
-        &["task", "move", "DEV-1", "--to", "WEB", "--status", "Todo"],
-    );
+    let out = fails(&ws, &["task", "move", "DEV-1", "--to", "WEB", "--status", "Todo"]);
     assert!(out.to_lowercase().contains("status"), "{out}");
 
     ok(&ws, &["task", "delete", "DEV-2", "--yes"]);
@@ -190,10 +152,7 @@ fn moves_are_refused_when_they_cannot_be_done_safely() {
     ok(&ws, &["task", "archive", "DEV-1"]);
     let out = fails(&ws, &["task", "move", "DEV-1", "--to", "WEB"]);
     assert!(out.contains("archived and read-only"), "{out}");
-    ok(
-        &ws,
-        &["--force-archived", "task", "move", "DEV-1", "--to", "WEB"],
-    );
+    ok(&ws, &["--force-archived", "task", "move", "DEV-1", "--to", "WEB"]);
     assert!(ws.tasks.join("WEB/@archive/2.yml").exists());
     assert_eq!(yaml(&ws, "DEV/@archive/1.yml")["moved_to"], "WEB-2");
     // Nothing was half-written by the refused attempts.
@@ -219,10 +178,7 @@ fn chains_resolve_and_moving_back_takes_the_old_number() {
 
     ok(&ws, &["task", "move", "OPS-1", "--to", "DEV"]);
     let back = yaml(&ws, "DEV/2.yml");
-    assert!(
-        back.get("moved_to").is_none(),
-        "the stub became the task again"
-    );
+    assert!(back.get("moved_to").is_none(), "the stub became the task again");
     assert!(back.get("deleted_at").is_none());
     assert_eq!(back["moved_from"].as_sequence().unwrap().len(), 2);
     assert_eq!(yaml(&ws, "OPS/1.yml")["moved_to"], "DEV-2");
@@ -240,16 +196,8 @@ fn broken_chains_and_loops_are_reported() {
     let out = fails(&ws, &["status", "DEV-1", "Done"]);
     assert!(out.contains("DEV-1"), "{out}");
 
-    std::fs::write(
-        ws.tasks.join("DEV/2.yml"),
-        "title: A\ncreated: 2026-01-01T00:00:00Z\ndeleted_at: 2026-01-01T00:00:00Z\nmoved_to: OPS-9\n",
-    )
-    .unwrap();
-    std::fs::write(
-        ws.tasks.join("OPS/9.yml"),
-        "title: B\ncreated: 2026-01-01T00:00:00Z\ndeleted_at: 2026-01-01T00:00:00Z\nmoved_to: DEV-2\n",
-    )
-    .unwrap();
+    std::fs::write(ws.tasks.join("DEV/2.yml"), "title: A\ncreated: 2026-01-01T00:00:00Z\ndeleted_at: 2026-01-01T00:00:00Z\nmoved_to: OPS-9\n").unwrap();
+    std::fs::write(ws.tasks.join("OPS/9.yml"), "title: B\ncreated: 2026-01-01T00:00:00Z\ndeleted_at: 2026-01-01T00:00:00Z\nmoved_to: DEV-2\n").unwrap();
     let out = fails(&ws, &["task", "move", "DEV-2", "--to", "WEB"]);
     assert!(out.contains("loop"), "{out}");
 }
@@ -260,24 +208,12 @@ fn request(api: &ApiServer, path: &str, body: Value) -> (u16, Value) {
         path: path.split('?').next().unwrap().into(),
         query: path
             .split_once('?')
-            .map(|(_, q)| {
-                q.split('&')
-                    .filter_map(|pair| pair.split_once('='))
-                    .map(|(k, v)| (k.to_string(), v.to_string()))
-                    .collect()
-            })
+            .map(|(_, q)| q.split('&').filter_map(|pair| pair.split_once('=')).map(|(k, v)| (k.to_string(), v.to_string())).collect())
             .unwrap_or_default(),
         headers: HashMap::new(),
-        body: if body.is_null() {
-            Vec::new()
-        } else {
-            serde_json::to_vec(&body).unwrap()
-        },
+        body: if body.is_null() { Vec::new() } else { serde_json::to_vec(&body).unwrap() },
     });
-    (
-        response.status,
-        serde_json::from_slice(&response.body).unwrap_or(Value::Null),
-    )
+    (response.status, serde_json::from_slice(&response.body).unwrap_or(Value::Null))
 }
 
 #[test]
@@ -291,22 +227,14 @@ fn rest_and_mcp_move_and_redirect() {
     let mut api = ApiServer::new();
     lotar::routes::initialize(&mut api);
 
-    let (status, body) = request(
-        &api,
-        "/api/tasks/move",
-        json!({"id": "DEV-1", "project": "WEB", "status": "Doing", "dry_run": true}),
-    );
+    let (status, body) = request(&api, "/api/tasks/move", json!({"id": "DEV-1", "project": "WEB", "status": "Doing", "dry_run": true}));
     assert_eq!(status, 200, "{body}");
     assert_eq!(body["data"]["to"], "WEB-2");
     assert_eq!(body["data"]["dry_run"], true);
     assert_eq!(body["data"]["task"]["status"], "Doing");
     assert!(!ws.tasks.join("WEB/2.yml").exists());
 
-    let (status, body) = request(
-        &api,
-        "/api/tasks/move",
-        json!({"id": "DEV-1", "project": "WEB", "status": "Doing"}),
-    );
+    let (status, body) = request(&api, "/api/tasks/move", json!({"id": "DEV-1", "project": "WEB", "status": "Doing"}));
     assert_eq!(status, 200, "{body}");
     assert_eq!(body["data"]["task"]["id"], "WEB-2");
     assert_eq!(body["data"]["task"]["moved_from"][0], "DEV-1");
@@ -315,23 +243,12 @@ fn rest_and_mcp_move_and_redirect() {
     let (status, body) = request(&api, "/api/tasks/get?id=DEV-1", Value::Null);
     assert_eq!(status, 200, "{body}");
     assert_eq!(body["data"]["id"], "WEB-2");
-    let (status, body) = request(
-        &api,
-        "/api/tasks/update",
-        json!({"id": "DEV-1", "title": "Renamed through the old ID"}),
-    );
+    let (status, body) = request(&api, "/api/tasks/update", json!({"id": "DEV-1", "title": "Renamed through the old ID"}));
     assert_eq!(status, 200, "{body}");
     assert_eq!(body["data"]["id"], "WEB-2");
-    assert_eq!(
-        yaml(&ws, "WEB/2.yml")["title"],
-        "Renamed through the old ID"
-    );
+    assert_eq!(yaml(&ws, "WEB/2.yml")["title"], "Renamed through the old ID");
 
-    let (status, body) = request(
-        &api,
-        "/api/tasks/move",
-        json!({"id": "DEV-2", "project": "WEB", "custom_fields": {"owner": "me"}}),
-    );
+    let (status, body) = request(&api, "/api/tasks/move", json!({"id": "DEV-2", "project": "WEB", "custom_fields": {"owner": "me"}}));
     assert_eq!(status, 400, "{body}");
 
     let call = |name: &str, arguments: Value| -> Value {
@@ -356,20 +273,11 @@ fn git(ws: &Workspace, args: &[&str]) {
     let out = std::process::Command::new("git")
         .current_dir(ws.tasks.parent().unwrap())
         .args(["-c", "user.name=Tester", "-c", "user.email=t@example.com"])
-        .args([
-            "-c",
-            "commit.gpgsign=false",
-            "-c",
-            "core.hooksPath=/dev/null",
-        ])
+        .args(["-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null"])
         .args(args)
         .output()
         .unwrap();
-    assert!(
-        out.status.success(),
-        "git {args:?}: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
+    assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
 }
 
 #[test]
@@ -377,30 +285,14 @@ fn sprints_relationships_and_search_follow_moved_tasks() {
     let ws = workspace();
     ok(&ws, &["sprint", "create", "--label", "Now"]);
     ok(&ws, &["sprint", "add", "--sprint", "1", "DEV-1"]);
-    ok(
-        &ws,
-        &[
-            "task",
-            "relationships",
-            "add",
-            "DEV-2",
-            "DEV-1",
-            "--kind",
-            "depends-on",
-        ],
-    );
+    ok(&ws, &["task", "relationships", "add", "DEV-2", "DEV-1", "--kind", "depends-on"]);
     ok(&ws, &["task", "move", "DEV-1", "--to", "WEB"]);
 
     // The sprint file still says DEV-1, but the task is a member as WEB-2.
     let sprint = std::fs::read_to_string(ws.tasks.join("@sprints/1.yml")).unwrap();
     assert!(sprint.contains("DEV-1"), "{sprint}");
     let in_sprint = json_ok(&ws, &["list", "sprint:1"]);
-    let ids: Vec<&str> = in_sprint["tasks"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|t| t["id"].as_str().unwrap())
-        .collect();
+    let ids: Vec<&str> = in_sprint["tasks"].as_array().unwrap().iter().map(|t| t["id"].as_str().unwrap()).collect();
     assert_eq!(ids, ["WEB-2"], "{in_sprint}");
     // Adding it again by its new ID does not list it twice.
     let out = ok(&ws, &["sprint", "add", "--sprint", "1", "WEB-2"]);
@@ -412,26 +304,15 @@ fn sprints_relationships_and_search_follow_moved_tasks() {
     assert!(!sprint.contains("DEV-1"), "{sprint}");
 
     // DEV-2 still stores DEV-1; the graph treats it as WEB-2 and sees no problem.
-    assert_eq!(
-        yaml(&ws, "DEV/2.yml")["relationships"]["depends_on"][0],
-        "DEV-1"
-    );
+    assert_eq!(yaml(&ws, "DEV/2.yml")["relationships"]["depends_on"][0], "DEV-1");
     let check = ok(&ws, &["task", "relationships", "check"]);
-    assert!(
-        !check.contains("missing") && !check.contains("deleted"),
-        "{check}"
-    );
+    assert!(!check.contains("missing") && !check.contains("deleted"), "{check}");
     let deps = ok(&ws, &["task", "relationships", "DEV-2"]);
     assert!(deps.contains("WEB-2") || deps.contains("DEV-1"), "{deps}");
 
     // Searching the old ID finds the moved task, not the stub.
     let found = json_ok(&ws, &["list", "DEV-1"]);
-    let ids: Vec<&str> = found["tasks"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|t| t["id"].as_str().unwrap())
-        .collect();
+    let ids: Vec<&str> = found["tasks"].as_array().unwrap().iter().map(|t| t["id"].as_str().unwrap()).collect();
     assert_eq!(ids.first(), Some(&"WEB-2"), "{found}");
     assert!(!ids.contains(&"DEV-1"));
     // The trash does not show the stub either.
@@ -457,10 +338,7 @@ fn history_spans_the_move_and_hand_moves_can_be_recorded() {
         assert!(text.contains(message), "{message}: {text}");
     }
     // The old ID shows the same history.
-    assert_eq!(
-        json_ok(&ws, &["task", "history", "DEV-1"])["items"],
-        history["items"]
-    );
+    assert_eq!(json_ok(&ws, &["task", "history", "DEV-1"])["items"], history["items"]);
 
     // A move made by hand: the file is renamed outside LoTaR.
     std::fs::rename(ws.tasks.join("DEV/3.yml"), ws.tasks.join("OPS/7.yml")).unwrap();

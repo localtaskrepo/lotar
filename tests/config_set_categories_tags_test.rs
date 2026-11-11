@@ -19,49 +19,18 @@ fn config_set_global_custom_fields_and_tags() {
         .args(["config", "set", "categories", "Feat,Bug,Chore", "--global"])
         .assert()
         .failure()
-        .stderr(
-            predicate::str::contains("Invalid global config field")
-                .and(predicate::str::contains("'categories'")),
-        );
+        .stderr(predicate::str::contains("Invalid global config field").and(predicate::str::contains("'categories'")));
+
+    crate::common::lotar_cmd().unwrap().current_dir(temp.path()).args(["config", "set", "tags", r#"["team","backend","ui"]"#, "--global"]).assert().success();
 
     crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
-        .args([
-            "config",
-            "set",
-            "tags",
-            r#"["team","backend","ui"]"#,
-            "--global",
-        ])
+        .args(["config", "set", "custom_fields", r#"["product","component"]"#, "--global"])
         .assert()
         .success();
 
-    crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(temp.path())
-        .args([
-            "config",
-            "set",
-            "custom_fields",
-            r#"["product","component"]"#,
-            "--global",
-        ])
-        .assert()
-        .success();
-
-    crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(temp.path())
-        .args([
-            "config",
-            "set",
-            "default_tags",
-            r#"["team","ui"]"#,
-            "--global",
-        ])
-        .assert()
-        .success();
+    crate::common::lotar_cmd().unwrap().current_dir(temp.path()).args(["config", "set", "default_tags", r#"["team","ui"]"#, "--global"]).assert().success();
 
     // Normalize and check canonical output contains the values
     crate::common::lotar_cmd()
@@ -81,11 +50,7 @@ fn config_set_global_custom_fields_and_tags() {
                 .and(predicate::str::contains("- backend"))
                 .and(predicate::str::contains("- ui"))
                 .and(predicate::str::contains("default:"))
-                .and(
-                    predicate::str::contains("tags:")
-                        .and(predicate::str::contains("- team"))
-                        .and(predicate::str::contains("- ui")),
-                )
+                .and(predicate::str::contains("tags:").and(predicate::str::contains("- team")).and(predicate::str::contains("- ui")))
                 .and(predicate::str::contains("product")),
         );
 
@@ -100,11 +65,7 @@ fn config_set_project_custom_fields_and_tags() {
     std::fs::create_dir_all(&tasks_dir).unwrap();
 
     // Minimal global so project parsing works
-    std::fs::write(
-        tasks_dir.join("config.yml"),
-        "issue.states: [Todo]\nissue.types: [Feature]\nissue.priorities: [Low, Medium]\n",
-    )
-    .unwrap();
+    std::fs::write(tasks_dir.join("config.yml"), "issue.states: [Todo]\nissue.types: [Feature]\nissue.priorities: [Low, Medium]\n").unwrap();
 
     // Create project directory
     let proj_dir = tasks_dir.join("TEST");
@@ -115,12 +76,7 @@ fn config_set_project_custom_fields_and_tags() {
     let _silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
 
     // Use global default_project to enable project set without explicit --project
-    crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(temp.path())
-        .args(["config", "set", "default_project", "TEST", "--global"])
-        .assert()
-        .success();
+    crate::common::lotar_cmd().unwrap().current_dir(temp.path()).args(["config", "set", "default_project", "TEST", "--global"]).assert().success();
 
     // Now set project-scoped fields (no --global)
     crate::common::lotar_cmd()
@@ -129,31 +85,13 @@ fn config_set_project_custom_fields_and_tags() {
         .args(["config", "set", "categories", "Feat,Bugfix"])
         .assert()
         .failure()
-        .stderr(
-            predicate::str::contains("Invalid project config field")
-                .and(predicate::str::contains("'categories'")),
-        );
+        .stderr(predicate::str::contains("Invalid project config field").and(predicate::str::contains("'categories'")));
 
-    crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(temp.path())
-        .args(["config", "set", "tags", r#"["team","backend"]"#])
-        .assert()
-        .success();
+    crate::common::lotar_cmd().unwrap().current_dir(temp.path()).args(["config", "set", "tags", r#"["team","backend"]"#]).assert().success();
 
-    crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(temp.path())
-        .args(["config", "set", "custom_fields", r#"["product","feature"]"#])
-        .assert()
-        .success();
+    crate::common::lotar_cmd().unwrap().current_dir(temp.path()).args(["config", "set", "custom_fields", r#"["product","feature"]"#]).assert().success();
 
-    crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(temp.path())
-        .args(["config", "set", "default_tags", "team"])
-        .assert()
-        .success();
+    crate::common::lotar_cmd().unwrap().current_dir(temp.path()).args(["config", "set", "default_tags", "team"]).assert().success();
 
     // Normalize project and verify
     crate::common::lotar_cmd()
@@ -166,39 +104,18 @@ fn config_set_project_custom_fields_and_tags() {
     let contents = std::fs::read_to_string(proj_dir.join("config.yml")).unwrap();
     let doc: serde_yaml_ng::Value = serde_yaml_ng::from_str(&contents).expect("valid yaml");
 
-    let custom_fields = doc
-        .get("custom")
-        .and_then(|v| v.get("fields"))
-        .and_then(|v| v.as_sequence())
-        .expect("custom.fields present");
-    let field_names: Vec<String> = custom_fields
-        .iter()
-        .filter_map(|v| v.as_str().map(|s| s.to_string()))
-        .collect();
+    let custom_fields = doc.get("custom").and_then(|v| v.get("fields")).and_then(|v| v.as_sequence()).expect("custom.fields present");
+    let field_names: Vec<String> = custom_fields.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect();
     assert!(field_names.contains(&"product".to_string()));
     assert!(field_names.contains(&"feature".to_string()));
 
-    let issue_tags = doc
-        .get("issue")
-        .and_then(|v| v.get("tags"))
-        .and_then(|v| v.as_sequence())
-        .expect("issue.tags present");
-    let tag_names: Vec<String> = issue_tags
-        .iter()
-        .filter_map(|v| v.as_str().map(|s| s.to_string()))
-        .collect();
+    let issue_tags = doc.get("issue").and_then(|v| v.get("tags")).and_then(|v| v.as_sequence()).expect("issue.tags present");
+    let tag_names: Vec<String> = issue_tags.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect();
     assert!(tag_names.contains(&"team".to_string()));
     assert!(tag_names.contains(&"backend".to_string()));
 
-    let default_tags = doc
-        .get("default")
-        .and_then(|v| v.get("tags"))
-        .and_then(|v| v.as_sequence())
-        .expect("default.tags present");
-    let default_names: Vec<String> = default_tags
-        .iter()
-        .filter_map(|v| v.as_str().map(|s| s.to_string()))
-        .collect();
+    let default_tags = doc.get("default").and_then(|v| v.get("tags")).and_then(|v| v.as_sequence()).expect("default.tags present");
+    let default_names: Vec<String> = default_tags.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect();
     assert!(default_names.contains(&"team".to_string()));
     assert!(doc.get("issue").and_then(|v| v.get("categories")).is_none());
 

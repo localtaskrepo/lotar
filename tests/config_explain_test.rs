@@ -11,30 +11,12 @@ fn config_show_explain_includes_sources() {
     let _guard = EnvVarGuard::set("LOTAR_DEFAULT_REPORTER", "env.reporter@example.com");
 
     let mut cmd = crate::common::lotar_cmd().unwrap();
-    let output = cmd
-        .current_dir(temp_dir)
-        .arg("config")
-        .arg("show")
-        .arg("--explain")
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
+    let output = cmd.current_dir(temp_dir).arg("config").arg("show").arg("--explain").assert().success().get_output().stdout.clone();
 
     let stdout = String::from_utf8_lossy(&output);
-    assert!(
-        stdout.contains("Global configuration – canonical YAML:"),
-        "explain output should include global heading\n{stdout}"
-    );
-    assert!(
-        stdout.contains("default:"),
-        "canonical YAML should include default section when explaining overrides\n{stdout}"
-    );
-    assert!(
-        stdout.contains("reporter: env.reporter@example.com # (env)"),
-        "explain output should annotate env reporter\n{stdout}"
-    );
+    assert!(stdout.contains("Global configuration – canonical YAML:"), "explain output should include global heading\n{stdout}");
+    assert!(stdout.contains("default:"), "canonical YAML should include default section when explaining overrides\n{stdout}");
+    assert!(stdout.contains("reporter: env.reporter@example.com # (env)"), "explain output should annotate env reporter\n{stdout}");
 
     // restored by guard on drop
 }

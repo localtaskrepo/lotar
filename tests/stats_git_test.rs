@@ -12,11 +12,7 @@ fn run_git(repo: &std::path::Path, args: &[&str], envs: &[(&str, &str)]) {
     }
     let out = cmd.output().expect("failed to run git");
     if !out.status.success() {
-        panic!(
-            "git {:?} failed: {}",
-            args,
-            String::from_utf8_lossy(&out.stderr)
-        );
+        panic!("git {:?} failed: {}", args, String::from_utf8_lossy(&out.stderr));
     }
 }
 
@@ -39,13 +35,7 @@ fn normalize_status_key(value: &str) -> String {
     value.to_ascii_lowercase().replace(['_', '-', ' '], "")
 }
 
-fn add_and_commit(
-    repo: &std::path::Path,
-    rel: &str,
-    author: (&str, &str),
-    date_rfc3339: &str,
-    message: &str,
-) {
+fn add_and_commit(repo: &std::path::Path, rel: &str, author: (&str, &str), date_rfc3339: &str, message: &str) {
     run_git(repo, &["add", rel], &[]);
     let envs = [
         ("GIT_AUTHOR_NAME", author.0),
@@ -76,18 +66,8 @@ mod git_required {
         // Setup project and task
         write_file(root, ".tasks/TEST/config.yml", "project_name: TEST\n");
         // Initial commit at 2025-08-01T10:00Z - status TODO
-        write_file(
-            root,
-            ".tasks/TEST/1.yml",
-            "title: One\nstatus: Todo\npriority: Medium\ncreated: 2025-08-01T10:00:00Z\nmodified: 2025-08-01T10:00:00Z\n",
-        );
-        add_and_commit(
-            root,
-            ".tasks/TEST/1.yml",
-            ("Alice", "alice@example.com"),
-            "2025-08-01T10:00:00Z",
-            "add 1",
-        );
+        write_file(root, ".tasks/TEST/1.yml", "title: One\nstatus: Todo\npriority: Medium\ncreated: 2025-08-01T10:00:00Z\nmodified: 2025-08-01T10:00:00Z\n");
+        add_and_commit(root, ".tasks/TEST/1.yml", ("Alice", "alice@example.com"), "2025-08-01T10:00:00Z", "add 1");
 
         // Move to IN_PROGRESS at 2025-08-10T09:00Z
         write_file(
@@ -95,71 +75,33 @@ mod git_required {
             ".tasks/TEST/1.yml",
             "title: One\nstatus: InProgress\npriority: Medium\ncreated: 2025-08-01T10:00:00Z\nmodified: 2025-08-10T09:00:00Z\n",
         );
-        add_and_commit(
-            root,
-            ".tasks/TEST/1.yml",
-            ("Bob", "bob@example.com"),
-            "2025-08-10T09:00:00Z",
-            "progress",
-        );
+        add_and_commit(root, ".tasks/TEST/1.yml", ("Bob", "bob@example.com"), "2025-08-10T09:00:00Z", "progress");
 
         // Move to DONE at 2025-08-17T12:00Z
-        write_file(
-            root,
-            ".tasks/TEST/1.yml",
-            "title: One\nstatus: Done\npriority: Medium\ncreated: 2025-08-01T10:00:00Z\nmodified: 2025-08-17T12:00:00Z\n",
-        );
-        add_and_commit(
-            root,
-            ".tasks/TEST/1.yml",
-            ("Alice", "alice@example.com"),
-            "2025-08-17T12:00:00Z",
-            "done",
-        );
+        write_file(root, ".tasks/TEST/1.yml", "title: One\nstatus: Done\npriority: Medium\ncreated: 2025-08-01T10:00:00Z\nmodified: 2025-08-17T12:00:00Z\n");
+        add_and_commit(root, ".tasks/TEST/1.yml", ("Alice", "alice@example.com"), "2025-08-17T12:00:00Z", "done");
 
         // Query time-in-status in a window up to 2025-08-18T00:00Z (global scope)
         let output = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(root)
-            .args([
-                "--format",
-                "json",
-                "stats",
-                "time-in-status",
-                "--since",
-                "2025-08-01T00:00:00Z",
-                "--until",
-                "2025-08-18T00:00:00Z",
-                "--global",
-            ])
+            .args(["--format", "json", "stats", "time-in-status", "--since", "2025-08-01T00:00:00Z", "--until", "2025-08-18T00:00:00Z", "--global"])
             .output()
             .unwrap();
-        assert!(
-            output.status.success(),
-            "stats time-in-status failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
+        assert!(output.status.success(), "stats time-in-status failed: {}", String::from_utf8_lossy(&output.stderr));
 
         let v: Value = serde_json::from_slice(&output.stdout).unwrap();
         assert_eq!(v["status"], "ok");
         let items = v["items"].as_array().unwrap();
         assert!(!items.is_empty());
         // Find TEST-1
-        let my = items
-            .iter()
-            .find(|it| it["id"].as_str() == Some("TEST-1"))
-            .expect("missing TEST-1 in results");
+        let my = items.iter().find(|it| it["id"].as_str() == Some("TEST-1")).expect("missing TEST-1 in results");
 
         let rows = my["items"].as_array().unwrap();
         let get_secs = |name: &str| -> i64 {
             let expect_key = normalize_status_key(name);
             rows.iter()
-                .find(|r| {
-                    r["status"]
-                        .as_str()
-                        .map(|status| normalize_status_key(status) == expect_key)
-                        .unwrap_or(false)
-                })
+                .find(|r| r["status"].as_str().map(|status| normalize_status_key(status) == expect_key).unwrap_or(false))
                 .and_then(|r| r["seconds"].as_i64())
                 .unwrap_or(0)
         };
@@ -181,18 +123,8 @@ mod git_required {
         // Setup project and task
         write_file(root, ".tasks/TEST/config.yml", "project_name: TEST\n");
         // Initial commit at 2025-08-01T10:00Z - status Todo (PascalCase)
-        write_file(
-            root,
-            ".tasks/TEST/1.yml",
-            "title: One\nstatus: Todo\npriority: Medium\ncreated: 2025-08-01T10:00:00Z\nmodified: 2025-08-01T10:00:00Z\n",
-        );
-        add_and_commit(
-            root,
-            ".tasks/TEST/1.yml",
-            ("Alice", "alice@example.com"),
-            "2025-08-01T10:00:00Z",
-            "add 1",
-        );
+        write_file(root, ".tasks/TEST/1.yml", "title: One\nstatus: Todo\npriority: Medium\ncreated: 2025-08-01T10:00:00Z\nmodified: 2025-08-01T10:00:00Z\n");
+        add_and_commit(root, ".tasks/TEST/1.yml", ("Alice", "alice@example.com"), "2025-08-01T10:00:00Z", "add 1");
 
         // Move to IN_PROGRESS at 2025-08-10T09:00Z
         write_file(
@@ -200,51 +132,20 @@ mod git_required {
             ".tasks/TEST/1.yml",
             "title: One\nstatus: InProgress\npriority: Medium\ncreated: 2025-08-01T10:00:00Z\nmodified: 2025-08-10T09:00:00Z\n",
         );
-        add_and_commit(
-            root,
-            ".tasks/TEST/1.yml",
-            ("Bob", "bob@example.com"),
-            "2025-08-10T09:00:00Z",
-            "progress",
-        );
+        add_and_commit(root, ".tasks/TEST/1.yml", ("Bob", "bob@example.com"), "2025-08-10T09:00:00Z", "progress");
 
         // Move to DONE at 2025-08-17T12:00Z
-        write_file(
-            root,
-            ".tasks/TEST/1.yml",
-            "title: One\nstatus: Done\npriority: Medium\ncreated: 2025-08-01T10:00:00Z\nmodified: 2025-08-17T12:00:00Z\n",
-        );
-        add_and_commit(
-            root,
-            ".tasks/TEST/1.yml",
-            ("Alice", "alice@example.com"),
-            "2025-08-17T12:00:00Z",
-            "done",
-        );
+        write_file(root, ".tasks/TEST/1.yml", "title: One\nstatus: Done\npriority: Medium\ncreated: 2025-08-01T10:00:00Z\nmodified: 2025-08-17T12:00:00Z\n");
+        add_and_commit(root, ".tasks/TEST/1.yml", ("Alice", "alice@example.com"), "2025-08-17T12:00:00Z", "done");
 
         // Query per-ticket time-in-status
         let output = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(root)
-            .args([
-                "--format",
-                "json",
-                "stats",
-                "status",
-                "TEST-1",
-                "--time-in-status",
-                "--since",
-                "2025-08-01T00:00:00Z",
-                "--until",
-                "2025-08-18T00:00:00Z",
-            ])
+            .args(["--format", "json", "stats", "status", "TEST-1", "--time-in-status", "--since", "2025-08-01T00:00:00Z", "--until", "2025-08-18T00:00:00Z"])
             .output()
             .unwrap();
-        assert!(
-            output.status.success(),
-            "stats status --time-in-status failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
+        assert!(output.status.success(), "stats status --time-in-status failed: {}", String::from_utf8_lossy(&output.stderr));
 
         let v: Value = serde_json::from_slice(&output.stdout).unwrap();
         assert_eq!(v["status"], "ok");
@@ -256,12 +157,7 @@ mod git_required {
         let get_secs = |name: &str| -> i64 {
             let expect_key = normalize_status_key(name);
             rows.iter()
-                .find(|r| {
-                    r["status"]
-                        .as_str()
-                        .map(|status| normalize_status_key(status) == expect_key)
-                        .unwrap_or(false)
-                })
+                .find(|r| r["status"].as_str().map(|status| normalize_status_key(status) == expect_key).unwrap_or(false))
                 .and_then(|r| r["seconds"].as_i64())
                 .unwrap_or(0)
         };
@@ -287,39 +183,21 @@ mod git_required {
             ".tasks/TEST/1.yml",
             "title: One\nassignee: Alice\nstatus: TODO\npriority: MEDIUM\neffort: 4h\ncreated: 2025-08-10T10:00:00Z\nmodified: 2025-08-10T10:00:00Z\n",
         );
-        add_and_commit(
-            root,
-            ".tasks/TEST/1.yml",
-            ("Alice", "alice@example.com"),
-            "2025-08-10T10:00:00Z",
-            "add 1",
-        );
+        add_and_commit(root, ".tasks/TEST/1.yml", ("Alice", "alice@example.com"), "2025-08-10T10:00:00Z", "add 1");
         // Change status to IN_PROGRESS inside window; keep effort
         write_file(
             root,
             ".tasks/TEST/1.yml",
             "title: One\nassignee: Alice\nstatus: IN_PROGRESS\npriority: MEDIUM\neffort: 4h\ncreated: 2025-08-10T10:00:00Z\nmodified: 2025-08-12T09:00:00Z\n",
         );
-        add_and_commit(
-            root,
-            ".tasks/TEST/1.yml",
-            ("Bob", "bob@example.com"),
-            "2025-08-12T09:00:00Z",
-            "move to in_progress",
-        );
+        add_and_commit(root, ".tasks/TEST/1.yml", ("Bob", "bob@example.com"), "2025-08-12T09:00:00Z", "move to in_progress");
         // Later change to DONE (outside the query until)
         write_file(
             root,
             ".tasks/TEST/1.yml",
             "title: One\nassignee: Alice\nstatus: DONE\npriority: MEDIUM\neffort: 4h\ncreated: 2025-08-10T10:00:00Z\nmodified: 2025-08-16T12:00:00Z\n",
         );
-        add_and_commit(
-            root,
-            ".tasks/TEST/1.yml",
-            ("Alice", "alice@example.com"),
-            "2025-08-16T12:00:00Z",
-            "done 1",
-        );
+        add_and_commit(root, ".tasks/TEST/1.yml", ("Alice", "alice@example.com"), "2025-08-16T12:00:00Z", "done 1");
 
         // TEST-2: transitions to IN_PROGRESS before window (should be excluded)
         write_file(
@@ -327,25 +205,13 @@ mod git_required {
             ".tasks/TEST/2.yml",
             "title: Two\nassignee: Bob\nstatus: TODO\npriority: LOW\neffort: 2h\ncreated: 2025-08-05T11:00:00Z\nmodified: 2025-08-05T11:00:00Z\n",
         );
-        add_and_commit(
-            root,
-            ".tasks/TEST/2.yml",
-            ("Bob", "bob@example.com"),
-            "2025-08-05T11:00:00Z",
-            "add 2",
-        );
+        add_and_commit(root, ".tasks/TEST/2.yml", ("Bob", "bob@example.com"), "2025-08-05T11:00:00Z", "add 2");
         write_file(
             root,
             ".tasks/TEST/2.yml",
             "title: Two\nassignee: Bob\nstatus: IN_PROGRESS\npriority: LOW\neffort: 2h\ncreated: 2025-08-05T11:00:00Z\nmodified: 2025-08-09T08:00:00Z\n",
         );
-        add_and_commit(
-            root,
-            ".tasks/TEST/2.yml",
-            ("Bob", "bob@example.com"),
-            "2025-08-09T08:00:00Z",
-            "move 2 to in_progress (before window)",
-        );
+        add_and_commit(root, ".tasks/TEST/2.yml", ("Bob", "bob@example.com"), "2025-08-09T08:00:00Z", "move 2 to in_progress (before window)");
 
         // TEST-3: transitions to DONE inside window (filter asks for IN_PROGRESS, should be excluded)
         write_file(
@@ -353,25 +219,13 @@ mod git_required {
             ".tasks/TEST/3.yml",
             "title: Three\nassignee: Carol\nstatus: TODO\npriority: LOW\neffort: 1h\ncreated: 2025-08-11T10:00:00Z\nmodified: 2025-08-11T10:00:00Z\n",
         );
-        add_and_commit(
-            root,
-            ".tasks/TEST/3.yml",
-            ("Carol", "carol@example.com"),
-            "2025-08-11T10:00:00Z",
-            "add 3",
-        );
+        add_and_commit(root, ".tasks/TEST/3.yml", ("Carol", "carol@example.com"), "2025-08-11T10:00:00Z", "add 3");
         write_file(
             root,
             ".tasks/TEST/3.yml",
             "title: Three\nassignee: Carol\nstatus: DONE\npriority: LOW\neffort: 1h\ncreated: 2025-08-11T10:00:00Z\nmodified: 2025-08-12T10:00:00Z\n",
         );
-        add_and_commit(
-            root,
-            ".tasks/TEST/3.yml",
-            ("Carol", "carol@example.com"),
-            "2025-08-12T10:00:00Z",
-            "move 3 to done (inside window)",
-        );
+        add_and_commit(root, ".tasks/TEST/3.yml", ("Carol", "carol@example.com"), "2025-08-12T10:00:00Z", "move 3 to done (inside window)");
 
         // Query: window that includes 2025-08-12 only, transitions to IN_PROGRESS
         let output = crate::common::lotar_cmd()
@@ -397,18 +251,11 @@ mod git_required {
             .output()
             .unwrap();
 
-        assert!(
-            output.status.success(),
-            "stats effort with transitions failed"
-        );
+        assert!(output.status.success(), "stats effort with transitions failed");
         let v: Value = serde_json::from_slice(&output.stdout).unwrap();
         assert_eq!(v["status"], "ok");
         let items = v["items"].as_array().unwrap();
-        assert_eq!(
-            items.len(),
-            1,
-            "expected exactly one matching group, got {items:?}"
-        );
+        assert_eq!(items.len(), 1, "expected exactly one matching group, got {items:?}");
         let hours = items[0]["hours"].as_f64().unwrap_or(0.0);
         assert!((3.99..=4.01).contains(&hours), "unexpected hours: {hours}");
     }
@@ -438,13 +285,7 @@ mod git_required {
                 modified = created_one,
             ),
         );
-        add_and_commit(
-            root,
-            ".tasks/TEST/1.yml",
-            ("Alice", "alice@example.com"),
-            &created_one,
-            "add 1",
-        );
+        add_and_commit(root, ".tasks/TEST/1.yml", ("Alice", "alice@example.com"), &created_one, "add 1");
 
         // Modify 1
         write_file(
@@ -456,13 +297,7 @@ mod git_required {
                 modified = edit_one,
             ),
         );
-        add_and_commit(
-            root,
-            ".tasks/TEST/1.yml",
-            ("Bob", "bob@example.com"),
-            &edit_one,
-            "edit 1",
-        );
+        add_and_commit(root, ".tasks/TEST/1.yml", ("Bob", "bob@example.com"), &edit_one, "edit 1");
 
         // Add 2
         write_file(
@@ -474,13 +309,7 @@ mod git_required {
                 modified = created_two,
             ),
         );
-        add_and_commit(
-            root,
-            ".tasks/TEST/2.yml",
-            ("Alice", "alice@example.com"),
-            &created_two,
-            "add 2",
-        );
+        add_and_commit(root, ".tasks/TEST/2.yml", ("Alice", "alice@example.com"), &created_two, "add 2");
 
         // Another churn for 1
         write_file(
@@ -492,21 +321,13 @@ mod git_required {
                 modified = edit_one_again,
             ),
         );
-        add_and_commit(
-            root,
-            ".tasks/TEST/1.yml",
-            ("Alice", "alice@example.com"),
-            &edit_one_again,
-            "edit 1 again",
-        );
+        add_and_commit(root, ".tasks/TEST/1.yml", ("Alice", "alice@example.com"), &edit_one_again, "edit 1 again");
 
         // stats changed (global to avoid project scope mismatch)
         let output = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(root)
-            .args([
-                "--format", "json", "stats", "changed", "--since", "120d", "--global",
-            ])
+            .args(["--format", "json", "stats", "changed", "--since", "120d", "--global"])
             .output()
             .unwrap();
         assert!(output.status.success(), "stats changed failed");
@@ -514,23 +335,14 @@ mod git_required {
         assert_eq!(v["status"], "ok");
         let items = v["items"].as_array().unwrap();
         // Should include TEST-1 and TEST-2
-        let ids: Vec<String> = items
-            .iter()
-            .map(|i| i["id"].as_str().unwrap().to_string())
-            .collect();
+        let ids: Vec<String> = items.iter().map(|i| i["id"].as_str().unwrap().to_string()).collect();
         assert!(ids.contains(&"TEST-1".to_string()));
         assert!(ids.contains(&"TEST-2".to_string()));
 
         // stats churn: TEST-1 should have the most commits (>=2 commits)
         // Use a 90-day window to ensure both commits land inside the range regardless of test execution time
-        let output = crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(root)
-            .args([
-                "--format", "json", "stats", "churn", "--since", "90d", "--global",
-            ])
-            .output()
-            .unwrap();
+        let output =
+            crate::common::lotar_cmd().unwrap().current_dir(root).args(["--format", "json", "stats", "churn", "--since", "90d", "--global"]).output().unwrap();
         assert!(output.status.success(), "stats churn failed");
         let v: Value = serde_json::from_slice(&output.stdout).unwrap();
         let items = v["items"].as_array().unwrap();
@@ -542,18 +354,13 @@ mod git_required {
         let output = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(root)
-            .args([
-                "--format", "json", "stats", "authors", "--since", "90d", "--global",
-            ])
+            .args(["--format", "json", "stats", "authors", "--since", "90d", "--global"])
             .output()
             .unwrap();
         assert!(output.status.success(), "stats authors failed");
         let v: Value = serde_json::from_slice(&output.stdout).unwrap();
         let items = v["items"].as_array().unwrap();
-        let names: Vec<String> = items
-            .iter()
-            .map(|i| i["author"].as_str().unwrap().to_string())
-            .collect();
+        let names: Vec<String> = items.iter().map(|i| i["author"].as_str().unwrap().to_string()).collect();
         assert!(names.contains(&"Alice".to_string()));
         assert!(names.contains(&"Bob".to_string()));
 
@@ -561,17 +368,7 @@ mod git_required {
         let output = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(root)
-            .args([
-                "--format",
-                "json",
-                "stats",
-                "activity",
-                "--group-by",
-                "day",
-                "--since",
-                "90d",
-                "--global",
-            ])
+            .args(["--format", "json", "stats", "activity", "--group-by", "day", "--since", "90d", "--global"])
             .output()
             .unwrap();
         assert!(output.status.success(), "stats activity day failed");
@@ -585,26 +382,13 @@ mod git_required {
         let output = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(root)
-            .args([
-                "--format",
-                "json",
-                "stats",
-                "activity",
-                "--group-by",
-                "project",
-                "--since",
-                "90d",
-                "--global",
-            ])
+            .args(["--format", "json", "stats", "activity", "--group-by", "project", "--since", "90d", "--global"])
             .output()
             .unwrap();
         assert!(output.status.success(), "stats activity project failed");
         let v: Value = serde_json::from_slice(&output.stdout).unwrap();
         let items = v["items"].as_array().unwrap();
-        let keys: Vec<String> = items
-            .iter()
-            .map(|i| i["key"].as_str().unwrap().to_string())
-            .collect();
+        let keys: Vec<String> = items.iter().map(|i| i["key"].as_str().unwrap().to_string()).collect();
         assert!(keys.contains(&"TEST".to_string()));
     }
 }

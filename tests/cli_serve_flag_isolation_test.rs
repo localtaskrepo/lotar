@@ -86,11 +86,7 @@ fn run_binary(cwd: &std::path::Path, args: &[&str]) -> (bool, String, String) {
         .args(args)
         .output()
         .expect("run lotar binary");
-    (
-        output.status.success(),
-        String::from_utf8_lossy(&output.stdout).into_owned(),
-        String::from_utf8_lossy(&output.stderr).into_owned(),
-    )
+    (output.status.success(), String::from_utf8_lossy(&output.stdout).into_owned(), String::from_utf8_lossy(&output.stderr).into_owned())
 }
 
 #[test]
@@ -98,14 +94,8 @@ fn serve_help_advertises_port_short_and_not_project_short() {
     let tmp = tempfile::tempdir().unwrap();
     let (ok, stdout, _stderr) = run_binary(tmp.path(), &["serve", "--help"]);
     assert!(ok, "serve --help must succeed");
-    assert!(
-        stdout.contains("-p <PORT>") && stdout.contains("--port <PORT>"),
-        "serve --help must advertise -p as the port short: {stdout}"
-    );
-    assert!(
-        !stdout.contains("-p, --project") && !stdout.contains("-p <PROJECT>"),
-        "serve --help must not advertise -p as the project short: {stdout}"
-    );
+    assert!(stdout.contains("-p <PORT>") && stdout.contains("--port <PORT>"), "serve --help must advertise -p as the port short: {stdout}");
+    assert!(!stdout.contains("-p, --project") && !stdout.contains("-p <PROJECT>"), "serve --help must not advertise -p as the project short: {stdout}");
 }
 
 #[test]
@@ -113,10 +103,7 @@ fn root_help_still_advertises_project_short() {
     let tmp = tempfile::tempdir().unwrap();
     let (ok, stdout, _stderr) = run_binary(tmp.path(), &["--help"]);
     assert!(ok, "lotar --help must succeed");
-    assert!(
-        stdout.contains("--project, -p <PREFIX>"),
-        "root help must keep advertising -p as the global project short: {stdout}"
-    );
+    assert!(stdout.contains("--project, -p <PREFIX>"), "root help must keep advertising -p as the global project short: {stdout}");
 }
 
 #[test]
@@ -128,14 +115,8 @@ fn serve_malformed_short_port_fails_as_a_port_error() {
     // not name the argument; the contract to pin is that the failure is a
     // value error for the port flag and is never attributed to a project
     // selector.
-    assert!(
-        stderr.to_lowercase().contains("invalid value"),
-        "failure must be an invalid-value error: {stderr}"
-    );
-    assert!(
-        !stderr.to_lowercase().contains("project"),
-        "failure must not be attributed to the project selector: {stderr}"
-    );
+    assert!(stderr.to_lowercase().contains("invalid value"), "failure must be an invalid-value error: {stderr}");
+    assert!(!stderr.to_lowercase().contains("project"), "failure must not be attributed to the project selector: {stderr}");
 }
 
 struct OwnedServeChild {
@@ -147,10 +128,7 @@ impl OwnedServeChild {
     fn stop(mut self) {
         // Test-owned teardown: stop endpoint, wake-up connection, bounded
         // wait, kill fallback, and always reap.
-        for request in [
-            "GET /__test/stop HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
-            "GET /__test/stop HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
-        ] {
+        for request in ["GET /__test/stop HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n", "GET /__test/stop HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"] {
             if let Ok(mut stream) = TcpStream::connect(("127.0.0.1", self.port)) {
                 let _ = stream.set_read_timeout(Some(Duration::from_millis(250)));
                 let _ = stream.write_all(request.as_bytes());
@@ -213,12 +191,8 @@ fn spawn_serve_port_zero(tmp: &std::path::Path, port_flag: &str, value: &str) ->
                 seen.push_str(&line);
                 seen.push('\n');
                 if let Some(rest) = line.strip_prefix("   URL: http://") {
-                    let (_host, port) = rest
-                        .rsplit_once(':')
-                        .unwrap_or_else(|| panic!("malformed readiness banner: {line}"));
-                    break port.trim().parse::<u16>().unwrap_or_else(|_| {
-                        panic!("non-numeric port in readiness banner: {line}")
-                    });
+                    let (_host, port) = rest.rsplit_once(':').unwrap_or_else(|| panic!("malformed readiness banner: {line}"));
+                    break port.trim().parse::<u16>().unwrap_or_else(|_| panic!("non-numeric port in readiness banner: {line}"));
                 }
             }
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
@@ -251,10 +225,7 @@ fn serve_short_p_port_zero_banner_reports_actual_bound_port() {
 fn serve_long_port_zero_banner_reports_actual_bound_port() {
     let tmp = tempfile::tempdir().unwrap();
     let serve = spawn_serve_port_zero(tmp.path(), "--port", "0");
-    assert!(
-        serve.port != 0,
-        "banner must report the actual bound port, got 0"
-    );
+    assert!(serve.port != 0, "banner must report the actual bound port, got 0");
     TcpStream::connect(("127.0.0.1", serve.port)).expect("connect to advertised port");
     serve.stop();
 }

@@ -8,42 +8,25 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Ok(body) => body,
             Err(response) => return response,
         };
-        let name = body
-            .get("name")
-            .and_then(|v| v.as_str())
-            .map(|s| s.trim().to_string())
-            .unwrap_or_default();
+        let name = body.get("name").and_then(|v| v.as_str()).map(|s| s.trim().to_string()).unwrap_or_default();
         if name.is_empty() {
             return bad_request("Project name is required".into());
         }
 
-        let prefix = body
-            .get("prefix")
-            .and_then(|v| v.as_str())
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty());
+        let prefix = body.get("prefix").and_then(|v| v.as_str()).map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
 
         let values_map = body.get("values").and_then(|v| v.as_object()).map(|obj| {
             let mut map = std::collections::BTreeMap::new();
             for (k, v) in obj {
-                let value = v
-                    .as_str()
-                    .map(|s| s.to_string())
-                    .unwrap_or_else(|| v.to_string());
+                let value = v.as_str().map(|s| s.to_string()).unwrap_or_else(|| v.to_string());
                 map.insert(k.clone(), value);
             }
             map
         });
 
-        match ConfigService::create_project(
-            &resolver,
-            &name,
-            prefix.as_deref(),
-            values_map.as_ref(),
-        ) {
+        match ConfigService::create_project(&resolver, &name, prefix.as_deref(), values_map.as_ref()) {
             Ok(project) => {
-                let actor =
-                    crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
+                let actor = crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
                 crate::api_events::emit_config_updated(actor.as_deref());
                 ok_json(201, json!({"data": project}))
             }
@@ -67,12 +50,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
         let (start, end) = crate::utils::pagination::slice_bounds(total, page.offset, page.limit);
         let page_projects = projects[start..end].to_vec();
 
-        let payload = crate::api_types::ProjectListResponse {
-            total,
-            limit: page.limit,
-            offset: page.offset,
-            projects: page_projects,
-        };
+        let payload = crate::api_types::ProjectListResponse { total, limit: page.limit, offset: page.offset, projects: page_projects };
 
         ok_json(200, json!({"data": payload}))
     });

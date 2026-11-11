@@ -1,10 +1,7 @@
 use crate::api_types::{AgentJobCreateRequest, TaskDTO, TaskUpdate};
 use crate::automation::persistence as automation_persistence;
 use crate::automation::template::TemplateContext;
-use crate::automation::types::{
-    AutomationAction, AutomationActionSet, AutomationFile, AutomationRule, AutomationRunAction,
-    AutomationTagAction, StringOrVec,
-};
+use crate::automation::types::{AutomationAction, AutomationActionSet, AutomationFile, AutomationRule, AutomationRunAction, AutomationTagAction, StringOrVec};
 use crate::config::types::ResolvedConfig;
 use crate::config::validation::errors::ValidationResult;
 use crate::errors::{LoTaRError, LoTaRResult};
@@ -33,15 +30,11 @@ const DEFAULT_MAX_ITERATIONS: u32 = 10;
 /// otherwise its 0-based index in the automation file.
 type CooldownKey = (String, String);
 
-static COOLDOWN_STATE: std::sync::LazyLock<Mutex<HashMap<CooldownKey, Instant>>> =
-    std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
+static COOLDOWN_STATE: std::sync::LazyLock<Mutex<HashMap<CooldownKey, Instant>>> = std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// Return a stable identity string for a rule (name if present, else index).
 fn rule_identity(rule: &AutomationRule, index: usize) -> String {
-    rule.name
-        .as_deref()
-        .map(|n| n.to_string())
-        .unwrap_or_else(|| format!("__rule_{index}"))
+    rule.name.as_deref().map(|n| n.to_string()).unwrap_or_else(|| format!("__rule_{index}"))
 }
 
 /// Check whether the rule's cooldown allows firing on this ticket.
@@ -49,12 +42,7 @@ fn rule_identity(rule: &AutomationRule, index: usize) -> String {
 /// The last firing is remembered in memory and in a small state file, so
 /// separate processes (cron `lotar automation run`, CLI edits) honour it
 /// too (DEV-278).
-fn cooldown_allows(
-    rule: &AutomationRule,
-    rule_key: &str,
-    ticket_id: &str,
-    tasks_dir: &Path,
-) -> bool {
+fn cooldown_allows(rule: &AutomationRule, rule_key: &str, ticket_id: &str, tasks_dir: &Path) -> bool {
     let cooldown_str = match rule.cooldown.as_deref() {
         Some(s) => s,
         None => return true,
@@ -72,10 +60,7 @@ fn cooldown_allows(
     }
     drop(map);
     match cooldown_store::last_fired(tasks_dir, rule_key, ticket_id) {
-        Some(at) => chrono::Utc::now()
-            .signed_duration_since(at)
-            .to_std()
-            .is_ok_and(|elapsed| elapsed >= duration),
+        Some(at) => chrono::Utc::now().signed_duration_since(at).to_std().is_ok_and(|elapsed| elapsed >= duration),
         None => true,
     }
 }
@@ -113,22 +98,14 @@ mod cooldown_store {
     }
 
     fn entry_key(tasks_dir: &Path, rule: &str, ticket: &str) -> String {
-        let dir = tasks_dir
-            .canonicalize()
-            .unwrap_or_else(|_| tasks_dir.to_path_buf());
+        let dir = tasks_dir.canonicalize().unwrap_or_else(|_| tasks_dir.to_path_buf());
         format!("{}\u{1f}{rule}\u{1f}{ticket}", dir.display())
     }
 
     fn with_state<T>(apply: impl FnOnce(&mut BTreeMap<String, String>) -> T) -> Option<T> {
         let path = state_file()?;
         std::fs::create_dir_all(path.parent()?).ok()?;
-        let mut file = std::fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .truncate(false)
-            .open(&path)
-            .ok()?;
+        let mut file = std::fs::OpenOptions::new().read(true).write(true).create(true).truncate(false).open(&path).ok()?;
         file.lock_exclusive().ok()?;
         let mut text = String::new();
         let _ = file.read_to_string(&mut text);
@@ -144,11 +121,7 @@ mod cooldown_store {
         Some(result)
     }
 
-    pub(super) fn last_fired(
-        tasks_dir: &Path,
-        rule: &str,
-        ticket: &str,
-    ) -> Option<chrono::DateTime<chrono::Utc>> {
+    pub(super) fn last_fired(tasks_dir: &Path, rule: &str, ticket: &str) -> Option<chrono::DateTime<chrono::Utc>> {
         let key = entry_key(tasks_dir, rule, ticket);
         with_state(|state| state.get(&key).cloned())
             .flatten()
@@ -160,11 +133,7 @@ mod cooldown_store {
         let key = entry_key(tasks_dir, rule, ticket);
         let now = chrono::Utc::now();
         let _ = with_state(|state| {
-            state.retain(|_, at| {
-                chrono::DateTime::parse_from_rfc3339(at).is_ok_and(|at| {
-                    now.signed_duration_since(at) < chrono::Duration::days(MAX_AGE_DAYS)
-                })
-            });
+            state.retain(|_, at| chrono::DateTime::parse_from_rfc3339(at).is_ok_and(|at| now.signed_duration_since(at) < chrono::Duration::days(MAX_AGE_DAYS)));
             state.insert(key, now.to_rfc3339());
         });
     }
@@ -172,12 +141,7 @@ mod cooldown_store {
 
 /// Report a failed rule action (DEV-278): later rules still run, and the
 /// failure is printed to stderr and sent as an `automation_failed` event.
-fn rule_failure(
-    rule: &AutomationRule,
-    rule_key: &str,
-    ticket_id: &str,
-    err: &LoTaRError,
-) -> String {
+fn rule_failure(rule: &AutomationRule, rule_key: &str, ticket_id: &str, err: &LoTaRError) -> String {
     let name = rule.name.clone().unwrap_or_else(|| rule_key.to_string());
     let message = format!("Automation rule '{name}' failed on {ticket_id}: {err}");
     eprintln!("[lotar][warn] {message}");
@@ -189,11 +153,7 @@ fn rule_failure(
 }
 
 fn failures_result(failures: &[String]) -> LoTaRResult<()> {
-    if failures.is_empty() {
-        Ok(())
-    } else {
-        Err(LoTaRError::ValidationError(failures.join("; ")))
-    }
+    if failures.is_empty() { Ok(()) } else { Err(LoTaRError::ValidationError(failures.join("; "))) }
 }
 
 /// Reset all cooldown state (useful for tests).
@@ -315,45 +275,25 @@ pub struct AutomationSetOutcome {
 pub struct AutomationService;
 
 impl AutomationService {
-    pub fn inspect(
-        tasks_dir: &Path,
-        project: Option<&str>,
-    ) -> LoTaRResult<AutomationInspectResult> {
+    pub fn inspect(tasks_dir: &Path, project: Option<&str>) -> LoTaRResult<AutomationInspectResult> {
         let config = resolve_config_for_project(tasks_dir, project)?;
-        let scope = if project.is_some() {
-            AutomationScope::Project
-        } else {
-            AutomationScope::Global
-        };
+        let scope = if project.is_some() { AutomationScope::Project } else { AutomationScope::Global };
         let (effective, source) = load_effective_automation(tasks_dir, project, Some(&config))?;
         let scope_file = match scope {
-            AutomationScope::Project => project
-                .and_then(|p| automation_persistence::load_project_automation(tasks_dir, p).ok())
-                .flatten(),
+            AutomationScope::Project => project.and_then(|p| automation_persistence::load_project_automation(tasks_dir, p).ok()).flatten(),
             AutomationScope::Global => automation_persistence::load_global_automation(tasks_dir)?,
             AutomationScope::Home => automation_persistence::load_home_automation()?,
             AutomationScope::BuiltIn => None,
         };
 
         let scope_exists = scope_file.is_some();
-        let scope_yaml =
-            automation_persistence::to_canonical_yaml(&scope_file.unwrap_or_default())?;
+        let scope_yaml = automation_persistence::to_canonical_yaml(&scope_file.unwrap_or_default())?;
         let effective_yaml = automation_persistence::to_canonical_yaml(&effective)?;
 
-        Ok(AutomationInspectResult {
-            scope,
-            source,
-            scope_exists,
-            scope_yaml,
-            effective_yaml,
-        })
+        Ok(AutomationInspectResult { scope, source, scope_exists, scope_yaml, effective_yaml })
     }
 
-    pub fn set(
-        tasks_dir: &Path,
-        project: Option<&str>,
-        yaml: &str,
-    ) -> LoTaRResult<AutomationSetOutcome> {
+    pub fn set(tasks_dir: &Path, project: Option<&str>, yaml: &str) -> LoTaRResult<AutomationSetOutcome> {
         let file: AutomationFile = serde_yaml_ng::from_str(yaml).map_err(LoTaRError::from)?;
         let config = resolve_config_for_project(tasks_dir, project)?;
         let validation = validate_rules(&file, &config);
@@ -370,63 +310,28 @@ impl AutomationService {
         // comments and unknown extensions) are preserved, caches stay
         // untouched, and callers see `updated: false`. A missing file is
         // creation semantics and always writes.
-        let scope_label = if project.is_some() {
-            "project"
-        } else {
-            "global"
-        };
+        let scope_label = if project.is_some() { "project" } else { "global" };
         let current = match project {
             Some(prefix) => automation_persistence::load_project_automation(tasks_dir, prefix),
             None => automation_persistence::load_global_automation(tasks_dir),
         }
-        .map_err(|e| {
-            LoTaRError::ValidationError(format!(
-                "Failed to read current {} automation configuration: {}",
-                scope_label, e
-            ))
-        })?;
-        if current
-            .as_ref()
-            .is_some_and(|current| automation_persistence::files_effectively_equal(current, &file))
-        {
-            return Ok(AutomationSetOutcome {
-                updated: false,
-                validation,
-            });
+        .map_err(|e| LoTaRError::ValidationError(format!("Failed to read current {} automation configuration: {}", scope_label, e)))?;
+        if current.as_ref().is_some_and(|current| automation_persistence::files_effectively_equal(current, &file)) {
+            return Ok(AutomationSetOutcome { updated: false, validation });
         }
 
         match project {
-            Some(prefix) => {
-                automation_persistence::save_project_automation(tasks_dir, prefix, &file)?
-            }
+            Some(prefix) => automation_persistence::save_project_automation(tasks_dir, prefix, &file)?,
             None => automation_persistence::save_global_automation(tasks_dir, &file)?,
         }
 
-        Ok(AutomationSetOutcome {
-            updated: true,
-            validation,
-        })
+        Ok(AutomationSetOutcome { updated: true, validation })
     }
 
-    pub fn apply_task_update(
-        storage: &mut Storage,
-        previous: Option<&TaskDTO>,
-        current: &TaskDTO,
-        config: &ResolvedConfig,
-    ) -> LoTaRResult<()> {
+    pub fn apply_task_update(storage: &mut Storage, previous: Option<&TaskDTO>, current: &TaskDTO, config: &ResolvedConfig) -> LoTaRResult<()> {
         let tasks_dir = storage.root_path.clone();
-        let project = crate::storage::TaskId::parse(&current.id)
-            .map(|parsed| parsed.project)
-            .unwrap_or_default();
-        let (automation, _) = load_effective_automation(
-            &tasks_dir,
-            if project.is_empty() {
-                None
-            } else {
-                Some(project.as_str())
-            },
-            Some(config),
-        )?;
+        let project = crate::storage::TaskId::parse(&current.id).map(|parsed| parsed.project).unwrap_or_default();
+        let (automation, _) = load_effective_automation(&tasks_dir, if project.is_empty() { None } else { Some(project.as_str()) }, Some(config))?;
         let changes = ChangeSet::new(previous, current);
 
         // Implicit agent job queueing: when assignee changes to an agent profile, start a job
@@ -441,10 +346,8 @@ impl AutomationService {
 
         // Determine which events to fire
         let is_create = previous.is_none();
-        let assignee_changed = previous.is_some()
-            && previous.and_then(|t| t.assignee.as_deref()) != current.assignee.as_deref();
-        let sprints_changed =
-            previous.is_some() && previous.map(|t| &t.sprints) != Some(&current.sprints);
+        let assignee_changed = previous.is_some() && previous.and_then(|t| t.assignee.as_deref()) != current.assignee.as_deref();
+        let sprints_changed = previous.is_some() && previous.map(|t| &t.sprints) != Some(&current.sprints);
 
         let events: Vec<AutomationEvent> = if is_create {
             vec![AutomationEvent::Created]
@@ -477,15 +380,8 @@ impl AutomationService {
             // Fire event-specific hooks
             for &event in &events {
                 if let Some(action) = resolve_action_for_event(&rule.on, event) {
-                    let action_context = AutomationActionContext {
-                        event,
-                        job: None,
-                        previous: previous.cloned(),
-                        comment_text: None,
-                    };
-                    if let Err(err) =
-                        apply_action(storage, current, config, action, &action_context)
-                    {
+                    let action_context = AutomationActionContext { event, job: None, previous: previous.cloned(), comment_text: None };
+                    if let Err(err) = apply_action(storage, current, config, action, &action_context) {
                         failures.push(rule_failure(rule, &rk, &current.id, &err));
                     }
                     fired = true;
@@ -495,12 +391,7 @@ impl AutomationService {
             // Fire legacy catch-all `start` hook (backward compat)
             if let Some(action) = rule.on.start.as_ref() {
                 let primary_event = events.first().copied().unwrap_or(AutomationEvent::Updated);
-                let action_context = AutomationActionContext {
-                    event: primary_event,
-                    job: None,
-                    previous: previous.cloned(),
-                    comment_text: None,
-                };
+                let action_context = AutomationActionContext { event: primary_event, job: None, previous: previous.cloned(), comment_text: None };
                 if let Err(err) = apply_action(storage, current, config, action, &action_context) {
                     failures.push(rule_failure(rule, &rk, &current.id, &err));
                 }
@@ -515,39 +406,17 @@ impl AutomationService {
     }
 
     /// Fire automation rules for a comment being added to a task.
-    pub fn apply_comment_event(
-        storage: &mut Storage,
-        task: &TaskDTO,
-        comment_text: &str,
-        config: &ResolvedConfig,
-    ) -> LoTaRResult<()> {
+    pub fn apply_comment_event(storage: &mut Storage, task: &TaskDTO, comment_text: &str, config: &ResolvedConfig) -> LoTaRResult<()> {
         let tasks_dir = storage.root_path.clone();
-        let project = crate::storage::TaskId::parse(&task.id)
-            .map(|parsed| parsed.project)
-            .unwrap_or_default();
-        let (automation, _) = load_effective_automation(
-            &tasks_dir,
-            if project.is_empty() {
-                None
-            } else {
-                Some(project.as_str())
-            },
-            Some(config),
-        )?;
+        let project = crate::storage::TaskId::parse(&task.id).map(|parsed| parsed.project).unwrap_or_default();
+        let (automation, _) = load_effective_automation(&tasks_dir, if project.is_empty() { None } else { Some(project.as_str()) }, Some(config))?;
         let changes = ChangeSet::empty(task);
         let active_sprints = compute_active_sprint_ids(storage);
         let event = AutomationEvent::Commented;
         let mut failures: Vec<String> = Vec::new();
 
         for (rule_idx, rule) in automation.automation.rules().iter().enumerate() {
-            if !matches_rule(
-                rule,
-                task,
-                &changes,
-                MatchMode::Current,
-                config,
-                &active_sprints,
-            ) {
+            if !matches_rule(rule, task, &changes, MatchMode::Current, config, &active_sprints) {
                 continue;
             }
             let rk = rule_identity(rule, rule_idx);
@@ -555,12 +424,7 @@ impl AutomationService {
                 continue;
             }
             if let Some(action) = resolve_action_for_event(&rule.on, event) {
-                let action_context = AutomationActionContext {
-                    event,
-                    job: None,
-                    previous: None,
-                    comment_text: Some(comment_text.to_string()),
-                };
+                let action_context = AutomationActionContext { event, job: None, previous: None, comment_text: Some(comment_text.to_string()) };
                 if let Err(err) = apply_action(storage, task, config, action, &action_context) {
                     failures.push(rule_failure(rule, &rk, &task.id, &err));
                 }
@@ -570,54 +434,25 @@ impl AutomationService {
         failures_result(&failures)
     }
 
-    pub fn apply_job_event(
-        tasks_dir: &Path,
-        ticket_id: &str,
-        event: AutomationEvent,
-        job_context: Option<AutomationJobContext>,
-    ) -> LoTaRResult<()> {
-        let project_prefix = crate::storage::TaskId::parse(ticket_id)
-            .map(|parsed| parsed.project)
-            .unwrap_or_default();
+    pub fn apply_job_event(tasks_dir: &Path, ticket_id: &str, event: AutomationEvent, job_context: Option<AutomationJobContext>) -> LoTaRResult<()> {
+        let project_prefix = crate::storage::TaskId::parse(ticket_id).map(|parsed| parsed.project).unwrap_or_default();
         let config = resolve_config_for_project(tasks_dir, Some(&project_prefix))?;
         let mut storage = Storage::new(tasks_dir);
         let task = TaskService::get(&storage, ticket_id, None)?;
-        let (automation, _) =
-            load_effective_automation(tasks_dir, Some(project_prefix.as_str()), Some(&config))?;
+        let (automation, _) = load_effective_automation(tasks_dir, Some(project_prefix.as_str()), Some(&config))?;
 
         // A status/assignee set while the job ran is the job's outcome
         // (DEV-320): it replaces those fields of the end rules' `set`.
         let ending_job = job_context
             .as_ref()
-            .filter(|_| {
-                matches!(
-                    event,
-                    AutomationEvent::JobCompleted
-                        | AutomationEvent::JobFailed
-                        | AutomationEvent::JobCancelled
-                )
-            })
+            .filter(|_| matches!(event, AutomationEvent::JobCompleted | AutomationEvent::JobFailed | AutomationEvent::JobCancelled))
             .map(|job| job.job_id.clone());
-        let recorded = ending_job
-            .as_deref()
-            .and_then(|job_id| crate::services::agent_active_jobs::peek_outcome(tasks_dir, job_id));
-        let action_context = AutomationActionContext {
-            event,
-            job: job_context,
-            previous: None,
-            comment_text: None,
-        };
+        let recorded = ending_job.as_deref().and_then(|job_id| crate::services::agent_active_jobs::peek_outcome(tasks_dir, job_id));
+        let action_context = AutomationActionContext { event, job: job_context, previous: None, comment_text: None };
         let mut failures: Vec<String> = Vec::new();
 
         for (rule_idx, rule) in automation.automation.rules().iter().enumerate() {
-            if !matches_rule(
-                rule,
-                &task,
-                &ChangeSet::empty(&task),
-                MatchMode::Current,
-                &config,
-                &compute_active_sprint_ids(&storage),
-            ) {
+            if !matches_rule(rule, &task, &ChangeSet::empty(&task), MatchMode::Current, &config, &compute_active_sprint_ids(&storage)) {
                 continue;
             }
             let rk = rule_identity(rule, rule_idx);
@@ -626,9 +461,7 @@ impl AutomationService {
             }
             if let Some(action) = resolve_action_for_event(&rule.on, event) {
                 let action = without_outcome_fields(action, recorded.as_ref());
-                if let Err(err) =
-                    apply_action(&mut storage, &task, &config, &action, &action_context)
-                {
+                if let Err(err) = apply_action(&mut storage, &task, &config, &action, &action_context) {
                     failures.push(rule_failure(rule, &rk, ticket_id, &err));
                 }
                 cooldown_record(rule, &rk, ticket_id, tasks_dir);
@@ -638,13 +471,10 @@ impl AutomationService {
         // The rules have run: end the job's guard and apply the outcome,
         // including anything recorded while they ran.
         if let Some(job_id) = ending_job.as_deref()
-            && let Some(outcome) =
-                crate::services::agent_active_jobs::end_and_take_outcome(tasks_dir, job_id)
+            && let Some(outcome) = crate::services::agent_active_jobs::end_and_take_outcome(tasks_dir, job_id)
             && let Err(err) = apply_job_outcome(&mut storage, ticket_id, &config, &outcome)
         {
-            failures.push(format!(
-                "Outcome recorded during job {job_id} for {ticket_id} failed: {err}"
-            ));
+            failures.push(format!("Outcome recorded during job {job_id} for {ticket_id} failed: {err}"));
         }
         failures_result(&failures)
     }
@@ -652,9 +482,7 @@ impl AutomationService {
     /// Whether an automation rule moves this ticket when its agent job ends,
     /// judged on the ticket as it is now (the assignee that started the job).
     pub fn handles_job_end(tasks_dir: &Path, ticket_id: &str) -> bool {
-        let project_prefix = crate::storage::TaskId::parse(ticket_id)
-            .map(|parsed| parsed.project)
-            .unwrap_or_default();
+        let project_prefix = crate::storage::TaskId::parse(ticket_id).map(|parsed| parsed.project).unwrap_or_default();
         let Ok(config) = resolve_config_for_project(tasks_dir, Some(&project_prefix)) else {
             return false;
         };
@@ -662,60 +490,32 @@ impl AutomationService {
         let Ok(task) = TaskService::get(&storage, ticket_id, None) else {
             return false;
         };
-        let Ok((automation, _)) =
-            load_effective_automation(tasks_dir, Some(project_prefix.as_str()), Some(&config))
-        else {
+        let Ok((automation, _)) = load_effective_automation(tasks_dir, Some(project_prefix.as_str()), Some(&config)) else {
             return false;
         };
         let active_sprints = compute_active_sprint_ids(&storage);
-        automation.automation.rules().iter().any(|rule| {
-            rule.on.job_completed.is_some()
-                && matches_rule(
-                    rule,
-                    &task,
-                    &ChangeSet::empty(&task),
-                    MatchMode::Current,
-                    &config,
-                    &active_sprints,
-                )
-        })
+        automation
+            .automation
+            .rules()
+            .iter()
+            .any(|rule| rule.on.job_completed.is_some() && matches_rule(rule, &task, &ChangeSet::empty(&task), MatchMode::Current, &config, &active_sprints))
     }
 
     /// Simulate automation rules without applying changes
-    pub fn simulate(
-        tasks_dir: &Path,
-        ticket_id: &str,
-        event: AutomationEvent,
-    ) -> LoTaRResult<SimulateResult> {
-        let project_prefix = crate::storage::TaskId::parse(ticket_id)
-            .map(|parsed| parsed.project)
-            .unwrap_or_default();
+    pub fn simulate(tasks_dir: &Path, ticket_id: &str, event: AutomationEvent) -> LoTaRResult<SimulateResult> {
+        let project_prefix = crate::storage::TaskId::parse(ticket_id).map(|parsed| parsed.project).unwrap_or_default();
         let config = resolve_config_for_project(tasks_dir, Some(&project_prefix))?;
         let storage = Storage::new(tasks_dir);
         let task = TaskService::get(&storage, ticket_id, None)?;
-        let (automation, _) =
-            load_effective_automation(tasks_dir, Some(project_prefix.as_str()), Some(&config))?;
-        Self::simulate_rules(
-            &storage,
-            &task,
-            &config,
-            automation.automation.rules(),
-            event,
-        )
+        let (automation, _) = load_effective_automation(tasks_dir, Some(project_prefix.as_str()), Some(&config))?;
+        Self::simulate_rules(&storage, &task, &config, automation.automation.rules(), event)
     }
 
     /// [`Self::simulate`] for one rule that is not saved yet, e.g. the rule
     /// being edited in the web UI (DEV-241). A rule that is switched off is
     /// simulated anyway: the editor shows what it would do once on.
-    pub fn simulate_rule(
-        tasks_dir: &Path,
-        ticket_id: &str,
-        event: AutomationEvent,
-        rule: &AutomationRule,
-    ) -> LoTaRResult<SimulateResult> {
-        let project_prefix = crate::storage::TaskId::parse(ticket_id)
-            .map(|parsed| parsed.project)
-            .unwrap_or_default();
+    pub fn simulate_rule(tasks_dir: &Path, ticket_id: &str, event: AutomationEvent, rule: &AutomationRule) -> LoTaRResult<SimulateResult> {
+        let project_prefix = crate::storage::TaskId::parse(ticket_id).map(|parsed| parsed.project).unwrap_or_default();
         let config = resolve_config_for_project(tasks_dir, Some(&project_prefix))?;
         let storage = Storage::new(tasks_dir);
         let task = TaskService::get(&storage, ticket_id, None)?;
@@ -734,14 +534,7 @@ impl AutomationService {
         let active_sprints = compute_active_sprint_ids(storage);
 
         for rule in rules {
-            if !matches_rule(
-                rule,
-                task,
-                &ChangeSet::empty(task),
-                MatchMode::Current,
-                config,
-                &active_sprints,
-            ) {
+            if !matches_rule(rule, task, &ChangeSet::empty(task), MatchMode::Current, config, &active_sprints) {
                 continue;
             }
             if let Some(action) = resolve_action_for_event_with_fallback(&rule.on, event) {
@@ -757,13 +550,7 @@ impl AutomationService {
                 });
             }
         }
-        Ok(SimulateResult {
-            matched: false,
-            rule_name: None,
-            actions: vec![],
-            task_after: None,
-            warnings: vec![],
-        })
+        Ok(SimulateResult { matched: false, rule_name: None, actions: vec![], task_after: None, warnings: vec![] })
     }
 }
 
@@ -798,30 +585,17 @@ impl AutomationService {
     /// automations run on a schedule: from cron, `lotar automation run`.
     /// `query` narrows the tasks with the search syntax of `lotar list`.
     /// Each task's own project rules apply; disabled rules never run.
-    pub fn run_manual(
-        storage: &mut Storage,
-        rule_names: &[String],
-        query: Option<&str>,
-        dry_run: bool,
-    ) -> LoTaRResult<ManualRunReport> {
+    pub fn run_manual(storage: &mut Storage, rule_names: &[String], query: Option<&str>, dry_run: bool) -> LoTaRResult<ManualRunReport> {
         let tasks_dir = storage.root_path.clone();
         let base = resolve_config_for_project(&tasks_dir, None)?;
         let _least_busy = LeastBusyMemo::new();
         let ids: Vec<String> = match query.map(str::trim).filter(|q| !q.is_empty()) {
             Some(search) => {
-                crate::services::task_list::select_ids(storage, &base, &tasks_dir, search)
-                    .map_err(|err| LoTaRError::ValidationError(err.cli_message()))?
+                crate::services::task_list::select_ids(storage, &base, &tasks_dir, search).map_err(|err| LoTaRError::ValidationError(err.cli_message()))?
             }
-            None => TaskService::list(storage, &crate::api_types::TaskListFilter::default())
-                .into_iter()
-                .map(|(id, _)| id)
-                .collect(),
+            None => TaskService::list(storage, &crate::api_types::TaskListFilter::default()).into_iter().map(|(id, _)| id).collect(),
         };
-        let wanted: Vec<String> = rule_names
-            .iter()
-            .map(|name| name.trim().to_lowercase())
-            .filter(|name| !name.is_empty())
-            .collect();
+        let wanted: Vec<String> = rule_names.iter().map(|name| name.trim().to_lowercase()).filter(|name| !name.is_empty()).collect();
         let active_sprints = compute_active_sprint_ids(storage);
         let mut rules_seen: Vec<String> = Vec::new();
         let mut found: std::collections::HashSet<String> = std::collections::HashSet::new();
@@ -832,9 +606,7 @@ impl AutomationService {
             let Ok(task) = TaskService::get(storage, id, None) else {
                 continue;
             };
-            let project = crate::storage::TaskId::parse(&task.id)
-                .map(|parsed| parsed.project)
-                .unwrap_or_default();
+            let project = crate::storage::TaskId::parse(&task.id).map(|parsed| parsed.project).unwrap_or_default();
             if !cache.contains_key(&project) {
                 let config = resolve_config_for_project(&tasks_dir, Some(&project))?;
                 let (file, _) = load_effective_automation(&tasks_dir, Some(&project), None)?;
@@ -845,10 +617,7 @@ impl AutomationService {
                 let Some(action) = rule.on.manual.as_ref() else {
                     continue;
                 };
-                let name = rule
-                    .name
-                    .clone()
-                    .unwrap_or_else(|| format!("Rule {}", index + 1));
+                let name = rule.name.clone().unwrap_or_else(|| format!("Rule {}", index + 1));
                 if !wanted.is_empty() && !wanted.contains(&name.to_lowercase()) {
                     continue;
                 }
@@ -860,14 +629,7 @@ impl AutomationService {
                     rules_seen.push(name.clone());
                 }
                 let changes = ChangeSet::empty(&task);
-                if !matches_rule(
-                    rule,
-                    &task,
-                    &changes,
-                    MatchMode::Current,
-                    &config,
-                    &active_sprints,
-                ) {
+                if !matches_rule(rule, &task, &changes, MatchMode::Current, &config, &active_sprints) {
                     continue;
                 }
                 let key = rule_identity(rule, index);
@@ -880,20 +642,11 @@ impl AutomationService {
                     rule: name.clone(),
                     task: task.id.clone(),
                     actions,
-                    warnings: if dry_run {
-                        preview.into_warnings()
-                    } else {
-                        Vec::new()
-                    },
+                    warnings: if dry_run { preview.into_warnings() } else { Vec::new() },
                     error: None,
                 };
                 if !dry_run {
-                    let context = AutomationActionContext {
-                        event: AutomationEvent::Manual,
-                        job: None,
-                        previous: None,
-                        comment_text: None,
-                    };
+                    let context = AutomationActionContext { event: AutomationEvent::Manual, job: None, previous: None, comment_text: None };
                     match apply_action(storage, &task, &config, action, &context) {
                         Ok(()) => cooldown_record(rule, &key, &task.id, &tasks_dir),
                         Err(err) => entry.error = Some(err.to_string()),
@@ -903,20 +656,10 @@ impl AutomationService {
             }
         }
 
-        if let Some(missing) = wanted
-            .iter()
-            .find(|name| !ids.is_empty() && !found.contains(*name))
-        {
-            return Err(LoTaRError::ValidationError(format!(
-                "No rule named '{missing}' with a manual action (on.manual) applies to the selected tasks"
-            )));
+        if let Some(missing) = wanted.iter().find(|name| !ids.is_empty() && !found.contains(*name)) {
+            return Err(LoTaRError::ValidationError(format!("No rule named '{missing}' with a manual action (on.manual) applies to the selected tasks")));
         }
-        Ok(ManualRunReport {
-            dry_run,
-            rules: rules_seen,
-            checked: ids.len(),
-            entries,
-        })
+        Ok(ManualRunReport { dry_run, rules: rules_seen, checked: ids.len(), entries })
     }
 }
 
@@ -938,122 +681,60 @@ pub struct SimulatedAction {
 }
 
 /// Describe what an automation action would do
-fn describe_action(
-    action: &AutomationAction,
-    current: &TaskDTO,
-    config: &ResolvedConfig,
-    preview: &mut PreviewContext,
-) -> Vec<SimulatedAction> {
+fn describe_action(action: &AutomationAction, current: &TaskDTO, config: &ResolvedConfig, preview: &mut PreviewContext) -> Vec<SimulatedAction> {
     let mut actions = Vec::new();
     fn push(actions: &mut Vec<SimulatedAction>, action: &str, description: String) {
-        actions.push(SimulatedAction {
-            action: action.to_string(),
-            description,
-        });
+        actions.push(SimulatedAction { action: action.to_string(), description });
     }
 
     if let Some(set) = action.set.as_ref() {
         let expand = |preview: &mut PreviewContext, value: &String| preview.expand(value);
         if let Some(value) = set.status.as_ref() {
-            push(
-                &mut actions,
-                "set_status",
-                format!("Set status to '{}'", expand(preview, value)),
-            );
+            push(&mut actions, "set_status", format!("Set status to '{}'", expand(preview, value)));
         }
         if let Some(value) = set.priority.as_ref() {
-            push(
-                &mut actions,
-                "set_priority",
-                format!("Set priority to '{}'", expand(preview, value)),
-            );
+            push(&mut actions, "set_priority", format!("Set priority to '{}'", expand(preview, value)));
         }
         if let Some(value) = set.task_type.as_ref() {
-            push(
-                &mut actions,
-                "set_type",
-                format!("Set type to '{}'", expand(preview, value)),
-            );
+            push(&mut actions, "set_type", format!("Set type to '{}'", expand(preview, value)));
         }
         if let Some(value) = set.assignee.as_ref() {
             let value = expand(preview, value);
             let resolved = if value == "@me" {
                 "current user".to_string()
             } else if value == "@reporter" {
-                current
-                    .reporter
-                    .clone()
-                    .unwrap_or_else(|| "reporter".to_string())
+                current.reporter.clone().unwrap_or_else(|| "reporter".to_string())
             } else if value.starts_with('@') && config.agent_profiles.contains_key(&value[1..]) {
                 format!("agent '{}'", &value[1..])
             } else {
                 value.clone()
             };
-            push(
-                &mut actions,
-                "set_assignee",
-                format!("Set assignee to {}", resolved),
-            );
+            push(&mut actions, "set_assignee", format!("Set assignee to {}", resolved));
         }
         if let Some(value) = set.reporter.as_ref() {
-            push(
-                &mut actions,
-                "set_reporter",
-                format!("Set reporter to '{}'", expand(preview, value)),
-            );
+            push(&mut actions, "set_reporter", format!("Set reporter to '{}'", expand(preview, value)));
         }
         if let Some(value) = set.title.as_ref() {
-            push(
-                &mut actions,
-                "set_title",
-                format!("Set title to '{}'", expand(preview, value)),
-            );
+            push(&mut actions, "set_title", format!("Set title to '{}'", expand(preview, value)));
         }
         if let Some(value) = set.description.as_ref() {
-            push(
-                &mut actions,
-                "set_description",
-                format!("Set description to '{}'", expand(preview, value)),
-            );
+            push(&mut actions, "set_description", format!("Set description to '{}'", expand(preview, value)));
         }
         if let Some(value) = set.due_date.as_ref() {
-            push(
-                &mut actions,
-                "set_due_date",
-                format!("Set due date to '{}'", expand(preview, value)),
-            );
+            push(&mut actions, "set_due_date", format!("Set due date to '{}'", expand(preview, value)));
         }
         if let Some(value) = set.effort.as_ref() {
-            push(
-                &mut actions,
-                "set_effort",
-                format!("Set effort to '{}'", expand(preview, value)),
-            );
+            push(&mut actions, "set_effort", format!("Set effort to '{}'", expand(preview, value)));
         }
-        if let Some(values) = set
-            .tags
-            .as_ref()
-            .or(set.labels.as_ref())
-            .map(StringOrVec::as_vec)
-        {
-            push(
-                &mut actions,
-                "set_tags",
-                format!("Set tags: {}", values.join(", ")),
-            );
+        if let Some(values) = set.tags.as_ref().or(set.labels.as_ref()).map(StringOrVec::as_vec) {
+            push(&mut actions, "set_tags", format!("Set tags: {}", values.join(", ")));
         }
         if let Some(map) = set.custom_fields.as_ref() {
             let mut keys: Vec<&String> = map.keys().collect();
             keys.sort();
             for key in keys {
-                let shown = convert_custom_field_value(&map[key], key)
-                    .map(|value| crate::types::custom_value_to_string(&value))
-                    .unwrap_or_default();
-                push(
-                    &mut actions,
-                    "set_custom_field",
-                    format!("Set custom field '{}' to '{}'", key, shown),
-                );
+                let shown = convert_custom_field_value(&map[key], key).map(|value| crate::types::custom_value_to_string(&value)).unwrap_or_default();
+                push(&mut actions, "set_custom_field", format!("Set custom field '{}' to '{}'", key, shown));
             }
         }
     }
@@ -1061,27 +742,14 @@ fn describe_action(
     if let Some(add) = action.add.as_ref() {
         let tags = tag_action_values(add);
         if !tags.is_empty() {
-            actions.push(SimulatedAction {
-                action: "add_tags".to_string(),
-                description: format!("Add tags: {}", tags.join(", ")),
-            });
+            actions.push(SimulatedAction { action: "add_tags".to_string(), description: format!("Add tags: {}", tags.join(", ")) });
         }
         if let Some(sprint) = add.sprint.as_ref() {
-            actions.push(SimulatedAction {
-                action: "add_sprint".to_string(),
-                description: format!("Add to sprint: {}", sprint),
-            });
+            actions.push(SimulatedAction { action: "add_sprint".to_string(), description: format!("Add to sprint: {}", sprint) });
         }
-        for (field, vals) in [
-            ("depends_on", &add.depends_on),
-            ("blocks", &add.blocks),
-            ("related", &add.related),
-        ] {
+        for (field, vals) in [("depends_on", &add.depends_on), ("blocks", &add.blocks), ("related", &add.related)] {
             if let Some(v) = vals {
-                actions.push(SimulatedAction {
-                    action: format!("add_{}", field),
-                    description: format!("Add {}: {}", field, v.as_vec().join(", ")),
-                });
+                actions.push(SimulatedAction { action: format!("add_{}", field), description: format!("Add {}: {}", field, v.as_vec().join(", ")) });
             }
         }
     }
@@ -1089,27 +757,14 @@ fn describe_action(
     if let Some(remove) = action.remove.as_ref() {
         let tags = tag_action_values(remove);
         if !tags.is_empty() {
-            actions.push(SimulatedAction {
-                action: "remove_tags".to_string(),
-                description: format!("Remove tags: {}", tags.join(", ")),
-            });
+            actions.push(SimulatedAction { action: "remove_tags".to_string(), description: format!("Remove tags: {}", tags.join(", ")) });
         }
         if let Some(sprint) = remove.sprint.as_ref() {
-            actions.push(SimulatedAction {
-                action: "remove_sprint".to_string(),
-                description: format!("Remove from sprint: {}", sprint),
-            });
+            actions.push(SimulatedAction { action: "remove_sprint".to_string(), description: format!("Remove from sprint: {}", sprint) });
         }
-        for (field, vals) in [
-            ("depends_on", &remove.depends_on),
-            ("blocks", &remove.blocks),
-            ("related", &remove.related),
-        ] {
+        for (field, vals) in [("depends_on", &remove.depends_on), ("blocks", &remove.blocks), ("related", &remove.related)] {
             if let Some(v) = vals {
-                actions.push(SimulatedAction {
-                    action: format!("remove_{}", field),
-                    description: format!("Remove {}: {}", field, v.as_vec().join(", ")),
-                });
+                actions.push(SimulatedAction { action: format!("remove_{}", field), description: format!("Remove {}: {}", field, v.as_vec().join(", ")) });
             }
         }
     }
@@ -1123,37 +778,22 @@ fn describe_action(
                 if command.args.is_empty() {
                     format!("Run command: {}", preview.expand(&command.command))
                 } else {
-                    let args: Vec<String> =
-                        command.args.iter().map(|arg| preview.expand(arg)).collect();
-                    format!(
-                        "Run command: {} {}",
-                        preview.expand(&command.command),
-                        args.join(" ")
-                    )
+                    let args: Vec<String> = command.args.iter().map(|arg| preview.expand(arg)).collect();
+                    format!("Run command: {} {}", preview.expand(&command.command), args.join(" "))
                 }
             }
         };
-        actions.push(SimulatedAction {
-            action: "run_command".to_string(),
-            description,
-        });
+        actions.push(SimulatedAction { action: "run_command".to_string(), description });
     }
 
     if let Some(comment) = action.comment.as_ref() {
-        actions.push(SimulatedAction {
-            action: "add_comment".to_string(),
-            description: format!("Add comment: {}", preview.expand(comment)),
-        });
+        actions.push(SimulatedAction { action: "add_comment".to_string(), description: format!("Add comment: {}", preview.expand(comment)) });
     }
 
     if let Some(archive) = action.archive {
         actions.push(SimulatedAction {
             action: if archive { "archive" } else { "unarchive" }.to_string(),
-            description: if archive {
-                "Archive the task (move it into @archive)".to_string()
-            } else {
-                "Bring the task back out of @archive".to_string()
-            },
+            description: if archive { "Archive the task (move it into @archive)".to_string() } else { "Bring the task back out of @archive".to_string() },
         });
     }
 
@@ -1166,13 +806,8 @@ fn describe_action(
         let mut description = format!("Queue agent job for profile '{}'", &assignee[1..]);
         if let Some(agent) = action.agent.as_ref() {
             let mut settings: Vec<String> = Vec::new();
-            for (name, value) in [
-                ("model", &agent.model),
-                ("effort", &agent.effort),
-                ("provider", &agent.provider),
-            ] {
-                if let Some(value) = expand_run_setting(value.as_deref(), |raw| preview.expand(raw))
-                {
+            for (name, value) in [("model", &agent.model), ("effort", &agent.effort), ("provider", &agent.provider)] {
+                if let Some(value) = expand_run_setting(value.as_deref(), |raw| preview.expand(raw)) {
                     settings.push(format!("{name} {value}"));
                 }
             }
@@ -1183,10 +818,7 @@ fn describe_action(
                 description.push_str(&format!(" ({})", settings.join(", ")));
             }
         }
-        actions.push(SimulatedAction {
-            action: "queue_agent".to_string(),
-            description,
-        });
+        actions.push(SimulatedAction { action: "queue_agent".to_string(), description });
     }
 
     actions
@@ -1194,21 +826,7 @@ fn describe_action(
 
 /// Tag values of an add/remove action, including the `labels` alias.
 fn tag_action_values(action: &AutomationTagAction) -> Vec<String> {
-    action
-        .tags
-        .as_ref()
-        .map(StringOrVec::as_vec)
-        .into_iter()
-        .flatten()
-        .chain(
-            action
-                .labels
-                .as_ref()
-                .map(StringOrVec::as_vec)
-                .into_iter()
-                .flatten(),
-        )
-        .collect()
+    action.tags.as_ref().map(StringOrVec::as_vec).into_iter().flatten().chain(action.labels.as_ref().map(StringOrVec::as_vec).into_iter().flatten()).collect()
 }
 
 /// Template expansion and warnings for one preview (DEV-118).
@@ -1220,11 +838,7 @@ struct PreviewContext {
 
 impl PreviewContext {
     fn new(task: &TaskDTO) -> Self {
-        Self {
-            tmpl: TemplateContext::from_task(task),
-            unresolved: Vec::new(),
-            warnings: Vec::new(),
-        }
+        Self { tmpl: TemplateContext::from_task(task), unresolved: Vec::new(), warnings: Vec::new() }
     }
 
     fn expand(&mut self, input: &str) -> String {
@@ -1239,10 +853,7 @@ impl PreviewContext {
 
     fn into_warnings(mut self) -> Vec<String> {
         for key in std::mem::take(&mut self.unresolved) {
-            self.warnings.push(format!(
-                "Template value '${{{{{}}}}}' comes from the triggering event and is shown unexpanded",
-                key
-            ));
+            self.warnings.push(format!("Template value '${{{{{}}}}}' comes from the triggering event and is shown unexpanded", key));
         }
         self.warnings
     }
@@ -1252,33 +863,20 @@ impl PreviewContext {
 /// `@round_robin` advances a shared counter, so previewing it would change
 /// the next real assignment.
 fn is_runtime_assignee(value: &str) -> bool {
-    matches!(
-        value.trim().to_ascii_lowercase().as_str(),
-        "@round_robin" | "@random"
-    )
+    matches!(value.trim().to_ascii_lowercase().as_str(), "@round_robin" | "@random")
 }
 
 /// Preview what the task would look like after applying an action, with the
 /// same field coverage as `apply_action` (DEV-118). Nothing is written:
 /// sprint membership, comments and run commands are listed in the described
 /// actions but not applied to the preview.
-fn simulate_action(
-    current: &TaskDTO,
-    action: &AutomationAction,
-    config: &ResolvedConfig,
-    storage: &Storage,
-    preview: &mut PreviewContext,
-) -> TaskDTO {
+fn simulate_action(current: &TaskDTO, action: &AutomationAction, config: &ResolvedConfig, storage: &Storage, preview: &mut PreviewContext) -> TaskDTO {
     let mut simulated = current.clone();
 
     if let Some(set) = action.set.as_ref() {
         let plan = SetPlan::parse(set, config, |value| preview.expand(value));
         for (field, value) in &plan.rejected {
-            preview.warn(format!(
-                "Unknown {} '{}' would be skipped",
-                set_enum_label(*field),
-                value
-            ));
+            preview.warn(format!("Unknown {} '{}' would be skipped", set_enum_label(*field), value));
         }
         if let Some(status) = plan.status {
             simulated.status = status;
@@ -1299,30 +897,19 @@ fn simulate_action(
             simulated.due_date = (!due_date.trim().is_empty()).then_some(due_date);
         }
         if let Some(effort) = plan.effort {
-            simulated.effort = if effort.is_empty() {
-                None
-            } else {
-                Some(
-                    crate::utils::effort::parse_effort(&effort)
-                        .map(|parsed| parsed.canonical)
-                        .unwrap_or(effort),
-                )
-            };
+            simulated.effort =
+                if effort.is_empty() { None } else { Some(crate::utils::effort::parse_effort(&effort).map(|parsed| parsed.canonical).unwrap_or(effort)) };
         }
         if let Some(value) = plan.assignee.as_deref() {
             if is_runtime_assignee(value) {
-                preview.warn(format!(
-                    "Assignee '{}' is chosen when the rule runs; the preview shows the token",
-                    value.trim()
-                ));
+                preview.warn(format!("Assignee '{}' is chosen when the rule runs; the preview shows the token", value.trim()));
                 simulated.assignee = Some(value.trim().to_string());
             } else if let Some(resolved) = resolve_assignee_value(value, current, config, storage) {
                 simulated.assignee = Some(resolved);
             }
         }
         if let Some(value) = plan.reporter.as_deref()
-            && let Some(resolved) =
-                resolve_reporter_value(value, current, storage.root_path.as_path())
+            && let Some(resolved) = resolve_reporter_value(value, current, storage.root_path.as_path())
         {
             simulated.reporter = Some(resolved);
         }
@@ -1336,10 +923,7 @@ fn simulate_action(
                     Ok(converted) => {
                         simulated.custom_fields.insert(key.clone(), converted);
                     }
-                    Err(err) => preview.warn(format!(
-                        "Custom field '{}' would fail to apply: {}",
-                        key, err
-                    )),
+                    Err(err) => preview.warn(format!("Custom field '{}' would fail to apply: {}", key, err)),
                 }
             }
         }
@@ -1350,28 +934,15 @@ fn simulate_action(
             continue;
         };
         apply_tag_action(tag_action, add, &mut simulated.tags);
-        apply_relationship_action(
-            Some(storage.root_path.as_path()),
-            tag_action,
-            add,
-            &mut simulated.relationships,
-        );
+        apply_relationship_action(Some(storage.root_path.as_path()), tag_action, add, &mut simulated.relationships);
         if tag_action.sprint.is_some() {
-            preview.warn(
-                "Sprint membership changes are listed in actions but not reflected in task_after"
-                    .to_string(),
-            );
+            preview.warn("Sprint membership changes are listed in actions but not reflected in task_after".to_string());
         }
     }
 
     // The simulated state must reflect the projected completion/due
     // classification (DEV-21), not the pre-action snapshot.
-    simulated.task_state = Some(crate::services::completion::compute_task_state(
-        &simulated.status,
-        simulated.due_date.as_deref(),
-        config,
-        chrono::Utc::now(),
-    ));
+    simulated.task_state = Some(crate::services::completion::compute_task_state(&simulated.status, simulated.due_date.as_deref(), config, chrono::Utc::now()));
 
     simulated
 }
@@ -1391,10 +962,7 @@ fn set_enum_label(field: SetEnumField) -> &'static str {
 /// For task events (`Created/Updated/Assigned`) the `start` catch-all is NOT
 /// included here; the caller handles the legacy fallback separately so the new
 /// event-specific hooks always take priority.
-fn resolve_action_for_event(
-    on: &crate::automation::types::AutomationRuleActions,
-    event: AutomationEvent,
-) -> Option<&AutomationAction> {
+fn resolve_action_for_event(on: &crate::automation::types::AutomationRuleActions, event: AutomationEvent) -> Option<&AutomationAction> {
     match event {
         AutomationEvent::Created => on.created.as_ref(),
         AutomationEvent::Updated => on.updated.as_ref(),
@@ -1411,26 +979,17 @@ fn resolve_action_for_event(
 
 /// Like `resolve_action_for_event` but falls back to the legacy `start`
 /// catch-all for task events (used by the simulate path).
-fn resolve_action_for_event_with_fallback(
-    on: &crate::automation::types::AutomationRuleActions,
-    event: AutomationEvent,
-) -> Option<&AutomationAction> {
+fn resolve_action_for_event_with_fallback(on: &crate::automation::types::AutomationRuleActions, event: AutomationEvent) -> Option<&AutomationAction> {
     resolve_action_for_event(on, event).or(match event {
-        AutomationEvent::Created
-        | AutomationEvent::Updated
-        | AutomationEvent::Assigned
-        | AutomationEvent::Commented
-        | AutomationEvent::SprintChanged => on.start.as_ref(),
+        AutomationEvent::Created | AutomationEvent::Updated | AutomationEvent::Assigned | AutomationEvent::Commented | AutomationEvent::SprintChanged => {
+            on.start.as_ref()
+        }
         _ => None,
     })
 }
 
-fn resolve_config_for_project(
-    tasks_dir: &Path,
-    project: Option<&str>,
-) -> LoTaRResult<ResolvedConfig> {
-    crate::config::resolution::config_for_project(tasks_dir, project)
-        .map_err(|e| LoTaRError::ValidationError(e.to_string()))
+fn resolve_config_for_project(tasks_dir: &Path, project: Option<&str>) -> LoTaRResult<ResolvedConfig> {
+    crate::config::resolution::config_for_project(tasks_dir, project).map_err(|e| LoTaRError::ValidationError(e.to_string()))
 }
 
 fn compute_active_sprint_ids(storage: &Storage) -> Vec<u32> {
@@ -1440,11 +999,7 @@ fn compute_active_sprint_ids(storage: &Storage) -> Vec<u32> {
     }
 }
 
-fn load_effective_automation(
-    tasks_dir: &Path,
-    project: Option<&str>,
-    _config: Option<&ResolvedConfig>,
-) -> LoTaRResult<(AutomationFile, AutomationScope)> {
+fn load_effective_automation(tasks_dir: &Path, project: Option<&str>, _config: Option<&ResolvedConfig>) -> LoTaRResult<(AutomationFile, AutomationScope)> {
     if let Some(prefix) = project
         && !prefix.trim().is_empty()
         && let Some(file) = automation_persistence::load_project_automation(tasks_dir, prefix)?
@@ -1478,14 +1033,8 @@ pub(crate) fn build_lotar_env(
     let mut env = HashMap::new();
     let workspace_root = tasks_dir.parent().unwrap_or(tasks_dir);
 
-    env.insert(
-        "LOTAR_TASKS_DIR".to_string(),
-        tasks_dir.to_string_lossy().to_string(),
-    );
-    env.insert(
-        "LOTAR_WORKSPACE_ROOT".to_string(),
-        workspace_root.to_string_lossy().to_string(),
-    );
+    env.insert("LOTAR_TASKS_DIR".to_string(), tasks_dir.to_string_lossy().to_string());
+    env.insert("LOTAR_WORKSPACE_ROOT".to_string(), workspace_root.to_string_lossy().to_string());
     if let Some(label) = event_label {
         env.insert("LOTAR_AUTOMATION_EVENT".to_string(), label.to_string());
     }
@@ -1494,10 +1043,7 @@ pub(crate) fn build_lotar_env(
         env.insert("LOTAR_TICKET_PROJECT".to_string(), project.to_string());
     }
     env.insert("LOTAR_TICKET_STATUS".to_string(), task.status.to_string());
-    env.insert(
-        "LOTAR_TICKET_PRIORITY".to_string(),
-        task.priority.to_string(),
-    );
+    env.insert("LOTAR_TICKET_PRIORITY".to_string(), task.priority.to_string());
     env.insert("LOTAR_TICKET_TYPE".to_string(), task.task_type.to_string());
     env.insert("LOTAR_TICKET_TITLE".to_string(), task.title.clone());
 
@@ -1535,20 +1081,9 @@ pub(crate) fn build_lotar_env(
     env
 }
 
-fn build_automation_env(
-    task: &TaskDTO,
-    config: &ResolvedConfig,
-    tasks_dir: &Path,
-    context: &AutomationActionContext,
-) -> HashMap<String, String> {
+fn build_automation_env(task: &TaskDTO, config: &ResolvedConfig, tasks_dir: &Path, context: &AutomationActionContext) -> HashMap<String, String> {
     let event_label = context.event.to_string();
-    build_lotar_env(
-        task,
-        config,
-        tasks_dir,
-        Some(&event_label),
-        context.job.as_ref(),
-    )
+    build_lotar_env(task, config, tasks_dir, Some(&event_label), context.job.as_ref())
 }
 
 fn resolve_run_cwd(tasks_dir: &Path, raw: Option<&str>) -> LoTaRResult<std::path::PathBuf> {
@@ -1559,22 +1094,15 @@ fn resolve_run_cwd(tasks_dir: &Path, raw: Option<&str>) -> LoTaRResult<std::path
 
     let trimmed = raw.trim();
     if trimmed.is_empty() {
-        return Err(LoTaRError::ValidationError(
-            "Automation run cwd cannot be empty".to_string(),
-        ));
+        return Err(LoTaRError::ValidationError("Automation run cwd cannot be empty".to_string()));
     }
 
     let path = std::path::Path::new(trimmed);
     if path.is_absolute() {
         return Ok(path.to_path_buf());
     }
-    if path
-        .components()
-        .any(|component| matches!(component, std::path::Component::ParentDir))
-    {
-        return Err(LoTaRError::ValidationError(
-            "Automation run cwd cannot contain '..'".to_string(),
-        ));
+    if path.components().any(|component| matches!(component, std::path::Component::ParentDir)) {
+        return Err(LoTaRError::ValidationError("Automation run cwd cannot contain '..'".to_string()));
     }
     Ok(workspace_root.join(path))
 }
@@ -1582,11 +1110,8 @@ fn resolve_run_cwd(tasks_dir: &Path, raw: Option<&str>) -> LoTaRResult<std::path
 /// Whether `run` actions may execute for this task: rules from the home
 /// automation file always may; repository rules need a trusted workspace.
 fn run_allowed(tasks_dir: &Path, task: &TaskDTO) -> bool {
-    let project = crate::storage::TaskId::parse(&task.id)
-        .map(|parsed| parsed.project)
-        .unwrap_or_default();
-    let project_file = !project.is_empty()
-        && crate::utils::paths::project_automation_path(tasks_dir, &project).exists();
+    let project = crate::storage::TaskId::parse(&task.id).map(|parsed| parsed.project).unwrap_or_default();
+    let project_file = !project.is_empty() && crate::utils::paths::project_automation_path(tasks_dir, &project).exists();
     if !project_file && matches!(automation_persistence::load_home_automation(), Ok(Some(_))) {
         return true;
     }
@@ -1599,13 +1124,7 @@ fn warn_untrusted_run_once(tasks_dir: &Path) {
     if WARNED.swap(true, std::sync::atomic::Ordering::Relaxed) {
         return;
     }
-    eprintln!(
-        "[lotar][warn] {}",
-        crate::services::trust_service::TrustService::untrusted_message(
-            tasks_dir,
-            "automation run commands"
-        )
-    );
+    eprintln!("[lotar][warn] {}", crate::services::trust_service::TrustService::untrusted_message(tasks_dir, "automation run commands"));
 }
 
 /// Default time a waited-for `run` command may take.
@@ -1615,15 +1134,9 @@ const DEFAULT_RUN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(
 /// (DEV-278): stdin is empty, so it can't swallow MCP requests, and its
 /// output goes to stderr, so it can't corrupt MCP frames or `--format json`
 /// output. A command that outlives `timeout` is stopped with its children.
-fn run_and_wait(
-    mut cmd: Command,
-    timeout: std::time::Duration,
-    ignore_failure: bool,
-) -> LoTaRResult<()> {
+fn run_and_wait(mut cmd: Command, timeout: std::time::Duration, ignore_failure: bool) -> LoTaRResult<()> {
     use std::io::Read;
-    cmd.stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped());
+    cmd.stdin(std::process::Stdio::null()).stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::piped());
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;
@@ -1632,10 +1145,7 @@ fn run_and_wait(
     let mut child = cmd.spawn()?;
     let drain = |pipe: Option<Box<dyn Read + Send>>| {
         std::thread::spawn(move || {
-            let mut tail = BoundedTail {
-                limit: ASYNC_STDERR_LOG_LIMIT,
-                ..BoundedTail::default()
-            };
+            let mut tail = BoundedTail { limit: ASYNC_STDERR_LOG_LIMIT, ..BoundedTail::default() };
             if let Some(mut pipe) = pipe {
                 let mut buf = [0u8; 4096];
                 while let Ok(n) = pipe.read(&mut buf) {
@@ -1648,18 +1158,8 @@ fn run_and_wait(
             tail.snapshot()
         })
     };
-    let stdout = drain(
-        child
-            .stdout
-            .take()
-            .map(|p| Box::new(p) as Box<dyn Read + Send>),
-    );
-    let stderr = drain(
-        child
-            .stderr
-            .take()
-            .map(|p| Box::new(p) as Box<dyn Read + Send>),
-    );
+    let stdout = drain(child.stdout.take().map(|p| Box::new(p) as Box<dyn Read + Send>));
+    let stderr = drain(child.stderr.take().map(|p| Box::new(p) as Box<dyn Read + Send>));
     let deadline = Instant::now() + timeout;
     let status = loop {
         if let Some(status) = child.try_wait()? {
@@ -1686,10 +1186,7 @@ fn run_and_wait(
         }
     }
     match status {
-        None => Err(LoTaRError::ValidationError(format!(
-            "Automation run command did not finish within {}s and was stopped",
-            timeout.as_secs()
-        ))),
+        None => Err(LoTaRError::ValidationError(format!("Automation run command did not finish within {}s and was stopped", timeout.as_secs()))),
         Some(status) if !status.success() && !ignore_failure => {
             let detail = err.trim();
             Err(LoTaRError::ValidationError(if detail.is_empty() {
@@ -1703,11 +1200,7 @@ fn run_and_wait(
 }
 
 fn build_shell_command(raw: &str) -> (String, Vec<String>) {
-    if cfg!(windows) {
-        ("cmd".to_string(), vec!["/C".to_string(), raw.to_string()])
-    } else {
-        ("sh".to_string(), vec!["-c".to_string(), raw.to_string()])
-    }
+    if cfg!(windows) { ("cmd".to_string(), vec!["/C".to_string(), raw.to_string()]) } else { ("sh".to_string(), vec!["-c".to_string(), raw.to_string()]) }
 }
 
 fn execute_run_action(
@@ -1729,9 +1222,7 @@ fn execute_run_action(
             let expanded = tmpl.expand_for_shell(raw);
             let trimmed = expanded.script.trim().to_string();
             if trimmed.is_empty() {
-                return Err(LoTaRError::ValidationError(
-                    "Automation run command cannot be empty".to_string(),
-                ));
+                return Err(LoTaRError::ValidationError("Automation run command cannot be empty".to_string()));
             }
             // cmd.exe expands %VARS% before parsing, so it cannot keep
             // values out of the command line; refuse rather than inject.
@@ -1741,33 +1232,16 @@ fn execute_run_action(
                 ));
             }
             let (program, args) = build_shell_command(&trimmed);
-            (
-                program,
-                args,
-                expanded
-                    .env
-                    .into_iter()
-                    .collect::<HashMap<String, String>>(),
-                None,
-                false,
-                true,
-                DEFAULT_RUN_TIMEOUT,
-            )
+            (program, args, expanded.env.into_iter().collect::<HashMap<String, String>>(), None, false, true, DEFAULT_RUN_TIMEOUT)
         }
         AutomationRunAction::Command(command) => {
             let expanded_cmd = tmpl.expand(&command.command);
             let trimmed = expanded_cmd.trim().to_string();
             if trimmed.is_empty() {
-                return Err(LoTaRError::ValidationError(
-                    "Automation run command cannot be empty".to_string(),
-                ));
+                return Err(LoTaRError::ValidationError("Automation run command cannot be empty".to_string()));
             }
             let args = command.args.iter().map(|a| tmpl.expand(a)).collect();
-            let env = command
-                .env
-                .iter()
-                .map(|(k, v)| (k.clone(), tmpl.expand(v)))
-                .collect();
+            let env = command.env.iter().map(|(k, v)| (k.clone(), tmpl.expand(v))).collect();
             (
                 trimmed,
                 args,
@@ -1777,11 +1251,8 @@ fn execute_run_action(
                 command.wait,
                 match command.timeout.as_deref() {
                     None => DEFAULT_RUN_TIMEOUT,
-                    Some(raw) => parse_cooldown(raw).ok_or_else(|| {
-                        LoTaRError::ValidationError(format!(
-                            "Invalid run timeout '{raw}': use a number followed by s, m, h or d"
-                        ))
-                    })?,
+                    Some(raw) => parse_cooldown(raw)
+                        .ok_or_else(|| LoTaRError::ValidationError(format!("Invalid run timeout '{raw}': use a number followed by s, m, h or d")))?,
                 },
             )
         }
@@ -1811,12 +1282,8 @@ fn execute_run_action(
         // `windows_async_stdio::detach_stdio_for_async_children`.
         #[cfg(windows)]
         windows_async_stdio::detach_stdio_for_async_children();
-        cmd.stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::piped());
-        let child = cmd.spawn().map_err(|e| {
-            LoTaRError::ValidationError(format!("Failed to spawn async run command: {e}"))
-        })?;
+        cmd.stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::piped());
+        let child = cmd.spawn().map_err(|e| LoTaRError::ValidationError(format!("Failed to spawn async run command: {e}")))?;
         spawn_async_run_monitor(child, task.id.clone());
     }
     Ok(())
@@ -1842,11 +1309,7 @@ struct BoundedTail {
 
 impl BoundedTail {
     fn new(limit: usize) -> Self {
-        Self {
-            data: Vec::new(),
-            dropped: 0,
-            limit,
-        }
+        Self { data: Vec::new(), dropped: 0, limit }
     }
 
     fn push(&mut self, bytes: &[u8]) {
@@ -1882,9 +1345,7 @@ fn spawn_async_run_monitor(mut child: std::process::Child, task_id: String) {
     use std::io::Read;
 
     let stderr = child.stderr.take();
-    let tail = std::sync::Arc::new(std::sync::Mutex::new(BoundedTail::new(
-        ASYNC_STDERR_LOG_LIMIT,
-    )));
+    let tail = std::sync::Arc::new(std::sync::Mutex::new(BoundedTail::new(ASYNC_STDERR_LOG_LIMIT)));
     let (eof_tx, eof_rx) = std::sync::mpsc::channel::<()>();
     if let Some(mut stderr) = stderr {
         let tail = std::sync::Arc::clone(&tail);
@@ -1893,10 +1354,7 @@ fn spawn_async_run_monitor(mut child: std::process::Child, task_id: String) {
             loop {
                 match stderr.read(&mut chunk) {
                     Ok(0) | Err(_) => break,
-                    Ok(n) => tail
-                        .lock()
-                        .unwrap_or_else(|e| e.into_inner())
-                        .push(&chunk[..n]),
+                    Ok(n) => tail.lock().unwrap_or_else(|e| e.into_inner()).push(&chunk[..n]),
                 }
             }
             let _ = eof_tx.send(());
@@ -1909,48 +1367,29 @@ fn spawn_async_run_monitor(mut child: std::process::Child, task_id: String) {
         let status = match child.wait() {
             Ok(status) => status,
             Err(e) => {
-                eprintln!(
-                    "[lotar][warn] Async automation run for task {task_id} failed to complete: {e}"
-                );
+                eprintln!("[lotar][warn] Async automation run for task {task_id} failed to complete: {e}");
                 return;
             }
         };
         let drained = stderr_eof_within_grace(&eof_rx, ASYNC_STDERR_EOF_GRACE);
         let stderr_text = tail.lock().unwrap_or_else(|e| e.into_inner()).snapshot();
-        let held_note = if drained {
-            ""
-        } else {
-            " (stderr pipe still open, likely held by a descendant; tail truncated)"
-        };
+        let held_note = if drained { "" } else { " (stderr pipe still open, likely held by a descendant; tail truncated)" };
         if !status.success() {
             if stderr_text.trim().is_empty() {
-                eprintln!(
-                    "[lotar][warn] Async automation run for task {task_id} exited with {status}{held_note}"
-                );
+                eprintln!("[lotar][warn] Async automation run for task {task_id} exited with {status}{held_note}");
             } else {
-                eprintln!(
-                    "[lotar][warn] Async automation run for task {task_id} exited with {status}{held_note}: {}",
-                    stderr_text.trim()
-                );
+                eprintln!("[lotar][warn] Async automation run for task {task_id} exited with {status}{held_note}: {}", stderr_text.trim());
             }
         } else if !drained {
-            eprintln!(
-                "[lotar][warn] Async automation run for task {task_id} exited successfully; a descendant still holds its stderr pipe"
-            );
+            eprintln!("[lotar][warn] Async automation run for task {task_id} exited successfully; a descendant still holds its stderr pipe");
         }
     });
 }
 
 /// EOF (or a vanished reader) counts as drained; a pipe that stays silent
 /// past `grace` is treated as held open by a descendant.
-fn stderr_eof_within_grace(
-    eof_rx: &std::sync::mpsc::Receiver<()>,
-    grace: std::time::Duration,
-) -> bool {
-    matches!(
-        eof_rx.recv_timeout(grace),
-        Ok(()) | Err(std::sync::mpsc::RecvTimeoutError::Disconnected)
-    )
+fn stderr_eof_within_grace(eof_rx: &std::sync::mpsc::Receiver<()>, grace: std::time::Duration) -> bool {
+    matches!(eof_rx.recv_timeout(grace), Ok(()) | Err(std::sync::mpsc::RecvTimeoutError::Disconnected))
 }
 
 /// Windows stdio inheritance scope for fire-and-forget automation runs.
@@ -2011,11 +1450,7 @@ mod windows_async_stdio {
             if handle.is_null() || handle == usize::MAX as Handle {
                 return SlotDetach::NoHandle;
             }
-            if SetHandleInformation(handle, HANDLE_FLAG_INHERIT, 0) != 0 {
-                SlotDetach::Cleared
-            } else {
-                SlotDetach::NotClearable
-            }
+            if SetHandleInformation(handle, HANDLE_FLAG_INHERIT, 0) != 0 { SlotDetach::Cleared } else { SlotDetach::NotClearable }
         }
     }
 
@@ -2037,11 +1472,7 @@ mod windows_async_stdio {
                 return None;
             }
             let mut flags: u32 = 0;
-            if GetHandleInformation(handle, &mut flags) != 0 {
-                Some(flags)
-            } else {
-                None
-            }
+            if GetHandleInformation(handle, &mut flags) != 0 { Some(flags) } else { None }
         }
     }
 
@@ -2109,21 +1540,10 @@ fn apply_action(
     let has_relationship_delta = [action.add.as_ref(), action.remove.as_ref()]
         .into_iter()
         .flatten()
-        .any(|action| {
-            action.depends_on.is_some() || action.blocks.is_some() || action.related.is_some()
-        });
+        .any(|action| action.depends_on.is_some() || action.blocks.is_some() || action.related.is_some());
 
     if let Some(set) = action.set.as_ref() {
-        apply_set_action(
-            set,
-            current,
-            config,
-            storage,
-            &mut patch,
-            &mut updated_tags,
-            &mut custom_fields,
-            &tmpl,
-        )?;
+        apply_set_action(set, current, config, storage, &mut patch, &mut updated_tags, &mut custom_fields, &tmpl)?;
     }
 
     if let Some(add) = action.add.as_ref() {
@@ -2149,38 +1569,23 @@ fn apply_action(
     let mut next_task = None;
     if has_relationship_delta {
         let moves_root = storage.root_path.clone();
-        next_task = Some(TaskService::update_with_relationship_delta(
-            storage,
-            &base.id,
-            patch,
-            TaskUpdateContext::automation_disabled(),
-            |relationships| {
-                if let Some(add) = &action.add {
-                    apply_relationship_action(Some(&moves_root), add, true, relationships);
-                }
-                if let Some(remove) = &action.remove {
-                    apply_relationship_action(Some(&moves_root), remove, false, relationships);
-                }
-            },
-        )?);
+        next_task = Some(TaskService::update_with_relationship_delta(storage, &base.id, patch, TaskUpdateContext::automation_disabled(), |relationships| {
+            if let Some(add) = &action.add {
+                apply_relationship_action(Some(&moves_root), add, true, relationships);
+            }
+            if let Some(remove) = &action.remove {
+                apply_relationship_action(Some(&moves_root), remove, false, relationships);
+            }
+        })?);
     } else if patch_has_changes(&patch) {
-        next_task = Some(TaskService::update_with_context(
-            storage,
-            &base.id,
-            patch,
-            TaskUpdateContext::automation_disabled(),
-        )?);
+        next_task = Some(TaskService::update_with_context(storage, &base.id, patch, TaskUpdateContext::automation_disabled())?);
     }
     if let Some(updated) = next_task.as_ref() {
         let run = action.agent.as_ref().map(|agent| AgentRunSettings {
             model: expand_run_setting(agent.model.as_deref(), |raw| tmpl.expand(raw)),
             effort: expand_run_setting(agent.effort.as_deref(), |raw| tmpl.expand(raw)),
             provider: expand_run_setting(agent.provider.as_deref(), |raw| tmpl.expand(raw)),
-            prompt: agent
-                .prompt
-                .as_ref()
-                .map(|prompt| tmpl.expand(prompt))
-                .filter(|prompt| !prompt.trim().is_empty()),
+            prompt: agent.prompt.as_ref().map(|prompt| tmpl.expand(prompt)).filter(|prompt| !prompt.trim().is_empty()),
         });
         maybe_queue_agent_on_assignment(
             storage.root_path.as_path(),
@@ -2202,14 +1607,7 @@ fn apply_action(
     }
 
     if let Some(run) = action.run.as_ref() {
-        execute_run_action(
-            run,
-            task_for_env,
-            config,
-            storage.root_path.as_path(),
-            action_context,
-            &tmpl,
-        )?;
+        execute_run_action(run, task_for_env, config, storage.root_path.as_path(), action_context, &tmpl)?;
     }
 
     if let Some(archive) = action.archive {
@@ -2220,10 +1618,7 @@ fn apply_action(
 }
 
 /// The action without the `set` fields a job outcome decides (DEV-320).
-fn without_outcome_fields<'a>(
-    action: &'a AutomationAction,
-    outcome: Option<&crate::api_types::JobOutcome>,
-) -> std::borrow::Cow<'a, AutomationAction> {
+fn without_outcome_fields<'a>(action: &'a AutomationAction, outcome: Option<&crate::api_types::JobOutcome>) -> std::borrow::Cow<'a, AutomationAction> {
     let Some(outcome) = outcome else {
         return std::borrow::Cow::Borrowed(action);
     };
@@ -2242,24 +1637,10 @@ fn without_outcome_fields<'a>(
 /// Apply the status/assignee recorded while a job ran, as a rule's `set`
 /// would: no update automation, and an agent profile as the new assignee
 /// starts its job.
-fn apply_job_outcome(
-    storage: &mut Storage,
-    ticket_id: &str,
-    config: &ResolvedConfig,
-    outcome: &crate::api_types::JobOutcome,
-) -> LoTaRResult<()> {
+fn apply_job_outcome(storage: &mut Storage, ticket_id: &str, config: &ResolvedConfig, outcome: &crate::api_types::JobOutcome) -> LoTaRResult<()> {
     let base = TaskService::get(storage, ticket_id, None)?;
-    let patch = TaskUpdate {
-        status: outcome.status.clone(),
-        assignee: outcome.assignee.clone(),
-        ..TaskUpdate::default()
-    };
-    let updated = TaskService::update_with_context(
-        storage,
-        &base.id,
-        patch,
-        TaskUpdateContext::automation_disabled(),
-    )?;
+    let patch = TaskUpdate { status: outcome.status.clone(), assignee: outcome.assignee.clone(), ..TaskUpdate::default() };
+    let updated = TaskService::update_with_context(storage, &base.id, patch, TaskUpdateContext::automation_disabled())?;
     maybe_queue_agent_on_assignment(
         storage.root_path.as_path(),
         base.assignee.as_deref(),
@@ -2308,11 +1689,7 @@ pub(crate) struct SetPlan<'a> {
 }
 
 impl<'a> SetPlan<'a> {
-    pub(crate) fn parse(
-        set: &'a AutomationActionSet,
-        config: &ResolvedConfig,
-        mut expand: impl FnMut(&str) -> String,
-    ) -> Self {
+    pub(crate) fn parse(set: &'a AutomationActionSet, config: &ResolvedConfig, mut expand: impl FnMut(&str) -> String) -> Self {
         let mut plan = SetPlan::default();
         if let Some(value) = set.status.as_ref() {
             let value = expand(value);
@@ -2348,10 +1725,7 @@ impl<'a> SetPlan<'a> {
     }
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "independent inputs from the single caller; bundling them only for this lint would not clarify the call"
-)]
+#[expect(clippy::too_many_arguments, reason = "independent inputs from the single caller; bundling them only for this lint would not clarify the call")]
 fn apply_set_action(
     set: &AutomationActionSet,
     current: &TaskDTO,
@@ -2415,14 +1789,7 @@ fn apply_tag_action(action: &AutomationTagAction, add: bool, tags: &mut Vec<Stri
         .map(StringOrVec::as_vec)
         .into_iter()
         .flatten()
-        .chain(
-            action
-                .labels
-                .as_ref()
-                .map(StringOrVec::as_vec)
-                .into_iter()
-                .flatten(),
-        )
+        .chain(action.labels.as_ref().map(StringOrVec::as_vec).into_iter().flatten())
         .collect::<Vec<_>>();
     if values.is_empty() {
         return;
@@ -2446,12 +1813,7 @@ fn apply_tag_action(action: &AutomationTagAction, add: bool, tags: &mut Vec<Stri
     *tags = merged;
 }
 
-fn apply_relationship_action(
-    root: Option<&std::path::Path>,
-    action: &AutomationTagAction,
-    add: bool,
-    relationships: &mut crate::types::TaskRelationships,
-) {
+fn apply_relationship_action(root: Option<&std::path::Path>, action: &AutomationTagAction, add: bool, relationships: &mut crate::types::TaskRelationships) {
     let moves = root.map(crate::storage::moves::MoveResolver::new);
     // Old IDs of moved tasks name the task they became (DEV-183).
     let identity = |value: &str| match (&moves, crate::storage::TaskId::parse(value)) {
@@ -2485,12 +1847,7 @@ fn apply_relationship_action(
     }
 }
 
-fn apply_sprint_action(
-    storage: &mut Storage,
-    task_id: &str,
-    sprint_ref: &str,
-    add: bool,
-) -> LoTaRResult<()> {
+fn apply_sprint_action(storage: &mut Storage, task_id: &str, sprint_ref: &str, add: bool) -> LoTaRResult<()> {
     use crate::services::sprint_assignment;
 
     let mut records = SprintService::list(storage)?;
@@ -2519,12 +1876,7 @@ fn apply_sprint_action(
             false, // force_single
         );
     } else {
-        let _ = sprint_assignment::remove_tasks(
-            storage,
-            &mut records,
-            &tasks,
-            Some(&sprint_id.to_string()),
-        );
+        let _ = sprint_assignment::remove_tasks(storage, &mut records, &tasks, Some(&sprint_id.to_string()));
     }
     Ok(())
 }
@@ -2534,8 +1886,7 @@ fn apply_sprint_action(
 /// `automation` actor and never re-dispatches `on.commented` rules, so
 /// comment actions cannot recurse.
 fn append_automation_comment(storage: &mut Storage, task_id: &str, text: &str) -> LoTaRResult<()> {
-    TaskService::add_comment_with_context(storage, task_id, text, CommentContext::automation())
-        .map(|_| ())
+    TaskService::add_comment_with_context(storage, task_id, text, CommentContext::automation()).map(|_| ())
 }
 
 fn patch_has_changes(patch: &TaskUpdate) -> bool {
@@ -2558,8 +1909,7 @@ fn patch_has_changes(patch: &TaskUpdate) -> bool {
 /// (DEV-316). An empty result means "not set", so the job keeps the
 /// profile's own value instead of getting an empty flag.
 fn expand_run_setting(raw: Option<&str>, expand: impl FnOnce(&str) -> String) -> Option<String> {
-    raw.map(|raw| expand(raw).trim().to_string())
-        .filter(|value| !value.is_empty())
+    raw.map(|raw| expand(raw).trim().to_string()).filter(|value| !value.is_empty())
 }
 
 /// Run settings an automation action gives the job its assignment starts.
@@ -2605,17 +1955,9 @@ fn maybe_queue_agent_on_assignment(
     }
 
     // Check max_iterations safety net
-    let project_prefix = crate::storage::TaskId::parse(&task.id)
-        .ok()
-        .map(|parsed| parsed.project)
-        .unwrap_or_default();
-    if let Ok((automation, _)) =
-        load_effective_automation(tasks_dir, Some(project_prefix.as_str()), Some(config))
-    {
-        let limit = automation
-            .automation
-            .max_iterations()
-            .unwrap_or(DEFAULT_MAX_ITERATIONS);
+    let project_prefix = crate::storage::TaskId::parse(&task.id).ok().map(|parsed| parsed.project).unwrap_or_default();
+    if let Ok((automation, _)) = load_effective_automation(tasks_dir, Some(project_prefix.as_str()), Some(config)) {
+        let limit = automation.automation.max_iterations().unwrap_or(DEFAULT_MAX_ITERATIONS);
         let terminal_count = count_terminal_jobs_for_ticket(&task.id);
         if terminal_count >= limit as usize {
             let mut storage = Storage::new(tasks_dir);
@@ -2647,9 +1989,7 @@ fn maybe_queue_agent_on_assignment(
 
     let req = AgentJobCreateRequest {
         ticket_id: task.id.clone(),
-        prompt: run
-            .prompt
-            .unwrap_or_else(|| DEFAULT_AUTO_PROMPT.to_string()),
+        prompt: run.prompt.unwrap_or_else(|| DEFAULT_AUTO_PROMPT.to_string()),
         runner: None,
         agent: Some(agent_name),
         model: run.model,
@@ -2658,10 +1998,7 @@ fn maybe_queue_agent_on_assignment(
     };
 
     let ticket = req.ticket_id.clone();
-    let started = if matches!(
-        AgentJobService::orchestrator_mode(),
-        AgentOrchestratorMode::Server
-    ) {
+    let started = if matches!(AgentJobService::orchestrator_mode(), AgentOrchestratorMode::Server) {
         AgentJobService::start_job_with_tasks_dir(req, tasks_dir).map(|_| ())
     } else {
         AgentQueueService::enqueue(tasks_dir, req).map(|_| ())
@@ -2695,25 +2032,12 @@ fn count_terminal_jobs_for_ticket(ticket_id: &str) -> usize {
         .count()
 }
 
-fn find_blocked_dependencies(
-    storage: &Storage,
-    task: &TaskDTO,
-    _config: &ResolvedConfig,
-) -> Vec<String> {
-    crate::services::relationships::blocked_dependencies(
-        storage,
-        &task.id,
-        &task.relationships.depends_on,
-    )
-    .unwrap_or_else(|error| vec![format!("dependency graph unavailable: {error}")])
+fn find_blocked_dependencies(storage: &Storage, task: &TaskDTO, _config: &ResolvedConfig) -> Vec<String> {
+    crate::services::relationships::blocked_dependencies(storage, &task.id, &task.relationships.depends_on)
+        .unwrap_or_else(|error| vec![format!("dependency graph unavailable: {error}")])
 }
 
-fn mark_task_blocked(
-    storage: &mut Storage,
-    task: &TaskDTO,
-    config: &ResolvedConfig,
-    blocked_by: &[String],
-) -> LoTaRResult<()> {
+fn mark_task_blocked(storage: &mut Storage, task: &TaskDTO, config: &ResolvedConfig, blocked_by: &[String]) -> LoTaRResult<()> {
     let mut patch = TaskUpdate::default();
     if let Ok(status) = TaskStatus::parse_with_config("HelpNeeded", config) {
         patch.status = Some(status.to_string());
@@ -2730,12 +2054,7 @@ fn mark_task_blocked(
     patch.tags = Some(normalize_tags(tags));
 
     if patch_has_changes(&patch) {
-        TaskService::update_with_context(
-            storage,
-            &task.id,
-            patch,
-            TaskUpdateContext::automation_disabled(),
-        )?;
+        TaskService::update_with_context(storage, &task.id, patch, TaskUpdateContext::automation_disabled())?;
     }
 
     Ok(())
@@ -2746,31 +2065,20 @@ fn push_unique_tag(tags: &mut Vec<String>, tag: &str) {
     if trimmed.is_empty() {
         return;
     }
-    if tags
-        .iter()
-        .any(|existing| existing.eq_ignore_ascii_case(trimmed))
-    {
+    if tags.iter().any(|existing| existing.eq_ignore_ascii_case(trimmed)) {
         return;
     }
     tags.push(trimmed.to_string());
 }
 
-fn resolve_assignee_value(
-    value: &str,
-    task: &TaskDTO,
-    config: &ResolvedConfig,
-    storage: &Storage,
-) -> Option<String> {
+fn resolve_assignee_value(value: &str, task: &TaskDTO, config: &ResolvedConfig, storage: &Storage) -> Option<String> {
     let normalized = value.trim();
     match normalized.to_ascii_lowercase().as_str() {
         "@assignee" => task.assignee.clone(),
         "@reporter" => task.reporter.clone(),
         "@assignee_or_reporter" => {
             if let Some(assignee) = task.assignee.clone()
-                && config
-                    .agent_profiles
-                    .keys()
-                    .any(|name| assignee.eq_ignore_ascii_case(&format!("@{}", name)))
+                && config.agent_profiles.keys().any(|name| assignee.eq_ignore_ascii_case(&format!("@{}", name)))
             {
                 return task.reporter.clone();
             }
@@ -2784,23 +2092,11 @@ fn resolve_assignee_value(
 }
 
 /// Global round-robin counter for cycling through project members.
-static ROUND_ROBIN_COUNTER: std::sync::LazyLock<Mutex<usize>> =
-    std::sync::LazyLock::new(|| Mutex::new(0));
+static ROUND_ROBIN_COUNTER: std::sync::LazyLock<Mutex<usize>> = std::sync::LazyLock::new(|| Mutex::new(0));
 
 /// Filter project members to exclude @-prefixed special tokens and agent profiles.
 fn real_members(config: &ResolvedConfig) -> Vec<String> {
-    config
-        .members
-        .iter()
-        .filter(|m| !m.starts_with('@'))
-        .filter(|m| {
-            !config
-                .agent_profiles
-                .keys()
-                .any(|name| m.eq_ignore_ascii_case(name))
-        })
-        .cloned()
-        .collect()
+    config.members.iter().filter(|m| !m.starts_with('@')).filter(|m| !config.agent_profiles.keys().any(|name| m.eq_ignore_ascii_case(name))).cloned().collect()
 }
 
 fn resolve_round_robin(config: &ResolvedConfig, _storage: &Storage) -> Option<String> {
@@ -2808,9 +2104,7 @@ fn resolve_round_robin(config: &ResolvedConfig, _storage: &Storage) -> Option<St
     if members.is_empty() {
         return None;
     }
-    let mut counter = ROUND_ROBIN_COUNTER
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
+    let mut counter = ROUND_ROBIN_COUNTER.lock().unwrap_or_else(|e| e.into_inner());
     let idx = *counter % members.len();
     *counter = counter.wrapping_add(1);
     Some(members[idx].clone())
@@ -2870,16 +2164,12 @@ fn active_counts_by_assignee(storage: &Storage) -> HashMap<String, usize> {
         let Some(assignee) = task.assignee.as_deref().filter(|a| !a.trim().is_empty()) else {
             continue;
         };
-        let prefix = crate::storage::TaskId::parse(&id)
-            .map(|parsed| parsed.project)
-            .unwrap_or_default();
-        let done = done_sets
-            .entry((root.clone(), prefix.clone()))
-            .or_insert_with(|| {
-                crate::config::resolution::config_for_project(root.as_path(), Some(&prefix))
-                    .map(|config| crate::services::completion::effective_done_statuses(&config))
-                    .unwrap_or_default()
-            });
+        let prefix = crate::storage::TaskId::parse(&id).map(|parsed| parsed.project).unwrap_or_default();
+        let done = done_sets.entry((root.clone(), prefix.clone())).or_insert_with(|| {
+            crate::config::resolution::config_for_project(root.as_path(), Some(&prefix))
+                .map(|config| crate::services::completion::effective_done_statuses(&config))
+                .unwrap_or_default()
+        });
         if !done.contains(&task.status.as_str().to_ascii_lowercase()) {
             *counts.entry(assignee.to_string()).or_insert(0) += 1;
         }
@@ -2887,11 +2177,7 @@ fn active_counts_by_assignee(storage: &Storage) -> HashMap<String, usize> {
     counts
 }
 
-fn resolve_least_busy(
-    config: &ResolvedConfig,
-    storage: &Storage,
-    task: &TaskDTO,
-) -> Option<String> {
+fn resolve_least_busy(config: &ResolvedConfig, storage: &Storage, task: &TaskDTO) -> Option<String> {
     let members = real_members(config);
     if members.is_empty() {
         return None;
@@ -2900,18 +2186,13 @@ fn resolve_least_busy(
     let counts = if memoized {
         LEAST_BUSY_MEMO.with(|memo| {
             let mut memo = memo.borrow_mut();
-            memo.as_mut()
-                .expect("memo is active")
-                .get_or_insert_with(|| active_counts_by_assignee(storage))
-                .clone()
+            memo.as_mut().expect("memo is active").get_or_insert_with(|| active_counts_by_assignee(storage)).clone()
         })
     } else {
         active_counts_by_assignee(storage)
     };
 
-    let chosen = members
-        .into_iter()
-        .min_by_key(|m| counts.get(m).copied().unwrap_or(0))?;
+    let chosen = members.into_iter().min_by_key(|m| counts.get(m).copied().unwrap_or(0))?;
     if memoized {
         let task_active = !task.task_state.as_ref().is_some_and(|state| state.is_done);
         LEAST_BUSY_MEMO.with(|memo| {
@@ -2942,21 +2223,13 @@ fn resolve_reporter_value(value: &str, task: &TaskDTO, tasks_dir: &Path) -> Opti
 }
 
 #[cfg(not(feature = "schema"))]
-fn convert_custom_field_value(
-    value: &serde_yaml_ng::Value,
-    _key: &str,
-) -> LoTaRResult<crate::types::CustomFieldValue> {
+fn convert_custom_field_value(value: &serde_yaml_ng::Value, _key: &str) -> LoTaRResult<crate::types::CustomFieldValue> {
     Ok(value.clone())
 }
 
 #[cfg(feature = "schema")]
-fn convert_custom_field_value(
-    value: &serde_yaml_ng::Value,
-    key: &str,
-) -> LoTaRResult<crate::types::CustomFieldValue> {
-    serde_json::to_value(value).map_err(|err| {
-        LoTaRError::SerializationError(format!("Invalid custom field value for {}: {}", key, err))
-    })
+fn convert_custom_field_value(value: &serde_yaml_ng::Value, key: &str) -> LoTaRResult<crate::types::CustomFieldValue> {
+    serde_json::to_value(value).map_err(|err| LoTaRError::SerializationError(format!("Invalid custom field value for {}: {}", key, err)))
 }
 
 #[cfg(test)]
@@ -2967,38 +2240,15 @@ mod cooldown_tests {
 
     #[test]
     fn cooldown_parser_checks_units_and_arithmetic() {
-        for (input, seconds) in [
-            ("0s", 0),
-            ("30s", 30),
-            (" 5m ", 300),
-            ("2h", 7200),
-            ("1d", 86400),
-        ] {
+        for (input, seconds) in [("0s", 0), ("30s", 30), (" 5m ", 300), ("2h", 7200), ("1d", 86400)] {
             assert_eq!(parse_cooldown(input), Some(Duration::from_secs(seconds)));
         }
-        for input in [
-            "",
-            "5",
-            "-1s",
-            "1.5m",
-            "1\u{e9}",
-            "\u{1d11e}",
-            "18446744073709551615d",
-            "18446744073709551616s",
-        ] {
+        for input in ["", "5", "-1s", "1.5m", "1\u{e9}", "\u{1d11e}", "18446744073709551615d", "18446744073709551616s"] {
             assert_eq!(parse_cooldown(input), None, "invalid cooldown: {input}");
-            let rule = AutomationRule {
-                cooldown: Some(input.into()),
-                ..Default::default()
-            };
+            let rule = AutomationRule { cooldown: Some(input.into()), ..Default::default() };
             assert!(!cooldown_allows(&rule, "invalid", "TEST-1", Path::new(".")));
         }
-        assert!(cooldown_allows(
-            &AutomationRule::default(),
-            "absent",
-            "TEST-1",
-            Path::new(".")
-        ));
+        assert!(cooldown_allows(&AutomationRule::default(), "absent", "TEST-1", Path::new(".")));
     }
 
     #[test]
@@ -3008,21 +2258,13 @@ mod cooldown_tests {
         let original = "automation: []\n";
         std::fs::write(&path, original).unwrap();
         for input in ["", "1\u{e9}", "18446744073709551615h"] {
-            let file = AutomationFile {
-                automation: AutomationRuleSet::List(vec![AutomationRule {
-                    cooldown: Some(input.into()),
-                    ..Default::default()
-                }]),
-            };
+            let file = AutomationFile { automation: AutomationRuleSet::List(vec![AutomationRule { cooldown: Some(input.into()), ..Default::default() }]) };
             let yaml = serde_yaml_ng::to_string(&file).unwrap();
             let result = AutomationService::set(dir.path(), None, &yaml);
-            assert!(
-                matches!(result, Err(LoTaRError::ValidationError(ref message)) if message.contains("cooldown"))
-            );
+            assert!(matches!(result, Err(LoTaRError::ValidationError(ref message)) if message.contains("cooldown")));
             assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
         }
-        let outcome =
-            AutomationService::set(dir.path(), None, "automation:\n- cooldown: 30s\n").unwrap();
+        let outcome = AutomationService::set(dir.path(), None, "automation:\n- cooldown: 30s\n").unwrap();
         assert!(outcome.updated);
         assert!(!outcome.validation.has_errors());
     }
@@ -3035,17 +2277,13 @@ mod dev21_cross_root_dependency_tests {
 
     #[test]
     fn padded_alias_actions_preserve_noop_bytes_history_events_and_remove_both_assertions() {
-        use crate::api_types::{
-            RelationshipField, RelationshipMutationRequest, RelationshipOperation,
-        };
+        use crate::api_types::{RelationshipField, RelationshipMutationRequest, RelationshipOperation};
         let temp = tempfile::tempdir().unwrap();
         let workspace = temp.path().join("workspace");
         write_config(&workspace, "Done");
         write_task(&workspace, "PX", 1, "Todo");
         write_task(&workspace, "BB", 1, "Todo");
-        let mut storage = Storage {
-            root_path: workspace.join(".tasks"),
-        };
+        let mut storage = Storage { root_path: workspace.join(".tasks") };
         crate::services::relationships::mutate(
             &storage,
             &RelationshipMutationRequest {
@@ -3060,51 +2298,30 @@ mod dev21_cross_root_dependency_tests {
         .unwrap();
         let current = TaskService::get(&storage, "PX-1", None).unwrap();
         let config = TaskService::resolve_config_for_project(&storage.root_path, "PX");
-        let context = AutomationActionContext {
-            event: AutomationEvent::Updated,
-            job: None,
-            previous: None,
-            comment_text: None,
-        };
+        let context = AutomationActionContext { event: AutomationEvent::Updated, job: None, previous: None, comment_text: None };
         let source = storage.root_path.join("PX/1.yml");
         let target = storage.root_path.join("BB/1.yml");
         let before_source = std::fs::read(&source).unwrap();
         let before_target = std::fs::read(&target).unwrap();
         let events = crate::api_events::subscribe();
-        let add: AutomationAction =
-            serde_yaml_ng::from_str("add:\n  depends_on: [BB-001]\n").unwrap();
+        let add: AutomationAction = serde_yaml_ng::from_str("add:\n  depends_on: [BB-001]\n").unwrap();
         apply_action(&mut storage, &current, &config, &add, &context).unwrap();
         assert_eq!(std::fs::read(&source).unwrap(), before_source);
         assert_eq!(std::fs::read(&target).unwrap(), before_target);
         assert!(events.try_iter().next().is_none());
-        let remove: AutomationAction =
-            serde_yaml_ng::from_str("remove:\n  depends_on: [BB-001]\n").unwrap();
+        let remove: AutomationAction = serde_yaml_ng::from_str("remove:\n  depends_on: [BB-001]\n").unwrap();
         apply_action(&mut storage, &current, &config, &remove, &context).unwrap();
         let after = TaskService::get(&storage, "PX-1", None).unwrap();
         assert!(after.relationships.depends_on.is_empty());
-        assert!(
-            TaskService::get(&storage, "BB-1", None)
-                .unwrap()
-                .relationships
-                .blocks
-                .is_empty()
-        );
+        assert!(TaskService::get(&storage, "BB-1", None).unwrap().relationships.blocks.is_empty());
         assert_eq!(after.history.len(), current.history.len() + 1);
         let emitted: Vec<_> = events.try_iter().collect();
-        assert_eq!(
-            emitted
-                .iter()
-                .filter(|event| event.kind == "task_updated")
-                .count(),
-            2
-        );
+        assert_eq!(emitted.iter().filter(|event| event.kind == "task_updated").count(), 2);
     }
 
     #[test]
     fn relationship_deltas_compose_after_concurrent_user_commit_and_keep_rule_atomic() {
-        use crate::api_types::{
-            RelationshipField, RelationshipMutationRequest, RelationshipOperation,
-        };
+        use crate::api_types::{RelationshipField, RelationshipMutationRequest, RelationshipOperation};
         use std::fs;
         use std::sync::mpsc;
         use std::time::Duration;
@@ -3115,9 +2332,7 @@ mod dev21_cross_root_dependency_tests {
             for number in 1..=3 {
                 write_task(&workspace, "PX", number, "Todo");
             }
-            let storage = Storage {
-                root_path: workspace.join(".tasks"),
-            };
+            let storage = Storage { root_path: workspace.join(".tasks") };
             let request = RelationshipMutationRequest {
                 source: "PX-1".into(),
                 target: "PX-2".into(),
@@ -3131,11 +2346,8 @@ mod dev21_cross_root_dependency_tests {
             }
             let current = TaskService::get(&storage, "PX-1", None).unwrap();
             let config = TaskService::resolve_config_for_project(&storage.root_path, "PX");
-            let action: AutomationAction = serde_yaml_ng::from_str(&format!(
-                "set:\n  title: rule edit\n{}:\n  depends_on: [PX-2]\n",
-                if removing { "remove" } else { "add" }
-            ))
-            .unwrap();
+            let action: AutomationAction =
+                serde_yaml_ng::from_str(&format!("set:\n  title: rule edit\n{}:\n  depends_on: [PX-2]\n", if removing { "remove" } else { "add" })).unwrap();
             let (read_tx, read_rx) = mpsc::channel();
             let (resume_tx, resume_rx) = mpsc::channel();
             let root = storage.root_path.clone();
@@ -3149,22 +2361,13 @@ mod dev21_cross_root_dependency_tests {
                     &current,
                     &config,
                     &action,
-                    &AutomationActionContext {
-                        event: AutomationEvent::Updated,
-                        job: None,
-                        previous: None,
-                        comment_text: None,
-                    },
+                    &AutomationActionContext { event: AutomationEvent::Updated, job: None, previous: None, comment_text: None },
                 )
             });
             read_rx.recv_timeout(Duration::from_secs(5)).unwrap();
             crate::services::relationships::mutate(
                 &storage,
-                &RelationshipMutationRequest {
-                    target: "PX-3".into(),
-                    kind: RelationshipField::Blocks,
-                    ..request
-                },
+                &RelationshipMutationRequest { target: "PX-3".into(), kind: RelationshipField::Blocks, ..request },
             )
             .unwrap();
             resume_tx.send(()).unwrap();
@@ -3172,43 +2375,13 @@ mod dev21_cross_root_dependency_tests {
             let updated = TaskService::get(&storage, "PX-1", None).unwrap();
             assert_eq!(updated.title, "rule edit");
             assert_eq!(updated.relationships.blocks, ["PX-3"]);
-            assert_eq!(
-                TaskService::get(&storage, "PX-3", None)
-                    .unwrap()
-                    .relationships
-                    .depends_on,
-                ["PX-1"]
-            );
-            assert_eq!(
-                updated.relationships.depends_on,
-                if removing {
-                    vec![]
-                } else {
-                    vec!["PX-2".to_string()]
-                }
-            );
-            assert_eq!(
-                TaskService::get(&storage, "PX-2", None)
-                    .unwrap()
-                    .relationships
-                    .blocks,
-                if removing {
-                    vec![]
-                } else {
-                    vec!["PX-1".to_string()]
-                }
-            );
+            assert_eq!(TaskService::get(&storage, "PX-3", None).unwrap().relationships.depends_on, ["PX-1"]);
+            assert_eq!(updated.relationships.depends_on, if removing { vec![] } else { vec!["PX-2".to_string()] });
+            assert_eq!(TaskService::get(&storage, "PX-2", None).unwrap().relationships.blocks, if removing { vec![] } else { vec!["PX-1".to_string()] });
 
-            let before: Vec<_> = (1..=3)
-                .map(|n| fs::read(storage.root_path.join(format!("PX/{n}.yml"))).unwrap())
-                .collect();
-            let invalid: AutomationAction = serde_yaml_ng::from_str(
-                "set:\n  title: must not publish\nadd:\n  depends_on: [ABSENT-99]\n",
-            )
-            .unwrap();
-            let mut current_storage = Storage {
-                root_path: storage.root_path.clone(),
-            };
+            let before: Vec<_> = (1..=3).map(|n| fs::read(storage.root_path.join(format!("PX/{n}.yml"))).unwrap()).collect();
+            let invalid: AutomationAction = serde_yaml_ng::from_str("set:\n  title: must not publish\nadd:\n  depends_on: [ABSENT-99]\n").unwrap();
+            let mut current_storage = Storage { root_path: storage.root_path.clone() };
             let config = TaskService::resolve_config_for_project(&storage.root_path, "PX");
             assert!(
                 apply_action(
@@ -3216,20 +2389,12 @@ mod dev21_cross_root_dependency_tests {
                     &updated,
                     &config,
                     &invalid,
-                    &AutomationActionContext {
-                        event: AutomationEvent::Updated,
-                        job: None,
-                        previous: None,
-                        comment_text: None
-                    }
+                    &AutomationActionContext { event: AutomationEvent::Updated, job: None, previous: None, comment_text: None }
                 )
                 .is_err()
             );
             for n in 1..=3 {
-                assert_eq!(
-                    fs::read(storage.root_path.join(format!("PX/{n}.yml"))).unwrap(),
-                    before[n - 1]
-                );
+                assert_eq!(fs::read(storage.root_path.join(format!("PX/{n}.yml"))).unwrap(), before[n - 1]);
             }
             assert!(!storage.root_path.join("ABSENT").exists());
         }
@@ -3238,10 +2403,7 @@ mod dev21_cross_root_dependency_tests {
     #[test]
     fn relationship_actions_preserve_exact_case_task_identities() {
         let action: AutomationTagAction = serde_yaml_ng::from_str("depends_on: [aa-1]\n").unwrap();
-        let mut relationships = crate::types::TaskRelationships {
-            depends_on: vec!["AA-1".into()],
-            ..Default::default()
-        };
+        let mut relationships = crate::types::TaskRelationships { depends_on: vec!["AA-1".into()], ..Default::default() };
         apply_relationship_action(None, &action, true, &mut relationships);
         assert_eq!(relationships.depends_on, ["AA-1", "aa-1"]);
         apply_relationship_action(None, &action, false, &mut relationships);
@@ -3253,9 +2415,7 @@ mod dev21_cross_root_dependency_tests {
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(
             dir.join(format!("{num}.yml")),
-            format!(
-                "title: t{num}\nstatus: {status}\npriority: medium\ntype: task\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-01-01T00:00:00Z\ntags: []\n"
-            ),
+            format!("title: t{num}\nstatus: {status}\npriority: medium\ntype: task\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-01-01T00:00:00Z\ntags: []\n"),
         )
         .unwrap();
     }
@@ -3263,11 +2423,7 @@ mod dev21_cross_root_dependency_tests {
     fn write_config(root: &std::path::Path, done: &str) {
         let tasks = root.join(".tasks");
         std::fs::create_dir_all(&tasks).unwrap();
-        std::fs::write(
-            tasks.join("config.yml"),
-            format!("issue:\n  states: [Todo, Done, Shipped]\n  done_states: [{done}]\n"),
-        )
-        .unwrap();
+        std::fs::write(tasks.join("config.yml"), format!("issue:\n  states: [Todo, Done, Shipped]\n  done_states: [{done}]\n")).unwrap();
     }
 
     fn dependent_dto(id: &str, deps: &[&str]) -> TaskDTO {
@@ -3290,10 +2446,7 @@ mod dev21_cross_root_dependency_tests {
             subtitle: None,
             description: None,
             tags: Vec::new(),
-            relationships: crate::types::TaskRelationships {
-                depends_on: deps.iter().map(|d| (*d).to_string()).collect(),
-                ..Default::default()
-            },
+            relationships: crate::types::TaskRelationships { depends_on: deps.iter().map(|d| (*d).to_string()).collect(), ..Default::default() },
             comments: Vec::new(),
             references: Vec::new(),
             acceptance_criteria: Vec::new(),
@@ -3322,13 +2475,10 @@ mod dev21_cross_root_dependency_tests {
         write_task(&root_b, "PX", 2, "Done");
 
         let storage = Storage::new(&root_a.join(".tasks"));
-        let config =
-            crate::config::resolution::load_and_merge_configs(Some(&root_a.join(".tasks")))
-                .unwrap();
+        let config = crate::config::resolution::load_and_merge_configs(Some(&root_a.join(".tasks"))).unwrap();
 
         for deps in [["PX-1", "PX-2"], ["PX-2", "PX-1"]] {
-            let blocked =
-                find_blocked_dependencies(&storage, &dependent_dto("PX-9", &deps), &config);
+            let blocked = find_blocked_dependencies(&storage, &dependent_dto("PX-9", &deps), &config);
             // PX-1 (Done, non-terminal in A) blocks; PX-2 (Done, terminal
             // in its own root B) does not — regardless of input order.
             assert_eq!(blocked, vec!["PX-1".to_string()], "deps: {deps:?}");
@@ -3346,14 +2496,9 @@ mod dev21_cross_root_dependency_tests {
         yaml.push_str("deleted_at: 2026-10-01T00:00:00Z\n");
         std::fs::write(file, yaml).unwrap();
         let storage = Storage::new(&tmp.path().join(".tasks"));
-        let config =
-            crate::config::resolution::config_for_project(&storage.root_path, Some("PX")).unwrap();
+        let config = crate::config::resolution::config_for_project(&storage.root_path, Some("PX")).unwrap();
         assert_eq!(
-            find_blocked_dependencies(
-                &storage,
-                &dependent_dto("PX-9", &["PX-1", "PX-2", "PX-3"]),
-                &config
-            ),
+            find_blocked_dependencies(&storage, &dependent_dto("PX-9", &["PX-1", "PX-2", "PX-3"]), &config),
             vec!["PX-2".to_string(), "PX-3".to_string()]
         );
     }
@@ -3377,10 +2522,7 @@ mod async_run_monitor_tests {
         assert_eq!(tail.dropped, 6);
 
         let snapshot = tail.snapshot();
-        assert!(
-            snapshot.contains("[+6 earlier stderr bytes]\n"),
-            "{snapshot}"
-        );
+        assert!(snapshot.contains("[+6 earlier stderr bytes]\n"), "{snapshot}");
         assert!(snapshot.ends_with("ghijklmn"), "{snapshot}");
     }
 
@@ -3399,23 +2541,13 @@ mod async_run_monitor_tests {
         // waits out the grace period before being reported as held.
         let (silent_tx, silent_rx) = mpsc::channel::<()>();
         let start = Instant::now();
-        assert!(!stderr_eof_within_grace(
-            &silent_rx,
-            Duration::from_millis(50)
-        ));
-        assert!(
-            start.elapsed() >= Duration::from_millis(45),
-            "grace returned early: {:?}",
-            start.elapsed()
-        );
+        assert!(!stderr_eof_within_grace(&silent_rx, Duration::from_millis(50)));
+        assert!(start.elapsed() >= Duration::from_millis(45), "grace returned early: {:?}", start.elapsed());
 
         // A reader that finished (message sent, then channel closed) is
         // drained, including the already-disconnected case.
         drop(silent_tx);
-        assert!(stderr_eof_within_grace(
-            &silent_rx,
-            Duration::from_millis(1)
-        ));
+        assert!(stderr_eof_within_grace(&silent_rx, Duration::from_millis(1)));
 
         let (tx, rx) = mpsc::channel::<()>();
         tx.send(()).unwrap();
@@ -3435,10 +2567,7 @@ mod windows_async_stdio_tests {
 
     #[test]
     fn detach_clears_inherit_bit_on_pipe_stdio() {
-        for (name, slot) in [
-            ("stdout", sys::STD_OUTPUT_HANDLE),
-            ("stderr", sys::STD_ERROR_HANDLE),
-        ] {
+        for (name, slot) in [("stdout", sys::STD_OUTPUT_HANDLE), ("stderr", sys::STD_ERROR_HANDLE)] {
             let file_type = sys::std_slot_file_type(slot);
             let outcome = sys::clear_std_slot(slot);
             let flags = sys::std_slot_flags(slot);
@@ -3446,16 +2575,8 @@ mod windows_async_stdio_tests {
                 // Captured pipe stdio (nextest/CI): the detach must
                 // verifiably clear the bit. A refusal on a real pipe is a
                 // genuine failure and must not be silently accepted.
-                assert_eq!(
-                    outcome,
-                    sys::SlotDetach::Cleared,
-                    "{name} std slot is a pipe; detach refused (file_type={file_type:#x})"
-                );
-                assert_eq!(
-                    flags.unwrap_or(u32::MAX) & sys::HANDLE_FLAG_INHERIT,
-                    0,
-                    "{name} pipe std slot still inheritable after detach"
-                );
+                assert_eq!(outcome, sys::SlotDetach::Cleared, "{name} std slot is a pipe; detach refused (file_type={file_type:#x})");
+                assert_eq!(flags.unwrap_or(u32::MAX) & sys::HANDLE_FLAG_INHERIT, 0, "{name} pipe std slot still inheritable after detach");
             } else {
                 // Console/character handles legitimately refuse
                 // SetHandleInformation; interactive runs take this arm and
@@ -3464,15 +2585,9 @@ mod windows_async_stdio_tests {
                     (sys::SlotDetach::NoHandle, None) => {}
                     (sys::SlotDetach::NotClearable, _) => {}
                     (sys::SlotDetach::Cleared, Some(flags)) => {
-                        assert_eq!(
-                            flags & sys::HANDLE_FLAG_INHERIT,
-                            0,
-                            "{name} std slot still inheritable after detach"
-                        );
+                        assert_eq!(flags & sys::HANDLE_FLAG_INHERIT, 0, "{name} std slot still inheritable after detach");
                     }
-                    other => panic!(
-                        "{name}: inconsistent detach state {other:?} (file_type={file_type:#x})"
-                    ),
+                    other => panic!("{name}: inconsistent detach state {other:?} (file_type={file_type:#x})"),
                 }
             }
         }
@@ -3488,11 +2603,7 @@ mod windows_async_stdio_tests {
         // outcome, not a flip-flop of the inherit bit).
         if let sys::SlotDetach::Cleared = second {
             let flags = sys::std_slot_flags(sys::STD_OUTPUT_HANDLE);
-            assert_eq!(
-                flags.unwrap_or(0) & sys::HANDLE_FLAG_INHERIT,
-                0,
-                "repeat detach re-armed the inherit flag"
-            );
+            assert_eq!(flags.unwrap_or(0) & sys::HANDLE_FLAG_INHERIT, 0, "repeat detach re-armed the inherit flag");
         }
     }
 }

@@ -8,39 +8,19 @@ use common::TestFixtures;
 use lotar::services::audit_service::AuditService;
 
 fn git(root: &std::path::Path, args: &[&str]) {
-    let out = std::process::Command::new("git")
-        .current_dir(root)
-        .env_remove("GIT_DIR")
-        .args(args)
-        .output()
-        .unwrap();
+    let out = std::process::Command::new("git").current_dir(root).env_remove("GIT_DIR").args(args).output().unwrap();
     assert!(out.status.success(), "{:?}", out);
 }
 
 fn lotar(root: &std::path::Path, args: &[&str]) -> String {
-    let out = common::lotar_cmd()
-        .unwrap()
-        .current_dir(root)
-        .env("LOTAR_DEFAULT_REPORTER", "tester")
-        .args(args)
-        .output()
-        .unwrap();
-    assert!(
-        out.status.success(),
-        "{args:?}: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
+    let out = common::lotar_cmd().unwrap().current_dir(root).env("LOTAR_DEFAULT_REPORTER", "tester").args(args).output().unwrap();
+    assert!(out.status.success(), "{args:?}: {}", String::from_utf8_lossy(&out.stderr));
     String::from_utf8_lossy(&out.stdout).into_owned()
 }
 
 fn ids(json: &str) -> Vec<String> {
     let value: serde_json::Value = serde_json::from_str(json).unwrap();
-    let mut ids: Vec<String> = value["tasks"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|task| task["id"].as_str().unwrap().to_string())
-        .collect();
+    let mut ids: Vec<String> = value["tasks"].as_array().unwrap().iter().map(|task| task["id"].as_str().unwrap().to_string()).collect();
     ids.sort();
     ids
 }
@@ -66,27 +46,13 @@ fn feed_reports_every_task_of_a_bulk_commit() {
 
     let since = chrono::Utc::now() - chrono::Duration::days(1);
     let until = chrono::Utc::now() + chrono::Duration::days(1);
-    let feed = AuditService::list_activity_feed(
-        root,
-        std::path::Path::new(".tasks"),
-        since,
-        until,
-        None,
-        200,
-    )
-    .unwrap();
+    let feed = AuditService::list_activity_feed(root, std::path::Path::new(".tasks"), since, until, None, 200).unwrap();
 
     let bulk: Vec<_> = feed.iter().filter(|i| i.message == "bulk status").collect();
     assert_eq!(bulk.len(), 12, "{feed:#?}");
     for item in &bulk {
         assert!(item.task_title.as_deref().unwrap().starts_with("task "));
-        assert!(
-            item.history.iter().any(|entry| entry
-                .changes
-                .iter()
-                .any(|c| c.field == "status" && c.new.as_deref() == Some("InProgress"))),
-            "{item:#?}"
-        );
+        assert!(item.history.iter().any(|entry| entry.changes.iter().any(|c| c.field == "status" && c.new.as_deref() == Some("InProgress"))), "{item:#?}");
     }
     // The root commit has no parent; its history entries still show (new
     // tasks start without history, so only the priority change appears).
@@ -103,11 +69,7 @@ fn least_busy_spreads_a_manual_run() {
     for i in 0..6 {
         lotar(root, &["add", &format!("open {i}"), "-p", "LB"]);
     }
-    std::fs::write(
-        root.join(".tasks/config.yml"),
-        "default:\n  project: LB\n  members: [alice, bob, carol]\n",
-    )
-    .unwrap();
+    std::fs::write(root.join(".tasks/config.yml"), "default:\n  project: LB\n  members: [alice, bob, carol]\n").unwrap();
     std::fs::write(
         root.join(".tasks/automation.yml"),
         r#"automation:
@@ -128,9 +90,7 @@ fn least_busy_spreads_a_manual_run() {
     let value: serde_json::Value = serde_json::from_str(&json).unwrap();
     let mut counts = std::collections::BTreeMap::new();
     for task in value["tasks"].as_array().unwrap() {
-        *counts
-            .entry(task["assignee"].as_str().unwrap_or("-").to_string())
-            .or_insert(0) += 1;
+        *counts.entry(task["assignee"].as_str().unwrap_or("-").to_string()).or_insert(0) += 1;
     }
     // Every task is assigned and the load stays within one task per member
     // (the project's members are alice plus the auto-added reporter).
@@ -145,26 +105,11 @@ fn least_busy_spreads_a_manual_run() {
 fn exclusions_filter_the_main_results() {
     let fixtures = TestFixtures::new();
     let root = fixtures.get_temp_path();
-    lotar(
-        root,
-        &["add", "a", "-p", "DEMO", "--tag", "ui", "-P", "low"],
-    );
-    lotar(
-        root,
-        &["add", "b", "-p", "DEMO", "--tag", "api", "-P", "high"],
-    );
-    lotar(
-        root,
-        &["add", "c", "-p", "DEMO", "--tag", "ui", "-P", "high"],
-    );
-    lotar(
-        root,
-        &["add", "d", "-p", "DEMO", "-P", "low", "--type", "bug"],
-    );
-    lotar(
-        root,
-        &["add", "e", "-p", "DEMO", "-P", "high", "--assignee", "bob"],
-    );
+    lotar(root, &["add", "a", "-p", "DEMO", "--tag", "ui", "-P", "low"]);
+    lotar(root, &["add", "b", "-p", "DEMO", "--tag", "api", "-P", "high"]);
+    lotar(root, &["add", "c", "-p", "DEMO", "--tag", "ui", "-P", "high"]);
+    lotar(root, &["add", "d", "-p", "DEMO", "-P", "low", "--type", "bug"]);
+    lotar(root, &["add", "e", "-p", "DEMO", "-P", "high", "--assignee", "bob"]);
     lotar(root, &["status", "DEMO-5", "Done"]);
 
     let list = |args: &[&str]| {
@@ -174,16 +119,7 @@ fn exclusions_filter_the_main_results() {
     };
     assert_eq!(list(&["-tag:ui"]), ["DEMO-2", "DEMO-4", "DEMO-5"]);
     assert_eq!(list(&["-tag:ui", "-priority:low"]), ["DEMO-2", "DEMO-5"]);
-    assert_eq!(
-        list(&["--", "-type:bug", "-tag:api"]),
-        ["DEMO-1", "DEMO-3", "DEMO-5"]
-    );
-    assert_eq!(
-        list(&["-assignee:bob"]),
-        ["DEMO-1", "DEMO-2", "DEMO-3", "DEMO-4"]
-    );
-    assert_eq!(
-        list(&["priority:high", "-status:Done"]),
-        ["DEMO-2", "DEMO-3"]
-    );
+    assert_eq!(list(&["--", "-type:bug", "-tag:api"]), ["DEMO-1", "DEMO-3", "DEMO-5"]);
+    assert_eq!(list(&["-assignee:bob"]), ["DEMO-1", "DEMO-2", "DEMO-3", "DEMO-4"]);
+    assert_eq!(list(&["priority:high", "-status:Done"]), ["DEMO-2", "DEMO-3"]);
 }

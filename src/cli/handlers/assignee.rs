@@ -4,9 +4,8 @@ use crate::cli::handlers::agent::running_job_for_ticket;
 use crate::cli::handlers::task::context::TaskCommandContext;
 use crate::cli::handlers::task::mutation::{LoadedTask, load_task};
 use crate::cli::handlers::task::render::{
-    ExplainPlacement, PropertyCurrent, PropertyExplain, PropertyNoop, PropertyPreview,
-    PropertySuccess, render_property_current, render_property_noop, render_property_preview,
-    render_property_success,
+    ExplainPlacement, PropertyCurrent, PropertyExplain, PropertyNoop, PropertyPreview, PropertySuccess, render_property_current, render_property_noop,
+    render_property_preview, render_property_success,
 };
 use crate::cli::validation::CliValidator;
 use crate::output::OutputRenderer;
@@ -25,49 +24,22 @@ pub struct AssigneeArgs {
 }
 
 impl AssigneeArgs {
-    pub fn new(
-        task_id: String,
-        new_assignee: Option<String>,
-        explicit_project: Option<String>,
-        dry_run: bool,
-        explain: bool,
-    ) -> Self {
-        Self {
-            task_id,
-            new_assignee,
-            explicit_project,
-            dry_run,
-            explain,
-        }
+    pub fn new(task_id: String, new_assignee: Option<String>, explicit_project: Option<String>, dry_run: bool, explain: bool) -> Self {
+        Self { task_id, new_assignee, explicit_project, dry_run, explain }
     }
 }
 
-const ASSIGNEE_DRY_RUN_EXPLANATION: &str =
-    "assignee validated against project members; @me resolved during persistence";
+const ASSIGNEE_DRY_RUN_EXPLANATION: &str = "assignee validated against project members; @me resolved during persistence";
 
 impl CommandHandler for AssigneeHandler {
     type Args = AssigneeArgs;
     type Result = Result<(), String>;
 
-    fn execute(
-        args: Self::Args,
-        project: Option<&str>,
-        resolver: &TasksDirectoryResolver,
-        renderer: &OutputRenderer,
-    ) -> Self::Result {
-        let AssigneeArgs {
-            task_id,
-            new_assignee,
-            explicit_project,
-            dry_run,
-            explain,
-        } = args;
+    fn execute(args: Self::Args, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Self::Result {
+        let AssigneeArgs { task_id, new_assignee, explicit_project, dry_run, explain } = args;
 
         let project_hint = explicit_project.as_deref().or(project);
-        renderer.log_info(format_args!(
-            "assignee: begin task_id={} explicit_project={:?}",
-            task_id, project_hint
-        ));
+        renderer.log_info(format_args!("assignee: begin task_id={} explicit_project={:?}", task_id, project_hint));
 
         let mut ctx = if new_assignee.is_some() {
             TaskCommandContext::new(resolver, project_hint, Some(task_id.as_str()))?
@@ -82,9 +54,7 @@ impl CommandHandler for AssigneeHandler {
                 render_current_assignee(renderer, &full_id, task.assignee.as_deref(), explain);
                 Ok(())
             }
-            Some(candidate) => handle_set_assignee(
-                &candidate, dry_run, explain, &full_id, task, &mut ctx, renderer,
-            ),
+            Some(candidate) => handle_set_assignee(&candidate, dry_run, explain, &full_id, task, &mut ctx, renderer),
         }
     }
 }
@@ -100,10 +70,7 @@ fn handle_set_assignee(
 ) -> Result<(), String> {
     let validator = CliValidator::new(&ctx.config);
     let autop_members_enabled = ctx.config.auto_populate_members;
-    renderer.log_debug(format_args!(
-        "assignee: validating new_assignee='{}'",
-        candidate
-    ));
+    renderer.log_debug(format_args!("assignee: validating new_assignee='{}'", candidate));
 
     let trimmed = candidate.trim();
     if trimmed.is_empty() {
@@ -113,18 +80,11 @@ fn handle_set_assignee(
     // The ticket's own reporter is an identity LoTaR already stored, even
     // when it is not username-shaped (a git user.name such as "Sam Example"),
     // so handing a ticket back to its reporter always works.
-    let is_reporter = task
-        .reporter
-        .as_deref()
-        .is_some_and(|reporter| reporter.trim() == trimmed);
+    let is_reporter = task.reporter.as_deref().is_some_and(|reporter| reporter.trim() == trimmed);
     let validated = if is_reporter {
         trimmed.to_string()
     } else {
-        let validation = if autop_members_enabled {
-            validator.validate_assignee_allow_unknown(trimmed)
-        } else {
-            validator.validate_assignee(trimmed)
-        };
+        let validation = if autop_members_enabled { validator.validate_assignee_allow_unknown(trimmed) } else { validator.validate_assignee(trimmed) };
         validation.map_err(|e| format!("Assignee validation failed: {}", e))?
     };
 
@@ -144,19 +104,11 @@ fn handle_set_assignee(
     // None and deliberately falls through to the regular flow instead of
     // guessing.
     let is_agent_profile = |name: &str| ctx.config.agent_profiles.contains_key(name);
-    let assignment_key = |value: &str| {
-        crate::utils::member::member_for_assignment_comparison(value, is_agent_profile)
-    };
-    let resolved_candidate = crate::utils::identity::resolve_me_alias_for_project(
-        validated.as_str(),
-        Some(&ctx.storage.root_path),
-        ctx.resolved_project_name(),
-    );
-    let unchanged = resolved_candidate.as_deref().is_some_and(|next| {
-        previous
-            .as_deref()
-            .is_some_and(|current| assignment_key(current) == assignment_key(next))
-    });
+    let assignment_key = |value: &str| crate::utils::member::member_for_assignment_comparison(value, is_agent_profile);
+    let resolved_candidate =
+        crate::utils::identity::resolve_me_alias_for_project(validated.as_str(), Some(&ctx.storage.root_path), ctx.resolved_project_name());
+    let unchanged =
+        resolved_candidate.as_deref().is_some_and(|next| previous.as_deref().is_some_and(|current| assignment_key(current) == assignment_key(next)));
     if unchanged {
         render_assignee_noop(renderer, full_id, previous.as_deref());
         return Ok(());
@@ -168,20 +120,11 @@ fn handle_set_assignee(
     if let Some(job) = running_job_for_ticket(&ctx.tasks_dir.path, full_id)
         && !job.takes_ticket_changes(&ctx.tasks_dir.path, full_id)
     {
-        return Err(format!(
-            "Ticket '{}' has an active agent job (pid {}). Cancel it before changing assignee.",
-            full_id, job.pid
-        ));
+        return Err(format!("Ticket '{}' has an active agent job (pid {}). Cancel it before changing assignee.", full_id, job.pid));
     }
 
     if dry_run {
-        render_assignee_dry_run(
-            renderer,
-            full_id,
-            previous.as_deref(),
-            Some(validated.as_str()),
-            explain,
-        );
+        render_assignee_dry_run(renderer, full_id, previous.as_deref(), Some(validated.as_str()), explain);
         return Ok(());
     }
     task.assignee = Some(validated.clone());
@@ -202,46 +145,24 @@ fn handle_set_assignee(
         custom_fields: None,
         sprints: None,
     };
-    let receipt = TaskService::update_with_receipt(
-        &mut ctx.storage,
-        full_id,
-        patch,
-        crate::services::task_service::TaskUpdateContext::default(),
-    )
-    .map_err(|e| e.to_string())?;
+    let receipt = TaskService::update_with_receipt(&mut ctx.storage, full_id, patch, crate::services::task_service::TaskUpdateContext::default())
+        .map_err(|e| e.to_string())?;
     if let Some(outcome) = receipt.deferred.as_ref() {
         crate::cli::handlers::task::render::render_job_outcome(renderer, full_id, outcome);
         return Ok(());
     }
     let updated = receipt.dto;
 
-    render_assignee_success(
-        renderer,
-        full_id,
-        previous.as_deref(),
-        updated.assignee.as_deref(),
-    );
+    render_assignee_success(renderer, full_id, previous.as_deref(), updated.assignee.as_deref());
     Ok(())
 }
 
-fn render_current_assignee(
-    renderer: &OutputRenderer,
-    task_id: &str,
-    assignee: Option<&str>,
-    explain: bool,
-) {
+fn render_current_assignee(renderer: &OutputRenderer, task_id: &str, assignee: Option<&str>, explain: bool) {
     let display = assignee.unwrap_or("-");
-    let mut current = PropertyCurrent::new(
-        task_id,
-        "assignee",
-        assignee.map(|value| value.to_string()),
-        format!("Task {} assignee: {}", task_id, display),
-    );
+    let mut current = PropertyCurrent::new(task_id, "assignee", assignee.map(|value| value.to_string()), format!("Task {} assignee: {}", task_id, display));
     if explain {
-        current = current.with_explain(PropertyExplain::info(
-            "When updating, @me resolves using git user.name/email or system username.",
-            ExplainPlacement::After,
-        ));
+        current =
+            current.with_explain(PropertyExplain::info("When updating, @me resolves using git user.name/email or system username.", ExplainPlacement::After));
     }
     render_property_current(renderer, current);
 }
@@ -258,13 +179,7 @@ fn render_assignee_noop(renderer: &OutputRenderer, task_id: &str, assignee: Opti
     render_property_noop(renderer, noop);
 }
 
-fn render_assignee_dry_run(
-    renderer: &OutputRenderer,
-    task_id: &str,
-    old_assignee: Option<&str>,
-    new_assignee: Option<&str>,
-    explain: bool,
-) {
+fn render_assignee_dry_run(renderer: &OutputRenderer, task_id: &str, old_assignee: Option<&str>, new_assignee: Option<&str>, explain: bool) {
     let old_display = old_assignee.unwrap_or("-");
     let new_display = new_assignee.unwrap_or("-");
     let mut preview = PropertyPreview::new(
@@ -274,26 +189,15 @@ fn render_assignee_dry_run(
         "new_assignee",
         old_assignee.map(|value| value.to_string()),
         new_assignee.map(|value| value.to_string()),
-        format!(
-            "DRY RUN: Would change {} assignee from {} to {}",
-            task_id, old_display, new_display
-        ),
+        format!("DRY RUN: Would change {} assignee from {} to {}", task_id, old_display, new_display),
     );
     if explain {
-        preview = preview.with_explain(PropertyExplain::info(
-            ASSIGNEE_DRY_RUN_EXPLANATION,
-            ExplainPlacement::After,
-        ));
+        preview = preview.with_explain(PropertyExplain::info(ASSIGNEE_DRY_RUN_EXPLANATION, ExplainPlacement::After));
     }
     render_property_preview(renderer, preview);
 }
 
-fn render_assignee_success(
-    renderer: &OutputRenderer,
-    task_id: &str,
-    old_assignee: Option<&str>,
-    new_assignee: Option<&str>,
-) {
+fn render_assignee_success(renderer: &OutputRenderer, task_id: &str, old_assignee: Option<&str>, new_assignee: Option<&str>) {
     let old_display = old_assignee.unwrap_or("-");
     let new_display = new_assignee.unwrap_or("-");
     let success = PropertySuccess::new(
@@ -302,14 +206,8 @@ fn render_assignee_success(
         "new_assignee",
         old_assignee.map(|value| value.to_string()),
         new_assignee.map(|value| value.to_string()),
-        format!(
-            "Task {} assignee changed from {} to {}",
-            task_id, old_display, new_display
-        ),
-        format!(
-            "Task {} assignee changed: {} -> {}",
-            task_id, old_display, new_display
-        ),
+        format!("Task {} assignee changed from {} to {}", task_id, old_display, new_display),
+        format!("Task {} assignee changed: {} -> {}", task_id, old_display, new_display),
     );
     render_property_success(renderer, success);
 }

@@ -37,33 +37,14 @@ impl GithubIssuePayload {
         if include_state && let Some(state) = self.state.as_ref() {
             map.insert("state".to_string(), JsonValue::String(state.clone()));
             if let Some(reason) = self.state_reason.as_ref() {
-                map.insert(
-                    "state_reason".to_string(),
-                    JsonValue::String(reason.clone()),
-                );
+                map.insert("state_reason".to_string(), JsonValue::String(reason.clone()));
             }
         }
         if self.labels_explicit || !self.labels.is_empty() {
-            map.insert(
-                "labels".to_string(),
-                JsonValue::Array(
-                    self.labels
-                        .iter()
-                        .map(|label| JsonValue::String(label.clone()))
-                        .collect(),
-                ),
-            );
+            map.insert("labels".to_string(), JsonValue::Array(self.labels.iter().map(|label| JsonValue::String(label.clone())).collect()));
         }
         if self.assignees_explicit || !self.assignees.is_empty() {
-            map.insert(
-                "assignees".to_string(),
-                JsonValue::Array(
-                    self.assignees
-                        .iter()
-                        .map(|assignee| JsonValue::String(assignee.clone()))
-                        .collect(),
-                ),
-            );
+            map.insert("assignees".to_string(), JsonValue::Array(self.assignees.iter().map(|assignee| JsonValue::String(assignee.clone())).collect()));
         }
         JsonValue::Object(map)
     }
@@ -92,10 +73,7 @@ pub(super) fn build_jira_payload(
     let mut payload = JiraIssuePayload::default();
     for (local_key, mapping) in &remote.mapping {
         let detail = normalize_mapping_detail(local_key, mapping);
-        let remote_field = detail
-            .field
-            .clone()
-            .unwrap_or_else(|| local_key.to_string());
+        let remote_field = detail.field.clone().unwrap_or_else(|| local_key.to_string());
         let value = local_value_for_field(task, local_key);
         let mapped = apply_mapping_for_push(remote.provider, &remote_field, value, &detail);
         let Some(value) = mapped else {
@@ -105,51 +83,31 @@ pub(super) fn build_jira_payload(
             payload.desired_status = value.to_string_value();
             continue;
         }
-        apply_jira_field(
-            &mut payload.fields,
-            &remote_field,
-            value,
-            client,
-            lookup,
-            warnings,
-        );
+        apply_jira_field(&mut payload.fields, &remote_field, value, client, lookup, warnings);
     }
 
     if matches!(op, SyncOperation::Create) {
         if !payload.fields.contains_key("summary") {
-            payload
-                .fields
-                .insert("summary".to_string(), JsonValue::String(task.title.clone()));
+            payload.fields.insert("summary".to_string(), JsonValue::String(task.title.clone()));
         }
         if !payload.fields.contains_key("project")
             && let Some(project) = remote.project.as_deref()
         {
-            payload
-                .fields
-                .insert("project".to_string(), json!({"key": project}));
+            payload.fields.insert("project".to_string(), json!({"key": project}));
         }
         if !payload.fields.contains_key("issuetype") {
-            payload
-                .fields
-                .insert("issuetype".to_string(), json!({"name": "Task"}));
+            payload.fields.insert("issuetype".to_string(), json!({"name": "Task"}));
         }
     }
 
     payload
 }
 
-pub(super) fn build_github_payload(
-    remote: &SyncRemoteConfig,
-    task: &TaskDTO,
-    op: SyncOperation,
-) -> GithubIssuePayload {
+pub(super) fn build_github_payload(remote: &SyncRemoteConfig, task: &TaskDTO, op: SyncOperation) -> GithubIssuePayload {
     let mut payload = GithubIssuePayload::default();
     for (local_key, mapping) in &remote.mapping {
         let detail = normalize_mapping_detail(local_key, mapping);
-        let remote_field = detail
-            .field
-            .clone()
-            .unwrap_or_else(|| local_key.to_string());
+        let remote_field = detail.field.clone().unwrap_or_else(|| local_key.to_string());
         let value = local_value_for_field(task, local_key);
         let mapped = apply_mapping_for_push(remote.provider, &remote_field, value, &detail);
         let Some(value) = mapped else {
@@ -212,28 +170,13 @@ pub(super) fn apply_jira_field(
             let next = JsonValue::Array(list.into_iter().map(JsonValue::String).collect());
             if let Some(existing) = fields.get(field).cloned() {
                 let mut merged = match existing {
-                    JsonValue::Array(items) => items
-                        .iter()
-                        .filter_map(|item| item.as_str().map(|s| s.to_string()))
-                        .collect::<Vec<_>>(),
+                    JsonValue::Array(items) => items.iter().filter_map(|item| item.as_str().map(|s| s.to_string())).collect::<Vec<_>>(),
                     _ => Vec::new(),
                 };
                 if let JsonValue::Array(next_items) = next {
-                    merged.extend(
-                        next_items
-                            .into_iter()
-                            .filter_map(|item| item.as_str().map(|s| s.to_string())),
-                    );
+                    merged.extend(next_items.into_iter().filter_map(|item| item.as_str().map(|s| s.to_string())));
                 }
-                fields.insert(
-                    field.to_string(),
-                    JsonValue::Array(
-                        dedupe_list(merged)
-                            .into_iter()
-                            .map(JsonValue::String)
-                            .collect(),
-                    ),
-                );
+                fields.insert(field.to_string(), JsonValue::Array(dedupe_list(merged).into_iter().map(JsonValue::String).collect()));
             } else {
                 fields.insert(field.to_string(), next);
             }
@@ -241,19 +184,14 @@ pub(super) fn apply_jira_field(
         _ => {
             let json_value = match value {
                 FieldValue::String(text) => JsonValue::String(text),
-                FieldValue::List(values) => {
-                    JsonValue::Array(values.into_iter().map(JsonValue::String).collect())
-                }
+                FieldValue::List(values) => JsonValue::Array(values.into_iter().map(JsonValue::String).collect()),
             };
             fields.insert(field.to_string(), json_value);
         }
     }
 }
 
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "the caller hands this value over and does not use it afterwards"
-)]
+#[expect(clippy::needless_pass_by_value, reason = "the caller hands this value over and does not use it afterwards")]
 pub(super) fn apply_github_field(payload: &mut GithubIssuePayload, field: &str, value: FieldValue) {
     let field_lower = field.to_ascii_lowercase();
     match field_lower.as_str() {
@@ -274,16 +212,7 @@ pub(super) fn apply_github_field(payload: &mut GithubIssuePayload, field: &str, 
 }
 
 /// Issue fields a GitHub mapping can write; others are not sent.
-pub(crate) const GITHUB_PUSH_FIELDS: &[&str] = &[
-    "title",
-    "body",
-    "description",
-    "state",
-    "status",
-    "state_reason",
-    "labels",
-    "assignees",
-];
+pub(crate) const GITHUB_PUSH_FIELDS: &[&str] = &["title", "body", "description", "state", "status", "state_reason", "labels", "assignees"];
 
 pub(super) fn jira_payload_field_names(payload: &JiraIssuePayload) -> Vec<String> {
     let mut names = payload.fields.keys().cloned().collect::<Vec<_>>();
@@ -313,19 +242,14 @@ pub(super) fn github_payload_field_names(payload: &GithubIssuePayload) -> Vec<St
     names
 }
 
-pub(super) fn filter_jira_payload_against_issue(
-    issue: &JsonValue,
-    payload: &mut JiraIssuePayload,
-) -> Vec<String> {
+pub(super) fn filter_jira_payload_against_issue(issue: &JsonValue, payload: &mut JiraIssuePayload) -> Vec<String> {
     let mut changed = Vec::new();
     let mut next = JsonMap::new();
     for (field, value) in &payload.fields {
         let desired = jira_payload_field_value(field, value);
         // Users are sent as {accountId}, so compare with the issue's
         // accountId, not the email/display name a pull stores (DEV-262).
-        let current = if matches!(field.to_ascii_lowercase().as_str(), "assignee" | "reporter")
-            && value.get("accountId").is_some()
-        {
+        let current = if matches!(field.to_ascii_lowercase().as_str(), "assignee" | "reporter") && value.get("accountId").is_some() {
             issue
                 .get("fields")
                 .and_then(|fields| fields.get(field.as_str()))
@@ -348,10 +272,7 @@ pub(super) fn filter_jira_payload_against_issue(
 
     if let Some(status) = payload.desired_status.clone() {
         let desired = FieldValue::String(status.clone());
-        let matches = read_jira_field(issue, "status")
-            .as_ref()
-            .map(|current| field_values_match(&desired, current))
-            .unwrap_or(false);
+        let matches = read_jira_field(issue, "status").as_ref().map(|current| field_values_match(&desired, current)).unwrap_or(false);
         if matches {
             payload.desired_status = None;
         } else {
@@ -362,18 +283,12 @@ pub(super) fn filter_jira_payload_against_issue(
     changed
 }
 
-pub(super) fn filter_github_payload_against_issue(
-    issue: &JsonValue,
-    payload: &mut GithubIssuePayload,
-) -> Vec<String> {
+pub(super) fn filter_github_payload_against_issue(issue: &JsonValue, payload: &mut GithubIssuePayload) -> Vec<String> {
     let mut changed = Vec::new();
 
     if let Some(title) = payload.title.clone() {
         let desired = FieldValue::String(title);
-        let matches = read_github_field(issue, "title")
-            .as_ref()
-            .map(|current| field_values_match(&desired, current))
-            .unwrap_or(false);
+        let matches = read_github_field(issue, "title").as_ref().map(|current| field_values_match(&desired, current)).unwrap_or(false);
         if matches {
             payload.title = None;
         } else {
@@ -383,10 +298,7 @@ pub(super) fn filter_github_payload_against_issue(
 
     if let Some(body) = payload.body.clone() {
         let desired = FieldValue::String(body);
-        let matches = read_github_field(issue, "body")
-            .as_ref()
-            .map(|current| field_values_match(&desired, current))
-            .unwrap_or(false);
+        let matches = read_github_field(issue, "body").as_ref().map(|current| field_values_match(&desired, current)).unwrap_or(false);
         if matches {
             payload.body = None;
         } else {
@@ -396,10 +308,7 @@ pub(super) fn filter_github_payload_against_issue(
 
     if let Some(state) = payload.state.clone() {
         let desired = FieldValue::String(state);
-        let matches = read_github_field(issue, "state")
-            .as_ref()
-            .map(|current| field_values_match(&desired, current))
-            .unwrap_or(false);
+        let matches = read_github_field(issue, "state").as_ref().map(|current| field_values_match(&desired, current)).unwrap_or(false);
         if matches {
             payload.state = None;
         } else {
@@ -409,10 +318,7 @@ pub(super) fn filter_github_payload_against_issue(
 
     if payload.labels_explicit || !payload.labels.is_empty() {
         let desired = FieldValue::List(dedupe_list(payload.labels.clone()));
-        let matches = read_github_field(issue, "labels")
-            .as_ref()
-            .map(|current| field_values_match(&desired, current))
-            .unwrap_or(false);
+        let matches = read_github_field(issue, "labels").as_ref().map(|current| field_values_match(&desired, current)).unwrap_or(false);
         if matches {
             payload.labels.clear();
             payload.labels_explicit = false;
@@ -423,10 +329,7 @@ pub(super) fn filter_github_payload_against_issue(
 
     if payload.assignees_explicit || !payload.assignees.is_empty() {
         let desired = FieldValue::List(dedupe_list(payload.assignees.clone()));
-        let matches = read_github_field(issue, "assignees")
-            .as_ref()
-            .map(|current| field_values_match(&desired, current))
-            .unwrap_or(false);
+        let matches = read_github_field(issue, "assignees").as_ref().map(|current| field_values_match(&desired, current)).unwrap_or(false);
         if matches {
             payload.assignees.clear();
             payload.assignees_explicit = false;
@@ -458,26 +361,14 @@ mod tests {
         let mut payload = JiraIssuePayload {
             fields: JsonMap::from_iter([
                 ("assignee".to_string(), json!({"accountId": "557058:ada"})),
-                (
-                    "description".to_string(),
-                    jira_text_to_adf(&jira_adf_to_text(&issue["fields"]["description"])),
-                ),
+                ("description".to_string(), jira_text_to_adf(&jira_adf_to_text(&issue["fields"]["description"]))),
             ]),
             desired_status: None,
         };
         let changed = filter_jira_payload_against_issue(&issue, &mut payload);
         assert!(changed.is_empty(), "nothing changed: {changed:?}");
 
-        let mut payload = JiraIssuePayload {
-            fields: JsonMap::from_iter([(
-                "assignee".to_string(),
-                json!({"accountId": "557058:bob"}),
-            )]),
-            desired_status: None,
-        };
-        assert_eq!(
-            filter_jira_payload_against_issue(&issue, &mut payload),
-            vec!["assignee".to_string()]
-        );
+        let mut payload = JiraIssuePayload { fields: JsonMap::from_iter([("assignee".to_string(), json!({"accountId": "557058:bob"}))]), desired_status: None };
+        assert_eq!(filter_jira_payload_against_issue(&issue, &mut payload), vec!["assignee".to_string()]);
     }
 }

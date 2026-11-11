@@ -8,20 +8,10 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Err(response) => return response,
         };
         let project = req.query.get("project").map(|s| s.as_str());
-        let limit = req
-            .query
-            .get("limit")
-            .and_then(|s| s.parse::<usize>().ok())
-            .unwrap_or(200);
-        match crate::services::audit_service::AuditService::list_activity_feed(
-            &repo_root, &tasks_rel, since, until, project, limit,
-        ) {
+        let limit = req.query.get("limit").and_then(|s| s.parse::<usize>().ok()).unwrap_or(200);
+        match crate::services::audit_service::AuditService::list_activity_feed(&repo_root, &tasks_rel, since, until, project, limit) {
             Ok(items) => ok_json(200, json!({"data": items})),
-            Err(e)
-                if e.starts_with("Unknown project") || e.starts_with("Invalid project filter") =>
-            {
-                bad_request(e)
-            }
+            Err(e) if e.starts_with("Unknown project") || e.starts_with("Invalid project filter") => bad_request(e),
             Err(e) => internal_error(e),
         }
     });
@@ -38,9 +28,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Some("project") => crate::services::audit_service::GroupBy::Project,
             None => crate::services::audit_service::GroupBy::Day,
             Some(other) => {
-                return bad_request(format!(
-                    "Invalid group '{other}': use author, day, week or project"
-                ));
+                return bad_request(format!("Invalid group '{other}': use author, day, week or project"));
             }
         };
         // Parse since/until
@@ -49,15 +37,9 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Err(response) => return response,
         };
         let project = req.query.get("project").map(|s| s.as_str());
-        match crate::services::audit_service::AuditService::list_activity(
-            &repo_root, &tasks_rel, since, until, gb, project,
-        ) {
+        match crate::services::audit_service::AuditService::list_activity(&repo_root, &tasks_rel, since, until, gb, project) {
             Ok(items) => ok_json(200, json!({"data": items})),
-            Err(e)
-                if e.starts_with("Unknown project") || e.starts_with("Invalid project filter") =>
-            {
-                bad_request(e)
-            }
+            Err(e) if e.starts_with("Unknown project") || e.starts_with("Invalid project filter") => bad_request(e),
             Err(e) => internal_error(e),
         }
     });
@@ -71,15 +53,9 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Err(response) => return response,
         };
         let project = req.query.get("project").map(|s| s.as_str());
-        match crate::services::audit_service::AuditService::list_authors_activity(
-            &repo_root, &tasks_rel, since, until, project,
-        ) {
+        match crate::services::audit_service::AuditService::list_authors_activity(&repo_root, &tasks_rel, since, until, project) {
             Ok(items) => ok_json(200, json!({"data": items})),
-            Err(e)
-                if e.starts_with("Unknown project") || e.starts_with("Invalid project filter") =>
-            {
-                bad_request(e)
-            }
+            Err(e) if e.starts_with("Unknown project") || e.starts_with("Invalid project filter") => bad_request(e),
             Err(e) => internal_error(e),
         }
     });
@@ -94,15 +70,9 @@ pub(super) fn register(api_server: &mut ApiServer) {
         };
         let author = req.query.get("author").map(|s| s.as_str());
         let project = req.query.get("project").map(|s| s.as_str());
-        match crate::services::audit_service::AuditService::list_changed_tasks(
-            &repo_root, &tasks_rel, since, until, author, project,
-        ) {
+        match crate::services::audit_service::AuditService::list_changed_tasks(&repo_root, &tasks_rel, since, until, author, project) {
             Ok(items) => ok_json(200, json!({"data": items})),
-            Err(e)
-                if e.starts_with("Unknown project") || e.starts_with("Invalid project filter") =>
-            {
-                bad_request(e)
-            }
+            Err(e) if e.starts_with("Unknown project") || e.starts_with("Invalid project filter") => bad_request(e),
             Err(e) => internal_error(e),
         }
     });
@@ -114,19 +84,13 @@ pub(super) fn register(api_server: &mut ApiServer) {
 /// fall back to the last 30 days.
 /// `since`/`until` window (RFC 3339), defaulting to the last 30 days. A
 /// value that does not parse is a 400, not a silent default (DEV-276).
-fn activity_window(
-    req: &HttpRequest,
-) -> Result<(chrono::DateTime<Utc>, chrono::DateTime<Utc>), HttpResponse> {
+fn activity_window(req: &HttpRequest) -> Result<(chrono::DateTime<Utc>, chrono::DateTime<Utc>), HttpResponse> {
     let parse = |key: &str| -> Result<Option<chrono::DateTime<Utc>>, HttpResponse> {
         match req.query.get(key).map(|s| s.trim()).filter(|s| !s.is_empty()) {
             None => Ok(None),
             Some(raw) => chrono::DateTime::parse_from_rfc3339(raw)
                 .map(|dt| Some(dt.with_timezone(&Utc)))
-                .map_err(|_| {
-                    bad_request(format!(
-                        "Invalid {key} '{raw}': use an RFC 3339 timestamp such as 2026-01-31T00:00:00Z"
-                    ))
-                }),
+                .map_err(|_| bad_request(format!("Invalid {key} '{raw}': use an RFC 3339 timestamp such as 2026-01-31T00:00:00Z"))),
         }
     };
     let now = Utc::now();

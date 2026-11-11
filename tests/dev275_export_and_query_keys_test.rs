@@ -10,10 +10,7 @@ fn get(api: &ApiServer, path: &str, query: &[(&str, &str)]) -> (u16, String) {
     let resp = api.handle_request(&HttpRequest {
         method: "GET".into(),
         path: path.into(),
-        query: query
-            .iter()
-            .map(|(k, v)| (k.to_string(), v.to_string()))
-            .collect::<HashMap<_, _>>(),
+        query: query.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect::<HashMap<_, _>>(),
         headers: HashMap::new(),
         body: Vec::new(),
     });
@@ -24,16 +21,8 @@ fn workspace(custom_fields: &str) -> (tempfile::TempDir, EnvVarGuard, ApiServer)
     let tmp = tempfile::tempdir().unwrap();
     let tasks = tmp.path().join(".tasks");
     std::fs::create_dir_all(tasks.join("DEMO")).unwrap();
-    std::fs::write(
-        tasks.join("config.yml"),
-        format!("default:\n  project: DEMO\ncustom:\n  fields: {custom_fields}\n"),
-    )
-    .unwrap();
-    for (n, title) in [
-        (1, r#"Say "hi" now"#),
-        (2, r#"=HYPERLINK("http://x.example","click")"#),
-        (3, "plain, with comma"),
-    ] {
+    std::fs::write(tasks.join("config.yml"), format!("default:\n  project: DEMO\ncustom:\n  fields: {custom_fields}\n")).unwrap();
+    for (n, title) in [(1, r#"Say "hi" now"#), (2, r#"=HYPERLINK("http://x.example","click")"#), (3, "plain, with comma")] {
         std::fs::write(
             tasks.join("DEMO").join(format!("{n}.yml")),
             format!(
@@ -57,10 +46,7 @@ fn export_honours_format_and_quotes_cells() {
     let lines: Vec<&str> = csv.lines().collect();
     assert_eq!(lines.len(), 4, "header + 3 rows: {csv}");
     assert!(csv.contains(r#"DEMO-1,"Say ""hi"" now",Todo"#), "{csv}");
-    assert!(
-        csv.contains(r#"DEMO-2,"'=HYPERLINK(""http://x.example"",""click"")",Todo"#),
-        "{csv}"
-    );
+    assert!(csv.contains(r#"DEMO-2,"'=HYPERLINK(""http://x.example"",""click"")",Todo"#), "{csv}");
     assert!(csv.contains(r#"DEMO-3,"plain, with comma",Todo"#), "{csv}");
 
     let (status, body) = get(&api, "/api/tasks/export", &[("format", "xml")]);

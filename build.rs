@@ -34,9 +34,7 @@ fn main() {
 
     if let Ok(entries) = walk_files(&web_dir) {
         for entry in entries {
-            let path = entry
-                .strip_prefix(&manifest_dir_path)
-                .unwrap_or(entry.as_path());
+            let path = entry.strip_prefix(&manifest_dir_path).unwrap_or(entry.as_path());
             println!("cargo:rerun-if-changed={}", path.display());
         }
     }
@@ -114,28 +112,18 @@ fn embed_compressed_docs(manifest_dir: &Path) {
     );
     for file in help_files {
         println!("cargo:rerun-if-changed={}", file.display());
-        let relative = file
-            .strip_prefix(&help_root)
-            .expect("inside docs/help")
-            .to_string_lossy()
-            .replace('\\', "/");
+        let relative = file.strip_prefix(&help_root).expect("inside docs/help").to_string_lossy().replace('\\', "/");
         let target = out_dir.join("help-gz").join(format!("{relative}.gz"));
         fs::create_dir_all(target.parent().expect("has parent")).expect("create help-gz");
         fs::write(&target, gzip(&fs::read(&file).expect("read help file"))).expect("write help gz");
-        index.push_str(&format!(
-            "    ({relative:?}, include_bytes!(concat!(env!(\"OUT_DIR\"), \"/help-gz/{relative}.gz\"))),\n"
-        ));
+        index.push_str(&format!("    ({relative:?}, include_bytes!(concat!(env!(\"OUT_DIR\"), \"/help-gz/{relative}.gz\"))),\n"));
     }
     index.push_str("];\n");
     fs::write(out_dir.join("help_docs.rs"), index).expect("write help_docs.rs");
 
     let spec = manifest_dir.join("docs").join("openapi.json");
     println!("cargo:rerun-if-changed=docs/openapi.json");
-    fs::write(
-        out_dir.join("openapi.json.gz"),
-        gzip(&fs::read(&spec).expect("read docs/openapi.json")),
-    )
-    .expect("write openapi.json.gz");
+    fs::write(out_dir.join("openapi.json.gz"), gzip(&fs::read(&spec).expect("read docs/openapi.json"))).expect("write openapi.json.gz");
 }
 
 fn walk_files(root: &Path) -> std::io::Result<Vec<PathBuf>> {

@@ -19,43 +19,20 @@ impl CommandHandler for DeleteHandler {
     type Args = TaskDeleteArgs;
     type Result = Result<(), String>;
 
-    fn execute(
-        args: Self::Args,
-        project: Option<&str>,
-        resolver: &TasksDirectoryResolver,
-        renderer: &crate::output::OutputRenderer,
-    ) -> Self::Result {
+    fn execute(args: Self::Args, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &crate::output::OutputRenderer) -> Self::Result {
         renderer.log_info("delete: begin");
-        let TaskDeleteArgs {
-            id,
-            force,
-            hard,
-            dry_run,
-        } = args;
+        let TaskDeleteArgs { id, force, hard, dry_run } = args;
         let mut ctx = TaskCommandContext::new(resolver, project, Some(id.as_str()))?;
-        let LoadedDeletedAwareTask {
-            full_id,
-            project_prefix,
-            task: loaded_task,
-        } = load_task_including_deleted(&mut ctx, &id, project)?;
+        let LoadedDeletedAwareTask { full_id, project_prefix, task: loaded_task } = load_task_including_deleted(&mut ctx, &id, project)?;
 
         // Confirm deletion if not forced (skip prompt in dry-run)
         if !force && !dry_run {
-            let action = if hard {
-                "permanently delete (hard)"
-            } else {
-                "soft delete"
-            };
+            let action = if hard { "permanently delete (hard)" } else { "soft delete" };
             use std::io::{self, IsTerminal, Write};
             // Like sprint delete (DEV-282): no prompt that would corrupt JSON
             // output or silently "cancel" with exit 0 in scripts.
-            if matches!(renderer.format, crate::output::OutputFormat::Json)
-                || !io::stdin().is_terminal()
-            {
-                return Err(
-                    "Task deletion requires --force with JSON output or non-interactive input."
-                        .to_string(),
-                );
+            if matches!(renderer.format, crate::output::OutputFormat::Json) || !io::stdin().is_terminal() {
+                return Err("Task deletion requires --force with JSON output or non-interactive input.".to_string());
             }
             eprint!("Are you sure you want to {action} task '{}'? (y/N): ", id);
             let _ = io::stderr().flush();
@@ -72,13 +49,8 @@ impl CommandHandler for DeleteHandler {
         }
 
         if dry_run {
-            let preview = TaskService::preview_delete(
-                &ctx.storage,
-                &full_id,
-                Some(project_prefix.as_str()),
-                hard,
-            )
-            .map_err(|e| format!("Failed to preview deletion of task '{}': {}", id, e))?;
+            let preview = TaskService::preview_delete(&ctx.storage, &full_id, Some(project_prefix.as_str()), hard)
+                .map_err(|e| format!("Failed to preview deletion of task '{}': {}", id, e))?;
             let warnings = preview.warnings;
             match renderer.format {
                 crate::output::OutputFormat::Json => {
@@ -97,11 +69,7 @@ impl CommandHandler for DeleteHandler {
                         "DRY RUN: Would delete task '{}' from project {} ({})",
                         id,
                         project_prefix,
-                        if hard {
-                            "hard delete: physically removes the task file"
-                        } else {
-                            "soft delete: recoverable via 'lotar task restore'"
-                        }
+                        if hard { "hard delete: physically removes the task file" } else { "soft delete: recoverable via 'lotar task restore'" }
                     ));
                     for warning in &warnings {
                         renderer.emit_warning(format_args!("{}", warning));
@@ -112,13 +80,8 @@ impl CommandHandler for DeleteHandler {
         }
 
         // Delete the task (soft by default, physical with --hard)
-        let outcome = TaskService::delete_with_options(
-            &mut ctx.storage,
-            &full_id,
-            Some(project_prefix.as_str()),
-            hard,
-        )
-        .map_err(TaskStorageAction::Delete.map_err(&full_id))?;
+        let outcome = TaskService::delete_with_options(&mut ctx.storage, &full_id, Some(project_prefix.as_str()), hard)
+            .map_err(TaskStorageAction::Delete.map_err(&full_id))?;
         if !hard && loaded_task.deleted_at.is_some() {
             // Already soft-deleted: a successful no-op. The service keeps
             // the tombstone untouched (no rewrite, no extra history entry)
@@ -138,10 +101,7 @@ impl CommandHandler for DeleteHandler {
                     renderer.emit_json(&obj);
                 }
                 _ => {
-                    renderer.emit_success(format_args!(
-                        "Task '{}' already deleted (soft); no changes",
-                        full_id
-                    ));
+                    renderer.emit_success(format_args!("Task '{}' already deleted (soft); no changes", full_id));
                 }
             }
             Ok(())
@@ -163,13 +123,9 @@ impl CommandHandler for DeleteHandler {
                 }
                 _ => {
                     if outcome.hard {
-                        renderer
-                            .emit_success(format_args!("Task '{}' permanently deleted", full_id));
+                        renderer.emit_success(format_args!("Task '{}' permanently deleted", full_id));
                     } else {
-                        renderer.emit_success(format_args!(
-                            "Task '{}' deleted (soft; restore with 'lotar task restore {}')",
-                            full_id, full_id
-                        ));
+                        renderer.emit_success(format_args!("Task '{}' deleted (soft; restore with 'lotar task restore {}')", full_id, full_id));
                     }
                     for warning in &outcome.warnings {
                         renderer.emit_warning(format_args!("{}", warning));

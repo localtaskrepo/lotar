@@ -1,7 +1,4 @@
-#[expect(
-    clippy::too_many_arguments,
-    reason = "one parameter per CLI flag; this handler forwards them unchanged"
-)]
+#[expect(clippy::too_many_arguments, reason = "one parameter per CLI flag; this handler forwards them unchanged")]
 pub(crate) fn run(
     since: Option<&str>,
     until: Option<&str>,
@@ -16,13 +13,7 @@ pub(crate) fn run(
 
     let scope_project = super::common::scope_project(global, project, resolver);
 
-    let mut header = super::common::window_header(
-        "stats.activity",
-        since_dt,
-        until_dt,
-        global,
-        scope_project.as_deref(),
-    );
+    let mut header = super::common::window_header("stats.activity", since_dt, until_dt, global, scope_project.as_deref());
     header.insert("group_by".into(), serde_json::json!(group_by));
     let Some(git) = super::common::git_window(resolver, renderer, header.clone())? else {
         return Ok(());
@@ -38,14 +29,7 @@ pub(crate) fn run(
         _ => crate::services::audit_service::GroupBy::Day,
     };
 
-    let items = crate::services::audit_service::AuditService::list_activity(
-        repo_root,
-        &tasks_rel,
-        since_dt,
-        until_dt,
-        gb,
-        scope_project.as_deref(),
-    )?;
+    let items = crate::services::audit_service::AuditService::list_activity(repo_root, &tasks_rel, since_dt, until_dt, gb, scope_project.as_deref())?;
     let limited: Vec<_> = items.into_iter().take(limit).collect();
 
     super::common::emit_items(

@@ -25,10 +25,7 @@ const MAX_DECODE_BYTES: u64 = 64 * 1024 * 1024;
 /// the cache holds a few variants per image, not one per pixel width.
 pub const THUMBNAIL_WIDTHS: [u32; 5] = [96, 240, 480, 960, 1600];
 
-fn cache<K, V>(
-    slot: &'static OnceLock<Arc<MemoryCache<K, V>>>,
-    budget: usize,
-) -> &'static MemoryCache<K, V>
+fn cache<K, V>(slot: &'static OnceLock<Arc<MemoryCache<K, V>>>, budget: usize) -> &'static MemoryCache<K, V>
 where
     K: Eq + std::hash::Hash + Clone + Send + 'static,
     V: Send + Sync + 'static,
@@ -93,13 +90,7 @@ fn build_index(root: &Path) -> HashIndex {
             }
         }
     }
-    HashIndex {
-        files: files
-            .into_iter()
-            .map(|(tag, (path, _))| (tag, path))
-            .collect(),
-        built: Instant::now(),
-    }
+    HashIndex { files: files.into_iter().map(|(tag, (path, _))| (tag, path)).collect(), built: Instant::now() }
 }
 
 /// Forget the index for a store after this process wrote to it, so the next
@@ -124,19 +115,13 @@ pub fn find_by_hash(root: &Path, hash: &str) -> Option<PathBuf> {
     {
         return Some(path.clone());
     }
-    if cached.as_ref().is_some_and(|index| {
-        index.built.elapsed() < RESCAN_AFTER && !index.files.contains_key(&hash)
-    }) {
+    if cached.as_ref().is_some_and(|index| index.built.elapsed() < RESCAN_AFTER && !index.files.contains_key(&hash)) {
         return None;
     }
     let index = build_index(root);
     let cost = 64 + index.files.len() * 160;
     let index = index_cache().insert(key, index, cost);
-    index
-        .files
-        .get(&hash)
-        .filter(|path| path.is_file())
-        .cloned()
+    index.files.get(&hash).filter(|path| path.is_file()).cloned()
 }
 
 // ---------------------------------------------------------------------------
@@ -158,18 +143,11 @@ fn thumbnail_cache() -> &'static MemoryCache<(String, u32), ThumbnailEntry> {
 
 /// The supported thumbnail width for a requested width.
 pub fn snap_width(requested: u32) -> u32 {
-    THUMBNAIL_WIDTHS
-        .iter()
-        .copied()
-        .find(|width| *width >= requested)
-        .unwrap_or(THUMBNAIL_WIDTHS[THUMBNAIL_WIDTHS.len() - 1])
+    THUMBNAIL_WIDTHS.iter().copied().find(|width| *width >= requested).unwrap_or(THUMBNAIL_WIDTHS[THUMBNAIL_WIDTHS.len() - 1])
 }
 
 fn extension(path: &Path) -> String {
-    path.extension()
-        .and_then(OsStr::to_str)
-        .unwrap_or("")
-        .to_ascii_lowercase()
+    path.extension().and_then(OsStr::to_str).unwrap_or("").to_ascii_lowercase()
 }
 
 /// A downscaled copy of the image at `path`, or `None` when the original
@@ -205,9 +183,7 @@ fn make_thumbnail(path: &Path, width: u32) -> Option<Thumbnail> {
     }
     let path = path.to_path_buf();
     // Decoders are hardened, but a preview must never take the server down.
-    std::panic::catch_unwind(move || downscale(&path, width, always))
-        .ok()
-        .flatten()
+    std::panic::catch_unwind(move || downscale(&path, width, always)).ok().flatten()
 }
 
 fn downscale(path: &Path, width: u32, always: bool) -> Option<Thumbnail> {
@@ -241,22 +217,12 @@ fn has_transparency(image: &DynamicImage) -> bool {
 fn encode(image: &DynamicImage) -> Option<Thumbnail> {
     let mut bytes = Vec::new();
     if has_transparency(image) {
-        image
-            .write_to(&mut Cursor::new(&mut bytes), image::ImageFormat::Png)
-            .ok()?;
-        return Some(Thumbnail {
-            bytes,
-            content_type: "image/png",
-        });
+        image.write_to(&mut Cursor::new(&mut bytes), image::ImageFormat::Png).ok()?;
+        return Some(Thumbnail { bytes, content_type: "image/png" });
     }
     let rgb = image.to_rgb8();
-    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut bytes, 82)
-        .encode_image(&rgb)
-        .ok()?;
-    Some(Thumbnail {
-        bytes,
-        content_type: "image/jpeg",
-    })
+    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut bytes, 82).encode_image(&rgb).ok()?;
+    Some(Thumbnail { bytes, content_type: "image/jpeg" })
 }
 
 // ---------------------------------------------------------------------------
@@ -284,22 +250,9 @@ pub fn file_info(path: &Path, hash: &str) -> Option<AttachmentFileInfo> {
     let size = std::fs::metadata(path).ok()?.len();
     let dimensions = {
         let path = path.to_path_buf();
-        std::panic::catch_unwind(move || {
-            ImageReader::open(&path)
-                .ok()?
-                .with_guessed_format()
-                .ok()?
-                .into_dimensions()
-                .ok()
-        })
-        .ok()
-        .flatten()
+        std::panic::catch_unwind(move || ImageReader::open(&path).ok()?.with_guessed_format().ok()?.into_dimensions().ok()).ok().flatten()
     };
-    let info = AttachmentFileInfo {
-        size,
-        width: dimensions.map(|(width, _)| width),
-        height: dimensions.map(|(_, height)| height),
-    };
+    let info = AttachmentFileInfo { size, width: dimensions.map(|(width, _)| width), height: dimensions.map(|(_, height)| height) };
     info_cache().insert(key, info.clone(), 64);
     Some(info)
 }
@@ -308,21 +261,14 @@ pub fn file_info(path: &Path, hash: &str) -> Option<AttachmentFileInfo> {
 mod tests {
     use super::*;
 
-    fn write_image(
-        dir: &Path,
-        name: &str,
-        image: &DynamicImage,
-        format: image::ImageFormat,
-    ) -> PathBuf {
+    fn write_image(dir: &Path, name: &str, image: &DynamicImage, format: image::ImageFormat) -> PathBuf {
         let path = dir.join(name);
         image.save_with_format(&path, format).unwrap();
         path
     }
 
     fn gradient(width: u32, height: u32) -> DynamicImage {
-        DynamicImage::ImageRgb8(image::RgbImage::from_fn(width, height, |x, y| {
-            image::Rgb([(x % 256) as u8, (y % 256) as u8, 128])
-        }))
+        DynamicImage::ImageRgb8(image::RgbImage::from_fn(width, height, |x, y| image::Rgb([(x % 256) as u8, (y % 256) as u8, 128])))
     }
 
     #[test]
@@ -337,24 +283,14 @@ mod tests {
     fn downscales_large_photos_and_leaves_small_ones() {
         let dir = tempfile::tempdir().unwrap();
         let hash = "a".repeat(32);
-        let big = write_image(
-            dir.path(),
-            &format!("photo.{hash}.jpg"),
-            &gradient(1200, 800),
-            image::ImageFormat::Jpeg,
-        );
+        let big = write_image(dir.path(), &format!("photo.{hash}.jpg"), &gradient(1200, 800), image::ImageFormat::Jpeg);
         let thumb = thumbnail(&big, &hash, 300).expect("large photo gets a thumbnail");
         assert_eq!(thumb.content_type, "image/jpeg");
         let decoded = image::load_from_memory(&thumb.bytes).unwrap();
         assert_eq!((decoded.width(), decoded.height()), (480, 320));
 
         let small_hash = "b".repeat(32);
-        let small = write_image(
-            dir.path(),
-            &format!("icon.{small_hash}.png"),
-            &gradient(16, 16),
-            image::ImageFormat::Png,
-        );
+        let small = write_image(dir.path(), &format!("icon.{small_hash}.png"), &gradient(16, 16), image::ImageFormat::Png);
         assert!(thumbnail(&small, &small_hash, 96).is_none(), "fits already");
     }
 
@@ -362,27 +298,12 @@ mod tests {
     fn keeps_transparency_and_converts_tiff() {
         let dir = tempfile::tempdir().unwrap();
         let hash = "c".repeat(32);
-        let logo = DynamicImage::ImageRgba8(image::RgbaImage::from_fn(600, 600, |x, _| {
-            image::Rgba([0, 0, 255, if x < 300 { 0 } else { 255 }])
-        }));
-        let path = write_image(
-            dir.path(),
-            &format!("logo.{hash}.png"),
-            &logo,
-            image::ImageFormat::Png,
-        );
-        assert_eq!(
-            thumbnail(&path, &hash, 240).unwrap().content_type,
-            "image/png"
-        );
+        let logo = DynamicImage::ImageRgba8(image::RgbaImage::from_fn(600, 600, |x, _| image::Rgba([0, 0, 255, if x < 300 { 0 } else { 255 }])));
+        let path = write_image(dir.path(), &format!("logo.{hash}.png"), &logo, image::ImageFormat::Png);
+        assert_eq!(thumbnail(&path, &hash, 240).unwrap().content_type, "image/png");
 
         let tiff_hash = "d".repeat(32);
-        let tiff = write_image(
-            dir.path(),
-            &format!("scan.{tiff_hash}.tiff"),
-            &gradient(64, 64),
-            image::ImageFormat::Tiff,
-        );
+        let tiff = write_image(dir.path(), &format!("scan.{tiff_hash}.tiff"), &gradient(64, 64), image::ImageFormat::Tiff);
         let converted = thumbnail(&tiff, &tiff_hash, 96).expect("tiff is always converted");
         assert_eq!(converted.content_type, "image/jpeg");
     }
@@ -412,13 +333,7 @@ mod tests {
         let second = "2".repeat(32);
         std::fs::write(dir.path().join(format!("b-{second}.txt")), b"b").unwrap();
         std::thread::sleep(RESCAN_AFTER + Duration::from_millis(50));
-        assert_eq!(
-            find_by_hash(dir.path(), &second)
-                .unwrap()
-                .file_name()
-                .unwrap(),
-            format!("b-{second}.txt").as_str()
-        );
+        assert_eq!(find_by_hash(dir.path(), &second).unwrap().file_name().unwrap(), format!("b-{second}.txt").as_str());
 
         // Removed files are not returned from a stale index.
         std::fs::remove_file(dir.path().join(format!("a.{first}.txt"))).unwrap();
@@ -429,25 +344,13 @@ mod tests {
     fn info_reports_size_and_dimensions() {
         let dir = tempfile::tempdir().unwrap();
         let hash = "9".repeat(32);
-        let path = write_image(
-            dir.path(),
-            &format!("p.{hash}.png"),
-            &gradient(30, 20),
-            image::ImageFormat::Png,
-        );
+        let path = write_image(dir.path(), &format!("p.{hash}.png"), &gradient(30, 20), image::ImageFormat::Png);
         let info = file_info(&path, &hash).unwrap();
         assert_eq!((info.width, info.height), (Some(30), Some(20)));
         assert!(info.size > 0);
         let text_hash = "8".repeat(32);
         let text = dir.path().join(format!("t.{text_hash}.txt"));
         std::fs::write(&text, b"hello").unwrap();
-        assert_eq!(
-            file_info(&text, &text_hash).unwrap(),
-            AttachmentFileInfo {
-                size: 5,
-                width: None,
-                height: None
-            }
-        );
+        assert_eq!(file_info(&text, &text_hash).unwrap(), AttachmentFileInfo { size: 5, width: None, height: None });
     }
 }

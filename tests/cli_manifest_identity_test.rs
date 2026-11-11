@@ -46,9 +46,7 @@ fn whoami_uses_project_manifest_author_when_no_default_reporter() {
         .args(["whoami"]) // text mode
         .assert()
         .success()
-        .stdout(predicate::str::contains(
-            std::env::var("USER").unwrap_or_default(),
-        ));
+        .stdout(predicate::str::contains(std::env::var("USER").unwrap_or_default()));
 
     // Without git or OS usernames, the manifest author is the only source left.
     crate::common::lotar_cmd()

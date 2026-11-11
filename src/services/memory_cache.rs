@@ -33,21 +33,12 @@ pub struct MemoryCache<K, V> {
 
 impl<K: Eq + Hash + Clone, V> MemoryCache<K, V> {
     pub fn new(max_bytes: usize, idle: Duration) -> Self {
-        Self {
-            inner: Mutex::new(Inner {
-                entries: HashMap::new(),
-                bytes: 0,
-            }),
-            max_bytes,
-            idle,
-        }
+        Self { inner: Mutex::new(Inner { entries: HashMap::new(), bytes: 0 }), max_bytes, idle }
     }
 
     fn lock(&self) -> std::sync::MutexGuard<'_, Inner<K, V>> {
         // A panic while holding the lock leaves plain data behind; keep going.
-        self.inner
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
+        self.inner.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
     /// The cached value, marking it as recently used.
@@ -71,12 +62,7 @@ impl<K: Eq + Hash + Clone, V> MemoryCache<K, V> {
             inner.bytes -= old.bytes;
         }
         while inner.bytes + bytes > self.max_bytes {
-            let Some(oldest) = inner
-                .entries
-                .iter()
-                .min_by_key(|(_, entry)| entry.touched)
-                .map(|(key, _)| key.clone())
-            else {
+            let Some(oldest) = inner.entries.iter().min_by_key(|(_, entry)| entry.touched).map(|(key, _)| key.clone()) else {
                 break;
             };
             if let Some(evicted) = inner.entries.remove(&oldest) {
@@ -84,14 +70,7 @@ impl<K: Eq + Hash + Clone, V> MemoryCache<K, V> {
             }
         }
         inner.bytes += bytes;
-        inner.entries.insert(
-            key,
-            Entry {
-                value: value.clone(),
-                bytes,
-                touched: Instant::now(),
-            },
-        );
+        inner.entries.insert(key, Entry { value: value.clone(), bytes, touched: Instant::now() });
         value
     }
 
@@ -157,14 +136,12 @@ pub fn register_for_sweeping(cache: &Arc<dyn Sweep>) {
         caches.push(Arc::downgrade(cache));
     }
     STARTED.get_or_init(|| {
-        let _ = std::thread::Builder::new()
-            .name("lotar-cache-sweeper".into())
-            .spawn(|| {
-                loop {
-                    std::thread::sleep(SWEEP_INTERVAL);
-                    sweep_registered(Instant::now());
-                }
-            });
+        let _ = std::thread::Builder::new().name("lotar-cache-sweeper".into()).spawn(|| {
+            loop {
+                std::thread::sleep(SWEEP_INTERVAL);
+                sweep_registered(Instant::now());
+            }
+        });
     });
 }
 
@@ -234,8 +211,7 @@ mod tests {
 
     #[test]
     fn registered_caches_are_swept_and_dropped_ones_forgotten() {
-        let cache: Arc<MemoryCache<&str, i32>> =
-            Arc::new(MemoryCache::new(100, Duration::from_secs(1)));
+        let cache: Arc<MemoryCache<&str, i32>> = Arc::new(MemoryCache::new(100, Duration::from_secs(1)));
         cache.insert("a", 1, 1);
         let as_sweep: Arc<dyn Sweep> = cache.clone();
         register_for_sweeping(&as_sweep);

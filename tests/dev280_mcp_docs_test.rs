@@ -11,22 +11,11 @@ fn call(method: &str) -> serde_json::Value {
 
 #[test]
 fn docs_tool_table_matches_tools_list() {
-    let advertised: BTreeSet<String> = call("tools/list")["result"]["tools"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|tool| tool["name"].as_str().unwrap().to_string())
-        .collect();
+    let advertised: BTreeSet<String> =
+        call("tools/list")["result"]["tools"].as_array().unwrap().iter().map(|tool| tool["name"].as_str().unwrap().to_string()).collect();
 
-    let docs = std::fs::read_to_string(
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("docs/help/mcp.md"),
-    )
-    .unwrap();
-    let section = docs
-        .split("## Tool Surface")
-        .nth(1)
-        .and_then(|rest| rest.split("\n## ").next())
-        .unwrap();
+    let docs = std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("docs/help/mcp.md")).unwrap();
+    let section = docs.split("## Tool Surface").nth(1).and_then(|rest| rest.split("\n## ").next()).unwrap();
     let mut documented = BTreeSet::new();
     for row in section.lines().filter(|line| line.starts_with("| `")) {
         let first_cell = row.split('|').nth(1).unwrap();
@@ -34,10 +23,7 @@ fn docs_tool_table_matches_tools_list() {
             documented.insert(name.to_string());
         }
     }
-    assert_eq!(
-        documented, advertised,
-        "docs/help/mcp.md Tool Surface table"
-    );
+    assert_eq!(documented, advertised, "docs/help/mcp.md Tool Surface table");
 }
 
 #[test]

@@ -1,10 +1,7 @@
 fn norm(s: &str) -> String {
     // Strip a leading `@` so member-style queries ("@alice") match values
     // stored without the prefix (and vice versa).
-    s.strip_prefix('@')
-        .unwrap_or(s)
-        .to_lowercase()
-        .replace(['_', '-'], "")
+    s.strip_prefix('@').unwrap_or(s).to_lowercase().replace(['_', '-'], "")
 }
 
 /// Normalized comparison key for member-style values (assignee/reporter):

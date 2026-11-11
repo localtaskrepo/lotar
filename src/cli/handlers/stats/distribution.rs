@@ -1,7 +1,4 @@
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "parsed CLI arguments are moved in from the command"
-)]
+#[expect(clippy::needless_pass_by_value, reason = "parsed CLI arguments are moved in from the command")]
 pub(crate) fn run(
     field: crate::cli::args::stats::StatsDistributionField,
     limit: usize,
@@ -37,9 +34,7 @@ pub(crate) fn run(
             }
             crate::cli::args::stats::StatsDistributionField::Project => {
                 // Group by project prefix embedded in ID
-                let proj = crate::storage::TaskId::parse(&t.id)
-                    .map(|parsed| parsed.project)
-                    .unwrap_or_default();
+                let proj = crate::storage::TaskId::parse(&t.id).map(|parsed| parsed.project).unwrap_or_default();
                 *freq.entry(proj).or_insert(0) += 1;
             }
             crate::cli::args::stats::StatsDistributionField::Tag => {
@@ -53,8 +48,7 @@ pub(crate) fn run(
         }
     }
 
-    let limited =
-        super::common::ranked_counts(freq.into_iter().filter(|(k, _)| !k.is_empty()), limit);
+    let limited = super::common::ranked_counts(freq.into_iter().filter(|(k, _)| !k.is_empty()), limit);
 
     let field_name = match field {
         crate::cli::args::stats::StatsDistributionField::Status => "status",

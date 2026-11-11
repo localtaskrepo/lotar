@@ -26,25 +26,17 @@ use std::sync::OnceLock;
 use serde_json::{Value, json};
 
 use super::handlers::{
-    handle_agent_cancel, handle_agent_list_jobs, handle_agent_run, handle_agent_send_message,
-    handle_agent_status, handle_config_set, handle_config_show, handle_project_list,
-    handle_project_stats, handle_relationship_check, handle_relationship_graph,
-    handle_relationship_mutate, handle_relationship_repair, handle_sprint_add,
-    handle_sprint_backlog, handle_sprint_burndown, handle_sprint_create, handle_sprint_delete,
-    handle_sprint_get, handle_sprint_list, handle_sprint_remove, handle_sprint_reorder,
-    handle_sprint_summary, handle_sprint_update, handle_sprint_velocity, handle_sync_pull,
-    handle_sync_push, handle_task_archive, handle_task_bulk_comment_add,
-    handle_task_bulk_reference_add, handle_task_bulk_reference_remove, handle_task_bulk_update,
-    handle_task_comment_add, handle_task_comment_update, handle_task_create, handle_task_delete,
-    handle_task_get, handle_task_list, handle_task_move, handle_task_reference_add,
-    handle_task_reference_remove, handle_task_restore, handle_task_unarchive, handle_task_update,
-    handle_whoami,
+    handle_agent_cancel, handle_agent_list_jobs, handle_agent_run, handle_agent_send_message, handle_agent_status, handle_config_set, handle_config_show,
+    handle_project_list, handle_project_stats, handle_relationship_check, handle_relationship_graph, handle_relationship_mutate, handle_relationship_repair,
+    handle_sprint_add, handle_sprint_backlog, handle_sprint_burndown, handle_sprint_create, handle_sprint_delete, handle_sprint_get, handle_sprint_list,
+    handle_sprint_remove, handle_sprint_reorder, handle_sprint_summary, handle_sprint_update, handle_sprint_velocity, handle_sync_pull, handle_sync_push,
+    handle_task_archive, handle_task_bulk_comment_add, handle_task_bulk_reference_add, handle_task_bulk_reference_remove, handle_task_bulk_update,
+    handle_task_comment_add, handle_task_comment_update, handle_task_create, handle_task_delete, handle_task_get, handle_task_list, handle_task_move,
+    handle_task_reference_add, handle_task_reference_remove, handle_task_restore, handle_task_unarchive, handle_task_update, handle_whoami,
 };
 use super::schema::{unsupported_keywords, validate_instance};
 use super::tools::build_tool_definitions;
-use super::{
-    JsonRpcRequest, JsonRpcResponse, err, handle_schema_discover_request, normalize_method,
-};
+use super::{JsonRpcRequest, JsonRpcResponse, err, handle_schema_discover_request, normalize_method};
 
 pub(crate) type ToolHandler = fn(JsonRpcRequest) -> JsonRpcResponse;
 
@@ -77,236 +69,52 @@ pub(crate) fn is_control_plane_method(method: &str) -> bool {
 
 pub(crate) fn tool_specs() -> &'static [ToolSpec] {
     &[
-        ToolSpec {
-            name: "whoami",
-            method: "whoami",
-            handler: handle_whoami,
-        },
-        ToolSpec {
-            name: "task_create",
-            method: "task/create",
-            handler: handle_task_create,
-        },
-        ToolSpec {
-            name: "relationship_graph",
-            method: "relationship/graph",
-            handler: handle_relationship_graph,
-        },
-        ToolSpec {
-            name: "relationship_check",
-            method: "relationship/check",
-            handler: handle_relationship_check,
-        },
-        ToolSpec {
-            name: "relationship_mutate",
-            method: "relationship/mutate",
-            handler: handle_relationship_mutate,
-        },
-        ToolSpec {
-            name: "relationship_repair",
-            method: "relationship/repair",
-            handler: handle_relationship_repair,
-        },
-        ToolSpec {
-            name: "task_get",
-            method: "task/get",
-            handler: handle_task_get,
-        },
-        ToolSpec {
-            name: "task_update",
-            method: "task/update",
-            handler: handle_task_update,
-        },
-        ToolSpec {
-            name: "task_comment_add",
-            method: "task/comment_add",
-            handler: handle_task_comment_add,
-        },
-        ToolSpec {
-            name: "task_comment_update",
-            method: "task/comment_update",
-            handler: handle_task_comment_update,
-        },
-        ToolSpec {
-            name: "task_bulk_update",
-            method: "task/bulk_update",
-            handler: handle_task_bulk_update,
-        },
-        ToolSpec {
-            name: "task_bulk_comment_add",
-            method: "task/bulk_comment_add",
-            handler: handle_task_bulk_comment_add,
-        },
-        ToolSpec {
-            name: "task_bulk_reference_add",
-            method: "task/bulk_reference_add",
-            handler: handle_task_bulk_reference_add,
-        },
-        ToolSpec {
-            name: "task_bulk_reference_remove",
-            method: "task/bulk_reference_remove",
-            handler: handle_task_bulk_reference_remove,
-        },
-        ToolSpec {
-            name: "task_reference_add",
-            method: "task/reference_add",
-            handler: handle_task_reference_add,
-        },
-        ToolSpec {
-            name: "task_reference_remove",
-            method: "task/reference_remove",
-            handler: handle_task_reference_remove,
-        },
-        ToolSpec {
-            name: "task_delete",
-            method: "task/delete",
-            handler: handle_task_delete,
-        },
-        ToolSpec {
-            name: "task_restore",
-            method: "task/restore",
-            handler: handle_task_restore,
-        },
-        ToolSpec {
-            name: "task_archive",
-            method: "task/archive",
-            handler: handle_task_archive,
-        },
-        ToolSpec {
-            name: "task_unarchive",
-            method: "task/unarchive",
-            handler: handle_task_unarchive,
-        },
-        ToolSpec {
-            name: "task_move",
-            method: "task/move",
-            handler: handle_task_move,
-        },
-        ToolSpec {
-            name: "task_list",
-            method: "task/list",
-            handler: handle_task_list,
-        },
-        ToolSpec {
-            name: "sprint_list",
-            method: "sprint/list",
-            handler: handle_sprint_list,
-        },
-        ToolSpec {
-            name: "sprint_get",
-            method: "sprint/get",
-            handler: handle_sprint_get,
-        },
-        ToolSpec {
-            name: "sprint_create",
-            method: "sprint/create",
-            handler: handle_sprint_create,
-        },
-        ToolSpec {
-            name: "sprint_update",
-            method: "sprint/update",
-            handler: handle_sprint_update,
-        },
-        ToolSpec {
-            name: "sprint_summary",
-            method: "sprint/summary",
-            handler: handle_sprint_summary,
-        },
-        ToolSpec {
-            name: "sprint_burndown",
-            method: "sprint/burndown",
-            handler: handle_sprint_burndown,
-        },
-        ToolSpec {
-            name: "sprint_velocity",
-            method: "sprint/velocity",
-            handler: handle_sprint_velocity,
-        },
-        ToolSpec {
-            name: "sprint_add",
-            method: "sprint/add",
-            handler: handle_sprint_add,
-        },
-        ToolSpec {
-            name: "sprint_remove",
-            method: "sprint/remove",
-            handler: handle_sprint_remove,
-        },
-        ToolSpec {
-            name: "sprint_delete",
-            method: "sprint/delete",
-            handler: handle_sprint_delete,
-        },
-        ToolSpec {
-            name: "sprint_backlog",
-            method: "sprint/backlog",
-            handler: handle_sprint_backlog,
-        },
-        ToolSpec {
-            name: "sprint_reorder",
-            method: "sprint/reorder",
-            handler: handle_sprint_reorder,
-        },
-        ToolSpec {
-            name: "project_list",
-            method: "project/list",
-            handler: handle_project_list,
-        },
-        ToolSpec {
-            name: "project_stats",
-            method: "project/stats",
-            handler: handle_project_stats,
-        },
-        ToolSpec {
-            name: "config_show",
-            method: "config/show",
-            handler: handle_config_show,
-        },
-        ToolSpec {
-            name: "config_set",
-            method: "config/set",
-            handler: handle_config_set,
-        },
-        ToolSpec {
-            name: "sync_pull",
-            method: "sync/pull",
-            handler: handle_sync_pull,
-        },
-        ToolSpec {
-            name: "sync_push",
-            method: "sync/push",
-            handler: handle_sync_push,
-        },
-        ToolSpec {
-            name: "schema_discover",
-            method: "schema/discover",
-            handler: handle_schema_discover_request,
-        },
-        ToolSpec {
-            name: "agent_run",
-            method: "agent/run",
-            handler: handle_agent_run,
-        },
-        ToolSpec {
-            name: "agent_status",
-            method: "agent/status",
-            handler: handle_agent_status,
-        },
-        ToolSpec {
-            name: "agent_list_jobs",
-            method: "agent/list_jobs",
-            handler: handle_agent_list_jobs,
-        },
-        ToolSpec {
-            name: "agent_cancel",
-            method: "agent/cancel",
-            handler: handle_agent_cancel,
-        },
-        ToolSpec {
-            name: "agent_send_message",
-            method: "agent/send_message",
-            handler: handle_agent_send_message,
-        },
+        ToolSpec { name: "whoami", method: "whoami", handler: handle_whoami },
+        ToolSpec { name: "task_create", method: "task/create", handler: handle_task_create },
+        ToolSpec { name: "relationship_graph", method: "relationship/graph", handler: handle_relationship_graph },
+        ToolSpec { name: "relationship_check", method: "relationship/check", handler: handle_relationship_check },
+        ToolSpec { name: "relationship_mutate", method: "relationship/mutate", handler: handle_relationship_mutate },
+        ToolSpec { name: "relationship_repair", method: "relationship/repair", handler: handle_relationship_repair },
+        ToolSpec { name: "task_get", method: "task/get", handler: handle_task_get },
+        ToolSpec { name: "task_update", method: "task/update", handler: handle_task_update },
+        ToolSpec { name: "task_comment_add", method: "task/comment_add", handler: handle_task_comment_add },
+        ToolSpec { name: "task_comment_update", method: "task/comment_update", handler: handle_task_comment_update },
+        ToolSpec { name: "task_bulk_update", method: "task/bulk_update", handler: handle_task_bulk_update },
+        ToolSpec { name: "task_bulk_comment_add", method: "task/bulk_comment_add", handler: handle_task_bulk_comment_add },
+        ToolSpec { name: "task_bulk_reference_add", method: "task/bulk_reference_add", handler: handle_task_bulk_reference_add },
+        ToolSpec { name: "task_bulk_reference_remove", method: "task/bulk_reference_remove", handler: handle_task_bulk_reference_remove },
+        ToolSpec { name: "task_reference_add", method: "task/reference_add", handler: handle_task_reference_add },
+        ToolSpec { name: "task_reference_remove", method: "task/reference_remove", handler: handle_task_reference_remove },
+        ToolSpec { name: "task_delete", method: "task/delete", handler: handle_task_delete },
+        ToolSpec { name: "task_restore", method: "task/restore", handler: handle_task_restore },
+        ToolSpec { name: "task_archive", method: "task/archive", handler: handle_task_archive },
+        ToolSpec { name: "task_unarchive", method: "task/unarchive", handler: handle_task_unarchive },
+        ToolSpec { name: "task_move", method: "task/move", handler: handle_task_move },
+        ToolSpec { name: "task_list", method: "task/list", handler: handle_task_list },
+        ToolSpec { name: "sprint_list", method: "sprint/list", handler: handle_sprint_list },
+        ToolSpec { name: "sprint_get", method: "sprint/get", handler: handle_sprint_get },
+        ToolSpec { name: "sprint_create", method: "sprint/create", handler: handle_sprint_create },
+        ToolSpec { name: "sprint_update", method: "sprint/update", handler: handle_sprint_update },
+        ToolSpec { name: "sprint_summary", method: "sprint/summary", handler: handle_sprint_summary },
+        ToolSpec { name: "sprint_burndown", method: "sprint/burndown", handler: handle_sprint_burndown },
+        ToolSpec { name: "sprint_velocity", method: "sprint/velocity", handler: handle_sprint_velocity },
+        ToolSpec { name: "sprint_add", method: "sprint/add", handler: handle_sprint_add },
+        ToolSpec { name: "sprint_remove", method: "sprint/remove", handler: handle_sprint_remove },
+        ToolSpec { name: "sprint_delete", method: "sprint/delete", handler: handle_sprint_delete },
+        ToolSpec { name: "sprint_backlog", method: "sprint/backlog", handler: handle_sprint_backlog },
+        ToolSpec { name: "sprint_reorder", method: "sprint/reorder", handler: handle_sprint_reorder },
+        ToolSpec { name: "project_list", method: "project/list", handler: handle_project_list },
+        ToolSpec { name: "project_stats", method: "project/stats", handler: handle_project_stats },
+        ToolSpec { name: "config_show", method: "config/show", handler: handle_config_show },
+        ToolSpec { name: "config_set", method: "config/set", handler: handle_config_set },
+        ToolSpec { name: "sync_pull", method: "sync/pull", handler: handle_sync_pull },
+        ToolSpec { name: "sync_push", method: "sync/push", handler: handle_sync_push },
+        ToolSpec { name: "schema_discover", method: "schema/discover", handler: handle_schema_discover_request },
+        ToolSpec { name: "agent_run", method: "agent/run", handler: handle_agent_run },
+        ToolSpec { name: "agent_status", method: "agent/status", handler: handle_agent_status },
+        ToolSpec { name: "agent_list_jobs", method: "agent/list_jobs", handler: handle_agent_list_jobs },
+        ToolSpec { name: "agent_cancel", method: "agent/cancel", handler: handle_agent_cancel },
+        ToolSpec { name: "agent_send_message", method: "agent/send_message", handler: handle_agent_send_message },
     ]
 }
 
@@ -324,10 +132,7 @@ pub(crate) fn find_tool_for_call(name: &str) -> Result<&'static ToolSpec, String
     if is_control_plane_method(&normalized) {
         return Err(format!("Unknown tool: {name}"));
     }
-    tool_specs()
-        .iter()
-        .find(|spec| spec.name == name || spec.method == normalized)
-        .ok_or_else(|| format!("Unknown tool: {name}"))
+    tool_specs().iter().find(|spec| spec.name == name || spec.method == normalized).ok_or_else(|| format!("Unknown tool: {name}"))
 }
 
 /// The advertised `inputSchema` for a tool. Enum hints never alter
@@ -348,12 +153,7 @@ pub(crate) fn schema_for_tool(name: &str) -> Option<Value> {
 }
 
 fn invalid_params(id: Option<Value>, tool: &str, issues: &[String]) -> JsonRpcResponse {
-    err(
-        id,
-        -32602,
-        "Invalid params",
-        Some(json!({ "tool": tool, "issues": issues })),
-    )
+    err(id, -32602, "Invalid params", Some(json!({ "tool": tool, "issues": issues })))
 }
 
 /// Structured form of a converted domain execution failure.
@@ -378,11 +178,7 @@ fn validate_arguments(spec: &ToolSpec, arguments: &Value) -> Result<(), Vec<Stri
         return Err(unsupported);
     }
     let issues = validate_instance(&schema, arguments);
-    if issues.is_empty() {
-        Ok(())
-    } else {
-        Err(issues)
-    }
+    if issues.is_empty() { Ok(()) } else { Err(issues) }
 }
 
 /// Invoke a registered tool: schema-validate first, run the handler, then
@@ -390,34 +186,17 @@ fn validate_arguments(spec: &ToolSpec, arguments: &Value) -> Result<(), Vec<Stri
 ///
 /// Returns the response plus the structured domain error when one was
 /// converted (used by the `tools/call` wrapper).
-pub(crate) fn invoke_tool(
-    spec: &ToolSpec,
-    id: Option<Value>,
-    arguments: Value,
-) -> (JsonRpcResponse, Option<DomainError>) {
+pub(crate) fn invoke_tool(spec: &ToolSpec, id: Option<Value>, arguments: Value) -> (JsonRpcResponse, Option<DomainError>) {
     if !arguments.is_object() {
-        return (
-            invalid_params(id, spec.name, &["arguments must be an object".to_string()]),
-            None,
-        );
+        return (invalid_params(id, spec.name, &["arguments must be an object".to_string()]), None);
     }
     if let Err(issues) = validate_arguments(spec, &arguments) {
         return (invalid_params(id, spec.name, &issues), None);
     }
 
     // Archived tasks are read-only unless the call is forced (DEV-4).
-    let _archived_writes = crate::storage::operations::allow_archived_writes(
-        arguments
-            .get("force_archived")
-            .and_then(Value::as_bool)
-            .unwrap_or(false),
-    );
-    let request = JsonRpcRequest {
-        jsonrpc: "2.0".into(),
-        id,
-        method: spec.method.into(),
-        params: arguments,
-    };
+    let _archived_writes = crate::storage::operations::allow_archived_writes(arguments.get("force_archived").and_then(Value::as_bool).unwrap_or(false));
+    let request = JsonRpcRequest { jsonrpc: "2.0".into(), id, method: spec.method.into(), params: arguments };
     let mut response = (spec.handler)(request);
 
     if let Some(error) = response.error.take() {
@@ -432,10 +211,7 @@ pub(crate) fn invoke_tool(
             text.push('\n');
             text.push_str(&pretty);
         }
-        let domain = DomainError {
-            message: error.message,
-            data: error.data,
-        };
+        let domain = DomainError { message: error.message, data: error.data };
         response.result = Some(json!({
             "content": [ { "type": "text", "text": text } ],
             "isError": true
@@ -450,19 +226,11 @@ pub(crate) fn invoke_tool(
 /// the historical dual shape (`result.content` array + Gemini-style
 /// `result.functionResponse`); converted domain failures carry the same
 /// `content`/`isError` plus a structured `functionResponse.response`.
-pub(crate) fn wrap_for_tools_call(
-    mut response: JsonRpcResponse,
-    domain_error: Option<DomainError>,
-    tool_name: &str,
-) -> JsonRpcResponse {
+pub(crate) fn wrap_for_tools_call(mut response: JsonRpcResponse, domain_error: Option<DomainError>, tool_name: &str) -> JsonRpcResponse {
     if response.error.is_some() {
         return response;
     }
-    let already_wrapped = response
-        .result
-        .as_ref()
-        .and_then(|value| value.get("functionResponse"))
-        .is_some();
+    let already_wrapped = response.result.as_ref().and_then(|value| value.get("functionResponse")).is_some();
     if already_wrapped {
         return response;
     }
@@ -522,11 +290,7 @@ mod tests {
 
     fn dispatch_tool(tool: &str, arguments: Value, wrapped: bool) -> Value {
         let spec = find_tool_for_call(tool).unwrap();
-        let (method, params) = if wrapped {
-            ("tools/call", json!({"name": tool, "arguments": arguments}))
-        } else {
-            (spec.method, arguments)
-        };
+        let (method, params) = if wrapped { ("tools/call", json!({"name": tool, "arguments": arguments})) } else { (spec.method, arguments) };
         let request = json!({"jsonrpc": "2.0", "id": 21, "method": method, "params": params});
         serde_json::from_str(&super::super::handle_json_line(&request.to_string())).unwrap()
     }
@@ -534,24 +298,11 @@ mod tests {
     #[test]
     fn registry_binds_every_advertised_tool_exactly_once() {
         let definitions = build_tool_definitions(None);
-        let mut advertised: Vec<String> = definitions
-            .iter()
-            .map(|tool| {
-                tool.get("name")
-                    .and_then(|v| v.as_str())
-                    .unwrap()
-                    .to_string()
-            })
-            .collect();
+        let mut advertised: Vec<String> = definitions.iter().map(|tool| tool.get("name").and_then(|v| v.as_str()).unwrap().to_string()).collect();
         advertised.sort();
         assert_eq!(advertised.len(), 46, "advertised tool count changed");
         assert!(advertised.iter().any(|name| name == "sprint_reorder"));
-        for name in [
-            "relationship_graph",
-            "relationship_check",
-            "relationship_mutate",
-            "relationship_repair",
-        ] {
+        for name in ["relationship_graph", "relationship_check", "relationship_mutate", "relationship_repair"] {
             assert!(advertised.iter().any(|advertised| advertised == name));
         }
 
@@ -559,20 +310,10 @@ mod tests {
         registered.sort_unstable();
         let mut registered_unique = registered.clone();
         registered_unique.dedup();
-        assert_eq!(
-            registered.len(),
-            registered_unique.len(),
-            "duplicate registry names"
-        );
-        let mut registered_owned: Vec<String> = registered
-            .into_iter()
-            .map(|name| name.to_string())
-            .collect();
+        assert_eq!(registered.len(), registered_unique.len(), "duplicate registry names");
+        let mut registered_owned: Vec<String> = registered.into_iter().map(|name| name.to_string()).collect();
         registered_owned.sort();
-        assert_eq!(
-            advertised, registered_owned,
-            "registry must match tools/list"
-        );
+        assert_eq!(advertised, registered_owned, "registry must match tools/list");
 
         let mut methods: Vec<&str> = tool_specs().iter().map(|spec| spec.method).collect();
         methods.sort_unstable();
@@ -582,26 +323,15 @@ mod tests {
 
         // Every registry entry resolves through both aliases.
         for spec in tool_specs() {
-            assert_eq!(
-                find_tool_by_method(spec.method).map(|found| found.name),
-                Some(spec.name),
-                "method {} must resolve",
-                spec.method
-            );
-            assert_eq!(
-                find_tool_by_method(spec.name).map(|found| found.name),
-                Some(spec.name),
-                "snake_case alias {} must resolve",
-                spec.name
-            );
+            assert_eq!(find_tool_by_method(spec.method).map(|found| found.name), Some(spec.name), "method {} must resolve", spec.method);
+            assert_eq!(find_tool_by_method(spec.name).map(|found| found.name), Some(spec.name), "snake_case alias {} must resolve", spec.name);
         }
     }
 
     #[test]
     fn every_advertised_schema_is_regression_compiled() {
         for spec in tool_specs() {
-            let schema =
-                schema_for_tool(spec.name).unwrap_or_else(|| panic!("schema for {}", spec.name));
+            let schema = schema_for_tool(spec.name).unwrap_or_else(|| panic!("schema for {}", spec.name));
             assert!(
                 unsupported_keywords(&schema).is_empty(),
                 "schema for {} uses keywords the validator fails closed on: {:?}",
@@ -628,23 +358,14 @@ mod tests {
             "logging/setLevel",
             "logging_setLevel",
         ] {
-            assert!(
-                is_control_plane_method(&normalize_method(method)),
-                "{method} must be control-plane"
-            );
+            assert!(is_control_plane_method(&normalize_method(method)), "{method} must be control-plane");
             let resolved = find_tool_for_call(method);
             assert!(resolved.is_err(), "{method} must not resolve as a tool");
         }
 
         // schema_discover stays a callable tool through both surfaces.
-        assert_eq!(
-            find_tool_for_call("schema_discover").unwrap().name,
-            "schema_discover"
-        );
-        assert_eq!(
-            find_tool_for_call("schema/discover").unwrap().name,
-            "schema_discover"
-        );
+        assert_eq!(find_tool_for_call("schema_discover").unwrap().name, "schema_discover");
+        assert_eq!(find_tool_for_call("schema/discover").unwrap().name, "schema_discover");
     }
 
     #[test]
@@ -654,26 +375,13 @@ mod tests {
         // "dryrun" typo must be rejected as an unknown property; dry_run
         // defaults to false inside handlers, so executing would perform a
         // live sync.
-        let (response, domain) = invoke_tool(
-            spec,
-            Some(json!(1)),
-            json!({"remote": "origin", "dryrun": true}),
-        );
+        let (response, domain) = invoke_tool(spec, Some(json!(1)), json!({"remote": "origin", "dryrun": true}));
         assert!(domain.is_none());
         let error = response.error.expect("dryrun typo must be invalid params");
         assert_eq!(error.code, -32602);
         assert_eq!(error.message, "Invalid params");
-        let issues = error
-            .data
-            .and_then(|data| data.get("issues").and_then(|v| v.as_array()).cloned())
-            .unwrap_or_default();
-        assert!(
-            issues.iter().any(|issue| issue
-                .as_str()
-                .unwrap_or("")
-                .contains("unknown property 'dryrun'")),
-            "issues must name the typo: {issues:?}"
-        );
+        let issues = error.data.and_then(|data| data.get("issues").and_then(|v| v.as_array()).cloned()).unwrap_or_default();
+        assert!(issues.iter().any(|issue| issue.as_str().unwrap_or("").contains("unknown property 'dryrun'")), "issues must name the typo: {issues:?}");
 
         // Missing required remote.
         let (response, _) = invoke_tool(spec, Some(json!(2)), json!({}));
@@ -681,20 +389,12 @@ mod tests {
 
         // Nested type violations: task_update patch with a non-string tag.
         let update = find_tool_by_method("task/update").unwrap();
-        let (response, _) = invoke_tool(
-            update,
-            Some(json!(3)),
-            json!({"id": "MCP-1", "patch": {"tags": ["a", 5]}}),
-        );
+        let (response, _) = invoke_tool(update, Some(json!(3)), json!({"id": "MCP-1", "patch": {"tags": ["a", 5]}}));
         let error = response.error.expect("nested type violation rejected");
         assert_eq!(error.code, -32602);
         let issues = error.data.unwrap();
         let issues = issues.get("issues").and_then(|v| v.as_array()).unwrap();
-        assert!(
-            issues
-                .iter()
-                .any(|issue| issue.as_str().unwrap_or("").contains("/patch/tags/1"))
-        );
+        assert!(issues.iter().any(|issue| issue.as_str().unwrap_or("").contains("/patch/tags/1")));
 
         // Enum enforcement on advertised enums.
         let list = find_tool_by_method("task/list").unwrap();
@@ -704,11 +404,7 @@ mod tests {
         // Null is an advertised variant of the multi-value filters
         // (documented null-clear semantics) and must pass.
         let (response, _) = invoke_tool(list, Some(json!(5)), json!({"status": null}));
-        assert!(
-            response.error.is_none(),
-            "null filter must stay valid: {:?}",
-            response.error
-        );
+        assert!(response.error.is_none(), "null filter must stay valid: {:?}", response.error);
         // A non-string filter value still violates the oneOf branches.
         let (response, _) = invoke_tool(list, Some(json!(6)), json!({"status": 5}));
         assert_eq!(response.error.unwrap().code, -32602);
@@ -728,51 +424,25 @@ mod tests {
         // inside the handler, meaning a missed rejection would perform a
         // live sync).
         let spec = find_tool_by_method("sync/pull").unwrap();
-        let (response, domain) = invoke_tool(
-            spec,
-            Some(json!(11)),
-            json!({"remote": "origin", "dryrun": true}),
-        );
+        let (response, domain) = invoke_tool(spec, Some(json!(11)), json!({"remote": "origin", "dryrun": true}));
         assert!(domain.is_none());
         let error = response.error.expect("dryrun typo must not execute");
         assert_eq!(error.code, -32602);
         let issues = error.data.unwrap();
         assert!(
-            issues
-                .get("issues")
-                .and_then(|v| v.as_array())
-                .unwrap()
-                .iter()
-                .any(|issue| issue
-                    .as_str()
-                    .unwrap_or("")
-                    .contains("unknown property 'dryrun'"))
+            issues.get("issues").and_then(|v| v.as_array()).unwrap().iter().any(|issue| issue.as_str().unwrap_or("").contains("unknown property 'dryrun'"))
         );
 
         // Direct method dispatch enforces the identical contract.
-        let (direct, domain) = invoke_tool(
-            find_tool_by_method("sync_pull").unwrap(),
-            Some(json!(12)),
-            json!({"remote": "origin", "dryrun": true}),
-        );
+        let (direct, domain) = invoke_tool(find_tool_by_method("sync_pull").unwrap(), Some(json!(12)), json!({"remote": "origin", "dryrun": true}));
         assert!(domain.is_none());
         let direct_error = direct.error.expect("direct dispatch must match");
         assert_eq!(direct_error.code, -32602);
-        assert_eq!(
-            direct_error
-                .data
-                .as_ref()
-                .and_then(|data| data.get("tool"))
-                .and_then(|v| v.as_str()),
-            Some("sync_pull")
-        );
+        assert_eq!(direct_error.data.as_ref().and_then(|data| data.get("tool")).and_then(|v| v.as_str()), Some("sync_pull"));
 
         // Belt and suspenders: nothing was written to the workspace.
-        let entries: Vec<_> = std::fs::read_dir(&tasks_dir)
-            .unwrap()
-            .filter_map(|entry| entry.ok())
-            .map(|entry| entry.file_name().to_string_lossy().to_string())
-            .collect();
+        let entries: Vec<_> =
+            std::fs::read_dir(&tasks_dir).unwrap().filter_map(|entry| entry.ok()).map(|entry| entry.file_name().to_string_lossy().to_string()).collect();
         assert!(entries.is_empty(), "no side effects: {entries:?}");
 
         drop(guard);
@@ -798,12 +468,7 @@ mod tests {
         assert_eq!(hinted.len(), hintless.len());
         for (with_hints, without) in hinted.iter().zip(hintless.iter()) {
             assert_eq!(with_hints.get("name"), without.get("name"));
-            assert_eq!(
-                with_hints.get("inputSchema"),
-                without.get("inputSchema"),
-                "hints altered inputSchema for {:?}",
-                with_hints.get("name")
-            );
+            assert_eq!(with_hints.get("inputSchema"), without.get("inputSchema"), "hints altered inputSchema for {:?}", with_hints.get("name"));
         }
     }
 
@@ -813,68 +478,33 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let tasks_dir = tmp.path().join(".tasks");
         std::fs::create_dir_all(&tasks_dir).unwrap();
-        std::fs::write(
-            tasks_dir.join("config.yml"),
-            "default:\n  project: MCP\nmembers:\n  - alice\n",
-        )
-        .unwrap();
+        std::fs::write(tasks_dir.join("config.yml"), "default:\n  project: MCP\nmembers:\n  - alice\n").unwrap();
         super::super::test_env::set_tasks_dir(&tasks_dir);
 
         let config_before = std::fs::read(tasks_dir.join("config.yml")).unwrap();
         let pins = [
             // sprint_delete advertised force historically but the handler
             // ignored it; the flag is intentionally rejected now.
-            (
-                "sprint_delete",
-                json!({"sprint": "#1", "force": true}),
-                "unknown property 'force'",
-            ),
+            ("sprint_delete", json!({"sprint": "#1", "force": true}), "unknown property 'force'"),
             // MCP task_delete has no confirmation concept; CLI-style force
             // must be rejected instead of silently ignored.
-            (
-                "task_delete",
-                json!({"id": "MCP-1", "force": true}),
-                "unknown property 'force'",
-            ),
+            ("task_delete", json!({"id": "MCP-1", "force": true}), "unknown property 'force'"),
             // task_restore has no hard/dry-run flags on the MCP surface.
-            (
-                "task_restore",
-                json!({"id": "MCP-1", "dry_run": true}),
-                "unknown property 'dry_run'",
-            ),
-            (
-                "config_set",
-                json!({"values": {"default.project": 42}}),
-                "/values/default.project: expected type string, found number",
-            ),
+            ("task_restore", json!({"id": "MCP-1", "dry_run": true}), "unknown property 'dry_run'"),
+            ("config_set", json!({"values": {"default.project": 42}}), "/values/default.project: expected type string, found number"),
         ];
         for (tool, arguments, expected_issue) in pins {
             for wrapped in [false, true] {
                 let response = dispatch_tool(tool, arguments.clone(), wrapped);
-                assert_eq!(
-                    response["error"]["code"], -32602,
-                    "{tool}, wrapped={wrapped}: {response}"
-                );
+                assert_eq!(response["error"]["code"], -32602, "{tool}, wrapped={wrapped}: {response}");
                 assert!(response.get("result").is_none());
                 assert_eq!(response["error"]["data"]["tool"], tool);
                 let issues = response["error"]["data"]["issues"].as_array().unwrap();
-                assert!(
-                    issues
-                        .iter()
-                        .any(|issue| issue.as_str().unwrap().contains(expected_issue)),
-                    "{tool}: {issues:?}"
-                );
+                assert!(issues.iter().any(|issue| issue.as_str().unwrap().contains(expected_issue)), "{tool}: {issues:?}");
             }
         }
-        assert_eq!(
-            std::fs::read(tasks_dir.join("config.yml")).unwrap(),
-            config_before
-        );
-        assert_eq!(
-            std::fs::read_dir(&tasks_dir).unwrap().count(),
-            1,
-            "rejected inputs must not create tasks, sprints, reports, or project overrides"
-        );
+        assert_eq!(std::fs::read(tasks_dir.join("config.yml")).unwrap(), config_before);
+        assert_eq!(std::fs::read_dir(&tasks_dir).unwrap().count(), 1, "rejected inputs must not create tasks, sprints, reports, or project overrides");
 
         drop(guard);
     }
@@ -890,42 +520,24 @@ mod tests {
         // Handlers never read these filters, so advertising them promised
         // silently-unfiltered results; they are intentionally rejected now.
         for tool in ["project_list", "sprint_backlog"] {
-            for ignored in [
-                json!({"sort_by": "priority"}),
-                json!({"order": "asc"}),
-                json!({"due": "today"}),
-                json!({"recent": "7d"}),
-                json!({"needs": "effort"}),
-            ] {
+            for ignored in
+                [json!({"sort_by": "priority"}), json!({"order": "asc"}), json!({"due": "today"}), json!({"recent": "7d"}), json!({"needs": "effort"})]
+            {
                 for wrapped in [false, true] {
                     let response = dispatch_tool(tool, ignored.clone(), wrapped);
-                    assert_eq!(
-                        response["error"]["code"], -32602,
-                        "{tool} {ignored}: {response}"
-                    );
+                    assert_eq!(response["error"]["code"], -32602, "{tool} {ignored}: {response}");
                     assert!(response.get("result").is_none());
                     let field = ignored.as_object().unwrap().keys().next().unwrap();
-                    assert!(
-                        response["error"]["data"]["issues"]
-                            .to_string()
-                            .contains(&format!("unknown property '{field}'"))
-                    );
+                    assert!(response["error"]["data"]["issues"].to_string().contains(&format!("unknown property '{field}'")));
                 }
             }
         }
 
         // Implemented parameters still work: plain calls succeed.
-        for (tool, args) in [
-            ("project_list", json!({"limit": 5, "cursor": 0})),
-            ("sprint_backlog", json!({"project": "MCP"})),
-        ] {
+        for (tool, args) in [("project_list", json!({"limit": 5, "cursor": 0})), ("sprint_backlog", json!({"project": "MCP"}))] {
             let spec = find_tool_for_call(tool).unwrap();
             let (response, _) = invoke_tool(spec, Some(json!(24)), args.clone());
-            assert!(
-                response.error.is_none(),
-                "{tool} {args} must stay accepted: {:?}",
-                response.error
-            );
+            assert!(response.error.is_none(), "{tool} {args} must stay accepted: {:?}", response.error);
         }
 
         drop(guard);
@@ -937,70 +549,29 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let tasks_dir = tmp.path().join(".tasks");
         std::fs::create_dir_all(&tasks_dir).unwrap();
-        std::fs::write(
-            tasks_dir.join("config.yml"),
-            "default:\n  project: MCP\nmembers:\n  - alice\n",
-        )
-        .unwrap();
+        std::fs::write(tasks_dir.join("config.yml"), "default:\n  project: MCP\nmembers:\n  - alice\n").unwrap();
         super::super::test_env::set_tasks_dir(&tasks_dir);
 
         for (tool, arguments, explanation) in [
-            (
-                "agent_run",
-                json!({"ticket_id": "MCP-404", "prompt": "do it", "runner": "command"}),
-                "Task not found: MCP-404",
-            ),
-            (
-                "agent_run",
-                json!({"ticket_id": "MCP-404", "prompt": "do it", "runner": "bogus-runner"}),
-                "Unsupported runner 'bogus-runner'",
-            ),
-            (
-                "agent_run",
-                json!({"ticket_id": "MCP-404", "prompt": "do it", "agent": "missing-profile"}),
-                "Unknown agent profile 'missing-profile'",
-            ),
-            (
-                "agent_cancel",
-                json!({"id": "job-does-not-exist"}),
-                "Job not found",
-            ),
-            (
-                "agent_send_message",
-                json!({"id": "job-does-not-exist", "message": "hi"}),
-                "Validation error: Job not found",
-            ),
-            (
-                "sprint_update",
-                json!({"sprint": "#424242", "label": "x"}),
-                "Sprint #424242 not found",
-            ),
-            (
-                "sprint_delete",
-                json!({"sprint": "#424242"}),
-                "Sprint #424242 not found",
-            ),
+            ("agent_run", json!({"ticket_id": "MCP-404", "prompt": "do it", "runner": "command"}), "Task not found: MCP-404"),
+            ("agent_run", json!({"ticket_id": "MCP-404", "prompt": "do it", "runner": "bogus-runner"}), "Unsupported runner 'bogus-runner'"),
+            ("agent_run", json!({"ticket_id": "MCP-404", "prompt": "do it", "agent": "missing-profile"}), "Unknown agent profile 'missing-profile'"),
+            ("agent_cancel", json!({"id": "job-does-not-exist"}), "Job not found"),
+            ("agent_send_message", json!({"id": "job-does-not-exist", "message": "hi"}), "Validation error: Job not found"),
+            ("sprint_update", json!({"sprint": "#424242", "label": "x"}), "Sprint #424242 not found"),
+            ("sprint_delete", json!({"sprint": "#424242"}), "Sprint #424242 not found"),
         ] {
             for wrapped in [false, true] {
                 let response = dispatch_tool(tool, arguments.clone(), wrapped);
                 assert!(response.get("error").is_none(), "{tool}: {response}");
                 let result = &response["result"];
                 assert_eq!(result["isError"], true, "{tool}: {response}");
-                assert!(
-                    result["content"][0]["text"]
-                        .as_str()
-                        .unwrap()
-                        .contains(explanation),
-                    "{tool}: {response}"
-                );
+                assert!(result["content"][0]["text"].as_str().unwrap().contains(explanation), "{tool}: {response}");
                 if wrapped {
                     let envelope = &result["functionResponse"];
                     assert_eq!(envelope["name"], tool);
                     assert_eq!(envelope["response"]["isError"], true);
-                    assert!(
-                        envelope["response"].to_string().contains(explanation),
-                        "{tool}: {response}"
-                    );
+                    assert!(envelope["response"].to_string().contains(explanation), "{tool}: {response}");
                 } else {
                     assert!(result.get("functionResponse").is_none());
                 }
@@ -1015,26 +586,16 @@ mod tests {
         use crate::errors::LoTaRError;
 
         for (error, code) in [
-            (
-                LoTaRError::ValidationError("invalid profile".into()),
-                -32000,
-            ),
+            (LoTaRError::ValidationError("invalid profile".into()), -32000),
             (LoTaRError::TaskNotFound("MCP-404".into()), -32000),
             (LoTaRError::SprintNotFound(404), -32000),
             (LoTaRError::InvalidTaskId("invalid".into()), -32000),
             (LoTaRError::ProjectNotFound("MCP".into()), -32000),
             (LoTaRError::IndexError("invalid index".into()), -32000),
-            (
-                LoTaRError::SerializationError("cannot encode".into()),
-                -32603,
-            ),
-            (
-                LoTaRError::IoError(std::io::Error::other("cannot read")),
-                -32603,
-            ),
+            (LoTaRError::SerializationError("cannot encode".into()), -32603),
+            (LoTaRError::IoError(std::io::Error::other("cannot read")), -32603),
         ] {
-            let response =
-                super::super::domain_service_error(Some(json!(41)), "Service failed", &error);
+            let response = super::super::domain_service_error(Some(json!(41)), "Service failed", &error);
             let failure = response.error.unwrap();
             assert_eq!(failure.code, code);
             assert_eq!(failure.message, "Service failed");
@@ -1048,11 +609,7 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let tasks_dir = tmp.path().join(".tasks");
         std::fs::create_dir_all(&tasks_dir).unwrap();
-        std::fs::write(
-            tasks_dir.join("config.yml"),
-            "default:\n  project: MCP\nmembers:\n  - alice\n",
-        )
-        .unwrap();
+        std::fs::write(tasks_dir.join("config.yml"), "default:\n  project: MCP\nmembers:\n  - alice\n").unwrap();
         super::super::test_env::set_tasks_dir(&tasks_dir);
 
         let spec = find_tool_by_method("task/get").unwrap();
@@ -1061,12 +618,7 @@ mod tests {
         let result = response.result.as_ref().unwrap();
         assert_eq!(result.get("isError"), Some(&json!(true)));
         assert!(response.error.is_none());
-        let text = result
-            .get("content")
-            .and_then(|c| c.get(0))
-            .and_then(|entry| entry.get("text"))
-            .and_then(|v| v.as_str())
-            .unwrap();
+        let text = result.get("content").and_then(|c| c.get(0)).and_then(|entry| entry.get("text")).and_then(|v| v.as_str()).unwrap();
         assert!(text.contains(&domain.message));
 
         let wrapped = wrap_for_tools_call(response, Some(domain.clone()), "task_get");

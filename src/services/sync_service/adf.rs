@@ -20,12 +20,7 @@ pub(super) fn adf_to_text(value: &JsonValue) -> String {
 }
 
 fn blocks_to_text(blocks: &[JsonValue], indent: &str) -> String {
-    blocks
-        .iter()
-        .map(|block| block_to_text(block, indent))
-        .filter(|text| !text.trim().is_empty())
-        .collect::<Vec<_>>()
-        .join("\n\n")
+    blocks.iter().map(|block| block_to_text(block, indent)).filter(|text| !text.trim().is_empty()).collect::<Vec<_>>().join("\n\n")
 }
 
 fn node_type(node: &JsonValue) -> &str {
@@ -33,82 +28,45 @@ fn node_type(node: &JsonValue) -> &str {
 }
 
 fn children(node: &JsonValue) -> &[JsonValue] {
-    node.get("content")
-        .and_then(|v| v.as_array())
-        .map(Vec::as_slice)
-        .unwrap_or(&[])
+    node.get("content").and_then(|v| v.as_array()).map(Vec::as_slice).unwrap_or(&[])
 }
 
 fn block_to_text(node: &JsonValue, indent: &str) -> String {
     match node_type(node) {
         "paragraph" => inline_to_text(children(node)).trim().to_string(),
         "heading" => {
-            let level = node
-                .pointer("/attrs/level")
-                .and_then(|v| v.as_u64())
-                .unwrap_or(1)
-                .clamp(1, 6) as usize;
-            format!(
-                "{} {}",
-                "#".repeat(level),
-                inline_to_text(children(node)).trim()
-            )
+            let level = node.pointer("/attrs/level").and_then(|v| v.as_u64()).unwrap_or(1).clamp(1, 6) as usize;
+            format!("{} {}", "#".repeat(level), inline_to_text(children(node)).trim())
         }
         "bulletList" | "orderedList" => list_to_text(node, indent),
         "codeBlock" => {
-            let language = node
-                .pointer("/attrs/language")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
-            format!(
-                "```{language}\n{}\n```",
-                inline_to_text(children(node)).trim_end_matches('\n')
-            )
+            let language = node.pointer("/attrs/language").and_then(|v| v.as_str()).unwrap_or("");
+            format!("```{language}\n{}\n```", inline_to_text(children(node)).trim_end_matches('\n'))
         }
         "blockquote" => blocks_to_text(children(node), "")
             .lines()
-            .map(|line| {
-                if line.is_empty() {
-                    ">".to_string()
-                } else {
-                    format!("> {line}")
-                }
-            })
+            .map(|line| if line.is_empty() { ">".to_string() } else { format!("> {line}") })
             .collect::<Vec<_>>()
             .join("\n"),
         "rule" => "---".to_string(),
         "mediaSingle" | "mediaGroup" | "media" => String::new(),
         _ => {
             // Unknown blocks (panels, tables, ...): keep their text.
-            if children(node).iter().any(is_inline) {
-                inline_to_text(children(node)).trim().to_string()
-            } else {
-                blocks_to_text(children(node), indent)
-            }
+            if children(node).iter().any(is_inline) { inline_to_text(children(node)).trim().to_string() } else { blocks_to_text(children(node), indent) }
         }
     }
 }
 
 fn is_inline(node: &JsonValue) -> bool {
-    matches!(
-        node_type(node),
-        "text" | "hardBreak" | "mention" | "emoji" | "date" | "inlineCard" | "status"
-    )
+    matches!(node_type(node), "text" | "hardBreak" | "mention" | "emoji" | "date" | "inlineCard" | "status")
 }
 
 fn list_to_text(node: &JsonValue, indent: &str) -> String {
     let ordered = node_type(node) == "orderedList";
-    let start = node
-        .pointer("/attrs/order")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(1);
+    let start = node.pointer("/attrs/order").and_then(|v| v.as_u64()).unwrap_or(1);
     let mut lines = Vec::new();
     for (index, item) in children(node).iter().enumerate() {
-        let marker = if ordered {
-            format!("{}. ", start + index as u64)
-        } else {
-            "- ".to_string()
-        };
+        let marker = if ordered { format!("{}. ", start + index as u64) } else { "- ".to_string() };
         let nested_indent = format!("{indent}  ");
         let mut first = true;
         for block in children(item) {
@@ -139,24 +97,13 @@ fn list_to_text(node: &JsonValue, indent: &str) -> String {
 fn inline_to_text(nodes: &[JsonValue]) -> String {
     let mut out = String::new();
     for node in nodes {
-        let attr = |name: &str| {
-            node.pointer(&format!("/attrs/{name}"))
-                .and_then(|v| v.as_str())
-                .map(str::to_string)
-        };
+        let attr = |name: &str| node.pointer(&format!("/attrs/{name}")).and_then(|v| v.as_str()).map(str::to_string);
         match node_type(node) {
             "text" => {
                 let text = node.get("text").and_then(|v| v.as_str()).unwrap_or("");
-                let href = node
-                    .get("marks")
-                    .and_then(|v| v.as_array())
-                    .and_then(|marks| {
-                        marks
-                            .iter()
-                            .find(|mark| node_type(mark) == "link")
-                            .and_then(|mark| mark.pointer("/attrs/href"))
-                            .and_then(|v| v.as_str())
-                    });
+                let href = node.get("marks").and_then(|v| v.as_array()).and_then(|marks| {
+                    marks.iter().find(|mark| node_type(mark) == "link").and_then(|mark| mark.pointer("/attrs/href")).and_then(|v| v.as_str())
+                });
                 match href {
                     Some(href) if href == text => out.push_str(href),
                     Some(href) => out.push_str(&format!("[{text}]({href})")),
@@ -165,11 +112,7 @@ fn inline_to_text(nodes: &[JsonValue]) -> String {
             }
             "hardBreak" => out.push('\n'),
             "mention" => out.push_str(&attr("text").unwrap_or_default()),
-            "emoji" => out.push_str(
-                &attr("text")
-                    .or_else(|| attr("shortName"))
-                    .unwrap_or_default(),
-            ),
+            "emoji" => out.push_str(&attr("text").or_else(|| attr("shortName")).unwrap_or_default()),
             "inlineCard" => out.push_str(&attr("url").unwrap_or_default()),
             "status" => out.push_str(&attr("text").unwrap_or_default()),
             "date" => {
@@ -265,14 +208,7 @@ fn parse_chunk(chunk: &[&str]) -> JsonValue {
         return json!({"type": "rule"});
     }
     if chunk.iter().all(|line| line.starts_with('>')) {
-        let inner: Vec<&str> = chunk
-            .iter()
-            .map(|line| {
-                line.strip_prefix("> ")
-                    .or_else(|| line.strip_prefix('>'))
-                    .unwrap_or("")
-            })
-            .collect();
+        let inner: Vec<&str> = chunk.iter().map(|line| line.strip_prefix("> ").or_else(|| line.strip_prefix('>')).unwrap_or("")).collect();
         return json!({"type": "blockquote", "content": parse_blocks(&inner)});
     }
     if list_marker(chunk[0]).is_some_and(|(indent, ..)| indent == 0) {
@@ -322,19 +258,12 @@ fn parse_list(lines: &[&str], indent: usize) -> (JsonValue, usize) {
             i += used;
             continue;
         }
-        let content = if text.is_empty() {
-            vec![json!({"type": "paragraph", "content": []})]
-        } else {
-            vec![paragraph(text)]
-        };
+        let content = if text.is_empty() { vec![json!({"type": "paragraph", "content": []})] } else { vec![paragraph(text)] };
         items.push(json!({"type": "listItem", "content": content}));
         i += 1;
     }
     let mut node = JsonMap::new();
-    node.insert(
-        "type".into(),
-        json!(if ordered { "orderedList" } else { "bulletList" }),
-    );
+    node.insert("type".into(), json!(if ordered { "orderedList" } else { "bulletList" }));
     if ordered && order.unwrap_or(1) != 1 {
         node.insert("attrs".into(), json!({"order": order.unwrap_or(1)}));
     }
@@ -384,9 +313,7 @@ fn parse_links(line: &str, nodes: &mut Vec<JsonValue>) {
                 continue;
             }
         }
-        if (rest.starts_with("http://") || rest.starts_with("https://"))
-            && (plain.is_empty() || plain.ends_with(char::is_whitespace) || plain.ends_with('('))
-        {
+        if (rest.starts_with("http://") || rest.starts_with("https://")) && (plain.is_empty() || plain.ends_with(char::is_whitespace) || plain.ends_with('(')) {
             let end = rest.find(char::is_whitespace).unwrap_or(rest.len());
             let url = rest[..end].trim_end_matches(['.', ',', ';', ':', ')', '!', '?']);
             if is_url(url) {
@@ -403,9 +330,7 @@ fn parse_links(line: &str, nodes: &mut Vec<JsonValue>) {
 }
 
 fn is_url(value: &str) -> bool {
-    (value.starts_with("http://") || value.starts_with("https://"))
-        && value.len() > 8
-        && !value.contains(char::is_whitespace)
+    (value.starts_with("http://") || value.starts_with("https://")) && value.len() > 8 && !value.contains(char::is_whitespace)
 }
 
 #[cfg(test)]
@@ -413,11 +338,7 @@ mod tests {
     use super::*;
 
     fn round_trip(text: &str) {
-        assert_eq!(
-            adf_to_text(&text_to_adf(text)),
-            text,
-            "round trip of {text:?}"
-        );
+        assert_eq!(adf_to_text(&text_to_adf(text)), text, "round trip of {text:?}");
     }
 
     #[test]

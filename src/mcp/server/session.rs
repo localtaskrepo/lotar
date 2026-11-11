@@ -47,12 +47,7 @@ impl Default for McpSession {
 
 impl McpSession {
     pub(crate) fn new() -> Self {
-        Self {
-            inner: Mutex::new(SessionInner {
-                state: SessionState::Uninitialized,
-                pending_list_changed: false,
-            }),
-        }
+        Self { inner: Mutex::new(SessionInner { state: SessionState::Uninitialized, pending_list_changed: false }) }
     }
 
     /// Handle an `initialize` request. Returns `true` only when this call
@@ -116,9 +111,7 @@ impl McpSession {
 }
 
 fn lock_inner(inner: &Mutex<SessionInner>) -> std::sync::MutexGuard<'_, SessionInner> {
-    inner
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
+    inner.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 #[cfg(test)]

@@ -8,12 +8,7 @@ use crate::workspace::TasksDirectoryResolver;
 /// `lotar task move` (DEV-183): move tasks to another project. Each task gets
 /// the next free number there; its old ID stays as a redirect. Tasks come
 /// from IDs, a `--select` query, or both.
-pub(crate) fn execute(
-    args: &TaskMoveArgs,
-    project: Option<&str>,
-    resolver: &TasksDirectoryResolver,
-    renderer: &OutputRenderer,
-) -> Result<(), String> {
+pub(crate) fn execute(args: &TaskMoveArgs, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
     let mut ctx = TaskCommandContext::new(resolver, project, args.ids.first().map(String::as_str))?;
     if let Some(new_id) = args.record.as_deref() {
         return record(&mut ctx, args, new_id, project, renderer);
@@ -35,40 +30,19 @@ pub(crate) fn execute(
     if let Some(select) = args.select.as_deref() {
         let mut search = String::new();
         if let Some(prefix) = project {
-            search.push_str(&format!(
-                "project={} ",
-                ctx.project_prefix_for(Some(prefix))
-            ));
+            search.push_str(&format!("project={} ", ctx.project_prefix_for(Some(prefix))));
         }
         search.push_str(select);
-        let selected = crate::services::task_list::select_ids(
-            &ctx.storage,
-            &ctx.config,
-            ctx.storage_root(),
-            &search,
-        )
-        .map_err(|e| e.cli_message())?;
+        let selected = crate::services::task_list::select_ids(&ctx.storage, &ctx.config, ctx.storage_root(), &search).map_err(|e| e.cli_message())?;
         ids.extend(selected);
     } else if ids.is_empty() {
-        return Err(
-            "Name the tasks to move: task IDs, or --select '<query>' (e.g. --select 'tag:web')"
-                .to_string(),
-        );
+        return Err("Name the tasks to move: task IDs, or --select '<query>' (e.g. --select 'tag:web')".to_string());
     }
     let mut seen = std::collections::HashSet::new();
     ids.retain(|id| seen.insert(id.clone()));
 
-    let custom_fields = (!args.fields.is_empty()).then(|| {
-        args.fields
-            .iter()
-            .map(|(key, value)| {
-                (
-                    key.clone(),
-                    crate::types::custom_value_string(value.clone()),
-                )
-            })
-            .collect()
-    });
+    let custom_fields =
+        (!args.fields.is_empty()).then(|| args.fields.iter().map(|(key, value)| (key.clone(), crate::types::custom_value_string(value.clone()))).collect());
 
     let mut moved: Vec<TaskMoveResponse> = Vec::new();
     let mut failed: Vec<(String, String)> = Vec::new();
@@ -130,34 +104,19 @@ pub(crate) fn execute(
             }
         }
     }
-    if failed.is_empty() {
-        Ok(())
-    } else {
-        Err(format!("{} task(s) could not be moved", failed.len()))
-    }
+    if failed.is_empty() { Ok(()) } else { Err(format!("{} task(s) could not be moved", failed.len())) }
 }
 
 /// `lotar task move OLD --record NEW`: the file was moved by hand; write the
 /// redirect only. The old ID cannot be resolved (its file is gone), so it is
 /// taken as typed, with the project prefix added to a bare number.
-fn record(
-    ctx: &mut TaskCommandContext,
-    args: &TaskMoveArgs,
-    new_id: &str,
-    project: Option<&str>,
-    renderer: &OutputRenderer,
-) -> Result<(), String> {
+fn record(ctx: &mut TaskCommandContext, args: &TaskMoveArgs, new_id: &str, project: Option<&str>, renderer: &OutputRenderer) -> Result<(), String> {
     let [old] = args.ids.as_slice() else {
         return Err("--record takes exactly one old task ID".to_string());
     };
-    let old = if old.chars().all(|c| c.is_ascii_digit()) {
-        format!("{}-{}", ctx.project_prefix_for(project), old)
-    } else {
-        old.clone()
-    };
+    let old = if old.chars().all(|c| c.is_ascii_digit()) { format!("{}-{}", ctx.project_prefix_for(project), old) } else { old.clone() };
     let new_id = ctx.resolve_full_task_id(new_id, project)?;
-    let changed = TaskService::record_move(&mut ctx.storage, &old, &new_id)
-        .map_err(|error| error.to_string())?;
+    let changed = TaskService::record_move(&mut ctx.storage, &old, &new_id).map_err(|error| error.to_string())?;
     match renderer.format {
         OutputFormat::Json => renderer.emit_json(&serde_json::json!({
             "status": "ok",
@@ -166,9 +125,7 @@ fn record(
             "to": new_id,
             "changed": changed,
         })),
-        _ if changed => {
-            renderer.emit_success(format_args!("Recorded the move of {old} to {new_id}"))
-        }
+        _ if changed => renderer.emit_success(format_args!("Recorded the move of {old} to {new_id}")),
         _ => renderer.emit_info(format_args!("{old} already redirects to {new_id}")),
     }
     Ok(())
@@ -176,17 +133,10 @@ fn record(
 
 /// `lotar task renumber ID --file PATH` (DEV-270): resolve a number stored
 /// twice by giving the chosen copy the next free number.
-pub(crate) fn renumber(
-    args: &TaskRenumberArgs,
-    project: Option<&str>,
-    resolver: &TasksDirectoryResolver,
-    renderer: &OutputRenderer,
-) -> Result<(), String> {
+pub(crate) fn renumber(args: &TaskRenumberArgs, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
     let mut ctx = TaskCommandContext::new(resolver, project, Some(args.id.as_str()))?;
     let id = ctx.resolve_full_task_id(&args.id, project)?;
-    let outcome =
-        TaskService::renumber_duplicate(&mut ctx.storage, &id, args.file.as_deref(), args.dry_run)
-            .map_err(|e| e.to_string())?;
+    let outcome = TaskService::renumber_duplicate(&mut ctx.storage, &id, args.file.as_deref(), args.dry_run).map_err(|e| e.to_string())?;
     match renderer.format {
         OutputFormat::Json => renderer.emit_json(&serde_json::json!({
             "status": "ok",
@@ -199,18 +149,8 @@ pub(crate) fn renumber(
             "kept": outcome.kept.iter().map(|p| p.display().to_string()).collect::<Vec<_>>(),
         })),
         _ => {
-            let verb = if args.dry_run {
-                "DRY RUN: Would renumber"
-            } else {
-                "Renumbered"
-            };
-            let line = format!(
-                "{verb} {} to {} ({} -> {})",
-                outcome.from,
-                outcome.to,
-                outcome.old_file.display(),
-                outcome.new_file.display()
-            );
+            let verb = if args.dry_run { "DRY RUN: Would renumber" } else { "Renumbered" };
+            let line = format!("{verb} {} to {} ({} -> {})", outcome.from, outcome.to, outcome.old_file.display(), outcome.new_file.display());
             if args.dry_run {
                 renderer.emit_info(format_args!("{line}"));
             } else {

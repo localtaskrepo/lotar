@@ -73,19 +73,8 @@ pub const MAX_JOB_LOGS: usize = 500;
 /// turned off (`off`, `false` or `none`).
 pub fn effective_logs_dir(tasks_dir: &Path, configured: Option<&str>) -> Option<String> {
     match configured.map(str::trim) {
-        None | Some("") => Some(
-            tasks_dir
-                .join(DEFAULT_LOGS_DIR)
-                .to_string_lossy()
-                .to_string(),
-        ),
-        Some(value)
-            if ["off", "false", "none"]
-                .iter()
-                .any(|off| value.eq_ignore_ascii_case(off)) =>
-        {
-            None
-        }
+        None | Some("") => Some(tasks_dir.join(DEFAULT_LOGS_DIR).to_string_lossy().to_string()),
+        Some(value) if ["off", "false", "none"].iter().any(|off| value.eq_ignore_ascii_case(off)) => None,
         Some(value) => Some(value.to_string()),
     }
 }
@@ -96,11 +85,7 @@ fn prepare_logs_dir(dir: &Path) {
     // logs, so pointing agent_logs_dir at an existing folder can't hide its
     // other files from git (DEV-279).
     let ignore = dir.join(".gitignore");
-    let only_logs = fs::read_dir(dir).is_ok_and(|entries| {
-        entries
-            .filter_map(Result::ok)
-            .all(|entry| is_job_log(&entry.path()))
-    });
+    let only_logs = fs::read_dir(dir).is_ok_and(|entries| entries.filter_map(Result::ok).all(|entry| is_job_log(&entry.path())));
     if !ignore.exists() && only_logs {
         let _ = fs::write(&ignore, "# Agent job logs written by LoTaR\n*\n");
     }
@@ -129,11 +114,7 @@ fn prepare_logs_dir(dir: &Path) {
 impl AgentLogService {
     /// Initialize log file for a new job. Writes header line.
     /// Only writes if logs_dir is provided.
-    pub fn init_log(
-        workspace_root: &Path,
-        logs_dir: Option<&str>,
-        header: JobLogHeader,
-    ) -> LoTaRResult<()> {
+    pub fn init_log(workspace_root: &Path, logs_dir: Option<&str>, header: JobLogHeader) -> LoTaRResult<()> {
         let Some(logs_dir) = logs_dir else {
             return Ok(());
         };
@@ -147,22 +128,14 @@ impl AgentLogService {
         let header = JobLogLine::Header(header);
 
         let mut file = File::create(&path)?;
-        let line = serde_json::to_string(&header)
-            .map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
+        let line = serde_json::to_string(&header).map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
         writeln!(file, "{}", line)?;
         Ok(())
     }
 
     /// Append an event line to the log file.
     /// Only writes if logs_dir is provided.
-    pub fn append_event(
-        workspace_root: &Path,
-        logs_dir: Option<&str>,
-        job_id: &str,
-        kind: &str,
-        at: &str,
-        message: Option<String>,
-    ) -> LoTaRResult<()> {
+    pub fn append_event(workspace_root: &Path, logs_dir: Option<&str>, job_id: &str, kind: &str, at: &str, message: Option<String>) -> LoTaRResult<()> {
         let Some(logs_dir) = logs_dir else {
             return Ok(());
         };
@@ -173,15 +146,10 @@ impl AgentLogService {
             return Ok(());
         }
 
-        let entry = JobLogLine::Event(JobLogEntry {
-            kind: kind.to_string(),
-            at: at.to_string(),
-            message,
-        });
+        let entry = JobLogLine::Event(JobLogEntry { kind: kind.to_string(), at: at.to_string(), message });
 
         let mut file = OpenOptions::new().append(true).open(&path)?;
-        let line = serde_json::to_string(&entry)
-            .map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
+        let line = serde_json::to_string(&entry).map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
         writeln!(file, "{}", line)?;
         Ok(())
     }
@@ -201,23 +169,12 @@ impl AgentLogService {
             workspace_root,
             logs_dir,
             job_id,
-            JobStatusLine {
-                status: status.to_string(),
-                at: at.to_string(),
-                exit_code,
-                summary,
-                usage: None,
-            },
+            JobStatusLine { status: status.to_string(), at: at.to_string(), exit_code, summary, usage: None },
         )
     }
 
     /// Write the final status line, including what the job used.
-    pub fn write_status_with_usage(
-        workspace_root: &Path,
-        logs_dir: Option<&str>,
-        job_id: &str,
-        status_line: JobStatusLine,
-    ) -> LoTaRResult<()> {
+    pub fn write_status_with_usage(workspace_root: &Path, logs_dir: Option<&str>, job_id: &str, status_line: JobStatusLine) -> LoTaRResult<()> {
         let Some(logs_dir) = logs_dir else {
             return Ok(());
         };
@@ -230,18 +187,13 @@ impl AgentLogService {
         let status_line = JobLogLine::Status(status_line);
 
         let mut file = OpenOptions::new().append(true).open(&path)?;
-        let line = serde_json::to_string(&status_line)
-            .map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
+        let line = serde_json::to_string(&status_line).map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
         writeln!(file, "{}", line)?;
         Ok(())
     }
 
     /// Load all events from a log file.
-    pub fn load_events(
-        workspace_root: &Path,
-        logs_dir: &str,
-        job_id: &str,
-    ) -> LoTaRResult<Vec<JobLogEntry>> {
+    pub fn load_events(workspace_root: &Path, logs_dir: &str, job_id: &str) -> LoTaRResult<Vec<JobLogEntry>> {
         let path = resolve_log_path(workspace_root, logs_dir, job_id)?;
         if !path.exists() {
             return Ok(Vec::new());
@@ -265,11 +217,7 @@ impl AgentLogService {
     }
 
     /// Load header from a log file.
-    pub fn load_header(
-        workspace_root: &Path,
-        logs_dir: &str,
-        job_id: &str,
-    ) -> LoTaRResult<Option<JobLogHeader>> {
+    pub fn load_header(workspace_root: &Path, logs_dir: &str, job_id: &str) -> LoTaRResult<Option<JobLogHeader>> {
         let path = resolve_log_path(workspace_root, logs_dir, job_id)?;
         if !path.exists() {
             return Ok(None);
@@ -294,11 +242,7 @@ impl AgentLogService {
     }
 
     /// Load final status from a log file (last status line).
-    pub fn load_status(
-        workspace_root: &Path,
-        logs_dir: &str,
-        job_id: &str,
-    ) -> LoTaRResult<Option<JobStatusLine>> {
+    pub fn load_status(workspace_root: &Path, logs_dir: &str, job_id: &str) -> LoTaRResult<Option<JobStatusLine>> {
         let path = resolve_log_path(workspace_root, logs_dir, job_id)?;
         if !path.exists() {
             return Ok(None);
@@ -348,33 +292,16 @@ impl AgentLogService {
 /// Resolve the logs directory path. Supports both relative and absolute paths.
 fn resolve_logs_dir(workspace_root: &Path, logs_dir: &str) -> PathBuf {
     let logs_path = Path::new(logs_dir);
-    let resolved = if logs_path.is_absolute() {
-        logs_path.to_path_buf()
-    } else {
-        workspace_root.join(logs_dir)
-    };
+    let resolved = if logs_path.is_absolute() { logs_path.to_path_buf() } else { workspace_root.join(logs_dir) };
     // Never the workspace root itself: LoTaR writes a `*` .gitignore into
     // its logs folder (DEV-279). `agent_logs_dir: .` gets a subfolder.
-    let same = |a: &Path, b: &Path| {
-        a.canonicalize()
-            .ok()
-            .zip(b.canonicalize().ok())
-            .is_some_and(|(a, b)| a == b)
-    };
-    if same(&resolved, workspace_root) {
-        resolved.join("lotar-agent-logs")
-    } else {
-        resolved
-    }
+    let same = |a: &Path, b: &Path| a.canonicalize().ok().zip(b.canonicalize().ok()).is_some_and(|(a, b)| a == b);
+    if same(&resolved, workspace_root) { resolved.join("lotar-agent-logs") } else { resolved }
 }
 
 /// A job log LoTaR wrote: `job-<id>.jsonl`.
 fn is_job_log(path: &Path) -> bool {
-    path.extension().is_some_and(|ext| ext == "jsonl")
-        && path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .is_some_and(|name| name.starts_with("job-"))
+    path.extension().is_some_and(|ext| ext == "jsonl") && path.file_name().and_then(|name| name.to_str()).is_some_and(|name| name.starts_with("job-"))
 }
 
 fn resolve_log_path(workspace_root: &Path, logs_dir: &str, job_id: &str) -> LoTaRResult<PathBuf> {
@@ -406,18 +333,9 @@ mod tests {
     #[test]
     fn logs_default_to_the_tasks_dir_and_can_be_turned_off() {
         let tasks = Path::new("/work/.tasks");
-        assert_eq!(
-            effective_logs_dir(tasks, None).as_deref(),
-            Some("/work/.tasks/@agent-logs")
-        );
-        assert_eq!(
-            effective_logs_dir(tasks, Some(" ")).as_deref(),
-            Some("/work/.tasks/@agent-logs")
-        );
-        assert_eq!(
-            effective_logs_dir(tasks, Some(".logs")).as_deref(),
-            Some(".logs")
-        );
+        assert_eq!(effective_logs_dir(tasks, None).as_deref(), Some("/work/.tasks/@agent-logs"));
+        assert_eq!(effective_logs_dir(tasks, Some(" ")).as_deref(), Some("/work/.tasks/@agent-logs"));
+        assert_eq!(effective_logs_dir(tasks, Some(".logs")).as_deref(), Some(".logs"));
         assert_eq!(effective_logs_dir(tasks, Some("off")), None);
         assert_eq!(effective_logs_dir(tasks, Some("None")), None);
     }
@@ -430,14 +348,8 @@ mod tests {
         for index in 0..MAX_JOB_LOGS + 3 {
             let path = logs.join(format!("job-{index:04}.jsonl"));
             fs::write(&path, "{}\n").unwrap();
-            let time = std::time::SystemTime::UNIX_EPOCH
-                + std::time::Duration::from_secs(1_000_000 + index as u64);
-            File::options()
-                .write(true)
-                .open(&path)
-                .unwrap()
-                .set_modified(time)
-                .unwrap();
+            let time = std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000 + index as u64);
+            File::options().write(true).open(&path).unwrap().set_modified(time).unwrap();
         }
         let header = JobLogHeader {
             job_id: "job-new".to_string(),
@@ -450,21 +362,8 @@ mod tests {
             effort: None,
         };
         AgentLogService::init_log(dir.path(), Some("logs"), header).unwrap();
-        assert!(
-            fs::read_to_string(logs.join(".gitignore"))
-                .unwrap()
-                .contains('*')
-        );
-        let remaining = fs::read_dir(&logs)
-            .unwrap()
-            .filter(|e| {
-                e.as_ref()
-                    .unwrap()
-                    .path()
-                    .extension()
-                    .is_some_and(|x| x == "jsonl")
-            })
-            .count();
+        assert!(fs::read_to_string(logs.join(".gitignore")).unwrap().contains('*'));
+        let remaining = fs::read_dir(&logs).unwrap().filter(|e| e.as_ref().unwrap().path().extension().is_some_and(|x| x == "jsonl")).count();
         assert!(remaining <= MAX_JOB_LOGS + 1, "{remaining}");
         assert!(!logs.join("job-0000.jsonl").exists(), "oldest log removed");
         assert!(logs.join("job-new.jsonl").exists());
@@ -494,15 +393,7 @@ mod tests {
         .unwrap();
 
         // Append events
-        AgentLogService::append_event(
-            workspace_root,
-            Some(logs_dir),
-            "job-test-1",
-            "agent_job_started",
-            "2026-02-03T12:00:01Z",
-            None,
-        )
-        .unwrap();
+        AgentLogService::append_event(workspace_root, Some(logs_dir), "job-test-1", "agent_job_started", "2026-02-03T12:00:01Z", None).unwrap();
 
         AgentLogService::append_event(
             workspace_root,
@@ -527,9 +418,7 @@ mod tests {
         .unwrap();
 
         // Load and verify
-        let header = AgentLogService::load_header(workspace_root, logs_dir, "job-test-1")
-            .unwrap()
-            .unwrap();
+        let header = AgentLogService::load_header(workspace_root, logs_dir, "job-test-1").unwrap().unwrap();
         assert_eq!(header.ticket_id, "DICE-1");
         assert_eq!(header.runner, "claude");
         assert_eq!(header.model.as_deref(), Some("sonnet"));
@@ -540,9 +429,7 @@ mod tests {
         assert_eq!(events[1].kind, "agent_job_progress");
         assert_eq!(events[1].message, Some("Reading files...".to_string()));
 
-        let status = AgentLogService::load_status(workspace_root, logs_dir, "job-test-1")
-            .unwrap()
-            .unwrap();
+        let status = AgentLogService::load_status(workspace_root, logs_dir, "job-test-1").unwrap().unwrap();
         assert_eq!(status.status, "completed");
         assert_eq!(status.exit_code, Some(0));
 
