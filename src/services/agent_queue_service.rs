@@ -39,6 +39,8 @@ pub struct AgentQueueEntry {
     pub model: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effort: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
 }
 
 pub struct AgentQueueService;
@@ -93,6 +95,7 @@ impl AgentQueueService {
             attempts: 0,
             model: req.model.clone(),
             effort: req.effort.clone(),
+            provider: req.provider.clone(),
         };
 
         let mut inserted = false;
@@ -284,6 +287,7 @@ fn start_entry(tasks_dir: &Path, entry: AgentQueueEntry) -> LoTaRResult<()> {
         agent: (!entry.agent.is_empty()).then_some(entry.agent),
         model: entry.model,
         effort: entry.effort,
+        provider: entry.provider,
     };
     let _ =
         AgentJobService::start_job_with_tasks_dir_mode(req, tasks_dir, JobStartMode::Immediate)?;

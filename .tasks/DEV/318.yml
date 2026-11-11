@@ -1,0 +1,51 @@
+title: 't3 runner: run agent jobs as T3 Code threads, with provider and model per profile, rule or ticket'
+status: Done
+priority: High
+type: Feature
+reporter: claude
+assignee: claude
+created: 2026-11-11T17:10:42.568463+00:00
+modified: 2026-11-11T17:46:10.204104+00:00
+relationships:
+  related:
+  - DEV-316
+comments:
+- date: 2026-11-11T17:46:10.066054+00:00
+  text: 'Outcome: runner t3 runs ''t3 thread start . - --title "<ID> <title>" [--provider P --model M] [--worktree B [--branch X]] --wait'' in the job''s checkout, prompt on stdin. Program: profile command, else t3 on PATH, else ~/.t3/bin/t3. Thread id from stderr ''Thread <id>'' (the CLI prints the id only at the end with --json, so LoTaR uses text mode) -> ''t3 thread show <id> --json'' -> link added as link reference, id as job session, T3''s worktree path/branch on the job. Exit 0 completed (reply = summary), 1 failed (T3''s error), 2 failed + ticket handed to the reporter (HelpNeeded if configured) with a comment linking the thread, so job_completed rules don''t fire. No timeout; cancel stops waiting only (note with link). provider: profile field, run override (agent run --provider, POST /api/jobs, MCP agent_run, queue), automation agent.provider with templates (empty -> profile). provider/model must come together. effort/permissions not supported by t3 (job note). t3 jobs are told to pass --tasks-dir (T3 threads don''t get LOTAR_* env). Item 4: home-config profile + untrusted repo rule (custom_fields finding exists -> @fix; job_completed -> Done, @reporter) starts the job and sets Done (tests/dev318_t3_runner_test.rs). Evidence: tests/dev318_t3_runner_test.rs (fake t3: full chain, exit 2, exit 1, worktree), agent_runner and job service unit tests; npm run lint:agent, npm run test:agent (Rust 1986, UI 1436, release 47, hooks 6) and npm run test:smoke:agent (372) all pass. Live runs (claudeAgent/claude-haiku-5-5, reply OK, nothing changed): https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8141caa6-f07c-46ee-9c11-e4e667b7520a (debug build) and https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A04777fdf-8ca7-4659-ae9f-1d47d7b34f57 (release build). Remaining: provider is not shown in job lists; UI has no provider field in the Run agent dialog. Not pushed (owner''s OK pending).'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8141caa6-f07c-46ee-9c11-e4e667b7520a
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A04777fdf-8ca7-4659-ae9f-1d47d7b34f57
+description: 'Owner decision 2026-11-11 (~/Development/standards/docs/decisions/2026-11-11-repo-health.md): automation starts fixes as T3 Code threads with a choice of model; no review state, Done on job_completed. runner: t3 runs t3 thread start <dir> - --title ''<ID> <title>'' --provider P --model M --wait with the prompt on stdin. Thread link added to the ticket as a link reference as soon as the thread exists; exit 2 (waits for an answer) leaves the ticket for the owner, not success. Profile fields model, provider; lotar worktrees map to t3 --worktree/--branch. No default timeout. Verify home-config profile + repo automation rule starts the job and job_completed can set Done. Fake t3 in tests; one live smoke run.'
+history:
+- at: 2026-11-11T17:13:57.107087+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-316"]}'
+- at: 2026-11-11T17:27:05.968555+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-11T17:35:21.599443+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8141caa6-f07c-46ee-9c11-e4e667b7520a
+- at: 2026-11-11T17:45:55.065145+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A04777fdf-8ca7-4659-ae9f-1d47d7b34f57
+- at: 2026-11-11T17:46:10.066054+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-11T17:46:10.204104+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

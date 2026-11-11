@@ -1137,7 +1137,11 @@ fn describe_action(
         let mut description = format!("Queue agent job for profile '{}'", &assignee[1..]);
         if let Some(agent) = action.agent.as_ref() {
             let mut settings: Vec<String> = Vec::new();
-            for (name, value) in [("model", &agent.model), ("effort", &agent.effort)] {
+            for (name, value) in [
+                ("model", &agent.model),
+                ("effort", &agent.effort),
+                ("provider", &agent.provider),
+            ] {
                 if let Some(value) = expand_run_setting(value.as_deref(), |raw| preview.expand(raw))
                 {
                     settings.push(format!("{name} {value}"));
@@ -2142,6 +2146,7 @@ fn apply_action(
         let run = action.agent.as_ref().map(|agent| AgentRunSettings {
             model: expand_run_setting(agent.model.as_deref(), |raw| tmpl.expand(raw)),
             effort: expand_run_setting(agent.effort.as_deref(), |raw| tmpl.expand(raw)),
+            provider: expand_run_setting(agent.provider.as_deref(), |raw| tmpl.expand(raw)),
             prompt: agent
                 .prompt
                 .as_ref()
@@ -2481,6 +2486,7 @@ fn expand_run_setting(raw: Option<&str>, expand: impl FnOnce(&str) -> String) ->
 struct AgentRunSettings {
     model: Option<String>,
     effort: Option<String>,
+    provider: Option<String>,
     prompt: Option<String>,
 }
 
@@ -2567,6 +2573,7 @@ fn maybe_queue_agent_on_assignment(
         agent: Some(agent_name),
         model: run.model,
         effort: run.effort,
+        provider: run.provider,
     };
 
     let ticket = req.ticket_id.clone();

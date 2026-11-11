@@ -22,6 +22,8 @@ pub enum AgentRunnerKind {
     Kilo,
     /// Google Antigravity CLI (`agy -p --output-format stream-json`); not run live.
     Antigravity,
+    /// A T3 Code thread (`t3 thread start … --wait`), DEV-318.
+    T3,
     Command,
 }
 
@@ -38,6 +40,7 @@ impl AgentRunnerKind {
             Self::Opencode => "opencode",
             Self::Kilo => "kilo",
             Self::Antigravity => "antigravity",
+            Self::T3 => "t3",
             Self::Command => "command",
         }
     }
@@ -52,7 +55,7 @@ impl AgentRunnerKind {
     }
 
     /// Every runner a profile may name.
-    pub const ALL: [AgentRunnerKind; 11] = [
+    pub const ALL: [AgentRunnerKind; 12] = [
         Self::Claude,
         Self::Codex,
         Self::Copilot,
@@ -63,6 +66,7 @@ impl AgentRunnerKind {
         Self::Opencode,
         Self::Kilo,
         Self::Antigravity,
+        Self::T3,
         Self::Command,
     ];
 }
@@ -82,6 +86,7 @@ impl FromStr for AgentRunnerKind {
             "opencode" => Ok(Self::Opencode),
             "kilo" | "kilocode" => Ok(Self::Kilo),
             "antigravity" | "agy" => Ok(Self::Antigravity),
+            "t3" | "t3code" => Ok(Self::T3),
             "command" => Ok(Self::Command),
             _ => Err(()),
         }
@@ -176,7 +181,8 @@ fn args_set_permissions(kind: AgentRunnerKind, args: &[String]) -> bool {
             &["--auto", "--yolo", "--dangerously-skip-permissions"]
         }
         AgentRunnerKind::Antigravity => &["--mode", "--dangerously-skip-permissions"],
-        AgentRunnerKind::Command => return true,
+        // T3 Code threads run in the project's own runtime mode.
+        AgentRunnerKind::T3 | AgentRunnerKind::Command => return true,
     };
     args.iter().any(|arg| {
         let name = arg.split('=').next().unwrap_or(arg);
@@ -278,7 +284,8 @@ pub fn usage_from_result(
                 ..Default::default()
             }
         }
-        AgentRunnerKind::Cursor => return None,
+        // Cursor reports no usage; T3 Code keeps it in the thread.
+        AgentRunnerKind::Cursor | AgentRunnerKind::T3 => return None,
         AgentRunnerKind::Antigravity => {
             let usage = payload.get("result")?.get("usage")?;
             let field = |name: &str| uint(usage.get(name));
@@ -406,6 +413,9 @@ pub fn installed_agent_clis() -> Vec<&'static str> {
         .into_iter()
         .filter(|kind| *kind != AgentRunnerKind::Command)
         .filter(|kind| {
+            if *kind == AgentRunnerKind::T3 && t3_home_launcher().is_some() {
+                return true;
+            }
             let program = kind.default_program();
             dirs.iter().any(|dir| {
                 let candidates = if cfg!(windows) {
@@ -474,7 +484,7 @@ fn level_args(
             .collect::<Vec<_>>()
     };
     match (kind, level) {
-        (AgentRunnerKind::Command, _) => Vec::new(),
+        (AgentRunnerKind::Command | AgentRunnerKind::T3, _) => Vec::new(),
         (AgentRunnerKind::Claude, AgentPermissions::ReadOnly) => {
             owned(&["--permission-mode", "plan"])
         }
@@ -558,6 +568,9 @@ pub fn build_runner_command(
     prompt: &str,
     writable_dirs: &[std::path::PathBuf],
 ) -> LoTaRResult<RunnerCommand> {
+    if kind == AgentRunnerKind::T3 {
+        return build_t3_command(profile, prompt, &T3Launch::default());
+    }
     if kind == AgentRunnerKind::Command {
         let program = profile.command.clone().ok_or_else(|| {
             LoTaRError::ValidationError(
@@ -625,7 +638,7 @@ pub fn build_runner_command(
         AgentRunnerKind::Antigravity => {
             owned(&["--output-format", "stream-json", "--disable-slash-commands"])
         }
-        AgentRunnerKind::Command => unreachable!("handled above"),
+        AgentRunnerKind::T3 | AgentRunnerKind::Command => unreachable!("handled above"),
     };
     if kind == AgentRunnerKind::Amp
         && profile.permissions == Some(AgentPermissions::ReadOnly)
@@ -690,6 +703,117 @@ pub fn build_runner_command(
         env,
         initial_input,
     })
+}
+
+/// What a T3 Code thread is started with besides the profile (DEV-318).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct T3Launch {
+    /// Thread title (`<ID> <title>`); empty lets T3 Code use the prompt's
+    /// first line.
+    pub title: String,
+    /// Run in a new git worktree instead of the project folder.
+    pub worktree: Option<T3Worktree>,
+}
+
+/// `--worktree <base> [--branch <branch>]`: T3 Code makes the worktree.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct T3Worktree {
+    /// Branch, tag or commit the worktree starts from (or the existing
+    /// ticket branch it checks out, when `branch` is unset).
+    pub base: String,
+    /// New branch created at `base`.
+    pub branch: Option<String>,
+}
+
+/// Where T3 Code installs its launcher (`t3` is often not on PATH).
+fn t3_home_launcher() -> Option<std::path::PathBuf> {
+    let home = std::env::var_os("HOME")?;
+    let path = std::path::Path::new(&home).join(".t3/bin/t3");
+    is_executable(&path).then_some(path)
+}
+
+fn on_path(program: &str) -> bool {
+    std::env::var_os("PATH").is_some_and(|path| {
+        std::env::split_paths(&path).any(|dir| is_executable(&dir.join(program)))
+    })
+}
+
+/// `t3 thread start . - --title … [--provider P --model M] [--worktree B
+/// [--branch X]] --wait`, run in the job's checkout, with the prompt on
+/// stdin. It prints `Thread <id>` to stderr once the thread exists, the
+/// agent's reply to stdout, and exits 0 (finished), 1 (the run failed) or
+/// 2 (the thread waits for an answer).
+pub fn build_t3_command(
+    profile: &AgentProfileDetail,
+    prompt: &str,
+    launch: &T3Launch,
+) -> LoTaRResult<RunnerCommand> {
+    let program = match profile.command.clone() {
+        Some(command) => command,
+        None if on_path("t3") => "t3".to_string(),
+        None => t3_home_launcher()
+            .map(|path| path.to_string_lossy().to_string())
+            .unwrap_or_else(|| "t3".to_string()),
+    };
+    let own = &profile.args;
+    let mut args: Vec<String> = ["thread", "start", ".", "-"]
+        .iter()
+        .map(|arg| arg.to_string())
+        .collect();
+    if !launch.title.trim().is_empty() && !has_flag(own, &["--title"]) {
+        args.extend(["--title".to_string(), launch.title.trim().to_string()]);
+    }
+    if !has_flag(own, &["--provider", "--model"]) {
+        match (profile.provider.as_deref(), profile.model.as_deref()) {
+            (Some(provider), Some(model)) => args.extend([
+                "--provider".to_string(),
+                provider.to_string(),
+                "--model".to_string(),
+                model.to_string(),
+            ]),
+            (None, None) => {}
+            (provider, _) => {
+                let missing = if provider.is_some() {
+                    "model"
+                } else {
+                    "provider"
+                };
+                return Err(LoTaRError::ValidationError(format!(
+                    "The t3 runner needs a provider and a model together (T3 Code: --provider with --model); set the {missing} on the profile, the rule or the run"
+                )));
+            }
+        }
+    }
+    if let Some(worktree) = launch.worktree.as_ref()
+        && !has_flag(own, &["--worktree"])
+    {
+        args.extend(["--worktree".to_string(), worktree.base.clone()]);
+        if let Some(branch) = worktree.branch.as_ref() {
+            args.extend(["--branch".to_string(), branch.clone()]);
+        }
+    }
+    if !has_flag(own, &["--wait"]) {
+        args.push("--wait".to_string());
+    }
+    args.extend(own.iter().cloned());
+    Ok(RunnerCommand {
+        program,
+        args,
+        env: expand_env_map(&profile.env),
+        initial_input: Some(prompt.as_bytes().to_vec()),
+    })
+}
+
+/// The thread id from a `t3 thread start --wait` stderr line.
+pub fn t3_thread_id(line: &str) -> Option<String> {
+    let id = line.trim().strip_prefix("Thread ")?.trim();
+    (!id.is_empty() && !id.contains(char::is_whitespace)).then(|| id.to_string())
+}
+
+/// Electron's note that the t3 launcher runs Node with app defaults; it is
+/// printed on every run and says nothing about the job.
+pub fn is_t3_noise(line: &str) -> bool {
+    line.contains(":ERROR:electron/") && line.contains("Node.js environment variables are disabled")
 }
 
 /// Model and effort values end up as CLI arguments (and, for Codex, inside a
@@ -794,8 +918,9 @@ fn model_effort_args(kind: AgentRunnerKind, profile: &AgentProfileDetail) -> Vec
             | AgentRunnerKind::Droid
             | AgentRunnerKind::Opencode
             | AgentRunnerKind::Kilo => Some("-m"),
-            // Amp picks models through modes; command runners read env vars.
-            AgentRunnerKind::Amp | AgentRunnerKind::Command => None,
+            // Amp picks models through modes; command runners read env vars;
+            // t3 pairs the model with its provider (`build_t3_command`).
+            AgentRunnerKind::Amp | AgentRunnerKind::Command | AgentRunnerKind::T3 => None,
         };
         if let Some(flag) = flag
             && !has_flag(own, &["--model", "-m"])
@@ -902,6 +1027,11 @@ pub fn parse_runner_line(kind: AgentRunnerKind, line: &str) -> Option<Vec<Runner
             None,
         )]);
     }
+    // `t3 thread start --wait` prints the agent's reply as plain text; the
+    // job keeps it whole as its summary (see `t3_reply`).
+    if kind == AgentRunnerKind::T3 {
+        return Some(Vec::new());
+    }
     let payload: JsonValue = serde_json::from_str(trimmed).ok()?;
     let tag = if kind == AgentRunnerKind::Antigravity {
         "event"
@@ -920,7 +1050,7 @@ pub fn parse_runner_line(kind: AgentRunnerKind, line: &str) -> Option<Vec<Runner
         AgentRunnerKind::Cursor => parse_cursor_event(&payload),
         AgentRunnerKind::Opencode | AgentRunnerKind::Kilo => parse_opencode_event(&payload),
         AgentRunnerKind::Antigravity => parse_antigravity_event(&payload),
-        AgentRunnerKind::Command => unreachable!("handled above"),
+        AgentRunnerKind::T3 | AgentRunnerKind::Command => unreachable!("handled above"),
     })
 }
 
@@ -2310,6 +2440,83 @@ mod tests {
             Some(0)
         );
         assert!(parse_runner_line(AgentRunnerKind::Claude, "Warning: something odd").is_none());
+    }
+
+    #[test]
+    fn t3_threads_get_the_prompt_on_stdin_and_provider_with_model() {
+        let mut t3 = profile("t3");
+        t3.command = Some("/opt/t3".to_string());
+        t3.provider = Some("codex".to_string());
+        t3.model = Some("gpt-5.5".to_string());
+        let launch = T3Launch {
+            title: "DEV-1 Fix it".to_string(),
+            worktree: Some(T3Worktree {
+                base: "main".to_string(),
+                branch: Some("agent/DEV-1".to_string()),
+            }),
+        };
+        let cmd = build_t3_command(&t3, "the prompt", &launch).unwrap();
+        assert_eq!(cmd.program, "/opt/t3");
+        assert_eq!(
+            cmd.args,
+            [
+                "thread",
+                "start",
+                ".",
+                "-",
+                "--title",
+                "DEV-1 Fix it",
+                "--provider",
+                "codex",
+                "--model",
+                "gpt-5.5",
+                "--worktree",
+                "main",
+                "--branch",
+                "agent/DEV-1",
+                "--wait",
+            ]
+        );
+        assert_eq!(cmd.initial_input.as_deref(), Some(&b"the prompt"[..]));
+
+        // Without a launch the title is T3's (the prompt's first line).
+        let plain = build_runner_command(AgentRunnerKind::T3, &t3, "p", &[]).unwrap();
+        assert!(
+            !plain.args.contains(&"--title".to_string()),
+            "{:?}",
+            plain.args
+        );
+
+        // T3 takes a provider only with a model.
+        t3.model = None;
+        let err = build_t3_command(&t3, "p", &launch).unwrap_err().to_string();
+        assert!(err.contains("set the model"), "{err}");
+        t3.provider = None;
+        t3.model = Some("gpt-5.5".to_string());
+        let err = build_t3_command(&t3, "p", &launch).unwrap_err().to_string();
+        assert!(err.contains("set the provider"), "{err}");
+
+        // The profile's own args win.
+        t3.args = vec![
+            "--provider".into(),
+            "claudeAgent".into(),
+            "--model".into(),
+            "x".into(),
+        ];
+        let cmd = build_t3_command(&t3, "p", &T3Launch::default()).unwrap();
+        assert_eq!(cmd.args.iter().filter(|a| *a == "--provider").count(), 1);
+    }
+
+    #[test]
+    fn t3_stderr_names_the_thread() {
+        assert_eq!(t3_thread_id("Thread abc-123\n").as_deref(), Some("abc-123"));
+        assert_eq!(t3_thread_id("Thread "), None);
+        assert_eq!(t3_thread_id("Threads are busy"), None);
+        assert!(is_t3_noise(
+            "[1111/090522.026791:ERROR:electron/shell/app/node_main.cc:154] Node.js environment variables are disabled because this process is invoked by other apps."
+        ));
+        assert!(!is_t3_noise("The run failed"));
+        assert_eq!("t3".parse::<AgentRunnerKind>(), Ok(AgentRunnerKind::T3));
     }
 
     #[test]

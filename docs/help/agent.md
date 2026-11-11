@@ -4,8 +4,8 @@ LoTaR can orchestrate supported agent CLIs (Claude Code, Codex CLI, Copilot CLI,
 
 ## CLI commands
 
-- `lotar agent run <TICKET> <PROMPT> [--runner <RUNNER>] [--agent <profile>] [--model <MODEL>] [--effort <LEVEL>] [--wait] [--follow] [--timeout-seconds <N>]`
-  - `<RUNNER>` is one of the [runners](#runners): `claude`, `codex`, `copilot`, `gemini`, `cursor`, `amp`, `droid`, `opencode`, `kilo`, `antigravity` or `command`.
+- `lotar agent run <TICKET> <PROMPT> [--runner <RUNNER>] [--agent <profile>] [--model <MODEL>] [--effort <LEVEL>] [--provider <PROVIDER>] [--wait] [--follow] [--timeout-seconds <N>]`
+  - `<RUNNER>` is one of the [runners](#runners): `claude`, `codex`, `copilot`, `gemini`, `cursor`, `amp`, `droid`, `opencode`, `kilo`, `antigravity`, `t3` or `command`.
   - Without `--wait` or `--follow`, the job is checked (ticket, profile or runner, settings) and handed to the background queue worker, and the command returns at once with `Queued <TICKET> for <agent>`. Follow it with `lotar agent queue` and `lotar agent list-jobs`. With `--wait`, the job runs in this terminal and the command exits non-zero unless it completes; with `--format json` it prints the finished job.
 - `lotar agent status <JOB_ID>`
 - `lotar agent logs <JOB_ID>`
@@ -34,6 +34,7 @@ Each agent profile names a runner. LoTaR starts the CLI headless, reads its JSON
 | `opencode` | OpenCode CLI docs (not run live) | `opencode run --format json … <prompt>` |
 | `kilo` | Kilo Code CLI (an OpenCode fork; not run live) | `kilo run --format json … <prompt>` |
 | `antigravity` | Antigravity CLI headless docs (not run live) | `agy --output-format stream-json --disable-slash-commands … -p <prompt>` |
+| `t3` | T3 Code 0.1.9 | `t3 thread start . - --title "<ID> <title>" … --wait`, the prompt on stdin; the job is a [T3 Code thread](#t3-code-threads) |
 | `command` | any program | runs `command` with `args`; the prompt is in `LOTAR_AGENT_PROMPT` |
 
 The runners marked "not run live" follow each CLI's documented headless interface; their parsers are tested against the documented example events. Treat them as a starting point and report differences you see with a real install; the research behind them is in [agent CLI research notes](../developers/agent-cli-research.md).
@@ -70,11 +71,11 @@ agents:
 
   OpenCode and Kilo get their permission rules through `OPENCODE_CONFIG_CONTENT`, unless the profile's `env` sets it.
 - If the profile's `args` already set permissions (for example `--permission-mode`, `--sandbox`, `--allow-tool`/`--deny-tool`, `--approval-mode` or `--yolo`), LoTaR adds no permission flags of its own.
-- `command` runners get no permission flags.
+- `command` and `t3` runners get no permission flags; a T3 Code thread runs in its project's own runtime mode.
 
 ### Model and effort
 
-A profile can pick the model and reasoning effort; a single run can override them with `lotar agent run --model/--effort`, the `model`/`effort` fields of `POST /api/jobs` and the MCP `agent_run` tool, or an automation action's [`agent` settings](automation.md#agent-run-settings).
+A profile can pick the model and reasoning effort (and, for `t3`, the provider); a single run can override them with `lotar agent run --model/--effort/--provider`, the `model`/`effort`/`provider` fields of `POST /api/jobs` and the MCP `agent_run` tool, or an automation action's [`agent` settings](automation.md#agent-run-settings).
 
 ```yaml
 agents:
@@ -99,6 +100,7 @@ agents:
 | `droid` | `-m` | `--reasoning-effort` |
 | `opencode`, `kilo` | `-m provider/model` | `--variant` |
 | `antigravity` | `--model` | `--effort` |
+| `t3` | `--model`, always with `--provider` (see [T3 Code threads](#t3-code-threads)) | not supported |
 | `command` | `LOTAR_AGENT_MODEL` | `LOTAR_AGENT_EFFORT` |
 
 Values are passed through as given, so each CLI decides which names it accepts. They may use letters, digits and `. _ - : / @ [ ]`. If the profile's `args` already set the model or effort, those win over the profile's `model`/`effort` fields; a single run's override wins over both, replacing the matching flags from the profile's `args` for that run. Jobs show their model and effort in `lotar agent status`, the job list, and on the Agents page.
@@ -117,6 +119,7 @@ When a job ends, LoTaR records what its CLI reports about it:
 | `opencode`, `kilo` | input tokens (with cached), output tokens, cost in USD, steps as turns |
 | `antigravity` | input tokens (with cached), output tokens including thinking, turns |
 | `cursor` | nothing (its output reports no usage) |
+| `t3` | nothing (T3 Code shows the thread's usage) |
 
 The usage appears in `lotar agent status`, at the end of `lotar agent run --wait`, on the Agents page (per job, plus a cost total per ticket), in the job's `usage` field over REST, SSE and MCP, and in the job log. Automation actions on job events can use `${{agent.usage}}`, `${{agent.cost_usd}}`, `${{agent.input_tokens}}`, `${{agent.output_tokens}}` and `${{agent.turns}}`, for example to comment the cost on the ticket.
 
@@ -171,6 +174,58 @@ agents:
 | `codex` | `-c mcp_servers.lotar.*` | `default_tools_approval_mode = "approve"` |
 
 The server only offers the tools a job needs: `task_get`, `task_list`, `task_update`, `task_comment_add`, `task_reference_add`, `relationship_graph`, `config_show` and `whoami` (set through `LOTAR_MCP_TOOLS`, which `lotar mcp` honours in general). An agent can't start other agents (including by assigning a ticket to an agent profile), delete tasks or sync through it. This limits the MCP tools only: the agent still has a shell and `lotar` on its PATH, so it is not a security boundary. Because the server is named `lotar`, it takes the place of a LoTaR server with that name in the CLI's own settings for the job, which would point at a different tasks directory or build. Other runners don't support the switch; their jobs log a note and use the CLI.
+
+### T3 Code threads
+
+The `t3` runner starts each job as a thread on the T3 Code server running on the same machine, so you follow and answer it in T3 Code like any other thread. LoTaR runs:
+
+```bash
+t3 thread start . - --title "<ID> <title>" --provider <provider> --model <model> --wait
+```
+
+in the job's checkout, which must be inside a T3 Code project, with the prompt on stdin.
+
+```yaml
+agents:
+  fix:
+    runner: t3
+    command: /Users/me/.t3/bin/t3   # optional: `t3` on PATH, else ~/.t3/bin/t3
+    provider: claudeAgent           # a T3 Code provider instance: claudeAgent, codex, …
+    model: claude-opus-5-5
+```
+
+- `provider` and `model` go together (T3 Code's rule). Leave both out to use the project's default model in T3 Code. A rule, a run or the ticket can pick them per job: `agent: { provider: "${{ticket.field:provider}}", model: "${{ticket.field:model}}" }` falls back to the profile's values when the ticket has no such fields.
+- As soon as the thread exists, LoTaR adds its link to the ticket as a link reference, records the thread id as the job's session, and logs `T3 Code thread: <link>`.
+- The agent's reply becomes the job's summary. Exit 0 completes the job; exit 1 (the run failed) fails it with T3 Code's error.
+- Exit 2 means the thread waits for an answer. The job fails (so `job_completed` rules don't treat the ticket as done), and LoTaR hands the ticket to its reporter, with status `HelpNeeded` when the project has it and a comment with the thread's link. Answer in T3 Code; the thread goes on there.
+- No timeout: the job lasts as long as the thread's run, hours if need be. Cancelling the job stops LoTaR waiting, not the thread: stop that in T3 Code (the job log says so, with the link).
+- With `agent.worktree.enabled`, T3 Code makes the worktree: LoTaR passes `--worktree <current branch> --branch <prefix><ticket>`, or `--worktree <prefix><ticket>` when the ticket branch already exists from an earlier phase, and records T3 Code's worktree path and branch on the job. LoTaR's own worktree folder isn't used, because a thread can only run inside a T3 project. The cleanup settings and `lotar agent worktree cleanup` treat that worktree like LoTaR's own.
+- The thread runs on the T3 Code server, so it doesn't get the job's environment (`LOTAR_TASKS_DIR`, `LOTAR_TICKET_ID`, …). Its "This job" section tells the agent to pass `--tasks-dir "<tasks folder>"` to every lotar command, so a thread in a worktree updates the ticket in the main checkout, not the worktree's copy.
+- `effort`, `permissions`, `tools`, `mcp.allow` and `mcp.lotar` don't apply (the t3 CLI has no such options); a job with `effort` or `permissions` set logs a note. Messages can't be sent to a running t3 job from LoTaR; send them in T3 Code.
+- Profile `args` come after LoTaR's flags; a `--title`, `--provider`/`--model`, `--worktree` or `--wait` there replaces LoTaR's.
+
+A profile in your home config (`~/.lotar`) needs no `lotar trust`, so a repository only needs a rule that assigns tickets to it and one that closes them:
+
+```yaml
+# .tasks/automation.yml
+automation:
+  rules:
+    - name: Fix reported findings
+      when:
+        custom_fields: { finding: { exists: true } }   # tickets reported with --finding
+      on:
+        created:
+          set:
+            assignee: "@fix"
+    - name: Done when the fix finished
+      when:
+        assignee: "@fix"
+      on:
+        job_completed:
+          set:
+            status: Done
+            assignee: "@reporter"
+```
 
 ## Jobs in other processes
 

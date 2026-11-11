@@ -1448,6 +1448,8 @@ export interface AgentJobCreateRequest {
     model?: string
     /** Overrides the profile's reasoning effort for this run. */
     effort?: string
+    /** Overrides the profile's provider for this run (t3 runner). */
+    provider?: string
 }
 
 export interface AgentJobCreateResponse {
@@ -1517,6 +1519,8 @@ export interface AgentProfileInfo {
     model?: string | null
     /** Reasoning effort the profile asks for, when set. */
     effort?: string | null
+    /** Provider the profile runs its model on (t3 runner), when set. */
+    provider?: string | null
     /** `read-only`, `workspace` or `full`. */
     permissions: string
 }
@@ -1537,6 +1541,8 @@ export interface AgentProfileCreateRequest {
     global?: boolean
     model?: string
     effort?: string
+    /** T3 Code provider instance for the t3 runner, such as `claudeAgent`. */
+    provider?: string
     permissions?: string
 }
 

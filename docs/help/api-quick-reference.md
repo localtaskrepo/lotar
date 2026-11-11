@@ -41,7 +41,7 @@ Endpoints with quick examples. For full schema see [OpenAPI](../openapi.json).
 - GET  /api/sync/reports/get?path=<relative>[&project=PREFIX] -> { data: SyncReport }
 - GET  /api/agents/profiles[?project=PREFIX] -> { data: { profiles: AgentProfileInfo[], installed_runners: string[], project } } (name, runner, model?, effort?, permissions), sorted by name; without `project` the default project is used
 - POST /api/agents/profiles (AgentProfileCreateRequest: name, runner, project?, global?, model?, effort?, permissions?) -> { data: ConfigSetResponse }; refuses a name that already exists for that scope
-- POST /api/jobs (AgentJobCreateRequest; optional `model`/`effort` override the profile for this run) -> { data: AgentJobCreateResponse }
+- POST /api/jobs (AgentJobCreateRequest; optional `model`/`effort`/`provider` override the profile for this run) -> { data: AgentJobCreateResponse }
 - GET  /api/jobs?ticket_id=ID&status=STATUS -> { data: AgentJobListResponse }
 - GET  /api/jobs/get?id=JOB_ID -> { data: AgentJobStatusResponse }
 - POST /api/jobs/cancel ({ id }) -> { data: AgentJobCancelResponse }

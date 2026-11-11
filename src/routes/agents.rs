@@ -30,6 +30,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                 description: None,
                 model: profile.model.clone(),
                 effort: profile.effort.clone(),
+                provider: profile.provider.clone(),
                 permissions: match profile.permissions.unwrap_or_default() {
                     crate::config::types::AgentPermissions::ReadOnly => "read-only",
                     crate::config::types::AgentPermissions::Workspace => "workspace",
@@ -71,8 +72,16 @@ pub(super) fn register(api_server: &mut ApiServer) {
                 .map(|v| v.trim().to_string())
                 .filter(|v| !v.is_empty())
         };
-        let (profile_model, profile_effort) = (non_blank(body.model), non_blank(body.effort));
-        for (label, value) in [("model", &profile_model), ("effort", &profile_effort)] {
+        let (profile_model, profile_effort, profile_provider) = (
+            non_blank(body.model),
+            non_blank(body.effort),
+            non_blank(body.provider),
+        );
+        for (label, value) in [
+            ("model", &profile_model),
+            ("effort", &profile_effort),
+            ("provider", &profile_provider),
+        ] {
             if let Some(value) = value
                 && let Err(e) = crate::services::agent_runner::validate_run_setting(label, value)
             {
@@ -84,6 +93,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             permissions,
             model: profile_model,
             effort: profile_effort,
+            provider: profile_provider,
             ..Default::default()
         };
         match crate::services::config_service::ConfigService::add_agent_profile(

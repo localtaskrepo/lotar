@@ -240,6 +240,9 @@ pub struct AutomationAgentAction {
     pub model: Option<String>,
     #[serde(default)]
     pub effort: Option<String>,
+    /// Provider for the job (t3 runner), like `model`.
+    #[serde(default)]
+    pub provider: Option<String>,
     #[serde(default)]
     pub prompt: Option<String>,
 }

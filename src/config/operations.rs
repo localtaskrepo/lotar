@@ -123,6 +123,7 @@ pub const AGENT_RUNNERS: &[&str] = &[
     "opencode",
     "kilo",
     "antigravity",
+    "t3",
     "command",
 ];
 

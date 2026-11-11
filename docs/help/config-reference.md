@@ -41,12 +41,13 @@ CLI > project > env > home > global > defaults (commands without a project skip 
 - All `agent.worktree.*` settings can be changed with `config set` (global or per project) using their flat names: `agent_worktree_enabled`, `agent_worktree_dir`, `agent_worktree_branch_prefix`, `agent_worktree_max_parallel_jobs`, `agent_worktree_cleanup_on_done`, `agent_worktree_cleanup_on_failure`, `agent_worktree_cleanup_on_cancel`, `agent_worktree_cleanup_delete_branches` and `agent_worktree_cleanup_ignored_files`, or on the Config page under Agents. An empty value clears a project override; an empty job limit means no limit.
 - agent.automation: retired. Old files that still have this block load fine and keep it as written, but it does nothing and `lotar config validate` warns and prints the equivalent rule. Agent job status changes and reassignment are `job_started` / `job_completed` / `job_failed` / `job_cancelled` rules in the automation file; see [Automation Rules](./automation.md#agent-job-queueing). The `agent_on_*` keys of `config set` were removed.
 - agents: map (named agent CLI profiles; values may be a runner string or a full object)
-  - agents.<name>.runner: `claude` | `codex` | `copilot` | `gemini` | `cursor` | `amp` | `droid` | `opencode` | `kilo` | `antigravity` | `command`
+  - agents.<name>.runner: `claude` | `codex` | `copilot` | `gemini` | `cursor` | `amp` | `droid` | `opencode` | `kilo` | `antigravity` | `t3` | `command`
   - agents.<name>.permissions: `read-only` | `workspace` | `full` (default `workspace`) — what the agent may do without asking; see [Agent Jobs](./agent.md#permissions)
   - agents.<name>.model / effort: optional strings — model and reasoning effort passed to the CLI; runs and automation actions can override them. See [Agent Jobs](./agent.md#model-and-effort)
+  - agents.<name>.provider: optional string — `t3` runner only: the T3 Code provider instance (`claudeAgent`, `codex`, …) the model runs on; set it together with `model`. See [T3 Code threads](./agent.md#t3-code-threads)
   - agents.<name>.tools.allowed / tools.disallowed: string[] — extra tools to allow or deny (Claude, Copilot); see [Agent Jobs](./agent.md#tools-and-mcp-servers)
   - agents.<name>.mcp.allow: string[] — MCP servers whose tools need no approval (Claude, Copilot)
-  - agents.<name>.command: optional string — the executable to run (default: the runner name; required for `command`)
+  - agents.<name>.command: optional string — the executable to run (default: the runner name, `agy` for `antigravity`, `cursor-agent` for `cursor`, and for `t3` `t3` on PATH or else `~/.t3/bin/t3`; required for `command`)
   - agents.<name>.args: string[] — extra CLI arguments, after LoTaR's own flags
   - agents.<name>.env: map — extra environment variables
   - `agents` can be set as a whole with `lotar config set agents '<json or yaml map>'` (project or `--global`); names may use letters, digits, `-`, `_` and `.`, and each runner must be one of the runners in [Agent Jobs](./agent.md#runners).

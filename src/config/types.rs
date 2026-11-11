@@ -177,6 +177,10 @@ pub struct AgentProfileDetail {
     /// Reasoning effort passed to the CLI (for example `low`, `high`).
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub effort: Option<String>,
+    /// Provider the CLI runs the model on. Only the t3 runner uses it: a
+    /// T3 Code provider instance id such as `claudeAgent` or `codex`.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub provider: Option<String>,
     /// Stop a run once it has cost this many US dollars (Claude only:
     /// `--max-budget-usd`).
     #[serde(skip_serializing_if = "Option::is_none", default)]

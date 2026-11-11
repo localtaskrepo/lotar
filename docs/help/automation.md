@@ -166,7 +166,7 @@ maintenance and does not itself request a status change or agent launch.
 
 ### Agent run settings
 
-When an action hands the ticket to an agent profile, `agent` sets how that job runs. Each value overrides the profile's own; leave one out to keep the profile's. `prompt` replaces the default request ("work on the ticket") and accepts the same templates as comments. Settings on an action that doesn't assign an agent have no effect.
+When an action hands the ticket to an agent profile, `agent` sets how that job runs: `model`, `effort`, `provider` (for the [`t3` runner](agent.md#t3-code-threads)) and `prompt`. Each value overrides the profile's own; leave one out to keep the profile's. `prompt` replaces the default request ("work on the ticket") and accepts the same templates as comments. Settings on an action that doesn't assign an agent have no effect.
 
 ```yaml
 - name: Hand over to testing
@@ -183,7 +183,7 @@ When an action hands the ticket to an agent profile, `agent` sets how that job r
         prompt: "Run the test suite for ${{ticket.id}} and report failures as a comment."
 ```
 
-`model` and `effort` accept templates too, so a ticket can pick its own model. A value that expands to nothing counts as not set, so a ticket without the field gets the profile's model and effort:
+`model`, `effort` and `provider` accept templates too, so a ticket can pick its own model. A value that expands to nothing counts as not set, so a ticket without the field gets the profile's values:
 
 ```yaml
 - name: Fix new findings
@@ -192,6 +192,7 @@ When an action hands the ticket to an agent profile, `agent` sets how that job r
       set:
         assignee: "@fix"
       agent:
+        provider: "${{ticket.field:provider}}"
         model: "${{ticket.field:model}}"    # the profile's model when the ticket has no `model` field
 ```
 

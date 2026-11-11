@@ -681,6 +681,9 @@ pub struct AgentJobCreateRequest {
     /// Overrides the profile's reasoning effort for this run.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub effort: Option<String>,
+    /// Overrides the profile's provider for this run (t3 runner).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub provider: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -881,6 +884,9 @@ pub struct AgentProfileInfo {
     /// Reasoning effort the profile asks for, when set.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub effort: Option<String>,
+    /// Provider the profile runs its model on (t3 runner), when set.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub provider: Option<String>,
     /// `read-only`, `workspace` or `full`.
     pub permissions: String,
 }
@@ -903,6 +909,9 @@ pub struct AgentProfileCreateRequest {
     pub model: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effort: Option<String>,
+    /// T3 Code provider instance for the t3 runner, such as `claudeAgent`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
     /// `read-only`, `workspace` (default) or `full`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub permissions: Option<String>,

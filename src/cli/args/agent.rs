@@ -66,7 +66,7 @@ pub struct AgentRunArgs {
     pub ticket: String,
     /// Prompt for the agent
     pub prompt: String,
-    /// Runner to use (claude, codex, copilot, gemini, cursor, amp, droid, opencode, kilo, antigravity)
+    /// Runner to use (claude, codex, copilot, gemini, cursor, amp, droid, opencode, kilo, antigravity, t3)
     #[arg(long)]
     pub runner: Option<String>,
     /// Named agent profile to use
@@ -78,6 +78,10 @@ pub struct AgentRunArgs {
     /// Reasoning effort for this run (for example low, medium, high), overriding the profile's
     #[arg(long)]
     pub effort: Option<String>,
+    /// Provider for this run (t3 runner: a T3 Code provider instance such as
+    /// claudeAgent or codex), overriding the profile's
+    #[arg(long)]
+    pub provider: Option<String>,
     /// Wait for the job to finish
     #[arg(long)]
     pub wait: bool,

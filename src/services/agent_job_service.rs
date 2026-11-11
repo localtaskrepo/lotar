@@ -6,8 +6,9 @@ use crate::services::agent_context_service::{
 };
 use crate::services::agent_log_service::AgentLogService;
 use crate::services::agent_runner::{
-    AgentRunnerKind, RunnerEventKind, build_runner_command, format_stdin_message,
-    parse_runner_line, supports_stdin, validate_runner_command,
+    AgentRunnerKind, RunnerEventKind, T3Launch, T3Worktree, build_runner_command, build_t3_command,
+    format_stdin_message, is_t3_noise, parse_runner_line, supports_stdin, t3_thread_id,
+    validate_runner_command,
 };
 use crate::services::automation_service::{
     AutomationEvent, AutomationJobContext, AutomationService, build_lotar_env,
@@ -118,6 +119,8 @@ struct AgentJobState {
     /// The runner reported a failure in its output (an error result, a
     /// failed turn), so the job fails even if the process exits 0.
     runner_failed: bool,
+    /// The T3 Code thread of a t3 job, once it exists (DEV-318).
+    t3_link: Option<String>,
 }
 
 /// Data needed to start a queued job when a slot becomes available
@@ -314,11 +317,13 @@ impl AgentJobService {
                 "Prompt cannot be empty".to_string(),
             ));
         }
-        let read_only =
-            profile.permissions == Some(crate::config::types::AgentPermissions::ReadOnly);
+        // A T3 Code thread runs in its project's runtime mode, whatever the
+        // profile's permissions say.
+        let read_only = runner_kind != AgentRunnerKind::T3
+            && profile.permissions == Some(crate::config::types::AgentPermissions::ReadOnly);
         let lotar_mcp = profile.mcp.as_ref().is_some_and(|mcp| mcp.lotar)
             && crate::services::agent_runner::supports_lotar_mcp(runner_kind);
-        let notes = job_notes(
+        let mut notes = job_notes(
             tasks_dir,
             &config,
             &ticket_id,
@@ -326,6 +331,9 @@ impl AgentJobService {
             read_only,
             lotar_mcp,
         );
+        if runner_kind == AgentRunnerKind::T3 {
+            notes.push_str(&t3_tasks_dir_note(tasks_dir));
+        }
         let prompt = build_prompt(
             &task,
             &user_prompt,
@@ -410,6 +418,7 @@ impl AgentJobService {
                     runtime: None,
                     cancellation_finalized: false,
                     runner_failed: false,
+                    t3_link: None,
                 },
             );
 
@@ -955,8 +964,15 @@ fn resolve_profile(
     if let Some(effort) = run_effort {
         profile.effort = Some(effort);
     }
+    if let Some(provider) = non_blank(req.provider.as_deref()) {
+        profile.provider = Some(provider);
+    }
     profile.model = non_blank(profile.model.as_deref());
     profile.effort = non_blank(profile.effort.as_deref());
+    profile.provider = non_blank(profile.provider.as_deref());
+    if let Some(provider) = profile.provider.as_deref() {
+        crate::services::agent_runner::validate_run_setting("provider", provider)?;
+    }
     if let Some(model) = profile.model.as_deref() {
         crate::services::agent_runner::validate_run_setting("model", model)?;
     }
@@ -1366,6 +1382,217 @@ fn prepare_worktree(
     Ok(context)
 }
 
+/// `t3 thread start --wait` exits 2 when the thread waits for an answer.
+const T3_WAITS_FOR_ANSWER: i32 = 2;
+
+/// How to run `t3` again for a job (`t3 thread show`).
+#[derive(Clone)]
+struct T3Cli {
+    program: String,
+    env: HashMap<String, String>,
+    cwd: std::path::PathBuf,
+}
+
+/// The part of `t3 thread show --json` a job uses.
+#[derive(Debug, Default, PartialEq, Eq)]
+struct T3ThreadInfo {
+    link: Option<String>,
+    worktree_path: Option<String>,
+    branch: Option<String>,
+}
+
+fn parse_t3_thread_show(output: &str) -> Option<T3ThreadInfo> {
+    let value: serde_json::Value = serde_json::from_str(output.trim()).ok()?;
+    let thread = value.get("thread")?;
+    let text = |key: &str| {
+        thread
+            .get(key)
+            .and_then(|v| v.as_str())
+            .map(str::trim)
+            .filter(|v| !v.is_empty())
+            .map(str::to_string)
+    };
+    Some(T3ThreadInfo {
+        link: text("link"),
+        worktree_path: text("worktreePath"),
+        branch: text("branch"),
+    })
+}
+
+impl T3Cli {
+    fn thread_info(&self, thread_id: &str) -> Option<T3ThreadInfo> {
+        let mut cmd = Command::new(&self.program);
+        cmd.args(["thread", "show", thread_id, "--json", "--messages", "1"])
+            .envs(&self.env)
+            .current_dir(&self.cwd)
+            .stdin(Stdio::null())
+            .stderr(Stdio::null());
+        clear_repository_env(&mut cmd);
+        let output = cmd.output().ok()?;
+        if !output.status.success() {
+            return None;
+        }
+        parse_t3_thread_show(&String::from_utf8_lossy(&output.stdout))
+    }
+}
+
+/// A T3 Code thread runs on the T3 server and doesn't get the job's
+/// environment (`LOTAR_TASKS_DIR`), so its lotar commands name the tasks
+/// folder; in a worktree they would otherwise change the worktree's copy.
+fn t3_tasks_dir_note(tasks_dir: &std::path::Path) -> String {
+    let dir = fs::canonicalize(tasks_dir).unwrap_or_else(|_| tasks_dir.to_path_buf());
+    format!(
+        "- This job runs as a T3 Code thread, which doesn't get LoTaR's environment. Add `--tasks-dir \"{}\"` \
+to every lotar command, so it changes this ticket in the main checkout and not a copy in a worktree.\n",
+        dir.display()
+    )
+}
+
+/// Settings a t3 profile can't pass to T3 Code, as job notes.
+fn t3_profile_notes(profile: &AgentProfileDetail) -> Vec<&'static str> {
+    let mut notes = Vec::new();
+    if profile.effort.is_some() {
+        notes.push("T3 Code's t3 CLI has no effort option; the effort setting is not passed.");
+    }
+    if profile.permissions.is_some() {
+        notes.push(
+            "T3 Code runs the thread in the project's own runtime mode; permissions don't apply.",
+        );
+    }
+    notes
+}
+
+/// The worktree a t3 job asks T3 Code for: a new ticket branch from the main
+/// checkout's current branch, or the existing ticket branch of an earlier
+/// phase. The job runs `t3` in the main checkout (the T3 project).
+fn plan_t3_worktree(
+    tasks_dir: &std::path::Path,
+    ticket_id: &str,
+    config: &ResolvedConfig,
+) -> LoTaRResult<(WorktreeContext, T3Worktree)> {
+    let repo_root = resolve_repo_root(tasks_dir)
+        .ok_or_else(|| LoTaRError::ValidationError("Git repository not found".to_string()))?;
+    let branch = build_worktree_branch(
+        &config.agent_worktree.branch_prefix,
+        &sanitize_worktree_token(ticket_id),
+    );
+    let plan = if branch_exists(&repo_root, &branch) {
+        T3Worktree {
+            base: branch.clone(),
+            branch: None,
+        }
+    } else {
+        let head = git_command(&repo_root)
+            .args(["symbolic-ref", "--quiet", "--short", "HEAD"])
+            .current_dir(&repo_root)
+            .output()
+            .map_err(LoTaRError::IoError)?;
+        let base = String::from_utf8_lossy(&head.stdout).trim().to_string();
+        T3Worktree {
+            base: if head.status.success() && !base.is_empty() {
+                base
+            } else {
+                "HEAD".to_string()
+            },
+            branch: Some(branch.clone()),
+        }
+    };
+    let context = WorktreeContext {
+        working_dir: repo_root,
+        worktree_path: None,
+        worktree_branch: Some(branch),
+    };
+    Ok((context, plan))
+}
+
+/// The thread exists: link it on the ticket so the owner and other agents
+/// find it, and record T3 Code's worktree as the job's.
+fn on_t3_thread_started(
+    cli: &T3Cli,
+    job_id: &str,
+    tasks_dir: &std::path::Path,
+    ticket_id: &str,
+    thread_id: &str,
+) {
+    let info = cli.thread_info(thread_id).unwrap_or_default();
+    let reference = info.link.clone().unwrap_or_else(|| thread_id.to_string());
+    update_job(job_id, |state| {
+        state.record.session_id = Some(thread_id.to_string());
+        state.t3_link = Some(reference.clone());
+        if let Some(path) = info.worktree_path.as_ref() {
+            state.record.worktree_path = Some(path.clone());
+            state.record.worktree_branch =
+                info.branch.clone().or(state.record.worktree_branch.take());
+        }
+        record_and_emit(
+            state,
+            "agent_job_progress",
+            Some(format!("T3 Code thread: {reference}")),
+        );
+    });
+    let mut storage = Storage::new(tasks_dir);
+    if let Err(err) = crate::services::reference_service::ReferenceService::attach_link_reference(
+        &mut storage,
+        ticket_id,
+        &reference,
+    ) {
+        update_job(job_id, |state| {
+            record_and_emit(
+                state,
+                "agent_job_progress",
+                Some(format!(
+                    "Could not link the T3 Code thread on {ticket_id}: {err}"
+                )),
+            );
+        });
+    }
+}
+
+/// The thread waits for an answer: hand the ticket back to its reporter
+/// (status HelpNeeded where the project has it) with the thread's link,
+/// and let the job fail, so `job_completed` rules don't treat it as done.
+fn hand_back_waiting_t3_job(
+    job_id: &str,
+    ticket_id: &str,
+    tasks_dir: &std::path::Path,
+    config: &ResolvedConfig,
+) {
+    let link = JOB_REGISTRY.lock().ok().and_then(|registry| {
+        registry
+            .jobs
+            .get(job_id)
+            .and_then(|state| state.t3_link.clone())
+    });
+    let message = match link.as_deref() {
+        Some(link) => format!("The T3 Code thread waits for an answer: {link}"),
+        None => "The T3 Code thread waits for an answer.".to_string(),
+    };
+    let mut storage = Storage::new(tasks_dir);
+    if let Ok(task) = TaskService::get(&storage, ticket_id, None) {
+        let mut patch = crate::api_types::TaskUpdate::default();
+        if let Ok(status) = crate::types::TaskStatus::parse_with_config("HelpNeeded", config) {
+            patch.status = Some(status.to_string());
+        }
+        patch.assignee = task.reporter.clone();
+        let _ = TaskService::update_with_context(
+            &mut storage,
+            ticket_id,
+            patch,
+            crate::services::task_service::TaskUpdateContext::automation_disabled(),
+        );
+        let _ = TaskService::add_comment_with_context(
+            &mut storage,
+            ticket_id,
+            &message,
+            crate::services::task_service::CommentContext::automation(),
+        );
+    }
+    update_job(job_id, |state| {
+        state.record.last_message = Some(message.clone());
+        record_and_emit(state, "agent_job_progress", Some(message.clone()));
+    });
+}
+
 fn resolve_repo_root(tasks_dir: &std::path::Path) -> Option<std::path::PathBuf> {
     crate::utils::git::find_repo_root(tasks_dir)
 }
@@ -1703,7 +1930,18 @@ fn run_job(
     if should_stop_job(&job_id) {
         return;
     }
-    let worktree_context = match prepare_worktree(&job_id, &tasks_dir, &ticket_id, &config) {
+    // A t3 job asks T3 Code for the worktree: a thread can only run inside a
+    // T3 project, which LoTaR's own worktree folder is not (DEV-318).
+    let mut t3_worktree = None;
+    let prepared = if runner_kind == AgentRunnerKind::T3 && config.agent_worktree.enabled {
+        plan_t3_worktree(&tasks_dir, &ticket_id, &config).map(|(context, plan)| {
+            t3_worktree = Some(plan);
+            context
+        })
+    } else {
+        prepare_worktree(&job_id, &tasks_dir, &ticket_id, &config)
+    };
+    let worktree_context = match prepared {
         Ok(context) => {
             update_job(&job_id, |state| {
                 state.record.worktree_path = context
@@ -1804,7 +2042,25 @@ fn run_job(
     });
     let writable_dirs =
         extra_writable_dirs(&worktree_context.working_dir, &tasks_dir, is_merge_job);
-    let mut command = match build_runner_command(runner_kind, &profile, &prompt, &writable_dirs) {
+    let built = if runner_kind == AgentRunnerKind::T3 {
+        for note in t3_profile_notes(&profile) {
+            update_job(&job_id, |state| {
+                record_and_emit(state, "agent_job_progress", Some(note.to_string()));
+            });
+        }
+        let title = Storage::try_open(&tasks_dir)
+            .and_then(|storage| TaskService::get(&storage, &ticket_id, None).ok())
+            .map(|task| task.title)
+            .unwrap_or_default();
+        let launch = T3Launch {
+            title: format!("{ticket_id} {title}").trim().to_string(),
+            worktree: t3_worktree.take(),
+        };
+        build_t3_command(&profile, &prompt, &launch)
+    } else {
+        build_runner_command(runner_kind, &profile, &prompt, &writable_dirs)
+    };
+    let mut command = match built {
         Ok(cmd) => cmd,
         Err(err) => {
             update_job_failure(&job_id, &ticket_id, err.to_string(), &tasks_dir);
@@ -1831,6 +2087,12 @@ fn run_job(
         }
     }
 
+    // `t3 thread show` runs with the same program and environment.
+    let t3_cli = (runner_kind == AgentRunnerKind::T3).then(|| T3Cli {
+        program: command.program.clone(),
+        env: command.env.clone(),
+        cwd: worktree_context.working_dir.clone(),
+    });
     let command = wrap_runner_command(command, &job_id, &ticket_id, runner_kind.as_str());
 
     if let Err(err) = validate_runner_command(&command) {
@@ -1872,9 +2134,9 @@ fn run_job(
     let mut cmd = Command::new(&command.program);
     cmd.args(&command.args)
         .envs(command.env)
-        // Claude reads the prompt and later messages from stdin; the other
-        // CLIs get null stdin so none of them waits for input.
-        .stdin(if supports_stdin(runner_kind) {
+        // Claude reads the prompt and later messages from stdin, t3 only the
+        // prompt; the other CLIs get null stdin so none of them waits for input.
+        .stdin(if supports_stdin(runner_kind) || initial_input.is_some() {
             Stdio::piped()
         } else {
             Stdio::null()
@@ -1933,7 +2195,9 @@ fn run_job(
     if let Some(state) = registry.jobs.get_mut(&job_id) {
         state.runtime = Some(AgentJobRuntime {
             child: Arc::clone(&child),
-            stdin: stdin.clone(),
+            // Only runners that take messages keep the pipe; for the others
+            // dropping it below ends their input after the prompt.
+            stdin: stdin.clone().filter(|_| supports_stdin(runner_kind)),
         });
         active_record = Some(crate::services::agent_active_jobs::ActiveJob {
             job_id: job_id.clone(),
@@ -1984,9 +2248,27 @@ fn run_job(
     let stderr_reader = stderr.map(|stderr| {
         let job_id_clone = job_id.clone();
         let exited = Arc::clone(&exited);
+        let t3_cli = t3_cli.clone();
+        let tasks_dir = tasks_dir.clone();
+        let ticket_id = ticket_id.clone();
         thread::spawn(move || {
             read_job_output(stderr, &exited, |line| {
                 let msg = line.trim().to_string();
+                if let Some(cli) = t3_cli.as_ref() {
+                    if is_t3_noise(&msg) {
+                        return;
+                    }
+                    if let Some(thread_id) = t3_thread_id(&msg) {
+                        on_t3_thread_started(
+                            cli,
+                            &job_id_clone,
+                            &tasks_dir,
+                            &ticket_id,
+                            &thread_id,
+                        );
+                        return;
+                    }
+                }
                 if !msg.is_empty() {
                     update_job(&job_id_clone, |state| {
                         state.record.last_message = Some(msg.clone());
@@ -2011,7 +2293,12 @@ fn run_job(
         let exited = Arc::clone(&exited);
         thread::spawn(move || {
             let mut messages = Vec::new();
+            let mut reply = String::new();
             let result = read_job_output(stdout, &exited, |line| {
+                if runner_kind == AgentRunnerKind::T3 {
+                    reply.push_str(line.trim_end_matches(['\r', '\n']));
+                    reply.push('\n');
+                }
                 handle_runner_line(
                     &job_id_clone,
                     runner_kind,
@@ -2020,7 +2307,7 @@ fn run_job(
                     &mut messages,
                 );
             });
-            (messages, result)
+            (messages, result, reply)
         })
     });
 
@@ -2033,6 +2320,19 @@ fn run_job(
             && let Ok(mut c) = child.lock()
         {
             terminate_child(&mut c);
+            if runner_kind == AgentRunnerKind::T3 {
+                update_job(&job_id, |state| {
+                    let note = format!(
+                        "Stopped waiting for the T3 Code thread; it keeps running until it is stopped in T3 Code{}",
+                        state
+                            .t3_link
+                            .as_deref()
+                            .map(|link| format!(": {link}"))
+                            .unwrap_or_default()
+                    );
+                    record_and_emit(state, "agent_job_progress", Some(note));
+                });
+            }
             break c.wait();
         }
         let status = child
@@ -2064,9 +2364,18 @@ fn run_job(
     let mut context_messages = vec![build_user_message(&user_prompt)];
     if let Some(reader) = stdout_reader {
         match reader.join() {
-            Ok((messages, result)) => {
+            Ok((messages, result, reply)) => {
                 context_messages.extend(messages);
                 output_error = output_error.or(result.err());
+                // t3 prints the agent's whole reply; it is the job's summary.
+                let reply = reply.trim().to_string();
+                if !reply.is_empty() {
+                    context_messages.push(build_assistant_message(&reply));
+                    update_job(&job_id, |state| {
+                        state.record.last_message = Some(reply.clone());
+                        record_and_emit(state, "agent_job_message", Some(reply.clone()));
+                    });
+                }
             }
             Err(_) => {
                 output_error = Some(std::io::Error::other("Stdout reader panicked"));
@@ -2092,10 +2401,14 @@ fn run_job(
         }
         return;
     }
+    let exit_code = status.ok().and_then(|status| status.code());
+    if runner_kind == AgentRunnerKind::T3 && exit_code == Some(T3_WAITS_FOR_ANSWER) {
+        hand_back_waiting_t3_job(&job_id, &ticket_id, &tasks_dir, &config);
+    }
     finalize_job(
         &job_id,
         &ticket_id,
-        status.ok().and_then(|status| status.code()),
+        exit_code,
         &context_messages,
         &tasks_dir,
         &config,
@@ -3152,6 +3465,23 @@ mod tests {
     }
 
     #[test]
+    fn t3_thread_show_gives_the_link_and_worktree() {
+        let info = parse_t3_thread_show(
+            r#"{"thread":{"threadId":"t1","link":"https://app.t3.codes/threads/e/t1","worktreePath":"/w/DEV-1","branch":"agent/DEV-1"},"messages":[]}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            info.link.as_deref(),
+            Some("https://app.t3.codes/threads/e/t1")
+        );
+        assert_eq!(info.worktree_path.as_deref(), Some("/w/DEV-1"));
+        assert_eq!(info.branch.as_deref(), Some("agent/DEV-1"));
+        let root = parse_t3_thread_show(r#"{"thread":{"link":"x","worktreePath":null}}"#).unwrap();
+        assert_eq!(root.worktree_path, None);
+        assert!(parse_t3_thread_show("not json").is_none());
+    }
+
+    #[test]
     fn worktree_helpers_sanitize_branch_names() {
         let suffix = sanitize_worktree_token("TEST-1 / scratch");
         assert_eq!(suffix, "TEST-1---scratch");
@@ -3256,6 +3586,7 @@ mod tests {
             runtime: None,
             cancellation_finalized: false,
             runner_failed: false,
+            t3_link: None,
         }
     }
 

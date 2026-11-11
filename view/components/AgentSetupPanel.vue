@@ -81,6 +81,7 @@ const RUNNERS = [
   { value: 'opencode', label: 'OpenCode' },
   { value: 'kilo', label: 'Kilo Code' },
   { value: 'antigravity', label: 'Antigravity' },
+  { value: 't3', label: 'T3 Code' },
 ]
 
 const name = ref('implement')
