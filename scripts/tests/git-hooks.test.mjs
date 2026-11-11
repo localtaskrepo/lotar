@@ -109,10 +109,22 @@ test('pre-commit rejects unformatted Rust and TypeScript without fixing them', (
     const before = snapshot(dir);
     const result = runHook(dir, 'pre-commit');
     assert.equal(result.status, 1);
-    assert.match(result.stdout, /Rust formatting/);
+    assert.match(result.stdout, /Rust formatting: run 'rustfmt --edition 2024 src\/lib\.rs'/);
     assert.match(result.stdout, /Frontend formatting/);
     assert.equal(readFileSync(path.join(dir, 'src/lib.rs'), 'utf8'), badRust);
     assert.equal(readFileSync(path.join(dir, 'view/ok.ts'), 'utf8'), badTs);
+    assert.deepEqual(snapshot(dir), before);
+});
+
+test('pre-commit blocks trailing whitespace and conflict markers in any staged file', (t) => {
+    const dir = fixtureRepo();
+    t.after(() => rmSync(dir, { recursive: true, force: true }));
+    writeFileSync(path.join(dir, 'notes.txt'), 'trailing space \n');
+    git(dir, 'add', 'notes.txt');
+    const before = snapshot(dir);
+    const result = runHook(dir, 'pre-commit');
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.match(result.stdout, /notes\.txt:1: trailing whitespace/);
     assert.deepEqual(snapshot(dir), before);
 });
 

@@ -36,7 +36,8 @@ and report without edits, task mutations, or implementation gates.
   targeting guidance in [testing-strategy](.github/skills/testing-strategy/SKILL.md).
   Repeat checks only when subsequent edits, failures, or unresolved risks justify it.
 - Lint requires warning-free Rust, frontend and smoke typechecking, oxlint, ESLint
-  (Vue templates), and Rust plus Prettier formatting. Use `npm run fmt` if formatting fails. Rust tests use **nextest, not `cargo test`**.
+  (Vue templates), and Rust plus Prettier formatting. Format only the files you changed (`rustfmt --edition 2024
+  <files>`, `npx prettier --write <files>`), not the whole repo: other sessions' files are in progress. Rust tests use **nextest, not `cargo test`**.
 - Lint rules are the owner's shared standard: `oxlintrc.standard.json` is an
   unchanged copy (lotar's additions live in `.oxlintrc.json`), Clippy lints are in
   `Cargo.toml` (`unwrap_used` included). Fix findings instead of suppressing them.

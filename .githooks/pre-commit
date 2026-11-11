@@ -2,8 +2,8 @@
 # Git pre-commit hook for LoTaR (DEV-162).
 #
 # Read-only and fast: checks only the files being committed and never
-# formats, stages, stashes or checks out anything. Fix findings with
-# `npm run fmt` (formatting) or by hand (lint), then commit again.
+# formats, stages, stashes or checks out anything. Fix formatting in the files
+# it names (not the whole repo) and lint by hand, then commit again.
 #
 # Install: npm run hooks:install   Bypass once: git commit --no-verify
 
@@ -20,6 +20,9 @@ scanner="$(command -v betterleaks || command -v gitleaks || true)"
 if [ -n "$scanner" ]; then
   "$scanner" git --pre-commit --staged --config .gitleaks.toml --redact --no-banner --no-color -v --log-level warn . || exit 1
 fi
+
+# Trailing whitespace and leftover conflict markers in the staged changes.
+git diff --cached --check || exit 1
 
 # Same scopes as `cargo fmt`, `npm run fmt:js` (Prettier), `oxlint` and `eslint .` (Vue templates only).
 rust_files=()
@@ -67,7 +70,7 @@ if [ "${#rust_files[@]}" -gt 0 ]; then
     exit 1
   fi
   if ! rustfmt --check --edition 2024 "${rust_files[@]}" >/dev/null 2>&1; then
-    echo "✗ Rust formatting: run 'cargo fmt --all' (files: ${rust_files[*]})"
+    echo "✗ Rust formatting: run 'rustfmt --edition 2024 ${rust_files[*]}'"
     failed=1
   fi
 fi
@@ -77,7 +80,7 @@ if [ "${#web_files[@]}" -gt 0 ]; then
     echo "note: node_modules missing; skipped Prettier/oxlint/ESLint (run 'npm ci')"
   else
     if [ "${#prettier_files[@]}" -gt 0 ] && ! npx --no-install prettier --check --log-level warn "${prettier_files[@]}"; then
-      echo "✗ Frontend formatting: run 'npm run fmt:js'"
+      echo "✗ Frontend formatting: run 'npx prettier --write ${prettier_files[*]}'"
       failed=1
     fi
     if [ "${#oxlint_files[@]}" -gt 0 ] && ! npx --no-install oxlint -f agent "${oxlint_files[@]}"; then
