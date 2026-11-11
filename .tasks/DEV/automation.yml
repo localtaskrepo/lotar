@@ -1,0 +1,84 @@
+# Source: standards configs/lotar/automation.yml. Repo-health tickets (tag health, filed by
+# node ~/Development/standards/scripts/repos.ts --report) start a fix agent as a T3 Code thread; tag owner never does.
+# Goes into each repo's .tasks/<PROJECT>/automation.yml; the repo's own rules follow below these. Setup, retries and
+# the model choice: configs/lotar/README.md. No review status: the owner follows the agents in T3 (2026-11-11).
+automation:
+  rules:
+    - name: "Health: start the fix agent"
+      when:
+        tags: { any: [health] }
+      on:
+        created:
+          set:
+            assignee: "@fix"
+          # The ticket fields model and provider override the profile's (set both for another provider's model);
+          # empty keeps the profile's.
+          agent: &fix
+            model: "${{ticket.field:model}}"
+            provider: "${{ticket.field:provider}}"
+            prompt: |
+              Fix the repo problem in ticket ${{ticket.id}} ("${{ticket.title}}").
+              1. Read the ticket: what was found, how to check it, what done looks like. Run its check command. If the
+                 problem is gone already, say so in a comment and stop.
+              2. Fix it the way this repo's AGENTS.md says: the smallest change, with the tests and checks it names.
+              3. Never delete or discard work that isn't saved elsewhere (unmerged commits, uncommitted changes,
+                 files a tool or another session may still use), and never decide what only the owner decides. When
+                 the fix needs that, comment the question, set the status to HelpNeeded, assign the ticket to its
+                 reporter and stop.
+              4. When you changed files: commit them signed, never with --no-verify, message "${{ticket.id}} ${{ticket.title}}".
+                 Push only if ~/Development/standards/repos.json lists this repo with "push": true; otherwise the
+                 commit waits for the owner's OK.
+              5. Run the check command again: it must no longer list the finding.
+              6. Comment the outcome: what you changed, the commit hash, pushed or waiting for the owner. The ticket
+                 goes to Done when your job ends.
+    - name: "Health: fix agent lifecycle"
+      when:
+        any:
+          - assignee: "@fix"
+          - assignee: "@fix-fable"
+          - assignee: "@fix-codex"
+      on:
+        job_started:
+          set:
+            status: InProgress
+        job_completed:
+          set:
+            status: Done
+        job_failed:
+          set:
+            status: HelpNeeded
+            assignee: "@reporter"
+          comment: >-
+            The fix agent's job ${{agent.job_id}} failed: lotar agent logs ${{agent.job_id}}. Try again with
+            lotar automation run "Health: retry with @fix" --select 'id:${{ticket.id}}' (or @fix-fable, @fix-codex).
+    # Manual: after answering a HelpNeeded question or a failed job. Always pass --select, or every waiting ticket starts.
+    - name: "Health: retry with @fix"
+      when:
+        all:
+          - tags: { any: [health] }
+          - status: HelpNeeded
+      on:
+        manual:
+          set:
+            assignee: "@fix"
+          agent: *fix
+    - name: "Health: retry with @fix-fable"
+      when:
+        all:
+          - tags: { any: [health] }
+          - status: HelpNeeded
+      on:
+        manual:
+          set:
+            assignee: "@fix-fable"
+          agent: *fix
+    - name: "Health: retry with @fix-codex"
+      when:
+        all:
+          - tags: { any: [health] }
+          - status: HelpNeeded
+      on:
+        manual:
+          set:
+            assignee: "@fix-codex"
+          agent: *fix

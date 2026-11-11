@@ -8,8 +8,12 @@ issue:
   states:
   - Todo
   - InProgress
+  - HelpNeeded
   - Blocked
-  - NeedsReview
   - Done
+  - WontDo
+  done_states:
+  - Done
+  - WontDo
 attachments:
   dir: DEV/@attachments
