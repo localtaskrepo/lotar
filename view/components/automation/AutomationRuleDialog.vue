@@ -597,6 +597,7 @@ import {
   automationEventOptions,
   buildAutomationRuleFromDraft,
   createChangeDraft,
+  createConditionDraft,
   createEmptyRuleDraft,
   createListFieldDraft,
   createSetFieldDraft,
@@ -609,6 +610,7 @@ import {
   type AutomationSetFieldDraft,
 } from '../../utils/automationRules'
 import { describeAutomationRule, templateVariables, triggerText } from '../../utils/automationText'
+import { required } from '../../utils/lookup'
 import IconGlyph from '../IconGlyph.vue'
 import UiButton from '../UiButton.vue'
 import UiModal from '../UiModal.vue'
@@ -850,7 +852,7 @@ function valueListFor(field: string, use: 'condition' | 'set') {
 }
 
 function addCondition() {
-  const row = createEmptyRuleDraft().conditions[0]!
+  const row = createConditionDraft()
   row.field = 'status'
   row.operator = 'equals'
   draft.value.conditions.push(row)
@@ -933,7 +935,8 @@ function setSetField(row: AutomationSetFieldDraft, value: string) {
 function extrasOf(action: AutomationEventActionDraft): Set<Extra> {
   const key = action.event
   if (!extras.value[key]) extras.value[key] = new Set()
-  return extras.value[key]!
+  // Read it back from the ref: the stored set is the reactive one.
+  return required(extras.value[key], `extras for ${key}`)
 }
 
 function shows(action: AutomationEventActionDraft, extra: Extra) {

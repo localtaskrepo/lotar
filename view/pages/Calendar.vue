@@ -182,9 +182,10 @@
                   >
                     <div class="task-inline">
                       <AttachmentTile
-                        v-if="chipAttachment(t)"
+                        v-for="thumb in asList(chipAttachment(t))"
+                        :key="thumb.path"
                         class="task-inline__thumb"
-                        :attachment="chipAttachment(t)!"
+                        :attachment="thumb"
                         :size="16"
                       />
                       <span class="id">{{ t.id }}</span>
@@ -258,6 +259,7 @@
 </template>
 
 <script setup lang="ts">
+import { asList } from '../utils/lookup'
 import { useProjectNames } from '../composables/useProjectNames'
 import PageHeader from '../components/PageHeader.vue'
 import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
@@ -294,14 +296,14 @@ const store = useTaskStore()
 // membership current while mounted.
 const calendarQuery = shallowRef<TaskQueryHandle | null>(null)
 let activeQueryHandle: TaskQueryHandle | null = null
-let activeQueryKey = ''
-function adoptQuery(handle: TaskQueryHandle) {
-  if (activeQueryKey === handle.key) return
+/** Switch to `handle` unless a query with its key is already active; returns the active query. */
+function adoptQuery(handle: TaskQueryHandle): TaskQueryHandle {
+  if (activeQueryHandle?.key === handle.key) return activeQueryHandle
   activeQueryHandle?.release()
   activeQueryHandle = handle
-  activeQueryKey = handle.key
   handle.retain()
   calendarQuery.value = handle
+  return handle
 }
 const loadingTasks = computed(() => calendarQuery.value?.status.value === 'loading')
 const loadError = computed(() => calendarQuery.value?.error.value ?? null)
@@ -559,9 +561,9 @@ const cells = computed(() => {
 async function refreshCalendarTasks(snapshot?: Record<string, string>) {
   const raw = snapshot ?? filter.value
   const { serverFilter } = buildServerFilter(raw, project.value)
-  adoptQuery(store.getQuery(serverFilter))
+  const query = adoptQuery(store.getQuery(serverFilter))
   // Refresh failures surface through the query's error state (loadError).
-  await activeQueryHandle!.refresh()
+  await query.refresh()
 }
 
 function prevMonth() {
@@ -709,7 +711,6 @@ onUnmounted(() => {
   }
   activeQueryHandle?.release()
   activeQueryHandle = null
-  activeQueryKey = ''
   calendarQuery.value = null
   if (typeof window !== 'undefined') {
     window.removeEventListener('click', handleCalendarPopoverClick)

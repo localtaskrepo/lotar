@@ -38,6 +38,8 @@ export interface LaneColumn {
 export interface BoardLane<C extends LaneColumn = LaneColumn> {
     key: string
     columns: C[]
+    /** The first column; every lane has at least one. */
+    lead: C
     stacked: boolean
     title: string
     config: BoardColumnConfig
@@ -116,8 +118,8 @@ export function reconcileColumns(columns: BoardColumnConfig[], statuses: LayoutS
         if (seen.has(status.key)) return
         seen.add(status.key)
         let insertAt = 0
-        for (let previous = index - 1; previous >= 0; previous -= 1) {
-            const at = result.findIndex((column) => column.statuses.includes(statuses[previous]!.key))
+        for (const earlier of statuses.slice(0, index).reverse()) {
+            const at = result.findIndex((column) => column.statuses.includes(earlier.key))
             if (at >= 0) {
                 insertAt = at + 1
                 break
@@ -178,10 +180,12 @@ export function computeBoardLanes<C extends LaneColumn>(columns: C[], layout: Bo
             .filter((key) => !hidden.has(key))
             .map((key) => byKey.get(key))
             .filter((column): column is C => column !== undefined)
-        if (!members.length) continue
+        const [lead] = members
+        if (lead === undefined) continue
         lanes.push({
             key: members.map((column) => column.key).join('+'),
             columns: members,
+            lead,
             stacked: members.length > 1,
             title: config.name || members.map((column) => column.label).join(' · '),
             config,
@@ -192,6 +196,7 @@ export function computeBoardLanes<C extends LaneColumn>(columns: C[], layout: Bo
             lanes.push({
                 key: column.key,
                 columns: [column],
+                lead: column,
                 stacked: false,
                 title: column.label,
                 config: { statuses: [] },

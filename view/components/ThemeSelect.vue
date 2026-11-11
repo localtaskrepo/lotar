@@ -95,6 +95,7 @@
 </template>
 
 <script setup lang="ts">
+import { itemAt } from '../utils/lookup'
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import IconGlyph from './IconGlyph.vue'
 import ThemePreview from './ThemePreview.vue'
@@ -279,7 +280,7 @@ function onPaletteKey(event: KeyboardEvent, current: string) {
         : 0
   if (!step) return
   event.preventDefault()
-  const next = ids[(index + step + ids.length) % ids.length]!
+  const next = itemAt(ids, (index + step + ids.length) % ids.length, 'palette')
   choosePalette(next)
   void nextTick(() => root.value?.querySelector<HTMLElement>('.theme-select__palette--selected')?.focus())
 }

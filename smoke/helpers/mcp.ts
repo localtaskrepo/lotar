@@ -267,7 +267,7 @@ export class NdjsonMcpClient implements McpClientLike {
     }
 
     private consumeLines(): void {
-        for (;;) {
+        while (true) {
             const newlineIndex = this.buffer.indexOf(0x0a);
             if (newlineIndex === -1) {
                 if (this.buffer.length > this.maxLineBytes) {
@@ -432,7 +432,7 @@ export class FramedMcpClient implements McpClientLike {
     private tryParseFrames(): void {
         const separator = Buffer.from('\r\n\r\n', 'utf8');
 
-        for (;;) {
+        while (true) {
             const headerIndex = this.buffer.indexOf(separator);
             if (headerIndex === -1) {
                 if (this.buffer.length > MCP_MAX_MESSAGE_BYTES) {

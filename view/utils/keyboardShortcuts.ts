@@ -61,12 +61,13 @@ export function isEditableTarget(target: EventTarget | null): boolean {
  */
 export function commandMatchRank(query: string, label: string, keywords = ''): number | null {
     const words = query.toLowerCase().split(/\s+/).filter(Boolean)
-    if (!words.length) return 0
+    const [firstWord] = words
+    if (firstWord === undefined) return 0
     const lowerLabel = label.toLowerCase()
     const haystack = `${lowerLabel} ${keywords.toLowerCase()}`
     if (!words.every((word) => haystack.includes(word))) return null
     const phrase = words.join(' ')
     if (lowerLabel.startsWith(phrase)) return 0
-    if (lowerLabel.split(/\s+/).some((word) => word.startsWith(words[0]!))) return 1
+    if (lowerLabel.split(/\s+/).some((word) => word.startsWith(firstWord))) return 1
     return 2
 }

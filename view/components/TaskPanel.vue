@@ -959,6 +959,7 @@
 </template>
 
 <script setup lang="ts">
+import { itemAt } from '../utils/lookup'
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { api } from '../api/client'
 import type {
@@ -1471,7 +1472,8 @@ function onAttachmentPicked(event: Event) {
 
 const attachmentUrl = (relPath: string) => buildAttachmentUrl(relPath, task.id)
 // Images get a preview gallery; other files keep compact chips with a type tile.
-const attachmentView = (relPath: string) => taskAttachments({ id: task.id, references: [{ attachment: relPath }] })[0]!
+const attachmentView = (relPath: string) =>
+  itemAt(taskAttachments({ id: task.id, references: [{ attachment: relPath }] }), 0, 'attachment view')
 const isImagePath = (relPath: string) => attachmentKind(relPath) === 'image'
 
 // Removing from the Attachments area hides the file at once and offers Undo;

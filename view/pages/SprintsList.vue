@@ -1474,10 +1474,12 @@ const tasksBySprint = computed(() => {
   tasks.value.forEach((task) => {
     const memberships = Array.isArray(task.sprints) ? task.sprints : []
     memberships.forEach((id) => {
-      if (!map.has(id)) {
-        map.set(id, [])
+      let sprintTasks = map.get(id)
+      if (!sprintTasks) {
+        sprintTasks = []
+        map.set(id, sprintTasks)
       }
-      map.get(id)!.push(task)
+      sprintTasks.push(task)
     })
   })
   return map
@@ -1972,11 +1974,10 @@ function applyTaskOrder(sprint: number | null, ids: string[]) {
   if (sprint === null) backlogOrder.value = ids
   else {
     const positions = new Map(ids.map((id, index) => [id, index]))
-    tasks.value = tasks.value.map((task) =>
-      positions.has(task.id)
-        ? { ...task, sprint_order: { ...task.sprint_order, [sprint]: positions.get(task.id)! + 1 } }
-        : task,
-    )
+    tasks.value = tasks.value.map((task) => {
+      const position = positions.get(task.id)
+      return position === undefined ? task : { ...task, sprint_order: { ...task.sprint_order, [sprint]: position + 1 } }
+    })
   }
 }
 
@@ -2350,10 +2351,9 @@ async function onBacklogDrop(event: DragEvent) {
     return
   }
   const task = tasks.value.find((item) => item.id === taskId)
-  const memberships = Array.isArray(task?.sprints)
-    ? Array.from(
-        new Set(task!.sprints.filter((id): id is number => typeof id === 'number' && Number.isFinite(id) && id > 0)),
-      )
+  const sprints = task?.sprints
+  const memberships = Array.isArray(sprints)
+    ? Array.from(new Set(sprints.filter((id): id is number => typeof id === 'number' && Number.isFinite(id) && id > 0)))
     : []
   if (!memberships.length) {
     onTaskDragEnd()

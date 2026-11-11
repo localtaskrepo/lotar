@@ -100,7 +100,10 @@ function upsertChart() {
   ]
 
   if (!chart.value) {
-    chart.value = new Chart(canvasEl.value.getContext('2d')!, {
+    // No 2D context (canvas unsupported): leave the chart out.
+    const context = canvasEl.value.getContext('2d')
+    if (!context) return
+    chart.value = new Chart(context, {
       type: 'line',
       data: {
         labels: labels.value,

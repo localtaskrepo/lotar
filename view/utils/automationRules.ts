@@ -1222,7 +1222,7 @@ function parseYamlScalar(value: string): unknown {
     }
 }
 
-function createConditionDraft(): AutomationConditionDraft {
+export function createConditionDraft(): AutomationConditionDraft {
     return {
         id: nextRowId('condition'),
         scope: 'field',

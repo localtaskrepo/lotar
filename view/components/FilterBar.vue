@@ -469,6 +469,7 @@
   </div>
 </template>
 <script setup lang="ts">
+import { itemAt } from '../utils/lookup'
 import { computed, nextTick, onMounted, onUnmounted, ref, useId, watch, watchEffect } from 'vue'
 import { listFromCsv } from '../composables/useFilterBuilder'
 import { registerFilterBar } from '../composables/useFilterCommands'
@@ -1246,7 +1247,7 @@ function replaceFragment(replacement: string): void {
   let end = prefix.length
   let quote = ''
   for (; end < searchDraft.value.length; end++) {
-    const char = searchDraft.value[end]!
+    const char = itemAt(searchDraft.value, end)
     if (quote) {
       if (char === '\\' && ['\\', quote].includes(searchDraft.value[end + 1] || '')) end++
       else if (char === quote) quote = ''

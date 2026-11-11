@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { api } from '../../api/client'
 import type { TaskDTO } from '../../api/types'
 import { showToast } from '../../components/toast'
+import { itemAt } from '../../utils/lookup'
 import { attachmentDisplayName, fileToBase64, normalizeUrlCandidate } from '../../utils/taskAttachments'
 
 interface UseTaskPanelReferenceMutationsOptions {
@@ -186,7 +187,7 @@ export function useTaskPanelReferenceMutations(
             const warnings: string[] = []
 
             for (const [index, file] of files.entries()) {
-                const progress = uploadProgress.value[index]!
+                const progress = itemAt(uploadProgress.value, index, 'upload progress')
                 progress.state = 'uploading'
                 try {
                     const base64 = await fileToBase64(file)
@@ -235,7 +236,9 @@ export function useTaskPanelReferenceMutations(
             }
 
             if (added > 0 && skipped === 0 && failed === 0) {
-                showToast(added === 1 && files.length === 1 ? `Attached ${files[0]!.name}` : `Attached ${added} files`)
+                showToast(
+                    added === 1 && files.length === 1 ? `Attached ${itemAt(files, 0).name}` : `Attached ${added} files`,
+                )
             } else {
                 const parts = []
                 if (added > 0) parts.push(`${added} added`)

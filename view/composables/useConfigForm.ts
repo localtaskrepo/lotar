@@ -8,6 +8,7 @@ import type {
     TagProperties,
 } from '../api/types'
 import { resolveTagColor } from '../utils/tagColors'
+import { itemAt } from '../utils/lookup'
 import { parseThemeValue } from '../utils/themes'
 import { provenanceClass as getProvenanceClass, provenanceLabel as getProvenanceLabel } from '../utils/provenance'
 
@@ -779,7 +780,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
                 : 'Use a whole number of hours, days or weeks, e.g. 12h, 1d or 2w.'
         }
         const count = Number(match[1])
-        const unit = match[2]![0]
+        const unit = itemAt(match, 2, 'duration unit')[0]
         const hours = count * (unit === 'h' ? 1 : unit === 'd' ? 24 : 168)
         if (isLength && hours === 0) return 'The length must be longer than zero.'
         if (hours > 3650 * 24) return 'Keep it to ten years (3650 days) or less.'
@@ -920,12 +921,15 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             case 'sync_reports_dir':
             case 'agent_context_extension':
             case 'agent_worktree_branch_prefix': {
-                const labels: Record<string, [FormTextField, string]> = {
+                const labels: Record<
+                    'sync_reports_dir' | 'agent_context_extension' | 'agent_worktree_branch_prefix',
+                    [FormTextField, string]
+                > = {
                     sync_reports_dir: ['syncReportsDir', 'Reports folder'],
                     agent_context_extension: ['agentContextExtension', 'Context file extension'],
                     agent_worktree_branch_prefix: ['agentWorktreeBranchPrefix', 'Branch prefix'],
                 }
-                const [key, label] = labels[field]!
+                const [key, label] = labels[field]
                 const value = form[key].trim()
                 const loaded = (baseline.value?.[key] ?? '').trim()
                 if (!value) {

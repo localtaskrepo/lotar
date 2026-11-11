@@ -1,0 +1,41 @@
+title: 'Lint standard: ban non-null assertions outside tests and fix every site'
+status: Done
+priority: Medium
+type: Chore
+reporter: claude
+assignee: claude
+created: 2026-11-11T05:03:11.256494+00:00
+modified: 2026-11-11T05:06:41.283587+00:00
+relationships:
+  related:
+  - DEV-313
+comments:
+- date: 2026-11-11T05:06:41.126090+00:00
+  text: 'Done. oxlintrc.standard.json = current standard (0 new findings, no stale disable comments); no-non-null-assertion override removed. 125 oxlint findings (all `!`, 49 in view/utils/dependencyLayout.ts) -> 0, plus 38 `!` in Vue templates that oxlint does not read -> 0. New view/utils/lookup.ts (mustGet, itemAt, required throw a clear error; asList binds a narrowed v-for variable in templates) with tests. Other fixes: for-of/entries, typed tuples (dependency edge controls), BoardLane.lead, adoptQuery returns the active query (Board, Calendar, Insights; redundant activeQueryKey removed), canvas without a 2D context skips the chart instead of passing null to Chart.js, MyWorkLens filters timelines without doneAt (was sorting them as 0). DEV-313''s for (;;) workaround restored to while (true) in smoke/helpers (3); its explicit switch case lists kept (stricter than default). No bugs found that needed a failing test. Checks: lint:agent (vue-tsc, tsc smoke, oxlint, eslint, prettier, clippy all targets/features -D warnings, cargo fmt), test:agent (1972 Rust, 1436 UI, release 47, hooks 6), test:smoke:agent 372, CI-only node tests (rust-test-runner, compress-web, ticket-screenshot), cargo deny: all pass. Not pushed: needs the owner''s OK.'
+description: |-
+  Owner decision 2026-11-10 (standards docs/decisions/2026-11-10-lint-standard.md): `!` stays banned outside tests and every repo fixes its sites ("Agreed"). Follows DEV-313.
+  Scope: oxlintrc.standard.json replaced by the current standard (eqeqeq smart, allowConstantLoopConditions, considerDefaultExhaustiveForUnions, no-unnecessary-condition off for JS); the no-non-null-assertion override removed from .oxlintrc.json; every `!` outside tests restructured (lookups that throw, for-of, guards, typed tuples), including Vue templates, which oxlint does not read. Workarounds DEV-313 added for the old rules removed where they are now unnecessary.
+  Acceptance: oxlint 0 findings, lint:agent, test:agent, test:smoke:agent and clippy --all-targets --all-features -D warnings pass.
+history:
+- at: 2026-11-11T05:03:11.332686+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-313"]}'
+- at: 2026-11-11T05:03:32.756917+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-11T05:06:41.126090+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-11T05:06:41.283587+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

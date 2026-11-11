@@ -11,6 +11,7 @@
   },
   "rules": {
     "unicorn/no-useless-spread": "off",
+    "eqeqeq": ["error", "smart"],
     "no-array-constructor": "error",
     "no-case-declarations": "error",
     "no-empty": "error",
@@ -42,7 +43,7 @@
     "typescript/no-non-null-assertion": "error",
     "typescript/no-require-imports": "error",
     "typescript/no-unnecessary-boolean-literal-compare": "error",
-    "typescript/no-unnecessary-condition": "error",
+    "typescript/no-unnecessary-condition": ["error", { "allowConstantLoopConditions": "only-allowed-literals" }],
     "typescript/no-unnecessary-template-expression": "error",
     "typescript/no-unnecessary-type-arguments": "error",
     "typescript/no-unnecessary-type-assertion": "error",
@@ -67,7 +68,7 @@
     "typescript/restrict-plus-operands": "error",
     "typescript/restrict-template-expressions": ["error", { "allowNumber": true }],
     "typescript/return-await": "error",
-    "typescript/switch-exhaustiveness-check": "error",
+    "typescript/switch-exhaustiveness-check": ["error", { "considerDefaultExhaustiveForUnions": true }],
     "typescript/use-unknown-in-catch-callback-variable": "error",
     "vitest/valid-expect": ["error", { "maxArgs": 2 }],
     "vitest/require-mock-type-parameters": "off",
@@ -91,9 +92,11 @@
       }
     },
     {
-      // JavaScript has no types, so every call would be "unsafe".
+      // JavaScript has no types, so every call would be "unsafe", and inferred types (`{ x: null }` is null, no
+      // noUncheckedIndexedAccess) make "unnecessary condition" findings wrong.
       "files": ["**/*.js", "**/*.mjs", "**/*.cjs"],
       "rules": {
+        "typescript/no-unnecessary-condition": "off",
         "typescript/no-unsafe-argument": "off",
         "typescript/no-unsafe-assignment": "off",
         "typescript/no-unsafe-call": "off",

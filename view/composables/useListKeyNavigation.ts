@@ -1,5 +1,6 @@
 import { onMounted, onUnmounted } from 'vue'
 import { isEditableTarget } from '../utils/keyboardShortcuts'
+import { itemAt } from '../utils/lookup'
 import { readSingleKeyShortcutsPreference } from '../utils/preferences'
 import { useTaskPanelController } from './useTaskPanelController'
 
@@ -35,7 +36,7 @@ export function useListKeyNavigation(itemSelector: string) {
                     ? 0
                     : list.length - 1
                 : Math.min(list.length - 1, Math.max(0, current + (event.key === 'j' ? 1 : -1)))
-        const target = list[next]!
+        const target = itemAt(list, next)
         target.focus({ preventScroll: true })
         target.scrollIntoView({ block: 'nearest' })
     }

@@ -113,7 +113,8 @@ async function handle(request) {
                     setImmediate(pump);
                 } else {
                     process.stderr.once('drain', () => setImmediate(pump));
-                }            };
+                }
+            };
             pump();
             break;
         }
@@ -146,7 +147,7 @@ function readFramedStdin() {
     let buffered = Buffer.alloc(0);
     process.stdin.on('data', (chunk) => {
         buffered = Buffer.concat([buffered, chunk]);
-        for (;;) {
+        while (true) {
             const separator = buffered.indexOf('\r\n\r\n');
             if (separator === -1) {
                 return;

@@ -301,6 +301,7 @@
 </template>
 
 <script setup lang="ts">
+import { itemAt } from '../utils/lookup'
 import { computed, ref, useId, watch, onBeforeUnmount, getCurrentInstance } from 'vue'
 import type {
   RelationshipEdge,
@@ -462,7 +463,7 @@ const focalId = computed(() => {
     const suffix = rootValue.slice(id.project.length)
     return rootValue.startsWith(id.project) && /^[0-9]+$/.test(suffix) && BigInt(suffix).toString() === id.number
   })
-  return candidates.length === 1 ? candidates[0]!.id : ''
+  return candidates.length === 1 ? itemAt(candidates, 0).id : ''
 })
 const enabledEdges = computed(() =>
   (graph.value?.edges || []).filter((edge) =>
@@ -502,7 +503,7 @@ const searchId = computed(() => {
     const suffix = query.slice(id.project.length)
     return query.startsWith(id.project) && /^[0-9]+$/.test(suffix) && BigInt(suffix).toString() === id.number
   })
-  return candidates.length === 1 ? candidates[0]!.id : ''
+  return candidates.length === 1 ? itemAt(candidates, 0).id : ''
 })
 const nodes = computed(() => {
   const inventory = projectedNodes.value
@@ -647,7 +648,8 @@ function observeCard(id: string, el: unknown) {
 }
 onBeforeUnmount(() => observer?.disconnect())
 function estimatedHeight(node: RelationshipNode) {
-  if (cardHeights.value[node.id]) return cardHeights.value[node.id]!
+  const measured = cardHeights.value[node.id]
+  if (measured) return measured
   const values = { ...node.task, id: node.id, title: node.task?.title ?? node.title }
   const lines = Object.entries(values)
     .filter(([key, value]) => props.fields?.[key] !== false && value != null && value !== '')

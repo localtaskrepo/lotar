@@ -1,4 +1,5 @@
 import type { ConfigFormState } from '../composables/useConfigForm'
+import { itemAt } from './lookup'
 
 /** Sections of the Config page, in menu order (DEV-19). */
 export type ConfigSectionId =
@@ -189,7 +190,7 @@ export function sectionsForScope(isGlobal: boolean): ConfigSectionDefinition[] {
 export function resolveSection(requested: unknown, isGlobal: boolean): ConfigSectionId {
     const available = sectionsForScope(isGlobal)
     const match = available.find((section) => section.id === requested)
-    return (match ?? available[0]!).id
+    return (match ?? itemAt(available, 0, 'config section')).id
 }
 
 /** Sections whose fields differ from the loaded baseline. */

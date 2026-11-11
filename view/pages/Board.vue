@@ -194,8 +194,8 @@
               v-for="lane in boardLanes"
               :key="`${group}::${lane.key}`"
               class="col column-group-cell"
-              :data-status="lane.stacked ? undefined : statusAttr(lane.columns[0]!)"
-              :data-column-kind="lane.stacked ? 'stack' : kindAttr(lane.columns[0]!)"
+              :data-status="lane.stacked ? undefined : statusAttr(lane.lead)"
+              :data-column-kind="lane.stacked ? 'stack' : kindAttr(lane.lead)"
               :class="{ 'over-limit': laneOverLimit(lane), 'column-group-cell--stacked': lane.stacked }"
               @dragover.prevent="onDragOver"
               @drop.prevent="onLaneDrop(lane, $event)"
@@ -224,8 +224,13 @@
                     tabindex="0"
                     data-board-card
                   >
-                    <div v-if="cardCover(task)" class="task-cover" aria-hidden="true">
-                      <AttachmentTile :attachment="cardCover(task)!" cover :cover-height="120" />
+                    <div
+                      v-for="cover in asList(cardCover(task))"
+                      :key="cover.path"
+                      class="task-cover"
+                      aria-hidden="true"
+                    >
+                      <AttachmentTile :attachment="cover" cover :cover-height="120" />
                     </div>
                     <header v-if="hasTaskHeader(task)" class="row task-header">
                       <template v-if="hasTaskIdentity(task)">
@@ -281,8 +286,8 @@
           :key="`hdr-${lane.key}`"
           class="col-header row board-col-header lane-header"
           :class="{ 'lane-header--stacked': lane.stacked }"
-          :data-status="lane.stacked ? undefined : statusAttr(lane.columns[0]!)"
-          :data-column-kind="lane.stacked ? 'stack' : kindAttr(lane.columns[0]!)"
+          :data-status="lane.stacked ? undefined : statusAttr(lane.lead)"
+          :data-column-kind="lane.stacked ? 'stack' : kindAttr(lane.lead)"
           style="justify-content: space-between; align-items: center; gap: 8px"
         >
           <strong class="lane-header__title" :title="lane.title">{{ lane.title }}</strong>
@@ -293,9 +298,9 @@
               variant="ghost"
               class="board-col-add"
               type="button"
-              :aria-label="lane.columns[0]!.synthetic ? 'Add task' : `Add task in ${lane.columns[0]!.label}`"
-              :title="lane.columns[0]!.synthetic ? 'Add task' : `Add task in ${lane.columns[0]!.label}`"
-              @click="lane.columns[0]!.synthetic ? openCreateInBoard() : openCreateInStatus(lane.columns[0]!.label)"
+              :aria-label="lane.lead.synthetic ? 'Add task' : `Add task in ${lane.lead.label}`"
+              :title="lane.lead.synthetic ? 'Add task' : `Add task in ${lane.lead.label}`"
+              @click="lane.lead.synthetic ? openCreateInBoard() : openCreateInStatus(lane.lead.label)"
             >
               <IconGlyph name="plus" />
             </UiButton>
@@ -340,13 +345,13 @@
           v-for="lane in boardLanes"
           :key="lane.key"
           class="col column"
-          :data-status="lane.stacked ? undefined : statusAttr(lane.columns[0]!)"
-          :data-column-kind="lane.stacked ? 'stack' : kindAttr(lane.columns[0]!)"
+          :data-status="lane.stacked ? undefined : statusAttr(lane.lead)"
+          :data-column-kind="lane.stacked ? 'stack' : kindAttr(lane.lead)"
           :class="{ 'over-limit': laneOverLimit(lane), 'column--stacked': lane.stacked }"
           :tabindex="lane.stacked ? undefined : 0"
           @dragover.prevent="onDragOver"
           @drop.prevent="onLaneDrop(lane, $event)"
-          @keydown.enter.self.prevent="!lane.stacked && onDrop(lane.columns[0]!)"
+          @keydown.enter.self.prevent="!lane.stacked && onDrop(lane.lead)"
         >
           <div
             class="col-header row lane-header"
@@ -361,9 +366,9 @@
                 variant="ghost"
                 class="board-col-add"
                 type="button"
-                :aria-label="lane.columns[0]!.synthetic ? 'Add task' : `Add task in ${lane.columns[0]!.label}`"
-                :title="lane.columns[0]!.synthetic ? 'Add task' : `Add task in ${lane.columns[0]!.label}`"
-                @click="lane.columns[0]!.synthetic ? openCreateInBoard() : openCreateInStatus(lane.columns[0]!.label)"
+                :aria-label="lane.lead.synthetic ? 'Add task' : `Add task in ${lane.lead.label}`"
+                :title="lane.lead.synthetic ? 'Add task' : `Add task in ${lane.lead.label}`"
+                @click="lane.lead.synthetic ? openCreateInBoard() : openCreateInStatus(lane.lead.label)"
               >
                 <IconGlyph name="plus" />
               </UiButton>
@@ -445,8 +450,8 @@
                 tabindex="0"
                 data-board-card
               >
-                <div v-if="cardCover(task)" class="task-cover" aria-hidden="true">
-                  <AttachmentTile :attachment="cardCover(task)!" cover :cover-height="120" />
+                <div v-for="cover in asList(cardCover(task))" :key="cover.path" class="task-cover" aria-hidden="true">
+                  <AttachmentTile :attachment="cover" cover :cover-height="120" />
                 </div>
                 <header v-if="hasTaskHeader(task)" class="row task-header">
                   <template v-if="hasTaskIdentity(task)">
@@ -504,6 +509,7 @@
 
 <script setup lang="ts">
 import { errorMessage } from '../utils/errors'
+import { asList } from '../utils/lookup'
 import { useProjectNames } from '../composables/useProjectNames'
 import { formatProjectLabel } from '../utils/projectLabels'
 import PageHeader from '../components/PageHeader.vue'
@@ -573,14 +579,14 @@ const store = useTaskStore()
 // authoritative refreshes keep this membership current while mounted.
 const boardQuery = shallowRef<TaskQueryHandle | null>(null)
 let activeQueryHandle: TaskQueryHandle | null = null
-let activeQueryKey = ''
-function adoptQuery(handle: TaskQueryHandle) {
-  if (activeQueryKey === handle.key) return
+/** Switch to `handle` unless a query with its key is already active; returns the active query. */
+function adoptQuery(handle: TaskQueryHandle): TaskQueryHandle {
+  if (activeQueryHandle?.key === handle.key) return activeQueryHandle
   activeQueryHandle?.release()
   activeQueryHandle = handle
-  activeQueryKey = handle.key
   handle.retain()
   boardQuery.value = handle
+  return handle
 }
 const loadingTasks = computed(() => boardQuery.value?.status.value === 'loading')
 const loadError = computed(() => boardQuery.value?.error.value ?? null)
@@ -801,10 +807,10 @@ async function refreshBoardTasks(snapshot?: Record<string, string>) {
   }
   const raw = snapshot ?? filter.value
   const { serverFilter } = buildServerFilter(raw, project.value)
-  adoptQuery(store.getQuery(serverFilter))
+  const query = adoptQuery(store.getQuery(serverFilter))
   // Refresh failures surface through the query's error state (loadError);
   // previously they were swallowed by the shared status with stale rows left behind.
-  await activeQueryHandle!.refresh()
+  await query.refresh()
 }
 
 const statusSource = computed(() => {
@@ -985,7 +991,7 @@ function kindAttr(col: BoardColumnDescriptor): string {
 /** Drops on a stacked lane land in the status section under the pointer. */
 function onLaneDrop(lane: BoardLane<BoardColumnDescriptor>, event: DragEvent) {
   if (!lane.stacked) {
-    void onDrop(lane.columns[0]!)
+    void onDrop(lane.lead)
     return
   }
   const target = event.target instanceof Element ? event.target.closest('[data-section-key]') : null
@@ -1252,7 +1258,6 @@ onUnmounted(() => {
   }
   activeQueryHandle?.release()
   activeQueryHandle = null
-  activeQueryKey = ''
   boardQuery.value = null
 })
 </script>

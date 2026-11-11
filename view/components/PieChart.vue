@@ -98,7 +98,10 @@ function upsertChart() {
   if (!canvasEl.value) return
   const borderColor = resolveCssVar('--color-bg')
   if (!chart.value) {
-    chart.value = new Chart(canvasEl.value.getContext('2d')!, {
+    // No 2D context (canvas unsupported): leave the chart out.
+    const context = canvasEl.value.getContext('2d')
+    if (!context) return
+    chart.value = new Chart(context, {
       type: 'doughnut',
       data: {
         labels: labels.value,

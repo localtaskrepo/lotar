@@ -81,7 +81,7 @@ export function buildServerFilter(
         // silently widening it by dropping bad tokens.
         const tokens = listFromCsv(normalized.sprints)
         const ids = tokens.map((token) => Number(token))
-        const allValid = tokens.length > 0 && tokens.every((token, i) => /^\d+$/.test(token) && ids[i]! > 0)
+        const allValid = tokens.length > 0 && tokens.every((token) => /^\d+$/.test(token) && Number(token) > 0)
         serverFilter.sprints = allValid ? ids : normalized.sprints
     }
     if (normalized.due) serverFilter.due = normalized.due

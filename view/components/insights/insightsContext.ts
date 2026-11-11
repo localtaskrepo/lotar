@@ -3,6 +3,7 @@ import { useRouter } from 'vue-router'
 import type { TaskDTO } from '../../api/types'
 import { useCompletionPolicy, type CompletionPolicyApi } from '../../composables/useCompletionPolicy'
 import { useTaskPanelController } from '../../composables/useTaskPanelController'
+import { required } from '../../utils/lookup'
 import {
     bucketsFor,
     bucketUnitFor,
@@ -173,7 +174,10 @@ export function provideInsights(input: InsightsInput): InsightsContext {
                 ? `${shortDay.format(customRange.value.start)} – ${shortDay.format(customRange.value.end - 1)}`
                 : 'Custom range'
         }
-        return PERIOD_OPTIONS.find((option) => option.value === period.value)!.label
+        return required(
+            PERIOD_OPTIONS.find((option) => option.value === period.value),
+            `period option ${period.value}`,
+        ).label
     })
     /** "previous 30 days", "previous period" for comparisons. */
     const previousLabel = computed(() =>

@@ -15,6 +15,8 @@
  * Keep skins and palettes in sync with `UI_THEMES` in
  * src/services/branding_service.rs; the theme spec checks this.
  */
+import { itemAt } from './lookup'
+
 export type ThemeGroup = 'classic' | 'playful'
 
 export interface PaletteInfo {
@@ -183,7 +185,7 @@ export function parseThemeValue(raw: unknown, allowCustom = false): ThemeChoice 
     if (palette === null) return { theme: theme.id as ThemeId, palette: null }
     if (!theme.palettes?.some((option) => option.id === palette)) return null
     // The default palette is written without a suffix.
-    return { theme: theme.id as ThemeId, palette: theme.palettes[0]!.id === palette ? null : palette }
+    return { theme: theme.id as ThemeId, palette: itemAt(theme.palettes, 0, 'palette').id === palette ? null : palette }
 }
 
 /** `skin` or `skin:palette`, omitting the default palette. */
@@ -204,6 +206,7 @@ export function themeLabel(choice: ThemeChoice, customName = 'Repository theme')
     const theme = findTheme(choice.theme)
     if (!theme) return choice.theme
     const paletteId = effectivePalette(choice)
-    const palette = theme.palettes?.find((option) => option.id === paletteId)
-    return palette && theme.palettes!.length > 1 ? `${theme.name} · ${palette.name}` : theme.name
+    const palettes = theme.palettes
+    const palette = palettes?.find((option) => option.id === paletteId)
+    return palettes && palette && palettes.length > 1 ? `${theme.name} · ${palette.name}` : theme.name
 }

@@ -289,7 +289,8 @@ const filteredVelocity = computed<SprintVelocityResponse | undefined>(() => {
   }
   const focusSet = new Set(normalizedVelocityFocusIds.value)
   const entries = (payload.entries ?? []).filter(
-    (entry): entry is SprintVelocityEntryPayload => Boolean(entry?.summary) && focusSet.has(entry!.summary.id),
+    (entry: SprintVelocityEntryPayload | null | undefined): entry is SprintVelocityEntryPayload =>
+      !!entry?.summary && focusSet.has(entry.summary.id),
   )
   const averageVelocity = computeAverageVelocity(entries)
   const averageCompletion = computeAverageCompletion(entries)

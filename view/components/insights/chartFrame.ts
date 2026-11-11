@@ -11,8 +11,12 @@ export function niceTicks(max: number, integer = true): number[] {
     const power = 10 ** Math.floor(Math.log10(raw))
     let step = [1, 2, 5, 10].map((m) => m * power).find((candidate) => candidate >= raw) ?? power * 10
     if (integer) step = Math.max(1, Math.round(step))
-    const out: number[] = [0]
-    while (out[out.length - 1]! < max) out.push(out[out.length - 1]! + step)
+    let last = 0
+    const out = [last]
+    while (last < max) {
+        last += step
+        out.push(last)
+    }
     return out
 }
 

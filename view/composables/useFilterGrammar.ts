@@ -1,3 +1,4 @@
+import { itemAt } from '../utils/lookup'
 import { listFromCsv } from './useFilterBuilder'
 /**
  * Search-grammar engine for the unified filter toolbar.
@@ -151,9 +152,9 @@ function unquoteSegment(raw: string): Segment {
     if (quote !== '"' && quote !== "'") return { value: raw, quoted: false, ok: true }
     let value = ''
     for (let i = 1; i < raw.length; i++) {
-        const ch = raw[i]!
-        if (ch === '\\' && i + 1 < raw.length) {
-            const next = raw[i + 1]!
+        const ch = itemAt(raw, i)
+        if (ch === '\\') {
+            const next = raw[i + 1]
             if (next === quote || next === '\\') {
                 value += next
                 i++
@@ -172,7 +173,7 @@ function unquoteSegment(raw: string): Segment {
 function findTopLevel(raw: string, target: string): number {
     let quote: QuoteChar | null = null
     for (let i = 0; i < raw.length; i++) {
-        const ch = raw[i]!
+        const ch = itemAt(raw, i)
         if (quote) {
             if (ch === '\\') {
                 const next = raw[i + 1]
@@ -199,7 +200,7 @@ function splitTopLevel(raw: string, isSep: (ch: string) => boolean): string[] {
     let current = ''
     let quote: QuoteChar | null = null
     for (let i = 0; i < raw.length; i++) {
-        const ch = raw[i]!
+        const ch = itemAt(raw, i)
         if (quote) {
             if (ch === '\\') {
                 const next = raw[i + 1]
@@ -406,20 +407,21 @@ function parseToken(
         const innerWords: string[] = []
         const innerErrors: string[] = []
         parseToken(raw.slice(1), inner, innerWords, innerErrors, Object.create(null) as Record<string, boolean>)
-        const keys = Object.keys(inner)
+        const entries = Object.entries(inner)
         if (innerErrors.length) {
             errors.push(...innerErrors)
             return
         }
-        if (keys.length === 1 && !innerWords.length) {
-            const key = keys[0]!
+        const [only] = entries
+        if (only && entries.length === 1 && !innerWords.length) {
+            const [key, value] = only
             if (UNNEGATABLE_KEYS.has(key)) {
                 errors.push(`"${raw}" cannot be excluded`)
                 return
             }
             const negated = `-${key}`
             const previous = filters[negated]
-            filters[negated] = previous ? `${previous},${inner[key]}` : inner[key]!
+            filters[negated] = previous ? `${previous},${value}` : value
             return
         }
     }
@@ -517,7 +519,7 @@ export function filterFragment(input: string): { prefix: string; fragment: strin
     let start = 0
     let quote: QuoteChar | null = null
     for (let i = 0; i < input.length; i++) {
-        const ch = input[i]!
+        const ch = itemAt(input, i)
         if (quote) {
             if (ch === '\\') {
                 const next = input[i + 1]

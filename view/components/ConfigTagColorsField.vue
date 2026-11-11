@@ -15,7 +15,7 @@
     <ul v-else class="tag-colors__rows">
       <li v-for="(entry, index) in entries" :key="`tag-color-${index}`" class="tag-colors__row">
         <UiInput
-          v-model="entries[index]!.tag"
+          v-model="entry.tag"
           class="tag-colors__name"
           placeholder="Tag"
           :list="listId"

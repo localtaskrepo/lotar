@@ -46,9 +46,7 @@ const paletteCssVars = [
 
 const labels = computed(() => props.series.map((s) => s.key))
 const isStacked = computed(() =>
-  props.series.some(
-    (item) => item.breakdown && Object.keys(item.breakdown).some((key) => (item.breakdown![key] ?? 0) !== 0),
-  ),
+  props.series.some((item) => item.breakdown && Object.values(item.breakdown).some((value) => value !== 0)),
 )
 
 const totals = computed(() =>
@@ -148,7 +146,10 @@ function upsertChart(resize = false) {
   const config = buildDatasets(baseColor, hoverColor)
 
   if (!chart.value) {
-    chart.value = new Chart(canvasEl.value.getContext('2d')!, {
+    // No 2D context (canvas unsupported): leave the chart out.
+    const context = canvasEl.value.getContext('2d')
+    if (!context) return
+    chart.value = new Chart(context, {
       type: 'bar',
       data: {
         labels: labels.value,

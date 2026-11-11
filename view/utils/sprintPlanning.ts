@@ -56,9 +56,6 @@ const DURATION_UNIT_MS: Record<string, number> = {
     weeks: 604_800_000,
 }
 
-/** Plan length units, largest first: weeks, days, hours, minutes. */
-const PLAN_LENGTH_LABELS = ['w', 'd', 'h', 'm']
-
 const ELAPSED_UNITS = [
     { label: 'd', size: 86_400_000 },
     { label: 'h', size: 3_600_000 },
@@ -131,9 +128,17 @@ export function planLengthBetween(start: number, end: number): string {
 
 /** Days and clock time are formatted separately: on a 25-hour day `ms` can exceed 24h. */
 function formatPlanLength(days: number, ms: number): string {
-    const amounts = [Math.floor(days / 7), days % 7, Math.floor(ms / 3_600_000), Math.floor((ms % 3_600_000) / 60_000)]
-    const parts = PLAN_LENGTH_LABELS.map((label, index) => (amounts[index]! > 0 ? `${amounts[index]}${label}` : ''))
-    const text = parts.filter(Boolean).join(' ')
+    // Largest first: weeks, days, hours, minutes.
+    const amounts: Array<[number, string]> = [
+        [Math.floor(days / 7), 'w'],
+        [days % 7, 'd'],
+        [Math.floor(ms / 3_600_000), 'h'],
+        [Math.floor((ms % 3_600_000) / 60_000), 'm'],
+    ]
+    const text = amounts
+        .filter(([amount]) => amount > 0)
+        .map(([amount, label]) => `${amount}${label}`)
+        .join(' ')
     return text || (days > 0 || ms > 0 ? '1m' : '')
 }
 

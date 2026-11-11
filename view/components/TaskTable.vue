@@ -208,12 +208,10 @@
                         data-testid="task-archived"
                         >Archived</span
                       >
-                      <div v-if="touchesMap[t.id]" class="session-touch">
-                        <span class="session-touch__badge" :class="touchesMap[t.id]!.kind">{{
-                          touchBadge(touchesMap[t.id]!)
-                        }}</span>
-                        <span>{{ relativeTime(touchesMap[t.id]!.time) }}</span>
-                        <span v-if="touchesMap[t.id]!.actor">• {{ touchesMap[t.id]!.actor }}</span>
+                      <div v-for="touch in asList(touchesMap[t.id])" :key="touch.kind" class="session-touch">
+                        <span class="session-touch__badge" :class="touch.kind">{{ touchBadge(touch) }}</span>
+                        <span>{{ relativeTime(touch.time) }}</span>
+                        <span v-if="touch.actor">• {{ touch.actor }}</span>
                       </div>
                     </div>
                   </template>
@@ -291,7 +289,7 @@
                     <span v-else class="muted">—</span>
                   </template>
                   <template v-else-if="customFieldKey(col)">
-                    <span>{{ t.custom_fields?.[customFieldKey(col)!] || '—' }}</span>
+                    <span>{{ customFieldText(t, col) }}</span>
                   </template>
                   <template v-else>
                     <span>{{ (t as any)[col] }}</span>
@@ -422,6 +420,8 @@
 import { tagAttrs } from '../composables/useTagColors'
 import AgentActivityIndicator from './AgentActivityIndicator.vue'
 import AttachmentTile from './AttachmentTile.vue'
+import type { TaskDTO } from '../api/types'
+import { asList } from '../utils/lookup'
 import { taskAttachments } from '../utils/taskAttachments'
 import { computed, onMounted, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue'
 import { useTaskTableState, type TaskTableEmit, type TaskTableProps } from '../composables/useTaskTableState'
@@ -474,6 +474,12 @@ const {
 } = useTaskTableState(props, emit)
 
 const rowsKey = computed(() => sorted.value.map((t) => t.id).join('|'))
+
+/** A custom field column's value for one task, or a dash when it is empty. */
+function customFieldText(task: TaskDTO, col: string): unknown {
+  const key = customFieldKey(col)
+  return (key !== null && task.custom_fields?.[key]) || '—'
+}
 
 const {
   draggingCol,

@@ -24,14 +24,14 @@
       </div>
       <div v-for="(entry, index) in entries" :key="`alias-${index}`" class="alias-row">
         <UiInput
-          v-model="entries[index]!.key"
+          v-model="entry.key"
           :placeholder="keyPlaceholder"
           :aria-label="`${title}: branch token ${index + 1}`"
           @blur="onFieldBlur"
         />
         <UiSelect
           v-if="valueOptions.length"
-          v-model="entries[index]!.value"
+          v-model="entry.value"
           :aria-label="`${title}: maps to ${index + 1}`"
           @change="onFieldBlur"
         >
@@ -40,7 +40,7 @@
         </UiSelect>
         <UiInput
           v-else
-          v-model="entries[index]!.value"
+          v-model="entry.value"
           :placeholder="valuePlaceholder"
           :aria-label="`${title}: maps to ${index + 1}`"
           @blur="onFieldBlur"

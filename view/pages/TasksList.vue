@@ -1509,7 +1509,8 @@ function handleTaskEvent(kind: 'task_created' | 'task_updated' | 'task_deleted',
 }
 
 function registerSseHandlers() {
-  if (!sse) return
+  const stream = sse
+  if (!stream) return
   const kinds: Array<'task_created' | 'task_updated' | 'task_deleted'> = [
     'task_created',
     'task_updated',
@@ -1527,7 +1528,7 @@ function registerSseHandlers() {
       }
       handleTaskEvent(kind, payload)
     }
-    sse!.on(kind, handler)
+    stream.on(kind, handler)
     sseUnsubscribers.push(() => {
       if (sse) sse.off(kind, handler)
     })

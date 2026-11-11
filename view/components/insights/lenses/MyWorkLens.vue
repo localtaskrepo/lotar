@@ -48,7 +48,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { TaskDTO } from '../../../api/types'
-import { cycleDays, formatDays, parseDue } from '../../../utils/insightsMetrics'
+import { cycleDays, formatDays, parseDue, type TaskTimeline } from '../../../utils/insightsMetrics'
 import ChartCard from '../ChartCard.vue'
 import { dayFormat, fmt, formatDue, useInsights } from '../insightsContext'
 import StatTile from '../StatTile.vue'
@@ -63,7 +63,11 @@ const myWip = computed(() => wip.value.filter((timeline) => isMine(timeline.task
 const myOverdue = computed(() => overdue.value.filter(isMine))
 const myDueSoon = computed(() => dueSoon.value.filter(isMine))
 const myCompleted = computed(() =>
-  completed.value.filter((timeline) => isMine(timeline.task)).sort((a, b) => (b.doneAt ?? 0) - (a.doneAt ?? 0)),
+  completed.value
+    .filter(
+      (timeline): timeline is TaskTimeline & { doneAt: number } => timeline.doneAt !== null && isMine(timeline.task),
+    )
+    .sort((a, b) => b.doneAt - a.doneAt),
 )
 
 const priorityRank = computed(() => new Map(priorities.value.map((label, index) => [label.toLowerCase(), index])))
@@ -96,7 +100,7 @@ const myCompletedRows = computed<TaskTableRow[]>(() =>
     id: timeline.task.id,
     title: timeline.task.title,
     cells: {
-      done: dayFormat.format(timeline.doneAt!),
+      done: dayFormat.format(timeline.doneAt),
       cycle: formatDays(cycleDays(timeline)),
     },
   })),

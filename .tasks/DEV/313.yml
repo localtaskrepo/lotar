@@ -5,12 +5,13 @@ type: Chore
 reporter: claude
 assignee: claude
 created: 2026-11-10T21:58:17.873069+00:00
-modified: 2026-11-11T02:02:48.011528+00:00
+modified: 2026-11-11T05:03:11.331923+00:00
 relationships:
   related:
   - DEV-123
   - DEV-302
   - DEV-250
+  - DEV-314
 comments:
 - date: 2026-11-10T22:04:01.503541+00:00
   text: 'Step 1 (Rust): unwrap_used in [lints.clippy]; clippy.toml = standard (allow unwrap/expect/dbg in tests) + large-error-threshold 200 (the other 7 old settings were defaults or tuned lints that are off). The 27 src unwraps are fixed by restructuring (if-let guards, let-else, a checked active_task/edited_task helper in relationships.rs, ? with the existing ''Invalid relationship task'' error), expect only where impossible (JSON of strings, constant fallback regexes, non-empty line rest). Integration test crate roots (tests/integration.rs, tests/performance_test.rs) allow unwrap in helpers: 644 findings, one line each since DEV-302 made tests one binary. Pre-push clippy uses --message-format=short. Toolchain pin 1.98.1 kept (same 27 findings on 1.99). Gates: lint:agent, test:agent (1972 Rust, 1431 UI, release, hooks), test:smoke:agent 372, cargo deny pass; one agent_automation git_required test failed once under load and passed 3/3 alone and in the full rerun.'
@@ -65,3 +66,9 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-11T05:03:11.331923+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-123","DEV-302","DEV-250"]}'
+    new: '{"related":["DEV-123","DEV-302","DEV-250","DEV-314"]}'

@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import type { TagProperties } from '../api/types'
+import { itemAt } from './lookup'
 import { AUTO_TAG_COLORS_KEY, onPreferencesChanged, readAutoTagColorsPreference } from './preferences'
 
 /**
@@ -8,7 +9,7 @@ import { AUTO_TAG_COLORS_KEY, onPreferencesChanged, readAutoTagColorsPreference 
  * the server merges global and project entries per tag. Values are `#rgb`,
  * `#rrggbb` or one of these names; anything else shows the tag uncoloured.
  */
-export const TAG_COLOR_NAMES: Readonly<Record<string, string>> = {
+const NAMED_TAG_COLORS = {
     red: '#ef4444',
     orange: '#f97316',
     amber: '#f59e0b',
@@ -27,7 +28,9 @@ export const TAG_COLOR_NAMES: Readonly<Record<string, string>> = {
     brown: '#a16207',
     gray: '#6b7280',
     grey: '#6b7280',
-}
+} as const
+
+export const TAG_COLOR_NAMES: Readonly<Record<string, string>> = NAMED_TAG_COLORS
 
 /** A CSS colour for a configured value, or null when it is not understood. */
 export function resolveTagColor(value: unknown): string | null {
@@ -43,7 +46,7 @@ export function resolveTagColor(value: unknown): string | null {
  * left out (they read as "no colour"), as are near twins such as indigo,
  * purple and cyan.
  */
-const AUTO_TAG_COLORS = [
+const AUTO_TAG_COLORS: ReadonlyArray<keyof typeof NAMED_TAG_COLORS> = [
     'sky',
     'rose',
     'teal',
@@ -55,7 +58,7 @@ const AUTO_TAG_COLORS = [
     'pink',
     'lime',
     'red',
-] as const
+]
 
 /**
  * A stable colour for `tag` from its name (FNV-1a over the lower-cased name),
@@ -67,8 +70,7 @@ export function autoTagColor(tag: string): string {
         hash ^= char.codePointAt(0) ?? 0
         hash = Math.imul(hash, 0x01000193) >>> 0
     }
-    const name = AUTO_TAG_COLORS[hash % AUTO_TAG_COLORS.length]!
-    return TAG_COLOR_NAMES[name]!
+    return NAMED_TAG_COLORS[itemAt(AUTO_TAG_COLORS, hash % AUTO_TAG_COLORS.length)]
 }
 
 /** Whether tags without a configured colour get one (Preferences). */

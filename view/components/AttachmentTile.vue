@@ -49,6 +49,7 @@
 </template>
 
 <script setup lang="ts">
+import { itemAt } from '../utils/lookup'
 import { computed, ref, watch } from 'vue'
 import IconGlyph from './IconGlyph.vue'
 import {
@@ -140,7 +141,7 @@ function hasTransparentEdges(img: HTMLImageElement): boolean {
       for (let x = 0; x < side; x += 1) {
         if (x !== 0 && y !== 0 && x !== side - 1 && y !== side - 1) continue
         edge += 1
-        if (data[(y * side + x) * 4 + 3]! < 200) clear += 1
+        if (itemAt(data, (y * side + x) * 4 + 3, 'alpha value') < 200) clear += 1
       }
     }
     return clear / edge > 0.25

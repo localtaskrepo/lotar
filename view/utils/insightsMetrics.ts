@@ -4,6 +4,7 @@
  * policy so every number is reproducible in tests.
  */
 import type { TaskDTO } from '../api/types'
+import { itemAt } from './lookup'
 import { parseEffort } from './taskSort'
 
 export const DAY_MS = 86_400_000
@@ -174,12 +175,13 @@ export function buildTimeline(
 
     const created = parseTime(task.created)
     const { changes, entries } = readHistory(task)
-    const initialKey = changes.length ? statusKey(changes[0]!.old) || initialStatus : initialStatus
+    const first = changes[0]
+    const initialKey = first ? statusKey(first.old) || initialStatus : initialStatus
     const isDoneKey = (key: string) => doneKeys.has(key)
     const isActiveKey = (key: string) => !!key && key !== initialKey && !isDoneKey(key)
 
     let startedAt: number | null = null
-    let inDone = changes.length ? isDoneKey(statusKey(changes[0]!.old)) : isDone
+    let inDone = first ? isDoneKey(statusKey(first.old)) : isDone
     let doneCandidate: number | null = inDone ? created : null
     const reopenedAt: number[] = []
     for (const change of changes) {
@@ -197,7 +199,8 @@ export function buildTimeline(
     if (startedAt === null && !changes.length && initialKey !== null && isActiveKey(statusKey(task.status))) {
         startedAt = created
     }
-    const doneAt = isDone ? (doneCandidate ?? (changes.length ? changes[changes.length - 1]!.at : created)) : null
+    const last = changes[changes.length - 1]
+    const doneAt = isDone ? (doneCandidate ?? (last ? last.at : created)) : null
     const currentKey = statusKey(task.status)
     const timeline: TaskTimeline = {
         task,
@@ -240,7 +243,8 @@ export function percentile(values: readonly number[], p: number): number | null 
     const rank = (Math.min(100, Math.max(0, p)) / 100) * (sorted.length - 1)
     const low = Math.floor(rank)
     const high = Math.ceil(rank)
-    return sorted[low]! + (sorted[high]! - sorted[low]!) * (rank - low)
+    const lowValue = itemAt(sorted, low)
+    return lowValue + (itemAt(sorted, high) - lowValue) * (rank - low)
 }
 
 /** Minimum samples before a percentile is shown or used for flagging. */
@@ -408,27 +412,28 @@ export function timeInStatus(
     const totals = new Map<string, { label: string; ms: number; tasks: Set<string> }>()
     let completedCount = 0
     for (const timeline of timelines) {
-        if (!inRange(timeline.doneAt, range) || timeline.created === null) continue
+        const { changes, created, doneAt } = timeline
+        if (doneAt === null || created === null || !inRange(doneAt, range)) continue
         completedCount += 1
         const doneKeys = new Set(completion.doneLabels(timeline.task).map(statusKey))
-        const { changes } = timeline
-        let status = changes.length ? changes[0]!.old : timeline.task.status
-        let cursor = timeline.created
+        const first = changes[0]
+        let status = first ? first.old : timeline.task.status
+        let cursor = created
         const add = (name: string | null, until: number) => {
             const key = statusKey(name)
-            if (!key || doneKeys.has(key) || until <= cursor) return
-            const entry = totals.get(key) ?? { label: name!, ms: 0, tasks: new Set<string>() }
+            if (name === null || !key || doneKeys.has(key) || until <= cursor) return
+            const entry = totals.get(key) ?? { label: name, ms: 0, tasks: new Set<string>() }
             entry.ms += until - cursor
             entry.tasks.add(timeline.task.id)
             totals.set(key, entry)
         }
         for (const change of changes) {
-            if (change.at > timeline.doneAt!) break
+            if (change.at > doneAt) break
             add(status, change.at)
             status = change.next
             cursor = change.at
         }
-        add(status, timeline.doneAt!)
+        add(status, doneAt)
     }
     return [...totals.values()]
         .map(({ label, ms, tasks }) => ({

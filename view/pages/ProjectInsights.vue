@@ -93,8 +93,8 @@
         @click="setLens(lens.key)"
         @keydown.right.prevent="stepLens(1)"
         @keydown.left.prevent="stepLens(-1)"
-        @keydown.home.prevent="focusLens(LENSES[0]!.key)"
-        @keydown.end.prevent="focusLens(LENSES[LENSES.length - 1]!.key)"
+        @keydown.home.prevent="focusEdgeLens('first')"
+        @keydown.end.prevent="focusEdgeLens('last')"
       >
         {{ lens.label }}
       </button>
@@ -125,6 +125,7 @@
 </template>
 
 <script setup lang="ts">
+import { itemAt, required } from '../utils/lookup'
 import { useProjectNames } from '../composables/useProjectNames'
 import { computed, onMounted, onUnmounted, ref, shallowRef, watch, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -231,11 +232,14 @@ const {
 
 // One live task query (shared store, all pages, kept current over SSE).
 const query = shallowRef<TaskQueryHandle | null>(null)
-function adoptQuery(handle: TaskQueryHandle) {
-  if (query.value?.key === handle.key) return
-  query.value?.release()
+/** Switch to `handle` unless a query with its key is already active; returns the active query. */
+function adoptQuery(handle: TaskQueryHandle): TaskQueryHandle {
+  const current = query.value
+  if (current?.key === handle.key) return current
+  current?.release()
   handle.retain()
   query.value = handle
+  return handle
 }
 const tasks = computed<TaskDTO[]>(() => (query.value?.tasks.value ?? []).filter((task) => !task.deleted_at))
 const loadingTasks = computed(() => query.value?.status.value === 'loading')
@@ -252,8 +256,7 @@ let disposed = false
 async function refreshTasks() {
   if (disposed) return
   const { serverFilter } = buildServerFilter(filter.value, project.value)
-  adoptQuery(store.getQuery(serverFilter))
-  await query.value!.refresh()
+  await adoptQuery(store.getQuery(serverFilter)).refresh()
 }
 
 let filterDebounce: ReturnType<typeof setTimeout> | null = null
@@ -290,7 +293,12 @@ const activeLens = ref<LensKey>(readLens())
 const period = ref<PeriodChoice>(readPeriod())
 const customFrom = ref(readDay('from'))
 const customTo = ref(readDay('to'))
-const activeLensInfo = computed(() => LENSES.find((lens) => lens.key === activeLens.value)!)
+const activeLensInfo = computed(() =>
+  required(
+    LENSES.find((lens) => lens.key === activeLens.value),
+    `insights lens ${activeLens.value}`,
+  ),
+)
 
 /** Only ever rewrite the URL while this page is the one being shown (DEV-187). */
 function writeViewQuery() {
@@ -317,9 +325,12 @@ function focusLens(key: LensKey) {
   setLens(key)
   document.getElementById(`insights-tab-${key}`)?.focus()
 }
+function focusEdgeLens(edge: 'first' | 'last') {
+  focusLens(itemAt(LENSES, edge === 'first' ? 0 : LENSES.length - 1, 'insights lens').key)
+}
 function stepLens(direction: number) {
   const index = LENSES.findIndex((lens) => lens.key === activeLens.value)
-  focusLens(LENSES[(index + direction + LENSES.length) % LENSES.length]!.key)
+  focusLens(itemAt(LENSES, (index + direction + LENSES.length) % LENSES.length, 'insights lens').key)
 }
 function setPeriod(value: string) {
   if (!isPeriodChoice(value)) return

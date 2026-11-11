@@ -73,8 +73,8 @@
             class="appearance-image__preview"
             :class="{ 'appearance-image__preview--dark': slot.image === 'logo-dark' }"
           >
-            <img v-if="previewFor(slot)" :src="previewFor(slot)!" :alt="`${slot.label} preview`" />
-            <span v-else class="muted">{{ slot.models.value ? 'Save to preview' : 'None' }}</span>
+            <img v-for="src in asList(previewFor(slot))" :key="src" :src="src" :alt="`${slot.label} preview`" />
+            <span v-if="!previewFor(slot)" class="muted">{{ slot.models.value ? 'Save to preview' : 'None' }}</span>
           </span>
           <UiInput
             :id="`config-ui-${slot.image}`"
@@ -104,6 +104,7 @@
 </template>
 
 <script setup lang="ts">
+import { asList } from '../utils/lookup'
 import { computed, onUnmounted, reactive, ref, watch, type Ref } from 'vue'
 import { api } from '../api/client'
 import { useBranding } from '../composables/useBranding'

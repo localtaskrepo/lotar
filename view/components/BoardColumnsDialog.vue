@@ -323,14 +323,16 @@ function moveColumn(index: number, delta: number) {
   if (target < 0 || target >= draft.value.length) return
   const next = [...draft.value]
   const [column] = next.splice(index, 1)
-  next.splice(target, 0, column!)
+  if (column === undefined) throw new Error(`No board column at index ${index}`)
+  next.splice(target, 0, column)
   draft.value = next
 }
 
 /** Remove a status from its column; returns the index that column had. */
 function detach(key: string): number {
   const index = draft.value.findIndex((column) => column.statuses.includes(key))
-  if (index >= 0) draft.value[index]!.statuses = draft.value[index]!.statuses.filter((entry) => entry !== key)
+  const column = draft.value[index]
+  if (column) column.statuses = column.statuses.filter((entry) => entry !== key)
   return index
 }
 

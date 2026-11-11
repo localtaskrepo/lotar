@@ -92,15 +92,11 @@
             <div class="ticket-group-card__identity">
               <div class="ticket-group-card__title-row">
                 <button class="chip" type="button" @click="openTask(group.ticketId)">{{ group.ticketId }}</button>
-                <span v-if="ticketInfo[group.ticketId]?.title" class="ticket-title">{{
-                  ticketInfo[group.ticketId]!.title
-                }}</span>
+                <span v-if="group.ticket?.title" class="ticket-title">{{ group.ticket.title }}</span>
               </div>
               <div class="ticket-meta">
-                <span v-if="ticketInfo[group.ticketId]" class="ticket-status">{{
-                  ticketInfo[group.ticketId]!.status
-                }}</span>
-                <span v-if="ticketInfo[group.ticketId]?.assignee">{{ ticketInfo[group.ticketId]!.assignee }}</span>
+                <span v-if="group.ticket" class="ticket-status">{{ group.ticket.status }}</span>
+                <span v-if="group.ticket?.assignee">{{ group.ticket.assignee }}</span>
                 <span>{{ group.jobs.length }} {{ group.jobs.length === 1 ? 'job' : 'jobs' }}</span>
                 <span v-if="group.cost !== null" class="ticket-cost" title="Total cost of these jobs">{{
                   formatCost(group.cost)
@@ -333,6 +329,7 @@ const groupedJobs = computed(() => {
       const jobs = [...ticketJobs].sort((a, b) => a.created_at.localeCompare(b.created_at))
       return {
         ticketId,
+        ticket: ticketInfo.value[ticketId],
         latest,
         jobs,
         cost: ticketJobs.some((job) => job.usage?.cost_usd !== undefined)
@@ -610,7 +607,8 @@ function updateLogEntries(id: string, entries: AgentJobLogEntry[]) {
   const ordered = [...retained.values()].sort((a, b) => a.sequence - b.sequence)
   const evicted = ordered.splice(0, Math.max(0, ordered.length - LOG_BUFFER_LIMIT))
   for (const entry of evicted) retained.delete(entry.sequence)
-  if (evicted.length) logEvictionFloors.set(id, evicted[evicted.length - 1]!.sequence)
+  const newestEvicted = evicted[evicted.length - 1]
+  if (newestEvicted) logEvictionFloors.set(id, newestEvicted.sequence)
   logEvents.set(id, retained)
   logsByJob.value = {
     ...logsByJob.value,

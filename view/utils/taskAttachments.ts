@@ -327,7 +327,8 @@ export function firstPreviewImage(task: Parameters<typeof taskAttachments>[0]): 
 }
 
 /** Preview widths the server renders (see `?w=` on attachment URLs). */
-const THUMBNAIL_WIDTHS = [96, 240, 480, 960, 1600]
+const LARGEST_THUMBNAIL_WIDTH = 1600
+const THUMBNAIL_WIDTHS = [96, 240, 480, 960, LARGEST_THUMBNAIL_WIDTH]
 
 /**
  * URL of a server-made preview at least `cssWidth` CSS pixels wide on this
@@ -338,8 +339,7 @@ export function attachmentPreviewUrl(url: string, cssWidth: number): string {
     const ratio =
         typeof window !== 'undefined' && window.devicePixelRatio > 1 ? Math.min(window.devicePixelRatio, 2) : 1
     const wanted = Math.ceil(cssWidth * ratio)
-    const width =
-        THUMBNAIL_WIDTHS.find((candidate) => candidate >= wanted) ?? THUMBNAIL_WIDTHS[THUMBNAIL_WIDTHS.length - 1]!
+    const width = THUMBNAIL_WIDTHS.find((candidate) => candidate >= wanted) ?? LARGEST_THUMBNAIL_WIDTH
     if (!url.includes('/api/attachments/h/')) return url
     return `${url}${url.includes('?') ? '&' : '?'}w=${width}`
 }
@@ -357,8 +357,13 @@ export function needsConvertedPreview(view: Pick<TaskAttachmentView, 'path'>): b
  */
 export function reorderSubset(all: string[], subsetInNewOrder: string[]): string[] {
     const members = new Set(subsetInNewOrder)
-    const next = [...subsetInNewOrder]
-    return all.map((path) => (members.has(path) ? next.shift()! : path))
+    const order = subsetInNewOrder.values()
+    return all.map((path) => {
+        if (!members.has(path)) return path
+        const next = order.next()
+        if (next.done) throw new Error(`The reordered attachments have fewer entries than the list (at ${path})`)
+        return next.value
+    })
 }
 
 /** Move one entry of `list` to `index` (clamped). */

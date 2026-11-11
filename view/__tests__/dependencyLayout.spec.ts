@@ -32,7 +32,7 @@ describe('dependency ranks', () => {
         const result = dependencyLayout(nodes('a', 'b', 'c'), edges)
         const c = result.nodes.find((node) => node.id === 'c')!
         for (const routed of result.edges.filter((edge) => edge.target !== 'c')) {
-            expect(Math.max(routed.controls[2]!, routed.controls[4]!)).toBeLessThan(c.x - 16)
+            expect(Math.max(routed.controls[2], routed.controls[4])).toBeLessThan(c.x - 16)
         }
         expect(result.width).toBe(c.x + 300 + 16)
     })

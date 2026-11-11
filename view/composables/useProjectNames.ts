@@ -1,12 +1,16 @@
 import { computed, effectScope } from 'vue'
 import { formatProjectLabel } from '../utils/projectLabels'
+import { required } from '../utils/lookup'
 import { useProjects } from './useProjects'
 
 let shared: ReturnType<typeof useProjects> | null = null
 
 function sharedProjects() {
     if (!shared) {
-        shared = effectScope(true).run(() => useProjects())!
+        shared = required(
+            effectScope(true).run(() => useProjects()),
+            'project list (its effect scope was inactive)',
+        )
     }
     if (shared.status.value === 'idle') void shared.refresh().catch(() => {})
     return shared

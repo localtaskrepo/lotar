@@ -1,5 +1,6 @@
 import type { TaskDTO } from '../api/types'
 import type { ColKey } from '../composables/useColumns'
+import { itemAt, required } from './lookup'
 import { projectOf } from './text'
 
 /**
@@ -226,14 +227,15 @@ export function parseEffort(input: string | null | undefined): EffortParsed | nu
     if (!s) return null
     const parts = s.split(/\s+/)
     if (parts.length === 1) {
-        const parsed = parseEffortToken(parts[0]!)
+        const parsed = parseEffortToken(itemAt(parts, 0))
         return parsed ? finishEffort(parsed.kind, parsed.value) : null
     }
     let totalHours = 0
     let totalPoints = 0
     let i = 0
     while (i < parts.length) {
-        const tok = parts[i]!.trim()
+        const tok = itemAt(parts, i).trim()
+        const following = parts[i + 1]
         if (!tok) {
             i += 1
             continue
@@ -246,8 +248,8 @@ export function parseEffort(input: string | null | undefined): EffortParsed | nu
                 continue
             }
             const bare = tryNumber(tok)
-            if (bare !== null && i + 1 < parts.length) {
-                const unit = parts[i + 1]!.trim().toLowerCase()
+            if (bare !== null && following !== undefined) {
+                const unit = following.trim().toLowerCase()
                 const factor = timeWordUnitFactor(unit)
                 if (factor !== null) {
                     if (parsed.value < 0) return null
@@ -267,8 +269,8 @@ export function parseEffort(input: string | null | undefined): EffortParsed | nu
             continue
         }
         const n = tryNumber(tok)
-        if (n !== null && i + 1 < parts.length) {
-            const unit = parts[i + 1]!.trim().toLowerCase()
+        if (n !== null && following !== undefined) {
+            const unit = following.trim().toLowerCase()
             const factor = timeWordUnitFactor(unit)
             if (factor !== null) {
                 if (n < 0) return null
@@ -329,10 +331,13 @@ export function compareTaskIds(a: string, b: string): number {
 
 /** Code-point order, like Rust's `str::cmp` (UTF-16 order differs above U+FFFF). */
 function cmpCodePoints(a: string, b: string): number {
-    const left = Array.from(a, (char) => char.codePointAt(0)!)
-    const right = Array.from(b, (char) => char.codePointAt(0)!)
-    for (let index = 0; index < Math.min(left.length, right.length); index++) {
-        if (left[index] !== right[index]) return left[index]! - right[index]!
+    const codePoint = (char: string) => required(char.codePointAt(0), 'code point')
+    const left = Array.from(a, codePoint)
+    const right = Array.from(b, codePoint)
+    for (const [index, code] of left.entries()) {
+        const other = right[index]
+        if (other === undefined) break
+        if (code !== other) return code - other
     }
     return left.length - right.length
 }
@@ -517,9 +522,8 @@ function cmpCustomField(
 
 /** Rust `Vec<T>` Ord parity: element-wise, then shorter-prefix first. */
 function cmpVec<T>(a: readonly T[], b: readonly T[], cmp: (x: T, y: T) => number): number {
-    const len = Math.min(a.length, b.length)
-    for (let i = 0; i < len; i += 1) {
-        const ordering = cmp(a[i]!, b[i]!)
+    for (const [i, x] of a.slice(0, b.length).entries()) {
+        const ordering = cmp(x, itemAt(b, i))
         if (ordering !== 0) return ordering
     }
     return a.length - b.length
