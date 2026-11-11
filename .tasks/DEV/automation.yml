@@ -17,7 +17,8 @@ automation:
             model: "${{ticket.field:model}}"
             provider: "${{ticket.field:provider}}"
             prompt: |
-              Fix the repo problem in ticket ${{ticket.id}} ("${{ticket.title}}").
+              Fix the repo problem in ticket ${{ticket.id}} ("${{ticket.title}}"). Run lotar with
+              LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex), so comments show who wrote them.
               1. Read the ticket: what was found, how to check it, what done looks like. Run its check command. If the
                  problem is gone already, say so in a comment and stop.
               2. Fix it the way this repo's AGENTS.md says: the smallest change, with the tests and checks it names.

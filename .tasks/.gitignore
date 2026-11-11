@@ -3,3 +3,4 @@
 .*.lock
 .txn-pending.json
 .*.tmp-*
+*.context
