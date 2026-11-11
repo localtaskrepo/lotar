@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: claude
 created: 2026-11-10T08:30:58.984955+00:00
-modified: 2026-11-10T08:38:26.730116+00:00
+modified: 2026-11-10T09:12:19.195997+00:00
 relationships:
   related:
   - DEV-311
@@ -20,6 +20,8 @@ comments:
     Evidence: tests/dev312_existing_project_before_detection_test.rs (foundera layout with default FND; FND with only tickets and no/empty/no-default config; service create) failed before, pass now; the gairola layout stays covered by dev311. npm run lint:agent, test:agent (1972 Rust + 1431 UI), test:smoke:agent (372) pass.
     Remaining: uncommitted. Users on 0.12.1 need a release to get DEV-311 + DEV-312; until then pass --project.
     Guidance: no durable finding.
+- date: 2026-11-10T09:12:19.195997+00:00
+  text: 'Committed as 8d4e379, released in v0.12.2 (tag on 04e5af3, release workflow green: binaries, deb/rpm, npm, Docker, Homebrew, Scoop). Homebrew lotar 0.12.2 on this Mac picks FND in ~/Development/foundera.'
 description: |-
   Reported by the pyxzl.net session (~/Development/local), lotar 0.12.1: in ~/Development/foundera (default.project FND, package.json name foundera, infra/package.json @foundera/infra) lotar add created FOUN; same earlier in ~/Development/gairola (G vs GAIR).
 
@@ -51,3 +53,7 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-10T09:12:19.195997+00:00
+  actor: claude
+  changes:
+  - field: comment_added

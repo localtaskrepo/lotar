@@ -5,7 +5,10 @@ type: Chore
 reporter: mallox
 assignee: mallox
 created: 2026-10-19T20:21:43.664545+00:00
-modified: 2026-10-22T01:30:29.513699+00:00
+modified: 2026-11-10T21:58:18.013143+00:00
+relationships:
+  related:
+  - DEV-313
 comments:
 - date: 2026-10-20T00:36:56.495585+00:00
   text: Current user-approved build/devNodecontract is^24.15.0||>=26.0.0, notoldunqualified>=24. Preserveactualsupportedenginesattimeofmigration; noalphaTS/Vueorunused7dependencywitholdchecker. Floorstrictinstall/typecheck/buildpassedbutfullUIhosttimingsnotyetclean(121),so no blanketNativeNodefloor/runtimepassclaim. RustreleasebinarydoesnotrequireNode.
@@ -29,3 +32,9 @@ history:
     new: Blocked
   - field: assignee
     new: mallox
+- at: 2026-11-10T21:58:18.013143+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-313"]}'

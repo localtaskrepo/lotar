@@ -5,11 +5,12 @@ type: Chore
 reporter: mallox
 assignee: mallox
 created: 2026-10-30T01:02:52.755541+00:00
-modified: 2026-10-31T02:12:28.720437+00:00
+modified: 2026-11-11T02:02:47.908994+00:00
 relationships:
   related:
   - DEV-251
   - DEV-252
+  - DEV-313
 comments:
 - date: 2026-10-30T01:06:55.820854+00:00
   text: "This may also be an opportunity to merge the scoop and homebrew repos into one, if possible, along with other repos that may be added. \nThere may even be a case for merging them back into the main repo if that provides any benefits."
@@ -143,3 +144,9 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-11T02:02:47.908994+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-251","DEV-252"]}'
+    new: '{"related":["DEV-251","DEV-252","DEV-313"]}'
