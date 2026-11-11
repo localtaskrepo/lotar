@@ -15,7 +15,8 @@ const CONFIGS = [
     '.prettierrc.json',
     '.prettierignore',
     'eslint.config.mjs',
-    'eslint-suppressions.json',
+    '.oxlintrc.json',
+    'oxlintrc.standard.json',
     '.gitleaks.toml',
 ];
 
@@ -115,7 +116,7 @@ test('pre-commit rejects unformatted Rust and TypeScript without fixing them', (
     assert.deepEqual(snapshot(dir), before);
 });
 
-test('pre-commit reports ESLint findings and leaves partially staged files alone', (t) => {
+test('pre-commit reports oxlint findings and leaves partially staged files alone', (t) => {
     const dir = fixtureRepo();
     t.after(() => rmSync(dir, { recursive: true, force: true }));
     writeFileSync(path.join(dir, 'view/ok.ts'), "const unused = 1\nexport const value = 'ok'\n");

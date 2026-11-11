@@ -34,6 +34,7 @@ if (typeof window !== 'undefined') {
 
 const router = createRouter({
     history: createWebHistory(),
+    // oxlint-disable-next-line typescript/no-deprecated -- vue-router 5 replaces it with the experimental useScrollRestoration(); keep the stable option until that API is stable.
     scrollBehavior,
     routes: [
         { path: '/', component: TasksList },

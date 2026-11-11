@@ -24,7 +24,7 @@ describe.skipIf(!gitAvailable())('Git hooks smoke scenarios', () => {
             expect(first.stdout).toContain("Configured git core.hooksPath to '.githooks'");
 
             const config = await workspace.runGit(['config', '--local', '--get', 'core.hooksPath']);
-            const hooksPath = (config.stdout ?? '').trim();
+            const hooksPath = config.stdout.trim();
             expect(hooksPath).toBe('.githooks');
 
             const second = await workspace.runLotar(['git', 'hooks', 'install']);

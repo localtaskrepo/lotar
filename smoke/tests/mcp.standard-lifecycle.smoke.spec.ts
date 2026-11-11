@@ -476,7 +476,7 @@ describe.concurrent('MCP 2025-06-18 standard stdio lifecycle', () => {
                 expect(created.error).toBeUndefined();
 
                 const createdPayload = extractToolPayload(created) as Record<string, any>;
-                const taskId = createdPayload?.task?.id ?? createdPayload?.id;
+                const taskId = createdPayload.task?.id ?? createdPayload.id;
                 expect(typeof taskId).toBe('string');
 
                 const getId = nextMcpRequestId('get');
@@ -490,7 +490,7 @@ describe.concurrent('MCP 2025-06-18 standard stdio lifecycle', () => {
                 expect(fetched.error).toBeUndefined();
 
                 const fetchedPayload = extractToolPayload(fetched) as Record<string, any>;
-                const fetchedTask = fetchedPayload?.task ?? fetchedPayload;
+                const fetchedTask = fetchedPayload.task ?? fetchedPayload;
                 expect(fetchedTask?.title).toBe(title);
 
                 const yaml = await workspace.readTaskYaml(taskId);

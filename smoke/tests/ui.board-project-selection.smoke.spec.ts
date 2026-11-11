@@ -17,9 +17,7 @@ it('selects a Board project directly from the empty state on mobile and desktop'
                 expect(await selector.inputValue()).toBe('');
                 expect(
                     await selector.evaluate((element) =>
-                        Array.from((element as HTMLSelectElement).labels ?? []).map((label) =>
-                            label.textContent?.trim(),
-                        ),
+                        Array.from((element as HTMLSelectElement).labels).map((label) => label.textContent.trim()),
                     ),
                 ).toEqual(['Project']);
                 expect(

@@ -105,7 +105,7 @@ function suggestionLabels(page: Page): Promise<string[]> {
     return page.evaluate(() =>
         Array.from(document.querySelectorAll('[role="option"]')).map((option) => {
             const label = option.querySelector('.filter-bar__suggestion-label');
-            return (label?.textContent ?? option.textContent ?? '').trim();
+            return (label?.textContent ?? option.textContent).trim();
         }),
     );
 }
@@ -119,7 +119,7 @@ async function pickWithKeyboard(page: Page, search: Locator, name: string): Prom
         () =>
             document
                 .querySelector('[role="option"][aria-selected="true"] .filter-bar__suggestion-label')
-                ?.textContent?.trim() ?? null,
+                ?.textContent.trim() ?? null,
     );
     if (highlighted !== name) throw new Error(`Expected highlight "${name}", got "${highlighted}"`);
     await search.press('Enter');

@@ -8,7 +8,7 @@ function sharedProjects() {
     if (!shared) {
         shared = effectScope(true).run(() => useProjects())!
     }
-    if (shared.status?.value === 'idle') void shared.refresh?.()?.catch(() => {})
+    if (shared.status.value === 'idle') void shared.refresh().catch(() => {})
     return shared
 }
 
@@ -20,15 +20,13 @@ function sharedProjects() {
 export function useProjectNames() {
     const projects = sharedProjects()
 
-    const byPrefix = computed(
-        () => new Map((projects.projects?.value ?? []).map((project) => [project.prefix, project])),
-    )
+    const byPrefix = computed(() => new Map(projects.projects.value.map((project) => [project.prefix, project])))
 
     /** The project's name, or its prefix when it has none (or is unknown). */
     function projectName(prefix: string | null | undefined): string {
         const key = (prefix ?? '').trim()
         if (!key) return ''
-        return byPrefix.value.get(key)?.name?.trim() || key
+        return byPrefix.value.get(key)?.name.trim() || key
     }
 
     /** "Name (PREFIX)", for places where both help. */

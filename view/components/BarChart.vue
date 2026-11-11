@@ -152,7 +152,7 @@ function upsertChart(resize = false) {
       type: 'bar',
       data: {
         labels: labels.value,
-        datasets: config.datasets as any,
+        datasets: config.datasets,
       },
       options: {
         responsive: false,
@@ -198,7 +198,7 @@ function upsertChart(resize = false) {
       chart.value.resize()
     }
     chart.value.data.labels = [...labels.value]
-    chart.value.data.datasets = config.datasets as any
+    chart.value.data.datasets = config.datasets
     if (chart.value.options?.scales?.x) {
       chart.value.options.scales.x.stacked = isStacked.value
     }

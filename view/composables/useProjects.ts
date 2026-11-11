@@ -40,7 +40,7 @@ export function createUseProjects(client: ApiClient) {
 
             const collected: ProjectDTO[] = []
             let currentOffset = 0
-            let expectedTotal = 0
+            let expectedTotal: number
             let pages = 0
 
             while (pages < maxPages) {
@@ -48,12 +48,12 @@ export function createUseProjects(client: ApiClient) {
                 const response = await client.listProjects({ limit: pageSize, offset: currentOffset })
 
                 if (pages === 1) {
-                    total.value = response.total ?? 0
-                    limit.value = response.limit ?? pageSize
-                    offset.value = response.offset ?? 0
+                    total.value = response.total
+                    limit.value = response.limit
+                    offset.value = response.offset
                 }
 
-                expectedTotal = response.total ?? expectedTotal
+                expectedTotal = response.total
                 const batch = Array.isArray(response.projects) ? response.projects : []
                 if (batch.length === 0) {
                     break

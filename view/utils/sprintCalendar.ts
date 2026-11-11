@@ -137,7 +137,7 @@ export function buildSprintSchedule(
                 beforeActualStart: actualStartEpoch !== null && cursorEpoch < actualStartEpoch,
                 afterActualEnd: actualEndEpoch !== null && cursorEpoch > actualEndEpoch,
             }
-            ;(schedule[key] ||= []).push(entry)
+            ;(schedule[key] ??= []).push(entry)
         }
     }
 

@@ -25,10 +25,10 @@ interface ListPayload {
 async function expectBackendSupportsSortBy(serverUrl: string, fixtureIds: string[]): Promise<void> {
     const response = await fetch(`${serverUrl}/api/tasks/list?sort_by=modified&order=desc&limit=1`);
     const payload = response.ok ? ((await response.json()) as ListPayload) : undefined;
-    const served = payload?.data?.tasks?.[0]?.id;
+    const served = payload?.data.tasks[0]?.id;
     expect(
-        response.ok && payload?.data?.total === fixtureIds.length && fixtureIds.includes(served ?? ''),
-        `backend must serve the seeded fixtures through a sort_by query (status=${response.status}, total=${payload?.data?.total ?? 'n/a'}, first=${served ?? 'n/a'})`,
+        response.ok && payload?.data.total === fixtureIds.length && fixtureIds.includes(served ?? ''),
+        `backend must serve the seeded fixtures through a sort_by query (status=${response.status}, total=${payload?.data.total ?? 'n/a'}, first=${served ?? 'n/a'})`,
     ).toBe(true);
 }
 

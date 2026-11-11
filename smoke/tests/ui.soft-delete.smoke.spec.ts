@@ -87,7 +87,7 @@ describe.concurrent('DEV-92 soft deletion (actual backend/browser)', () => {
             expect(deleted.deleted_at).toEqual(expect.any(String));
             expect(deleted.modified).toBe(before.modified);
             const listed = await workspace.runLotar(['--format', 'json', 'list', '--project=LIFE', '--deleted']);
-            const deletedRows = JSON.parse(String(listed.stdout)).tasks as TaskSnapshot[];
+            const deletedRows = JSON.parse(listed.stdout).tasks as TaskSnapshot[];
             expect(deletedRows.map((entry) => entry.id)).toEqual([task.id]);
             expect(deletedRows[0]!.deleted_at).toBe(deleted.deleted_at);
             expect(deletedRows[0]!.modified).toBe(before.modified);

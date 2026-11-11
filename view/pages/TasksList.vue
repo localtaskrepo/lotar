@@ -599,7 +599,7 @@ function sortStorageKey(project: string) {
 }
 
 function readSavedSort(project: string): { sort_by: string; order: 'asc' | 'desc' } {
-  const stored = storageGetJson<{ sort_by?: unknown; order?: unknown }>(sortStorageKey(project))
+  const stored = storageGetJson(sortStorageKey(project)) as { sort_by?: unknown; order?: unknown } | null
   const sortBy = stored ? normalizeSortBy(stored.sort_by) : null
   return {
     sort_by: sortBy ?? '',

@@ -518,7 +518,7 @@ const cells = computed(() => {
     date: Date
     dateKey: string
     inMonth: boolean
-    tasks: any[]
+    tasks: TaskDTO[]
     sprints: SprintCalendarDayEntry[]
   }> = []
   const month = cursor.value.getMonth()
@@ -528,9 +528,9 @@ const cells = computed(() => {
   const smartFiltered = calendarQuery.value?.tasks.value ?? []
 
   // Index tasks by due date for this window
-  const byDate: Record<string, any[]> = {}
+  const byDate: Record<string, TaskDTO[]> = {}
   for (const t of smartFiltered) {
-    const due = (t as any).due_date
+    const due = t.due_date
     if (!due) continue
     const parsed = parseTaskDate(due)
     if (!parsed) continue
@@ -610,7 +610,7 @@ function isTodayCell(d: Date) {
 function pushRoute() {
   const y = cursor.value.getFullYear()
   const m = String(cursor.value.getMonth() + 1).padStart(2, '0')
-  const q: any = { month: `${y}-${m}` }
+  const q: Record<string, string> = { month: `${y}-${m}` }
   if (project.value) q.project = project.value
   if (showSprints.value) q.sprints = '1'
   router.push({ path: '/calendar', query: q })
@@ -725,7 +725,7 @@ onMounted(async () => {
     window.addEventListener('keydown', onCalendarKey)
   }
   await Promise.all([refreshProjects(), refreshSprints(true)])
-  const q = route.query as Record<string, any>
+  const q = route.query
   // Parse month from query (YYYY-MM)
   if (q.month && /^\d{4}-\d{2}$/.test(String(q.month))) {
     const [y, m] = String(q.month)
@@ -743,7 +743,7 @@ onMounted(async () => {
 watch(
   () => route.query,
   async (q) => {
-    const r = q as any
+    const r = q
     const nextProject = r.project ? String(r.project) : ''
     if (nextProject !== project.value) {
       project.value = nextProject

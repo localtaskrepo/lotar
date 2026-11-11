@@ -320,6 +320,7 @@ vi.mock('../composables/useProjects', () => {
     return {
         useProjects: () => ({
             projects: ref([{ prefix: 'DEMO', name: 'Demo Project' }]),
+            status: ref('ready'),
             refresh,
         }),
     }
@@ -360,7 +361,7 @@ let configDefaults: { reporter: string }
 
 beforeAll(async () => {
     const module = await import('../composables/useConfig')
-    configDefaults = module.useConfig().defaults.value as { reporter: string }
+    configDefaults = module.useConfig().defaults.value
 })
 
 const mountTaskPanel = async () => {

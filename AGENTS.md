@@ -35,8 +35,13 @@ and report without edits, task mutations, or implementation gates.
   `npm run lint`, `npm test`, and `npm run smoke`. Use the low-noise variants and
   targeting guidance in [testing-strategy](.github/skills/testing-strategy/SKILL.md).
   Repeat checks only when subsequent edits, failures, or unresolved risks justify it.
-- Lint requires warning-free Rust, frontend typechecking, ESLint, and Rust plus
-  Prettier formatting. Use `npm run fmt` if formatting fails. Rust tests use **nextest, not `cargo test`**.
+- Lint requires warning-free Rust, frontend and smoke typechecking, oxlint, ESLint
+  (Vue templates), and Rust plus Prettier formatting. Use `npm run fmt` if formatting fails. Rust tests use **nextest, not `cargo test`**.
+- Lint rules are the owner's shared standard: `oxlintrc.standard.json` is an
+  unchanged copy (lotar's additions live in `.oxlintrc.json`), Clippy lints are in
+  `Cargo.toml` (`unwrap_used` included). Fix findings instead of suppressing them.
+  lotar differs from the standard in two ways: the git hooks are opt-in and light
+  (CI is the gate), and ESLint stays for Vue templates.
 - Documentation-only changes need link, example, and consistency checks, not a
   full application build. Embedded prompts, executable examples, and configuration
   that changes runtime behavior also need the relevant behavior checks.

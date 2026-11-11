@@ -19,7 +19,7 @@ export function formatProjectLabel(
     maxLength = PROJECT_LABEL_MAX_LENGTH,
 ): string {
     const normalizedName = (project.name ?? '').trim()
-    const normalizedPrefix = (project.prefix ?? '').trim()
+    const normalizedPrefix = project.prefix.trim()
     // A project named after its prefix shows once, not as "DEV (DEV)".
     const hasName = normalizedName.length > 0 && normalizedName !== normalizedPrefix
 

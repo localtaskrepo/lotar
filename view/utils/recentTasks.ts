@@ -12,9 +12,9 @@ export interface RecentTask {
 }
 
 export function readRecentTasks(): RecentTask[] {
-    const stored = storageGetJson<unknown>(RECENT_TASKS_KEY)
+    const stored = storageGetJson(RECENT_TASKS_KEY)
     if (!Array.isArray(stored)) return []
-    return stored
+    return (stored as Array<Partial<RecentTask> | null>)
         .filter(
             (entry): entry is RecentTask =>
                 !!entry && typeof entry.id === 'string' && !!entry.id && typeof entry.title === 'string',

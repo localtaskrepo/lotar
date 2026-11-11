@@ -52,7 +52,7 @@ const PAGE_DEFAULTS = { locale: 'en-US', timezoneId: 'UTC' };
 function parseArgs(argv) {
     const opts = {
         out: path.join(ROOT, 'docs', 'assets', 'screenshots'),
-        only: null,
+        only: /** @type {Set<string> | null} */ (null),
         hero: true,
         terminal: true,
         social: true,
@@ -188,7 +188,7 @@ async function newCapturePage(context) {
 async function settle(page, ms = 600) {
     // Live EventSource streams never reach network idle.
     await page.waitForLoadState('domcontentloaded');
-    await page.evaluate(() => document.fonts?.ready);
+    await page.evaluate(() => document.fonts.ready);
     await sleep(ms);
     await waitFor(() => pendingRequests.get(page).size === 0, { label: 'page requests excluding live events' });
 }
@@ -719,7 +719,7 @@ async function main() {
     }
 }
 
-main().catch((err) => {
+main().catch((/** @type {unknown} */ err) => {
     console.error(err);
     process.exit(1);
 });

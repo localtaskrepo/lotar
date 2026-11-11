@@ -17,7 +17,6 @@ export function useSse(
 ) {
     const usp = new URLSearchParams()
     Object.entries(params).forEach(([k, v]) => {
-        if (v === undefined || v === null) return
         usp.set(k, String(v))
     })
     // One unfiltered stream per scope avoids exhausting the browser's per-host

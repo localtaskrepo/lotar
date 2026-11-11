@@ -216,7 +216,11 @@ export function parseHex(value) {
     const match = value?.trim().match(/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i);
     if (!match) return null;
     let hex = match[1];
-    if (hex.length <= 4) hex = [...hex].map((c) => c + c).join('');
+    if (hex.length <= 4)
+        hex = hex
+            .split('')
+            .map((c) => c + c)
+            .join('');
     const channels = [0, 2, 4, 6].filter((i) => i < hex.length).map((i) => parseInt(hex.slice(i, i + 2), 16));
     return [channels[0], channels[1], channels[2], channels.length === 4 ? channels[3] / 255 : 1];
 }
@@ -581,7 +585,7 @@ export function checkThemes(themes) {
                 dark: skin.dark && cascade(skin.light, skin.dark),
             },
         ];
-        for (const [paletteId, palette] of Object.entries(skin.palettes ?? {})) {
+        for (const [paletteId, palette] of Object.entries(skin.palettes)) {
             const label = `${id}:${paletteId}`;
             for (const mode of ['light', 'dark']) {
                 if (!palette[mode]) errors.push(`${label}: missing ${mode} block`);
@@ -638,7 +642,7 @@ export function formatTable(rows) {
         row.theme,
         row.mode,
         ...labels.map((label) => {
-            const r = row.results[label];
+            const r = /** @type {{ ratio: number | null, pass?: boolean } | undefined} */ (row.results[label]);
             if (!r || r.ratio === null) return label === BACKGROUND_LABEL ? '-' : 'skip';
             return `${r.ratio.toFixed(2)}${r.pass ? '' : ' ✗'}`;
         }),

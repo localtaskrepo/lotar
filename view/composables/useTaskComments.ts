@@ -93,7 +93,7 @@ export function useTaskComments(options: UseTaskCommentsOptions) {
         const id = options.task.id
         if (!id) return
         const targetIndex = typeof index === 'number' ? index : editingCommentIndex.value
-        if (targetIndex === null || targetIndex === undefined) return
+        if (targetIndex === null) return
         const list = options.task.comments
         const original = Array.isArray(list) && list[targetIndex] ? list[targetIndex].text || '' : ''
         const trimmed = editingCommentText.value.trim()

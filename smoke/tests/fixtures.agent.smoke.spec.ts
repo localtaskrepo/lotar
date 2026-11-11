@@ -226,7 +226,7 @@ ${runBlock
                 automation: { rules: Array<{ on: { created: Record<string, unknown> } }> };
             };
 
-            const run = automation.automation.rules[0]?.on?.created?.run as {
+            const run = automation.automation.rules[0]?.on.created.run as {
                 command: string;
                 args: string[];
                 wait: boolean;

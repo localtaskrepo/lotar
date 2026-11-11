@@ -8,7 +8,7 @@ function stripLeadingDots(value: string): string {
 }
 
 export function generateProjectPrefix(name: string): string {
-    const cleaned = stripLeadingDots(name ?? '').trim()
+    const cleaned = stripLeadingDots(name).trim()
     if (!cleaned) {
         return ''
     }
@@ -28,7 +28,7 @@ export function generateProjectPrefix(name: string): string {
 }
 
 export function normalizePrefixInput(prefix: string): string {
-    const upper = (prefix ?? '').toUpperCase()
+    const upper = prefix.toUpperCase()
     const cleaned = upper.replace(/[^A-Z0-9_-]/g, '')
     return cleaned.slice(0, MAX_PREFIX_LENGTH)
 }
@@ -37,8 +37,8 @@ function prefixConflicts(prefix: string, projects: ProjectDTO[]): boolean {
     const upper = prefix.toUpperCase()
     if (!upper) return true
     return projects.some((project) => {
-        const nameUpper = (project.name ?? '').toUpperCase()
-        const prefixUpper = (project.prefix ?? '').toUpperCase()
+        const nameUpper = project.name.toUpperCase()
+        const prefixUpper = project.prefix.toUpperCase()
         return prefixUpper === upper || nameUpper === upper
     })
 }

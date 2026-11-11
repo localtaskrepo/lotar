@@ -6,7 +6,6 @@ import { spawnSync } from 'node:child_process';
 
 export interface GitCommandOptions {
     readonly env?: NodeJS.ProcessEnv;
-    readonly stdio?: 'pipe' | 'inherit';
     readonly reject?: boolean;
     readonly timeout?: number;
 }
@@ -84,7 +83,7 @@ export function probeGit(gitBinary?: string): GitProbeResult {
         if (result.status !== 0) {
             return {
                 available: false,
-                reason: `\`git init\` failed with status ${result.status}: ${(result.stderr ?? '').trim()}`,
+                reason: `\`git init\` failed with status ${result.status}: ${result.stderr.trim()}`,
             };
         }
         if (!existsSync(join(repo, '.git'))) {
@@ -132,7 +131,7 @@ export async function runGitCommand(cwd: string, args: readonly string[], option
     return execa('git', args as string[], {
         cwd,
         env: options.env,
-        stdio: options.stdio ?? 'pipe',
+        stdio: 'pipe',
         reject: options.reject ?? true,
         timeout: options.timeout ?? 60_000,
     });

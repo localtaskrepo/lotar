@@ -1410,7 +1410,7 @@ async function openReportByItem(item: ReportListItem) {
   const gen = ++detailGen
   reportsError.value = null
   const candidates = dedupeScopes([item.queryScope, item.project, ''])
-  let lastError: any = null
+  let lastError: unknown = null
   for (const candidate of candidates) {
     if (!alive || gen !== detailGen) return
     try {
@@ -1426,7 +1426,7 @@ async function openReportByItem(item: ReportListItem) {
   }
   if (!alive || gen !== detailGen) return
   // Keep the previous valid selection; surface the load failure instead.
-  reportsError.value = lastError?.message || 'Failed to load report'
+  reportsError.value = errorMessage(lastError) || 'Failed to load report'
 }
 
 function recordLiveEvent(run: SyncRun) {

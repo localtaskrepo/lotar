@@ -483,7 +483,14 @@ async function refresh(options: { silent?: boolean } = {}) {
   }
 }
 
-function updateFromEvent(payload: any, kind: string) {
+/** An agent_job_* SSE payload: the job's fields plus the event's message, time and log sequence. */
+type AgentJobEventPayload = Partial<Omit<AgentJob, 'last_message'>> & {
+  message?: string | null
+  at: string
+  sequence: number
+}
+
+function updateFromEvent(payload: AgentJobEventPayload | null, kind: string) {
   if (!payload?.id) return
   const next: AgentJob = {
     id: payload.id,
@@ -738,8 +745,7 @@ function setupSse() {
     const wrapped = (ev: MessageEvent) => {
       if (!ev.data) return
       try {
-        const payload = JSON.parse(ev.data)
-        updateFromEvent(payload, kind)
+        updateFromEvent(JSON.parse(String(ev.data)) as AgentJobEventPayload | null, kind)
       } catch (err) {
         console.warn('Failed to parse agent job SSE payload', err)
       }

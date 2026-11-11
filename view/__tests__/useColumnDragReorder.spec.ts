@@ -26,8 +26,7 @@ function makeEvent(options: { dataTransfer?: any; clientX?: number; currentTarge
     } as any
 }
 
-function makeTarget(rect?: { left: number; width: number }) {
-    if (!rect) return {} as any
+function makeTarget(rect: { left: number; width: number }) {
     return { getBoundingClientRect: () => ({ left: rect.left, width: rect.width }) } as any
 }
 
@@ -139,8 +138,6 @@ describe('useColumnDragReorder', () => {
 
         // Missing target or zero-width rect falls back to 'before'.
         dnd.onColDragOver('title', makeEvent({ currentTarget: null, clientX: 999 }))
-        expect(dnd.dragOverPos.value).toBe('before')
-        dnd.onColDragOver('title', makeEvent({ currentTarget: makeTarget(), clientX: 999 }))
         expect(dnd.dragOverPos.value).toBe('before')
         dnd.onColDragOver('title', makeEvent({ currentTarget: makeTarget({ left: 0, width: 0 }), clientX: 0 }))
         expect(dnd.dragOverPos.value).toBe('before')

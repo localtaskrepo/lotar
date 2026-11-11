@@ -52,6 +52,12 @@ export interface LegacyBoardSettings {
 
 const STORAGE_VERSION = 2
 
+/** A stored JSON object, or null when the key is missing or holds something else. */
+function storedObject(key: string): Record<string, unknown> | null {
+    const value = storageGetJson(key)
+    return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null
+}
+
 function stringList(value: unknown): string[] {
     return Array.isArray(value)
         ? value.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0)
@@ -202,13 +208,13 @@ export function useBoardLayout(project: Ref<string>, statuses: Ref<LayoutStatus[
     const key = (name: string) => (project.value ? `${name}::${project.value}` : name)
 
     function load() {
-        stored.value = parseBoardLayout(storageGetJson<unknown>(key('lotar.boardColumns')))
+        stored.value = parseBoardLayout(storageGetJson(key('lotar.boardColumns')))
         legacy.value = stored.value
             ? {}
             : {
-                  stack: storageGetJson<LegacyBoardSettings['stack']>(key('lotar.boardLayout')),
-                  wip: storageGetJson<Record<string, unknown>>(key('lotar.wip')),
-                  done: storageGetJson<LegacyBoardSettings['done']>(key('lotar.doneFilters')),
+                  stack: storedObject(key('lotar.boardLayout')),
+                  wip: storedObject(key('lotar.wip')),
+                  done: storedObject(key('lotar.doneFilters')),
               }
     }
 

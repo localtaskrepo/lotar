@@ -19,7 +19,8 @@ excludeAgent: ["code-review"]
 
 ## Tests + lint
 
-- Typecheck frontend: `npm run lint:frontend`; lint: `npm run lint:js`; format: `npm run fmt:js` (Prettier).
+- Typecheck frontend and smoke: `npm run lint:frontend`; lint: `npm run lint:js` (oxlint for TypeScript/JavaScript including `<script>` blocks, ESLint for Vue templates); format: `npm run fmt:js` (Prettier).
+- Lint rules are the owner's shared standard (`oxlintrc.standard.json`, a copy: replace it whole when the standard changes; lotar's additions go in `.oxlintrc.json`). Fix findings rather than suppressing them; type data from the server or storage honestly (`unknown` plus a check) instead of `any`.
 - Multi-statement inline handlers must be arrow functions (`@click="() => { a(); b() }"`): Prettier drops semicolons, and Vue cannot split statements without them.
 - UI unit tests: `npm run test:ui` (see the `testing-strategy` skill for targeting).
 

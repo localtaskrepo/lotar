@@ -1016,8 +1016,9 @@ onMounted(async () => {
   if (unmounted) return
   filtersHydrated = true
   try {
-    const saved = storageGetJson<Record<string, unknown>>(filterKey())
-    const usable = saved && typeof saved === 'object' && !Array.isArray(saved)
+    const stored = storageGetJson(filterKey())
+    const usable = !!stored && typeof stored === 'object' && !Array.isArray(stored)
+    const saved = (usable ? stored : {}) as Record<string, unknown>
     if (usable && (!hasMeaningfulIncoming(props.value) || isReturnToSavedProject(props.value, saved))) {
       const asText = (v: unknown) => (typeof v === 'string' ? v : '')
       query.value = asText(saved.q)

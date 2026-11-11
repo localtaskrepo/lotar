@@ -27,7 +27,7 @@ export const NAV_TABS: NavTabDefinition[] = [
 const ALWAYS_VISIBLE = new Set(['/preferences'])
 
 function readHidden(): Set<string> {
-    const parsed = storageGetJson<unknown>(STORAGE_KEY)
+    const parsed = storageGetJson(STORAGE_KEY)
     if (!Array.isArray(parsed)) return new Set()
     return new Set(parsed.filter((p): p is string => typeof p === 'string'))
 }

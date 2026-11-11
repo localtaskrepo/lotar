@@ -52,18 +52,15 @@
 </template>
 
 <script setup lang="ts">
+import type { TaskHistoryEntry } from '../../api/types'
 import ReloadButton from '../ReloadButton.vue'
 
 defineProps<{
   mode: 'create' | 'edit'
-  changeLog: Array<{
-    at: string
-    actor?: string | null
-    changes: Array<{ field: string; old?: unknown; new?: unknown }>
-  }>
+  changeLog: TaskHistoryEntry[]
   formatDate: (input: string) => string
   formatFieldName: (field: string) => string
-  formatChangeValue: (value: any) => string
+  formatChangeValue: (value?: string | null) => string
 }>()
 
 defineEmits<{ (e: 'reload'): void }>()

@@ -117,10 +117,7 @@ export function formatDateTime(value?: string | Date | null, opts?: { empty?: st
     return date.toLocaleString()
 }
 
-const relativeTimeFormatter =
-    typeof Intl !== 'undefined' && (Intl as any).RelativeTimeFormat
-        ? new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
-        : null
+const relativeTimeFormatter = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
 
 const relativeUnits: Array<{ unit: Intl.RelativeTimeFormatUnit; ms: number }> = [
     { unit: 'year', ms: 1000 * 60 * 60 * 24 * 365 },
@@ -142,7 +139,6 @@ export function formatRelativeTime(value?: string | null, opts?: { empty?: strin
     const timestamp = safeTimestamp(value)
     if (timestamp === null) return value
     const diff = timestamp - Date.now()
-    if (!relativeTimeFormatter) return new Date(timestamp).toLocaleString()
     for (const { unit, ms } of relativeUnits) {
         if (Math.abs(diff) >= ms || unit === 'second') {
             const amount = Math.round(diff / ms)

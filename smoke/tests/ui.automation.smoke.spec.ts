@@ -99,7 +99,7 @@ describe.concurrent('UI Automation page smoke tests', () => {
 
                     // Rules should be rendered
                     await page.waitForSelector('.rule-card', { timeout: 10_000 });
-                    const ruleNames = await page.$$eval('.rule-name', (els) => els.map((el) => el.textContent?.trim()));
+                    const ruleNames = await page.$$eval('.rule-name', (els) => els.map((el) => el.textContent.trim()));
                     expect(ruleNames).toContain('Auto-tag bugs');
                     expect(ruleNames).toContain('Review notification');
                 });
@@ -278,7 +278,7 @@ describe.concurrent('UI Automation page smoke tests', () => {
                     await page.getByRole('button', { name: 'Save rules', exact: true }).click();
                     await page.waitForFunction(() =>
                         [...document.querySelectorAll('button')]
-                            .find((b) => b.textContent?.includes('Save rules'))
+                            .find((b) => b.textContent.includes('Save rules'))
                             ?.hasAttribute('disabled'),
                     );
                     await page.click('button[title="Refresh automations"]');

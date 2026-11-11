@@ -235,7 +235,8 @@ describe('ConfigView project creation propagation', () => {
         // Stand-in for an always-mounted consumer (e.g. the task panel host)
         // with its own warmed useProjects instance.
         const panelScope = effectScope()
-        const panelProjects = panelScope.run(() => createUseProjects(api as unknown as ApiClient))!
+        const panelProjects = panelScope.run(() => createUseProjects(api))
+        if (!panelProjects) throw new Error('panel scope is not active')
         await panelProjects.refresh()
 
         const wrapper = await mountConfigView()

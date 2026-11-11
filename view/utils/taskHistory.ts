@@ -5,7 +5,7 @@ export function findLastStatusChangeAt(task: TaskDTO | null | undefined, status?
     for (let idx = task.history.length - 1; idx >= 0; idx -= 1) {
         const entry = task.history[idx]
         if (!entry || !Array.isArray(entry.changes)) continue
-        const hit = entry.changes.find((change) => change?.field === 'status' && (!status || change.new === status))
+        const hit = entry.changes.find((change) => change.field === 'status' && (!status || change.new === status))
         if (hit) {
             const ts = Date.parse(entry.at)
             return Number.isNaN(ts) ? null : ts
@@ -40,8 +40,8 @@ export function statusEnteredAt(task: TaskDTO | null | undefined, status: string
     let latestAny: number | null = null
     let sawStatusChange = false
     for (const entry of Array.isArray(task.history) ? task.history : []) {
-        if (!entry || !Array.isArray(entry.changes)) continue
-        const changes = entry.changes.filter((change) => change?.field === 'status')
+        if (!Array.isArray(entry.changes)) continue
+        const changes = entry.changes.filter((change) => change.field === 'status')
         if (!changes.length) continue
         sawStatusChange = true
         const at = Date.parse(entry.at)

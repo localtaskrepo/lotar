@@ -1,32 +1,30 @@
-// ESLint flat config for the TypeScript/Vue frontend, smoke tests and Node
-// scripts (DEV-161). Formatting is Prettier's job: eslint-config-prettier
-// switches off every stylistic rule that could conflict with it.
-import js from '@eslint/js';
+// ESLint checks only the templates of the Vue components (eslint-plugin-vue): oxlint has no template rules. oxlint
+// (.oxlintrc.json) checks all TypeScript and JavaScript, including the <script> blocks. Formatting is Prettier's
+// job: eslint-config-prettier switches off every stylistic rule that could conflict with it.
 import prettier from 'eslint-config-prettier';
 import { defineConfig } from 'eslint/config';
 import pluginVue from 'eslint-plugin-vue';
-import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default defineConfig(
     {
-        ignores: ['**/node_modules/', 'target/', 'docs/', '.tasks/', '.history/', '.kilo/', '.playwright-mcp/'],
+        // Only .vue files: everything else is oxlint's.
+        ignores: [
+            '**/node_modules/',
+            'target/',
+            'docs/',
+            '.tasks/',
+            '.history/',
+            '.kilo/',
+            '.playwright-mcp/',
+            '**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}',
+        ],
     },
-    js.configs.recommended,
-    tseslint.configs.recommended,
-    pluginVue.configs['flat/recommended'],
     {
         files: ['**/*.vue'],
+        extends: [pluginVue.configs['flat/recommended']],
+        // The script blocks are TypeScript; the parser only has to read them.
         languageOptions: { parserOptions: { parser: tseslint.parser } },
-    },
-    {
-        languageOptions: {
-            ecmaVersion: 'latest',
-            sourceType: 'module',
-            globals: { ...globals.browser, ...globals.node },
-        },
-    },
-    {
         linterOptions: { reportUnusedDisableDirectives: 'error' },
         rules: {
             // Style the codebase deliberately does not follow; formatting
@@ -40,36 +38,12 @@ export default defineConfig(
             // The task panel shares one reactive form object with its
             // sections; editing its fields is intended, replacing it is not.
             'vue/no-mutating-props': ['error', { shallowOnly: true }],
-            '@typescript-eslint/no-unused-vars': [
-                'error',
-                {
-                    argsIgnorePattern: '^_',
-                    varsIgnorePattern: '^_',
-                    caughtErrorsIgnorePattern: '^_',
-                    destructuredArrayIgnorePattern: '^_',
-                },
-            ],
         },
     },
     {
-        // TypeScript already resolves globals and types.
-        files: ['**/*.ts', '**/*.vue'],
-        rules: { 'no-undef': 'off' },
-    },
-    {
-        // The npm launcher is CommonJS, so it runs on every supported Node.js
-        // without a package "type" (DEV-250).
-        files: ['packaging/npm/**/*.js'],
-        languageOptions: { sourceType: 'commonjs' },
-        rules: { '@typescript-eslint/no-require-imports': 'off' },
-    },
-    {
-        // Tests mock freely and define throwaway components inline.
-        files: ['view/__tests__/**', 'smoke/**'],
-        rules: {
-            '@typescript-eslint/no-explicit-any': 'off',
-            'vue/one-component-per-file': 'off',
-        },
+        // Tests define throwaway components inline.
+        files: ['view/__tests__/**'],
+        rules: { 'vue/one-component-per-file': 'off' },
     },
     prettier,
 );

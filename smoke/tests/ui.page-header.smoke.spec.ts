@@ -72,7 +72,7 @@ describe.concurrent('Shared page header layout (DEV-186)', () => {
                             expect(report.outside, `${path} overflow`).toBe(0);
                             expect(
                                 report.heights.every((h) => h === 36),
-                                `${path} heights ${report.heights}`,
+                                `${path} heights ${report.heights.join(',')}`,
                             ).toBe(true);
                             expect(report.labelColors.length, `${path} label colours`).toBeLessThanOrEqual(1);
                             if (width > 640 && report.controlTop !== null) {

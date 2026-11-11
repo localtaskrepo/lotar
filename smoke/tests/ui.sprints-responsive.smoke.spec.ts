@@ -72,7 +72,7 @@ async function geometry(dialog: Locator) {
             buttons: Array.from(element.querySelectorAll('button.btn')).map((button) => {
                 const box = button.getBoundingClientRect();
                 return {
-                    name: button.getAttribute('aria-label') || button.textContent?.trim(),
+                    name: button.getAttribute('aria-label') || button.textContent.trim(),
                     height: box.height,
                     width: box.width,
                     iconOnly: button.classList.contains('icon-only'),
@@ -111,7 +111,7 @@ describe.concurrent('Responsive sprint controls and standardized pagination (DEV
                                 buttons.map((button) => {
                                     const bounds = button.getBoundingClientRect();
                                     return {
-                                        name: button.getAttribute('aria-label') || button.textContent?.trim(),
+                                        name: button.getAttribute('aria-label') || button.textContent.trim(),
                                         height: bounds.height,
                                         width: bounds.width,
                                         iconOnly:
@@ -149,7 +149,7 @@ describe.concurrent('Responsive sprint controls and standardized pagination (DEV
                                     const box = item.getBoundingClientRect();
                                     const title = item.closest('.group-title')!.getBoundingClientRect();
                                     return {
-                                        name: item.getAttribute('aria-label') || item.textContent?.trim(),
+                                        name: item.getAttribute('aria-label') || item.textContent.trim(),
                                         right: box.right,
                                         titleRight: title.right,
                                     };

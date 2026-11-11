@@ -11,6 +11,7 @@ const projectsStore = {
         { prefix: 'ACME', name: 'Acme Co' },
         { prefix: 'BETA', name: 'Beta Co' },
     ]),
+    status: ref('ready'),
     refresh: vi.fn(async () => {}),
 }
 

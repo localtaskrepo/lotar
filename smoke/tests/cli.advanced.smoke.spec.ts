@@ -1,26 +1,9 @@
 import fs from 'fs-extra';
-import { Buffer } from 'node:buffer';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { gitAvailable } from '../helpers/git.js';
 import { parse, stringify } from 'yaml';
 import { SmokeWorkspace } from '../helpers/workspace.js';
-
-const stdoutText = (value: unknown): string => {
-    if (typeof value === 'string') {
-        return value;
-    }
-
-    if (value instanceof Uint8Array) {
-        return Buffer.from(value).toString('utf8');
-    }
-
-    if (Array.isArray(value)) {
-        return value.map((entry) => stdoutText(entry)).join('');
-    }
-
-    return value === undefined || value === null ? '' : String(value);
-};
 
 interface TimeInStatusResponse {
     status: string;
@@ -46,12 +29,12 @@ describe.skipIf(!gitAvailable())('CLI advanced smoke scenarios', () => {
             const detached = await workspace.addTask('Detached head task');
 
             const list = await workspace.runLotar(['list']);
-            const listOutput = stdoutText(list.stdout);
+            const listOutput = list.stdout;
             expect(listOutput).toContain(initial.id);
             expect(listOutput).toContain(detached.id);
 
             const status = await workspace.runGit(['status', '--short']);
-            expect(stdoutText(status.stdout)).toContain(path.basename(detached.filePath));
+            expect(status.stdout).toContain(path.basename(detached.filePath));
         } finally {
             await workspace.dispose();
         }
@@ -70,7 +53,7 @@ describe.skipIf(!gitAvailable())('CLI advanced smoke scenarios', () => {
             await fs.writeFile(created.filePath, stringify(payload));
 
             const list = await workspace.runLotar(['list']);
-            const listOutput = stdoutText(list.stdout);
+            const listOutput = list.stdout;
             expect(listOutput).toContain('Edited without commit');
             expect(listOutput).not.toContain('Original title smoke task');
         } finally {
@@ -86,7 +69,7 @@ describe.skipIf(!gitAvailable())('CLI advanced smoke scenarios', () => {
             await workspace.runGit(['branch', '-m', 'trunk']);
 
             const head = await workspace.runGit(['rev-parse', '--abbrev-ref', 'HEAD']);
-            expect(stdoutText(head.stdout).trim()).toBe('trunk');
+            expect(head.stdout.trim()).toBe('trunk');
 
             const trunkTask = await workspace.addTask('Trunk branch default task');
             await workspace.commitAll('record trunk baseline');
@@ -96,7 +79,7 @@ describe.skipIf(!gitAvailable())('CLI advanced smoke scenarios', () => {
             await workspace.commitAll('record feature task');
 
             const list = await workspace.runLotar(['list']);
-            const listOutput = stdoutText(list.stdout);
+            const listOutput = list.stdout;
             expect(listOutput).toContain(trunkTask.id);
             expect(listOutput).toContain(featureTask.id);
         } finally {
@@ -165,7 +148,7 @@ describe.skipIf(!gitAvailable())('CLI advanced smoke scenarios', () => {
                 '--global',
             ]);
 
-            const payload = JSON.parse(stdoutText(stats.stdout)) as TimeInStatusResponse;
+            const payload = JSON.parse(stats.stdout) as TimeInStatusResponse;
             expect(payload.status).toBe('ok');
             const entry = payload.items.find((item) => item.id === 'TEST-1');
             expect(entry).toBeDefined();
@@ -196,7 +179,7 @@ describe.skipIf(!gitAvailable())('CLI advanced smoke scenarios', () => {
             await workspace.commitAll('record nested task');
 
             const nestedList = await workspace.runLotarIn(nestedDir, ['list']);
-            const nestedOutput = stdoutText(nestedList.stdout);
+            const nestedOutput = nestedList.stdout;
             expect(nestedOutput).toContain(rootTask.id);
             expect(nestedOutput).toContain(nestedTask.id);
         } finally {
@@ -228,8 +211,8 @@ describe.skipIf(!gitAvailable())('CLI advanced smoke scenarios', () => {
             expect(merge.exitCode).not.toBe(0);
 
             const list = await workspace.runLotar(['list']);
-            expect(stdoutText(list.stderr)).toContain('No tasks found');
-            expect(stdoutText(list.stdout).trim()).toBe('');
+            expect(list.stderr).toContain('No tasks found');
+            expect(list.stdout.trim()).toBe('');
         } finally {
             await workspace.dispose();
         }
@@ -254,14 +237,14 @@ describe.skipIf(!gitAvailable())('CLI advanced smoke scenarios', () => {
                 acceptExitCodes: [1],
             });
             expect(check.exitCode).toBe(1);
-            const checkOutput = stdoutText(check.stderr);
+            const checkOutput = check.stderr;
             expect(checkOutput).toContain('Sprint #1 requires normalization (run with --write to update).');
             expect(checkOutput).toContain(
                 'Sprint #1 canonicalization notice: plan.length was ignored because plan.ends_at was provided.',
             );
 
             const write = await workspace.runLotar(['sprint', 'normalize', '--write']);
-            const writeOutput = stdoutText(write.stdout);
+            const writeOutput = write.stdout;
             expect(writeOutput).toContain('Normalized sprint #1.');
             expect(writeOutput).toContain(
                 'Sprint #1 canonicalization notice: plan.length was ignored because plan.ends_at was provided.',
@@ -274,7 +257,7 @@ describe.skipIf(!gitAvailable())('CLI advanced smoke scenarios', () => {
 
             const verify = await workspace.runLotar(['sprint', 'normalize', '--check']);
             expect(verify.exitCode).toBe(0);
-            expect(stdoutText(verify.stdout)).toContain('Sprint #1 already canonical.');
+            expect(verify.stdout).toContain('Sprint #1 already canonical.');
         } finally {
             await workspace.dispose();
         }
@@ -347,7 +330,7 @@ describe.skipIf(!gitAvailable())('CLI advanced smoke scenarios', () => {
             ]);
 
             const stats = await workspace.runLotar(['sprint', 'stats', '1']);
-            const output = stdoutText(stats.stdout);
+            const output = stats.stdout;
             expect(output).toContain('Sprint stats for #1 (Smoke Stats).');
             expect(output).toContain('Tasks: 4 committed');
             expect(output).toContain('Points: 8 committed');
@@ -391,7 +374,7 @@ describe.skipIf(!gitAvailable())('CLI advanced smoke scenarios', () => {
             } satisfies Record<string, string>;
 
             const whoami = await workspace.runLotar(['whoami'], { env });
-            expect(stdoutText(whoami.stdout)).toContain('env-reporter@example.com');
+            expect(whoami.stdout).toContain('env-reporter@example.com');
 
             const created = await workspace.addTask('Env override smoke task', {
                 env,

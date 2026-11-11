@@ -909,7 +909,7 @@ export function seedDemoWorkspace({ dir, bin, now = Date.now(), log = () => {}, 
             ];
             if (t.assignee) args.push('--assignee', t.assignee);
             if (t.description) args.push('--description', t.description);
-            for (const tag of t.tags ?? []) args.push('--tag', tag);
+            for (const tag of t.tags) args.push('--tag', tag);
             if (t.due !== undefined) args.push('--due', new Date(today + t.due * DAY_MS).toISOString().slice(0, 10));
             const out = lotar(t.reporter, args);
             const match = out.match(/Created task:\s*([A-Z0-9_-]+)/i);

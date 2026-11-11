@@ -57,7 +57,7 @@ export function sortBoardTasks(
         ;(options.priorities ?? []).forEach((label, index) => rank.set(label.trim().toLowerCase(), index))
         // Fall back to recency inside a priority, then sort stably by rank.
         const base = sortTasks(tasks, 'modified', 'desc')
-        const value = (task: TaskDTO) => rank.get((task.priority ?? '').trim().toLowerCase()) ?? -1
+        const value = (task: TaskDTO) => rank.get(task.priority.trim().toLowerCase()) ?? -1
         return base.sort((a, b) => (dir === 'desc' ? value(b) - value(a) : value(a) - value(b)))
     }
     return sortTasks(tasks, key, dir)
@@ -68,8 +68,9 @@ export function useBoardSort(project: Ref<string>, filter: Ref<Record<string, st
     const storageKey = () => (project.value ? `lotar.boardSort::${project.value}` : 'lotar.boardSort')
 
     function read(): { key: BoardSortKey; dir: TaskSortOrder } {
-        const saved = storageGetJson<{ key?: string; dir?: string }>(storageKey())
-        const key = saved?.key && KEYS.has(saved.key) ? (saved.key as BoardSortKey) : DEFAULT_BOARD_SORT.key
+        const saved = storageGetJson(storageKey()) as { key?: unknown; dir?: unknown } | null
+        const key =
+            typeof saved?.key === 'string' && KEYS.has(saved.key) ? (saved.key as BoardSortKey) : DEFAULT_BOARD_SORT.key
         const dir = saved?.dir === 'asc' || saved?.dir === 'desc' ? saved.dir : DEFAULT_BOARD_SORT.dir
         return { key, dir }
     }

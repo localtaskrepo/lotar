@@ -123,7 +123,12 @@ afterEach(() => {
 
 describe('TaskPanel with real config and persistence', () => {
     it('silently refreshes SSE relationships without replacing the scroller or unsaved fields and ignores stale task reads', async () => {
-        vi.stubGlobal('EventSource', class {})
+        vi.stubGlobal(
+            'EventSource',
+            class {
+                close() {}
+            },
+        )
         const wrapper = panel('A-1')
         await flushPromises()
         const vm = wrapper.vm as any

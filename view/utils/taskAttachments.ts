@@ -175,17 +175,17 @@ export function isFileDrag(event: DragEvent): boolean {
     const dt = event.dataTransfer
     if (!dt) return false
 
-    const items = Array.from(dt.items ?? [])
+    const items = Array.from(dt.items)
     if (items.some((item) => item.kind === 'file')) return true
 
-    const types = Array.from(dt.types ?? [])
+    const types = Array.from(dt.types)
     return types.includes('Files') || types.includes('public.file-url') || types.includes('application/x-moz-file')
 }
 
 export function isLinkDrag(event: DragEvent): boolean {
     const dt = event.dataTransfer
     if (!dt) return false
-    const types = Array.from(dt.types ?? [])
+    const types = Array.from(dt.types)
     return (
         types.includes('text/uri-list') ||
         types.includes('text/x-moz-url') ||

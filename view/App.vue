@@ -150,7 +150,7 @@ onUnmounted(() => {
   store.disconnectSse()
   unsubError?.()
 })
-const version = (import.meta as any).env?.VITE_CARGO_VERSION || ''
+const version = import.meta.env.VITE_CARGO_VERSION || ''
 const router = useRouter()
 // DEV-218: repository logo, name and theme default.
 const branding = useBranding()

@@ -5,7 +5,7 @@
 # CI review) runs the full test, build and smoke suites. Rust and frontend
 # checks run in parallel and only when files of that kind changed:
 #   Rust:     cargo fmt --check, clippy (lib + bins, -D warnings)
-#   Frontend: vue-tsc typecheck, ESLint, Prettier check
+#   Frontend: vue-tsc and smoke typecheck, oxlint, ESLint (Vue templates), Prettier check
 #
 # Install: npm run hooks:install   Bypass once: git push --no-verify
 
@@ -42,7 +42,7 @@ if grep -qx "ALL" <<<"$changed"; then
   needs_web=1
 else
   grep -qE '\.rs$|(^|/)Cargo\.(toml|lock)$|(^|/)(clippy|rustfmt)\.toml$|^build\.rs$' <<<"$changed" && needs_rust=1
-  grep -qE '\.(ts|vue|mjs|mts|cjs|js)$|^package(-lock)?\.json$|^eslint|^\.prettier|view/tsconfig\.json$' <<<"$changed" && needs_web=1
+  grep -qE '\.(ts|vue|mjs|mts|cjs|js)$|^package(-lock)?\.json$|^eslint|^\.?oxlintrc|^\.prettier|(view|smoke)/tsconfig\.json$' <<<"$changed" && needs_web=1
 fi
 
 if [ "$needs_rust" -eq 0 ] && [ "$needs_web" -eq 0 ]; then
@@ -63,6 +63,8 @@ run_web() {
     return 1
   fi
   npx --no-install vue-tsc --project view/tsconfig.json --noEmit &&
+    npx --no-install tsc --project smoke/tsconfig.json --noEmit &&
+    npx --no-install oxlint -f agent &&
     npx --no-install eslint --cache --cache-location node_modules/.cache/eslint/ . &&
     npm run --silent fmt:js:check
 }
@@ -90,7 +92,7 @@ if [ -n "$rust_pid" ]; then
 fi
 if [ -n "$web_pid" ]; then
   if wait "$web_pid"; then
-    echo "✓ Frontend: typecheck, ESLint and Prettier"
+    echo "✓ Frontend: typecheck, oxlint, ESLint and Prettier"
   else
     echo "✗ Frontend checks failed:"
     cat "$log_dir/web.log"

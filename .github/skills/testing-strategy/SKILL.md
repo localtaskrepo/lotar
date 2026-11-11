@@ -37,7 +37,7 @@ description: Choose meaningful behavior checks and run targeted Rust, UI, or smo
 - Full: `npm run test:ui`
 - By name: `npm run test:ui -- -t "<substring>"`
 - Single file: `npm run test:ui -- view/<path>/<file>.test.ts`
-- Typecheck frontend: `npm run lint:frontend`; ESLint: `npm run lint:js`; Prettier check: `npm run fmt:js:check`
+- Typecheck frontend and smoke: `npm run lint:frontend`; oxlint + ESLint (Vue templates): `npm run lint:js`; Prettier check: `npm run fmt:js:check`
 
 ## Smoke (Playwright + vitest harness)
 

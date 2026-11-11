@@ -102,9 +102,9 @@ function isTextEntry(target: EventTarget | null): boolean {
 export function pastedFiles(event: ClipboardEvent): File[] {
     const data = event.clipboardData
     if (!data) return []
-    const files = Array.from(data.files ?? [])
+    const files = Array.from(data.files)
     if (!files.length) return []
-    if (isTextEntry(event.target) && Array.from(data.types ?? []).includes('text/plain')) return []
+    if (isTextEntry(event.target) && Array.from(data.types).includes('text/plain')) return []
     return namePastedFiles(files)
 }
 
@@ -287,7 +287,7 @@ export function useTaskPanelAttachmentDrop(options: UseTaskPanelAttachmentDropOp
             // task is ready. A files-bearing event ignores link payloads, matching
             // the direct drop path where files take priority.
             if (hasFiles) {
-                const files = Array.from(event.dataTransfer?.files ?? []).filter((file) => file && file.size >= 0)
+                const files = Array.from(event.dataTransfer?.files ?? []).filter((file) => file.size >= 0)
                 await attachFiles(files)
                 return
             }
@@ -301,7 +301,7 @@ export function useTaskPanelAttachmentDrop(options: UseTaskPanelAttachmentDropOp
         }
 
         if (hasFiles) {
-            const files = Array.from(event.dataTransfer?.files ?? []).filter((file) => file && file.size >= 0)
+            const files = Array.from(event.dataTransfer?.files ?? []).filter((file) => file.size >= 0)
             if (!files.length) return
             await uploadDroppedFiles(files)
             return

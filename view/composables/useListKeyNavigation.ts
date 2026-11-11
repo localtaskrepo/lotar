@@ -37,7 +37,7 @@ export function useListKeyNavigation(itemSelector: string) {
                 : Math.min(list.length - 1, Math.max(0, current + (event.key === 'j' ? 1 : -1)))
         const target = list[next]!
         target.focus({ preventScroll: true })
-        target.scrollIntoView?.({ block: 'nearest' })
+        target.scrollIntoView({ block: 'nearest' })
     }
 
     onMounted(() => window.addEventListener('keydown', onKeydown))

@@ -194,7 +194,7 @@ async function capture(opts) {
             .filter({ visible: true })
             .first();
         await target.waitFor({ state: 'visible', timeout: 15_000 });
-        await page.evaluate(() => document.fonts?.ready);
+        await page.evaluate(() => document.fonts.ready);
         // Let transitions and lazy images finish.
         await page.waitForTimeout(400);
 
@@ -235,7 +235,7 @@ async function main() {
     try {
         opts = parseArgs(process.argv.slice(2));
     } catch (error) {
-        console.error(`ticket-screenshot: ${error.message}`);
+        console.error(`ticket-screenshot: ${error instanceof Error ? error.message : 'unknown error'}`);
         process.exit(2);
     }
     if (opts.help) {
@@ -269,8 +269,8 @@ async function main() {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-    main().catch((error) => {
-        console.error(`ticket-screenshot: ${error.message}`);
+    main().catch((/** @type {unknown} */ error) => {
+        console.error(`ticket-screenshot: ${error instanceof Error ? error.message : 'unknown error'}`);
         process.exit(1);
     });
 }

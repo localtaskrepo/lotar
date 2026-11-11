@@ -427,7 +427,7 @@
 import { errorMessage } from '../../utils/errors'
 import { computed, nextTick, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue'
 import { api } from '../../api/client'
-import type { ConfigInspectResult, ReferenceSnippet, SyncAuthProfile, SyncRemoteConfig } from '../../api/types'
+import type { ConfigInspectResult, ReferenceSnippet, SyncAuthProfile, SyncRemoteConfig, TaskDTO } from '../../api/types'
 import IconGlyph from '../IconGlyph.vue'
 import ReloadButton from '../ReloadButton.vue'
 import UiButton from '../UiButton.vue'
@@ -474,7 +474,7 @@ const props = defineProps<{
   setReferencePreviewElement: (el: HTMLElement | null) => void
 }>()
 
-const emit = defineEmits<{ (e: 'reload'): void; (e: 'updated', task: any): void }>()
+const emit = defineEmits<{ (e: 'reload'): void; (e: 'updated', task: TaskDTO): void }>()
 
 const taskId = computed(() => (props.task?.id || '').trim())
 
@@ -500,6 +500,11 @@ const addReferenceTab = ref<'link' | 'code' | 'file'>('link')
 
 const addLinkUrl = ref('')
 const addLinkSubmitting = ref(false)
+/** The refs hold UiInput instances; focus them when they expose focus(). */
+function focusIfPossible(target: unknown) {
+  ;(target as { focus?: () => void } | null)?.focus?.()
+}
+
 const addLinkInputRef = ref<HTMLElement | null>(null)
 
 const addCodeFile = ref('')
@@ -575,7 +580,7 @@ function openAddReferenceDialog() {
   addReferenceDialogOpen.value = true
   nextTick(() => {
     // UiInput renders an input internally; focus if possible.
-    ;(addLinkInputRef.value as any)?.focus?.()
+    focusIfPossible(addLinkInputRef.value)
   })
 }
 
@@ -588,11 +593,11 @@ function selectAddReferenceTab(tab: 'link' | 'code' | 'file') {
   addReferenceTab.value = tab
   nextTick(() => {
     if (tab === 'link') {
-      ;(addLinkInputRef.value as any)?.focus?.()
+      focusIfPossible(addLinkInputRef.value)
     } else if (tab === 'file') {
-      ;(addFileInputRef.value as any)?.focus?.()
+      focusIfPossible(addFileInputRef.value)
     } else {
-      ;(addCodeFileInputRef.value as any)?.focus?.()
+      focusIfPossible(addCodeFileInputRef.value)
     }
   })
 }

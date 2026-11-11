@@ -45,6 +45,7 @@ vi.mock('../composables/useProjects', async () => {
                 { prefix: 'DEV', name: 'Development' },
                 { prefix: 'OTHER', name: 'Other' },
             ]),
+            status: ref('ready'),
             refresh: vi.fn(async () => {}),
         }),
     }
@@ -67,7 +68,12 @@ afterEach(() => {
 })
 
 async function setup(path: string) {
-    vi.stubGlobal('EventSource', class {})
+    vi.stubGlobal(
+        'EventSource',
+        class {
+            close() {}
+        },
+    )
     const router = createRouter({
         history: createMemoryHistory(),
         routes: [{ path: '/dependencies', component: Dependencies }],

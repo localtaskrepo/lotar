@@ -107,6 +107,7 @@ test('tree assertions normalize host separators without rewriting literal posix 
 });
 
 function listTree(root) {
+    /** @type {string[]} */
     const files = [];
     const collect = (dir) => {
         for (const entry of readdirSync(dir, { withFileTypes: true })) {

@@ -181,11 +181,7 @@ function ensureSystemThemeListener() {
             applyMode()
         }
     }
-    if (typeof prefersDarkQuery.addEventListener === 'function') {
-        prefersDarkQuery.addEventListener('change', listener)
-    } else if (typeof prefersDarkQuery.addListener === 'function') {
-        prefersDarkQuery.addListener(listener)
-    }
+    prefersDarkQuery.addEventListener('change', listener)
     systemThemeChangeHandler = listener
 }
 

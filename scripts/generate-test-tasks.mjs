@@ -41,7 +41,14 @@ function resolveBinary() {
 }
 
 function parseArgs(argv) {
-    const opts = { count: 40, project: 'DEMO', dir: null, serve: false, keep: true, demo: false };
+    const opts = {
+        count: 40,
+        project: 'DEMO',
+        dir: /** @type {string | null} */ (null),
+        serve: false,
+        keep: true,
+        demo: false,
+    };
     for (let i = 0; i < argv.length; i += 1) {
         const a = argv[i];
         if (a === '--count') opts.count = Number(argv[++i]);

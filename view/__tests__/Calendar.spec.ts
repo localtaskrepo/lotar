@@ -8,6 +8,7 @@ const routerPushMock = vi.fn()
 
 const projectsStore = {
     projects: ref([{ prefix: 'ACME', name: 'Acme Co' }]),
+    status: ref('ready'),
     refresh: vi.fn(async () => {}),
 }
 
@@ -31,7 +32,8 @@ function createCalendarHandle(
         status,
         error,
         lastSyncAt: ref(1),
-        tasks: computed(() => _calendarItems.value),
+        // The server always sends tags and custom fields; the fixtures leave them out.
+        tasks: computed(() => _calendarItems.value.map((task) => ({ tags: [], custom_fields: {}, ...task }))),
         refresh: vi.fn(async () => {
             status.value = 'ready'
             hasSnapshot.value = true
@@ -42,7 +44,7 @@ function createCalendarHandle(
 }
 
 function calendarKeyOf(filter: Record<string, unknown> = {}): string {
-    const source: Record<string, unknown> = { order: 'desc', ...(filter ?? {}) }
+    const source: Record<string, unknown> = { order: 'desc', ...filter }
     return JSON.stringify(
         Object.entries(source)
             .filter(([k, v]) => !['limit', 'offset', 'page'].includes(k) && v !== undefined && v !== null && v !== '')
@@ -137,7 +139,7 @@ vi.mock('../components/UiSelect.vue', () => ({
         ) {
             const onChange = (event: Event) => {
                 const target = event.target as HTMLSelectElement
-                const value = target?.value ?? ''
+                const value = target.value
                 emit('update:modelValue', value)
                 emit('change', value)
             }

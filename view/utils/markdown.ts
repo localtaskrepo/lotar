@@ -31,7 +31,7 @@ const TASK_REFERENCE_CANDIDATE =
     /(?<![\p{Alphabetic}\p{Number}_-])[\p{Alphabetic}\p{Number}][\p{Alphabetic}\p{Number}_-]*-[0-9]+(?![\p{Alphabetic}\p{Number}_-])/gu
 
 export function renderMarkdownToHtml(source: string, options: RenderMarkdownOptions = {}): string {
-    const markdown = source ?? ''
+    const markdown = source
 
     // micromark blanks unknown URL schemes, so resolve `attachment:` targets
     // in the source; the resolved same-origin URLs pass its checks.
@@ -80,7 +80,7 @@ function linkTaskReferences(html: string, refs: NonNullable<RenderMarkdownOption
             const parsed = parseTaskId(id)
             if (!parsed || !refs.isProject(parsed.project)) continue
             fragment ??= document.createDocumentFragment()
-            const start = match.index ?? 0
+            const start = match.index
             if (start > last) fragment.append(text.slice(last, start))
             const link = document.createElement('a')
             link.className = TASK_REFERENCE_CLASS

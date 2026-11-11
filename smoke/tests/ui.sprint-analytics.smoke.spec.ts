@@ -36,7 +36,7 @@ function normalizeVelocityPayload(value: unknown): VelocityEntriesPayload {
 
 function velocityEntryIds(payload: VelocityEntriesPayload): number[] {
     return (payload.entries ?? [])
-        .map((entry) => entry?.summary?.id ?? null)
+        .map((entry) => entry.summary?.id ?? null)
         .filter((id): id is number => typeof id === 'number');
 }
 
@@ -108,7 +108,7 @@ describe.concurrent('UI sprint analytics smoke scenarios', () => {
                 '--format',
                 'json',
             ]);
-            const cliPayload = normalizeVelocityPayload(JSON.parse(String(cliVelocity.stdout ?? '{}')));
+            const cliPayload = normalizeVelocityPayload(JSON.parse(cliVelocity.stdout));
             const cliEntryIds = velocityEntryIds(cliPayload);
             expect(cliEntryIds).toEqual(expect.arrayContaining([2, 3, 4, 5]));
 

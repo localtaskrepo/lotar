@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick, ref } from 'vue'
+import type { TaskDTO } from '../api/types'
 import TaskPanel from '../components/TaskPanel.vue'
 import { _resetTaskStore, useTaskStore } from '../composables/useTaskStore'
 
@@ -274,7 +275,7 @@ describe('TaskPanel deleted (trash) mode — DEV-92', () => {
         expect(apiFixtures.restoreTaskMock).toHaveBeenCalledWith('DEMO-123', 'DEMO')
         const updated = wrapper.emitted('updated') ?? []
         expect(updated.length).toBeGreaterThan(0)
-        expect((updated[updated.length - 1]?.[0] as any).deleted_at).toBeUndefined()
+        expect((updated[updated.length - 1]?.[0] as TaskDTO | undefined)?.deleted_at).toBeUndefined()
         expect(wrapper.find('[data-testid="task-deleted-banner"]').exists()).toBe(false)
         expect(wrapper.find('fieldset[disabled]').exists()).toBe(false)
     })

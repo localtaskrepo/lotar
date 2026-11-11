@@ -21,9 +21,10 @@ if [ -n "$scanner" ]; then
   "$scanner" git --pre-commit --staged --config .gitleaks.toml --redact --no-banner --no-color -v --log-level warn . || exit 1
 fi
 
-# Same scopes as `cargo fmt`, `npm run fmt:js` (Prettier) and `eslint .`.
+# Same scopes as `cargo fmt`, `npm run fmt:js` (Prettier), `oxlint` and `eslint .` (Vue templates only).
 rust_files=()
 prettier_files=()
+oxlint_files=()
 eslint_files=()
 while IFS= read -r -d '' file; do
   case "$file" in
@@ -34,19 +35,22 @@ while IFS= read -r -d '' file; do
     *.mjs | *.mts) [[ "$file" == */* ]] || prettier_files+=("$file") ;;
   esac
   case "$file" in
-    *.ts | *.vue | *.mjs | *.mts | *.cjs | *.js) eslint_files+=("$file") ;;
+    *.ts | *.vue | *.mjs | *.mts | *.cjs | *.js) oxlint_files+=("$file") ;;
+  esac
+  case "$file" in
+    *.vue) eslint_files+=("$file") ;;
   esac
 done < <(git diff --cached --name-only -z --diff-filter=ACMR)
 
-web_files=("${prettier_files[@]+"${prettier_files[@]}"}" "${eslint_files[@]+"${eslint_files[@]}"}")
-if [ "${#rust_files[@]}" -eq 0 ] && [ "${#eslint_files[@]}" -eq 0 ] && [ "${#prettier_files[@]}" -eq 0 ]; then
+web_files=("${prettier_files[@]+"${prettier_files[@]}"}" "${oxlint_files[@]+"${oxlint_files[@]}"}")
+if [ "${#rust_files[@]}" -eq 0 ] && [ "${#oxlint_files[@]}" -eq 0 ] && [ "${#prettier_files[@]}" -eq 0 ]; then
   exit 0
 fi
 
 # The checks read the working-tree copy; say so when it differs from what
 # is staged so a partially staged file is not silently misjudged.
 partial=()
-for file in "${rust_files[@]+"${rust_files[@]}"}" "${eslint_files[@]+"${eslint_files[@]}"}"; do
+for file in "${rust_files[@]+"${rust_files[@]}"}" "${oxlint_files[@]+"${oxlint_files[@]}"}"; do
   if ! git diff --quiet -- "$file"; then
     partial+=("$file")
   fi
@@ -70,14 +74,18 @@ fi
 
 if [ "${#web_files[@]}" -gt 0 ]; then
   if [ ! -d node_modules ]; then
-    echo "note: node_modules missing; skipped Prettier/ESLint (run 'npm ci')"
+    echo "note: node_modules missing; skipped Prettier/oxlint/ESLint (run 'npm ci')"
   else
     if [ "${#prettier_files[@]}" -gt 0 ] && ! npx --no-install prettier --check --log-level warn "${prettier_files[@]}"; then
       echo "✗ Frontend formatting: run 'npm run fmt:js'"
       failed=1
     fi
+    if [ "${#oxlint_files[@]}" -gt 0 ] && ! npx --no-install oxlint -f agent "${oxlint_files[@]}"; then
+      echo "✗ oxlint findings above"
+      failed=1
+    fi
     if [ "${#eslint_files[@]}" -gt 0 ] && ! npx --no-install eslint --cache --cache-location node_modules/.cache/eslint/ --no-warn-ignored "${eslint_files[@]}"; then
-      echo "✗ ESLint findings above"
+      echo "✗ ESLint (Vue template) findings above"
       failed=1
     fi
   fi

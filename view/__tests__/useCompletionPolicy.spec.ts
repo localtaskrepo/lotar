@@ -853,7 +853,7 @@ describe('useCompletionPolicy', () => {
             expect(invalidator).toHaveBeenCalledTimes(2)
 
             // Global save scope goes through the same refresh+invalidate.
-            await invalidateCompletionPolicies()
+            invalidateCompletionPolicies()
             await ensureCompletionPolicy('ACME')
             invalidator.mockClear()
             await refreshCompletionPoliciesForScope('')

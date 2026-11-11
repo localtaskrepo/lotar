@@ -66,6 +66,7 @@
 </template>
 
 <script setup lang="ts">
+import type { TaskPanelFormState } from '../../composables/task-panel/useTaskPanelPersistence'
 import { computed, isRef, type PropType, type Ref } from 'vue'
 import UiInput from '../UiInput.vue'
 import UiSelect from '../UiSelect.vue'
@@ -76,7 +77,7 @@ interface ProjectOption {
 }
 
 const props = defineProps({
-  form: { type: Object as PropType<Record<string, any>>, required: true },
+  form: { type: Object as PropType<TaskPanelFormState>, required: true },
   mode: { type: String as PropType<'create' | 'edit'>, required: true },
   projects: {
     type: [Array, Object] as PropType<ProjectOption[] | Ref<ProjectOption[]>>,

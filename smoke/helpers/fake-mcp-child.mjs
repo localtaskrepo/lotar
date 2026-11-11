@@ -146,7 +146,7 @@ function readFramedStdin() {
     let buffered = Buffer.alloc(0);
     process.stdin.on('data', (chunk) => {
         buffered = Buffer.concat([buffered, chunk]);
-        while (true) {
+        for (;;) {
             const separator = buffered.indexOf('\r\n\r\n');
             if (separator === -1) {
                 return;

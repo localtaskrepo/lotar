@@ -666,7 +666,7 @@ function collapsedKey() {
   return `lotar.boardCollapsed::${project.value}::${groupBy.value}`
 }
 function loadCollapsed(): Set<string> {
-  const saved = storageGetJson<unknown>(collapsedKey())
+  const saved = storageGetJson(collapsedKey())
   return new Set(Array.isArray(saved) ? saved.filter((label): label is string => typeof label === 'string') : [])
 }
 const collapsedGroups = ref<Set<string>>(loadCollapsed())
@@ -692,7 +692,8 @@ function filterSignature() {
   return JSON.stringify(Object.entries(filter.value).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
 }
 function loadExpansion(): Record<string, number> {
-  const saved = sessionGetJson<{ filter?: string; columns?: Record<string, number> }>(expansionKey())
+  // Written by this page; a stale or hand-edited entry for another filter is ignored.
+  const saved = sessionGetJson(expansionKey()) as { filter?: unknown; columns?: Record<string, number> } | null
   return saved?.filter === filterSignature() && saved.columns ? saved.columns : {}
 }
 const columnExpansion = ref<Record<string, number>>(loadExpansion())
@@ -1129,7 +1130,7 @@ watch(availableCustomFields, (keys) => boardFields.setCustomFieldKeys(keys), { i
 
 watch(project, (next) => boardFields.setProjectKey(next), { immediate: true })
 
-function onDragStart(t: any) {
+function onDragStart(t: TaskDTO) {
   draggingId.value = t.id
 }
 function onDragOver(ev: DragEvent) {

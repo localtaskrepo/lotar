@@ -174,7 +174,7 @@ describe('server launch readiness against real child processes', () => {
                 readyTimeoutMs: 5_000,
             }).then(
                 () => undefined,
-                (failure: Error & { node?: ChildProcess }) => failure,
+                (failure: unknown) => failure as Error & { node?: ChildProcess },
             );
             expect(error).toBeInstanceOf(Error);
             expect(error?.message).toMatch(/exited before becoming ready[\s\S]*code=3/);
@@ -194,7 +194,7 @@ describe('server launch readiness against real child processes', () => {
                 { cwd, env: { ...process.env }, readyTimeoutMs: 5_000 },
             ).then(
                 () => undefined,
-                (failure: Error & { node?: ChildProcess }) => failure,
+                (failure: unknown) => failure as Error & { node?: ChildProcess },
             );
             expect(error).toBeInstanceOf(Error);
             expect(error?.message).toMatch(/exited before becoming ready|ended before a complete readiness banner/i);
@@ -212,7 +212,7 @@ describe('server launch readiness against real child processes', () => {
                 readyTimeoutMs: 400,
             }).then(
                 () => undefined,
-                (failure: Error & { node?: ChildProcess }) => failure,
+                (failure: unknown) => failure as Error & { node?: ChildProcess },
             );
             expect(error?.message).toMatch(/did not advertise readiness within 400ms/i);
             // The timed-out child was killed and reaped before the rejection.
@@ -277,7 +277,7 @@ describe('server launch readiness against real child processes', () => {
                 expectedPort: 59_999,
             }).then(
                 () => undefined,
-                (failure: Error & { node?: ChildProcess }) => failure,
+                (failure: unknown) => failure as Error & { node?: ChildProcess },
             );
             expect(error?.message).toMatch(/advertised port 45678 but 59999 was requested/i);
             expect(exited(error?.node)).toBe(true);
@@ -297,7 +297,7 @@ describe.skipIf(!lotarBinaryAvailable)('lotar serve readiness contract (real bin
             const held = (holder.address() as net.AddressInfo).port;
             const error = await startLotarServer(workspace, { port: held }).then(
                 () => undefined,
-                (failure: Error & { node?: ChildProcess }) => failure,
+                (failure: unknown) => failure as Error & { node?: ChildProcess },
             );
             expect(error).toBeInstanceOf(Error);
             // The banner is only printed after a successful bind, so a bind
@@ -336,7 +336,7 @@ describe.skipIf(!lotarBinaryAvailable)('lotar serve readiness contract (real bin
                 const { port } = await resolveServerBind();
                 const started = await startLotarServer(workspace, { port }).then(
                     (server) => ({ server }),
-                    (error: Error) => ({ error }),
+                    (error: unknown) => ({ error: error as Error }),
                 );
                 if ('error' in started) {
                     if (attempt < 3 && /Failed to bind/.test(started.error.message)) continue;

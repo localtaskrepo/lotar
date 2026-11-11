@@ -67,13 +67,13 @@ export function useTaskPanelReferenceMutations(
     const attachments = computed(() => {
         const list = Array.isArray(task.references) ? task.references : []
         return list.filter(
-            (entry) => typeof entry?.attachment === 'string' && (entry.attachment || '').trim().length > 0,
+            (entry) => typeof entry.attachment === 'string' && (entry.attachment || '').trim().length > 0,
         )
     })
 
     const linkReferences = computed(() => {
         const list = Array.isArray(task.references) ? task.references : []
-        return list.filter((entry) => typeof entry?.link === 'string' && (entry.link || '').trim().length > 0)
+        return list.filter((entry) => typeof entry.link === 'string' && (entry.link || '').trim().length > 0)
     })
 
     function applyReferencesFromTaskResponse(updated: Partial<TaskDTO> | null | undefined) {
@@ -128,7 +128,7 @@ export function useTaskPanelReferenceMutations(
 
         const existing = new Set(
             (Array.isArray(task.references) ? task.references : [])
-                .map((r) => (typeof r?.link === 'string' ? r.link.trim() : ''))
+                .map((r) => (typeof r.link === 'string' ? r.link.trim() : ''))
                 .filter(Boolean),
         )
         if (existing.has(normalized)) return 'skipped'

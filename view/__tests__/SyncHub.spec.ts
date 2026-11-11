@@ -637,7 +637,7 @@ describe('SyncHub scope isolation', () => {
         configState.projectRemotes = { ALPHA: {} }
         const globalItem = reportMeta('glob-1', 'gvremote', 'ALPHA')
         listHandler = async (params) => {
-            if (params?.project === 'ALPHA') {
+            if (params.project === 'ALPHA') {
                 return { total: 1, limit: 20, offset: 0, reports: [reportMeta('alpha-1', 'avremote', 'ALPHA')] }
             }
             return { total: 1, limit: 20, offset: 0, reports: [globalItem] }
@@ -704,7 +704,7 @@ describe('SyncHub scope isolation', () => {
         await flushPromises()
 
         listHandler = async (params) => {
-            if (params?.limit === 200) {
+            if (params.limit === 200) {
                 return { total: 1, limit: 200, offset: 0, reports: [reportMeta(runA, 'jira-home', null)] }
             }
             return emptyList()

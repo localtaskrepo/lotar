@@ -21,11 +21,12 @@ export function storageSet(key: string, value: string): void {
     }
 }
 
-export function storageGetJson<T>(key: string): T | null {
+/** Stored JSON as written (by any earlier version, or by hand): callers check its shape. */
+export function storageGetJson(key: string): unknown {
     const raw = storageGet(key)
     if (!raw) return null
     try {
-        return JSON.parse(raw) as T
+        return JSON.parse(raw)
     } catch {
         return null
     }
@@ -61,10 +62,10 @@ export function storageRemove(key: string): void {
 }
 
 /** Session-scoped JSON read (per tab, cleared when the tab closes). */
-export function sessionGetJson<T>(key: string): T | null {
+export function sessionGetJson(key: string): unknown {
     try {
         const raw = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(key) : null
-        return raw ? (JSON.parse(raw) as T) : null
+        return raw ? JSON.parse(raw) : null
     } catch {
         return null
     }

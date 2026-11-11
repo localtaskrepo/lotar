@@ -17,20 +17,20 @@ describe('Sprint deletion confirmation', () => {
                 { acceptExitCodes: [1], timeout: 5_000 },
             );
             expect(refused.exitCode).toBe(1);
-            expect(String(refused.stderr)).toContain('--force');
+            expect(refused.stderr).toContain('--force');
             expect(await fs.readFile(sprintPath, 'utf8')).toBe(original);
 
             const confirmed = await workspace.runLotar(['--format', format, 'sprint', 'delete', '1', '--force']);
             expect(confirmed.exitCode).toBe(0);
             expect(await fs.pathExists(sprintPath)).toBe(false);
             if (format === 'json') {
-                expect(JSON.parse(String(confirmed.stdout))).toMatchObject({
+                expect(JSON.parse(confirmed.stdout)).toMatchObject({
                     status: 'ok',
                     deleted: true,
                     sprint_id: 1,
                 });
             } else {
-                expect(String(confirmed.stdout)).toContain('Deleted');
+                expect(confirmed.stdout).toContain('Deleted');
             }
         } finally {
             await workspace.dispose();

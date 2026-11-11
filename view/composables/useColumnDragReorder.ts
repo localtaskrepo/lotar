@@ -65,8 +65,8 @@ export function useColumnDragReorder(options: UseColumnDragReorderOptions) {
             dragOverPos.value = 'before'
             return
         }
-        const rect = target.getBoundingClientRect?.()
-        if (!rect || !rect.width) {
+        const rect = target.getBoundingClientRect()
+        if (!rect.width) {
             dragOverPos.value = 'before'
             return
         }

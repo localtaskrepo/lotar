@@ -24,6 +24,7 @@ vi.mock('../components/toast', () => ({
 vi.mock('../composables/useProjects', () => ({
     useProjects: () => ({
         projects: ref([{ prefix: 'DEMO', name: 'Demo Project' }]),
+        status: ref('ready'),
         refresh: vi.fn(async () => {}),
     }),
 }))
@@ -299,7 +300,7 @@ describe('TaskPanel create-mode sprint destination (DEV-104)', () => {
         await flushPromises()
 
         expect((wrapper.vm as any).form.sprints).toEqual([])
-        expect(vi.mocked(showToast).mock.calls.some((call) => String(call[0]).includes('closed sprints'))).toBe(true)
+        expect(vi.mocked(showToast).mock.calls.some((call) => call[0].includes('closed sprints'))).toBe(true)
 
         const allowClosed = dialog.find('.task-panel-dialog__checkbox input')
         expect(allowClosed.exists()).toBe(true)

@@ -162,7 +162,7 @@ export function toolErrorText(message: any): string {
     }
     if (message?.result?.isError) {
         const text = toolResultContent(message)
-            .filter((entry) => typeof entry?.text === 'string')
+            .filter((entry) => typeof entry.text === 'string')
             .map((entry) => entry.text)
             .join('\n');
         if (text) {
@@ -220,12 +220,12 @@ export function expectToolFailure(message: any, ...substrings: string[]): void {
     }
 }
 
-export function extractToolPayload(source: McpFrame | McpClientLike | any): unknown {
+export function extractToolPayload(source: any): unknown {
     const message = isFrame(source) ? source.message : source;
     const content: McpContentEntry[] =
         message?.result?.functionResponse?.response?.content ?? message?.result?.content ?? [];
 
-    const entry = content.find((candidate) => typeof candidate?.text === 'string' || candidate?.json);
+    const entry = content.find((candidate) => typeof candidate.text === 'string' || candidate.json);
     if (!entry) {
         throw new Error(`No content payload returned: ${JSON.stringify(message?.result ?? {}, null, 2)}`);
     }

@@ -4,8 +4,8 @@ import { withPage } from '../helpers/ui.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
 function formatLabel(name: string, prefix: string, maxLength = 28): string {
-    const normalizedName = (name ?? '').trim();
-    const normalizedPrefix = (prefix ?? '').trim();
+    const normalizedName = name.trim();
+    const normalizedPrefix = prefix.trim();
     const hasName = normalizedName.length > 0;
 
     let base = hasName ? normalizedName : normalizedPrefix || 'Project';
@@ -60,12 +60,12 @@ describe.concurrent('UI project labels', () => {
 
                     const qcLabel = await page.evaluate((value: string) => {
                         const option = document.querySelector(`select.ui-select option[value="${value}"]`);
-                        return option?.textContent?.trim() ?? null;
+                        return option?.textContent.trim() ?? null;
                     }, 'QC');
 
                     const opsLabel = await page.evaluate((value: string) => {
                         const option = document.querySelector(`select.ui-select option[value="${value}"]`);
-                        return option?.textContent?.trim() ?? null;
+                        return option?.textContent.trim() ?? null;
                     }, 'OPS');
 
                     expect(qcLabel).toBe(formatLabel(qcName, 'QC'));

@@ -252,7 +252,7 @@ export class NdjsonMcpClient implements McpClientLike {
 
     async awaitResponse(id: unknown, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<McpMessage> {
         return this.queue.wait(
-            (message) => mcpIdsMatch(message?.id, id),
+            (message) => mcpIdsMatch(message.id, id),
             timeoutMs,
             `Timed out waiting for MCP response with id ${JSON.stringify(id)}`,
         );
@@ -267,7 +267,7 @@ export class NdjsonMcpClient implements McpClientLike {
     }
 
     private consumeLines(): void {
-        while (true) {
+        for (;;) {
             const newlineIndex = this.buffer.indexOf(0x0a);
             if (newlineIndex === -1) {
                 if (this.buffer.length > this.maxLineBytes) {
@@ -432,7 +432,7 @@ export class FramedMcpClient implements McpClientLike {
     private tryParseFrames(): void {
         const separator = Buffer.from('\r\n\r\n', 'utf8');
 
-        while (true) {
+        for (;;) {
             const headerIndex = this.buffer.indexOf(separator);
             if (headerIndex === -1) {
                 if (this.buffer.length > MCP_MAX_MESSAGE_BYTES) {

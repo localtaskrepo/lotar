@@ -39,7 +39,7 @@ export function useTaskPanelTags(options: UseTaskPanelTagsOptions): TaskPanelTag
     })
 
     const mergeKnownTags = (input: Array<string | null | undefined>) => {
-        if (!input?.length) return
+        if (!input.length) return
         const map = new Map<string, string>()
         knownTags.value.forEach((tag) => {
             const trimmed = tag.trim()
@@ -70,7 +70,7 @@ export function useTaskPanelTags(options: UseTaskPanelTagsOptions): TaskPanelTag
         watcherStarted = true
         watch(
             () => options.form.tags.slice(),
-            async (tags, prev = []) => {
+            async (tags, prev) => {
                 if (!options.ready.value || options.suppressWatch.value || options.mode.value !== 'edit') {
                     return
                 }

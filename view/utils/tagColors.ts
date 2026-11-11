@@ -97,7 +97,7 @@ export function tagColorOf(
     if (exact) return resolveTagColor(exact.color)
     const lower = tag.toLowerCase()
     for (const [name, props] of Object.entries(properties)) {
-        if (name.toLowerCase() === lower) return resolveTagColor(props?.color)
+        if (name.toLowerCase() === lower) return resolveTagColor(props.color)
     }
     return null
 }

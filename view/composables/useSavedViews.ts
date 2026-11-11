@@ -16,8 +16,9 @@ export interface SavedView {
 const STORAGE_KEY = 'lotar.savedViews'
 
 function load(): SavedView[] {
-    const arr = storageGetJson<unknown>(STORAGE_KEY)
-    return Array.isArray(arr) ? arr : []
+    const arr = storageGetJson(STORAGE_KEY)
+    // Written by persist() below.
+    return Array.isArray(arr) ? (arr as SavedView[]) : []
 }
 
 function persist(list: SavedView[]) {

@@ -73,12 +73,17 @@ const dev54Graph = () =>
 const visibleIds = (wrapper: ReturnType<typeof mount>) =>
     wrapper
         .findAll('.dependency-task-list > li')
-        .map((row) => row.attributes('data-task-id'))
+        .map((row) => row.attributes('data-task-id') ?? '')
         .sort()
 beforeEach(() => {
     vi.clearAllMocks()
     mocks.graph.mockResolvedValue(graph())
-    vi.stubGlobal('EventSource', class {})
+    vi.stubGlobal(
+        'EventSource',
+        class {
+            close() {}
+        },
+    )
     vi.stubGlobal(
         'matchMedia',
         vi.fn(() => ({ matches: false })),
@@ -567,7 +572,7 @@ describe('Bounded dependency view', () => {
         expect(
             wrapper
                 .findAll('[aria-label="Dependency tasks"] > li')
-                .map((entry) => entry.attributes('data-task-id'))
+                .map((entry) => entry.attributes('data-task-id') ?? '')
                 .sort(),
         ).toEqual(['BLOCKER-1', 'DEV-8', 'INDEPENDENT-1'])
         expect(wrapper.get('[aria-label="Relationship legend"]').text()).toContain('blocks')
@@ -577,7 +582,7 @@ describe('Bounded dependency view', () => {
         expect(
             wrapper
                 .findAll('[aria-label="Dependency tasks"] > li')
-                .map((entry) => entry.attributes('data-task-id'))
+                .map((entry) => entry.attributes('data-task-id') ?? '')
                 .sort(),
         ).toEqual(['DEV-8', 'INDEPENDENT-1'])
         expect(wrapper.find('[aria-label="Relationship legend"]').exists()).toBe(false)

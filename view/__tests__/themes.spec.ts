@@ -100,7 +100,7 @@ describe('colour themes (themes.css)', () => {
 
     it('lists the classic themes first, then the playful ones', () => {
         const groups = THEMES.map((theme) => theme.group)
-        expect(groups.every((group) => group === 'classic' || group === 'playful')).toBe(true)
+        expect(groups.filter((group) => !['classic', 'playful'].includes(group))).toEqual([])
         expect(groups.lastIndexOf('classic')).toBeLessThan(groups.indexOf('playful'))
     })
 

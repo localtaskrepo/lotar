@@ -56,7 +56,7 @@ function snapshotTree(root: string): Map<string, string> {
 
 async function currentBranch(cwd: string, env: NodeJS.ProcessEnv): Promise<string> {
     const result = await runGitCommand(cwd, ['symbolic-ref', 'HEAD'], { env });
-    return (result.stdout ?? '').trim();
+    return result.stdout.trim();
 }
 
 afterEach(() => {

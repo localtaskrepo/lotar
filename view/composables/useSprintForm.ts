@@ -111,7 +111,7 @@ export function useSprintForm() {
 
     function fillFormFromSprint(sprint: SprintListItem) {
         Object.assign(form, {
-            label: sprint.label ?? sprint.display_name ?? '',
+            label: sprint.label ?? sprint.display_name,
             goal: sprint.goal ?? '',
             plan_length: sprint.plan_length ?? '',
             ends_at: toDateTimeInputValue(sprint.planned_end),

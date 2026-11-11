@@ -39,11 +39,12 @@ let inflight: Promise<void> | null = null
 
 /** Apply a server response: theme default, tab title and icon. */
 export function applyBranding(response: BrandingResponse) {
+    // index.html loaded the skin already; only a later change needs a reload.
+    const skinChanged = state.loaded && state.themeFile !== (response.theme_file ?? null)
     state.loaded = true
     state.theme = response.theme ?? null
     state.themeSource = response.theme_source ?? null
     state.repositoryTheme = response.repository_theme ?? null
-    const skinChanged = state.loaded && state.themeFile !== (response.theme_file ?? null)
     state.themeFile = response.theme_file ?? null
     if (skinChanged) reloadSkinStylesheet()
     state.name = response.name?.trim() || null

@@ -653,7 +653,7 @@ describe.concurrent('UI relationship integrity and dependencies (DEV-15/DEV-8/DE
                     expect(
                         (
                             await cards.evaluateAll((elements) =>
-                                elements.map((element) => (element as HTMLElement).dataset.taskId),
+                                elements.map((element) => (element as HTMLElement).dataset.taskId ?? ''),
                             )
                         ).sort(),
                     ).toEqual([source.id, ...dependents.map((task) => task.id)].sort());
@@ -813,7 +813,7 @@ describe.concurrent('UI relationship integrity and dependencies (DEV-15/DEV-8/DE
                         const pairs = await page.locator('.dependency-edge').evaluateAll(
                             (edges, id) =>
                                 edges
-                                    .filter((edge) => edge.querySelector('title')?.textContent?.includes(id))
+                                    .filter((edge) => edge.querySelector('title')?.textContent.includes(id))
                                     .map((edge) => ({
                                         path: edge.querySelector('path')?.getAttribute('d'),
                                         title: edge.querySelector('title')?.textContent,

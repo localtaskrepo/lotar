@@ -78,7 +78,7 @@ const requestSeq = new Map<string, number>()
 const serverCalendarDay = ref('')
 
 function extractPolicy(prefix: string, config: unknown): CompletionPolicy | null {
-    const source = (config ?? {}) as Record<string, any>
+    const source = (config ?? {}) as Record<string, unknown>
     const doneLabels: string[] = Array.isArray(source.effective_done_states)
         ? source.effective_done_states
               .map((value: unknown) => String(value))
@@ -150,7 +150,7 @@ export function ensureCompletionPolicy(prefix: string): Promise<void> {
 export function ensureCompletionPolicies(tasks: readonly TaskDTO[] | null | undefined): Promise<void> {
     const prefixes = new Set<string>()
     for (const task of tasks || []) {
-        const prefix = projectOf(task?.id)
+        const prefix = projectOf(task.id)
         if (prefix) prefixes.add(prefix)
     }
     return Promise.all(Array.from(prefixes, (prefix) => ensureCompletionPolicy(prefix))).then(() => undefined)
@@ -220,7 +220,7 @@ export function refreshCompletionPoliciesForScope(scope: string): Promise<void> 
 
 /** Drop cached policies (all, or one prefix) so the next ensure refetches. */
 export function invalidateCompletionPolicies(prefix?: string): void {
-    if (prefix === undefined || prefix === null) {
+    if (prefix === undefined) {
         policyRecords.clear()
         // Drop refresh bookkeeping too, so an immediate follow-up refresh is
         // not swallowed by the dedupe window of a pre-invalidation refresh,
@@ -274,7 +274,7 @@ function observeServerDay(day: string): void {
 export async function probeServerCalendarDay(): Promise<void> {
     let day: unknown
     try {
-        day = ((await api.showConfig()) as Record<string, any> | null | undefined)?.task_calendar_day
+        day = (await api.showConfig()).task_calendar_day
     } catch {
         return
     }

@@ -100,7 +100,7 @@ describe('frontend scope safety', () => {
 
     it('applies panel project defaults once for the latest A/B/A request', async () => {
         const scope = effectScope()
-        const requests = [deferred<void>(), deferred<void>(), deferred<void>()]
+        const requests = [deferred<undefined>(), deferred<undefined>(), deferred<undefined>()]
         const refreshConfig = vi.fn()
         requests.forEach((request) => refreshConfig.mockReturnValueOnce(request.promise))
         const resetSprintsState = vi.fn()
@@ -132,11 +132,11 @@ describe('frontend scope safety', () => {
         lifecycle.onProjectChange()
         form.project = 'A'
         lifecycle.onProjectChange()
-        requests[2]!.resolve()
+        requests[2]!.resolve(undefined)
         await flushPromises()
         expect(resetSprintsState).toHaveBeenCalledTimes(1)
-        requests[0]!.resolve()
-        requests[1]!.resolve()
+        requests[0]!.resolve(undefined)
+        requests[1]!.resolve(undefined)
         await flushPromises()
         expect(form.project).toBe('A')
         expect(resetSprintsState).toHaveBeenCalledTimes(1)

@@ -160,16 +160,16 @@ export async function launchAndWaitReady(
     // unhandled rejection would otherwise surface at process level.
     void child.catch(() => undefined);
 
-    child.stdout?.setEncoding('utf8');
-    child.stderr?.setEncoding('utf8');
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
     // Destroying a still-readable pipe (e.g. when the readiness scan stops
     // iterating) raises an AbortError; keep a no-op handler so it can never
     // become an unhandled stream error.
-    child.stdout?.once('error', () => undefined);
-    child.stderr?.once('error', () => undefined);
+    child.stdout.once('error', () => undefined);
+    child.stderr.once('error', () => undefined);
 
     const stderrChunks: string[] = [];
-    child.stderr?.on('data', (chunk: unknown) => {
+    child.stderr.on('data', (chunk: unknown) => {
         const text = chunkToString(chunk);
         stderrChunks.push(text);
         if (process.env.SMOKE_DEBUG === '1') {
@@ -195,12 +195,6 @@ export async function launchAndWaitReady(
     type Outcome = ReadyResult | ExitResult | { kind: 'error'; error: Error };
 
     const waitForReady = async (): Promise<Outcome> => {
-        if (!child.stdout) {
-            return {
-                kind: 'error',
-                error: new Error('server was spawned without a piped stdout'),
-            };
-        }
         try {
             return {
                 kind: 'ready',
@@ -345,6 +339,10 @@ export async function startLotarServer(
  * Graceful teardown: SIGINT, bounded wait, SIGKILL fallback, then await the
  * exit so the child is reaped before returning (joined teardown).
  */
+function isRunning(node: ChildProcess): boolean {
+    return node.exitCode === null && !node.killed;
+}
+
 async function stopChildProcess(child: ResultPromise, node: ChildProcess): Promise<void> {
     if (node.exitCode !== null || node.signalCode !== null) {
         // Already exited (by code or signal): attach a rejection handler so
@@ -383,7 +381,8 @@ async function stopChildProcess(child: ResultPromise, node: ChildProcess): Promi
         child.stdout?.destroy();
         child.stderr?.destroy();
 
-        if (!graceful && node.exitCode === null && !node.killed) {
+        // Read live: the child can exit during the awaits above.
+        if (!graceful && isRunning(node)) {
             child.kill('SIGKILL');
         }
     }

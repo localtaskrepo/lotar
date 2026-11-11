@@ -23,7 +23,7 @@ async function load(force = false): Promise<void> {
             const normalized = Array.isArray(response.sprints)
                 ? response.sprints.map((item) => ({
                       ...item,
-                      warnings: Array.isArray((item as any).warnings) ? item.warnings : [],
+                      warnings: Array.isArray(item.warnings) ? item.warnings : [],
                   }))
                 : []
             sprints.value = normalized
@@ -75,5 +75,5 @@ export function useSprints() {
 
 /** Dropdown options for the sprint grammar/filter UI (id + label), shared by pages. */
 export function useSprintFilterOptions(sprints: Ref<SprintListItem[]>) {
-    return computed(() => (sprints.value || []).map((s) => ({ id: s.id, label: s.display_name || `Sprint ${s.id}` })))
+    return computed(() => sprints.value.map((s) => ({ id: s.id, label: s.display_name || `Sprint ${s.id}` })))
 }

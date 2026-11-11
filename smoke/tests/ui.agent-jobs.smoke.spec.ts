@@ -352,11 +352,11 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
                     await withPage(`${server.url}/agents`, async (page) => {
                         await page.waitForSelector('.filter-tab', { timeout: 15_000 });
 
-                        const tabs = await page.$$eval('.filter-tab', (els) => els.map((el) => el.textContent?.trim()));
-                        expect(tabs.some((t) => t?.includes('All'))).toBe(true);
-                        expect(tabs.some((t) => t?.includes('Running'))).toBe(true);
-                        expect(tabs.some((t) => t?.includes('Completed'))).toBe(true);
-                        expect(tabs.some((t) => t?.includes('Failed'))).toBe(true);
+                        const tabs = await page.$$eval('.filter-tab', (els) => els.map((el) => el.textContent.trim()));
+                        expect(tabs.some((t) => t.includes('All'))).toBe(true);
+                        expect(tabs.some((t) => t.includes('Running'))).toBe(true);
+                        expect(tabs.some((t) => t.includes('Completed'))).toBe(true);
+                        expect(tabs.some((t) => t.includes('Failed'))).toBe(true);
 
                         const completedCards = page.locator('.job-card.job-completed');
                         const failedCards = page.locator('.job-card.job-failed');

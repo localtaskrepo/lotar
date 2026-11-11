@@ -129,7 +129,7 @@ export class JiraStub {
 
     async stop(): Promise<void> {
         this.releaseSearchBarrier();
-        this.server.closeAllConnections?.();
+        this.server.closeAllConnections();
         await new Promise<void>((resolve) => {
             this.server.close(() => resolve());
         });
@@ -218,10 +218,8 @@ export class JiraStub {
         if (path === '/rest/api/3/issue' && req.method === 'POST') {
             const key = `${this.projectKey}-${this.nextCreatedId}`;
             this.nextCreatedId += 1;
-            const summary =
-                (body && typeof body === 'object' && (body as { fields?: { summary?: unknown } }).fields?.summary) ||
-                key;
-            this.issues.push({ key, summary: String(summary) });
+            const summary = (body as { fields?: { summary?: unknown } } | null)?.fields?.summary;
+            this.issues.push({ key, summary: typeof summary === 'string' && summary ? summary : key });
             this.sendJson(res, 201, { id: String(this.nextCreatedId), key });
             return;
         }

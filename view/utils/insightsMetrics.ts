@@ -113,11 +113,11 @@ function readHistory(task: TaskDTO): { changes: StatusChange[]; entries: TaskTim
     const changes: StatusChange[] = []
     const entries: TaskTimeline['entries'] = []
     for (const entry of Array.isArray(task.history) ? task.history : []) {
-        const at = parseTime(entry?.at)
+        const at = parseTime(entry.at)
         if (at === null) continue
         entries.push({ at, actor: (entry.actor ?? '').trim() })
         for (const change of Array.isArray(entry.changes) ? entry.changes : []) {
-            if (change?.field === 'status') changes.push({ at, old: change.old ?? null, next: change.new ?? null })
+            if (change.field === 'status') changes.push({ at, old: change.old ?? null, next: change.new ?? null })
         }
     }
     changes.sort((a, b) => a.at - b.at)
@@ -133,10 +133,10 @@ export function inferInitialStatuses(tasks: readonly TaskDTO[]): Map<string, str
     for (const task of tasks) {
         let first: { at: number; old: string | null } | null = null
         for (const entry of Array.isArray(task.history) ? task.history : []) {
-            const at = parseTime(entry?.at)
+            const at = parseTime(entry.at)
             if (at === null) continue
             for (const change of Array.isArray(entry.changes) ? entry.changes : []) {
-                if (change?.field === 'status' && change.old && (!first || at < first.at))
+                if (change.field === 'status' && change.old && (!first || at < first.at))
                     first = { at, old: change.old }
             }
         }

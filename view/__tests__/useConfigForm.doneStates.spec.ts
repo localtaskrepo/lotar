@@ -109,7 +109,7 @@ describe('useConfigForm done states (DEV-21)', () => {
     })
 
     afterEach(() => {
-        form?.resetForm()
+        form.resetForm()
     })
 
     it('populates the global scope from global_raw and keeps automatic as null', () => {

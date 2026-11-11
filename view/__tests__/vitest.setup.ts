@@ -12,7 +12,7 @@ class MemoryStorage {
     }
 
     setItem(key: string, value: string) {
-        this.store.set(key, String(value))
+        this.store.set(key, value)
     }
 
     removeItem(key: string) {
@@ -36,6 +36,8 @@ const jsonResponse = (data: unknown) =>
 
 beforeAll(() => {
     vi.stubGlobal('localStorage', new MemoryStorage())
+    // jsdom has no layout, so it leaves out scrollIntoView; every browser has it.
+    Element.prototype.scrollIntoView = () => {}
 
     vi.stubGlobal(
         'fetch',
@@ -55,8 +57,6 @@ beforeAll(() => {
 })
 
 afterEach(() => {
-    if (typeof globalThis.localStorage?.clear === 'function') {
-        globalThis.localStorage.clear()
-    }
+    globalThis.localStorage.clear()
     vi.clearAllMocks()
 })

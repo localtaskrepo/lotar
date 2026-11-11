@@ -32,7 +32,7 @@ export interface TaskTableProps {
      * `update:sort` instead of mutating local state, and only columns with a
      * server sort key offer the sort affordance.
      */
-    sort?: { key: ColKey | string | null; dir: 'asc' | 'desc' } | null
+    sort?: { key: ColKey | (string & {}) | null; dir: 'asc' | 'desc' } | null
 }
 
 export interface TaskTableEmit {
@@ -124,10 +124,10 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
     }
 
     function readStoredSort(): { key: ColKey | null; dir: 'asc' | 'desc' } {
-        return (
-            storageGetJson<{ key: ColKey | null; dir: 'asc' | 'desc' }>(sortKey()) ??
-            storageGetJson<{ key: ColKey | null; dir: 'asc' | 'desc' }>(SORT_KEY) ?? { key: null, dir: 'desc' }
-        )
+        // Written by this component as { key, dir }.
+        type StoredSort = { key: ColKey | null; dir: 'asc' | 'desc' }
+        const stored = (storageGetJson(sortKey()) ?? storageGetJson(SORT_KEY)) as StoredSort | null
+        return stored ?? { key: null, dir: 'desc' }
     }
 
     // Internal sort state (standalone usage). When the page passes the
@@ -137,7 +137,7 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
 
     const isControlledSort = computed(() => props.sort !== undefined && props.sort !== null)
 
-    const sort = computed<{ key: ColKey | string | null; dir: 'asc' | 'desc' }>(() =>
+    const sort = computed<{ key: ColKey | (string & {}) | null; dir: 'asc' | 'desc' }>(() =>
         isControlledSort.value ? (props.sort as { key: ColKey | null; dir: 'asc' | 'desc' }) : internalSort,
     )
 
@@ -177,7 +177,7 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
         internalSort.dir = dir
     }
 
-    function isSortableCol(key: ColKey | string): boolean {
+    function isSortableCol(key: ColKey | (string & {})): boolean {
         if (key === 'attachments') return false
         if (!isControlledSort.value) return true
         return colKeyToSortBy(key) !== null
@@ -207,7 +207,7 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
         return !!rowMenu.value[id]
     }
 
-    const filtered = computed(() => props.tasks || [])
+    const filtered = computed(() => props.tasks)
 
     // DEV-21: shared per-project completion policy drives overdue styling.
     const completion = useCompletionPolicy({ tasks: () => filtered.value })

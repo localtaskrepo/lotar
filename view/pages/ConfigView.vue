@@ -803,9 +803,9 @@ const prefixEdited = ref(false)
 const trimmedCreateName = computed(() => createName.value.trim())
 const normalizedCreatePrefix = computed(() => normalizePrefixInput(createPrefix.value))
 
-function extractDefaultPrefix(source: Record<string, any> | null | undefined): string {
-  if (!source) return ''
-  return source.default_project ?? ''
+function extractDefaultPrefix(source: Record<string, unknown> | null | undefined): string {
+  const prefix = source?.default_project
+  return typeof prefix === 'string' ? prefix : ''
 }
 
 watch(normalizedCreatePrefix, (value) => {

@@ -141,7 +141,7 @@ export function parseWrapperArgs(argv) {
     const state = {
         agent: false,
         dryRun: false,
-        forceProbe: null,
+        forceProbe: /** @type {string | null} */ (null),
         passthrough: [],
         explicitProfile: null,
         hasFilterset: false,
@@ -385,7 +385,7 @@ async function realGitLaunch(cwd, gitBinary, env, timeoutMs) {
             child.kill('SIGKILL');
             reject(new RunnerError(`git init probe timed out after ${timeoutMs}ms`));
         }, timeoutMs);
-        child.on('error', (error) => {
+        child.on('error', (/** @type {Error} */ error) => {
             if (settled) {
                 return;
             }
@@ -439,7 +439,7 @@ export async function probeGitCapability({
                         () => reject(new RunnerError(`git init probe timed out after ${timeoutMs}ms`)),
                         timeoutMs,
                     );
-                    timer.unref?.();
+                    timer.unref();
                 }),
             ]);
         } catch (error) {
@@ -490,10 +490,10 @@ export async function runInventoryList(listArgs, { spawnImpl = spawn } = {}) {
             clearTimeout(timer);
             reject(new RunnerError(`cannot run cargo nextest list: ${error.message}`));
         });
-        child.stdout?.on('data', (chunk) => {
+        child.stdout.on('data', (chunk) => {
             stdout += chunk;
         });
-        child.stderr?.on('data', (chunk) => {
+        child.stderr.on('data', (chunk) => {
             stderr += chunk;
         });
         child.on('close', (code) => {
@@ -614,12 +614,12 @@ export async function main({
     return outcome.exitCode;
 }
 
-const isMain =
-    process.argv[1] !== undefined && import.meta.url === new URL(`file://${path.resolve(process.argv[1])}`).href;
+const entryScript = process.argv.at(1);
+const isMain = entryScript !== undefined && import.meta.url === new URL(`file://${path.resolve(entryScript)}`).href;
 if (isMain) {
     main().then(
         (code) => process.exit(code),
-        (error) => {
+        (/** @type {unknown} */ error) => {
             const message = error instanceof RunnerError ? error.message : (error?.stack ?? String(error));
             console.error(`rust-test-runner: error: ${message}`);
             process.exit(error instanceof RunnerError ? error.code : 2);

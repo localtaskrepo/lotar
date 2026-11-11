@@ -206,7 +206,7 @@ describe('ConfigView branch alias handling', () => {
             project_raw: {
                 project_name: 'APP',
                 branch_priority_aliases: { hotfix: 'High', sev1: 'Critical' },
-            } as any,
+            },
             project_exists: true,
             sources: { branch_priority_aliases: 'project' },
         })
@@ -376,7 +376,7 @@ describe('ConfigView branch alias handling', () => {
             project_raw: {
                 project_name: 'APP',
                 auto_assign_on_status: true,
-            } as any,
+            },
             project_exists: true,
             sources: { auto_assign_on_status: 'project' },
         })
@@ -393,8 +393,8 @@ describe('ConfigView branch alias handling', () => {
         expect(projectCalls[1][0]).toBe('APP')
 
         const projectVm = projectWrapper.vm as any
-        const baselineRef = (projectVm as any).$?.setupState?.baseline as { value: any }
-        expect(baselineRef?.value).not.toBeNull()
+        const baselineRef = projectVm.$?.setupState?.baseline as { value: any }
+        expect(baselineRef.value).not.toBeNull()
         expect(projectVm.isGlobal).toBe(false)
         projectVm.form.autoAssignOnStatus = 'true'
         await projectWrapper.vm.$nextTick()

@@ -258,13 +258,15 @@ describe('UI DEV-65 query isolation and live convergence', () => {
                         // clickable button, click while clickable, and accept
                         // whichever real BASE request lands first.
                         const refreshButton = page.getByRole('button', { name: 'Refresh tasks' });
-                        for (let attempt = 0; attempt < 3 && held.length === 0; attempt += 1) {
+                        // Read live: the route handler fills `held` while this loop awaits.
+                        const anyHeld = () => held.length > 0;
+                        for (let attempt = 0; attempt < 3 && !anyHeld(); attempt += 1) {
                             await expect
-                                .poll(async () => held.length > 0 || (await refreshButton.isEnabled()), {
+                                .poll(async () => anyHeld() || (await refreshButton.isEnabled()), {
                                     timeout: 10_000,
                                 })
                                 .toBe(true);
-                            if (held.length > 0) break;
+                            if (anyHeld()) break;
                             try {
                                 await refreshButton.click({ timeout: 5_000 });
                             } catch {

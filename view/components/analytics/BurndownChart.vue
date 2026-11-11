@@ -104,7 +104,7 @@ function upsertChart() {
       type: 'line',
       data: {
         labels: labels.value,
-        datasets: datasets as any,
+        datasets,
       },
       options: {
         responsive: false,
@@ -137,7 +137,7 @@ function upsertChart() {
     })
   } else {
     chart.value.data.labels = [...labels.value]
-    chart.value.data.datasets = datasets as any
+    chart.value.data.datasets = datasets
     chart.value.update()
   }
 }

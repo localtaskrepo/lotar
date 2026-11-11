@@ -64,7 +64,7 @@ const apiFixtures = vi.hoisted(() => {
     const addTaskCodeReferenceMock = vi.fn(async (_payload: any) => {
         const next = {
             ...clone(state.task),
-            references: [...(state.task.references || []), { code: 'src/lib.rs#10-12' }],
+            references: [...state.task.references, { code: 'src/lib.rs#10-12' }],
         }
         state.task = clone(next)
         return { task: clone(state.task), added: true }
@@ -128,7 +128,7 @@ const apiFixtures = vi.hoisted(() => {
         addTaskCodeReferenceMock.mockReset().mockImplementation(async () => {
             const next = {
                 ...clone(state.task),
-                references: [...(state.task.references || []), { code: 'src/lib.rs#10-12' }],
+                references: [...state.task.references, { code: 'src/lib.rs#10-12' }],
             }
             state.task = clone(next)
             return { task: clone(state.task), added: true }

@@ -180,7 +180,7 @@ describe('TaskPanel Escape (DEV-263)', () => {
         const wrapper = await openPanel('new', { realTeleport: true })
         const vm = wrapper.vm as any
         const title = () => document.querySelector('input[placeholder="Title"]') as HTMLInputElement
-        const find = (id: string) => document.querySelector(`[data-testid="${id}"]`) as HTMLElement | null
+        const find = (id: string) => document.querySelector<HTMLElement>(`[data-testid="${id}"]`)
         title().focus()
         title().value = 'Unsaved draft'
         title().dispatchEvent(new Event('input', { bubbles: true }))

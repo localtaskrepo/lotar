@@ -155,7 +155,7 @@ describe('CommandPalette', () => {
         input.value = 'boa'
         input.dispatchEvent(new Event('input'))
         await flushPromises()
-        const options = [...document.querySelectorAll('[role="option"]')].map((el) => el.textContent?.trim())
+        const options = [...document.querySelectorAll('[role="option"]')].map((el) => el.textContent.trim())
         expect(options[0]).toContain('Boards')
         input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
         await flushPromises()
@@ -280,7 +280,7 @@ describe('CommandPalette groups', () => {
             attachTo: document.body,
         })
         await flushPromises()
-        const groups = () => [...document.querySelectorAll('.palette__group')].map((el) => el.textContent?.trim())
+        const groups = () => [...document.querySelectorAll('.palette__group')].map((el) => el.textContent.trim())
         expect(groups()).toEqual(['This task', 'Recent tasks', 'Go to', 'Filters'])
         const input = document.querySelector<HTMLInputElement>('[data-testid="command-palette-input"]')!
         input.value = 'fix'

@@ -1,0 +1,44 @@
+// lotar's additions to the shared standard (oxlintrc.standard.json, copied unchanged from the standards repo).
+// oxlint checks the TypeScript and JavaScript rules, including the <script> blocks of .vue files; ESLint keeps only
+// eslint-plugin-vue's template rules (eslint.config.mjs).
+{
+  "extends": ["./oxlintrc.standard.json"],
+  "plugins": ["vue"],
+  "ignorePatterns": ["target/**", "docs/**", ".tasks/**", ".history/**", ".kilo/**", ".playwright-mcp/**", "site/**"],
+  "rules": {
+    // Open question (standards docs/decisions/2026-11-10-lint-standard.md, "`!` non-null assertions"): off here
+    // until the owner decides; the standard bans it outside tests.
+    "typescript/no-non-null-assertion": "off"
+  },
+  "overrides": [
+    {
+      // The npm launcher is CommonJS so it runs on every supported Node.js without a package "type" (DEV-250).
+      "files": ["packaging/npm/**/*.js"],
+      "rules": { "typescript/no-require-imports": "off" }
+    },
+    {
+      // The smoke harness (helpers, config) drives the app like tests do: the same rules off as the standard's test
+      // override.
+      "files": ["smoke/**"],
+      "rules": {
+        "typescript/no-unsafe-argument": "off",
+        "typescript/no-unsafe-assignment": "off",
+        "typescript/no-unsafe-call": "off",
+        "typescript/no-unsafe-member-access": "off",
+        "typescript/no-unsafe-return": "off",
+        "typescript/no-explicit-any": "off",
+        "typescript/no-non-null-assertion": "off",
+        "typescript/require-await": "off",
+        "typescript/unbound-method": "off",
+        // Smoke tests also assert through these helpers and Playwright waits, which throw when the page never gets
+        // there.
+        "vitest/expect-expect": [
+          "error",
+          {
+            "assertFunctionNames": ["expect", "expectProtocolError", "expectToolFailure", "expectLifecycleRejection", "*.waitForSelector", "*.waitForFunction"]
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -25,7 +25,7 @@ export function useFilterOptions(
             scope: project(),
             tasks: tasks().map((task) => ({
                 id: task.id,
-                tags: [...(task.tags || [])],
+                tags: [...task.tags],
                 assignee: task.assignee,
                 fields: { ...task.custom_fields },
             })),

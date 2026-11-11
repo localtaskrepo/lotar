@@ -6,18 +6,21 @@ import DependencyGraph from '../components/DependencyGraph.vue'
 import FilterBar from '../components/FilterBar.vue'
 import ColumnsMenu from '../components/ColumnsMenu.vue'
 
-const mocks = vi.hoisted(() => ({
-    check: vi.fn(),
-    repair: vi.fn(),
-    suggest: vi.fn(),
-    replace: vi.fn(),
-    refreshGraph: vi.fn(),
-    refreshConfig: vi.fn(),
-    on: vi.fn(),
-    close: vi.fn(),
-    reconnect: undefined as (() => void) | undefined,
-    route: { query: {} as Record<string, string> },
-}))
+const mocks = vi.hoisted(() => {
+    const query: Record<string, string> = {}
+    return {
+        check: vi.fn(),
+        repair: vi.fn(),
+        suggest: vi.fn(),
+        replace: vi.fn(),
+        refreshGraph: vi.fn(),
+        refreshConfig: vi.fn(),
+        on: vi.fn(),
+        close: vi.fn(),
+        reconnect: undefined as (() => void) | undefined,
+        route: { query },
+    }
+})
 vi.mock('../api/client', () => ({
     api: { relationshipCheck: mocks.check, relationshipRepair: mocks.repair, suggestTasks: mocks.suggest },
 }))
@@ -51,6 +54,7 @@ vi.mock('../composables/useProjects', async () => {
                 { prefix: 'DEV', name: 'Development' },
                 { prefix: 'OTHER', name: 'Other' },
             ]),
+            status: ref('ready'),
             refresh: vi.fn(async () => {}),
         }),
     }
@@ -131,7 +135,12 @@ beforeEach(() => {
         revision: 'r1',
         issues: [{ code: 'missing_mirror', message: 'Review reciprocal', repairable: true }],
     })
-    vi.stubGlobal('EventSource', class {})
+    vi.stubGlobal(
+        'EventSource',
+        class {
+            close() {}
+        },
+    )
 })
 afterEach(() => {
     for (const { wrapper, host } of mounted.splice(0).reverse()) {
@@ -397,9 +406,8 @@ describe('Unified dependency search and view controls', () => {
         const wrapper = create()
         await flushPromises()
         expect(wrapper.getComponent(ColumnsMenu).props('label')).toBe('Card fields')
-        wrapper.getComponent(ColumnsMenu).props('setVisible')('reporter', {
-            target: { checked: false },
-        } as unknown as Event)
+        const uncheck = { target: { checked: false } } as unknown as Event
+        wrapper.getComponent(ColumnsMenu).props('setVisible')('reporter', uncheck)
         await flushPromises()
         expect(wrapper.getComponent(DependencyGraph).props('fields')).toMatchObject({ reporter: false })
         wrapper.unmount()

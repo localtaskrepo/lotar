@@ -88,12 +88,13 @@
 </template>
 
 <script setup lang="ts">
+import type { TaskPanelFormState } from '../../composables/task-panel/useTaskPanelPersistence'
 import UiButton from '../UiButton.vue'
 import UiInput from '../UiInput.vue'
 import UiSelect from '../UiSelect.vue'
 
 defineProps<{
-  form: Record<string, any>
+  form: TaskPanelFormState
   orderedKnownUsers: string[]
   whoami: string | null
   reporterSelection: string

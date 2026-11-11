@@ -54,9 +54,9 @@ describe('TaskMoveDialog (DEV-183)', () => {
         const wrapper = await open()
         const dialog = document.body.querySelector('[data-testid="task-move-dialog"]')!
         const targets = [...dialog.querySelectorAll('[data-testid="task-move-project"] option')].map((o) =>
-            o.textContent?.trim(),
+            o.textContent.trim(),
         )
-        expect(targets.some((label) => label?.includes('DEV'))).toBe(false)
+        expect(targets.some((label) => label.includes('DEV'))).toBe(false)
         expect(dialog.querySelector('[data-testid="task-move-new-id"]')?.textContent).toContain('WEB-7')
         expect(dialog.textContent).toContain('Status: InProgress → Backlog')
         expect(api.moveTask).toHaveBeenCalledWith(

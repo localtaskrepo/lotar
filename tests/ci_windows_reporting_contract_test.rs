@@ -275,8 +275,8 @@ fn ui_job_typechecks_lints_and_format_checks_the_frontend() {
         .filter_map(|step| step["run"].as_str())
         .collect();
     for (script, purpose) in [
-        ("npm run lint:frontend", "the vue-tsc typecheck"),
-        ("npm run lint:js", "ESLint"),
+        ("npm run lint:frontend", "the vue-tsc and smoke typecheck"),
+        ("npm run lint:js", "oxlint and ESLint"),
         ("npm run fmt:js:check", "the Prettier check"),
         ("npm run test:hooks", "the git hook tests"),
     ] {

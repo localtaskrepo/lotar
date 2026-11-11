@@ -882,7 +882,7 @@ const allColumns: ColumnKey[] = [
 const defaultColumns: ColumnKey[] = ['id', 'title', 'status', 'priority', 'assignee', 'due_date', 'modified']
 
 function loadStoredSort(): { key: ColumnKey | null; dir: 'asc' | 'desc' } | null {
-  const parsed = storageGetJson<{ key?: ColumnKey; dir?: 'asc' | 'desc' }>(sortStorageKey)
+  const parsed = storageGetJson(sortStorageKey) as { key?: ColumnKey; dir?: 'asc' | 'desc' } | null
   if (parsed && (!parsed.key || allColumns.includes(parsed.key))) {
     return {
       key: parsed.key ?? null,
@@ -1189,9 +1189,14 @@ function showReorderHint(event: DragEvent, sprint: number | null) {
 function onOrderHintKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') hideReorderHint()
 }
-const manualSprints = ref<number[]>(
-  storageGetJson<number[]>('lotar.sprints.manualOrder')?.filter((id) => Number.isInteger(id) && id > 0) ?? [],
-)
+/** The saved manual sprint order: positive sprint ids, anything else dropped. */
+function storedSprintOrder(): number[] {
+  const stored = storageGetJson('lotar.sprints.manualOrder')
+  return Array.isArray(stored)
+    ? stored.filter((id): id is number => typeof id === 'number' && Number.isInteger(id) && id > 0)
+    : []
+}
+const manualSprints = ref<number[]>(storedSprintOrder())
 const backlogOrder = ref<string[]>([])
 const backlogOrderLoading = ref(false)
 const reordering = ref(false)

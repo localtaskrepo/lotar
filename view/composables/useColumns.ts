@@ -233,13 +233,13 @@ export function useColumns(options: UseColumnsOptions = {}): ColumnStore {
     function loadForProject(pk: string) {
         loading = true
         try {
-            let stored = storageGetJson<unknown>(storageKeyFor(pk))
+            let stored = storageGetJson(storageKeyFor(pk))
             if (stored === null) {
                 // Migrate the legacy boolean-map format written by earlier versions.
-                stored = storageGetJson<unknown>(storageKeyForLegacy(pk))
+                stored = storageGetJson(storageKeyForLegacy(pk))
             }
             columns.value = normalizeVisible(stored)
-            columnOrder.value = normalizeColumnOrder(storageGetJson<unknown>(storageKeyForOrder(pk)))
+            columnOrder.value = normalizeColumnOrder(storageGetJson(storageKeyForOrder(pk)))
         } finally {
             loading = false
         }

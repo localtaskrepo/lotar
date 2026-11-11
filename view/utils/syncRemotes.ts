@@ -13,20 +13,21 @@ export interface RemoteFormState {
 }
 
 export function hasValue(value?: string | null): boolean {
-    return String(value ?? '').trim().length > 0
+    return (value ?? '').trim().length > 0
 }
 
-export function remoteProviderIcon(remote: SyncRemoteConfig): 'jira' | 'github' | 'list' {
-    if (remote.provider === 'jira') return 'jira'
-    if (remote.provider === 'github') return 'github'
-    return 'list'
+export function remoteProviderIcon(remote: SyncRemoteConfig): 'jira' | 'github' {
+    return remote.provider
 }
 
 /** The Jira project or GitHub repo, falling back to the provider name. */
 export function remoteProviderLabel(remote: SyncRemoteConfig): string {
-    if (remote.provider === 'jira') return remote.project?.trim() || 'Jira'
-    if (remote.provider === 'github') return remote.repo?.trim() || 'GitHub'
-    return String(remote.provider)
+    switch (remote.provider) {
+        case 'jira':
+            return remote.project?.trim() || 'Jira'
+        case 'github':
+            return remote.repo?.trim() || 'GitHub'
+    }
 }
 
 /** A remote with every optional field present, for stable YAML comparisons. */
@@ -49,13 +50,13 @@ export function formatMapping(mapping?: Record<string, SyncFieldMapping>): strin
 }
 
 /** The mapping in `value`, `{}` when blank, or null when it is not a YAML mapping. */
-export function parseMappingInput(value: string): Record<string, SyncFieldMapping> | null {
+export function parseMappingInput(value: string): Record<string, unknown> | null {
     const trimmed = value.trim()
     if (!trimmed) return {}
     try {
-        const parsed = parseYaml(trimmed)
+        const parsed: unknown = parseYaml(trimmed)
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
-        return parsed as Record<string, SyncFieldMapping>
+        return parsed as Record<string, unknown>
     } catch {
         return null
     }
@@ -64,7 +65,7 @@ export function parseMappingInput(value: string): Record<string, SyncFieldMappin
 const MAPPING_KEYS = new Set(['field', 'values', 'set', 'default', 'add', 'when_empty'])
 
 /** Problems with a parsed mapping, one message per issue. */
-export function validateMapping(mapping: Record<string, SyncFieldMapping>): string[] {
+export function validateMapping(mapping: Record<string, unknown>): string[] {
     const errors: string[] = []
     for (const [localField, value] of Object.entries(mapping)) {
         if (!localField.trim()) {
@@ -85,7 +86,7 @@ export function validateMapping(mapping: Record<string, SyncFieldMapping>): stri
                 errors.push(`Mapping for ${localField} values must be a key/value object.`)
             } else {
                 for (const [mapKey, mapValue] of Object.entries(detail.values)) {
-                    if (!String(mapKey).trim() || typeof mapValue !== 'string') {
+                    if (!mapKey.trim() || typeof mapValue !== 'string') {
                         errors.push(`Mapping for ${localField} values must map strings to strings.`)
                         break
                     }
@@ -133,7 +134,8 @@ export function buildRemoteConfig(form: RemoteFormState): { config: SyncRemoteCo
             repo: provider === 'github' ? repoValue || null : null,
             filter: form.filter.trim() || null,
             auth_profile: form.auth_profile.trim() || null,
-            mapping: Object.keys(mapping).length ? mapping : {},
+            // validateMapping checked the shape above.
+            mapping: Object.keys(mapping).length ? (mapping as Record<string, SyncFieldMapping>) : {},
         },
         errors,
     }

@@ -22,6 +22,6 @@ The `smoke` script recompiles the frontend and CLI (`npm run build`), ensures Pl
 - Use the helpers in `helpers/` to keep tests declarative. For example, `SmokeWorkspace` exposes `runLotar`, `initGit`, and filesystem helpers, while `startLotarServer` handles lifecycle management of the background web server.
 - Prefer `describe.concurrent` suites and keep per-test state self-contained so the harness can run in parallel without coordination overhead.
 - If you add browser-based checks, `withPage` wraps Playwright in a safe lifecycle that automatically closes pages and browsers even when assertions fail.
-- To debug a single test, run `npx vitest watch --config smoke/vitest.config.ts --runInBand` and enable logging or `stdio: 'inherit'` on the CLI helpers as needed.
+- To debug a single test, run `npx vitest watch --config smoke/vitest.config.ts --runInBand`; `SMOKE_DEBUG=1` logs workspace and server details from the helpers.
 
 See the placeholder comments inside `tests/` for ideas on the first smoke flows to automate.

@@ -31,10 +31,10 @@ describe('syncRemotes', () => {
         expect(validateMapping({ status: 'state' })).toEqual([])
         expect(
             validateMapping({
-                status: { field: 'state', colour: 'x' } as never,
-                tags: { add: [1] } as never,
-                priority: { values: { High: 2 } } as never,
-                due: { when_empty: 'drop' } as never,
+                status: { field: 'state', colour: 'x' },
+                tags: { add: [1] },
+                priority: { values: { High: 2 } },
+                due: { when_empty: 'drop' },
             }),
         ).toEqual([
             "Mapping for status has unsupported key 'colour'.",
