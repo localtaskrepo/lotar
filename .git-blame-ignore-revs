@@ -4,3 +4,6 @@
 
 # DEV-161 Format TypeScript and Vue code with Prettier
 0969766de894e3838e7816568a2427a555d7c166
+
+# DEV-326 Format Rust at width 160 with use_small_heuristics Max
+45681d9eecd1f8813a18f18f9e2595c9d5a58615

@@ -1,7 +1,18 @@
 title: Rust formatting at width 160 with use_small_heuristics Max
-status: Todo
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
+assignee: mallox
 created: 2026-11-11T21:18:12.517861+00:00
+modified: 2026-11-11T21:28:49.073204+00:00
 description: 'Owner 2026-11-11 (standards docs/decisions/2026-11-11-formatting.md): lotar Rust width ''Yes, 160''; use_small_heuristics Max ''Yes''; TypeScript and Vue keep Prettier (''Keep for now''). rustfmt.toml becomes the standard''s copy; one reformat commit listed in .git-blame-ignore-revs; the commit hook also runs git diff --cached --check.'
+history:
+- at: 2026-11-11T21:28:49.073204+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox
