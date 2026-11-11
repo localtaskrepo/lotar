@@ -77,14 +77,19 @@ function run(program, args, options = {}) {
     return spawnSync(program, args, { encoding: 'utf8', ...options });
 }
 
+/**
+ * Environment for lotar in a throwaway repository: its own job logs, and its
+ * agent profiles trusted without `lotar trust`, which would leave one record per
+ * run in ~/.lotar.trust.yml (DEV-329).
+ */
+function lotarEnv(dir) {
+    return { LOTAR_AGENT_LOGS_DIR: path.join(dir, '.agent-logs'), LOTAR_TRUST_ALL: '1' };
+}
+
 function lotar(dir, args, env = {}, timeoutSeconds = 240) {
     return run(lotarBin, ['--tasks-dir', path.join(dir, '.tasks'), ...args], {
         cwd: dir,
-        env: {
-            ...process.env,
-            LOTAR_AGENT_LOGS_DIR: path.join(dir, '.agent-logs'),
-            ...env,
-        },
+        env: { ...process.env, ...lotarEnv(dir), ...env },
         timeout: timeoutSeconds * 1000,
     });
 }
@@ -473,7 +478,7 @@ function withServer(dir, body) {
     const server = spawn(lotarBin, ['--tasks-dir', path.join(dir, '.tasks'), 'serve', '--port', String(port)], {
         cwd: dir,
         stdio: 'ignore',
-        env: { ...process.env, LOTAR_AGENT_LOGS_DIR: path.join(dir, '.agent-logs') },
+        env: { ...process.env, ...lotarEnv(dir) },
     });
     const api = (method, route, payload) => {
         const args = ['-s', '-X', method, `http://localhost:${port}${route}`];
