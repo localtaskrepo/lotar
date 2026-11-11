@@ -585,6 +585,22 @@ impl AutomationService {
         let (automation, _) =
             load_effective_automation(tasks_dir, Some(project_prefix.as_str()), Some(&config))?;
 
+        // A status/assignee set while the job ran is the job's outcome
+        // (DEV-320): it replaces those fields of the end rules' `set`.
+        let ending_job = job_context
+            .as_ref()
+            .filter(|_| {
+                matches!(
+                    event,
+                    AutomationEvent::JobCompleted
+                        | AutomationEvent::JobFailed
+                        | AutomationEvent::JobCancelled
+                )
+            })
+            .map(|job| job.job_id.clone());
+        let recorded = ending_job
+            .as_deref()
+            .and_then(|job_id| crate::services::agent_active_jobs::peek_outcome(tasks_dir, job_id));
         let action_context = AutomationActionContext {
             event,
             job: job_context,
@@ -609,13 +625,26 @@ impl AutomationService {
                 continue;
             }
             if let Some(action) = resolve_action_for_event(&rule.on, event) {
+                let action = without_outcome_fields(action, recorded.as_ref());
                 if let Err(err) =
-                    apply_action(&mut storage, &task, &config, action, &action_context)
+                    apply_action(&mut storage, &task, &config, &action, &action_context)
                 {
                     failures.push(rule_failure(rule, &rk, ticket_id, &err));
                 }
                 cooldown_record(rule, &rk, ticket_id, tasks_dir);
             }
+        }
+
+        // The rules have run: end the job's guard and apply the outcome,
+        // including anything recorded while they ran.
+        if let Some(job_id) = ending_job.as_deref()
+            && let Some(outcome) =
+                crate::services::agent_active_jobs::end_and_take_outcome(tasks_dir, job_id)
+            && let Err(err) = apply_job_outcome(&mut storage, ticket_id, &config, &outcome)
+        {
+            failures.push(format!(
+                "Outcome recorded during job {job_id} for {ticket_id} failed: {err}"
+            ));
         }
         failures_result(&failures)
     }
@@ -2187,6 +2216,58 @@ fn apply_action(
         TaskService::archive_with_receipt(storage, &current.id, None, archive)?;
     }
 
+    Ok(())
+}
+
+/// The action without the `set` fields a job outcome decides (DEV-320).
+fn without_outcome_fields<'a>(
+    action: &'a AutomationAction,
+    outcome: Option<&crate::api_types::JobOutcome>,
+) -> std::borrow::Cow<'a, AutomationAction> {
+    let Some(outcome) = outcome else {
+        return std::borrow::Cow::Borrowed(action);
+    };
+    let mut action = action.clone();
+    if let Some(set) = action.set.as_mut() {
+        if outcome.status.is_some() {
+            set.status = None;
+        }
+        if outcome.assignee.is_some() {
+            set.assignee = None;
+        }
+    }
+    std::borrow::Cow::Owned(action)
+}
+
+/// Apply the status/assignee recorded while a job ran, as a rule's `set`
+/// would: no update automation, and an agent profile as the new assignee
+/// starts its job.
+fn apply_job_outcome(
+    storage: &mut Storage,
+    ticket_id: &str,
+    config: &ResolvedConfig,
+    outcome: &crate::api_types::JobOutcome,
+) -> LoTaRResult<()> {
+    let base = TaskService::get(storage, ticket_id, None)?;
+    let patch = TaskUpdate {
+        status: outcome.status.clone(),
+        assignee: outcome.assignee.clone(),
+        ..TaskUpdate::default()
+    };
+    let updated = TaskService::update_with_context(
+        storage,
+        &base.id,
+        patch,
+        TaskUpdateContext::automation_disabled(),
+    )?;
+    maybe_queue_agent_on_assignment(
+        storage.root_path.as_path(),
+        base.assignee.as_deref(),
+        updated.assignee.as_deref(),
+        &updated,
+        config,
+        AgentRunSettings::default(),
+    );
     Ok(())
 }
 

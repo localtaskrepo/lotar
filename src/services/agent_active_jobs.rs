@@ -25,6 +25,10 @@ pub struct ActiveJob {
     pub started_at: String,
 }
 
+/// What a ticket should be when its job ends, set while the job ran
+/// (DEV-320). An empty assignee clears it.
+pub type JobOutcome = crate::api_types::JobOutcome;
+
 fn dir(tasks_dir: &Path) -> PathBuf {
     let canonical = tasks_dir
         .canonicalize()
@@ -86,6 +90,67 @@ pub fn unregister(tasks_dir: &Path, job_id: &str) {
     let dir = dir(tasks_dir);
     let _ = std::fs::remove_file(dir.join(format!("{name}.json")));
     let _ = std::fs::remove_file(dir.join(format!("{name}.cancel")));
+    let _ = std::fs::remove_file(dir.join(format!("{name}.outcome.json")));
+}
+
+/// Record a status and/or assignee change made while the job runs; it is
+/// applied when the job ends instead of the end rules' `set` (DEV-320).
+/// Later values replace earlier ones per field. Returns the merged outcome.
+pub fn record_outcome(tasks_dir: &Path, outcome: &JobOutcome) -> std::io::Result<JobOutcome> {
+    let Some(name) = safe_name(&outcome.job_id) else {
+        return Err(std::io::Error::other(format!(
+            "invalid job id '{}'",
+            outcome.job_id
+        )));
+    };
+    let dir = dir(tasks_dir);
+    std::fs::create_dir_all(&dir)?;
+    let _lock = crate::storage::safety::acquire_storage_lock_within(
+        &dir,
+        &format!("{name}.outcome"),
+        std::time::Duration::from_secs(5),
+    )?;
+    let path = dir.join(format!("{name}.outcome.json"));
+    let mut merged = read_outcome(&path).unwrap_or_else(|| JobOutcome {
+        job_id: outcome.job_id.clone(),
+        ..JobOutcome::default()
+    });
+    if outcome.status.is_some() {
+        merged.status = outcome.status.clone();
+    }
+    if outcome.assignee.is_some() {
+        merged.assignee = outcome.assignee.clone();
+    }
+    let json = serde_json::to_string(&merged).map_err(std::io::Error::other)?;
+    crate::storage::safety::atomic_write_file(&path, &json)?;
+    Ok(merged)
+}
+
+/// The outcome recorded so far, without consuming it.
+pub fn peek_outcome(tasks_dir: &Path, job_id: &str) -> Option<JobOutcome> {
+    let name = safe_name(job_id)?;
+    read_outcome(&dir(tasks_dir).join(format!("{name}.outcome.json")))
+}
+
+/// End the job's guard and hand back its recorded outcome. The record goes
+/// first, so a change made from now on applies directly instead of being
+/// recorded for a job that no longer reads it. A change that checked for
+/// the record just before it went and writes its outcome just after the
+/// read below is lost; that window is the length of one file read.
+pub fn end_and_take_outcome(tasks_dir: &Path, job_id: &str) -> Option<JobOutcome> {
+    let name = safe_name(job_id)?;
+    let dir = dir(tasks_dir);
+    let _ = std::fs::remove_file(dir.join(format!("{name}.json")));
+    let path = dir.join(format!("{name}.outcome.json"));
+    let outcome = read_outcome(&path);
+    let _ = std::fs::remove_file(&path);
+    outcome
+}
+
+fn read_outcome(path: &Path) -> Option<JobOutcome> {
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|text| serde_json::from_str(&text).ok())
 }
 
 /// Live records; stale ones (owner gone) are removed on the way.
@@ -97,7 +162,11 @@ pub fn list(tasks_dir: &Path) -> Vec<ActiveJob> {
     let mut jobs = Vec::new();
     for entry in entries.flatten() {
         let path = entry.path();
-        if path.extension().and_then(|e| e.to_str()) != Some("json") {
+        let is_record = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .is_some_and(|n| n.ends_with(".json") && !n.ends_with(".outcome.json"));
+        if !is_record {
             continue;
         }
         let Some(job) = std::fs::read_to_string(&path)

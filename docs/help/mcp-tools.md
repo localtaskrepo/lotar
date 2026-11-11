@@ -40,7 +40,7 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 ### `task_update`
 - **Params:** `id` (required) and `patch` object. Patch keys mirror `task_create` fields (including the `task_type` alias for `type`) plus `acceptance_criteria` and `sprints`.
 - **Behavior:** tri-state semantics per key: omitted = no-op, `null` = clear, value = set. Empty string clears reporter/assignee/due_date/effort/description; empty array/object clears tags/acceptance_criteria/relationships/custom_fields/sprints. `title`/`status`/`priority`/`type` treat `null` as omitted and blank titles are rejected. Enum strings are validated against the task's project configuration (failures return `-32602` with `error.data.suggestions`); list and map patches replace the whole value; `sprints` must be an array of positive integers (invalid entries are rejected, not dropped); membership failures keep the `Task update failed` envelope with `data.message` (a tool-execution `isError` result).
-- **Response:** Updated `TaskDTO` serialized to JSON.
+- **Response:** Updated `TaskDTO` serialized to JSON. While an agent job runs on the ticket, a status or assignee change is not applied: the task comes back unchanged in those fields with `deferred: {job_id, status?, assignee?}` and a `message` ("HelpNeeded will be set when job <id> ends"), and the job's end applies it ([Status and assignee during a job](agent.md#status-and-assignee-during-a-job)).
 
 ### `task_comment_add`
 - **Params:** `id` (required), `text` (required).
@@ -65,7 +65,7 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 ### `task_bulk_update`
 - **Params:** `ids[]` (required), `patch` (required, same keys as `task_update` including the `task_type` alias), optional `stop_on_error`.
 - **Behavior:** applies the same patch to multiple tasks using the `task_update` tri-state semantics. Enum validation runs per task against its own project configuration, so a value valid in one project can fail in another (reported per id in `failed[]`). When `stop_on_error=true`, aborts after the first failure.
-- **Response:** JSON with `updated[]` and `failed[]` per task id.
+- **Response:** JSON with `updated[]` and `failed[]` per task id, plus `deferred[]` (`id`, `message`, `outcome`) for tickets whose running agent job holds the status or assignee change for its end.
 
 ### `task_bulk_comment_add`
 - **Params:** `ids[]` (required), `text` (required), optional `stop_on_error`.

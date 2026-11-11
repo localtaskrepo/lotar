@@ -162,17 +162,12 @@ fn handle_set_assignee(
         return Ok(());
     }
 
-    // If an agent job is already running for this ticket, changing assignee would
-    // disrupt the automation lifecycle. Require the user to cancel the job first.
+    // A job run by a lotar-agent-wrapper process can't record an outcome
+    // (no job record); refuse as before. Other running jobs get the change
+    // as their outcome (DEV-320).
     if let Some(job) = running_job_for_ticket(&ctx.tasks_dir.path, full_id)
-        && !current_agent_job_matches_ticket(full_id)
+        && !job.takes_ticket_changes(&ctx.tasks_dir.path, full_id)
     {
-        if let Some(job_id) = job.job_id.as_deref() {
-            return Err(format!(
-                "Ticket '{}' has an active agent job ({}). Cancel it first: lotar agent cancel {}",
-                full_id, job_id, job_id
-            ));
-        }
         return Err(format!(
             "Ticket '{}' has an active agent job (pid {}). Cancel it before changing assignee.",
             full_id, job.pid
@@ -207,8 +202,18 @@ fn handle_set_assignee(
         custom_fields: None,
         sprints: None,
     };
-    let updated =
-        TaskService::update(&mut ctx.storage, full_id, patch).map_err(|e| e.to_string())?;
+    let receipt = TaskService::update_with_receipt(
+        &mut ctx.storage,
+        full_id,
+        patch,
+        crate::services::task_service::TaskUpdateContext::default(),
+    )
+    .map_err(|e| e.to_string())?;
+    if let Some(outcome) = receipt.deferred.as_ref() {
+        crate::cli::handlers::task::render::render_job_outcome(renderer, full_id, outcome);
+        return Ok(());
+    }
+    let updated = receipt.dto;
 
     render_assignee_success(
         renderer,
@@ -217,18 +222,6 @@ fn handle_set_assignee(
         updated.assignee.as_deref(),
     );
     Ok(())
-}
-
-fn current_agent_job_matches_ticket(ticket_id: &str) -> bool {
-    let Ok(job_id) = std::env::var("LOTAR_AGENT_JOB_ID") else {
-        return false;
-    };
-    let Ok(current_ticket) = std::env::var("LOTAR_TICKET_ID") else {
-        return false;
-    };
-
-    crate::storage::identity::aliases_match(current_ticket.trim(), ticket_id)
-        && !job_id.trim().is_empty()
 }
 
 fn render_current_assignee(

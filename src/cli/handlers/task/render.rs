@@ -406,3 +406,31 @@ fn option_to_value(value: Option<String>) -> Value {
         None => Value::Null,
     }
 }
+
+/// A status/assignee change held back for the ticket's running agent job
+/// (DEV-320): one line per field, `changed: false` and the `deferred`
+/// outcome in JSON.
+pub fn render_job_outcome(
+    renderer: &OutputRenderer,
+    task_id: &str,
+    outcome: &crate::api_types::JobOutcome,
+) {
+    let lines = outcome.describe();
+    match renderer.format {
+        OutputFormat::Json => {
+            let payload = serde_json::json!({
+                "status": "success",
+                "message": lines.join("; "),
+                "task_id": task_id,
+                "changed": false,
+                "deferred": outcome,
+            });
+            renderer.emit_json(&payload);
+        }
+        _ => {
+            for line in lines {
+                renderer.emit_success(format_args!("{task_id}: {line}"));
+            }
+        }
+    }
+}

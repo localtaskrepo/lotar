@@ -435,6 +435,18 @@ export interface TaskCreate {
     finding?: string
 }
 
+/**
+ * A status/assignee change held back while an agent job runs on the ticket
+ * (DEV-320): `/api/tasks/update` and `/api/tasks/status` answer it next to
+ * `data` (unchanged), and the job's end applies it in place of the end
+ * rules' `set`. An empty `assignee` clears the assignee.
+ */
+export interface JobOutcome {
+    job_id: string
+    status?: string
+    assignee?: string
+}
+
 /** How `/api/tasks/add` handled a `finding` report. */
 export interface FindingReport {
     created: boolean

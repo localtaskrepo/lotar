@@ -777,7 +777,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                 );
             }
         };
-        match TaskService::update_with_context(
+        match TaskService::update_with_receipt(
             &mut storage,
             &id,
             patch,
@@ -787,7 +787,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                 ..Default::default()
             },
         ) {
-            Ok(task) => ok_json(200, json!({"data": task})),
+            Ok(receipt) => task_change_response(receipt),
             Err(e) => map_lotar_error(e),
         }
     });
@@ -814,7 +814,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
             status: Some(new_status),
             ..Default::default()
         };
-        match TaskService::update_with_context(
+        match TaskService::update_with_receipt(
             &mut storage,
             &id,
             patch,
@@ -823,7 +823,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
                 ..Default::default()
             },
         ) {
-            Ok(task) => ok_json(200, json!({"data": task})),
+            Ok(receipt) => task_change_response(receipt),
             Err(e) => map_lotar_error(e),
         }
     });
@@ -1406,4 +1406,15 @@ fn task_file_rel(
             .join(&parsed.project)
             .join(format!("{}.yml", parsed.number))
     })
+}
+
+/// `{ data }`, plus `deferred` when a running agent job holds the status or
+/// assignee change for its end (DEV-320).
+fn task_change_response(
+    receipt: crate::services::task_service::TaskUpdateReceipt,
+) -> crate::api_server::HttpResponse {
+    match receipt.deferred {
+        Some(deferred) => ok_json(200, json!({"data": receipt.dto, "deferred": deferred})),
+        None => ok_json(200, json!({"data": receipt.dto})),
+    }
 }

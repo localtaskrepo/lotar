@@ -58,13 +58,15 @@ fn jobs_in_another_process_are_seen_guarded_and_cancelled() {
         std::thread::sleep(Duration::from_millis(200));
     };
 
-    // The status guard refuses to disturb it.
+    // The status guard doesn't disturb it: the change waits for its end
+    // (DEV-320).
     let status = cmd().args(["status", "TEST-1", "Done"]).output().unwrap();
-    assert!(!status.status.success());
+    assert!(status.status.success());
     assert!(
-        String::from_utf8_lossy(&status.stderr).contains("active agent job"),
+        String::from_utf8_lossy(&status.stdout)
+            .contains(&format!("Done will be set when job {job_id} ends")),
         "{}",
-        String::from_utf8_lossy(&status.stderr)
+        String::from_utf8_lossy(&status.stdout)
     );
 
     // And it can be cancelled from here.

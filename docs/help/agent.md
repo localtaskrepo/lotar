@@ -233,11 +233,29 @@ A job runs inside the process that started it: `lotar serve`, the background que
 
 - list it with `lotar agent list-running` and show it with `lotar agent status <JOB_ID>`
 - cancel it with `lotar agent cancel <JOB_ID>`; the owning process stops the agent and finishes the job as cancelled, so `job_cancelled` automation runs
-- refuse `lotar status` and `lotar assignee` changes on its ticket, and skip its worktree in `lotar agent worktree cleanup`
+- hold back `lotar status` and `lotar assignee` changes on its ticket until it ends (see [Status and assignee during a job](#status-and-assignee-during-a-job)), and skip its worktree in `lotar agent worktree cleanup`
 
 Records of a process that died are ignored and cleaned up. When an MCP session ends (or reloads after an upgrade), it cancels and finishes the jobs it started instead of leaving agents running unsupervised.
 
 `list-running` also lists `lotar-agent-wrapper` processes if that binary is available (next to `lotar`, on `PATH`, or `LOTAR_AGENT_WRAPPER`).
+
+## Status and assignee during a job
+
+While a job runs (or waits in the queue) for a ticket, its status and assignee belong to the job: the job's own lifecycle and its automation rules change them, and nothing else does mid-run. A status or assignee change from anyone else is not refused; it is recorded as the job's **outcome** and applied when the job ends:
+
+```console
+$ lotar status QIS-174 HelpNeeded
+✅ QIS-174: HelpNeeded will be set when job job-20261111T182920.808Z-1 ends
+$ lotar assignee QIS-174 ravi
+✅ QIS-174: ravi will be assigned when job job-20261111T182920.808Z-1 ends
+```
+
+- The command exits 0 and leaves the ticket as it is; `--format json` adds `"changed": false` and `"deferred": {"job_id", "status", "assignee"}`. REST (`/api/tasks/update`, `/api/tasks/status`) answers `deferred` next to `data`, MCP `task_update` adds `deferred` and `message` to the task, and the web UI shows a notice. Other fields (description, tags, comments, links) change at once.
+- This holds for every process, agents included: a T3 Code thread gets no `LOTAR_*` variables, so lotar can't tell the agent's own commands from anyone else's. An agent that stops for a decision can set the waiting status and reassign the ticket to its reporter as the [built-in instructions](agent-instructions.md) say, and that is what the ticket ends with.
+- When the job ends (completed, failed or cancelled), the `job_completed`, `job_failed` or `job_cancelled` rules run first, without the fields the outcome sets: a recorded status replaces the rule's `set.status`, a recorded assignee its `set.assignee`. The rest of the rule (other `set` fields, `add`, `remove`, `comment`, `run`) still runs. Then the outcome is applied, also when no rule matches. Assigning an agent profile there starts that agent, as a rule's `set` would.
+- Several changes during one job: the last status and the last assignee win. A change to the value the ticket already has records nothing. Clearing the assignee (`lotar assignee <ID> --clear`) records a cleared assignee.
+- Automation `run` commands of the job's own events carry `LOTAR_AGENT_JOB_ID` and `LOTAR_TICKET_ID`; their changes are part of the lifecycle and apply at once.
+- The outcome lives next to the job's record and goes with it. A job that only a `lotar-agent-wrapper` process shows (no job record) still refuses the change.
 
 ## Environment variables
 

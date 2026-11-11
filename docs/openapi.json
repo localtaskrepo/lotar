@@ -236,7 +236,7 @@
     "/api/tasks/status": {
       "post": {
         "summary": "Change task status",
-        "description": "Sets the status of a task. Validates against configured workflow states and applies auto-assign rules if enabled.",
+        "description": "Sets the status of a task. Validates against configured workflow states and applies auto-assign rules if enabled. While an agent job runs on the ticket, a status or assignee change is not applied: the response carries `deferred` and the job's end applies it (DEV-320).",
         "requestBody": {
           "required": true,
           "content": {
@@ -269,7 +269,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EnvelopeTask"
+                  "$ref": "#/components/schemas/EnvelopeTaskChange"
                 }
               }
             }
@@ -824,7 +824,7 @@
     "/api/tasks/update": {
       "post": {
         "summary": "Update a task by id",
-        "description": "Updates task fields. People fields support @me. Note: The 'status' field is ignored by this REST route; status changes are handled by CLI. Auto-assign on status change (auto.assign_on_status) applies when status transitions via supported channels.",
+        "description": "Updates task fields. People fields support @me. Note: The 'status' field is ignored by this REST route; status changes are handled by CLI. Auto-assign on status change (auto.assign_on_status) applies when status transitions via supported channels. While an agent job runs on the ticket, a status or assignee change is not applied: the response carries `deferred` and the job's end applies it (DEV-320).",
         "requestBody": {
           "required": true,
           "content": {
@@ -865,7 +865,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EnvelopeTask"
+                  "$ref": "#/components/schemas/EnvelopeTaskChange"
                 },
                 "examples": {
                   "updated": {
@@ -8038,6 +8038,16 @@
           "data"
         ]
       },
+      "JobOutcome": {
+        "type": "object",
+        "description": "A status and/or assignee change made while an agent job runs on the ticket (DEV-320). The job's end applies it in place of the `set` of the job_completed, job_failed or job_cancelled rules. An empty `assignee` clears the assignee.",
+        "properties": {
+          "job_id": { "type": "string" },
+          "status": { "type": "string" },
+          "assignee": { "type": "string" }
+        },
+        "required": ["job_id"]
+      },
       "FindingReport": {
         "type": "object",
         "description": "How a finding report was handled (DEV-317).",
@@ -8064,6 +8074,15 @@
           "state",
           "id"
         ]
+      },
+      "EnvelopeTaskChange": {
+        "type": "object",
+        "description": "A task update. `deferred` is present when an agent job runs on the ticket: the status/assignee change was recorded for the job's end instead of applied, and `data` is the ticket as it is now (DEV-320).",
+        "properties": {
+          "data": { "$ref": "#/components/schemas/TaskDTO" },
+          "deferred": { "$ref": "#/components/schemas/JobOutcome" }
+        },
+        "required": ["data"]
       },
       "EnvelopeTaskFinding": {
         "type": "object",

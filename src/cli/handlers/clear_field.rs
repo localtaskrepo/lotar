@@ -48,10 +48,11 @@ pub fn clear_task_field(
     if field == ClearableField::Assignee
         && let Some(job) =
             crate::cli::handlers::agent::running_job_for_ticket(&ctx.tasks_dir.path, &full_id)
-        && let Some(job_id) = job.job_id
+        && !job.takes_ticket_changes(&ctx.tasks_dir.path, &full_id)
     {
         return Err(format!(
-            "Ticket '{full_id}' has an active agent job ({job_id}). Cancel it first: lotar agent cancel {job_id}"
+            "Ticket '{full_id}' has an active agent job (pid {}). Cancel it before changing assignee.",
+            job.pid
         ));
     }
     let label = field.label();
@@ -72,8 +73,17 @@ pub fn clear_task_field(
                 ClearableField::DueDate => patch.due_date = Some(String::new()),
                 ClearableField::Assignee => patch.assignee = Some(String::new()),
             }
-            crate::services::task_service::TaskService::update(&mut ctx.storage, &full_id, patch)
-                .map_err(|e| e.to_string())?;
+            let receipt = crate::services::task_service::TaskService::update_with_receipt(
+                &mut ctx.storage,
+                &full_id,
+                patch,
+                crate::services::task_service::TaskUpdateContext::default(),
+            )
+            .map_err(|e| e.to_string())?;
+            if let Some(outcome) = receipt.deferred.as_ref() {
+                crate::cli::handlers::task::render::render_job_outcome(renderer, &full_id, outcome);
+                return Ok(());
+            }
             ("success", format!("Task {full_id} {label} cleared"), true)
         }
     };

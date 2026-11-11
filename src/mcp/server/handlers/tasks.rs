@@ -769,8 +769,25 @@ pub(crate) fn handle_task_update(req: JsonRpcRequest) -> JsonRpcResponse {
     }
 
     let mut storage = Storage::new(&resolver.path.clone());
-    match TaskService::update(&mut storage, id, patch) {
-        Ok(task) => text_result(req.id, &task),
+    match TaskService::update_with_receipt(
+        &mut storage,
+        id,
+        patch,
+        crate::services::task_service::TaskUpdateContext::default(),
+    ) {
+        // A running agent job holds a status/assignee change for its end
+        // (DEV-320): the task JSON gains `deferred` and a `message`.
+        Ok(receipt) => match receipt.deferred {
+            Some(deferred) => {
+                let mut value = serde_json::to_value(&receipt.dto).unwrap_or_default();
+                if let Some(object) = value.as_object_mut() {
+                    object.insert("message".into(), json!(deferred.describe().join("; ")));
+                    object.insert("deferred".into(), json!(deferred));
+                }
+                text_result(req.id, &value)
+            }
+            None => text_result(req.id, &receipt.dto),
+        },
         Err(e) => task_mutation_error(req.id, e, -32005, "Task update failed", None),
     }
 }
@@ -903,9 +920,20 @@ pub(crate) fn handle_task_bulk_update(req: JsonRpcRequest) -> JsonRpcResponse {
     let mut updated: Vec<TaskDTO> = Vec::new();
     let mut failed: Vec<Value> = Vec::new();
 
+    let mut deferred: Vec<Value> = Vec::new();
     for id in ids {
-        match TaskService::update(&mut storage, &id, patch.clone()) {
-            Ok(task) => updated.push(task),
+        match TaskService::update_with_receipt(
+            &mut storage,
+            &id,
+            patch.clone(),
+            crate::services::task_service::TaskUpdateContext::default(),
+        ) {
+            Ok(receipt) => {
+                if let Some(outcome) = receipt.deferred {
+                    deferred.push(json!({"id": receipt.dto.id, "message": outcome.describe().join("; "), "outcome": outcome}));
+                }
+                updated.push(receipt.dto);
+            }
             Err(e) => {
                 failed.push(json!({"id": id, "error": e.to_string()}));
                 if stop_on_error {
@@ -915,11 +943,14 @@ pub(crate) fn handle_task_bulk_update(req: JsonRpcRequest) -> JsonRpcResponse {
         }
     }
 
-    let payload = json!({
+    let mut payload = json!({
         "status": "ok",
         "updated": updated,
         "failed": failed,
     });
+    if !deferred.is_empty() {
+        payload["deferred"] = json!(deferred);
+    }
 
     text_result(req.id, &payload)
 }

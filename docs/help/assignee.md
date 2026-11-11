@@ -18,6 +18,8 @@ lotar assignee <TASK_ID> <NEW_ASSIGNEE> [--dry-run] [--explain]
 - `--dry-run`, `-n` - Show the change without saving it
 - `--explain`, `-e` - Explain how the value was validated and normalized
 
+While an agent job runs on the ticket, a new or cleared assignee is recorded for the job's end and the command says so (`ravi will be assigned when job <id> ends`); see [Status and assignee during a job](agent.md#status-and-assignee-during-a-job).
+
 ## Examples
 
 ```bash

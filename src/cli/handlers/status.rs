@@ -6,8 +6,8 @@ use crate::cli::handlers::task::errors::TaskStorageAction;
 use crate::cli::handlers::task::mutation::{LoadedTask, load_task};
 use crate::cli::handlers::task::render::{
     ExplainPlacement, PropertyCurrent, PropertyExplain, PropertyNoop, PropertyPreview,
-    PropertySuccess, render_property_current, render_property_noop, render_property_preview,
-    render_property_success,
+    PropertySuccess, render_job_outcome, render_property_current, render_property_noop,
+    render_property_preview, render_property_success,
 };
 use crate::cli::validation::CliValidator;
 use crate::config::types::ResolvedConfig;
@@ -114,9 +114,12 @@ fn handle_set_status(
         return Ok(());
     }
 
+    // A running agent job keeps the change for its end (DEV-320); the
+    // status alone is its outcome, without an auto-assigned assignee.
+    let running_job = running_job_for_ticket(&ctx.tasks_dir.path, full_id);
     let was_unassigned = task.assignee.is_none();
-    let should_assign =
-        should_auto_assign(&ctx.config, &old_status, &validated_status, was_unassigned);
+    let should_assign = running_job.is_none()
+        && should_auto_assign(&ctx.config, &old_status, &validated_status, was_unassigned);
     let mut resolved_assignee = if should_assign {
         resolve_auto_assign_candidate(ctx, &ctx.config)
     } else {
@@ -140,17 +143,12 @@ fn handle_set_status(
         task.assignee = Some(assignee);
     }
 
-    // If an agent job is already running for this ticket, changing status would
-    // disrupt the automation lifecycle. Require the user to cancel the job first.
-    if let Some(job) = running_job_for_ticket(&ctx.tasks_dir.path, full_id)
-        && !current_agent_job_matches_ticket(full_id)
+    // A job run by a lotar-agent-wrapper process can't record an outcome
+    // (no job record); refuse as before. Other running jobs get the change
+    // as their outcome (DEV-320).
+    if let Some(job) = running_job.as_ref()
+        && !job.takes_ticket_changes(&ctx.tasks_dir.path, full_id)
     {
-        if let Some(job_id) = job.job_id.as_deref() {
-            return Err(format!(
-                "Ticket '{}' has an active agent job ({}). Cancel it first: lotar agent cancel {}",
-                full_id, job_id, job_id
-            ));
-        }
         return Err(format!(
             "Ticket '{}' has an active agent job (pid {}). Cancel it before changing status.",
             full_id, job.pid
@@ -176,8 +174,18 @@ fn handle_set_status(
         sprints: None,
     };
 
-    let updated = TaskService::update(&mut ctx.storage, full_id, patch)
-        .map_err(TaskStorageAction::Update.map_err(full_id))?;
+    let receipt = TaskService::update_with_receipt(
+        &mut ctx.storage,
+        full_id,
+        patch,
+        crate::services::task_service::TaskUpdateContext::default(),
+    )
+    .map_err(TaskStorageAction::Update.map_err(full_id))?;
+    if let Some(outcome) = receipt.deferred.as_ref() {
+        render_job_outcome(renderer, full_id, outcome);
+        return Ok(());
+    }
+    let updated = receipt.dto;
 
     renderer.log_info("status: updated successfully");
 
@@ -189,18 +197,6 @@ fn handle_set_status(
         updated.assignee.as_deref(),
     );
     Ok(())
-}
-
-fn current_agent_job_matches_ticket(ticket_id: &str) -> bool {
-    let Ok(job_id) = std::env::var("LOTAR_AGENT_JOB_ID") else {
-        return false;
-    };
-    let Ok(current_ticket) = std::env::var("LOTAR_TICKET_ID") else {
-        return false;
-    };
-
-    crate::storage::identity::aliases_match(current_ticket.trim(), ticket_id)
-        && !job_id.trim().is_empty()
 }
 
 fn render_current_status(renderer: &OutputRenderer, task_id: &str, status: &TaskStatus) {

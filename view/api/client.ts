@@ -84,6 +84,7 @@ import type {
     SyncValidateResponse,
     TaskCreate,
     TaskDTO,
+    JobOutcome,
     TaskOrderRequest,
     TaskOrderResponse,
     TaskDeleteResponse,
@@ -91,6 +92,7 @@ import type {
     TaskListResponse,
     TaskUpdate,
 } from './types'
+import { showToast } from '../components/toast'
 
 const BASE = '' // same origin; server serves /api
 
@@ -125,7 +127,12 @@ function qs(params: object = {}): string {
     return s ? `?${s}` : ''
 }
 
-async function parseEnvelope<T>(method: 'GET' | 'POST', path: string, res: Response): Promise<T> {
+async function parseEnvelope<T>(
+    method: 'GET' | 'POST',
+    path: string,
+    res: Response,
+    onBody?: (body: Record<string, unknown>) => void,
+): Promise<T> {
     const raw = await res.text()
     // Server JSON: an envelope ({ data } or { error }), or a bare value from older endpoints.
     let payload: unknown = null
@@ -159,6 +166,7 @@ async function parseEnvelope<T>(method: 'GET' | 'POST', path: string, res: Respo
     if (!body || !('data' in body)) {
         return payload as T
     }
+    onBody?.(body)
 
     return (body as ApiEnvelope<T>).data
 }
@@ -175,6 +183,33 @@ async function post<T>(path: string, body: unknown): Promise<T> {
         body: JSON.stringify(body),
     })
     return parseEnvelope('POST', path, res)
+}
+
+/** The lines `lotar status`/`lotar assignee` print for a held-back change. */
+export function describeJobOutcome(outcome: JobOutcome): string[] {
+    const lines: string[] = []
+    if (outcome.status) lines.push(`${outcome.status} will be set when job ${outcome.job_id} ends`)
+    if (outcome.assignee === '') lines.push(`The assignee will be cleared when job ${outcome.job_id} ends`)
+    else if (outcome.assignee) lines.push(`${outcome.assignee} will be assigned when job ${outcome.job_id} ends`)
+    return lines
+}
+
+/**
+ * A task update; a change held back for the ticket's running agent job
+ * (DEV-320) is announced in a toast, since the returned task is unchanged.
+ */
+async function postTaskChange(path: string, body: unknown): Promise<TaskDTO> {
+    const res = await fetch(`${BASE}${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(body),
+    })
+    return parseEnvelope('POST', path, res, (envelope) => {
+        const deferred = envelope.deferred as JobOutcome | undefined
+        if (deferred?.job_id) {
+            showToast(describeJobOutcome(deferred).join('. '), 'Agent job running', 6000)
+        }
+    })
 }
 
 export const api = {
@@ -210,7 +245,7 @@ export const api = {
         return post('/api/tasks/add', payload)
     },
     updateTask(id: string, patch: TaskUpdate): Promise<TaskDTO> {
-        return post('/api/tasks/update', { id, ...patch })
+        return postTaskChange('/api/tasks/update', { id, ...patch })
     },
     addComment(id: string, text: string): Promise<TaskDTO> {
         return post('/api/tasks/comment', { id, text })
@@ -219,7 +254,7 @@ export const api = {
         return post('/api/tasks/comment/update', { id, index, text })
     },
     setStatus(id: string, status: string): Promise<TaskDTO> {
-        return post('/api/tasks/status', { id, status })
+        return postTaskChange('/api/tasks/status', { id, status })
     },
     /**
      * DEV-92: deletion is soft by default (recoverable trash tombstone);

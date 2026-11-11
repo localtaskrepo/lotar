@@ -99,7 +99,9 @@ allowed actors and the configuration path for recovery.
 
 The same guard is shared by CLI, REST, and MCP. Unchanged status/assignment
 requests remain no-ops, and reviewer membership does not bypass active agent-job
-locks or other validation. This is workflow policy based on resolved identity,
+locks or other validation. While an agent job runs on the ticket, a status change
+is recorded for the job's end instead of applied
+([Status and assignee during a job](agent.md#status-and-assignee-during-a-job)). This is workflow policy based on resolved identity,
 not additional user authentication or operating-system access control.
 
 ## Status values

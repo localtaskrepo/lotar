@@ -983,6 +983,22 @@ pub(crate) struct RunningAgentJob {
     pub runner: Option<String>,
 }
 
+impl RunningAgentJob {
+    /// Whether a status/assignee change for this job's ticket can wait for
+    /// its end (DEV-320) or is part of its lifecycle. Only a
+    /// lotar-agent-wrapper process without a job record can do neither.
+    pub(crate) fn takes_ticket_changes(
+        &self,
+        tasks_dir: &std::path::Path,
+        ticket_id: &str,
+    ) -> bool {
+        self.job_id.as_deref().is_some_and(|job_id| {
+            crate::services::agent_active_jobs::find(tasks_dir, job_id).is_some()
+                || crate::services::task_service::TaskService::is_job_lifecycle(job_id, ticket_id)
+        })
+    }
+}
+
 /// Alias-aware match between a running job's ticket and the requested one
 /// (canonical or padded spelling of the same ticket).
 pub(crate) fn running_job_matches(job_ticket: &str, needle: &str) -> bool {

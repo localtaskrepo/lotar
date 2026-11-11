@@ -63,7 +63,8 @@ pub struct TaskUpdateContext {
     pub expected_modified: Option<String>,
     pub allow_agent_automation: bool,
     /// Internal bypass used by automation/job lifecycle handlers so they can
-    /// mutate assignee/status while a job is active.
+    /// mutate assignee/status while a job is active. Without it such
+    /// changes are recorded as the job's outcome (DEV-320).
     pub bypass_active_job_lock: bool,
     /// External callers must respect review ownership checks.
     pub enforce_review_owner: bool,
@@ -105,6 +106,9 @@ impl Default for TaskUpdateContext {
 pub struct TaskUpdateReceipt {
     pub dto: TaskDTO,
     pub changed: bool,
+    /// Status/assignee changes recorded for the end of the ticket's running
+    /// agent job instead of applied (DEV-320).
+    pub deferred: Option<crate::api_types::JobOutcome>,
 }
 
 /// Extras for [`TaskService::create_with`].
@@ -1001,6 +1005,7 @@ impl TaskService {
         Ok(TaskUpdateReceipt {
             dto,
             changed: outcome.changed,
+            deferred: None,
         })
     }
 
@@ -1109,12 +1114,38 @@ impl TaskService {
         Self::update_composed(storage, id, patch, context, Some(delta)).map(|receipt| receipt.dto)
     }
 
+    /// [`Self::update_composed_inner`], then record the status/assignee it
+    /// held back for a running job, once the rest of the update succeeded.
     fn update_composed<F: FnOnce(&mut crate::types::TaskRelationships)>(
+        storage: &mut Storage,
+        id: &str,
+        patch: TaskUpdate,
+        context: TaskUpdateContext,
+        relationship_delta: Option<F>,
+    ) -> LoTaRResult<TaskUpdateReceipt> {
+        let mut deferred = None;
+        let mut receipt = Self::update_composed_inner(
+            storage,
+            id,
+            patch,
+            context,
+            relationship_delta,
+            &mut deferred,
+        )?;
+        if let Some(outcome) = deferred {
+            crate::services::agent_active_jobs::record_outcome(&storage.root_path, &outcome)?;
+            receipt.deferred = Some(outcome);
+        }
+        Ok(receipt)
+    }
+
+    fn update_composed_inner<F: FnOnce(&mut crate::types::TaskRelationships)>(
         storage: &mut Storage,
         id: &str,
         mut patch: TaskUpdate,
         context: TaskUpdateContext,
         relationship_delta: Option<F>,
+        deferred: &mut Option<crate::api_types::JobOutcome>,
     ) -> LoTaRResult<TaskUpdateReceipt> {
         let expected_modified = context.expected_modified;
         let (id, _) = Self::follow_moves(storage, id, None)?;
@@ -1191,7 +1222,7 @@ impl TaskService {
         // Shared project-aware enum validation: raw patch strings are checked
         // against this task's project configuration and canonicalized before
         // any mutation is applied.
-        let parsed_status = match patch.status.as_deref() {
+        let mut parsed_status = match patch.status.as_deref() {
             Some(raw) => Some(validation::parse_status(raw, &config)?),
             None => None,
         };
@@ -1224,18 +1255,21 @@ impl TaskService {
             )?;
         }
 
-        // Canonical id for the active-job carveout: a job running for TP-1
-        // covers updates addressed through the padded alias TP-001, and the
-        // registry lookup must not miss it either.
-        let current_job_can_mutate = Self::current_job_matches_ticket(&canonical);
-
-        if AgentJobService::has_active_job(&canonical)
-            && !context.bypass_active_job_lock
-            && !current_job_can_mutate
+        // A running agent job owns the ticket's status and assignee
+        // (DEV-320): a change from anyone but its lifecycle (automation, run
+        // actions carrying the job's id) is held back and recorded as the
+        // job's outcome, applied when the job ends. Other fields stay
+        // editable so people can still talk to the agent.
+        if let Some(job_id) =
+            Self::running_job_id(storage.root_path.as_path(), &canonical).filter(|job_id| {
+                !context.bypass_active_job_lock && !Self::is_job_lifecycle(job_id, &canonical)
+            })
         {
-            // Block assignee/status changes while a job is active for external callers.
-            // Other fields remain editable so the user can communicate with the agent (e.g. description/links).
-            if let Some(next) = patch.assignee.as_ref() {
+            let mut outcome = crate::api_types::JobOutcome {
+                job_id,
+                ..Default::default()
+            };
+            if let Some(next) = patch.assignee.take() {
                 let trimmed = next.trim();
                 let next_value = if trimmed.is_empty() {
                     None
@@ -1244,9 +1278,7 @@ impl TaskService {
                 };
                 // Assignment-aware identity (DEV-102): a registered agent
                 // directive ("@copilot") and the bare human spelling
-                // ("copilot") are DIFFERENT assignees, so switching between
-                // them is blocked while a job is active exactly like any
-                // other reassignment.
+                // ("copilot") are DIFFERENT assignees.
                 let is_agent = |name: &str| config.agent_profiles.contains_key(name);
                 let same = match (&existing.assignee, &next_value) {
                     (Some(a), Some(b)) => {
@@ -1257,19 +1289,17 @@ impl TaskService {
                     _ => false,
                 };
                 if !same {
-                    return Err(LoTaRError::ValidationError(format!(
-                        "Ticket '{}' has an active agent job. Stop/cancel the running job before changing assignee.",
-                        id
-                    )));
+                    outcome.assignee = Some(next_value.unwrap_or_default());
                 }
             }
-            if let Some(next_status) = parsed_status.as_ref()
-                && &existing.status != next_status
-            {
-                return Err(LoTaRError::ValidationError(format!(
-                    "Ticket '{}' has an active agent job. Stop/cancel the running job before changing status.",
-                    id
-                )));
+            if let Some(next_status) = parsed_status.take() {
+                patch.status = None;
+                if existing.status != next_status {
+                    outcome.status = Some(next_status.to_string());
+                }
+            }
+            if outcome.status.is_some() || outcome.assignee.is_some() {
+                *deferred = Some(outcome);
             }
         }
         let explicit_reporter = patch.reporter.is_some();
@@ -1542,6 +1572,7 @@ impl TaskService {
             return Ok(TaskUpdateReceipt {
                 dto,
                 changed: false,
+                deferred: None,
             });
         }
 
@@ -1635,7 +1666,11 @@ impl TaskService {
                 AutomationService::apply_task_update(storage, Some(&previous_dto), &dto, &config);
         }
 
-        Ok(TaskUpdateReceipt { dto, changed: true })
+        Ok(TaskUpdateReceipt {
+            dto,
+            changed: true,
+            deferred: None,
+        })
     }
 
     /// DEV-102 effective-equality between the projected existing state and
@@ -1754,25 +1789,25 @@ impl TaskService {
         norm(a) == norm(b)
     }
 
-    fn current_job_matches_ticket(id: &str) -> bool {
-        let Ok(job_id) = std::env::var("LOTAR_AGENT_JOB_ID") else {
-            return false;
-        };
-        let Ok(ticket_id) = std::env::var("LOTAR_TICKET_ID") else {
-            return false;
-        };
-        let trimmed_job_id = job_id.trim();
-        // Canonical alias comparison: a job's env identity matches updates
-        // addressed through any valid padded alias of the same ticket.
-        // Unparseable values never match, keeping unrelated callers locked out.
-        if trimmed_job_id.is_empty() || !ticket_alias_matches(ticket_id.trim(), id) {
-            return false;
-        }
-
-        AgentJobService::get_job(trimmed_job_id).is_some_and(|job| {
-            ticket_alias_matches(job.ticket_id.trim(), id)
-                && matches!(job.status.as_str(), "queued" | "running")
+    /// The agent job running (or queued) for the ticket: in this process,
+    /// or in another one for the same tasks directory (DEV-279).
+    fn running_job_id(tasks_root: &Path, id: &str) -> Option<String> {
+        AgentJobService::active_job_id(id).or_else(|| {
+            crate::services::agent_active_jobs::for_ticket_elsewhere(tasks_root, id)
+                .map(|job| job.job_id)
         })
+    }
+
+    /// Whether this process is part of the job's lifecycle: an automation
+    /// `run` command started for that job carries its id and ticket in
+    /// `LOTAR_AGENT_JOB_ID` and `LOTAR_TICKET_ID`. Agents themselves (T3
+    /// threads among them) don't, so their changes become the job's outcome.
+    pub(crate) fn is_job_lifecycle(job_id: &str, id: &str) -> bool {
+        let env = |name: &str| std::env::var(name).ok().map(|v| v.trim().to_string());
+        // Canonical alias comparison: padded aliases of the ticket match;
+        // unparseable values never do.
+        env("LOTAR_AGENT_JOB_ID").is_some_and(|env_job| env_job == job_id)
+            && env("LOTAR_TICKET_ID").is_some_and(|ticket| ticket_alias_matches(&ticket, id))
     }
 
     fn enforce_review_owner_transition(
@@ -2224,6 +2259,7 @@ impl TaskService {
         Ok(TaskUpdateReceipt {
             dto,
             changed: outcome.changed,
+            deferred: None,
         })
     }
 
@@ -2286,6 +2322,7 @@ impl TaskService {
         Ok(TaskUpdateReceipt {
             dto: Self::dto_from_task(storage, &canonical, task),
             changed,
+            deferred: None,
         })
     }
 

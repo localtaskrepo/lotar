@@ -513,6 +513,14 @@ impl AgentJobService {
         }
     }
 
+    /// The job this process runs (or queues) for the ticket.
+    pub fn active_job_id(ticket_id: &str) -> Option<String> {
+        JOB_REGISTRY
+            .lock()
+            .ok()
+            .and_then(|registry| registry.active_by_ticket.get(ticket_id).cloned())
+    }
+
     /// Whether no worker of this process still works on the job: its end
     /// automation has run (DEV-322). A job that never got a worker (queued,
     /// then cancelled) is settled too.
@@ -3725,8 +3733,11 @@ mod tests {
     }
 
     #[test]
-    fn padded_job_start_registers_canonical_and_locks_canonical_updates() {
+    fn padded_job_start_registers_canonical_and_holds_back_canonical_updates() {
         let (_tmp, tasks_dir) = dev56_workspace();
+        // SAFETY: test-local override of the queue directory (nextest runs
+        // each test in its own process).
+        unsafe { std::env::set_var("LOTAR_AGENT_QUEUE_DIR", _tmp.path().join("queue")) };
 
         // Padded alias start registers the CANONICAL ticket (queue mode via
         // max_parallel_jobs: 0 keeps the job pending, so no runner spawns).
@@ -3748,23 +3759,32 @@ mod tests {
         );
 
         // Canonical and padded status/assignee updates from unrelated callers
-        // are locked out (other fields stay editable by design).
+        // don't touch the ticket; they become the job's outcome (DEV-320).
         let mut storage = Storage::new(&tasks_dir);
-        for id in ["AJB-1", "AJB-001"] {
-            let err = crate::services::task_service::TaskService::update(
+        for (id, status) in [("AJB-1", "InProgress"), ("AJB-001", "Done")] {
+            let receipt = crate::services::task_service::TaskService::update_with_receipt(
                 &mut storage,
                 id,
                 crate::api_types::TaskUpdate {
-                    status: Some("InProgress".to_string()),
+                    status: Some(status.to_string()),
                     ..Default::default()
                 },
+                crate::services::task_service::TaskUpdateContext::default(),
             )
-            .unwrap_err();
-            assert!(
-                err.to_string().contains("active agent job"),
-                "update via {id} must be locked: {err}"
-            );
+            .unwrap();
+            assert!(!receipt.changed, "update via {id} must wait for the job");
+            assert_eq!(receipt.dto.status.as_str(), "Todo");
+            let deferred = receipt.deferred.expect("recorded as the outcome");
+            assert_eq!(deferred.job_id, job.id);
+            assert_eq!(deferred.status.as_deref(), Some(status));
         }
+        let recorded =
+            crate::services::agent_active_jobs::peek_outcome(&tasks_dir, &job.id).unwrap();
+        assert_eq!(
+            recorded.status.as_deref(),
+            Some("Done"),
+            "the last change wins"
+        );
     }
 
     #[test]

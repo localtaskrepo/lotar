@@ -51,4 +51,6 @@ Example:
 "${{lotar.bin}}" assignee ${{ticket.id}} "${{ticket.reporter}}"
 ```
 
+While this job runs, these two commands answer that the status and assignee will be set when the job ends. That is expected: the ticket ends that way instead of with the job's default outcome. Stop after them.
+
 If you receive an agent-job message that answers the question, incorporate it and continue from the current state.

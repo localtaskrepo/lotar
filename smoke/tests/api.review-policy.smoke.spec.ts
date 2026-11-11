@@ -264,7 +264,7 @@ describe.each<Surface>(['REST', 'MCP'])('%s project review policy (DEV-128)', (s
 });
 
 describe('REST reviewer active-job boundary (DEV-128)', () => {
-    it('does not let an authorized reviewer bypass a running agent job', async ({ expect }) => {
+    it('holds an authorized reviewer change until the running agent job ends', async ({ expect }) => {
         const gate = await createGateFixture('lotar-smoke-review-gate-');
         try {
             const agents = await createFixtureAgents({
@@ -314,10 +314,10 @@ describe('REST reviewer active-job boundary (DEV-128)', () => {
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ id: 'REVIEW-1', ...patch }),
                             });
-                            expect(response.status).toBe(400);
-                            const rejected = (await response.json()) as { error: { code: string; message: string } };
-                            expect(rejected.error.code).toBe('INVALID_ARGUMENT');
-                            expect(rejected.error.message).toContain('active agent job');
+                            // DEV-320: held for the job's end, not applied now.
+                            expect(response.status).toBe(200);
+                            const held = (await response.json()) as { deferred?: Record<string, string> };
+                            expect(held.deferred).toEqual({ job_id: payload.data.job.id, ...patch });
                             expect(await snapshot(workspace, 'REVIEW-1')).toEqual(before);
                         }
                     } finally {

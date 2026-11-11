@@ -1,0 +1,50 @@
+title: Status and assignee changes during an agent job become its outcome
+status: Done
+priority: High
+type: Bug
+reporter: claude
+assignee: claude
+created: 2026-11-11T18:42:57.575800+00:00
+modified: 2026-11-11T19:10:36.991434+00:00
+relationships:
+  related:
+  - DEV-322
+comments:
+- date: 2026-11-11T19:10:36.924789+00:00
+  text: |-
+    Outcome: while an agent job runs or is queued for a ticket (this process's registry, or another process's job record), a status or assignee change through TaskService (CLI status/assignee/assignee --clear, REST /api/tasks/update and /api/tasks/status, MCP task_update and task_bulk_update, sync) is no longer refused: those two fields are held back and recorded as the job's outcome (<job>.outcome.json next to the job record, merged per field under a lock, last write wins), other fields of the same patch apply. Output: CLI '<ID>: HelpNeeded will be set when job <id> ends' / '<who> will be assigned …' / 'The assignee will be cleared …', exit 0, JSON changed:false + deferred{job_id,status?,assignee?}; REST {data, deferred}; MCP task JSON + deferred + message, bulk deferred[]; web UI toast. At job end (completed/failed/cancelled) AutomationService::apply_job_event runs the end rules with set.status/set.assignee removed where the outcome sets them (other set fields, add/remove/comment/run still run), then removes the job record (guard ends) and applies the outcome like a rule's set (automation_disabled, an agent-profile assignee starts its job), also when no rule matches. Lifecycle writes keep applying at once: bypass_active_job_lock contexts and run actions whose LOTAR_AGENT_JOB_ID/LOTAR_TICKET_ID match the job (replaces both env checks). The CLI status command doesn't auto-assign while a job runs. Jobs seen only as lotar-agent-wrapper processes (no record) are still refused. Review-owner checks still run when the change is recorded.
+    Evidence: tests/dev320_job_outcome_test.rs: end-to-end (agent run --wait in another process; status HelpNeeded + assignee owner during the job exit 0 with the message, ticket unchanged meanwhile; job completes; rule set Done/robot loses, its comment runs) failed before ('has an active agent job … Cancel it first'), passes now; REST+MCP+apply_job_event test (written after the fix). Updated: dev279 (status during a foreign job now waits), agent_job_service padded-alias unit test, smoke api.review-policy (reviewer change → 200 deferred, file unchanged), view/__tests__/jobOutcome.spec.ts. Contracts: api_types JobOutcome, view/api/types.ts, openapi EnvelopeTaskChange/JobOutcome. Docs: agent.md#status-and-assignee-during-a-job, automation.md, status.md, assignee.md, mcp-tools.md, api-quick-reference.md, built-in agent-instructions.md (expect the message, stop after it).
+    Checks: npm run lint:agent clean; npm run test:agent 1991 Rust + 1439 UI pass; smoke see commit report.
+    Limits: a change recorded in the microseconds between the job's final outcome read and record removal is lost (documented in code). Existing tickets hit by the bug (QIS-174, FND-5, DDI-1) need a manual fix.
+    Guidance: no durable finding.
+description: |-
+  Fix agents in T3 threads (QIS-174, FND-5, DDI-1, 2026-11-11) stopped at an owner decision and ran `lotar status <ID> HelpNeeded` / `lotar assignee <ID> <owner>`. lotar refuses status/assignee changes while the ticket's job runs, so the job ended normally and the job_completed rule set Done on unfinished tickets.
+
+  Wanted: during a job, status/assignee changes (CLI, MCP, REST, any process) are recorded as the job's outcome instead of refused; the command says so ("HelpNeeded will be set when job <id> ends"), exit 0. At job end the recorded status/assignee win over the set of job_completed/job_failed/job_cancelled rules; the rules' other actions still run. Lifecycle writes (automation, run actions with LOTAR_AGENT_JOB_ID) are unchanged. T3 threads get no LOTAR_* env vars, so every such change counts.
+
+  Acceptance: failing test first (job runs, status HelpNeeded during it, job completes, rule sets Done -> HelpNeeded); docs/help/agent.md, automation.md, REST/MCP contracts.
+history:
+- at: 2026-11-11T18:43:07.284214+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-11T18:57:39.085307+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-322"]}'
+- at: 2026-11-11T19:10:36.924789+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-11T19:10:36.991434+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

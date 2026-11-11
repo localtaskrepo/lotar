@@ -394,6 +394,46 @@ pub struct TaskCreate {
     pub sprints: Vec<u32>,
 }
 
+/// A status and/or assignee change made while an agent job runs on the
+/// ticket (DEV-320). It is not applied now: the job's end applies it in
+/// place of the `set` of the `job_completed`, `job_failed` or
+/// `job_cancelled` rules. An empty `assignee` clears the assignee.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct JobOutcome {
+    pub job_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assignee: Option<String>,
+}
+
+impl JobOutcome {
+    /// One line per field, for command output: "HelpNeeded will be set when
+    /// job <id> ends".
+    pub fn describe(&self) -> Vec<String> {
+        let mut lines = Vec::new();
+        if let Some(status) = self.status.as_deref() {
+            lines.push(format!(
+                "{status} will be set when job {} ends",
+                self.job_id
+            ));
+        }
+        match self.assignee.as_deref() {
+            Some("") => lines.push(format!(
+                "The assignee will be cleared when job {} ends",
+                self.job_id
+            )),
+            Some(assignee) => lines.push(format!(
+                "{assignee} will be assigned when job {} ends",
+                self.job_id
+            )),
+            None => {}
+        }
+        lines
+    }
+}
+
 /// How a finding report was handled (DEV-317).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
