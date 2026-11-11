@@ -13,7 +13,8 @@ pub const RUNTIME_GITIGNORE: &str = "# Written by LoTaR: runtime files that are 
 # Edit this file rather than deleting it; LoTaR recreates it when missing.\n\
 .*.lock\n\
 .txn-pending.json\n\
-.*.tmp-*\n";
+.*.tmp-*\n\
+*.context\n";
 
 /// Create `<tasks>/.gitignore` for runtime files when it is missing. A
 /// workspace's own file is never changed. Called when a task or sprint lock

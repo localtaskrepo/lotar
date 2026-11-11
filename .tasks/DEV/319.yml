@@ -1,0 +1,25 @@
+title: Runtime .gitignore leaves out agent job context files
+status: Done
+priority: Medium
+type: Bug
+reporter: claude
+assignee: claude
+created: 2026-11-11T18:18:24.512137+00:00
+modified: 2026-11-11T18:23:53.472157+00:00
+comments:
+- date: 2026-11-11T18:23:53.442893+00:00
+  text: 'Fixed: the written .tasks/.gitignore now lists *.context (src/storage/manager.rs RUNTIME_GITIGNORE), test tests/dev319_runtime_gitignore_test.rs failed first. Existing .gitignore files are never changed; the owner''s 12 repos got the line by hand. Ships with the next release.'
+description: 'The .tasks/.gitignore LoTaR writes lists runtime files (.*.lock, .txn-pending.json, .*.tmp-*) but not the per-ticket job context files (<ID>.context, agent.context_enabled), so every agent job leaves an untracked file next to the ticket (seen 2026-11-11: STD-22.context after the first health ticket''s t3 job). Fix: ignore *.context in the written file. Existing files are never changed, so the owner''s repos get the line by hand.'
+history:
+- at: 2026-11-11T18:23:53.442893+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-11T18:23:53.472157+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: claude
