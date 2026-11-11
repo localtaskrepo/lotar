@@ -1,0 +1,54 @@
+title: HelpNeeded set by a job is overwritten to Done when the job ends (STD-25)
+status: Done
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-11T20:52:28.165124+00:00
+modified: 2026-11-11T20:54:15.059882+00:00
+relationships:
+  related:
+  - DEV-320
+comments:
+- date: 2026-11-11T20:54:08.225372+00:00
+  text: 'Not a lotar bug; no change, no commit. STD-25''s job log (standards .tasks/@agent-logs/job-20261111T195430.813Z-1.jsonl) shows the job completed at 19:54:51.325Z and lotar set the deferred HelpNeeded at 19:54:51.328Z, so the job-end automation kept HelpNeeded as DEV-320 intends. The Done 40 s later was not automation: the test-running session in ~/Development/local (Claude transcript 0ff21561, line 4231) ran ''lotar comment STD-25 -m "Test passed ... HelpNeeded held" && lotar status STD-25 done'' itself, closing the test ticket after checking it. Both changes therefore show actor claude. The check (after the job ends, status stays HelpNeeded) passes; the later Done was that session''s deliberate cleanup.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9f14ca0f-3474-4ff1-b783-88358084c244
+description: 'Found: STD-25 (lotar 0.13.1, DEV-320). Job set status HelpNeeded at 19:54:51Z; at 19:55:31Z automation changed it to Done and added the comment ''Test passed ... HelpNeeded held''. The ticket is still Done at 20:15Z. Check: after a job that sets HelpNeeded ends, status must stay HelpNeeded. Done: the job-end automation keeps HelpNeeded, or the test comment is not written when status is not Done.'
+tags:
+- health
+custom_fields:
+  finding: test:helpneeded-2026-11-11
+history:
+- at: 2026-11-11T20:52:28.265878+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-320"]}'
+- at: 2026-11-11T20:52:28.361303+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-11T20:52:28.460091+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-11T20:52:29.058426+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9f14ca0f-3474-4ff1-b783-88358084c244
+- at: 2026-11-11T20:54:08.225372+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-11T20:54:15.059882+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

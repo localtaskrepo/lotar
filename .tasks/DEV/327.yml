@@ -1,0 +1,7 @@
+title: Comments record who wrote them
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+created: 2026-11-11T23:36:51.131233+00:00
+description: 'From the standards ticket-process review (STD-27, 2026-11-11). A comment stores only date and text (docs/help/comment.md: ''Author attribution isn''t stored''); the author is only in the history''s actor, and lotar show doesn''t print it. Agents now start comments with ''claude:'' by hand, and the fix-agent prompt asks for that until this lands. Wanted: store the author on each comment from the same identity the history uses (LOTAR_DEFAULT_REPORTER, the agent job''s profile, a project''s default.reporter), show it in lotar show, the JSON, the web UI and MCP, and keep old comments without an author readable. Done: lotar comment X -m hi with LOTAR_DEFAULT_REPORTER=claude shows ''claude'' next to the comment in show and JSON; tests cover CLI, REST and MCP. Afterwards standards drops the ''start each comment with your agent name'' line (configs/lotar/automation.yml, skills/lotar-workflow).'

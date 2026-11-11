@@ -1,0 +1,35 @@
+title: 't3 runner: pass the profile''s effort to T3 Code'
+status: Todo
+priority: Low
+type: Feature
+reporter: claude
+created: 2026-11-11T19:27:16.036194+00:00
+modified: 2026-11-11T19:46:26.590334+00:00
+comments:
+- date: 2026-11-11T19:46:26.433353+00:00
+  text: 'Upstream already has it: issue https://github.com/pingdotgg/t3code/issues/29863 (CLI: add --effort to t3 thread start and send) and PR https://github.com/pingdotgg/t3code/pull/27189 (open, not reviewed yet as of 2026-11-11), which adds ''t3 thread start --effort <level>'' together with --provider/--model. Once it ships: pass the profile''s/run''s effort as --effort (the runner already passes provider and model), drop the job note. No new upstream request needed.'
+references:
+- link: https://github.com/pingdotgg/t3code/pull/27189
+description: |-
+  Profiles and runs can set effort, but the t3 runner drops it (job note), so T3 threads run at T3's default (Opus 5.5: medium). The owner wants effort settable per profile, rule and ticket, like model and provider (2026-11-11).
+
+  Findings, T3 Code 0.1.9 (2026-11-11):
+  - The server takes effort: t3_thread_launch's modelSelection has options, a list of {id, value} (also accepted as an object), e.g. [{"id":"effort","value":"high"}]. orchestrator_capabilities lists effort low..max (Opus 5.5 default medium).
+  - 't3 thread start' calls t3_thread_launch with only instanceId and model; it has no flag for options.
+  - Calling the server's /mcp endpoint directly works with a token from 't3 auth session issue --subject mcp-client --scope orchestration:read --scope orchestration:operate' (tested: initialize and tools/list OK, token revoked). But such a session has no runtime-mode ceiling, so the server treats it as approval-required and launched threads can't exceed that: unattended fix agents would stop at every approval. The CLI itself mints a full-access MCP session in-process, which an outside program can't do.
+
+  So this waits for T3: either 't3 thread start' takes model options (e.g. --option effort=high), or 't3 auth session issue' can grant a full-access MCP client. With the first, pass the profile's/run's effort as that option and drop the job note; with the second, launch through /mcp instead of the CLI.
+
+  Check: a t3 job with effort set starts its thread at that effort (T3 shows it on the thread) and logs no ignored-effort note. Done: agents.yml profiles, automation agent settings and the ticket field effort reach T3.
+custom_fields:
+  finding: t3:effort
+history:
+- at: 2026-11-11T19:46:26.433353+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-11T19:46:26.590334+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://github.com/pingdotgg/t3code/pull/27189

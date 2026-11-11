@@ -1,0 +1,41 @@
+title: 'Live agent check fails every scenario: its temp repos are not trusted'
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-11T23:44:28.210270+00:00
+modified: 2026-11-11T23:44:29.022507+00:00
+relationships:
+  related:
+  - DEV-328
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A80174681-f8fa-4499-9214-f151054077b7
+description: 'Found while fixing DEV-328 (2026-11-11): node scripts/agent-live-check.mjs --runner codex --scenario settings fails in 0s with ''agent profiles are not trusted yet ... run lotar trust (or set LOTAR_TRUST_ALL=1 in CI)''; pipeline stays Todo. With LOTAR_TRUST_ALL=1 both pass. Check: npm run agents:live -- --runner codex --scenario settings. Done: the script trusts its own throwaway repos (lotar trust in makeRepo/writeConfig, or LOTAR_TRUST_ALL=1 in lotar()/withServer env) and the scenario passes without extra env.'
+tags:
+- health
+custom_fields:
+  finding: agents-live:trust
+history:
+- at: 2026-11-11T23:44:28.298036+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-328"]}'
+- at: 2026-11-11T23:44:28.387585+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-11T23:44:28.518007+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-11T23:44:29.022507+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A80174681-f8fa-4499-9214-f151054077b7

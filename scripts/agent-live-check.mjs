@@ -104,6 +104,26 @@ function makeRepo(runner, scenario) {
     return dir;
 }
 
+/**
+ * Codex records every folder it starts in as a trusted project in its
+ * config.toml (DEV-328). Remove the tables for `dir` and anything below it,
+ * such as worktrees next to it, so throwaway repositories don't pile up there.
+ */
+function forgetCodexProjects(dir) {
+    const configFile = path.join(process.env.CODEX_HOME || path.join(os.homedir(), '.codex'), 'config.toml');
+    if (!fs.existsSync(configFile)) return;
+    const prefixes = [dir, fs.realpathSync(dir)].map((prefix) => `[projects."${prefix}`);
+    let dropping = false;
+    const kept = fs
+        .readFileSync(configFile, 'utf8')
+        .split('\n')
+        .filter((line) => {
+            if (line.startsWith('[')) dropping = prefixes.some((prefix) => line.startsWith(prefix));
+            return !dropping;
+        });
+    fs.writeFileSync(configFile, kept.join('\n'));
+}
+
 function writeConfig(dir, runner, extra = '', args = JSON.stringify(RUNNERS[runner].args)) {
     fs.mkdirSync(path.join(dir, '.tasks'), { recursive: true });
     fs.writeFileSync(
@@ -554,6 +574,7 @@ for (const runner of runners) {
                 );
         }
         if (outcome.dir) {
+            if (runner === 'codex') forgetCodexProjects(outcome.dir);
             if (options.keep || !outcome.ok) console.log(`    kept: ${outcome.dir}`);
             else fs.rmSync(outcome.dir, { recursive: true, force: true });
         }

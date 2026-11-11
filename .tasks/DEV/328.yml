@@ -1,0 +1,44 @@
+title: Live agent check leaves its temp workspaces in ~/.codex/config.toml
+status: InProgress
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-11T23:37:13.082766+00:00
+modified: 2026-11-11T23:44:28.297521+00:00
+relationships:
+  related:
+  - DEV-329
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8ce0f7ba-91df-4a42-9207-ef0462d45cd3
+description: |-
+  Found by the standards ticket-process review (STD-27, 2026-11-11): ~/.codex/config.toml holds 23 [projects."/private/var/folders/.../T/lotar-live-codex-*"] entries (cancel, edit, failure, handback, mcp, pipeline, settings, template), one per run of scripts/agent-live-check.mjs: Codex records each temp workspace it is started in as a trusted project. The folders are gone; the entries stay and grow.
+  Check: grep -c 'lotar-live-codex' ~/.codex/config.toml (23 on 2026-11-11).
+  Done: agent-live-check.mjs starts Codex so it doesn't write the real config (a temporary CODEX_HOME with the auth it needs, or removing its own entries when the run ends), a test or the live check shows the count stays the same after a run, and the existing stale entries are removed from ~/.codex/config.toml without touching the others.
+tags:
+- health
+custom_fields:
+  finding: codex-config:live-check
+history:
+- at: 2026-11-11T23:37:13.179742+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-11T23:37:13.339496+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-11T23:37:13.848071+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8ce0f7ba-91df-4a42-9207-ef0462d45cd3
+- at: 2026-11-11T23:44:28.297521+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-329"]}'
