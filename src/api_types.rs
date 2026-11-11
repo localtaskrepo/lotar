@@ -403,7 +403,8 @@ pub enum FindingState {
     New,
     /// The newest ticket with the key is done; a new one was created.
     Recurred,
-    /// An open ticket has the key; the report was added to it as a comment.
+    /// An open ticket has the key; a report with a new description was
+    /// added to it as a comment, one without only updated `finding_seen`.
     Open,
     /// The newest ticket with the key was closed as won't do; nothing changed.
     Suppressed,
@@ -418,6 +419,11 @@ pub struct FindingReport {
     pub state: FindingState,
     /// The new ticket, or the existing one that already reports the finding.
     pub id: String,
+    /// An open ticket got this report as a comment; `false` when the report
+    /// said nothing new and only `finding_seen` was updated (DEV-321). Not
+    /// part of the wire format.
+    #[serde(skip)]
+    pub commented: bool,
 }
 
 /// Patch payload shared by REST, MCP, and UI clients.

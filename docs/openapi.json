@@ -4445,7 +4445,7 @@
           },
           "finding": {
             "type": "string",
-            "description": "Report a problem once (DEV-317): a stable key for it, one line of at most 200 characters, stored in the ticket's `finding` custom field. The newest ticket of the project with this key decides: an open one gets the report as a comment (200, `data` is that ticket), a won't-do one (WontDo, Won't fix, Cancelled, Rejected, Declined) suppresses the report (200), a done one gets a new ticket related to it (201), none gets a new ticket (201). The check and the write hold the project's finding lock, so parallel reports of one key create one ticket. The response adds `finding`."
+            "description": "Report a problem once (DEV-317): a stable key for it, one line of at most 200 characters, stored in the ticket's `finding` custom field. The newest ticket of the project with this key decides: an open one gets the report as a comment when its description is new, otherwise only today's date in its `finding_seen` field (DEV-321) (200, `data` is that ticket), a won't-do one (WontDo, Won't fix, Cancelled, Rejected, Declined) suppresses the report (200), a done one gets a new ticket related to it (201), none gets a new ticket (201). The check and the write hold the project's finding lock, so parallel reports of one key create one ticket. The response adds `finding`."
           }
         },
         "required": [

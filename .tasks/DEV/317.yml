@@ -5,7 +5,10 @@ type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-11T17:10:42.493922+00:00
-modified: 2026-11-11T17:25:59.687346+00:00
+modified: 2026-11-11T18:42:57.803412+00:00
+relationships:
+  related:
+  - DEV-321
 comments:
 - date: 2026-11-11T17:25:59.657213+00:00
   text: 'Outcome: lotar add --finding <KEY>, MCP task_create finding, REST /api/tasks/add finding. Under <project>/.finding.lock (30 s wait) the newest ticket of the project with the key decides: open -> comment ''Reported again by <reporter> on <date>.'' + description, {created:false,state:open,id}; won''t-do by name (WontDo, Won''t fix, Cancelled, Canceled, Rejected, Declined) -> {created:false,state:suppressed,id}; done (effective done states) -> new ticket related to it, {created:true,state:recurred,id}; none -> {created:true,state:new,id}. Exit 0 always; text names the ID; CLI JSON has created/state/id plus status/message/task_id/task; REST {data, finding} 201/200; MCP {task, finding}. Key stored as custom field ''finding'' (also where custom fields are limited); lotar list finding=<key> works in every project. created automation runs after the lock, only for new tickets. Evidence: tests/dev317_finding_report_test.rs (4 states, 6 parallel processes -> one ticket + 5 comments, created automation once, REST+MCP), finding_service unit tests; related groups 369/369. Docs: add.md#findings, list.md, mcp-tools.md, api-quick-reference.md, openapi.json, view/api/types.ts, lotar-workflow skill. Remaining: none.'
@@ -27,3 +30,9 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-11T18:42:57.803412+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-321"]}'

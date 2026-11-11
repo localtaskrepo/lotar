@@ -576,7 +576,7 @@ impl AddHandler {
                     .map_err(|e| e.to_string())?;
                 match FindingService::prior(&storage, &project_for_storage, key, &config) {
                     Prior::Open(id) => {
-                        FindingService::comment_repeat(
+                        let (_, commented) = FindingService::record_repeat(
                             &mut storage,
                             &id,
                             task.reporter.as_deref(),
@@ -587,6 +587,7 @@ impl AddHandler {
                             created: false,
                             state: FindingState::Open,
                             id: id.clone(),
+                            commented,
                         };
                         return Ok(AddedTask {
                             task_id: id,
@@ -598,6 +599,7 @@ impl AddHandler {
                             created: false,
                             state: FindingState::Suppressed,
                             id: id.clone(),
+                            commented: false,
                         };
                         return Ok(AddedTask {
                             task_id: id,
@@ -667,6 +669,7 @@ impl AddHandler {
                 created: true,
                 state,
                 id: task_id.clone(),
+                commented: false,
             };
             (key, outcome)
         });

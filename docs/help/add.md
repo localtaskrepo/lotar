@@ -116,12 +116,13 @@ The newest ticket of the project with that key decides what happens. The command
 | Newest ticket with the key | What happens | JSON |
 | --- | --- | --- |
 | none | a new ticket | `{"created": true, "state": "new", "id": "DEV-12"}` |
-| open (any status that isn't done) | no new ticket; the report is added to it as a comment with the reporter, date and description | `{"created": false, "state": "open", "id": "DEV-12"}` |
+| open (any status that isn't done) | no new ticket; the report is added to it as a comment with the reporter, date and description. A report with nothing new (no description, or the ticket's description, or the text of the last report comment) adds no comment; it sets the ticket's `finding_seen` field to today's date | `{"created": false, "state": "open", "id": "DEV-12"}` |
 | won't do (`WontDo`, `Won't fix`, `Cancelled`, `Rejected` or `Declined`) | nothing; the problem was accepted | `{"created": false, "state": "suppressed", "id": "DEV-12"}` |
 | done | a new ticket, related to the done one | `{"created": true, "state": "recurred", "id": "DEV-15"}` |
 
 - The JSON also has the usual `status`, `message`, `task_id` and `task` (the new ticket, or the one that already reports the problem). Text output names the ticket in its first line.
 - The key is stored in the ticket's `finding` field (also in projects that limit custom fields), so `lotar list finding=worktrees:lotar` lists the tickets that reported it.
+- `finding_seen` (`YYYY-MM-DD`) is set without a history entry and leaves `modified` alone, so a daily check doesn't make the ticket look edited every day. `lotar list finding_seen=2026-11-11` lists what a check saw that day.
 - Checking and creating hold the project's finding lock (`.finding.lock`), so two agents reporting the same key at the same moment create one ticket.
 - Automation rules on `created` run only when a ticket is created; the comment on an open ticket runs `commented` rules.
 - REST (`/api/tasks/add`) and MCP (`task_create`) take the same key as `finding`; see [API quick reference](api-quick-reference.md) and [MCP tools](mcp-tools.md#task_create).

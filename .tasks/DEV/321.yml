@@ -1,0 +1,46 @@
+title: Repeated finding reports with the same description add no comment
+status: Done
+priority: Medium
+type: Bug
+reporter: claude
+assignee: claude
+created: 2026-11-11T18:42:57.737717+00:00
+modified: 2026-11-11T19:10:36.785931+00:00
+relationships:
+  related:
+  - DEV-317
+comments:
+- date: 2026-11-11T19:10:36.644195+00:00
+  text: |-
+    Outcome: a repeated finding report on an open ticket adds the 'Reported again by … on …' comment only when its description is new: not empty, not the ticket's description, not the body of the last 'Reported again' comment (all compared trimmed). Otherwise the custom field finding_seen gets today's date (YYYY-MM-DD), written without a history entry and without touching modified (so a daily scan doesn't make the ticket look edited); finding_seen is, like finding, allowed in projects that limit custom fields, so 'lotar list finding_seen=<date>' works. JSON finding result unchanged ({created:false,state:open,id}); text/JSON message says 'seen again with nothing new, no comment added'. FindingReport gained a serde-skipped commented flag (wire format unchanged).
+    Evidence: tests/dev317_finding_report_test.rs::cli_repeated_report_without_news_records_the_date_instead_of_a_comment failed before (comment added), passes now; other DEV-317 tests unchanged. Docs: add.md#findings, openapi.json, MCP task_create finding description.
+    Remaining: none. Guidance: no durable finding.
+description: |-
+  `lotar add --finding` (DEV-317) comments 'Reported again by ... on ...' on the open ticket at every report. The daily repo-health scan re-reports every open finding, so a ticket waiting weeks (DDI-1) collects a comment per day.
+
+  Wanted: no comment when the new description equals the ticket's description or the last report comment's text; record the last report date instead (custom field finding_seen). A changed description still comments. JSON finding result unchanged (created: false, state: open). Failing test first; docs/help/add.md.
+history:
+- at: 2026-11-11T18:42:57.803890+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-317"]}'
+- at: 2026-11-11T18:43:07.230381+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-11T19:10:36.644195+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-11T19:10:36.785931+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

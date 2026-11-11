@@ -296,3 +296,63 @@ fn rest_and_mcp_report_findings() {
     assert!(plain.get("finding").is_none(), "{plain}");
     assert_eq!(plain["task"]["id"], json!("REPO-2"));
 }
+
+/// DEV-321: a daily scan reports the same finding again and again; a report
+/// that says nothing new records the date instead of adding a comment.
+#[test]
+fn cli_repeated_report_without_news_records_the_date_instead_of_a_comment() {
+    let fixtures = TestFixtures::new();
+    fixtures.create_config_in_dir(&fixtures.tasks_root, CONFIG);
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let comments = |task: &Value| task["comments"].as_array().map_or(0, Vec::len);
+
+    add_json(&fixtures, "deps:jest", "jest 30 breaks the build");
+
+    // Same text as the ticket: no comment, the date is recorded.
+    let same = add_json(&fixtures, "deps:jest", "jest 30 breaks the build");
+    assert_eq!(
+        (
+            same["created"].clone(),
+            same["state"].clone(),
+            same["id"].clone()
+        ),
+        (json!(false), json!("open"), json!("REPO-1"))
+    );
+    assert_eq!(comments(&same["task"]), 0, "{same}");
+    assert_eq!(same["task"]["custom_fields"]["finding_seen"], json!(today));
+    assert!(
+        same["message"].as_str().unwrap().contains("seen again"),
+        "{same}"
+    );
+
+    // A changed description is news: a comment.
+    let changed = add_json(&fixtures, "deps:jest", "jest 30.1 still breaks it");
+    assert_eq!(comments(&changed["task"]), 1, "{changed}");
+
+    // The same text as the last report comment, or no text: no comment.
+    let repeat = add_json(&fixtures, "deps:jest", "jest 30.1 still breaks it");
+    assert_eq!(comments(&repeat["task"]), 1, "{repeat}");
+    let output = add(
+        &fixtures,
+        &["add", "Outdated jest", "--finding", "deps:jest"],
+    );
+    assert!(output.status.success());
+    let text = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        text.contains("REPO-1") && text.contains("seen again"),
+        "{text}"
+    );
+    let stored = std::fs::read_to_string(fixtures.tasks_root.join("REPO/1.yml")).unwrap();
+    assert_eq!(stored.matches("Reported again").count(), 1, "{stored}");
+    assert!(
+        stored.contains(&format!("finding_seen: '{today}'"))
+            || stored.contains(&format!("finding_seen: {today}")),
+        "{stored}"
+    );
+
+    // The field is a list filter, like `finding`.
+    assert_eq!(
+        listed_ids(&fixtures, &format!("finding_seen={today}")),
+        ["REPO-1"]
+    );
+}

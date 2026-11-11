@@ -72,9 +72,11 @@ pub fn resolve_filter_name(raw_key: &str, config: &ResolvedConfig) -> Option<Str
         }
     }
 
-    // `finding` is LoTaR's own field (DEV-317), declared or not.
+    // `finding` and `finding_seen` are LoTaR's own fields (DEV-317,
+    // DEV-321), declared or not.
     if config.custom_fields.has_wildcard()
         || trimmed.eq_ignore_ascii_case(crate::services::finding_service::FINDING_FIELD)
+        || trimmed.eq_ignore_ascii_case(crate::services::finding_service::FINDING_SEEN_FIELD)
         || config
             .custom_fields
             .values

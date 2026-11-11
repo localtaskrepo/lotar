@@ -23,6 +23,12 @@ use crate::storage::{TaskFilter, TaskId};
 /// The custom field that holds a ticket's finding key.
 pub const FINDING_FIELD: &str = "finding";
 
+/// The custom field with the date a finding was last reported without news.
+pub const FINDING_SEEN_FIELD: &str = "finding_seen";
+
+/// How a repeated report's comment starts.
+const REPORT_PREFIX: &str = "Reported again by ";
+
 /// Status names that mean "decided not to do" (compared without case,
 /// spaces, `-`, `_` and `'`).
 const WONT_DO_NAMES: &[&str] = &[
@@ -47,8 +53,12 @@ impl FindingReport {
                 "Created {} for finding {key}; it was fixed before and came back",
                 self.id
             ),
-            FindingState::Open => format!(
+            FindingState::Open if self.commented => format!(
                 "{} already reports finding {key}; added this report as a comment",
+                self.id
+            ),
+            FindingState::Open => format!(
+                "{} already reports finding {key}; seen again with nothing new, no comment added",
                 self.id
             ),
             FindingState::Suppressed => format!(
@@ -131,13 +141,22 @@ impl FindingService {
         }
     }
 
-    /// Add a repeated report to the open ticket as a comment.
-    pub fn comment_repeat(
+    /// Record a repeated report on the open ticket. A report with news (a
+    /// description that differs from the ticket's and from the last report
+    /// comment's) becomes a comment; one without only updates the
+    /// `finding_seen` date (DEV-321), so a daily check adds no daily comment.
+    /// Returns the ticket and whether a comment was added.
+    pub fn record_repeat(
         storage: &mut Storage,
         id: &str,
         reporter: Option<&str>,
         description: Option<&str>,
-    ) -> LoTaRResult<TaskDTO> {
+    ) -> LoTaRResult<(TaskDTO, bool)> {
+        let description = description.map(str::trim).filter(|d| !d.is_empty());
+        let task = TaskService::get(storage, id, None)?;
+        let Some(description) = description.filter(|text| !already_reported(&task, text)) else {
+            return Ok((Self::mark_seen(storage, &task.id)?, false));
+        };
         let reporter = reporter
             .map(str::trim)
             .filter(|value| !value.is_empty())
@@ -147,20 +166,33 @@ impl FindingService {
             })
             .unwrap_or_else(|| "unknown".to_string());
         let date = chrono::Local::now().format("%Y-%m-%d");
-        let mut text = format!("Reported again by {reporter} on {date}.");
-        if let Some(description) = description.map(str::trim).filter(|d| !d.is_empty()) {
-            text.push_str("\n\n");
-            text.push_str(description);
-        }
-        TaskService::add_comment_with_context(
+        let text = format!("{REPORT_PREFIX}{reporter} on {date}.\n\n{description}");
+        let task = TaskService::add_comment_with_context(
             storage,
-            id,
+            &task.id,
             &text,
             CommentContext {
                 actor_override: Some(reporter),
                 ..CommentContext::default()
             },
-        )
+        )?;
+        Ok((task, true))
+    }
+
+    /// Set `finding_seen` to today. Bookkeeping, not an edit: no history
+    /// entry, `modified` stays, no automation.
+    fn mark_seen(storage: &mut Storage, id: &str) -> LoTaRResult<TaskDTO> {
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+        let value = crate::types::custom_value_string(today);
+        storage.mutate_task(id, |task| {
+            if task.custom_fields.get(FINDING_SEEN_FIELD) == Some(&value) {
+                return Ok(false);
+            }
+            task.custom_fields
+                .insert(FINDING_SEEN_FIELD.to_string(), value);
+            Ok(true)
+        })?;
+        TaskService::get(storage, id, None)
     }
 
     /// Report a finding through the shared create path (REST and MCP).
@@ -178,7 +210,7 @@ impl FindingService {
         let lock = Self::lock(&storage.root_path, &project)?;
         let (outcome, task) = match Self::prior(storage, &project, &key, &config) {
             Prior::Open(id) => {
-                let task = Self::comment_repeat(
+                let (task, commented) = Self::record_repeat(
                     storage,
                     &id,
                     req.reporter.as_deref(),
@@ -188,6 +220,7 @@ impl FindingService {
                     created: false,
                     state: FindingState::Open,
                     id,
+                    commented,
                 };
                 return Ok((outcome, task));
             }
@@ -198,6 +231,7 @@ impl FindingService {
                     created: false,
                     state: FindingState::Suppressed,
                     id,
+                    commented: false,
                 };
                 return Ok((outcome, task));
             }
@@ -212,6 +246,7 @@ impl FindingService {
                         created: true,
                         state: FindingState::Recurred,
                         id: task.id.clone(),
+                        commented: false,
                     },
                     task,
                 )
@@ -223,6 +258,7 @@ impl FindingService {
                         created: true,
                         state: FindingState::New,
                         id: task.id.clone(),
+                        commented: false,
                     },
                     task,
                 )
@@ -247,6 +283,20 @@ impl FindingService {
             },
         )
     }
+}
+
+/// Whether `text` is the ticket's description or the last report comment's.
+fn already_reported(task: &TaskDTO, text: &str) -> bool {
+    if task.description.as_deref().map(str::trim) == Some(text) {
+        return true;
+    }
+    let last_report = task.comments.iter().rev().find_map(|comment| {
+        comment
+            .text
+            .strip_prefix(REPORT_PREFIX)
+            .map(|rest| rest.split_once("\n\n").map_or("", |(_, body)| body).trim())
+    });
+    last_report == Some(text)
 }
 
 fn is_wont_do(status: &str) -> bool {
