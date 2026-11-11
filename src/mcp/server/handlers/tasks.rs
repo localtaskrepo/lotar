@@ -533,6 +533,31 @@ pub(crate) fn handle_task_create(req: JsonRpcRequest) -> JsonRpcResponse {
     };
 
     let mut storage = Storage::new(&resolver.path.clone());
+    // Report once (DEV-317): an existing ticket for the finding is returned
+    // instead of a new one.
+    if let Some(key) = opt_string(&req.params, "finding") {
+        return match crate::services::finding_service::FindingService::report(
+            &mut storage,
+            dto,
+            &key,
+        ) {
+            Ok((outcome, task)) => {
+                let mut response_body =
+                    make_task_create_payload(&task, &req.params, enum_hints.as_ref());
+                if let Some(root) = response_body.as_object_mut() {
+                    root.insert(
+                        "finding".into(),
+                        serde_json::to_value(&outcome).unwrap_or(Value::Null),
+                    );
+                    if !outcome.created {
+                        root.remove("metadata");
+                    }
+                }
+                text_result(req.id, &response_body)
+            }
+            Err(e) => task_mutation_error(req.id, e, -32000, "Task create failed", None),
+        };
+    }
     match TaskService::create(&mut storage, dto) {
         Ok(task) => {
             let response_body = make_task_create_payload(&task, &req.params, enum_hints.as_ref());

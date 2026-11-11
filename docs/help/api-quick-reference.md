@@ -2,7 +2,7 @@
 
 Endpoints with quick examples. For full schema see [OpenAPI](../openapi.json).
 
-- POST /api/tasks/add (TaskCreate) -> { data: TaskDTO }
+- POST /api/tasks/add (TaskCreate) -> { data: TaskDTO }; with `finding` -> { data: TaskDTO, finding: { created, state, id } } (201 created, 200 already reported; see [Findings](add.md#findings))
 - GET  /api/tasks/list -> { data: { total, limit, offset, tasks? } }; `tasks` is a `TaskDTO[]` page and is
   omitted when the page is empty (treat missing as `[]`); empty page:
   `{ "data": { "total": 0, "limit": 50, "offset": 0 } }`, populated page:

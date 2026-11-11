@@ -78,18 +78,15 @@ impl CommandHandler for TaskHandler {
                     description: add_args.description,
                     tags: add_args.tags,
                     fields: add_args.fields,
+                    finding: add_args.finding,
                     dry_run: false,
                     explain: false,
                 };
 
-                match AddHandler::execute(cli_add_args, project, resolver, renderer) {
-                    Ok(task_id) => {
-                        // Use the shared output rendering function
-                        AddHandler::render_add_success(&task_id, project, resolver, renderer);
-                        Ok(())
-                    }
-                    Err(e) => Err(e),
-                }
+                let added =
+                    AddHandler::execute_with_finding(cli_add_args, project, resolver, renderer)?;
+                AddHandler::render_add_result(&added, project, resolver, renderer);
+                Ok(())
             }
             TaskAction::List(args) => SearchHandler::execute(args, project, resolver, renderer),
             TaskAction::Show(show_args) => {

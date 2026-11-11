@@ -91,7 +91,7 @@
     "/api/tasks/add": {
       "post": {
         "summary": "Create a new task",
-        "description": "Creates a task using project validation and smart defaults. People fields support @me (resolved via config.default_reporter → git user → system username → project manifest author as last resort). If auto.set_reporter is enabled in config, reporter is set automatically when not provided. Project may be provided via the JSON body field 'project' (preferred) or the query parameter 'project' (deprecated).",
+        "description": "Creates a task using project validation and smart defaults. People fields support @me (resolved via config.default_reporter → git user → system username → project manifest author as last resort). If auto.set_reporter is enabled in config, reporter is set automatically when not provided. Project may be provided via the JSON body field 'project' (preferred) or the query parameter 'project' (deprecated). With `finding` the problem is reported once (see TaskCreate.finding); the response is then EnvelopeTaskFinding: 201 when a ticket was created, 200 when an existing one already reports it.",
         "parameters": [
           {
             "name": "project",
@@ -126,6 +126,16 @@
                     "priority": "High",
                     "task_type": "feature"
                   }
+                },
+                "finding": {
+                  "summary": "Report a problem once",
+                  "value": {
+                    "title": "Leftover worktrees in lotar",
+                    "project": "DEV",
+                    "finding": "worktrees:lotar",
+                    "reporter": "claude",
+                    "description": "3 worktrees under .lotar-worktrees have no running job."
+                  }
                 }
               }
             }
@@ -137,7 +147,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EnvelopeTask"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/EnvelopeTask"
+                    },
+                    {
+                      "$ref": "#/components/schemas/EnvelopeTaskFinding"
+                    }
+                  ]
                 },
                 "examples": {
                   "created": {
@@ -167,6 +184,36 @@
                         },
                         "comments": [],
                         "custom_fields": {}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "With `finding`: an existing ticket already reports it (state open or suppressed); nothing was created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeTaskFinding"
+                },
+                "examples": {
+                  "open": {
+                    "summary": "Already reported",
+                    "value": {
+                      "data": {
+                        "id": "DEV-12",
+                        "title": "Leftover worktrees in lotar",
+                        "status": "Todo",
+                        "custom_fields": {
+                          "finding": "worktrees:lotar"
+                        }
+                      },
+                      "finding": {
+                        "created": false,
+                        "state": "open",
+                        "id": "DEV-12"
                       }
                     }
                   }
@@ -4393,6 +4440,10 @@
               "format": "int32"
             },
             "default": []
+          },
+          "finding": {
+            "type": "string",
+            "description": "Report a problem once (DEV-317): a stable key for it, one line of at most 200 characters, stored in the ticket's `finding` custom field. The newest ticket of the project with this key decides: an open one gets the report as a comment (200, `data` is that ticket), a won't-do one (WontDo, Won't fix, Cancelled, Rejected, Declined) suppresses the report (200), a done one gets a new ticket related to it (201), none gets a new ticket (201). The check and the write hold the project's finding lock, so parallel reports of one key create one ticket. The response adds `finding`."
           }
         },
         "required": [
@@ -7983,6 +8034,48 @@
         },
         "required": [
           "data"
+        ]
+      },
+      "FindingReport": {
+        "type": "object",
+        "description": "How a finding report was handled (DEV-317).",
+        "properties": {
+          "created": {
+            "type": "boolean"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "new",
+              "recurred",
+              "open",
+              "suppressed"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "description": "The new ticket, or the existing one that already reports the finding."
+          }
+        },
+        "required": [
+          "created",
+          "state",
+          "id"
+        ]
+      },
+      "EnvelopeTaskFinding": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TaskDTO"
+          },
+          "finding": {
+            "$ref": "#/components/schemas/FindingReport"
+          }
+        },
+        "required": [
+          "data",
+          "finding"
         ]
       },
       "AutomationInspectResponse": {

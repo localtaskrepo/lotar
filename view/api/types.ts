@@ -428,6 +428,19 @@ export interface TaskCreate {
     relationships?: TaskRelationships
     custom_fields?: Record<string, unknown>
     sprints?: number[]
+    /**
+     * Report a problem once (DEV-317): a stable key for it. The response then
+     * carries `finding`, and `data` may be an existing ticket.
+     */
+    finding?: string
+}
+
+/** How `/api/tasks/add` handled a `finding` report. */
+export interface FindingReport {
+    created: boolean
+    state: 'new' | 'recurred' | 'open' | 'suppressed'
+    /** The new ticket, or the existing one that already reports the finding. */
+    id: string
 }
 
 /**

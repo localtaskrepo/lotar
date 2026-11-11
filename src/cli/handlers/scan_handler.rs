@@ -283,6 +283,7 @@ impl CommandHandler for ScanHandler {
                                 description: None,
                                 tags: inline_attrs.tags,
                                 fields: inline_attrs.fields,
+                                finding: None,
                                 dry_run: false,
                                 explain: false,
                             };

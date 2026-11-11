@@ -111,11 +111,38 @@ impl CommandHandler for AddHandler {
         resolver: &TasksDirectoryResolver,
         renderer: &OutputRenderer,
     ) -> Self::Result {
+        Self::execute_with_finding(args, project, resolver, renderer).map(|added| added.task_id)
+    }
+}
+
+/// What `add` did: the ticket it names and, with `--finding`, how the
+/// report was handled (DEV-317).
+pub struct AddedTask {
+    pub task_id: String,
+    pub finding: Option<(String, crate::services::finding_service::FindingReport)>,
+}
+
+impl AddHandler {
+    pub fn execute_with_finding(
+        args: AddArgs,
+        project: Option<&str>,
+        resolver: &TasksDirectoryResolver,
+        renderer: &OutputRenderer,
+    ) -> Result<AddedTask, String> {
+        use crate::services::finding_service::{
+            FINDING_FIELD, FindingReport, FindingService, FindingState, Prior,
+        };
         renderer.log_info("add: begin validation and project resolution");
         // Like REST and MCP: no task without a title (DEV-285).
         if args.title.trim().is_empty() {
             return Err("Title cannot be empty.".to_string());
         }
+        let finding_key = args
+            .finding
+            .as_deref()
+            .map(FindingService::validate_key)
+            .transpose()
+            .map_err(|e| e.to_string())?;
         // Create project resolver and validator
         let mut project_resolver = ProjectResolver::new(resolver)
             .map_err(|e| format!("Failed to initialize project resolver: {}", e))?;
@@ -507,7 +534,10 @@ impl CommandHandler for AddHandler {
                     }
                 }
             }
-            return Ok(format!("{}-PREVIEW", project_for_storage));
+            return Ok(AddedTask {
+                task_id: format!("{}-PREVIEW", project_for_storage),
+                finding: None,
+            });
         }
 
         // Created only now: opening storage bootstraps the workspace config,
@@ -537,6 +567,59 @@ impl CommandHandler for AddHandler {
                 project_for_storage, original_project_name
             );
         }
+        // Report once (DEV-317): check and write under the finding lock, so
+        // two reporters of one key create one ticket.
+        let mut finding_state = None;
+        let finding_lock = match finding_key.as_deref() {
+            Some(key) => {
+                let lock = FindingService::lock(&write_root, &project_for_storage)
+                    .map_err(|e| e.to_string())?;
+                match FindingService::prior(&storage, &project_for_storage, key, &config) {
+                    Prior::Open(id) => {
+                        FindingService::comment_repeat(
+                            &mut storage,
+                            &id,
+                            task.reporter.as_deref(),
+                            task.description.as_deref(),
+                        )
+                        .map_err(|e| e.to_string())?;
+                        let outcome = FindingReport {
+                            created: false,
+                            state: FindingState::Open,
+                            id: id.clone(),
+                        };
+                        return Ok(AddedTask {
+                            task_id: id,
+                            finding: Some((key.to_string(), outcome)),
+                        });
+                    }
+                    Prior::Suppressed(id) => {
+                        let outcome = FindingReport {
+                            created: false,
+                            state: FindingState::Suppressed,
+                            id: id.clone(),
+                        };
+                        return Ok(AddedTask {
+                            task_id: id,
+                            finding: Some((key.to_string(), outcome)),
+                        });
+                    }
+                    Prior::Done(old) => {
+                        if !task.relationships.related.contains(&old) {
+                            task.relationships.related.push(old);
+                        }
+                        finding_state = Some(FindingState::Recurred);
+                    }
+                    Prior::None => finding_state = Some(FindingState::New),
+                }
+                task.custom_fields.insert(
+                    FINDING_FIELD.to_string(),
+                    crate::types::custom_value_string(key),
+                );
+                Some(lock)
+            }
+            None => None,
+        };
         let task_id = crate::services::task_service::TaskService::commit_prepared_create(
             &storage,
             crate::services::task_service::PreparedTaskCreate {
@@ -549,6 +632,7 @@ impl CommandHandler for AddHandler {
             },
         )
         .map_err(TaskStorageAction::Create.map_err(&project_for_storage))?;
+        drop(finding_lock);
         renderer.log_info(format_args!("add: created id={}", task_id));
         if args.explain {
             renderer.emit_info(format_args!("Explanation: {project_explanation}."));
@@ -578,7 +662,28 @@ impl CommandHandler for AddHandler {
             );
         }
 
-        Ok(task_id)
+        let finding = finding_key.zip(finding_state).map(|(key, state)| {
+            let outcome = FindingReport {
+                created: true,
+                state,
+                id: task_id.clone(),
+            };
+            (key, outcome)
+        });
+        Ok(AddedTask { task_id, finding })
+    }
+}
+
+/// `created`, `state` and `id` of a finding report on the JSON of a created task.
+fn add_finding_fields(
+    response: &mut serde_json::Value,
+    finding: Option<&(String, crate::services::finding_service::FindingReport)>,
+) {
+    if let Some((key, outcome)) = finding {
+        response["created"] = serde_json::json!(outcome.created);
+        response["state"] = serde_json::json!(outcome.state);
+        response["id"] = serde_json::json!(outcome.id);
+        response["message"] = serde_json::json!(outcome.describe(key));
     }
 }
 
@@ -675,9 +780,52 @@ impl AddHandler {
         OutputRenderer::new(OutputFormat::Text, level)
     }
 
+    /// Render what `add` did: the created task, or with `--finding` the
+    /// existing ticket that already reports it (DEV-317).
+    pub fn render_add_result(
+        added: &AddedTask,
+        cli_project: Option<&str>,
+        resolver: &TasksDirectoryResolver,
+        renderer: &OutputRenderer,
+    ) {
+        let Some((key, outcome)) = added.finding.as_ref().filter(|(_, o)| !o.created) else {
+            Self::render_add_success(
+                &added.task_id,
+                added.finding.as_ref(),
+                cli_project,
+                resolver,
+                renderer,
+            );
+            return;
+        };
+        let message = outcome.describe(key);
+        match renderer.format {
+            OutputFormat::Json => {
+                let task = Storage::try_open(&resolver.path)
+                    .and_then(|storage| {
+                        crate::services::task_service::TaskService::get(&storage, &outcome.id, None)
+                            .ok()
+                    })
+                    .and_then(|dto| serde_json::to_value(dto).ok())
+                    .unwrap_or(serde_json::Value::Null);
+                renderer.emit_json(&serde_json::json!({
+                    "status": "success",
+                    "created": outcome.created,
+                    "state": outcome.state,
+                    "id": outcome.id,
+                    "task_id": outcome.id,
+                    "message": message,
+                    "task": task,
+                }));
+            }
+            _ => renderer.emit_success(format_args!("{message}")),
+        }
+    }
+
     /// Render the output for a successfully created task
-    pub fn render_add_success(
+    fn render_add_success(
         task_id: &str,
+        finding: Option<&(String, crate::services::finding_service::FindingReport)>,
         cli_project: Option<&str>,
         resolver: &TasksDirectoryResolver,
         renderer: &OutputRenderer,
@@ -722,12 +870,13 @@ impl AddHandler {
                                 "modified": task.modified
                             })
                         });
-                        let response = serde_json::json!({
+                        let mut response = serde_json::json!({
                             "status": "success",
                             "message": format!("Created task: {}", task_id),
                             "task_id": task_id,
                             "task": task_json,
                         });
+                        add_finding_fields(&mut response, finding);
                         renderer.emit_json(&response);
                     }
                     _ => {
@@ -751,17 +900,21 @@ impl AddHandler {
                             renderer
                                 .emit_raw_stdout(format_args!("  Description: {}", description));
                         }
+                        if let Some((key, outcome)) = finding {
+                            renderer.emit_raw_stdout(format_args!("  {}", outcome.describe(key)));
+                        }
                     }
                 }
             } else {
                 // Fallback to simple message if we can't fetch task details
                 match renderer.format {
                     OutputFormat::Json => {
-                        let response = serde_json::json!({
+                        let mut response = serde_json::json!({
                             "status": "success",
                             "message": format!("Created task: {}", task_id),
                             "task_id": task_id
                         });
+                        add_finding_fields(&mut response, finding);
                         renderer.emit_json(&response);
                     }
                     _ => {
@@ -773,11 +926,12 @@ impl AddHandler {
             // Fallback if storage can't be opened
             match renderer.format {
                 OutputFormat::Json => {
-                    let response = serde_json::json!({
+                    let mut response = serde_json::json!({
                         "status": "success",
                         "message": format!("Created task: {}", task_id),
                         "task_id": task_id
                     });
+                    add_finding_fields(&mut response, finding);
                     renderer.emit_json(&response);
                 }
                 _ => {

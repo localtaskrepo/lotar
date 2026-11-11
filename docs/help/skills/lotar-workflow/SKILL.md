@@ -43,6 +43,7 @@ Do not call both transports for each operation or repeatedly dump every schema.
 | Search | `task_list` with `project`, `search`, `limit` | `list -p "$PROJECT" "search words" --limit 10` |
 | Read | `task_get` with `id` | `--format json list "$TASK_ID"`; `comment "$TASK_ID"` |
 | Create | `task_create` | `add "Outcome" -p "$PROJECT" --description "Scope and acceptance criteria"` |
+| Report a found problem once | `task_create` with `finding` | `add "Problem" -p "$PROJECT" --finding "<stable key>" -D "What you saw"` |
 | Progress | `task_comment_add` with `id`, `text` | `comment "$TASK_ID" -m "Outcome; evidence; next step"` |
 | State | `task_update` with `id`, `patch.status` | `status "$TASK_ID" "$STATUS"` |
 | Values/schema | `config_show`; `schema_discover` filtered by `tool` | `config show --project "$PROJECT"`; command `--help` |

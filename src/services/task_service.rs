@@ -107,6 +107,16 @@ pub struct TaskUpdateReceipt {
     pub changed: bool,
 }
 
+/// Extras for [`TaskService::create_with`].
+#[derive(Debug, Default)]
+pub(crate) struct CreateOptions {
+    /// Stored as the `finding` custom field after validation.
+    pub finding: Option<String>,
+    /// Leave the `created` automation to the caller, which runs it after
+    /// releasing the finding lock.
+    pub skip_automation: bool,
+}
+
 /// Execution context for comment mutations, shared by every surface so
 /// single and bulk operations record identical history and fire identical
 /// post-commit hooks.
@@ -216,6 +226,15 @@ impl TaskService {
     }
 
     pub fn create(storage: &mut Storage, req: TaskCreate) -> LoTaRResult<TaskDTO> {
+        Self::create_with(storage, req, CreateOptions::default())
+    }
+
+    /// [`Self::create`] with the extras a finding report needs (DEV-317).
+    pub(crate) fn create_with(
+        storage: &mut Storage,
+        req: TaskCreate,
+        options: CreateOptions,
+    ) -> LoTaRResult<TaskDTO> {
         let TaskCreate {
             title,
             project,
@@ -381,6 +400,14 @@ impl TaskService {
         if let Some(cf) = custom_fields {
             t.custom_fields = cf;
         }
+        // LoTaR's own field, so it is stored even where the project limits
+        // custom fields; later edits keep it as an existing field.
+        if let Some(key) = options.finding {
+            t.custom_fields.insert(
+                crate::services::finding_service::FINDING_FIELD.to_string(),
+                crate::types::custom_value_string(key),
+            );
+        }
         t.acceptance_criteria = acceptance_criteria
             .into_iter()
             .map(|item| item.trim().to_string())
@@ -447,6 +474,9 @@ impl TaskService {
             dto = Self::get(storage, &id, Some(&project)).unwrap_or(dto);
         }
 
+        if options.skip_automation {
+            return Ok(dto);
+        }
         let _ = AutomationService::apply_task_update(storage, None, &dto, &config);
 
         // Re-fetch after automation may have mutated the task

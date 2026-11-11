@@ -363,6 +363,13 @@ fn make_task_create_tool(enum_hints: Option<&EnumHints>) -> Value {
             "description": "Initial sprint memberships; entries must be positive integers."
         }),
     );
+    properties.insert(
+        "finding".into(),
+        json!({
+            "type": ["string", "null"],
+            "description": "Report a problem once: a stable key for it (for example 'worktrees:lotar'). The newest ticket of the project with this key decides: open gets a comment, WontDo suppresses the report, Done gets a new related ticket, none gets a new ticket. The result adds finding: {created, state (new|recurred|open|suppressed), id}."
+        }),
+    );
 
     let mut tool = json!({
         "name": "task_create",

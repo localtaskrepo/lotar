@@ -62,6 +62,9 @@ Types and priorities are whatever your configuration defines, so there are no sh
 - `--field <KEY>=<VALUE>` - Arbitrary properties (can be used multiple times)
 - `--field=sprint=N` stores a custom field named `sprint`; it does not assign the task to a sprint. Use `lotar sprint add --sprint N TASK_ID` for actual membership (see [Sprints](./sprints.md)).
 
+### Report a problem once
+- `--finding <KEY>` - A stable key for the problem (one line, at most 200 characters), for agents and scripts that check repositories and report what they find. See [Findings](#findings).
+
 ### Global Options
 - `--format <FORMAT>` - Output format: text or json
 - `--verbose` - Enable verbose output
@@ -99,6 +102,30 @@ lotar add "New task" --format=json
 lotar add "Preview task" --dry-run --format=json
 # {"status":"preview","action":"create","project":"AUTH","title":"Preview task","priority":"MEDIUM","status_value":"TODO"}
 ```
+
+## Findings
+
+A check that runs again and again (leftover worktrees, a red CI run, a stale dependency) should report each problem once. Give it a key that stays the same for the same problem:
+
+```bash
+lotar add "Leftover worktrees in lotar" --finding worktrees:lotar -D "3 worktrees have no running job" --format json
+```
+
+The newest ticket of the project with that key decides what happens. The command exits 0 in every case and names the ticket:
+
+| Newest ticket with the key | What happens | JSON |
+| --- | --- | --- |
+| none | a new ticket | `{"created": true, "state": "new", "id": "DEV-12"}` |
+| open (any status that isn't done) | no new ticket; the report is added to it as a comment with the reporter, date and description | `{"created": false, "state": "open", "id": "DEV-12"}` |
+| won't do (`WontDo`, `Won't fix`, `Cancelled`, `Rejected` or `Declined`) | nothing; the problem was accepted | `{"created": false, "state": "suppressed", "id": "DEV-12"}` |
+| done | a new ticket, related to the done one | `{"created": true, "state": "recurred", "id": "DEV-15"}` |
+
+- The JSON also has the usual `status`, `message`, `task_id` and `task` (the new ticket, or the one that already reports the problem). Text output names the ticket in its first line.
+- The key is stored in the ticket's `finding` field (also in projects that limit custom fields), so `lotar list finding=worktrees:lotar` lists the tickets that reported it.
+- Checking and creating hold the project's finding lock (`.finding.lock`), so two agents reporting the same key at the same moment create one ticket.
+- Automation rules on `created` run only when a ticket is created; the comment on an open ticket runs `commented` rules.
+- REST (`/api/tasks/add`) and MCP (`task_create`) take the same key as `finding`; see [API quick reference](api-quick-reference.md) and [MCP tools](mcp-tools.md#task_create).
+- Done means the project's done states (`issue.done_states`, or the inferred ones: see [Done States](config.md#done-states)). A won't-do state is recognized by its name, done or not.
 
 ## Validation
 

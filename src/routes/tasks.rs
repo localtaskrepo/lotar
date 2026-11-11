@@ -16,6 +16,31 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Ok(v) => v,
             Err(msg) => return bad_request(msg),
         };
+        let finding = match parse_string_field(&body, "finding") {
+            Ok(v) => v,
+            Err(msg) => return bad_request(msg),
+        };
+        // Report once (DEV-317): `finding` names the problem; an existing
+        // ticket for it is returned instead of a new one.
+        if let Some(key) = finding {
+            return match crate::services::finding_service::FindingService::report(
+                &mut storage,
+                req_create,
+                &key,
+            ) {
+                Ok((outcome, task)) => {
+                    if outcome.created {
+                        let actor = crate::utils::identity::resolve_current_user(Some(
+                            resolver.path.as_path(),
+                        ));
+                        crate::api_events::emit_task_created(&task, actor.as_deref());
+                    }
+                    let status = if outcome.created { 201 } else { 200 };
+                    ok_json(status, json!({"data": task, "finding": outcome}))
+                }
+                Err(e) => map_lotar_error(e),
+            };
+        }
         match TaskService::create(&mut storage, req_create) {
             Ok(task) => {
                 let actor =

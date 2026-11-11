@@ -44,6 +44,7 @@ The query uses the web search-box syntax. Values come from your configuration, s
 | `has:attachment,image,link,tag` | carries every listed kind | `with:` | `has` |
 | `effort_min:2h`, `effort_max:1d` | inclusive effort bounds; time and points never compare; tasks without an effort are left out | `effortmin:`, `effortmax:` | `effort_min`, `effort_max` |
 | `field:iteration=wave-2`, `iteration=wave-2` | a custom field | | any other key; MCP `custom_fields` |
+| `finding=worktrees:lotar` | tickets reported for that [finding](add.md#findings), in every project (the field needs no declaring); add `archived=all` for archived ones | | `finding` |
 | `sort_by=due-date`, `order=asc` | sort key and direction | | `sort_by`, `order` |
 | `deletion=deleted\|all` | deleted tasks only, or both | | `deletion` |
 | `archived=yes\|all` | archived tasks only, or both (default `no` leaves them out) | | `archived` |

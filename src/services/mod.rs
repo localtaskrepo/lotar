@@ -14,6 +14,7 @@ pub mod automation_validation;
 pub mod branding_service;
 pub mod completion;
 pub mod config_service;
+pub mod finding_service;
 pub mod memory_cache;
 pub mod project_service;
 pub mod reference_service;

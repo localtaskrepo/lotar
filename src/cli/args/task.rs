@@ -183,6 +183,13 @@ pub struct AddArgs {
     #[serde(default, deserialize_with = "deserialize_kv_pairs")]
     pub fields: Vec<(String, String)>,
 
+    /// Report a problem once: a stable key for it. An open ticket with the
+    /// key gets a comment instead, a WontDo one suppresses the report, a Done
+    /// one gets a new related ticket
+    #[arg(long, value_name = "KEY")]
+    #[serde(default)]
+    pub finding: Option<String>,
+
     /// Preview without writing
     #[arg(long, short = 'n')]
     #[serde(default)]
@@ -524,6 +531,11 @@ pub struct TaskAddArgs {
     #[arg(long = "field", short = 'F', value_parser = parse_key_value)]
     #[serde(default, deserialize_with = "deserialize_kv_pairs")]
     pub fields: Vec<(String, String)>,
+
+    /// Report a problem once (see `lotar add --finding`)
+    #[arg(long, value_name = "KEY")]
+    #[serde(default)]
+    pub finding: Option<String>,
 }
 
 #[derive(Args, Deserialize, Debug)]

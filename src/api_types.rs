@@ -394,6 +394,32 @@ pub struct TaskCreate {
     pub sprints: Vec<u32>,
 }
 
+/// How a finding report was handled (DEV-317).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+#[serde(rename_all = "lowercase")]
+pub enum FindingState {
+    /// No ticket had the key; one was created.
+    New,
+    /// The newest ticket with the key is done; a new one was created.
+    Recurred,
+    /// An open ticket has the key; the report was added to it as a comment.
+    Open,
+    /// The newest ticket with the key was closed as won't do; nothing changed.
+    Suppressed,
+}
+
+/// What a finding report did: the `finding` object of `/api/tasks/add`,
+/// MCP `task_create` and `lotar add --finding --format json`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct FindingReport {
+    pub created: bool,
+    pub state: FindingState,
+    /// The new ticket, or the existing one that already reports the finding.
+    pub id: String,
+}
+
 /// Patch payload shared by REST, MCP, and UI clients.
 ///
 /// Field presence is tri-state on the wire: omitted = no-op, `null` = clear,

@@ -72,7 +72,9 @@ pub fn resolve_filter_name(raw_key: &str, config: &ResolvedConfig) -> Option<Str
         }
     }
 
+    // `finding` is LoTaR's own field (DEV-317), declared or not.
     if config.custom_fields.has_wildcard()
+        || trimmed.eq_ignore_ascii_case(crate::services::finding_service::FINDING_FIELD)
         || config
             .custom_fields
             .values

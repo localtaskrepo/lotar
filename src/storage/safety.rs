@@ -81,10 +81,19 @@ fn is_lock_contention(error: &std::io::Error, native_code: Option<i32>) -> bool 
 /// Do not sweep atomic-write temp files here: other writers need not hold this
 /// lock, so even an exclusive lock does not prove that their temp files are orphaned.
 pub fn acquire_storage_lock(target_dir: &Path, lock_name: &str) -> std::io::Result<File> {
+    acquire_storage_lock_within(target_dir, lock_name, Duration::from_secs(2))
+}
+
+/// [`acquire_storage_lock`] with its own wait for a busy lock.
+pub fn acquire_storage_lock_within(
+    target_dir: &Path,
+    lock_name: &str,
+    wait: Duration,
+) -> std::io::Result<File> {
     let lock_path = target_dir.join(format!(".{lock_name}.lock"));
-    // Task and sprint locks live one level below the tasks root (a project
-    // folder, `@sprints`); give the root its runtime .gitignore (DEV-271).
-    if (lock_name == "task" || lock_name == SPRINT_LOCK_NAME)
+    // Task, sprint and finding locks live one level below the tasks root (a
+    // project folder, `@sprints`); give the root its runtime .gitignore (DEV-271).
+    if matches!(lock_name, "task" | "finding" | SPRINT_LOCK_NAME)
         && let Some(root) = target_dir.parent()
         && root.join("config.yml").is_file()
     {
@@ -101,12 +110,13 @@ pub fn acquire_storage_lock(target_dir: &Path, lock_name: &str) -> std::io::Resu
         match file.try_lock_exclusive() {
             Ok(()) => return Ok(file),
             Err(e) if is_lock_contention(&e, contention_code) => {
-                if start.elapsed() >= Duration::from_secs(2) {
+                if start.elapsed() >= wait {
                     return Err(std::io::Error::new(
                         std::io::ErrorKind::WouldBlock,
                         format!(
-                            "Storage lock {} is still busy after 2 seconds; retry after the other writer finishes; mutation was not run",
-                            lock_path.display()
+                            "Storage lock {} is still busy after {} seconds; retry after the other writer finishes; mutation was not run",
+                            lock_path.display(),
+                            wait.as_secs()
                         ),
                     ));
                 }

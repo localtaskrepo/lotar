@@ -203,14 +203,19 @@ fn main() {
     let result = match cli.command {
         Commands::Add(args) => {
             renderer.log_info("BEGIN ADD");
-            match AddHandler::execute(args, cli.project.as_deref(), &resolver, &renderer) {
-                Ok(task_id) => {
+            match AddHandler::execute_with_finding(
+                args,
+                cli.project.as_deref(),
+                &resolver,
+                &renderer,
+            ) {
+                Ok(added) => {
                     // Use the shared output rendering function
-                    if task_id.ends_with("-PREVIEW") {
+                    if added.task_id.ends_with("-PREVIEW") {
                         // Dry run preview already printed
                     } else {
-                        AddHandler::render_add_success(
-                            &task_id,
+                        AddHandler::render_add_result(
+                            &added,
                             cli.project.as_deref(),
                             &resolver,
                             &renderer,

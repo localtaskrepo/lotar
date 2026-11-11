@@ -26,9 +26,10 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 - **Response:** JSON with `status`, `user`, and optional `explain` metadata.
 
 ### `task_create`
-- **Params:** `title` (required), optional `description`, `project`, `priority`, `type` (alias `task_type`), `status`, `reporter`, `assignee`, `due_date`, `effort`, `tags[]`, `acceptance_criteria[]`, `relationships`, `custom_fields` map, and `sprints[]` (positive integers).
+- **Params:** `title` (required), optional `description`, `project`, `priority`, `type` (alias `task_type`), `status`, `reporter`, `assignee`, `due_date`, `effort`, `tags[]`, `acceptance_criteria[]`, `relationships`, `custom_fields` map, `sprints[]` (positive integers) and `finding`.
 - **Behavior:** validates `status`/`priority`/`type` against the target project's configuration (project-only enum values are accepted; failures carry `error.data.suggestions` from that project); an explicit `status` is persisted atomically with creation; auto-fills missing defaults (priority/type/status/reporter/assignee/tags) per project config; `@me` supported for people fields.
 - **Response:** JSON blob containing the saved `task` plus `metadata.appliedDefaults` (fields the server filled) and `metadata.enumHints` when available.
+- **Findings:** with `finding` (a stable key for a problem), the problem is reported once, as with [`lotar add --finding`](add.md#findings): the response adds `finding: {created, state, id}` (`state` is `new`, `recurred`, `open` or `suppressed`), and `task` is the ticket it names. When nothing was created there is no `metadata`.
 - **Project:** An explicit `project` selects that project. When omitted, MCP uses the configured default project (`default.project` or `LOTAR_PROJECT`), else the existing project (first alphabetically), else a prefix from the repository folder name, for both enum validation and creation; it does not pre-validate against unrelated global values.
 - **Type Alias:** A non-null `type` takes precedence over `task_type`; `type: null` permits the alias. This precedence is consistent in create, patch, and list filters.
 
