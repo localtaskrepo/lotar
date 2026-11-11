@@ -716,6 +716,97 @@ echo '{{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\
     );
 }
 
+/// DEV-316: a rule can take the model and effort from the ticket; a ticket
+/// without those fields gets the profile's own (never an empty `--model`).
+#[cfg(unix)]
+#[test]
+fn automation_agent_settings_expand_ticket_fields_and_fall_back_to_the_profile() {
+    let _guard = lock_agent_tests();
+    enable_server_mode();
+    let fixtures = TestFixtures::new();
+    let root = fixtures.get_temp_path();
+    let args_file = root.join("fix.args");
+    let script = write_stub_agent_script(
+        root,
+        "stub-fix.sh",
+        &format!(
+            "#!/bin/sh\n\
+printf '%s\\n' \"$@\" >> \"{}\"\n\
+echo '--' >> \"{}\"\n\
+head -n 1 > /dev/null\n\
+echo '{{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"ok\"}}'\n",
+            args_file.display(),
+            args_file.display()
+        ),
+    );
+    fixtures.create_config_in_dir(
+        &fixtures.tasks_root,
+        &format!(
+            "issue:\n  states: [Todo, InProgress, Done]\nagents:\n  fix:\n    runner: claude\n    model: sonnet\n    effort: medium\n    command: \"{}\"\n",
+            script.display()
+        ),
+    );
+    AutomationService::set(
+        &fixtures.tasks_root,
+        None,
+        "automation:\n  rules:\n    - name: Fix new tickets\n      on:\n        created:\n          set:\n            assignee: \"@fix\"\n          agent:\n            model: \"${{ticket.field:model}}\"\n            effort: \"${{ticket.field:reasoning}}\"\n",
+    )
+    .expect("set automation");
+
+    let mut storage = fixtures.create_storage();
+    let mut fields = lotar::types::CustomFields::new();
+    fields.insert(
+        "model".to_string(),
+        lotar::types::custom_value_string("opus"),
+    );
+    fields.insert(
+        "reasoning".to_string(),
+        lotar::types::custom_value_string("high"),
+    );
+    let picked = TaskService::create(
+        &mut storage,
+        TaskCreate {
+            title: "Ticket picks its model".to_string(),
+            project: Some("FIX".to_string()),
+            reporter: Some("sam".to_string()),
+            custom_fields: Some(fields),
+            ..Default::default()
+        },
+    )
+    .expect("create task with fields");
+    let picked_jobs = wait_for_completed_jobs(&picked.id, 1, 10_000);
+    assert_eq!(picked_jobs.len(), 1, "{picked_jobs:?}");
+    assert_eq!(picked_jobs[0].model.as_deref(), Some("opus"));
+    assert_eq!(picked_jobs[0].effort.as_deref(), Some("high"));
+
+    let plain = TaskService::create(
+        &mut storage,
+        TaskCreate {
+            title: "Ticket without fields".to_string(),
+            project: Some("FIX".to_string()),
+            reporter: Some("sam".to_string()),
+            ..Default::default()
+        },
+    )
+    .expect("create task without fields");
+    let plain_jobs = wait_for_completed_jobs(&plain.id, 1, 10_000);
+    assert_eq!(plain_jobs.len(), 1, "{plain_jobs:?}");
+    assert_eq!(plain_jobs[0].model.as_deref(), Some("sonnet"));
+    assert_eq!(plain_jobs[0].effort.as_deref(), Some("medium"));
+
+    let args = fs::read_to_string(&args_file).unwrap();
+    let runs: Vec<&str> = args.split("--\n").filter(|run| !run.is_empty()).collect();
+    assert_eq!(runs.len(), 2, "{args}");
+    assert!(
+        runs[0].contains("--model\nopus\n--effort\nhigh\n"),
+        "{args}"
+    );
+    assert!(
+        runs[1].contains("--model\nsonnet\n--effort\nmedium\n"),
+        "{args}"
+    );
+}
+
 // ---------- New feature tests ----------
 
 /// Command runner: `runner: command` runs arbitrary scripts with full job lifecycle.

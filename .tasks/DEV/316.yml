@@ -1,0 +1,38 @@
+title: Automation agent model/effort are not template-expanded; an empty value must fall back to the profile
+status: Done
+priority: Medium
+type: Bug
+reporter: claude
+assignee: claude
+created: 2026-11-11T17:10:42.396951+00:00
+modified: 2026-11-11T17:13:57.206419+00:00
+relationships:
+  related:
+  - DEV-318
+comments:
+- date: 2026-11-11T17:13:56.997529+00:00
+  text: 'Outcome: an action''s agent model/effort now expand ${{...}} templates (apply and simulate); an empty expansion means not set, so the profile''s own value is used. Evidence: tests/agent_automation_integration_test.rs automation_agent_settings_expand_ticket_fields_and_fall_back_to_the_profile failed first (job refused: Invalid agent model ''${{ticket.field:model}}''), passes now; automation filter 125/125. Docs: docs/help/automation.md (Agent run settings). Remaining: none (provider follows in DEV-318). Guidance: no durable finding.'
+description: 'Owner decision 2026-11-11 (~/Development/standards/docs/decisions/2026-11-11-repo-health.md): rules pick the model per ticket, e.g. agent: { model: "${{ticket.field:model}}" }. Today the action''s model/effort are passed through literally, so the job is refused as an invalid model. Expected: templates expand; an empty expansion means the profile''s own model/effort (never an empty --model). Fix starts with a failing test.'
+history:
+- at: 2026-11-11T17:10:49.402806+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-11T17:13:56.997529+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-11T17:13:57.106892+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-318"]}'
+- at: 2026-11-11T17:13:57.206419+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

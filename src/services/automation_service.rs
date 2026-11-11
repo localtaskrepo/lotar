@@ -1136,16 +1136,16 @@ fn describe_action(
     {
         let mut description = format!("Queue agent job for profile '{}'", &assignee[1..]);
         if let Some(agent) = action.agent.as_ref() {
-            let settings: Vec<String> = [("model", &agent.model), ("effort", &agent.effort)]
-                .into_iter()
-                .filter_map(|(name, value)| value.as_ref().map(|value| format!("{name} {value}")))
-                .chain(
-                    agent
-                        .prompt
-                        .as_ref()
-                        .map(|prompt| format!("prompt: {}", preview.expand(prompt))),
-                )
-                .collect();
+            let mut settings: Vec<String> = Vec::new();
+            for (name, value) in [("model", &agent.model), ("effort", &agent.effort)] {
+                if let Some(value) = expand_run_setting(value.as_deref(), |raw| preview.expand(raw))
+                {
+                    settings.push(format!("{name} {value}"));
+                }
+            }
+            if let Some(prompt) = agent.prompt.as_ref() {
+                settings.push(format!("prompt: {}", preview.expand(prompt)));
+            }
             if !settings.is_empty() {
                 description.push_str(&format!(" ({})", settings.join(", ")));
             }
@@ -2140,8 +2140,8 @@ fn apply_action(
     }
     if let Some(updated) = next_task.as_ref() {
         let run = action.agent.as_ref().map(|agent| AgentRunSettings {
-            model: agent.model.clone(),
-            effort: agent.effort.clone(),
+            model: expand_run_setting(agent.model.as_deref(), |raw| tmpl.expand(raw)),
+            effort: expand_run_setting(agent.effort.as_deref(), |raw| tmpl.expand(raw)),
             prompt: agent
                 .prompt
                 .as_ref()
@@ -2466,6 +2466,14 @@ fn patch_has_changes(patch: &TaskUpdate) -> bool {
         || patch.custom_fields.is_some()
         || patch.relationships.is_some()
         || patch.sprints.is_some()
+}
+
+/// An action's model or effort with its `${{...}}` templates filled in
+/// (DEV-316). An empty result means "not set", so the job keeps the
+/// profile's own value instead of getting an empty flag.
+fn expand_run_setting(raw: Option<&str>, expand: impl FnOnce(&str) -> String) -> Option<String> {
+    raw.map(|raw| expand(raw).trim().to_string())
+        .filter(|value| !value.is_empty())
 }
 
 /// Run settings an automation action gives the job its assignment starts.

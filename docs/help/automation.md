@@ -183,6 +183,18 @@ When an action hands the ticket to an agent profile, `agent` sets how that job r
         prompt: "Run the test suite for ${{ticket.id}} and report failures as a comment."
 ```
 
+`model` and `effort` accept templates too, so a ticket can pick its own model. A value that expands to nothing counts as not set, so a ticket without the field gets the profile's model and effort:
+
+```yaml
+- name: Fix new findings
+  on:
+    created:
+      set:
+        assignee: "@fix"
+      agent:
+        model: "${{ticket.field:model}}"    # the profile's model when the ticket has no `model` field
+```
+
 `lotar automation simulate` lists these settings next to the job it would queue.
 
 ### Assignee tokens for actions
