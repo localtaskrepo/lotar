@@ -1,0 +1,46 @@
+title: agent run --wait returns before the job's end automation has run
+status: Done
+priority: Medium
+type: Bug
+reporter: claude
+assignee: claude
+created: 2026-11-11T18:57:39.008126+00:00
+modified: 2026-11-11T19:10:36.889086+00:00
+relationships:
+  related:
+  - DEV-320
+comments:
+- date: 2026-11-11T19:10:36.823272+00:00
+  text: |-
+    Outcome: lotar agent run --wait returned as soon as the job record turned Completed/Failed, which finalize_job does before running the job_completed/job_failed rules, so the process could exit mid-automation. Jobs now carry worker_running (set when run_job takes its slot, cleared in RunningJobSlot::drop after end automation, context and worktree cleanup); --wait returns only when the job is terminal and AgentJobService::job_settled() (polls every 50 ms once terminal).
+    Evidence: tests/dev322_wait_for_end_automation_test.rs (job_completed run action sleeps 1 s then touches a file; the file must exist when --wait returns) failed 3/3 before, passes 3/3 now. Found because the DEV-320 end-to-end test lost its job_completed rule under full-suite load. Docs: agent.md (--wait).
+    Remaining: none. Guidance: no durable finding.
+description: |-
+  `lotar agent run --wait` polls the job record and returns as soon as its status is terminal. finalize_job sets Completed/Failed before it runs the job_completed/job_failed rules, so the command (and its process) can exit while those rules still run: a slow rule, or a loaded machine, loses its set/comment/run. Found while testing DEV-320 under the full suite (the job_completed rule never ran).
+
+  Wanted: --wait returns only after the job's worker has finished (end automation, context, worktree cleanup). Failing test first: a job_completed rule whose run action takes a second; the file it writes exists when --wait returns.
+history:
+- at: 2026-11-11T18:57:39.085794+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-320"]}'
+- at: 2026-11-11T18:57:48.232729+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-11T19:10:36.823272+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-11T19:10:36.889086+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

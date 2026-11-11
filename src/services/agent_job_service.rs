@@ -121,6 +121,9 @@ struct AgentJobState {
     runner_failed: bool,
     /// The T3 Code thread of a t3 job, once it exists (DEV-318).
     t3_link: Option<String>,
+    /// A worker thread runs the job; it clears this only after the job's
+    /// end automation, context and worktree cleanup (DEV-322).
+    worker_running: bool,
 }
 
 /// Data needed to start a queued job when a slot becomes available
@@ -419,6 +422,7 @@ impl AgentJobService {
                     cancellation_finalized: false,
                     runner_failed: false,
                     t3_link: None,
+                    worker_running: false,
                 },
             );
 
@@ -507,6 +511,18 @@ impl AgentJobService {
                 max_parallel: None,
             }
         }
+    }
+
+    /// Whether no worker of this process still works on the job: its end
+    /// automation has run (DEV-322). A job that never got a worker (queued,
+    /// then cancelled) is settled too.
+    pub fn job_settled(job_id: &str) -> bool {
+        JOB_REGISTRY.lock().map_or(true, |registry| {
+            registry
+                .jobs
+                .get(job_id)
+                .is_none_or(|state| !state.worker_running)
+        })
     }
 
     pub fn has_active_job(ticket_id: &str) -> bool {
@@ -1922,6 +1938,7 @@ fn run_job(
     user_prompt: String,
     config: ResolvedConfig,
 ) {
+    update_job(&job_id, |state| state.worker_running = true);
     let _slot = RunningJobSlot {
         job_id: &job_id,
         ticket_id: &ticket_id,
@@ -2549,6 +2566,7 @@ impl Drop for RunningJobSlot<'_> {
             }
             if let Some(state) = registry.jobs.get_mut(self.job_id) {
                 state.runtime = None;
+                state.worker_running = false;
             }
             registry.running_count = registry.running_count.saturating_sub(1);
         }
@@ -3587,6 +3605,7 @@ mod tests {
             cancellation_finalized: false,
             runner_failed: false,
             t3_link: None,
+            worker_running: false,
         }
     }
 

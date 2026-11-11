@@ -1100,7 +1100,9 @@ fn wait_for_job_completion(
             return Err(format!("Job '{}' not found", job_id));
         };
 
-        if job_is_terminal(job.status.as_str()) {
+        // Final status comes before the end automation; the worker is done
+        // only after it (DEV-322).
+        if job_is_terminal(job.status.as_str()) && AgentJobService::job_settled(job_id) {
             if text {
                 if job.status.eq_ignore_ascii_case("completed") {
                     renderer.emit_success(format!("Job {} completed", job.id));
@@ -1123,7 +1125,13 @@ fn wait_for_job_completion(
             return Err(format!("Timed out waiting for job '{}'", job_id));
         }
 
-        thread::sleep(Duration::from_millis(500));
+        thread::sleep(Duration::from_millis(
+            if job_is_terminal(job.status.as_str()) {
+                50
+            } else {
+                500
+            },
+        ));
     }
 }
 

@@ -129,6 +129,7 @@ mod dev312_existing_project_before_detection_test;
 mod dev317_finding_report_test;
 mod dev318_t3_runner_test;
 mod dev319_runtime_gitignore_test;
+mod dev322_wait_for_end_automation_test;
 mod dev3_dev13_recent_and_sum_test;
 mod dev4_archive_test;
 mod dev54_mutation_contract_test;

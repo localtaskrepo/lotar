@@ -6,7 +6,7 @@ LoTaR can orchestrate supported agent CLIs (Claude Code, Codex CLI, Copilot CLI,
 
 - `lotar agent run <TICKET> <PROMPT> [--runner <RUNNER>] [--agent <profile>] [--model <MODEL>] [--effort <LEVEL>] [--provider <PROVIDER>] [--wait] [--follow] [--timeout-seconds <N>]`
   - `<RUNNER>` is one of the [runners](#runners): `claude`, `codex`, `copilot`, `gemini`, `cursor`, `amp`, `droid`, `opencode`, `kilo`, `antigravity`, `t3` or `command`.
-  - Without `--wait` or `--follow`, the job is checked (ticket, profile or runner, settings) and handed to the background queue worker, and the command returns at once with `Queued <TICKET> for <agent>`. Follow it with `lotar agent queue` and `lotar agent list-jobs`. With `--wait`, the job runs in this terminal and the command exits non-zero unless it completes; with `--format json` it prints the finished job.
+  - Without `--wait` or `--follow`, the job is checked (ticket, profile or runner, settings) and handed to the background queue worker, and the command returns at once with `Queued <TICKET> for <agent>`. Follow it with `lotar agent queue` and `lotar agent list-jobs`. With `--wait`, the job runs in this terminal and the command exits non-zero unless it completes; it returns once the job's end automation (the `job_completed`/`job_failed` rules), context and worktree cleanup are done. With `--format json` it prints the finished job.
 - `lotar agent status <JOB_ID>`
 - `lotar agent logs <JOB_ID>`
 - `lotar agent cancel <JOB_ID>`
