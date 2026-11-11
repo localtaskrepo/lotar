@@ -1,0 +1,20 @@
+title: 'openapi: /api/tasks/update says status is ignored, but the route applies it (and defers it during a job)'
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+created: 2026-11-11T19:18:53.444560+00:00
+modified: 2026-11-11T19:18:53.532868+00:00
+relationships:
+  related:
+  - DEV-320
+description: 'Found by the DEV-320 agent on 2026-11-11: docs/openapi.json describes /api/tasks/update as ignoring status, which is stale. Check: grep the route''s description in docs/openapi.json against src/routes. Done: the description matches the behaviour, including the deferred outcome during an agent job.'
+custom_fields:
+  finding: docs:openapi-tasks-update-status
+history:
+- at: 2026-11-11T19:18:53.532868+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-320"]}'

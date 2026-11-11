@@ -64,6 +64,9 @@ automation and the manual checks to run after every tag.
    npm run smoke
    ```
 4. Commit the changes on `main` and push.
+5. Push the tag only after the Quality Assurance run for that commit has succeeded: the release job checks it
+   ("Ensure QA succeeded") and fails, publishing nothing, while QA is still running (v0.13.0, 2026-11-11). Then
+   `git tag -s vX.Y.Z -m vX.Y.Z` and `git push origin vX.Y.Z`.
 
 ## One-Time npm Setup
 
