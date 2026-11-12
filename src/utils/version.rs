@@ -304,26 +304,8 @@ pub fn is_comparison(value: &str) -> bool {
 /// The version strings a custom field value holds: one for a scalar, one per
 /// item for a list. Numbers (a hand-written `affects: 0.13` loads as one)
 /// read as written by YAML's number formatting.
-#[cfg(not(feature = "schema"))]
 pub fn value_strings(value: &crate::types::CustomFieldValue) -> Vec<String> {
-    use serde_yaml_ng::Value;
-    match value {
-        Value::Sequence(items) => items.iter().flat_map(value_strings).collect(),
-        Value::Null => Vec::new(),
-        Value::String(s) if s.trim().is_empty() => Vec::new(),
-        other => vec![crate::types::custom_value_to_string(other)],
-    }
-}
-
-#[cfg(feature = "schema")]
-pub fn value_strings(value: &crate::types::CustomFieldValue) -> Vec<String> {
-    use serde_json::Value;
-    match value {
-        Value::Array(items) => items.iter().flat_map(value_strings).collect(),
-        Value::Null => Vec::new(),
-        Value::String(s) if s.trim().is_empty() => Vec::new(),
-        other => vec![crate::types::custom_value_to_string(other)],
-    }
+    crate::types::custom_value_items(value).into_iter().filter(|item| !item.trim().is_empty()).collect()
 }
 
 /// The versions a custom field value holds; unreadable items are skipped.

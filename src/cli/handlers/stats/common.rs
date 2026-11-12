@@ -12,10 +12,6 @@ use crate::output::{OutputFormat, OutputRenderer};
 use crate::storage::manager::Storage;
 use crate::workspace::TasksDirectoryResolver;
 
-pub(crate) fn custom_value_key(v: &crate::types::CustomFieldValue) -> String {
-    crate::types::custom_value_to_string(v)
-}
-
 /// Project a stats query covers: `None` with `--global`, otherwise the
 /// explicit project or the workspace's effective project.
 pub(crate) fn scope_project(global: bool, project: Option<&str>, resolver: &TasksDirectoryResolver) -> Option<String> {

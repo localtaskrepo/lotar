@@ -47,7 +47,7 @@ pub fn render_task_text(task: &TaskDTO, tasks_root: &std::path::Path) -> String 
     push("Created", Some(task.created.clone()));
     push("Modified", Some(task.modified.clone()));
     for (name, value) in &task.custom_fields {
-        let text = crate::types::custom_value_to_string(value);
+        let text = crate::types::custom_value_items(value).join(", ");
         if !text.trim().is_empty() {
             fields.push(("", format!("{name}: {text}")));
         }

@@ -306,6 +306,12 @@ lotar stats custom-field --field <name> [--limit N] [--global]
 
 Notes:
 - `--limit` defaults to 20 on both custom field commands.
+- A list value counts once for each item: a ticket with `affects: [0.13.1, 0.14.0]`
+  counts toward `0.13.1` and toward `0.14.0`. The same holds when grouping by
+  `field:<name>`, as in `lotar stats effort --by field:affects`.
+- Values of a `version` field are listed newest version first, so the limit keeps
+  the latest versions; values that don't read as versions follow by count. Other
+  fields are listed by count. `--format json` keeps the same order.
 
 ## JSON Output Examples
 

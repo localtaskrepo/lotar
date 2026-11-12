@@ -131,6 +131,44 @@ fn sorting_by_a_version_field_follows_version_order() {
     assert_eq!(titles(&temp, &["--sort-by", "field:affects", "order=desc"]), ["final", "rc", "ten", "nine", "none"]);
 }
 
+fn stats_json(temp: &TempDir, args: &[&str]) -> Vec<(String, u64)> {
+    let mut all = vec!["--format", "json", "stats"];
+    all.extend_from_slice(args);
+    let out = lotar(temp, &all);
+    assert!(out.status.success(), "stats {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+    let value: Value = serde_json::from_slice(&out.stdout).unwrap();
+    let key = |item: &Value| item.get("value").or_else(|| item.get("key")).and_then(Value::as_str).unwrap().to_string();
+    value["items"].as_array().unwrap().iter().map(|item| (key(item), item["count"].as_u64().unwrap())).collect()
+}
+
+/// A list value counts once for each item (DEV-391); a version field lists
+/// its values in version order, newest first.
+#[test]
+fn stats_count_each_item_of_a_list_value() {
+    let temp = workspace();
+    let first = add(&temp, "several", &["affects=0.13.1,0.14.0", "product=web"]);
+    add(&temp, "one", &["affects=0.14.0"]);
+    add(&temp, "older", &["affects=0.9.0"]);
+    let number = first.rsplit('-').next().unwrap();
+    let path = temp.path().join(format!(".tasks/DEMO/{number}.yml"));
+    let yaml = std::fs::read_to_string(&path).unwrap();
+    std::fs::write(&path, yaml.replace("product: web", "product:\n  - web\n  - api")).unwrap();
+
+    let affects = stats_json(&temp, &["custom-field", "--field", "affects", "--global"]);
+    assert_eq!(affects, [("0.14.0".to_string(), 2), ("0.13.1".to_string(), 1), ("0.9.0".to_string(), 1)]);
+    let text = lotar(&temp, &["stats", "custom-field", "--field", "affects", "--global"]);
+    assert_eq!(String::from_utf8_lossy(&text.stdout), "   2  0.14.0\n   1  0.13.1\n   1  0.9.0\n");
+
+    let product = stats_json(&temp, &["custom-field", "--field", "product", "--global"]);
+    assert_eq!(product, [("api".to_string(), 1), ("web".to_string(), 1)]);
+
+    let out = lotar(&temp, &["--format", "json", "stats", "effort", "--by", "field:affects", "--global"]);
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let body = String::from_utf8_lossy(&out.stdout);
+    assert!(!body.contains("[array]"), "{body}");
+    assert!(body.contains("\"0.13.1\""), "{body}");
+}
+
 fn mk_req(method: &str, path: &str, query: &[(&str, &str)], body: Value) -> HttpRequest {
     let query: HashMap<String, String> = query.iter().map(|(k, v)| ((*k).to_string(), (*v).to_string())).collect();
     HttpRequest { method: method.to_string(), path: path.to_string(), query, headers: HashMap::new(), body: serde_json::to_vec(&body).unwrap() }

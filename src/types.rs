@@ -432,6 +432,24 @@ pub fn custom_value_from_json(value: &serde_json::Value) -> CustomFieldValue {
     serde_yaml_ng::to_value(value).unwrap_or(serde_yaml_ng::Value::Null)
 }
 
+/// The strings a custom field value holds: one for a scalar, one per item
+/// for a list (DEV-391), so a list never reads as `[array]`.
+#[cfg(feature = "schema")]
+pub fn custom_value_items(v: &CustomFieldValue) -> Vec<String> {
+    match v {
+        serde_json::Value::Array(items) => items.iter().flat_map(custom_value_items).collect(),
+        other => vec![custom_value_to_string(other)],
+    }
+}
+
+#[cfg(not(feature = "schema"))]
+pub fn custom_value_items(v: &CustomFieldValue) -> Vec<String> {
+    match v {
+        serde_yaml_ng::Value::Sequence(items) => items.iter().flat_map(custom_value_items).collect(),
+        other => vec![custom_value_to_string(other)],
+    }
+}
+
 /// Convert a custom field value to a comparable display string for sorting/filtering.
 #[cfg(feature = "schema")]
 pub fn custom_value_to_string(v: &CustomFieldValue) -> String {

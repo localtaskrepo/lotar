@@ -1,5 +1,5 @@
 use crate::config::types::ResolvedConfig;
-use crate::types::{CustomFields, custom_value_to_string};
+use crate::types::{CustomFields, custom_value_items};
 
 /// Task types that can feed filter-value resolution (reserved or custom keys).
 /// Implemented for `TaskDTO`, the shape every task query works on.
@@ -75,15 +75,15 @@ pub fn resolve_filter_name(raw_key: &str, config: &ResolvedConfig) -> Option<Str
     None
 }
 
-/// Extract a string representation of a task's custom field value with the
-/// provided name (case-insensitive lookup).
+/// The strings a task's custom field holds, one per list item, for the
+/// field with the provided name (case-insensitive lookup).
 pub fn extract_value_strings(fields: &CustomFields, name: &str) -> Option<Vec<String>> {
     if let Some(value) = fields.get(name) {
-        return Some(vec![custom_value_to_string(value)]);
+        return Some(custom_value_items(value));
     }
 
     let target = name.to_ascii_lowercase();
-    fields.iter().find(|(key, _)| key.to_ascii_lowercase() == target).map(|(_, value)| vec![custom_value_to_string(value)])
+    fields.iter().find(|(key, _)| key.to_ascii_lowercase() == target).map(|(_, value)| custom_value_items(value))
 }
 
 /// A task's value for a custom field, by name ignoring case.
