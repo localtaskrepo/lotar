@@ -1,0 +1,223 @@
+title: Finished agent jobs leave GBs of build output in their worktrees
+status: InProgress
+priority: High
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T05:21:54.615269+00:00
+modified: 2026-11-12T05:25:15.411751+00:00
+relationships:
+  related:
+  - DEV-343
+  - DEV-358
+  - DEV-366
+comments:
+- date: 2026-11-12T05:24:07.203106+00:00
+  text: 'claude: the owner approved the fix in Fix (2026-11-11). Build it as described; the space is already freed (see Cleanup done). Reporter thread: the pyxzl.net link reference. The lotar thread that filed this tells the reporter when it is released.'
+- date: 2026-11-12T05:25:15.411751+00:00
+  text: 'claude: whoever releases this messages the reporter thread (the link reference) with the version, as the last done criterion says. I already sent the step-1 reply (space freed).'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa38f4398-ffb1-4376-9c12-47e5507a143c
+- link: t3-thread://v2/d834978d-9e75-43fb-ba01-45747238fc44/b51ca0ac-1980-485f-a905-ffe6a2c807e5
+description: |-
+  Finished agent jobs leave their build output behind: every lotar job worktree keeps a 2 to 7 GB `target/`, so 41 lotar worktrees grew to 144 GB and the Mac's disk reached 98% (13 GiB free) on 2026-11-11. The owner: "That's a little too much storage used in parallel. we don't have that much space available actually". Reported by the pyxzl.net thread "Split Repo Binaries to Skip CI Builds".
+
+  ## Cause
+
+  - Each worktree builds three profiles of its own (`debug` for lint, `local` for tests, `smoke`), about half of it `incremental/` data. sccache (`~/.cargo/config.toml`, STD-40) already shares the compile cache, at an 86% hit rate, but every `target/` still holds full copies.
+  - DEV-343's cleanup at Done removes a worktree only when `git cherry` finds every branch commit on main. The merge jobs land the commit rebased or reworked, so 3 of the 8 Done worktrees were refused (DEV-343, 346, 348). DEV-366 tracks that.
+  - Jobs that end with the ticket open (HelpNeeded, failures) keep their worktree on purpose, and with it `target/`.
+  - T3 thread worktrees (`t3-*`) are T3's. lotar only touches the ones its `t3` runner plans for a job.
+
+  ## Cleanup done 2026-11-11 (owner approved)
+
+  - Removed the 8 agent worktrees of Done tickets (5 by `lotar agent worktree cleanup`, 3 by `git worktree remove` after checking they were clean). Their branches stay.
+  - Deleted `target/` in the 25 idle worktrees. Running jobs (DEV-358, 360, 361, 362) and active threads were left alone.
+  - Thinned Time Machine's local snapshots, which still held the deleted files (`tmutil thinlocalsnapshots / 200000000000 4`).
+  - The worktrees went from 144 GB to 24 GB. The disk went from 13 GiB to 207 GiB free; the snapshots also held other deleted data.
+
+  ## Fix (owner approved 2026-11-11: "Go ahead, @fix job builds it")
+
+  - A setting such as `agent.worktree.cleanup_paths` (lotar's repo: `["target"]`). When a job ends and no other job runs in its worktree, lotar deletes those paths if git ignores them, and the worktree stays. This covers the `t3` runner's worktrees too. A resumed job rebuilds, mostly from sccache.
+  - No shared `CARGO_TARGET_DIR`. Parallel jobs would wait on Cargo's build lock and rebuild one another's branches, and sccache already shares the compiling.
+  - The `npm ci` on worktree creation stays (the owner's T3 setting, about 230 MB a worktree). It matters little once finished worktrees lose their build output.
+  - Interactive T3 threads' worktrees are cleaned by `scripts/repos.ts` in standards, a day after they are clean and merged (STD-41). Dropping `target/` as soon as such a thread settles is a proposal for standards.
+
+  ## Done when
+
+  - [x] Space freed without losing work
+  - [ ] Ending a job deletes the configured build output from its worktree; tests cover the success, HelpNeeded and running-job cases
+  - [ ] Docs (`docs/help/agent.md`, `docs/help/config-reference.md`) and lotar's own config updated
+  - [ ] Reporter thread told when it is released
+tags:
+- agent
+history:
+- at: 2026-11-12T05:21:54.786503+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-343","DEV-358"]}'
+- at: 2026-11-12T05:21:55.090639+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T05:21:55.607633+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T05:21:56.592149+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa38f4398-ffb1-4376-9c12-47e5507a143c
+- at: 2026-11-12T05:24:06.928265+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Finished agent jobs leave their build output behind: every lotar job worktree keeps a 2 to 7 GB `target/`, so 41 lotar worktrees grew to 144 GB and the Mac's disk reached 98% (13 GiB free) on 2026-11-11. The owner: "That's a little too much storage used in parallel. we don't have that much space available actually". Reported by the pyxzl.net thread "Split Repo Binaries to Skip CI Builds".
+
+      ## Cause
+
+      - Each worktree builds three profiles of its own (`debug` for lint, `local` for tests, `smoke`), about half of it `incremental/` data. sccache (`~/.cargo/config.toml`, STD-40) already shares the compile cache, at an 86% hit rate, but every `target/` still holds full copies.
+      - DEV-343's cleanup at Done removes a worktree only when `git cherry` finds every branch commit on main. The merge jobs land the commit rebased or reworked, so 3 of the 8 Done worktrees were refused (DEV-343, 346, 348). See the related ticket.
+      - Jobs that end with the ticket open (HelpNeeded, failures) keep their worktree on purpose, and with it `target/`.
+      - T3 thread worktrees (`t3-*`) are T3's. lotar only touches the ones its `t3` runner plans for a job.
+
+      ## Cleanup done 2026-11-11 (owner approved)
+
+      - Removed the 8 agent worktrees of Done tickets (5 by `lotar agent worktree cleanup`, 3 by `git worktree remove` after checking they were clean). Their branches stay.
+      - Deleted `target/` in the 25 idle worktrees. Running jobs (DEV-358, 360, 361, 362) and active threads were left alone.
+      - Thinned Time Machine's local snapshots, which still held the deleted files (`tmutil thinlocalsnapshots / 200000000000 4`).
+      - The worktrees went from 144 GB to 24 GB. The disk went from 13 GiB to 207 GiB free; the snapshots also held other deleted data.
+
+      ## Proposed fix (waiting for the owner's go-ahead)
+
+      - A setting such as `agent.worktree.cleanup_paths` (lotar's repo: `["target"]`). When a job ends and no other job runs in its worktree, lotar deletes those paths if git ignores them, and the worktree stays. This covers the `t3` runner's worktrees too. A resumed job rebuilds, mostly from sccache.
+      - No shared `CARGO_TARGET_DIR`. Parallel jobs would wait on Cargo's build lock and rebuild one another's branches, and sccache already shares the compiling.
+      - The `npm ci` on worktree creation stays (the owner's T3 setting, about 230 MB a worktree). It matters little once finished worktrees lose their build output.
+      - Interactive T3 threads' worktrees are cleaned by `scripts/repos.ts` in standards, a day after they are clean and merged (STD-41). Dropping `target/` as soon as such a thread settles is a proposal for standards.
+
+      ## Done when
+
+      - [x] Space freed without losing work
+      - [ ] Ending a job deletes the configured build output from its worktree; tests cover the success, HelpNeeded and running-job cases
+      - [ ] Docs (`docs/help/agent.md`, `docs/help/config-reference.md`) and lotar's own config updated
+      - [ ] Reporter thread told when it is released
+    new: |-
+      Finished agent jobs leave their build output behind: every lotar job worktree keeps a 2 to 7 GB `target/`, so 41 lotar worktrees grew to 144 GB and the Mac's disk reached 98% (13 GiB free) on 2026-11-11. The owner: "That's a little too much storage used in parallel. we don't have that much space available actually". Reported by the pyxzl.net thread "Split Repo Binaries to Skip CI Builds".
+
+      ## Cause
+
+      - Each worktree builds three profiles of its own (`debug` for lint, `local` for tests, `smoke`), about half of it `incremental/` data. sccache (`~/.cargo/config.toml`, STD-40) already shares the compile cache, at an 86% hit rate, but every `target/` still holds full copies.
+      - DEV-343's cleanup at Done removes a worktree only when `git cherry` finds every branch commit on main. The merge jobs land the commit rebased or reworked, so 3 of the 8 Done worktrees were refused (DEV-343, 346, 348). See the related ticket.
+      - Jobs that end with the ticket open (HelpNeeded, failures) keep their worktree on purpose, and with it `target/`.
+      - T3 thread worktrees (`t3-*`) are T3's. lotar only touches the ones its `t3` runner plans for a job.
+
+      ## Cleanup done 2026-11-11 (owner approved)
+
+      - Removed the 8 agent worktrees of Done tickets (5 by `lotar agent worktree cleanup`, 3 by `git worktree remove` after checking they were clean). Their branches stay.
+      - Deleted `target/` in the 25 idle worktrees. Running jobs (DEV-358, 360, 361, 362) and active threads were left alone.
+      - Thinned Time Machine's local snapshots, which still held the deleted files (`tmutil thinlocalsnapshots / 200000000000 4`).
+      - The worktrees went from 144 GB to 24 GB. The disk went from 13 GiB to 207 GiB free; the snapshots also held other deleted data.
+
+      ## Fix (owner approved 2026-11-11: "Go ahead, @fix job builds it")
+
+      - A setting such as `agent.worktree.cleanup_paths` (lotar's repo: `["target"]`). When a job ends and no other job runs in its worktree, lotar deletes those paths if git ignores them, and the worktree stays. This covers the `t3` runner's worktrees too. A resumed job rebuilds, mostly from sccache.
+      - No shared `CARGO_TARGET_DIR`. Parallel jobs would wait on Cargo's build lock and rebuild one another's branches, and sccache already shares the compiling.
+      - The `npm ci` on worktree creation stays (the owner's T3 setting, about 230 MB a worktree). It matters little once finished worktrees lose their build output.
+      - Interactive T3 threads' worktrees are cleaned by `scripts/repos.ts` in standards, a day after they are clean and merged (STD-41). Dropping `target/` as soon as such a thread settles is a proposal for standards.
+
+      ## Done when
+
+      - [x] Space freed without losing work
+      - [ ] Ending a job deletes the configured build output from its worktree; tests cover the success, HelpNeeded and running-job cases
+      - [ ] Docs (`docs/help/agent.md`, `docs/help/config-reference.md`) and lotar's own config updated
+      - [ ] Reporter thread told when it is released
+- at: 2026-11-12T05:24:07.116664+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:t3-thread://v2/d834978d-9e75-43fb-ba01-45747238fc44/b51ca0ac-1980-485f-a905-ffe6a2c807e5
+- at: 2026-11-12T05:24:07.203106+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:24:42.067565+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Finished agent jobs leave their build output behind: every lotar job worktree keeps a 2 to 7 GB `target/`, so 41 lotar worktrees grew to 144 GB and the Mac's disk reached 98% (13 GiB free) on 2026-11-11. The owner: "That's a little too much storage used in parallel. we don't have that much space available actually". Reported by the pyxzl.net thread "Split Repo Binaries to Skip CI Builds".
+
+      ## Cause
+
+      - Each worktree builds three profiles of its own (`debug` for lint, `local` for tests, `smoke`), about half of it `incremental/` data. sccache (`~/.cargo/config.toml`, STD-40) already shares the compile cache, at an 86% hit rate, but every `target/` still holds full copies.
+      - DEV-343's cleanup at Done removes a worktree only when `git cherry` finds every branch commit on main. The merge jobs land the commit rebased or reworked, so 3 of the 8 Done worktrees were refused (DEV-343, 346, 348). See the related ticket.
+      - Jobs that end with the ticket open (HelpNeeded, failures) keep their worktree on purpose, and with it `target/`.
+      - T3 thread worktrees (`t3-*`) are T3's. lotar only touches the ones its `t3` runner plans for a job.
+
+      ## Cleanup done 2026-11-11 (owner approved)
+
+      - Removed the 8 agent worktrees of Done tickets (5 by `lotar agent worktree cleanup`, 3 by `git worktree remove` after checking they were clean). Their branches stay.
+      - Deleted `target/` in the 25 idle worktrees. Running jobs (DEV-358, 360, 361, 362) and active threads were left alone.
+      - Thinned Time Machine's local snapshots, which still held the deleted files (`tmutil thinlocalsnapshots / 200000000000 4`).
+      - The worktrees went from 144 GB to 24 GB. The disk went from 13 GiB to 207 GiB free; the snapshots also held other deleted data.
+
+      ## Fix (owner approved 2026-11-11: "Go ahead, @fix job builds it")
+
+      - A setting such as `agent.worktree.cleanup_paths` (lotar's repo: `["target"]`). When a job ends and no other job runs in its worktree, lotar deletes those paths if git ignores them, and the worktree stays. This covers the `t3` runner's worktrees too. A resumed job rebuilds, mostly from sccache.
+      - No shared `CARGO_TARGET_DIR`. Parallel jobs would wait on Cargo's build lock and rebuild one another's branches, and sccache already shares the compiling.
+      - The `npm ci` on worktree creation stays (the owner's T3 setting, about 230 MB a worktree). It matters little once finished worktrees lose their build output.
+      - Interactive T3 threads' worktrees are cleaned by `scripts/repos.ts` in standards, a day after they are clean and merged (STD-41). Dropping `target/` as soon as such a thread settles is a proposal for standards.
+
+      ## Done when
+
+      - [x] Space freed without losing work
+      - [ ] Ending a job deletes the configured build output from its worktree; tests cover the success, HelpNeeded and running-job cases
+      - [ ] Docs (`docs/help/agent.md`, `docs/help/config-reference.md`) and lotar's own config updated
+      - [ ] Reporter thread told when it is released
+    new: |-
+      Finished agent jobs leave their build output behind: every lotar job worktree keeps a 2 to 7 GB `target/`, so 41 lotar worktrees grew to 144 GB and the Mac's disk reached 98% (13 GiB free) on 2026-11-11. The owner: "That's a little too much storage used in parallel. we don't have that much space available actually". Reported by the pyxzl.net thread "Split Repo Binaries to Skip CI Builds".
+
+      ## Cause
+
+      - Each worktree builds three profiles of its own (`debug` for lint, `local` for tests, `smoke`), about half of it `incremental/` data. sccache (`~/.cargo/config.toml`, STD-40) already shares the compile cache, at an 86% hit rate, but every `target/` still holds full copies.
+      - DEV-343's cleanup at Done removes a worktree only when `git cherry` finds every branch commit on main. The merge jobs land the commit rebased or reworked, so 3 of the 8 Done worktrees were refused (DEV-343, 346, 348). DEV-366 tracks that.
+      - Jobs that end with the ticket open (HelpNeeded, failures) keep their worktree on purpose, and with it `target/`.
+      - T3 thread worktrees (`t3-*`) are T3's. lotar only touches the ones its `t3` runner plans for a job.
+
+      ## Cleanup done 2026-11-11 (owner approved)
+
+      - Removed the 8 agent worktrees of Done tickets (5 by `lotar agent worktree cleanup`, 3 by `git worktree remove` after checking they were clean). Their branches stay.
+      - Deleted `target/` in the 25 idle worktrees. Running jobs (DEV-358, 360, 361, 362) and active threads were left alone.
+      - Thinned Time Machine's local snapshots, which still held the deleted files (`tmutil thinlocalsnapshots / 200000000000 4`).
+      - The worktrees went from 144 GB to 24 GB. The disk went from 13 GiB to 207 GiB free; the snapshots also held other deleted data.
+
+      ## Fix (owner approved 2026-11-11: "Go ahead, @fix job builds it")
+
+      - A setting such as `agent.worktree.cleanup_paths` (lotar's repo: `["target"]`). When a job ends and no other job runs in its worktree, lotar deletes those paths if git ignores them, and the worktree stays. This covers the `t3` runner's worktrees too. A resumed job rebuilds, mostly from sccache.
+      - No shared `CARGO_TARGET_DIR`. Parallel jobs would wait on Cargo's build lock and rebuild one another's branches, and sccache already shares the compiling.
+      - The `npm ci` on worktree creation stays (the owner's T3 setting, about 230 MB a worktree). It matters little once finished worktrees lose their build output.
+      - Interactive T3 threads' worktrees are cleaned by `scripts/repos.ts` in standards, a day after they are clean and merged (STD-41). Dropping `target/` as soon as such a thread settles is a proposal for standards.
+
+      ## Done when
+
+      - [x] Space freed without losing work
+      - [ ] Ending a job deletes the configured build output from its worktree; tests cover the success, HelpNeeded and running-job cases
+      - [ ] Docs (`docs/help/agent.md`, `docs/help/config-reference.md`) and lotar's own config updated
+      - [ ] Reporter thread told when it is released
+- at: 2026-11-12T05:24:42.234391+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-343","DEV-358"]}'
+    new: '{"related":["DEV-343","DEV-358","DEV-366"]}'
+- at: 2026-11-12T05:25:15.411751+00:00
+  actor: claude
+  changes:
+  - field: comment_added

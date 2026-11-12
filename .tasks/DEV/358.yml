@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T04:36:54.876848+00:00
-modified: 2026-11-12T05:17:51.889849+00:00
+modified: 2026-11-12T05:26:42.883879+00:00
 relationships:
   related:
   - DEV-349
@@ -14,6 +14,9 @@ relationships:
   - DEV-357
   - DEV-363
   - DEV-348
+  - DEV-364
+  - DEV-342
+  - DEV-361
 comments:
 - date: 2026-11-12T05:02:05.534862+00:00
   text: 'claude: Reproduced on main (f10a63c) standalone: 4 of 6 runs hit the 15 s deadline. Not DEV-349: the worker is busy, one log event (open+2 writes+close) per stderr line, ~2.5 ms each under I/O load, so 6000 lines outlast 15 s. A second failure under load: ''trailing stderr must be persisted''. read_job_output stopped 5 s after the runner exited even while reading output the runner left in the pipe, failing the job and dropping its last lines (docs/help/agent.md promised available output is drained). Fix in progress: drain the bytes in the pipe at exit (FIONREAD/PeekNamedPipe) before the 5 s descendant limit starts; one write per log event; test burst 100 lines of 1 KB (still more than a pipe holds).'
@@ -23,12 +26,21 @@ comments:
   text: 'claude: Merged aa8cbc4 (rebased fix commit d1ea496) into main by fast-forward. Checks in the worktree after the rebase: npm run lint:agent, npm run test:agent and npm run smoke (379 tests) pass; the first full test:agent run failed once in dev279_cross_process_jobs_test (unrelated flake, passed on rerun and 3 of 3 alone; filed as DEV-363). Ticket check ''cargo nextest run --cargo-profile local worker_persists_trailing'' passes 5 of 5 on the merged code. Pushing per repos.json if only this ticket''s commits are unpushed. Windows build not run (CI).'
 - date: 2026-11-12T05:17:51.822709+00:00
   text: 'claude: Not pushed: main has 17 unpushed commits and only 2 are this ticket''s (aa8cbc4, 7baefd7); the rest belong to DEV-348, 352, 354, 355, 356 and 359 and wait for their sessions. This comment is in the ticket file and stays uncommitted for the next ticket-updates commit.'
+- date: 2026-11-12T05:18:00.545970+00:00
+  text: The merge agent's job job-20261112T050845.506Z-35 failed (lotar agent logs job-20261112T050845.506Z-35); the fix agent retries it on branch agent/DEV-358.
+- date: 2026-11-12T05:24:11.439844+00:00
+  text: 'claude: Already fixed on main, nothing new to commit. The fix is aa8cbc4 (the rebased d1ea496), fast-forwarded into main at 21:17. git cherry main agent/DEV-358 shows d1ea496 as already applied (-). Check on main''s code (71cde54): cargo nextest run --cargo-profile local worker_persists_trailing passed 5 of 5 alone (1.9-3.2 s) and 6 of 6 with a full nextest run in the background (1.9-3.0 s). Why the merge job was marked failed: the agent worker (pid 11651) started at 18:31, before c55f67c (DEV-342), which treats a branch rebased onto main as merged, and before 0.13.2 was installed at 20:27. That worker is still the old build, so it ran git merge --ff-only on the unrebased agent/DEV-358 and got ''Diverging branches''. DEV-361 (the worker keeps running its old build after an upgrade) already covers this, so I filed no new ticket. The merge retry has nothing to merge: agent/DEV-358 rebases onto main as empty.'
+- date: 2026-11-12T05:26:42.883879+00:00
+  text: 'claude: Merge job. The fix is already on main as aa8cbc4 (rebased d1ea496); rebasing this branch onto main leaves no commits of its own, so there is nothing more to merge. Check command ''cargo nextest run --cargo-profile local worker_persists_trailing'' passes on main''s code (1 of 1, 0.5 s). Committed the pending .tasks changes in the main checkout as a ticket-update commit. Not pushed: main has other tickets'' unpushed commits that wait for their sessions. Lint, full tests and smoke not rerun: no code changed.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acb13752d-02d4-4f9a-8cdf-d5868377dfce
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5b64ac66-413e-4f67-a73f-93869f527170
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A06ec8930-f43b-4c49-98d9-4b65f617025e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abe6be720-0663-4467-bda3-c56474a81d51
 description: 'Found by DEV-355 (claude, 2026-11-11): in a full npm run test:agent run (branch agent/DEV-355 at 7bd5c46, without the DEV-349 fix from main, while other agent jobs ran on the machine), tests/agent_safety_test.rs:100 panicked ''worker did not exit after draining jobs'' after the 15 s wait_worker deadline. Earlier full runs passed it. May share the cause of DEV-349/DEV-351 (other worktrees'' wrapper processes counted as active jobs); unconfirmed. Check: cargo nextest run --cargo-profile local worker_persists_trailing passes repeatedly under full-suite load on main. Done when the worker exits for a reason the test controls, not a timeout race.'
 tags:
 - health
+- merge-retried
 custom_fields:
   finding: flaky-test:worker_persists_trailing_stderr_before_exit_and_summary
 history:
@@ -99,3 +111,52 @@ history:
   - field: relationships
     old: '{"related":["DEV-349","DEV-351","DEV-355","DEV-357","DEV-363"]}'
     new: '{"related":["DEV-349","DEV-351","DEV-355","DEV-357","DEV-363","DEV-348"]}'
+- at: 2026-11-12T05:18:00.314239+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: health
+    new: health, merge-retried
+- at: 2026-11-12T05:18:00.545970+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:18:01.449885+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A06ec8930-f43b-4c49-98d9-4b65f617025e
+- at: 2026-11-12T05:21:54.786114+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-349","DEV-351","DEV-355","DEV-357","DEV-363","DEV-348"]}'
+    new: '{"related":["DEV-349","DEV-351","DEV-355","DEV-357","DEV-363","DEV-348","DEV-364"]}'
+- at: 2026-11-12T05:24:11.439844+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:24:11.564776+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-349","DEV-351","DEV-355","DEV-357","DEV-363","DEV-348","DEV-364"]}'
+    new: '{"related":["DEV-349","DEV-351","DEV-355","DEV-357","DEV-363","DEV-348","DEV-364","DEV-342","DEV-361"]}'
+- at: 2026-11-12T05:24:20.052982+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T05:24:22.157347+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abe6be720-0663-4467-bda3-c56474a81d51
+- at: 2026-11-12T05:26:42.883879+00:00
+  actor: claude
+  changes:
+  - field: comment_added

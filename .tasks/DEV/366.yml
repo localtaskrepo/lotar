@@ -1,0 +1,77 @@
+title: Worktree cleanup keeps worktrees whose commit landed rebased or reworked
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T05:24:14.222418+00:00
+modified: 2026-11-12T05:24:42.234881+00:00
+relationships:
+  related:
+  - DEV-343
+  - DEV-346
+  - DEV-348
+  - DEV-364
+comments:
+- date: 2026-11-12T05:24:21.653717+00:00
+  text: 'claude: filed for @fix with the owner''s OK (2026-11-11: "Ticket for @fix"). Pick the check from Open questions and say in the ticket which and why.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aad7f2d6a-56ad-4a09-904b-adf0cbbae072
+- link: t3-thread://v2/d834978d-9e75-43fb-ba01-45747238fc44/b51ca0ac-1980-485f-a905-ffe6a2c807e5
+description: |-
+  `lotar agent worktree cleanup` and the cleanup at Done (DEV-343) keep worktrees whose work is already on main. The merge job lands the ticket's commit rebased onto a newer main or reworked, so `git cherry` sees no equivalent commit. On 2026-11-11 this kept 3 of 8 Done worktrees (DEV-343, DEV-346, DEV-348, about 15 GB with their build output), with "has commits that are not in the main checkout's current branch".
+
+  ## Evidence
+
+  - `agent/DEV-343` (aa4b664) and main's bd76b82 change the same lines, but the context lines differ, so the patch ids differ.
+  - `agent/DEV-346` and `agent/DEV-348` were reworked at merge (main's 5306bce and 5939e6b differ from the branch).
+  - `git merge-tree --write-tree main <branch>` yields main's own tree for DEV-346, 348 and 339 (merging adds nothing). For DEV-343 it doesn't, because main has since changed those lines.
+
+  ## Open questions
+
+  - Which proof that a branch landed is safe enough: merge-tree yields main's tree, the merge job records the commit it landed, or the merge job moves the ticket branch to that commit?
+  - The check must never pass for a branch with work missing from main, such as `agent/DEV-350` today.
+
+  ## Done when
+
+  - [ ] A ticket branch whose commit landed rebased or reworked is removed at Done, and a branch with missing work is kept; tests cover both
+tags:
+- agent
+history:
+- at: 2026-11-12T05:24:14.410492+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-343","DEV-346","DEV-348"]}'
+- at: 2026-11-12T05:24:14.978198+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T05:24:15.334532+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T05:24:16.086326+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aad7f2d6a-56ad-4a09-904b-adf0cbbae072
+- at: 2026-11-12T05:24:21.567435+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:t3-thread://v2/d834978d-9e75-43fb-ba01-45747238fc44/b51ca0ac-1980-485f-a905-ffe6a2c807e5
+- at: 2026-11-12T05:24:21.653717+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:24:42.234881+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-343","DEV-346","DEV-348"]}'
+    new: '{"related":["DEV-343","DEV-346","DEV-348","DEV-364"]}'

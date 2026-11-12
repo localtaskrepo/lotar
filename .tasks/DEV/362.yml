@@ -3,11 +3,18 @@ status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T05:03:17.785328+00:00
-modified: 2026-11-12T05:03:19.397224+00:00
+modified: 2026-11-12T05:23:48.873399+00:00
+relationships:
+  related:
+  - DEV-365
+comments:
+- date: 2026-11-12T05:21:43.308438+00:00
+  text: 'Claude (Opus 5.5): Done in 4eaad9d on agent/DEV-362. simulate now matches change events like a real update: created uses a new-task change set; updated/sprint_changed/assigned look for an update of one field (assigned always includes assignee) that fires the rule (update_match in automation_matching.rs). A match that needs a field change carries the warning ''Matches only when status changes in the same update.''; a rule needing several fields at once no longer matches, and the no-match result names it (''Done and tagged: matches only when status and tags change in the same update; ...''). CLI prints these notes on no match, the rule editor''s Try it shows them too. Docs: automation.md (field conditions inside all, Simulating rules), warnings field in api_types.rs/types.ts/openapi.json (shape unchanged). Tests: new tests/dev362_simulate_change_events_test.rs (failed before the fix); dev118 preview test now expects the status note. Checks: npm run lint:agent, test:agent (Rust 2006 passed; UI 1444 passed on rerun, Board/SprintsList specs timed out once at 5s under load and pass alone and on full rerun; release, hooks), test:smoke:agent 379 passed; ticket scenario run with the built CLI. Finding, not fixed: field conditions written with the aliases labels/task_type never match a real update, because ChangeSet records tags/type only.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A06a83034-9de4-4f4e-ad88-79a49f4b1eeb
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A45e5d649-0eee-4666-83ae-ceeec8f1bd3c
 description: |-
   ## Found
   In standards STD-46 (2026-11-12) a rule `when: { all: [ { status: Done }, { tags: { any: [merge-retried] } } ] }` with `on: updated` never fired when `lotar status <ID> Done` ran on a ticket tagged merge-retried, while `lotar automation simulate --ticket <ID> --event updated` reported "Rule matched".
@@ -38,3 +45,24 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A06a83034-9de4-4f4e-ad88-79a49f4b1eeb
+- at: 2026-11-12T05:21:43.308438+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:21:56.213939+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T05:21:57.200981+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A45e5d649-0eee-4666-83ae-ceeec8f1bd3c
+- at: 2026-11-12T05:23:48.873399+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-365"]}'

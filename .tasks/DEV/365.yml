@@ -1,0 +1,52 @@
+title: automation conditions on labels and task_type never match a real update
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T05:23:48.738895+00:00
+modified: 2026-11-12T05:23:51.434346+00:00
+relationships:
+  related:
+  - DEV-362
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3ac5dec7-ebec-4f8c-9960-503be09cc459
+description: |-
+  ## Found
+  While fixing DEV-362 (2026-11-11): a rule condition written with the alias `labels:` or `task_type:` never fires on a real update, while the same condition written as `tags:` or `type:` does. docs/help/automation.md uses `labels` as an alias in `set`, and matching accepts both aliases for the current value.
+
+  ## Cause
+  `matches_field_map` (src/services/automation_matching.rs) reads the current value for `labels` and `task_type`, but in `MatchMode::OnChange` it looks the change up with `changes.changed_field(&field_key)` under the alias name. `ChangeSet::new` records the changes only as `tags` and `type`, so the lookup finds nothing and the condition fails. The `changes:` group probably has the same problem with the aliases. `update_match` (DEV-362) also only collects the names in `CHANGE_FIELDS`, so simulate says nothing about these aliases.
+
+  ## Check
+  In a scratch workspace with `LOTAR_IGNORE_HOME_CONFIG=1`: rules `when: { labels: { any: [t] } }`, `when: { tags: { any: [t] } }`, `when: { task_type: Bug }` and `when: { type: Bug }`, each with `on: updated: comment: <name>-fired`. Run `lotar task edit SC-1 --tag t` and `lotar task edit SC-1 --type Bug`. Only tags-fired and type-fired are added.
+
+  ## Done
+  `labels`/`tags` and `task_type`/`type` match the same way in field conditions and in `changes`, on real updates and in `lotar automation simulate`. A test covers both aliases.
+tags:
+- health
+custom_fields:
+  finding: code-review:automation-condition-aliases
+history:
+- at: 2026-11-12T05:23:48.873988+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-362"]}'
+- at: 2026-11-12T05:23:49.004801+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T05:23:49.234452+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T05:23:51.434346+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3ac5dec7-ebec-4f8c-9960-503be09cc459
