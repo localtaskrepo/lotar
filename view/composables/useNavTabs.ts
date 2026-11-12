@@ -12,6 +12,7 @@ export interface NavTabDefinition {
 export const NAV_TABS: NavTabDefinition[] = [
     { label: 'Tasks', path: '/' },
     { label: 'Sprints', path: '/sprints' },
+    { label: 'Releases', path: '/releases' },
     { label: 'Boards', path: '/boards' },
     { label: 'Calendar', path: '/calendar' },
     { label: 'Dependencies', path: '/dependencies' },

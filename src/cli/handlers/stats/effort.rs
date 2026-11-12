@@ -220,6 +220,7 @@ pub(crate) fn run(
                             deleted_at: task.deleted_at,
                             sprints,
                             sprint_order: std::collections::BTreeMap::new(),
+                            releases: Vec::new(),
                             history: task.history,
                             custom_fields: task.custom_fields,
                         };

@@ -273,6 +273,9 @@ pub struct TaskDTO {
     pub sprints: Vec<u32>,
     #[serde(skip_serializing_if = "crate::api_types::btreemap_u32_is_empty", default)]
     pub sprint_order: BTreeMap<u32, u32>,
+    /// Releases the task belongs to (DEV-393).
+    #[serde(default)]
+    pub releases: Vec<u32>,
     #[serde(default)]
     pub history: Vec<crate::types::TaskChangeLogEntry>,
     #[serde(default)]
@@ -393,6 +396,9 @@ pub struct TaskCreate {
     pub custom_fields: Option<crate::types::CustomFields>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub sprints: Vec<u32>,
+    /// Release ids to add the new task to (DEV-393).
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub releases: Vec<u32>,
 }
 
 /// A status and/or assignee change made while an agent job runs on the
@@ -527,6 +533,9 @@ pub struct TaskUpdate {
     /// Replace sprint memberships; empty list clears them.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub sprints: Option<Vec<u32>>,
+    /// Replace release memberships; empty list clears them (DEV-393).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub releases: Option<Vec<u32>>,
 }
 
 /// Move a task to another project (DEV-183). The task gets the next free
@@ -861,7 +870,7 @@ pub struct AutomationSimulateRequest {
     /// The task ID to simulate against
     pub ticket_id: String,
     /// The event to simulate. Canonical names: "created", "updated",
-    /// "assigned", "commented", "sprint_changed", "job_started",
+    /// "assigned", "commented", "sprint_changed", "release_changed", "job_started",
     /// "job_completed", "job_failed", "job_cancelled", "manual",
     /// "unblocked". Matching
     /// is case-insensitive and legacy aliases are accepted ("job_start",
@@ -1614,6 +1623,180 @@ pub struct SprintListResponse {
     pub missing_sprints: Vec<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub integrity: Option<SprintIntegrityDiagnostics>,
+}
+
+/// A release (DEV-393) with counts over its tickets.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct ReleaseListItem {
+    pub id: u32,
+    pub version: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub label: Option<String>,
+    pub display_name: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub notes: Option<String>,
+    /// `YYYY-MM-DD`.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub planned_date: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub released_at: Option<String>,
+    /// `planned` or `released`.
+    pub state: String,
+    /// Planned for a day before today and not released.
+    pub overdue: bool,
+    pub task_count: usize,
+    pub done_count: usize,
+    pub open_count: usize,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub created: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub modified: Option<String>,
+}
+
+/// A release named by ID (`3`) or by `#3`, version or label.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+#[serde(untagged)]
+pub enum ReleaseSelector {
+    Id(u32),
+    Reference(String),
+}
+
+impl ReleaseSelector {
+    pub fn as_reference(&self) -> String {
+        match self {
+            ReleaseSelector::Id(id) => id.to_string(),
+            ReleaseSelector::Reference(value) => value.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct ReleaseListResponse {
+    pub status: String,
+    pub total: usize,
+    /// In version order.
+    #[serde(default)]
+    pub releases: Vec<ReleaseListItem>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct ReleaseGetResponse {
+    pub status: String,
+    pub release: ReleaseListItem,
+    /// The release's tickets.
+    #[serde(default)]
+    pub tasks: Vec<TaskDTO>,
+    #[serde(default)]
+    pub history: Vec<crate::types::TaskChangeLogEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct ReleaseCreateRequest {
+    /// `0.15.0` or `v0.15.0` (stored without the `v`).
+    pub version: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub notes: Option<String>,
+    /// `YYYY-MM-DD`.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub planned_date: Option<String>,
+    /// RFC 3339 or `YYYY-MM-DD`; set for a release that is already out.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub released_at: Option<String>,
+}
+
+/// Fields left out stay as they are; an empty string clears one.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct ReleaseUpdateRequest {
+    pub release: ReleaseSelector,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub notes: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub planned_date: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub released_at: Option<String>,
+}
+
+/// Mark a release released (at `at`, default now), reopen it, or delete it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct ReleaseActionRequest {
+    pub release: ReleaseSelector,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct ReleaseMutationResponse {
+    pub status: String,
+    pub release: ReleaseListItem,
+    /// False when the request changed nothing.
+    pub changed: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct ReleaseDeleteResponse {
+    pub status: String,
+    pub deleted: bool,
+    pub release_id: u32,
+    /// Tickets the release was taken off.
+    #[serde(default)]
+    pub removed_from: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct ReleaseAssignmentRequest {
+    pub release: ReleaseSelector,
+    #[serde(default)]
+    pub tasks: Vec<String>,
+    /// Also act on the tasks this search selects, in the web search syntax.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub query: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct ReleaseAssignmentResponse {
+    pub status: String,
+    /// `add`, `move` or `remove`.
+    pub action: String,
+    pub release_id: u32,
+    pub release_version: String,
+    #[serde(default)]
+    pub modified: Vec<String>,
+    #[serde(default)]
+    pub unchanged: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct ReleaseBacklogResponse {
+    pub status: String,
+    pub total: usize,
+    pub count: usize,
+    pub limit: usize,
+    pub offset: usize,
+    /// Open tickets in no release.
+    #[serde(default)]
+    pub tasks: Vec<TaskDTO>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

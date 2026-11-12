@@ -38,6 +38,7 @@ lotar serve --open
 | Run agent jobs | `lotar agent run`, `lotar agent list-running` |
 | Sync with Jira or GitHub | `lotar pull <remote>`, `lotar push <remote>`, `lotar sync check <remote>` (see [Sync](./sync.md)) |
 | Watch metrics | `lotar stats`, `lotar sprint ...`, or the Insights tab in the browser |
+| Plan and ship releases | `lotar release create 0.15.0`, `lotar release add 0.15.0 --select 'status:done'`, `lotar release release 0.15.0`, or the Releases page (see [Releases](./releases.md)) |
 
 See [Agent Jobs](./agent.md) for the full CLI workflow and wrapper requirements.
 

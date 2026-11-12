@@ -28,11 +28,13 @@ use serde_json::{Value, json};
 use super::handlers::{
     handle_agent_cancel, handle_agent_list_jobs, handle_agent_run, handle_agent_send_message, handle_agent_status, handle_config_set, handle_config_show,
     handle_project_list, handle_project_stats, handle_relationship_check, handle_relationship_graph, handle_relationship_mutate, handle_relationship_repair,
-    handle_sprint_add, handle_sprint_backlog, handle_sprint_burndown, handle_sprint_create, handle_sprint_delete, handle_sprint_get, handle_sprint_list,
-    handle_sprint_remove, handle_sprint_reorder, handle_sprint_summary, handle_sprint_update, handle_sprint_velocity, handle_sync_pull, handle_sync_push,
-    handle_task_archive, handle_task_bulk_comment_add, handle_task_bulk_reference_add, handle_task_bulk_reference_remove, handle_task_bulk_update,
-    handle_task_comment_add, handle_task_comment_update, handle_task_create, handle_task_delete, handle_task_get, handle_task_list, handle_task_move,
-    handle_task_reference_add, handle_task_reference_remove, handle_task_restore, handle_task_unarchive, handle_task_update, handle_whoami,
+    handle_release_add, handle_release_backlog, handle_release_create, handle_release_delete, handle_release_get, handle_release_list, handle_release_move,
+    handle_release_release, handle_release_remove, handle_release_reopen, handle_release_update, handle_sprint_add, handle_sprint_backlog,
+    handle_sprint_burndown, handle_sprint_create, handle_sprint_delete, handle_sprint_get, handle_sprint_list, handle_sprint_remove, handle_sprint_reorder,
+    handle_sprint_summary, handle_sprint_update, handle_sprint_velocity, handle_sync_pull, handle_sync_push, handle_task_archive, handle_task_bulk_comment_add,
+    handle_task_bulk_reference_add, handle_task_bulk_reference_remove, handle_task_bulk_update, handle_task_comment_add, handle_task_comment_update,
+    handle_task_create, handle_task_delete, handle_task_get, handle_task_list, handle_task_move, handle_task_reference_add, handle_task_reference_remove,
+    handle_task_restore, handle_task_unarchive, handle_task_update, handle_whoami,
 };
 use super::schema::{unsupported_keywords, validate_instance};
 use super::tools::build_tool_definitions;
@@ -103,6 +105,17 @@ pub(crate) fn tool_specs() -> &'static [ToolSpec] {
         ToolSpec { name: "sprint_delete", method: "sprint/delete", handler: handle_sprint_delete },
         ToolSpec { name: "sprint_backlog", method: "sprint/backlog", handler: handle_sprint_backlog },
         ToolSpec { name: "sprint_reorder", method: "sprint/reorder", handler: handle_sprint_reorder },
+        ToolSpec { name: "release_list", method: "release/list", handler: handle_release_list },
+        ToolSpec { name: "release_get", method: "release/get", handler: handle_release_get },
+        ToolSpec { name: "release_create", method: "release/create", handler: handle_release_create },
+        ToolSpec { name: "release_update", method: "release/update", handler: handle_release_update },
+        ToolSpec { name: "release_delete", method: "release/delete", handler: handle_release_delete },
+        ToolSpec { name: "release_add", method: "release/add", handler: handle_release_add },
+        ToolSpec { name: "release_move", method: "release/move", handler: handle_release_move },
+        ToolSpec { name: "release_remove", method: "release/remove", handler: handle_release_remove },
+        ToolSpec { name: "release_backlog", method: "release/backlog", handler: handle_release_backlog },
+        ToolSpec { name: "release_release", method: "release/release", handler: handle_release_release },
+        ToolSpec { name: "release_reopen", method: "release/reopen", handler: handle_release_reopen },
         ToolSpec { name: "project_list", method: "project/list", handler: handle_project_list },
         ToolSpec { name: "project_stats", method: "project/stats", handler: handle_project_stats },
         ToolSpec { name: "config_show", method: "config/show", handler: handle_config_show },
@@ -300,7 +313,7 @@ mod tests {
         let definitions = build_tool_definitions(None);
         let mut advertised: Vec<String> = definitions.iter().map(|tool| tool.get("name").and_then(|v| v.as_str()).unwrap().to_string()).collect();
         advertised.sort();
-        assert_eq!(advertised.len(), 46, "advertised tool count changed");
+        assert_eq!(advertised.len(), 57, "advertised tool count changed");
         assert!(advertised.iter().any(|name| name == "sprint_reorder"));
         for name in ["relationship_graph", "relationship_check", "relationship_mutate", "relationship_repair"] {
             assert!(advertised.iter().any(|advertised| advertised == name));

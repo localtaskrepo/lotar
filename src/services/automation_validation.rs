@@ -41,6 +41,7 @@ pub(crate) fn validate_rules(file: &AutomationFile, config: &ResolvedConfig) -> 
         validate_action(rule.on.assigned.as_ref(), config, &mut result);
         validate_action(rule.on.commented.as_ref(), config, &mut result);
         validate_action(rule.on.sprint_changed.as_ref(), config, &mut result);
+        validate_action(rule.on.release_changed.as_ref(), config, &mut result);
         // Job events
         validate_action(rule.on.job_started.as_ref(), config, &mut result);
         validate_action(rule.on.job_completed.as_ref(), config, &mut result);

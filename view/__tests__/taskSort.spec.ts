@@ -35,6 +35,7 @@ function task(overrides: Partial<TaskDTO>): TaskDTO {
         history: [],
         custom_fields: {},
         sprints: [],
+        releases: [],
         ...overrides,
     }
 }

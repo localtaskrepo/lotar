@@ -431,6 +431,7 @@ fn query_predicates_evaluate_injected_clock_not_snapshots() {
         acceptance_criteria: Vec::new(),
         sprints: Vec::new(),
         sprint_order: Default::default(),
+        releases: Vec::new(),
         history: Vec::new(),
         custom_fields: Default::default(),
     };

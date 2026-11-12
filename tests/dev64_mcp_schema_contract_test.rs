@@ -140,7 +140,7 @@ fn property_allows_null(property: &Value) -> bool {
 #[test]
 fn advertised_catalog_covers_every_registered_tool_with_schemas() {
     let tools = advertised_tools();
-    assert_eq!(tools.len(), 46, "advertised tool count changed");
+    assert_eq!(tools.len(), 57, "advertised tool count changed");
     let mut names: Vec<&str> = tools.iter().filter_map(|tool| tool.get("name").and_then(|v| v.as_str())).collect();
     let total = names.len();
     names.sort_unstable();

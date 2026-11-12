@@ -227,6 +227,20 @@ fn all_tool_definitions(enum_hints: Option<&EnumHints>) -> Vec<Value> {
                 "additionalProperties": false
             }
         }),
+        make_release_list_tool(),
+        make_release_get_tool(),
+        make_release_create_tool(),
+        make_release_update_tool(),
+        make_release_delete_tool(),
+        make_release_assign_tool(
+            "release_add",
+            "Add tasks to a release. A task can be in several releases (a fix may ship in 0.15.1 and 0.16.0); its other releases stay.",
+        ),
+        make_release_assign_tool("release_move", "Move tasks to a release: their other releases are replaced by this one."),
+        make_release_assign_tool("release_remove", "Remove tasks from a release."),
+        make_release_backlog_tool(),
+        make_release_mark_tool("release_release", "Mark a release as released, at `at` (RFC 3339 or YYYY-MM-DD; defaults to now)."),
+        make_release_mark_tool("release_reopen", "Mark a released release as planned again (clears released_at)."),
         make_project_list_tool(enum_hints),
         make_project_stats_tool(enum_hints),
         make_config_show_tool(enum_hints),
@@ -240,6 +254,136 @@ fn all_tool_definitions(enum_hints: Option<&EnumHints>) -> Vec<Value> {
         make_agent_cancel_tool(),
         make_agent_send_message_tool(),
     ]
+}
+
+const RELEASE_REFERENCE: &str = "Release id (3), or '#3', a version ('0.15.0', 'v0.15.0') or a label.";
+
+fn make_release_list_tool() -> Value {
+    json!({
+        "name": "release_list",
+        "description": "List releases in version order, each with its state (planned or released), planned_date, released_at, overdue flag and task counts (task_count, done_count, open_count).",
+        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false}
+    })
+}
+
+fn make_release_get_tool() -> Value {
+    json!({
+        "name": "release_get",
+        "description": "Fetch a release with its tasks and history.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"release": {"type": ["string", "integer"], "description": RELEASE_REFERENCE}},
+            "required": ["release"],
+            "additionalProperties": false
+        }
+    })
+}
+
+fn make_release_create_tool() -> Value {
+    json!({
+        "name": "release_create",
+        "description": "Create a release for a version. The version is stored without a leading 'v' and must be unique.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "version": {"type": "string", "description": "Version such as 0.15.0 or v0.15.0."},
+                "label": {"type": ["string", "null"]},
+                "notes": {"type": ["string", "null"]},
+                "planned_date": {"type": ["string", "null"], "description": "Planned release day, YYYY-MM-DD."},
+                "released_at": {"type": ["string", "null"], "description": "For a release already out: RFC 3339 or YYYY-MM-DD."}
+            },
+            "required": ["version"],
+            "additionalProperties": false
+        }
+    })
+}
+
+fn make_release_update_tool() -> Value {
+    json!({
+        "name": "release_update",
+        "description": "Change a release. Fields left out stay as they are; an empty string clears label, notes, planned_date or released_at.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "release": {"type": ["string", "integer"], "description": RELEASE_REFERENCE},
+                "version": {"type": ["string", "null"]},
+                "label": {"type": ["string", "null"]},
+                "notes": {"type": ["string", "null"]},
+                "planned_date": {"type": ["string", "null"], "description": "YYYY-MM-DD; empty clears."},
+                "released_at": {"type": ["string", "null"], "description": "RFC 3339 or YYYY-MM-DD; empty marks it planned again."}
+            },
+            "required": ["release"],
+            "additionalProperties": false
+        }
+    })
+}
+
+fn make_release_delete_tool() -> Value {
+    json!({
+        "name": "release_delete",
+        "description": "Delete a release and take it off its tasks. Returns the tasks it was removed from.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"release": {"type": ["string", "integer"], "description": RELEASE_REFERENCE}},
+            "required": ["release"],
+            "additionalProperties": false
+        }
+    })
+}
+
+fn make_release_assign_tool(name: &str, description: &str) -> Value {
+    json!({
+        "name": name,
+        "description": description,
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "release": {"type": ["string", "integer"], "description": RELEASE_REFERENCE},
+                "tasks": {
+                    "oneOf": [
+                        {"type": "string"},
+                        {"type": "array", "items": {"type": "string"}}
+                    ]
+                },
+                "query": {
+                    "type": ["string", "null"],
+                    "description": "Also act on the tasks this search selects, in the web search-box syntax (same as task_list query), e.g. 'status:done release:none'. tasks may be omitted when query is given."
+                }
+            },
+            "required": ["release"],
+            "additionalProperties": false
+        }
+    })
+}
+
+fn make_release_mark_tool(name: &str, description: &str) -> Value {
+    let mut properties = serde_json::Map::new();
+    properties.insert("release".into(), json!({"type": ["string", "integer"], "description": RELEASE_REFERENCE}));
+    if name == "release_release" {
+        properties.insert("at".into(), json!({"type": ["string", "null"], "description": "When it was released; defaults to now."}));
+    }
+    json!({
+        "name": name,
+        "description": description,
+        "inputSchema": {"type": "object", "properties": properties, "required": ["release"], "additionalProperties": false}
+    })
+}
+
+fn make_release_backlog_tool() -> Value {
+    json!({
+        "name": "release_backlog",
+        "description": "Open tasks that are in no release. Paginated like task_list (cursor, limit, hasMore, nextCursor).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "project": {"type": ["string", "null"]},
+                "query": {"type": ["string", "null"], "description": "Narrow it with the web search-box syntax, e.g. 'type:bug'."},
+                "limit": {"type": ["number", "null"], "minimum": 1, "maximum": 200, "description": "Defaults to 50."},
+                "cursor": {"type": ["string", "number", "null"], "description": "0-based offset from nextCursor."}
+            },
+            "additionalProperties": false
+        }
+    })
 }
 
 fn make_task_reference_add_tool(enum_hints: Option<&EnumHints>) -> Value {
@@ -338,6 +482,14 @@ fn make_task_create_tool(enum_hints: Option<&EnumHints>) -> Value {
             "type": ["array", "null"],
             "items": {"type": "integer", "minimum": 1},
             "description": "Initial sprint memberships; entries must be positive integers."
+        }),
+    );
+    properties.insert(
+        "releases".into(),
+        json!({
+            "type": ["array", "null"],
+            "items": {"type": "integer", "minimum": 1},
+            "description": "Releases the task ships in (release ids from release_list)."
         }),
     );
     properties.insert(
@@ -463,6 +615,14 @@ fn make_task_update_tool(enum_hints: Option<&EnumHints>) -> Value {
             "type": ["array", "null"],
             "items": {"type": "integer", "minimum": 1},
             "description": "Replaces sprint memberships; null or [] clears them."
+        }),
+    );
+    patch_properties.insert(
+        "releases".into(),
+        json!({
+            "type": ["array", "null"],
+            "items": {"type": "integer", "minimum": 1},
+            "description": "Replaces release memberships (release ids); null or [] clears them."
         }),
     );
 
@@ -656,6 +816,14 @@ fn make_task_list_tool(enum_hints: Option<&EnumHints>) -> Value {
         }),
     );
     properties.insert(
+        "releases".into(),
+        json!({
+            "type": ["array", "string", "null"],
+            "items": {"type": "string"},
+            "description": "Filter by releases: 'none', a release id ('3' or '#3'), a label, or a version or version range ('0.15', '>=0.15 <0.16'). Any of several values matches."
+        }),
+    );
+    properties.insert(
         "limit".into(),
         json!({
             "type": ["number", "null"],
@@ -684,7 +852,7 @@ fn make_task_list_tool(enum_hints: Option<&EnumHints>) -> Value {
         "sort_by".into(),
         json!({
             "type": ["string", "null"],
-            "description": "Global sort key: one of priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints, or custom:<name> (alias field:<name>). Defaults to modified. tags compares the array of strings lexicographically (empty first ascending); sprints compares the ascending sprint-id list numerically (empty first ascending)."
+            "description": "Global sort key: one of priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints, releases, or custom:<name> (alias field:<name>). Defaults to modified. tags compares the array of strings lexicographically (empty first ascending); sprints compares the ascending sprint-id list numerically (empty first ascending); releases compares the tasks' releases in version order (no release first ascending)."
         }),
     );
     properties.insert(
@@ -876,6 +1044,7 @@ fn make_task_bulk_update_tool(enum_hints: Option<&EnumHints>) -> Value {
         json!({"type": ["object", "null"], "description": "Replaces the whole custom_fields map, so include the fields to keep. Null clears all."}),
     );
     patch_properties.insert("sprints".into(), json!({"type": ["array", "null"], "items": {"type": "integer", "minimum": 1}}));
+    patch_properties.insert("releases".into(), json!({"type": ["array", "null"], "items": {"type": "integer", "minimum": 1}}));
     patch_properties.insert("task_type".into(), json!({"type": ["string", "null"], "description": "Alias for 'type'; 'type' wins when both are provided."}));
 
     let mut tool = json!({

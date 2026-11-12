@@ -43,6 +43,7 @@ Field | Type | Notes
 `references` | `ReferenceEntry[]?` | Code locations (`code`), external URLs (`link`), repository files (`file`), managed attachments (`attachment`), or platform references (`jira`, `github`); omitted when empty.
 `sprints` | `u32[]?` | Numeric sprint IDs the task belongs to; omitted when empty.
 `sprint_order` | `BTreeMap<u32, u32>?` | Optional manual ordering for this task (sprint id → order index).
+`releases` | `u32[]` | IDs of the [releases](./releases.md) the task ships in, stored in the task YAML (`releases: [3]`); always present in responses, `[]` when none.
 `history` | `TaskChangeLogEntry[]?` | Chronological change log entries (field deltas, actor, timestamp); omitted when empty.
 `custom_fields` | `CustomFields` | Map of configured custom-field keys → YAML/JSON values. Skipped when empty.
 `task_state` | `TaskStateDTO?` | Computed completion and due-bucket snapshot from the task's actual storage root, project configuration, and server-local calendar day. Never persisted in task YAML.
@@ -86,6 +87,8 @@ cycle. No read operation silently repairs task YAML.
 
 Sprint files under `.tasks/@sprints/<ID>.yml` are authoritative for membership and manual ordering: their `tasks` entries identify tasks and carry optional order values. The DTO's `sprints` and `sprint_order` are derived from these records by the sprint services/helpers. The task YAML's legacy `sprints` field remains readable but is not the membership authority.
 
+Releases are the other way round: release files under `.tasks/@releases/<ID>.yml` hold a release's version, dates and notes, and the task YAML's `releases` list is the membership, so it moves with the task. A task can be in several releases. See [Releases](./releases.md).
+
 ### YAML extensions
 
 Unknown task YAML keys are retained as typed YAML values across task edits, including scalar, list, and nested mapping values. This covers top-level keys and unknown keys inside `relationships`, `comments`, `references` and `history` entries; sprint files keep unknown keys in `plan` and in `tasks` entries too. This is **semantic preservation**, not lossless text editing: comments, key order, quoting, whitespace, and anchor formatting are not preserved. Built-in fields and their aliases (such as `type`/`task_type`) remain authoritative and cannot be overridden by extension values.
@@ -103,8 +106,8 @@ These extensions are separate from `custom_fields`. Top-level ones are not added
 
 ## Create/update payloads
 
-- `TaskCreate` accepts `title`, optional `project`, and optional metadata for `status`, `priority`, `task_type`, `reporter`, `assignee`, `due_date`, `effort`, `description`, `tags`, `acceptance_criteria`, `relationships`, `custom_fields`, and `sprints`. Missing properties are defaulted downstream; enum strings are validated against the target project's configuration and an explicit `status` is stored atomically with creation.
-- `TaskUpdate` treats every field as optional with explicit null semantics: omitted = no-op, `null` = clear (where clearing is allowed), value = set. Empty string clears the clearable scalars (`reporter`, `assignee`, `due_date`, `effort`, `description`); empty array/object clears `tags`, `acceptance_criteria`, `relationships`, `custom_fields`, and `sprints`. `title`, `status`, `priority`, and `task_type` treat `null` as omitted. List and map patches replace the whole value, and enum strings are validated against the task's project configuration.
+- `TaskCreate` accepts `title`, optional `project`, and optional metadata for `status`, `priority`, `task_type`, `reporter`, `assignee`, `due_date`, `effort`, `description`, `tags`, `acceptance_criteria`, `relationships`, `custom_fields`, `sprints`, and `releases`. Missing properties are defaulted downstream; enum strings are validated against the target project's configuration and an explicit `status` is stored atomically with creation.
+- `TaskUpdate` treats every field as optional with explicit null semantics: omitted = no-op, `null` = clear (where clearing is allowed), value = set. Empty string clears the clearable scalars (`reporter`, `assignee`, `due_date`, `effort`, `description`); empty array/object clears `tags`, `acceptance_criteria`, `relationships`, `custom_fields`, `sprints`, and `releases` (release IDs must exist). `title`, `status`, `priority`, and `task_type` treat `null` as omitted. List and map patches replace the whole value, and enum strings are validated against the task's project configuration.
 - Both structs share the same schema in `docs/openapi.json`.
 
 ## Invariants & best practices

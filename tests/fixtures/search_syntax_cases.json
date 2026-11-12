@@ -578,7 +578,7 @@
     "text": "",
     "filters": {},
     "errors": [
-      "\"status\" cannot be compared: only version fields use < and >"
+      "\"status\" cannot be compared: only version fields and releases use < and >"
     ]
   },
   {
@@ -586,7 +586,35 @@
     "text": "",
     "filters": {},
     "errors": [
-      "\"prio\" cannot be compared: only version fields use < and >"
+      "\"prio\" cannot be compared: only version fields and releases use < and >"
     ]
+  },
+  {
+    "input": "release:0.15",
+    "text": "",
+    "filters": {
+      "releases": "0.15"
+    }
+  },
+  {
+    "input": "release:0.15 releases:#2",
+    "text": "",
+    "filters": {
+      "releases": "0.15,#2"
+    }
+  },
+  {
+    "input": "release>=0.15 release<0.16 fix",
+    "text": "fix",
+    "filters": {
+      "releases": ">=0.15 <0.16"
+    }
+  },
+  {
+    "input": "-release:none",
+    "text": "",
+    "filters": {
+      "-releases": "none"
+    }
   }
 ]

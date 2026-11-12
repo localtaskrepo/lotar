@@ -4,6 +4,7 @@ pub mod common;
 pub mod completions;
 pub mod config;
 pub mod git;
+pub mod release;
 pub mod scan;
 pub mod serve;
 pub mod sprint;

@@ -270,6 +270,7 @@ function baseTask(overrides: Partial<TaskDTO>): TaskDTO {
         comments: [],
         custom_fields: {},
         sprints: [1],
+        releases: [],
         references: [],
         history: [],
         reporter: null,

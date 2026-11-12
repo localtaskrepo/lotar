@@ -82,6 +82,7 @@ impl TemplateContext {
         self.lists.insert(format!("{prefix}.tags"), plain(&task.tags));
         self.lists.insert(format!("{prefix}.acceptance_criteria"), plain(&task.acceptance_criteria));
         self.lists.insert(format!("{prefix}.sprints"), task.sprints.iter().map(|id| ListItem::plain(id.to_string())).collect());
+        self.lists.insert(format!("{prefix}.releases"), task.releases.iter().map(|id| ListItem::plain(id.to_string())).collect());
         let relationships = &task.relationships;
         for (name, values) in [
             ("depends_on", &relationships.depends_on),

@@ -42,7 +42,10 @@ pub fn normalize_args(raw_args: &[String]) -> Result<Vec<String>, String> {
 /// `-s Todo` or `-s=Todo` keep working.
 fn route_query_exclusions(args: &[String]) -> Vec<String> {
     let takes_query = |idx: usize| {
-        args[..idx].iter().enumerate().any(|(i, arg)| matches!(arg.as_str(), "list" | "ls") || (arg == "backlog" && i > 0 && args[i - 1] == "sprint"))
+        args[..idx]
+            .iter()
+            .enumerate()
+            .any(|(i, arg)| matches!(arg.as_str(), "list" | "ls") || (arg == "backlog" && i > 0 && matches!(args[i - 1].as_str(), "sprint" | "release")))
     };
     let mut out = Vec::with_capacity(args.len());
     let mut after_separator = false;

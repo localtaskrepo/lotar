@@ -230,11 +230,14 @@ impl TaskService {
             relationships,
             custom_fields,
             sprints,
+            releases,
         } = req;
         if title.trim().is_empty() {
             return Err(LoTaRError::ValidationError("Title cannot be empty.".to_string()));
         }
         let normalized_sprints = Self::normalize_sprint_ids(&sprints);
+        let normalized_releases = Self::normalize_sprint_ids(&releases);
+        crate::services::release_service::ReleaseService::ensure_exist(&storage.root_path, &normalized_releases)?;
 
         // Explicit project, else the configured default, else the repo folder name
         let project = Self::resolve_create_project(&storage.root_path, project);
@@ -274,6 +277,7 @@ impl TaskService {
         }
 
         let mut t = Task::new(storage.root_path.clone(), title, resolved_priority.clone());
+        t.releases = normalized_releases;
         t.priority = resolved_priority;
         t.task_type = resolved_type;
         t.status = parsed_status
@@ -1164,6 +1168,16 @@ impl TaskService {
             t.custom_fields = v;
         }
 
+        if let Some(ids) = patch.releases.clone() {
+            let new_releases = Self::normalize_sprint_ids(&ids);
+            if new_releases != t.releases {
+                crate::services::release_service::ReleaseService::ensure_exist(&storage.root_path, &new_releases)?;
+                let format = |ids: &[u32]| (!ids.is_empty()).then(|| ids.iter().map(|id| format!("#{id}")).collect::<Vec<_>>().join(", "));
+                record_change("releases", format(&t.releases), format(&new_releases));
+                t.releases = new_releases;
+            }
+        }
+
         let mut sprint_change: Option<(Vec<SprintRecord>, BTreeSet<u32>)> = None;
         if let Some(sprint_ids) = patch.sprints.clone() {
             let desired_set: BTreeSet<u32> = Self::normalize_sprint_ids(&sprint_ids).into_iter().collect();
@@ -1318,6 +1332,7 @@ impl TaskService {
             && (!tags_relevant || crate::utils::tags::normalize_tags(a.tags.clone()) == b.tags)
             && a.relationships == b.relationships
             && a.custom_fields == b.custom_fields
+            && a.releases == b.releases
             && a.comments == b.comments
             && a.references == b.references
             && a.subtitle == b.subtitle
@@ -1966,6 +1981,7 @@ impl TaskService {
             acceptance_criteria: task.acceptance_criteria,
             sprints,
             sprint_order,
+            releases: task.releases,
             history: task.history,
             custom_fields: task.custom_fields,
         }

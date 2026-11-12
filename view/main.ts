@@ -39,6 +39,7 @@ const router = createRouter({
     routes: [
         { path: '/', component: TasksList },
         { path: '/sprints', component: () => import('./pages/SprintsList.vue') },
+        { path: '/releases', component: () => import('./pages/ReleasesList.vue') },
         { path: '/boards', component: () => import('./pages/Board.vue') },
         { path: '/calendar', component: () => import('./pages/Calendar.vue') },
         { path: '/insights', component: () => import('./pages/ProjectInsights.vue') },

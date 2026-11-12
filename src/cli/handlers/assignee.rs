@@ -146,6 +146,7 @@ fn handle_set_assignee(
         relationships: None,
         custom_fields: None,
         sprints: None,
+        releases: None,
     };
     let receipt = TaskService::update_with_receipt(&mut ctx.storage, full_id, patch, crate::services::task_service::TaskUpdateContext::default())
         .map_err(|e| e.to_string())?;

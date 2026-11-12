@@ -19,6 +19,8 @@ export interface TaskTableProps {
     showBulkControls?: boolean
     touches?: Record<string, TaskTouch>
     sprintLookup?: Record<number, { label: string; state?: string }>
+    /** Release names by id for the Releases column (DEV-393). */
+    releaseLookup?: Record<number, { label: string; state?: string }>
     sprintOptions?: Array<{ value: string; label: string }>
     sprintSelection?: string
     allowClosedSprint?: boolean

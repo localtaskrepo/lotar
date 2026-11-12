@@ -27,6 +27,7 @@ fn create_task(storage: &mut Storage, title: &str, status: &str, effort: Option<
             relationships: None,
             custom_fields: None,
             sprints: Vec::new(),
+            releases: Vec::new(),
         },
     )
     .expect("create task");

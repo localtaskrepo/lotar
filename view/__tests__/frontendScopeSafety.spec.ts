@@ -104,7 +104,7 @@ describe('frontend scope safety', () => {
         const refreshConfig = vi.fn()
         requests.forEach((request) => refreshConfig.mockReturnValueOnce(request.promise))
         const resetSprintsState = vi.fn()
-        const form = reactive({ project: 'A' })
+        const form = reactive({ project: 'A', releases: [] as number[] })
         const lifecycle = scope.run(() =>
             useTaskPanelFormLifecycle({
                 mode: computed(() => 'create'),

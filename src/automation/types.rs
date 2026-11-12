@@ -90,6 +90,8 @@ pub struct AutomationRuleActions {
     pub commented: Option<AutomationAction>,
     #[serde(default)]
     pub sprint_changed: Option<AutomationAction>,
+    #[serde(default)]
+    pub release_changed: Option<AutomationAction>,
 
     // Job events (canonical names; old names kept as serde aliases)
     #[serde(default, alias = "job_start")]
@@ -346,6 +348,9 @@ pub struct AutomationTagAction {
     pub labels: Option<StringOrVec>,
     #[serde(default)]
     pub sprint: Option<String>,
+    /// A release reference (ID, version, label) or `@next` (DEV-393).
+    #[serde(default)]
+    pub release: Option<String>,
     #[serde(default, alias = "blocked_by")]
     pub depends_on: Option<StringOrVec>,
     #[serde(default)]

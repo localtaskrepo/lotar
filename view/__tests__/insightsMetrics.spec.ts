@@ -48,6 +48,7 @@ function task(id: string, fields: Partial<TaskDTO> = {}): TaskDTO {
         comments: [],
         references: [],
         sprints: [],
+        releases: [],
         history: [],
         custom_fields: {},
         ...fields,

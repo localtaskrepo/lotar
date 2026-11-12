@@ -199,6 +199,40 @@ or journal data. Unavailable locks and pending recovery are reported explicitly.
 - **Validation:** Explicit status values are canonicalized and validated against the selected project's configuration; invalid values return `-32602` with that project's suggestions. Validation also runs for empty results.
 - **Response:** Paginated backlog with `status`, `count`, `total`, `cursor`, `limit`, `nextCursor` (number or null), `tasks[]`, `missing_sprints`, optional project-scoped `enumHints`, and `truncated`/`hasMore` flags. Empty pages retain the same pagination fields; cursors beyond the result set are clamped to its length.
 
+## Releases
+
+[Releases](./releases.md) work like sprints. Every tool that takes `release` accepts an ID (`3`), `'#3'`, a version (`'0.15.0'`, `'v0.15.0'`) or a label. Errors (unknown release, duplicate version, bad date) are tool errors (`isError: true`).
+
+### `release_list`
+- **Params:** none.
+- **Response:** `{ status, total, releases[] }` in version order; each release has `id`, `version`, `label?`, `display_name`, `notes?`, `planned_date?`, `released_at?`, `state` (`planned`|`released`), `overdue`, `task_count`, `done_count`, `open_count`.
+
+### `release_get`
+- **Params:** `release`.
+- **Response:** `{ status, release, tasks[], history[] }`.
+
+### `release_create` / `release_update`
+- **Params:** `version` (required to create; stored without a leading `v`, unique), `label`, `notes`, `planned_date` (`YYYY-MM-DD`), `released_at` (RFC 3339 or `YYYY-MM-DD`). `release_update` also takes `release`; an empty string clears a field.
+- **Response:** `{ status, release, changed }`; `changed` is false when nothing changed.
+
+### `release_release` / `release_reopen`
+- **Params:** `release`, and for `release_release` an optional `at` (defaults to now).
+- **Effect:** Sets or clears `released_at`. Response as `release_update`.
+
+### `release_delete`
+- **Params:** `release`.
+- **Effect:** Deletes the release and takes it off its tasks. Response `{ status, deleted, release_id, removed_from[] }`.
+
+### `release_add` / `release_move` / `release_remove`
+- **Params:** `release`, `tasks` (ID or array), and/or `query` (web search syntax selecting more tasks).
+- **Effect:** `add` keeps a task's other releases, `move` replaces them, `remove` takes this one off. Response `{ status, action, release_id, release_version, modified[], unchanged[] }`.
+
+### `release_backlog`
+- **Params:** `project`, `query`, `limit` (default 50, max 200), `cursor`.
+- **Response:** Open tasks in no release: `{ status, total, count, limit, offset, tasks[], hasMore, nextCursor }`.
+
+`task_create` and `task_update` (`patch.releases`) take release IDs; `task_list` takes `releases` (`'none'`, an ID, a label, a version or range) and `sort_by: releases`.
+
 ## Project Tools
 
 ### `project_list`

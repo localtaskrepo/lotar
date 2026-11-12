@@ -24,6 +24,7 @@
         :priorities="priorities"
         :types="types"
         :sprint-options="sprintFilterOptions"
+        :release-options="releaseFilterOptions"
         :tag-options="filterOptions.tags"
         :assignee-options="filterOptions.assignees"
         :custom-field-values="filterOptions.customFieldValues"
@@ -146,6 +147,7 @@ import { useConfig } from '../composables/useConfig'
 import { buildServerFilter, useProjectFilterSync } from '../composables/useFilterBuilder'
 import { useFilterOptions } from '../composables/useFilterOptions'
 import { useSprintFilterOptions, useSprints } from '../composables/useSprints'
+import { useReleaseFilterOptions, useReleases } from '../composables/useReleases'
 import { useTaskStore, type TaskQueryHandle } from '../composables/useTaskStore'
 import { isPeriodKey, PERIOD_OPTIONS } from '../utils/insightsMetrics'
 import { storageGet, storageSet } from '../utils/storage'
@@ -212,6 +214,8 @@ const {
 } = useConfig()
 const { sprints, refresh: refreshSprints } = useSprints()
 const sprintFilterOptions = useSprintFilterOptions(sprints)
+const { releases: releaseList } = useReleases()
+const releaseFilterOptions = useReleaseFilterOptions(releaseList)
 
 // -- Filters and data --------------------------------------------------------
 const project = ref<string>(typeof route.query.project === 'string' ? route.query.project : '')

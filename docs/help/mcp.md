@@ -108,6 +108,17 @@ The registry binds every advertised tool to its handler; `tools/list` returns ex
 | `sprint_delete` | Delete a sprint by id and optionally clean dangling references. |
 | `sprint_backlog` | Return ranked backlog tasks with pagination and hints. |
 | `sprint_reorder` | Move a task before or after another within a sprint or the backlog. |
+| `release_list` | List releases in version order with state, dates and task counts. |
+| `release_get` | Fetch one release with its tasks and history (by id, `#id`, version or label). |
+| `release_create` | Create a release for a version. |
+| `release_update` | Change a release's version, label, notes, planned date or released time. |
+| `release_delete` | Delete a release and take it off its tasks. |
+| `release_add` | Add tasks to a release (they keep their other releases). |
+| `release_move` | Move tasks to a release, replacing their other releases. |
+| `release_remove` | Remove tasks from a release. |
+| `release_backlog` | Open tasks in no release, paginated. |
+| `release_release` | Mark a release as released (now or at a given time). |
+| `release_reopen` | Mark a released release as planned again. |
 | `project_list` | Enumerate known projects. |
 | `project_stats` | Aggregate stats for a single project. |
 | `config_show` | Render merged config (global or per project). |

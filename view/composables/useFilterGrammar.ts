@@ -49,7 +49,7 @@ export interface GrammarKeyMeta {
     /** Which value style the key expects. */
     values: 'options' | 'assignee' | 'due' | 'recent' | 'flag' | 'text'
     /** Option list id, resolved by the caller (e.g. 'statuses', 'sprints'). */
-    optionsFrom?: 'statuses' | 'priorities' | 'types' | 'sprints' | 'projects' | 'tags' | 'customFields'
+    optionsFrom?: 'statuses' | 'priorities' | 'types' | 'sprints' | 'releases' | 'projects' | 'tags' | 'customFields'
 }
 
 export const GRAMMAR_KEYS: GrammarKeyMeta[] = [
@@ -57,6 +57,7 @@ export const GRAMMAR_KEYS: GrammarKeyMeta[] = [
     { key: 'priority', aliases: ['priority', 'prio'], label: 'Priority', values: 'options', optionsFrom: 'priorities' },
     { key: 'type', aliases: ['type', 'tasktype', 'kind'], label: 'Type', values: 'options', optionsFrom: 'types' },
     { key: 'sprints', aliases: ['sprint', 'sprints'], label: 'Sprint', values: 'options', optionsFrom: 'sprints' },
+    { key: 'releases', aliases: ['release', 'releases'], label: 'Release', values: 'options', optionsFrom: 'releases' },
     {
         key: 'project',
         aliases: ['project', 'projectkey'],
@@ -365,8 +366,9 @@ function parseAssignment(
 }
 
 /**
- * `affects>=0.13`: a range on a version field. Comparisons of one key add up
- * into one range (`>=0.13 <0.14`); builtin keys cannot be compared.
+ * `affects>=0.13`: a range on a version field, or on a ticket's releases
+ * (`release>=0.15`). Comparisons of one key add up into one range
+ * (`>=0.13 <0.14`); other builtin keys cannot be compared.
  */
 function parseComparison(
     raw: string,
@@ -388,11 +390,13 @@ function parseComparison(
     }
     const field = isFieldKey(comparison.key)
     const name = field ? comparison.key.slice(comparison.key.indexOf(':') + 1).trim() : comparison.key
-    if (RESERVED_FIELD_ALIASES[normalizeReservedKey(name)] || findGrammarKey(name)) {
-        errors.push(`"${name}" cannot be compared: only version fields use < and >`)
+    // `release>=0.15` compares the versions of a ticket's releases.
+    const release = !field && findGrammarKey(name)?.key === 'releases'
+    if (!release && (RESERVED_FIELD_ALIASES[normalizeReservedKey(name)] || findGrammarKey(name))) {
+        errors.push(`"${name}" cannot be compared: only version fields and releases use < and >`)
         return
     }
-    const key = field ? `field:${name.toLowerCase()}` : name.toLowerCase()
+    const key = release ? 'releases' : field ? `field:${name.toLowerCase()}` : name.toLowerCase()
     const next = `${comparison.op}${value}`
     const previous = filters[key]
     filters[key] = previous && comparedKeys.has(key) ? `${previous} ${next}` : next
@@ -628,6 +632,8 @@ export interface FilterValueSource {
     priorities?: string[]
     types?: string[]
     sprints?: Array<{ id: number; label: string }>
+    /** Releases, offered by version (`release:0.15.0`). */
+    releases?: Array<{ version: string; label: string }>
     projects?: Array<{ prefix: string; name?: string }>
     customFields?: string[]
     /** Existing tags in scope; suggested only behind an explicit tag:/tags: prefix. */
@@ -657,6 +663,8 @@ function optionsFor(meta: GrammarKeyMeta, source: FilterValueSource): string[] {
             return source.types ?? []
         case 'sprints':
             return (source.sprints ?? []).map((s) => String(s.id))
+        case 'releases':
+            return (source.releases ?? []).map((r) => r.version)
         case 'projects':
             return (source.projects ?? []).map((p) => p.prefix)
         case 'tags':
@@ -721,6 +729,7 @@ const SORT_BY_BUILTINS = [
     'id',
     'tags',
     'sprints',
+    'releases',
     'relevance',
 ]
 
@@ -762,6 +771,8 @@ function optionCandidates(meta: GrammarKeyMeta, source: FilterValueSource): Arra
     switch (meta.optionsFrom) {
         case 'sprints':
             return (source.sprints ?? []).map((s) => ({ value: String(s.id), label: s.label }))
+        case 'releases':
+            return (source.releases ?? []).map((r) => ({ value: r.version, label: r.label }))
         case 'projects':
             return (source.projects ?? []).map((p) => ({ value: p.prefix, label: p.prefix }))
         case 'statuses':
@@ -791,7 +802,7 @@ function customFieldSuggestions(partial: string, source: FilterValueSource): Sug
 }
 
 /** Keys whose filter value is a CSV multi-select (one chip per entry). */
-const CSV_VALUE_KEYS = new Set(['status', 'priority', 'type', 'sprints', 'tags', 'needs', 'has'])
+const CSV_VALUE_KEYS = new Set(['status', 'priority', 'type', 'sprints', 'releases', 'tags', 'needs', 'has'])
 
 const VALUE_SUGGESTION_LIMIT = 10
 /** sort_by lists every backend builtin plus custom:<name>, so it needs more room. */

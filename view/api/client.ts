@@ -62,6 +62,17 @@ import type {
     RelationshipMutationResponse,
     RelationshipRepairRequest,
     RelationshipRepairResponse,
+    ReleaseActionRequest,
+    ReleaseAssignmentRequest,
+    ReleaseAssignmentResponse,
+    ReleaseBacklogResponse,
+    ReleaseCreateRequest,
+    ReleaseDeleteResponse,
+    ReleaseGetResponse,
+    ReleaseListResponse,
+    ReleaseMutationResponse,
+    ReleaseSelector,
+    ReleaseUpdateRequest,
     ScanRequest,
     ScanResponse,
     SprintAssignmentRequest,
@@ -544,6 +555,43 @@ export const api = {
         params: { limit?: number; include_active?: boolean; metric?: 'tasks' | 'points' | 'hours' } = {},
     ): Promise<SprintVelocityResponse> {
         return get('/api/sprints/velocity', params)
+    },
+
+    // Releases (DEV-393)
+    releaseList(): Promise<ReleaseListResponse> {
+        return get('/api/releases/list')
+    },
+    releaseGet(release: ReleaseSelector): Promise<ReleaseGetResponse> {
+        return get('/api/releases/get', { release })
+    },
+    releaseBacklog(
+        params: { project?: string; limit?: number; offset?: number } = {},
+    ): Promise<ReleaseBacklogResponse> {
+        return get('/api/releases/backlog', params)
+    },
+    releaseCreate(payload: ReleaseCreateRequest): Promise<ReleaseMutationResponse> {
+        return post('/api/releases/create', payload)
+    },
+    releaseUpdate(payload: ReleaseUpdateRequest): Promise<ReleaseMutationResponse> {
+        return post('/api/releases/update', payload)
+    },
+    releaseMarkReleased(payload: ReleaseActionRequest): Promise<ReleaseMutationResponse> {
+        return post('/api/releases/release', payload)
+    },
+    releaseReopen(payload: { release: ReleaseSelector }): Promise<ReleaseMutationResponse> {
+        return post('/api/releases/reopen', payload)
+    },
+    releaseDelete(payload: { release: ReleaseSelector }): Promise<ReleaseDeleteResponse> {
+        return post('/api/releases/delete', payload)
+    },
+    releaseAdd(payload: ReleaseAssignmentRequest): Promise<ReleaseAssignmentResponse> {
+        return post('/api/releases/add', payload)
+    },
+    releaseMove(payload: ReleaseAssignmentRequest): Promise<ReleaseAssignmentResponse> {
+        return post('/api/releases/move', payload)
+    },
+    releaseRemove(payload: ReleaseAssignmentRequest): Promise<ReleaseAssignmentResponse> {
+        return post('/api/releases/remove', payload)
     },
 }
 

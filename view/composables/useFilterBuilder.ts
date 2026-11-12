@@ -20,6 +20,7 @@ const BUILTIN_QUERY_KEYS = new Set([
     'effort_min',
     'effort_max',
     'sprints',
+    'releases',
     'sort_by',
     'order',
     'deletion',
@@ -84,6 +85,8 @@ export function buildServerFilter(
         const allValid = tokens.length > 0 && tokens.every((token) => /^\d+$/.test(token) && Number(token) > 0)
         serverFilter.sprints = allValid ? ids : normalized.sprints
     }
+    // Release selectors (DEV-393) go through as typed; the server resolves them.
+    if (normalized.releases) serverFilter.releases = normalized.releases
     if (normalized.due) serverFilter.due = normalized.due
     if (normalized.recent) serverFilter.recent = normalized.recent
     if (normalized.needs) serverFilter.needs = normalized.needs

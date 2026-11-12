@@ -228,7 +228,12 @@ fn load_resolved_config(resolver: &TasksDirectoryResolver) -> Result<ResolvedCon
 /// Task IDs chosen by the `--select*` flags: the value flags plus a
 /// `--select` query in the web search syntax, run as the shared task query
 /// (DEV-231). Empty when no selection flag is given.
-fn select_task_ids(args: &TaskSelectionArgs, storage: &Storage, resolver: &TasksDirectoryResolver, config: &ResolvedConfig) -> Result<Vec<String>, String> {
+pub(crate) fn select_task_ids(
+    args: &TaskSelectionArgs,
+    storage: &Storage,
+    resolver: &TasksDirectoryResolver,
+    config: &ResolvedConfig,
+) -> Result<Vec<String>, String> {
     if !args.is_active() {
         return Ok(Vec::new());
     }

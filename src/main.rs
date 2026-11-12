@@ -55,6 +55,7 @@ fn is_valid_command(command: &str) -> bool {
             | "trust"
             | "stats"
             | "sprint"
+            | "release"
             | "changelog"
             | "mcp"
             | "git"
@@ -492,6 +493,20 @@ fn main() {
                 Err(e) => {
                     renderer.emit_error(&e);
                     renderer.log_info("END STATS status=err");
+                    Err(e)
+                }
+            }
+        }
+        Commands::Release(args) => {
+            renderer.log_info("BEGIN RELEASE");
+            match lotar::cli::handlers::ReleaseHandler::execute(args, cli.project.as_deref(), &resolver, &renderer) {
+                Ok(()) => {
+                    renderer.log_info("END RELEASE status=ok");
+                    Ok(())
+                }
+                Err(e) => {
+                    renderer.emit_error(&e);
+                    renderer.log_info("END RELEASE status=err");
                     Err(e)
                 }
             }

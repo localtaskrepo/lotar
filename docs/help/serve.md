@@ -125,6 +125,7 @@ Exactly one case does not fail on a busy port: when **no** source configured a p
 - `GET /api/projects/stats?project=PREFIX` - Project stats
 - `GET /api/whoami` - Resolve the identity that auto-populates reporter/assignee fields.
 - Sprint endpoints (`/api/sprints/*`) expose creation, listing, metrics, and cleanup flows (see `docs/help/sprints.md` for the full matrix).
+- Release endpoints (`/api/releases/*`) create, list, fill and release releases (see [Releases](./releases.md)).
 
 ### Real-time Updates
 - Server-Sent Events (SSE)
@@ -212,7 +213,7 @@ Read [exposing the server](#notes) before using `--host` with anything but `loca
 
 - Each task and sprint file is written in one step, so a crash never leaves half a file. A change that touches several files (for example a new task plus its sprint) is undone as a whole if it fails.
 - The tasks folder gets a `.gitignore` for these runtime files (lock files, `.txn-pending.json`, `.<name>.tmp-*` and agent job context files `<ID>.context`), so `git add .tasks` commits only task data. LoTaR writes it when it is missing and never changes an existing one; an attachments folder outside `.tasks` needs its own rule for `.attachments-store.lock`.
-- Leave `.task.lock`, `.sprints.lock` and `.txn-pending.json` files alone. Deleting them does not fix anything and can break recovery. A leftover `.<name>.tmp-*` file is not removed automatically, and there is no cleanup command yet; if you are not sure whether something is still writing it, keep it.
+- Leave `.task.lock`, `.sprints.lock`, `.releases.lock` and `.txn-pending.json` files alone. Deleting them does not fix anything and can break recovery. A leftover `.<name>.tmp-*` file is not removed automatically, and there is no cleanup command yet; if you are not sure whether something is still writing it, keep it.
 - LoTaR does not promise that changes survive a power cut. Commit your `.tasks` folder to git regularly.
 
 Developers can find the details in [Write locking and transactions](../developers/task-model.md#write-locking-and-transactions).

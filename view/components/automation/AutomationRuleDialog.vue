@@ -701,7 +701,13 @@ function eventLabel(event: AutomationEventKey) {
 
 const activeActions = computed(() => draft.value.eventActions.filter((entry) => entry.enabled))
 const activeEvents = computed(() => activeActions.value.map((entry) => entry.event))
-const CHANGE_TRIGGERS = new Set<AutomationEventKey>(['updated', 'assigned', 'sprint_changed', 'start'])
+const CHANGE_TRIGGERS = new Set<AutomationEventKey>([
+  'updated',
+  'assigned',
+  'sprint_changed',
+  'release_changed',
+  'start',
+])
 const hasChangeTrigger = computed(() => activeEvents.value.some((event) => CHANGE_TRIGGERS.has(event)))
 const variables = computed(() => templateVariables(activeEvents.value, props.customFields))
 
@@ -719,7 +725,7 @@ function toggleTrigger(event: AutomationEventKey) {
 
 // ── conditions ──────────────────────────────────────────────────────────────
 
-type FieldKind = 'enum' | 'person' | 'tags' | 'text' | 'date' | 'moment' | 'custom'
+type FieldKind = 'enum' | 'person' | 'tags' | 'text' | 'date' | 'moment' | 'release' | 'custom'
 
 const conditionFields: Array<{ value: string; label: string }> = [
   { value: 'status', label: 'Status' },
@@ -735,6 +741,7 @@ const conditionFields: Array<{ value: string; label: string }> = [
   { value: 'created', label: 'Created' },
   { value: 'modified', label: 'Last changed' },
   { value: 'status_changed', label: 'Time in current status' },
+  { value: 'release', label: 'Release' },
   { value: 'custom_field', label: 'Custom field…' },
   { value: 'other', label: 'Other field…' },
 ]
@@ -747,6 +754,7 @@ function kindOf(field: string, scope: 'field' | 'custom_field' = 'field'): Field
   if (field === 'tags' || field === 'labels') return 'tags'
   if (field === 'due_date') return 'date'
   if (field === 'created' || field === 'modified' || field === 'status_changed') return 'moment'
+  if (field === 'release' || field === 'releases') return 'release'
   return 'text'
 }
 
@@ -807,6 +815,13 @@ const OPERATORS: Record<FieldKind, Array<{ value: string; label: string }>> = {
     { value: 'older_than', label: 'more than … ago' },
     { value: 'within', label: 'in the last' },
   ],
+  release: [
+    { value: 'equals', label: 'is in' },
+    { value: 'in', label: 'is in one of' },
+    { value: 'version', label: 'is in a version range' },
+    { value: 'exists:true', label: 'is in a release' },
+    { value: 'exists:false', label: 'is in no release' },
+  ],
   custom: [
     { value: 'equals', label: 'is' },
     { value: 'contains', label: 'contains' },
@@ -845,6 +860,7 @@ function valuePlaceholder(row: AutomationConditionDraft) {
   if (row.operator === 'in' || kind === 'tags') return 'comma separated'
   if (row.operator === 'matches') return 'regular expression'
   if (row.operator === 'version') return 'e.g. >=0.13 <0.14, or ^1.2'
+  if (kind === 'release') return '@next, @planned, @released, 0.15, #2 or >=0.15'
   return 'value'
 }
 
@@ -907,6 +923,7 @@ const setFields = [
 const listFields = [
   { value: 'tags', label: 'tags' },
   { value: 'sprint', label: 'sprint' },
+  { value: 'release', label: 'release' },
   { value: 'depends_on', label: '“depends on” link' },
   { value: 'blocks', label: '“blocks” link' },
   { value: 'related', label: '“related” link' },
@@ -925,6 +942,7 @@ function setPlaceholder(field: string) {
 
 function listPlaceholder(field: string) {
   if (field === 'sprint') return '@active, or a sprint number'
+  if (field === 'release') return '@next, a version, #id or label'
   if (field === 'tags' || field === 'labels') return 'comma separated'
   return 'task IDs, comma separated'
 }
@@ -980,6 +998,8 @@ function actionMenu(action: AutomationEventActionDraft) {
     { value: 'remove:tags', label: 'Remove tags', disabled: false },
     { value: 'add:sprint', label: 'Add to a sprint', disabled: false },
     { value: 'remove:sprint', label: 'Remove from a sprint', disabled: false },
+    { value: 'add:release', label: 'Add to a release', disabled: false },
+    { value: 'remove:release', label: 'Remove from a release', disabled: false },
     { value: 'add:depends_on', label: 'Link another task', disabled: false },
     { value: 'comment', label: 'Add a comment', disabled: has('comment') },
     { value: 'run', label: 'Run a command', disabled: has('run') },

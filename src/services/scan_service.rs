@@ -203,6 +203,7 @@ impl ScanService {
                         relationships: None,
                         custom_fields: build_custom_fields(inline_attrs.fields),
                         sprints: Vec::new(),
+                        releases: Vec::new(),
                     };
 
                     let prepared = (|| {

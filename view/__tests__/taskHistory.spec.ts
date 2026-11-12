@@ -16,6 +16,7 @@ function makeTask(history: Array<{ at: string; old?: string | null; new?: string
         comments: [],
         references: [],
         sprints: [],
+        releases: [],
         history: history.map((entry) => ({
             at: entry.at,
             changes: [{ field: 'status', old: entry.old ?? null, new: entry.new ?? null }],

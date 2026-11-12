@@ -24,6 +24,7 @@ pub const KNOWN_QUERY_KEYS: &[&str] = &[
     "type",
     "tags",
     "sprints",
+    "releases",
     "q",
     // The web search syntax (DEV-235), added to the other parameters.
     "query",
@@ -69,6 +70,9 @@ pub struct TaskQueryInput {
     /// Search text (all words must match, see `utils::text_search`).
     pub text: Option<String>,
     pub sprints: Vec<u32>,
+    /// Release selectors (DEV-393): `none`, an ID, a label, or a version
+    /// or version range.
+    pub releases: Vec<String>,
     /// A member name, `@me`, or `__none__` for unassigned tasks.
     pub assignee: Option<String>,
     /// Other `key=value` filters: custom fields (declared, wildcard or
@@ -108,6 +112,8 @@ pub struct TaskQuery {
     pub config: ResolvedConfig,
     /// Tasks matching any of these are left out (DEV-5).
     pub exclude: Vec<TaskQuery>,
+    /// The releases a task must be in (DEV-393).
+    pub releases: Option<crate::services::release_service::ReleaseFilter>,
 }
 
 /// Why a query was rejected. Interfaces map these onto their own error
@@ -192,6 +198,7 @@ impl TaskQueryInput {
             tags: list("tags"),
             text: query.get("q").cloned(),
             sprints: parse_sprints_csv(query.get("sprints").map(String::as_str))?,
+            releases: list("releases"),
             assignee: query.get("assignee").cloned(),
             fields,
             deletion: parse_deletion(query.get("deletion").map(String::as_str))?,
@@ -246,6 +253,7 @@ impl TaskQueryInput {
                 "type" => self.task_type.extend(csv(value)),
                 "tags" => self.tags.extend(csv(value)),
                 "sprints" => self.sprints.extend(parse_sprints_csv(Some(value))?),
+                "releases" => self.releases.extend(csv(value)),
                 "project" => self.project = Some(value.clone()),
                 "assignee" => self.assignee = Some(value.clone()),
                 "mine" => self.assignee = Some("@me".to_string()),
@@ -392,6 +400,11 @@ impl TaskQueryInput {
         options.ranks = task_query::SortRanks {
             priority: config.issue_priorities.values.iter().map(ToString::to_string).collect(),
             status: config.issue_states.values.iter().map(ToString::to_string).collect(),
+            releases: if options.sort == SortSpec::Builtin(SortKey::Releases) {
+                crate::services::release_service::ReleaseService::list(tasks_root).unwrap_or_default().into_iter().map(|record| record.id).collect()
+            } else {
+                Vec::new()
+            },
         };
 
         // Exclusions look at every task, deleted ones included, so they can
@@ -406,7 +419,14 @@ impl TaskQueryInput {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        Ok(TaskQuery { filter, field_filters, options, config, exclude })
+        let releases = if self.releases.is_empty() {
+            None
+        } else {
+            let records = crate::services::release_service::ReleaseService::list(tasks_root).map_err(|error| TaskQueryError::Invalid(error.to_string()))?;
+            Some(crate::services::release_service::ReleaseFilter::resolve(&self.releases, &records)?)
+        };
+
+        Ok(TaskQuery { filter, field_filters, options, config, exclude, releases })
     }
 }
 
@@ -459,10 +479,18 @@ fn stored_status(tasks_root: &Path, project: Option<&str>, raw: &str, message: S
 /// the caller.
 pub fn run(storage: &Storage, query: &TaskQuery, now: chrono::DateTime<chrono::Utc>) -> Vec<(String, TaskDTO)> {
     let mut tasks = crate::services::task_service::TaskService::list(storage, &query.filter);
+    apply_release_filter(&mut tasks, query.releases.as_ref());
     apply_field_filters(&mut tasks, &query.field_filters, &query.config);
     task_query::apply(&mut tasks, &query.options, now);
     remove_excluded(storage, query, &mut tasks, now);
     tasks
+}
+
+/// Keep tasks in one of the releases a `release:` term selects (DEV-393).
+fn apply_release_filter(tasks: &mut Vec<(String, TaskDTO)>, filter: Option<&crate::services::release_service::ReleaseFilter>) {
+    if let Some(filter) = filter {
+        tasks.retain(|(_, task)| filter.matches(&task.releases));
+    }
 }
 
 /// Leave out tasks matching any of the query's exclusions (DEV-5).
@@ -482,6 +510,7 @@ pub fn remove_matching(storage: &Storage, exclusions: &[TaskQuery], tasks: &mut 
         let mut matching: Vec<(String, TaskDTO)> =
             tasks.iter().filter(|(id, task)| !excluded.contains(id) && dto_matches_list_filter(storage, id, task, &exclusion.filter)).cloned().collect();
         crate::services::task_service::TaskService::filter_assignees(&mut matching, &exclusion.filter);
+        apply_release_filter(&mut matching, exclusion.releases.as_ref());
         apply_field_filters(&mut matching, &exclusion.field_filters, &exclusion.config);
         task_query::apply_smart_filters(&mut matching, &exclusion.options, now);
         remove_matching(storage, &exclusion.exclude, &mut matching, now);

@@ -366,6 +366,7 @@ pub(super) fn build_task_update_from_issue(
         relationships: None,
         custom_fields,
         sprints: None,
+        releases: None,
     };
 
     if let Some(existing) = existing {
@@ -425,6 +426,7 @@ pub(super) fn build_task_create_from_issue(provider: SyncProvider, remote: &Sync
         relationships: None,
         custom_fields: local.custom_fields,
         sprints: Vec::new(),
+        releases: Vec::new(),
     };
     Ok(create)
 }

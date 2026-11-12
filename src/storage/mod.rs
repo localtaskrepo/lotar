@@ -6,6 +6,7 @@
 // - search: Search and filtering functionality
 // - manager: High-level storage coordination and project management
 // - filter: Task filtering utilities
+// - release: Release entity definition (DEV-393)
 // - sprint: Sprint entity definition and helpers
 pub mod filter;
 pub mod identity;
@@ -14,6 +15,7 @@ pub mod locator;
 pub mod manager;
 pub mod moves;
 pub mod operations;
+pub mod release;
 pub mod safety;
 pub mod search;
 pub mod sprint;

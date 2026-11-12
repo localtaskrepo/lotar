@@ -56,6 +56,7 @@
         :priorities="priorities"
         :types="types"
         :sprint-options="sprintFilterOptions"
+        :release-options="releaseFilterOptions"
         :tag-options="filterOptions.tags"
         :assignee-options="filterOptions.assignees"
         :custom-field-values="filterOptions.customFieldValues"
@@ -162,6 +163,19 @@
                 >
                   <span class="sprint-pill__label">{{ sprint.label }}</span>
                 </div>
+              </div>
+              <div v-if="cell.releases.length" class="releases">
+                <RouterLink
+                  v-for="release in cell.releases"
+                  :key="`release-${release.id}-${cell.dateKey}`"
+                  to="/releases"
+                  class="release-pill"
+                  :class="`release-pill--${release.kind}`"
+                  :data-release-id="release.id"
+                  :title="release.title"
+                >
+                  <span class="sprint-pill__label">{{ release.label }}</span>
+                </RouterLink>
               </div>
               <TransitionGroup name="task-list" tag="ul" class="tasks" :ref="(el) => setTasksListRef(cell.dateKey, el)">
                 <li
@@ -281,6 +295,7 @@ import { buildServerFilter, useProjectFilterSync } from '../composables/useFilte
 import { useProjects } from '../composables/useProjects'
 import { useSprintFormatting } from '../composables/useSprintFormatting'
 import { useSprints, useSprintFilterOptions } from '../composables/useSprints'
+import { useReleaseFilterOptions, useReleases } from '../composables/useReleases'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
 import { useTaskStore, type TaskQueryHandle } from '../composables/useTaskStore'
 import { parseTaskDate, startOfLocalDay, toDateKey } from '../utils/date'
@@ -317,6 +332,8 @@ const initialLoading = computed(() => {
 })
 const { sprints: sprintList, refresh: refreshSprints } = useSprints()
 const sprintFilterOptions = useSprintFilterOptions(sprintList)
+const { releases: releaseList } = useReleases()
+const releaseFilterOptions = useReleaseFilterOptions(releaseList)
 const { openTaskPanel } = useTaskPanelController()
 const {
   statuses,
@@ -513,6 +530,38 @@ const sprintSchedule = computed(() => {
   if (!showSprints.value) return {} as Record<string, SprintCalendarDayEntry[]>
   return buildSprintSchedule(sprintList.value, startOfGrid(cursor.value), endOfGrid(cursor.value))
 })
+// Releases (DEV-393) show on their planned day, and on the day they shipped.
+interface ReleaseDayEntry {
+  id: number
+  label: string
+  kind: 'planned' | 'overdue' | 'released'
+  title: string
+}
+const releaseDays = computed(() => {
+  const days: Record<string, ReleaseDayEntry[]> = {}
+  const add = (value: string | undefined, entry: ReleaseDayEntry) => {
+    const parsed = parseTaskDate(value)
+    if (parsed) (days[toDateKey(parsed)] ??= []).push(entry)
+  }
+  for (const release of releaseList.value) {
+    if (release.released_at) {
+      add(release.released_at, {
+        id: release.id,
+        label: release.display_name,
+        kind: 'released',
+        title: `${release.display_name} released`,
+      })
+    } else {
+      add(release.planned_date, {
+        id: release.id,
+        label: release.display_name,
+        kind: release.overdue ? 'overdue' : 'planned',
+        title: `${release.display_name} planned${release.overdue ? ' (overdue)' : ''}`,
+      })
+    }
+  }
+  return days
+})
 const cells = computed(() => {
   const start = startOfGrid(cursor.value)
   const end = endOfGrid(cursor.value)
@@ -522,6 +571,7 @@ const cells = computed(() => {
     inMonth: boolean
     tasks: TaskDTO[]
     sprints: SprintCalendarDayEntry[]
+    releases: ReleaseDayEntry[]
   }> = []
   const month = cursor.value.getMonth()
 
@@ -553,6 +603,7 @@ const cells = computed(() => {
       inMonth: d.getMonth() === month,
       tasks: byDate[key] || [],
       sprints: schedule[key] || [],
+      releases: releaseDays.value[key] || [],
     })
   }
   return days
@@ -948,6 +999,32 @@ watch(showSprints, (enabled, previous) => {
 .sprint-pill.partial-end {
   border-top-right-radius: var(--radius-sm);
   border-bottom-right-radius: var(--radius-sm);
+}
+.releases {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.release-pill {
+  --_color: var(--color-accent);
+  background: color-mix(in oklab, var(--_color) 16%, transparent);
+  border: 1px dashed color-mix(in oklab, var(--_color) 55%, transparent);
+  color: color-mix(in oklab, var(--_color) 70%, var(--color-fg) 30%);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  min-height: 18px;
+  text-decoration: none;
+}
+.release-pill--released {
+  --_color: var(--color-success);
+  border-style: solid;
+}
+.release-pill--overdue {
+  --_color: var(--color-danger);
 }
 .sprint-pill__label {
   overflow: hidden;

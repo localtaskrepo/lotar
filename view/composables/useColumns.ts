@@ -13,6 +13,7 @@ export type BuiltinColKey =
     | 'effort'
     | 'tags'
     | 'sprints'
+    | 'releases'
     | 'due_date'
     | 'created'
     | 'modified'
@@ -63,6 +64,7 @@ const BUILTIN_LABELS: Record<BuiltinColKey, string> = {
     effort: 'Effort',
     tags: 'Tags',
     sprints: 'Sprints',
+    releases: 'Releases',
     due_date: 'Due',
     created: 'Created',
     modified: 'Updated',

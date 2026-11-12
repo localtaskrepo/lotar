@@ -11,6 +11,7 @@ Centralized documentation topics for quick navigation.
 - Source & Git: [Scan](./scan.md) · [Stats](./stats.md) · [Git Hooks](./git.md)
 - Sync (beta): [Jira and GitHub Sync](./sync.md)
 - Sprints: [Sprint Workflows](./sprints.md)
+- Releases: [Releases](./releases.md)
 - MCP: [MCP Server](./mcp.md)
 - Agents: [Agent Jobs](./agent.md) · [Agent Skills and Template](./agent-skills.md)
 - Automation: [Automation Rules](./automation.md) · [Trust](./trust.md)

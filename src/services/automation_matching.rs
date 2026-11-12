@@ -160,11 +160,11 @@ pub(crate) enum UpdateMatch {
 
 /// How `rule` matches real updates of `current` that change at least `base`
 /// (`assignee` for the assigned event), as [`MatchMode::OnChange`] judges them.
-pub(crate) fn update_match(rule: &AutomationRule, current: &TaskDTO, base: &[&str], config: &ResolvedConfig, active_sprint_ids: &[u32]) -> UpdateMatch {
+pub(crate) fn update_match(rule: &AutomationRule, current: &TaskDTO, base: &[&str], config: &ResolvedConfig, state: &MatchState) -> UpdateMatch {
     let fires = |extra: &[String]| {
         let mut fields: Vec<String> = base.iter().map(|field| field.to_string()).collect();
         fields.extend_from_slice(extra);
-        matches_rule(rule, current, &ChangeSet::only(current, &fields), MatchMode::OnChange, config, active_sprint_ids)
+        matches_rule(rule, current, &ChangeSet::only(current, &fields), MatchMode::OnChange, config, state)
     };
     if fires(&[]) {
         return UpdateMatch::Always;
@@ -242,10 +242,18 @@ fn collect_change_fields(group: &AutomationConditionGroup, out: &mut BTreeSet<St
 /// Whether a top-level condition key can only be a custom field.
 fn is_top_level_custom(field: &str) -> bool {
     crate::utils::fields::is_reserved_field(field).is_none()
-        && !matches!(field.to_lowercase().as_str(), "labels" | "task_type" | "sprint" | "sprints" | "status_changed")
+        && !matches!(field.to_lowercase().as_str(), "labels" | "task_type" | "sprint" | "sprints" | "release" | "releases" | "status_changed")
 }
 
 // ── Rule matching ───────────────────────────────────────────────────────────
+
+/// What conditions look at besides the task: the active sprints and the
+/// releases (DEV-393).
+#[derive(Debug, Clone, Default)]
+pub(crate) struct MatchState {
+    pub active_sprints: Vec<u32>,
+    pub releases: Vec<crate::services::release_service::ReleaseRecord>,
+}
 
 pub(crate) fn matches_rule(
     rule: &AutomationRule,
@@ -253,7 +261,7 @@ pub(crate) fn matches_rule(
     changes: &ChangeSet,
     mode: MatchMode,
     config: &ResolvedConfig,
-    active_sprint_ids: &[u32],
+    state: &MatchState,
 ) -> bool {
     if !rule.is_enabled() {
         return false;
@@ -261,7 +269,7 @@ pub(crate) fn matches_rule(
     let Some(group) = rule.when.as_ref() else {
         return true;
     };
-    matches_group(group, current, changes, mode, config, active_sprint_ids)
+    matches_group(group, current, changes, mode, config, state)
 }
 
 fn matches_group(
@@ -270,26 +278,26 @@ fn matches_group(
     changes: &ChangeSet,
     mode: MatchMode,
     config: &ResolvedConfig,
-    active_sprint_ids: &[u32],
+    state: &MatchState,
 ) -> bool {
     if let Some(all) = group.all.as_ref()
-        && !all.iter().all(|entry| matches_group(entry, current, changes, mode, config, active_sprint_ids))
+        && !all.iter().all(|entry| matches_group(entry, current, changes, mode, config, state))
     {
         return false;
     }
     if let Some(any) = group.any.as_ref()
-        && !any.iter().any(|entry| matches_group(entry, current, changes, mode, config, active_sprint_ids))
+        && !any.iter().any(|entry| matches_group(entry, current, changes, mode, config, state))
     {
         return false;
     }
     if let Some(not) = group.not.as_ref()
-        && matches_group(not, current, changes, mode, config, active_sprint_ids)
+        && matches_group(not, current, changes, mode, config, state)
     {
         return false;
     }
 
     if let Some(now) = group.current.as_ref()
-        && !matches_group(now, current, changes, MatchMode::Current, config, active_sprint_ids)
+        && !matches_group(now, current, changes, MatchMode::Current, config, state)
     {
         return false;
     }
@@ -306,7 +314,7 @@ fn matches_group(
         return false;
     }
 
-    if !matches_field_map(&group.fields, current, changes, mode, config, active_sprint_ids) {
+    if !matches_field_map(&group.fields, current, changes, mode, config, state) {
         return false;
     }
 
@@ -357,7 +365,7 @@ fn matches_field_map(
     changes: &ChangeSet,
     mode: MatchMode,
     config: &ResolvedConfig,
-    active_sprint_ids: &[u32],
+    state: &MatchState,
 ) -> bool {
     for (key, condition) in fields {
         let field_key = key.to_lowercase();
@@ -406,7 +414,14 @@ fn matches_field_map(
             "tags" | "labels" => Some(AutomationValue::List(normalize_tags(current.tags.clone()))),
             "sprint" | "sprints" => {
                 // Sprint conditions evaluate current state (not changeset).
-                if !matches_sprint_condition(condition, current, active_sprint_ids) {
+                if !matches_sprint_condition(condition, current, &state.active_sprints) {
+                    return false;
+                }
+                continue;
+            }
+            "release" | "releases" => {
+                // Release conditions evaluate current state, like sprints.
+                if !matches_release_condition(condition, current, &state.releases) {
                     return false;
                 }
                 continue;
@@ -517,6 +532,48 @@ fn matches_sprint_condition(condition: &AutomationFieldCondition, current: &Task
         }
     }
 
+    true
+}
+
+/// `release: 0.15`, `release: { in: ["@next", "#3"] }`, `release: { exists:
+/// false }`, `release: { version: ">=0.15" }`. A value is `@next` (the
+/// first planned release in version order), `@planned`, `@released`, or a
+/// `release:` search value (ID, label, version or range).
+fn matches_release_condition(condition: &AutomationFieldCondition, current: &TaskDTO, releases: &[crate::services::release_service::ReleaseRecord]) -> bool {
+    let selects = |raw: &str| -> bool {
+        let value = raw.trim().to_ascii_lowercase();
+        let mine = || releases.iter().filter(|record| current.releases.contains(&record.id));
+        match value.as_str() {
+            "@next" => releases.iter().find(|record| !record.release.is_released()).is_some_and(|next| current.releases.contains(&next.id)),
+            "@planned" => mine().any(|record| !record.release.is_released()),
+            "@released" => mine().any(|record| record.release.is_released()),
+            _ => crate::services::release_service::ReleaseFilter::resolve(&[raw.to_string()], releases).is_ok_and(|filter| filter.matches(&current.releases)),
+        }
+    };
+    if let AutomationFieldCondition::Scalar(raw) = condition {
+        return selects(raw);
+    }
+    let map = condition.as_map();
+    if let Some(expected) = map.exists
+        && current.releases.is_empty() == expected
+    {
+        return false;
+    }
+    if let Some(eq) = map.equals.as_ref()
+        && !selects(eq)
+    {
+        return false;
+    }
+    if let Some(options) = map.r#in.as_ref()
+        && !options.iter().any(|option| selects(option))
+    {
+        return false;
+    }
+    if let Some(range) = map.version.as_ref()
+        && !selects(range)
+    {
+        return false;
+    }
     true
 }
 

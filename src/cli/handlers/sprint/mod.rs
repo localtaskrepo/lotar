@@ -3,6 +3,8 @@ mod operations;
 mod reporting;
 mod shared;
 
+pub(crate) use assignment::select_task_ids;
+
 use crate::cli::args::sprint::{SprintAction, SprintArgs};
 use crate::cli::handlers::{CommandHandler, emit_subcommand_overview};
 use crate::output::OutputRenderer;

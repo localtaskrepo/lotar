@@ -137,6 +137,7 @@ fn handle_set_effort(
         relationships: None,
         custom_fields: None,
         sprints: None,
+        releases: None,
     };
     let updated = TaskService::update(&mut ctx.storage, full_id, patch).map_err(|e| e.to_string())?;
 

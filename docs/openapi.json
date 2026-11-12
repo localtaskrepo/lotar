@@ -579,6 +579,14 @@
             "description": "CSV of positive sprint IDs (e.g. 1,2,3). Only return tasks assigned to these sprints. Invalid entries return 400."
           },
           {
+            "name": "releases",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "CSV of release selectors: none, an id (3 or #3), a label, or a version or version range (0.15, >=0.15 <0.16). Returns tasks in any of the selected releases (DEV-393)."
+          },
+          {
             "name": "assignee",
             "in": "query",
             "schema": {
@@ -1692,6 +1700,457 @@
                 }
               }
             }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/releases/list": {
+      "get": {
+        "summary": "List releases",
+        "description": "Every release in version order, with its state, dates and counts over its tickets (DEV-393).",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeReleaseList"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/releases/get": {
+      "get": {
+        "summary": "Get a release",
+        "description": "A release with its tickets and history.",
+        "parameters": [
+          {
+            "name": "release",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Release id (3), '#3', version (0.15.0 or v0.15.0) or label."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeReleaseGet"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/releases/backlog": {
+      "get": {
+        "summary": "Tickets in no release",
+        "description": "Open tickets that are in no release. Takes the /api/tasks/list filter parameters (project, query, status, ...) to narrow it.",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Web search syntax, e.g. type:bug."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeReleaseBacklog"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/releases/create": {
+      "post": {
+        "summary": "Create a release",
+        "description": "Creates a release for a version. The version is stored without a leading v and must be unique among releases.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReleaseCreateRequest"
+              },
+              "example": {
+                "version": "0.15.0",
+                "label": "Spring",
+                "planned_date": "2026-12-01"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeReleaseMutation"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/releases/update": {
+      "post": {
+        "summary": "Update a release",
+        "description": "Changes the fields given; an empty string clears label, notes, planned_date or released_at (clearing released_at marks the release planned again). changed is false when nothing changed.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReleaseUpdateRequest"
+              },
+              "example": {
+                "release": "0.15.0",
+                "planned_date": "2026-12-08"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeReleaseMutation"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/releases/release": {
+      "post": {
+        "summary": "Mark a release released",
+        "description": "Sets released_at to at (RFC 3339 or YYYY-MM-DD), or now.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReleaseActionRequest"
+              },
+              "example": {
+                "release": 3
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeReleaseMutation"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/releases/reopen": {
+      "post": {
+        "summary": "Reopen a release",
+        "description": "Clears released_at, so the release is planned again.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReleaseActionRequest"
+              },
+              "example": {
+                "release": 3
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeReleaseMutation"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/releases/delete": {
+      "post": {
+        "summary": "Delete a release",
+        "description": "Deletes the release file and takes the release off every ticket in it; removed_from lists them.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReleaseActionRequest"
+              },
+              "example": {
+                "release": "#3"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeReleaseDelete"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/releases/add": {
+      "post": {
+        "summary": "Add tickets to a release",
+        "description": "Adds the tickets named in tasks and those query selects. A ticket keeps its other releases: releases are not exclusive.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReleaseAssignmentRequest"
+              },
+              "example": {
+                "release": "0.15.0",
+                "tasks": [
+                  "APP-12"
+                ],
+                "query": "status:done release:none"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeReleaseAssignment"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/releases/move": {
+      "post": {
+        "summary": "Move tickets to a release",
+        "description": "Like add, but replaces each ticket's other releases with this one.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReleaseAssignmentRequest"
+              },
+              "example": {
+                "release": "0.16.0",
+                "tasks": [
+                  "APP-12"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeReleaseAssignment"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/releases/remove": {
+      "post": {
+        "summary": "Remove tickets from a release",
+        "description": "Takes the release off the tickets named in tasks and those query selects.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReleaseAssignmentRequest"
+              },
+              "example": {
+                "release": "0.15.0",
+                "tasks": [
+                  "APP-12"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeReleaseAssignment"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
@@ -3125,6 +3584,14 @@
             "description": "CSV of positive sprint IDs. Invalid entries return 400."
           },
           {
+            "name": "releases",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "CSV of release selectors: none, an id (3 or #3), a label, or a version or version range (0.15, >=0.15 <0.16). Returns tasks in any of the selected releases (DEV-393)."
+          },
+          {
             "name": "assignee",
             "in": "query",
             "schema": {
@@ -4308,6 +4775,14 @@
               "format": "int32"
             }
           },
+          "releases": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "description": "Releases the task ships in (DEV-393)."
+          },
           "sprint_order": {
             "type": "object",
             "additionalProperties": {
@@ -4448,6 +4923,15 @@
             },
             "default": []
           },
+          "releases": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "description": "Release ids to add the new task to.",
+            "default": []
+          },
           "finding": {
             "type": "string",
             "description": "Report a problem once (DEV-317): a stable key for it, one line of at most 200 characters, stored in the ticket's `finding` custom field. The newest ticket of the project with this key decides: an open one gets the report as a comment when its description is new, otherwise only today's date in its `finding_seen` field (DEV-321) (200, `data` is that ticket), a won't-do one (WontDo, Won't fix, Cancelled, Rejected, Declined) suppresses the report (200), a done one gets a new ticket related to it (201), none gets a new ticket (201). The check and the write hold the project's finding lock, so parallel reports of one key create one ticket. The response adds `finding`."
@@ -4542,6 +5026,15 @@
             },
             "nullable": true,
             "description": "Replaces sprint memberships; null or [] clears them. Entries must be positive integers; invalid entries are rejected."
+          },
+          "releases": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "description": "Replaces release memberships; null or [] clears them. Entries must be existing release ids.",
+            "nullable": true
           }
         }
       },
@@ -4634,6 +5127,15 @@
             },
             "nullable": true,
             "description": "Replaces sprint memberships; null or [] clears them."
+          },
+          "releases": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "description": "Replaces release memberships; null or [] clears them.",
+            "nullable": true
           },
           "expected_modified": {
             "type": "string",
@@ -5751,6 +6253,439 @@
         "required": [
           "removed_references",
           "updated_tasks"
+        ]
+      },
+      "ReleaseListItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "version": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "planned_date": {
+            "type": "string",
+            "description": "YYYY-MM-DD"
+          },
+          "released_at": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "planned",
+              "released"
+            ]
+          },
+          "overdue": {
+            "type": "boolean",
+            "description": "Planned for a day before today and not released."
+          },
+          "task_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "done_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "open_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "created": {
+            "type": "string"
+          },
+          "modified": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "display_name",
+          "state",
+          "overdue",
+          "task_count",
+          "done_count",
+          "open_count"
+        ]
+      },
+      "ReleaseListResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "releases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReleaseListItem"
+            }
+          }
+        },
+        "required": [
+          "status",
+          "total",
+          "releases"
+        ]
+      },
+      "ReleaseGetResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "release": {
+            "$ref": "#/components/schemas/ReleaseListItem"
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskDTO"
+            }
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskChangeLogEntry"
+            }
+          }
+        },
+        "required": [
+          "status",
+          "release",
+          "tasks",
+          "history"
+        ]
+      },
+      "ReleaseBacklogResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "offset": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskDTO"
+            }
+          }
+        },
+        "required": [
+          "status",
+          "total",
+          "count",
+          "limit",
+          "offset",
+          "tasks"
+        ]
+      },
+      "ReleaseCreateRequest": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "planned_date": {
+            "type": "string",
+            "description": "YYYY-MM-DD"
+          },
+          "released_at": {
+            "type": "string",
+            "description": "RFC 3339 or YYYY-MM-DD, for a release already out."
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "additionalProperties": false
+      },
+      "ReleaseUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "release": {
+            "oneOf": [
+              {
+                "type": "integer",
+                "format": "int32",
+                "minimum": 1
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "description": "Release id, or '#id', version or label."
+          },
+          "version": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "planned_date": {
+            "type": "string"
+          },
+          "released_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "release"
+        ],
+        "additionalProperties": false
+      },
+      "ReleaseActionRequest": {
+        "type": "object",
+        "properties": {
+          "release": {
+            "oneOf": [
+              {
+                "type": "integer",
+                "format": "int32",
+                "minimum": 1
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "description": "Release id, or '#id', version or label."
+          },
+          "at": {
+            "type": "string",
+            "description": "For /api/releases/release: when it was released; defaults to now."
+          }
+        },
+        "required": [
+          "release"
+        ],
+        "additionalProperties": false
+      },
+      "ReleaseAssignmentRequest": {
+        "type": "object",
+        "properties": {
+          "release": {
+            "oneOf": [
+              {
+                "type": "integer",
+                "format": "int32",
+                "minimum": 1
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "description": "Release id, or '#id', version or label."
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "query": {
+            "type": "string",
+            "description": "Also act on the tasks this search selects, in the web search syntax."
+          }
+        },
+        "required": [
+          "release"
+        ],
+        "additionalProperties": false
+      },
+      "ReleaseMutationResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "release": {
+            "$ref": "#/components/schemas/ReleaseListItem"
+          },
+          "changed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "status",
+          "release",
+          "changed"
+        ]
+      },
+      "ReleaseDeleteResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "deleted": {
+            "type": "boolean"
+          },
+          "release_id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "removed_from": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "status",
+          "deleted",
+          "release_id",
+          "removed_from"
+        ]
+      },
+      "ReleaseAssignmentResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "add",
+              "move",
+              "remove"
+            ]
+          },
+          "release_id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "release_version": {
+            "type": "string"
+          },
+          "modified": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "unchanged": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "status",
+          "action",
+          "release_id",
+          "release_version",
+          "modified",
+          "unchanged"
+        ]
+      },
+      "EnvelopeReleaseList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ReleaseListResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeReleaseGet": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ReleaseGetResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeReleaseBacklog": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ReleaseBacklogResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeReleaseMutation": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ReleaseMutationResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeReleaseDelete": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ReleaseDeleteResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeReleaseAssignment": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ReleaseAssignmentResponse"
+          }
+        },
+        "required": [
+          "data"
         ]
       },
       "SprintListItem": {
@@ -8230,7 +9165,7 @@
           },
           "event": {
             "type": "string",
-            "description": "Event to simulate. Canonical events: created, updated, assigned, commented, sprint_changed, job_started, job_completed, job_failed, job_cancelled, manual, unblocked. Matching is case-insensitive and legacy aliases are accepted (job_start, complete, success, error, failure, cancel).",
+            "description": "Event to simulate. Canonical events: created, updated, assigned, commented, sprint_changed, release_changed, job_started, job_completed, job_failed, job_cancelled, manual, unblocked. Matching is case-insensitive and legacy aliases are accepted (job_start, complete, success, error, failure, cancel).",
             "examples": [
               "created",
               "updated",

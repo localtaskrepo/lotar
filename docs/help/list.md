@@ -34,6 +34,7 @@ The query uses the web search-box syntax. Values come from your configuration, s
 | `type:bug` | any of these types | `kind:`, `tasktype:` | `type` |
 | `tag:ui,api` | any of these tags | `tags:` | `tags` (MCP also `tag`) |
 | `sprint:3,4` | in any of these sprints | `sprints:` | `sprints` |
+| `release:0.15`, `release:#3`, `release:none`, `release>=0.15` | in a [release](./releases.md#finding-tickets-by-release) by version, ID, label or version range, or in none | `releases:` | `releases` |
 | `project:AUTH` | one project | `projectkey:` | `project` |
 | `assignee:alice`, `assignee:@me`, `assignee:__none__` | assignee, yourself, or unassigned | `owner:` | `assignee` |
 | `mine:true` | assigned to you | `me:` | `assignee=@me` |
@@ -112,7 +113,7 @@ Flags set the same filters as the query and combine with it: list filters add up
 | Missing or present | `--needs effort,due`, `--has attachment,image,link,tag` |
 | Effort | `--effort-min 2h`, `--effort-max 1d` |
 | Deletion | Active tasks by default; `--deleted` for deleted tasks only, or `--include-deleted` for both (mutually exclusive) |
-| Sorting & size | `--sort-by due-date` (keys: priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints, relevance, `field:<name>`), `--reverse`, `--page-size 100` (alias: `--limit`), plus `--offset` / `--page` |
+| Sorting & size | `--sort-by due-date` (keys: priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints, releases, relevance, `field:<name>`), `--reverse`, `--page-size 100` (alias: `--limit`), plus `--offset` / `--page` |
 | Totals | `--sum effort`, `--sum <custom field>` (repeatable): totals over every matching task, not just the page |
 | Output | `--format text|json`, `--log-level info`, `--details`; `table`/`markdown`/`md` are text aliases |
 

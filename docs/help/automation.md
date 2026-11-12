@@ -48,7 +48,7 @@ Statuses in rules must exist in your project. The default states are Todo, InPro
 
 Rules only evaluate on task changes. The short form `status: InProgress` means “status changed to InProgress.” Use `changes` for explicit transitions.
 
-Every field condition needs its field to change in the update that fires the rule, also inside `all`. `all: [ {status: Done}, {tags: {any: [urgent]}} ]` fires only when one update sets the status to Done and changes the tags; setting the status of a ticket that is already tagged `urgent` does not fire it. The exceptions look at the task as it is now: `sprint` conditions, the time conditions below, `before`/`within`/`older_than` on `due_date`, and `assignee: { exists: ... }`. `lotar automation simulate` tells you which fields a rule needs to change ([Simulating rules](#simulating-rules)).
+Every field condition needs its field to change in the update that fires the rule, also inside `all`. `all: [ {status: Done}, {tags: {any: [urgent]}} ]` fires only when one update sets the status to Done and changes the tags; setting the status of a ticket that is already tagged `urgent` does not fire it. The exceptions look at the task as it is now: `sprint` and `release` conditions, the time conditions below, `before`/`within`/`older_than` on `due_date`, and `assignee: { exists: ... }`. `lotar automation simulate` tells you which fields a rule needs to change ([Simulating rules](#simulating-rules)).
 
 To check a field's value without requiring it to change, put the condition under `current`. It looks at the task as it is now, takes the same conditions as `when`, and works next to change conditions and inside `all`, `any` and `not`. This rule fires when a Change ticket moves to InProgress, although its type did not change:
 
@@ -90,6 +90,17 @@ when:
 ```
 
 An unreadable range is rejected when the rules are saved through LoTaR.
+
+### Release conditions
+
+`release:` checks the ticket's [releases](./releases.md) as they are now, like `sprint:`. A value is `@next` (the first planned release in version order), `@planned` or `@released` (in a release in that state), or what the `release:` search term takes: an ID, a label, a version or a version range.
+
+```yaml
+when: { status: Done, release: { exists: false } }        # done, in no release
+when: { release: '@next' }                               # in the next planned release
+when: { release: { in: ['0.15', '#7'] } }                # in a 0.15.x release or in #7
+when: { release: { version: '>=0.15 <0.16' } }           # in a release in that range
+```
 
 ### Time conditions
 
@@ -158,6 +169,7 @@ Actions define what happens at different points in the automation lifecycle:
 - `assigned`: when the task's assignee changes
 - `commented`: when a comment is added to the task
 - `sprint_changed`: when the task's sprint memberships change
+- `release_changed`: when the task's releases change
 - `job_started`: when an agent job begins
 - `job_completed`: when an agent job succeeds
 - `job_failed`: when an agent job fails
@@ -193,7 +205,7 @@ on:
 ### Action fields
 
 - `set`: any task field (status, assignee, reporter, priority, type, title, description, due_date, effort, tags, custom_fields)
-- `add/remove`: tags/labels, sprint membership (`sprint: <sprint reference or @active>`), and relationships (`depends_on`, `blocks`, `related`)
+- `add/remove`: tags/labels, sprint membership (`sprint: <sprint reference or @active>`), release membership (`release: <release ID, version or label, or @next>`; adding keeps the ticket's other releases, an unknown release is skipped), and relationships (`depends_on`, `blocks`, `related`)
 - `run`: execute a command when the action fires
 - `comment`: add a comment to the task
 - `agent`: `model`, `effort` and `prompt` for the agent job this action starts by assigning the ticket to an agent profile (see below)
@@ -366,7 +378,7 @@ Available variables:
 | Prefix | Variables |
 |--------|-----------|
 | `ticket.*` | `id`, `title`, `status`, `priority`, `type`, `assignee`, `reporter`, `description`, `due_date`, `effort`, `tags`, `field:<name>` |
-| `previous.*` | Same as `ticket.*` but for the pre-change state (available on the update-derived hooks `updated`, `assigned`, `sprint_changed`, and the legacy `start`, which also covers task creation where no prior state exists; not available on `commented` or job hooks) |
+| `previous.*` | Same as `ticket.*` but for the pre-change state (available on the update-derived hooks `updated`, `assigned`, `sprint_changed`, `release_changed`, and the legacy `start`, which also covers task creation where no prior state exists; not available on `commented` or job hooks) |
 | `comment.*` | `text`, `author` (available on `commented` events; `author` is empty for a comment without one) |
 | `agent.*` | `job_id`, `runner`, `profile`, `worktree_path`, `worktree_branch` (available on job events); after a job ends also `usage`, `cost_usd`, `input_tokens`, `output_tokens`, `turns` when the CLI reported them |
 | `unblocked.*` | `by` (the prerequisites with their titles: `DEV-1 (Docs), DEV-2 (Release v1.4.0)`) and `ids` (`DEV-1,DEV-2`), on `unblocked` events |
@@ -375,7 +387,7 @@ Lists take a selector in square brackets. `[*]` joins every item with ", ", a nu
 
 | List | Fields |
 |------|--------|
-| `ticket.tags`, `ticket.acceptance_criteria`, `ticket.sprints` | — |
+| `ticket.tags`, `ticket.acceptance_criteria`, `ticket.sprints`, `ticket.releases` (release IDs) | — |
 | `ticket.relationships.depends_on`, `.blocks`, `.related`, `.children`, `.fixes` | — (`ticket.relationships.parent` and `.duplicate_of` are plain values) |
 | `ticket.comments` | `text`, `date`, `author` (the item itself is the text) |
 | `ticket.references` | `code`, `link`, `file`, `attachment`, `jira`, `github` (the item itself is whichever is set) |
@@ -395,7 +407,7 @@ on:
 
 ## Execution and composition semantics
 
-- Rules run in file order. A matching rule fires its event hook(s) (`created`, `updated`, `assigned`, `sprint_changed`, `commented`, `unblocked`, or the job hooks) and then the legacy `start` catch-all. Each action is committed before the next one applies.
+- Rules run in file order. A matching rule fires its event hook(s) (`created`, `updated`, `assigned`, `sprint_changed`, `release_changed`, `commented`, `unblocked`, or the job hooks) and then the legacy `start` catch-all. Each action is committed before the next one applies.
 - Reference changes (link/code/file/attachment/platform attach and detach, including uploads, removals, and sync-linked platform references) dispatch the `updated` event with the previous/current task pair. Reference values are not part of the condition vocabulary, so the change set is empty: bare `on.updated` rules and the legacy `start` catch-all fire once per changed operation. Conditions keep their normal semantics — change-dependent predicates (the `changes` group, short-form field conditions, and custom-field conditions, which all require the named field to have changed) cannot match an empty change set and stay silent, while current-state predicates such as `sprint` conditions and date-window checks (`before`/`within`/`older_than` on `due_date`) still evaluate the task as it is and can fire. No-op reference operations (the value was already present or absent) dispatch nothing. Comments written by the automation `comment` action never re-dispatch `on.commented`.
 - Every action composes against the task's latest persisted state: tag and relationship `add`/`remove` operations from earlier rules and hooks accumulate instead of overwriting each other, and `set.custom_fields` writes only the listed keys (existing keys keep their values; writing the same key twice keeps the last write).
 - Explicit replacement still wins: `set.tags`/`set.labels` replaces the whole tag list, and scalar `set` fields overwrite. When several rules set the same field, the last rule in file order wins. Within a single action, `set` applies before `add`, which applies before `remove`.
@@ -485,7 +497,7 @@ lotar automation simulate --ticket PROJ-1 --event manual
 
 The web UI's rule editor runs the same simulation on the rule you are editing (**Try it**), before it is saved.
 
-For the change events (`created`, `updated`, `assigned`, `sprint_changed`) the simulation matches like a real update: `created` treats every field the ticket has as new, and the others look for an update of one field that fires the rule (`assigned` always changes the assignee). A match that needs a field to change says so (`Matches only when status changes in the same update.`). A rule that only fires when several fields change in the same update does not match; when nothing matches, the simulation names it (`Done and tagged: matches only when status and tags change in the same update; ...`). A rule with `current` conditions also names the fields it checked on the ticket as it is now (`Checked on the ticket as it is now: type.`).
+For the change events (`created`, `updated`, `assigned`, `sprint_changed`, `release_changed`) the simulation matches like a real update: `created` treats every field the ticket has as new, and the others look for an update of one field that fires the rule (`assigned` always changes the assignee). A match that needs a field to change says so (`Matches only when status changes in the same update.`). A rule that only fires when several fields change in the same update does not match; when nothing matches, the simulation names it (`Done and tagged: matches only when status and tags change in the same update; ...`). A rule with `current` conditions also names the fields it checked on the ticket as it is now (`Checked on the ticket as it is now: type.`).
 
 The preview applies the matched action the same way a real run would, without writing anything: every `set` field (including due date, effort, custom fields and the `labels` alias), templates built from the ticket's current values, `@me`/`@reporter`/`@assignee`/`@assignee_or_reporter`/`@least_busy` assignees, and case-insensitive tag adds and removes. A few things can only be known when the rule actually runs; the preview lists them as warnings instead of guessing:
 

@@ -315,6 +315,7 @@ mod sync_mapping_tests {
             acceptance_criteria: vec![],
             sprints: vec![],
             sprint_order: Default::default(),
+            releases: Vec::new(),
             history: vec![],
             custom_fields: Default::default(),
         }

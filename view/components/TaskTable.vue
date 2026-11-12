@@ -257,6 +257,19 @@
                       <span v-if="!(t.sprints && t.sprints.length)" class="muted">—</span>
                     </div>
                   </template>
+                  <template v-else-if="col === 'releases'">
+                    <div class="row" style="gap: 6px; flex-wrap: wrap; align-items: center">
+                      <span
+                        v-for="releaseId in t.releases || []"
+                        :key="`${t.id}-release-${releaseId}`"
+                        class="chip small release-chip"
+                        :class="{ 'release-chip--released': releaseLookupLocal[releaseId]?.state === 'released' }"
+                      >
+                        {{ releaseLookupLocal[releaseId]?.label ?? `#${releaseId}` }}
+                      </span>
+                      <span v-if="!(t.releases && t.releases.length)" class="muted">—</span>
+                    </div>
+                  </template>
                   <template v-else-if="col === 'due_date'">
                     <span v-if="t.due_date" :class="{ overdue: isOverdue(t) }">{{ fmtDate(t.due_date) }}</span>
                     <span v-else class="muted">—</span>
@@ -497,6 +510,7 @@ const {
 })
 
 const sprintLookup = computed(() => props.sprintLookup ?? {})
+const releaseLookupLocal = computed(() => props.releaseLookup ?? {})
 const hasSprintsLocal = computed(() => props.hasSprints ?? false)
 const sprintsLoadingLocal = computed(() => props.sprintsLoading ?? false)
 
@@ -804,7 +818,8 @@ tbody tr.is-recent {
   border-radius: var(--radius-pill);
 }
 
-.chip.sprint-chip {
+.chip.sprint-chip,
+.chip.release-chip {
   max-width: 200px;
   white-space: nowrap;
   overflow: hidden;
@@ -831,6 +846,7 @@ tbody tr.is-recent {
   color: var(--color-danger);
 }
 
+.chip.release-chip--released,
 .chip.sprint--complete {
   background: color-mix(in oklab, var(--color-success) 18%, transparent);
   color: var(--color-success-strong);

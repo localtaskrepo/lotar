@@ -737,7 +737,7 @@ fn handle_sse_connection(mut stream: &TcpStream, query: &HashMap<String, String>
                             // workspace-wide config, which concerns every
                             // project. Order and sprint changes span projects.
                             "config_updated" => evt.data.get("project").and_then(|v| v.as_str()).is_none_or(|name| name == pf),
-                            "task_order_changed" | "sprint_changed" => true,
+                            "task_order_changed" | "sprint_changed" | "release_changed" => true,
                             // Task events include { id: "PREFIX-N" }; compare
                             // against the canonical ID prefix (final numeric
                             // suffix split) so hyphenated prefixes match.
@@ -1089,6 +1089,16 @@ fn process_watch_batch(
                 continue;
             }
             [_] => continue, // other root files are not projects
+            ["@releases", file] => {
+                // A release file (DEV-393); its tickets change through their own files.
+                if let Some(id) = file.strip_suffix(".yml").and_then(|stem| stem.parse::<u32>().ok()).filter(|id| *id > 0) {
+                    crate::api_events::emit(&crate::api_events::ApiEvent {
+                        kind: "release_changed".into(),
+                        data: serde_json::json!({"id": id, "deleted": !path.exists()}),
+                    });
+                }
+                continue;
+            }
             ["@sprints", file] => {
                 if let Some(stem) = file.strip_suffix(".yml") {
                     let container = if stem == "backlog" { Some(None) } else { stem.parse::<u32>().ok().filter(|id| *id > 0).map(Some) };

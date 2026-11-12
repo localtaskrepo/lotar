@@ -203,6 +203,7 @@ pub fn handle_diff(
             push_change("relationships", serde_json::json!(prev.relationships), serde_json::json!(cur.relationships));
             push_change("custom_fields", serde_json::json!(prev.custom_fields), serde_json::json!(cur.custom_fields));
             push_change("sprints", serde_json::json!(prev.sprints), serde_json::json!(cur.sprints));
+            push_change("releases", serde_json::json!(prev.releases), serde_json::json!(cur.releases));
         }
         let structured_available = cur_task.is_some() && prev_task.is_some();
         let result = serde_json::Value::Object(deltas);

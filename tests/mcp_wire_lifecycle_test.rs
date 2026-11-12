@@ -290,7 +290,7 @@ fn initialize_response_and_await_window_before_initialized_notification() {
     let list = child.request(4, "tools/list", json!({}));
     assert!(list.get("error").is_none(), "tools/list after ready: {list}");
     let tools = list.get("result").and_then(|result| result.get("tools")).and_then(|tools| tools.as_array()).expect("tools array");
-    assert_eq!(tools.len(), 46, "advertised tool count");
+    assert_eq!(tools.len(), 57, "advertised tool count");
 }
 
 #[test]

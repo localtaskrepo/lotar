@@ -6,8 +6,9 @@
 //! Unknown `key:value` tokens, URLs, `/regex/` terms and fully quoted
 //! literals stay search text. A leading minus on a filter excludes it
 //! (`-status:done`). `name<value`, `name<=value`, `name>value` and
-//! `name>=value` compare a version field (DEV-373); comparisons of one field
-//! add up into one range (`affects>=0.13 affects<0.14` is `>=0.13 <0.14`).
+//! `name>=value` compare a version field (DEV-373) or a release's version
+//! (`release>=0.15`, DEV-393); comparisons of one field add up into one
+//! range (`affects>=0.13 affects<0.14` is `>=0.13 <0.14`).
 //! Both parsers are checked against the shared
 //! cases in `tests/fixtures/search_syntax_cases.json`, so keep them in step.
 
@@ -36,6 +37,7 @@ pub const SEARCH_KEYS: &[SearchKey] = &[
     key("priority", &["priority", "prio"]),
     key("type", &["type", "tasktype", "kind"]),
     key("sprints", &["sprint", "sprints"]),
+    key("releases", &["release", "releases"]),
     key("project", &["project", "projectkey"]),
     key("assignee", &["assignee", "owner"]),
     key("tags", &["tag", "tags"]),
@@ -54,7 +56,7 @@ const fn key(key: &'static str, aliases: &'static [&'static str]) -> SearchKey {
 }
 
 /// Multi-select keys: repeated `key:value` tokens add up.
-pub const LIST_KEYS: &[&str] = &["status", "priority", "type", "sprints", "tags", "needs", "has"];
+pub const LIST_KEYS: &[&str] = &["status", "priority", "type", "sprints", "releases", "tags", "needs", "has"];
 
 /// Routing keys a leading minus cannot exclude.
 const UNNEGATABLE_KEYS: &[&str] = &["q", "order", "sort_by", "deletion", "archived"];
@@ -346,11 +348,19 @@ impl Parser {
         }
         let field = is_field_key(key_text);
         let name = if field { key_text[key_text.find(':').unwrap_or(0) + 1..].trim() } else { key_text };
-        if reserved_field_alias(name).is_some() || find_key(name).is_some() {
-            self.parsed.errors.push(format!("\"{name}\" cannot be compared: only version fields use < and >"));
+        // `release>=0.15` compares the versions of a ticket's releases.
+        let release = !field && find_key(name).is_some_and(|meta| meta.key == "releases");
+        if !release && (reserved_field_alias(name).is_some() || find_key(name).is_some()) {
+            self.parsed.errors.push(format!("\"{name}\" cannot be compared: only version fields and releases use < and >"));
             return;
         }
-        let key = if field { format!("field:{}", name.to_lowercase()) } else { name.to_lowercase() };
+        let key = if release {
+            "releases".to_string()
+        } else if field {
+            format!("field:{}", name.to_lowercase())
+        } else {
+            name.to_lowercase()
+        };
         let next = format!("{op}{value}");
         let value = match self.parsed.filters.get(&key) {
             Some(previous) if self.compared.contains(&key) => format!("{previous} {next}"),

@@ -101,6 +101,7 @@ export function useTaskPanelFormLifecycle(options: UseTaskPanelFormLifecycleOpti
         options.form.effort = ''
         options.form.description = ''
         options.form.tags = []
+        options.form.releases = []
         options.resetSprintsState()
         options.resetOwnership()
         options.activityTab.value = 'comments'
@@ -128,6 +129,7 @@ export function useTaskPanelFormLifecycle(options: UseTaskPanelFormLifecycleOpti
             .map((tag: string) => tag.trim())
             .filter((tag: string) => tag.length > 0)
         options.resetSprintsState()
+        options.form.releases = []
         options.mergeKnownTags(options.form.tags)
         options.resetCustomFields()
         options.ensureConfiguredCustomFields()
@@ -188,6 +190,7 @@ export function useTaskPanelFormLifecycle(options: UseTaskPanelFormLifecycleOpti
         options.form.tags = [...data.tags]
         options.mergeKnownTags(options.form.tags)
         options.applyTaskSprints(data)
+        options.form.releases = Array.isArray(data.releases) ? [...data.releases] : []
         options.resetReferencePreviews()
 
         options.task.comments = Array.isArray(data.comments) ? data.comments.map((comment) => ({ ...comment })) : []
@@ -235,8 +238,10 @@ export function useTaskPanelFormLifecycle(options: UseTaskPanelFormLifecycleOpti
                 // Preserve the latest global membership, including draft edits
                 // made while the project's configuration was loading.
                 const sprintMembership = Array.isArray(options.form.sprints) ? [...options.form.sprints] : []
+                const releaseMembership = [...options.form.releases]
                 applyDefaults(project)
                 options.form.sprints = sprintMembership
+                options.form.releases = releaseMembership
                 options.ready.value = true
             })
             .catch((error: unknown) => {

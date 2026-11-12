@@ -123,6 +123,7 @@ fn handle_set_status(
         relationships: None,
         custom_fields: None,
         sprints: None,
+        releases: None,
     };
 
     let receipt = TaskService::update_with_receipt(&mut ctx.storage, full_id, patch, crate::services::task_service::TaskUpdateContext::default())

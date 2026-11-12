@@ -21,6 +21,7 @@ export type AutomationEventKey =
     | 'assigned'
     | 'commented'
     | 'sprint_changed'
+    | 'release_changed'
     | 'job_start'
     | 'complete'
     | 'error'
@@ -70,7 +71,7 @@ export interface AutomationSetFieldDraft {
 
 export interface AutomationListFieldDraft {
     id: string
-    field: 'tags' | 'labels' | 'sprint' | 'depends_on' | 'blocks' | 'related'
+    field: 'tags' | 'labels' | 'sprint' | 'release' | 'depends_on' | 'blocks' | 'related'
     value: string
 }
 
@@ -152,6 +153,7 @@ export type ConditionFieldOptionValue =
     | 'created'
     | 'modified'
     | 'status_changed'
+    | 'release'
     | 'custom_field'
     | 'other'
 
@@ -178,6 +180,7 @@ const EVENT_LABELS: Record<AutomationEventKey, string> = {
     assigned: 'Assigned',
     commented: 'Comment added',
     sprint_changed: 'Sprint changed',
+    release_changed: 'Releases changed',
     job_start: 'Job started',
     complete: 'Job completed',
     error: 'Job failed',
@@ -194,6 +197,7 @@ const EVENT_ALIAS_TO_KEY: Record<string, AutomationEventKey> = {
     assigned: 'assigned',
     commented: 'commented',
     sprint_changed: 'sprint_changed',
+    release_changed: 'release_changed',
     job_start: 'job_start',
     job_started: 'job_start',
     complete: 'complete',
@@ -218,6 +222,7 @@ const YAML_EVENT_KEYS: Record<AutomationEventKey, string> = {
     assigned: 'assigned',
     commented: 'commented',
     sprint_changed: 'sprint_changed',
+    release_changed: 'release_changed',
     // Write the canonical job hook names; the old aliases are still read.
     job_start: 'job_started',
     complete: 'job_completed',
@@ -260,7 +265,7 @@ const SUPPORTED_SET_FIELDS = new Set([
     'labels',
     'custom_fields',
 ])
-const SUPPORTED_LIST_FIELDS = new Set(['tags', 'labels', 'sprint', 'depends_on', 'blocks', 'related'])
+const SUPPORTED_LIST_FIELDS = new Set(['tags', 'labels', 'sprint', 'release', 'depends_on', 'blocks', 'related'])
 
 export const automationEventOptions: NamedOption<AutomationEventKey>[] = (
     Object.keys(EVENT_LABELS) as AutomationEventKey[]
@@ -287,6 +292,7 @@ export const automationConditionFieldOptions: NamedOption<ConditionFieldOptionVa
     { value: 'created', label: 'Created' },
     { value: 'modified', label: 'Last changed' },
     { value: 'status_changed', label: 'Time in current status' },
+    { value: 'release', label: 'Release' },
     { value: 'custom_field', label: 'Custom field' },
     { value: 'other', label: 'Other field' },
 ]
@@ -310,6 +316,7 @@ export const automationListFieldOptions: NamedOption<AutomationListFieldDraft['f
     { value: 'tags', label: 'Tags' },
     { value: 'labels', label: 'Labels' },
     { value: 'sprint', label: 'Sprint' },
+    { value: 'release', label: 'Release' },
     { value: 'depends_on', label: 'Depends on' },
     { value: 'blocks', label: 'Blocks' },
     { value: 'related', label: 'Related' },
@@ -1231,8 +1238,10 @@ function buildListAction(entries: AutomationListFieldDraft[]): AutomationRecord 
     return entries.reduce<AutomationRecord>((acc, entry) => {
         const value = entry.value.trim()
         if (!value) return acc
-        const values = entry.field === 'sprint' ? value : listFromCsv(value)
-        acc[entry.field] = entry.field === 'sprint' ? value : values.length === 1 ? values[0] : values
+        // A sprint or release is one value (`@active`, `@next`, `0.15.0`).
+        const single = entry.field === 'sprint' || entry.field === 'release'
+        const values = single ? value : listFromCsv(value)
+        acc[entry.field] = single ? value : values.length === 1 ? values[0] : values
         return acc
     }, {})
 }
@@ -1365,6 +1374,7 @@ function denormalizeEventKey(event: AutomationEventKey): string {
         case 'assigned':
         case 'commented':
         case 'sprint_changed':
+        case 'release_changed':
         case 'manual':
         case 'unblocked':
         case 'start':

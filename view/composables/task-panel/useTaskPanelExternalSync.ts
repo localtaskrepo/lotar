@@ -18,6 +18,7 @@ export type ExternalSyncField =
     | 'effort'
     | 'tags'
     | 'sprints'
+    | 'releases'
     | 'custom_fields'
 
 const FIELD_LABELS: Record<ExternalSyncField, string> = {
@@ -32,6 +33,7 @@ const FIELD_LABELS: Record<ExternalSyncField, string> = {
     effort: 'Effort',
     tags: 'Tags',
     sprints: 'Sprints',
+    releases: 'Releases',
     custom_fields: 'Custom fields',
 }
 
@@ -130,6 +132,8 @@ export function useTaskPanelExternalSync(options: UseTaskPanelExternalSyncOption
                 return [...task.tags]
             case 'sprints':
                 return normalizeSprints(task.sprints)
+            case 'releases':
+                return normalizeSprints(task.releases)
             case 'custom_fields':
                 return task.custom_fields
         }
@@ -149,6 +153,8 @@ export function useTaskPanelExternalSync(options: UseTaskPanelExternalSyncOption
                 return form.tags.map((tag) => (tag || '').trim()).filter((tag) => tag.length > 0)
             case 'sprints':
                 return normalizeSprints(form.sprints)
+            case 'releases':
+                return normalizeSprints(form.releases)
             case 'custom_fields':
                 return undefined
             case 'status':
@@ -191,6 +197,9 @@ export function useTaskPanelExternalSync(options: UseTaskPanelExternalSyncOption
                 break
             case 'sprints':
                 options.applySprints(source)
+                break
+            case 'releases':
+                form.releases = Array.isArray(source.releases) ? [...source.releases] : []
                 break
             case 'custom_fields':
                 options.applyCustomFields(JSON.parse(JSON.stringify(source.custom_fields)) as Record<string, unknown>)

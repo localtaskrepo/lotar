@@ -63,6 +63,7 @@ issue.priorities: [Low, Medium, High]
             relationships: None,
             custom_fields: None,
             sprints: Vec::new(),
+            releases: Vec::new(),
         },
     )
     .expect("create feature task");
@@ -92,6 +93,7 @@ issue.priorities: [Low, Medium, High]
             relationships: None,
             custom_fields: None,
             sprints: Vec::new(),
+            releases: Vec::new(),
         },
     )
     .expect("create blocked task");

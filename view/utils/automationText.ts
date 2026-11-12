@@ -14,6 +14,7 @@ const TRIGGER_TEXT: Record<AutomationEventKey, string> = {
     assigned: 'a task is assigned',
     commented: 'someone comments',
     sprint_changed: 'a task moves between sprints',
+    release_changed: "a task's releases change",
     job_start: 'an agent job starts',
     complete: 'an agent job finishes',
     error: 'an agent job fails',
@@ -30,6 +31,7 @@ const HOOK_TO_EVENT: Record<string, AutomationEventKey> = {
     assigned: 'assigned',
     commented: 'commented',
     sprint_changed: 'sprint_changed',
+    release_changed: 'release_changed',
     job_start: 'job_start',
     job_started: 'job_start',
     complete: 'complete',
@@ -65,6 +67,8 @@ const FIELD_NAMES: Record<string, string> = {
     status_changed: 'time in current status',
     sprint: 'sprint',
     sprints: 'sprint',
+    release: 'release',
+    releases: 'release',
     'comment.author': 'comment author',
 }
 
@@ -204,8 +208,8 @@ export function describeActionSteps(action: unknown): string[] {
         for (const [key, value] of Object.entries(section as AutomationRecord)) {
             const values = asList(value).join(', ')
             if (key === 'tags' || key === 'labels') steps.push(`${verb} tag ${values}`)
-            else if (key === 'sprint')
-                steps.push(verb === 'add' ? `add to sprint ${values}` : `remove from sprint ${values}`)
+            else if (key === 'sprint' || key === 'release')
+                steps.push(verb === 'add' ? `add to ${key} ${values}` : `remove from ${key} ${values}`)
             else if (key === 'depends_on' || key === 'blocked_by') steps.push(`${verb} “depends on” ${values}`)
             else if (key === 'blocks') steps.push(`${verb} “blocks” ${values}`)
             else steps.push(`${verb} ${key.replace('_', ' ')} ${values}`)
@@ -289,12 +293,13 @@ const TASK_VARIABLES: Array<[string, string]> = [
     ['due_date', 'Due date'],
     ['effort', 'Effort'],
     ['tags[*]', 'All tags'],
+    ['releases[*]', 'Release IDs'],
     ['description', 'Description'],
     ['comments[-1].text', 'Latest comment'],
     ['references[*].link', 'All links'],
 ]
 
-const CHANGE_EVENTS = new Set<AutomationEventKey>(['updated', 'assigned', 'sprint_changed', 'start'])
+const CHANGE_EVENTS = new Set<AutomationEventKey>(['updated', 'assigned', 'sprint_changed', 'release_changed', 'start'])
 const JOB_EVENTS = new Set<AutomationEventKey>(['job_start', 'complete', 'error', 'cancel'])
 
 /** The placeholders a rule can use, given the events it runs on. Values
@@ -343,10 +348,17 @@ function readTaskValue(task: TaskDTO, path: string): string | null {
         const value = task.custom_fields[path.slice('field:'.length)]
         return value == null ? '' : displayText(value)
     }
-    const listMatch = /^(tags|comments|references)\[(\*|-?\d+)\](?:\.(\w+))?$/.exec(path)
+    const listMatch = /^(tags|releases|comments|references)\[(\*|-?\d+)\](?:\.(\w+))?$/.exec(path)
     if (listMatch) {
         const [, list, selector, prop] = listMatch
-        const items: unknown[] = list === 'tags' ? task.tags : list === 'comments' ? task.comments : task.references
+        const items: unknown[] =
+            list === 'tags'
+                ? task.tags
+                : list === 'releases'
+                  ? task.releases
+                  : list === 'comments'
+                    ? task.comments
+                    : task.references
         const pick = (item: unknown) => {
             if (item == null) return ''
             if (typeof item !== 'object') return displayText(item)
@@ -378,6 +390,8 @@ function readTaskValue(task: TaskDTO, path: string): string | null {
             return task.task_type
         case 'tags':
             return task.tags.join(', ')
+        case 'releases':
+            return task.releases.join(', ')
         case null:
         default:
             return null

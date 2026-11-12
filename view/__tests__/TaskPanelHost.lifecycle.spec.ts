@@ -43,6 +43,7 @@ function makeTask(id: string, overrides: Record<string, unknown> = {}) {
         comments: [],
         references: [],
         sprints: [],
+        releases: [],
         history: [],
         custom_fields: {},
         ...overrides,

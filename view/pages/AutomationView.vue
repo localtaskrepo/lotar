@@ -130,6 +130,7 @@
                 <option value="assigned">Assigned</option>
                 <option value="commented">Comment added</option>
                 <option value="sprint_changed">Sprint changed</option>
+                <option value="release_changed">Releases changed</option>
                 <option value="job_start">Job started</option>
                 <option value="complete">Job completed</option>
                 <option value="error">Job failed</option>

@@ -23,6 +23,7 @@ import {
 } from './useCompletionPolicy'
 import { useProjects } from './useProjects'
 import { useReferencePreview } from './useReferencePreview'
+import { useReleases } from './useReleases'
 import { useSprints } from './useSprints'
 import { useTaskPanelOwnership } from './useTaskPanelOwnership'
 import { useTaskPanelController } from './useTaskPanelController'
@@ -84,6 +85,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         active: activeSprints,
         refresh: refreshSprints,
     } = useSprints()
+    const { releases: releaseList, loading: releasesLoading } = useReleases()
     const {
         statuses,
         priorities,
@@ -137,6 +139,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         description: '',
         tags: [] as string[],
         sprints: [] as number[],
+        releases: [] as number[],
     })
     const canCreate = computed(
         () =>
@@ -774,6 +777,8 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         resetCustomFields,
         sprintLookup,
         refreshSprints,
+        releaseList,
+        releasesLoading,
         setTags,
         updateCustomFieldKey,
         updateCustomFieldValue,

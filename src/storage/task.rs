@@ -47,6 +47,10 @@ pub struct Task {
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub sprints: Vec<u32>,
 
+    // Release memberships (numeric release ids, DEV-393), kept on the task
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub releases: Vec<u32>,
+
     // Legacy fields (keeping for backward compatibility)
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub subtitle: Option<String>,
@@ -103,6 +107,7 @@ fn is_builtin_key(key: &str) -> bool {
             | "comments"
             | "references"
             | "sprints"
+            | "releases"
             | "subtitle"
             | "description"
             | "tags"

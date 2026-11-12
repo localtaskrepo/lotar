@@ -931,21 +931,31 @@ fn parse_string_list_field(body: &serde_json::Value, key: &str) -> Result<Option
 }
 
 fn parse_sprints_field(body: &serde_json::Value) -> Result<Option<Vec<u32>>, String> {
-    match body.get("sprints") {
+    parse_id_list_field(body, "sprints")
+}
+
+fn parse_releases_field(body: &serde_json::Value) -> Result<Option<Vec<u32>>, String> {
+    parse_id_list_field(body, "releases")
+}
+
+/// A list of positive numeric ids (`sprints`, `releases`); null clears.
+fn parse_id_list_field(body: &serde_json::Value, key: &str) -> Result<Option<Vec<u32>>, String> {
+    let invalid = || format!("{key} must be an array of positive integers");
+    match body.get(key) {
         None => Ok(None),
         Some(serde_json::Value::Null) => Ok(Some(Vec::new())),
         Some(serde_json::Value::Array(items)) => {
             let mut collected = Vec::with_capacity(items.len());
             for item in items {
-                let id = item.as_u64().and_then(|v| u32::try_from(v).ok()).ok_or_else(|| "sprints must be an array of positive integers".to_string())?;
+                let id = item.as_u64().and_then(|v| u32::try_from(v).ok()).ok_or_else(invalid)?;
                 if id == 0 {
-                    return Err("sprints must be an array of positive integers".to_string());
+                    return Err(invalid());
                 }
                 collected.push(id);
             }
             Ok(Some(collected))
         }
-        Some(_) => Err("sprints must be an array of positive integers".to_string()),
+        Some(_) => Err(invalid()),
     }
 }
 
@@ -1045,6 +1055,7 @@ fn parse_task_create_body(body: &serde_json::Value, req: &HttpRequest) -> Result
         },
         custom_fields: parse_custom_fields_body(body)?,
         sprints: parse_sprints_field(body)?.unwrap_or_default(),
+        releases: parse_releases_field(body)?.unwrap_or_default(),
     })
 }
 
@@ -1069,6 +1080,7 @@ const TASK_UPDATE_KEYS: &[&str] = &[
     "custom_fields",
     "fields",
     "sprints",
+    "releases",
     "expected_modified",
 ];
 
@@ -1104,6 +1116,7 @@ fn parse_task_update_body(body: &serde_json::Value) -> Result<crate::api_types::
             Some(_) => return Err("custom_fields must be an object or null".into()),
         },
         sprints: parse_sprints_field(body)?,
+        releases: parse_releases_field(body)?,
     })
 }
 

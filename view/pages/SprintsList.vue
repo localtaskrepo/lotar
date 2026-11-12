@@ -211,6 +211,7 @@
         :priorities="priorities"
         :types="types"
         :sprint-options="sprintFilterOptions"
+        :release-options="releaseFilterOptions"
         :tag-options="filterOptions.tags"
         :assignee-options="filterOptions.assignees"
         :custom-field-values="filterOptions.customFieldValues"
@@ -818,6 +819,7 @@ import { useColumnDragReorder } from '../composables/useColumnDragReorder'
 import { ensureCompletionPolicies, useCompletionPolicy } from '../composables/useCompletionPolicy'
 import { DEFAULT_VELOCITY_PARAMS, useSprintAnalytics } from '../composables/useSprintAnalytics'
 import { useSprints, useSprintFilterOptions } from '../composables/useSprints'
+import { useReleaseFilterOptions, useReleases } from '../composables/useReleases'
 import { useSprintForm } from '../composables/useSprintForm'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
 import { MS_PER_DAY, formatRelativeTime, parseTaskDate, safeTimestamp } from '../utils/date'
@@ -914,6 +916,8 @@ const {
   hasMissing: hasMissingSprints,
 } = useSprints()
 const sprintFilterOptions = useSprintFilterOptions(sprints)
+const { releases: releaseList } = useReleases()
+const releaseFilterOptions = useReleaseFilterOptions(releaseList)
 const { state: taskPanelState, openTaskPanel } = useTaskPanelController()
 // Preserve an open draft instead of silently changing its destination.
 const taskPanelOpen = computed(() => taskPanelState.open)

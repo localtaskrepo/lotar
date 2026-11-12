@@ -623,6 +623,15 @@
                     </div>
                   </fieldset>
 
+                  <TaskPanelReleasesSection
+                    v-if="releaseList.length || form.releases.length"
+                    :releases="form.releases"
+                    :release-list="releaseList"
+                    :loading="releasesLoading"
+                    :disabled="isReadOnly"
+                    @update:releases="setReleases"
+                  />
+
                   <TaskPanelCustomFieldsSection
                     :custom-fields="customFields"
                     :custom-field-keys="customFieldKeys"
@@ -1016,6 +1025,7 @@ import TaskPanelReferencesTab from './task-panel/TaskPanelReferencesTab.vue'
 import TaskPanelRelationshipsTab from './task-panel/TaskPanelRelationshipsTab.vue'
 import TaskPanelSummarySection from './task-panel/TaskPanelSummarySection.vue'
 import TaskPanelTagEditor from './task-panel/TaskPanelTagEditor.vue'
+import TaskPanelReleasesSection from './task-panel/TaskPanelReleasesSection.vue'
 import TaskMoveDialog from './TaskMoveDialog.vue'
 import { showToast } from './toast'
 
@@ -1090,6 +1100,8 @@ const {
   sprintOptions,
   sprintLookup,
   hasSprints,
+  releaseList,
+  releasesLoading,
   relationships,
   mutateRelationship,
   mergeKnownTags,
@@ -1686,6 +1698,13 @@ const handleFieldBlur = async (field: string) => {
   if (field === 'title') {
     await detectAndAttachLinksFromTaskText()
   }
+}
+
+/** DEV-393: drafts keep releases for the create request; saved tasks update at once. */
+function setReleases(ids: number[]) {
+  if (rejectDeletedMutation('changing releases')) return
+  form.releases = ids
+  if (mode.value === 'edit') void onFieldBlurBase('releases')
 }
 
 const onFieldBlur = async (field: string) => {

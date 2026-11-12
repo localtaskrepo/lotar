@@ -44,6 +44,7 @@ pub fn render_task_text(task: &TaskDTO, tasks_root: &std::path::Path) -> String 
     push("Effort", task.effort.clone());
     push("Tags", (!task.tags.is_empty()).then(|| task.tags.join(", ")));
     push("Sprints", (!task.sprints.is_empty()).then(|| task.sprints.iter().map(|id| format!("#{id}")).collect::<Vec<_>>().join(", ")));
+    push("Releases", (!task.releases.is_empty()).then(|| task.releases.iter().map(|id| format!("#{id}")).collect::<Vec<_>>().join(", ")));
     push("Created", Some(task.created.clone()));
     push("Modified", Some(task.modified.clone()));
     for (name, value) in &task.custom_fields {

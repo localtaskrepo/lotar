@@ -846,7 +846,7 @@ pub fn graph(storage: &Storage, request: &RelationshipGraphRequest) -> LoTaRResu
         .unwrap_or(&inventory.local_root);
     let query_config = crate::config::resolution::load_and_merge_configs(Some(query_root))
         .map_err(|error| invalid(format!("Relationship filter configuration unavailable: {error}")))?;
-    let crate::services::task_list::TaskQuery { filter, field_filters: unknown, options, config: query_config, exclude } =
+    let crate::services::task_list::TaskQuery { filter, field_filters: unknown, options, config: query_config, exclude, releases } =
         crate::services::task_list::TaskQueryInput::from_params(&query)
             .and_then(|input| input.resolve(&query_config, query_root))
             .map_err(|e| invalid(e.to_string()))?;
@@ -936,6 +936,7 @@ pub fn graph(storage: &Storage, request: &RelationshipGraphRequest) -> LoTaRResu
                     if exact.as_ref() == Some(id) { &exact_filter } else { &storage_filter },
                 )
                 || (!filter.sprints.is_empty() && !dto.sprints.iter().any(|s| filter.sprints.contains(s)))
+                || releases.as_ref().is_some_and(|releases| !releases.matches(&dto.releases))
             {
                 continue;
             }

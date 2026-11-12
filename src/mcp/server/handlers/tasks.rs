@@ -90,24 +90,26 @@ fn parse_tags_params(params: &Value) -> Vec<String> {
 /// absent/null or an array of positive integers; invalid entries are rejected
 /// instead of silently dropped (matching REST).
 fn parse_strict_sprint_ids(value: Option<&Value>) -> Result<Vec<u32>, String> {
+    parse_strict_ids(value, "sprints")
+}
+
+/// Strict id-list parsing for `sprints` and `releases` (DEV-393).
+fn parse_strict_ids(value: Option<&Value>, key: &str) -> Result<Vec<u32>, String> {
     let Some(v) = value else {
         return Ok(Vec::new());
     };
+    let invalid = || format!("{key} must be an array of positive integers");
     match v {
         Value::Null => Ok(Vec::new()),
         Value::Array(items) => {
             let mut ids = Vec::with_capacity(items.len());
             for item in items {
-                let id = item
-                    .as_u64()
-                    .and_then(|raw| u32::try_from(raw).ok())
-                    .filter(|id| *id > 0)
-                    .ok_or_else(|| "sprints must be an array of positive integers".to_string())?;
+                let id = item.as_u64().and_then(|raw| u32::try_from(raw).ok()).filter(|id| *id > 0).ok_or_else(invalid)?;
                 ids.push(id);
             }
             Ok(ids)
         }
-        _ => Err("sprints must be an array of positive integers".to_string()),
+        _ => Err(invalid()),
     }
 }
 
@@ -229,6 +231,13 @@ fn parse_task_update_patch(req_id: Option<Value>, patch_val: &Value) -> Result<T
             _ => {
                 return Err(err(req_id, -32602, "sprints must be an array of positive integers or null", None));
             }
+        }
+    }
+
+    if let Some(value) = patch_val.get("releases") {
+        match parse_strict_ids(Some(value), "releases") {
+            Ok(ids) => patch.releases = Some(ids),
+            Err(msg) => return Err(err(req_id, -32602, &format!("{msg} or null"), None)),
         }
     }
 
@@ -372,6 +381,10 @@ pub(crate) fn handle_task_create(req: JsonRpcRequest) -> JsonRpcResponse {
         relationships,
         custom_fields,
         sprints: match parse_strict_sprint_ids(req.params.get("sprints")) {
+            Ok(ids) => ids,
+            Err(msg) => return err(req.id, -32602, &msg, None),
+        },
+        releases: match parse_strict_ids(req.params.get("releases"), "releases") {
             Ok(ids) => ids,
             Err(msg) => return err(req.id, -32602, &msg, None),
         },
@@ -1209,6 +1222,7 @@ pub(crate) fn task_list_input(params: &Value) -> Result<crate::services::task_li
         tags: parse_tags_params(params),
         text: params.get("search").and_then(Value::as_str).map(str::to_string),
         sprints: parse_sprint_ids_strict(params.get("sprints"))?,
+        releases: strings(params, "releases")?,
         assignee: params.get("assignee").and_then(Value::as_str).map(str::to_string),
         fields,
         deletion,

@@ -166,6 +166,7 @@ function makeTask(idNum: number, sprints: number[] = []) {
         comments: [],
         custom_fields: {},
         sprints,
+        releases: [] as number[],
         references: [],
         history: [],
     }

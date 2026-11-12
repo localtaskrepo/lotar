@@ -48,6 +48,7 @@
         :priorities="priorities"
         :types="types"
         :sprint-options="sprintOptions"
+        :release-options="releaseFilterOptions"
         :tag-options="filterOptions.tags"
         :assignee-options="filterOptions.assignees"
         :custom-field-values="filterOptions.customFieldValues"
@@ -253,6 +254,7 @@ import { useConfig } from '../composables/useConfig'
 import { useProjectFilterSync } from '../composables/useFilterBuilder'
 import { useFilterOptions } from '../composables/useFilterOptions'
 import { useSprints, useSprintFilterOptions } from '../composables/useSprints'
+import { useReleaseFilterOptions, useReleases } from '../composables/useReleases'
 import { useSse } from '../composables/useSse'
 
 const { projectName, projectLabel } = useProjectNames()
@@ -358,6 +360,8 @@ const {
 } = useConfig()
 const { sprints, refresh: refreshSprints } = useSprints()
 const sprintOptions = useSprintFilterOptions(sprints)
+const { releases: releaseList } = useReleases()
+const releaseFilterOptions = useReleaseFilterOptions(releaseList)
 const graphNodes = ref<RelationshipGraphResponse['nodes']>([])
 const filterOptions = useFilterOptions(
   () => graphNodes.value.flatMap((node) => (node.task ? [node.task] : [])),

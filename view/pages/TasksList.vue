@@ -48,6 +48,7 @@
         :priorities="priorities"
         :types="types"
         :sprint-options="sprintFilterOptions"
+        :release-options="releaseFilterOptions"
         :tag-options="filterOptions.tags"
         :assignee-options="filterOptions.assignees"
         :custom-field-values="filterOptions.customFieldValues"
@@ -159,6 +160,24 @@
                 <span class="menu-item__label">Remove from sprint…</span>
               </button>
               <button
+                class="menu-item"
+                type="button"
+                :disabled="disableReleaseActions"
+                @click="handleBulkAction('release-add')"
+              >
+                <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="flag" /></span>
+                <span class="menu-item__label">Add to release…</span>
+              </button>
+              <button
+                class="menu-item"
+                type="button"
+                :disabled="disableReleaseActions"
+                @click="handleBulkAction('release-remove')"
+              >
+                <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="flag-remove" /></span>
+                <span class="menu-item__label">Remove from release…</span>
+              </button>
+              <button
                 class="menu-item danger"
                 type="button"
                 :disabled="disableBulkActions"
@@ -230,6 +249,7 @@
         :project-key="filter.project || projectOf(shownTasks[0]?.id)"
         :touches="activityTouches"
         :sprint-lookup="sprintLookup"
+        :release-lookup="releaseLookup"
         :has-sprints="hasSprints"
         :sprints-loading="sprintsLoading"
         v-model:bulk="bulk"
@@ -423,6 +443,56 @@
       </form>
     </UiModal>
 
+    <UiModal :open="releaseDialog.open" :aria-label="releaseDialogTitle" @close="closeReleaseDialog">
+      <form class="col tasks-modal__form" @submit.prevent="submitReleaseDialog">
+        <header class="row tasks-modal__header">
+          <div class="col" style="gap: 4px">
+            <h2>{{ releaseDialogTitle }}</h2>
+            <p class="muted tasks-modal__hint">
+              {{
+                releaseDialog.mode === 'add'
+                  ? 'The tasks keep the releases they are already in.'
+                  : 'The tasks stay in their other releases.'
+              }}
+            </p>
+          </div>
+          <UiButton
+            variant="ghost"
+            icon-only
+            type="button"
+            aria-label="Close dialog"
+            title="Close dialog"
+            :disabled="releaseDialog.submitting"
+            @click="closeReleaseDialog"
+          >
+            <IconGlyph name="close" />
+          </UiButton>
+        </header>
+        <label class="col" style="gap: 4px">
+          <span class="muted">Release</span>
+          <select class="input" v-model="releaseDialog.selection" :disabled="!releaseList.length">
+            <option v-for="release in releaseList" :key="release.id" :value="String(release.id)">
+              {{ releaseLookup[release.id]?.label }}
+            </option>
+          </select>
+        </label>
+        <footer class="row tasks-modal__footer">
+          <UiButton variant="primary" type="submit" :disabled="releaseDialog.submitting || !releaseDialog.selection">
+            {{
+              releaseDialog.submitting
+                ? 'Saving…'
+                : releaseDialog.mode === 'add'
+                  ? 'Add to release'
+                  : 'Remove from release'
+            }}
+          </UiButton>
+          <UiButton variant="ghost" type="button" :disabled="releaseDialog.submitting" @click="closeReleaseDialog"
+            >Cancel</UiButton
+          >
+        </footer>
+      </form>
+    </UiModal>
+
     <UiModal :open="deleteDialogOpen" :aria-label="deleteDialogTitle" @close="closeDeleteDialog">
       <div class="col tasks-modal__form">
         <header class="row tasks-modal__header">
@@ -481,7 +551,17 @@
 <script setup lang="ts">
 import { errorMessage } from '../utils/errors'
 import PageHeader from '../components/PageHeader.vue'
-import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch, type ComponentPublicInstance } from 'vue'
+import {
+  computed,
+  nextTick,
+  onMounted,
+  onUnmounted,
+  reactive,
+  ref,
+  shallowRef,
+  watch,
+  type ComponentPublicInstance,
+} from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { api } from '../api/client'
 import type { SprintAssignmentRequest, TaskDTO } from '../api/types'
@@ -496,13 +576,14 @@ import UiLoader from '../components/UiLoader.vue'
 import UiModal from '../components/UiModal.vue'
 import UiPagination from '../components/UiPagination.vue'
 import { useActivity } from '../composables/useActivity'
-import { useColumns, provideColumnStore } from '../composables/useColumns'
+import { BUILTIN_COLUMNS, useColumns, provideColumnStore, type BuiltinColKey } from '../composables/useColumns'
 import { useConfig } from '../composables/useConfig'
 import { useFilterOptions } from '../composables/useFilterOptions'
 import { buildServerFilter } from '../composables/useFilterBuilder'
 import { useProjects } from '../composables/useProjects'
 import { useSprintFormatting } from '../composables/useSprintFormatting'
 import { useSprintFilterOptions, useSprints } from '../composables/useSprints'
+import { releaseLabel, useReleaseFilterOptions, useReleases } from '../composables/useReleases'
 import { useSse } from '../composables/useSse'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
 import { useTaskStore, type TaskQueryHandle } from '../composables/useTaskStore'
@@ -592,6 +673,13 @@ const {
 const { sprints, loading: sprintsLoading, refresh: refreshSprints, active: activeSprints } = useSprints()
 const { sprintLookup } = useSprintFormatting(sprints)
 const sprintFilterOptions = useSprintFilterOptions(sprints)
+const { releases: releaseList, refresh: refreshReleases } = useReleases()
+const releaseFilterOptions = useReleaseFilterOptions(releaseList)
+const releaseLookup = computed(() =>
+  Object.fromEntries(
+    releaseList.value.map((release) => [release.id, { label: releaseLabel(release), state: release.state }]),
+  ),
+)
 const sprintSelection = ref('active')
 const allowClosedSprint = ref(false)
 const sprintOptions = computed(() => {
@@ -634,7 +722,10 @@ watch(
 const filter = ref<Record<string, string>>({})
 const filterBarRef = ref<{ clear?: () => void } | null>(null)
 
-const columnsStore = useColumns()
+// The task list also offers a Releases column (DEV-393).
+const columnsStore = useColumns({
+  builtinColumns: BUILTIN_COLUMNS.flatMap((key): BuiltinColKey[] => (key === 'sprints' ? [key, 'releases'] : [key])),
+})
 provideColumnStore(columnsStore)
 const columnsMenuOpen = ref(false)
 const fieldOptions = columnsStore.fieldOptions
@@ -1025,7 +1116,8 @@ const bulk = ref(false)
 const selectedIds = ref<string[]>([])
 
 const showBulkMenu = ref(false)
-type BulkMenuAction = 'assign' | 'unassign' | 'set-field' | 'sprint-add' | 'sprint-remove' | 'delete'
+type BulkMenuAction =
+  'assign' | 'unassign' | 'set-field' | 'sprint-add' | 'sprint-remove' | 'release-add' | 'release-remove' | 'delete'
 type BulkMenuButtonRef = HTMLElement | (ComponentPublicInstance & { $el: HTMLElement })
 const bulkMenuButton = ref<BulkMenuButtonRef | null>(null)
 const bulkMenuPopover = ref<HTMLElement | null>(null)
@@ -1039,6 +1131,7 @@ const scopedSelection = computed(() => {
 })
 const disableBulkActions = computed(() => !scopedSelection.value.length)
 const disableSprintActions = computed(() => disableBulkActions.value || sprintsLoading.value || !hasSprints.value)
+const disableReleaseActions = computed(() => disableBulkActions.value || !releaseList.value.length)
 
 function toggleBulkMode() {
   bulk.value = !bulk.value
@@ -1070,6 +1163,12 @@ function handleBulkAction(action: BulkMenuAction) {
       break
     case 'sprint-remove':
       openBulkSprintRemove()
+      break
+    case 'release-add':
+      openReleaseDialog(scopedSelection.value, 'add')
+      break
+    case 'release-remove':
+      openReleaseDialog(scopedSelection.value, 'remove')
       break
     case 'delete':
       openBulkDelete()
@@ -1494,6 +1593,66 @@ function openBulkSprintAdd() {
 
 function openBulkSprintRemove() {
   openSprintDialog(scopedSelection.value, 'remove')
+}
+
+// Add to / remove from a release (DEV-393): membership is not exclusive.
+const releaseDialog = reactive({
+  open: false,
+  submitting: false,
+  mode: 'add' as 'add' | 'remove',
+  ids: [] as string[],
+  selection: '',
+})
+const releaseDialogTitle = computed(() => {
+  const count = releaseDialog.ids.length
+  const noun = `${count} task${count === 1 ? '' : 's'}`
+  return releaseDialog.mode === 'add' ? `Add ${noun} to release` : `Remove ${noun} from release`
+})
+
+function openReleaseDialog(ids: string[], mode: 'add' | 'remove') {
+  if (releaseDialog.submitting) return
+  const unique = Array.from(new Set(ids))
+  if (!unique.length) {
+    showToast('Select at least one task first')
+    return
+  }
+  const planned = releaseList.value.find((release) => release.state === 'planned') ?? releaseList.value[0]
+  releaseDialog.ids = unique
+  releaseDialog.mode = mode
+  if (!releaseList.value.some((release) => String(release.id) === releaseDialog.selection)) {
+    releaseDialog.selection = planned ? String(planned.id) : ''
+  }
+  releaseDialog.open = true
+}
+
+function closeReleaseDialog(force?: boolean | Event) {
+  if (releaseDialog.submitting && force !== true) return
+  releaseDialog.open = false
+  releaseDialog.ids = []
+}
+
+async function submitReleaseDialog() {
+  const release = Number(releaseDialog.selection)
+  if (releaseDialog.submitting || !releaseDialog.ids.length || !Number.isInteger(release)) return
+  releaseDialog.submitting = true
+  try {
+    const payload = { release, tasks: releaseDialog.ids }
+    const response = releaseDialog.mode === 'add' ? await api.releaseAdd(payload) : await api.releaseRemove(payload)
+    const changed = response.modified.length
+    const name = releaseLookup.value[response.release_id]?.label ?? response.release_version
+    if (changed) {
+      const verb = releaseDialog.mode === 'add' ? 'Added' : 'Removed'
+      showToast(`${verb} ${changed} task(s) ${releaseDialog.mode === 'add' ? 'to' : 'from'} ${name}`)
+      await Promise.all([refreshReleases(true), applyFilter(filter.value, 'none')])
+    } else {
+      showToast(releaseDialog.mode === 'add' ? 'No tasks added' : 'No tasks removed')
+    }
+    closeReleaseDialog(true)
+  } catch (e: unknown) {
+    showToast(errorMessage(e) || 'Failed to update the release')
+  } finally {
+    releaseDialog.submitting = false
+  }
 }
 
 const deleteDialogOpen = ref(false)

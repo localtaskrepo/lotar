@@ -61,6 +61,7 @@ function task(id: string, overrides: Partial<TaskDTO> = {}): TaskDTO {
         comments: [],
         references: [],
         sprints: [],
+        releases: [],
         history: [],
         custom_fields: {},
         ...overrides,

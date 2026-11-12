@@ -216,6 +216,9 @@ pub enum Commands {
     /// Sprint storage management (create/list/show commands)
     Sprint(SprintArgs),
 
+    /// Releases: versions you plan and ship, and the tickets in them
+    Release(crate::cli::args::release::ReleaseArgs),
+
     /// Show task changes (default: vs HEAD working tree; optionally vs a ref)
     Changelog {
         /// Compare since this git ref (e.g., HEAD~1, a tag, or a commit); if omitted, compares working tree vs HEAD

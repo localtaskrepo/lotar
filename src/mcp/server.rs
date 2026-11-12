@@ -148,6 +148,7 @@ fn domain_service_error(id: Option<Value>, envelope: &str, error: &crate::errors
         LoTaRError::ValidationError(_)
         | LoTaRError::TaskNotFound(_)
         | LoTaRError::SprintNotFound(_)
+        | LoTaRError::ReleaseNotFound(_)
         | LoTaRError::InvalidTaskId(_)
         | LoTaRError::ProjectNotFound(_)
         | LoTaRError::IndexError(_)

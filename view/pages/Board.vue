@@ -57,6 +57,7 @@
         :priorities="priorities"
         :types="types"
         :sprint-options="sprintFilterOptions"
+        :release-options="releaseFilterOptions"
         :tag-options="filterOptions.tags"
         :assignee-options="filterOptions.assignees"
         :custom-field-values="filterOptions.customFieldValues"
@@ -550,6 +551,7 @@ import {
 import { useProjects } from '../composables/useProjects'
 import { useSprintFormatting } from '../composables/useSprintFormatting'
 import { useSprintFilterOptions, useSprints } from '../composables/useSprints'
+import { useReleaseFilterOptions, useReleases } from '../composables/useReleases'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
 import { useTaskStore, type TaskQueryHandle } from '../composables/useTaskStore'
 import { parseTaskDate, startOfLocalDay } from '../utils/date'
@@ -630,6 +632,8 @@ const {
 const { sprintLabel, sprintStateClass, sprintTooltip } = useSprintFormatting(sprints)
 
 const sprintFilterOptions = useSprintFilterOptions(sprints)
+const { releases: releaseList } = useReleases()
+const releaseFilterOptions = useReleaseFilterOptions(releaseList)
 
 // -- Swimlane group-by (persisted per project) ----------------------------
 // `field:<name>` groups by a custom field (DEV-394).

@@ -20,6 +20,8 @@ export interface TaskPanelFormState {
     description: string
     tags: string[]
     sprints: number[]
+    /** Release ids (DEV-393); a task can be in several. */
+    releases: number[]
 }
 
 interface TaskPanelApiClient {
@@ -396,6 +398,8 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
             }
             case 'sprints':
                 return normalizeSprints(options.form.sprints)
+            case 'releases':
+                return normalizeSprints(options.form.releases)
             case 'custom_fields':
                 return options.buildCustomFields()
             case 'relationships':
@@ -472,6 +476,9 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
                 break
             case 'sprints':
                 options.form.sprints = [...server.sprints]
+                break
+            case 'releases':
+                options.form.releases = [...server.releases]
                 break
             case 'custom_fields':
                 options.applyTaskCustomFields(server.custom_fields)
@@ -551,6 +558,15 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
                 patch.sprints = next
                 break
             }
+            case 'releases': {
+                const current = normalizeSprints(options.task.releases)
+                const next = normalizeSprints(options.form.releases)
+                if (current.length === next.length && current.every((value, index) => value === next[index])) {
+                    return
+                }
+                patch.releases = next
+                break
+            }
             default:
                 return
         }
@@ -609,6 +625,7 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
                 description: options.form.description || undefined,
                 tags: [...options.form.tags],
                 sprints: options.form.sprints.length ? [...options.form.sprints] : undefined,
+                releases: options.form.releases.length ? [...options.form.releases] : undefined,
                 relationships: options.buildRelationships(),
                 custom_fields: options.buildCustomFields(),
             }

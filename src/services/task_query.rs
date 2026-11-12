@@ -44,6 +44,8 @@ pub enum SortKey {
     Id,
     Tags,
     Sprints,
+    /// Releases in version order (DEV-393); tasks in no release first.
+    Releases,
     /// Best text match first for the current search; without a search it
     /// falls back to the default order (modified desc). DEV-167.
     Relevance,
@@ -139,6 +141,8 @@ pub struct TaskQueryOptions {
 pub struct SortRanks {
     pub priority: Vec<String>,
     pub status: Vec<String>,
+    /// Release IDs in version order, for sorting by release.
+    pub releases: Vec<u32>,
 }
 
 fn compare_ranked(order: &[String], a: &str, b: &str) -> Ordering {
@@ -183,6 +187,7 @@ fn parse_builtin_sort_key(lower: &str) -> Option<SortKey> {
         "id" => Some(SortKey::Id),
         "tags" => Some(SortKey::Tags),
         "sprints" => Some(SortKey::Sprints),
+        "releases" | "release" => Some(SortKey::Releases),
         "relevance" | "best-match" => Some(SortKey::Relevance),
         _ => None,
     }
@@ -212,7 +217,7 @@ pub fn parse_sort_by(raw: &str) -> Result<SortSpec, String> {
         return Ok(SortSpec::Builtin(key));
     }
     Err(format!(
-        "Invalid sort_by: '{raw}' (expected a builtin key (priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints, relevance), custom:<name>, or field:<name>)"
+        "Invalid sort_by: '{raw}' (expected a builtin key (priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints, releases, relevance), custom:<name>, or field:<name>)"
     ))
 }
 
@@ -325,6 +330,8 @@ pub trait TaskSortFields {
     fn tags(&self) -> &[String];
     /// Sprint memberships, ascending (deterministic numeric vec-lex key).
     fn sprints(&self) -> Vec<u32>;
+    /// Release memberships.
+    fn releases(&self) -> &[u32];
     fn due_date(&self) -> Option<&str>;
     fn effort(&self) -> Option<&str>;
     fn created(&self) -> &str;
@@ -360,6 +367,9 @@ impl TaskSortFields for TaskDTO {
         let mut ids = self.sprints.clone();
         ids.sort_unstable();
         ids
+    }
+    fn releases(&self) -> &[u32] {
+        self.releases.as_slice()
     }
     fn due_date(&self) -> Option<&str> {
         self.due_date.as_deref()
@@ -610,6 +620,13 @@ fn compare_parsed_instant(a: &str, b: &str) -> Ordering {
     }
 }
 
+/// A task's releases as positions in version order, earliest first.
+fn release_positions(order: &[u32], releases: &[u32]) -> Vec<usize> {
+    let mut positions: Vec<usize> = releases.iter().map(|id| order.iter().position(|known| known == id).unwrap_or(order.len())).collect();
+    positions.sort_unstable();
+    positions
+}
+
 fn project_prefix_of(id: &str) -> String {
     crate::storage::TaskId::parse(id).map(|parsed| parsed.project).unwrap_or_default()
 }
@@ -629,6 +646,7 @@ fn compare_by_spec<T: TaskSortFields + ?Sized>(id_a: &str, a: &T, id_b: &str, b:
             SortKey::Title => a.title_str().cmp(b.title_str()),
             SortKey::Tags => a.tags().to_vec().cmp(&b.tags().to_vec()),
             SortKey::Sprints => a.sprints().cmp(&b.sprints()),
+            SortKey::Releases => release_positions(&ranks.releases, a.releases()).cmp(&release_positions(&ranks.releases, b.releases())),
             SortKey::Type => a.type_str().cmp(&b.type_str()),
             SortKey::Project => project_prefix_of(id_a).cmp(&project_prefix_of(id_b)),
             SortKey::Id => crate::storage::compare_task_ids(id_a, id_b),
@@ -816,6 +834,7 @@ mod tests {
             acceptance_criteria: Vec::new(),
             sprints: Vec::new(),
             sprint_order: Default::default(),
+            releases: Vec::new(),
             history: Vec::new(),
             custom_fields: crate::types::CustomFields::new(),
         }

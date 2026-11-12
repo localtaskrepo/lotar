@@ -162,6 +162,8 @@ export interface TaskDTO {
     acceptance_criteria?: string[]
     sprints: number[]
     sprint_order?: Record<number, number>
+    /** Releases the task belongs to (DEV-393); a task can be in several. */
+    releases: number[]
     history: TaskHistoryEntry[]
     custom_fields: Record<string, unknown>
 }
@@ -434,6 +436,8 @@ export interface TaskCreate {
     relationships?: TaskRelationships
     custom_fields?: Record<string, unknown>
     sprints?: number[]
+    /** Release ids to add the new task to (DEV-393). */
+    releases?: number[]
     /**
      * Report a problem once (DEV-317): a stable key for it. The response then
      * carries `finding`, and `data` may be an existing ticket.
@@ -526,6 +530,8 @@ export interface TaskUpdate {
     custom_fields?: Record<string, unknown> | null
     /** Replaces sprint memberships; null or [] clears them. */
     sprints?: number[] | null
+    /** Replaces release memberships; null or [] clears them (DEV-393). */
+    releases?: number[] | null
     /**
      * DEV-301: the `modified` value the caller loaded. If the task changed
      * since, the server answers 409 and writes nothing.
@@ -558,6 +564,8 @@ export interface TaskListFilter {
     assignee_none?: boolean
     /** Sprint id CSV; a raw string is forwarded when tokens are invalid so the strict server parser rejects the query. */
     sprints?: number[] | string
+    /** Release selectors CSV (DEV-393): a version or range, `#id`, label, or `none`. */
+    releases?: string
     custom_fields?: Record<string, string | string[]>
     /** Server-side sort key; see {@link TaskSortBy}. */
     sort_by?: TaskSortBy
@@ -790,6 +798,113 @@ export interface SprintListResponse {
     sprints: SprintListItem[]
     missing_sprints: number[]
     integrity?: SprintIntegrityDiagnostics
+}
+
+/** A release (DEV-393) with counts over its tickets. */
+export interface ReleaseListItem {
+    id: number
+    /** Stored without a leading `v` (`0.15.0`). */
+    version: string
+    label?: string
+    display_name: string
+    notes?: string
+    /** `YYYY-MM-DD`. */
+    planned_date?: string
+    /** RFC 3339 or `YYYY-MM-DD`; absent while planned. */
+    released_at?: string
+    state: 'planned' | 'released'
+    /** Planned for a day before today and not released. */
+    overdue: boolean
+    task_count: number
+    done_count: number
+    open_count: number
+    created?: string
+    modified?: string
+}
+
+/** A release named by id (`3`) or by `#3`, version or label. */
+export type ReleaseSelector = number | string
+
+export interface ReleaseListResponse {
+    status: string
+    total: number
+    /** In version order. */
+    releases: ReleaseListItem[]
+}
+
+export interface ReleaseGetResponse {
+    status: string
+    release: ReleaseListItem
+    tasks: TaskDTO[]
+    history: TaskHistoryEntry[]
+}
+
+export interface ReleaseCreateRequest {
+    /** `0.15.0` or `v0.15.0` (stored without the `v`). */
+    version: string
+    label?: string
+    notes?: string
+    /** `YYYY-MM-DD`. */
+    planned_date?: string
+    /** RFC 3339 or `YYYY-MM-DD`; set for a release that is already out. */
+    released_at?: string
+}
+
+/** Fields left out stay as they are; an empty string clears one. */
+export interface ReleaseUpdateRequest {
+    release: ReleaseSelector
+    version?: string
+    label?: string
+    notes?: string
+    planned_date?: string
+    released_at?: string
+}
+
+/** Mark a release released (at `at`, default now), reopen it, or delete it. */
+export interface ReleaseActionRequest {
+    release: ReleaseSelector
+    at?: string
+}
+
+export interface ReleaseMutationResponse {
+    status: string
+    release: ReleaseListItem
+    /** False when the request changed nothing. */
+    changed: boolean
+}
+
+export interface ReleaseDeleteResponse {
+    status: string
+    deleted: boolean
+    release_id: number
+    /** Tickets the release was taken off. */
+    removed_from: string[]
+}
+
+export interface ReleaseAssignmentRequest {
+    release: ReleaseSelector
+    tasks: string[]
+    /** Also act on the tasks this search selects, in the web search syntax. */
+    query?: string
+}
+
+export interface ReleaseAssignmentResponse {
+    status: string
+    action: 'add' | 'move' | 'remove'
+    release_id: number
+    release_version: string
+    modified: string[]
+    unchanged: string[]
+}
+
+export interface ReleaseBacklogResponse {
+    status: string
+    total: number
+    count: number
+    limit: number
+    offset: number
+    /** Open tickets in no release. */
+    tasks: TaskDTO[]
 }
 
 export interface ProjectListResponse {

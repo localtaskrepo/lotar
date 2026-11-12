@@ -148,6 +148,34 @@ describe('version conditions (DEV-373)', () => {
     })
 })
 
+describe('release rules (DEV-393)', () => {
+    it('round trips the release_changed event, release conditions and release actions', () => {
+        const rule: AutomationRecord = {
+            name: 'Ship with the next release',
+            when: { all: [{ release: { version: '>=0.15' } }, { status: 'Done' }] },
+            on: {
+                release_changed: { comment: 'Now in ${{ticket.releases[*]}}' },
+                updated: { add: { release: '@next' }, remove: { release: '0.14.0' } },
+            },
+        }
+        const state = getEditableRuleState(rule)
+        expect(state.unsupportedReasons).toEqual([])
+        expect(state.draft.conditions.map((row) => [row.field, row.operator])).toEqual([
+            ['release', 'version'],
+            ['status', 'equals'],
+        ])
+        expect(buildAutomationRuleFromDraft(state.draft)).toEqual(rule)
+    })
+
+    it('keeps the release_changed hook through yaml', () => {
+        const yaml = buildAutomationYamlDocument([{ name: 'r', on: { release_changed: { comment: 'x' } } }], '')
+        expect(yaml).toContain('release_changed:')
+        expect(parseAutomationYamlDocument(yaml).rules).toEqual([
+            { name: 'r', on: { release_changed: { comment: 'x' } } },
+        ])
+    })
+})
+
 describe('automation yaml documents', () => {
     it('round trips rules and max_iterations through yaml', () => {
         const rules: AutomationRecord[] = [

@@ -50,6 +50,7 @@ mod jobs;
 mod projects;
 mod references;
 mod relationships;
+mod releases;
 mod scan;
 mod sprints;
 mod sync;
@@ -178,7 +179,9 @@ pub(super) fn map_lotar_error(err: LoTaRError) -> HttpResponse {
         // InvalidTaskId display keeps its "Invalid task ID: " qualifier.
         LoTaRError::ValidationError(msg) => bad_request(msg),
         err @ LoTaRError::InvalidTaskId(_) => bad_request(err.to_string()),
-        err @ (LoTaRError::TaskNotFound(_) | LoTaRError::SprintNotFound(_) | LoTaRError::ProjectNotFound(_)) => not_found(err.to_string()),
+        err @ (LoTaRError::TaskNotFound(_) | LoTaRError::SprintNotFound(_) | LoTaRError::ReleaseNotFound(_) | LoTaRError::ProjectNotFound(_)) => {
+            not_found(err.to_string())
+        }
         err @ (LoTaRError::SerializationError(_) | LoTaRError::IndexError(_)) => internal_error(err.to_string()),
         LoTaRError::Conflict(msg) => conflict(&msg),
         LoTaRError::IoError(io_err) => {
@@ -211,6 +214,7 @@ pub fn initialize(api_server: &mut ApiServer) {
     jobs::register(api_server);
     tasks::register(api_server);
     sprints::register(api_server);
+    releases::register(api_server);
     references::register(api_server);
     relationships::register(api_server);
     attachments::register(api_server);

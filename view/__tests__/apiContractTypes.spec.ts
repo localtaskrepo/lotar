@@ -30,6 +30,7 @@ const task: TaskDTO = {
     comments: [],
     references: [],
     sprints: [],
+    releases: [],
     history: [],
     custom_fields: {},
 }

@@ -500,6 +500,8 @@ const props = withDefaults(
     priorities?: string[]
     types?: string[]
     sprintOptions?: Array<{ id: number; label: string }>
+    /** Releases offered behind `release:` (DEV-393). */
+    releaseOptions?: Array<{ version: string; label: string }>
     tagOptions?: string[]
     assigneeOptions?: string[]
     customFieldValues?: Record<string, string[]>
@@ -566,7 +568,7 @@ let pendingHydrationEmit = false
 // custom-field map. Derived from the grammar so aliases stay in one place.
 // Grammar keys without a control of their own (DEV-230) travel with the
 // custom filters: kept, shown as chips and removed like them.
-const PASS_THROUGH_KEYS = new Set(['due_within', 'effort_min', 'effort_max', 'archived'])
+const PASS_THROUGH_KEYS = new Set(['due_within', 'effort_min', 'effort_max', 'archived', 'releases'])
 const CUSTOM_UI_KEYS = new Set([
   'q',
   'order',
@@ -584,6 +586,8 @@ const helpDescriptions: Record<string, string> = {
   priority: 'Configured priorities.',
   type: 'Configured task types.',
   sprints: 'Sprint IDs; suggestions show sprint names.',
+  releases:
+    'A version (release:0.15 matches 0.15.x), #id, label, or none for tasks in no release; release>=0.15 compares versions.',
   project: 'Project prefixes.',
   assignee: 'Member name, @me for yourself, or __none__ for unassigned tasks.',
   tags: 'Existing tags, or a tag you type.',
@@ -635,7 +639,7 @@ const filterHelp = computed(() => [
     syntax: 'sort_by=priority',
     label: 'Sort field',
     description:
-      'priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints, relevance (best match first) or custom:name.',
+      'priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints, releases, relevance (best match first) or custom:name.',
     aliases: '',
   },
 ])
@@ -1158,6 +1162,7 @@ const suggestionSource = computed(() => ({
   priorities: props.priorities ?? [],
   types: props.types ?? [],
   sprints: props.sprintOptions ?? [],
+  releases: props.releaseOptions ?? [],
   projects: projects.value ?? [],
   tags: props.tagOptions ?? [],
   assignees: props.assigneeOptions ?? [],
@@ -1441,6 +1446,9 @@ function applyGrammarFilters(filters: Record<string, string>, replaceKeys: strin
         break
       case 'q':
         break
+      case 'releases':
+        extras.releases = csvValue(key, extras.releases ?? '', value)
+        break
       default:
         extras[key] = value
     }
@@ -1557,7 +1565,8 @@ function removeChip(chip: FilterChip) {
     default: {
       // An exclusion (`-status:done`, DEV-5) removes one value at a time.
       const current = customFilters.value
-      const remaining = chip.key.startsWith('-') ? removeCsvValue(current[chip.key] ?? '', chip.value) : ''
+      const remaining =
+        chip.key.startsWith('-') || chip.key === 'releases' ? removeCsvValue(current[chip.key] ?? '', chip.value) : ''
       customFilters.value = Object.fromEntries(
         Object.entries(current).flatMap(([key, value]): [string, string][] =>
           key !== chip.key ? [[key, value]] : remaining ? [[key, remaining]] : [],

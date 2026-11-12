@@ -7,7 +7,7 @@ use crate::config::validation::errors::ValidationResult;
 use crate::errors::{LoTaRError, LoTaRResult};
 use crate::services::agent_job_service::{AgentJobService, AgentOrchestratorMode};
 use crate::services::agent_queue_service::AgentQueueService;
-use crate::services::automation_matching::{ChangeSet, MatchMode, UpdateMatch, current_fields, has_comment_condition, matches_rule, update_match};
+use crate::services::automation_matching::{ChangeSet, MatchMode, MatchState, UpdateMatch, current_fields, has_comment_condition, matches_rule, update_match};
 use crate::services::automation_validation::{parse_cooldown, validate_rules};
 use crate::services::sprint_service::SprintService;
 use crate::services::task_service::{CommentContext, TaskService, TaskUpdateContext};
@@ -170,6 +170,7 @@ pub enum AutomationEvent {
     Assigned,
     Commented,
     SprintChanged,
+    ReleaseChanged,
 
     // Job events
     JobStarted,
@@ -192,6 +193,7 @@ impl std::fmt::Display for AutomationEvent {
             Self::Assigned => "assigned",
             Self::Commented => "commented",
             Self::SprintChanged => "sprint_changed",
+            Self::ReleaseChanged => "release_changed",
             Self::JobStarted => "job_started",
             Self::JobCompleted => "job_completed",
             Self::JobFailed => "job_failed",
@@ -211,6 +213,7 @@ impl std::str::FromStr for AutomationEvent {
             "assigned" => Ok(Self::Assigned),
             "commented" => Ok(Self::Commented),
             "sprint_changed" => Ok(Self::SprintChanged),
+            "release_changed" => Ok(Self::ReleaseChanged),
             "job_started" | "job_start" => Ok(Self::JobStarted),
             "job_completed" | "complete" | "success" => Ok(Self::JobCompleted),
             "job_failed" | "error" | "failure" => Ok(Self::JobFailed),
@@ -218,7 +221,7 @@ impl std::str::FromStr for AutomationEvent {
             "manual" => Ok(Self::Manual),
             "unblocked" => Ok(Self::Unblocked),
             _ => Err(format!(
-                "Unknown event: '{}'. Expected: created, updated, assigned, commented, sprint_changed, job_started, job_completed, job_failed, job_cancelled, manual, unblocked",
+                "Unknown event: '{}'. Expected: created, updated, assigned, commented, sprint_changed, release_changed, job_started, job_completed, job_failed, job_cancelled, manual, unblocked",
                 s
             )),
         }
@@ -355,6 +358,7 @@ impl AutomationService {
         let is_create = previous.is_none();
         let assignee_changed = previous.is_some() && previous.and_then(|t| t.assignee.as_deref()) != current.assignee.as_deref();
         let sprints_changed = previous.is_some() && previous.map(|t| &t.sprints) != Some(&current.sprints);
+        let releases_changed = previous.is_some() && previous.map(|t| &t.releases) != Some(&current.releases);
 
         let events: Vec<AutomationEvent> = if is_create {
             vec![AutomationEvent::Created]
@@ -365,6 +369,9 @@ impl AutomationService {
             }
             if sprints_changed {
                 evts.push(AutomationEvent::SprintChanged);
+            }
+            if releases_changed {
+                evts.push(AutomationEvent::ReleaseChanged);
             }
             evts
         };
@@ -618,7 +625,7 @@ impl AutomationService {
             // Change events match the way a real update does (DEV-362).
             let matched = match event {
                 AutomationEvent::Created => matches_rule(rule, task, &ChangeSet::new(None, task), MatchMode::OnChange, config, &active_sprints),
-                AutomationEvent::Updated | AutomationEvent::Assigned | AutomationEvent::SprintChanged => {
+                AutomationEvent::Updated | AutomationEvent::Assigned | AutomationEvent::SprintChanged | AutomationEvent::ReleaseChanged => {
                     let base: &[&str] = if matches!(event, AutomationEvent::Assigned) { &["assignee"] } else { &[] };
                     match update_match(rule, task, base, config, &active_sprints) {
                         UpdateMatch::Always => true,
@@ -657,7 +664,14 @@ impl AutomationService {
             }
             let now = current_fields(rule);
             if !now.is_empty()
-                && matches!(event, AutomationEvent::Created | AutomationEvent::Updated | AutomationEvent::Assigned | AutomationEvent::SprintChanged)
+                && matches!(
+                    event,
+                    AutomationEvent::Created
+                        | AutomationEvent::Updated
+                        | AutomationEvent::Assigned
+                        | AutomationEvent::SprintChanged
+                        | AutomationEvent::ReleaseChanged
+                )
             {
                 notes.push(format!("Checked on the ticket as it is now: {}.", now.join(", ")));
             }
@@ -872,6 +886,9 @@ fn describe_action(action: &AutomationAction, current: &TaskDTO, config: &Resolv
         if let Some(sprint) = add.sprint.as_ref() {
             actions.push(SimulatedAction { action: "add_sprint".to_string(), description: format!("Add to sprint: {}", sprint) });
         }
+        if let Some(release) = add.release.as_ref() {
+            actions.push(SimulatedAction { action: "add_release".to_string(), description: format!("Add to release: {}", release) });
+        }
         for (field, vals) in [("depends_on", &add.depends_on), ("blocks", &add.blocks), ("related", &add.related)] {
             if let Some(v) = vals {
                 actions.push(SimulatedAction { action: format!("add_{}", field), description: format!("Add {}: {}", field, v.as_vec().join(", ")) });
@@ -886,6 +903,9 @@ fn describe_action(action: &AutomationAction, current: &TaskDTO, config: &Resolv
         }
         if let Some(sprint) = remove.sprint.as_ref() {
             actions.push(SimulatedAction { action: "remove_sprint".to_string(), description: format!("Remove from sprint: {}", sprint) });
+        }
+        if let Some(release) = remove.release.as_ref() {
+            actions.push(SimulatedAction { action: "remove_release".to_string(), description: format!("Remove from release: {}", release) });
         }
         for (field, vals) in [("depends_on", &remove.depends_on), ("blocks", &remove.blocks), ("related", &remove.related)] {
             if let Some(v) = vals {
@@ -1072,6 +1092,9 @@ fn simulate_action(current: &TaskDTO, action: &AutomationAction, config: &Resolv
         if tag_action.sprint.is_some() {
             preview.warn("Sprint membership changes are listed in actions but not reflected in task_after".to_string());
         }
+        if let Some(reference) = tag_action.release.as_deref() {
+            apply_release_change(&storage.root_path, &mut simulated.releases, reference, add);
+        }
     }
 
     // The simulated state must reflect the projected completion/due
@@ -1103,6 +1126,7 @@ fn resolve_action_for_event(on: &crate::automation::types::AutomationRuleActions
         AutomationEvent::Assigned => on.assigned.as_ref(),
         AutomationEvent::Commented => on.commented.as_ref(),
         AutomationEvent::SprintChanged => on.sprint_changed.as_ref(),
+        AutomationEvent::ReleaseChanged => on.release_changed.as_ref(),
         AutomationEvent::JobStarted => on.job_started.as_ref(),
         AutomationEvent::JobCompleted => on.job_completed.as_ref(),
         AutomationEvent::JobFailed => on.job_failed.as_ref(),
@@ -1124,9 +1148,12 @@ fn join_and(items: &[String]) -> String {
 
 fn resolve_action_for_event_with_fallback(on: &crate::automation::types::AutomationRuleActions, event: AutomationEvent) -> Option<&AutomationAction> {
     resolve_action_for_event(on, event).or(match event {
-        AutomationEvent::Created | AutomationEvent::Updated | AutomationEvent::Assigned | AutomationEvent::Commented | AutomationEvent::SprintChanged => {
-            on.start.as_ref()
-        }
+        AutomationEvent::Created
+        | AutomationEvent::Updated
+        | AutomationEvent::Assigned
+        | AutomationEvent::Commented
+        | AutomationEvent::SprintChanged
+        | AutomationEvent::ReleaseChanged => on.start.as_ref(),
         _ => None,
     })
 }
@@ -1135,10 +1162,13 @@ fn resolve_config_for_project(tasks_dir: &Path, project: Option<&str>) -> LoTaRR
     crate::config::resolution::config_for_project(tasks_dir, project).map_err(|e| LoTaRError::ValidationError(e.to_string()))
 }
 
-fn compute_active_sprint_ids(storage: &Storage) -> Vec<u32> {
-    match SprintService::list(storage) {
-        Ok(records) => crate::services::sprint_assignment::active_sprint_ids(&records),
-        Err(_) => Vec::new(),
+fn compute_active_sprint_ids(storage: &Storage) -> MatchState {
+    MatchState {
+        active_sprints: match SprintService::list(storage) {
+            Ok(records) => crate::services::sprint_assignment::active_sprint_ids(&records),
+            Err(_) => Vec::new(),
+        },
+        releases: crate::services::release_service::ReleaseService::list(&storage.root_path).unwrap_or_default(),
     }
 }
 
@@ -1690,10 +1720,14 @@ fn apply_action(
         apply_set_action(set, current, config, storage, &mut patch, &mut updated_tags, &mut custom_fields, &tmpl)?;
     }
 
+    let mut releases = base.releases.clone();
     if let Some(add) = action.add.as_ref() {
         apply_tag_action(add, true, &mut updated_tags);
         if let Some(sprint_ref) = add.sprint.as_ref() {
             apply_sprint_action(storage, &current.id, sprint_ref, true)?;
+        }
+        if let Some(reference) = add.release.as_deref() {
+            apply_release_change(&storage.root_path, &mut releases, reference, true);
         }
     }
     if let Some(remove) = action.remove.as_ref() {
@@ -1701,6 +1735,12 @@ fn apply_action(
         if let Some(sprint_ref) = remove.sprint.as_ref() {
             apply_sprint_action(storage, &current.id, sprint_ref, false)?;
         }
+        if let Some(reference) = remove.release.as_deref() {
+            apply_release_change(&storage.root_path, &mut releases, reference, false);
+        }
+    }
+    if patch.releases.is_none() && releases != base.releases {
+        patch.releases = Some(releases);
     }
 
     if patch.tags.is_none() && updated_tags != base.tags {
@@ -2005,6 +2045,27 @@ fn apply_relationship_action(root: Option<&std::path::Path>, action: &Automation
     }
 }
 
+/// Add or remove the release a reference names (`@next`: the first planned
+/// release in version order). An unknown release is skipped, as for sprints.
+fn apply_release_change(tasks_root: &Path, releases: &mut Vec<u32>, reference: &str, add: bool) {
+    let records = crate::services::release_service::ReleaseService::list(tasks_root).unwrap_or_default();
+    let found = if reference.trim().eq_ignore_ascii_case("@next") {
+        records.iter().find(|record| !record.release.is_released())
+    } else {
+        crate::services::release_service::resolve_in(&records, reference).ok()
+    };
+    let Some(record) = found else {
+        return;
+    };
+    if add {
+        releases.push(record.id);
+        releases.sort_unstable();
+        releases.dedup();
+    } else {
+        releases.retain(|id| *id != record.id);
+    }
+}
+
 fn apply_sprint_action(storage: &mut Storage, task_id: &str, sprint_ref: &str, add: bool) -> LoTaRResult<()> {
     use crate::services::sprint_assignment;
 
@@ -2061,6 +2122,7 @@ fn patch_has_changes(patch: &TaskUpdate) -> bool {
         || patch.custom_fields.is_some()
         || patch.relationships.is_some()
         || patch.sprints.is_some()
+        || patch.releases.is_some()
 }
 
 /// An action's model or effort with its `${{...}}` templates filled in
@@ -2694,6 +2756,7 @@ mod dev21_cross_root_dependency_tests {
             acceptance_criteria: Vec::new(),
             sprints: Vec::new(),
             sprint_order: Default::default(),
+            releases: Vec::new(),
             history: Vec::new(),
             custom_fields: Default::default(),
         }

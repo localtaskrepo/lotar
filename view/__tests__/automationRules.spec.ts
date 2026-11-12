@@ -6,7 +6,7 @@ import {
     parseAutomationYamlDocument,
     summarizeAutomationRule,
 } from '../utils/automationRules'
-import { describeActionSteps, describeConditions } from '../utils/automationText'
+import { describeActionSteps, describeConditions, templateVariables } from '../utils/automationText'
 
 describe('automationRules utilities', () => {
     it('builds any-match rules into an any group', () => {
@@ -111,6 +111,17 @@ describe('automationRules utilities', () => {
         expect(describeActionSteps(rule.on.commented)).toEqual([
             'tell the ticket’s agent (or start @fix) “${{comment.author}}: ${{comment.text}}”',
         ])
+    })
+
+    it('describes release actions, conditions and the release_changed placeholders (DEV-393)', () => {
+        expect(describeActionSteps({ add: { release: '@next' }, remove: { release: '0.14.0' } })).toEqual([
+            'add to release @next',
+            'remove from release 0.14.0',
+        ])
+        expect(describeConditions({ release: '@planned' }).items).toEqual(['release is @planned'])
+        const keys = templateVariables(['release_changed']).map((variable) => variable.key)
+        expect(keys).toContain('ticket.releases[*]')
+        expect(keys).toContain('previous.status')
     })
 
     it('compacts canonical yaml before building summaries', () => {

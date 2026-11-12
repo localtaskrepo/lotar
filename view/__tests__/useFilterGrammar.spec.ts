@@ -490,6 +490,19 @@ describe('suggestForFragment', () => {
         expect(suggestions.map((s) => s.insert)).toContain('sprints:2')
     })
 
+    it('suggests release versions and parses release ranges (DEV-393)', () => {
+        const releases = {
+            releases: [
+                { version: '0.15.0', label: '0.15.0 (Spring)' },
+                { version: '0.16.0', label: '0.16.0' },
+            ],
+        }
+        const suggestions = suggestForFragment('release:0.1', releases)
+        expect(suggestions.map((s) => s.insert)).toEqual(['releases:0.15.0', 'releases:0.16.0'])
+        expect(parseFilterQuery('release>=0.15 release<0.16').filters.releases).toBe('>=0.15 <0.16')
+        expect(parseFilterQuery('release:none').filters.releases).toBe('none')
+    })
+
     it('suggests assignee modes', () => {
         const suggestions = suggestForFragment('assignee:', source)
         expect(suggestions.map((s) => s.label)).toContain('Me')

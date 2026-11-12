@@ -48,6 +48,8 @@ export type TaskSortBuiltin =
     | 'title'
     | 'tags'
     | 'sprints'
+    /** Release ids; the server sorts them in version order (DEV-393). */
+    | 'releases'
     /** Best text match first for the current search (server-side only). */
     | 'relevance'
 export type TaskSortBy = TaskSortBuiltin | `custom:${string}`
@@ -75,12 +77,14 @@ const TASK_SORT_BUILTINS = new Set<string>([
     'title',
     'tags',
     'sprints',
+    'releases',
     'relevance',
 ])
 
 const BUILTIN_ALIASES: Record<string, TaskSortBuiltin> = {
     'due-date': 'due',
     'best-match': 'relevance',
+    release: 'releases',
 }
 
 /** Normalize a `sort_by` wire value; `null` when absent or invalid. */
@@ -114,6 +118,7 @@ const COL_KEY_TO_SORT_BY: Record<string, TaskSortBy> = {
     effort: 'effort',
     tags: 'tags',
     sprints: 'sprints',
+    releases: 'releases',
     due_date: 'due',
     created: 'created',
     modified: 'modified',
@@ -592,6 +597,9 @@ export function compareTasks(a: TaskDTO, b: TaskDTO, sortBy: TaskSortBy, options
             return cmpVec(a.tags, b.tags, cmpStr)
         case 'sprints':
             return cmpVec(a.sprints, b.sprints, (x, y) => x - y)
+        case 'releases':
+            // By id here; only the server knows the version order.
+            return cmpVec(a.releases, b.releases, (x, y) => x - y)
         case 'relevance':
             // Only the server can score a search; keep its order.
             return 0
