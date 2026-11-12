@@ -11,7 +11,7 @@ this is the order and the gates. Comment each step's result on the release ticke
    tickets waiting for it. For each, find its commit (its comments name it, or
    `git log main --grep <ID>`) and check `git branch --contains <commit>` lists `main`. A
    fix not on main: comment it on the release ticket and ask the owner whether to wait.
-2. **Version bump**: the next 0.13.x patch version, as the guide's
+2. **Version bump**: a patch unless the owner asks for a minor, as the guide's
    [Pre-Release Checklist](../../../docs/release-guide.md#pre-release-checklist) says, with
    its local checks, committed on main.
 3. **QA green** for that commit: the Quality Assurance run (`gh run list --workflow

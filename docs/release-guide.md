@@ -79,9 +79,10 @@ hand: `lotar automation run "Release installed: run the waiting check" --select 
 
 1. Update the version in `Cargo.toml` (and `Cargo.lock`, which the next `cargo build`
    updates) and in any docs that mention the release number. The root `package.json` keeps its
-   own workspace version; the npm packages take theirs from the tag. Releases stay on 0.13.x
-   (patch bumps) "until we add a major feature or something breaks compatibility" (owner
-   2026-11-11). The release notes are written by the workflow from the commit list
+   own workspace version; the npm packages take theirs from the tag. The owner picks the bump:
+   a patch by default ("stay on version 0.13.x until we add a major feature or something breaks
+   compatibility", 2026-11-11), a minor when he asks for one (v0.14.0: "create a release now with
+   a minor bump", 2026-11-12). The release notes are written by the workflow from the commit list
    ([Automation Overview](#automation-overview)).
 2. Run the full quality gates locally:
    ```bash
