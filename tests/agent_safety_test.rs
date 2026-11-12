@@ -216,8 +216,11 @@ fn repository_env_sanitizer_removes_inherited_and_explicit_overrides_only() {
 
 #[test]
 fn worker_persists_trailing_stderr_before_exit_and_summary() {
+    // About 100 KiB, more than a pipe buffer holds, so output is still
+    // unread when the runner exits. Each line is one log event: few long
+    // lines keep the run short on a busy machine (DEV-358).
     let (fixture, ticket) = setup(
-        "i=0; while [ $i -lt 6000 ]; do printf 'stderr-burst-%s\\n' \"$i\" >&2; i=$((i + 1)); done\nprintf 'unique-trailing-stderr-sentinel\\n' >&2",
+        "i=0; while [ $i -lt 100 ]; do printf 'stderr-burst-%04d-%0980d\\n' \"$i\" 0 >&2; i=$((i + 1)); done\nprintf 'unique-trailing-stderr-sentinel\\n' >&2",
         false,
     );
     let path = fixture.tasks_root.join("config.yml");

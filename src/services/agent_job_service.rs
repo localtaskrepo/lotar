@@ -26,6 +26,8 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 const EVENT_LOG_LIMIT: usize = 200;
+/// How long a runner's descendants may keep its output streams busy after it exits.
+const OUTPUT_DRAIN_LIMIT: Duration = Duration::from_secs(5);
 const DEFAULT_AGENT_INSTRUCTIONS: &str = include_str!("../../docs/help/agent-instructions.md");
 
 static JOB_COUNTER: AtomicU64 = AtomicU64::new(1);
@@ -1829,7 +1831,7 @@ fn run_job(
         let tasks_dir = tasks_dir.clone();
         let ticket_id = ticket_id.clone();
         thread::spawn(move || {
-            read_job_output(stderr, &exited, |line| {
+            read_job_output(stderr, &exited, OUTPUT_DRAIN_LIMIT, |line| {
                 let msg = line.trim().to_string();
                 if let Some(cli) = t3_cli.as_ref() {
                     if is_t3_noise(&msg) {
@@ -1865,7 +1867,7 @@ fn run_job(
         thread::spawn(move || {
             let mut messages = Vec::new();
             let mut reply = String::new();
-            let result = read_job_output(stdout, &exited, |line| {
+            let result = read_job_output(stdout, &exited, OUTPUT_DRAIN_LIMIT, |line| {
                 if runner_kind == AgentRunnerKind::T3 {
                     reply.push_str(line.trim_end_matches(['\r', '\n']));
                     reply.push('\n');
@@ -1957,6 +1959,8 @@ fn run_job(
 
 trait JobOutputPipe: Read {
     fn output_ready(&self) -> std::io::Result<bool>;
+    /// Bytes waiting to be read.
+    fn output_available(&self) -> std::io::Result<usize>;
 }
 
 #[cfg(unix)]
@@ -1967,43 +1971,64 @@ impl<T: Read + std::os::fd::AsRawFd> JobOutputPipe for T {
         let result = unsafe { libc::poll(&mut poll, 1, 0) };
         if result < 0 { Err(std::io::Error::last_os_error()) } else { Ok(result > 0) }
     }
+
+    fn output_available(&self) -> std::io::Result<usize> {
+        let mut available: libc::c_int = 0;
+        let result = unsafe { libc::ioctl(self.as_raw_fd(), libc::FIONREAD, &mut available) };
+        if result < 0 { Err(std::io::Error::last_os_error()) } else { Ok(usize::try_from(available).unwrap_or(0)) }
+    }
+}
+
+/// Bytes waiting in a pipe; `None` once the writer closed it (broken pipe).
+#[cfg(windows)]
+fn peek_named_pipe_available(handle: std::os::windows::io::RawHandle) -> std::io::Result<Option<u32>> {
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        #[link_name = "PeekNamedPipe"]
+        fn peek_named_pipe(
+            handle: *mut std::ffi::c_void,
+            buffer: *mut std::ffi::c_void,
+            size: u32,
+            read: *mut u32,
+            available: *mut u32,
+            remaining: *mut u32,
+        ) -> i32;
+    }
+    let mut available = 0;
+    let result = unsafe { peek_named_pipe(handle, std::ptr::null_mut(), 0, std::ptr::null_mut(), &mut available, std::ptr::null_mut()) };
+    if result != 0 {
+        return Ok(Some(available));
+    }
+    let error = std::io::Error::last_os_error();
+    if error.raw_os_error() == Some(109) { Ok(None) } else { Err(error) }
 }
 
 #[cfg(windows)]
 impl<T: Read + std::os::windows::io::AsRawHandle> JobOutputPipe for T {
     fn output_ready(&self) -> std::io::Result<bool> {
-        #[link(name = "kernel32")]
-        unsafe extern "system" {
-            #[link_name = "PeekNamedPipe"]
-            fn peek_named_pipe(
-                handle: *mut std::ffi::c_void,
-                buffer: *mut std::ffi::c_void,
-                size: u32,
-                read: *mut u32,
-                available: *mut u32,
-                remaining: *mut u32,
-            ) -> i32;
-        }
-        let mut available = 0;
-        let result = unsafe { peek_named_pipe(self.as_raw_handle(), std::ptr::null_mut(), 0, std::ptr::null_mut(), &mut available, std::ptr::null_mut()) };
-        if result != 0 {
-            return Ok(available > 0);
-        }
-        let error = std::io::Error::last_os_error();
-        if error.raw_os_error() == Some(109) { Ok(true) } else { Err(error) }
+        // A closed pipe is ready: the read returns its end.
+        Ok(peek_named_pipe_available(self.as_raw_handle())?.is_none_or(|available| available > 0))
+    }
+
+    fn output_available(&self) -> std::io::Result<usize> {
+        Ok(peek_named_pipe_available(self.as_raw_handle())?.map_or(0, |available| usize::try_from(available).unwrap_or(0)))
     }
 }
 
-fn read_job_output(mut pipe: impl JobOutputPipe, exited: &AtomicBool, mut on_line: impl FnMut(&str)) -> std::io::Result<()> {
+fn read_job_output(mut pipe: impl JobOutputPipe, exited: &AtomicBool, drain_limit: Duration, mut on_line: impl FnMut(&str)) -> std::io::Result<()> {
     let mut pending = Vec::new();
     let mut buffer = [0; 8192];
     let mut drain_started = None;
+    let mut unread_at_exit = None;
     loop {
         let process_exited = exited.load(Ordering::Acquire);
         if process_exited {
-            let started = drain_started.get_or_insert_with(Instant::now);
-            if started.elapsed() > Duration::from_secs(5) {
-                return Err(std::io::Error::new(std::io::ErrorKind::TimedOut, "Runner output drain exceeded five seconds after exit"));
+            // What the runner wrote before it exited is read however long its
+            // lines take; only output after that (from descendants holding the
+            // streams) is limited (DEV-358).
+            let unread = *unread_at_exit.get_or_insert_with(|| pipe.output_available().unwrap_or(0));
+            if unread == 0 && drain_started.get_or_insert_with(Instant::now).elapsed() > drain_limit {
+                return Err(std::io::Error::new(std::io::ErrorKind::TimedOut, format!("Runner output drain exceeded {drain_limit:?} after exit")));
             }
         }
         match pipe.output_ready() {
@@ -2020,7 +2045,12 @@ fn read_job_output(mut pipe: impl JobOutputPipe, exited: &AtomicBool, mut on_lin
         }
         match pipe.read(&mut buffer) {
             Ok(0) => break,
-            Ok(count) => pending.extend_from_slice(&buffer[..count]),
+            Ok(count) => {
+                pending.extend_from_slice(&buffer[..count]);
+                if let Some(unread) = unread_at_exit.as_mut() {
+                    *unread = unread.saturating_sub(count);
+                }
+            }
             Err(err) if err.kind() == std::io::ErrorKind::Interrupted => continue,
             Err(err) => return Err(err),
         }
@@ -2910,6 +2940,39 @@ mod tests {
         assert_eq!(next.sequence, total as u64 + 1);
         assert_eq!(state.events.len(), EVENT_LOG_LIMIT);
         assert_eq!(state.events.last().map(|event| event.sequence), Some(next.sequence));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn output_left_in_the_pipe_at_exit_is_read_however_slow_its_lines_are() {
+        let (reader, mut writer) = std::io::pipe().unwrap();
+        for index in 0..20 {
+            writeln!(writer, "line-{index}").unwrap();
+        }
+        drop(writer);
+        let exited = AtomicBool::new(true);
+        let mut lines = Vec::new();
+        // Each line takes longer than the whole drain limit (DEV-358).
+        let result = read_job_output(reader, &exited, Duration::from_millis(1), |line| {
+            thread::sleep(Duration::from_millis(5));
+            lines.push(line.trim_end().to_string());
+        });
+        assert!(result.is_ok(), "{result:?}");
+        assert_eq!(lines.len(), 20);
+        assert_eq!(lines.last().map(String::as_str), Some("line-19"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn output_after_exit_is_limited() {
+        let (reader, mut writer) = std::io::pipe().unwrap();
+        writeln!(writer, "last-runner-line").unwrap();
+        // A descendant that keeps the pipe full; it stops once the reader is gone.
+        let descendant = thread::spawn(move || while writeln!(writer, "still-running").is_ok() {});
+        let exited = AtomicBool::new(true);
+        let result = read_job_output(reader, &exited, Duration::from_millis(50), |_| thread::sleep(Duration::from_millis(1)));
+        assert_eq!(result.map_err(|error| error.kind()), Err(std::io::ErrorKind::TimedOut));
+        descendant.join().unwrap();
     }
 
     #[test]

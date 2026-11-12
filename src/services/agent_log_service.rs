@@ -149,8 +149,10 @@ impl AgentLogService {
         let entry = JobLogLine::Event(JobLogEntry { kind: kind.to_string(), at: at.to_string(), message });
 
         let mut file = OpenOptions::new().append(true).open(&path)?;
-        let line = serde_json::to_string(&entry).map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
-        writeln!(file, "{}", line)?;
+        let mut line = serde_json::to_string(&entry).map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
+        // One write per event: a runner can print thousands of lines (DEV-358).
+        line.push('\n');
+        file.write_all(line.as_bytes())?;
         Ok(())
     }
 

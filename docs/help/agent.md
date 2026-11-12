@@ -405,7 +405,7 @@ The queue worker drains pending entries and waits for dispatched jobs, including
 
 Cancelling a dispatched job requests termination immediately, but cancellation automation and reassignment wait until process/output teardown and context persistence finish. The job retains its capacity slot through finalization, so a replacement is queued safely and cancellation automation runs once. Cancelling an undispatched queued job finalizes immediately.
 
-Both output readers are joined before final summaries, persisted status, and slot release. After the runner exits, already-available output is drained without waiting for a surviving descendant to close inherited streams. Continuous descendant output is bounded to five seconds of draining and reported as an output failure rather than keeping the worker alive indefinitely.
+Both output readers are joined before final summaries, persisted status, and slot release. After the runner exits, the output it left in the pipes is read in full, however long its lines take to record, without waiting for a surviving descendant to close inherited streams. Continuous descendant output after that is bounded to five seconds of draining and reported as an output failure rather than keeping the worker alive indefinitely.
 
 ## Automation rules
 
