@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T04:17:51.251399+00:00
-modified: 2026-11-12T04:43:07.541235+00:00
+modified: 2026-11-12T04:53:49.152467+00:00
 relationships:
   related:
   - DEV-352
@@ -13,11 +13,15 @@ relationships:
   - DEV-358
   - DEV-349
   - DEV-356
+  - DEV-348
+  - DEV-354
 comments:
 - date: 2026-11-12T04:37:28.916711+00:00
   text: 'claude: Fixed in bb47b58 on agent/DEV-355. Cause: an app race, not the palette. The palette''s Enter ran ''Boards'' and started the move to /boards. While the lazy Board chunk loaded, the tasks page finished its first load (projects, then sprints) and called router.replace(''/''), which cancelled the pending /boards navigation. So the path stayed ''/'', and a real user could lose a click the same way. Fix: view/pages/TasksList.vue sets a flag in onBeforeRouteLeave (cleared by the next afterEach, even when the navigation fails), and applyFilter doesn''t write the URL or reload while a navigation away is underway. Test first: a new smoke test in smoke/tests/ui.keyboard-shortcuts.smoke.spec.ts holds /api/sprints/list and the Board chunk, presses Enter on ''boards'', releases sprints, then the chunk. It failed before the fix and passed 3 of 3 runs after. TasksList unit-test router mocks gained onBeforeRouteLeave. Checks: npm run lint passed. npm run test:smoke:agent (the ticket''s check) passed, 379/379. npm run test:agent: UI, release and hooks passed. Rust failed one different test in each of 3 full runs; none touches this change, and each passes alone: dev279_cross_process_jobs_test (DEV-349, fixed on main but not in this branch''s base 7bd5c46), plus two new flakes filed as DEV-357 (status_dry_run_explain) and DEV-358 (worker_persists_trailing_stderr). The first run''s failure came from LOTAR_DEFAULT_REPORTER in this job''s environment; I reran without it.'
 - date: 2026-11-12T04:37:36.757678+00:00
   text: 'claude: Correction to my last comment: the first run''s status_dry_run_explain failure was not caused by LOTAR_DEFAULT_REPORTER. It also passes alone with that variable set, so it is a flake (DEV-357).'
+- date: 2026-11-12T04:53:48.760491+00:00
+  text: 'claude: merge agent: merged into main as f07976b (rebased twice onto main, fast-forward). Not pushed: main also holds unpushed commits of DEV-348, DEV-352 and DEV-354, which wait for their sessions. Checks in the worktree: npm run lint passed; npm run test:rust 2003/2003 passed; npm run test:ui, test:release and test:hooks passed; npm run test:smoke:agent 379/379 passed (the check named on the ticket). After the second rebase (main only added DEV-354''s Rust test file and tickets) I reran lint, test:ui and the keyboard-shortcuts smoke spec: all passed. Two earlier full Rust runs failed other tests (cli_agent_check_test, dev279_cross_process_jobs_test) while several runs overlapped; each passes alone and the later clean run passed, so I treat them as load flakes.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A424e1473-5583-4789-883a-23c4b542adda
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adf020238-61f3-43b3-8e7c-d56d41cc7879
@@ -92,3 +96,13 @@ history:
   - field: relationships
     old: '{"related":["DEV-352","DEV-357","DEV-358","DEV-349"]}'
     new: '{"related":["DEV-352","DEV-357","DEV-358","DEV-349","DEV-356"]}'
+- at: 2026-11-12T04:53:48.760491+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T04:53:49.152467+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-352","DEV-357","DEV-358","DEV-349","DEV-356"]}'
+    new: '{"related":["DEV-352","DEV-357","DEV-358","DEV-349","DEV-356","DEV-348","DEV-354"]}'
