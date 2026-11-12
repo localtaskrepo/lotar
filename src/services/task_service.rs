@@ -839,6 +839,8 @@ impl TaskService {
 
     /// [`Self::update_composed_inner`], then record the status/assignee it
     /// held back for a running job, once the rest of the update succeeded.
+    /// A job that ended meanwhile no longer applies an outcome, so they are
+    /// applied directly instead (DEV-350).
     fn update_composed<F: FnOnce(&mut crate::types::TaskRelationships)>(
         storage: &mut Storage,
         id: &str,
@@ -846,11 +848,18 @@ impl TaskService {
         context: TaskUpdateContext,
         relationship_delta: Option<F>,
     ) -> LoTaRResult<TaskUpdateReceipt> {
+        let held = TaskUpdate { status: patch.status.clone(), assignee: patch.assignee.clone(), ..TaskUpdate::default() };
+        let retry_context = TaskUpdateContext { expected_modified: None, bypass_active_job_lock: true, ..context.clone() };
         let mut deferred = None;
         let mut receipt = Self::update_composed_inner(storage, id, patch, context, relationship_delta, &mut deferred)?;
         if let Some(outcome) = deferred {
-            let recorded = crate::services::agent_active_jobs::record_outcome(&storage.root_path, &outcome)?;
-            receipt.deferred = Some(recorded).filter(|recorded| !recorded.is_empty());
+            match crate::services::agent_active_jobs::record_outcome(&storage.root_path, &outcome)? {
+                Some(recorded) => receipt.deferred = Some(recorded).filter(|recorded| !recorded.is_empty()),
+                None => {
+                    let applied = Self::update_composed(storage, &receipt.dto.id, held, retry_context, None::<fn(&mut crate::types::TaskRelationships)>)?;
+                    receipt = TaskUpdateReceipt { changed: receipt.changed || applied.changed, ..applied };
+                }
+            }
         }
         Ok(receipt)
     }

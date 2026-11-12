@@ -82,21 +82,43 @@ pub fn unregister(tasks_dir: &Path, job_id: &str) {
     let dir = dir(tasks_dir);
     let _ = std::fs::remove_file(dir.join(format!("{name}.json")));
     let _ = std::fs::remove_file(dir.join(format!("{name}.cancel")));
+    let _lock = lock_outcome(&dir, name);
+    mark_ended(&dir, name);
     let _ = std::fs::remove_file(dir.join(format!("{name}.outcome.json")));
+}
+
+/// How long an ended job's marker stays: far longer than any update that
+/// checked for the job before it ended takes to record its outcome.
+const ENDED_MARKER_TTL: std::time::Duration = std::time::Duration::from_secs(24 * 60 * 60);
+
+fn lock_outcome(dir: &Path, name: &str) -> std::io::Result<std::fs::File> {
+    crate::storage::safety::acquire_storage_lock_within(dir, &format!("{name}.outcome"), std::time::Duration::from_secs(5))
+}
+
+/// Marks the job as ended, so [`record_outcome`] refuses it (DEV-350).
+fn mark_ended(dir: &Path, name: &str) {
+    if std::fs::create_dir_all(dir).is_ok() {
+        let _ = std::fs::write(dir.join(format!("{name}.ended")), b"");
+    }
 }
 
 /// Record a status and/or assignee change made while the job runs; it is
 /// applied when the job ends instead of the end rules' `set` (DEV-320).
 /// Later values replace earlier ones per field; a field in `cleared` drops
 /// its recorded value (DEV-340). Returns the change as recorded: `cleared`
-/// keeps only fields that held a value.
-pub fn record_outcome(tasks_dir: &Path, outcome: &JobOutcome) -> std::io::Result<JobOutcome> {
+/// keeps only fields that held a value, or `None` when the job has
+/// already ended: nobody would apply the outcome, so the caller applies the
+/// change directly (DEV-350).
+pub fn record_outcome(tasks_dir: &Path, outcome: &JobOutcome) -> std::io::Result<Option<JobOutcome>> {
     let Some(name) = safe_name(&outcome.job_id) else {
         return Err(std::io::Error::other(format!("invalid job id '{}'", outcome.job_id)));
     };
     let dir = dir(tasks_dir);
     std::fs::create_dir_all(&dir)?;
-    let _lock = crate::storage::safety::acquire_storage_lock_within(&dir, &format!("{name}.outcome"), std::time::Duration::from_secs(5))?;
+    let _lock = lock_outcome(&dir, name)?;
+    if dir.join(format!("{name}.ended")).exists() {
+        return Ok(None);
+    }
     let path = dir.join(format!("{name}.outcome.json"));
     let mut merged = read_outcome(&path).unwrap_or_else(|| JobOutcome { job_id: outcome.job_id.clone(), ..JobOutcome::default() });
     let mut recorded = outcome.clone();
@@ -122,7 +144,7 @@ pub fn record_outcome(tasks_dir: &Path, outcome: &JobOutcome) -> std::io::Result
         let json = serde_json::to_string(&merged).map_err(std::io::Error::other)?;
         crate::storage::safety::atomic_write_file(&path, &json)?;
     }
-    Ok(recorded)
+    Ok(Some(recorded))
 }
 
 /// The outcome recorded so far, without consuming it.
@@ -134,12 +156,14 @@ pub fn peek_outcome(tasks_dir: &Path, job_id: &str) -> Option<JobOutcome> {
 /// End the job's guard and hand back its recorded outcome. The record goes
 /// first, so a change made from now on applies directly instead of being
 /// recorded for a job that no longer reads it. A change that checked for
-/// the record just before it went and writes its outcome just after the
-/// read below is lost; that window is the length of one file read.
+/// the job before that and records its outcome after the read below is
+/// refused by [`record_outcome`] and applied directly by its caller.
 pub fn end_and_take_outcome(tasks_dir: &Path, job_id: &str) -> Option<JobOutcome> {
     let name = safe_name(job_id)?;
     let dir = dir(tasks_dir);
     let _ = std::fs::remove_file(dir.join(format!("{name}.json")));
+    let _lock = lock_outcome(&dir, name);
+    mark_ended(&dir, name);
     let path = dir.join(format!("{name}.outcome.json"));
     let outcome = read_outcome(&path);
     let _ = std::fs::remove_file(&path);
@@ -159,6 +183,13 @@ pub fn list(tasks_dir: &Path) -> Vec<ActiveJob> {
     let mut jobs = Vec::new();
     for entry in entries.flatten() {
         let path = entry.path();
+        if path.extension().is_some_and(|ext| ext == "ended") {
+            let expired = entry.metadata().and_then(|meta| meta.modified()).ok().and_then(|at| at.elapsed().ok()).is_some_and(|age| age > ENDED_MARKER_TTL);
+            if expired {
+                let _ = std::fs::remove_file(&path);
+            }
+            continue;
+        }
         let is_record = path.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.ends_with(".json") && !n.ends_with(".outcome.json"));
         if !is_record {
             continue;
@@ -236,6 +267,25 @@ mod tests {
         let stale = ActiveJob { job_id: "job-2".into(), owner_pid: 0, ..job };
         register(tasks.path(), &stale);
         assert!(list(tasks.path()).is_empty(), "dead owner is stale");
+        unsafe { std::env::remove_var("LOTAR_AGENT_QUEUE_DIR") };
+    }
+
+    #[test]
+    fn an_outcome_recorded_after_the_job_ended_is_refused() {
+        let _queue = tempfile::tempdir().unwrap();
+        // SAFETY: test-local override of the queue directory.
+        unsafe { std::env::set_var("LOTAR_AGENT_QUEUE_DIR", _queue.path()) };
+        let tasks = tempfile::tempdir().unwrap();
+        let outcome = |job_id: &str| JobOutcome { job_id: job_id.into(), assignee: Some("owner".into()), ..JobOutcome::default() };
+
+        assert_eq!(record_outcome(tasks.path(), &outcome("job-1")).unwrap(), Some(outcome("job-1")));
+        assert_eq!(end_and_take_outcome(tasks.path(), "job-1"), Some(outcome("job-1")));
+        assert_eq!(record_outcome(tasks.path(), &outcome("job-1")).unwrap(), None, "after the end took the outcome");
+        assert!(peek_outcome(tasks.path(), "job-1").is_none());
+
+        unregister(tasks.path(), "job-2");
+        assert_eq!(record_outcome(tasks.path(), &outcome("job-2")).unwrap(), None, "after the job was unregistered");
+        assert!(peek_outcome(tasks.path(), "job-2").is_none());
         unsafe { std::env::remove_var("LOTAR_AGENT_QUEUE_DIR") };
     }
 }

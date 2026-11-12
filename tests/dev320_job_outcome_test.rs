@@ -368,3 +368,40 @@ fn clearing_the_assignee_during_a_job_records_a_cleared_assignee() {
     assert!(String::from_utf8_lossy(&out.stdout).contains("The assignee will be cleared when job job-clear ends"), "{}", String::from_utf8_lossy(&out.stdout));
     assert_eq!(agent_active_jobs::peek_outcome(&tasks_dir, "job-clear").and_then(|outcome| outcome.assignee).as_deref(), Some(""));
 }
+
+/// DEV-350: an update that saw the job before it ended and records its
+/// outcome after the end took it applies the change directly instead.
+#[test]
+fn an_assignment_recorded_after_the_job_ended_applies_directly() {
+    use lotar::services::agent_active_jobs::{self, ActiveJob};
+    use lotar::services::task_service::TaskService;
+
+    let fixtures = TestFixtures::new();
+    let tasks_dir = fixtures.tasks_root.clone();
+    std::fs::write(tasks_dir.join("config.yml"), "default:\n  project: OUTE\nissue:\n  states: [Todo, InProgress, HelpNeeded, Done]\n").unwrap();
+    let _queue_env = crate::common::env_mutex::EnvVarGuard::set("LOTAR_AGENT_QUEUE_DIR", fixtures.get_temp_path().join("queue").to_str().unwrap());
+    let mut storage = fixtures.create_storage();
+    TaskService::create(&mut storage, lotar::api_types::TaskCreate { title: "Hand it back".into(), ..Default::default() }).unwrap();
+    let job = ActiveJob {
+        job_id: "job-ending".into(),
+        ticket_id: "OUTE-1".into(),
+        runner: "t3".into(),
+        agent: None,
+        owner_pid: 1,
+        child_pid: 1,
+        started_at: "2026-11-11T00:00:00Z".into(),
+    };
+    agent_active_jobs::register(&tasks_dir, &job);
+    assert!(agent_active_jobs::end_and_take_outcome(&tasks_dir, "job-ending").is_none());
+    // The update still sees the job, as one that checked just before its end.
+    agent_active_jobs::register(&tasks_dir, &job);
+
+    let patch = lotar::api_types::TaskUpdate { status: Some("HelpNeeded".into()), assignee: Some("owner".into()), ..Default::default() };
+    let receipt = TaskService::update_with_receipt(&mut storage, "OUTE-1", patch, Default::default()).unwrap();
+    assert!(receipt.deferred.is_none(), "{:?}", receipt.deferred);
+    assert!(receipt.changed);
+    assert_eq!(receipt.dto.status.as_str(), "HelpNeeded");
+    assert_eq!(receipt.dto.assignee.as_deref(), Some("owner"));
+    assert!(agent_active_jobs::peek_outcome(&tasks_dir, "job-ending").is_none(), "nothing is left for nobody to apply");
+    agent_active_jobs::unregister(&tasks_dir, "job-ending");
+}
