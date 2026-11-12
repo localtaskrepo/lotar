@@ -1,0 +1,48 @@
+title: Release v0.13.3
+status: Todo
+priority: Medium
+type: Chore
+reporter: claude
+assignee: mallox
+created: 2026-11-12T06:34:39.087737+00:00
+modified: 2026-11-12T06:39:43.260997+00:00
+relationships:
+  blocks:
+  - DEV-361
+  - DEV-364
+  related:
+  - DEV-361
+  - DEV-370
+comments:
+- date: 2026-11-12T06:39:43.260997+00:00
+  text: 'claude: Waiting on this release: DEV-361 (Blocked; check: upgrade while a worker runs, next job runs on a new worker) and DEV-364 (fix 6144029 not merged yet; after release, tell the reporter thread). Before tagging, check that main holds every dependent''s fix.'
+description: 'Ship v0.13.3 by the steps in docs/release-guide.md: version bump, QA green, signed tag pushed, release workflow green, then brew upgrade lotar on this Mac. Done when the release is installed here (lotar --version prints 0.13.3). Tickets that wait for this release depend on it and are Blocked. Closing this ticket starts their checks (see the release-process ticket that links here). Waiting now: DEV-361 (worker restart after upgrade; needs a build with 06b571f).'
+history:
+- at: 2026-11-12T06:34:39.186755+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-361"]}'
+- at: 2026-11-12T06:34:54.405128+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-361"]}'
+    new: '{"related":["DEV-361","DEV-370"]}'
+- at: 2026-11-12T06:35:00.986564+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-361","DEV-370"]}'
+    new: '{"blocks":["DEV-361"],"related":["DEV-361","DEV-370"]}'
+- at: 2026-11-12T06:39:42.957903+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-361"],"related":["DEV-361","DEV-370"]}'
+    new: '{"blocks":["DEV-361","DEV-364"],"related":["DEV-361","DEV-370"]}'
+- at: 2026-11-12T06:39:43.260997+00:00
+  actor: claude
+  changes:
+  - field: comment_added

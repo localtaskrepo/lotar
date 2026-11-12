@@ -1,12 +1,13 @@
 title: lotar agent worker keeps running its old build after lotar is upgraded
-status: Done
+status: Blocked
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@merge'
 created: 2026-11-12T05:01:21.522818+00:00
-modified: 2026-11-12T05:46:15.902666+00:00
+modified: 2026-11-12T06:35:01.561504+00:00
 relationships:
+  depends_on:
+  - DEV-369
   related:
   - DEV-342
   - DEV-356
@@ -16,6 +17,8 @@ relationships:
   - DEV-354
   - DEV-360
   - DEV-362
+  - DEV-369
+  - DEV-370
 comments:
 - date: 2026-11-12T05:13:14.012531+00:00
   text: 'claude: Fixed in 32a8819 on agent/DEV-361. The queue worker now watches the binary it was started from (utils::binary_watch, the DEV-305 watcher that lotar mcp uses, so a Homebrew symlink move counts). After a change it takes no new queue entries, lets its running jobs finish, and exits. Its existing exit path then starts a new worker, now from the path lotar was started as (watched_path) and not current_exe, so it runs the upgraded build. New test tests/dev361_worker_restarts_after_upgrade_test.rs: it upgrades a fake install while job 1 runs, then queues job 2, and checks that a different worker process runs job 2. It fails without the fix and passes with it. Documented in docs/help/agent.md (queue section). Checks: npm run lint, npm run test:agent (Rust 2004 passed, UI 1444, release, hooks) and npm run smoke (379 passed) all pass. Note: the running worker (pid 11651) still runs the old code until it next goes idle or is restarted. The fix only applies to workers started from a build that includes it.'
@@ -31,6 +34,10 @@ comments:
   text: 'claude: Retry pass, nothing to change. The fix is on main as 06b571f; git cherry main agent/DEV-361 shows 32a8819 as applied (-), so the branch adds nothing. No files changed, no commit, no checks run. This job itself runs under the old worker 11651, which still has 6 job children (DEV-360/362/364/365/367 and this one), so the stop-worker-11651.sh watcher (pid 57797) has not fired yet. 11651 keeps taking new queue entries while it has children, so it may not go idle on its own; if the merge retry fails again with ''not merged ... can''t be fast-forwarded'', it ran on 11651. Still open: the check needs a release with 06b571f installed, then an upgrade while a worker runs.'
 - date: 2026-11-12T05:34:31.399280+00:00
   text: 'claude: Nothing to merge. The branch''s only commit (32a8819) is already on main as 06b571f: git cherry main HEAD shows it as applied, and the branch only trails main (its docs/help/agent.md differs just because main has a newer DEV-358 edit). I merged, pushed and ran nothing. The ticket''s check still needs a lotar release that includes 06b571f, installed, and worker 11651 (old build) stopped or replaced; see the earlier comment.'
+- date: 2026-11-12T06:27:21.340226+00:00
+  text: 'claude: Old worker pid 11651 exited on its own at 2026-11-11 22:20 local, once it had no jobs left (the watcher saw it go and sent no signal). Owner decision 2026-11-11 (mallox): ''Cancel job, keep waiting''. My earlier change back to @fix started job-20261112T053313.085Z-47 by mistake; it had already finished before I could cancel it, changed nothing, and the merge agent then set Done. I set the ticket back to HelpNeeded for mallox because the check has not run: it needs a lotar release that includes 06b571f, installed, then an upgrade while a worker runs. Question for mallox: when you have released and installed a build that includes 06b571f, should an agent run the check (upgrade while a worker runs, next job runs on a new worker) and close this ticket?'
+- date: 2026-11-12T06:35:01.444477+00:00
+  text: 'claude: Owner decision 2026-11-11 (mallox): ''Yes'' to an agent running the check once a release with 06b571f is installed. Following his choice (''Blocked + depends on release''), this ticket is Blocked and depends on DEV-369 (Release v0.13.3). Closing DEV-369 starts the check, once DEV-370 sets up that process. Check to run then: upgrade lotar while a worker runs; the next job runs on a new worker started from the new build.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af86593d9-5bfc-43dc-9e6e-504db1577842
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab7be4f58-8651-4692-8cf6-4cb0c810c1c9
@@ -200,3 +207,52 @@ history:
   - field: relationships
     old: '{"related":["DEV-342","DEV-356","DEV-305","DEV-358","DEV-367","DEV-354","DEV-360"]}'
     new: '{"related":["DEV-342","DEV-356","DEV-305","DEV-358","DEV-367","DEV-354","DEV-360","DEV-362"]}'
+- at: 2026-11-12T06:27:21.340226+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T06:27:21.418950+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Done
+    new: HelpNeeded
+- at: 2026-11-12T06:27:21.463972+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-12T06:34:39.186078+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-342","DEV-356","DEV-305","DEV-358","DEV-367","DEV-354","DEV-360","DEV-362"]}'
+    new: '{"related":["DEV-342","DEV-356","DEV-305","DEV-358","DEV-367","DEV-354","DEV-360","DEV-362","DEV-369"]}'
+- at: 2026-11-12T06:35:00.985808+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-342","DEV-356","DEV-305","DEV-358","DEV-367","DEV-354","DEV-360","DEV-362","DEV-369"]}'
+    new: '{"depends_on":["DEV-369"],"related":["DEV-342","DEV-356","DEV-305","DEV-358","DEV-367","DEV-354","DEV-360","DEV-362","DEV-369"]}'
+- at: 2026-11-12T06:35:01.291553+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-369"],"related":["DEV-342","DEV-356","DEV-305","DEV-358","DEV-367","DEV-354","DEV-360","DEV-362","DEV-369"]}'
+    new: '{"depends_on":["DEV-369"],"related":["DEV-342","DEV-356","DEV-305","DEV-358","DEV-367","DEV-354","DEV-360","DEV-362","DEV-369","DEV-370"]}'
+- at: 2026-11-12T06:35:01.444477+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T06:35:01.516225+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-12T06:35:01.561504+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox

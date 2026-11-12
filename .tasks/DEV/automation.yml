@@ -93,14 +93,18 @@ automation:
         job_started:
           set:
             status: InProgress
-        # Not the ticket's model fields: they pick the fix agent's model.
+        # The merge runs as the next turn of the fix agent's T3 thread, in its worktree and on its model (owner
+        # 2026-11-11, docs/decisions/2026-11-11-merge-in-fix-thread.md, STD-47); lotar before DEV-368 ignores
+        # session and starts a thread of its own. Not the ticket's model fields: they pick the fix agent's model.
         job_completed:
           set:
             assignee: "@merge"
           agent:
+            session: continue
             prompt: |
               Merge the work for ticket ${{ticket.id}} ("${{ticket.title}}") into the main checkout (<root>, the
-              first entry of git worktree list). Your worktree's branch holds the fix agent's commits. Run lotar
+              first entry of git worktree list). When this thread did the fix, this turn is the merge: it replaces
+              the earlier "Don't merge or push". Your worktree's branch holds the fix agent's commits. Run lotar
               with LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex), and start each comment with it.
               1. Main is the main checkout's current branch (git -C <root> branch --show-current). No commits
                  beyond main (git log <main>..HEAD): comment "nothing to merge" and stop.

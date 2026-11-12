@@ -5,12 +5,15 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-12T05:21:54.615269+00:00
-modified: 2026-11-12T05:46:28.892095+00:00
+modified: 2026-11-12T06:39:43.162322+00:00
 relationships:
+  depends_on:
+  - DEV-369
   related:
   - DEV-343
   - DEV-358
   - DEV-366
+  - DEV-370
 comments:
 - date: 2026-11-12T05:24:07.203106+00:00
   text: 'claude: the owner approved the fix in Fix (2026-11-11). Build it as described; the space is already freed (see Cleanup done). Reporter thread: the pyxzl.net link reference. The lotar thread that filed this tells the reporter when it is released.'
@@ -22,6 +25,8 @@ comments:
   text: 'claude: Merge not done. agent/DEV-364 has no commits beyond main (main is 5 commits ahead of it). The fix agent''s work (config cleanup_paths setting, agent_job_service.rs, docs, tests, UI, smoke spec) is still uncommitted in its worktree agent-DEV-364-a4468022dfcd537a, and its T3 thread is still running (npm run test:agent was in progress at 21:36). I did not touch that worktree. No checks ran and nothing was merged or pushed. Question: run the merge again once the fix agent has committed, or let it finish first?'
 - date: 2026-11-12T05:46:28.892095+00:00
   text: 'Claude (@fix job): done, commit 6144029 on agent/DEV-364. Changes: setting agent.worktree.cleanup_paths (src/config/*, config set as comma list, Config page > Agents chip list, view/api/types.ts); remove_build_output in agent_job_service.rs runs at every job end (completed, failed, cancelled, HelpNeeded). It skips when another job runs for the ticket, and only deletes paths that git ignores and tracks nothing under (no symlinks, nothing outside the worktree, no .git). It moves them into the worktree''s git dir under the registry lock, then deletes them after the lock is released. lotar''s .tasks/DEV/config.yml sets cleanup_paths: [target]. Docs: docs/help/agent.md, docs/help/config-reference.md. Tests: tests/agent_safety_test.rs (success, HelpNeeded, running job elsewhere + tracked file; they fail without the fix), tests/dev153_worktree_settings_test.rs (config set), smoke/tests/ui.config-cleanup-paths.smoke.spec.ts. Checks: npm run lint (agent variant) clean; npm test: 2009 Rust, 1444 UI, release and hook tests pass; npm run smoke: 380 passed. Not in scope: DEV-366 (rebased branches), interactive T3 threads (standards). Takes effect once the merged build runs the jobs.'
+- date: 2026-11-12T06:39:43.104705+00:00
+  text: 'claude: Depends on DEV-369 (Release v0.13.3) now, because its last done item (''Reporter thread told when it is released'') waits for that release. Status and assignee unchanged: the open question about the merge (comment above) still stands, and the fix (6144029 on agent/DEV-364) is not on main yet. Once it is merged, set it Blocked until DEV-369 closes (process: DEV-370).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa38f4398-ffb1-4376-9c12-47e5507a143c
 - link: t3-thread://v2/d834978d-9e75-43fb-ba01-45747238fc44/b51ca0ac-1980-485f-a905-ffe6a2c807e5
@@ -260,3 +265,19 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-12T06:39:42.957267+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-343","DEV-358","DEV-366"]}'
+    new: '{"depends_on":["DEV-369"],"related":["DEV-343","DEV-358","DEV-366"]}'
+- at: 2026-11-12T06:39:43.104705+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T06:39:43.162322+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-369"],"related":["DEV-343","DEV-358","DEV-366"]}'
+    new: '{"depends_on":["DEV-369"],"related":["DEV-343","DEV-358","DEV-366","DEV-370"]}'

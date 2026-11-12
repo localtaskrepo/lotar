@@ -1,0 +1,118 @@
+title: 'Release process: tickets waiting for a release get checked when it ships'
+status: HelpNeeded
+priority: Medium
+type: Feature
+reporter: claude
+assignee: mallox
+created: 2026-11-12T06:34:54.326999+00:00
+modified: 2026-11-12T06:53:43.484071+00:00
+relationships:
+  related:
+  - DEV-369
+  - DEV-361
+  - DEV-364
+  - DEV-368
+comments:
+- date: 2026-11-12T06:39:43.328867+00:00
+  text: 'claude: Owner 2026-11-11 (mallox), on the trigger: ''we can use the depends on relationship between tickets to standardize the release trigger''. So the standard is: a ticket that waits for a release depends_on that release''s ticket, and closing the release ticket starts the checks of its dependents, found through that relationship (not through tags or a hand-kept list). Current dependents of DEV-369: DEV-361, DEV-364.'
+- date: 2026-11-12T06:42:38.767922+00:00
+  text: 'claude: Scope addition, owner decision 2026-11-11 (mallox): ''Add to DEV-370''. Add a release skill, .github/skills/release/SKILL.md, plus a row in AGENTS.md''s skill table. It covers: check that main holds every fix of the release ticket''s dependents; version bump (stay on 0.13.x patch bumps); QA green for the commit; signed tag and push only with the owner''s OK; release workflow green; brew upgrade lotar on this Mac; close the release ticket, which starts the dependents'' checks; open the next release ticket. docs/release-guide.md stays the reference and the skill points to it rather than copying it. Validate the skill with instruction-maintenance.'
+- date: 2026-11-12T06:48:19.204606+00:00
+  text: 'claude: Done in 068c2a2 on agent/DEV-370, with no lotar code change. (1) .tasks/DEV/automation.yml, below the standards rules: ''Release installed: start the waiting checks'' fires when a ticket goes Done. Its sh command exits unless the title starts with ''Release v'', then follows the release''s blocks list (the reciprocal of depends_on, so the waiting tickets are found through the relationship, not tags or a list) and runs the manual rule ''Release installed: run the waiting check'' with --select ''status:blocked id:/^DEV-N$/'' for each one. That rule assigns the ticket to @fix with a prompt: run the check against the installed lotar; if it passes, comment and stop (the merge agent finds nothing and closes it); if it fails, HelpNeeded to mallox. It uses the lotar on PATH and needs the repo trusted (lotar trust) after the merge, as every run action does. (2) docs/release-guide.md: a new section ''Tickets waiting for a release'', and step 4 of Cutting a Release (brew upgrade, close the release ticket, open the next one). I also fixed stale lines: no package.json bump and no CHANGELOG.md (the workflow writes the notes), and a signed tag in Cutting a Release. (3) lotar-dev-tracking skill: a ticket whose check needs a release goes Blocked + depends_on the open release ticket, not HelpNeeded. (4) The added scope: a new .github/skills/release/SKILL.md (fixes on main, 0.13.x bump, QA green, signed tag only with the owner''s OK, Release workflow green, brew upgrade, close the ticket, open the next one), which points to the guide, plus a row in AGENTS.md. Validated with instruction-maintenance: its commands work on the real backlog (DEV-369 blocks DEV-361, DEV-364), links and anchors resolve, git diff --check is clean. Test: tests/dev370_release_waiting_checks_test.rs copies the real automation.yml into a temp workspace. Closing ''Release v9.9.9'' hands its Blocked dependent to @fix with the prompt; a Blocked ticket waiting on other work, and another ticket going Done, start nothing. It fails without the rules. Checks: npm run lint, npm test (Rust 2019, UI 1444), npm run smoke (379), all pass. Note: main''s .tasks/DEV/automation.yml has uncommitted edits (session: continue, DEV-368) in hunks separate from mine.'
+- date: 2026-11-12T06:53:29.089059+00:00
+  text: 'claude: Merge refused, not pushed. Branch t3/release-process-waiting-checks holds 068c2a2 (DEV-370), already on top of main c724ed9, so no rebase was needed. Checks in the worktree all pass: npm run lint, npm test (2019 Rust, 1444 UI), npm run smoke (379). git -C <root> merge --ff-only refused: the main checkout has an uncommitted edit to .tasks/DEV/automation.yml (the @merge rule gets session: continue and new prompt text, the open item from DEV-368), and the merge would overwrite it. The two changes are in separate hunks (that edit is near line 93, DEV-370 appends rules at the end), so once the edit is committed, main fast-forwards after a rebase with no conflict. I didn''t commit, stash or touch anything in the main checkout. Question: may the merge agent commit that automation.yml edit with the ticket files (DEV-370 Ticket updates), then rebase, fast-forward and push?'
+- date: 2026-11-12T06:53:43.413902+00:00
+  text: The merge agent's job job-20261112T064831.342Z-2 failed (lotar agent logs job-20261112T064831.342Z-2); the fix agent retries it on branch t3/release-process-waiting-checks.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A757d9bf4-8214-467d-9d47-5df92236f012
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A39e8c835-32c8-4f3d-907f-4d81655e1cbb
+description: 'Two tickets now wait for the next release to run their checks (rule of 2, owner 2026-11-11): ''Maybe we should create a ticket for the next release which other agents can check ... They need to be triggered when the release is done, so we need a release process defined and set up for lotar''. Owner decisions 2026-11-11: a waiting ticket is ''Blocked + depends on release'' (status Blocked, depends_on the ''Release vX.Y.Z'' ticket, e.g. DEV-369); the checks start on ''Closing the release ticket'': the last release-guide step, after brew upgrade lotar on this Mac, sets the release ticket Done. Set up: (1) an automation rule in lotar''s .tasks config that, when a release ticket goes Done, hands every Blocked ticket depending on it to @fix with a prompt like ''Release <version> is installed: run your check, close the ticket or report what still fails''; (2) docs/release-guide.md: create the next release ticket, link waiting tickets, close it after installing; (3) the agent guidance (lotar-dev-tracking or development-workflow skill): a ticket whose check needs a release goes Blocked + depends_on the open release ticket, not HelpNeeded. Open for the implementer: rule conditions need their field to change in the update (docs/help/automation.md Triggers), and actions apply to the ticket that fired, so reaching the dependents may need a run: lotar automation run ... --select step or a small lotar change; propose before adding code. Check: create a test release ticket and a Blocked dependent in a temp workspace, close the release ticket, and the dependent is assigned to the check agent. Done when that works with a test, and the docs and guidance describe it.'
+tags:
+- merge-retried
+history:
+- at: 2026-11-12T06:34:54.405518+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-369"]}'
+- at: 2026-11-12T06:34:54.503264+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T06:34:54.627791+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T06:34:55.149712+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A757d9bf4-8214-467d-9d47-5df92236f012
+- at: 2026-11-12T06:35:01.292214+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-369"]}'
+    new: '{"related":["DEV-369","DEV-361"]}'
+- at: 2026-11-12T06:39:43.162776+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-369","DEV-361"]}'
+    new: '{"related":["DEV-369","DEV-361","DEV-364"]}'
+- at: 2026-11-12T06:39:43.328867+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T06:42:38.767922+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T06:48:19.204606+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T06:48:19.350786+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-369","DEV-361","DEV-364"]}'
+    new: '{"related":["DEV-369","DEV-361","DEV-364","DEV-368"]}'
+- at: 2026-11-12T06:48:31.127406+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T06:48:31.851802+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A39e8c835-32c8-4f3d-907f-4d81655e1cbb
+- at: 2026-11-12T06:53:29.089059+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T06:53:43.386124+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: merge-retried
+- at: 2026-11-12T06:53:43.413902+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-12T06:53:43.484071+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
