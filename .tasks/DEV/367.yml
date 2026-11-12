@@ -1,11 +1,11 @@
 title: 'Flaky Rust: task_noop_update_test cli_configured_reviewer_can_resolve_an_agent_reported_review sees an active agent job'
-status: InProgress
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T05:28:33.195026+00:00
-modified: 2026-11-12T05:59:54.298063+00:00
+modified: 2026-11-12T05:59:59.198784+00:00
 relationships:
   related:
   - DEV-349
@@ -36,7 +36,6 @@ references:
 description: 'Found by DEV-361 (claude, 2026-11-12): in a full npm run test:agent on t3/agent-worker-restart-after-upgrade (rebased on 86239c2, other agent jobs running), tests/task_noop_update_test.rs:930 failed with ''Ticket TEST-1 has an active agent job (pid 88551). Cancel it before changing status.'' It passed alone and in the rerun of the full suite. Likely the same cause as DEV-349/DEV-351: a pid in the test''s temp workspace matches a live process of another session. Check: cargo nextest run --retries 0 cli_configured_reviewer_can_resolve next to a full suite 30 times, no failure. Done when the test cannot see a foreign process as its job.'
 tags:
 - health
-- merge-retried
 custom_fields:
   finding: flaky-test:task_noop_update_test::cli_configured_reviewer_can_resolve_an_agent_reported_review
 history:
@@ -140,3 +139,12 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-12T05:59:59.198784+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: tags
+    old: health, merge-retried
+    new: health
