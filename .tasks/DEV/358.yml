@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T04:36:54.876848+00:00
-modified: 2026-11-12T05:17:43.445219+00:00
+modified: 2026-11-12T05:17:51.889849+00:00
 relationships:
   related:
   - DEV-349
@@ -13,6 +13,7 @@ relationships:
   - DEV-355
   - DEV-357
   - DEV-363
+  - DEV-348
 comments:
 - date: 2026-11-12T05:02:05.534862+00:00
   text: 'claude: Reproduced on main (f10a63c) standalone: 4 of 6 runs hit the 15 s deadline. Not DEV-349: the worker is busy, one log event (open+2 writes+close) per stderr line, ~2.5 ms each under I/O load, so 6000 lines outlast 15 s. A second failure under load: ''trailing stderr must be persisted''. read_job_output stopped 5 s after the runner exited even while reading output the runner left in the pipe, failing the job and dropping its last lines (docs/help/agent.md promised available output is drained). Fix in progress: drain the bytes in the pipe at exit (FIONREAD/PeekNamedPipe) before the 5 s descendant limit starts; one write per log event; test burst 100 lines of 1 KB (still more than a pipe holds).'
@@ -20,6 +21,8 @@ comments:
   text: 'claude: Done in d1ea496 on agent/DEV-358. Changes: (1) read_job_output (agent_job_service.rs) counts the bytes left in the pipe when the runner exits (FIONREAD on unix, PeekNamedPipe on Windows) and reads them all before the 5 s limit for descendant output starts; before, a slow drain failed a successful job and lost its last lines. (2) AgentLogService::append_event writes each event in one write call instead of two. (3) The test''s burst is 100 lines of ~1 KB (98 KiB, still more than a pipe holds) instead of 6000 short ones: each line is one log event, so the run takes 1-3 s under load instead of 8-15+. (4) docs/help/agent.md says the leftover output is read in full. New unit tests: output_left_in_the_pipe_at_exit_is_read_however_slow_its_lines_are (failed before the fix), output_after_exit_is_limited. Checks: before the fix the check command failed 4/6 standalone and 3/8 under full-suite load; after it passed 8/8 and 10/10 with the full suite running in the background. npm run lint:agent, npm run test:agent (2005 Rust + 1444 UI + release + hooks) and npm run smoke (378) passed. Not run: the Windows build. Cross-compiling here fails in ring/blake3''s C builds, so CI checks the Windows code. Not DEV-349: no wrapper process was counted; the worker was busy writing log events.'
 - date: 2026-11-12T05:17:43.445219+00:00
   text: 'claude: Merged aa8cbc4 (rebased fix commit d1ea496) into main by fast-forward. Checks in the worktree after the rebase: npm run lint:agent, npm run test:agent and npm run smoke (379 tests) pass; the first full test:agent run failed once in dev279_cross_process_jobs_test (unrelated flake, passed on rerun and 3 of 3 alone; filed as DEV-363). Ticket check ''cargo nextest run --cargo-profile local worker_persists_trailing'' passes 5 of 5 on the merged code. Pushing per repos.json if only this ticket''s commits are unpushed. Windows build not run (CI).'
+- date: 2026-11-12T05:17:51.822709+00:00
+  text: 'claude: Not pushed: main has 17 unpushed commits and only 2 are this ticket''s (aa8cbc4, 7baefd7); the rest belong to DEV-348, 352, 354, 355, 356 and 359 and wait for their sessions. This comment is in the ticket file and stays uncommitted for the next ticket-updates commit.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acb13752d-02d4-4f9a-8cdf-d5868377dfce
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5b64ac66-413e-4f67-a73f-93869f527170
@@ -86,3 +89,13 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-12T05:17:51.822709+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:17:51.889849+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-349","DEV-351","DEV-355","DEV-357","DEV-363"]}'
+    new: '{"related":["DEV-349","DEV-351","DEV-355","DEV-357","DEV-363","DEV-348"]}'

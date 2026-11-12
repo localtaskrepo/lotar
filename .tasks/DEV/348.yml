@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T03:37:59.551010+00:00
-modified: 2026-11-12T05:07:08.535444+00:00
+modified: 2026-11-12T05:17:51.889513+00:00
 relationships:
   related:
   - DEV-343
@@ -20,6 +20,7 @@ relationships:
   - DEV-355
   - DEV-356
   - DEV-359
+  - DEV-358
 comments:
 - date: 2026-11-12T04:07:27.715821+00:00
   text: 'claude: Fixed in 1c4db03 on agent/DEV-348 (signed). Check confirmed it: with --retries 0, 3 of 30 runs failed (the default profile retries, so a plain loop hides failures; use --retries 0). The ticket''s cause was only half of it. Diagnostics showed the second @test assignment was never applied: the test assigned right after the hand-back job reported completed, while that job was still ending, so DEV-320 held the assignment back as the job''s outcome and lost it. That product race is already filed as DEV-350, and DEV-347 (25d4385, not on main yet) added a job_settled wait to this test for the same reason. Changes: the test now waits for job_settled after the hand-back (same lines as DEV-347, so the two branches merge cleanly), and a new wait_for_task(predicate) helper (wait_for_task_state now uses it) lets the failure step wait for HelpNeeded + Agent Tests + the agent-failed tag together. Checks: cargo nextest run --retries 0 -E ''test(shipped_agent_reviewed_template_handles_hand_back_failure_review_and_merge)'' 30 times: 30 pass. npm run lint:agent pass, npm run test:agent pass (2000 Rust, 1442 frontend, release and hook tests), npm run smoke pass (377).'
@@ -135,3 +136,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-343","DEV-346","DEV-349","DEV-320","DEV-347","DEV-350","DEV-351","DEV-352","DEV-354","DEV-355","DEV-356"]}'
     new: '{"related":["DEV-343","DEV-346","DEV-349","DEV-320","DEV-347","DEV-350","DEV-351","DEV-352","DEV-354","DEV-355","DEV-356","DEV-359"]}'
+- at: 2026-11-12T05:17:51.889513+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-343","DEV-346","DEV-349","DEV-320","DEV-347","DEV-350","DEV-351","DEV-352","DEV-354","DEV-355","DEV-356","DEV-359"]}'
+    new: '{"related":["DEV-343","DEV-346","DEV-349","DEV-320","DEV-347","DEV-350","DEV-351","DEV-352","DEV-354","DEV-355","DEV-356","DEV-359","DEV-358"]}'
