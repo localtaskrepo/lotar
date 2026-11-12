@@ -213,6 +213,7 @@ vi.mock('../composables/useConfig', () => ({
         priorities: configStore.priorities,
         types: configStore.types,
         customFields: configStore.customFields,
+        versionFields: ref<string[]>([]),
         refresh: configStore.refresh,
     }),
 }))

@@ -76,6 +76,7 @@
               <option value="assignee">Assignee</option>
               <option value="priority">Priority</option>
               <option value="type">Type</option>
+              <option v-for="name in groupByFieldNames" :key="name" :value="`field:${name}`">{{ name }}</option>
             </select>
           </label>
           <div class="board-chips-row__sort">
@@ -554,6 +555,8 @@ import { useTaskStore, type TaskQueryHandle } from '../composables/useTaskStore'
 import { parseTaskDate, startOfLocalDay } from '../utils/date'
 import { memberColor, memberInitials } from '../utils/member'
 import { statusEnteredAt } from '../utils/taskHistory'
+import { customFieldValues } from '../utils/customFields'
+import { compareVersionText } from '../utils/versions'
 import { useListKeyNavigation } from '../composables/useListKeyNavigation'
 
 const { projectName, projectLabel } = useProjectNames()
@@ -571,6 +574,7 @@ const {
   scope: configScope,
   tags: configuredTags,
   members,
+  versionFields,
 } = useConfig()
 const { sprints, refresh: refreshSprints } = useSprints()
 const store = useTaskStore()
@@ -628,16 +632,28 @@ const { sprintLabel, sprintStateClass, sprintTooltip } = useSprintFormatting(spr
 const sprintFilterOptions = useSprintFilterOptions(sprints)
 
 // -- Swimlane group-by (persisted per project) ----------------------------
-type GroupByMode = 'none' | 'assignee' | 'priority' | 'type'
+// `field:<name>` groups by a custom field (DEV-394).
+type GroupByMode = 'none' | 'assignee' | 'priority' | 'type' | `field:${string}`
 function groupByKey() {
   return project.value ? `lotar.boardGroupBy::${project.value}` : 'lotar.boardGroupBy'
 }
 function loadGroupBy(): GroupByMode {
   const v = storageGet(groupByKey())
   if (v === 'assignee' || v === 'priority' || v === 'type') return v
+  if (v?.startsWith('field:') && v.length > 'field:'.length) return v as GroupByMode
   return 'none'
 }
 const groupBy = ref<GroupByMode>(loadGroupBy())
+const groupByField = computed(() => (groupBy.value.startsWith('field:') ? groupBy.value.slice('field:'.length) : ''))
+// A saved field stays selectable while the config loads or after it is undeclared.
+const groupByFieldNames = computed(() => {
+  const names = availableCustomFields.value.filter((name) => name !== '*')
+  const current = groupByField.value
+  return current && !names.some((name) => name.toLowerCase() === current.toLowerCase()) ? [...names, current] : names
+})
+const groupByVersionField = computed(() =>
+  versionFields.value.some((name) => name.toLowerCase() === groupByField.value.toLowerCase()),
+)
 function saveGroupBy() {
   storageSet(groupByKey(), groupBy.value)
 }
@@ -1006,18 +1022,23 @@ function columnTasks(col: BoardColumnDescriptor): TaskDTO[] {
 }
 
 // -- Aligned swimlane group-by ---------------------------------------------
-function groupKeyFor(task: TaskDTO): string {
-  if (groupBy.value === 'assignee') return (task.assignee || '').trim() || '(none)'
-  if (groupBy.value === 'priority') return (task.priority || '').trim() || '(none)'
-  if (groupBy.value === 'type') return (task.task_type || '').trim() || '(none)'
-  return ''
+// A task whose custom field holds a list shows in the lane of each value.
+function groupKeysFor(task: TaskDTO): string[] {
+  if (groupBy.value === 'assignee') return [(task.assignee || '').trim() || '(none)']
+  if (groupBy.value === 'priority') return [(task.priority || '').trim() || '(none)']
+  if (groupBy.value === 'type') return [(task.task_type || '').trim() || '(none)']
+  if (groupByField.value) {
+    const values = customFieldValues(task.custom_fields, groupByField.value)
+    return values.length ? [...new Set(values)] : ['(none)']
+  }
+  return ['']
 }
 
 const allGroupLabels = computed<string[]>(() => {
   if (groupBy.value === 'none') return []
   const labels = new Set<string>()
   for (const col of boardColumns.value) {
-    for (const t of columnTasks(col)) labels.add(groupKeyFor(t))
+    for (const t of columnTasks(col)) for (const key of groupKeysFor(t)) labels.add(key)
   }
   const source = groupBy.value === 'priority' ? priorities.value : groupBy.value === 'type' ? types.value : []
   // Match the server's enum keys without folding distinct non-ASCII labels.
@@ -1038,19 +1059,19 @@ const allGroupLabels = computed<string[]>(() => {
     const aRank = ranks.get(keyFor(a)) ?? Infinity
     const bRank = ranks.get(keyFor(b)) ?? Infinity
     if (aRank !== bRank) return aRank - bRank
-    return a.localeCompare(b)
+    return groupByVersionField.value ? compareVersionText(a, b) : a.localeCompare(b)
   })
   return arr
 })
 
 function groupedColumnTasks(col: BoardColumnDescriptor, group: string): TaskDTO[] {
-  return columnTasks(col).filter((t) => groupKeyFor(t) === group)
+  return columnTasks(col).filter((t) => groupKeysFor(t).includes(group))
 }
 
 function groupTotalCount(group: string): number {
   let count = 0
   for (const col of boardColumns.value) {
-    count += columnTasks(col).filter((t) => groupKeyFor(t) === group).length
+    count += groupedColumnTasks(col, group).length
   }
   return count
 }

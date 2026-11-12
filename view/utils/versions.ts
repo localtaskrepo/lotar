@@ -137,3 +137,11 @@ export function versionFieldNames(properties: unknown): string[] {
         .filter(([, props]) => !!props && typeof props === 'object' && (props as { type?: unknown }).type === 'version')
         .map(([name]) => name)
 }
+
+/** Orders text as versions, as the Board's version lanes need; text that is not a version comes last. */
+export function compareVersionText(a: string, b: string): number {
+    const va = parseVersion(a)
+    const vb = parseVersion(b)
+    if (va && vb) return compareVersions(va, vb)
+    return va ? -1 : vb ? 1 : a.localeCompare(b)
+}

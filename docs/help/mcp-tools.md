@@ -64,7 +64,7 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 
 ### `task_bulk_update`
 - **Params:** `ids[]` (required), `patch` (required, same keys as `task_update` including the `task_type` alias), optional `stop_on_error`.
-- **Behavior:** applies the same patch to multiple tasks using the `task_update` tri-state semantics. Enum validation runs per task against its own project configuration, so a value valid in one project can fail in another (reported per id in `failed[]`). When `stop_on_error=true`, aborts after the first failure.
+- **Behavior:** applies the same patch to multiple tasks using the `task_update` tri-state semantics. Enum validation runs per task against its own project configuration, so a value valid in one project can fail in another (reported per id in `failed[]`). When `stop_on_error=true`, aborts after the first failure. A `custom_fields` patch replaces each task's whole map, so it does not set one field and keep the others; for that, use `lotar edit --select '<query>' -F key=value` or the Tasks page's **Set field…**.
 - **Response:** JSON with `updated[]` and `failed[]` per task id, plus `deferred[]` (`id`, `message`, `outcome`) for tickets whose running agent job holds the status or assignee change for its end.
 
 ### `task_bulk_comment_add`

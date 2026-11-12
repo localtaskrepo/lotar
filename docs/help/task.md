@@ -78,10 +78,12 @@ lotar --format json show <TASK_ID>
 ### edit
 
 ```bash
-lotar task edit <TASK_ID> [--title|-T] [--type|-t] [--priority|-P] [--reporter|-R] [--assignee|-a] [--effort|-E] [--due|-d] [--description|-D] [--tag|-i ...] [--untag TAG ...] [--field|-F key=value ...] [--dry-run|-n]
+lotar task edit [TASK_ID] [--select QUERY] [--title|-T] [--type|-t] [--priority|-P] [--reporter|-R] [--assignee|-a] [--effort|-E] [--due|-d] [--description|-D] [--tag|-i ...] [--untag TAG ...] [--field|-F key=value ...] [--dry-run|-n]
 ```
 
 - Also available as `lotar edit <TASK_ID> …` and `lotar update <TASK_ID> …`.
+- `--select '<query>'` makes the same edit on every task the query matches, in the [search syntax of `lotar list`](list.md#filters-in-the-query), together with a named task if one is given: `lotar edit --select 'tag:web status:done' -F fixed_in=0.15.0`. Each task is checked on its own; the command reports the tasks it updated and the ones it could not, and fails when any could not be edited. A blank query is refused.
+- `--field key=value` sets one custom field and keeps the task's other fields; `--field key=` drops the field.
 - Validates and normalizes edits in the task's project context, including `@me` handling, before updating through the shared task service.
 - When `auto.populate_members` is enabled, new reporter/assignee members and the task edit are saved in one coordinated transaction. Validation or write failures do not leave member configuration changes behind; a pending transaction that cannot be safely recovered blocks the edit.
 - `--dry-run` works with both text and JSON output (`--format=json` emits the preview envelope described in `docs/help/effort.md`).

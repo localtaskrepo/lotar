@@ -871,7 +871,10 @@ fn make_task_bulk_update_tool(enum_hints: Option<&EnumHints>) -> Value {
         }),
     );
     patch_properties.insert("relationships".into(), json!({"type": ["object", "null"], "description": "Replaces the map; null or {} clears."}));
-    patch_properties.insert("custom_fields".into(), json!({"type": ["object", "null"], "description": "Set/clear custom_fields. Null clears all."}));
+    patch_properties.insert(
+        "custom_fields".into(),
+        json!({"type": ["object", "null"], "description": "Replaces the whole custom_fields map, so include the fields to keep. Null clears all."}),
+    );
     patch_properties.insert("sprints".into(), json!({"type": ["array", "null"], "items": {"type": "integer", "minimum": 1}}));
     patch_properties.insert("task_type".into(), json!({"type": ["string", "null"], "description": "Alias for 'type'; 'type' wins when both are provided."}));
 

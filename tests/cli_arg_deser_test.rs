@@ -71,7 +71,7 @@ fn task_edit_args_deserialize_minimal() {
         "fields": {"k": "v"}
     });
     let args: cli::TaskEditArgs = serde_json::from_value(payload).expect("valid edit");
-    assert_eq!(args.id, "PROJ-1");
+    assert_eq!(args.id.as_deref(), Some("PROJ-1"));
     assert_eq!(args.title.as_deref(), Some("New title"));
     assert_eq!(args.due.as_deref(), Some("2025-10-10"));
     assert_eq!(args.tags, vec!["one", "two"]);

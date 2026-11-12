@@ -133,6 +133,16 @@
               <button
                 class="menu-item"
                 type="button"
+                data-testid="bulk-set-field"
+                :disabled="disableBulkActions || !bulkFieldNames.length"
+                @click="handleBulkAction('set-field')"
+              >
+                <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="edit" /></span>
+                <span class="menu-item__label">Set field…</span>
+              </button>
+              <button
+                class="menu-item"
+                type="button"
                 :disabled="disableSprintActions"
                 @click="handleBulkAction('sprint-add')"
               >
@@ -299,6 +309,65 @@
       </form>
     </UiModal>
 
+    <UiModal :open="fieldDialogOpen" :aria-label="fieldDialogTitle" @close="closeFieldDialog">
+      <form class="col tasks-modal__form" data-testid="bulk-field-dialog" @submit.prevent="submitFieldDialog">
+        <header class="row tasks-modal__header">
+          <div class="col" style="gap: 4px">
+            <h2>{{ fieldDialogTitle }}</h2>
+            <p class="muted tasks-modal__hint">
+              Leave the value empty to clear the field. Other fields stay as they are.
+            </p>
+          </div>
+          <UiButton
+            variant="ghost"
+            icon-only
+            type="button"
+            aria-label="Close dialog"
+            title="Close dialog"
+            :disabled="fieldDialogSubmitting"
+            @click="closeFieldDialog"
+          >
+            <IconGlyph name="close" />
+          </UiButton>
+        </header>
+        <label class="col" style="gap: 4px">
+          <span class="muted">Field</span>
+          <select v-model="fieldDialogName" class="input" data-testid="bulk-field-name">
+            <option v-for="name in bulkFieldNames" :key="name" :value="name">{{ name }}</option>
+          </select>
+        </label>
+        <label class="col" style="gap: 4px">
+          <span class="muted">Value</span>
+          <input
+            ref="fieldValueInputRef"
+            v-model="fieldDialogValue"
+            class="input"
+            data-testid="bulk-field-value"
+            autocomplete="off"
+            :placeholder="fieldDialogIsVersion ? 'e.g. 0.15.0' : 'empty clears the field'"
+            :aria-invalid="fieldDialogError ? 'true' : undefined"
+            :aria-describedby="fieldDialogError ? 'bulk-field-error' : undefined"
+          />
+          <span v-if="fieldDialogError" id="bulk-field-error" class="tasks-modal__error" role="alert">{{
+            fieldDialogError
+          }}</span>
+        </label>
+        <footer class="row tasks-modal__footer">
+          <UiButton
+            variant="primary"
+            type="submit"
+            data-testid="bulk-field-submit"
+            :disabled="fieldDialogSubmitting || !fieldDialogName || !!fieldDialogError"
+          >
+            {{ fieldDialogSubmitting ? 'Saving…' : fieldDialogValue.trim() ? 'Set field' : 'Clear field' }}
+          </UiButton>
+          <UiButton variant="ghost" type="button" :disabled="fieldDialogSubmitting" @click="closeFieldDialog"
+            >Cancel</UiButton
+          >
+        </footer>
+      </form>
+    </UiModal>
+
     <UiModal :open="sprintDialogOpen" :aria-label="sprintDialogTitle" @close="closeSprintDialog">
       <form class="col tasks-modal__form" @submit.prevent="submitSprintDialog">
         <header class="row tasks-modal__header">
@@ -444,6 +513,8 @@ import { onPreferencesChanged, readTasksPageSizePreference } from '../utils/pref
 import { isDeletedTask, projectOf, titleCase } from '../utils/text'
 import { storageGet, storageGetJson, storageRemove, storageSet, storageSetJson } from '../utils/storage'
 import { toDateKey } from '../utils/date'
+import { withCustomField } from '../utils/customFields'
+import { versionValueError } from '../utils/versions'
 
 const router = useRouter()
 const store = useTaskStore()
@@ -515,6 +586,7 @@ const {
   scope: configScope,
   tags: configuredTags,
   members,
+  versionFields,
 } = useConfig()
 
 const { sprints, loading: sprintsLoading, refresh: refreshSprints, active: activeSprints } = useSprints()
@@ -953,7 +1025,7 @@ const bulk = ref(false)
 const selectedIds = ref<string[]>([])
 
 const showBulkMenu = ref(false)
-type BulkMenuAction = 'assign' | 'unassign' | 'sprint-add' | 'sprint-remove' | 'delete'
+type BulkMenuAction = 'assign' | 'unassign' | 'set-field' | 'sprint-add' | 'sprint-remove' | 'delete'
 type BulkMenuButtonRef = HTMLElement | (ComponentPublicInstance & { $el: HTMLElement })
 const bulkMenuButton = ref<BulkMenuButtonRef | null>(null)
 const bulkMenuPopover = ref<HTMLElement | null>(null)
@@ -989,6 +1061,9 @@ function handleBulkAction(action: BulkMenuAction) {
       break
     case 'unassign':
       bulkUnassign()
+      break
+    case 'set-field':
+      openFieldDialog()
       break
     case 'sprint-add':
       openBulkSprintAdd()
@@ -1167,6 +1242,96 @@ async function bulkUnassign() {
     return
   }
   await unassignTasks(scopedSelection.value)
+}
+
+// -- Bulk set a custom field (DEV-394) --------------------------------------
+const bulkFieldNames = computed(() => availableCustomFields.value.filter((name) => name !== '*'))
+const fieldDialogOpen = ref(false)
+const fieldDialogSubmitting = ref(false)
+const fieldDialogIds = ref<string[]>([])
+const fieldDialogName = ref('')
+const fieldDialogValue = ref('')
+const fieldValueInputRef = ref<HTMLInputElement | null>(null)
+const fieldDialogTitle = computed(() => {
+  const count = fieldDialogIds.value.length
+  return `Set a field on ${count} task${count === 1 ? '' : 's'}`
+})
+const fieldDialogIsVersion = computed(() =>
+  versionFields.value.some((name) => name.toLowerCase() === fieldDialogName.value.toLowerCase()),
+)
+const fieldDialogError = computed(() => (fieldDialogIsVersion.value ? versionValueError(fieldDialogValue.value) : null))
+
+function openFieldDialog() {
+  if (fieldDialogSubmitting.value) return
+  if (!scopedSelection.value.length) {
+    showToast('Select at least one task first')
+    return
+  }
+  fieldDialogIds.value = [...new Set(scopedSelection.value)]
+  if (!bulkFieldNames.value.includes(fieldDialogName.value)) fieldDialogName.value = bulkFieldNames.value[0] ?? ''
+  fieldDialogValue.value = ''
+  fieldDialogOpen.value = true
+  nextTick(() => fieldValueInputRef.value?.focus())
+}
+
+function closeFieldDialog(force?: boolean | Event) {
+  if (fieldDialogSubmitting.value && force !== true) return
+  fieldDialogOpen.value = false
+  fieldDialogIds.value = []
+}
+
+// An update's custom_fields replaces the whole map, so each task gets its own
+// map with the one field changed, guarded by its `modified` (DEV-301): a task
+// changed meanwhile is read again once instead of losing that change.
+async function setFieldOn(id: string, name: string, value: string): Promise<TaskDTO | null> {
+  for (let attempt = 0; ; attempt += 1) {
+    const fresh = await api.getTask(id)
+    const next = withCustomField(fresh.custom_fields, name, value)
+    if (!next) return null
+    try {
+      return await api.updateTask(id, { custom_fields: next, expected_modified: fresh.modified })
+    } catch (error) {
+      if (attempt > 0 || (error as { status?: number } | null)?.status !== 409) throw error
+    }
+  }
+}
+
+async function submitFieldDialog() {
+  if (fieldDialogSubmitting.value || !fieldDialogOpen.value || !fieldDialogName.value || fieldDialogError.value) return
+  const scope = filterGeneration
+  const name = fieldDialogName.value
+  const value = fieldDialogValue.value.trim()
+  const failures: Array<{ id: string; error: unknown }> = []
+  let success = 0
+  fieldDialogSubmitting.value = true
+  try {
+    for (const id of fieldDialogIds.value) {
+      try {
+        const updated = await setFieldOn(id, name, value)
+        if (!updated) continue
+        if (scope === filterGeneration) store.upsert(updated)
+        success += 1
+      } catch (error) {
+        failures.push({ id, error })
+      }
+    }
+    if (success) {
+      const verb = value ? `Set ${name} to ${value} on` : `Cleared ${name} on`
+      showToast(`${verb} ${success} task${success === 1 ? '' : 's'}`)
+    } else if (!failures.length) {
+      showToast('No task needed a change')
+    }
+    if (failures.length) {
+      const first = errorMessage(failures[0]?.error)
+      showToast(
+        `Failed to update ${failures.length} task${failures.length === 1 ? '' : 's'}${first ? `: ${first}` : ''}`,
+      )
+      console.error('Set field errors', failures)
+    }
+    closeFieldDialog(true)
+  } finally {
+    fieldDialogSubmitting.value = false
+  }
 }
 
 function parseSprintToken(token: string): number | string | undefined {
@@ -1883,6 +2048,12 @@ const handleTaskUpdated = (task: TaskDTO) => {
   flex-wrap: wrap;
 }
 
+/* A long hint wraps beside the close button instead of pushing it below. */
+.tasks-modal__header > .col {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
 .tasks-modal__footer {
   gap: 8px;
   flex-wrap: wrap;
@@ -1894,6 +2065,11 @@ const handleTaskUpdated = (task: TaskDTO) => {
 
 .tasks-modal__hint--danger {
   color: var(--color-danger);
+}
+
+.tasks-modal__error {
+  color: var(--color-danger);
+  font-size: var(--text-sm, 0.875rem);
 }
 
 .tasks-modal__checkbox {

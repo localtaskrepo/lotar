@@ -19,7 +19,8 @@ fn write_global_config(tasks_dir: &std::path::Path, extra: &str) {
 
 fn edit_args(id: &str, title: Option<&str>, reporter: Option<&str>) -> TaskEditArgs {
     TaskEditArgs {
-        id: id.to_string(),
+        id: Some(id.to_string()),
+        select: None,
         title: title.map(str::to_string),
         task_type: None,
         priority: None,

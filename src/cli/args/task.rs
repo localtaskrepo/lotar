@@ -530,7 +530,14 @@ pub struct TaskShowArgs {
 #[derive(Args, Deserialize, Debug)]
 pub struct TaskEditArgs {
     /// Task ID to edit
-    pub id: String,
+    #[arg(required_unless_present = "select")]
+    #[serde(default)]
+    pub id: Option<String>,
+
+    /// Also edit every task matching this query, e.g. 'tag:web status:todo'
+    #[arg(long, value_name = "QUERY", allow_hyphen_values = true)]
+    #[serde(default)]
+    pub select: Option<String>,
 
     /// New title
     #[arg(long, short = 'T', allow_hyphen_values = true)]
@@ -576,7 +583,7 @@ pub struct TaskEditArgs {
     #[serde(default)]
     pub untag: Vec<String>,
 
-    /// Set custom fields
+    /// Set a custom field (key=value); key= drops it
     #[arg(long = "field", short = 'F', value_parser = parse_key_value)]
     #[serde(default, deserialize_with = "deserialize_kv_pairs")]
     pub fields: Vec<(String, String)>,

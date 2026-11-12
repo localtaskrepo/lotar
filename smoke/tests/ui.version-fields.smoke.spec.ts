@@ -1,3 +1,5 @@
+import fs from 'fs-extra';
+import path from 'node:path';
 import { parse, stringify } from 'yaml';
 import { describe, it } from 'vitest';
 import { startLotarServer } from '../helpers/server.js';
@@ -7,6 +9,10 @@ import { SmokeWorkspace } from '../helpers/workspace.js';
 // DEV-373: custom fields can hold versions. The task panel flags a value
 // that is not a version and does not save it, the search box compares
 // versions, and the Config page lists the version fields.
+// DEV-394: the Tasks list sets or clears a field on many tasks at once, and
+// the Board groups by a custom field, version lanes in version order.
+
+const artifacts = path.resolve('target/smoke-artifacts/version-fields');
 
 function seed(): Record<string, string> {
     const files: Record<string, string> = {
@@ -30,6 +36,21 @@ function seed(): Record<string, string> {
             created: '2026-11-01T00:00:00Z',
             modified: '2026-11-01T00:00:00Z',
             custom_fields: { affects, product: 'web' },
+        });
+    }
+    for (const [number, title, affects] of [
+        ['4', 'Listed crash', ['0.9.1', '1.0.0-rc.1']],
+        ['5', 'Unknown crash', null],
+    ] as const) {
+        files[`.tasks/VER/${number}.yml`] = stringify({
+            title,
+            status: 'Todo',
+            priority: 'Low',
+            type: 'Bug',
+            reporter: 'Fixture',
+            created: '2026-11-01T00:00:00Z',
+            modified: '2026-11-01T00:00:00Z',
+            custom_fields: affects ? { affects } : { product: 'cli' },
         });
     }
     return files;
@@ -90,6 +111,94 @@ describe.concurrent('UI version fields (DEV-373)', () => {
                     const field = page.getByTestId('config-version-fields');
                     await field.waitFor({ timeout: 15_000 });
                     await expect.poll(() => field.textContent()).toContain('affects');
+                });
+            } finally {
+                await server.stop();
+            }
+        } finally {
+            await workspace.dispose();
+        }
+    });
+
+    it('sets and clears a field on the selected tasks and keeps their other fields', async ({ expect }) => {
+        await fs.ensureDir(artifacts);
+        const workspace = await SmokeWorkspace.create({ name: 'dev394-bulk-field-', seedFiles: seed() });
+        try {
+            const server = await startLotarServer(workspace);
+            try {
+                await withPage(`${server.url}/?project=VER`, async (page) => {
+                    await page.waitForSelector('text=Old crash', { timeout: 15_000 });
+                    await page.getByRole('button', { name: 'Bulk select', exact: true }).click();
+                    const select = async (...titles: string[]) => {
+                        for (const title of titles)
+                            await page.locator('tr', { hasText: title }).locator('input[type="checkbox"]').check();
+                    };
+                    const setField = async (name: string, value: string) => {
+                        await page.getByRole('button', { name: 'Bulk actions', exact: true }).click();
+                        await page.getByTestId('bulk-set-field').click();
+                        const dialog = page.getByTestId('bulk-field-dialog');
+                        await dialog.waitFor();
+                        await page.getByTestId('bulk-field-name').selectOption(name);
+                        await page.getByTestId('bulk-field-value').fill(value);
+                        return dialog;
+                    };
+                    const fields = async (id: string) => parse(await workspace.readTaskYaml(id))?.custom_fields ?? {};
+
+                    await select('Old crash', 'New crash');
+                    const dialog = await setField('affects', 'soon');
+                    await expect
+                        .poll(() => dialog.getByRole('alert').textContent())
+                        .toContain('"soon" is not a version');
+                    expect(await page.getByTestId('bulk-field-submit').isDisabled()).toBe(true);
+                    await page.screenshot({ path: path.join(artifacts, 'bulk-set-field.png'), animations: 'disabled' });
+                    await page.getByTestId('bulk-field-value').fill('v0.14.0');
+                    await page.getByTestId('bulk-field-submit').click();
+                    await dialog.waitFor({ state: 'hidden' });
+                    await expect
+                        .poll(() => fields('VER-1'), { timeout: 10_000 })
+                        .toEqual({ affects: '0.14.0', product: 'web' });
+                    await expect.poll(() => fields('VER-3')).toEqual({ affects: '0.14.0', product: 'web' });
+                    expect(await fields('VER-2')).toEqual({ affects: '0.13', product: 'web' });
+
+                    await setField('product', '');
+                    await expect
+                        .poll(() => page.getByTestId('bulk-field-submit').textContent())
+                        .toContain('Clear field');
+                    await page.getByTestId('bulk-field-submit').click();
+                    await expect.poll(() => fields('VER-1'), { timeout: 10_000 }).toEqual({ affects: '0.14.0' });
+                    await expect.poll(() => fields('VER-3')).toEqual({ affects: '0.14.0' });
+                });
+            } finally {
+                await server.stop();
+            }
+        } finally {
+            await workspace.dispose();
+        }
+    });
+
+    it('groups the Board by a custom field, version lanes in version order', async ({ expect }) => {
+        await fs.ensureDir(artifacts);
+        const workspace = await SmokeWorkspace.create({ name: 'dev394-board-field-', seedFiles: seed() });
+        try {
+            const server = await startLotarServer(workspace);
+            try {
+                await withPage(`${server.url}/boards?project=VER`, async (page) => {
+                    await expect.poll(() => page.locator('article.task').count(), { timeout: 15_000 }).toBe(5);
+                    const group = page.getByTestId('board-groupby');
+                    const labels = () => page.locator('.swimlane-label').allTextContents();
+                    const counts = () => page.locator('.swimlane-count').allTextContents();
+                    await group.selectOption('field:affects');
+                    // A list value shows the task in each of its lanes.
+                    await expect.poll(labels).toEqual(['0.9.1', '0.12.4', '0.13', '1.0.0-rc.1', '1.0.0', '(none)']);
+                    expect(await counts()).toEqual(['1', '1', '1', '1', '1', '1']);
+                    expect(await page.locator('article.task', { hasText: 'Listed crash' }).count()).toBe(2);
+                    await page.screenshot({
+                        path: path.join(artifacts, 'board-by-version.png'),
+                        animations: 'disabled',
+                    });
+                    await group.selectOption('field:product');
+                    await expect.poll(labels).toEqual(['cli', 'web', '(none)']);
+                    expect(await counts()).toEqual(['1', '3', '1']);
                 });
             } finally {
                 await server.stop();
