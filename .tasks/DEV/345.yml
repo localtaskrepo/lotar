@@ -1,16 +1,17 @@
 title: Lotar favicon doesn't switch to project icon
-status: HelpNeeded
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
-assignee: mallox
+assignee: claude
 created: 2026-11-12T02:54:29.137527+00:00
-modified: 2026-11-12T03:47:57.291787+00:00
+modified: 2026-11-12T08:49:37.049786+00:00
 relationships:
   related:
   - DEV-343
   - DEV-344
   - DEV-346
+  - DEV-361
 comments:
 - date: 2026-11-12T03:07:54.918816+00:00
   text: 'Done in 1fc9c7f on agent/DEV-345. Without ui.name the tab title is ''<repository folder> · LoTaR'' (ui.name still wins). Without ui.icon the tab shows the repository''s own icon: the first real image named favicon.svg/.ico/.png or icon.svg/.png at the repo root or in public/, static/, assets/, app/, src/, src/app/, web/. /api/branding gains repository and detected_icon (api_types.rs, types.ts, openapi.json, help docs updated); Config > Appearance previews the found icon and names the file. Tests: branding_service unit test, dev218 endpoint test, useBranding.spec, new smoke test in ui.theming. npm run lint, npm test (2000 Rust + 1443 UI) and npm run smoke (378) all pass. Note: the lotar repo itself keeps the built-in icon, as its icon lives in view/assets/branding/ and is not in the searched places.'
@@ -18,6 +19,8 @@ comments:
   text: 'claude: Merged into main (fast-forward) as dc306cc ''DEV-345 Lotar favicon doesn''t switch to project icon'', rebased twice because main moved (DEV-343, DEV-344). Ticket files committed as 22fc4cb ''DEV-345 Ticket updates''. Not pushed: main has unpushed commits from other tickets (DEV-343, DEV-344, DEV-346, version 0.13.2) that wait for their sessions. Checks on the final rebased branch: npm run lint and npm test passed (2002 Rust tests, 2 flaky passed on retry: dev279_cross_process_jobs_test failed in an earlier full run but passes alone and on retry; vitest; release; hooks). npm run smoke passed 378/378 on the first rebase (one ui.relationships failure in an earlier run passed on re-run); I did not re-run smoke after the second rebase because main''s new commits touch only agent-job code and docs, not branding or the UI.'
 - date: 2026-11-12T03:47:57.291787+00:00
   text: 'The merge agent''s job job-20261112T030803.821Z-10 failed: lotar agent logs job-20261112T030803.821Z-10. The fix is on branch agent/DEV-345. Try again with lotar automation run "Health: retry with @fix" --select ''id:DEV-345'', or for an agent''s ticket lotar assignee DEV-345 @fix.'
+- date: 2026-11-12T08:49:35.911127+00:00
+  text: 'claude: Closing (owner OK 2026-11-12): the fix is on main as dc306cc (git cherry main agent/DEV-345 lists nothing unmerged). The merge job failed only because the old worker (DEV-361, fixed in v0.13.3) still ran it.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab910bf4e-b967-408d-b7e5-9f0d3dfaf395
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afcc8adc5-80ba-4595-af72-f7b7b6cb7415
@@ -72,3 +75,25 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-12T08:49:35.911127+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T08:49:36.026562+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-343","DEV-344","DEV-346"]}'
+    new: '{"related":["DEV-343","DEV-344","DEV-346","DEV-361"]}'
+- at: 2026-11-12T08:49:36.135528+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done
+- at: 2026-11-12T08:49:37.049786+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: claude

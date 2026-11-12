@@ -1,16 +1,17 @@
 title: 'Flaky Rust: task_creation_waits_for_fragmented_body_with_case_insensitive_content_length times out reading the response'
-status: HelpNeeded
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: claude
 created: 2026-11-12T04:47:42.443342+00:00
-modified: 2026-11-12T05:08:40.408986+00:00
+modified: 2026-11-12T08:49:44.662640+00:00
 relationships:
   related:
   - DEV-354
   - DEV-356
   - DEV-348
+  - DEV-361
 comments:
 - date: 2026-11-12T04:58:54.479545+00:00
   text: 'claude: Fixed in commit 1d69b61 on agent/DEV-359. tests/web_api_integration_test.rs: after the body is sent, the response is now read to EOF with read_until_deadline (RESPONSE_DEADLINE, 15 s) instead of read_to_string against the 500 ms net_timeout. A real hang still fails with ''no response from test server within 15s''. The early-response check (100 ms read before the body) is unchanged. Checks: the ticket''s cargo nextest command, 5 runs, 35/35 each time; npm run lint:agent passes; npm run test:agent passes (Rust, UI, release, hooks). Smoke: the first run had 1 failure of 378, which I didn''t capture (smoke doesn''t touch this Rust test file), and the 2 reruns passed 378/378.'
@@ -26,6 +27,8 @@ comments:
   text: 'claude: Merge retry: nothing to merge. The branch''s only commit (1d69b61) was already on main as 4be7d13; the rebase skipped it and the branch now equals main. Not pushed: main holds unpushed commits from DEV-348, 352, 354, 355 and 356 that wait for their own sessions. No code changed, so no checks ran this time (the earlier merge ran the nextest check 5 of 5, lint:agent, test:agent, smoke).'
 - date: 2026-11-12T05:08:40.408986+00:00
   text: 'The merge agent''s job job-20261112T050807.696Z-34 failed again: lotar agent logs job-20261112T050807.696Z-34. The fix is on branch agent/DEV-359. Try again with lotar automation run "Health: retry with @fix" --select ''id:DEV-359'', or for an agent''s ticket lotar assignee DEV-359 @fix.'
+- date: 2026-11-12T08:49:43.600106+00:00
+  text: 'claude: Closing (owner OK 2026-11-12): the fix is on main as 4be7d13 (git cherry main agent/DEV-359 lists nothing unmerged). The merge job failed only because the old worker (DEV-361, fixed in v0.13.3) still ran it.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8a800754-e4a5-4ec5-9daa-e8c4f4cdab68
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae828c50c-0209-44ef-8410-92ca55d914f5
@@ -34,7 +37,6 @@ references:
 description: 'Found by DEV-354 merge (claude, 2026-11-11): in the main checkout, running the web_api_integration_test module with cargo nextest run --no-fail-fast -E ''test(web_api_integration_test::)'' failed this test in 4 of 7 runs at tests/web_api_integration_test.rs:606 (stream.read_to_string(&mut response).unwrap() returned WouldBlock, os error 35) because the stream read timeout is net_timeout() (500 ms). It passes alone and in the DEV-354 worktree. Same cause as DEV-354: the response read uses a short fixed timeout. Check: run that cargo nextest command 5 times; all must pass. Done when this read waits for the response with the read_until_deadline helper added in DEV-354 (deadline, not fixed short budget), still failing fast on a real hang.'
 tags:
 - health
-- merge-retried
 custom_fields:
   finding: flaky-test:task_creation_waits_for_fragmented_body_with_case_insensitive_content_length
 history:
@@ -145,3 +147,31 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-12T08:49:43.600106+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T08:49:43.658823+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-354","DEV-356","DEV-348"]}'
+    new: '{"related":["DEV-354","DEV-356","DEV-348","DEV-361"]}'
+- at: 2026-11-12T08:49:43.764065+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done
+- at: 2026-11-12T08:49:43.794347+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, merge-retried
+    new: health
+- at: 2026-11-12T08:49:44.662640+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: claude

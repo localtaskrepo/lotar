@@ -5,16 +5,16 @@ type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-12T06:34:39.087737+00:00
-modified: 2026-11-12T07:35:55.221340+00:00
+modified: 2026-11-12T08:02:58.898065+00:00
 relationships:
   blocks:
   - DEV-361
-  - DEV-364
   related:
   - DEV-361
   - DEV-370
   - DEV-371
   - DEV-372
+  - DEV-364
 comments:
 - date: 2026-11-12T06:39:43.260997+00:00
   text: 'claude: Waiting on this release: DEV-361 (Blocked; check: upgrade while a worker runs, next job runs on a new worker) and DEV-364 (fix 6144029 not merged yet; after release, tell the reporter thread). Before tagging, check that main holds every dependent''s fix.'
@@ -78,3 +78,15 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-361","DEV-364"],"related":["DEV-361","DEV-370","DEV-371"]}'
     new: '{"blocks":["DEV-361","DEV-364"],"related":["DEV-361","DEV-370","DEV-371","DEV-372"]}'
+- at: 2026-11-12T08:02:58.401743+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-361","DEV-364"],"related":["DEV-361","DEV-370","DEV-371","DEV-372"]}'
+    new: '{"blocks":["DEV-361"],"related":["DEV-361","DEV-370","DEV-371","DEV-372"]}'
+- at: 2026-11-12T08:02:58.898065+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-361"],"related":["DEV-361","DEV-370","DEV-371","DEV-372"]}'
+    new: '{"blocks":["DEV-361"],"related":["DEV-361","DEV-370","DEV-371","DEV-372","DEV-364"]}'

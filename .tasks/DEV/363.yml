@@ -1,15 +1,16 @@
 title: 'Flaky Rust: dev279_cross_process_jobs_test status change fails under full-suite load'
-status: HelpNeeded
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: claude
 created: 2026-11-12T05:17:25.629363+00:00
-modified: 2026-11-12T05:40:25.106055+00:00
+modified: 2026-11-12T08:56:41.094958+00:00
 relationships:
   related:
   - DEV-358
   - TEST-1
+  - DEV-360
 comments:
 - date: 2026-11-12T05:29:28.248634+00:00
   text: 'claude: Cause found. The job''s runner is spawned through lotar-agent-wrapper (argv carries --job-id/--ticket-id) before the owning process wrote the shared job record. In that window list-running finds the job via the wrapper process, and ''status'' finds no record, so it refuses with ''has an active agent job (pid N)''. Reproduced in a stress run (cargo nextest --stress-count 40: 5+ failures in a row with that error). Fix: write the record before spawn (child_pid 0), rewrite it with the runner pid after; the job slot already removes it on every exit path. New deterministic test job_record_exists_when_its_wrapper_starts (fake wrapper via LOTAR_AGENT_WRAPPER lists the records at start) fails before, passes after. Running lint/test/smoke next.'
@@ -17,6 +18,8 @@ comments:
   text: 'claude: Nothing to merge yet. agent/DEV-363 has no commits beyond main (git log main..agent/DEV-363 is empty), and the fix agent is still running: its full npm run test:agent was in progress when I looked. Its fix sits uncommitted in the worktree agent-DEV-363-86baae05b7888a2d: src/services/agent_job_service.rs (the job record is registered before the runner spawns) and a new test in tests/dev279_cross_process_jobs_test.rs. That branch is also behind main. I left both untouched. Handing the ticket back so it isn''t marked Done with the fix unmerged; once the fix agent commits, run the merge again.'
 - date: 2026-11-12T05:40:25.106055+00:00
   text: 'claude: Done in commit 8e39487 on agent/DEV-363. src/services/agent_job_service.rs run_job writes the shared job record before spawning the runner (child_pid 0) and rewrites it with the runner pid after, so a process that sees the job through its lotar-agent-wrapper process always finds the record and the status change is recorded for the job''s end. New test tests/dev279_cross_process_jobs_test.rs job_record_exists_when_its_wrapper_starts (fails without the fix, passes with it). Checks: npm run lint:agent, npm run test:agent (2006 Rust tests passed, UI/release/hooks passed), npm run test:smoke:agent (379 passed), and cargo nextest --stress-count 40 of dev279_cross_process with the rest of the suite running alongside: 40/40 passed. Side effect: agent list-running may show pid 0 for a job in the moment before its runner starts.'
+- date: 2026-11-12T08:56:38.729526+00:00
+  text: 'claude: DEV-360''s 57d580b on main already writes the job record before the runner, the same fix as 8e39487, so I took only this ticket''s test: 894e000 on main (owner OK 2026-11-12), pushed; it passes. Checks: npm run lint, npm test (Rust 2028, UI 1444), npm run smoke (380).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2c8fa46a-572d-4b0f-acb2-8f67616c1184
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8b41df6e-a512-4c29-afe9-43e4c0633457
@@ -80,3 +83,25 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-12T08:56:38.729526+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T08:56:38.793221+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-358","TEST-1"]}'
+    new: '{"related":["DEV-358","TEST-1","DEV-360"]}'
+- at: 2026-11-12T08:56:40.831241+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done
+- at: 2026-11-12T08:56:41.094958+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: claude

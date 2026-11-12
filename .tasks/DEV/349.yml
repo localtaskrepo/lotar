@@ -1,11 +1,11 @@
 title: Tests see other worktrees' lotar-agent-wrapper processes as active jobs
-status: HelpNeeded
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: claude
 created: 2026-11-12T03:40:57.903870+00:00
-modified: 2026-11-12T05:28:33.304102+00:00
+modified: 2026-11-12T08:49:39.201692+00:00
 relationships:
   blocks:
   - DEV-351
@@ -19,6 +19,7 @@ relationships:
   - DEV-356
   - DEV-357
   - DEV-367
+  - DEV-361
 comments:
 - date: 2026-11-12T03:57:10.900916+00:00
   text: 'claude: Fixed in b3323aa on agent/DEV-349. lotar now passes --tasks-dir to lotar-agent-wrapper (the wrapper accepts and ignores it). running_job_for_ticket and list-running count a wrapper only when its --tasks-dir matches this tasks dir (canonical paths). Wrappers from older builds with no --tasks-dir still count, so their real jobs stay guarded. Updated docs/help/agent.md and docs/developers/agent-automation-tracker.md. Check: with foreign wrappers for TEST-1 and OUTC-1 running (--tasks-dir /elsewhere/.tasks), the three named tests pass. With a wrapper that has no --tasks-dir, two of them still fail with ''has an active agent job'', which reproduces the bug. New unit test: wrappers_of_another_tasks_dir_are_not_counted. lint, smoke (377/377), test:ui, test:release and test:hooks pass. test:rust: 1966/1967 passed; the one failure was shipped_agent_reviewed_template_handles_hand_back_failure_review_and_merge, the known flake tracked in DEV-348, which passed 3/3 on rerun. I didn''t run two full test:rust:agent suites in separate worktrees at once; the foreign-wrapper run above stands in for that.'
@@ -28,6 +29,8 @@ comments:
   text: 'claude: Pushed main (6910cc0 fix, 4db0aa8 ticket updates) to origin; the pre-push hook passed.'
 - date: 2026-11-12T04:19:40.106488+00:00
   text: 'The merge agent''s job job-20261112T035723.971Z-13 failed: lotar agent logs job-20261112T035723.971Z-13. The fix is on branch agent/DEV-349. Try again with lotar automation run "Health: retry with @fix" --select ''id:DEV-349'', or for an agent''s ticket lotar assignee DEV-349 @fix.'
+- date: 2026-11-12T08:49:38.194836+00:00
+  text: 'claude: Closing (owner OK 2026-11-12): the fix is on main as 6910cc0 (git cherry main agent/DEV-349 lists nothing unmerged). The merge job failed only because the old worker (DEV-361, fixed in v0.13.3) still ran it.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A37ad6ebf-499f-4de9-81da-99a5895c6316
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afc980a0b-ca48-4141-83d1-7b3ee7a36e92
@@ -143,3 +146,25 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-351"],"related":["DEV-346","TEST-1","DEV-348","DEV-352","DEV-358","DEV-355","DEV-356","DEV-357"]}'
     new: '{"blocks":["DEV-351"],"related":["DEV-346","TEST-1","DEV-348","DEV-352","DEV-358","DEV-355","DEV-356","DEV-357","DEV-367"]}'
+- at: 2026-11-12T08:49:38.194836+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T08:49:38.253696+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-351"],"related":["DEV-346","TEST-1","DEV-348","DEV-352","DEV-358","DEV-355","DEV-356","DEV-357","DEV-367"]}'
+    new: '{"blocks":["DEV-351"],"related":["DEV-346","TEST-1","DEV-348","DEV-352","DEV-358","DEV-355","DEV-356","DEV-357","DEV-367","DEV-361"]}'
+- at: 2026-11-12T08:49:38.355376+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done
+- at: 2026-11-12T08:49:39.201692+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: claude

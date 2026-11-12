@@ -1,11 +1,11 @@
 title: automation conditions on labels and task_type never match a real update
-status: HelpNeeded
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: claude
 created: 2026-11-12T05:23:48.738895+00:00
-modified: 2026-11-12T05:52:57.902661+00:00
+modified: 2026-11-12T08:56:41.462783+00:00
 relationships:
   related:
   - DEV-362
@@ -24,6 +24,8 @@ comments:
   text: 'claude: Nothing to merge. The fix is already on main as 6d62cb7 (ticket files in 69e4a11). This branch''s DEV-365 commit ebdb85b is the pre-rebase copy: src/services/automation_matching.rs and tests/dev365_automation_alias_conditions_test.rs are byte-identical to main. No rebase, checks, merge or push run; main''s checkout untouched.'
 - date: 2026-11-12T05:52:57.902661+00:00
   text: 'The merge agent''s job job-20261112T055222.841Z-57 failed again: lotar agent logs job-20261112T055222.841Z-57. The fix is on branch agent/DEV-365. Try again with lotar automation run "Health: retry with @fix" --select ''id:DEV-365'', or for an agent''s ticket lotar assignee DEV-365 @fix.'
+- date: 2026-11-12T08:56:38.896927+00:00
+  text: 'claude: Already on main as 6d62cb7: the same changes as ebdb85b on agent/DEV-365 (git cherry flagged it only because the surrounding lines differ; the branch''s other commit is an older copy of DEV-362''s cac2b14). Closing (owner OK 2026-11-12).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3ac5dec7-ebec-4f8c-9960-503be09cc459
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A78efb4ae-e7de-4471-9faa-b47a7dec7e8f
@@ -43,7 +45,6 @@ description: |-
   `labels`/`tags` and `task_type`/`type` match the same way in field conditions and in `changes`, on real updates and in `lotar automation simulate`. A test covers both aliases.
 tags:
 - health
-- merge-retried
 custom_fields:
   finding: code-review:automation-condition-aliases
 history:
@@ -144,3 +145,25 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-12T08:56:38.896927+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T08:56:41.143599+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done
+- at: 2026-11-12T08:56:41.176956+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, merge-retried
+    new: health
+- at: 2026-11-12T08:56:41.462783+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: claude

@@ -1,11 +1,11 @@
 title: 'Flaky: home_profile_and_repo_rule_run_a_t3_thread_and_set_done'
-status: HelpNeeded
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: claude
 created: 2026-11-12T04:24:49.286137+00:00
-modified: 2026-11-12T05:02:06.338677+00:00
+modified: 2026-11-12T08:49:42.468181+00:00
 relationships:
   related:
   - DEV-351
@@ -32,6 +32,8 @@ comments:
   text: 'claude: Nothing to merge. This branch (t3/fix-flaky-t3-runner-test-2) holds only 5fe75f2, which main already has as 0a8b272 (git cherry shows it applied; no diff in tests/dev318_t3_runner_test.rs between main and this branch). Main is at 0c41aef. No rebase, checks, merge or push were needed. Pending ticket-file changes in the main checkout''s .tasks belong to other sessions'' status updates and were left alone.'
 - date: 2026-11-12T05:02:06.338677+00:00
   text: 'The merge agent''s job job-20261112T050138.959Z-31 failed again: lotar agent logs job-20261112T050138.959Z-31. The fix is on branch agent/DEV-356. Try again with lotar automation run "Health: retry with @fix" --select ''id:DEV-356'', or for an agent''s ticket lotar assignee DEV-356 @fix.'
+- date: 2026-11-12T08:49:41.479072+00:00
+  text: 'claude: Closing (owner OK 2026-11-12): the fix is on main as 0a8b272 (git cherry main agent/DEV-356 lists nothing unmerged). The merge job failed only because the old worker (DEV-361, fixed in v0.13.3) still ran it.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A249d99cd-7c07-495c-be46-39132be3417f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ade9e46ff-a217-43ec-95ac-ef85a994da84
@@ -40,7 +42,6 @@ references:
 description: 'Found by DEV-351 (claude, 2026-11-11): tests/dev318_t3_runner_test.rs home_profile_and_repo_rule_run_a_t3_thread_and_set_done failed once in npm run test:agent (retries 0) on agent/DEV-351 under load (another session''s suite was running): tests/dev318_t3_runner_test.rs:152 left "Todo", right "Done", so the job read as completed before the rule''s Done was written. It passed on its own right after. DEV-351 only adds a test, so it did not cause this. Check: run it 30 times under load (cargo nextest run --retries 0 next to the full suite) with no failure. Done when the cause is found and fixed, with the test passing without retries.'
 tags:
 - health
-- merge-retried
 custom_fields:
   finding: flaky-test:dev318_t3_runner_test::home_profile_and_repo_rule_run_a_t3_thread_and_set_done
 history:
@@ -165,3 +166,25 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-12T08:49:41.479072+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T08:49:41.561126+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done
+- at: 2026-11-12T08:49:41.595484+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, merge-retried
+    new: health
+- at: 2026-11-12T08:49:42.468181+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: claude

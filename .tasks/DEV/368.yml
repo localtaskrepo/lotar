@@ -1,15 +1,16 @@
 title: 't3 runner: run a follow-up job (merge) as the next turn of the ticket''s last thread'
-status: HelpNeeded
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: claude
 created: 2026-11-12T05:58:31.545950+00:00
-modified: 2026-11-12T06:48:19.350427+00:00
+modified: 2026-11-12T08:49:47.944331+00:00
 relationships:
   related:
   - DEV-362
   - DEV-370
+  - DEV-361
 comments:
 - date: 2026-11-12T06:01:37.926667+00:00
   text: 'claude (Opus 5.5): Plan: `session: continue` (default `new`) on profiles, rule `agent` actions, `agent run --session`, POST /api/jobs and MCP agent_run. A t3 job with it finds the ticket''s newest t3 job with a session (this process''s jobs, else the job logs, whose status line now keeps the session id), checks the thread with `t3 thread show`, and runs `t3 thread send <thread> - --wait` in the thread''s worktree, recording that worktree and branch on the job. model/provider are not passed (logged). No earlier thread or a gone thread: a new thread, with a log line. Other runners: a log line and a new session. Tests in tests/dev318_t3_runner_test.rs.'
@@ -25,6 +26,8 @@ comments:
   text: 'claude: Nothing to merge. The fix commit 800f224 is already in main as db59099 (git cherry shows it applied); nothing new on the branch. No checks run. Not pushed: main has unpushed commits from DEV-362, 365, 366 and 367 that wait for their sessions. Still open for the owner: the @merge rule in standards configs/lotar/automation.yml needs agent: { session: continue }.'
 - date: 2026-11-12T06:19:55.932200+00:00
   text: 'The merge agent''s job job-20261112T061940.344Z-63 failed again: lotar agent logs job-20261112T061940.344Z-63. The fix is on branch agent/DEV-368. Try again with lotar automation run "Health: retry with @fix" --select ''id:DEV-368'', or for an agent''s ticket lotar assignee DEV-368 @fix.'
+- date: 2026-11-12T08:49:46.783633+00:00
+  text: 'claude: Closing (owner OK 2026-11-12): the fix is on main as db59099 (git cherry main agent/DEV-368 lists nothing unmerged). The merge job failed only because the old worker (DEV-361, fixed in v0.13.3) still ran it.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8eb9de4e-e61b-41d2-a1de-00fb2c0f19e0
 - file: docs/help/agent.md
@@ -54,7 +57,6 @@ description: |-
   - [ ] docs/help/agent.md and automation.md describe the setting; tests cover the t3 send path and the fallback.
 tags:
 - agent
-- merge-retried
 history:
 - at: 2026-11-12T05:58:31.639893+00:00
   actor: claude
@@ -167,3 +169,31 @@ history:
   - field: relationships
     old: '{"related":["DEV-362"]}'
     new: '{"related":["DEV-362","DEV-370"]}'
+- at: 2026-11-12T08:49:46.783633+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T08:49:46.847582+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-362","DEV-370"]}'
+    new: '{"related":["DEV-362","DEV-370","DEV-361"]}'
+- at: 2026-11-12T08:49:46.960345+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done
+- at: 2026-11-12T08:49:46.992919+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent, merge-retried
+    new: agent
+- at: 2026-11-12T08:49:47.944331+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: claude

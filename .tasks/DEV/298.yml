@@ -1,10 +1,38 @@
 title: Automation conditions on the current value of a field
-status: Todo
+status: InProgress
 priority: Low
 type: Feature
 reporter: claude
+assignee: '@fix'
 created: 2026-11-03T21:12:54.993705+00:00
+modified: 2026-11-12T08:57:57.834787+00:00
+comments:
+- date: 2026-11-12T08:57:56.752950+00:00
+  text: 'claude: Owner 2026-11-12: work this now (@fix). Do it the way AGENTS.md says, with lint, test and smoke. Run lotar with LOTAR_DEFAULT_REPORTER set to your agent name and start each comment with it. Commit on your worktree''s branch, signed, never --no-verify, message ''DEV-N <title>''; don''t merge or push, the merge agent does. Never delete work that isn''t saved elsewhere. A question only the owner can answer: comment one question, set HelpNeeded and assign mallox (not the reporter). Pick the condition form from the description''s proposal and document it in docs/help/automation.md (Triggers). Then use it in lotar''s release rule (.tasks/DEV/automation.yml, ''Release installed: start the waiting checks''), which today checks the title inside its sh command because a title condition needs the title to change; tests/dev370_release_waiting_checks_test.rs must keep passing.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8690acd3-fb82-4e74-918b-1a57f1bf4b52
 description: |-
   Short-form conditions ('type: Change', 'status: InProgress') mean 'changed to'. A rule like 'when a Change ticket moves to InProgress' can't express 'type is Change' without type itself changing, so the run script has to check LOTAR_TICKET_TYPE itself (that's what the home-network repo does now).
 
   Proposal: an explicit current-state form, e.g. 'type: { is: Change }' or 'current: { type: Change }', usable inside all/any/not next to change conditions, with 'lotar automation simulate' showing which part matched. Verified with lotar 0.11.2: 'when: { all: [ {type: Chore}, {status: InProgress} ] }' does not fire on a status change of an existing Chore.
+history:
+- at: 2026-11-12T08:57:56.752950+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T08:57:56.923019+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T08:57:57.262782+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T08:57:57.834787+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8690acd3-fb82-4e74-918b-1a57f1bf4b52

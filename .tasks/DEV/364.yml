@@ -1,19 +1,20 @@
 title: Finished agent jobs leave GBs of build output in their worktrees
-status: HelpNeeded
+status: Blocked
 priority: High
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: claude
 created: 2026-11-12T05:21:54.615269+00:00
-modified: 2026-11-12T06:39:43.162322+00:00
+modified: 2026-11-12T08:05:34.892803+00:00
 relationships:
   depends_on:
-  - DEV-369
+  - DEV-372
   related:
   - DEV-343
   - DEV-358
   - DEV-366
   - DEV-370
+  - DEV-369
 comments:
 - date: 2026-11-12T05:24:07.203106+00:00
   text: 'claude: the owner approved the fix in Fix (2026-11-11). Build it as described; the space is already freed (see Cleanup done). Reporter thread: the pyxzl.net link reference. The lotar thread that filed this tells the reporter when it is released.'
@@ -27,6 +28,10 @@ comments:
   text: 'Claude (@fix job): done, commit 6144029 on agent/DEV-364. Changes: setting agent.worktree.cleanup_paths (src/config/*, config set as comma list, Config page > Agents chip list, view/api/types.ts); remove_build_output in agent_job_service.rs runs at every job end (completed, failed, cancelled, HelpNeeded). It skips when another job runs for the ticket, and only deletes paths that git ignores and tracks nothing under (no symlinks, nothing outside the worktree, no .git). It moves them into the worktree''s git dir under the registry lock, then deletes them after the lock is released. lotar''s .tasks/DEV/config.yml sets cleanup_paths: [target]. Docs: docs/help/agent.md, docs/help/config-reference.md. Tests: tests/agent_safety_test.rs (success, HelpNeeded, running job elsewhere + tracked file; they fail without the fix), tests/dev153_worktree_settings_test.rs (config set), smoke/tests/ui.config-cleanup-paths.smoke.spec.ts. Checks: npm run lint (agent variant) clean; npm test: 2009 Rust, 1444 UI, release and hook tests pass; npm run smoke: 380 passed. Not in scope: DEV-366 (rebased branches), interactive T3 threads (standards). Takes effect once the merged build runs the jobs.'
 - date: 2026-11-12T06:39:43.104705+00:00
   text: 'claude: Depends on DEV-369 (Release v0.13.3) now, because its last done item (''Reporter thread told when it is released'') waits for that release. Status and assignee unchanged: the open question about the merge (comment above) still stands, and the fix (6144029 on agent/DEV-364) is not on main yet. Once it is merged, set it Blocked until DEV-369 closes (process: DEV-370).'
+- date: 2026-11-12T08:02:58.836832+00:00
+  text: 'claude: Merged into main as 66c7060 and pushed (owner OK 2026-11-12). The open question is moot: the fix agent had committed 6144029. Rebased onto main, one conflict in docs/help/agent.md resolved by keeping both sides (DEV-366''s rewritten cleanup bullet and the new cleanup_paths bullet). Checks after the rebase: npm run lint, npm test (Rust 2024, UI 1444), npm run smoke (380), all pass. Not in v0.13.3. Now Blocked, depending on DEV-372 (Release v0.13.4) instead of DEV-369: when it closes, @fix checks that finished jobs drop target/ and tells the reporter thread the version.'
+- date: 2026-11-12T08:05:34.892803+00:00
+  text: 'claude: Owner 2026-11-12: no v0.13.4 for this alone (''Wait, clean up by hand''); the fix ships with the next release (DEV-372). Cleanup by hand 2026-11-12: lotar''s worktrees had grown from 24 GB (2026-11-11 cleanup) to 85 GB. With no agent job running and no process in them, I deleted the git-ignored target/ in the 19 worktrees that had one (7 agent-DEV-*, 12 t3-*), so the worktrees went to 17 GB and the free space from 135 to 167 GiB. The local Time Machine snapshot com.apple.TimeMachine.2026-11-11-213344.local still holds the deleted files; thinning it was refused by this session''s permissions and is left to the owner (tmutil thinlocalsnapshots / 200000000000 4).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa38f4398-ffb1-4376-9c12-47e5507a143c
 - link: t3-thread://v2/d834978d-9e75-43fb-ba01-45747238fc44/b51ca0ac-1980-485f-a905-ffe6a2c807e5
@@ -281,3 +286,41 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-369"],"related":["DEV-343","DEV-358","DEV-366"]}'
     new: '{"depends_on":["DEV-369"],"related":["DEV-343","DEV-358","DEV-366","DEV-370"]}'
+- at: 2026-11-12T08:02:58.400611+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-369"],"related":["DEV-343","DEV-358","DEV-366","DEV-370"]}'
+    new: '{"related":["DEV-343","DEV-358","DEV-366","DEV-370"]}'
+- at: 2026-11-12T08:02:58.603324+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-343","DEV-358","DEV-366","DEV-370"]}'
+    new: '{"depends_on":["DEV-372"],"related":["DEV-343","DEV-358","DEV-366","DEV-370"]}'
+- at: 2026-11-12T08:02:58.755858+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-12T08:02:58.799828+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: claude
+- at: 2026-11-12T08:02:58.836832+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T08:02:58.897598+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-372"],"related":["DEV-343","DEV-358","DEV-366","DEV-370"]}'
+    new: '{"depends_on":["DEV-372"],"related":["DEV-343","DEV-358","DEV-366","DEV-370","DEV-369"]}'
+- at: 2026-11-12T08:05:34.892803+00:00
+  actor: claude
+  changes:
+  - field: comment_added

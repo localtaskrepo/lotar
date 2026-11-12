@@ -1,11 +1,11 @@
 title: Assignment made while a job ends can be lost
-status: HelpNeeded
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: claude
 created: 2026-11-12T03:43:14.648117+00:00
-modified: 2026-11-12T05:44:21.072949+00:00
+modified: 2026-11-12T08:56:39.898470+00:00
 relationships:
   related:
   - DEV-347
@@ -17,6 +17,8 @@ comments:
   text: 'claude: Merge not done. agent/DEV-350 has no commits beyond main (still at 0b25f02), so there is nothing to merge as committed. The fix agent''s work exists only as uncommitted changes in its worktree /Users/mallox/.t3/worktrees/lotar/agent-DEV-350-9ed4478618ebbb28 (src/services/agent_active_jobs.rs, src/services/task_service.rs, tests/dev320_job_outcome_test.rs; +104/-8), and its nextest runs were still going when I looked. I did not touch, commit or discard them. Needed: let the fix agent finish and commit on agent/DEV-350, then rerun the merge. Setting HelpNeeded so the ticket does not go to Done without the fix.'
 - date: 2026-11-12T03:58:29.670652+00:00
   text: 'claude: Fixed in 147f64f on agent/DEV-350. The end of a job (end_and_take_outcome, and unregister) now writes a <job>.ended marker while it holds the outcome lock. record_outcome takes the same lock and returns None for an ended job instead of writing an outcome nobody reads. update_composed then applies the held-back status/assignee directly: it retries with bypass_active_job_lock, because the job''s record or active_by_ticket entry can still be visible for a moment. Markers older than 24h are pruned in list(). Tests: unit agent_active_jobs::an_outcome_recorded_after_the_job_ended_is_refused; integration dev320_job_outcome_test::an_assignment_recorded_after_the_job_ended_applies_directly (fails before the fix: the receipt stays deferred). Checks: npm run lint:agent clean, npm run test:agent passed, dev320 tests 5x green. npm run test:smoke:agent: 376/377. The one failure, ui.relationships ''edits categories atomically'' at 1440px, passes when run alone (2/2) and has nothing to do with this change; filed as DEV-352.'
+- date: 2026-11-12T08:56:38.481226+00:00
+  text: 'claude: Merged into main as 4a36dee (cherry-picked onto main, owner OK 2026-11-12), pushed. Checks: npm run lint, npm test (Rust 2028, UI 1444), npm run smoke (380).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A627ccc61-c4a9-4cc6-a210-7cb9860ff5eb
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2570ed37-c6bf-4cb9-a2a5-012d7f053df8
@@ -94,3 +96,19 @@ history:
   - field: relationships
     old: '{"related":["DEV-347","DEV-352","DEV-348"]}'
     new: '{"related":["DEV-347","DEV-352","DEV-348","DEV-366"]}'
+- at: 2026-11-12T08:56:38.481226+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T08:56:38.974599+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done
+- at: 2026-11-12T08:56:39.898470+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: claude

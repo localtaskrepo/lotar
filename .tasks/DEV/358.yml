@@ -1,11 +1,11 @@
 title: 'Flaky Rust: worker_persists_trailing_stderr_before_exit_and_summary worker doesn''t exit in 15 s'
-status: HelpNeeded
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: claude
 created: 2026-11-12T04:36:54.876848+00:00
-modified: 2026-11-12T05:33:52.691657+00:00
+modified: 2026-11-12T08:49:43.508128+00:00
 relationships:
   related:
   - DEV-349
@@ -35,6 +35,8 @@ comments:
   text: 'claude: Merge job. The fix is already on main as aa8cbc4 (rebased d1ea496); rebasing this branch onto main leaves no commits of its own, so there is nothing more to merge. Check command ''cargo nextest run --cargo-profile local worker_persists_trailing'' passes on main''s code (1 of 1, 0.5 s). Committed the pending .tasks changes in the main checkout as a ticket-update commit. Not pushed: main has other tickets'' unpushed commits that wait for their sessions. Lint, full tests and smoke not rerun: no code changed.'
 - date: 2026-11-12T05:26:49.714373+00:00
   text: 'The merge agent''s job job-20261112T052420.481Z-43 failed again: lotar agent logs job-20261112T052420.481Z-43. The fix is on branch agent/DEV-358. Try again with lotar automation run "Health: retry with @fix" --select ''id:DEV-358'', or for an agent''s ticket lotar assignee DEV-358 @fix.'
+- date: 2026-11-12T08:49:42.568910+00:00
+  text: 'claude: Closing (owner OK 2026-11-12): the fix is on main as aa8cbc4 (git cherry main agent/DEV-358 lists nothing unmerged). The merge job failed only because the old worker (DEV-361, fixed in v0.13.3) still ran it.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acb13752d-02d4-4f9a-8cdf-d5868377dfce
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5b64ac66-413e-4f67-a73f-93869f527170
@@ -43,7 +45,6 @@ references:
 description: 'Found by DEV-355 (claude, 2026-11-11): in a full npm run test:agent run (branch agent/DEV-355 at 7bd5c46, without the DEV-349 fix from main, while other agent jobs ran on the machine), tests/agent_safety_test.rs:100 panicked ''worker did not exit after draining jobs'' after the 15 s wait_worker deadline. Earlier full runs passed it. May share the cause of DEV-349/DEV-351 (other worktrees'' wrapper processes counted as active jobs); unconfirmed. Check: cargo nextest run --cargo-profile local worker_persists_trailing passes repeatedly under full-suite load on main. Done when the worker exits for a reason the test controls, not a timeout race.'
 tags:
 - health
-- merge-retried
 custom_fields:
   finding: flaky-test:worker_persists_trailing_stderr_before_exit_and_summary
 history:
@@ -182,3 +183,25 @@ history:
   - field: relationships
     old: '{"related":["DEV-349","DEV-351","DEV-355","DEV-357","DEV-363","DEV-348","DEV-364","DEV-342","DEV-361"]}'
     new: '{"related":["DEV-349","DEV-351","DEV-355","DEV-357","DEV-363","DEV-348","DEV-364","DEV-342","DEV-361","DEV-360"]}'
+- at: 2026-11-12T08:49:42.568910+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T08:49:42.645954+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done
+- at: 2026-11-12T08:49:42.679191+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, merge-retried
+    new: health
+- at: 2026-11-12T08:49:43.508128+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: claude
