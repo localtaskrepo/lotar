@@ -58,7 +58,7 @@ All planned features are implemented. See `docs/help/agent.md` and `docs/help/au
 - **Config format**: Custom statuses must use `issue: states: [...]`, not `statuses: [...]` at the top level. Same for `issue: priorities:` and `issue: types:`. See `src/config/normalization.rs`.
 - **`MatchMode::OnChange`**: For `updated` events, each field in `when` conditions must have actually changed in the update. Single-field CLI commands only include that one field in the changeset. For `created` events, all fields count as "new".
 - **`default: project:`**: The config's default project is only used in certain code paths. `detect_project_name()` returns a value first (from env → project files → git repo → directory name → "default"). Use `-p <project>` to force prefix.
-- **Wrapper process discovery is per tasks directory**: `running_job_for_ticket()` scans system processes for `lotar-agent-wrapper` (wrapper-based discovery lets `list-running` work without persistence; see `src/cli/handlers/agent.rs`) and counts only wrappers whose `--tasks-dir` is this tasks directory, or that have none (older lotar builds; DEV-349). Ticket matching is alias-aware (DEV-56).
+- **Wrapper process discovery is per tasks directory**: `running_job_for_ticket()` scans system processes for `lotar-agent-wrapper` (wrapper-based discovery lets `list-running` work without persistence; see `src/cli/handlers/agent.rs`) and counts only wrappers whose `--tasks-dir` is this tasks directory (DEV-349). A wrapper from an older build has no `--tasks-dir` and is not counted; its job's record still is (DEV-367). Ticket matching is alias-aware (DEV-56).
 
 ---
 
@@ -244,7 +244,7 @@ The following test scenarios are NOT yet covered. Most require complex setup (sp
 
 | Bug | Severity | Details |
 |-----|----------|---------|
-| Cross-test visibility of wrapper processes | Low | `running_job_for_ticket()` scans system processes for `lotar-agent-wrapper` (`src/cli/handlers/agent.rs`) but counts only wrappers of its own tasks directory (DEV-349); wrappers from older builds without `--tasks-dir` are still counted everywhere. Ticket matching is alias-aware (DEV-56). |
+| Cross-test visibility of wrapper processes | Low | `running_job_for_ticket()` scans system processes for `lotar-agent-wrapper` (`src/cli/handlers/agent.rs`) but counts only wrappers of its own tasks directory (DEV-349); wrappers from older builds without `--tasks-dir` are not counted (DEV-367). Ticket matching is alias-aware (DEV-56). |
 
 ## Fixed (formerly tracked here)
 

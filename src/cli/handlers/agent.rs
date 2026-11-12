@@ -960,10 +960,11 @@ fn is_wrapper_name(name: &str) -> bool {
 
 /// Whether a wrapper runs a job of this tasks directory: another
 /// worktree's wrapper for the same ticket ID is not this one's job. A
-/// wrapper without `--tasks-dir` (an older lotar) is counted.
+/// wrapper without `--tasks-dir` (an older lotar) is not counted; its job's
+/// record is (DEV-367).
 fn wrapper_runs_in(cmd: &[String], tasks_dir: &std::path::Path) -> bool {
     let Some(value) = cmd.iter().take_while(|arg| *arg != "--").skip_while(|arg| *arg != "--tasks-dir").nth(1) else {
-        return true;
+        return false;
     };
     let canonical = |path: &std::path::Path| path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
     canonical(std::path::Path::new(value)) == canonical(tasks_dir)
@@ -1030,9 +1031,11 @@ mod tests {
         let cmd: Vec<String> = ["lotar-agent-wrapper", "--job-id", "job-1", "--tasks-dir", "/work/a/.tasks", "--", "codex"].map(String::from).to_vec();
         assert!(wrapper_runs_in(&cmd, Path::new("/work/a/.tasks")));
         assert!(!wrapper_runs_in(&cmd, Path::new("/work/b/.tasks")));
-        // A wrapper started without the flag (an older lotar) still counts.
+        // A wrapper without the flag (an older lotar, such as another
+        // worktree's test run) names no tasks directory and is no one's
+        // job; its job's own record still counts (DEV-367).
         let legacy: Vec<String> = ["lotar-agent-wrapper", "--job-id", "job-1", "--", "codex"].map(String::from).to_vec();
-        assert!(wrapper_runs_in(&legacy, Path::new("/work/b/.tasks")));
+        assert!(!wrapper_runs_in(&legacy, Path::new("/work/b/.tasks")));
     }
 
     #[test]
