@@ -116,4 +116,87 @@ describe.concurrent('UI description preview toggle', () => {
             await workspace.dispose();
         }
     });
+
+    // DEV-330: on a phone, a finger that lands on the description to scroll
+    // the panel used to open the editor right away (it started on pointerdown).
+    // Only a tap opens it now; a scroll gesture leaves it in display mode.
+    it('scrolls on a touch drag and opens the editor on a tap', async ({ expect }) => {
+        const workspace = await SmokeWorkspace.create();
+        try {
+            const description = Array.from({ length: 60 }, (_, i) => `Paragraph ${i + 1} of a long description.`).join(
+                '\n\n',
+            );
+            const created = await workspace.addTask('Long description task', { args: ['--description', description] });
+            const server = await startLotarServer(workspace);
+            try {
+                await withPage(
+                    `${server.url}/task/${created.id}`,
+                    async (page) => {
+                        const display = page.locator('.task-panel__description-display');
+                        const textarea = page.locator('.task-panel__description-body textarea');
+                        await display.waitFor({ timeout: 15_000 });
+                        const body = page.locator('.task-panel__body');
+                        await expect.poll(() => body.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+                        const box = (await display.boundingBox())!;
+                        const x = box.x + box.width / 2;
+                        const startY = Math.min(box.y + box.height, 700) - 40;
+
+                        // A real touch drag, so the browser decides it is a scroll.
+                        const cdp = await page.context().newCDPSession(page);
+                        await cdp.send('Input.dispatchTouchEvent', {
+                            type: 'touchStart',
+                            touchPoints: [{ x, y: startY }],
+                        });
+                        for (let step = 1; step <= 10; step++) {
+                            await cdp.send('Input.dispatchTouchEvent', {
+                                type: 'touchMove',
+                                touchPoints: [{ x, y: startY - step * 30 }],
+                            });
+                        }
+                        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+
+                        await expect.poll(() => body.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+                        // Give a late click from the gesture time to land.
+                        await page.waitForTimeout(300);
+                        expect(await textarea.count()).toBe(0);
+                        expect(await display.isVisible()).toBe(true);
+
+                        await display.tap();
+                        await textarea.waitFor();
+                        await expect.poll(() => textarea.evaluate((el) => el === document.activeElement)).toBe(true);
+                    },
+                    { context: { viewport: { width: 390, height: 800 }, hasTouch: true, isMobile: true } },
+                );
+            } finally {
+                await server.stop();
+            }
+        } finally {
+            await workspace.dispose();
+        }
+    });
+
+    for (const key of ['Enter', 'Space']) {
+        it(`opens the editor with the ${key} key`, async ({ expect }) => {
+            const workspace = await SmokeWorkspace.create();
+            try {
+                const created = await workspace.addTask('Keyboard description task');
+                const server = await startLotarServer(workspace);
+                try {
+                    await withPage(`${server.url}/task/${created.id}`, async (page) => {
+                        const display = page.locator('.task-panel__description-display');
+                        await display.waitFor({ timeout: 15_000 });
+                        await display.focus();
+                        await page.keyboard.press(key);
+                        const textarea = page.locator('.task-panel__description-body textarea');
+                        await textarea.waitFor();
+                        await expect.poll(() => textarea.evaluate((el) => el === document.activeElement)).toBe(true);
+                    });
+                } finally {
+                    await server.stop();
+                }
+            } finally {
+                await workspace.dispose();
+            }
+        });
+    }
 });

@@ -1,7 +1,8 @@
-import { Browser, BrowserContext, chromium, Page } from '@playwright/test';
+import { Browser, BrowserContext, BrowserContextOptions, chromium, Page } from '@playwright/test';
 
 export interface BrowserSessionOptions {
     readonly headless?: boolean;
+    readonly context?: BrowserContextOptions;
 }
 
 export interface PageVisitOptions extends BrowserSessionOptions {
@@ -75,7 +76,7 @@ export async function withBrowser<T>(
         headless: options.headless ?? true,
         args: extraLaunchArgs(),
     });
-    const context = await browser.newContext();
+    const context = await browser.newContext(options.context);
 
     try {
         return await callback(context, browser);

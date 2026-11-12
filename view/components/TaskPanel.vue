@@ -198,7 +198,6 @@
                       tabindex="0"
                       role="button"
                       aria-label="Edit description"
-                      @pointerdown.prevent="startEditingDescription"
                       @click="startEditingDescription"
                       @keydown.enter.prevent="startEditingDescription"
                       @keydown.space.prevent="startEditingDescription"
