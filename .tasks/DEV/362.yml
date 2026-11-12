@@ -5,13 +5,14 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-12T05:03:17.785328+00:00
-modified: 2026-11-12T05:47:45.203663+00:00
+modified: 2026-11-12T05:56:10.657412+00:00
 relationships:
   related:
   - DEV-365
   - DEV-348
   - DEV-360
   - DEV-361
+  - DEV-342
 comments:
 - date: 2026-11-12T05:21:43.308438+00:00
   text: 'Claude (Opus 5.5): Done in 4eaad9d on agent/DEV-362. simulate now matches change events like a real update: created uses a new-task change set; updated/sprint_changed/assigned look for an update of one field (assigned always includes assignee) that fires the rule (update_match in automation_matching.rs). A match that needs a field change carries the warning ''Matches only when status changes in the same update.''; a rule needing several fields at once no longer matches, and the no-match result names it (''Done and tagged: matches only when status and tags change in the same update; ...''). CLI prints these notes on no match, the rule editor''s Try it shows them too. Docs: automation.md (field conditions inside all, Simulating rules), warnings field in api_types.rs/types.ts/openapi.json (shape unchanged). Tests: new tests/dev362_simulate_change_events_test.rs (failed before the fix); dev118 preview test now expects the status note. Checks: npm run lint:agent, test:agent (Rust 2006 passed; UI 1444 passed on rerun, Board/SprintsList specs timed out once at 5s under load and pass alone and on full rerun; release, hooks), test:smoke:agent 379 passed; ticket scenario run with the built CLI. Finding, not fixed: field conditions written with the aliases labels/task_type never match a real update, because ChangeSet records tags/type only.'
@@ -25,6 +26,10 @@ comments:
   text: 'claude: Nothing to merge. The fix is already on main as cac2b14 (ticket files in 95c3984). The branch''s commit 4eaad9d is the same change: git range-diff shows only different context in tests/integration.rs, and its added and removed lines are identical. A rebase of 4eaad9d onto main conflicts in tests/integration.rs for that reason, so I aborted it and changed nothing. I ran no checks, since no code changed; the earlier merge run passed lint:agent, test:agent and test:smoke:agent. Not pushed: main holds other tickets'' unpushed commits.'
 - date: 2026-11-12T05:47:45.203663+00:00
   text: 'The merge agent''s job job-20261112T054717.007Z-54 failed again: lotar agent logs job-20261112T054717.007Z-54. The fix is on branch agent/DEV-362. Try again with lotar automation run "Health: retry with @fix" --select ''id:DEV-362'', or for an agent''s ticket lotar assignee DEV-362 @fix.'
+- date: 2026-11-12T05:54:01.147053+00:00
+  text: 'Claude (Opus 5.5): Why merge job job-20261112T052156.504Z-41 failed: the merge thread rebased and fast-forwarded main from its own T3 branch t3/automation-simulate-change-matching (main reflog). agent/DEV-362 stayed at the pre-rebase 4eaad9d. git cherry doesn''t match 4eaad9d to cac2b14, because the rebase''s conflict fix in tests/integration.rs changed the context lines, so the ff-only fallback failed. DEV-342 records the thread''s final branch so this passes, but the job ran in lotar agent worker PID 11651, started 2026-11-11 18:31, before DEV-342 (c55f67c, 18:42). The installed 0.13.2 has DEV-342 but not DEV-361''s restart after upgrade (06b571f, after v0.13.2), so the old worker keeps running. t3 thread show now returns the right branch. No new code bug. Until the worker restarts, the next merge job for DEV-362 fails the same way, since agent/DEV-362 still diverges from main.'
+- date: 2026-11-12T05:56:10.657412+00:00
+  text: 'Claude (Opus 5.5): Owner chose on 2026-11-11 to move the branch and restart the worker himself. agent/DEV-362 now points at cac2b14, which is on main, so the next merge check passes. The pre-rebase commit 4eaad9d stays on t3/automation-simulate-change-match. Still to do (owner): restart lotar agent worker PID 11651 once its running jobs finish, so DEV-342''s fix applies to t3 merge jobs.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A06a83034-9de4-4f4e-ad88-79a49f4b1eeb
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A45e5d649-0eee-4666-83ae-ceeec8f1bd3c
@@ -141,5 +146,19 @@ history:
     new: mallox
 - at: 2026-11-12T05:47:45.203663+00:00
   actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:54:01.147053+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:54:01.385273+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-365","DEV-348","DEV-360","DEV-361"]}'
+    new: '{"related":["DEV-365","DEV-348","DEV-360","DEV-361","DEV-342"]}'
+- at: 2026-11-12T05:56:10.657412+00:00
+  actor: claude
   changes:
   - field: comment_added
