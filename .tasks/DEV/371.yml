@@ -3,14 +3,19 @@ status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T07:35:38.897340+00:00
-modified: 2026-11-12T07:35:39.839208+00:00
+modified: 2026-11-12T07:42:35.441645+00:00
 relationships:
   related:
   - DEV-361
   - DEV-369
   - DEV-370
+  - DEV-271
+  - DEV-57
+comments:
+- date: 2026-11-12T07:42:26.248102+00:00
+  text: 'claude: Reproduced (Status ''blocked'' is not enabled for this project). The rejection is deliberate (DEV-271/DEV-57 keep project-only statuses out of the unscoped query), so I took the ticket''s second option: the error now names the projects that configure the status and the fix, e.g. "... ''<status>'' is configured only in project AM: add project:AM to the query". This applies to every query (list, archive/move --select, automation run, REST/MCP). Changed src/services/task_list.rs (stored_status), docs/help/list.md; test tests/dev241_automation_test.rs a_project_only_status_in_the_selection_says_how_to_scope_it (failed before, passes now). Commit 910ab2e on agent/DEV-371. Checks: npm run lint, npm run test:agent (2020 Rust, 1444 UI, release and hook tests), npm run smoke (379): all pass. If you''d rather have unscoped queries accept a project-only status (dropping the DEV-57 scoping), that''s a separate decision.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A73cc72ad-d85f-47f1-b339-b66fabc162d4
 description: 'Found by DEV-370 (claude, 2026-11-11): closing DEV-369 ran lotar automation run ''Release installed: run the waiting check'' --select ''status:blocked id:/^DEV-361$/'' and it failed with ''Status blocked is not enabled for this project. Valid statuses: Todo, InProgress, NeedsReview, Done''. Blocked is in .tasks/DEV/config.yml issue.states and default.project is DEV, but the query is checked against the global statuses only. With project:DEV in the query, or --project DEV, it works. The release rule now passes --project (f51de7c). Check: in a workspace whose global config has no Blocked and whose project config does, lotar automation run <rule> --select ''status:blocked'' --dry-run succeeds without --project (or the error names --project/project:). Done when that works with a test.'
@@ -41,3 +46,19 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A73cc72ad-d85f-47f1-b339-b66fabc162d4
+- at: 2026-11-12T07:42:26.248102+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T07:42:26.394879+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-361","DEV-369","DEV-370"]}'
+    new: '{"related":["DEV-361","DEV-369","DEV-370","DEV-271","DEV-57"]}'
+- at: 2026-11-12T07:42:35.441645+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
