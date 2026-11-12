@@ -1,11 +1,11 @@
 title: 'Flaky smoke: relationships edits categories atomically at 1440px'
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-12T03:58:07.244288+00:00
-modified: 2026-11-12T04:36:18.068335+00:00
+modified: 2026-11-12T04:36:38.318672+00:00
 relationships:
   related:
   - DEV-350
@@ -18,6 +18,8 @@ comments:
   text: 'claude: Fixed in commit 05c3e96 on agent/DEV-352. Cause: at desktop width the dependency view first shows the dependency-only graph, which has 0 edges, so no diagram and the ''Tasks in this graph'' details is open. The test saw it open and didn''t click it. Then the graph with the related edge arrived, the diagram appeared and the details closed. getByRole(''list'', ''Dependency relationships'') stopped matching, so edgeList.textContent() never resolved. Reproduced with a 1.5 s delay on the related graph response: same ''expect.poll() function didn''t resolve in time'' at that line. Fix: before checking whether the lists are open, the test waits for the ''related (undirected)'' entry in the Relationship legend, which is the related graph being rendered. With the delay it passes at 1440px and 390px (2 runs); the delay is not committed. Checks: npm run lint passes. npm run test:smoke:agent passes 378/378, and test:smoke:quick:agent passes this test again (DEV-355 failed in that run). npm test: UI, release and hook tests pass; Rust nextest --no-fail-fast 1998/2002. Failures not caused by this change, all passing when rerun alone: dev279/dev320 job tests (another worktree''s agent wrapper, DEV-349), 4 web_api SSE tests (filed DEV-354). Also filed DEV-355 (keyboard palette smoke flake).'
 - date: 2026-11-12T04:36:17.858106+00:00
   text: 'claude: Merged into main as 4f823c6 (fast-forward, rebased twice as main moved; only smoke/tests/ui.relationships.smoke.spec.ts changed). Not pushed: main also holds 5939e6b (DEV-348), which isn''t this ticket''s. Checks in my worktree: npm run lint passes (rerun after the last rebase); npm run smoke 378/378 (before the last rebase, which only added unrelated Rust changes); npm test: the node tests and the Rust suite passed in separate runs, but whole-suite Rust runs failed on load-sensitive tests that pass alone (agent_safety_test worker_persists_trailing_stderr..., codeowners_auto_assign_test, dev279 cross-process jobs: leftover test agent processes from other worktrees/cancelled runs). Not run: test:smoke:agent against the main checkout itself; the spec was verified in the worktree with the identical file.'
+- date: 2026-11-12T04:36:38.318672+00:00
+  text: 'The merge agent''s job job-20261112T041830.952Z-18 failed: lotar agent logs job-20261112T041830.952Z-18. The fix is on branch agent/DEV-352. Try again with lotar automation run "Health: retry with @fix" --select ''id:DEV-352'', or for an agent''s ticket lotar assignee DEV-352 @fix.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adc5b1f6d-bcaf-4cd8-a823-41a8dcb723c6
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae6e26ecd-9bdb-4d82-9b7c-77b61235f072
@@ -92,3 +94,16 @@ history:
   - field: relationships
     old: '{"related":["DEV-350","DEV-354","DEV-355","DEV-349"]}'
     new: '{"related":["DEV-350","DEV-354","DEV-355","DEV-349","DEV-348"]}'
+- at: 2026-11-12T04:36:38.046046+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-12T04:36:38.318672+00:00
+  actor: automation
+  changes:
+  - field: comment_added

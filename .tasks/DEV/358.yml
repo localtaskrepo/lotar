@@ -1,0 +1,43 @@
+title: 'Flaky Rust: worker_persists_trailing_stderr_before_exit_and_summary worker doesn''t exit in 15 s'
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T04:36:54.876848+00:00
+modified: 2026-11-12T04:36:57.282094+00:00
+relationships:
+  related:
+  - DEV-349
+  - DEV-351
+  - DEV-355
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acb13752d-02d4-4f9a-8cdf-d5868377dfce
+description: 'Found by DEV-355 (claude, 2026-11-11): in a full npm run test:agent run (branch agent/DEV-355 at 7bd5c46, without the DEV-349 fix from main, while other agent jobs ran on the machine), tests/agent_safety_test.rs:100 panicked ''worker did not exit after draining jobs'' after the 15 s wait_worker deadline. Earlier full runs passed it. May share the cause of DEV-349/DEV-351 (other worktrees'' wrapper processes counted as active jobs); unconfirmed. Check: cargo nextest run --cargo-profile local worker_persists_trailing passes repeatedly under full-suite load on main. Done when the worker exits for a reason the test controls, not a timeout race.'
+tags:
+- health
+custom_fields:
+  finding: flaky-test:worker_persists_trailing_stderr_before_exit_and_summary
+history:
+- at: 2026-11-12T04:36:55.204733+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-349","DEV-351","DEV-355"]}'
+- at: 2026-11-12T04:36:56.065036+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T04:36:56.488414+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T04:36:57.282094+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acb13752d-02d4-4f9a-8cdf-d5868377dfce

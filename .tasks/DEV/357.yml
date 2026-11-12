@@ -1,0 +1,42 @@
+title: 'Flaky Rust: status_dry_run_explain_previews_and_does_not_write misses the assignee preview'
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T04:36:53.978265+00:00
+modified: 2026-11-12T04:36:56.834897+00:00
+relationships:
+  related:
+  - DEV-355
+  - TEST-1
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A72f77ff8-2304-4e5e-bf36-8eee61294176
+description: 'Found by DEV-355 (claude, 2026-11-11): in a full npm run test:agent run (branch agent/DEV-355 at 7bd5c46 plus frontend-only changes), tests/cli_whoami_and_dryrun_test.rs:362 failed: lotar status TEST-1 Done --dry-run --explain printed the DRY RUN and Explanation lines but no assignee line, so contains("assignee") failed. It passed in the next full run and alone (with and without LOTAR_DEFAULT_REPORTER=claude). Check: cargo nextest run --cargo-profile local status_dry_run_explain passes repeatedly under full-suite load. Done when the auto-assign preview no longer depends on timing or outside state, or the test pins the input it depends on.'
+tags:
+- health
+custom_fields:
+  finding: flaky-test:status_dry_run_explain_previews_and_does_not_write
+history:
+- at: 2026-11-12T04:36:54.152589+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-355","TEST-1"]}'
+- at: 2026-11-12T04:36:54.610846+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T04:36:55.823823+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T04:36:56.834897+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A72f77ff8-2304-4e5e-bf36-8eee61294176

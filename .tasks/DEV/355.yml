@@ -5,10 +5,16 @@ type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-12T04:17:51.251399+00:00
-modified: 2026-11-12T04:17:53.699705+00:00
+modified: 2026-11-12T04:37:29.493418+00:00
 relationships:
   related:
   - DEV-352
+  - DEV-357
+  - DEV-358
+  - DEV-349
+comments:
+- date: 2026-11-12T04:37:28.916711+00:00
+  text: 'claude: Fixed in bb47b58 on agent/DEV-355. Cause: an app race, not the palette. The palette''s Enter ran ''Boards'' and started the move to /boards. While the lazy Board chunk loaded, the tasks page finished its first load (projects, then sprints) and called router.replace(''/''), which cancelled the pending /boards navigation. So the path stayed ''/'', and a real user could lose a click the same way. Fix: view/pages/TasksList.vue sets a flag in onBeforeRouteLeave (cleared by the next afterEach, even when the navigation fails), and applyFilter doesn''t write the URL or reload while a navigation away is underway. Test first: a new smoke test in smoke/tests/ui.keyboard-shortcuts.smoke.spec.ts holds /api/sprints/list and the Board chunk, presses Enter on ''boards'', releases sprints, then the chunk. It failed before the fix and passed 3 of 3 runs after. TasksList unit-test router mocks gained onBeforeRouteLeave. Checks: npm run lint passed. npm run test:smoke:agent (the ticket''s check) passed, 379/379. npm run test:agent: UI, release and hooks passed. Rust failed one different test in each of 3 full runs; none touches this change, and each passes alone: dev279_cross_process_jobs_test (DEV-349, fixed on main but not in this branch''s base 7bd5c46), plus two new flakes filed as DEV-357 (status_dry_run_explain) and DEV-358 (worker_persists_trailing_stderr). The first run''s failure came from LOTAR_DEFAULT_REPORTER in this job''s environment; I reran without it.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A424e1473-5583-4789-883a-23c4b542adda
 description: 'Found by DEV-352 (claude, 2026-11-11): in a full npm run test:smoke:quick:agent run, smoke/tests/ui.keyboard-shortcuts.smoke.spec.ts ''navigates, creates and finds tasks from the keyboard'' failed at line 46: after input.fill(''boards'') and Enter in the command palette, the path stayed ''/'' for the whole 15 s poll; the spec passed when run alone. Unconfirmed guess: Enter is pressed before the palette''s filtered list has an active ''boards'' entry. Check: npm run test:smoke:agent passes this test repeatedly under full-suite load. Done when the test waits for the state the palette actually reaches before pressing Enter (or the palette acts on the typed query), not a timeout race.'
@@ -39,3 +45,25 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A424e1473-5583-4789-883a-23c4b542adda
+- at: 2026-11-12T04:36:54.152056+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-352"]}'
+    new: '{"related":["DEV-352","DEV-357"]}'
+- at: 2026-11-12T04:36:55.204552+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-352","DEV-357"]}'
+    new: '{"related":["DEV-352","DEV-357","DEV-358"]}'
+- at: 2026-11-12T04:37:28.916711+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T04:37:29.493418+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-352","DEV-357","DEV-358"]}'
+    new: '{"related":["DEV-352","DEV-357","DEV-358","DEV-349"]}'
