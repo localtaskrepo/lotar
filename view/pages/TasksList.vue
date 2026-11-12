@@ -413,7 +413,7 @@
 import { errorMessage } from '../utils/errors'
 import PageHeader from '../components/PageHeader.vue'
 import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch, type ComponentPublicInstance } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { api } from '../api/client'
 import type { SprintAssignmentRequest, TaskDTO } from '../api/types'
 import ColumnsMenu from '../components/ColumnsMenu.vue'
@@ -783,7 +783,7 @@ async function applyFilter(raw: Record<string, string>, nav: NavMode = 'push', p
   if (disposed) return
   lastFilterJson = filterJson(raw)
   const onTasksRoute = router.currentRoute.value.path === '/'
-  if (!onTasksRoute) return
+  if (!onTasksRoute || leaving) return
 
   if (paging.resetOffset) {
     pageOffset.value = 0
@@ -1457,6 +1457,16 @@ let sse: {
 } | null = null
 const sseUnsubscribers: Array<() => void> = []
 let disposed = false
+// A move to another page is underway (its page may still be loading): writing
+// this page's query now would cancel that navigation (DEV-355).
+let leaving = false
+onBeforeRouteLeave(() => {
+  leaving = true
+  const stop = router.afterEach(() => {
+    leaving = false
+    stop()
+  })
+})
 let suppressRouteSync = false
 let suppressFilterWatch = false
 

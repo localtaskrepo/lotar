@@ -95,6 +95,48 @@ describe('Keyboard shortcuts and command palette (DEV-158)', () => {
             await workspace.dispose();
         }
     });
+    it('keeps a navigation that starts while the tasks page is still loading (DEV-355)', async ({ expect }) => {
+        const workspace = await SmokeWorkspace.create({ seedFiles: seed() });
+        const server = await startLotarServer(workspace);
+        try {
+            await withPage(`${server.url}/`, async (page) => {
+                // Hold the tasks page's sprint load and the Boards page chunk, so the
+                // tasks page finishes loading while the move to /boards is pending.
+                let releaseSprints = () => {};
+                const sprintsHeld = new Promise<void>((resolve) => (releaseSprints = resolve));
+                let releaseBoard = () => {};
+                const boardHeld = new Promise<void>((resolve) => (releaseBoard = resolve));
+                let boardRequested = () => {};
+                const boardReached = new Promise<void>((resolve) => (boardRequested = resolve));
+                await page.route('**/api/sprints/list*', async (route) => {
+                    await sprintsHeld;
+                    await route.continue();
+                });
+                await page.route(/\/assets\/Board-[^/]*\.js$/, async (route) => {
+                    boardRequested();
+                    await boardHeld;
+                    await route.continue();
+                });
+                await page.reload({ waitUntil: 'domcontentloaded' });
+                await page.getByTestId('filter-search').waitFor({ state: 'visible' });
+                const isMac = await page.evaluate(() => /mac/i.test(navigator.platform));
+                await page.keyboard.press(isMac ? 'Meta+k' : 'Control+k');
+                const input = page.getByTestId('command-palette-input');
+                await input.waitFor({ state: 'visible' });
+                await input.fill('boards');
+                await input.press('Enter');
+                await boardReached;
+                releaseSprints();
+                await page.waitForResponse('**/api/sprints/list*');
+                await page.waitForTimeout(200);
+                releaseBoard();
+                await expect.poll(() => new URL(page.url()).pathname).toBe('/boards');
+            });
+        } finally {
+            await server.stop();
+            await workspace.dispose();
+        }
+    });
     it('acts on the open task, lists recent tasks, applies quick filters and moves with j/k (DEV-198)', async ({
         expect,
     }) => {

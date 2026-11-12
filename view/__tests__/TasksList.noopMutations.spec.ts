@@ -62,6 +62,7 @@ const configStore = {
 }
 
 vi.mock('vue-router', () => ({
+    onBeforeRouteLeave: vi.fn(),
     useRoute: () => routeState,
     useRouter: () => ({
         currentRoute: ref({ path: '/' }),
