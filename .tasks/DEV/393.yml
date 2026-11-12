@@ -3,9 +3,9 @@ status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T20:54:21.522017+00:00
-modified: 2026-11-12T21:38:49.796104+00:00
+modified: 2026-11-12T21:40:25.161802+00:00
 relationships:
   related:
   - DEV-373
@@ -106,3 +106,9 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-12T21:40:25.161802+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'

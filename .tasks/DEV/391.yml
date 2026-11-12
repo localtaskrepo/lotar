@@ -1,19 +1,26 @@
 title: Stats count a list of versions as one value, [array]
-status: InProgress
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T20:54:20.317536+00:00
-modified: 2026-11-12T21:11:31.408662+00:00
+modified: 2026-11-12T21:47:32.739091+00:00
 relationships:
   related:
   - DEV-373
   - DEV-374
+  - DEV-385
+  - DEV-392
+  - DEV-397
+  - DEV-390
 comments:
 - date: 2026-11-12T21:11:22.483505+00:00
   author: claude
   text: 'claude (Opus 5.5): Done in 8d49ec2 on agent/DEV-391. A list value now counts once per item: new custom_value_items (src/types.rs) feeds stats custom-field, field:<name> grouping (stats effort --by), field filters, and version parsing (which now uses the same helper). For a version field, stats custom-field lists values newest version first, so --limit keeps the latest; values that don''t read as versions come after, by count; JSON uses the same order. Also fixed lotar show, which printed ''affects: [array]'': it now prints the items joined with '', ''. Test first: custom_field_versions_test::stats_count_each_item_of_a_list_value (it failed with [array] before the fix). docs/help/stats.md says how list values count. Checks: lint:agent clean, test:agent (2076 Rust + 1471 UI + release + hooks) passed, smoke 381 passed.'
+- date: 2026-11-12T21:40:06.739079+00:00
+  author: claude
+  text: 'claude: Merged and pushed. Rebased agent/DEV-391 onto main three times (main moved on with DEV-385, then DEV-392; no conflicts) and reran the checks after each rebase: lint:agent clean, test:agent passed (2087 Rust, 1472 UI, release, hooks), smoke 381 passed. Fast-forwarded main to 82fe986 (the fix), committed ticket files as a894e33 ''DEV-391 Ticket updates'' (also DEV-392''s ticket file), pushed 2697c9a..a894e33 to origin/main. No health check applies.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A04006dc7-f937-493d-81e9-819ca8ab91a0
 - file: src/cli/handlers/stats/custom.rs
@@ -87,3 +94,31 @@ history:
   - field: assignee
     old: '@fix'
     new: '@merge'
+- at: 2026-11-12T21:40:06.739079+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T21:40:07.407757+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-373","DEV-374"]}'
+    new: '{"related":["DEV-373","DEV-374","DEV-385","DEV-392"]}'
+- at: 2026-11-12T21:40:18.306736+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-11-12T21:47:13.352850+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-373","DEV-374","DEV-385","DEV-392"]}'
+    new: '{"related":["DEV-373","DEV-374","DEV-385","DEV-392","DEV-397"]}'
+- at: 2026-11-12T21:47:32.739091+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-373","DEV-374","DEV-385","DEV-392","DEV-397"]}'
+    new: '{"related":["DEV-373","DEV-374","DEV-385","DEV-392","DEV-397","DEV-390"]}'
