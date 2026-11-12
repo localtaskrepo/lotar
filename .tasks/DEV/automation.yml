@@ -1,5 +1,6 @@
 # Source: standards configs/lotar/automation.yml. Repo-health tickets (tag health, filed by
 # node ~/Development/standards/scripts/repos.ts --report) start a fix agent as a T3 Code thread; tag owner never does.
+# So does a ticket an agent files without an assignee (owner 2026-11-11, skill lotar-workflow).
 # Goes into each repo's .tasks/<PROJECT>/automation.yml; the repo's own rules follow below these. Setup, retries and
 # the model choice: configs/lotar/README.md. No review status: the owner follows the agents in T3 (2026-11-11).
 automation:
@@ -46,6 +47,20 @@ automation:
           set:
             assignee: "@fix-light"
           agent: *fix
+    # An agent's ticket nobody took: @fix works it with lotar's built-in instructions. The filer assigns itself, the
+    # owner (a question) or @fix-light (mechanical) instead when that fits; proposals, owner and recurring tickets wait.
+    - name: "Agent tickets: start the fix agent"
+      when:
+        all:
+          - any:
+              - reporter: claude
+              - reporter: codex
+          - not: { assignee: "@any" }
+          - not: { tags: { any: [health, proposal, owner, recurring] } }
+      on:
+        created:
+          set:
+            assignee: "@fix"
     - name: "Health: fix agent lifecycle"
       when:
         any:
