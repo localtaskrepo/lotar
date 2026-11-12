@@ -1,11 +1,11 @@
 title: 'Releases like sprints: release records, a ticket''s releases, Releases page'
-status: InProgress
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T20:54:21.522017+00:00
-modified: 2026-11-12T22:06:17.249305+00:00
+modified: 2026-11-12T22:07:02.555615+00:00
 relationships:
   related:
   - DEV-373
@@ -127,3 +127,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-373","DEV-394"]}'
     new: '{"related":["DEV-373","DEV-394","DEV-385","DEV-397"]}'
+- at: 2026-11-12T22:07:02.555615+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
