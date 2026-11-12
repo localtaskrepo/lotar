@@ -551,6 +551,37 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
         }
     });
 
+    it('starts an agent job when the task panel assigns an agent profile', async () => {
+        const agents = await createFixtureAgents({ mock: {} }, 'lotar-smoke-agents-panel-assign-');
+
+        try {
+            const workspace = await SmokeWorkspace.create({
+                seedFiles: { '.tasks/config.yml': configWithAgents(agents.yaml) },
+            });
+
+            try {
+                const task = await workspace.addTask('Assign from panel', { args: ['-p', 'UIAG'] });
+                const server = await startLotarServer(workspace);
+
+                try {
+                    await withPage(`${server.url}/?project=UIAG&taskPanel=${task.id}`, async (page) => {
+                        const select = page.locator('#task-panel-assignee-select');
+                        await select.locator('option[value="@mock"]').waitFor({ state: 'attached' });
+                        expect(await select.locator('option[value="mock"]').count()).toBe(0);
+                        await select.selectOption('@mock');
+                        expect(await waitForJobCountViaApi(server.url, task.id, 1)).toBeGreaterThanOrEqual(1);
+                    });
+                } finally {
+                    await server.stop();
+                }
+            } finally {
+                await workspace.dispose();
+            }
+        } finally {
+            await agents.dispose();
+        }
+    });
+
     it.skipIf(!gitAvailable())('advances the reviewed template workflow live without reloads', async () => {
         const agents = await createFixtureAgents({ mock: {} }, 'lotar-smoke-agents-reviewed-');
         const worktreeDir = await mkdtemp(path.join(tmpdir(), 'lotar-smoke-worktrees-'));

@@ -30,6 +30,8 @@ interface UseTaskPanelOwnershipOptions {
 export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
     const knownUsers = ref<string[]>([])
     const whoami = ref('')
+    // Agent profile names; an assignee `@<profile>` starts that agent, so these keep their `@`.
+    const agentProfiles = ref<string[]>([])
 
     const reporterMode = ref<OwnershipMode>('select')
     const assigneeMode = ref<OwnershipMode>('select')
@@ -47,17 +49,20 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
         return [whoami.value, ...filtered]
     })
 
+    // People are offered without `@`, agent profiles as `@<profile>`.
+    const personName = (value: string | null | undefined) => {
+        const trimmed = (value || '').trim()
+        const bare = trimmed.replace(/^@/, '')
+        return trimmed.startsWith('@') && agentProfiles.value.includes(bare) ? trimmed : bare
+    }
+
     const sanitizedConfiguredMembers = () => {
-        return options.members.value
-            .map((value) => (value || '').trim().replace(/^@/, ''))
-            .filter((value) => value.length > 0)
+        return options.members.value.map(personName).filter((value) => value.length > 0)
     }
 
     const defaultOwnershipCandidates = () => {
         const defaults = options.defaults.value
-        return [defaults.reporter, defaults.assignee]
-            .map((value) => (value || '').trim().replace(/^@/, ''))
-            .filter((value) => value.length > 0)
+        return [defaults.reporter, defaults.assignee].map(personName).filter((value) => value.length > 0)
     }
 
     const assignKnownUsersFrom = (set: Set<string>) => {
@@ -70,6 +75,7 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
         const baseline = new Set<string>()
         sanitizedConfiguredMembers().forEach((value) => baseline.add(value))
         defaultOwnershipCandidates().forEach((value) => baseline.add(value))
+        agentProfiles.value.forEach((name) => baseline.add(`@${name}`))
         if (whoami.value) {
             baseline.add(whoami.value)
         }
@@ -208,26 +214,33 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
         syncReporterControl()
     }
 
+    async function loadAgentProfiles(scope?: string) {
+        try {
+            const response = await api.listAgentProfiles(scope)
+            return response.profiles.map((profile) => profile.name).filter(Boolean)
+        } catch {
+            return []
+        }
+    }
+
     async function preloadPeople(project?: string | null) {
         const scope = project && project.trim() ? project.trim() : undefined
+        const [profiles, tasks] = await Promise.allSettled([
+            loadAgentProfiles(scope),
+            api.listTasks(scope ? { project: scope, limit: 200, offset: 0 } : { limit: 200, offset: 0 }),
+        ])
+        agentProfiles.value = profiles.status === 'fulfilled' ? profiles.value : []
         const baseline = seedKnownUsers()
-        try {
-            const response = await api.listTasks(
-                scope ? { project: scope, limit: 200, offset: 0 } : { limit: 200, offset: 0 },
-            )
+        if (tasks.status === 'fulfilled') {
+            const response = tasks.value
             const list = Array.isArray(response.tasks) ? response.tasks : []
             const seen = new Set<string>()
             const tags = new Set<string>()
             list.forEach((item) => {
-                if (item.assignee) {
-                    const normalized = item.assignee.startsWith('@') ? item.assignee.slice(1) : item.assignee
-                    if (normalized) seen.add(normalized)
-                }
-                const reporter = item.reporter
-                if (reporter) {
-                    const normalized = reporter.startsWith('@') ? reporter.slice(1) : reporter
-                    if (normalized) seen.add(normalized)
-                }
+                const assignee = personName(item.assignee)
+                if (assignee) seen.add(assignee)
+                const reporter = personName(item.reporter)
+                if (reporter) seen.add(reporter)
                 item.tags.forEach((tag) => {
                     if (!tag) return
                     const trimmed = tag.trim()
@@ -237,7 +250,7 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
             baseline.forEach((value) => seen.add(value))
             assignKnownUsersFrom(seen)
             options.mergeKnownTags(Array.from(tags))
-        } catch {
+        } else {
             assignKnownUsersFrom(baseline)
         }
     }
