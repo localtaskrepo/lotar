@@ -1,0 +1,88 @@
+title: Integration tests leave agent-queue folders in the user's cache
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@merge'
+created: 2026-11-12T19:12:53.510074+00:00
+modified: 2026-11-12T19:23:07.563404+00:00
+relationships:
+  related:
+  - DEV-378
+  - DEV-379
+  - DEV-381
+comments:
+- date: 2026-11-12T19:22:32.017825+00:00
+  author: claude
+  text: 'claude: Fixed in 267ef5d on agent/DEV-380. tests/common/mod.rs: the test-process constructor now sets LOTAR_AGENT_QUEUE_DIR to the process scratch (like LOTAR_AUTOMATION_STATE_DIR), and the destructor removes it. Tests that inspect queue files still set their own. smoke/helpers/workspace.ts: the smoke server env gets LOTAR_AGENT_QUEUE_DIR=<workspace>/.agent-queue (the UIAG-1 mock jobs came from smoke). src/services/agent_job_service.rs: the lib unit test job_notes_describe_the_branch_and_who_moves_the_ticket queued a NOTE-1 job; it now sets its own queue dir. Lib unit tests don''t run the constructor. Check: because other sessions also write to ~/Library/Caches/lotar/agent-queue, counting entries there isn''t reliable. Instead I ran npm test and npm run smoke with XDG_RUNTIME_DIR pointed at an empty folder; any test without LOTAR_AGENT_QUEUE_DIR would write there. Before the fix in the unit test that folder got one queue file, afterwards nothing. npm test: 2062/2062 passed. npm run lint: passed. npm run smoke: 380/381; ui.version-fields fails without this change too (DEV-379). Not done: the existing leftovers in the cache are untouched; deleting them is the owner''s decision.'
+- date: 2026-11-12T19:22:55.884765+00:00
+  author: claude
+  text: 'claude: The question about deleting the existing leftovers is now DEV-381 (HelpNeeded, assigned to mallox), so it doesn''t hold up this merge.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adf680bc5-ab8b-4b5c-84db-43786c2d84fd
+description: |-
+  ## Found
+
+  claude (DEV-378 agent), 2026-11-12: ~/Library/Caches/lotar/agent-queue holds 12863 entries, nearly all empty active-<hash> folders and queue-<hash>.json files of temporary test tasks dirs. One `npm test` run tonight added 127 active-* folders and 9 queue files. Integration tests that start agent jobs (tests/dev318_t3_runner_test.rs, dev320_job_outcome_test.rs, agent_safety_test.rs, ...) don't set LOTAR_AGENT_QUEUE_DIR, so job records go to the real cache; AGENTS.md says automated tests use isolated temporary workspaces.
+
+  ## Check
+
+  Count entries in ~/Library/Caches/lotar/agent-queue, run `npm test`, count again: the count is unchanged.
+
+  ## Done when
+
+  - [ ] Tests write job records and queue files only under their temp folders.
+  - [ ] Ask the owner before deleting the existing leftovers: some entries belong to real tasks dirs.
+tags:
+- health
+custom_fields:
+  finding: tests:agent-queue-leak
+history:
+- at: 2026-11-12T19:12:53.602266+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-378"]}'
+- at: 2026-11-12T19:12:53.708099+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T19:12:53.868733+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T19:12:54.416973+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adf680bc5-ab8b-4b5c-84db-43786c2d84fd
+- at: 2026-11-12T19:22:32.017825+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T19:22:32.125426+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-378"]}'
+    new: '{"related":["DEV-378","DEV-379"]}'
+- at: 2026-11-12T19:22:45.754427+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-378","DEV-379"]}'
+    new: '{"related":["DEV-378","DEV-379","DEV-381"]}'
+- at: 2026-11-12T19:22:55.884765+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T19:23:07.563404+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'

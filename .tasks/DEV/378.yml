@@ -1,14 +1,54 @@
 title: Agent jobs are left without an end when their worker exits
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-12T18:53:33.811162+00:00
-modified: 2026-11-12T18:53:35.319942+00:00
+modified: 2026-11-12T19:20:33.531873+00:00
 relationships:
   related:
   - DEV-377
+  - DEV-379
+  - DEV-380
+comments:
+- date: 2026-11-12T18:59:44.351508+00:00
+  author: claude
+  text: 'claude: A second effect, reported by the LOCA-119 agent. The rerun merge for LOCA-118 (lotar agent run --agent merge --session continue, job-20261112T185649.166Z-1) didn''t continue thread mcp:86dd6b77-396d-484b-8d97-ce0ca1cafdb3. It started mcp:a3e24f97-c4bf-435c-a6c2-69a9cae9b71b on t3/shrink-agents-md-instructions. The cause: previous_session (src/services/agent_job_service.rs) reads an earlier job''s session only from the job log''s status line. The orphaned job never wrote one, although its log has the ''T3 Code thread: <link>'' progress event. Fix idea: record the session in the log as soon as the thread exists, or finish orphaned jobs (this ticket), so continue and the DEV-377 open-work check find the thread. agent/LOCA-118 still points at 091d1b0.'
+- date: 2026-11-12T19:13:08.476673+00:00
+  author: claude
+  text: |-
+    claude: Fixed in 449acb5 on agent/DEV-378 (signed, not merged).
+
+    Cause: when a worker died, the next lotar process that listed active jobs deleted the dead worker's job record as stale. Nothing ended the job: no end in the log, no end rules, and the outcome recorded during the job was lost.
+
+    Change:
+    - A record whose owning process is gone is now an orphan. It stops counting as running but stays. The record also stores the T3 thread id.
+    - The queue worker (on every poll, but not while it waits to exit after an upgrade) and lotar serve (at start) claim each orphan under a lock and take it over in their own registry. A t3 job reads its thread with `t3 thread show`, waits while the run goes on, then ends through the normal end path: completed gives exit 0 with the last reply as the summary, a pending request hands the ticket back, any other status fails. Then the log gets its end, the job_completed/failed rules run once, the outcome applies, and cleanup runs. Other runners, or a thread that can't be read after 3 tries, fail with the reason.
+    - docs/help/agent.md has a new section, 'Jobs whose process died'.
+
+    Checks:
+    - Ticket check, end to end with the built binary and a fake t3: queued a t3 job, kill -9 on the worker while the thread ran, then `lotar agent worker` again. The log got 'process … took it over', agent_job_completed and a status line with the session. The job_completed rule ran once (one comment). A third worker start did nothing.
+    - New tests in tests/dev318_t3_runner_test.rs: an orphan waits while the thread runs, then completes, the outcome applies and the rules run once; an unreadable thread fails the job. Plus unit tests for orphan/claim and thread state parsing.
+    - npm run lint: clean. npm test (test:agent): 2064 Rust and 1469 UI tests pass, release and hook tests pass.
+    - npm run smoke: 379 of 381 pass. ui.board-state passed on rerun (load flake). ui.version-fields fails on base 916b0cd too, with this change's src reverted: filed as DEV-379.
+    - Also filed DEV-380: integration tests leave agent-queue folders in ~/Library/Caches/lotar.
+
+    For the merge agent: main's DEV-377 commit also appended tests at the end of tests/dev318_t3_runner_test.rs. Resolve the conflict by keeping both blocks. The code merges cleanly.
+
+    Not covered: the LOCA-118 and LOCA-120..122 jobs from the report. Their records were already deleted under the old behaviour, so this fix can't take them over. They need ending by hand in the local repo (for LOCA-118: merge 091d1b0 on agent/LOCA-118 and run its end rules).
+- date: 2026-11-12T19:20:22.611382+00:00
+  author: claude
+  text: |-
+    claude: Merge held: one smoke test fails, and it isn't caused by this branch.
+
+    Done: rebased agent/DEV-378 onto main 8195112, now 1a6a46b (signed). The only conflict was in tests/dev318_t3_runner_test.rs, where DEV-377 and DEV-378 had both appended tests at the end. I kept both blocks unchanged, and the diff to main shows only DEV-378's own changes. Checks in the worktree: npm run lint is clean, npm test passes (2065 Rust, 1469 UI, release and hook tests), and npm run smoke passes 380 of 381.
+
+    The failure is smoke/tests/ui.version-fields.smoke.spec.ts, which is DEV-379. It fails on main as well: I checked earlier on 916b0cd with this branch's src reverted. Its fix is in progress, uncommitted, in agent/DEV-379. The cause is a race in the test: it waits for 0 rows while the list still shows its loader. With that test-only fix applied temporarily, the test passed 3 of 3 runs on this branch. I reverted it afterwards, so this branch is unchanged.
+
+    Not done: main isn't fast-forwarded, nothing is pushed, and the ticket check hasn't been rerun against main.
+
+    Question for mallox: merge DEV-378 now even though ui.version-fields fails (DEV-379, which fails on main too), or wait until DEV-379 lands and then rerun smoke and merge?
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4e76c77c-bfa8-45ce-86c9-4fd1a4c6314c
 description: |-
@@ -51,3 +91,42 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4e76c77c-bfa8-45ce-86c9-4fd1a4c6314c
+- at: 2026-11-12T18:59:44.351508+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T19:12:53.289204+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-377"]}'
+    new: '{"related":["DEV-377","DEV-379"]}'
+- at: 2026-11-12T19:12:53.601715+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-377","DEV-379"]}'
+    new: '{"related":["DEV-377","DEV-379","DEV-380"]}'
+- at: 2026-11-12T19:13:08.476673+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T19:13:26.296597+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T19:20:22.611382+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T19:20:33.531873+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox

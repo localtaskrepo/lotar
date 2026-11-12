@@ -1,0 +1,27 @@
+title: Delete test leftovers in ~/Library/Caches/lotar/agent-queue?
+status: HelpNeeded
+priority: Medium
+type: Feature
+reporter: claude
+assignee: mallox
+created: 2026-11-12T19:22:45.549361+00:00
+modified: 2026-11-12T19:22:55.783026+00:00
+relationships:
+  related:
+  - DEV-380
+description: 'claude (DEV-380 agent), 2026-11-12: ~/Library/Caches/lotar/agent-queue has 12863 entries, almost all of them leftovers from tests (empty active-<hash> folders and queue-<hash>.json files whose tasks_dir is a temporary test folder under /var/folders or /tmp). DEV-380 stops new ones from appearing. Some entries belong to real tasks dirs (for example /Users/mallox/Development/gairola/.tasks) and must stay. Question: may an agent delete the entries whose queue file or job record points to a tasks dir that no longer exists, and keep everything else?'
+tags:
+- owner
+history:
+- at: 2026-11-12T19:22:45.755125+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-380"]}'
+- at: 2026-11-12T19:22:55.783026+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: HelpNeeded

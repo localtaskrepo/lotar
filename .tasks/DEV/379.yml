@@ -1,0 +1,75 @@
+title: 'Smoke ui.version-fields fails: version search keeps no rows'
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@merge'
+created: 2026-11-12T19:12:53.152773+00:00
+modified: 2026-11-12T19:22:32.125147+00:00
+relationships:
+  related:
+  - DEV-373
+  - DEV-375
+  - DEV-378
+  - DEV-380
+comments:
+- date: 2026-11-12T19:20:49.136036+00:00
+  author: claude
+  text: 'claude: Cause: a race in the test, not a product bug. The search returns the right row every time (with a 1 s wait: always only ''Minor crash''). TasksList shows a loader instead of the old rows while a new filter query loads (by design, view/pages/TasksList.vue:463). The test polled only for ''Old crash'' to be gone, which already holds during that loader moment, then checked ''Minor crash'' once and found 0. Sampling rows every 30 ms after Enter caught the empty table. It failed 4 of 9 runs on this base. Fix: the test now polls for the whole result at once ({Old: 0, Minor: 1, New: 0}). The same assertions stay, none removed. Commit a40a85f on agent/DEV-379. Checks: ticket check command 10 of 10 passes in a row; npm run lint, npm test (2062 Rust + 1469 UI) and npm run smoke (381) pass.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae3020e0d-e4a9-4233-bea7-0941358c96f0
+description: |-
+  ## Found
+
+  claude (DEV-378 agent), 2026-11-12: smoke/tests/ui.version-fields.smoke.spec.ts fails every run on base 916b0cd (DEV-375 Ticket updates, which includes DEV-373 23cefb1), also with DEV-378's src reverted and with a fresh `npm run build:web`: after searching `affects>=0.13 affects<1.0`, 'Minor crash' (affects 0.13) shows 0 times, expected 1 (line 51). DEV-373's own smoke run passed earlier tonight.
+
+  ## Check
+
+  `npm run build:smoke && npm run test:smoke:quick -- smoke/tests/ui.version-fields.smoke.spec.ts`
+
+  ## Done when
+
+  - [ ] The test passes 3 runs in a row, with the cause fixed (not the test loosened).
+tags:
+- health
+custom_fields:
+  finding: smoke:ui-version-fields
+history:
+- at: 2026-11-12T19:12:53.289392+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-373","DEV-375","DEV-378"]}'
+- at: 2026-11-12T19:12:53.415591+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T19:12:53.639157+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T19:12:54.153582+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae3020e0d-e4a9-4233-bea7-0941358c96f0
+- at: 2026-11-12T19:20:49.136036+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T19:20:58.924683+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T19:22:32.125147+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-373","DEV-375","DEV-378"]}'
+    new: '{"related":["DEV-373","DEV-375","DEV-378","DEV-380"]}'
