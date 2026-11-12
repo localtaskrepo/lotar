@@ -928,6 +928,7 @@ as long as the branch is rebased onto it.\n",
         notes.push_str(
             "- When this job ends, LoTaR's automation rules move this ticket to the next step as if you finished. \
 If you finished, don't change its status or assignee; add a comment that says what you did. \
+In your final summary, say that the ticket moves to its next step when this job ends and that you didn't change its status or assignee. \
 If you could not finish (you are blocked, something fails that you can't fix, or you need a decision), \
 hand the ticket back as described under \"Clarifications, blockers and feedback\" so it doesn't move on.\n",
         );
@@ -2635,6 +2636,7 @@ mod tests {
         assert!(notes.contains("branch `agent/NOTE-1`"), "{notes}");
         assert!(notes.contains("Commit your work"), "{notes}");
         assert!(notes.contains("move this ticket to the next step"), "{notes}");
+        assert!(notes.contains("the ticket moves to its next step when this job ends"), "{notes}");
         assert!(notes.contains("hand the ticket back"), "{notes}");
 
         let notes = job_notes(&tasks_dir, &config, &task.id, false, true, false);
