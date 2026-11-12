@@ -1,0 +1,76 @@
+title: Bulk set a custom field, and Board swimlanes by custom field
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T20:54:22.216856+00:00
+modified: 2026-11-12T20:54:42.428470+00:00
+relationships:
+  related:
+  - DEV-373
+  - DEV-393
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa8e0c08-a022-42ea-b8e6-8c47e4f8181f
+- file: view/pages/TasksList.vue
+- file: view/pages/Board.vue
+description: |-
+  Setting a custom field on many tickets takes one edit per ticket in the web UI, and the Board can't group by a custom field. With version fields (DEV-373), "set `fixed_in=0.15.0` on these 15 tickets" and "a board per `fixed_in`" are common needs. Found by claude in an audit of version support, 2026-11-12.
+
+  ## Context
+
+  - The Tasks list's bulk menu (`view/pages/TasksList.vue`) offers Assign, Clear assignee, Add to sprint, Remove from sprint and Delete; nothing for fields.
+  - Board swimlanes (`view/pages/Board.vue`, `GroupByMode`) are `none`, `assignee`, `priority`, `type`.
+  - Check whether MCP `task_bulk_update` with a `custom_fields` patch replaces the whole map (it says "Null clears all"); a bulk set of one field must keep a ticket's other fields.
+
+  ## Plan
+
+  - Bulk menu: "Set field…" that picks a declared custom field and a value, and clears it when empty; a version field checks the value as the task panel does (`view/utils/versions.ts`). Uses the existing bulk update route.
+  - Board: group by any declared custom field; a version field's lanes in version order, a list value in each of its lanes (or say why not), and a "none" lane.
+  - CLI parity if missing: setting a field on the tickets a query selects (as `lotar sprint add --select` does).
+
+  ## Done when
+
+  - [ ] One bulk action sets or clears a field on the selected tickets and leaves their other fields alone (test plus smoke).
+  - [ ] The Board groups by a custom field, version fields in version order (smoke).
+tags:
+- web-ui
+history:
+- at: 2026-11-12T20:54:22.393307+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-373"]}'
+- at: 2026-11-12T20:54:22.714951+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T20:54:23.371073+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T20:54:24.784399+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa8e0c08-a022-42ea-b8e6-8c47e4f8181f
+- at: 2026-11-12T20:54:41.795800+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-373"]}'
+    new: '{"related":["DEV-373","DEV-393"]}'
+- at: 2026-11-12T20:54:42.378543+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:view/pages/TasksList.vue
+- at: 2026-11-12T20:54:42.428470+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:view/pages/Board.vue

@@ -5,9 +5,9 @@ type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-12T20:52:33.189344+00:00
-modified: 2026-11-12T20:52:33.278167+00:00
+modified: 2026-11-12T20:52:40.677152+00:00
 relationships:
-  related:
+  depends_on:
   - DEV-386
 description: |-
   DEV-386 lets depends_on and related name a task in another repo's LoTaR (repo name, a colon, the ID; see docs/help/task.md, Tasks in another repo). The CLI shows them with status, title and link; the web task panel still lists them like local IDs, so a chip links to a task that does not exist here.
@@ -29,3 +29,9 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-386"]}'
+- at: 2026-11-12T20:52:40.677152+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-386"]}'
+    new: '{"depends_on":["DEV-386"]}'

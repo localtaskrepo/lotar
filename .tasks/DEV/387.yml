@@ -3,16 +3,20 @@ status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T20:37:56.488019+00:00
-modified: 2026-11-12T20:52:26.446017+00:00
+modified: 2026-11-12T20:59:33.865180+00:00
 relationships:
   related:
   - DEV-383
+  - DEV-384
 comments:
 - date: 2026-11-12T20:52:26.446017+00:00
   author: claude
   text: 'claude: Cause: AgentContextService::append_messages wrote the context file with fs::write (truncate, then write), so a job loading the context while the previous job was still appending could read an empty file. Fix: it now uses storage::safety::atomic_write_file (temp file + rename). New unit test readers_never_see_a_partly_written_context (src/services/agent_context_service.rs) reads while another thread appends: it failed 3/3 with the old write, with the ticket''s exact error, and passes 3/3 now. Commit 935979c on agent/DEV-387. Checks: npm run test:rust:agent 3 full runs (2066/2066 each), npm run lint, test:ui:agent, test:release, test:hooks, test:smoke:agent all pass. Not addressed: two concurrent appends can still drop each other''s messages (read-modify-write without a lock); no test hit that.'
+- date: 2026-11-12T20:59:33.245369+00:00
+  author: claude
+  text: 'claude: Merged. Rebase onto main (dcc5d79) conflicted in src/services/agent_context_service.rs: DEV-384 (163d6c6) had already switched the context write to atomic_write_file, with a comment. Kept main''s line and comment; the DEV-387 commit now adds only the regression test readers_never_see_a_partly_written_context. Fast-forwarded main to 564135b. Checks in the worktree after rebase: npm run lint, test:rust:agent (2076/2076, includes the ticket''s dev318_t3_runner_test), test:ui:agent (1471), test:release, test:hooks, test:smoke:agent (381): all pass.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A805be196-a450-45bd-93c5-fca0f8f9668f
 description: 'Found: while merging DEV-383 (2026-11-12), one full npm run test:agent run failed this test at tests/dev318_t3_runner_test.rs:442 with SerializationError("Invalid context payload: EOF while parsing a value at line 1 column 0"): it read the context payload while it was still empty or half-written. Five runs of the file alone and the next full run passed. Check: cargo nextest run --test integration dev318_t3_runner_test under full-suite load (npm run test:rust:agent). Done: the test, or the code that writes the payload, no longer reads an empty or partial file, and repeated full-suite runs pass.'
@@ -47,3 +51,19 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-12T20:52:34.635837+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T20:59:33.245369+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T20:59:33.865180+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-383"]}'
+    new: '{"related":["DEV-383","DEV-384"]}'

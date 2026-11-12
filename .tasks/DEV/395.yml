@@ -1,0 +1,68 @@
+title: 'Version fields: list values in filter suggestions, types in MCP hints, suggestions in the version input'
+status: InProgress
+priority: Low
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T20:54:22.994464+00:00
+modified: 2026-11-12T20:54:42.556447+00:00
+relationships:
+  related:
+  - DEV-373
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1b2db749-64df-475b-9b1e-7c3dba96772f
+- file: view/composables/useFilterOptions.ts
+- file: src/mcp/server/hints.rs
+- file: view/components/task-panel/TaskPanelCustomFieldsSection.vue
+description: |-
+  Three small gaps in version support that make version fields harder to use than they need to be. Found by claude in an audit of version support, 2026-11-12.
+
+  ## Gaps
+
+  - **Filter suggestions**: the web search box's value suggestions skip tickets whose field holds a list (`view/composables/useFilterOptions.ts` takes only strings, numbers and booleans) and sort values alphabetically (`localeCompare`). For a version field: take each item of a list, and sort in version order.
+  - **MCP field hints** list custom field names without their types (`src/mcp/server/hints.rs`), so an agent learns that `affects` holds versions only when a write is refused. Add the type where the hints name the fields.
+  - **Version input** in the task panel (`view/components/task-panel/TaskPanelCustomFieldsSection.vue`) checks a value but suggests none, so `0.15` and `0.15.0` drift apart. Suggest versions already used in that field.
+
+  ## Done when
+
+  - [ ] Each gap is fixed with a test (unit or smoke for the UI ones, an MCP test for the hints).
+tags:
+- web-ui
+history:
+- at: 2026-11-12T20:54:23.220242+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T20:54:23.943749+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T20:54:25.009225+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1b2db749-64df-475b-9b1e-7c3dba96772f
+- at: 2026-11-12T20:54:40.398629+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-373"]}'
+- at: 2026-11-12T20:54:42.469468+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:view/composables/useFilterOptions.ts
+- at: 2026-11-12T20:54:42.514937+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:src/mcp/server/hints.rs
+- at: 2026-11-12T20:54:42.556447+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:view/components/task-panel/TaskPanelCustomFieldsSection.vue

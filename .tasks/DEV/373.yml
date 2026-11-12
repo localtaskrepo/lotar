@@ -5,7 +5,7 @@ type: Feature
 reporter: mallox
 assignee: '@merge'
 created: 2026-11-12T08:53:59.182009+00:00
-modified: 2026-11-12T19:12:53.288308+00:00
+modified: 2026-11-12T20:54:40.395541+00:00
 relationships:
   related:
   - DEV-374
@@ -13,6 +13,12 @@ relationships:
   - DEV-375
   - DEV-364
   - DEV-379
+  - DEV-390
+  - DEV-391
+  - DEV-393
+  - DEV-394
+  - DEV-392
+  - DEV-395
 comments:
 - date: 2026-11-12T09:43:09.710104+00:00
   author: claude
@@ -136,3 +142,39 @@ history:
   - field: relationships
     old: '{"related":["DEV-374","DEV-298","DEV-375","DEV-364"]}'
     new: '{"related":["DEV-374","DEV-298","DEV-375","DEV-364","DEV-379"]}'
+- at: 2026-11-12T20:54:19.755329+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-374","DEV-298","DEV-375","DEV-364","DEV-379"]}'
+    new: '{"related":["DEV-374","DEV-298","DEV-375","DEV-364","DEV-379","DEV-390"]}'
+- at: 2026-11-12T20:54:20.522380+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-374","DEV-298","DEV-375","DEV-364","DEV-379","DEV-390"]}'
+    new: '{"related":["DEV-374","DEV-298","DEV-375","DEV-364","DEV-379","DEV-390","DEV-391"]}'
+- at: 2026-11-12T20:54:21.665498+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-374","DEV-298","DEV-375","DEV-364","DEV-379","DEV-390","DEV-391"]}'
+    new: '{"related":["DEV-374","DEV-298","DEV-375","DEV-364","DEV-379","DEV-390","DEV-391","DEV-393"]}'
+- at: 2026-11-12T20:54:22.392275+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-374","DEV-298","DEV-375","DEV-364","DEV-379","DEV-390","DEV-391","DEV-393"]}'
+    new: '{"related":["DEV-374","DEV-298","DEV-375","DEV-364","DEV-379","DEV-390","DEV-391","DEV-393","DEV-394"]}'
+- at: 2026-11-12T20:54:39.245532+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-374","DEV-298","DEV-375","DEV-364","DEV-379","DEV-390","DEV-391","DEV-393","DEV-394"]}'
+    new: '{"related":["DEV-374","DEV-298","DEV-375","DEV-364","DEV-379","DEV-390","DEV-391","DEV-393","DEV-394","DEV-392"]}'
+- at: 2026-11-12T20:54:40.395541+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-374","DEV-298","DEV-375","DEV-364","DEV-379","DEV-390","DEV-391","DEV-393","DEV-394","DEV-392"]}'
+    new: '{"related":["DEV-374","DEV-298","DEV-375","DEV-364","DEV-379","DEV-390","DEV-391","DEV-393","DEV-394","DEV-392","DEV-395"]}'

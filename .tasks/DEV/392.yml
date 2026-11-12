@@ -1,0 +1,76 @@
+title: Sync pulls no versions from Jira fixVersions or a GitHub milestone
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T20:54:20.979539+00:00
+modified: 2026-11-12T20:54:42.221198+00:00
+relationships:
+  related:
+  - DEV-373
+  - DEV-374
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1c0ff9ac-b919-430f-851b-5bbd5d3d8db9
+- file: src/services/sync_service/remote_fields.rs
+- file: src/services/sync_service/payloads.rs
+description: |-
+  Mapping a version field to Jira's `fixVersions` or `versions`, or to a GitHub milestone, brings in nothing, so versions can't come over from an existing tracker. Found by claude reading the code in an audit of version support, 2026-11-12; not reproduced against a live Jira or GitHub.
+
+  ## Cause
+
+  - Jira sends `fixVersions` and `versions` as lists of objects (`[{"id": "10001", "name": "0.15.0", ...}]`). `jira_payload_field_value` falls through to `read_generic_field` (`src/services/sync_service/remote_fields.rs`), which keeps only plain strings from a list, so the result is an empty list.
+  - A GitHub issue's `milestone` is an object (`{"title": "v0.15.0", ...}`); `read_generic_field` returns nothing for an object.
+  - Push: check what `src/services/sync_service/payloads.rs` sends for these fields; Jira expects `[{"name": "0.15.0"}]`, GitHub a milestone number.
+
+  ## Fix
+
+  - Pull: read `name` from Jira version objects and `title` from a GitHub milestone (a leading `v` is dropped by the version field as usual).
+  - Push: send the shapes the remotes expect, or refuse the mapping with a clear message where lotar can't (e.g. a milestone that doesn't exist on GitHub).
+  - Starts with failing tests in `src/services/sync_service/provider_tests.rs` using recorded payloads.
+
+  ## Done when
+
+  - [ ] `mapping: { fixed_in: fixVersions }` pulls `0.15.0` from Jira, and `fixed_in: milestone` pulls it from GitHub.
+  - [ ] Push works or is refused clearly, and `docs/help/sync.md` has an example.
+tags:
+- backend
+history:
+- at: 2026-11-12T20:54:21.166296+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T20:54:21.885092+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T20:54:22.667373+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1c0ff9ac-b919-430f-851b-5bbd5d3d8db9
+- at: 2026-11-12T20:54:39.246279+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-373"]}'
+- at: 2026-11-12T20:54:41.553051+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-373"]}'
+    new: '{"related":["DEV-373","DEV-374"]}'
+- at: 2026-11-12T20:54:42.186247+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:src/services/sync_service/remote_fields.rs
+- at: 2026-11-12T20:54:42.221198+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:src/services/sync_service/payloads.rs

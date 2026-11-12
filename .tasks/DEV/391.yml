@@ -1,0 +1,75 @@
+title: Stats count a list of versions as one value, [array]
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T20:54:20.317536+00:00
+modified: 2026-11-12T20:54:42.148177+00:00
+relationships:
+  related:
+  - DEV-373
+  - DEV-374
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A04006dc7-f937-493d-81e9-819ca8ab91a0
+- file: src/cli/handlers/stats/custom.rs
+- file: src/cli/handlers/stats/common.rs
+description: |-
+  `lotar stats custom-field --field affects` counts every ticket that holds a list of versions under one value, `[array]`, and ranks values by count, not version. So the stats can't answer "how many tickets does 0.13.2 affect". Found by claude in an audit of version support, 2026-11-12.
+
+  ## Cause
+
+  - `src/cli/handlers/stats/custom.rs` keys each value with `custom_value_key`, which calls `custom_value_to_string` (`src/types.rs`); that returns `[array]` for any list. This predates versions, but versions made list values common (DEV-373: `affects: [0.13.2, 0.13.3]`).
+  - Probably the same for grouping by `field:<name>` in other stats (`stats distribution`, `stats effort --group-by field:<name>`): check `src/cli/handlers/stats/common.rs` and its callers.
+
+  ## Fix
+
+  - A list value counts once for each of its items, for text and version fields alike.
+  - For a version field, list the values in version order (or say why count order stays), with `--format json` showing the same.
+  - Starts with a failing test: two tickets, `affects: [0.13.1, 0.14.0]` and `affects: 0.14.0`, give `0.14.0: 2` and `0.13.1: 1`.
+
+  ## Done when
+
+  - [ ] No stats command prints `[array]` for a list value.
+  - [ ] Docs (`docs/help/stats.md`) say how list values count.
+tags:
+- backend
+history:
+- at: 2026-11-12T20:54:20.523108+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-373"]}'
+- at: 2026-11-12T20:54:20.757632+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T20:54:21.284390+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T20:54:21.984659+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A04006dc7-f937-493d-81e9-819ca8ab91a0
+- at: 2026-11-12T20:54:41.241754+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-373"]}'
+    new: '{"related":["DEV-373","DEV-374"]}'
+- at: 2026-11-12T20:54:42.109334+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:src/cli/handlers/stats/custom.rs
+- at: 2026-11-12T20:54:42.148177+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:src/cli/handlers/stats/common.rs

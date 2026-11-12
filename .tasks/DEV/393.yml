@@ -1,0 +1,91 @@
+title: 'Releases like sprints: release records, a ticket''s releases, Releases page'
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T20:54:21.522017+00:00
+modified: 2026-11-12T20:54:42.336337+00:00
+relationships:
+  related:
+  - DEV-373
+  - DEV-394
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A34b8c971-d1ce-4ec1-9f04-f191b66e3734
+- file: src/storage/sprint.rs
+- file: view/pages/SprintsList.vue
+- file: docs/help/sprints.md
+description: |-
+  Releases become records of their own, built the way sprints are: a release file, a ticket's list of releases, a CLI command, REST and MCP endpoints, and a Releases page that shows which tickets are in which release and lets you manage them. Today a version is only a value in a custom field (DEV-373), so nothing records which releases exist, when they ship, or whether they are out.
+
+  ## Decisions
+
+  - Owner 2026-11-12: "yes we should treat releases like sprints. That's already an establish pattern so that's good to repeat"
+  - Owner 2026-11-12, asked how a ticket belongs to a release, chose "Own list, like sprints": tickets get a `releases` list, the way they have `sprints`, set through the CLI, the page and MCP. `fixed_in` and `affects` stay separate version fields; a ticket's release and its `fixed_in` can differ.
+
+  ## Plan
+
+  Follow sprints at every layer, so the two read alike; where a sprint idea doesn't fit a release, decide, say why in a comment, and keep going.
+
+  1. **Storage**: release files next to `@sprints/` (`src/storage/sprint.rs` is the model): a version (parsed with `src/utils/version.rs`, so `v0.15.0` and `0.15.0` are the same), a label, notes, a planned date, and when it was released (the counterpart of a sprint's `plan`/`actual`), plus history and kept unknown keys. Tickets get `releases: [<id>]` like `sprints: [<id>]` (`src/storage/task.rs`); old task YAML loads unchanged.
+  2. **CLI**: `lotar release` mirroring `lotar sprint` (`docs/help/sprints.md`): create, list, show, update, delete, `add`/`move`/`remove` with `--select '<query>'`, a backlog of tickets in no release, `release`/`reopen` for the released state. Whether membership is exclusive like sprints is open: decide (a ticket fixed in 0.15.1 may also ship in 0.16.0).
+  3. **Search and sort**: a `release:` term in both search parsers (`src/utils/search_syntax.rs`, `view/composables/useFilterGrammar.ts`, `tests/fixtures/search_syntax_cases.json`), as `sprint:` works, accepting the version (`release:0.15`, with the version-range operators if they fit); sort by release.
+  4. **REST and MCP**: `/api/releases` and `release_*` tools like `/api/sprints` and `sprint_*`; `src/api_types.rs`, `view/api/types.ts`, `docs/openapi.json` agree (skill api-contract-change-end-to-end).
+  5. **Web UI**: a Releases page modelled on `view/pages/SprintsList.vue`: releases in version order, each with its tickets, open/done counts and progress, a backlog, add/move/remove (drag and bulk), mark released. The task panel shows and sets a ticket's releases; the Calendar shows planned and actual release dates if that is cheap.
+  6. **Automation**: conditions and actions on releases where sprints have them (`src/automation`, `docs/help/automation.md`).
+  7. **Docs**: a `docs/help/releases.md` page, plus task-model, list, config, mcp-tools.
+
+  Out of scope: taking releases from git tags (a follow-up ticket if wanted), changing what `fixed_in`/`affects` do.
+
+  ## Done when
+
+  - [ ] A release can be created, filled, marked released and found from the CLI, REST, MCP and the web UI.
+  - [ ] Tests at each layer as for sprints, a smoke test for the Releases page, lint, test and smoke pass.
+  - [ ] Docs describe it.
+tags:
+- web-ui
+- backend
+history:
+- at: 2026-11-12T20:54:21.666838+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-373"]}'
+- at: 2026-11-12T20:54:22.015263+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T20:54:22.560101+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T20:54:23.522983+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A34b8c971-d1ce-4ec1-9f04-f191b66e3734
+- at: 2026-11-12T20:54:41.795190+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-373"]}'
+    new: '{"related":["DEV-373","DEV-394"]}'
+- at: 2026-11-12T20:54:42.258771+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:src/storage/sprint.rs
+- at: 2026-11-12T20:54:42.297993+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:view/pages/SprintsList.vue
+- at: 2026-11-12T20:54:42.336337+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:docs/help/sprints.md

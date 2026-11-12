@@ -3,16 +3,33 @@ status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T20:26:41.019459+00:00
-modified: 2026-11-12T20:52:33.277524+00:00
+modified: 2026-11-12T20:53:20.464209+00:00
 relationships:
   blocks:
   - DEV-388
+  - DEV-389
   related:
   - DEV-374
   - DEV-385
-  - DEV-389
+comments:
+- date: 2026-11-12T20:52:59.418429+00:00
+  author: claude
+  text: |-
+    claude: done in commit 73facec on agent/DEV-386.
+
+    What changed:
+    - New global setting `repos`: a repo name and the path to that repo or its tasks folder, e.g. `repos: { lotar: ~/Development/@localtaskrepo/lotar }`. It belongs in ~/.lotar (paths differ per machine); the repo's own config wins for the same name. Nothing is registered yet: the standards config block needs that entry before standards tickets can use it.
+    - depends_on and related can hold `<repo>:<ID>` (e.g. `lotar:DEV-374`), added with `lotar task relationships add STD-54 lotar:DEV-374 --kind depends-on` or through task edits, REST and MCP. Only the dependent ticket is written. Adding one checks that the other ticket exists. Other relationship kinds refuse it.
+    - Dependency evaluation reads the other repo's ticket by that repo's done states, so the dependent counts as unblocked once the other ticket closes, for example when its agent job starts. Unresolved (repo not registered, folder missing, ticket missing or deleted) means still open, as for a deleted local prerequisite. `task relationships check` warns (external_unresolved) without failing.
+    - `lotar show` and `lotar task relationships` print the other ticket's status, title and link (its server.public_url); JSON has a cross_repo map. Cross-repo references stay out of the local graph and repairs, and a `lotar:DEV-12` mention no longer adds a local related link.
+    - Docs: task.md (Tasks in another repo), task-model.md, config-reference.md.
+    - Test: tests/dev386_cross_repo_relationships_test.rs (two temp repos: add, show with link, blocked until the other ticket is Done, unresolved cases, mentions).
+
+    Not covered, filed as follow-ups: DEV-388, the unblocked hook for cross-repo prerequisites (scan in `lotar automation run`; uses DEV-385's apply_unblocked_event, agreed with the DEV-385 agent), Blocked on DEV-385 and DEV-386. DEV-389, the web UI shows these with status and link, Blocked on DEV-386. DEV-388 started an agent as soon as I filed it. I cancelled the job and stopped its thread; it changed nothing.
+
+    Checks: npm run lint (lint:agent), npm test (2069 Rust, 1469 UI, release and hooks tests), npm run smoke (381): all pass. No guidance correction.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A19c84812-c551-4f62-ad53-58b1c7b4fc71
 description: |-
@@ -79,3 +96,31 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-388"],"related":["DEV-374","DEV-385"]}'
     new: '{"blocks":["DEV-388"],"related":["DEV-374","DEV-385","DEV-389"]}'
+- at: 2026-11-12T20:52:40.676570+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-388"],"related":["DEV-374","DEV-385","DEV-389"]}'
+    new: '{"blocks":["DEV-388","DEV-389"],"related":["DEV-374","DEV-385"]}'
+- at: 2026-11-12T20:52:40.899167+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-388","DEV-389"],"related":["DEV-374","DEV-385"]}'
+    new: '{"blocks":["DEV-388","DEV-389"],"related":["DEV-374","DEV-385","DEV-388"]}'
+- at: 2026-11-12T20:52:46.475540+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-388","DEV-389"],"related":["DEV-374","DEV-385","DEV-388"]}'
+    new: '{"blocks":["DEV-388","DEV-389"],"related":["DEV-374","DEV-385"]}'
+- at: 2026-11-12T20:52:59.418429+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T20:53:20.464209+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
