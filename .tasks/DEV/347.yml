@@ -1,19 +1,24 @@
 title: Agent templates make HelpNeeded a done status
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-12T03:07:58.357216+00:00
-modified: 2026-11-12T03:50:06.110513+00:00
+modified: 2026-11-12T04:07:27.854843+00:00
 relationships:
   related:
   - DEV-343
   - DEV-350
   - DEV-351
+  - DEV-348
 comments:
 - date: 2026-11-12T03:49:55.770521+00:00
   text: 'claude: Fixed in 25d4385 on agent/DEV-347 (signed). Check confirmed the problem first: a project from agent-pipeline had issue_done_states null and HelpNeeded last, so it was inferred as done. Changes: both templates set issue.done_states: [Done]; lotar init now copies a template''s done_states along with its states (it copied only states before, so a template''s done_states never reached the project), except when --states overrides them; docs/help/templates.md says so. Test: cli_init_behavior_test agent_templates_produce_a_project_their_automation_can_drive checks that config show reports issue_done_states [Done] for both templates. With HelpNeeded no longer done, shipped_agent_reviewed_template_handles_hand_back_failure_review_and_merge failed about 1 in 5: it reassigned right after the hand-back job reported completed, while that job was still ending, and the assignment was lost as its outcome. The test now waits for job_settled (0 failures in 30 runs); the product race is filed as DEV-350. Checks: npm run lint, npm test (1998 Rust + 1441 frontend pass; one unrelated flaky retry, filed as DEV-351), npm run smoke (377 pass).'
+- date: 2026-11-12T03:59:17.476637+00:00
+  text: 'claude: Merged into main (fast-forward after rebase): fc1dfdf DEV-347 Agent templates make HelpNeeded a done status, plus ce0687c DEV-347 Ticket updates (the pending .tasks changes). Not pushed: main has other tickets'' unpushed commits (DEV-343, 344, 345, 346 and the 0.13.2 version bump) that wait for their sessions. Checks in the worktree after the rebase: npm run lint, npm test (Rust nextest, UI, release, hooks) and npm run smoke all passed. The health check (a project from either template counts only Done) is covered by agent_templates_produce_a_project_their_automation_can_drive, which passed; I did not run it by hand against a freshly built binary.'
+- date: 2026-11-12T03:59:20.908225+00:00
+  text: 'The merge agent''s job job-20261112T035005.487Z-11 failed: lotar agent logs job-20261112T035005.487Z-11. The fix is on branch agent/DEV-347. Try again with lotar automation run "Health: retry with @fix" --select ''id:DEV-347'', or for an agent''s ticket lotar assignee DEV-347 @fix.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A625e1a2b-f4c8-455d-af86-5352809905c4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6bd556a0-0103-42c8-a8ff-e17391c8c841
@@ -72,3 +77,26 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6bd556a0-0103-42c8-a8ff-e17391c8c841
+- at: 2026-11-12T03:59:17.476637+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T03:59:20.875571+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-12T03:59:20.908225+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-12T04:07:27.854843+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-343","DEV-350","DEV-351"]}'
+    new: '{"related":["DEV-343","DEV-350","DEV-351","DEV-348"]}'

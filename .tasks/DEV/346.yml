@@ -1,11 +1,11 @@
 title: Lighter Rust profile for local agent test builds
-status: InProgress
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T03:02:46.839936+00:00
-modified: 2026-11-12T03:49:37.768192+00:00
+modified: 2026-11-12T04:11:22.403400+00:00
 relationships:
   related:
   - DEV-349
@@ -63,6 +63,8 @@ comments:
     Unrelated failures seen on both profiles: DEV-348 (shipped_agent_reviewed flake, 2 of 6 isolated runs failed on each profile); EAGAIN socket errors in web_api tests at load 120+; and other worktrees' lotar-agent-wrapper processes counted as active jobs, now filed as DEV-349.
 
     Commit 44c51976ed30e753f890b61f8f1d4044c806ea5e (signed, amended from 79fc503). Checks: npm run lint:agent passed; npm test passed (1998 Rust, 1 flaky: DEV-348 passed on retry; 1441 UI; release and hook tests); npm run smoke passed (377). Guidance: no durable finding.
+- date: 2026-11-12T04:11:21.961214+00:00
+  text: 'claude: Merged into main as 5306bce. That''s the rest of 44c5197 from agent/DEV-346; main had only its first Cargo.toml change (79fc503), and no merge job ran. Checks on the final tree: lint passed; Rust 2001/2002, the one failure is agent_safety_test::worker_persists_trailing_stderr_before_exit_and_summary at load 47, which passed 3/3 on its own (likely DEV-349); UI 1444, release 47, hooks 7 and smoke 378 passed.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5a73e8a5-ea85-4fa2-b0c8-4bdd19af14f3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A16de8fb3-cc50-4a19-850d-6ebf170216ae
@@ -187,3 +189,13 @@ history:
   - field: status
     old: Done
     new: InProgress
+- at: 2026-11-12T04:11:21.961214+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T04:11:22.403400+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
