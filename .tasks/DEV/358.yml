@@ -1,11 +1,11 @@
 title: 'Flaky Rust: worker_persists_trailing_stderr_before_exit_and_summary worker doesn''t exit in 15 s'
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-12T04:36:54.876848+00:00
-modified: 2026-11-12T05:26:42.883879+00:00
+modified: 2026-11-12T05:26:49.714373+00:00
 relationships:
   related:
   - DEV-349
@@ -32,6 +32,8 @@ comments:
   text: 'claude: Already fixed on main, nothing new to commit. The fix is aa8cbc4 (the rebased d1ea496), fast-forwarded into main at 21:17. git cherry main agent/DEV-358 shows d1ea496 as already applied (-). Check on main''s code (71cde54): cargo nextest run --cargo-profile local worker_persists_trailing passed 5 of 5 alone (1.9-3.2 s) and 6 of 6 with a full nextest run in the background (1.9-3.0 s). Why the merge job was marked failed: the agent worker (pid 11651) started at 18:31, before c55f67c (DEV-342), which treats a branch rebased onto main as merged, and before 0.13.2 was installed at 20:27. That worker is still the old build, so it ran git merge --ff-only on the unrebased agent/DEV-358 and got ''Diverging branches''. DEV-361 (the worker keeps running its old build after an upgrade) already covers this, so I filed no new ticket. The merge retry has nothing to merge: agent/DEV-358 rebases onto main as empty.'
 - date: 2026-11-12T05:26:42.883879+00:00
   text: 'claude: Merge job. The fix is already on main as aa8cbc4 (rebased d1ea496); rebasing this branch onto main leaves no commits of its own, so there is nothing more to merge. Check command ''cargo nextest run --cargo-profile local worker_persists_trailing'' passes on main''s code (1 of 1, 0.5 s). Committed the pending .tasks changes in the main checkout as a ticket-update commit. Not pushed: main has other tickets'' unpushed commits that wait for their sessions. Lint, full tests and smoke not rerun: no code changed.'
+- date: 2026-11-12T05:26:49.714373+00:00
+  text: 'The merge agent''s job job-20261112T052420.481Z-43 failed again: lotar agent logs job-20261112T052420.481Z-43. The fix is on branch agent/DEV-358. Try again with lotar automation run "Health: retry with @fix" --select ''id:DEV-358'', or for an agent''s ticket lotar assignee DEV-358 @fix.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acb13752d-02d4-4f9a-8cdf-d5868377dfce
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5b64ac66-413e-4f67-a73f-93869f527170
@@ -158,5 +160,18 @@ history:
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abe6be720-0663-4467-bda3-c56474a81d51
 - at: 2026-11-12T05:26:42.883879+00:00
   actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:26:49.466618+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-12T05:26:49.714373+00:00
+  actor: automation
   changes:
   - field: comment_added
