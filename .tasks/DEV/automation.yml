@@ -63,6 +63,25 @@ automation:
         created:
           set:
             assignee: "@fix"
+          # Without a prompt the job runs on lotar's built-in instructions, which leave the changes uncommitted
+          # (DEV-332, 2026-11-12).
+          agent:
+            model: "${{ticket.field:model}}"
+            provider: "${{ticket.field:provider}}"
+            prompt: |
+              Work ticket ${{ticket.id}} ("${{ticket.title}}"), filed by an agent: read it and its relationships, then
+              do it the way this repo's AGENTS.md says, with the tests and checks it names. Start each comment with your
+              agent name: lotar doesn't record who wrote a comment yet.
+              1. Never delete or discard work that isn't saved elsewhere, and never decide what only the owner decides.
+                 Ask the running agents (T3 threads) first; when it still needs him, comment one question, set the
+                 status to HelpNeeded, assign the ticket to mallox and stop.
+              2. Commit only your own files (git status first: other sessions work in this checkout), signed, never
+                 with --no-verify, message "${{ticket.id}} ${{ticket.title}}". Push only if
+                 ~/Development/standards/repos.json lists this repo with "push": true; otherwise the commit waits for
+                 the owner's OK.
+              3. Don't end your turn while tests or other background work still run: the job ends with your turn.
+              4. Comment the outcome: what you changed, the commit hash, pushed or waiting, the checks that ran. The
+                 ticket goes to Done when your job ends.
     - name: "Health: fix agent lifecycle"
       when:
         any:
