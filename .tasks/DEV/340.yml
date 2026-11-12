@@ -1,17 +1,19 @@
 title: 'Job outcome: setting the assignee back to its current value doesn''t undo a deferred change'
-status: InProgress
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T01:43:44.864229+00:00
-modified: 2026-11-12T02:25:40.484890+00:00
+modified: 2026-11-12T02:26:06.552430+00:00
 relationships:
   related:
   - DEV-1
   - DEV-339
   - DEV-335
   - DEV-341
+  - DEV-330
+  - DEV-333
 comments:
 - date: 2026-11-12T02:02:32.161100+00:00
   text: 'claude (Opus 5.5): Done in commit db898c5 on agent/DEV-340. During a job, setting the status or assignee back to the ticket''s current value now drops what was recorded for that field, so the job''s rules decide it again. The command says ''DEV-1: deferred assignee cleared; the job''s rules decide when job <id> ends'', and JSON/REST/MCP add the field to deferred.cleared (JobOutcome.cleared in api_types.rs, view/api/types.ts, openapi.json; the web toast uses the same text). With nothing recorded, nothing changes. lotar status/assignee no longer stop at their ''unchanged'' check while a job takes ticket changes, and lotar status no longer resends the current assignee with every status change. lotar assignee --clear always records a cleared assignee, also on a ticket that has none. docs/help/agent.md (Status and assignee during a job) describes this. Tests: tests/dev320_job_outcome_test.rs, setting_the_current_value_back_lets_the_job_completed_rule_decide (set claude, then the current assignee back, then end the job: the job_completed rule''s status and assignee apply) and clearing_the_assignee_during_a_job_records_a_cleared_assignee; vitest jobOutcome.spec. Checks: npm run lint:agent passed; npm test passed (Rust 1997/1997, UI 1439, release 47, hooks 7); npm run test:smoke:agent passed (373). The Rust tests ran with LOTAR_IGNORE_HOME_CONFIG=1. Without it, 2 tests fail on this machine''s ~/.lotar (padded_job_start_registers_canonical..., dev279 jobs_in_another_process...); padded_job_start also fails on the base commit. That is DEV-339 (in merge), not this change.'
@@ -21,6 +23,8 @@ comments:
   text: 'The merge agent''s job job-20261112T020243.242Z-8 failed: lotar agent logs job-20261112T020243.242Z-8. The fix is on branch agent/DEV-340. Try again with lotar automation run "Health: retry with @fix" --select ''id:DEV-340'', or for an agent''s ticket lotar assignee DEV-340 @fix.'
 - date: 2026-11-12T02:25:29.411663+00:00
   text: 'claude (Opus 5.5): Nothing left to do. The fix is already on main as ab22fac: the merge did happen; only the merge job was reported as failed. My branch''s commit db898c5 was the same change (git cherry: equivalent), so I rebased the branch onto main and it now has no commits of its own. No new commit. Check: the four dev320 job-outcome tests on main pass (cargo nextest run --test integration dev320, LOTAR_IGNORE_HOME_CONFIG=1), including the ticket''s test. I didn''t rerun the full lint/test/smoke; they passed at the merge. Not pushed yet. Status and assignee unchanged: the ticket moves on when this job ends.'
+- date: 2026-11-12T02:26:01.446114+00:00
+  text: 'claude (Sonnet 5.5): Nothing new to merge: the fix is already on main as ab22fac (my branch''s db898c5 has the same patch-id). I committed the pending ticket file as 9edb23b (DEV-340 Ticket updates, .tasks only). Not pushed: main has unpushed commits from other sessions (3c01b6e DEV-335, 0a14c46 STD-38, 22b7e26/0c549dd DEV-341, a1d0fc3 DEV-330, 5f9d4bc DEV-333, 2794219 version bump) that wait for their sessions. No checks rerun in this job: lint, npm test and smoke passed at the earlier merge (with LOTAR_IGNORE_HOME_CONFIG=1, see DEV-339).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acb9d8964-080c-46aa-accf-527e61b00ece
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A10853b74-1c2f-4b9c-a435-1407d478d850
@@ -138,3 +142,19 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A91cc98e8-182b-498a-b452-d41f16f13a5f
+- at: 2026-11-12T02:26:01.446114+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T02:26:01.550332+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-1","DEV-339","DEV-335","DEV-341"]}'
+    new: '{"related":["DEV-1","DEV-339","DEV-335","DEV-341","DEV-330","DEV-333"]}'
+- at: 2026-11-12T02:26:06.552430+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

@@ -5,10 +5,11 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-12T00:44:43.671+00:00
-modified: 2026-11-12T00:52:23.172485+00:00
+modified: 2026-11-12T02:26:01.550113+00:00
 relationships:
   related:
   - DEV-330
+  - DEV-340
 comments:
 - date: 2026-11-12T00:52:13.531289+00:00
   text: 'Fixed in view/composables/useTaskPanelOwnership.ts (uncommitted). preloadPeople now also loads api.listAgentProfiles(project) and offers each profile as @<name>. A task assignee or reporter @<profile> keeps its @; other names still drop it as before (@me unchanged). If the profiles fail to load, the list shows people only. Filter bar needs no change: useFilterOptions takes the stored assignee values as they are. Tests: view/__tests__/useTaskPanelOwnership.spec.ts (profiles offered as @fix/@review, no plain fix from a @fix ticket, @fix selection stays in the select, profiles failing to load), plus a smoke test in smoke/tests/ui.agent-jobs.smoke.spec.ts: picking @mock in the panel queues a job. Checks: npm run lint passes; all 1441 frontend tests pass; the full smoke run passes 376 of 377. Two failures come from other sessions'' uncommitted work, not this change: Rust tests config::fields::tests::{alias_paths_match_legacy_table_with_per_field_order, global_settable_fields_match_legacy_list_in_order} (src/config/fields.rs), and the smoke test harness.server.smoke.spec.ts:340, which expects dev334.'
@@ -79,3 +80,9 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-12T02:26:01.550113+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-330"]}'
+    new: '{"related":["DEV-330","DEV-340"]}'

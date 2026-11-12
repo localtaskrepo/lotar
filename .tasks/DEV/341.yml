@@ -1,11 +1,11 @@
 title: Agent summaries make the job-end handoff sound already done
-status: HelpNeeded
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-12T02:05:58.432027+00:00
-modified: 2026-11-12T02:18:24.744958+00:00
+modified: 2026-11-12T02:29:33.979400+00:00
 relationships:
   related:
   - DEV-339
@@ -21,6 +21,7 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa3e111a2-2b28-4e13-b2e2-380984f73f58
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A295c2e68-231c-4e01-a9ff-4e9c3a547d24
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A25e4631a-fede-4132-a638-f37b5a4f41b9
 description: |-
   Found (DEV-339, 2026-11-11): agents end their summary with lines like "left its status and assignee for the job to move on". The owner read that as the ticket already being in the merge phase; it only moves when the job ends, through the automation rules. Agents copy the wording from the job prompt in src/services/agent_job_service.rs (the handles_job_end note, "move this ticket to the next step as if you finished ... don't change its status or assignee"), which tells them what to do but not how to report it.
 
@@ -88,3 +89,20 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-12T02:29:27.782394+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-12T02:29:31.171662+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-12T02:29:33.979400+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A25e4631a-fede-4132-a638-f37b5a4f41b9

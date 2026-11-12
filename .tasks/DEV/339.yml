@@ -1,16 +1,17 @@
 title: Rust lib tests read the developer's home config
-status: HelpNeeded
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@merge'
 created: 2026-11-12T01:41:44.112862+00:00
-modified: 2026-11-12T02:05:58.619489+00:00
+modified: 2026-11-12T02:30:25.288365+00:00
 relationships:
   related:
   - DEV-338
   - DEV-340
   - DEV-341
+  - DEV-335
 comments:
 - date: 2026-11-12T01:50:29.242450+00:00
   text: 'claude: Fixed in 2cefdb2 on agent/DEV-339. Check reproduced first: padded_job_start_registers_canonical_and_holds_back_canonical_updates failed with the current ~/.lotar. Cause: the lib-test constructor in src/lib.rs never set LOTAR_IGNORE_HOME_CONFIG; under nextest RUST_TEST_THREADS is unset, so home_config_honored() returned true and lib tests read ~/.lotar. Change: the constructor now sets LOTAR_IGNORE_HOME_CONFIG=1, as tests/common does. No lib test relies on the home config. Checks: npm run lint passes; npm test passes (Rust 1995/1995, UI 1439/1439, release 47/47, hooks 7/7) with ~/.lotar in place and no override. npm run smoke: 3 failures with LOTAR_DEFAULT_REPORTER=claude set (the DEV-338 bug: its fix 8d3b672 is on main, not on this branch); 373/373 pass with it unset. The merge agent''s rerun on main should pass smoke without that workaround.'
@@ -18,9 +19,13 @@ comments:
   text: 'claude: Merged and pushed as b261dee (rebased onto main 8d3b672 from 2cefdb2, fast-forward, signed). Pushed to origin/main; only this commit was unpushed. Checks in the worktree: npm run lint, npm test (Rust 1995/1995, UI 1439, release 47, hooks 7) and npm run smoke (373/373) all passed, with LOTAR_DEFAULT_REPORTER=claude set. Check command rerun in the main checkout with the real ~/.lotar and LOTAR_IGNORE_HOME_CONFIG unset: npm test passes (Rust 1995/1995, one reported as flaky/passed on retry; I did not identify which; UI 1441, release 47, hooks 7). The padded_job_start failure no longer shows up.'
 - date: 2026-11-12T02:01:10.329750+00:00
   text: 'The merge agent''s job job-20261112T015036.399Z-7 failed: lotar agent logs job-20261112T015036.399Z-7. The fix is on branch agent/DEV-339. Try again with lotar automation run "Health: retry with @fix" --select ''id:DEV-339'', or for an agent''s ticket lotar assignee DEV-339 @fix.'
+- date: 2026-11-12T02:30:16.484562+00:00
+  text: 'claude: Nothing left to fix. The fix is b261dee on main, pushed to origin/main (the LOTAR_IGNORE_HOME_CONFIG=1 line in the lib-test setup in src/lib.rs). The ticket went to HelpNeeded only because the merge job was recorded as failed after its work had finished (see DEV-335). I reran the check with the real ~/.lotar and LOTAR_IGNORE_HOME_CONFIG unset: padded_job_start_registers_canonical_and_holds_back_canonical_updates passes, and all 593 Rust lib tests pass (cargo nextest run --lib). I made no code changes and no commit.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9db129b8-5db1-4a09-9364-981ea1ddcb28
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acba0b962-1dac-46c2-80fb-c528f787b7e1
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A610c4b40-57b5-4b40-b649-9dbeb920d531
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8d0a49c5-6641-4bde-a3be-d363078209af
 description: 'Found (DEV-338, 2026-11-11): npm test fails in services::agent_job_service::tests::padded_job_start_registers_canonical_and_holds_back_canonical_updates (second start_job returns Ok instead of ''already has an active job''). The lib unit tests read ~/.lotar, which was changed today; LOTAR_IGNORE_HOME_CONFIG=1 npm test passes (1995/1995). Check: npm test with the current ~/.lotar. Done: lib unit tests ignore the home config (like tests/common does), so npm test passes regardless of ~/.lotar.'
 tags:
 - health
@@ -93,3 +98,41 @@ history:
   - field: relationships
     old: '{"related":["DEV-338","DEV-340"]}'
     new: '{"related":["DEV-338","DEV-340","DEV-341"]}'
+- at: 2026-11-12T02:29:03.379568+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-12T02:29:03.897028+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-12T02:29:07.352625+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A610c4b40-57b5-4b40-b649-9dbeb920d531
+- at: 2026-11-12T02:30:16.484562+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T02:30:16.561316+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-338","DEV-340","DEV-341"]}'
+    new: '{"related":["DEV-338","DEV-340","DEV-341","DEV-335"]}'
+- at: 2026-11-12T02:30:22.205463+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T02:30:25.288365+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8d0a49c5-6641-4bde-a3be-d363078209af
