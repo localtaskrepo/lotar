@@ -75,3 +75,42 @@ fn jobs_in_another_process_are_seen_guarded_and_cancelled() {
     }
     assert!(!done.exists(), "the agent finished despite the cancel");
 }
+
+/// The record exists before the runner starts (DEV-363): another process
+/// that finds the job through its `lotar-agent-wrapper` process can always
+/// hand it a status change.
+#[test]
+fn job_record_exists_when_its_wrapper_starts() {
+    let fixtures = TestFixtures::new();
+    let root = fixtures.get_temp_path().to_path_buf();
+    let queue = root.join("queue");
+    let seen = root.join("RECORDS_SEEN");
+    let wrapper = root.join("wrapper.sh");
+    std::fs::write(
+        &wrapper,
+        format!(
+            "#!/bin/sh\nls \"{}\"/agent-queue/active-*/ > \"{}\" 2>&1\nwhile [ \"$1\" != \"--\" ]; do shift; done\nshift\nexec \"$@\"\n",
+            queue.display(),
+            seen.display()
+        ),
+    )
+    .unwrap();
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o755)).unwrap();
+    std::fs::write(fixtures.tasks_root.join("config.yml"), "default:\n  project: TEST\nagents:\n  quick:\n    runner: command\n    command: 'true'\n").unwrap();
+    let cmd = || {
+        let mut cmd = std::process::Command::new(assert_cmd::cargo::cargo_bin!("lotar"));
+        cmd.current_dir(&root)
+            .env_remove("RUST_TEST_THREADS")
+            .env("LOTAR_IGNORE_HOME_CONFIG", "1")
+            .env("LOTAR_AGENT_QUEUE_DIR", &queue)
+            .env("LOTAR_AGENT_WRAPPER", &wrapper)
+            .env("LOTAR_TEST_SILENT", "1");
+        cmd
+    };
+    assert!(cmd().args(["add", "quick work"]).status().unwrap().success());
+    let run = cmd().args(["agent", "run", "TEST-1", "go", "--agent", "quick", "--wait"]).output().unwrap();
+    assert!(run.status.success(), "{}{}", String::from_utf8_lossy(&run.stdout), String::from_utf8_lossy(&run.stderr));
+    let listing = std::fs::read_to_string(&seen).unwrap();
+    assert!(listing.lines().any(|name| name.starts_with("job-") && name.ends_with(".json")), "no job record when the wrapper started: {listing}");
+}
