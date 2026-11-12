@@ -107,8 +107,11 @@ automation:
                  what each side wanted, set the status to HelpNeeded, assign the ticket to mallox and stop.
               3. Run the checks this repo's AGENTS.md names, in your worktree. One fails: hand back as in step 2.
               4. git -C <root> merge --ff-only <your branch>. Main moved on: back to step 2. Refused
-                 because of uncommitted changes in the main checkout: hand back. Never stash, reset, commit or
-                 check out anything in the main checkout.
+                 because of uncommitted changes in the main checkout: hand back. Then the ticket files: when
+                 git -C <root> status --short .tasks lists changes, git -C <root> add .tasks and
+                 git -C <root> commit -m "${{ticket.id}} Ticket updates" -- .tasks (all of them, also other
+                 tickets': they are a status update). Nothing else: never stash, reset, commit other files or check
+                 out anything in the main checkout.
               5. Push only if ~/Development/standards/repos.json lists this repo with "push": true, and only when
                  git -C <root> log @{u}.. lists nothing but this ticket's commits (others' unpushed
                  commits wait for their sessions). Never with --no-verify. Refused: hand back.

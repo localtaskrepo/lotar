@@ -1,13 +1,26 @@
 title: 'Job outcome: setting the assignee back to its current value doesn''t undo a deferred change'
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-12T01:43:44.864229+00:00
-modified: 2026-11-12T01:43:46.350626+00:00
+modified: 2026-11-12T02:07:29.499410+00:00
+relationships:
+  related:
+  - DEV-1
+  - DEV-339
+  - DEV-335
+comments:
+- date: 2026-11-12T02:02:32.161100+00:00
+  text: 'claude (Opus 5.5): Done in commit db898c5 on agent/DEV-340. During a job, setting the status or assignee back to the ticket''s current value now drops what was recorded for that field, so the job''s rules decide it again. The command says ''DEV-1: deferred assignee cleared; the job''s rules decide when job <id> ends'', and JSON/REST/MCP add the field to deferred.cleared (JobOutcome.cleared in api_types.rs, view/api/types.ts, openapi.json; the web toast uses the same text). With nothing recorded, nothing changes. lotar status/assignee no longer stop at their ''unchanged'' check while a job takes ticket changes, and lotar status no longer resends the current assignee with every status change. lotar assignee --clear always records a cleared assignee, also on a ticket that has none. docs/help/agent.md (Status and assignee during a job) describes this. Tests: tests/dev320_job_outcome_test.rs, setting_the_current_value_back_lets_the_job_completed_rule_decide (set claude, then the current assignee back, then end the job: the job_completed rule''s status and assignee apply) and clearing_the_assignee_during_a_job_records_a_cleared_assignee; vitest jobOutcome.spec. Checks: npm run lint:agent passed; npm test passed (Rust 1997/1997, UI 1439, release 47, hooks 7); npm run test:smoke:agent passed (373). The Rust tests ran with LOTAR_IGNORE_HOME_CONFIG=1. Without it, 2 tests fail on this machine''s ~/.lotar (padded_job_start_registers_canonical..., dev279 jobs_in_another_process...); padded_job_start also fails on the base commit. That is DEV-339 (in merge), not this change.'
+- date: 2026-11-12T02:07:25.600430+00:00
+  text: 'claude: Merged into main as ab22fac (rebased onto 3c01b6e, fast-forward, no conflicts). Not pushed: main also holds the unpushed DEV-335 commit (3c01b6e), which waits for its own session. Checks in my worktree, with LOTAR_IGNORE_HOME_CONFIG=1 (DEV-339): npm run lint, npm test (Rust, UI, release, hooks) and npm run smoke (373 tests) all passed. Without that variable, two Rust tests read ~/.lotar and fail (DEV-339); I did not run them without it.'
+- date: 2026-11-12T02:07:29.499410+00:00
+  text: 'The merge agent''s job job-20261112T020243.242Z-8 failed: lotar agent logs job-20261112T020243.242Z-8. The fix is on branch agent/DEV-340. Try again with lotar automation run "Health: retry with @fix" --select ''id:DEV-340'', or for an agent''s ticket lotar assignee DEV-340 @fix.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acb9d8964-080c-46aa-accf-527e61b00ece
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A10853b74-1c2f-4b9c-a435-1407d478d850
 description: |-
   During a job, an assignee change is recorded as the job's outcome, and changing it back can't undo that. Found in standards STD-37 (2026-11-11): the fix agent ran `lotar assignee STD-37 claude` by mistake and then `lotar assignee STD-37 @fix`. The second command recorded nothing, because `@fix` is the value the ticket already has ("A change to the value the ticket already has records nothing", docs/help/agent.md). So the job ended with assignee claude, and the `job_completed` rule's `set.assignee: "@merge"` never ran.
 
@@ -38,3 +51,47 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acb9d8964-080c-46aa-accf-527e61b00ece
+- at: 2026-11-12T02:02:32.161100+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T02:02:32.270818+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-1","DEV-339"]}'
+- at: 2026-11-12T02:02:43.059988+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T02:02:43.792855+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A10853b74-1c2f-4b9c-a435-1407d478d850
+- at: 2026-11-12T02:07:25.600430+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T02:07:25.722238+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-1","DEV-339"]}'
+    new: '{"related":["DEV-1","DEV-339","DEV-335"]}'
+- at: 2026-11-12T02:07:29.468935+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-12T02:07:29.499410+00:00
+  actor: automation
+  changes:
+  - field: comment_added
