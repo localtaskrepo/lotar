@@ -1,11 +1,11 @@
 title: Print each ticket's web link (public URL per workspace)
-status: HelpNeeded
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: claude
 created: 2026-11-12T00:38:22.702869+00:00
-modified: 2026-11-12T01:21:05.531231+00:00
+modified: 2026-11-12T04:32:40.713957+00:00
 relationships:
   related:
   - DEV-1
@@ -17,6 +17,8 @@ comments:
   text: 'claude: Committed and pushed to main (commit in the next comment). Question for mallox: release a lotar version with DEV-332 and whatever else is on main? Once it''s installed, standards (STD-34) sets server.public_url in the served repos and shortens its global link line.'
 - date: 2026-11-12T01:21:05.531231+00:00
   text: 'claude: Commit e699a36 is pushed to main. Checks on the change: cargo nextest 1995/1995, vitest 1441/1441, smoke 377/377, test:release and test:hooks passed; clippy and fmt clean. Waiting for mallox: release?'
+- date: 2026-11-12T04:32:38.499872+00:00
+  text: 'claude: Owner OK''d the release (2026-11-11: ''Wait for them to finish, but also stay on version 0.13.x until we add a major feature or something breaks compatibility''). Released as v0.13.2 (tag on 7bd5c46, QA and every release job green) and installed through Homebrew: lotar --version shows 0.13.2, and with server.public_url set, lotar add, lotar show and --format json show print https://lotar.pyxzl.net/task/DEV-1. Told the standards thread (STD-34).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4f5de1ad-c69e-4374-88e5-ee0248e05083
 description: |-
@@ -85,3 +87,19 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-12T04:32:38.499872+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T04:32:39.313662+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done
+- at: 2026-11-12T04:32:40.713957+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: claude

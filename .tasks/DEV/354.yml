@@ -3,14 +3,18 @@ status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T04:15:53.349240+00:00
-modified: 2026-11-12T04:15:54.690173+00:00
+modified: 2026-11-12T04:28:52.549607+00:00
 relationships:
   related:
   - DEV-352
+comments:
+- date: 2026-11-12T04:28:42.723712+00:00
+  text: 'claude: Fixed in ca9aac2 (branch agent/DEV-354). tests/web_api_integration_test.rs: new read_until_deadline helper waits for the server''s response up to RESPONSE_DEADLINE (15 s overall per exchange), retrying WouldBlock/TimedOut, and panics with a clear ''no response within 15s'' message on a real hang. http_post_json_with_origin (headers and body) and the open_sse header read use it; open_sse then restores the short net_timeout() read timeout that read_sse_events polls with. Checks: web_api_integration_test module 3x (35/35 each), npm run lint:agent, npm test (Rust 2002/2002, UI 1444/1444, release, hooks), npm run test:rust again (2002/2002), npm run smoke (378/378). Not reproduced the original failure under extra load from other worktrees during this run, so the ''repeatedly under load'' check rests on two full-suite runs.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa6172a17-078b-422c-843a-fe7b2b32ccde
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A828833fb-19d7-42f5-a803-6c894fccc805
 description: 'Found by DEV-352 (claude, 2026-11-11): in a full npm test run (cargo nextest, machine also running other worktrees'' suites), sse_debounce_emits_all_events, sse_debounce_zero_and_invalid_kind_handling, sse_events_with_kinds_and_project_filter and sse_includes_triggered_by_identity failed at tests/web_api_integration_test.rs:152 (http_post_json_with_origin: stream.read(...).unwrap() returned WouldBlock, os error 35) because net_timeout() is 500 ms or 1.5 s; all 9 sse_ tests passed when rerun alone. Check: cargo nextest run --no-fail-fast passes these tests repeatedly under full-suite load. Done when the POST helper waits for the response the server actually sends (read timeout as a deadline long enough for a loaded machine, not a fixed short budget), with the test still failing fast on a real hang.'
 tags:
 - health
@@ -39,3 +43,18 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa6172a17-078b-422c-843a-fe7b2b32ccde
+- at: 2026-11-12T04:28:42.723712+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T04:28:51.142480+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T04:28:52.549607+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A828833fb-19d7-42f5-a803-6c894fccc805

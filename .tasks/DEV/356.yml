@@ -1,0 +1,41 @@
+title: 'Flaky: home_profile_and_repo_rule_run_a_t3_thread_and_set_done'
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T04:24:49.286137+00:00
+modified: 2026-11-12T04:24:50.888441+00:00
+relationships:
+  related:
+  - DEV-351
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A249d99cd-7c07-495c-be46-39132be3417f
+description: 'Found by DEV-351 (claude, 2026-11-11): tests/dev318_t3_runner_test.rs home_profile_and_repo_rule_run_a_t3_thread_and_set_done failed once in npm run test:agent (retries 0) on agent/DEV-351 under load (another session''s suite was running): tests/dev318_t3_runner_test.rs:152 left "Todo", right "Done", so the job read as completed before the rule''s Done was written. It passed on its own right after. DEV-351 only adds a test, so it did not cause this. Check: run it 30 times under load (cargo nextest run --retries 0 next to the full suite) with no failure. Done when the cause is found and fixed, with the test passing without retries.'
+tags:
+- health
+custom_fields:
+  finding: flaky-test:dev318_t3_runner_test::home_profile_and_repo_rule_run_a_t3_thread_and_set_done
+history:
+- at: 2026-11-12T04:24:49.464151+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-351"]}'
+- at: 2026-11-12T04:24:49.717458+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T04:24:50.157420+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T04:24:50.888441+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A249d99cd-7c07-495c-be46-39132be3417f

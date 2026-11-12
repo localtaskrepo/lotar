@@ -2,3 +2,5 @@ ui:
   theme: synthwave:ice
 default:
   project: DEV
+server:
+  public_url: https://lotar.pyxzl.net

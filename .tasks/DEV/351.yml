@@ -1,19 +1,28 @@
 title: 'Flaky: cli_cleanup_accepts_clean_merged_worktree_with_project_done_status'
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: claude
 created: 2026-11-12T03:49:42.921375+00:00
-modified: 2026-11-12T03:49:44.129513+00:00
+modified: 2026-11-12T04:25:20.122445+00:00
 relationships:
+  depends_on:
+  - DEV-349
   related:
   - DEV-347
+  - DEV-356
+  - DEV-348
+comments:
+- date: 2026-11-12T04:25:01.636346+00:00
+  text: 'claude: Cause found. Every agent_safety fixture''s ticket is SAFE-1. lotar agent worktree cleanup counts every lotar-agent-wrapper process on the machine (list_wrapper_processes, src/cli/handlers/agent.rs), so a wrapper that another worktree''s suite starts for its own SAFE-1 makes cleanup skip this test''s worktree; the test then fails at tests/agent_safety_test.rs:483. Reproduced: with a foreign ''lotar-agent-wrapper --ticket-id SAFE-1 -- sleep 40'' running, the test fails every time. Same root cause as DEV-349, which already scopes the scan by a --tasks-dir wrapper argument and is waiting for the merge agent; I did not write a second fix (an env-based version I tried is dropped). Commit b619790 adds only tests: cli_cleanup_ignores_a_wrapper_running_for_another_tasks_dir (a wrapper for this tasks dir keeps the worktree, one for another dir does not), and the flaky test''s assertion now prints the cleanup output. MERGE ORDER: b619790 needs DEV-349 (added as depends-on); on its own the new test fails because today''s wrapper rejects --tasks-dir. Checks, with DEV-349 applied: npm run test:rust:agent 2004/2004 passed with retries 0, test:ui/test:release/test:hooks passed, smoke 378/378 passed, lint:agent clean. Ticket check: 30 runs with retries 0 next to the full suite and foreign SAFE-1 wrappers: 28/30 passed. The 2 failures happened while another session''s suite was running in worktree t3-4fd63b88; its build lacks DEV-349, so its wrappers have no --tasks-dir and still count (DEV-349 keeps flag-less wrappers counted on purpose). 80 more runs (40 with foreign scoped wrappers, 40 next to the full suite) all passed. Rerun the check once main has DEV-349 and the other worktrees rebuild. Also filed DEV-356 (dev318 t3 runner test flaked once under load, unrelated); shipped_agent_reviewed_template flaked under load too, already DEV-348.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2c7cfedf-e726-4214-913b-e67414ccf5a4
 description: 'Found by DEV-347 (claude, 2026-11-11): tests/agent_safety_test.rs cli_cleanup_accepts_clean_merged_worktree_with_project_done_status failed its first try and passed on retry (nextest FLAKY 2/3) in a full npm test run on agent/DEV-347; it passed 15 of 15 runs on its own, so it fails only under parallel load. The test writes its own SAFE config, so DEV-347''s template change does not affect it. The low-noise test output kept no failure message. Check: run it 30 times under load (cargo nextest run --retries 0 next to the full suite) with no failure. Done when the cause is found and fixed, with the test passing without retries.'
 tags:
 - health
+- blocked
+- blocked-by:DEV-349
 custom_fields:
   finding: flaky-test:cli_cleanup_accepts_clean_merged_worktree_with_project_done_status
 history:
@@ -39,3 +48,43 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2c7cfedf-e726-4214-913b-e67414ccf5a4
+- at: 2026-11-12T04:24:41.201599+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-347"]}'
+    new: '{"depends_on":["DEV-349"],"related":["DEV-347"]}'
+- at: 2026-11-12T04:24:49.463634+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-349"],"related":["DEV-347"]}'
+    new: '{"depends_on":["DEV-349"],"related":["DEV-347","DEV-356"]}'
+- at: 2026-11-12T04:25:01.636346+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T04:25:01.771590+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-349"],"related":["DEV-347","DEV-356"]}'
+    new: '{"depends_on":["DEV-349"],"related":["DEV-347","DEV-356","DEV-348"]}'
+- at: 2026-11-12T04:25:19.908975+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T04:25:20.122445+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: claude
+  - field: tags
+    old: health
+    new: health, blocked, blocked-by:DEV-349
