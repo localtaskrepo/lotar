@@ -54,7 +54,7 @@ impl CommandHandler for StatusHandler {
         let LoadedTask { full_id, task, .. } = load_task(&mut ctx, &task_id, project_hint)?;
 
         if let Some(candidate) = new_status {
-            return handle_set_status(&candidate, dry_run, explain, &full_id, task, &mut ctx, renderer);
+            return handle_set_status(&candidate, dry_run, explain, &full_id, &task, &mut ctx, renderer);
         }
 
         render_current_status(renderer, &full_id, &task.status);
@@ -67,7 +67,7 @@ fn handle_set_status(
     dry_run: bool,
     explain: bool,
     full_id: &str,
-    mut task: crate::storage::task::Task,
+    task: &crate::storage::task::Task,
     ctx: &mut TaskCommandContext,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
@@ -75,16 +75,19 @@ fn handle_set_status(
     renderer.log_debug(format_args!("status: validating new_status='{}'", candidate));
     let validated_status = validator.validate_status(candidate).map_err(|e| format!("Status validation failed: {}", e))?;
 
+    // A running agent job keeps the change for its end (DEV-320); the
+    // status alone is its outcome, without an auto-assigned assignee. The
+    // current status set back drops a recorded one (DEV-340), so it goes
+    // to the job too.
+    let running_job = running_job_for_ticket(&ctx.tasks_dir.path, full_id);
     let old_status = task.status.clone();
-    if old_status == validated_status {
+    let to_job = !dry_run && running_job.as_ref().is_some_and(|job| job.takes_ticket_changes(&ctx.tasks_dir.path, full_id));
+    if old_status == validated_status && !to_job {
         renderer.log_info("status: no-op (old == new)");
         render_status_noop(renderer, full_id, &old_status);
         return Ok(());
     }
 
-    // A running agent job keeps the change for its end (DEV-320); the
-    // status alone is its outcome, without an auto-assigned assignee.
-    let running_job = running_job_for_ticket(&ctx.tasks_dir.path, full_id);
     let was_unassigned = task.assignee.is_none();
     let should_assign = running_job.is_none() && should_auto_assign(&ctx.config, &old_status, &validated_status, was_unassigned);
     let mut resolved_assignee = if should_assign { resolve_auto_assign_candidate(ctx, &ctx.config) } else { None };
@@ -92,11 +95,6 @@ fn handle_set_status(
     if dry_run {
         render_status_preview(renderer, full_id, &old_status, &validated_status, resolved_assignee.as_deref(), explain);
         return Ok(());
-    }
-
-    task.status = validated_status.clone();
-    if let Some(assignee) = resolved_assignee.take() {
-        task.assignee = Some(assignee);
     }
 
     // A job run by a lotar-agent-wrapper process can't record an outcome
@@ -116,7 +114,7 @@ fn handle_set_status(
         priority: None,
         task_type: None,
         reporter: None,
-        assignee: task.assignee.clone(),
+        assignee: resolved_assignee.take(),
         due_date: None,
         effort: None,
         description: None,
@@ -131,6 +129,10 @@ fn handle_set_status(
         .map_err(TaskStorageAction::Update.map_err(full_id))?;
     if let Some(outcome) = receipt.deferred.as_ref() {
         render_job_outcome(renderer, full_id, outcome);
+        return Ok(());
+    }
+    if old_status == validated_status {
+        render_status_noop(renderer, full_id, &old_status);
         return Ok(());
     }
     let updated = receipt.dto;

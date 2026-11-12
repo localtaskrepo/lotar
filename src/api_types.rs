@@ -399,6 +399,9 @@ pub struct TaskCreate {
 /// ticket (DEV-320). It is not applied now: the job's end applies it in
 /// place of the `set` of the `job_completed`, `job_failed` or
 /// `job_cancelled` rules. An empty `assignee` clears the assignee.
+/// `cleared` names fields whose recorded change was dropped because they
+/// were set back to the ticket's current value (DEV-340); the job's rules
+/// decide them again.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct JobOutcome {
@@ -407,6 +410,26 @@ pub struct JobOutcome {
     pub status: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub assignee: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cleared: Vec<JobOutcomeField>,
+}
+
+/// A field a job's outcome can hold.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+#[serde(rename_all = "lowercase")]
+pub enum JobOutcomeField {
+    Status,
+    Assignee,
+}
+
+impl JobOutcomeField {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Status => "status",
+            Self::Assignee => "assignee",
+        }
+    }
 }
 
 impl JobOutcome {
@@ -422,7 +445,14 @@ impl JobOutcome {
             Some(assignee) => lines.push(format!("{assignee} will be assigned when job {} ends", self.job_id)),
             None => {}
         }
+        for field in &self.cleared {
+            lines.push(format!("deferred {} cleared; the job's rules decide when job {} ends", field.as_str(), self.job_id));
+        }
         lines
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.status.is_none() && self.assignee.is_none() && self.cleared.is_empty()
     }
 }
 

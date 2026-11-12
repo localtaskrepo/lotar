@@ -212,3 +212,124 @@ fn rest_and_mcp_changes_during_a_job_wait_for_its_end() {
     assert!(agent_active_jobs::find(&tasks_dir, "job-elsewhere").is_none());
     assert!(agent_active_jobs::peek_outcome(&tasks_dir, "job-elsewhere").is_none());
 }
+
+/// DEV-340: setting the current status or assignee back during a job drops
+/// what was recorded, so the `job_completed` rule's `set` applies again.
+#[test]
+fn setting_the_current_value_back_lets_the_job_completed_rule_decide() {
+    use lotar::services::agent_active_jobs::{self, ActiveJob};
+    use lotar::services::automation_service::{AutomationEvent, AutomationJobContext, AutomationService};
+
+    let fixtures = TestFixtures::new();
+    let root = fixtures.get_temp_path().to_path_buf();
+    let tasks_dir = fixtures.tasks_root.clone();
+    let queue = root.join("queue");
+    std::fs::write(tasks_dir.join("config.yml"), "default:\n  project: OUTB\nissue:\n  states: [Todo, InProgress, HelpNeeded, Done]\n").unwrap();
+    std::fs::write(
+        tasks_dir.join("automation.yml"),
+        "automation:\n  rules:\n    - name: Finish\n      on:\n        job_completed:\n          set:\n            status: Done\n            assignee: merger\n",
+    )
+    .unwrap();
+    let cmd = || {
+        let mut cmd = std::process::Command::new(assert_cmd::cargo::cargo_bin!("lotar"));
+        cmd.current_dir(&root)
+            .env_remove("RUST_TEST_THREADS")
+            .env_remove("LOTAR_AGENT_JOB_ID")
+            .env_remove("LOTAR_TICKET_ID")
+            .env("LOTAR_IGNORE_HOME_CONFIG", "1")
+            .env("LOTAR_AGENT_QUEUE_DIR", &queue)
+            .env("LOTAR_TEST_SILENT", "1");
+        cmd
+    };
+    assert!(cmd().args(["add", "fix it", "--assignee", "fixer"]).status().unwrap().success());
+    // A job another (live) process runs for the ticket.
+    let _queue_env = crate::common::env_mutex::EnvVarGuard::set("LOTAR_AGENT_QUEUE_DIR", queue.to_str().unwrap());
+    agent_active_jobs::register(
+        &tasks_dir,
+        &ActiveJob {
+            job_id: "job-back".into(),
+            ticket_id: "OUTB-1".into(),
+            runner: "t3".into(),
+            agent: Some("fix".into()),
+            owner_pid: 1,
+            child_pid: 1,
+            started_at: "2026-11-11T00:00:00Z".into(),
+        },
+    );
+    let run = |args: &[&str]| {
+        let out = cmd().args(args).output().unwrap();
+        assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+        String::from_utf8_lossy(&out.stdout).to_string()
+    };
+
+    // A mistake, then the current values back: both recorded changes go.
+    let out = run(&["assignee", "OUTB-1", "claude"]);
+    assert!(out.contains("claude will be assigned when job job-back ends"), "{out}");
+    assert!(run(&["status", "OUTB-1", "HelpNeeded"]).contains("HelpNeeded will be set when job job-back ends"));
+    let out = run(&["assignee", "OUTB-1", "fixer"]);
+    assert!(out.contains("OUTB-1: deferred assignee cleared; the job's rules decide when job job-back ends"), "{out}");
+    let json: serde_json::Value = serde_json::from_str(&run(&["--format", "json", "status", "OUTB-1", "Todo"])).unwrap();
+    assert_eq!(json["changed"], serde_json::json!(false));
+    assert_eq!(json["deferred"], serde_json::json!({"job_id": "job-back", "cleared": ["status"]}));
+    assert!(agent_active_jobs::peek_outcome(&tasks_dir, "job-back").is_none(), "nothing is left recorded");
+
+    AutomationService::apply_job_event(
+        &tasks_dir,
+        "OUTB-1",
+        AutomationEvent::JobCompleted,
+        Some(AutomationJobContext {
+            job_id: "job-back".into(),
+            runner: "t3".into(),
+            agent: Some("fix".into()),
+            worktree_path: None,
+            worktree_branch: None,
+            usage: None,
+        }),
+    )
+    .unwrap();
+    let storage = fixtures.create_storage();
+    let task = lotar::services::task_service::TaskService::get(&storage, "OUTB-1", None).unwrap();
+    assert_eq!(task.status.as_str(), "Done");
+    assert_eq!(task.assignee.as_deref(), Some("merger"));
+}
+
+/// `--clear` records a cleared assignee, also when the ticket has none.
+#[test]
+fn clearing_the_assignee_during_a_job_records_a_cleared_assignee() {
+    use lotar::services::agent_active_jobs::{self, ActiveJob};
+
+    let fixtures = TestFixtures::new();
+    let root = fixtures.get_temp_path().to_path_buf();
+    let tasks_dir = fixtures.tasks_root.clone();
+    let queue = root.join("queue");
+    std::fs::write(tasks_dir.join("config.yml"), "default:\n  project: OUTL\n").unwrap();
+    let cmd = || {
+        let mut cmd = std::process::Command::new(assert_cmd::cargo::cargo_bin!("lotar"));
+        cmd.current_dir(&root)
+            .env_remove("RUST_TEST_THREADS")
+            .env_remove("LOTAR_AGENT_JOB_ID")
+            .env_remove("LOTAR_TICKET_ID")
+            .env("LOTAR_IGNORE_HOME_CONFIG", "1")
+            .env("LOTAR_AGENT_QUEUE_DIR", &queue)
+            .env("LOTAR_TEST_SILENT", "1");
+        cmd
+    };
+    assert!(cmd().args(["add", "nobody's yet"]).status().unwrap().success());
+    let _queue_env = crate::common::env_mutex::EnvVarGuard::set("LOTAR_AGENT_QUEUE_DIR", queue.to_str().unwrap());
+    agent_active_jobs::register(
+        &tasks_dir,
+        &ActiveJob {
+            job_id: "job-clear".into(),
+            ticket_id: "OUTL-1".into(),
+            runner: "t3".into(),
+            agent: None,
+            owner_pid: 1,
+            child_pid: 1,
+            started_at: "2026-11-11T00:00:00Z".into(),
+        },
+    );
+    let out = cmd().args(["assignee", "OUTL-1", "--clear"]).output().unwrap();
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(String::from_utf8_lossy(&out.stdout).contains("The assignee will be cleared when job job-clear ends"), "{}", String::from_utf8_lossy(&out.stdout));
+    assert_eq!(agent_active_jobs::peek_outcome(&tasks_dir, "job-clear").and_then(|outcome| outcome.assignee).as_deref(), Some(""));
+}

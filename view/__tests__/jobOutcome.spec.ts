@@ -16,6 +16,9 @@ describe('changes held back for a running agent job (DEV-320)', () => {
         expect(describeJobOutcome({ job_id: 'job-1', assignee: '' })).toEqual([
             'The assignee will be cleared when job job-1 ends',
         ])
+        expect(describeJobOutcome({ job_id: 'job-1', cleared: ['assignee'] })).toEqual([
+            "deferred assignee cleared; the job's rules decide when job job-1 ends",
+        ])
     })
 
     it('announces a held-back status change in a toast', async () => {

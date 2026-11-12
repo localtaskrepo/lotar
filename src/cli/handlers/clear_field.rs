@@ -44,17 +44,22 @@ pub fn clear_task_field(
         ClearableField::Assignee => task.assignee.clone(),
     }
     .filter(|value| !value.trim().is_empty());
+    // A running job records a cleared assignee for its end (DEV-320), also
+    // when the ticket has none now (DEV-340).
+    let mut to_job = false;
     if field == ClearableField::Assignee
         && let Some(job) = crate::cli::handlers::agent::running_job_for_ticket(&ctx.tasks_dir.path, &full_id)
-        && !job.takes_ticket_changes(&ctx.tasks_dir.path, &full_id)
     {
-        return Err(format!("Ticket '{full_id}' has an active agent job (pid {}). Cancel it before changing assignee.", job.pid));
+        if !job.takes_ticket_changes(&ctx.tasks_dir.path, &full_id) {
+            return Err(format!("Ticket '{full_id}' has an active agent job (pid {}). Cancel it before changing assignee.", job.pid));
+        }
+        to_job = !dry_run;
     }
     let label = field.label();
     let (status, message, changed) = match (&current, dry_run) {
-        (None, _) => ("success", format!("Task {full_id} has no {label}; no changes"), false),
+        (None, _) if !to_job => ("success", format!("Task {full_id} has no {label}; no changes"), false),
         (Some(old), true) => ("preview", format!("DRY RUN: would clear the {label} of {full_id} (now {old})"), false),
-        (Some(_), false) => {
+        _ => {
             let mut patch = crate::api_types::TaskUpdate::default();
             match field {
                 ClearableField::DueDate => patch.due_date = Some(String::new()),
@@ -71,7 +76,11 @@ pub fn clear_task_field(
                 crate::cli::handlers::task::render::render_job_outcome(renderer, &full_id, outcome);
                 return Ok(());
             }
-            ("success", format!("Task {full_id} {label} cleared"), true)
+            if current.is_none() {
+                ("success", format!("Task {full_id} has no {label}; no changes"), false)
+            } else {
+                ("success", format!("Task {full_id} {label} cleared"), true)
+            }
         }
     };
     if matches!(renderer.format, OutputFormat::Json) {

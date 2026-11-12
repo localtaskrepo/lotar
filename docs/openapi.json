@@ -8045,11 +8045,12 @@
       },
       "JobOutcome": {
         "type": "object",
-        "description": "A status and/or assignee change made while an agent job runs on the ticket (DEV-320). The job's end applies it in place of the `set` of the job_completed, job_failed or job_cancelled rules. An empty `assignee` clears the assignee.",
+        "description": "A status and/or assignee change made while an agent job runs on the ticket (DEV-320). The job's end applies it in place of the `set` of the job_completed, job_failed or job_cancelled rules. An empty `assignee` clears the assignee. `cleared` names fields set back to the ticket's current value: their recorded change was dropped and the job's rules decide them again (DEV-340).",
         "properties": {
           "job_id": { "type": "string" },
           "status": { "type": "string" },
-          "assignee": { "type": "string" }
+          "assignee": { "type": "string" },
+          "cleared": { "type": "array", "items": { "type": "string", "enum": ["status", "assignee"] } }
         },
         "required": ["job_id"]
       },

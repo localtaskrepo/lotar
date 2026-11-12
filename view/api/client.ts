@@ -191,6 +191,9 @@ export function describeJobOutcome(outcome: JobOutcome): string[] {
     if (outcome.status) lines.push(`${outcome.status} will be set when job ${outcome.job_id} ends`)
     if (outcome.assignee === '') lines.push(`The assignee will be cleared when job ${outcome.job_id} ends`)
     else if (outcome.assignee) lines.push(`${outcome.assignee} will be assigned when job ${outcome.job_id} ends`)
+    for (const field of outcome.cleared ?? []) {
+        lines.push(`deferred ${field} cleared; the job's rules decide when job ${outcome.job_id} ends`)
+    }
     return lines
 }
 

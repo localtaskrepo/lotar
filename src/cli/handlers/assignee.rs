@@ -109,15 +109,17 @@ fn handle_set_assignee(
         crate::utils::identity::resolve_me_alias_for_project(validated.as_str(), Some(&ctx.storage.root_path), ctx.resolved_project_name());
     let unchanged =
         resolved_candidate.as_deref().is_some_and(|next| previous.as_deref().is_some_and(|current| assignment_key(current) == assignment_key(next)));
-    if unchanged {
+    // A job run by a lotar-agent-wrapper process can't record an outcome
+    // (no job record); refuse as before. Other running jobs get the change
+    // as their outcome (DEV-320), the current assignee set back included:
+    // it drops a recorded one (DEV-340).
+    let running_job = running_job_for_ticket(&ctx.tasks_dir.path, full_id);
+    let to_job = !dry_run && running_job.as_ref().is_some_and(|job| job.takes_ticket_changes(&ctx.tasks_dir.path, full_id));
+    if unchanged && !to_job {
         render_assignee_noop(renderer, full_id, previous.as_deref());
         return Ok(());
     }
-
-    // A job run by a lotar-agent-wrapper process can't record an outcome
-    // (no job record); refuse as before. Other running jobs get the change
-    // as their outcome (DEV-320).
-    if let Some(job) = running_job_for_ticket(&ctx.tasks_dir.path, full_id)
+    if let Some(job) = running_job.as_ref()
         && !job.takes_ticket_changes(&ctx.tasks_dir.path, full_id)
     {
         return Err(format!("Ticket '{}' has an active agent job (pid {}). Cancel it before changing assignee.", full_id, job.pid));
@@ -149,6 +151,10 @@ fn handle_set_assignee(
         .map_err(|e| e.to_string())?;
     if let Some(outcome) = receipt.deferred.as_ref() {
         crate::cli::handlers::task::render::render_job_outcome(renderer, full_id, outcome);
+        return Ok(());
+    }
+    if unchanged {
+        render_assignee_noop(renderer, full_id, previous.as_deref());
         return Ok(());
     }
     let updated = receipt.dto;

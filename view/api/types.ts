@@ -447,6 +447,8 @@ export interface JobOutcome {
     job_id: string
     status?: string
     assignee?: string
+    /** Fields set back to the ticket's current value: their recorded change was dropped. */
+    cleared?: ('status' | 'assignee')[]
 }
 
 /** How `/api/tasks/add` handled a `finding` report. */

@@ -8,6 +8,7 @@
 //! `lotar-agent-wrapper` binary. A record whose owning process is gone is
 //! treated as stale and removed.
 
+use crate::api_types::JobOutcomeField;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -86,7 +87,9 @@ pub fn unregister(tasks_dir: &Path, job_id: &str) {
 
 /// Record a status and/or assignee change made while the job runs; it is
 /// applied when the job ends instead of the end rules' `set` (DEV-320).
-/// Later values replace earlier ones per field. Returns the merged outcome.
+/// Later values replace earlier ones per field; a field in `cleared` drops
+/// its recorded value (DEV-340). Returns the change as recorded: `cleared`
+/// keeps only fields that held a value.
 pub fn record_outcome(tasks_dir: &Path, outcome: &JobOutcome) -> std::io::Result<JobOutcome> {
     let Some(name) = safe_name(&outcome.job_id) else {
         return Err(std::io::Error::other(format!("invalid job id '{}'", outcome.job_id)));
@@ -96,15 +99,30 @@ pub fn record_outcome(tasks_dir: &Path, outcome: &JobOutcome) -> std::io::Result
     let _lock = crate::storage::safety::acquire_storage_lock_within(&dir, &format!("{name}.outcome"), std::time::Duration::from_secs(5))?;
     let path = dir.join(format!("{name}.outcome.json"));
     let mut merged = read_outcome(&path).unwrap_or_else(|| JobOutcome { job_id: outcome.job_id.clone(), ..JobOutcome::default() });
+    let mut recorded = outcome.clone();
+    recorded.cleared.retain(|field| {
+        let slot = match field {
+            JobOutcomeField::Status => &mut merged.status,
+            JobOutcomeField::Assignee => &mut merged.assignee,
+        };
+        slot.take().is_some()
+    });
     if outcome.status.is_some() {
         merged.status = outcome.status.clone();
     }
     if outcome.assignee.is_some() {
         merged.assignee = outcome.assignee.clone();
     }
-    let json = serde_json::to_string(&merged).map_err(std::io::Error::other)?;
-    crate::storage::safety::atomic_write_file(&path, &json)?;
-    Ok(merged)
+    if merged.is_empty() {
+        match std::fs::remove_file(&path) {
+            Err(err) if err.kind() != std::io::ErrorKind::NotFound => return Err(err),
+            _ => {}
+        }
+    } else {
+        let json = serde_json::to_string(&merged).map_err(std::io::Error::other)?;
+        crate::storage::safety::atomic_write_file(&path, &json)?;
+    }
+    Ok(recorded)
 }
 
 /// The outcome recorded so far, without consuming it.

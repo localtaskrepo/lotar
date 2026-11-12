@@ -849,8 +849,8 @@ impl TaskService {
         let mut deferred = None;
         let mut receipt = Self::update_composed_inner(storage, id, patch, context, relationship_delta, &mut deferred)?;
         if let Some(outcome) = deferred {
-            crate::services::agent_active_jobs::record_outcome(&storage.root_path, &outcome)?;
-            receipt.deferred = Some(outcome);
+            let recorded = crate::services::agent_active_jobs::record_outcome(&storage.root_path, &outcome)?;
+            receipt.deferred = Some(recorded).filter(|recorded| !recorded.is_empty());
         }
         Ok(receipt)
     }
@@ -964,26 +964,31 @@ impl TaskService {
                 // Assignment-aware identity (DEV-102): a registered agent
                 // directive ("@copilot") and the bare human spelling
                 // ("copilot") are DIFFERENT assignees.
+                // Setting the current assignee back drops a recorded one
+                // (DEV-340); clearing always records a cleared assignee.
                 let is_agent = |name: &str| config.agent_profiles.contains_key(name);
                 let same = match (&existing.assignee, &next_value) {
                     (Some(a), Some(b)) => {
                         crate::utils::member::member_for_assignment_comparison(a, is_agent)
                             == crate::utils::member::member_for_assignment_comparison(b, is_agent)
                     }
-                    (None, None) => true,
                     _ => false,
                 };
-                if !same {
+                if same {
+                    outcome.cleared.push(crate::api_types::JobOutcomeField::Assignee);
+                } else {
                     outcome.assignee = Some(next_value.unwrap_or_default());
                 }
             }
             if let Some(next_status) = parsed_status.take() {
                 patch.status = None;
-                if existing.status != next_status {
+                if existing.status == next_status {
+                    outcome.cleared.push(crate::api_types::JobOutcomeField::Status);
+                } else {
                     outcome.status = Some(next_status.to_string());
                 }
             }
-            if outcome.status.is_some() || outcome.assignee.is_some() {
+            if !outcome.is_empty() {
                 *deferred = Some(outcome);
             }
         }
