@@ -23,7 +23,7 @@
 //          [--force-probe available|unavailable (dry-run only)]
 //          [cargo-nextest run arguments...]
 // --agent reproduces the old `test:rust:agent` contract inside this runner:
-//   --cargo-profile ci --color never --failure-output immediate-final
+//   --cargo-profile local --color never --failure-output immediate-final
 //   --retries 0 plus child-scoped NO_COLOR/FORCE_COLOR/CARGO_TERM_COLOR.
 // --dry-run prints the resolved probe, plan, and child command without
 //   running tests (used by scripts/tests/rust-test-runner.test.mjs).
@@ -277,7 +277,7 @@ export function resolvePlan({ probe, requireGit, explicitProfile, parsed }) {
 
 export function buildRunArgs(parsed, plan) {
     const agentBase = parsed.agent
-        ? ['--cargo-profile', 'ci', '--color', 'never', '--failure-output', 'immediate-final', '--retries', '0']
+        ? ['--cargo-profile', 'local', '--color', 'never', '--failure-output', 'immediate-final', '--retries', '0']
         : [];
     const inject = plan.injectProfile ? ['--profile', GITLESS_PROFILE] : [];
     return [...inject, ...agentBase, ...parsed.passthrough];
@@ -292,7 +292,7 @@ export function inventoryAllowed(parsed) {
 export function buildInventoryArgs(parsed) {
     // Match the agent-only build profile injected by buildRunArgs, not just
     // user passthrough flags. Otherwise inventory builds different binaries.
-    const mirrored = parsed.agent ? ['--cargo-profile', 'ci'] : [];
+    const mirrored = parsed.agent ? ['--cargo-profile', 'local'] : [];
     const passthrough = parsed.passthrough;
     for (let i = 0; i < passthrough.length; i += 1) {
         const token = passthrough[i];

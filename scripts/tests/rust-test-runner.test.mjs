@@ -183,7 +183,7 @@ test('build: agent mode reproduces the old test:rust:agent contract', () => {
     const plan = resolvePlan({ probe: AVAILABLE, requireGit: 'off', explicitProfile: null, parsed });
     assert.deepEqual(buildRunArgs(parsed, plan), [
         '--cargo-profile',
-        'ci',
+        'local',
         '--color',
         'never',
         '--failure-output',
@@ -242,7 +242,7 @@ test('inventory args: agent mode uses the same Cargo profile as the run', () => 
     const plan = resolvePlan({ probe: UNAVAILABLE, requireGit: 'off', explicitProfile: null, parsed });
     const run = buildRunArgs(parsed, plan);
     const inventory = buildInventoryArgs(parsed);
-    assert.deepEqual(inventory.slice(2, 4), ['--cargo-profile', 'ci']);
+    assert.deepEqual(inventory.slice(2, 4), ['--cargo-profile', 'local']);
     assert.equal(inventory[3], run[run.indexOf('--cargo-profile') + 1]);
     assert.equal(buildInventoryArgs(parseWrapperArgs([])).includes('--cargo-profile'), false);
 });
@@ -404,7 +404,7 @@ test('main dry-run: agent mode carries the full old contract', async () => {
     const { summary } = await dryRun({
         args: ['--dry-run', '--force-probe', 'available', '--agent'],
     });
-    assert.match(summary.command, /--cargo-profile ci/);
+    assert.match(summary.command, /--cargo-profile local/);
     assert.match(summary.command, /--color never/);
     assert.match(summary.command, /--failure-output immediate-final/);
     assert.match(summary.command, /--retries 0/);

@@ -98,7 +98,7 @@ opt-level = 3
 [profile.release.package.image-webp]
 opt-level = 3
 
-# Profile for running Rust tests (CI and local).
+# Profile for running Rust tests in CI.
 #
 # The default release profile is tuned for smallest binary size (fat LTO,
 # opt-level=z, single codegen unit), which significantly slows compiling/linking
@@ -130,14 +130,18 @@ panic = "unwind"
 strip = "none"
 split-debuginfo = "unpacked"
 
-[profile.agent]
-inherits = "dev"
-debug = "line-tables-only"
-split-debuginfo = "unpacked"
-
-[profile.agentnodebug]
+# Profile for local test runs (`npm test`, `npm run test:rust:agent`); CI and
+# releases keep `ci`. Many agent worktrees compile at once, so CPU per build
+# counts most: lotar's own crate unoptimized needs about 60% less CPU than
+# `ci` (DEV-346). Dependencies stay optimized (sccache builds them once):
+# unoptimized, some tests got up to 20x slower (log output bursts, image
+# decoding) and missed their deadlines. No debug info, as in `ci`.
+[profile.local]
 inherits = "dev"
 debug = false
+
+[profile.local.package."*"]
+opt-level = 2
 
 [dev-dependencies]
 assert_cmd = "2.2.2"

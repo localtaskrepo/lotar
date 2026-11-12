@@ -9,7 +9,7 @@ These commands keep CI and local development aligned. Treat them as the required
 | Format code | `npm run fmt` | Applies `cargo fmt` and Prettier (TypeScript, Vue, smoke tests, scripts). The format checks are part of `npm run lint`, not `npm test`. |
 | Lint front-end + back-end | `npm run lint` | Runs `vue-tsc` and `tsc` on the smoke suite (`npm run lint:frontend`), oxlint and ESLint (`npm run lint:js`), the Prettier check (`npm run fmt:js:check`), `cargo clippy --all-targets --all-features -- -D warnings`, and `cargo fmt --all --check`, matching CI. `npm run lint:agent` runs the same with short output. |
 | Dependency policy | `npm run check:deps` | Runs `cargo deny check` (RustSec advisories, licenses, banned crates, sources) against `deny.toml`; CI runs it in the Security Audit job. Needs `cargo install cargo-deny --locked`. |
-| Test suites | `npm test` | Runs `cargo nextest run --cargo-profile ci`, Vitest (`view/vitest.config.ts`), the release-page tests and the git hook tests (`npm run test:hooks`). It does not run lint or formatting checks. |
+| Test suites | `npm test` | Runs `cargo nextest run --cargo-profile local` (CI runs nextest with the `ci` profile), Vitest (`view/vitest.config.ts`), the release-page tests and the git hook tests (`npm run test:hooks`). It does not run lint or formatting checks. |
 | Smoke tests | `npm run smoke` | Runs `npm run build:smoke` (SPA plus Rust profile `smoke`) before the specs under `smoke/tests/`. The binary is `target/smoke/lotar`. Check build output for warnings as well as test failures. |
 
 > Policy recap: code changes require `npm run lint`, `npm test`, and `npm run smoke`. Use `cargo nextest`, never plain `cargo test`.
