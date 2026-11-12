@@ -1,6 +1,7 @@
 project:
   name: Local Task Repo
 members:
+- '@fix'
 - claude
 - codex
 - fix
@@ -16,12 +17,6 @@ issue:
   done_states:
   - Done
   - WontDo
-custom:
-  field_properties:
-    affects:
-      type: version
-    fixed_in:
-      type: version
 attachments:
   dir: DEV/@attachments
 agent:

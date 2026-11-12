@@ -3,14 +3,25 @@ status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T20:26:40.666774+00:00
-modified: 2026-11-12T20:26:55.165892+00:00
+modified: 2026-11-12T20:51:56.423068+00:00
 relationships:
+  blocks:
+  - DEV-388
   related:
   - DEV-374
   - DEV-386
   - DEV-384
+  - DEV-1
+  - DEV-2
+comments:
+- date: 2026-11-12T20:50:01.539729+00:00
+  author: claude
+  text: 'claude: Done in b029ff0 on agent/DEV-385. New automation hook on.unblocked: when a ticket goes from open to done (by its own project''s done states), every open ticket that depends on it (depends_on, or its blocks list) whose prerequisites are now all done gets the event. It fires from every update path, because the trigger sits in TaskService''s update (AutomationService::fire_unblocked_dependents): CLI, web UI, REST, MCP, rule set actions (lotar automation run too) and job outcomes. Templates: ${{unblocked.by}} (''DEV-1 (Docs), DEV-2 (Release)''), ${{unblocked.ids}}, ${{unblocked.by[*].title}}. simulate --event unblocked previews it with the ticket''s current prerequisites; the web UI has the trigger (''Prerequisites done''), its sentence and placeholders. The release rule''s shell loop is gone: .tasks/DEV/automation.yml now has one rule, ''Prerequisites done: continue the waiting ticket'' (when status Blocked: on unblocked, plus manual for starting it by hand; assignee @fix, session: continue). It now continues any Blocked ticket whose prerequisites are done, not only tickets that waited for a release, as the owner asked on 2026-11-12; the prompt covers both cases, and dev370_release_waiting_checks_test checks both. Docs: automation.md (new section ''When prerequisites are done'', template table), release-guide.md, API quick references, openapi simulate description. No changelog file: release notes come from the commit list. Note on the switch: an installed lotar older than this commit ignores on.unblocked, so the rule starts nothing until the release with this change is installed. The release that ships it is closed after brew upgrade, so the new binary runs that close. A lotar serve process still on the old binary would miss closes made through it. Cross-repo prerequisites stay with DEV-386 (agreed with that agent): they get the public AutomationService::apply_unblocked_event(storage, id, by). Checks: npm run lint, npm test (2066 Rust, 1470 UI, release and hook tests all pass), npm run smoke (381 pass). A new integration test (unblocked_starts_the_waiting_ticket_agent_when_its_last_prerequisite_is_done) fails without the trigger and passes with it. Not checked: the web UI in a real browser (vitest covers the rule sentence, round trip and placeholders), and agent.session is still YAML-only in the rule editor, as it was before.'
+- date: 2026-11-12T20:50:30.828144+00:00
+  author: claude
+  text: 'claude: Agreed with DEV-384''s agent: their new tell_agent action (start or queue the ticket''s agent, session: continue) works on on.unblocked without changes, since the hook dispatches through apply_action and its templates (${{unblocked.by}}) are in scope there. Follow-up after both are merged: switch lotar''s rule ''Prerequisites done: continue the waiting ticket'' in .tasks/DEV/automation.yml from set assignee + agent to tell_agent (message = the current prompt, agent @fix). Whichever of the two lands second does it; the DEV-384 agent will if theirs lands after this one. No code change to b029ff0.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad49ea37f-64bb-40fb-a025-a556a5bca60c
 description: |-
@@ -64,3 +75,41 @@ history:
   - field: relationships
     old: '{"related":["DEV-374","DEV-386"]}'
     new: '{"related":["DEV-374","DEV-386","DEV-384"]}'
+- at: 2026-11-12T20:50:01.539729+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T20:50:01.981633+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-374","DEV-386","DEV-384"]}'
+    new: '{"related":["DEV-374","DEV-386","DEV-384","DEV-1","DEV-2"]}'
+- at: 2026-11-12T20:50:16.401310+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T20:50:30.828144+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T20:50:50.040369+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-374","DEV-386","DEV-384","DEV-1","DEV-2"]}'
+    new: '{"related":["DEV-374","DEV-386","DEV-384","DEV-1","DEV-2","DEV-388"]}'
+- at: 2026-11-12T20:51:51.191543+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-374","DEV-386","DEV-384","DEV-1","DEV-2","DEV-388"]}'
+    new: '{"related":["DEV-374","DEV-386","DEV-384","DEV-1","DEV-2"]}'
+- at: 2026-11-12T20:51:56.423068+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-374","DEV-386","DEV-384","DEV-1","DEV-2"]}'
+    new: '{"blocks":["DEV-388"],"related":["DEV-374","DEV-386","DEV-384","DEV-1","DEV-2"]}'

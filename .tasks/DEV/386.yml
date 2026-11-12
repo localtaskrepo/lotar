@@ -5,11 +5,14 @@ type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-12T20:26:41.019459+00:00
-modified: 2026-11-12T20:26:54.927786+00:00
+modified: 2026-11-12T20:52:33.277524+00:00
 relationships:
+  blocks:
+  - DEV-388
   related:
   - DEV-374
   - DEV-385
+  - DEV-389
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A19c84812-c551-4f62-ad53-58b1c7b4fc71
 description: |-
@@ -52,3 +55,27 @@ history:
   - field: relationships
     old: '{"related":["DEV-374"]}'
     new: '{"related":["DEV-374","DEV-385"]}'
+- at: 2026-11-12T20:50:50.040669+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-374","DEV-385"]}'
+    new: '{"related":["DEV-374","DEV-385","DEV-388"]}'
+- at: 2026-11-12T20:51:53.845458+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-374","DEV-385","DEV-388"]}'
+    new: '{"related":["DEV-374","DEV-385"]}'
+- at: 2026-11-12T20:51:58.660441+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-374","DEV-385"]}'
+    new: '{"blocks":["DEV-388"],"related":["DEV-374","DEV-385"]}'
+- at: 2026-11-12T20:52:33.277524+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-388"],"related":["DEV-374","DEV-385"]}'
+    new: '{"blocks":["DEV-388"],"related":["DEV-374","DEV-385","DEV-389"]}'

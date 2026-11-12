@@ -1,0 +1,31 @@
+title: 'Web UI: show tasks in another repo with their status and link'
+status: Blocked
+priority: Medium
+type: Feature
+reporter: claude
+assignee: claude
+created: 2026-11-12T20:52:33.189344+00:00
+modified: 2026-11-12T20:52:33.278167+00:00
+relationships:
+  related:
+  - DEV-386
+description: |-
+  DEV-386 lets depends_on and related name a task in another repo's LoTaR (repo name, a colon, the ID; see docs/help/task.md, Tasks in another repo). The CLI shows them with status, title and link; the web task panel still lists them like local IDs, so a chip links to a task that does not exist here.
+
+  ## Plan
+  - REST: the task DTO (or the relationships tab's request) carries the resolved cross-repo tasks from `services::external_tasks::resolve`: title, status, done, url, or why unresolved. Keep src/api_types.rs, view/api/types.ts, docs/openapi.json and the help docs in agreement.
+  - Task panel: such chips open the other repo's link in a new tab and show status (or unresolved); adding one by typing the reference works; dragging is limited to Depends on and Related.
+  - Playwright smoke test.
+
+  ## Done when
+  - [ ] A cross-repo dependency shows its status and opens its link from the task panel, with a smoke test
+  - [ ] Documented
+
+  Blocked until DEV-386 is merged.
+history:
+- at: 2026-11-12T20:52:33.278167+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-386"]}'

@@ -3,9 +3,9 @@ status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T20:19:09.503584+00:00
-modified: 2026-11-12T20:27:57.708785+00:00
+modified: 2026-11-12T20:48:17.857269+00:00
 relationships:
   related:
   - DEV-327
@@ -18,6 +18,9 @@ comments:
 - date: 2026-11-12T20:27:57.708785+00:00
   author: claude
   text: 'claude: Plan after the owner widened the scope (relayed by the standards thread, 2026-11-12): a rule action `tell_agent: { message, agent }`, usable on any hook (on.commented now, DEV-385''s hook next). Running job on the ticket: the message is queued to it; for the t3 runner it runs as the thread''s next turn inside the same job, so end rules wait for the answer (the job drains an inbox file next to its active-job record, so a comment from any process reaches it). Idle ticket: its agent is the assignee if that is an agent profile, else the last agent profile in its history, else the action''s `agent`; the ticket is assigned to it and a job starts with the message as prompt, as the next turn of its last T3 thread (session: continue) when there is one. Who may trigger it is the rule''s conditions (DEV-383''s author condition); comments from inside an agent job (LOTAR_AGENT_JOB_ID set) never do. Asked the DEV-383 thread for its author field name and told the DEV-385 thread about the shared action.'
+- date: 2026-11-12T20:48:01.251023+00:00
+  author: claude
+  text: 'claude: Done in e7b3400 on agent/DEV-384 (signed, not merged). It sits on top of 5f4fc78 (DEV-383, not merged yet), so the merge agent must land DEV-383 first. What changed: a new rule action, tell_agent: { message, agent }, usable on any hook (src/automation/types.rs, src/services/automation_service.rs tell_agent(); DEV-385 can put it on its new hook as is). If a job is running on the ticket, the message is queued to it. A t3 job runs it as its thread''s next turn inside the same job, before the end rules (an inbox file next to the active-job record in agent_active_jobs.rs, so it works from any process, including taken-over jobs). A Claude job in the same process gets it on stdin. For other runners, a job with the message is queued behind the running one. Idle ticket: it goes to its agent (the assignee if that''s an agent profile, else the last agent profile in its history, else the action''s agent), which starts with the message, as the next turn of its last T3 thread. Safety: at most 10 queued turns per job; a runner with LoTaR''s env never tells itself. Pair the action with DEV-383''s comment author condition, as in the docs example. Validation and simulate know the action; the web UI describes it, and its editor edits it in YAML only. Docs: automation.md (Telling the ticket''s agent), agent.md. Also fixed a race I hit in npm test: the agent context file is now written atomically (agent_context_service.rs), so a job starting right after another can''t read it half-written. Checks: npm run lint passed; npm test passed (2075 Rust incl. 3 new t3 tests and 2 new unit tests, 1471 UI); npm run smoke 381/381. Not checked: a real T3 Code thread (tests use a fake t3).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A29c043b0-c171-4b91-85ae-99969ca704d8
 description: |-
@@ -79,3 +82,13 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-12T20:48:01.251023+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T20:48:17.857269+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'

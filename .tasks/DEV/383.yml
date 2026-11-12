@@ -1,11 +1,11 @@
 title: 'Automation: condition and template for a comment''s author'
-status: InProgress
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T20:19:09.244690+00:00
-modified: 2026-11-12T20:38:23.431546+00:00
+modified: 2026-11-12T20:38:54.324659+00:00
 relationships:
   related:
   - DEV-327
@@ -80,3 +80,9 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-12T20:38:54.324659+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
