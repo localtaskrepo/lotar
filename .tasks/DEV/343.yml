@@ -3,15 +3,28 @@ status: InProgress
 priority: High
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T02:37:52.182544+00:00
-modified: 2026-11-12T02:37:53.908084+00:00
+modified: 2026-11-12T03:08:38.320103+00:00
 relationships:
   related:
   - DEV-340
   - DEV-341
+  - DEV-347
+  - TEST-1
+comments:
+- date: 2026-11-12T03:08:20.659456+00:00
+  text: |-
+    claude (T3 job thread): Fixed in aa4b664 on agent/DEV-343 (signed).
+    - Done now cleans up whoever set it: TaskService::update_with_receipt calls cleanup_done_ticket_worktree on every status change. When the ticket is done and cleanup_on_done is set, it removes the worktree on the ticket branch (agent/<ID>) if it is clean and landed. It skips while a job runs for the ticket (checked under the job registry lock, the same way job start checks), and the job's end then calls it again. maybe_cleanup_worktree also calls it after its own worktree, so the merge job's end removes the fix job's worktree.
+    - Merged check: git cherry HEAD <branch> instead of merge-base --is-ancestor, so rebased or cherry-picked work counts as landed. This applies to automatic cleanup, lotar agent worktree cleanup, and the merge job's ensure_branch_merged (which no longer fails a merge that landed rebased). Branches are deleted with branch -D, since -d refuses rebased branches, and only after that check passes.
+    - Tests (tests/agent_safety_test.rs): fix job then a rebased landing then Done removes the worktree and branch (fails without the fix); Done during a running job leaves the worktree until the job's end; CLI cleanup accepts a cherry-picked branch.
+    - Docs: docs/help/agent.md (cleanup section).
+    Checks: npm run lint, npm run test:agent (1999 Rust, 1441 UI, release and hook tests), npm run smoke (377): all pass. One full-suite run hit an environmental failure: a lotar-agent-wrapper process for TEST-1 from elsewhere on the machine made cli_configured_reviewer_can_resolve_an_agent_reported_review refuse. It passed 3 times right after, and the next full run was green.
+    Found while testing: the agent-reviewed and agent-pipeline templates count HelpNeeded as done (it is their last state), so this cleanup also runs at HelpNeeded. That is safe (clean and landed only, and the next job recreates the worktree), but wrong. Filed as DEV-347.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac8bbef48-abb4-4ea3-a102-0aa1b813088b
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab8168ee7-4f3b-406a-97a3-127902318a7b
 description: |-
   Found by STD-41 on 2026-11-11 (claude, job thread of STD-41): ~/.t3/worktrees/lotar held 24 GB of agent worktrees, among them agent-DEV-340 (6.4 GB, ticket Done) and agent-DEV-341 (4.7 GB), with agent.worktree.cleanup_on_done: true.
 
@@ -43,3 +56,30 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac8bbef48-abb4-4ea3-a102-0aa1b813088b
+- at: 2026-11-12T03:07:58.491043+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-340","DEV-341"]}'
+    new: '{"related":["DEV-340","DEV-341","DEV-347"]}'
+- at: 2026-11-12T03:08:20.659456+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T03:08:20.849279+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-340","DEV-341","DEV-347"]}'
+    new: '{"related":["DEV-340","DEV-341","DEV-347","TEST-1"]}'
+- at: 2026-11-12T03:08:34.486389+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T03:08:38.320103+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab8168ee7-4f3b-406a-97a3-127902318a7b

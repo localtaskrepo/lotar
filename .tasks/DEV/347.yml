@@ -1,0 +1,41 @@
+title: Agent templates make HelpNeeded a done status
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T03:07:58.357216+00:00
+modified: 2026-11-12T03:07:59.868216+00:00
+relationships:
+  related:
+  - DEV-343
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A625e1a2b-f4c8-455d-af86-5352809905c4
+description: 'Found by DEV-343 (claude, 2026-11-11): agent-reviewed.yml and agent-pipeline.yml list HelpNeeded last under issue.states and set no issue.done_states, so the legacy inference (last state is done, src/services/completion.rs infer_done_statuses) counts HelpNeeded as done. Effects: worktree cleanup at Done also runs at HelpNeeded (safe: clean and landed only, and the next job recreates the worktree), and metrics and dependency checks treat handed-back tickets as finished. Shown by tests/agent_automation_integration_test.rs shipped_agent_reviewed_template_handles_hand_back_failure_review_and_merge, where DEV-343''s Done cleanup removed the worktree at HelpNeeded. Check: a project from either template counts only Done as done. Done when both templates set issue.done_states: [Done] (or order the states so Done is last) and a test checks the effective done states of each template.'
+tags:
+- health
+custom_fields:
+  finding: test:agent-templates-done-states
+history:
+- at: 2026-11-12T03:07:58.491867+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-343"]}'
+- at: 2026-11-12T03:07:58.630220+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T03:07:58.945171+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T03:07:59.868216+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A625e1a2b-f4c8-455d-af86-5352809905c4

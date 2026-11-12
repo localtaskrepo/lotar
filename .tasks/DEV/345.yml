@@ -1,0 +1,36 @@
+title: Lotar favicon doesn't switch to project icon
+status: InProgress
+priority: Medium
+type: Bug
+reporter: mallox
+assignee: '@merge'
+created: 2026-11-12T02:54:29.137527+00:00
+modified: 2026-11-12T03:08:03.345283+00:00
+comments:
+- date: 2026-11-12T03:07:54.918816+00:00
+  text: 'Done in 1fc9c7f on agent/DEV-345. Without ui.name the tab title is ''<repository folder> · LoTaR'' (ui.name still wins). Without ui.icon the tab shows the repository''s own icon: the first real image named favicon.svg/.ico/.png or icon.svg/.png at the repo root or in public/, static/, assets/, app/, src/, src/app/, web/. /api/branding gains repository and detected_icon (api_types.rs, types.ts, openapi.json, help docs updated); Config > Appearance previews the found icon and names the file. Tests: branding_service unit test, dev218 endpoint test, useBranding.spec, new smoke test in ui.theming. npm run lint, npm test (2000 Rust + 1443 UI) and npm run smoke (378) all pass. Note: the lotar repo itself keeps the built-in icon, as its icon lives in view/assets/branding/ and is not in the searched places.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab910bf4e-b967-408d-b7e5-9f0d3dfaf395
+description: The web UI title doesn't show what repo we're in making it harder to identify, and there is no favicon, when we could probably use the project icon to customize this as well.
+history:
+- at: 2026-11-12T02:54:30.108329+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T02:54:33.443828+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab910bf4e-b967-408d-b7e5-9f0d3dfaf395
+- at: 2026-11-12T03:07:54.918816+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T03:08:03.345283+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'

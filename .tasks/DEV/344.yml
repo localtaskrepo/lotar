@@ -3,11 +3,15 @@ status: InProgress
 priority: Medium
 type: Bug
 reporter: mallox
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T02:51:11.809578+00:00
-modified: 2026-11-12T02:51:44.508920+00:00
+modified: 2026-11-12T03:04:20.880642+00:00
+comments:
+- date: 2026-11-12T03:03:58.156447+00:00
+  text: 'Fixed in 0e19ccd (branch agent/DEV-344). Cause: the Columns dialog used the browser''s default drag image. Chrome paints that image from the element''s stacking context, clipped to the element, so inside the scrolling modal a neighbouring column (Done) could show up in the ghost. The drop logic was always right. Fix: on dragstart the dialog clones the dragged status or column header, places the copy off-screen in document.body and passes it to setDragImage. The copy is removed right after. Checks: new unit test in view/__tests__/BoardColumnsDialog.spec.ts (it failed before the fix). In a temporary Playwright check in Chromium, with the board scrolled, the drag image showed only the dragged status or header and the drops still worked. npm run lint, npm test and npm run smoke all pass. The Rust test dev279 cross-process jobs failed once, then passed on rerun (flaky, unrelated). Not checked: the real OS drag image can''t be captured in automation, and Safari/Firefox weren''t tried by hand.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acc5efee6-bd66-409d-b0a7-534b40ba7f0f
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa7ccd933-e8cc-4e1e-b762-0fa1c9a3d66d
 description: |-
   This is a visual bug where configuring the columns in the board view allow you to drag a status to combine it with another.
   In 2 projects I moved blocked and help needed, and during drag it looked like I was also dragging the done column. The behavior however was correct once dropping the column.
@@ -33,3 +37,18 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acc5efee6-bd66-409d-b0a7-534b40ba7f0f
+- at: 2026-11-12T03:03:58.156447+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T03:04:08.880457+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T03:04:20.880642+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa7ccd933-e8cc-4e1e-b762-0fa1c9a3d66d
