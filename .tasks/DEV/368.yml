@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T05:58:31.545950+00:00
-modified: 2026-11-12T06:19:14.856152+00:00
+modified: 2026-11-12T06:19:52.751112+00:00
 relationships:
   related:
   - DEV-362
@@ -16,11 +16,19 @@ comments:
   text: 'claude (Opus 5.5): Done in 800f224 on agent/DEV-368. `session: continue` (default `new`) works on profiles, rule `agent` actions, `agent run --session`, POST /api/jobs (api_types, view/api/types.ts and openapi agree) and queue entries. A t3 job with it takes the session of the ticket''s newest t3 job: this process''s jobs first, then the job logs, whose status line now keeps the session id. It checks the thread with `t3 thread show` and runs `t3 thread send <thread> - --wait` in the thread''s worktree, recording that worktree and branch on the job. provider/model/args are not passed (logged). No earlier thread, a gone thread or worktree, or another runner: a new session, with the reason in the job log. Not done: claude --resume and the MCP agent_run param. Docs: agent.md (new section ''Continuing the ticket''s last thread''), automation.md, config-reference.md, api-quick-reference.md. Tests: tests/dev318_t3_runner_test.rs, which covers fix then merge in one thread with the real merge-job fast-forward, no earlier thread, a gone thread, and a thread found only in the logs; plus a unit test for the send command. Checks: npm run lint:agent clean; test:agent passed (2017 Rust, re-run after the last edit; 1444 UI; release and hook tests); test:smoke:agent passed (102 files, 379 tests). Not run: a real T3 Code thread, because it would add threads to the owner''s list. The standards rules (configs/lotar/automation.yml @merge) still need `agent: { session: continue }` there.'
 - date: 2026-11-12T06:19:14.705143+00:00
   text: 'claude: merge done. Rebased 800f224 onto main (no conflicts), fast-forwarded main to db59099 (DEV-368 t3 runner: run a follow-up job (merge) as the next turn of the ticket''s last thread). Checks in the worktree after the rebase: npm run lint:agent clean; npm run test:agent passed (Rust, UI, release, hooks); npm run test:smoke:agent passed (379 tests in 102 files). Not pushed: main has unpushed commits from other tickets (DEV-362, 365, 366, 367) that wait for their sessions. Not run: a test against a real T3 Code thread. Still open for the owner: the @merge rule in standards configs/lotar/automation.yml needs agent: { session: continue }.'
+- date: 2026-11-12T06:19:18.723820+00:00
+  text: The merge agent's job job-20261112T061517.794Z-61 failed (lotar agent logs job-20261112T061517.794Z-61); the fix agent retries it on branch agent/DEV-368.
+- date: 2026-11-12T06:19:37.018550+00:00
+  text: 'claude: The work is done already. The fix commit 800f224 is in main as db59099 (git cherry main HEAD marks it as already applied), and the ticket updates are in 58fa126. Nothing new to implement or commit; not pushed. Still open for the owner: the @merge rule in standards configs/lotar/automation.yml needs agent: { session: continue } before merges actually run in the fix thread.'
+- date: 2026-11-12T06:19:52.751112+00:00
+  text: 'claude: Nothing to merge. The fix commit 800f224 is already in main as db59099 (git cherry shows it applied); nothing new on the branch. No checks run. Not pushed: main has unpushed commits from DEV-362, 365, 366 and 367 that wait for their sessions. Still open for the owner: the @merge rule in standards configs/lotar/automation.yml needs agent: { session: continue }.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8eb9de4e-e61b-41d2-a1de-00fb2c0f19e0
 - file: docs/help/agent.md
 - file: src/services/agent_runner.rs
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A42fba7aa-a4cc-4aec-8bfe-291a453c1ec5
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abf9debdd-b99c-4458-a0d1-a316d7746b47
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8432ca4c-01b1-42ed-934a-3f893794091e
 description: |-
   The standards repo's lotar rules start a second T3 Code thread for every finished fix job: `@merge` runs `t3 thread start ... --worktree ...`. Those merge threads fill the owner's thread list in T3 Code, and the merge agent starts without the fix agent's context. The owner wants the merge to run in the fix agent's thread instead (owner 2026-11-11, standards docs/decisions/2026-11-11-merge-in-fix-thread.md).
 
@@ -43,6 +51,7 @@ description: |-
   - [ ] docs/help/agent.md and automation.md describe the setting; tests cover the t3 send path and the fallback.
 tags:
 - agent
+- merge-retried
 history:
 - at: 2026-11-12T05:58:31.639893+00:00
   actor: claude
@@ -99,3 +108,40 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-362"]}'
+- at: 2026-11-12T06:19:18.638379+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: agent
+    new: agent, merge-retried
+- at: 2026-11-12T06:19:18.723820+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-12T06:19:19.339494+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abf9debdd-b99c-4458-a0d1-a316d7746b47
+- at: 2026-11-12T06:19:37.018550+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T06:19:40.170197+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T06:19:40.838338+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8432ca4c-01b1-42ed-934a-3f893794091e
+- at: 2026-11-12T06:19:52.751112+00:00
+  actor: claude
+  changes:
+  - field: comment_added
