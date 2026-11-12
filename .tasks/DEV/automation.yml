@@ -49,6 +49,7 @@ automation:
           agent: *fix
     # An agent's ticket nobody took: @fix works it with lotar's built-in instructions. The filer assigns itself, the
     # owner (a question) or @fix-light (mechanical) instead when that fits; proposals, owner and recurring tickets wait.
+    # A Change ticket (local's change records) belongs to the agent making that change.
     - name: "Agent tickets: start the fix agent"
       when:
         all:
@@ -57,6 +58,7 @@ automation:
               - reporter: codex
           - not: { assignee: "@any" }
           - not: { tags: { any: [health, proposal, owner, recurring] } }
+          - not: { type: Change }
       on:
         created:
           set:
