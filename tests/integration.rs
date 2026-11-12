@@ -131,6 +131,7 @@ mod dev318_t3_runner_test;
 mod dev319_runtime_gitignore_test;
 mod dev320_job_outcome_test;
 mod dev322_wait_for_end_automation_test;
+mod dev327_comment_author_test;
 mod dev332_task_url_test;
 mod dev361_worker_restarts_after_upgrade_test;
 mod dev362_simulate_change_events_test;

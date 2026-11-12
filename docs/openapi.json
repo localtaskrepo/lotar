@@ -5441,6 +5441,9 @@
           "date": {
             "type": "string"
           },
+          "author": {
+            "type": "string"
+          },
           "text": {
             "type": "string"
           }

@@ -330,6 +330,10 @@ impl TaskRelationships {
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct TaskComment {
     pub date: String,
+    /// Who wrote the comment: the same identity the history records as
+    /// actor (DEV-327). Comments from older versions have none.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub author: Option<String>,
     pub text: String,
     /// Keys this version does not know, kept so a newer tool's or a
     /// hand-written field survives edits (DEV-268).

@@ -39,7 +39,7 @@ Field | Type | Notes
 `description` | `string?` | Markdown-friendly long description.
 `tags` | `string[]?` | Normalized, unique tags. Omitted when empty; clients should default missing arrays to `[]`.
 `relationships` | `TaskRelationships` | Structured references to other tasks (see below).
-`comments` | `TaskComment[]?` | Each comment carries `{ date, text }`; omitted when empty.
+`comments` | `TaskComment[]?` | Each comment carries `{ date, author?, text }`; omitted when empty.
 `references` | `ReferenceEntry[]?` | Code locations (`code`), external URLs (`link`), repository files (`file`), managed attachments (`attachment`), or platform references (`jira`, `github`); omitted when empty.
 `sprints` | `u32[]?` | Numeric sprint IDs the task belongs to; omitted when empty.
 `sprint_order` | `BTreeMap<u32, u32>?` | Optional manual ordering for this task (sprint id → order index).
@@ -53,7 +53,7 @@ Field | Type | Notes
 - Invalid explicit done-state configuration is rejected on configuration reads. Legacy task-read paths that cannot return that configuration error project an empty embedded policy and `is_done: false` conservatively, rather than silently substituting the built-in `Done` policy. An empty runtime policy is not a valid writable `issue.done_states` setting.
 
 - `TaskRelationships` exposes dedicated arrays for `depends_on`, `blocks`, `related`, `children`, `fixes`, plus single-value `parent` and `duplicate_of`. All properties are optional; empty collections are dropped on serialization.
-- `TaskComment` holds `{ date: RFC3339, text: string }`. Comments do not store authorship today.
+- `TaskComment` holds `{ date: RFC3339, author?: string, text: string }`. `author` is the identity the history records as actor for the `comment_added` entry; comments written before DEV-327 have none.
 - `ReferenceEntry` supports `code` (e.g., `app/lib.rs#120` or `app/lib.rs#12-20`; `#L12`-style input anchors are accepted and stored canonically without the `L`), `link` (URL), `file` (a repository-relative path; paths resolving inside the configured attachments store are rejected), `attachment` (a managed attachments-store blob name, written by uploads and the `attachment` reference kind), and platform references via `jira` or `github`. The `file` and `attachment` kinds are distinct on purpose: managed blobs are never stored under `file` and repository files never under `attachment`, so detach and download operations cannot cross storage roots.
 - `TaskChangeLogEntry` captures `{ at, actor?, changes[] }`, where each `TaskChange` includes `field`, `old`, and `new` values for audit review.
 

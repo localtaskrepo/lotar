@@ -496,7 +496,12 @@ mod reference_mutation_tests {
                 let mut editor = Storage::new(&editor_tasks);
                 editor
                     .mutate_task("SAFE-1", |fresh| {
-                        fresh.comments.push(TaskComment { extra: Default::default(), date: "2026-10-20T00:00:00Z".into(), text: "concurrent comment".into() });
+                        fresh.comments.push(TaskComment {
+                            extra: Default::default(),
+                            author: None,
+                            date: "2026-10-20T00:00:00Z".into(),
+                            text: "concurrent comment".into(),
+                        });
                         fresh.references.push(ReferenceEntry { code: Some("other.rs#7".into()), ..Default::default() });
                         if already_anchored {
                             fresh.references.push(ReferenceEntry { code: Some(desired_anchor), ..Default::default() });

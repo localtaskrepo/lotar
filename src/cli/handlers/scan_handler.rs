@@ -513,6 +513,7 @@ mod reanchor_tests {
                 let mut fresh = storage.get(task_id, "SAFE").ok_or("task missing")?;
                 fresh.comments.push(crate::types::TaskComment {
                     extra: Default::default(),
+                    author: None,
                     date: "2026-10-13T00:00:00Z".into(),
                     text: "concurrent note".into(),
                 });

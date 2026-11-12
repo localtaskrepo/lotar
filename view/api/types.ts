@@ -981,6 +981,8 @@ export interface ProjectStatsDTO {
 /** A task comment; keys a newer server adds pass through unchanged. */
 export interface TaskComment {
     date: string
+    /** Who wrote it (the history's actor); absent on comments written before DEV-327. */
+    author?: string
     text: string
     [key: string]: unknown
 }

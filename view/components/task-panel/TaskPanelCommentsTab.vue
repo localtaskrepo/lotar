@@ -18,7 +18,10 @@
           class="task-panel__comment"
         >
           <div class="task-panel__comment-header">
-            <div class="task-panel__comment-meta">{{ formatDate(comment.date) }}</div>
+            <div class="task-panel__comment-meta">
+              <span v-if="comment.author" class="task-panel__comment-author">{{ comment.author }} · </span
+              >{{ formatDate(comment.date) }}
+            </div>
             <div class="task-panel__comment-actions">
               <template v-if="editingCommentIndex !== commentIndex">
                 <UiButton
@@ -92,6 +95,7 @@ import UiButton from '../UiButton.vue'
 
 interface TaskComment {
   date: string
+  author?: string
   text: string
 }
 
@@ -157,6 +161,10 @@ function onEditingTextareaRef(ref: Element | ComponentPublicInstance | null) {
 .task-panel__comment-meta {
   font-size: var(--text-xs, 0.75rem);
   color: var(--color-muted, var(--muted));
+}
+
+.task-panel__comment-author {
+  font-weight: 600;
 }
 
 .task-panel__comment-actions {

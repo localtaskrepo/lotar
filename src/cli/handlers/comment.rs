@@ -81,10 +81,11 @@ struct CommentAddInputs {
 #[expect(clippy::needless_pass_by_value, reason = "the caller hands this value over and does not use it afterwards")]
 fn handle_add_comment(ctx: &mut TaskCommandContext, renderer: &OutputRenderer, full_id: &str, inputs: CommentAddInputs) -> Result<(), String> {
     renderer.log_debug("comment: preparing new comment entry");
-    let timestamp = chrono::Utc::now().to_rfc3339();
-    let entry = TaskComment { extra: Default::default(), date: timestamp, text: inputs.text.clone() };
-
     if inputs.dry_run {
+        let timestamp = chrono::Utc::now().to_rfc3339();
+        let prefix = crate::storage::TaskId::parse(full_id).ok().map(|parsed| parsed.project);
+        let author = crate::utils::identity::resolve_current_user_for_project(Some(ctx.storage.root_path.as_path()), prefix.as_deref());
+        let entry = TaskComment { extra: Default::default(), date: timestamp, author, text: inputs.text.clone() };
         render_comment_preview(renderer, full_id, inputs.project.as_deref(), &entry, inputs.task.comments.len() + 1, inputs.explain);
         return Ok(());
     }
@@ -92,7 +93,8 @@ fn handle_add_comment(ctx: &mut TaskCommandContext, renderer: &OutputRenderer, f
     let dto = crate::services::task_service::TaskService::add_comment(&mut ctx.storage, full_id, &inputs.text).map_err(|e| e.to_string())?;
     renderer.log_info("comment: comment persisted");
 
-    render_comment_success(renderer, full_id, inputs.project.as_deref(), &entry, dto.comments.len());
+    let entry = dto.comments.last().ok_or("comment was not stored")?;
+    render_comment_success(renderer, full_id, inputs.project.as_deref(), entry, dto.comments.len());
     Ok(())
 }
 
@@ -143,7 +145,8 @@ fn render_comment_list(renderer: &OutputRenderer, task_id: &str, project: Option
                 renderer.emit_success(format_args!("No comments for {}.", task_id));
             } else {
                 for c in &task.comments {
-                    renderer.emit_raw_stdout(format_args!("{}  {}", c.date, c.text));
+                    let author = c.author.as_deref().map(|author| format!("{author}: ")).unwrap_or_default();
+                    renderer.emit_raw_stdout(format_args!("{}  {author}{}", c.date, c.text));
                 }
             }
             if explain {
@@ -163,10 +166,14 @@ fn build_comment_payload(status: &str, action: &str, task_id: &str, count: usize
 }
 
 fn comment_to_json(comment: &TaskComment) -> Value {
-    serde_json::json!({
+    let mut value = serde_json::json!({
         "date": comment.date,
         "text": comment.text,
-    })
+    });
+    if let (Some(author), Some(map)) = (&comment.author, value.as_object_mut()) {
+        map.insert("author".to_string(), Value::String(author.clone()));
+    }
+    value
 }
 
 fn insert_project(payload: &mut Map<String, Value>, project: Option<&str>) {

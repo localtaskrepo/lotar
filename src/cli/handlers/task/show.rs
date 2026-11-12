@@ -119,7 +119,8 @@ pub fn render_task_text(task: &TaskDTO) -> String {
         out.push_str(&format!("\nComments ({})\n", task.comments.len()));
         for comment in &task.comments {
             let mut lines = comment.text.lines();
-            out.push_str(&format!("  {}  {}\n", comment.date, lines.next().unwrap_or_default()));
+            let author = comment.author.as_deref().map(|author| format!("{author}: ")).unwrap_or_default();
+            out.push_str(&format!("  {}  {author}{}\n", comment.date, lines.next().unwrap_or_default()));
             for line in lines {
                 out.push_str(&format!("    {line}\n"));
             }

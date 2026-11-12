@@ -682,7 +682,7 @@ impl TaskService {
             Self::ensure_not_deleted(task, &canonical_guard)?;
             let now = chrono::Utc::now().to_rfc3339();
             let actor = context.actor_override.clone().or_else(|| resolve_current_user_for_project(Some(root_path.as_path()), Some(&identity_project)));
-            task.comments.push(crate::types::TaskComment { extra: Default::default(), date: now.clone(), text: text.to_string() });
+            task.comments.push(crate::types::TaskComment { extra: Default::default(), date: now.clone(), author: actor.clone(), text: text.to_string() });
             // Record that a comment was added without copying the body into
             // the changelog (the comment itself is the audit trail).
             task.history.push(TaskChangeLogEntry {

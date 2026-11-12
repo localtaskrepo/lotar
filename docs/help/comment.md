@@ -53,6 +53,7 @@ Example JSON response:
   "comments": 3,
   "added_comment": {
     "date": "2025-08-19T10:30:42Z",
+    "author": "alice",
     "text": "First note"
   }
 }
@@ -71,6 +72,6 @@ Example JSON list response (when no text is provided):
 
 ## Notes
 
-- Author attribution isn’t stored in the comment; use git blame/history to see who added or changed comments.
-- Each comment stores a UTC timestamp (RFC3339) and the text.
+- Each comment stores a UTC timestamp (RFC3339), its author and the text. The author is the identity the history records as actor (`default_reporter` such as `LOTAR_DEFAULT_REPORTER`, then git or system user; see [Identity & Users](./identity.md)). Comments written before lotar stored authors have no `author` and show without one.
+- `lotar comment <ID>` and `lotar show` print the author before the text (`2025-08-19T10:30:42Z  alice: First note`).
 - Project context is inferred from the numeric ID using your current repo (or configured `default_project`). Pass a fully-qualified ID (`AUTH-1`) or `--project` when multiple prefixes exist.

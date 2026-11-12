@@ -34,7 +34,7 @@ Field | Type | Notes
 `description` | `string?` | Markdown-friendly long description.
 `tags` | `string[]` | Normalized, unique tags. Empty array when unset.
 `relationships` | `TaskRelationships` | Structured references to other tasks (see below).
-`comments` | `TaskComment[]` | Each comment carries `{ date, text }`.
+`comments` | `TaskComment[]` | Each comment carries `{ date, author?, text }`.
 `references` | `ReferenceEntry[]` | Code locations (`code`), external URLs (`link`), repository files (`file`), managed attachments (`attachment`), or platform references (`jira`, `github`).
 `sprints` | `u32[]` | Numeric sprint IDs the task belongs to.
 `sprint_order` | `BTreeMap<u32, u32>` | Optional sprint-ID to task-position map projected from ordered membership records.
@@ -44,7 +44,7 @@ Field | Type | Notes
 ### Relationships & related structs
 
 - `TaskRelationships` exposes dedicated arrays for `depends_on`, `blocks`, `related`, `children`, `fixes`, plus single-value `parent` and `duplicate_of`. All properties are optional; empty collections are dropped on serialization.
-- `TaskComment` holds `{ date: RFC3339, text: string }`. Comments do not store authorship today.
+- `TaskComment` holds `{ date: RFC3339, author?: string, text: string }`. `author` is the identity the history records as actor for the `comment_added` entry; comments written before DEV-327 have none.
 - `ReferenceEntry` supports `code` (e.g., `src/lib.rs#120`, stored canonically as `path#line` or `path#start-end`), `link` (URL), `file` (repository-relative path; store paths rejected), `attachment` (managed attachments-store blob name), and `jira`/`github` platform references. The two file-ish kinds are distinct: managed blobs live only under `attachment`, repository files only under `file`.
 - `TaskChangeLogEntry` captures `{ at, actor?, changes[] }`, where each `TaskChange` includes `field`, `old`, and `new` values for audit review.
 
