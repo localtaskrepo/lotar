@@ -1,11 +1,11 @@
 title: 'Job outcome: setting the assignee back to its current value doesn''t undo a deferred change'
-status: HelpNeeded
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-12T01:43:44.864229+00:00
-modified: 2026-11-12T02:18:21.122165+00:00
+modified: 2026-11-12T02:24:11.995357+00:00
 relationships:
   related:
   - DEV-1
@@ -22,6 +22,7 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acb9d8964-080c-46aa-accf-527e61b00ece
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A10853b74-1c2f-4b9c-a435-1407d478d850
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aedd5cfca-4667-42aa-9862-d4d4732ae7e0
 description: |-
   During a job, an assignee change is recorded as the job's outcome, and changing it back can't undo that. Found in standards STD-37 (2026-11-11): the fix agent ran `lotar assignee STD-37 claude` by mistake and then `lotar assignee STD-37 @fix`. The second command recorded nothing, because `@fix` is the value the ticket already has ("A change to the value the ticket already has records nothing", docs/help/agent.md). So the job ended with assignee claude, and the `job_completed` rule's `set.assignee: "@merge"` never ran.
 
@@ -102,3 +103,20 @@ history:
   - field: relationships
     old: '{"related":["DEV-1","DEV-339","DEV-335"]}'
     new: '{"related":["DEV-1","DEV-339","DEV-335","DEV-341"]}'
+- at: 2026-11-12T02:24:06.596856+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-12T02:24:07.500175+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-12T02:24:11.995357+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aedd5cfca-4667-42aa-9862-d4d4732ae7e0
