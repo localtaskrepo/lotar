@@ -1,17 +1,23 @@
 title: 'Flaky Rust: dev279_cross_process_jobs_test status change fails under full-suite load'
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-12T05:17:25.629363+00:00
-modified: 2026-11-12T05:17:27.133873+00:00
+modified: 2026-11-12T05:32:23.559268+00:00
 relationships:
   related:
   - DEV-358
   - TEST-1
+comments:
+- date: 2026-11-12T05:29:28.248634+00:00
+  text: 'claude: Cause found. The job''s runner is spawned through lotar-agent-wrapper (argv carries --job-id/--ticket-id) before the owning process wrote the shared job record. In that window list-running finds the job via the wrapper process, and ''status'' finds no record, so it refuses with ''has an active agent job (pid N)''. Reproduced in a stress run (cargo nextest --stress-count 40: 5+ failures in a row with that error). Fix: write the record before spawn (child_pid 0), rewrite it with the runner pid after; the job slot already removes it on every exit path. New deterministic test job_record_exists_when_its_wrapper_starts (fake wrapper via LOTAR_AGENT_WRAPPER lists the records at start) fails before, passes after. Running lint/test/smoke next.'
+- date: 2026-11-12T05:32:19.453454+00:00
+  text: 'claude: Nothing to merge yet. agent/DEV-363 has no commits beyond main (git log main..agent/DEV-363 is empty), and the fix agent is still running: its full npm run test:agent was in progress when I looked. Its fix sits uncommitted in the worktree agent-DEV-363-86baae05b7888a2d: src/services/agent_job_service.rs (the job record is registered before the runner spawns) and a new test in tests/dev279_cross_process_jobs_test.rs. That branch is also behind main. I left both untouched. Handing the ticket back so it isn''t marked Done with the fix unmerged; once the fix agent commits, run the merge again.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2c8fa46a-572d-4b0f-acb2-8f67616c1184
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8b41df6e-a512-4c29-afe9-43e4c0633457
 description: 'Found by claude while merging DEV-358 (2026-11-11): in one full npm run test:agent, jobs_in_another_process_are_seen_guarded_and_cancelled failed at tests/dev279_cross_process_jobs_test.rs:56 (assert status.status.success() after ''status TEST-1 Done'') at 0.68s; a rerun of the full suite passed and the test passed 3 of 3 alone. Check: cargo nextest run --cargo-profile local jobs_in_another_process repeatedly under full-suite load. Done when the status command''s failure cause is known and the test no longer races.'
 tags:
 - health
@@ -40,3 +46,31 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2c8fa46a-572d-4b0f-acb2-8f67616c1184
+- at: 2026-11-12T05:29:28.248634+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:31:46.807684+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T05:31:49.159702+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8b41df6e-a512-4c29-afe9-43e4c0633457
+- at: 2026-11-12T05:32:19.453454+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:32:23.559268+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox

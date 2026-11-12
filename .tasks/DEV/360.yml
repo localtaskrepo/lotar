@@ -5,13 +5,17 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T04:55:55.878491+00:00
-modified: 2026-11-12T05:17:01.972980+00:00
+modified: 2026-11-12T05:33:52.692172+00:00
 relationships:
   related:
   - DEV-356
+  - DEV-361
+  - DEV-358
 comments:
 - date: 2026-11-12T05:16:45.226592+00:00
   text: 'claude: Cause found and fixed in b49019573a6c3e19ba7f8d33337c0c48288d9b8b (branch agent/DEV-360). run_job spawned the runner first and wrote the job''s shared record afterwards. For about 10-15 ms, list-running already showed the lotar-agent-wrapper process, but there was no record yet, so ''lotar status''/''assignee'' refused the change (''has an active agent job ... Cancel it'') instead of deferring it. The test polls every 200 ms, so it landed in that window only rarely. A script that polls without pausing hit it in 24 of 40 runs. Fix: write the record before the spawn (child_pid 0), then rewrite it with the runner''s pid; RunningJobSlot still unregisters it on every exit path. New regression test dev320_job_outcome_test::the_job_record_exists_when_the_runner_starts uses a shell LOTAR_AGENT_WRAPPER that looks for the record the moment it starts: it failed 6/6 before the fix and passes after. Checks: ticket check command (-E ''test(dev320_job_outcome_test::)'', --retries 0) 10/10 passed; race script 40/40; npm run lint:agent, test:agent (2004 Rust, 1444 UI, release and hooks tests), and smoke (379) all passed. I did not rerun the check next to a full suite run started by another session.'
+- date: 2026-11-12T05:33:52.381418+00:00
+  text: 'claude: Merged into main as 57d580b (fast-forward, rebased twice because main moved). Checks in the worktree after the last code rebase: lint:agent, test:agent (2007 Rust tests passed), smoke (379 passed). The ticket''s check command (dev320_job_outcome_test, --retries 0) passed 3 of 3, run from the worktree with the same code. Not pushed: main has unpushed commits from other tickets (DEV-358, DEV-361) that wait for their sessions.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1374b68b-4b59-4bba-85b3-9a0b258782d4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aaa2cf252-900b-4fc7-ad60-43ea614197bb
@@ -58,3 +62,19 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aaa2cf252-900b-4fc7-ad60-43ea614197bb
+- at: 2026-11-12T05:33:12.618175+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-356"]}'
+    new: '{"related":["DEV-356","DEV-361"]}'
+- at: 2026-11-12T05:33:52.381418+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:33:52.692172+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-356","DEV-361"]}'
+    new: '{"related":["DEV-356","DEV-361","DEV-358"]}'

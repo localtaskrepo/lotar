@@ -3,24 +3,38 @@ status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@merge'
+assignee: '@fix'
 created: 2026-11-12T05:01:21.522818+00:00
-modified: 2026-11-12T05:24:11.565118+00:00
+modified: 2026-11-12T05:33:13.944605+00:00
 relationships:
   related:
   - DEV-342
   - DEV-356
   - DEV-305
   - DEV-358
+  - DEV-367
+  - DEV-354
+  - DEV-360
 comments:
 - date: 2026-11-12T05:13:14.012531+00:00
   text: 'claude: Fixed in 32a8819 on agent/DEV-361. The queue worker now watches the binary it was started from (utils::binary_watch, the DEV-305 watcher that lotar mcp uses, so a Homebrew symlink move counts). After a change it takes no new queue entries, lets its running jobs finish, and exits. Its existing exit path then starts a new worker, now from the path lotar was started as (watched_path) and not current_exe, so it runs the upgraded build. New test tests/dev361_worker_restarts_after_upgrade_test.rs: it upgrades a fake install while job 1 runs, then queues job 2, and checks that a different worker process runs job 2. It fails without the fix and passes with it. Documented in docs/help/agent.md (queue section). Checks: npm run lint, npm run test:agent (Rust 2004 passed, UI 1444, release, hooks) and npm run smoke (379 passed) all pass. Note: the running worker (pid 11651) still runs the old code until it next goes idle or is restarted. The fix only applies to workers started from a build that includes it.'
+- date: 2026-11-12T05:28:38.832565+00:00
+  text: 'claude: merged into main as 06b571f (fast-forward after two rebases; main moved for DEV-358 ticket/test commits in between); ticket files committed as 77377dd ''DEV-361 Ticket updates''. Not pushed: repos.json allows push, but unpushed main holds other tickets'' commits (DEV-354/356/358/359 etc.). Checks on the branch before the last rebase: npm run lint, npm run test:agent, npm run smoke (379) pass. After the final rebase onto the DEV-358 test fix I reran lint-level clippy and nextest dev361/agent_safety/agent_queue (25 passed), not the full suite. One flaky failure in the first full test:agent (task_noop_update_test cli_configured_reviewer_can_resolve_an_agent_reported_review, ''active agent job (pid 88551)''); it passed alone and on rerun; filed as DEV-367. Check command not run as such: it needs a worker started after the upgrade. Worker pid 11651 still runs the old build until it is restarted; workers started from this build restart themselves on the next upgrade.'
+- date: 2026-11-12T05:28:43.813208+00:00
+  text: The merge agent's job job-20261112T051323.505Z-36 failed (lotar agent logs job-20261112T051323.505Z-36); the fix agent retries it on branch agent/DEV-361.
+- date: 2026-11-12T05:29:51.131480+00:00
+  text: 'claude: Nothing left to change in code. The fix is on main as 06b571f (git cherry main agent/DEV-361 shows 32a8819 as applied; the branch has no diff that main lacks). The merge job job-20261112T051323.505Z-36 failed with ''agent/DEV-361 is not merged ... can''t be fast-forwarded'' only because worker pid 11651 (started 2026-11-11 18:31, before DEV-342''s c55f67c) still runs it. That is this ticket''s bug. Every retry run by that worker fails the same way. No checks ran this pass, because no files changed. The ticket''s check needs a worker started from a build with 06b571f, and the installed lotar is 0.13.2 without it. Question for mallox: may 11651 be stopped once its running jobs finish (e.g. kill 11651 when lotar agent shows none running), with a release containing 06b571f installed first, so the next worker restarts itself on later upgrades and this ticket can be closed?'
+- date: 2026-11-12T05:33:12.437094+00:00
+  text: 'claude: Owner decision 2026-11-11 (mallox): ''Yes, you may stop the worker''. Old worker pid 11651 was running 6 other jobs (DEV-360/362/363/364/365/367), so I did not kill it right away. A detached watcher (stop-worker-11651.sh in this session''s scratchpad, log next to it) sends it TERM once it has no running job children. The second worker, pid 53147 (/opt/homebrew/bin/lotar 0.13.2, started 21:24, includes DEV-342''s fix), keeps serving the queue. I cleared the HelpNeeded/mallox outcome so the merge agent retries. The code is already on main (06b571f). A retry picked up by 11651 before it stops would fail the same way. Still open: the ticket''s check needs a lotar release with 06b571f installed (owner''s step), then an upgrade while a worker runs.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af86593d9-5bfc-43dc-9e6e-504db1577842
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab7be4f58-8651-4692-8cf6-4cb0c810c1c9
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9d6c1af5-42de-408e-bad9-68435488fc61
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa9c6ec5a-b410-4c1d-9139-06490a1ceb9c
 description: 'Found by DEV-356 (claude, 2026-11-11): the merge job job-20261112T044319.387Z-24 fast-forwarded main correctly (0a8b272), but LoTaR failed it with ''agent/DEV-356 is not merged into the main checkout''s current branch and can''t be fast-forwarded''. The thread worked on t3/fix-flaky-t3-runner-test, and git cherry main agent/DEV-356 shows the commit as applied, so DEV-342''s fix (c55f67c, in v0.13.2) would have passed it. The ''lotar agent worker'' (pid 11651) started 2026-11-11 18:31 local, before c55f67c (18:42) and before v0.13.2 was installed at /opt/homebrew/opt/lotar/bin/lotar (20:27), so it still runs the old code. Jobs it runs use old merge checks and old rules until someone restarts it. Check: after upgrading lotar while a worker runs, the worker runs the new build for the next job (or ''lotar agent'' status warns that the worker is older than the installed binary). Done when a worker notices its executable changed and restarts between jobs, or reports it clearly, with a test.'
 tags:
 - health
+- merge-retried
 custom_fields:
   finding: stale-process:agent-worker-binary
 history:
@@ -73,3 +87,77 @@ history:
   - field: relationships
     old: '{"related":["DEV-342","DEV-356","DEV-305"]}'
     new: '{"related":["DEV-342","DEV-356","DEV-305","DEV-358"]}'
+- at: 2026-11-12T05:28:33.305396+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-342","DEV-356","DEV-305","DEV-358"]}'
+    new: '{"related":["DEV-342","DEV-356","DEV-305","DEV-358","DEV-367"]}'
+- at: 2026-11-12T05:28:38.832565+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:28:38.966570+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-342","DEV-356","DEV-305","DEV-358","DEV-367"]}'
+    new: '{"related":["DEV-342","DEV-356","DEV-305","DEV-358","DEV-367","DEV-354"]}'
+- at: 2026-11-12T05:28:43.697240+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: health
+    new: health, merge-retried
+- at: 2026-11-12T05:28:43.813208+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:28:45.579065+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9d6c1af5-42de-408e-bad9-68435488fc61
+- at: 2026-11-12T05:29:51.131480+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:29:57.652513+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-12T05:33:12.437094+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:33:12.618478+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-342","DEV-356","DEV-305","DEV-358","DEV-367","DEV-354"]}'
+    new: '{"related":["DEV-342","DEV-356","DEV-305","DEV-358","DEV-367","DEV-354","DEV-360"]}'
+- at: 2026-11-12T05:33:12.753936+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-12T05:33:12.816238+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-12T05:33:13.944605+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa9c6ec5a-b410-4c1d-9139-06490a1ceb9c
