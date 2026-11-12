@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T04:47:42.443342+00:00
-modified: 2026-11-12T05:07:08.535894+00:00
+modified: 2026-11-12T05:08:32.902007+00:00
 relationships:
   related:
   - DEV-354
@@ -18,12 +18,21 @@ comments:
   text: 'claude: Merged into main (fast-forward) as 4be7d13: the fix commit, rebased onto main. Checks in the worktree: lint:agent, test:agent and smoke (379/379) passed. The ticket''s check in the main checkout, cargo nextest run --no-fail-fast -E ''test(web_api_integration_test::)'', passed 5 of 5 runs (35/35 each).'
 - date: 2026-11-12T05:07:07.909633+00:00
   text: 'claude: Not pushed: main has unpushed commits from other tickets (DEV-348, 352, 354, 355, 356), which wait for their sessions. Ticket files committed as 01e55b0.'
+- date: 2026-11-12T05:07:19.100761+00:00
+  text: The merge agent's job job-20261112T045901.881Z-28 failed (lotar agent logs job-20261112T045901.881Z-28); the fix agent retries it on branch agent/DEV-359.
+- date: 2026-11-12T05:07:58.519879+00:00
+  text: 'claude: Nothing left to fix. The fix is already on main as 4be7d13 (the rebased 1d69b61), and git diff 1d69b61 4be7d13 -- tests/web_api_integration_test.rs is empty. The merge agent''s comment says the ticket''s check passed 5 of 5 in the main checkout. Its job was marked failed only because main wasn''t pushed: main also holds unpushed commits from DEV-348, 352, 354, 355 and 356. agent/DEV-359 has no new commits. Pushing main is the only step left.'
+- date: 2026-11-12T05:08:32.902007+00:00
+  text: 'claude: Merge retry: nothing to merge. The branch''s only commit (1d69b61) was already on main as 4be7d13; the rebase skipped it and the branch now equals main. Not pushed: main holds unpushed commits from DEV-348, 352, 354, 355 and 356 that wait for their own sessions. No code changed, so no checks ran this time (the earlier merge ran the nextest check 5 of 5, lint:agent, test:agent, smoke).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8a800754-e4a5-4ec5-9daa-e8c4f4cdab68
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae828c50c-0209-44ef-8410-92ca55d914f5
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6b968181-b60d-4cd6-adb2-7f960fb945e4
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aabd60b6d-06d6-4eeb-a662-8d504442bb11
 description: 'Found by DEV-354 merge (claude, 2026-11-11): in the main checkout, running the web_api_integration_test module with cargo nextest run --no-fail-fast -E ''test(web_api_integration_test::)'' failed this test in 4 of 7 runs at tests/web_api_integration_test.rs:606 (stream.read_to_string(&mut response).unwrap() returned WouldBlock, os error 35) because the stream read timeout is net_timeout() (500 ms). It passes alone and in the DEV-354 worktree. Same cause as DEV-354: the response read uses a short fixed timeout. Check: run that cargo nextest command 5 times; all must pass. Done when this read waits for the response with the read_until_deadline helper added in DEV-354 (deadline, not fixed short budget), still failing fast on a real hang.'
 tags:
 - health
+- merge-retried
 custom_fields:
   finding: flaky-test:task_creation_waits_for_fragmented_body_with_case_insensitive_content_length
 history:
@@ -84,3 +93,40 @@ history:
   - field: relationships
     old: '{"related":["DEV-354","DEV-356"]}'
     new: '{"related":["DEV-354","DEV-356","DEV-348"]}'
+- at: 2026-11-12T05:07:18.816653+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: health
+    new: health, merge-retried
+- at: 2026-11-12T05:07:19.100761+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:07:21.388244+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6b968181-b60d-4cd6-adb2-7f960fb945e4
+- at: 2026-11-12T05:07:58.519879+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:08:07.373242+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T05:08:08.298485+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aabd60b6d-06d6-4eeb-a662-8d504442bb11
+- at: 2026-11-12T05:08:32.902007+00:00
+  actor: claude
+  changes:
+  - field: comment_added
