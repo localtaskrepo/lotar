@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T19:12:53.510074+00:00
-modified: 2026-11-12T19:23:07.563404+00:00
+modified: 2026-11-12T19:32:34.767156+00:00
 relationships:
   related:
   - DEV-378
@@ -18,6 +18,9 @@ comments:
 - date: 2026-11-12T19:22:55.884765+00:00
   author: claude
   text: 'claude: The question about deleting the existing leftovers is now DEV-381 (HelpNeeded, assigned to mallox), so it doesn''t hold up this merge.'
+- date: 2026-11-12T19:32:34.767156+00:00
+  author: claude
+  text: 'claude: Merged and pushed. Rebased agent/DEV-380 onto main three times while main moved (DEV-378, DEV-379, then DEV-378 ticket updates), with no conflicts; fast-forwarded main to e874b97 and pushed it to origin (only this commit was unpushed; hooks ran). Checks in the worktree after rebasing onto DEV-379: npm run lint passed, npm test 2065/2065, npm run smoke 381/381; with XDG_RUNTIME_DIR pointed at an empty folder, neither run wrote anything there. The last rebase only brought ticket-file changes, so I didn''t rerun them. Health check in the main checkout: ~/Library/Caches/lotar/agent-queue had 13095 entries before npm test (2065/2065) and 13095 after, same names. The finding is gone. The main checkout''s .tasks had no uncommitted changes, so there was no Ticket updates commit. The existing leftovers stay until the owner answers DEV-381.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adf680bc5-ab8b-4b5c-84db-43786c2d84fd
 description: |-
@@ -86,3 +89,7 @@ history:
   - field: assignee
     old: '@fix'
     new: '@merge'
+- at: 2026-11-12T19:32:34.767156+00:00
+  actor: claude
+  changes:
+  - field: comment_added
