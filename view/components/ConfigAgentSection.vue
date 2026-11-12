@@ -198,6 +198,28 @@
           :source-class="provenanceClass(sourceFor('agent_worktree_cleanup_ignored_files'))"
         />
       </div>
+      <div class="field field--full" data-testid="config-agent-cleanup-paths">
+        <label class="field-label">
+          <span>Build output to delete when a job ends</span>
+          <span
+            v-if="sourceFor('agent_worktree_cleanup_paths')"
+            :class="['provenance', provenanceClass(sourceFor('agent_worktree_cleanup_paths'))]"
+          >
+            {{ provenanceLabel(sourceFor('agent_worktree_cleanup_paths')) }}
+          </span>
+        </label>
+        <ChipListField
+          v-model="worktreeCleanupPaths"
+          placeholder="target"
+          add-label="Add path"
+          composer-label="Path in the worktree"
+          :empty-label="isGlobal ? 'Nothing is deleted' : 'Uses the global setting'"
+        />
+        <p class="field-hint">
+          Paths inside the worktree, deleted when a job ends and no other job runs in it. Only paths git ignores are
+          deleted; the worktree stays.
+        </p>
+      </div>
     </div>
   </ConfigGroup>
 </template>
@@ -206,6 +228,7 @@
 import { computed, useId } from 'vue'
 import type { ConfigSource } from '../api/types'
 import type { AgentInstructionsMode, ToggleField, ToggleValue } from '../composables/useConfigForm'
+import ChipListField from './ChipListField.vue'
 import ConfigGroup from './ConfigGroup.vue'
 import ConfigToggleField from './ConfigToggleField.vue'
 import UiInput from './UiInput.vue'
@@ -228,6 +251,7 @@ const worktreeCleanupDeleteBranches = defineModel<ToggleValue>('worktreeCleanupD
   default: 'false',
 })
 const worktreeCleanupIgnoredFiles = defineModel<ToggleValue>('worktreeCleanupIgnoredFiles', { default: 'true' })
+const worktreeCleanupPaths = defineModel<string[]>('worktreeCleanupPaths', { default: () => [] })
 
 const {
   description,

@@ -64,3 +64,28 @@ fn job_limit_and_cleanup_settings_are_settable() {
     assert!(!project.contains("cleanup_on_done"), "{project}");
     assert!(project.contains("max_parallel_jobs: 1"), "{project}");
 }
+
+/// DEV-364: build output deleted at job end, as a comma-separated list;
+/// paths outside the worktree are refused.
+#[test]
+fn cleanup_paths_are_settable() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path();
+    assert!(run(dir, &["add", "Seed", "-p", "WT"]).0);
+
+    let (ok, out) = run(dir, &["config", "set", "agent_worktree_cleanup_paths", "target, view/dist", "--global"]);
+    assert!(ok, "{out}");
+    let global = read(dir, "config.yml");
+    assert!(global.contains("cleanup_paths:\n    - target\n    - view/dist"), "{global}");
+    for bad in ["../target", "/tmp/target", ".git"] {
+        let (ok, out) = run(dir, &["config", "set", "agent_worktree_cleanup_paths", bad, "--global"]);
+        assert!(!ok && out.contains("inside the worktree"), "{bad}: {out}");
+    }
+
+    assert!(run(dir, &["config", "set", "agent_worktree_cleanup_paths", "build", "-p", "WT"]).0);
+    assert!(read(dir, "WT/config.yml").contains("cleanup_paths:\n    - build"), "{}", read(dir, "WT/config.yml"));
+    assert!(run(dir, &["config", "set", "agent_worktree_cleanup_paths", "", "-p", "WT"]).0);
+    assert!(!read(dir, "WT/config.yml").contains("cleanup_paths"));
+    assert!(run(dir, &["config", "set", "agent_worktree_cleanup_paths", "", "--global"]).0);
+    assert!(!read(dir, "config.yml").contains("cleanup_paths"));
+}

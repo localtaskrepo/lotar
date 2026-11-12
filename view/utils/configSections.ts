@@ -153,6 +153,7 @@ export const CONFIG_SECTIONS: readonly ConfigSectionDefinition[] = [
             'agentWorktreeCleanupOnCancel',
             'agentWorktreeCleanupDeleteBranches',
             'agentWorktreeCleanupIgnoredFiles',
+            'agentWorktreeCleanupPaths',
         ],
         errorKeys: [
             'agent_context_extension',

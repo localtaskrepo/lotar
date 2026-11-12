@@ -692,3 +692,117 @@ fn automatic_cleanup_removes_worktrees_with_only_ignored_files_unless_disabled()
         }
     }
 }
+
+/// DEV-364: a job that writes build output, in a repository that ignores
+/// `target/` and `keep/` and has `cleanup_paths: [target]` configured.
+fn build_output_setup(body: &str) -> (TestFixtures, String) {
+    let (fixture, ticket) = setup(&format!("mkdir -p target/debug keep && echo bin > target/debug/app && echo out > keep/log\n{body}"), true);
+    let root = fixture.get_temp_path();
+    fs::write(root.join(".gitignore"), "target/\nkeep/\n").unwrap();
+    git(root, &["add", ".gitignore"]);
+    git(root, &["commit", "-m", "Ignore build output"]);
+    let config_path = fixture.tasks_root.join("config.yml");
+    let config = fs::read_to_string(&config_path)
+        .unwrap()
+        .replace("states: [Todo, Done]", "states: [Todo, HelpNeeded, Done]")
+        .replace("    cleanup_delete_branches: true\n", "    cleanup_delete_branches: true\n    cleanup_paths: [target, ../escape, .git]\n");
+    fs::write(&config_path, config).unwrap();
+    fs::create_dir_all(root.join("escape")).unwrap();
+    (fixture, ticket)
+}
+
+fn run_build_output_job(fixture: &TestFixtures, ticket: &str) -> lotar::api_types::AgentJob {
+    let job = AgentJobService::start_job_with_tasks_dir(request(ticket), &fixture.tasks_root).unwrap();
+    wait_idle();
+    let job = AgentJobService::get_job(&job.id).unwrap();
+    assert!(Path::new(job.worktree_path.as_deref().unwrap()).join(".git").exists(), "the worktree stays");
+    job
+}
+
+fn deleted_note(job: &lotar::api_types::AgentJob) -> bool {
+    AgentJobService::events_for(&job.id).iter().any(|event| event.message.as_deref().is_some_and(|m| m.contains("Deleted build output `target`")))
+}
+
+/// Ending a job with the ticket still open deletes the configured build
+/// output and nothing else: unlisted ignored paths, paths outside the
+/// worktree and git's metadata stay.
+#[test]
+fn ending_a_job_deletes_configured_build_output_and_keeps_the_worktree() {
+    common::require_git();
+    let (fixture, ticket) = build_output_setup("exit 0");
+    let job = run_build_output_job(&fixture, &ticket);
+    assert_eq!(job.status, "completed", "{:?}", job.last_message);
+    let worktree = Path::new(job.worktree_path.as_deref().unwrap());
+    assert!(!worktree.join("target").exists(), "configured build output is deleted");
+    assert!(worktree.join("keep/log").exists(), "unlisted ignored files stay");
+    assert!(fixture.get_temp_path().join("escape").exists(), "paths outside the worktree stay");
+    assert!(deleted_note(&job), "the job log says what was deleted");
+    let git_dir = Command::new("git").args(["rev-parse", "--absolute-git-dir"]).current_dir(worktree).output().unwrap();
+    let git_dir = String::from_utf8(git_dir.stdout).unwrap();
+    assert!(fs::read_dir(git_dir.trim()).unwrap().flatten().all(|entry| !entry.file_name().to_string_lossy().starts_with("lotar-cleanup-")));
+}
+
+/// A job that hands its ticket back (HelpNeeded) keeps its worktree, but
+/// not its build output; a tracked file under a configured path keeps it.
+#[test]
+fn a_job_ending_with_help_needed_deletes_build_output() {
+    common::require_git();
+    let lotar_bin = env!("CARGO_BIN_EXE_lotar");
+    let (fixture, ticket) = build_output_setup("");
+    let script = fixture.get_temp_path().join("runner.sh");
+    let body = fs::read_to_string(&script).unwrap();
+    fs::write(
+        &script,
+        format!(
+            "{body}LOTAR_IGNORE_HOME_CONFIG=1 '{lotar_bin}' --tasks-dir '{}' status \"$LOTAR_TICKET_ID\" HelpNeeded >/dev/null\n",
+            fixture.tasks_root.display()
+        ),
+    )
+    .unwrap();
+    let job = run_build_output_job(&fixture, &ticket);
+    assert_eq!(job.status, "completed", "{:?}", job.last_message);
+    let task = fs::read_to_string(fixture.tasks_root.join("SAFE/1.yml")).unwrap();
+    assert!(task.contains("status: HelpNeeded"), "{task}");
+    let worktree = Path::new(job.worktree_path.as_deref().unwrap());
+    assert!(!worktree.join("target").exists());
+    assert!(deleted_note(&job));
+}
+
+/// Build output stays while another job runs for the ticket: it shares the
+/// worktree. So does a configured path that holds tracked files.
+#[test]
+fn build_output_stays_while_another_job_runs_in_the_worktree() {
+    common::require_git();
+    use lotar::services::agent_active_jobs::{self, ActiveJob};
+    let (fixture, ticket) = build_output_setup("");
+    let go = fixture.get_temp_path().join("GO");
+    let script = fixture.get_temp_path().join("runner.sh");
+    let body = fs::read_to_string(&script).unwrap();
+    fs::write(&script, format!("{body}while [ ! -f '{}' ]; do sleep 0.05; done\n", go.display())).unwrap();
+    let job = AgentJobService::start_job_with_tasks_dir(request(&ticket), &fixture.tasks_root).unwrap();
+    // A job another (live) process runs for the ticket.
+    let elsewhere = ActiveJob {
+        job_id: "job-elsewhere".into(),
+        ticket_id: ticket.clone(),
+        runner: "claude".into(),
+        agent: Some("safety".into()),
+        owner_pid: 1,
+        child_pid: 1,
+        started_at: "2026-11-11T00:00:00Z".into(),
+    };
+    agent_active_jobs::register(&fixture.tasks_root, &elsewhere);
+    fs::write(&go, "").unwrap();
+    wait_idle();
+    agent_active_jobs::unregister(&fixture.tasks_root, &elsewhere.job_id);
+    let job = AgentJobService::get_job(&job.id).unwrap();
+    let worktree = Path::new(job.worktree_path.as_deref().unwrap());
+    assert!(worktree.join("target/debug/app").exists(), "a running job's build output stays");
+    assert!(!deleted_note(&job));
+
+    // With no other job, tracked files under a configured path keep it.
+    fs::write(&script, format!("{body}git add -f target/debug/app && git -c commit.gpgsign=false commit -qm 'Track a build file'\n")).unwrap();
+    let job = run_build_output_job(&fixture, &ticket);
+    assert_eq!(job.status, "completed", "{:?}", job.last_message);
+    assert!(Path::new(job.worktree_path.as_deref().unwrap()).join("target/debug/app").exists(), "tracked files are never deleted");
+    assert!(!deleted_note(&job));
+}

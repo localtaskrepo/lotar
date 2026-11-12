@@ -535,6 +535,7 @@
               v-model:worktree-cleanup-on-cancel="form.agentWorktreeCleanupOnCancel"
               v-model:worktree-cleanup-delete-branches="form.agentWorktreeCleanupDeleteBranches"
               v-model:worktree-cleanup-ignored-files="form.agentWorktreeCleanupIgnoredFiles"
+              v-model:worktree-cleanup-paths="form.agentWorktreeCleanupPaths"
               :global-context-extension="inspectData.global_effective?.agent_context_extension ?? ''"
               :global-logs-dir="inspectData.global_effective?.agent_logs_dir ?? ''"
               :global-branch-prefix="inspectData.global_effective?.agent_worktree?.branch_prefix ?? ''"

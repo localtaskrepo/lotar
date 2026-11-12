@@ -18,3 +18,7 @@ issue:
   - WontDo
 attachments:
   dir: DEV/@attachments
+agent:
+  worktree:
+    cleanup_paths:
+    - target

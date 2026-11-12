@@ -1044,6 +1044,8 @@ export interface AgentWorktreeConfig {
     cleanup_delete_branches?: boolean
     /** Git-ignored files don't block cleanup (default true). */
     cleanup_ignored_files?: boolean
+    /** Paths in the worktree deleted when a job ends, if git ignores them (build output). */
+    cleanup_paths?: string[]
 }
 
 export interface SprintDefaultsConfig {

@@ -255,6 +255,7 @@ fn source_label_for_global(
         "agent_worktree_cleanup_on_cancel" => scope_field!(agent_worktree),
         "agent_worktree_cleanup_delete_branches" => scope_field!(agent_worktree),
         "agent_worktree_cleanup_ignored_files" => scope_field!(agent_worktree),
+        "agent_worktree_cleanup_paths" => scope_field!(agent_worktree),
         "sprints_defaults_capacity_points" => scope_for_global_value(
             &resolved.sprint_defaults.capacity_points,
             home.map(|cfg| &cfg.sprints.defaults.capacity_points),
@@ -352,6 +353,7 @@ fn env_value_matches(resolved: &ResolvedConfig, env_resolved: &ResolvedConfig, k
         "agent_worktree_cleanup_on_cancel" => env_equal!(agent_worktree),
         "agent_worktree_cleanup_delete_branches" => env_equal!(agent_worktree),
         "agent_worktree_cleanup_ignored_files" => env_equal!(agent_worktree),
+        "agent_worktree_cleanup_paths" => env_equal!(agent_worktree),
         "branch_type_aliases" => env_equal!(branch_type_aliases),
         "branch_status_aliases" => env_equal!(branch_status_aliases),
         "branch_priority_aliases" => env_equal!(branch_priority_aliases),
@@ -583,7 +585,8 @@ fn source_label_for_project(key: &str, resolved_project: &ResolvedConfig, projec
         | "agent_worktree_cleanup_on_failure"
         | "agent_worktree_cleanup_on_cancel"
         | "agent_worktree_cleanup_delete_branches"
-        | "agent_worktree_cleanup_ignored_files" => {
+        | "agent_worktree_cleanup_ignored_files"
+        | "agent_worktree_cleanup_paths" => {
             let has_override = project_cfg.and_then(|pc| pc.agent_worktree.as_ref()).is_some();
             let diff = resolved_project.agent_worktree != base_config.agent_worktree;
             project_scope!("agent_worktree", has_override, diff)

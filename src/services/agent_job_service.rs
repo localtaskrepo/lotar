@@ -1676,6 +1676,96 @@ fn maybe_cleanup_worktree(job_id: &str, ticket_id: &str, tasks_dir: &std::path::
     cleanup_done_ticket_worktree(tasks_dir, ticket_id);
 }
 
+/// A job ended: delete `agent.worktree.cleanup_paths` (build output such as
+/// `target`) from its worktree, which stays (DEV-364). Finished worktrees
+/// otherwise keep gigabytes each until cleanup removes them, and a job that
+/// ends with its ticket open keeps its worktree on purpose. Skipped while
+/// another job runs for the ticket, as it shares the worktree. Only paths
+/// git ignores and tracks nothing under are deleted.
+fn remove_build_output(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Path, config: &ResolvedConfig) {
+    let paths = &config.agent_worktree.cleanup_paths;
+    if paths.is_empty() {
+        return;
+    }
+    let Some(target) = resolve_job_worktree(job_id).filter(|target| target.path.exists()) else {
+        return;
+    };
+    let Some(repo_root) = resolve_repo_root(tasks_dir) else {
+        return;
+    };
+    let (Ok(root), Ok(worktree)) = (fs::canonicalize(&repo_root), fs::canonicalize(&target.path)) else {
+        return;
+    };
+    if worktree == root || verified_common_dir(&root).ok().is_none_or(|common| verified_common_dir(&worktree).ok() != Some(common)) {
+        return;
+    }
+    let Some(git_dir) = git_command(&worktree)
+        .args(["rev-parse", "--absolute-git-dir"])
+        .current_dir(&worktree)
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .map(|output| std::path::PathBuf::from(String::from_utf8_lossy(&output.stdout).trim()))
+    else {
+        return;
+    };
+    // Holding the registry keeps a job from starting in the worktree while
+    // its build output moves out; the slow delete runs after the release.
+    let Ok(mut registry) = JOB_REGISTRY.lock() else {
+        return;
+    };
+    if registry.active_by_ticket.get(ticket_id).is_some_and(|id| id != job_id)
+        || crate::services::agent_active_jobs::for_ticket_elsewhere(tasks_dir, ticket_id).is_some()
+    {
+        return;
+    }
+    let mut moved = Vec::new();
+    let mut removed = Vec::new();
+    for (index, path) in paths.iter().enumerate() {
+        if crate::config::types::validate_cleanup_path(path).is_err() || !build_output_removable(&worktree, path) {
+            continue;
+        }
+        let full = worktree.join(path);
+        // Moved into the worktree's git dir: same file system, invisible to
+        // git and to a job that starts next.
+        let parked = git_dir.join(format!("lotar-cleanup-{job_id}-{index}"));
+        if fs::rename(&full, &parked).is_ok() {
+            moved.push(parked);
+            removed.push(path.as_str());
+        } else if remove_path(&full).is_ok() {
+            removed.push(path.as_str());
+        }
+    }
+    if !removed.is_empty()
+        && let Some(state) = registry.jobs.get_mut(job_id)
+    {
+        let list = removed.iter().map(|path| format!("`{path}`")).collect::<Vec<_>>().join(", ");
+        record_and_emit(state, "agent_job_progress", Some(format!("Deleted build output {list} from the worktree {}.", target.path.display())));
+    }
+    drop(registry);
+    for parked in moved {
+        let _ = remove_path(&parked);
+    }
+}
+
+/// Whether `path` in the worktree exists, is not a symlink, is ignored by
+/// git and holds no tracked files.
+fn build_output_removable(worktree: &std::path::Path, path: &str) -> bool {
+    let Ok(metadata) = fs::symlink_metadata(worktree.join(path)) else {
+        return false;
+    };
+    if metadata.file_type().is_symlink() {
+        return false;
+    }
+    let git = |args: &[&str]| git_command(worktree).args(args).current_dir(worktree).output().ok();
+    let ignored = git(&["check-ignore", "--quiet", "--", path]).is_some_and(|output| output.status.success());
+    ignored && git(&["ls-files", "--", path]).is_some_and(|output| output.status.success() && output.stdout.is_empty())
+}
+
+fn remove_path(path: &std::path::Path) -> std::io::Result<()> {
+    if fs::symlink_metadata(path)?.is_dir() { fs::remove_dir_all(path) } else { fs::remove_file(path) }
+}
+
 #[expect(
     clippy::too_many_arguments,
     clippy::needless_pass_by_value,
@@ -2285,6 +2375,7 @@ fn finalize_cancelled_job(job_id: &str) {
     let prefix = crate::storage::TaskId::parse(&record.ticket_id).ok().map(|parsed| parsed.project);
     if let Ok(config) = crate::config::resolution::config_for_project(&record.tasks_dir, prefix.as_deref()) {
         maybe_cleanup_worktree(job_id, &record.ticket_id, &record.tasks_dir, &config, JobOutcome::Cancelled);
+        remove_build_output(job_id, &record.ticket_id, &record.tasks_dir, &config);
     }
 }
 
@@ -2570,6 +2661,7 @@ fn finalize_job(
     let _ = AgentContextService::append_messages(tasks_dir, config, ticket_id, context_messages.to_vec(), None);
 
     maybe_cleanup_worktree(job_id, ticket_id, tasks_dir, config, if success { JobOutcome::Success } else { JobOutcome::Failure });
+    remove_build_output(job_id, ticket_id, tasks_dir, config);
 }
 
 fn update_job_failure(job_id: &str, ticket_id: &str, message: String, tasks_dir: &std::path::Path) {

@@ -273,6 +273,11 @@ pub struct AgentWorktreeConfig {
     /// any ignored file keeps it too.
     #[serde(default = "default_true")]
     pub cleanup_ignored_files: bool,
+    /// Paths, relative to the worktree, deleted when a job ends and no
+    /// other job runs in its worktree (build output such as `target`).
+    /// Only paths git ignores are deleted; the worktree stays.
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub cleanup_paths: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -296,6 +301,8 @@ pub struct AgentWorktreeConfigOverride {
     pub cleanup_delete_branches: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub cleanup_ignored_files: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub cleanup_paths: Option<Vec<String>>,
 }
 
 impl Default for AgentWorktreeConfig {
@@ -310,6 +317,7 @@ impl Default for AgentWorktreeConfig {
             cleanup_on_cancel: false,
             cleanup_delete_branches: false,
             cleanup_ignored_files: true,
+            cleanup_paths: Vec::new(),
         }
     }
 }
@@ -931,6 +939,24 @@ pub fn public_url_problem(value: &str) -> Option<String> {
             Some(format!("server.public_url must be an http:// or https:// address without query or fragment, like https://lotar.example.com (got '{value}')"))
         }
     }
+}
+
+/// An `agent.worktree.cleanup_paths` entry names a path inside the worktree:
+/// relative, without `..`, and not git's own metadata.
+pub fn validate_cleanup_path(path: &str) -> Result<(), String> {
+    let mut components = std::path::Path::new(path).components().peekable();
+    if components.peek().is_none() {
+        return Err("agent.worktree.cleanup_paths entries cannot be empty".to_string());
+    }
+    for component in components {
+        match component {
+            std::path::Component::Normal(name) if name != ".git" => {}
+            _ => {
+                return Err(format!("agent.worktree.cleanup_paths entry '{path}' must be a path inside the worktree, like `target`, without `..` or `.git`"));
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Review authority accepts named literals only, never identity directives or wildcards.

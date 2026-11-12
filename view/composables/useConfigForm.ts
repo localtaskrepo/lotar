@@ -109,6 +109,7 @@ export interface ConfigFormState {
     agentWorktreeCleanupOnCancel: ToggleValue
     agentWorktreeCleanupDeleteBranches: ToggleValue
     agentWorktreeCleanupIgnoredFiles: ToggleValue
+    agentWorktreeCleanupPaths: string[]
     /** Global-only sprint defaults. */
     sprintLength: string
     sprintOverdueAfter: string
@@ -282,6 +283,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         agentWorktreeCleanupOnCancel: 'false',
         agentWorktreeCleanupDeleteBranches: 'false',
         agentWorktreeCleanupIgnoredFiles: 'true',
+        agentWorktreeCleanupPaths: [],
         sprintLength: '',
         sprintOverdueAfter: '',
         sprintCapacityPoints: '',
@@ -1263,6 +1265,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         form.agentWorktreeCleanupOnCancel = toToggle(!!effective.agent_worktree?.cleanup_on_cancel)
         form.agentWorktreeCleanupDeleteBranches = toToggle(!!effective.agent_worktree?.cleanup_delete_branches)
         form.agentWorktreeCleanupIgnoredFiles = toToggle(effective.agent_worktree?.cleanup_ignored_files !== false)
+        form.agentWorktreeCleanupPaths = [...(effective.agent_worktree?.cleanup_paths ?? [])]
         form.sprintLength = effective.sprint_defaults?.length ?? ''
         form.sprintOverdueAfter = effective.sprint_defaults?.overdue_after ?? ''
         form.sprintCapacityPoints = effective.sprint_defaults?.capacity_points?.toString() ?? ''
@@ -1354,6 +1357,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             form.agentWorktreeCleanupOnCancel = toTriToggle(raw.agent_worktree?.cleanup_on_cancel)
             form.agentWorktreeCleanupDeleteBranches = toTriToggle(raw.agent_worktree?.cleanup_delete_branches)
             form.agentWorktreeCleanupIgnoredFiles = toTriToggle(raw.agent_worktree?.cleanup_ignored_files)
+            form.agentWorktreeCleanupPaths = [...(raw.agent_worktree?.cleanup_paths ?? [])]
             if (Array.isArray(raw.scan_signal_words)) {
                 form.scanSignalWords = [...raw.scan_signal_words]
             }
@@ -1573,6 +1577,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         addToggleField('agentWorktreeCleanupIgnoredFiles', 'agent_worktree_cleanup_ignored_files', {
             allowInherit: true,
         })
+        addArray('agentWorktreeCleanupPaths', 'agent_worktree_cleanup_paths')
 
         if (isGlobal.value) {
             addValue('sprintLength', 'sprints_defaults_length')

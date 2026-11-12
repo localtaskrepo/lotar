@@ -139,6 +139,16 @@ fn parse_review_reviewers(value: &str) -> Result<Vec<String>, ConfigError> {
     crate::config::types::normalize_review_reviewers(&values)
 }
 
+/// `agent_worktree_cleanup_paths`: relative paths inside the worktree, as a
+/// YAML list or comma-separated.
+fn parse_cleanup_paths(value: &str) -> Result<Vec<String>, ConfigError> {
+    let paths = parse_simple_csv(value);
+    for path in &paths {
+        crate::config::types::validate_cleanup_path(path).map_err(ConfigError::ParseError)?;
+    }
+    Ok(paths)
+}
+
 fn parse_simple_csv(value: &str) -> Vec<String> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
@@ -622,6 +632,9 @@ pub fn apply_field_to_global_config(config: &mut GlobalConfig, field: &str, valu
         "agent_worktree_cleanup_ignored_files" => {
             config.agent_worktree.cleanup_ignored_files = parse_bool_flag(value, field)?;
         }
+        "agent_worktree_cleanup_paths" => {
+            config.agent_worktree.cleanup_paths = parse_cleanup_paths(value)?;
+        }
         "remotes" => {
             config.remotes = parse_sync_remotes(value)?;
         }
@@ -952,6 +965,14 @@ pub fn apply_field_to_project_config(config: &mut ProjectConfig, field: &str, va
             let worktree = config.agent_worktree.get_or_insert_with(Default::default);
             worktree.cleanup_ignored_files = parse_optional_bool_flag(value, field)?;
         }
+        "agent_worktree_cleanup_paths" => {
+            let paths = parse_cleanup_paths(value)?;
+            if paths.is_empty() {
+                clear_agent_worktree_field(config, WorktreeSubfield::CleanupPaths);
+            } else {
+                config.agent_worktree.get_or_insert_with(Default::default).cleanup_paths = Some(paths);
+            }
+        }
         "remotes" => {
             config.remotes = parse_sync_remotes(value)?;
         }
@@ -1238,6 +1259,9 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
         | "agent_worktree_cleanup_ignored_files" => {
             let _ = parse_optional_bool_flag(value, field)?;
         }
+        "agent_worktree_cleanup_paths" => {
+            let _ = parse_cleanup_paths(value)?;
+        }
         "remotes" => {
             let _ = parse_sync_remotes(value)?;
         }
@@ -1416,6 +1440,9 @@ pub fn clear_project_override_field(config: &mut ProjectConfig, field: &str) -> 
         "agent_worktree_cleanup_ignored_files" => {
             clear_agent_worktree_field(config, WorktreeSubfield::CleanupIgnoredFiles);
         }
+        "agent_worktree_cleanup_paths" => {
+            clear_agent_worktree_field(config, WorktreeSubfield::CleanupPaths);
+        }
         "attachments_dir" => config.attachments_dir = None,
         "attachments_max_upload_mb" => config.attachments_max_upload_mb = None,
         "sync_reports_dir" => config.sync_reports_dir = None,
@@ -1440,6 +1467,7 @@ enum WorktreeSubfield {
     CleanupOnCancel,
     CleanupDeleteBranches,
     CleanupIgnoredFiles,
+    CleanupPaths,
 }
 
 fn clear_agent_worktree_field(config: &mut ProjectConfig, subfield: WorktreeSubfield) {
@@ -1456,6 +1484,7 @@ fn clear_agent_worktree_field(config: &mut ProjectConfig, subfield: WorktreeSubf
         WorktreeSubfield::CleanupOnCancel => worktree.cleanup_on_cancel = None,
         WorktreeSubfield::CleanupDeleteBranches => worktree.cleanup_delete_branches = None,
         WorktreeSubfield::CleanupIgnoredFiles => worktree.cleanup_ignored_files = None,
+        WorktreeSubfield::CleanupPaths => worktree.cleanup_paths = None,
     }
     let empty = worktree.enabled.is_none()
         && worktree.dir.is_none()
@@ -1465,7 +1494,8 @@ fn clear_agent_worktree_field(config: &mut ProjectConfig, subfield: WorktreeSubf
         && worktree.cleanup_on_failure.is_none()
         && worktree.cleanup_on_cancel.is_none()
         && worktree.cleanup_delete_branches.is_none()
-        && worktree.cleanup_ignored_files.is_none();
+        && worktree.cleanup_ignored_files.is_none()
+        && worktree.cleanup_paths.is_none();
     if empty {
         config.agent_worktree = None;
     }
