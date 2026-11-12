@@ -64,6 +64,7 @@ mod test_environment {
     #[ctor::ctor(unsafe)]
     unsafe fn isolate_tmpdir_under_owned_scratch() {
         scrub_repository_routing_env();
+        scrub_config_override_env();
         if OWNED_SCRATCH.get().is_some() {
             return;
         }
@@ -108,6 +109,19 @@ mod test_environment {
             // scope tiny; the ctor runs before any test thread exists.
             unsafe {
                 std::env::remove_var(&key);
+            }
+        }
+    }
+
+    /// Remove inherited config overrides such as `LOTAR_DEFAULT_REPORTER`
+    /// (DEV-336): they beat the fixtures' own config. Same baseline as
+    /// `reset_lotar_test_environment` in `tests/common`.
+    fn scrub_config_override_env() {
+        for var in crate::config::env_overrides::ENV_OVERRIDE_DEFINITIONS.iter().flat_map(|definition| definition.env_vars) {
+            // Manipulating process-wide env vars requires `unsafe`. Keep
+            // scope tiny; the ctor runs before any test thread exists.
+            unsafe {
+                std::env::remove_var(var);
             }
         }
     }

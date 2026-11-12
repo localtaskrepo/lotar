@@ -184,6 +184,14 @@ pub fn reset_lotar_test_environment() {
             std::env::remove_var(var);
         }
     }
+    // Config overrides from the caller (an agent's LOTAR_DEFAULT_REPORTER)
+    // would beat the fixtures' own config (DEV-336).
+    for var in lotar::config::env_overrides::ENV_OVERRIDE_DEFINITIONS.iter().flat_map(|definition| definition.env_vars) {
+        let _guard = env_mutex::lock_var(var);
+        unsafe {
+            std::env::remove_var(var);
+        }
+    }
     let _guard = env_mutex::lock_var("LOTAR_IGNORE_HOME_CONFIG");
     unsafe {
         std::env::set_var("LOTAR_IGNORE_HOME_CONFIG", "1");

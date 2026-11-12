@@ -1,0 +1,48 @@
+title: Rust tests fail when LOTAR_DEFAULT_REPORTER is set
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T01:25:02.487035+00:00
+modified: 2026-11-12T01:33:17.154777+00:00
+relationships:
+  related:
+  - DEV-335
+  - DEV-338
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A413e7be2-3112-4aea-8f3c-dc8b5918a5d6
+description: 'Found (DEV-335, 2026-11-11): with LOTAR_DEFAULT_REPORTER=claude in the environment, as the fix-agent prompt in .tasks/DEV/automation.yml asks, npm test fails in services::relationships::dev15_relationship_cases::graph_filters_share_identity_dates_sprints_and_needs_semantics (tests/common/dev15_relationship_cases.rs:619, 0 nodes instead of 1): the env var beats the fixture''s default.reporter, so @ME no longer matches alice_smith. env -u LOTAR_DEFAULT_REPORTER npm test passes. Check: LOTAR_DEFAULT_REPORTER=claude cargo nextest run --lib graph_filters_share_identity_dates. Done: tests don''t read the caller''s LOTAR_DEFAULT_REPORTER (the shared test setup clears it), so npm test passes with it set.'
+tags:
+- health
+custom_fields:
+  finding: npm-test:LOTAR_DEFAULT_REPORTER
+history:
+- at: 2026-11-12T01:25:02.604462+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-335"]}'
+- at: 2026-11-12T01:25:02.707673+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T01:25:02.901851+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T01:25:03.431940+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A413e7be2-3112-4aea-8f3c-dc8b5918a5d6
+- at: 2026-11-12T01:33:17.154777+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-335"]}'
+    new: '{"related":["DEV-335","DEV-338"]}'

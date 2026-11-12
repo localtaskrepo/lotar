@@ -1,0 +1,41 @@
+title: Smoke tests fail when LOTAR_DEFAULT_REPORTER is set
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T01:33:17.041938+00:00
+modified: 2026-11-12T01:33:17.956029+00:00
+relationships:
+  related:
+  - DEV-336
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6533974e-16d9-4db2-b013-dacb3a1cf1aa
+description: 'Found (DEV-336, 2026-11-11): with LOTAR_DEFAULT_REPORTER=claude set, npm run smoke fails in cli.config-agent.smoke.spec.ts (config explain shows field sources: missing explain@example.com), mcp.high-value.smoke.spec.ts (resolves whoami with explain: ''claude'' instead of me@example.com) and ui.agent-jobs.smoke.spec.ts (advances the reviewed template workflow live). env -u LOTAR_DEFAULT_REPORTER npm run smoke passes. The Rust tests now clear config env overrides (DEV-336); the smoke harness doesn''t. Check: LOTAR_DEFAULT_REPORTER=claude npm run smoke. Done: the smoke harness drops the caller''s LOTAR config overrides (config/env_overrides.rs ENV_OVERRIDE_DEFINITIONS) before spawning lotar, so smoke passes with them set.'
+tags:
+- health
+custom_fields:
+  finding: smoke:LOTAR_DEFAULT_REPORTER
+history:
+- at: 2026-11-12T01:33:17.155278+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-336"]}'
+- at: 2026-11-12T01:33:17.259210+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T01:33:17.369562+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T01:33:17.956029+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6533974e-16d9-4db2-b013-dacb3a1cf1aa
