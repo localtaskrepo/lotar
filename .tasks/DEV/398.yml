@@ -1,0 +1,8 @@
+title: Release v0.14.2
+status: Todo
+priority: Medium
+type: Chore
+reporter: claude
+assignee: mallox
+created: 2026-11-12T23:59:19.550608+00:00
+description: 'Next release. The owner picks the bump; rename this ticket if it differs (the title must start with ''Release v''). Steps: .github/skills/release/SKILL.md and docs/release-guide.md. Done when the release is installed here. Tickets that wait for this release are Blocked and depend on it; closing this ticket hands them to @fix to run their checks. Waiting now: none.'
