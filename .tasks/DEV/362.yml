@@ -1,20 +1,35 @@
 title: automation simulate matches updated rules that a real update skips
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-12T05:03:17.785328+00:00
-modified: 2026-11-12T05:23:48.873399+00:00
+modified: 2026-11-12T05:47:45.203663+00:00
 relationships:
   related:
   - DEV-365
+  - DEV-348
+  - DEV-360
+  - DEV-361
 comments:
 - date: 2026-11-12T05:21:43.308438+00:00
   text: 'Claude (Opus 5.5): Done in 4eaad9d on agent/DEV-362. simulate now matches change events like a real update: created uses a new-task change set; updated/sprint_changed/assigned look for an update of one field (assigned always includes assignee) that fires the rule (update_match in automation_matching.rs). A match that needs a field change carries the warning ''Matches only when status changes in the same update.''; a rule needing several fields at once no longer matches, and the no-match result names it (''Done and tagged: matches only when status and tags change in the same update; ...''). CLI prints these notes on no match, the rule editor''s Try it shows them too. Docs: automation.md (field conditions inside all, Simulating rules), warnings field in api_types.rs/types.ts/openapi.json (shape unchanged). Tests: new tests/dev362_simulate_change_events_test.rs (failed before the fix); dev118 preview test now expects the status note. Checks: npm run lint:agent, test:agent (Rust 2006 passed; UI 1444 passed on rerun, Board/SprintsList specs timed out once at 5s under load and pass alone and on full rerun; release, hooks), test:smoke:agent 379 passed; ticket scenario run with the built CLI. Finding, not fixed: field conditions written with the aliases labels/task_type never match a real update, because ChangeSet records tags/type only.'
+- date: 2026-11-12T05:46:15.727065+00:00
+  text: 'claude: Merged into main by fast-forward as cac2b14 (DEV-362 automation simulate matches updated rules that a real update skips), after rebasing twice onto main (one conflict in tests/integration.rs, both new mod lines kept). Ticket files committed as 95c3984. Not pushed: main has about 25 unpushed commits from other tickets (DEV-348 to DEV-361), which wait for their sessions. Checks on the final rebased tree: lint:agent passed; test:agent passed (2010 Rust tests, 1444 UI tests, hooks tests); test:smoke:agent passed (379). Before the last rebase, agent_job_service::tests::output_after_exit_is_limited failed once in a full run and passed 3 times on its own; main''s DEV-360 flaky-test fix touched that file, and the final full run was green.'
+- date: 2026-11-12T05:46:19.665832+00:00
+  text: The merge agent's job job-20261112T052156.504Z-41 failed (lotar agent logs job-20261112T052156.504Z-41); the fix agent retries it on branch agent/DEV-362.
+- date: 2026-11-12T05:47:08.260842+00:00
+  text: 'Claude (Opus 5.5): Nothing left to do. main already has the work: cac2b14 makes the same changes as 4eaad9d on this branch (compared diff lines, identical), and the ticket files are in 95c3984. The merge job job-20261112T052156.504Z-41 was marked failed after the fast-forward had already landed. No new commit; no checks re-run, since the code is unchanged since the merge agent''s green lint:agent, test:agent and test:smoke:agent on the rebased tree.'
+- date: 2026-11-12T05:47:41.958749+00:00
+  text: 'claude: Nothing to merge. The fix is already on main as cac2b14 (ticket files in 95c3984). The branch''s commit 4eaad9d is the same change: git range-diff shows only different context in tests/integration.rs, and its added and removed lines are identical. A rebase of 4eaad9d onto main conflicts in tests/integration.rs for that reason, so I aborted it and changed nothing. I ran no checks, since no code changed; the earlier merge run passed lint:agent, test:agent and test:smoke:agent. Not pushed: main holds other tickets'' unpushed commits.'
+- date: 2026-11-12T05:47:45.203663+00:00
+  text: 'The merge agent''s job job-20261112T054717.007Z-54 failed again: lotar agent logs job-20261112T054717.007Z-54. The fix is on branch agent/DEV-362. Try again with lotar automation run "Health: retry with @fix" --select ''id:DEV-362'', or for an agent''s ticket lotar assignee DEV-362 @fix.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A06a83034-9de4-4f4e-ad88-79a49f4b1eeb
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A45e5d649-0eee-4666-83ae-ceeec8f1bd3c
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac544fe03-548a-41f4-857a-5c5c7c460f3e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4c8c98f1-47eb-4015-a39f-6beb1b3754a9
 description: |-
   ## Found
   In standards STD-46 (2026-11-12) a rule `when: { all: [ { status: Done }, { tags: { any: [merge-retried] } } ] }` with `on: updated` never fired when `lotar status <ID> Done` ran on a ticket tagged merge-retried, while `lotar automation simulate --ticket <ID> --event updated` reported "Rule matched".
@@ -28,6 +43,8 @@ description: |-
 
   ## Done
   simulate for change events (updated, assigned, created, sprint_changed) says which conditions need a change and does not report a match a real update of that field alone would skip (for example: "matches only when tags change in the same update"), with a test. The docs for simulate and for `all` with field conditions say so.
+tags:
+- merge-retried
 history:
 - at: 2026-11-12T05:03:18.060519+00:00
   actor: claude
@@ -66,3 +83,63 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-365"]}'
+- at: 2026-11-12T05:46:15.727065+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:46:15.903120+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-365"]}'
+    new: '{"related":["DEV-365","DEV-348","DEV-360","DEV-361"]}'
+- at: 2026-11-12T05:46:19.542767+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: ''
+    new: merge-retried
+- at: 2026-11-12T05:46:19.665832+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:46:20.846503+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac544fe03-548a-41f4-857a-5c5c7c460f3e
+- at: 2026-11-12T05:47:08.260842+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:47:16.629527+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T05:47:17.632502+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4c8c98f1-47eb-4015-a39f-6beb1b3754a9
+- at: 2026-11-12T05:47:41.958749+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:47:45.168662+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-12T05:47:45.203663+00:00
+  actor: automation
+  changes:
+  - field: comment_added

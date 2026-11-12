@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-12T05:21:54.615269+00:00
-modified: 2026-11-12T05:37:41.714535+00:00
+modified: 2026-11-12T05:46:28.892095+00:00
 relationships:
   related:
   - DEV-343
@@ -20,6 +20,8 @@ comments:
   text: 'Claude (@fix job): built as described in Fix. New setting agent.worktree.cleanup_paths (config set, Config page > Agents, project override); lotar''s own .tasks/DEV/config.yml sets [target]. Every job end (finalize_job and cancelled) deletes those paths from the job''s worktree when no other job runs for the ticket, git ignores them and tracks nothing under them; the worktree stays. Lint passes; npm test and smoke are running.'
 - date: 2026-11-12T05:37:34.434111+00:00
   text: 'claude: Merge not done. agent/DEV-364 has no commits beyond main (main is 5 commits ahead of it). The fix agent''s work (config cleanup_paths setting, agent_job_service.rs, docs, tests, UI, smoke spec) is still uncommitted in its worktree agent-DEV-364-a4468022dfcd537a, and its T3 thread is still running (npm run test:agent was in progress at 21:36). I did not touch that worktree. No checks ran and nothing was merged or pushed. Question: run the merge again once the fix agent has committed, or let it finish first?'
+- date: 2026-11-12T05:46:28.892095+00:00
+  text: 'Claude (@fix job): done, commit 6144029 on agent/DEV-364. Changes: setting agent.worktree.cleanup_paths (src/config/*, config set as comma list, Config page > Agents chip list, view/api/types.ts); remove_build_output in agent_job_service.rs runs at every job end (completed, failed, cancelled, HelpNeeded). It skips when another job runs for the ticket, and only deletes paths that git ignores and tracks nothing under (no symlinks, nothing outside the worktree, no .git). It moves them into the worktree''s git dir under the registry lock, then deletes them after the lock is released. lotar''s .tasks/DEV/config.yml sets cleanup_paths: [target]. Docs: docs/help/agent.md, docs/help/config-reference.md. Tests: tests/agent_safety_test.rs (success, HelpNeeded, running job elsewhere + tracked file; they fail without the fix), tests/dev153_worktree_settings_test.rs (config set), smoke/tests/ui.config-cleanup-paths.smoke.spec.ts. Checks: npm run lint (agent variant) clean; npm test: 2009 Rust, 1444 UI, release and hook tests pass; npm run smoke: 380 passed. Not in scope: DEV-366 (rebased branches), interactive T3 threads (standards). Takes effect once the merged build runs the jobs.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa38f4398-ffb1-4376-9c12-47e5507a143c
 - link: t3-thread://v2/d834978d-9e75-43fb-ba01-45747238fc44/b51ca0ac-1980-485f-a905-ffe6a2c807e5
@@ -254,3 +256,7 @@ history:
   - field: assignee
     old: '@merge'
     new: mallox
+- at: 2026-11-12T05:46:28.892095+00:00
+  actor: claude
+  changes:
+  - field: comment_added

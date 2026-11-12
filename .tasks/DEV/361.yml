@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T05:01:21.522818+00:00
-modified: 2026-11-12T05:34:44.895208+00:00
+modified: 2026-11-12T05:46:15.902666+00:00
 relationships:
   related:
   - DEV-342
@@ -15,6 +15,7 @@ relationships:
   - DEV-367
   - DEV-354
   - DEV-360
+  - DEV-362
 comments:
 - date: 2026-11-12T05:13:14.012531+00:00
   text: 'claude: Fixed in 32a8819 on agent/DEV-361. The queue worker now watches the binary it was started from (utils::binary_watch, the DEV-305 watcher that lotar mcp uses, so a Homebrew symlink move counts). After a change it takes no new queue entries, lets its running jobs finish, and exits. Its existing exit path then starts a new worker, now from the path lotar was started as (watched_path) and not current_exe, so it runs the upgraded build. New test tests/dev361_worker_restarts_after_upgrade_test.rs: it upgrades a fake install while job 1 runs, then queues job 2, and checks that a different worker process runs job 2. It fails without the fix and passes with it. Documented in docs/help/agent.md (queue section). Checks: npm run lint, npm run test:agent (Rust 2004 passed, UI 1444, release, hooks) and npm run smoke (379 passed) all pass. Note: the running worker (pid 11651) still runs the old code until it next goes idle or is restarted. The fix only applies to workers started from a build that includes it.'
@@ -193,3 +194,9 @@ history:
   - field: tags
     old: health, merge-retried
     new: health
+- at: 2026-11-12T05:46:15.902666+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-342","DEV-356","DEV-305","DEV-358","DEV-367","DEV-354","DEV-360"]}'
+    new: '{"related":["DEV-342","DEV-356","DEV-305","DEV-358","DEV-367","DEV-354","DEV-360","DEV-362"]}'
