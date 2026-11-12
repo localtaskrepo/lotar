@@ -66,6 +66,7 @@ Do not reread guidance already in context unless it changed. Path-scoped rules:
 | When | Skill |
 | --- | --- |
 | Task creation, status, progress, resuming work | [lotar-dev-tracking](.github/skills/lotar-dev-tracking/SKILL.md) |
+| Shipping a release, release tickets | [release](.github/skills/release/SKILL.md) |
 | REST contracts | [api-contract-change-end-to-end](.github/skills/api-contract-change-end-to-end/SKILL.md) |
 | Smoke failures | [smoke-suite-debugging](.github/skills/smoke-suite-debugging/SKILL.md) |
 | Local servers, ports, SSE | [local-dev-serve-troubleshooting](.github/skills/local-dev-serve-troubleshooting/SKILL.md) |

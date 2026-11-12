@@ -51,21 +51,46 @@ automation and the manual checks to run after every tag.
   Re-running a release job that already contains this renderer is idempotent;
   re-running an older workflow definition does not add the new linking code.
 
+## Tickets waiting for a release
+
+Some tickets can only be checked once their fix is in an installed release (for example a
+change to how the agent worker restarts after an upgrade). The next release has a ticket,
+`Release vX.Y.Z` (for example DEV-369), and those tickets wait for it (owner 2026-11-11):
+
+1. After a release ships, create the next one's ticket: `lotar add "Release vX.Y.Z" --type
+   Chore --assignee mallox` with these steps as its description. Its title must start with
+   `Release v`.
+2. A ticket that waits sets its status to `Blocked` and depends on that ticket:
+   `lotar task relationships add DEV-N DEV-R --kind depends-on`. Its comments say what to check.
+3. The last step of a release, after `brew upgrade lotar` on this Mac
+   ([Cutting a Release](#cutting-a-release), step 4), closes the release ticket with
+   `lotar status DEV-R Done`.
+
+Closing it runs the rule "Release installed: start the waiting checks" in
+`.tasks/DEV/automation.yml`. The rule follows the release ticket's `blocks` list (which lotar
+fills in from each `depends_on`) and runs "Release installed: run the waiting check" on every
+dependent that is still `Blocked`. That rule assigns it to `@fix` with a prompt to run the check
+against the installed lotar. A passing check ends with the ticket `Done`; a failing one comes
+back to mallox as `HelpNeeded`. The rule runs `lotar` from `PATH` and, like every `run` action,
+only in a trusted repository ([`lotar trust`](help/trust.md)). To start one ticket's check by
+hand: `lotar automation run "Release installed: run the waiting check" --select 'id:/^DEV-N$/'`.
+
 ## Pre-Release Checklist
 
-1. Update versions in `Cargo.toml`, `package.json`, and any docs that mention the release
-   number. Releases stay on 0.13.x (patch bumps) "until we add a major feature or something
-   breaks compatibility" (owner 2026-11-11).
-2. Update `CHANGELOG.md` (or the release notes draft) describing the highlights.
-3. Run the full quality gates locally:
+1. Update the version in `Cargo.toml` (and `Cargo.lock`, which the next `cargo build`
+   updates) and in any docs that mention the release number. The root `package.json` keeps its
+   own workspace version; the npm packages take theirs from the tag. Releases stay on 0.13.x
+   (patch bumps) "until we add a major feature or something breaks compatibility" (owner
+   2026-11-11). The release notes are written by the workflow from the commit list
+   ([Automation Overview](#automation-overview)).
+2. Run the full quality gates locally:
    ```bash
-   cargo fmt --all
    npm run lint
    npm test
    npm run smoke
    ```
-4. Commit the changes on `main` and push.
-5. Push the tag only after the Quality Assurance run for that commit has succeeded: the release job checks it
+3. Commit the changes on `main` and push.
+4. Push the tag only after the Quality Assurance run for that commit has succeeded: the release job checks it
    ("Ensure QA succeeded") and fails, publishing nothing, while QA is still running (v0.13.0, 2026-11-11). Then
    `git tag -s vX.Y.Z -m vX.Y.Z` and `git push origin vX.Y.Z`.
 
@@ -159,9 +184,9 @@ publisher matching this repository and `release.yml`, or its configuration expir
 
 ## Cutting a Release
 
-1. Tag the commit on `main`:
+1. Tag the commit on `main`, signed, once its Quality Assurance run has succeeded:
    ```bash
-   git tag vX.Y.Z
+   git tag -s vX.Y.Z -m vX.Y.Z
    git push origin vX.Y.Z
    ```
 2. Monitor the **Release** workflow in GitHub Actions. The important jobs are:
@@ -185,6 +210,9 @@ publisher matching this repository and `release.yml`, or its configuration expir
      checksums (uses the same token).
 3. Once the workflow finishes, check that GitHub shows a stable release as **Latest** and a
    prerelease as **Pre-release**.
+4. On this Mac, `brew upgrade lotar` and check that `lotar --version` prints the new version.
+   Then close the release ticket (`lotar status DEV-R Done`): that starts the checks of the
+   [tickets waiting for it](#tickets-waiting-for-a-release). Create the next release's ticket.
 
 ### Prereleases
 

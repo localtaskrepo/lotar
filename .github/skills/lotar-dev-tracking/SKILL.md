@@ -68,6 +68,11 @@ one or two area tags already in use (`api`, `backend`, `web-ui`, `docs`, `testin
    status; do not leave status reconciliation as an instruction for the developer.
    Do not close unrelated tickets. Use a configured blocked state only for a real
    blocker, without inventing enums or reassigning unrelated work.
+   A ticket whose check can only run on the next lotar release is `Blocked` and
+   depends on the open `Release vX.Y.Z` ticket (`lotar task relationships add
+   DEV-N <release> --kind depends-on`), not `HelpNeeded`; comment what to check.
+   Closing the release ticket hands it to @fix to run that check
+   ([release guide](../../../docs/release-guide.md#tickets-waiting-for-a-release)).
 4. Append a closing comment with the completed outcome, verification, limitations,
    and linked follow-ups. State whether changes remain uncommitted or unintegrated;
    append the commit reference later if that operation is authorized.
