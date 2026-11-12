@@ -1,15 +1,17 @@
 title: Bulk set a custom field, and Board swimlanes by custom field
-status: InProgress
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T20:54:22.216856+00:00
-modified: 2026-11-12T21:23:07.167574+00:00
+modified: 2026-11-12T21:57:10.817620+00:00
 relationships:
   related:
   - DEV-373
   - DEV-393
+  - DEV-390
+  - DEV-396
 comments:
 - date: 2026-11-12T21:22:57.561803+00:00
   author: claude
@@ -20,6 +22,12 @@ comments:
     - CLI: lotar edit --select '<query>' makes the same edit on every matching task (reports updated/failed, fails if any failed); -F key= now drops the field, as task move does.
     - Docs: task.md, serve.md, mcp-tools.md. Also fixed the Tasks dialogs' close button wrapping under a long hint (Set field and Delete).
     Checks: npm run lint (lint:agent) clean; npm test (test:agent): Rust 2079, UI 1477, release and hooks pass; npm run smoke: 104 files / 383 tests pass, incl. new bulk-set and board-by-field smoke tests with screenshots looked at.
+- date: 2026-11-12T21:57:01.921713+00:00
+  author: claude
+  text: |-
+    claude (Opus 5.5): Merged and pushed. main now has 43682ec (DEV-394 Bulk set a custom field, and Board swimlanes by custom field) and dc2b178 (ticket updates for DEV-390, 391, 394 and 396), pushed to origin (7183f7e..dc2b178).
+    Rebase: main moved four times during the merge. One conflict, in tests/integration.rs: both sides added a test module to the list, and I kept both. DEV-390 had also added a version comparator, compareVersions(Version, Version), to view/utils/versions.ts. I removed my duplicate and the Board's version lanes now use compareVersionText, a small wrapper over DEV-390's comparator.
+    Checks on the rebased branch: lint:agent clean; Rust 2092, UI 1481, release and hooks pass; smoke 104 files / 383 tests pass. After the last rebase onto DEV-396, which changes automation code only, I ran clippy and the automation, dev370 and dev394 tests (125 pass), not the full suite again.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa8e0c08-a022-42ea-b8e6-8c47e4f8181f
 - file: view/pages/TasksList.vue
@@ -94,3 +102,19 @@ history:
   - field: assignee
     old: '@fix'
     new: '@merge'
+- at: 2026-11-12T21:57:01.921713+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T21:57:02.070319+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-373","DEV-393"]}'
+    new: '{"related":["DEV-373","DEV-393","DEV-390","DEV-396"]}'
+- at: 2026-11-12T21:57:10.817620+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

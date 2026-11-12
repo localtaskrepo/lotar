@@ -3,13 +3,17 @@ status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T21:47:12.756768+00:00
-modified: 2026-11-12T21:47:21.815783+00:00
+modified: 2026-11-12T21:56:36.436878+00:00
 relationships:
   related:
   - DEV-390
   - DEV-391
+comments:
+- date: 2026-11-12T21:56:27.867572+00:00
+  author: claude
+  text: 'claude: Fixed in 1f62d4a on agent/DEV-397. customFieldValue (view/utils/taskSort.ts) now reads a list the way the server''s custom_value_items does: nested lists flattened, first item compared, an empty list counts as missing. So a non-version list field sorts the same on the Sprints page as on the Tasks page. Started with a failing test in view/__tests__/taskSort.spec.ts (it got ''[array]'' where it expected ''web''), which passes now. Version fields are unchanged. Checks run: lint:agent clean; test:agent passed (Rust 2088, UI 1476, release 47, hooks 7); test:smoke:agent passed (381).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0fee5246-8d18-490b-afff-8a1074fa1f45
 description: 'Found by claude while merging DEV-390, 2026-11-12. Since DEV-391, extract_value_strings (src/utils/custom_fields.rs) reads a list item by item, so the server''s text sort of a custom field (SortSpec::Custom in src/services/task_query.rs) compares a list by its first item, and an empty list as missing. The browser''s copy, cmpCustomField/customFieldValue in view/utils/taskSort.ts, still compares a list as the text [array]. Fix: customFieldValue mirrors custom_value_items (first item; empty list is missing), starting with a failing test in view/__tests__/taskSort.spec.ts. Version fields are not affected (DEV-390 sorts them by lowest version). Done when: sorting a non-version list field gives the same order on the Sprints page as on the Tasks page.'
@@ -39,3 +43,13 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0fee5246-8d18-490b-afff-8a1074fa1f45
+- at: 2026-11-12T21:56:27.867572+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T21:56:36.436878+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
