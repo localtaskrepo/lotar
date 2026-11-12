@@ -1,0 +1,41 @@
+title: 'Flaky Rust: status_and_assignee_set_during_a_job_win_over_the_job_completed_rule'
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T04:55:55.878491+00:00
+modified: 2026-11-12T04:55:57.449777+00:00
+relationships:
+  related:
+  - DEV-356
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1374b68b-4b59-4bba-85b3-9a0b258782d4
+description: 'Found by DEV-356 (claude, 2026-11-11): in npm run test:rust on t3/fix-flaky-t3-runner-test (rebased on efa1c0b) while other sessions ran test suites, tests/dev320_job_outcome_test.rs status_and_assignee_set_during_a_job_win_over_the_job_completed_rule failed once (1.5 s); the run stopped at that test, so I did not see the panic line. It passed on its own 6 times and in the next two full runs. Unconfirmed cause: a fixed sleep or poll deadline too short under load, like DEV-356. Check: cargo nextest run --cargo-profile local --retries 0 -E ''test(dev320_job_outcome_test::)'' passes repeatedly next to the full suite. Done when the cause is found and fixed, with the test passing without retries.'
+tags:
+- health
+custom_fields:
+  finding: flaky-test:status_and_assignee_set_during_a_job_win_over_the_job_completed_rule
+history:
+- at: 2026-11-12T04:55:56.004643+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-356"]}'
+- at: 2026-11-12T04:55:56.126533+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T04:55:56.501204+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T04:55:57.449777+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1374b68b-4b59-4bba-85b3-9a0b258782d4

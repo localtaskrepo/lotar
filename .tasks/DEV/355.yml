@@ -1,11 +1,11 @@
 title: 'Flaky smoke: keyboard shortcuts palette Enter doesn''t reach /boards'
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-12T04:17:51.251399+00:00
-modified: 2026-11-12T04:53:49.152467+00:00
+modified: 2026-11-12T04:54:00.389868+00:00
 relationships:
   related:
   - DEV-352
@@ -22,6 +22,8 @@ comments:
   text: 'claude: Correction to my last comment: the first run''s status_dry_run_explain failure was not caused by LOTAR_DEFAULT_REPORTER. It also passes alone with that variable set, so it is a flake (DEV-357).'
 - date: 2026-11-12T04:53:48.760491+00:00
   text: 'claude: merge agent: merged into main as f07976b (rebased twice onto main, fast-forward). Not pushed: main also holds unpushed commits of DEV-348, DEV-352 and DEV-354, which wait for their sessions. Checks in the worktree: npm run lint passed; npm run test:rust 2003/2003 passed; npm run test:ui, test:release and test:hooks passed; npm run test:smoke:agent 379/379 passed (the check named on the ticket). After the second rebase (main only added DEV-354''s Rust test file and tickets) I reran lint, test:ui and the keyboard-shortcuts smoke spec: all passed. Two earlier full Rust runs failed other tests (cli_agent_check_test, dev279_cross_process_jobs_test) while several runs overlapped; each passes alone and the later clean run passed, so I treat them as load flakes.'
+- date: 2026-11-12T04:54:00.389868+00:00
+  text: 'The merge agent''s job job-20261112T043747.458Z-23 failed: lotar agent logs job-20261112T043747.458Z-23. The fix is on branch agent/DEV-355. Try again with lotar automation run "Health: retry with @fix" --select ''id:DEV-355'', or for an agent''s ticket lotar assignee DEV-355 @fix.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A424e1473-5583-4789-883a-23c4b542adda
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adf020238-61f3-43b3-8e7c-d56d41cc7879
@@ -106,3 +108,16 @@ history:
   - field: relationships
     old: '{"related":["DEV-352","DEV-357","DEV-358","DEV-349","DEV-356"]}'
     new: '{"related":["DEV-352","DEV-357","DEV-358","DEV-349","DEV-356","DEV-348","DEV-354"]}'
+- at: 2026-11-12T04:54:00.247882+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-12T04:54:00.389868+00:00
+  actor: automation
+  changes:
+  - field: comment_added

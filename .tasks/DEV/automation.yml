@@ -25,7 +25,8 @@ automation:
               LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex), and start each comment with it: lotar
               doesn't record who wrote a comment yet.
               1. Read the ticket: what was found, how to check it, what done looks like. Run its check command. If the
-                 problem is gone already, say so in a comment and stop.
+                 problem is gone already, say so in a comment and stop. After a failed merge your branch may hold
+                 earlier commits (git log <main>..HEAD): build on them.
               2. Fix it the way this repo's AGENTS.md says: the smallest change, with the tests and checks it names.
               3. Never delete or discard work that isn't saved elsewhere (unmerged commits, uncommitted changes,
                  files a tool or another session may still use), and never decide what only the owner decides.
@@ -65,13 +66,14 @@ automation:
             assignee: "@fix"
           # Without a prompt the job runs on lotar's built-in instructions, which leave the changes uncommitted
           # (DEV-332, 2026-11-12).
-          agent:
+          agent: &work
             model: "${{ticket.field:model}}"
             provider: "${{ticket.field:provider}}"
             prompt: |
-              Work ticket ${{ticket.id}} ("${{ticket.title}}"), filed by an agent: read it and its relationships, then
-              do it the way this repo's AGENTS.md says, with the tests and checks it names. Start each comment with your
-              agent name: lotar doesn't record who wrote a comment yet.
+              Work ticket ${{ticket.id}} ("${{ticket.title}}"): read it and its relationships, then do it the way this
+              repo's AGENTS.md says, with the tests and checks it names. Start each comment with your agent name: lotar
+              doesn't record who wrote a comment yet. After a failed merge your branch may hold earlier commits
+              (git log <main>..HEAD): build on them; when the work is done already, comment that and stop.
               1. Never delete or discard work that isn't saved elsewhere, and never decide what only the owner decides.
                  Ask the running agents (T3 threads) first; when it still needs him, comment one question, set the
                  status to HelpNeeded, assign the ticket to mallox and stop.
@@ -137,14 +139,65 @@ automation:
         job_completed:
           set:
             status: Done
+          # A rule's own change doesn't fire the "clear the tag" rule below.
+          remove:
+            tags: [merge-retried]
+    # A failed merge job (a crash, or a false failure like DEV-342's) goes back to the fix agent once, which ends with
+    # nothing to do when the work is on main already; tag merge-retried sends a second failure to mallox, so fix,
+    # merge, fail can't loop (owner 2026-11-11, STD-46).
+    - name: "Merge failed: retry with @fix"
+      when:
+        all:
+          - assignee: "@merge"
+          - tags: { any: [health] }
+          - not: { tags: { any: [merge-retried] } }
+      on:
+        job_failed:
+          set:
+            assignee: "@fix"
+          add:
+            tags: [merge-retried]
+          comment: >-
+            The merge agent's job ${{agent.job_id}} failed (lotar agent logs ${{agent.job_id}}); the fix agent retries
+            it on branch ${{agent.worktree_branch}}.
+          agent: *fix
+    - name: "Merge failed: retry an agent ticket with @fix"
+      when:
+        all:
+          - assignee: "@merge"
+          - not: { tags: { any: [health, merge-retried] } }
+      on:
+        job_failed:
+          set:
+            assignee: "@fix"
+          add:
+            tags: [merge-retried]
+          comment: >-
+            The merge agent's job ${{agent.job_id}} failed (lotar agent logs ${{agent.job_id}}); the fix agent retries
+            it on branch ${{agent.worktree_branch}}.
+          agent: *work
+    - name: "Merge failed again: hand to mallox"
+      when:
+        all:
+          - assignee: "@merge"
+          - tags: { any: [merge-retried] }
+      on:
         job_failed:
           set:
             status: HelpNeeded
             assignee: mallox
           comment: >-
-            The merge agent's job ${{agent.job_id}} failed: lotar agent logs ${{agent.job_id}}. The fix is on branch
-            ${{agent.worktree_branch}}. Try again with lotar automation run "Health: retry with @fix" --select
+            The merge agent's job ${{agent.job_id}} failed again: lotar agent logs ${{agent.job_id}}. The fix is on
+            branch ${{agent.worktree_branch}}. Try again with lotar automation run "Health: retry with @fix" --select
             'id:${{ticket.id}}', or for an agent's ticket lotar assignee ${{ticket.id}} @fix.
+    # Not "and tagged": on updated every field condition needs that field to change in the same update.
+    - name: "Merge retry: clear the tag when done"
+      when:
+        status: Done
+      on:
+        updated:
+          remove:
+            tags: [merge-retried]
     # Manual: after answering a HelpNeeded question or a failed job. Always pass --select, or every waiting ticket starts.
     - name: "Health: retry with @fix"
       when:
