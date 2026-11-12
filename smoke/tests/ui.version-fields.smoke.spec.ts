@@ -46,9 +46,15 @@ describe.concurrent('UI version fields (DEV-373)', () => {
                     await page.waitForSelector('text=Minor crash', { timeout: 15_000 });
                     await search.fill('affects>=0.13 affects<1.0');
                     await search.press('Enter');
-                    await expect.poll(() => page.getByText('Old crash', { exact: true }).count()).toBe(0);
-                    expect(await page.getByText('New crash', { exact: true }).count()).toBe(0);
-                    expect(await page.getByText('Minor crash', { exact: true }).count()).toBe(1);
+                    // The list shows a loader, not rows, while the new query loads,
+                    // so wait for the whole result rather than for rows to go away.
+                    const shown = async () => {
+                        const counts: Record<string, number> = {};
+                        for (const title of ['Old crash', 'Minor crash', 'New crash'])
+                            counts[title] = await page.getByText(title, { exact: true }).count();
+                        return counts;
+                    };
+                    await expect.poll(shown).toEqual({ 'Old crash': 0, 'Minor crash': 1, 'New crash': 0 });
 
                     await page.locator('tr', { hasText: 'Minor crash' }).click();
                     const panel = page.locator('.task-panel');
