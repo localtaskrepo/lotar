@@ -4,6 +4,7 @@
 use crate::common::TestFixtures;
 use crate::common::env_mutex::EnvVarGuard;
 use lotar::api_types::{AgentJob, TaskCreate};
+use lotar::services::agent_active_jobs;
 use lotar::services::agent_job_service::{AgentJobService, AgentOrchestratorMode};
 use lotar::services::finding_service::FindingService;
 use lotar::services::task_service::TaskService;
@@ -48,12 +49,13 @@ exit "${{FAKE_T3_EXIT:-0}}"
 }
 
 fn wait_for_finished_job(ticket_id: &str) -> AgentJob {
+    let tasks_dir = PathBuf::from(std::env::var("LOTAR_TASKS_DIR").unwrap());
     let start = Instant::now();
     while start.elapsed() < Duration::from_secs(20) {
         let finished = AgentJobService::list_jobs().into_iter().find(|job| job.ticket_id == ticket_id && matches!(job.status.as_str(), "completed" | "failed"));
-        if let Some(job) = finished {
-            // Automation on the job's end runs right after the status change.
-            sleep(Duration::from_millis(300));
+        // The status changes before the end rules run; the job's active
+        // record goes once they have (DEV-356).
+        if let Some(job) = finished.filter(|job| agent_active_jobs::find(&tasks_dir, &job.id).is_none()) {
             return job;
         }
         sleep(Duration::from_millis(50));
