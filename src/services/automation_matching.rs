@@ -81,11 +81,21 @@ impl ChangeSet {
     }
 
     fn changed_field(&self, field: &str) -> Option<&FieldChange> {
-        self.fields.get(&field.to_lowercase())
+        self.fields.get(&change_key(field))
     }
 
     fn changed_custom_field(&self, field: &str) -> Option<&FieldChange> {
         self.custom_fields.get(field)
+    }
+}
+
+/// The name a [`ChangeSet`] records `field` under: conditions may use the
+/// aliases `labels` and `task_type` (DEV-365).
+fn change_key(field: &str) -> String {
+    match field.to_lowercase().as_str() {
+        "labels" => "tags".to_string(),
+        "task_type" => "type".to_string(),
+        other => other.to_string(),
     }
 }
 
@@ -111,7 +121,7 @@ impl ChangeSet {
         let mut all = Self::new(None, current);
         let mut out = Self { fields: HashMap::new(), custom_fields: HashMap::new() };
         for field in fields {
-            let key = field.to_lowercase();
+            let key = change_key(field);
             if let Some(change) = all.fields.remove(&key) {
                 out.fields.insert(key, change);
             } else if CHANGE_FIELDS.contains(&key.as_str()) {
@@ -178,9 +188,9 @@ fn collect_change_fields(group: &AutomationConditionGroup, out: &mut BTreeSet<St
         collect_change_fields(not, out);
     }
     if let Some(changes) = group.changes.as_ref() {
-        out.extend(changes.keys().map(|field| field.to_lowercase()));
+        out.extend(changes.keys().map(|field| change_key(field)));
     }
-    out.extend(group.fields.keys().map(|field| field.to_lowercase()).filter(|field| CHANGE_FIELDS.contains(&field.as_str())));
+    out.extend(group.fields.keys().map(|field| change_key(field)).filter(|field| CHANGE_FIELDS.contains(&field.as_str())));
     out.extend(group.custom_fields.keys().cloned());
 }
 
@@ -249,7 +259,7 @@ fn matches_changes(group: &HashMap<String, crate::automation::types::AutomationC
         return false;
     }
     for (field, condition) in group {
-        let Some(change) = changes.changed_field(&field.to_lowercase()) else {
+        let Some(change) = changes.changed_field(field) else {
             return false;
         };
         if let Some(from) = condition.from.as_ref()
