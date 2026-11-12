@@ -600,10 +600,18 @@ fn task_creation_waits_for_fragmented_body_with_case_insensitive_content_length(
             matches!(early, Err(ref error) if matches!(error.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut)),
             "server must wait for the body with {header}, got {early:?}"
         );
-        stream.set_read_timeout(Some(net_timeout())).unwrap();
         stream.write_all(body.as_bytes()).unwrap();
-        let mut response = String::new();
-        stream.read_to_string(&mut response).unwrap();
+        let deadline = Instant::now() + RESPONSE_DEADLINE;
+        let mut raw = Vec::new();
+        let mut tmp = [0u8; 4096];
+        loop {
+            let n = read_until_deadline(&mut stream, &mut tmp, deadline);
+            if n == 0 {
+                break;
+            }
+            raw.extend_from_slice(&tmp[..n]);
+        }
+        let response = String::from_utf8(raw).unwrap();
         assert!(response.starts_with("HTTP/1.1 201"), "{response}");
         let (_, payload) = response.split_once("\r\n\r\n").unwrap();
         let created: Value = serde_json::from_str(payload).unwrap();
