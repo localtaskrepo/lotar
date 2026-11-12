@@ -62,7 +62,9 @@
           placeholder="LoTaR"
           @blur="emit('validate', 'ui_name')"
         />
-        <p class="field-hint">Shown next to the logo and as the browser tab title.</p>
+        <p class="field-hint">
+          Shown next to the logo and as the browser tab title. Without one, the tab shows the repository name.
+        </p>
         <p v-if="errors.ui_name" class="field-error">{{ errors.ui_name }}</p>
       </div>
 
@@ -96,6 +98,13 @@
           </UiButton>
         </div>
         <p class="field-hint">{{ slot.hint }}</p>
+        <p
+          v-if="slot.image === 'icon' && !slot.models.value.trim() && branding.detectedIcon"
+          class="field-hint field-hint--note"
+          data-testid="config-ui-icon-detected"
+        >
+          Not set: the tab shows the repository's own icon, {{ branding.detectedIcon }}.
+        </p>
         <p v-if="errors[slot.key]" class="field-error">{{ errors[slot.key] }}</p>
         <p v-for="problem in problemsFor(slot)" :key="problem" class="field-error">{{ problem }}</p>
       </div>
@@ -246,6 +255,7 @@ function previewFor(slot: Slot): string | null {
   const local = pending[slot.image]
   if (local && local.path === value) return local.url
   if (value && value === slot.saved().trim()) return slot.url()
+  if (!value && slot.image === 'icon' && branding.detectedIcon) return branding.icon
   return null
 }
 

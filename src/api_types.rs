@@ -1052,6 +1052,9 @@ pub struct BrandingResponse {
     /// Name shown next to the logo and in the browser tab (`ui.name`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    /// The repository's folder name; the browser tab shows it without `name`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository: Option<String>,
     /// URL of the logo, when one is configured and can be served.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub logo: Option<String>,
@@ -1061,6 +1064,10 @@ pub struct BrandingResponse {
     /// URL of the app icon (browser tab icon).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
+    /// Without `ui.icon`: the repository's own icon file that `icon` shows
+    /// (e.g. `public/favicon.svg`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detected_icon: Option<String>,
     /// Why configured images are not shown (missing file, not an image…).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub problems: Vec<String>,

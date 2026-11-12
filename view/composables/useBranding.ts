@@ -13,9 +13,13 @@ export interface BrandingState {
     /** Path of a usable repository skin (`ui.theme_file`). */
     themeFile: string | null
     name: string | null
+    /** The repository's folder name, for the tab title without a name. */
+    repository: string | null
     logo: string | null
     logoDark: string | null
     icon: string | null
+    /** The repository's own icon file `icon` shows when ui.icon is unset. */
+    detectedIcon: string | null
     problems: string[]
 }
 
@@ -28,9 +32,11 @@ const state = reactive<BrandingState>({
     repositoryTheme: null,
     themeFile: null,
     name: null,
+    repository: null,
     logo: null,
     logoDark: null,
     icon: null,
+    detectedIcon: null,
     problems: [],
 })
 
@@ -50,12 +56,20 @@ export function applyBranding(response: BrandingResponse) {
     state.name = response.name?.trim() || null
     state.logo = response.logo ?? null
     state.logoDark = response.logo_dark ?? null
+    state.repository = response.repository?.trim() || null
     state.icon = response.icon ?? null
+    state.detectedIcon = response.detected_icon ?? null
     state.problems = response.problems ?? []
     setRepositoryTheme(state.theme)
     if (typeof document === 'undefined') return
-    document.title = state.name ?? DEFAULT_APP_NAME
+    document.title = tabTitle(state)
     applyIcon(state.icon)
+}
+
+/** The tab title: the configured name, else the repository it serves. */
+export function tabTitle(branding: Pick<BrandingState, 'name' | 'repository'>): string {
+    if (branding.name) return branding.name
+    return branding.repository ? `${branding.repository} · ${DEFAULT_APP_NAME}` : DEFAULT_APP_NAME
 }
 
 // The built-in icons from index.html, kept to restore them when the

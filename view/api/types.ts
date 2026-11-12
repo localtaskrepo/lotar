@@ -210,9 +210,13 @@ export interface BrandingResponse {
     /** Path of a usable repository skin (ui.theme_file); theme `custom`. */
     theme_file?: string
     name?: string
+    /** The repository's folder name; the tab title without `name`. */
+    repository?: string
     logo?: string
     logo_dark?: string
     icon?: string
+    /** Without ui.icon: the repository's own icon file that `icon` shows. */
+    detected_icon?: string
     problems?: string[]
 }
 

@@ -22,13 +22,14 @@ pub(super) fn register(api_server: &mut ApiServer) {
         };
         let resolver = try_response!(resolve_tasks_dir());
         let config = try_response!(load_merged_config(&resolver));
-        let Some(relative) = image.configured(&config) else {
+        let root = branding_service::workspace_root(&resolver.path);
+        let found = if image == BrandingImage::Icon { branding_service::find_icon(&root) } else { None };
+        let Some(relative) = image.configured(&config).map(str::to_string).or(found) else {
             return not_found(format!("No {} is configured", image.slug()));
         };
-        let root = branding_service::workspace_root(&resolver.path);
-        let (_path, bytes) = match branding_service::read_image(&root, relative) {
+        let (_path, bytes) = match branding_service::read_image(&root, &relative) {
             Ok(found) => found,
-            Err(err) => return not_found(problem_text(image, relative, &err)),
+            Err(err) => return not_found(problem_text(image, &relative, &err)),
         };
         // The file can change at any time; browsers revalidate by content.
         let etag = format!("\"{}\"", &blake3::hash(&bytes).to_hex()[..32]);
@@ -193,6 +194,11 @@ fn problem_text(image: BrandingImage, relative: &str, err: &BrandingFileError) -
     }
 }
 
+/// The version makes a changed file a new URL for the <img> tags.
+fn image_url(image: BrandingImage, bytes: &[u8]) -> String {
+    format!("/api/branding/{}?v={}", image.slug(), &blake3::hash(bytes).to_hex()[..12])
+}
+
 fn branding_response(resolver: &crate::workspace::TasksDirectoryResolver, config: &crate::config::types::ResolvedConfig) -> crate::api_types::BrandingResponse {
     let root = branding_service::workspace_root(&resolver.path);
     let mut problems = Vec::new();
@@ -227,8 +233,7 @@ fn branding_response(resolver: &crate::workspace::TasksDirectoryResolver, config
     let mut url_for = |image: BrandingImage| -> Option<String> {
         let relative = image.configured(config)?;
         match branding_service::read_image(&root, relative) {
-            // The version makes a changed file a new URL for the <img> tags.
-            Ok((_, bytes)) => Some(format!("/api/branding/{}?v={}", image.slug(), &blake3::hash(&bytes).to_hex()[..12])),
+            Ok((_, bytes)) => Some(image_url(image, &bytes)),
             Err(err) => {
                 problems.push(problem_text(image, relative, &err));
                 None
@@ -237,7 +242,15 @@ fn branding_response(resolver: &crate::workspace::TasksDirectoryResolver, config
     };
     let logo = url_for(BrandingImage::Logo);
     let logo_dark = url_for(BrandingImage::LogoDark);
-    let icon = url_for(BrandingImage::Icon);
+    // Without ui.icon the tab shows the repository's own icon, if it has one.
+    let detected_icon = match BrandingImage::Icon.configured(config) {
+        Some(_) => None,
+        None => branding_service::find_icon(&root),
+    };
+    let icon = match &detected_icon {
+        Some(relative) => branding_service::read_image(&root, relative).ok().map(|(_, bytes)| image_url(BrandingImage::Icon, &bytes)),
+        None => url_for(BrandingImage::Icon),
+    };
     let theme = config.ui.theme.clone().filter(|theme| branding_service::is_valid_ui_theme(theme));
     // ~/.lotar overrides the repository's config.yml (see resolution.rs).
     let valid = |theme: Option<String>| theme.filter(|theme| branding_service::is_valid_ui_theme(theme));
@@ -255,9 +268,11 @@ fn branding_response(resolver: &crate::workspace::TasksDirectoryResolver, config
         repository_theme,
         theme_file,
         name: config.ui.name.clone().filter(|name| !name.trim().is_empty()),
+        repository: branding_service::repository_name(&root),
         logo,
         logo_dark,
         icon,
+        detected_icon,
         problems,
     }
 }

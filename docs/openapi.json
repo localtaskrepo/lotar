@@ -5147,6 +5147,10 @@
           "name": {
             "type": "string"
           },
+          "repository": {
+            "type": "string",
+            "description": "The repository's folder name; the browser tab shows it without name."
+          },
           "logo": {
             "type": "string",
             "description": "URL of the logo."
@@ -5158,6 +5162,10 @@
           "icon": {
             "type": "string",
             "description": "URL of the app icon."
+          },
+          "detected_icon": {
+            "type": "string",
+            "description": "Without ui.icon: the repository's own icon file that icon shows (e.g. public/favicon.svg)."
           },
           "problems": {
             "type": "array",

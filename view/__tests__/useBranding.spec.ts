@@ -30,3 +30,41 @@ describe('applyBranding skin stylesheet', () => {
         expect(link.getAttribute('href')).toMatch(/^\/api\/branding\/theme\.css\?v=\d+$/)
     })
 })
+
+// DEV-345: the tab names the repository and shows its icon.
+describe('applyBranding tab', () => {
+    let icon: HTMLLinkElement
+
+    beforeEach(() => {
+        vi.resetModules()
+        icon = document.createElement('link')
+        icon.rel = 'icon'
+        icon.type = 'image/svg+xml'
+        icon.setAttribute('href', '/assets/branding/lotar-app-icon.svg')
+        document.head.append(icon)
+    })
+
+    afterEach(() => {
+        icon.remove()
+    })
+
+    it('titles the tab with the repository without a configured name', async () => {
+        const { applyBranding } = await import('../composables/useBranding')
+        applyBranding({ repository: 'my-app' })
+        expect(document.title).toBe('my-app · LoTaR')
+        applyBranding({ repository: 'my-app', name: 'Acme' })
+        expect(document.title).toBe('Acme')
+        applyBranding({})
+        expect(document.title).toBe('LoTaR')
+    })
+
+    it('switches the tab icon to the repository icon and back', async () => {
+        const { applyBranding } = await import('../composables/useBranding')
+        applyBranding({ icon: '/api/branding/icon?v=abc', detected_icon: 'public/favicon.svg' })
+        expect(icon.getAttribute('href')).toBe('/api/branding/icon?v=abc')
+        expect(icon.hasAttribute('type')).toBe(false)
+        applyBranding({})
+        expect(icon.href).toMatch(/\/assets\/branding\/lotar-app-icon\.svg$/)
+        expect(icon.type).toBe('image/svg+xml')
+    })
+})

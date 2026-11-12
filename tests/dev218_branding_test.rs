@@ -98,6 +98,32 @@ fn branding_reports_settings_and_serves_repository_images() {
     assert_eq!(get(&api, "/api/branding/wallpaper").status, 404);
 }
 
+// DEV-345: without ui.name / ui.icon the tab still names the repository and
+// shows its own icon.
+#[test]
+fn branding_falls_back_to_the_repository_name_and_icon() {
+    let fx = workspace("default:\n  project: APP\n");
+    std::fs::create_dir_all(fx.repo.join("public")).unwrap();
+    std::fs::write(fx.repo.join("public/favicon.svg"), SVG).unwrap();
+    let api = server();
+
+    let branding = data(&get(&api, "/api/branding"));
+    assert_eq!(branding["repository"], "repo");
+    assert!(branding.get("name").is_none());
+    assert_eq!(branding["detected_icon"], "public/favicon.svg");
+    assert!(branding["icon"].as_str().unwrap().starts_with("/api/branding/icon?v="));
+    let icon = get(&api, "/api/branding/icon");
+    assert_eq!(icon.status, 200);
+    assert_eq!(icon.body, SVG);
+
+    // A configured icon wins, even when it cannot be served.
+    std::fs::write(fx.tasks_dir.join("config.yml"), "default:\n  project: APP\nui:\n  icon: assets/missing.svg\n").unwrap();
+    let branding = data(&get(&api, "/api/branding"));
+    assert!(branding.get("detected_icon").is_none());
+    assert!(branding.get("icon").is_none());
+    assert_eq!(get(&api, "/api/branding/icon").status, 404);
+}
+
 #[test]
 fn settings_are_validated_and_stay_inside_the_repository() {
     let fx = workspace("default:\n  project: APP\n");

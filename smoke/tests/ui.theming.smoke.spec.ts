@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { expect, type Page } from '@playwright/test';
 import { describe, it } from 'vitest';
 import { startLotarServer } from '../helpers/server.js';
@@ -158,6 +159,39 @@ describe('UI theming and repository branding (DEV-218)', () => {
             expect(saved).toContain('theme: custom');
             expect(saved).toContain('theme_file: assets/lotar-theme.css');
             expect(saved).toContain('logo_dark: .tasks/@branding/logo-dark.svg');
+        } finally {
+            await workspace.dispose();
+        }
+    });
+
+    // DEV-345: without a configured name and icon, the tab names the
+    // repository and shows the repository's own icon.
+    it("names the tab after the repository and shows the repository's icon", async () => {
+        const workspace = await SmokeWorkspace.create();
+        try {
+            await workspace.addTask('Find me');
+            await workspace.write('public/favicon.svg', ICON_SVG);
+            const server = await startLotarServer(workspace);
+            try {
+                await withPage(`${server.url}/config`, async (page) => {
+                    await expect(page).toHaveTitle(`${path.basename(workspace.root)} · LoTaR`);
+                    await expect
+                        .poll(() =>
+                            page.evaluate(() =>
+                                Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel~="icon"]')).map(
+                                    (link) => new URL(link.href).pathname,
+                                ),
+                            ),
+                        )
+                        .toEqual(['/api/branding/icon', '/api/branding/icon']);
+                    await page.locator('.config-nav__link', { hasText: 'Appearance' }).click();
+                    const section = page.getByTestId('config-appearance');
+                    await expect(section.getByTestId('config-ui-icon-detected')).toContainText('public/favicon.svg');
+                    await expect(section.getByAltText('App icon preview')).toBeVisible();
+                });
+            } finally {
+                await server.stop();
+            }
         } finally {
             await workspace.dispose();
         }
