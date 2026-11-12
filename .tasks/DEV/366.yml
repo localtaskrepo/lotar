@@ -1,11 +1,11 @@
 title: Worktree cleanup keeps worktrees whose commit landed rebased or reworked
-status: InProgress
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T05:24:14.222418+00:00
-modified: 2026-11-12T06:00:20.925986+00:00
+modified: 2026-11-12T06:00:25.549847+00:00
 relationships:
   related:
   - DEV-343
@@ -120,3 +120,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-343","DEV-346","DEV-348","DEV-364","DEV-339","DEV-350"]}'
     new: '{"related":["DEV-343","DEV-346","DEV-348","DEV-364","DEV-339","DEV-350","DEV-367"]}'
+- at: 2026-11-12T06:00:25.549847+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
