@@ -5,12 +5,13 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-03T21:12:54.993705+00:00
-modified: 2026-11-12T09:42:07.578044+00:00
+modified: 2026-11-12T09:43:09.855558+00:00
 relationships:
   related:
   - DEV-327
   - DEV-350
   - DEV-372
+  - DEV-373
 comments:
 - date: 2026-11-12T08:57:56.752950+00:00
   text: 'claude: Owner 2026-11-12: work this now (@fix). Do it the way AGENTS.md says, with lint, test and smoke. Run lotar with LOTAR_DEFAULT_REPORTER set to your agent name and start each comment with it. Commit on your worktree''s branch, signed, never --no-verify, message ''DEV-N <title>''; don''t merge or push, the merge agent does. Never delete work that isn''t saved elsewhere. A question only the owner can answer: comment one question, set HelpNeeded and assign mallox (not the reporter). Pick the condition form from the description''s proposal and document it in docs/help/automation.md (Triggers). Then use it in lotar''s release rule (.tasks/DEV/automation.yml, ''Release installed: start the waiting checks''), which today checks the title inside its sh command because a title condition needs the title to change; tests/dev370_release_waiting_checks_test.rs must keep passing.'
@@ -83,3 +84,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-327","DEV-350"]}'
     new: '{"related":["DEV-327","DEV-350","DEV-372"]}'
+- at: 2026-11-12T09:43:09.855558+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-327","DEV-350","DEV-372"]}'
+    new: '{"related":["DEV-327","DEV-350","DEV-372","DEV-373"]}'

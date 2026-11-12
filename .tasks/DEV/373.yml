@@ -1,13 +1,37 @@
 title: Add versions
-status: Todo
+status: InProgress
 priority: High
 type: Feature
 reporter: mallox
+assignee: '@fix'
 created: 2026-11-12T08:53:59.182009+00:00
-modified: 2026-11-12T09:42:26.878678+00:00
+modified: 2026-11-12T09:43:24.159055+00:00
 relationships:
   related:
   - DEV-374
+  - DEV-298
+comments:
+- date: 2026-11-12T09:43:09.710104+00:00
+  author: claude
+  text: |-
+    claude: Plan (owner 2026-11-12: 'take your time to implement the versions ticket over night. I'll verify it tomorrow for the next major release'). The owner verifies it before DEV-374 (Release v0.15.0) ships.
+
+    Today custom fields have no type: a declaration is a name, values are raw YAML, filters compare loose strings (src/utils/fuzzy_match.rs strips '-', so 1.0-rc1 equals 1.0rc1). This adds typed fields, with version as the first type.
+
+    1. Declaring a type. custom.fields keeps plain names (text, as now) and also takes {name, type} entries, the same mixed list that tags/TagProperties use (src/config/types.rs StringConfigField ~366, normalization.rs, validator.rs, operations.rs for lotar config set, view/api/types.ts). Types: text (default) and version. Old configs load unchanged. Example: custom: { fields: [product, {name: affects, type: version}, {name: fixed_in, type: version}] }.
+    2. Version values: 0.13.3, v0.13.3, 1.0.0-rc.1, or a partial 0.13 (meaning every 0.13.x). Store as entered, minus a leading v, always as a YAML string (a hand-written affects: 0.13 loads as a float, and 0.10 as 0.1, so read numbers carefully). A field may hold one version or a list (affects: [0.13.2, 0.13.3]). Writes through CLI (--field), REST, MCP and the UI reject an unreadable version for a version field (src/services/task_validation.rs resolve_custom_fields, src/cli/validation.rs validate_custom_field). Compare by semver precedence; a partial version is a range. Look up the semver crate's latest stable release before adding it (AGENTS.md), or write a small parser if it can't do partial versions well.
+    3. Queries (CLI, REST q/query, MCP, web search box): affects>=0.13, affects<0.14, affects>0.13.2, affects<=1.0, affects=0.13 (any 0.13.x), plus semver ranges affects=^0.13 and affects=~0.13.2. Several terms AND: 'affects>=0.13 affects<0.14'. A list value matches when any version in it does. -affects>=0.14 excludes. The Rust parser (src/utils/search_syntax.rs) and the TS one (view/composables/useFilterGrammar.ts) change together, with the shared fixture tests/fixtures/search_syntax_cases.json. Evaluate in src/services/task_list.rs (resolve, apply_smart_filters; effort_min/max are the model). Text fields keep today's behaviour. Sorting by a version field uses version order (src/services/task_query.rs SortSpec::Custom).
+    4. Automation conditions on a version field: affects: { version: '>=0.13 <0.14' } (also usable with DEV-298's current-value form), validated when saving (src/automation/types.rs AutomationFieldConditionMap, src/services/automation_matching.rs matches_value_condition, src/services/automation_validation.rs, view/utils/automationRules.ts, AutomationRuleDialog.vue).
+    5. UI: the config page sets a field's type; the task panel's custom fields section shows a version input that flags an unreadable value; the filter bar accepts the new terms.
+    6. Contracts and docs: src/api_types.rs, view/api/types.ts, docs/openapi.json agree (skill api-contract-change-end-to-end); docs/help/config-reference.md, config.md, task-model.md, list.md (Filters in the query), add.md, automation.md, mcp-tools.md.
+    7. lotar's own .tasks/DEV/config.yml: declare affects and fixed_in as version fields so tickets can use them.
+    Tests: config with typed and untyped fields loads (old YAML too); version parse/compare/range unit tests (partial, prerelease, v-prefix, list values, float-loaded values); query operators in CLI and REST (and the TS grammar spec); a rejected bad value on write; an automation condition; a smoke test for the version input. Out of scope: other types (number, date), version suggestions from git tags.
+    Done when the above works with tests, lint/test/smoke pass, and the docs describe it.
+- date: 2026-11-12T09:43:23.354497+00:00
+  author: claude
+  text: 'claude: Owner 2026-11-12: work this overnight (@fix), take the time it needs; build all of the plan above, not a slice. Do it the way AGENTS.md says, with lint, test and smoke. Run lotar with LOTAR_DEFAULT_REPORTER set to your agent name and start each comment with it. Commit on your worktree''s branch, signed, never --no-verify, message ''DEV-373 Add versions'' (amend while unpushed); don''t merge or push, the merge agent does. Never delete work that isn''t saved elsewhere. A choice the plan leaves open: decide it, say why in a comment, and keep going; only what the owner alone can decide: comment one question, set HelpNeeded and assign mallox. End with a comment the owner can verify from: what to try (commands), what changed, the commit, the checks.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa2665ffa-2a99-4ee0-9537-002211dcfb14
 description: We don't have a place to indicate which version a bug affects or when it was found. We should add smart field support and fields with powerful operations for them, such as understanding version ranges.
 history:
 - at: 2026-11-12T09:42:26.878678+00:00
@@ -16,3 +40,33 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-374"]}'
+- at: 2026-11-12T09:43:09.710104+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T09:43:09.855795+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-374"]}'
+    new: '{"related":["DEV-374","DEV-298"]}'
+- at: 2026-11-12T09:43:23.354497+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T09:43:23.436007+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T09:43:23.611611+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T09:43:24.159055+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa2665ffa-2a99-4ee0-9537-002211dcfb14
