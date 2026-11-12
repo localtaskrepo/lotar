@@ -18,6 +18,25 @@ fn net_timeout() -> std::time::Duration {
     if fast_net() { std::time::Duration::from_millis(500) } else { std::time::Duration::from_millis(1500) }
 }
 
+// Upper bound for a whole request/response exchange. Generous so a loaded
+// machine (full suite, other worktrees' runs) still gets its response; a real
+// hang still fails the test with a clear message instead of a stalled run.
+const RESPONSE_DEADLINE: Duration = Duration::from_secs(15);
+
+// Read into `buf`, waiting until `deadline` for data. Returns 0 on EOF.
+fn read_until_deadline(stream: &mut TcpStream, buf: &mut [u8], deadline: Instant) -> usize {
+    loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        assert!(!remaining.is_zero(), "no response from test server within {RESPONSE_DEADLINE:?}");
+        stream.set_read_timeout(Some(remaining)).unwrap();
+        match stream.read(buf) {
+            Ok(n) => return n,
+            Err(e) if matches!(e.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut | std::io::ErrorKind::Interrupted) => {}
+            Err(e) => panic!("reading test server response failed: {e}"),
+        }
+    }
+}
+
 fn mk_req(method: &str, path: &str, query: &[(&str, &str)], body: Value) -> HttpRequest {
     let mut q = HashMap::new();
     for (k, v) in query {
@@ -133,7 +152,7 @@ fn http_post_json(port: u16, path_and_query: &str, body: &str) -> (u16, Vec<u8>)
 
 fn http_post_json_with_origin(port: u16, path_and_query: &str, body: &str, origin: Option<&str>) -> (u16, Vec<u8>) {
     let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
-    stream.set_read_timeout(Some(net_timeout())).unwrap();
+    let deadline = Instant::now() + RESPONSE_DEADLINE;
     let origin_header = origin.map(|o| format!("Origin: {o}\r\n")).unwrap_or_default();
     let req = format!(
         "POST {} HTTP/1.1\r\nHost: 127.0.0.1\r\n{}Content-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
@@ -149,7 +168,7 @@ fn http_post_json_with_origin(port: u16, path_and_query: &str, body: &str, origi
     let mut header_buf = Vec::new();
     let mut tmp = [0u8; 1024];
     loop {
-        let n = stream.read(&mut tmp).unwrap();
+        let n = read_until_deadline(&mut stream, &mut tmp, deadline);
         if n == 0 {
             break;
         }
@@ -174,7 +193,7 @@ fn http_post_json_with_origin(port: u16, path_and_query: &str, body: &str, origi
             // Read exact remaining bytes for body
             let mut body_bytes = body_leftover;
             while body_bytes.len() < content_length {
-                let n = stream.read(&mut tmp).unwrap_or(0);
+                let n = read_until_deadline(&mut stream, &mut tmp, deadline);
                 if n == 0 {
                     break;
                 }
@@ -397,14 +416,17 @@ fn open_sse(port: u16, query: &str) -> (TcpStream, Vec<u8>) {
     stream.flush().unwrap();
     let mut header_buf = [0u8; 1024];
     let mut collected = Vec::new();
+    let deadline = Instant::now() + RESPONSE_DEADLINE;
     loop {
-        let n = stream.read(&mut header_buf).unwrap();
+        let n = read_until_deadline(&mut stream, &mut header_buf, deadline);
         if n == 0 {
             break;
         }
         collected.extend_from_slice(&header_buf[..n]);
         if let Some(pos) = collected.windows(4).position(|w| w == b"\r\n\r\n") {
             let leftover = collected.split_off(pos + 4);
+            // read_sse_events polls with short reads against its own budget.
+            stream.set_read_timeout(Some(net_timeout())).unwrap();
             return (stream, leftover);
         }
     }
