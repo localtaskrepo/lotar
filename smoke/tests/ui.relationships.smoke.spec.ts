@@ -198,6 +198,11 @@ describe.concurrent('UI relationship integrity and dependencies (DEV-15/DEV-8/DE
                             (url.searchParams.get('relationships') || '').split(',').includes('related'),
                         );
                         await page.getByRole('button', { name: 'Toggle filters', exact: true }).click();
+                        // The first edge shows the desktop diagram, which closes the lists; decide on them after it.
+                        await page
+                            .getByRole('list', { name: 'Relationship legend', exact: true })
+                            .getByText('related (undirected)', { exact: true })
+                            .waitFor();
                         if (
                             !(await page
                                 .locator('.dependency-lists')
