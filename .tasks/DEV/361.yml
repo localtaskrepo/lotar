@@ -3,15 +3,20 @@ status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T05:01:21.522818+00:00
-modified: 2026-11-12T05:01:24.248099+00:00
+modified: 2026-11-12T05:13:24.433430+00:00
 relationships:
   related:
   - DEV-342
   - DEV-356
+  - DEV-305
+comments:
+- date: 2026-11-12T05:13:14.012531+00:00
+  text: 'claude: Fixed in 32a8819 on agent/DEV-361. The queue worker now watches the binary it was started from (utils::binary_watch, the DEV-305 watcher that lotar mcp uses, so a Homebrew symlink move counts). After a change it takes no new queue entries, lets its running jobs finish, and exits. Its existing exit path then starts a new worker, now from the path lotar was started as (watched_path) and not current_exe, so it runs the upgraded build. New test tests/dev361_worker_restarts_after_upgrade_test.rs: it upgrades a fake install while job 1 runs, then queues job 2, and checks that a different worker process runs job 2. It fails without the fix and passes with it. Documented in docs/help/agent.md (queue section). Checks: npm run lint, npm run test:agent (Rust 2004 passed, UI 1444, release, hooks) and npm run smoke (379 passed) all pass. Note: the running worker (pid 11651) still runs the old code until it next goes idle or is restarted. The fix only applies to workers started from a build that includes it.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af86593d9-5bfc-43dc-9e6e-504db1577842
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab7be4f58-8651-4692-8cf6-4cb0c810c1c9
 description: 'Found by DEV-356 (claude, 2026-11-11): the merge job job-20261112T044319.387Z-24 fast-forwarded main correctly (0a8b272), but LoTaR failed it with ''agent/DEV-356 is not merged into the main checkout''s current branch and can''t be fast-forwarded''. The thread worked on t3/fix-flaky-t3-runner-test, and git cherry main agent/DEV-356 shows the commit as applied, so DEV-342''s fix (c55f67c, in v0.13.2) would have passed it. The ''lotar agent worker'' (pid 11651) started 2026-11-11 18:31 local, before c55f67c (18:42) and before v0.13.2 was installed at /opt/homebrew/opt/lotar/bin/lotar (20:27), so it still runs the old code. Jobs it runs use old merge checks and old rules until someone restarts it. Check: after upgrading lotar while a worker runs, the worker runs the new build for the next job (or ''lotar agent'' status warns that the worker is older than the installed binary). Done when a worker notices its executable changed and restarts between jobs, or reports it clearly, with a test.'
 tags:
 - health
@@ -40,3 +45,24 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af86593d9-5bfc-43dc-9e6e-504db1577842
+- at: 2026-11-12T05:13:14.012531+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:13:14.325321+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-342","DEV-356"]}'
+    new: '{"related":["DEV-342","DEV-356","DEV-305"]}'
+- at: 2026-11-12T05:13:23.213875+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T05:13:24.433430+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab7be4f58-8651-4692-8cf6-4cb0c810c1c9

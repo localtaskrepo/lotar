@@ -1,11 +1,11 @@
 title: 'Flaky Rust: task_creation_waits_for_fragmented_body_with_case_insensitive_content_length times out reading the response'
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-12T04:47:42.443342+00:00
-modified: 2026-11-12T05:08:32.902007+00:00
+modified: 2026-11-12T05:08:40.408986+00:00
 relationships:
   related:
   - DEV-354
@@ -24,6 +24,8 @@ comments:
   text: 'claude: Nothing left to fix. The fix is already on main as 4be7d13 (the rebased 1d69b61), and git diff 1d69b61 4be7d13 -- tests/web_api_integration_test.rs is empty. The merge agent''s comment says the ticket''s check passed 5 of 5 in the main checkout. Its job was marked failed only because main wasn''t pushed: main also holds unpushed commits from DEV-348, 352, 354, 355 and 356. agent/DEV-359 has no new commits. Pushing main is the only step left.'
 - date: 2026-11-12T05:08:32.902007+00:00
   text: 'claude: Merge retry: nothing to merge. The branch''s only commit (1d69b61) was already on main as 4be7d13; the rebase skipped it and the branch now equals main. Not pushed: main holds unpushed commits from DEV-348, 352, 354, 355 and 356 that wait for their own sessions. No code changed, so no checks ran this time (the earlier merge ran the nextest check 5 of 5, lint:agent, test:agent, smoke).'
+- date: 2026-11-12T05:08:40.408986+00:00
+  text: 'The merge agent''s job job-20261112T050807.696Z-34 failed again: lotar agent logs job-20261112T050807.696Z-34. The fix is on branch agent/DEV-359. Try again with lotar automation run "Health: retry with @fix" --select ''id:DEV-359'', or for an agent''s ticket lotar assignee DEV-359 @fix.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8a800754-e4a5-4ec5-9daa-e8c4f4cdab68
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae828c50c-0209-44ef-8410-92ca55d914f5
@@ -128,5 +130,18 @@ history:
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aabd60b6d-06d6-4eeb-a662-8d504442bb11
 - at: 2026-11-12T05:08:32.902007+00:00
   actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:08:40.370439+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-12T05:08:40.408986+00:00
+  actor: automation
   changes:
   - field: comment_added

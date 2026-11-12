@@ -1,0 +1,42 @@
+title: 'Flaky Rust: dev279_cross_process_jobs_test status change fails under full-suite load'
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T05:17:25.629363+00:00
+modified: 2026-11-12T05:17:27.133873+00:00
+relationships:
+  related:
+  - DEV-358
+  - TEST-1
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2c8fa46a-572d-4b0f-acb2-8f67616c1184
+description: 'Found by claude while merging DEV-358 (2026-11-11): in one full npm run test:agent, jobs_in_another_process_are_seen_guarded_and_cancelled failed at tests/dev279_cross_process_jobs_test.rs:56 (assert status.status.success() after ''status TEST-1 Done'') at 0.68s; a rerun of the full suite passed and the test passed 3 of 3 alone. Check: cargo nextest run --cargo-profile local jobs_in_another_process repeatedly under full-suite load. Done when the status command''s failure cause is known and the test no longer races.'
+tags:
+- health
+custom_fields:
+  finding: cargo-nextest:dev279_cross_process_jobs_test
+history:
+- at: 2026-11-12T05:17:25.872584+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-358","TEST-1"]}'
+- at: 2026-11-12T05:17:26.026225+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T05:17:26.336708+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T05:17:27.133873+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2c8fa46a-572d-4b0f-acb2-8f67616c1184

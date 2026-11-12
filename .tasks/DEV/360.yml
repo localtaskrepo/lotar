@@ -3,14 +3,18 @@ status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T04:55:55.878491+00:00
-modified: 2026-11-12T04:55:57.449777+00:00
+modified: 2026-11-12T05:17:01.972980+00:00
 relationships:
   related:
   - DEV-356
+comments:
+- date: 2026-11-12T05:16:45.226592+00:00
+  text: 'claude: Cause found and fixed in b49019573a6c3e19ba7f8d33337c0c48288d9b8b (branch agent/DEV-360). run_job spawned the runner first and wrote the job''s shared record afterwards. For about 10-15 ms, list-running already showed the lotar-agent-wrapper process, but there was no record yet, so ''lotar status''/''assignee'' refused the change (''has an active agent job ... Cancel it'') instead of deferring it. The test polls every 200 ms, so it landed in that window only rarely. A script that polls without pausing hit it in 24 of 40 runs. Fix: write the record before the spawn (child_pid 0), then rewrite it with the runner''s pid; RunningJobSlot still unregisters it on every exit path. New regression test dev320_job_outcome_test::the_job_record_exists_when_the_runner_starts uses a shell LOTAR_AGENT_WRAPPER that looks for the record the moment it starts: it failed 6/6 before the fix and passes after. Checks: ticket check command (-E ''test(dev320_job_outcome_test::)'', --retries 0) 10/10 passed; race script 40/40; npm run lint:agent, test:agent (2004 Rust, 1444 UI, release and hooks tests), and smoke (379) all passed. I did not rerun the check next to a full suite run started by another session.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1374b68b-4b59-4bba-85b3-9a0b258782d4
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aaa2cf252-900b-4fc7-ad60-43ea614197bb
 description: 'Found by DEV-356 (claude, 2026-11-11): in npm run test:rust on t3/fix-flaky-t3-runner-test (rebased on efa1c0b) while other sessions ran test suites, tests/dev320_job_outcome_test.rs status_and_assignee_set_during_a_job_win_over_the_job_completed_rule failed once (1.5 s); the run stopped at that test, so I did not see the panic line. It passed on its own 6 times and in the next two full runs. Unconfirmed cause: a fixed sleep or poll deadline too short under load, like DEV-356. Check: cargo nextest run --cargo-profile local --retries 0 -E ''test(dev320_job_outcome_test::)'' passes repeatedly next to the full suite. Done when the cause is found and fixed, with the test passing without retries.'
 tags:
 - health
@@ -39,3 +43,18 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1374b68b-4b59-4bba-85b3-9a0b258782d4
+- at: 2026-11-12T05:16:45.226592+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:16:56.731325+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T05:17:01.972980+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aaa2cf252-900b-4fc7-ad60-43ea614197bb

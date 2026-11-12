@@ -5,7 +5,10 @@ type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-06T00:38:34.784415+00:00
-modified: 2026-11-06T00:48:30.834684+00:00
+modified: 2026-11-12T05:13:14.325082+00:00
+relationships:
+  related:
+  - DEV-361
 comments:
 - date: 2026-11-06T00:45:22.833547+00:00
   text: 'Done. New src/utils/binary_watch.rs watches the path lotar was started from: argv[0], resolved through PATH when it is a bare name, used only when it leads to the running binary, else current_exe(). It fires when that path leads to another file or a changed size or mtime, and only after the new binary is stable for one more interval. A missing path (mid-upgrade or uninstalled) is not a change. The interval is 2 s, overridable with LOTAR_BINARY_WATCH_INTERVAL_MS. lotar mcp now uses it, which fixes Homebrew upgrades: its old check compared current_exe()''s mtime, and that Cellar path never changes and is usually deleted. lotar serve --exit-on-upgrade (env LOTAR_SERVE_EXIT_ON_UPGRADE=1) stops agent jobs and exits 0 so launchd/systemd start the new version; it is off by default for servers started by hand. Docs: a new ''Run as a service'' section in serve.md with a launchd plist (checked with plutil -lint) and a systemd unit (Restart=always), covering the stable binary path, PATH for agent CLIs and git, and tokens; environment.md has the new variables. No lotar service command, by owner decision: the OS tools already do that. Tests: 3 unit tests (file replaced, symlink retargeted, missing path) and tests/dev305_serve_exit_on_upgrade_test.rs (a Homebrew-style upgrade with the flag exits 0, without the flag it keeps running). Full Rust suite 1966/1966; clippy and fmt clean.'
@@ -35,3 +38,9 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-12T05:13:14.325082+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-361"]}'
