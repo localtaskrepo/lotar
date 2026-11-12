@@ -169,7 +169,7 @@ Older files may use `job_start`, `complete`/`success`, `error`/`failure` and `ca
 
 A status or assignee someone sets while the job runs (an agent handing the ticket back, for example) is the job's outcome: it replaces the `set.status`/`set.assignee` of the `job_completed`, `job_failed` and `job_cancelled` rules, whose other actions still run. See [Status and assignee during a job](agent.md#status-and-assignee-during-a-job).
 
-Actions support `set`, `add`, `remove`, `comment`, `run`, `agent`, and `archive`.
+Actions support `set`, `add`, `remove`, `comment`, `run`, `agent`, `tell_agent`, and `archive`.
 
 ```yaml
 on:
@@ -196,6 +196,7 @@ on:
 - `run`: execute a command when the action fires
 - `comment`: add a comment to the task
 - `agent`: `model`, `effort` and `prompt` for the agent job this action starts by assigning the ticket to an agent profile (see below)
+- `tell_agent`: a message for the ticket's agent, queued to its running job or starting the agent (see [Telling the ticket's agent](#telling-the-tickets-agent))
 - `archive`: `true` moves the task into its project's `@archive` folder, `false` brings it back (see `lotar task archive`). It runs after every other part of the action, because archived tasks are read-only. To archive tasks some time after they finish, use a manual rule run from cron (below), or `lotar task archive --select 'status:done -recent:30d'`.
 
 ```yaml
@@ -265,6 +266,32 @@ A merge that runs in the fix agent's thread, with its context, instead of a thre
 ```
 
 `lotar automation simulate` lists these settings next to the job it would queue.
+
+### Telling the ticket's agent
+
+`tell_agent` hands a message to the ticket's agent, so a comment (or any other event) reaches the agent that works on the ticket:
+
+- A job runs on the ticket: the message is queued to it. A [`t3`](agent.md#t3-code-threads) job sends it to its thread as the next turn once the current turn ends, still in the same job, so the `job_completed` rules run after the agent has dealt with it. A job that runs [in another process](agent.md#jobs-in-other-processes) gets it too. Claude jobs of the same process get it on stdin; for other runners a job with the message is queued and starts when the running one ends.
+- No job runs: the ticket goes to its agent, which starts with the message as its prompt, as the next turn of the ticket's last T3 Code thread where there is one (as `session: continue` does). The ticket's agent is its assignee when that is an agent profile, else the last agent profile it was assigned to, else the profile in `agent`. Without any of them the action fails and says so.
+
+`message` takes the same templates as comments; `agent` (optional) is a profile name, with or without `@`. The `model`, `effort` and `provider` of the action's `agent` settings apply to a job it starts.
+
+Who may talk to the agent is up to the rule's conditions. Pair it with a [comment condition](#comment-conditions), or an agent's own comments come back to it as messages: only runners that get LoTaR's environment (not T3 Code threads) are kept from telling themselves. A job runs at most 10 queued turns; later messages stay on the ticket.
+
+```yaml
+- name: The owner's comments reach the agent
+  when:
+    comment: { author: mallox }
+  on:
+    commented:
+      tell_agent:
+        message: |
+          ${{comment.author}} commented on ${{ticket.id}}: ${{comment.text}}
+          Read it and act on it: answer with a ticket comment, or change the work as it asks.
+        agent: fix   # for a ticket that never had an agent
+```
+
+The web UI describes these rules ("tell the ticket's agent …"); its rule editor edits them only in YAML.
 
 ### Assignee tokens for actions
 

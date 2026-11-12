@@ -831,6 +831,15 @@ fn describe_action(action: &AutomationAction, current: &TaskDTO, config: &Resolv
         actions.push(SimulatedAction { action: "add_comment".to_string(), description: format!("Add comment: {}", preview.expand(comment)) });
     }
 
+    if let Some(tell) = action.tell_agent.as_ref() {
+        let fallback =
+            tell.agent.as_deref().map(|agent| format!(" (or start @{} if the ticket has no agent)", agent.trim().trim_start_matches('@'))).unwrap_or_default();
+        actions.push(SimulatedAction {
+            action: "tell_agent".to_string(),
+            description: format!("Tell the ticket's agent{fallback}: {}", preview.expand(&tell.message)),
+        });
+    }
+
     if let Some(archive) = action.archive {
         actions.push(SimulatedAction {
             action: if archive { "archive" } else { "unarchive" }.to_string(),
@@ -1660,6 +1669,19 @@ fn apply_action(
         execute_run_action(run, task_for_env, config, storage.root_path.as_path(), action_context, &tmpl)?;
     }
 
+    if let Some(tell) = action.tell_agent.as_ref() {
+        let message = tmpl.expand(&tell.message).trim().to_string();
+        if !message.is_empty() {
+            let run = action.agent.as_ref().map(|agent| AgentRunSettings {
+                model: expand_run_setting(agent.model.as_deref(), |raw| tmpl.expand(raw)),
+                effort: expand_run_setting(agent.effort.as_deref(), |raw| tmpl.expand(raw)),
+                provider: expand_run_setting(agent.provider.as_deref(), |raw| tmpl.expand(raw)),
+                ..AgentRunSettings::default()
+            });
+            tell_agent(storage, &current.id, config, &message, tell.agent.as_deref(), run.unwrap_or_default())?;
+        }
+    }
+
     if let Some(archive) = action.archive {
         TaskService::archive_with_receipt(storage, &current.id, None, archive)?;
     }
@@ -2063,6 +2085,84 @@ fn maybe_queue_agent_on_assignment(
             data: serde_json::json!({"id": ticket, "rule": "agent assignment", "message": err.to_string()}),
         });
     }
+}
+
+/// The `tell_agent` action (DEV-384), also the start-or-queue path for
+/// other hooks: a running job on the ticket gets the message as its next
+/// turn; a job that can't take it gets a follow-up job queued behind it.
+/// Otherwise the ticket goes to its agent, which starts with the message as
+/// the next turn of the ticket's last session where there is one. A job
+/// never tells itself: an agent's own comment doesn't come back to it.
+fn tell_agent(
+    storage: &mut Storage,
+    ticket_id: &str,
+    config: &ResolvedConfig,
+    message: &str,
+    fallback: Option<&str>,
+    mut run: AgentRunSettings,
+) -> LoTaRResult<()> {
+    let tasks_dir = storage.root_path.clone();
+    let task = TaskService::get(storage, ticket_id, None)?;
+    run.session = Some(crate::config::types::AgentSession::Continue);
+    run.prompt = Some(message.to_string());
+    if let Some(job) = crate::services::agent_active_jobs::for_ticket(&tasks_dir, &task.id) {
+        if std::env::var("LOTAR_AGENT_JOB_ID").is_ok_and(|own| own == job.job_id) {
+            return Ok(());
+        }
+        if crate::services::agent_job_service::tell_running_job(&tasks_dir, &job, message) {
+            return Ok(());
+        }
+        let Some(agent) = job.agent.clone() else {
+            return Err(LoTaRError::ValidationError(format!("The job running on {} has no agent profile to tell", task.id)));
+        };
+        let req = AgentJobCreateRequest {
+            ticket_id: task.id.clone(),
+            prompt: message.to_string(),
+            runner: None,
+            agent: Some(agent),
+            model: run.model,
+            effort: run.effort,
+            provider: run.provider,
+            session: run.session,
+        };
+        AgentQueueService::enqueue(&tasks_dir, req)?;
+        return AgentQueueService::ensure_worker(&tasks_dir);
+    }
+    if AgentJobService::has_active_job(&task.id) {
+        // Queued in this process: the job reads the ticket when it starts.
+        return Ok(());
+    }
+    let Some(agent) = ticket_agent(&task, config).or_else(|| fallback.map(|name| name.trim().trim_start_matches('@').to_string())) else {
+        return Err(LoTaRError::ValidationError(format!("{} has no agent to tell: set tell_agent.agent", task.id)));
+    };
+    if !config.agent_profiles.contains_key(&agent) {
+        return Err(LoTaRError::ValidationError(format!("Unknown agent profile '{agent}' for {}", task.id)));
+    }
+    let assignee = format!("@{agent}");
+    let (previous, updated) = if task.assignee.as_deref() == Some(assignee.as_str()) {
+        (None, task)
+    } else {
+        let patch = TaskUpdate { assignee: Some(assignee), ..TaskUpdate::default() };
+        let updated = TaskService::update_with_context(storage, &task.id, patch, TaskUpdateContext::automation_disabled())?;
+        (task.assignee.clone(), updated)
+    };
+    maybe_queue_agent_on_assignment(&tasks_dir, previous.as_deref(), updated.assignee.as_deref(), &updated, config, run);
+    Ok(())
+}
+
+/// The ticket's agent profile: its assignee when that is one, else the
+/// last one it was assigned to.
+fn ticket_agent(task: &TaskDTO, config: &ResolvedConfig) -> Option<String> {
+    let profile =
+        |value: Option<&str>| value.and_then(|value| value.strip_prefix('@')).filter(|name| config.agent_profiles.contains_key(*name)).map(str::to_string);
+    profile(task.assignee.as_deref()).or_else(|| {
+        task.history
+            .iter()
+            .rev()
+            .flat_map(|entry| entry.changes.iter().rev())
+            .filter(|change| change.field == "assignee")
+            .find_map(|change| profile(change.new.as_deref()).or_else(|| profile(change.old.as_deref())))
+    })
 }
 
 /// Count how many jobs have reached a terminal state (completed/failed) for the given ticket.

@@ -228,6 +228,14 @@ export function describeActionSteps(action: unknown): string[] {
         ].filter(Boolean)
         if (settings.length) steps.push(`run the agent with ${settings.join(', ')}`)
     }
+    if (record.tell_agent && typeof record.tell_agent === 'object') {
+        const tell = record.tell_agent as AutomationRecord
+        const fallback =
+            typeof tell.agent === 'string' && tell.agent.trim()
+                ? ` (or start @${tell.agent.trim().replace(/^@/, '')})`
+                : ''
+        steps.push(`tell the ticket’s agent${fallback} ${quote(displayText(tell.message ?? ''))}`)
+    }
     if (record.archive === true) steps.push('archive the task')
     if (record.archive === false) steps.push('bring the task back from the archive')
     return steps

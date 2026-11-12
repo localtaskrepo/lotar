@@ -22,7 +22,7 @@ use std::time::{Duration, Instant};
 /// until the run renames it to `FAKE_T3_RENAME`, with the run's status
 /// from the `status` file (default `completed`), or fails with
 /// `FAKE_T3_GONE`; `thread send` records its arguments, folder and stdin
-/// and replies (DEV-368).
+/// and replies (DEV-368). `thread start` runs while a `hold` file exists.
 fn fake_t3(dir: &Path) -> PathBuf {
     let path = dir.join("fake-t3");
     let script = format!(
@@ -49,6 +49,7 @@ cat > "$out/start.stdin"
 echo '[1111/090522.026791:ERROR:electron/shell/app/node_main.cc:154] Node.js environment variables are disabled because this process is invoked by other apps.' >&2
 echo "Thread thread-$$" >&2
 sleep 1
+while [ -f "$out/hold" ]; do sleep 0.1; done
 if [ -n "$FAKE_T3_RENAME" ]; then echo "$FAKE_T3_RENAME" > "$out/branch"; fi
 if [ "${{FAKE_T3_EXIT:-0}}" = "1" ]; then echo 'The run failed: provider quota exhausted' >&2; exit 1; fi
 printf 'Fixed it.\nAll tests pass.\n'
@@ -561,4 +562,106 @@ fn a_job_whose_thread_is_unknown_fails_with_the_reason() {
     assert!(job.summary.as_deref().is_some_and(|s| s.contains("Could not read the job's T3 Code thread thread-orphan")), "{job:?}");
     let task = TaskService::get(&fixtures.create_storage(), &id, None).unwrap();
     assert_eq!(task.status.as_str(), "HelpNeeded");
+}
+
+/// DEV-384: the owner's comments reach the ticket's agent through a
+/// `tell_agent` rule; other people's don't.
+const TELL_RULE: &str = "    - name: The owner's comments reach the agent\n      when:\n        comment: { author: mallox }\n      on:\n        commented:\n          tell_agent:\n            message: \"${{comment.author}} commented: ${{comment.text}}\"\n            agent: fix\n";
+
+fn comment_as(fixtures: &TestFixtures, id: &str, author: &str, text: &str) {
+    let mut storage = fixtures.create_storage();
+    let context = lotar::services::task_service::CommentContext { actor_override: Some(author.to_string()), fire_commented: true };
+    TaskService::add_comment_with_context(&mut storage, id, text, context).unwrap();
+}
+
+fn finished_jobs(ticket_id: &str, count: usize) -> Vec<AgentJob> {
+    let tasks_dir = PathBuf::from(std::env::var("LOTAR_TASKS_DIR").unwrap());
+    let start = Instant::now();
+    while start.elapsed() < Duration::from_secs(20) {
+        let jobs: Vec<_> = AgentJobService::list_jobs()
+            .into_iter()
+            .filter(|job| job.ticket_id == ticket_id && matches!(job.status.as_str(), "completed" | "failed"))
+            .filter(|job| agent_active_jobs::find(&tasks_dir, &job.id).is_none())
+            .collect();
+        if jobs.len() >= count {
+            return jobs;
+        }
+        sleep(Duration::from_millis(50));
+    }
+    panic!("not {count} finished jobs for {ticket_id}: {:?}", AgentJobService::list_jobs());
+}
+
+#[test]
+fn the_owners_comment_reaches_the_running_job_as_its_next_turn() {
+    let fixtures = TestFixtures::new();
+    let home = home_with_fix_profile(&fixtures, "");
+    fs::write(fixtures.tasks_root.join("automation.yml"), format!("{REPO_RULES}{TELL_RULE}")).unwrap();
+    fs::write(home.out.join("hold"), "").unwrap();
+
+    let id = create(&fixtures, "Flaky smoke test", None);
+    let tasks_dir = fixtures.tasks_root.clone();
+    let start = Instant::now();
+    while agent_active_jobs::for_ticket(&tasks_dir, &id).and_then(|job| job.session_id).is_none() {
+        assert!(start.elapsed() < Duration::from_secs(20), "the job never got its thread");
+        sleep(Duration::from_millis(50));
+    }
+    comment_as(&fixtures, &id, "claude", "claude: still working");
+    comment_as(&fixtures, &id, "mallox", "Please also check the retry count.");
+    fs::remove_file(home.out.join("hold")).unwrap();
+
+    let jobs = finished_jobs(&id, 1);
+    assert_eq!(jobs.len(), 1, "the comment runs in the same job: {jobs:?}");
+    let job = &jobs[0];
+    assert_eq!(job.status, "completed", "{job:?}: {:?}", messages(job));
+    let thread = job.session_id.clone().unwrap();
+    assert_eq!(read_lines(&home.out.join("send.args")), ["thread", "send", thread.as_str(), "-", "--wait"]);
+    assert_eq!(fs::read_to_string(home.out.join("send.stdin")).unwrap(), "mallox commented: Please also check the retry count.");
+    assert_eq!(job.summary.as_deref(), Some("Merged it."), "the queued turn's reply");
+    assert!(messages(job).contains(&"mallox commented: Please also check the retry count.".to_string()));
+    // The end rules ran after the queued turn.
+    let task = TaskService::get(&fixtures.create_storage(), &id, None).unwrap();
+    assert_eq!(task.status.as_str(), "Done");
+}
+
+#[test]
+fn the_owners_comment_on_an_idle_ticket_continues_its_agents_thread() {
+    let fixtures = TestFixtures::new();
+    let home = home_with_fix_profile(&fixtures, "");
+    fs::write(fixtures.tasks_root.join("automation.yml"), format!("{REPO_RULES}{TELL_RULE}")).unwrap();
+    let id = create(&fixtures, "Old warning", None);
+    let first = wait_for_finished_job(&id);
+    assert_eq!(first.status, "completed", "{first:?}");
+    let task = TaskService::get(&fixtures.create_storage(), &id, None).unwrap();
+    assert_eq!(task.assignee.as_deref(), Some("mallox"), "handed back");
+
+    comment_as(&fixtures, &id, "someone", "Not the owner.");
+    sleep(Duration::from_millis(300));
+    assert_eq!(finished_jobs(&id, 1).len(), 1, "only the owner's comments start a job");
+    assert!(agent_active_jobs::for_ticket(&fixtures.tasks_root, &id).is_none());
+
+    comment_as(&fixtures, &id, "mallox", "Why did you skip the docs?");
+    let jobs = finished_jobs(&id, 2);
+    let second = jobs.iter().find(|job| job.id != first.id).unwrap();
+    assert_eq!(second.status, "completed", "{second:?}: {:?}", messages(second));
+    assert_eq!(second.agent.as_deref(), Some("fix"), "the ticket's last agent");
+    let thread = first.session_id.clone().unwrap();
+    assert_eq!(second.session_id.as_deref(), Some(thread.as_str()), "the next turn of its thread");
+    assert_eq!(read_lines(&home.out.join("start.calls")).len(), 1, "no second thread");
+    assert!(fs::read_to_string(home.out.join("send.stdin")).unwrap().contains("mallox commented: Why did you skip the docs?"));
+}
+
+#[test]
+fn the_owners_comment_on_a_ticket_without_an_agent_starts_the_rules_agent() {
+    let fixtures = TestFixtures::new();
+    let home = home_with_fix_profile(&fixtures, "");
+    fs::write(fixtures.tasks_root.join("automation.yml"), format!("{REPO_RULES}{TELL_RULE}")).unwrap();
+    let mut storage = fixtures.create_storage();
+    let task = TaskService::create(&mut storage, TaskCreate { title: "An idea".into(), project: Some("REPO".into()), ..Default::default() }).unwrap();
+    assert!(task.assignee.is_none());
+
+    comment_as(&fixtures, &task.id, "mallox", "Could we try this?");
+    let job = wait_for_finished_job(&task.id);
+    assert_eq!(job.status, "completed", "{job:?}: {:?}", messages(&job));
+    assert_eq!(job.agent.as_deref(), Some("fix"));
+    assert!(fs::read_to_string(home.out.join("start.stdin")).unwrap().contains("mallox commented: Could we try this?"));
 }

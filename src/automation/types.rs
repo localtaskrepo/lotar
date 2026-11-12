@@ -233,6 +233,10 @@ pub struct AutomationAction {
     /// ticket to an agent profile.
     #[serde(default)]
     pub agent: Option<AutomationAgentAction>,
+    /// Tell the ticket's agent something (DEV-384): queued to its running
+    /// job, else it starts the ticket's agent with the message.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tell_agent: Option<AutomationTellAgentAction>,
     /// `true` archives the task, `false` brings it back (DEV-4). Runs after
     /// every other part of the action, since archived tasks are read-only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -242,6 +246,19 @@ pub struct AutomationAction {
 /// How the agent job started by an action's assignment should run. Each
 /// value overrides the profile's own; `prompt` replaces the default request
 /// and accepts the same `${{...}}` templates as comments.
+/// `tell_agent`: a message for the ticket's agent. A running job gets it as
+/// its next turn; otherwise the ticket's agent profile (its assignee, else
+/// the last agent profile it had, else `agent`) starts with it as the
+/// prompt, as the next turn of the ticket's last session where there is one.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct AutomationTellAgentAction {
+    /// Accepts the same `${{...}}` templates as comments.
+    pub message: String,
+    /// The profile for a ticket that never had an agent (`fix` or `@fix`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct AutomationAgentAction {
     #[serde(default)]

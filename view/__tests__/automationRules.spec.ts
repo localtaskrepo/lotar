@@ -6,7 +6,7 @@ import {
     parseAutomationYamlDocument,
     summarizeAutomationRule,
 } from '../utils/automationRules'
-import { describeConditions } from '../utils/automationText'
+import { describeActionSteps, describeConditions } from '../utils/automationText'
 
 describe('automationRules utilities', () => {
     it('builds any-match rules into an any group', () => {
@@ -100,6 +100,17 @@ describe('automationRules utilities', () => {
         expect(state.unsupportedReasons).toEqual(['Comment author conditions are currently YAML-only.'])
         expect(summarizeAutomationRule(rule).conditions).toEqual(['comment author = mallox'])
         expect(describeConditions(rule.when).items).toEqual(['comment author is mallox'])
+    })
+
+    it('describes tell_agent actions and keeps them yaml-only', () => {
+        const rule = {
+            name: 'Comments reach the agent',
+            on: { commented: { tell_agent: { message: '${{comment.author}}: ${{comment.text}}', agent: '@fix' } } },
+        }
+        expect(getEditableRuleState(rule).editable).toBe(false)
+        expect(describeActionSteps(rule.on.commented)).toEqual([
+            'tell the ticket’s agent (or start @fix) “${{comment.author}}: ${{comment.text}}”',
+        ])
     })
 
     it('compacts canonical yaml before building summaries', () => {

@@ -88,7 +88,8 @@ impl AgentContextService {
             fs::create_dir_all(parent)?;
         }
         let payload = serde_json::to_string_pretty(&context).map_err(|err| LoTaRError::SerializationError(format!("Failed to serialize context: {}", err)))?;
-        fs::write(&path, payload)?;
+        // A job starting on the ticket meanwhile reads the whole file or the old one.
+        crate::storage::safety::atomic_write_file(&path, &payload)?;
         Ok(())
     }
 }

@@ -436,6 +436,8 @@ Both output readers are joined before final summaries, persisted status, and slo
 
 Agent lifecycle automation lives in the automation rules file. Without a rule, a finished job leaves the ticket's status and assignee as they are. See [Automation Rules](automation.md#agent-job-queueing) for a lifecycle example.
 
+A rule's [`tell_agent`](automation.md#telling-the-tickets-agent) action hands the ticket's agent a message, for example a person's comment: a running job gets it as its next turn, an idle ticket starts its agent with it.
+
 ## Notes
 
 - Job status is streamed over `/api/events?kinds=agent_job_*` while the server is running. Streamed events carry the same `sequence` (stable per-job identity, positive, strictly monotonic, never reused) and `at` as the matching `GET /api/jobs/logs` entries, so live and snapshot logs can be joined losslessly.

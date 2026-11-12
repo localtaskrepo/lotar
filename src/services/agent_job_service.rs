@@ -1594,11 +1594,140 @@ fn finish_orphaned_job(
         });
         1
     };
-    if exit_code == T3_WAITS_FOR_ANSWER {
+    let mut context_messages: Vec<_> = thread.reply.as_deref().map(build_assistant_message).into_iter().collect();
+    let exit_code = run_queued_turns(&cli, job_id, tasks_dir, Some(exit_code), &mut context_messages);
+    if should_stop_job(job_id) {
+        return;
+    }
+    if exit_code == Some(T3_WAITS_FOR_ANSWER) {
         hand_back_waiting_t3_job(job_id, ticket_id, tasks_dir, config);
     }
-    let context_messages: Vec<_> = thread.reply.as_deref().map(build_assistant_message).into_iter().collect();
-    finalize_job(job_id, ticket_id, Some(exit_code), &context_messages, tasks_dir, config);
+    finalize_job(job_id, ticket_id, exit_code, &context_messages, tasks_dir, config);
+}
+
+/// Hand a running job a message (DEV-384): a t3 job runs it as its
+/// thread's next turn before it ends, from whichever process sent it; a
+/// runner of this process that reads messages gets it on stdin. `false`
+/// when the job can't take it (another runner, or the job is ending).
+pub fn tell_running_job(tasks_dir: &std::path::Path, job: &crate::services::agent_active_jobs::ActiveJob, message: &str) -> bool {
+    if job.runner == AgentRunnerKind::T3.as_str() {
+        return crate::services::agent_active_jobs::push_message(tasks_dir, &job.job_id, message);
+    }
+    job.owner_pid == std::process::id() && AgentJobService::send_message(&job.job_id, message).is_ok()
+}
+
+/// Messages queued while a t3 job ran (DEV-384) run as its thread's next
+/// turns, in the same job, so its end rules see what the agent did with
+/// them. Returns the exit code of the job's last turn. A thread that waits
+/// for an answer or a stopped job takes none.
+fn run_queued_turns(
+    cli: &T3Cli,
+    job_id: &str,
+    tasks_dir: &std::path::Path,
+    mut exit_code: Option<i32>,
+    context_messages: &mut Vec<crate::services::agent_context_service::AgentContextMessage>,
+) -> Option<i32> {
+    let thread_id = JOB_REGISTRY.lock().ok().and_then(|registry| registry.jobs.get(job_id).and_then(|state| state.record.session_id.clone()));
+    for turn in 0.. {
+        let Some(thread_id) = thread_id.as_deref().filter(|_| turn < MAX_QUEUED_TURNS && exit_code != Some(T3_WAITS_FOR_ANSWER) && !should_stop_job(job_id))
+        else {
+            let left = crate::services::agent_active_jobs::close_inbox(tasks_dir, job_id);
+            if !left.is_empty() {
+                update_job(job_id, |state| {
+                    let note = format!("{} message(s) for the agent arrived after it stopped taking turns; they stay on the ticket.", left.len());
+                    record_and_emit(state, "agent_job_progress", Some(note));
+                });
+            }
+            return exit_code;
+        };
+        let messages = crate::services::agent_active_jobs::take_messages_or_close(tasks_dir, job_id);
+        if messages.is_empty() {
+            return exit_code;
+        }
+        let prompt = messages.join("\n\n");
+        update_job(job_id, |state| {
+            record_and_emit(state, "agent_job_input", Some(prompt.clone()));
+        });
+        context_messages.push(build_user_message(&prompt));
+        let Some((code, reply)) = run_t3_turn(cli, job_id, tasks_dir, thread_id, &prompt) else {
+            return exit_code;
+        };
+        exit_code = code;
+        if !reply.is_empty() {
+            context_messages.push(build_assistant_message(&reply));
+            update_job(job_id, |state| {
+                state.record.last_message = Some(reply.clone());
+                record_and_emit(state, "agent_job_message", Some(reply.clone()));
+            });
+        }
+    }
+    exit_code
+}
+
+/// Queued turns one job runs at most: a rule that tells the agent about
+/// its own comments would otherwise keep it going.
+const MAX_QUEUED_TURNS: usize = 10;
+
+/// `t3 thread send <thread> - --wait` with `prompt`: the exit code and the
+/// reply, or `None` when it couldn't run or the job was stopped.
+fn run_t3_turn(cli: &T3Cli, job_id: &str, tasks_dir: &std::path::Path, thread_id: &str, prompt: &str) -> Option<(Option<i32>, String)> {
+    let mut cmd = Command::new(&cli.program);
+    cmd.args(["thread", "send", thread_id, "-", "--wait"])
+        .envs(&cli.env)
+        .current_dir(&cli.cwd)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    clear_repository_env(&mut cmd);
+    let mut child = match cmd.spawn() {
+        Ok(child) => child,
+        Err(err) => {
+            update_job(job_id, |state| {
+                record_and_emit(state, "agent_job_progress", Some(format!("Could not send the message to the T3 Code thread: {err}")));
+            });
+            return None;
+        }
+    };
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(prompt.as_bytes());
+    }
+    let read = |pipe: Option<Box<dyn Read + Send>>| {
+        thread::spawn(move || {
+            let mut text = String::new();
+            if let Some(mut pipe) = pipe {
+                let _ = pipe.read_to_string(&mut text);
+            }
+            text
+        })
+    };
+    let stdout = read(child.stdout.take().map(|pipe| Box::new(pipe) as Box<dyn Read + Send>));
+    let stderr = read(child.stderr.take().map(|pipe| Box::new(pipe) as Box<dyn Read + Send>));
+    let status = loop {
+        if crate::services::agent_active_jobs::cancel_requested(tasks_dir, job_id) {
+            let _ = AgentJobService::cancel_job(job_id);
+        }
+        if should_stop_job(job_id) {
+            terminate_child(&mut child);
+            let _ = child.wait();
+            return None;
+        }
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) => thread::sleep(Duration::from_millis(200)),
+            Err(_) => {
+                terminate_child(&mut child);
+                let _ = child.wait();
+                return None;
+            }
+        }
+    };
+    let reply = stdout.join().unwrap_or_default().trim().to_string();
+    for line in stderr.join().unwrap_or_default().lines().map(str::trim).filter(|line| !line.is_empty() && !is_t3_noise(line)) {
+        update_job(job_id, |state| {
+            record_and_emit(state, "agent_job_progress", Some(line.to_string()));
+        });
+    }
+    Some((status.code(), reply))
 }
 
 fn resolve_repo_root(tasks_dir: &std::path::Path) -> Option<std::path::PathBuf> {
@@ -2441,9 +2570,14 @@ fn run_job(
         }
         return;
     }
-    let exit_code = status.ok().and_then(|status| status.code());
+    let mut exit_code = status.ok().and_then(|status| status.code());
     if let Some(cli) = t3_cli.as_ref() {
         on_t3_thread_ended(cli, &job_id);
+        exit_code = run_queued_turns(cli, &job_id, &tasks_dir, exit_code, &mut context_messages);
+        if should_stop_job(&job_id) {
+            let _ = AgentContextService::append_messages(&tasks_dir, &config, &ticket_id, context_messages, None);
+            return;
+        }
     }
     if runner_kind == AgentRunnerKind::T3 && exit_code == Some(T3_WAITS_FOR_ANSWER) {
         hand_back_waiting_t3_job(&job_id, &ticket_id, &tasks_dir, &config);

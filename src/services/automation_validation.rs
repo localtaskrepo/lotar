@@ -192,6 +192,17 @@ fn validate_action(action: Option<&AutomationAction>, config: &ResolvedConfig, r
             result.add_error(ValidationError::warning(Some("automation".to_string()), "Automation run command cannot be empty.".to_string()));
         }
     }
+
+    if let Some(tell) = action.tell_agent.as_ref() {
+        if tell.message.trim().is_empty() {
+            result.add_error(ValidationError::error(Some("automation".to_string()), "tell_agent needs a message.".to_string()));
+        }
+        if let Some(agent) = tell.agent.as_deref().map(|agent| agent.trim().trim_start_matches('@'))
+            && !config.agent_profiles.contains_key(agent)
+        {
+            result.add_error(ValidationError::warning(Some("automation".to_string()), format!("tell_agent names unknown agent profile '{agent}'.")));
+        }
+    }
 }
 
 #[cfg(test)]
@@ -226,6 +237,13 @@ mod tests {
             "automation:\n  rules:\n    - when:\n        current: { changes: { status: { to: Done } } }\n      on:\n        updated:\n          comment: x\n",
         );
         assert!(result.warnings.iter().any(|error| error.to_string().contains("changes inside current")), "{:?}", result.warnings);
+    }
+
+    #[test]
+    fn checks_tell_agent() {
+        let result = validate("automation:\n  rules:\n    - on:\n        commented:\n          tell_agent: { message: ' ', agent: nobody }\n");
+        assert!(result.errors.iter().any(|error| error.to_string().contains("tell_agent needs a message")), "{:?}", result.errors);
+        assert!(result.warnings.iter().any(|error| error.to_string().contains("unknown agent profile 'nobody'")), "{:?}", result.warnings);
     }
 
     #[test]
