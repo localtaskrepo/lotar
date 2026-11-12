@@ -276,6 +276,34 @@ issue:
 - Set colours on the Config page (Tags & fields): it lists the tags in use, and clicking one adds a row with its current colour to adjust. Or use `lotar config set tag_properties 'ui=#0ea5e9, backend=teal' --global` (a YAML/JSON map such as `{ui: {color: "#0ea5e9"}}` works too; an empty value clears them).
 - Other properties in a tag object are kept when LoTaR rewrites the config, so newer versions can add more.
 
+## Version fields
+
+A custom field can hold versions, such as the release a bug affects or the one that fixes it. Give it a type in the field list: an entry is either a plain name (a text field, as before) or an object with a `name` and a `type`.
+
+```yaml
+custom:
+  fields:
+    - product
+    - { name: affects, type: version }
+    - { name: fixed_in, type: version }
+```
+
+- Types are `text` (the default) and `version`.
+- A version is `1.4.2`, `v1.4.2` (stored as `1.4.2`), `1.0.0-rc.1`, or a partial `0.13` or `0.13.x`, which means every 0.13 version, prereleases included. Build metadata (`+build.5`) is kept but ignored when comparing. A field holds one version or a list: `affects: [0.13.2, 0.13.3]`, or `--field affects=0.13.2,0.13.3` on the command line.
+- Writes through the CLI, REST, MCP and the web UI reject a value that is not a version, and store versions as strings. Write versions in a hand-edited task file in quotes (`affects: '0.10'`): YAML reads an unquoted `0.10` as the number 0.1. A hand-written value LoTaR cannot read does not block other edits of the task; searches skip it.
+- Versions compare by semver precedence (`0.9.1` < `0.10.0`, `1.0.0-rc.1` < `1.0.0`). Searches understand ranges (`lotar list 'affects>=0.13' 'affects<0.14'`, see [Version fields](./list.md#version-fields)), sorting by the field follows version order, and automation rules take `version:` conditions ([Version conditions](./automation.md#version-conditions)).
+- A project that inherits the global field list types fields under `custom.field_properties` instead, because its own `custom.fields` list would replace the global one:
+
+```yaml
+# .tasks/DEMO/config.yml
+custom:
+  field_properties:
+    affects: { type: version }
+```
+
+- Set types on the Config page (Tags & fields → Version fields), or with `lotar config set custom_field_properties 'affects=version, fixed_in=version' --global` (a YAML/JSON map such as `{affects: {type: version}}` works too; an empty value clears them). `config validate` warns about an unknown type (the field then holds text) and about a typed field missing from a fixed field list.
+- Other properties in a field object are kept when LoTaR rewrites the config, so newer versions can add more.
+
 ## Done States
 
 `issue.done_states` defines which task statuses count as finished. It is independent of sprint lifecycle states and agent-job states. The dotted spelling, nested YAML spelling, and flat `issue_done_states` alias address the same field.
@@ -321,7 +349,8 @@ Resolved configuration responses expose `effective_done_states`, `done_states_mo
 - `members` - Allowed members when `default.strict_members` is true
 - `review.reviewers` - Opt-in project-only list of named identities allowed to resolve review status/assignee changes alongside the reporter. Absent or empty means reporter-only. No workspace-global, home, environment, or inline-global override inheritance; use `--project` with config mutations. Entries are literal names/emails, not `@me`, agent directives, or `*`.
 - `default.strict_members` - Enforce member list for reporter/assignee fields
-- `custom_fields` - Custom field definitions
+- `custom_fields` - Custom field definitions, optionally with a type ([Version fields](#version-fields))
+- `custom.field_properties` - Field types for inherited fields
     
 For review recovery, for example when a reporter is an agent or has left the
 project:

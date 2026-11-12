@@ -59,14 +59,13 @@ impl<'a> CliValidator<'a> {
         crate::services::task_validation::validate_custom_field_name(field_name, self.config)
     }
 
-    /// Validate custom field key-value pair
-    pub fn validate_custom_field(&self, field_name: &str, field_value: &str) -> Result<(String, String), String> {
-        // First validate the field name
+    /// Validate a custom field key-value pair: the name against the project's
+    /// fields, the value against the field's type (DEV-373).
+    pub fn validate_custom_field(&self, field_name: &str, field_value: &str) -> Result<(String, crate::types::CustomFieldValue), String> {
         let validated_name = self.validate_custom_field_name(field_name)?;
-
-        // For now, allow any value for custom fields
-        // In the future, this could be extended to validate values based on field type
-        Ok((validated_name, field_value.to_string()))
+        let value =
+            crate::services::task_validation::normalize_custom_field_value(&validated_name, &crate::types::custom_value_string(field_value), self.config)?;
+        Ok((validated_name, value))
     }
 
     /// Validate assignee format (basic email validation) and enforce configured members

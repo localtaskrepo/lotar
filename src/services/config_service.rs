@@ -420,6 +420,9 @@ impl ConfigService {
                 local == global_value
             }
             "tag_properties" => crate::config::operations::parse_tag_properties(value).is_ok_and(|local| local == global.tag_properties),
+            "custom_field_properties" => {
+                crate::config::operations::parse_custom_field_properties(value).is_ok_and(|local| local == global.custom_field_properties)
+            }
             "branch_status_aliases" => {
                 let local = parse_alias_pairs(value).unwrap_or_default();
                 let mut global_value: Vec<(String, String)> = global.branch_status_aliases.iter().map(|(k, v)| (k.to_lowercase(), v.to_string())).collect();

@@ -220,6 +220,12 @@
               :global-tag-properties="isGlobal ? null : (inspectData.global_effective?.tag_properties ?? null)"
               :tag-colors-error="errors.tag_properties"
               :tag-colors-source="sourceFor('tag_properties')"
+              v-model:version-fields="form.versionFields"
+              :global-field-properties="
+                isGlobal ? null : (inspectData.global_effective?.custom_field_properties ?? null)
+              "
+              :version-fields-error="errors.custom_field_properties"
+              :version-fields-source="sourceFor('custom_field_properties')"
               :provenance-label="provenanceLabel"
               :provenance-class="provenanceClass"
               @validate="validateField"

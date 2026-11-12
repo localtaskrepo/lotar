@@ -198,6 +198,10 @@ pub struct AutomationFieldConditionMap {
     /// Date is older than this duration ("30d", "2w")
     #[serde(default)]
     pub older_than: Option<String>,
+    /// One of the field's versions meets this range (DEV-373), e.g.
+    /// `">=0.13 <0.14"` or `"^1.2"`; see `utils::version`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]

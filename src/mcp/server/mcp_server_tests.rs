@@ -1546,3 +1546,43 @@ fn tool_allowlist_covers_every_entry_point() {
     assert!(error.message.contains("@helper"), "{}", error.message);
     assert!(assign_person.error.is_none(), "{:?}", assign_person.error);
 }
+
+/// DEV-373: version custom fields over MCP: writes are checked and stored as
+/// strings, and `query` takes version ranges.
+#[test]
+fn version_fields_are_checked_and_queryable() {
+    let _lock = lock_var("LOTAR_TASKS_DIR");
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    std::fs::write(tasks_dir.join("config.yml"), "default:\n  project: MCP\ncustom:\n  fields: [{ name: affects, type: version }]\n").unwrap();
+    set_tasks_dir_env(&tasks_dir);
+
+    let call = |id: i64, name: &str, arguments: serde_json::Value| {
+        dispatch(JsonRpcRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(id)),
+            method: "tools/call".into(),
+            params: json!({"name": name, "arguments": arguments}),
+        })
+    };
+    for (id, title, affects) in [(1, "old", json!("0.12.1")), (2, "list", json!(["v0.13.2", "0.14.0"]))] {
+        let resp = call(id, "task_create", json!({"title": title, "project": "MCP", "custom_fields": {"affects": affects}}));
+        assert!(resp.error.is_none(), "{:?}", resp.error);
+        assert_ne!(resp.result.as_ref().and_then(|r| r.get("isError")), Some(&json!(true)), "{:?}", resp.result);
+    }
+    let file = std::fs::read_to_string(tasks_dir.join("MCP/2.yml")).unwrap();
+    assert!(file.contains("- 0.13.2") && !file.contains("v0.13.2"), "{file}");
+
+    let bad = call(3, "task_create", json!({"title": "bad", "project": "MCP", "custom_fields": {"affects": "soon"}}));
+    let rejected = bad.error.is_some() || bad.result.as_ref().and_then(|r| r.get("isError")) == Some(&json!(true));
+    assert!(rejected, "a value that is not a version is refused: {:?}", bad.result);
+
+    let resp = call(4, "task_list", json!({"query": "affects>=0.13"}));
+    assert!(resp.error.is_none(), "{:?}", resp.error);
+    let payload = parse_tool_payload(&resp);
+    let titles: Vec<&str> = payload["tasks"].as_array().unwrap().iter().filter_map(|t| t["title"].as_str()).collect();
+    assert_eq!(titles, vec!["list"]);
+
+    clear_tasks_dir_env();
+}

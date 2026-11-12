@@ -329,7 +329,7 @@ fn make_task_create_tool(enum_hints: Option<&EnumHints>) -> Value {
         "custom_fields".into(),
         json!({
             "type": "object",
-            "description": "Assign custom_fields key/value pairs defined in config."
+            "description": "Assign custom_fields key/value pairs defined in config. A version field takes a version string or an array of them."
         }),
     );
     properties.insert(
@@ -730,7 +730,7 @@ fn make_task_list_tool(enum_hints: Option<&EnumHints>) -> Value {
         "query".into(),
         json!({
             "type": ["string", "null"],
-            "description": "Filters and search text in the web UI search-box syntax, the same as `lotar list`: e.g. 'status:todo,inprogress prio:high has:tag owner:@me area=billing \"login redirect\" -oauth'. key:value adds to a list filter, key=value replaces, field:name=value is a custom field, unknown key:value stays search text. Added to the other params. Malformed terms are errors."
+            "description": "Filters and search text in the web UI search-box syntax, the same as `lotar list`: e.g. 'status:todo,inprogress prio:high has:tag owner:@me area=billing \"login redirect\" -oauth'. key:value adds to a list filter, key=value replaces, field:name=value is a custom field, a version field compares with affects>=0.13 affects<0.14 or affects=^0.13, unknown key:value stays search text. Added to the other params. Malformed terms are errors."
         }),
     );
     properties.insert(

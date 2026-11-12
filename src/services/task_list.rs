@@ -333,8 +333,16 @@ impl TaskQueryInput {
         // `field:COMPONENT`) share one filter whose values are ORed.
         let mut field_filters: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
         for (key, value) in self.fields {
+            let version_field = crate::utils::custom_fields::version_field_name(&key, &config);
+            if version_field.is_none() && crate::utils::version::is_comparison(&value) {
+                return Err(TaskQueryError::Invalid(format!("'{key}' is not a version field: only version fields compare with < and >")));
+            }
             if let Some(builtin) = crate::utils::fields::is_reserved_field(&key) {
                 field_filters.entry(builtin.to_string()).or_default().insert(value);
+            } else if let Some(name) = version_field {
+                // Version ranges (DEV-373) match in memory, like builtin fields.
+                crate::utils::version::VersionReq::parse(&value).map_err(|message| TaskQueryError::Invalid(format!("Filter '{key}': {message}")))?;
+                field_filters.entry(format!("field:{}", crate::utils::custom_fields::canonicalize(&name))).or_default().insert(value);
             } else if let Some(name) = crate::utils::custom_fields::resolve_filter_name(&key, &config) {
                 filter.custom_fields.entry(crate::utils::custom_fields::canonicalize(&name)).or_default().push(value);
             } else {
@@ -346,7 +354,13 @@ impl TaskQueryInput {
 
         let mut options = TaskQueryOptions { search: self.text.as_deref().map(crate::utils::text_search::SearchQuery::parse), ..TaskQueryOptions::default() };
         if let Some(raw) = self.sort_by.as_deref() {
-            options.sort = task_query::parse_sort_by(raw)?;
+            options.sort = match task_query::parse_sort_by(raw)? {
+                SortSpec::Custom(name) => match crate::utils::custom_fields::version_field_name(&name, &config) {
+                    Some(field) => SortSpec::Version(field),
+                    None => SortSpec::Custom(name),
+                },
+                spec => spec,
+            };
         }
         if let Some(raw) = self.order.as_deref() {
             options.order = task_query::parse_order(raw)?;
@@ -538,13 +552,25 @@ pub fn select_ids(storage: &Storage, base: &ResolvedConfig, tasks_root: &Path, s
     Ok(run(storage, &query, chrono::Utc::now()).into_iter().map(|(id, _)| id).collect())
 }
 
-/// Keep tasks whose field values loosely match every field filter.
+/// Keep tasks whose field values loosely match every field filter. Version
+/// fields match when one of their versions meets one of the ranges.
 pub fn apply_field_filters(tasks: &mut Vec<(String, TaskDTO)>, filters: &BTreeMap<String, BTreeSet<String>>, config: &ResolvedConfig) {
     if filters.is_empty() {
         return;
     }
+    let ranges: BTreeMap<&String, Vec<crate::utils::version::VersionReq>> = filters
+        .iter()
+        .filter(|(key, _)| crate::utils::custom_fields::version_field_name(key, config).is_some())
+        .map(|(key, allowed)| (key, allowed.iter().filter_map(|raw| crate::utils::version::VersionReq::parse(raw).ok()).collect()))
+        .collect();
     tasks.retain(|(id, task)| {
         filters.iter().all(|(key, allowed)| {
+            if let Some(ranges) = ranges.get(key) {
+                let name = key.strip_prefix("field:").unwrap_or(key);
+                let versions =
+                    crate::utils::custom_fields::find_value(&task.custom_fields, name).map(crate::utils::version::value_versions).unwrap_or_default();
+                return versions.iter().any(|version| ranges.iter().any(|range| range.matches(version)));
+            }
             let values: Vec<String> = crate::utils::custom_fields::resolve_task_filter_values(id, task, key, config)
                 .unwrap_or_default()
                 .into_iter()

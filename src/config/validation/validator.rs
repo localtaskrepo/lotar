@@ -21,6 +21,9 @@ impl ConfigValidator {
         if let Some(properties) = &config.tag_properties {
             self.validate_tag_properties(properties, config.tags.as_ref(), &mut result);
         }
+        if let Some(properties) = &config.custom_field_properties {
+            self.validate_custom_field_properties(properties, config.custom_fields.as_ref(), &mut result);
+        }
 
         if let Some(legacy) = &config.agent_automation {
             result.add_error(retired_agent_automation_warning(legacy));
@@ -143,6 +146,7 @@ impl ConfigValidator {
     pub fn validate_global_config(&self, config: &GlobalConfig) -> ValidationResult {
         let mut result = ValidationResult::new();
         self.validate_tag_properties(&config.tag_properties, Some(&config.tags), &mut result);
+        self.validate_custom_field_properties(&config.custom_field_properties, Some(&config.custom_fields), &mut result);
         if let Some(legacy) = &config.agent_automation {
             result.add_error(retired_agent_automation_warning(legacy));
         }
@@ -740,6 +744,38 @@ impl ConfigValidator {
 
     /// Tag properties (DEV-20): unknown colours are ignored by the UI, and
     /// properties of a tag a fixed list does not allow never show.
+    /// Field properties (DEV-373): an unknown type is read as text, and
+    /// properties of a field a fixed list does not allow never apply.
+    fn validate_custom_field_properties(
+        &self,
+        properties: &std::collections::BTreeMap<String, crate::config::types::CustomFieldProperties>,
+        fields: Option<&StringConfigField>,
+        result: &mut ValidationResult,
+    ) {
+        for (name, props) in properties {
+            if let Some(kind) = &props.field_type
+                && crate::config::types::CustomFieldType::parse(kind).is_none()
+            {
+                result.add_error(
+                    ValidationError::warning(
+                        Some("custom_field_properties".to_string()),
+                        format!("Field '{name}' has an unknown type '{kind}'; it holds text"),
+                    )
+                    .with_fix(format!("Use one of {}", crate::config::types::CUSTOM_FIELD_TYPES.join(", "))),
+                );
+            }
+            if let Some(fields) = fields
+                && !fields.has_wildcard()
+                && !fields.values.iter().any(|field| field.eq_ignore_ascii_case(name))
+            {
+                result.add_error(
+                    ValidationError::warning(Some("custom_field_properties".to_string()), format!("Field '{name}' has properties but is not in custom.fields"))
+                        .with_fix(format!("Add '{name}' to custom.fields or remove its properties")),
+                );
+            }
+        }
+    }
+
     fn validate_tag_properties(
         &self,
         properties: &std::collections::BTreeMap<String, crate::config::types::TagProperties>,

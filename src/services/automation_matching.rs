@@ -213,7 +213,15 @@ fn collect_change_fields(group: &AutomationConditionGroup, out: &mut BTreeSet<St
         out.extend(changes.keys().map(|field| change_key(field)));
     }
     out.extend(group.fields.keys().map(|field| change_key(field)).filter(|field| CHANGE_FIELDS.contains(&field.as_str())));
+    // Custom fields named at the top level (DEV-373).
+    out.extend(group.fields.keys().filter(|field| is_top_level_custom(field)).cloned());
     out.extend(group.custom_fields.keys().cloned());
+}
+
+/// Whether a top-level condition key can only be a custom field.
+fn is_top_level_custom(field: &str) -> bool {
+    crate::utils::fields::is_reserved_field(field).is_none()
+        && !matches!(field.to_lowercase().as_str(), "labels" | "task_type" | "sprint" | "sprints" | "status_changed")
 }
 
 // ── Rule matching ───────────────────────────────────────────────────────────
@@ -365,7 +373,14 @@ fn matches_field_map(
                 continue;
             }
             _ => {
-                return false;
+                // A declared custom field may stand at the top level too
+                // (DEV-373): `affects: { version: ">=0.13" }`.
+                let custom =
+                    if crate::utils::fields::is_reserved_field(key).is_none() { crate::utils::custom_fields::resolve_filter_name(key, config) } else { None };
+                match custom {
+                    Some(name) if matches_custom_field(&name, condition, current, changes, mode) => continue,
+                    _ => return false,
+                }
             }
         };
 
@@ -390,23 +405,22 @@ fn matches_field_map(
 }
 
 fn matches_custom_fields(fields: &HashMap<String, AutomationFieldCondition>, current: &TaskDTO, changes: &ChangeSet, mode: MatchMode) -> bool {
-    for (key, condition) in fields {
-        let current_value = current.custom_fields.get(key).map(custom_value_to_value);
-        let change_value = changes.changed_custom_field(key).and_then(|c| c.after.clone());
+    fields.iter().all(|(key, condition)| matches_custom_field(key, condition, current, changes, mode))
+}
 
-        let target = if matches!(mode, MatchMode::OnChange) {
-            if change_value.is_none() {
-                return false;
-            }
-            change_value.as_ref()
-        } else {
-            current_value.as_ref()
-        };
-        if !matches_value_condition(condition, target) {
+fn matches_custom_field(key: &str, condition: &AutomationFieldCondition, current: &TaskDTO, changes: &ChangeSet, mode: MatchMode) -> bool {
+    let current_value = current.custom_fields.get(key).map(custom_value_to_value);
+    let change_value = changes.changed_custom_field(key).and_then(|c| c.after.clone());
+
+    let target = if matches!(mode, MatchMode::OnChange) {
+        if change_value.is_none() {
             return false;
         }
-    }
-    true
+        change_value.as_ref()
+    } else {
+        current_value.as_ref()
+    };
+    matches_value_condition(condition, target)
 }
 
 fn matches_sprint_condition(condition: &AutomationFieldCondition, current: &TaskDTO, active_sprint_ids: &[u32]) -> bool {
@@ -546,6 +560,19 @@ fn matches_value_condition(condition: &AutomationFieldCondition, value: Option<&
     }
     if (map.before.is_some() || map.within.is_some() || map.older_than.is_some()) && !matches_date_conditions(value, &map) {
         return false;
+    }
+    if let Some(range) = map.version.as_deref() {
+        let Ok(range) = crate::utils::version::VersionReq::parse(range) else {
+            return false;
+        };
+        let items: Vec<&String> = match value {
+            AutomationValue::String(v) => vec![v],
+            AutomationValue::List(values) => values.iter().collect(),
+        };
+        let matched = items.iter().filter_map(|raw| crate::utils::version::Version::parse(raw).ok()).any(|version| range.matches(&version));
+        if !matched {
+            return false;
+        }
     }
     true
 }

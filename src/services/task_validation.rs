@@ -5,9 +5,9 @@
 //! checked against the target project's resolved configuration, never against
 //! an unrelated global snapshot.
 
-use crate::config::types::ResolvedConfig;
+use crate::config::types::{CustomFieldType, ResolvedConfig};
 use crate::errors::{LoTaRError, LoTaRResult};
-use crate::types::{CustomFields, Priority, TaskStatus, TaskType};
+use crate::types::{CustomFieldValue, CustomFields, Priority, TaskStatus, TaskType};
 
 pub fn parse_status(raw: &str, config: &ResolvedConfig) -> LoTaRResult<TaskStatus> {
     TaskStatus::parse_with_config(raw, config).map_err(LoTaRError::ValidationError)
@@ -93,10 +93,27 @@ pub fn resolve_custom_fields(fields: &CustomFields, config: &ResolvedConfig, exi
             )));
         }
         sources.insert(target.clone(), key.clone());
-        resolved.insert(target, value.clone());
+        // An unchanged echo of a stored value passes as is, so a hand-written
+        // value a typed field cannot read never blocks other edits.
+        let unchanged = existing.and_then(|map| map.get(&target)).is_some_and(|stored| stored == value);
+        let value = if unchanged { value.clone() } else { normalize_custom_field_value(&target, value, config).map_err(LoTaRError::ValidationError)? };
+        resolved.insert(target, value);
     }
 
     Ok(resolved)
+}
+
+/// Check and normalise a value for a custom field's type (DEV-373): version
+/// fields take versions only and store them as strings without a leading
+/// `v`; text fields take anything.
+pub fn normalize_custom_field_value(name: &str, value: &CustomFieldValue, config: &ResolvedConfig) -> Result<CustomFieldValue, String> {
+    if value.is_null() {
+        return Ok(value.clone());
+    }
+    match config.custom_field_type(name) {
+        CustomFieldType::Version => crate::utils::version::normalize_value(name, value),
+        CustomFieldType::Text => Ok(value.clone()),
+    }
 }
 
 fn configured_field_key(field_name: &str, config: &ResolvedConfig) -> Option<String> {

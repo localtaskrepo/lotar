@@ -118,6 +118,14 @@ fn validate_condition_value(field: &str, condition: &AutomationFieldCondition, c
             ));
         }
     }
+    if let Some(range) = map.version.as_deref()
+        && let Err(message) = crate::utils::version::VersionReq::parse(range)
+    {
+        result.add_error(ValidationError::error(
+            Some("automation".to_string()),
+            format!("Automation condition on '{field}' has an unreadable version range: {message}."),
+        ));
+    }
     if matches!(field.to_lowercase().as_str(), "created" | "modified" | "status_changed")
         && map.before.is_none()
         && map.within.is_none()
@@ -218,6 +226,17 @@ mod tests {
             "automation:\n  rules:\n    - when:\n        current: { changes: { status: { to: Done } } }\n      on:\n        updated:\n          comment: x\n",
         );
         assert!(result.warnings.iter().any(|error| error.to_string().contains("changes inside current")), "{:?}", result.warnings);
+    }
+
+    #[test]
+    fn checks_version_ranges() {
+        let result = validate(
+            "automation:\n  rules:\n    - when:\n        custom_fields: { affects: { version: '>=soon' } }\n      on:\n        updated:\n          comment: x\n",
+        );
+        assert!(result.errors.iter().any(|error| error.to_string().contains("unreadable version range")), "{:?}", result.errors);
+        let ok =
+            validate("automation:\n  rules:\n    - when:\n        affects: { version: '>=0.13 <0.14' }\n      on:\n        updated:\n          comment: x\n");
+        assert!(ok.errors.is_empty(), "{:?}", ok.errors);
     }
 
     /// DEV-221: Unicode classes user patterns (search, scan, validation,

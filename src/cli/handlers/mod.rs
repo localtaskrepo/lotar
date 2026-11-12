@@ -292,8 +292,7 @@ impl AddHandler {
             let (validated_key, validated_value) =
                 validator.validate_custom_field(&key, &value).map_err(|e| format!("Custom field validation failed for '{}': {}", key, e))?;
 
-            // Store as custom fields using feature-aware value constructor
-            task.custom_fields.insert(validated_key, crate::types::custom_value_string(validated_value));
+            task.custom_fields.insert(validated_key, validated_value);
         }
 
         #[expect(clippy::drop_non_drop, reason = "marks where the validator's borrow ends before the configuration is used again")]

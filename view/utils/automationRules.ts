@@ -40,6 +40,8 @@ export type AutomationConditionOperator =
     | 'before'
     | 'within'
     | 'older_than'
+    /** One of the field's versions meets a range such as `>=0.13 <0.14` (DEV-373). */
+    | 'version'
 
 export interface AutomationConditionDraft {
     id: string
@@ -234,6 +236,7 @@ const CONDITION_OPERATORS: AutomationConditionOperator[] = [
     'before',
     'within',
     'older_than',
+    'version',
 ]
 
 const SUPPORTED_RULE_KEYS = new Set(['name', 'enabled', 'cooldown', 'when', 'triggers', 'on'])
@@ -1104,6 +1107,7 @@ function buildFieldConditionFromDraft(condition: AutomationConditionDraft): stri
         case 'before':
         case 'older_than':
         case 'within':
+        case 'version':
             return { [condition.operator]: value }
     }
 }

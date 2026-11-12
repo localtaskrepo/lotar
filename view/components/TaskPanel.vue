@@ -629,6 +629,7 @@
                     :new-field-key="newField.key"
                     :new-field-value="newField.value"
                     :allow-new-fields="allowNewCustomFields"
+                    :version-fields="configVersionFields"
                     @updateCustomFieldKey="updateCustomFieldKey"
                     @updateCustomFieldValue="updateCustomFieldValue"
                     @updateNewFieldKey="updateNewFieldKey"
@@ -1076,6 +1077,7 @@ const {
   customFieldKeys,
   newField,
   allowNewCustomFields,
+  configVersionFields,
   activityTabs,
   activityTab,
   changeLog,

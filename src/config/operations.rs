@@ -222,6 +222,61 @@ pub fn parse_tag_properties(value: &str) -> Result<std::collections::BTreeMap<St
     Ok(out)
 }
 
+/// Field properties for `config set custom_field_properties` (DEV-373): a
+/// YAML/JSON map (`{affects: {type: version}}`) or type shorthand
+/// (`affects=version, fixed_in=version`). Empty means none. Types must be
+/// known; names must be unique ignoring case and not built-in fields.
+pub fn parse_custom_field_properties(value: &str) -> Result<BTreeMap<String, CustomFieldProperties>, ConfigError> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Ok(BTreeMap::new());
+    }
+    let parsed: BTreeMap<String, CustomFieldProperties> = match serde_yaml_ng::from_str::<BTreeMap<String, CustomFieldProperties>>(trimmed) {
+        Ok(map) => map,
+        Err(_) if !trimmed.starts_with('{') => {
+            let mut map = BTreeMap::new();
+            for part in trimmed.split([',', ';', '\n']) {
+                let part = part.trim();
+                if part.is_empty() {
+                    continue;
+                }
+                let (name, kind) = part.split_once('=').ok_or_else(|| ConfigError::ParseError(format!("Field type '{part}' must be written as name=type")))?;
+                map.insert(name.trim().to_string(), CustomFieldProperties { field_type: Some(kind.trim().to_string()), ..CustomFieldProperties::default() });
+            }
+            map
+        }
+        Err(_) => {
+            return Err(ConfigError::ParseError("Field properties must map field names to properties, e.g. {affects: {type: version}}".into()));
+        }
+    };
+    let mut seen = std::collections::HashSet::new();
+    let mut out = BTreeMap::new();
+    for (name, mut props) in parsed {
+        let name = name.trim().to_string();
+        if name.is_empty() || name == "*" {
+            return Err(ConfigError::ParseError("Field properties need a field name".into()));
+        }
+        if let Some(canonical) = crate::utils::fields::is_reserved_field(&name) {
+            return Err(ConfigError::ParseError(format!("Custom field '{name}' collides with built-in field '{canonical}'. Choose a different name.")));
+        }
+        if !seen.insert(name.to_lowercase()) {
+            return Err(ConfigError::ParseError(format!("Field '{name}' has properties more than once")));
+        }
+        if let Some(kind) = props.field_type.as_mut() {
+            *kind = kind.trim().to_ascii_lowercase();
+            if kind.is_empty() {
+                props.field_type = None;
+            } else if CustomFieldType::parse(kind).is_none() {
+                return Err(ConfigError::ParseError(format!("Field '{name}' has an unknown type '{kind}': use one of {}", CUSTOM_FIELD_TYPES.join(", "))));
+            }
+        }
+        if !props.is_empty() {
+            out.insert(name, props);
+        }
+    }
+    Ok(out)
+}
+
 fn parse_alias_map<T>(value: &str, label: &str) -> Result<BTreeMap<String, T>, ConfigError>
 where
     T: std::str::FromStr + DeserializeOwned,
@@ -672,6 +727,9 @@ pub fn apply_field_to_global_config(config: &mut GlobalConfig, field: &str, valu
         "tag_properties" => {
             config.tag_properties = parse_tag_properties(value)?;
         }
+        "custom_field_properties" => {
+            config.custom_field_properties = parse_custom_field_properties(value)?;
+        }
         "branch_priority_aliases" => {
             let map = parse_alias_map::<Priority>(value, "branch priority alias")?;
             config.branch_priority_aliases = map;
@@ -992,6 +1050,10 @@ pub fn apply_field_to_project_config(config: &mut ProjectConfig, field: &str, va
             let properties = parse_tag_properties(value)?;
             config.tag_properties = if properties.is_empty() { None } else { Some(properties) };
         }
+        "custom_field_properties" => {
+            let properties = parse_custom_field_properties(value)?;
+            config.custom_field_properties = if properties.is_empty() { None } else { Some(properties) };
+        }
         "branch_status_aliases" => {
             if value.trim().is_empty() {
                 config.branch_status_aliases = None;
@@ -1308,6 +1370,9 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
         "tag_properties" => {
             parse_tag_properties(value)?;
         }
+        "custom_field_properties" => {
+            parse_custom_field_properties(value)?;
+        }
         "branch_status_aliases"
             if !value.trim().is_empty() => {
                 parse_alias_map::<TaskStatus>(value, "branch status alias")?;
@@ -1410,6 +1475,7 @@ pub fn clear_project_override_field(config: &mut ProjectConfig, field: &str) -> 
         "branch_type_aliases" => config.branch_type_aliases = None,
         "branch_status_aliases" => config.branch_status_aliases = None,
         "tag_properties" => config.tag_properties = None,
+        "custom_field_properties" => config.custom_field_properties = None,
         "branch_priority_aliases" => config.branch_priority_aliases = None,
         "agent_context_enabled" => config.agent_context_enabled = None,
         "agent_context_extension" => config.agent_context_extension = None,

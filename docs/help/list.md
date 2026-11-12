@@ -44,6 +44,7 @@ The query uses the web search-box syntax. Values come from your configuration, s
 | `has:attachment,image,link,tag` | carries every listed kind | `with:` | `has` |
 | `effort_min:2h`, `effort_max:1d` | inclusive effort bounds; time and points never compare; tasks without an effort are left out | `effortmin:`, `effortmax:` | `effort_min`, `effort_max` |
 | `field:iteration=wave-2`, `iteration=wave-2` | a custom field | | any other key; MCP `custom_fields` |
+| `affects>=0.13`, `affects<0.14`, `affects=^0.13` | a [version field](#version-fields) in a range | | `affects=>=0.13 <0.14` |
 | `finding=worktrees:lotar` | tickets reported for that [finding](add.md#findings), in every project (the field needs no declaring); add `archived=all` for archived ones | | `finding` |
 | `sort_by=due-date`, `order=asc` | sort key and direction | | `sort_by`, `order` |
 | `deletion=deleted\|all` | deleted tasks only, or both | | `deletion` |
@@ -62,6 +63,27 @@ Rules, the same as in the web UI:
 - A custom field whose name is also a key above must be quoted: `field:"due"=friday`.
 - `@me` (in `assignee:` or `mine:true`) fails with an error when no identity is configured, rather than listing nothing.
 - A malformed term such as `owner=` or an unclosed quote is an error.
+
+## Version fields
+
+A custom field declared with `type: version` ([Version fields](./config.md#version-fields)) compares versions instead of text:
+
+| Term | Matches |
+| --- | --- |
+| `affects=0.13.2` | that version |
+| `affects=0.13` | any 0.13.x |
+| `affects>=0.13`, `affects>0.13.2`, `affects<0.14`, `affects<=1.0` | versions in that direction; `>0.13` means after every 0.13.x, `<=1.0` includes every 1.0.x |
+| `affects=^0.13`, `affects=^1.2` | changes that keep the leftmost non-zero number: 0.13.x, or 1.2 up to 2.0 (as in Cargo) |
+| `affects=~0.13.2` | patch releases from 0.13.2 on: 0.13.2 up to 0.14 |
+| `affects=0.12.4,1.0.0` | either version |
+
+- Comparisons of one field add up: `affects>=0.13 affects<0.14` is every version from 0.13 up to 0.14. An `=` term replaces them. A range can also be the value: `affects=">=0.13 <0.14"`.
+- A task's value matches when one of its versions falls in the range. A partial value matches every version it stands for, so a bug that `affects: 0.13` matches `affects>=0.13.2`.
+- `-affects>=0.14` leaves out tasks with a version from 0.14 on.
+- Prereleases sort before their release: `affects<0.14` leaves out `0.14.0-rc.1`, `affects<0.14.0` includes it.
+- Quote the terms in a shell, where `<` and `>` redirect: `lotar list 'affects>=0.13'`.
+- A value that is not a version range, or `<`/`>` on a field that is not a version field, is an error.
+- `--sort-by affects` sorts in version order; tasks without a version come first ascending.
 
 ## Search text
 

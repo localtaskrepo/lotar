@@ -810,6 +810,7 @@ const OPERATORS: Record<FieldKind, Array<{ value: string; label: string }>> = {
     { value: 'equals', label: 'is' },
     { value: 'contains', label: 'contains' },
     { value: 'in', label: 'is one of' },
+    { value: 'version', label: 'has a version in' },
     { value: 'exists:true', label: 'is set' },
     { value: 'exists:false', label: 'is empty' },
   ],
@@ -842,6 +843,7 @@ function valuePlaceholder(row: AutomationConditionDraft) {
   if (kind === 'date') return row.operator === 'before' ? 'today, or 2026-12-01' : 'e.g. 7d'
   if (row.operator === 'in' || kind === 'tags') return 'comma separated'
   if (row.operator === 'matches') return 'regular expression'
+  if (row.operator === 'version') return 'e.g. >=0.13 <0.14, or ^1.2'
   return 'value'
 }
 

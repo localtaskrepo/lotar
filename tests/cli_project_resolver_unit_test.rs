@@ -18,6 +18,7 @@ fn make_resolver() -> ProjectResolver {
         issue_priorities: ConfigurableField { values: vec![Priority::from("Low"), Priority::from("High")] },
         tags: StringConfigField::new_wildcard(),
         tag_properties: Default::default(),
+        custom_field_properties: Default::default(),
         default_assignee: None,
         default_reporter: None,
         default_tags: vec![],

@@ -23,7 +23,8 @@ CLI > project > env > home > global > defaults (commands without a project skip 
 - issue.priorities: string[] (built-in [Low, Medium, High]; Critical requires configuration)
 - issue.tags: list of tag names (default wildcard ["*"]); an entry can also be an object with properties, `{ name: ui, color: "#0ea5e9" }`. See [Tag colours](./config.md#tag-colours)
 - issue.tag_properties: map of tag name to properties (`color`), for a project that colours inherited tags without its own `issue.tags` list; `config set tag_properties` writes it
-- custom_fields: string[] (default wildcard ["*"])
+- custom_fields: string[] (default wildcard ["*"]); an entry can also be an object with a type, `{ name: affects, type: version }`. See [Version fields](./config.md#version-fields)
+- custom.field_properties: map of field name to properties (`type`: `text` or `version`), for a project that types inherited fields without its own `custom.fields` list; `config set custom_field_properties` writes it
   - For both lists, `["*"]` allows any value, a named list allows only those values, and `[]` allows none (for example, it turns custom fields off). In project scope a blank `config set` value clears the override, so set an explicit empty list with `lotar config set custom_fields '[]' --project=DEMO`.
 - attachments.dir: string (default "@attachments")
 - attachments.max_upload_mb: number (default 10) — `0` disables uploads; `-1` is unlimited (the server still stops at 512 MiB per upload); positive values are MiB

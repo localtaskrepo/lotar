@@ -61,6 +61,7 @@ Types and priorities are whatever your configuration defines, so there are no sh
 ### Custom Fields
 - `--field <KEY>=<VALUE>` - Arbitrary properties (can be used multiple times)
 - `--field=sprint=N` stores a custom field named `sprint`; it does not assign the task to a sprint. Use `lotar sprint add --sprint N TASK_ID` for actual membership (see [Sprints](./sprints.md)).
+- A [version field](./config.md#version-fields) takes versions only: `--field affects=0.13.3`, or a list `--field affects=0.13.2,0.13.3`. A leading `v` is dropped; anything else that is not a version is an error.
 
 ### Report a problem once
 - `--finding <KEY>` - A stable key for the problem (one line, at most 200 characters), for agents and scripts that check repositories and report what they find. See [Findings](#findings).

@@ -74,13 +74,42 @@
         <p class="field-hint">{{ modeHint(customFieldsMode, 'custom fields') }}</p>
         <p v-if="customFieldsError" class="field-error">{{ customFieldsError }}</p>
       </div>
+
+      <div v-if="customFieldsMode !== 'none'" class="field field--full" data-testid="config-version-fields">
+        <span class="field-label">
+          <span>Version fields</span>
+          <span v-if="versionFieldsSource" :class="['provenance', provenanceClass(versionFieldsSource)]">
+            {{ provenanceLabel(versionFieldsSource) }}
+          </span>
+        </span>
+        <ChipListField
+          v-model="versionFields"
+          placeholder="affects"
+          add-label="Add version field"
+          composer-label="Version field"
+          empty-label="No version fields"
+          :suggestions="versionFieldSuggestions"
+          @update:modelValue="emit('validate', 'custom_field_properties')"
+        />
+        <p class="field-hint">
+          These fields hold versions such as 1.4.2, 0.13 (every 0.13.x) or 1.0.0-rc.1. Values are checked when saved,
+          and searches compare them: <code>affects&gt;=0.13 affects&lt;0.14</code>.
+          <template v-if="inheritedVersionFields.length">
+            Global version fields: {{ inheritedVersionFields.join(', ') }}.
+          </template>
+        </p>
+        <p v-if="unlistedVersionFields.length" class="field-hint">
+          Not in the custom field list, so not used: {{ unlistedVersionFields.join(', ') }}.
+        </p>
+        <p v-if="versionFieldsError" class="field-error">{{ versionFieldsError }}</p>
+      </div>
     </div>
   </ConfigGroup>
 </template>
 
 <script setup lang="ts">
 import { computed, useId } from 'vue'
-import type { ConfigSource, TagProperties } from '../api/types'
+import type { ConfigSource, CustomFieldProperties, TagProperties } from '../api/types'
 import type { ListMode } from '../composables/useConfigForm'
 import type { TagColorEntry } from '../composables/useConfigForm'
 import ChipListField from './ChipListField.vue'
@@ -93,6 +122,7 @@ const tags = defineModel<string[]>('tags', { required: true })
 const customFieldsMode = defineModel<ListMode>('customFieldsMode', { required: true })
 const customFields = defineModel<string[]>('customFields', { required: true })
 const tagColors = defineModel<TagColorEntry[]>('tagColors', { required: true })
+const versionFields = defineModel<string[]>('versionFields', { required: true })
 
 const {
   description,
@@ -108,6 +138,9 @@ const {
   globalTagProperties = null,
   tagColorsError = null,
   tagColorsSource,
+  globalFieldProperties = null,
+  versionFieldsError = null,
+  versionFieldsSource,
   provenanceLabel,
   provenanceClass,
 } = defineProps<{
@@ -128,12 +161,16 @@ const {
   globalTagProperties?: Record<string, TagProperties> | null
   tagColorsError?: string | null
   tagColorsSource?: ConfigSource
+  /** Project scope: global custom field properties, shown for reference. */
+  globalFieldProperties?: Record<string, CustomFieldProperties> | null
+  versionFieldsError?: string | null
+  versionFieldsSource?: ConfigSource
   provenanceLabel: (source: ConfigSource | undefined) => string
   provenanceClass: (source: ConfigSource | undefined) => string
 }>()
 
 const emit = defineEmits<{
-  (e: 'validate', field: 'tags' | 'custom_fields' | 'tag_properties'): void
+  (e: 'validate', field: 'tags' | 'custom_fields' | 'tag_properties' | 'custom_field_properties'): void
   (e: 'addTagColor', tag?: string, color?: string): void
   (e: 'removeTagColor', index: number): void
 }>()
@@ -142,6 +179,23 @@ const emit = defineEmits<{
 const tagColorSuggestions = computed(() =>
   [...new Set([...tags.value, ...tagSuggestions])].filter((tag) => tag && tag !== '*'),
 )
+
+const versionFieldSuggestions = computed(() =>
+  customFields.value.filter((name) => name && name !== '*' && !versionFields.value.includes(name)),
+)
+
+const inheritedVersionFields = computed(() =>
+  Object.entries(globalFieldProperties ?? {})
+    .filter(([, props]) => props.type === 'version')
+    .map(([name]) => name),
+)
+
+// With a fixed list, a version field outside it is never offered.
+const unlistedVersionFields = computed(() => {
+  if (customFieldsMode.value !== 'list') return []
+  const listed = new Set(customFields.value.map((name) => name.toLowerCase()))
+  return versionFields.value.filter((name) => !listed.has(name.toLowerCase()))
+})
 
 const uid = useId()
 

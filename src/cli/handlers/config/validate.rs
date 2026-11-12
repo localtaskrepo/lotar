@@ -179,6 +179,10 @@ fn cli_hint_for_field(scope: &ValidationScope, error: &ValidationError) -> Optio
     let scope_flag = scope.cli_suffix();
 
     match field {
+        "custom_field_properties" => Some(format!(
+            "Fix the types with `lotar config set custom_field_properties 'affects=version'{flag}` or clear them via `lotar config set custom_field_properties ''{flag}`",
+            flag = scope_flag,
+        )),
         "tag_properties" => Some(format!(
             "Fix the colours with `lotar config set tag_properties 'ui=#0ea5e9, backend=teal'{flag}` or clear them via `lotar config set tag_properties ''{flag}`",
             flag = scope_flag,

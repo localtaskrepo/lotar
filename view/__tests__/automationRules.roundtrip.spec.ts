@@ -113,6 +113,21 @@ describe('automation rule form round trips', () => {
     })
 })
 
+describe('version conditions (DEV-373)', () => {
+    it('round trips a version range on a custom field and at the top level', () => {
+        for (const when of [
+            { affects: { version: '>=0.13 <0.14' } },
+            { custom_fields: { fixed_in: { version: '^1.0' } } },
+        ]) {
+            const rule = { name: 'Old bugs', when, on: { updated: { comment: 'Affects 0.13' } } }
+            const state = getEditableRuleState(rule)
+            expect(state.editable).toBe(true)
+            expect(state.draft.conditions.map((row) => row.operator)).toEqual(['version'])
+            expect(buildAutomationRuleFromDraft(state.draft)).toEqual(rule)
+        }
+    })
+})
+
 describe('automation yaml documents', () => {
     it('round trips rules and max_iterations through yaml', () => {
         const rules: AutomationRecord[] = [

@@ -471,5 +471,122 @@
     "filters": {
       "-priority": "low,medium"
     }
+  },
+  {
+    "input": "affects>=0.13",
+    "text": "",
+    "filters": {
+      "affects": ">=0.13"
+    }
+  },
+  {
+    "input": "affects>=0.13 affects<0.14 crash",
+    "text": "crash",
+    "filters": {
+      "affects": ">=0.13 <0.14"
+    }
+  },
+  {
+    "input": "field:Affects>0.13.2 fixed_in<=1.0",
+    "text": "",
+    "filters": {
+      "field:affects": ">0.13.2",
+      "fixed_in": "<=1.0"
+    }
+  },
+  {
+    "input": "affects=^0.13",
+    "text": "",
+    "filters": {
+      "affects": "^0.13"
+    }
+  },
+  {
+    "input": "affects=~0.13.2",
+    "text": "",
+    "filters": {
+      "affects": "~0.13.2"
+    }
+  },
+  {
+    "input": "affects=0.13 affects<0.14",
+    "text": "",
+    "filters": {
+      "affects": "<0.14"
+    }
+  },
+  {
+    "input": "affects<0.14 affects=0.13",
+    "text": "",
+    "filters": {
+      "affects": "0.13"
+    }
+  },
+  {
+    "input": "affects>=0.13,fixed_in<1.0",
+    "text": "",
+    "filters": {
+      "affects": ">=0.13",
+      "fixed_in": "<1.0"
+    }
+  },
+  {
+    "input": "affects>=0.13,<0.10",
+    "text": "",
+    "filters": {
+      "affects": ">=0.13,<0.10"
+    }
+  },
+  {
+    "input": "-affects>=0.14 -affects<0.1",
+    "text": "",
+    "filters": {
+      "-affects": ">=0.14,<0.1"
+    }
+  },
+  {
+    "input": "affects>=\"0.13\"",
+    "text": "",
+    "filters": {
+      "affects": ">=0.13"
+    }
+  },
+  {
+    "input": "a->b x<y> <html>",
+    "text": "a->b <html>",
+    "filters": {
+      "x": "<y>"
+    }
+  },
+  {
+    "input": "title=a>b",
+    "text": "",
+    "filters": {
+      "title": "a>b"
+    }
+  },
+  {
+    "input": "affects>=",
+    "text": "",
+    "filters": {},
+    "errors": [
+      "Add a value for \"affects\""
+    ]
+  },
+  {
+    "input": "status>=todo",
+    "text": "",
+    "filters": {},
+    "errors": [
+      "\"status\" cannot be compared: only version fields use < and >"
+    ]
+  },
+  {
+    "input": "field:prio<high",
+    "text": "",
+    "filters": {},
+    "errors": [
+      "\"prio\" cannot be compared: only version fields use < and >"
+    ]
   }
 ]

@@ -5,7 +5,10 @@
 //! become filters, `key=value` and `field:name=value` set a filter outright.
 //! Unknown `key:value` tokens, URLs, `/regex/` terms and fully quoted
 //! literals stay search text. A leading minus on a filter excludes it
-//! (`-status:done`). Both parsers are checked against the shared
+//! (`-status:done`). `name<value`, `name<=value`, `name>value` and
+//! `name>=value` compare a version field (DEV-373); comparisons of one field
+//! add up into one range (`affects>=0.13 affects<0.14` is `>=0.13 <0.14`).
+//! Both parsers are checked against the shared
 //! cases in `tests/fixtures/search_syntax_cases.json`, so keep them in step.
 
 use std::collections::BTreeMap;
@@ -192,6 +195,41 @@ fn is_url_like(raw: &str) -> bool {
     rest[scheme_end..].starts_with("://")
 }
 
+/// A field name usable before a comparison operator: a letter, then
+/// letters, digits, `_`, `-` or `.`, not ending in `-` or `.` (so `a->b`
+/// stays text).
+fn is_comparison_name(name: &str) -> bool {
+    let mut chars = name.chars();
+    chars.next().is_some_and(|c| c.is_ascii_alphabetic())
+        && name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'))
+        && !name.ends_with(['-', '.'])
+}
+
+/// `name<op>value` with `<op>` one of `<`, `<=`, `>`, `>=`: the key text
+/// (`affects` or `field:affects`), the operator and the raw value.
+fn split_comparison(raw: &str) -> Option<(String, &'static str, String)> {
+    let lt = find_top_level(raw, '<');
+    let gt = find_top_level(raw, '>');
+    let index = match (lt, gt) {
+        (Some(a), Some(b)) => a.min(b),
+        (a, b) => a.or(b)?,
+    };
+    let key = before(raw, index);
+    let name = if is_field_key(&key) { key[key.find(':').unwrap_or(0) + 1..].trim() } else { key.as_str() };
+    if !is_comparison_name(name) {
+        return None;
+    }
+    let chars: Vec<char> = raw.chars().collect();
+    let op = match (chars[index], chars.get(index + 1)) {
+        ('<', Some('=')) => "<=",
+        ('>', Some('=')) => ">=",
+        ('<', _) => "<",
+        _ => ">",
+    };
+    let value: String = chars[index + op.len()..].iter().collect();
+    Some((key, op, value))
+}
+
 fn is_field_key(key: &str) -> bool {
     key.to_lowercase().starts_with("field:")
 }
@@ -201,6 +239,9 @@ fn is_field_key(key: &str) -> bool {
 fn looks_like_expression(segment: &str) -> bool {
     if is_url_like(segment) {
         return false;
+    }
+    if split_comparison(segment).is_some() {
+        return true;
     }
     if let Some(eq) = find_top_level(segment, '=') {
         let key_raw = before(segment, eq);
@@ -229,11 +270,14 @@ fn split_comma_expressions(token: &str) -> Vec<String> {
     non_empty
 }
 
+#[derive(Default)]
 struct Parser {
     parsed: ParsedSearch,
     words: Vec<String>,
     /// Whether the last token for a key was an `=` assignment.
     assigned: BTreeMap<String, bool>,
+    /// Keys whose value so far comes from comparisons, which add up.
+    compared: std::collections::BTreeSet<String>,
 }
 
 impl Parser {
@@ -287,6 +331,35 @@ impl Parser {
         self.set(key_text.to_lowercase(), value, true);
     }
 
+    /// `affects>=0.13`: a range on a version field. Builtin keys cannot be
+    /// compared.
+    fn comparison(&mut self, raw: &str, key_text: &str, op: &str, value_raw: &str) {
+        let value_seg = unquote(value_raw);
+        if !value_seg.ok {
+            self.parsed.errors.push(format!("Unmatched quote in \"{raw}\""));
+            return;
+        }
+        let value = if value_seg.quoted { value_seg.value } else { value_seg.value.trim().to_string() };
+        if value.is_empty() {
+            self.parsed.errors.push(format!("Add a value for \"{key_text}\""));
+            return;
+        }
+        let field = is_field_key(key_text);
+        let name = if field { key_text[key_text.find(':').unwrap_or(0) + 1..].trim() } else { key_text };
+        if reserved_field_alias(name).is_some() || find_key(name).is_some() {
+            self.parsed.errors.push(format!("\"{name}\" cannot be compared: only version fields use < and >"));
+            return;
+        }
+        let key = if field { format!("field:{}", name.to_lowercase()) } else { name.to_lowercase() };
+        let next = format!("{op}{value}");
+        let value = match self.parsed.filters.get(&key) {
+            Some(previous) if self.compared.contains(&key) => format!("{previous} {next}"),
+            _ => next,
+        };
+        self.set(key.clone(), value, true);
+        self.compared.insert(key);
+    }
+
     fn colon(&mut self, raw: &str, colon: usize) {
         let key_seg = unquote(&before(raw, colon));
         if !key_seg.ok {
@@ -319,7 +392,7 @@ impl Parser {
     /// Parse `raw` (starting with `-`) as an excluded filter; false when the
     /// rest is not a single filter, so the token stays search text.
     fn negation(&mut self, raw: &str) -> bool {
-        let mut inner = Parser { parsed: ParsedSearch::default(), words: Vec::new(), assigned: BTreeMap::new() };
+        let mut inner = Parser::default();
         inner.token(&raw[1..]);
         if !inner.parsed.errors.is_empty() {
             self.parsed.errors.append(&mut inner.parsed.errors);
@@ -343,6 +416,7 @@ impl Parser {
     }
 
     fn set(&mut self, key: String, value: String, assigned: bool) {
+        self.compared.remove(&key);
         self.assigned.insert(key.clone(), assigned);
         self.parsed.filters.insert(key, value);
     }
@@ -366,6 +440,10 @@ impl Parser {
         if raw.len() > 1 && raw.starts_with('-') && !raw.starts_with("--") && self.negation(raw) {
             return;
         }
+        if let Some((key, op, value)) = split_comparison(raw) {
+            self.comparison(raw, &key, op, &value);
+            return;
+        }
         let eq = find_top_level(raw, '=');
         let colon = find_top_level(raw, ':');
         if let Some(eq) = eq
@@ -384,7 +462,7 @@ impl Parser {
 
 /// Parse a search-box query.
 pub fn parse(input: &str) -> ParsedSearch {
-    let mut parser = Parser { parsed: ParsedSearch::default(), words: Vec::new(), assigned: BTreeMap::new() };
+    let mut parser = Parser::default();
     for raw in split_top_level(input, char::is_whitespace).into_iter().filter(|t| !t.is_empty()) {
         for token in split_comma_expressions(&raw) {
             parser.token(&token);

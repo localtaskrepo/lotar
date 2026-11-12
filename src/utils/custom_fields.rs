@@ -86,6 +86,20 @@ pub fn extract_value_strings(fields: &CustomFields, name: &str) -> Option<Vec<St
     fields.iter().find(|(key, _)| key.to_ascii_lowercase() == target).map(|(_, value)| vec![custom_value_to_string(value)])
 }
 
+/// A task's value for a custom field, by name ignoring case.
+pub fn find_value<'a>(fields: &'a CustomFields, name: &str) -> Option<&'a crate::types::CustomFieldValue> {
+    fields.get(name).or_else(|| fields.iter().find(|(key, _)| key.eq_ignore_ascii_case(name)).map(|(_, value)| value))
+}
+
+/// The custom field name a filter or sort key names when that field holds
+/// versions (DEV-373).
+pub fn version_field_name(key: &str, config: &ResolvedConfig) -> Option<String> {
+    if crate::utils::fields::is_reserved_field(key).is_some() {
+        return None;
+    }
+    resolve_filter_name(key, config).filter(|name| config.custom_field_type(name) == crate::config::types::CustomFieldType::Version)
+}
+
 /// Canonicalize a custom field key for set membership checks.
 pub fn canonicalize(name: &str) -> String {
     name.trim().to_ascii_lowercase()

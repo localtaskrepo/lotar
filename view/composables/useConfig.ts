@@ -2,6 +2,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { api } from '../api/client'
 import type { ConfigShowResponse } from '../api/types'
 import { createResource } from './useResource'
+import { versionFieldNames } from '../utils/versions'
 
 type ConfigDefaults = {
     project: string
@@ -66,6 +67,8 @@ export function useConfig(options: { throwOnError?: boolean } = {}) {
     const priorities = ref<string[]>([])
     const types = ref<string[]>([])
     const customFieldKeys = ref<string[]>([])
+    /** Custom fields that hold versions (DEV-373). */
+    const versionFields = ref<string[]>([])
     const tags = ref<string[]>([])
     const members = ref<string[]>([])
 
@@ -92,6 +95,7 @@ export function useConfig(options: { throwOnError?: boolean } = {}) {
         priorities.value = []
         types.value = []
         customFieldKeys.value = []
+        versionFields.value = []
         tags.value = []
         members.value = []
         defaults.project = currentProject.value || ''
@@ -127,6 +131,7 @@ export function useConfig(options: { throwOnError?: boolean } = {}) {
         types.value = base.types
         tags.value = base.tags
         customFieldKeys.value = base.customFields
+        versionFields.value = versionFieldNames(config.custom_field_properties)
         members.value = sanitizeStringList(pickArray(config, ['members'], pickArray(config, ['default', 'members'])))
 
         // An empty, missing or non-scalar setting means "not set".
@@ -183,6 +188,7 @@ export function useConfig(options: { throwOnError?: boolean } = {}) {
         priorities,
         types,
         customFields: customFieldKeys,
+        versionFields,
         tags,
         members,
         defaults: computed(() => defaults),

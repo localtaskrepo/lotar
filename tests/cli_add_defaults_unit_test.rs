@@ -21,6 +21,7 @@ fn make_cfg(priorities: Vec<Priority>, default_priority: Priority, statuses: Vec
         issue_priorities: ConfigurableField { values: priorities },
         tags: StringConfigField { values: vec!["*".to_string()] },
         tag_properties: Default::default(),
+        custom_field_properties: Default::default(),
         default_assignee: None,
         default_reporter: None,
         default_tags: vec![],

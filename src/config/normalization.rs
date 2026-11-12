@@ -25,6 +25,7 @@ fn expand_dotted_keys(value: Value) -> Result<Value, ConfigError> {
                         | "branch_status_aliases"
                         | "branch_priority_aliases"
                         | "tag_properties"
+                        | "field_properties"
                 ) {
                     // These maps contain user-defined names, not config paths.
                     v
@@ -140,11 +141,24 @@ pub fn parse_issue_states_tolerant(v: Value) -> Option<crate::config::types::Con
 // itself, so newly shipped fields cannot silently disappear here.
 
 /// Tag lists may hold objects with properties next to plain names (DEV-20):
-/// `tags: [bug, { name: ui, color: "#0ea5e9" }]`. Replace each object with
-/// its name and move its other keys to `issue.tag_properties`, so the typed
-/// `tags` field stays a list of names. Inline entries win over entries of
-/// the same tag in an explicit `issue.tag_properties` map.
-fn split_tag_objects(data: &mut Value) -> Result<(), ConfigError> {
+/// `tags: [bug, { name: ui, color: "#0ea5e9" }]`, and so may custom field
+/// lists (DEV-373): `fields: [product, { name: affects, type: version }]`.
+/// Replace each object with its name and move its other keys to
+/// `issue.tag_properties` or `custom.field_properties`, so the typed lists
+/// stay lists of names. Inline entries win over entries of the same name in
+/// an explicit properties map.
+fn split_named_objects(data: &mut Value) -> Result<(), ConfigError> {
+    split_list_objects(data, &["tags"], &[("issue", "tags"), ("taxonomy", "tags")], ("issue", "tag_properties"), "Tag")?;
+    split_list_objects(data, &["custom_fields"], &[("custom", "fields")], ("custom", "field_properties"), "Custom field")
+}
+
+fn split_list_objects(
+    data: &mut Value,
+    root_lists: &[&str],
+    section_lists: &[(&str, &str)],
+    (target_section, target_key): (&str, &str),
+    label: &str,
+) -> Result<(), ConfigError> {
     let Value::Mapping(root) = data else {
         return Ok(());
     };
@@ -152,14 +166,17 @@ fn split_tag_objects(data: &mut Value) -> Result<(), ConfigError> {
     let mut lists: Vec<&mut Value> = Vec::new();
     let mut sections = Vec::new();
     for (key, value) in root.iter_mut() {
-        match key.as_str() {
-            Some("tags") => lists.push(value),
-            Some("issue" | "taxonomy") => sections.push(value),
-            _ => {}
+        let Some(key) = key.as_str() else {
+            continue;
+        };
+        if root_lists.contains(&key) {
+            lists.push(value);
+        } else if let Some((_, list_key)) = section_lists.iter().find(|(section, _)| *section == key) {
+            sections.push((value, *list_key));
         }
     }
-    for section in sections {
-        if let Some(list) = section.as_mapping_mut().and_then(|map| map.get_mut(Value::String("tags".into()))) {
+    for (section, list_key) in sections {
+        if let Some(list) = section.as_mapping_mut().and_then(|map| map.get_mut(Value::String(list_key.into()))) {
             lists.push(list);
         }
     }
@@ -174,7 +191,7 @@ fn split_tag_objects(data: &mut Value) -> Result<(), ConfigError> {
             let name = match object.remove(Value::String("name".into())) {
                 Some(Value::String(name)) if !name.trim().is_empty() => name.trim().to_string(),
                 _ => {
-                    return Err(ConfigError::ParseError("Tag entries with properties need a non-empty 'name'".into()));
+                    return Err(ConfigError::ParseError(format!("{label} entries with properties need a non-empty 'name'")));
                 }
             };
             if !object.is_empty() {
@@ -186,26 +203,28 @@ fn split_tag_objects(data: &mut Value) -> Result<(), ConfigError> {
     if collected.is_empty() {
         return Ok(());
     }
-    let issue = root.entry(Value::String("issue".into())).or_insert_with(|| Value::Mapping(serde_yaml_ng::Mapping::new()));
-    let Value::Mapping(issue) = issue else {
-        return Err(ConfigError::ParseError("Config section for 'issue' must be a mapping".into()));
+    let section = root.entry(Value::String(target_section.into())).or_insert_with(|| Value::Mapping(serde_yaml_ng::Mapping::new()));
+    let Value::Mapping(section) = section else {
+        return Err(ConfigError::ParseError(format!("Config section for '{target_section}' must be a mapping")));
     };
-    let properties = issue.entry(Value::String("tag_properties".into())).or_insert_with(|| Value::Mapping(serde_yaml_ng::Mapping::new()));
+    let properties = section.entry(Value::String(target_key.into())).or_insert_with(|| Value::Mapping(serde_yaml_ng::Mapping::new()));
     let Value::Mapping(properties) = properties else {
-        return Err(ConfigError::ParseError("Config section for 'issue.tag_properties' must be a mapping".into()));
+        return Err(ConfigError::ParseError(format!("Config section for '{target_section}.{target_key}' must be a mapping")));
     };
     properties.extend(collected);
     Ok(())
 }
 
-/// The `issue.tags` list with properties folded back in as objects, plus the
-/// properties that have no entry in it (DEV-20). A `*` list takes every
-/// coloured tag as an object; a fixed list leaves unlisted ones over.
-fn tags_with_properties(
+/// A name list with properties folded back in as objects, plus the
+/// properties that have no entry in it (DEV-20, DEV-373). A `*` list takes
+/// every name with properties as an object; a fixed list leaves unlisted
+/// ones over.
+fn names_with_properties<P: serde::Serialize>(
     names: &[String],
-    properties: &std::collections::BTreeMap<String, crate::config::types::TagProperties>,
+    properties: &std::collections::BTreeMap<String, P>,
+    is_empty: impl Fn(&P) -> bool,
 ) -> (Value, serde_yaml_ng::Mapping) {
-    let entry = |name: &str, props: &crate::config::types::TagProperties| {
+    let entry = |name: &str, props: &P| {
         let mut object = serde_yaml_ng::Mapping::new();
         object.insert(Value::String("name".into()), Value::String(name.to_string()));
         if let Value::Mapping(fields) = serde_yaml_ng::to_value(props).unwrap_or(Value::Null) {
@@ -216,14 +235,14 @@ fn tags_with_properties(
     let mut list: Vec<Value> = names
         .iter()
         .map(|name| match properties.get(name) {
-            Some(props) if !props.is_empty() => entry(name, props),
+            Some(props) if !is_empty(props) => entry(name, props),
             _ => Value::String(name.clone()),
         })
         .collect();
     let wildcard = names.iter().any(|name| name == "*");
     let mut leftover = serde_yaml_ng::Mapping::new();
     for (name, props) in properties {
-        if props.is_empty() || names.contains(name) {
+        if is_empty(props) || names.contains(name) {
             continue;
         }
         if wildcard {
@@ -233,6 +252,20 @@ fn tags_with_properties(
         }
     }
     (Value::Sequence(list), leftover)
+}
+
+fn tags_with_properties(
+    names: &[String],
+    properties: &std::collections::BTreeMap<String, crate::config::types::TagProperties>,
+) -> (Value, serde_yaml_ng::Mapping) {
+    names_with_properties(names, properties, crate::config::types::TagProperties::is_empty)
+}
+
+fn fields_with_properties(
+    names: &[String],
+    properties: &std::collections::BTreeMap<String, crate::config::types::CustomFieldProperties>,
+) -> (Value, serde_yaml_ng::Mapping) {
+    names_with_properties(names, properties, crate::config::types::CustomFieldProperties::is_empty)
 }
 
 fn parse_config<T: DeserializeOwned>(content: &str, defaults: Value) -> Result<T, ConfigError> {
@@ -247,7 +280,7 @@ fn parse_config<T: DeserializeOwned>(content: &str, defaults: Value) -> Result<T
         raw
     };
     let mut data = expand_dotted_keys(raw)?;
-    split_tag_objects(&mut data)?;
+    split_named_objects(&mut data)?;
     let input = data.as_mapping().ok_or_else(|| ConfigError::ParseError("Config root must be a mapping".into()))?;
     let Value::Mapping(mut flat) = defaults else {
         return Err(ConfigError::ParseError("Config defaults must be a mapping".into()));
@@ -436,8 +469,12 @@ pub fn to_canonical_global_yaml_with(cfg: &GlobalConfig, options: GlobalYamlOpti
 
     // custom
     let mut custom = serde_yaml_ng::Mapping::new();
-    if cfg.custom_fields.values != defaults.custom_fields.values {
-        custom.insert(Y::String("fields".into()), serde_yaml_ng::to_value(&cfg.custom_fields.values).unwrap_or(Y::Null));
+    if cfg.custom_fields.values != defaults.custom_fields.values || !cfg.custom_field_properties.is_empty() {
+        let (fields, leftover) = fields_with_properties(&cfg.custom_fields.values, &cfg.custom_field_properties);
+        custom.insert(Y::String("fields".into()), fields);
+        if !leftover.is_empty() {
+            custom.insert(Y::String("field_properties".into()), Y::Mapping(leftover));
+        }
     }
     if !custom.is_empty() {
         root.insert(Y::String("custom".into()), Y::Mapping(custom));
@@ -748,9 +785,21 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
         }
     }
 
+    // Field properties sit in the list as objects; a project that inherits
+    // the list keeps them in custom.field_properties instead (DEV-373).
+    let empty_field_properties = std::collections::BTreeMap::new();
+    let field_properties = cfg.custom_field_properties.as_ref().unwrap_or(&empty_field_properties);
+    let mut custom = serde_yaml_ng::Mapping::new();
     if let Some(fields) = &cfg.custom_fields {
-        let mut custom = serde_yaml_ng::Mapping::new();
-        custom.insert(Y::String("fields".into()), serde_yaml_ng::to_value(&fields.values).unwrap_or(Y::Null));
+        let (fields, leftover) = fields_with_properties(&fields.values, field_properties);
+        custom.insert(Y::String("fields".into()), fields);
+        if !leftover.is_empty() {
+            custom.insert(Y::String("field_properties".into()), Y::Mapping(leftover));
+        }
+    } else if !field_properties.is_empty() {
+        custom.insert(Y::String("field_properties".into()), serde_yaml_ng::to_value(field_properties).unwrap_or(Y::Null));
+    }
+    if !custom.is_empty() {
         root.insert(Y::String("custom".into()), Y::Mapping(custom));
     }
 

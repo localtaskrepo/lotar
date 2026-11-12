@@ -54,6 +54,9 @@ pub enum SortKey {
 pub enum SortSpec {
     Builtin(SortKey),
     Custom(String),
+    /// A version custom field (DEV-373), in version order; tasks without a
+    /// readable version come first.
+    Version(String),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -327,6 +330,8 @@ pub trait TaskSortFields {
     fn created(&self) -> &str;
     fn modified(&self) -> &str;
     fn custom_field_value(&self, name: &str) -> Option<String>;
+    /// The lowest version a version field holds, if any is readable.
+    fn custom_field_version(&self, name: &str) -> Option<crate::utils::version::Version>;
 }
 
 impl TaskSortFields for TaskDTO {
@@ -370,6 +375,10 @@ impl TaskSortFields for TaskDTO {
     }
     fn custom_field_value(&self, name: &str) -> Option<String> {
         crate::utils::custom_fields::extract_value_strings(&self.custom_fields, name).and_then(|values| values.into_iter().next())
+    }
+    fn custom_field_version(&self, name: &str) -> Option<crate::utils::version::Version> {
+        let value = crate::utils::custom_fields::find_value(&self.custom_fields, name)?;
+        crate::utils::version::value_versions(value).into_iter().min_by(crate::utils::version::Version::sort_cmp)
     }
 }
 
@@ -627,6 +636,10 @@ fn compare_by_spec<T: TaskSortFields + ?Sized>(id_a: &str, a: &T, id_b: &str, b:
             SortKey::Relevance => Ordering::Equal,
         },
         SortSpec::Custom(name) => a.custom_field_value(name).cmp(&b.custom_field_value(name)),
+        SortSpec::Version(name) => match (a.custom_field_version(name), b.custom_field_version(name)) {
+            (Some(va), Some(vb)) => va.sort_cmp(&vb),
+            (a, b) => a.is_some().cmp(&b.is_some()),
+        },
     }
 }
 

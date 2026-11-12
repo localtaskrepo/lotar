@@ -144,7 +144,17 @@ fn render_resolved_config_yaml(resolved: &ResolvedConfig, sources: &HashMap<Stri
     }
 
     let mut custom_body = String::new();
-    if write_sequence(&mut custom_body, 2, "fields", &resolved.custom_fields.values, sources.get("custom.fields"), options) {
+    let mut custom_written = write_sequence(&mut custom_body, 2, "fields", &resolved.custom_fields.values, sources.get("custom.fields"), options);
+    // Field properties (DEV-373) as one flow mapping per field.
+    let field_properties: Vec<(String, String)> = resolved
+        .custom_field_properties
+        .iter()
+        .map(|(name, props)| (name.clone(), serde_json::to_string(props).unwrap_or_else(|_| "{}".to_string())))
+        .collect();
+    if !field_properties.is_empty() {
+        custom_written |= write_mapping_entries(&mut custom_body, 2, "field-properties", &field_properties, sources.get("custom.field-properties"), options);
+    }
+    if custom_written {
         sections.push(format!("custom:\n{}", custom_body));
     }
 

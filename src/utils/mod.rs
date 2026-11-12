@@ -19,6 +19,7 @@ pub mod tags;
 pub mod task_intel;
 pub mod text_search;
 pub mod time;
+pub mod version;
 pub mod workspace_labels;
 
 // Back-compat re-exports used across the codebase

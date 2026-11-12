@@ -24,6 +24,7 @@ fn cfg() -> ResolvedConfig {
         },
         tags: StringConfigField::new_wildcard(),
         tag_properties: Default::default(),
+        custom_field_properties: Default::default(),
         default_assignee: None,
         default_reporter: None,
         default_tags: vec![],

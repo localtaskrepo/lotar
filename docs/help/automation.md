@@ -71,6 +71,25 @@ Supported combinators:
 
 A field condition can also test the value with a regular expression, e.g. `title: { matches: '^\[ops\]' }`. Patterns use the same syntax as [search text](list.md#search-text); an invalid pattern is rejected when the rules are saved through LoTaR.
 
+### Version conditions
+
+`version` tests a [version field](./config.md#version-fields) against a range, written as in [searches](./list.md#version-fields): `>=0.13 <0.14`, `0.13`, `^1.2`, `~0.13.2`. It matches when one of the field's versions is in the range. A declared custom field can stand at the top level or under `custom_fields`; both need the field to change in the update, unless the condition is under `current`:
+
+```yaml
+when:
+  all:
+    - current: { affects: { version: ">=0.13 <0.14" } }
+    - status: InProgress
+```
+
+```yaml
+when:
+  custom_fields:
+    fixed_in: { version: "^1.0" }
+```
+
+An unreadable range is rejected when the rules are saved through LoTaR.
+
 ### Time conditions
 
 Three fields name a moment in the task's past and take `older_than`, `within` or `before` (and `exists`). They always look at the task as it is now, so they work in every rule:

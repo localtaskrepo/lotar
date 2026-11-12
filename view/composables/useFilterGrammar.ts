@@ -245,12 +245,42 @@ function isFieldKey(key: string): boolean {
 }
 
 /**
+ * A field name usable before a comparison operator: a letter, then letters,
+ * digits, `_`, `-` or `.`, not ending in `-` or `.` (so `a->b` stays text).
+ */
+const COMPARISON_NAME = /^[A-Za-z](?:[A-Za-z0-9_.-]*[A-Za-z0-9_])?$/
+
+interface Comparison {
+    /** Key text before the operator: `affects` or `field:affects`. */
+    key: string
+    op: '<' | '<=' | '>' | '>='
+    value: string
+}
+
+/**
+ * `name<op>value` with `<op>` one of `<`, `<=`, `>`, `>=` (DEV-373): a range
+ * on a version field. Mirrors `split_comparison` in src/utils/search_syntax.rs.
+ */
+function splitComparison(raw: string): Comparison | null {
+    const lt = findTopLevel(raw, '<')
+    const gt = findTopLevel(raw, '>')
+    const index = lt === -1 ? gt : gt === -1 ? lt : Math.min(lt, gt)
+    if (index === -1) return null
+    const key = raw.slice(0, index)
+    const name = isFieldKey(key) ? key.slice(key.indexOf(':') + 1).trim() : key
+    if (!COMPARISON_NAME.test(name)) return null
+    const op = `${raw[index]}${raw[index + 1] === '=' ? '=' : ''}` as Comparison['op']
+    return { key, op, value: raw.slice(index + op.length) }
+}
+
+/**
  * A segment counts as an explicit expression when it has the shape of an
  * assignment (`key=value`, `field:name=value`) or a known `key:value` token.
  * Used to decide whether top-level commas separate legacy expressions.
  */
 function looksLikeExpression(segment: string): boolean {
     if (isUrlLike(segment)) return false
+    if (splitComparison(segment)) return true
     const eq = findTopLevel(segment, '=')
     if (eq !== -1) {
         const keyRaw = segment.slice(0, eq)
@@ -334,6 +364,42 @@ function parseAssignment(
     assignmentKeys[key] = true
 }
 
+/**
+ * `affects>=0.13`: a range on a version field. Comparisons of one key add up
+ * into one range (`>=0.13 <0.14`); builtin keys cannot be compared.
+ */
+function parseComparison(
+    raw: string,
+    comparison: Comparison,
+    filters: Record<string, string>,
+    errors: string[],
+    assignmentKeys: Record<string, boolean>,
+    comparedKeys: Set<string>,
+): void {
+    const valueSeg = unquoteSegment(comparison.value)
+    if (!valueSeg.ok) {
+        errors.push(`Unmatched quote in "${raw}"`)
+        return
+    }
+    const value = valueSeg.quoted ? valueSeg.value : valueSeg.value.trim()
+    if (!value) {
+        errors.push(`Add a value for "${comparison.key}"`)
+        return
+    }
+    const field = isFieldKey(comparison.key)
+    const name = field ? comparison.key.slice(comparison.key.indexOf(':') + 1).trim() : comparison.key
+    if (RESERVED_FIELD_ALIASES[normalizeReservedKey(name)] || findGrammarKey(name)) {
+        errors.push(`"${name}" cannot be compared: only version fields use < and >`)
+        return
+    }
+    const key = field ? `field:${name.toLowerCase()}` : name.toLowerCase()
+    const next = `${comparison.op}${value}`
+    const previous = filters[key]
+    filters[key] = previous && comparedKeys.has(key) ? `${previous} ${next}` : next
+    assignmentKeys[key] = true
+    comparedKeys.add(key)
+}
+
 function parseColonToken(
     raw: string,
     colon: number,
@@ -384,6 +450,7 @@ function parseToken(
     words: string[],
     errors: string[],
     assignmentKeys: Record<string, boolean>,
+    comparedKeys: Set<string>,
 ): void {
     // A fully quoted literal is explicit free text ("a=b", "status:todo").
     // It keeps its double quotes so the server searches it as one phrase
@@ -406,7 +473,14 @@ function parseToken(
         const inner: Record<string, string> = Object.create(null) as Record<string, string>
         const innerWords: string[] = []
         const innerErrors: string[] = []
-        parseToken(raw.slice(1), inner, innerWords, innerErrors, Object.create(null) as Record<string, boolean>)
+        parseToken(
+            raw.slice(1),
+            inner,
+            innerWords,
+            innerErrors,
+            Object.create(null) as Record<string, boolean>,
+            new Set<string>(),
+        )
         const entries = Object.entries(inner)
         if (innerErrors.length) {
             errors.push(...innerErrors)
@@ -425,10 +499,18 @@ function parseToken(
             return
         }
     }
+    const comparison = splitComparison(raw)
+    if (comparison) {
+        parseComparison(raw, comparison, filters, errors, assignmentKeys, comparedKeys)
+        return
+    }
     const eq = findTopLevel(raw, '=')
     const colon = findTopLevel(raw, ':')
     if (eq !== -1 && (colon === -1 || colon > eq || isFieldKey(unquoteSegment(raw.slice(0, eq)).value))) {
+        const before = { ...filters }
         parseAssignment(raw, eq, filters, errors, assignmentKeys)
+        // An assignment replaces a range built from comparisons.
+        for (const key of Object.keys(filters)) if (filters[key] !== before[key]) comparedKeys.delete(key)
         return
     }
     if (colon !== -1) {
@@ -443,9 +525,10 @@ export function parseFilterQuery(input: string): ParsedFilterQuery {
     const words: string[] = []
     const errors: string[] = []
     const assignmentKeys: Record<string, boolean> = Object.create(null) as Record<string, boolean>
+    const comparedKeys = new Set<string>()
     for (const rawToken of tokenize(input)) {
         for (const token of splitCommaExpressions(rawToken)) {
-            parseToken(token, filters, words, errors, assignmentKeys)
+            parseToken(token, filters, words, errors, assignmentKeys, comparedKeys)
         }
     }
     const result: ParsedFilterQuery = { text: words.join(' '), filters }

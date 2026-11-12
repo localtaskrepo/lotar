@@ -1064,6 +1064,15 @@ export interface TagProperties {
     [key: string]: unknown
 }
 
+/** Properties of one custom field (DEV-373); unknown keys from newer servers are kept. */
+export interface CustomFieldProperties {
+    /** `text` (the default) or `version`. */
+    type?: CustomFieldTypeName | null
+    [key: string]: unknown
+}
+
+export type CustomFieldTypeName = 'text' | 'version'
+
 export interface ResolvedConfigDTO {
     /** Project-only named reviewers; empty keeps reporter-only review authorization. */
     review_reviewers: string[]
@@ -1116,6 +1125,7 @@ export interface ResolvedConfigDTO {
     branch_priority_aliases: Record<string, string>
     /** Per-tag properties such as colours (DEV-20). */
     tag_properties?: Record<string, TagProperties>
+    custom_field_properties?: Record<string, CustomFieldProperties>
     // Always sent by the server; optional so partial fixtures stay valid.
     members?: string[]
     strict_members?: boolean
@@ -1174,6 +1184,7 @@ export interface GlobalConfigRaw {
     branch_priority_aliases: Record<string, string>
     /** Per-tag properties such as colours (DEV-20). */
     tag_properties?: Record<string, TagProperties>
+    custom_field_properties?: Record<string, CustomFieldProperties>
     /** Global-only external web bundle path; absent when unset. */
     web_ui_path?: string | null
     ui_theme?: string | null
@@ -1236,6 +1247,7 @@ export interface ProjectConfigRaw {
     branch_status_aliases?: Record<string, string>
     branch_priority_aliases?: Record<string, string>
     tag_properties?: Record<string, TagProperties> | null
+    custom_field_properties?: Record<string, CustomFieldProperties> | null
     remotes?: Record<string, SyncRemoteConfig>
     auth_profiles?: Record<string, SyncAuthProfile>
 }

@@ -509,7 +509,7 @@
     "/api/tasks/list": {
       "get": {
         "summary": "List tasks",
-        "description": "List tasks with the shared query grammar (DEV-57). Built-in filters via named query params (status, priority, type, assignee, tags, project, q, sprints); any other query key is treated as a property filter: declared custom field names can be used directly (e.g., sprint=W35); a key that is neither a parameter, a built-in field nor a declared custom field is a 400, and page, sort, format and cursor are rejected with a hint. Assignee supports @me (unresolvable @me returns 400) and __none__ for unassigned. Multiple values can be provided as CSV and values are matched using case- and separator-insensitive fuzzy matching. Smart filters: due=today|soon|later|overdue (local-date buckets; soon covers the next 7 days excluding today), recent=<N>d|<N>w (modified within the last N days or weeks, inclusive), needs=effort,due (CSV; tasks missing ALL listed fields). Ordering: sort_by selects a builtin key (priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints) or a custom field via custom:<name> (alias field:<name>); order is asc|desc. Default: modified desc with a natural task ID ascending tiebreak (A-2 before A-10) that never flips with order. Invalid explicit enum values, sprint entries, smart filters, order, sort_by, or page params return 400 INVALID_ARGUMENT (limit must be 1-1000).",
+        "description": "List tasks with the shared query grammar (DEV-57). Built-in filters via named query params (status, priority, type, assignee, tags, project, q, sprints); any other query key is treated as a property filter: declared custom field names can be used directly (e.g., sprint=W35); a key that is neither a parameter, a built-in field nor a declared custom field is a 400, and page, sort, format and cursor are rejected with a hint. Assignee supports @me (unresolvable @me returns 400) and __none__ for unassigned. Multiple values can be provided as CSV and values are matched using case- and separator-insensitive fuzzy matching. A version custom field (DEV-373) takes version ranges instead: affects=0.13 (any 0.13.x), affects=>=0.13 <0.14, affects=^0.13, affects=~0.13.2; CSV values are alternatives, and a value that is not a version range is a 400. < and > on any other field are a 400. Smart filters: due=today|soon|later|overdue (local-date buckets; soon covers the next 7 days excluding today), recent=<N>d|<N>w (modified within the last N days or weeks, inclusive), needs=effort,due (CSV; tasks missing ALL listed fields). Ordering: sort_by selects a builtin key (priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints) or a custom field via custom:<name> (alias field:<name>), in version order for version fields; order is asc|desc. Default: modified desc with a natural task ID ascending tiebreak (A-2 before A-10) that never flips with order. Invalid explicit enum values, sprint entries, smart filters, order, sort_by, or page params return 400 INVALID_ARGUMENT (limit must be 1-1000).",
         "parameters": [
           {
             "name": "deletion",
@@ -600,7 +600,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Global sort key: priority, status, effort, due-date (alias due), created, modified, assignee, reporter, title, type, project, id, tags, sprints, relevance (best match for q first with the default desc order), or custom:<name> (alias field:<name>). Defaults to modified. tags compares the tag array lexicographically (empty first ascending); sprints compares the ascending sprint-id list numerically (empty first ascending). Invalid values return 400."
+            "description": "Global sort key: priority, status, effort, due-date (alias due), created, modified, assignee, reporter, title, type, project, id, tags, sprints, relevance (best match for q first with the default desc order), or custom:<name> (alias field:<name>; version fields sort in version order, tasks without a version first ascending). Defaults to modified. tags compares the tag array lexicographically (empty first ascending); sprints compares the ascending sprint-id list numerically (empty first ascending). Invalid values return 400."
           },
           {
             "name": "order",
@@ -683,7 +683,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Filters and search text in the web search-box syntax, the same as `lotar list` (e.g. `status:todo,inprogress prio:high has:tag area=billing \"login redirect\"`). Added to the other parameters: list filters add up, single values replace. Malformed terms return 400."
+            "description": "Filters and search text in the web search-box syntax, the same as `lotar list` (e.g. `status:todo,inprogress prio:high has:tag area=billing affects>=0.13 \"login redirect\"`). Version fields compare with <, <=, >, >= and =, ^, ~ ranges; comparisons of one field add up. Added to the other parameters: list filters add up, single values replace. Malformed terms return 400."
           },
           {
             "name": "due_within",
@@ -3138,7 +3138,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Global sort key: priority, status, effort, due-date (alias due), created, modified, assignee, reporter, title, type, project, id, tags, sprints, relevance (best match for q first with the default desc order), or custom:<name> (alias field:<name>). Defaults to modified. tags compares the tag array lexicographically (empty first ascending); sprints compares the ascending sprint-id list numerically (empty first ascending). Invalid values return 400."
+            "description": "Global sort key: priority, status, effort, due-date (alias due), created, modified, assignee, reporter, title, type, project, id, tags, sprints, relevance (best match for q first with the default desc order), or custom:<name> (alias field:<name>; version fields sort in version order, tasks without a version first ascending). Defaults to modified. tags compares the tag array lexicographically (empty first ascending); sprints compares the ascending sprint-id list numerically (empty first ascending). Invalid values return 400."
           },
           {
             "name": "order",
@@ -3197,7 +3197,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Filters and search text in the web search-box syntax, the same as `lotar list` (e.g. `status:todo,inprogress prio:high has:tag area=billing \"login redirect\"`). Added to the other parameters: list filters add up, single values replace. Malformed terms return 400."
+            "description": "Filters and search text in the web search-box syntax, the same as `lotar list` (e.g. `status:todo,inprogress prio:high has:tag area=billing affects>=0.13 \"login redirect\"`). Version fields compare with <, <=, >, >= and =, ^, ~ ranges; comparisons of one field add up. Added to the other parameters: list filters add up, single values replace. Malformed terms return 400."
           },
           {
             "name": "due_within",

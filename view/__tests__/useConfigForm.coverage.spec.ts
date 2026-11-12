@@ -274,3 +274,54 @@ describe('useConfigForm tag colours (DEV-20)', () => {
         expect(form.errors.tag_properties).toMatch(/Name the tag/)
     })
 })
+
+describe('useConfigForm version fields (DEV-373)', () => {
+    it('edits global version fields and keeps other field properties', () => {
+        const form = load(
+            '',
+            inspectFor('', null, {
+                custom_field_properties: { affects: { type: 'version' }, build: { type: 'text', unit: 'n' } },
+            }),
+        )
+        expect(form.form.versionFields).toEqual(['affects'])
+        expect(form.buildPayload()).toEqual({})
+
+        form.form.versionFields = ['affects', 'fixed_in']
+        expect(JSON.parse(form.buildPayload().custom_field_properties!)).toEqual({
+            affects: { type: 'version' },
+            build: { type: 'text', unit: 'n' },
+            fixed_in: { type: 'version' },
+        })
+        form.form.versionFields = []
+        expect(JSON.parse(form.buildPayload().custom_field_properties!)).toEqual({
+            build: { type: 'text', unit: 'n' },
+        })
+    })
+
+    it('edits only the project overrides and clears them with a blank value', () => {
+        const form = load(
+            'TEST',
+            inspectFor(
+                'TEST',
+                { project_name: 'Test', custom_field_properties: { fixed_in: { type: 'version' } } },
+                { custom_field_properties: { affects: { type: 'version' }, fixed_in: { type: 'version' } } },
+            ),
+        )
+        expect(form.form.versionFields).toEqual(['fixed_in'])
+        form.form.versionFields = []
+        expect(form.buildPayload()).toEqual({ custom_field_properties: '' })
+    })
+
+    it('rejects the wildcard and duplicates', () => {
+        const form = load('', inspectFor('', null))
+        form.form.versionFields = ['*']
+        form.validateField('custom_field_properties')
+        expect(form.errors.custom_field_properties).toMatch(/not \*/)
+        form.form.versionFields = ['affects', 'Affects']
+        form.validateField('custom_field_properties')
+        expect(form.errors.custom_field_properties).toMatch(/listed twice/)
+        form.form.versionFields = ['affects']
+        form.validateField('custom_field_properties')
+        expect(form.errors.custom_field_properties).toBeNull()
+    })
+})

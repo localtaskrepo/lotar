@@ -607,6 +607,8 @@ pub fn merge_global_config_with(base: &mut GlobalConfig, override_config: Global
     if keys.has("custom_fields") || override_config.custom_fields.values != defaults.custom_fields.values {
         base.custom_fields = override_config.custom_fields;
     }
+    // Field properties merge per field: a later layer wins for the fields it names.
+    base.custom_field_properties.extend(override_config.custom_field_properties);
 
     if keys.has("attachments_dir") || override_config.attachments_dir != defaults.attachments_dir {
         base.attachments_dir = override_config.attachments_dir;
@@ -795,6 +797,7 @@ pub fn overlay_global_into_resolved_with(resolved: &mut ResolvedConfig, override
     if keys.has("custom_fields") || override_config.custom_fields.values != defaults.custom_fields.values {
         resolved.custom_fields = override_config.custom_fields;
     }
+    resolved.custom_field_properties.extend(override_config.custom_field_properties);
 
     if keys.has("attachments_dir") || override_config.attachments_dir != defaults.attachments_dir {
         resolved.attachments_dir = override_config.attachments_dir;
@@ -1036,6 +1039,9 @@ fn apply_project_config_overrides(resolved: &mut ResolvedConfig, project_config:
     if let Some(custom_fields) = project_config.custom_fields {
         resolved.custom_fields = custom_fields;
     }
+    if let Some(properties) = project_config.custom_field_properties {
+        resolved.custom_field_properties.extend(properties);
+    }
     if let Some(attachments_dir) = project_config.attachments_dir {
         resolved.attachments_dir = attachments_dir;
     }
@@ -1185,6 +1191,7 @@ impl ResolvedConfig {
             default_priority: global.default_priority,
             default_status: global.default_status,
             custom_fields: global.custom_fields,
+            custom_field_properties: global.custom_field_properties,
             scan_signal_words: global.scan_signal_words,
             scan_strip_attributes: global.scan_strip_attributes,
             scan_ticket_patterns: global.scan_ticket_patterns,

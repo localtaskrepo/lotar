@@ -405,6 +405,54 @@ impl TagProperties {
     }
 }
 
+/// Properties of one custom field (DEV-373). In YAML they sit in the
+/// `custom.fields` list as objects, `- { name: affects, type: version }`,
+/// next to plain names; loading splits them into `custom_field_properties`
+/// so `custom_fields` stays a name list. Unknown keys are kept, so newer
+/// properties survive older writers.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct CustomFieldProperties {
+    /// One of [`CUSTOM_FIELD_TYPES`]; none means `text`.
+    #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")]
+    pub field_type: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, serde_yaml_ng::Value>,
+}
+
+impl CustomFieldProperties {
+    pub fn is_empty(&self) -> bool {
+        self.field_type.is_none() && self.extra.is_empty()
+    }
+
+    pub fn kind(&self) -> CustomFieldType {
+        self.field_type.as_deref().and_then(CustomFieldType::parse).unwrap_or_default()
+    }
+}
+
+/// What a custom field holds (DEV-373).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum CustomFieldType {
+    /// Any value, matched as loose text.
+    #[default]
+    Text,
+    /// Versions (`0.13.3`, `1.0.0-rc.1`, or a partial `0.13`), compared by
+    /// semver precedence; see `utils::version`.
+    Version,
+}
+
+/// The custom field types LoTaR understands.
+pub const CUSTOM_FIELD_TYPES: &[&str] = &["text", "version"];
+
+impl CustomFieldType {
+    pub fn parse(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "text" => Some(Self::Text),
+            "version" => Some(Self::Version),
+            _ => None,
+        }
+    }
+}
+
 /// Named tag colours; the web UI maps each to a theme-friendly hex value.
 pub const TAG_COLOR_NAMES: &[&str] = &[
     "red", "orange", "amber", "yellow", "lime", "green", "teal", "cyan", "sky", "blue", "indigo", "violet", "purple", "pink", "rose", "brown", "gray", "grey",
@@ -483,6 +531,9 @@ pub struct ProjectConfig {
     pub default_status: Option<TaskStatus>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub custom_fields: Option<StringConfigField>,
+    /// Per-field properties (DEV-373), merged over the global ones per field.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub custom_field_properties: Option<BTreeMap<String, CustomFieldProperties>>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub auto_set_reporter: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -581,6 +632,7 @@ impl ProjectConfig {
             default_priority: None,
             default_status: None,
             custom_fields: None,
+            custom_field_properties: None,
             auto_set_reporter: None,
             auto_reciprocal_relationships: None,
             auto_link_mentions: None,
@@ -690,6 +742,9 @@ pub struct GlobalConfig {
     pub default_status: Option<TaskStatus>,
     #[serde(default = "default_custom_fields")]
     pub custom_fields: StringConfigField,
+    /// Per-field properties such as the type (DEV-373).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub custom_field_properties: BTreeMap<String, CustomFieldProperties>,
     #[serde(default = "default_scan_signal_words")]
     pub scan_signal_words: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -819,6 +874,8 @@ pub struct ResolvedConfig {
     pub default_priority: Priority,
     pub default_status: Option<TaskStatus>,
     pub custom_fields: StringConfigField,
+    /// Effective per-field properties: global, then project entries per field.
+    pub custom_field_properties: BTreeMap<String, CustomFieldProperties>,
     pub scan_signal_words: Vec<String>,
     pub scan_strip_attributes: bool,
     // Effective scanner options
@@ -887,6 +944,13 @@ pub struct UiSettings {
 }
 
 impl ResolvedConfig {
+    /// The type of a custom field, by name ignoring case (DEV-373); fields
+    /// without one hold text.
+    pub fn custom_field_type(&self, name: &str) -> CustomFieldType {
+        let name = name.trim();
+        self.custom_field_properties.iter().find(|(field, _)| field.eq_ignore_ascii_case(name)).map(|(_, props)| props.kind()).unwrap_or_default()
+    }
+
     /// The task's web link when `server.public_url` is set: the same link
     /// the web UI's "copy link" builds (DEV-332).
     pub fn task_url(&self, id: &str) -> Option<String> {
@@ -1086,6 +1150,7 @@ impl Default for GlobalConfig {
             default_priority: default_priority(),
             default_status: None,
             custom_fields: default_custom_fields(),
+            custom_field_properties: BTreeMap::new(),
             scan_signal_words: default_scan_signal_words(),
             scan_ticket_patterns: None,
             scan_enable_ticket_words: true,

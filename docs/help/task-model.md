@@ -74,7 +74,7 @@ cycle. No read operation silently repairs task YAML.
 
 ### Custom fields
 
-`custom_fields` is a free-form map backed by `HashMap<String, serde_yaml::Value>` (or JSON when schema generation is enabled). Keys correspond to names declared in `config.custom_fields` or dynamic fields permitted by `custom_fields.values`. CLI and REST mutate them via `field:<name>` syntax, while listing/filtering converts them back into strings using `custom_value_to_string`.
+`custom_fields` is a free-form map backed by `HashMap<String, serde_yaml::Value>` (or JSON when schema generation is enabled). Keys correspond to names declared in `config.custom_fields` or dynamic fields permitted by `custom_fields.values`. CLI and REST mutate them via `field:<name>` syntax, while listing/filtering converts them back into strings using `custom_value_to_string`. A field declared with `type: version` holds a version string or a list of them, checked on every write and compared by version in filters and sorting (see [Version fields](./config.md#version-fields)).
 
 ### Sprints & ordering
 

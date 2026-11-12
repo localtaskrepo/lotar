@@ -3,6 +3,7 @@ import type {
     AgentInstructionsValue,
     ConfigInspectResult,
     ConfigSource,
+    CustomFieldProperties,
     ProjectConfigRaw,
     ProjectDTO,
     TagProperties,
@@ -91,6 +92,8 @@ export interface ConfigFormState {
     branchPriorityAliases: BranchAliasEntry[]
     /** Tag colours of this scope (global, or the project's own overrides). */
     tagColors: TagColorEntry[]
+    /** Custom fields of this scope that hold versions (DEV-373). */
+    versionFields: string[]
     syncReportsDir: string
     syncWriteReports: ToggleValue
     agentContextEnabled: ToggleValue
@@ -266,6 +269,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         branchStatusAliases: [],
         branchPriorityAliases: [],
         tagColors: [],
+        versionFields: [],
         syncReportsDir: '',
         syncWriteReports: 'true',
         agentContextEnabled: 'true',
@@ -429,6 +433,48 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             if (!resolveTagColor(color)) return `"${color}" is not a colour: use #rrggbb or a colour name.`
             const key = tag.toLowerCase()
             if (seen.has(key)) return `"${tag}" has more than one colour.`
+            seen.add(key)
+        }
+        return null
+    }
+
+    /**
+     * Custom field properties as loaded for this scope. Saving rebuilds the
+     * map from the version field list and keeps every other property of a
+     * field (DEV-373).
+     */
+    let loadedFieldProperties: Record<string, CustomFieldProperties> = {}
+
+    function versionFieldNames(map: Record<string, CustomFieldProperties> | null | undefined): string[] {
+        if (!map) return []
+        return Object.entries(map)
+            .filter(([, props]) => props.type === 'version')
+            .map(([name]) => name)
+            .sort((a, b) => a.localeCompare(b))
+    }
+
+    /** The full `custom_field_properties` map for the version list, sorted by field. */
+    function fieldPropertiesFromVersions(names: string[]): Record<string, CustomFieldProperties> {
+        const next: Record<string, CustomFieldProperties> = {}
+        for (const [name, props] of Object.entries(loadedFieldProperties)) {
+            const { type, ...rest } = props
+            const kept = type && type !== 'version' ? { ...rest, type } : rest
+            if (Object.keys(kept).length) next[name] = kept
+        }
+        for (const raw of names) {
+            const name = raw.trim()
+            if (name) next[name] = { ...next[name], type: 'version' }
+        }
+        return Object.fromEntries(Object.entries(next).sort(([a], [b]) => a.localeCompare(b)))
+    }
+
+    function validateVersionFields(names: string[]): string | null {
+        const seen = new Set<string>()
+        for (const raw of names) {
+            const name = raw.trim()
+            if (name === '*') return 'Name a field, not *.'
+            const key = name.toLowerCase()
+            if (seen.has(key)) return `"${name}" is listed twice.`
             seen.add(key)
         }
         return null
@@ -1138,6 +1184,10 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
                 errors.tag_properties = validateTagColors(form.tagColors)
                 break
             }
+            case 'custom_field_properties': {
+                errors.custom_field_properties = validateVersionFields(form.versionFields)
+                break
+            }
             case 'branch_status_aliases': {
                 errors.branch_status_aliases = validateAliasEntries(form.branchStatusAliases, 'branch status')
                 break
@@ -1185,6 +1235,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             'branch_status_aliases',
             'branch_priority_aliases',
             'tag_properties',
+            'custom_field_properties',
         ]
         if (isGlobal.value) {
             fields.push(
@@ -1295,6 +1346,8 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         form.branchPriorityAliases = mapToAliasEntries(effective.branch_priority_aliases)
         loadedTagProperties = { ...effective.tag_properties }
         form.tagColors = tagColorEntries(loadedTagProperties)
+        loadedFieldProperties = { ...effective.custom_field_properties }
+        form.versionFields = versionFieldNames(loadedFieldProperties)
         if (!isGlobal.value) {
             const raw: ProjectConfigRaw = data.project_raw ?? {}
             form.projectName = raw.project_name || currentProject.value?.name || ''
@@ -1376,6 +1429,9 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             // A project edits its own tag colours; the rest are inherited.
             loadedTagProperties = { ...raw.tag_properties }
             form.tagColors = tagColorEntries(loadedTagProperties)
+            // Likewise its own field types.
+            loadedFieldProperties = { ...raw.custom_field_properties }
+            form.versionFields = versionFieldNames(loadedFieldProperties)
         } else {
             form.projectName = ''
             form.issueDoneStates = normalizeDoneStatesRaw(data.global_raw.issue_done_states)
@@ -1602,6 +1658,12 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             const next = JSON.stringify(tagPropertiesFromEntries(current.tagColors))
             if (next !== JSON.stringify(tagPropertiesFromEntries(base.tagColors))) {
                 payload.tag_properties = next === '{}' ? '' : next
+            }
+        }
+        {
+            const next = JSON.stringify(fieldPropertiesFromVersions(current.versionFields))
+            if (next !== JSON.stringify(fieldPropertiesFromVersions(base.versionFields))) {
+                payload.custom_field_properties = next === '{}' ? '' : next
             }
         }
 
