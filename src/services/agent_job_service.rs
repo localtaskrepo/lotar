@@ -637,6 +637,7 @@ fn wrap_runner_command(
     job_id: &str,
     ticket_id: &str,
     runner: &str,
+    tasks_dir: &std::path::Path,
 ) -> crate::services::agent_runner::RunnerCommand {
     let Some(wrapper_program) = resolve_wrapper_program() else {
         return command;
@@ -649,6 +650,8 @@ fn wrap_runner_command(
         ticket_id.to_string(),
         "--runner".to_string(),
         runner.to_string(),
+        "--tasks-dir".to_string(),
+        tasks_dir.canonicalize().unwrap_or_else(|_| tasks_dir.to_path_buf()).to_string_lossy().to_string(),
         "--".to_string(),
         command.program.clone(),
     ];
@@ -1691,7 +1694,7 @@ fn run_job(
         env: command.env.clone(),
         cwd: worktree_context.working_dir.clone(),
     });
-    let command = wrap_runner_command(command, &job_id, &ticket_id, runner_kind.as_str());
+    let command = wrap_runner_command(command, &job_id, &ticket_id, runner_kind.as_str(), &tasks_dir);
 
     if let Err(err) = validate_runner_command(&command) {
         update_job_failure(&job_id, &ticket_id, err.to_string(), &tasks_dir);

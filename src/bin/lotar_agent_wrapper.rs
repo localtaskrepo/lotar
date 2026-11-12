@@ -38,6 +38,12 @@ fn parse_args(args: &[String]) -> Result<WrapperConfig, String> {
                 cfg.runner = Some(value.to_string());
                 idx += 2;
             }
+            // Read from the process list only: lotar counts a wrapper as a
+            // job of the tasks directory it names (DEV-349).
+            "--tasks-dir" => {
+                args.get(idx + 1).ok_or("Missing value for --tasks-dir")?;
+                idx += 2;
+            }
             _ => {
                 return Err(format!("Unexpected argument '{arg}'"));
             }
@@ -287,6 +293,8 @@ mod tests {
             "TEST-1".to_string(),
             "--runner".to_string(),
             "codex".to_string(),
+            "--tasks-dir".to_string(),
+            "/work/.tasks".to_string(),
             "--".to_string(),
             "codex".to_string(),
             "exec".to_string(),

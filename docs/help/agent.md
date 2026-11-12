@@ -238,7 +238,7 @@ A job runs inside the process that started it: `lotar serve`, the background que
 
 Records of a process that died are ignored and cleaned up. When an MCP session ends (or reloads after an upgrade), it cancels and finishes the jobs it started instead of leaving agents running unsupervised.
 
-`list-running` also lists `lotar-agent-wrapper` processes if that binary is available (next to `lotar`, on `PATH`, or `LOTAR_AGENT_WRAPPER`).
+`list-running` also lists the `lotar-agent-wrapper` processes of this tasks directory if that binary is available (next to `lotar`, on `PATH`, or `LOTAR_AGENT_WRAPPER`). A wrapper started for another tasks directory, such as another worktree's, is not listed and doesn't block changes to a ticket with the same ID.
 
 ## Status and assignee during a job
 

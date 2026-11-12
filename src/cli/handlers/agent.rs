@@ -814,7 +814,8 @@ pub(crate) fn running_job_for_ticket(tasks_dir: &std::path::Path, ticket_id: &st
 }
 
 /// Running jobs: the shared records of this tasks directory (any process,
-/// no wrapper needed; DEV-279) plus any `lotar-agent-wrapper` processes.
+/// no wrapper needed; DEV-279) plus the `lotar-agent-wrapper` processes
+/// running for it (DEV-349).
 fn list_running_jobs(tasks_dir: Option<&std::path::Path>) -> Vec<RunningAgentJob> {
     let mut jobs: Vec<RunningAgentJob> = tasks_dir
         .map(crate::services::agent_active_jobs::list)
@@ -822,7 +823,7 @@ fn list_running_jobs(tasks_dir: Option<&std::path::Path>) -> Vec<RunningAgentJob
         .into_iter()
         .map(|job| RunningAgentJob { pid: job.child_pid, job_id: Some(job.job_id), ticket_id: Some(job.ticket_id), runner: Some(job.runner) })
         .collect();
-    for wrapper in list_wrapper_processes() {
+    for wrapper in list_wrapper_processes(tasks_dir) {
         let known = wrapper.job_id.is_some() && jobs.iter().any(|job| job.job_id == wrapper.job_id);
         if !known {
             jobs.push(wrapper);
@@ -831,7 +832,7 @@ fn list_running_jobs(tasks_dir: Option<&std::path::Path>) -> Vec<RunningAgentJob
     jobs
 }
 
-fn list_wrapper_processes() -> Vec<RunningAgentJob> {
+fn list_wrapper_processes(tasks_dir: Option<&std::path::Path>) -> Vec<RunningAgentJob> {
     // sysinfo 0.40 reports when the process list cannot be read; that is
     // treated as no wrapper processes, as on unsupported platforms before.
     let Ok(mut system) = System::new() else {
@@ -856,6 +857,9 @@ fn list_wrapper_processes() -> Vec<RunningAgentJob> {
                 return None;
             }
             let cmd: Vec<String> = process.cmd().iter().filter_map(|s| s.to_str().map(String::from)).collect();
+            if tasks_dir.is_some_and(|dir| !wrapper_runs_in(&cmd, dir)) {
+                return None;
+            }
             let (job_id, ticket_id, runner) = parse_wrapper_metadata(&cmd);
             Some(RunningAgentJob { pid: pid.as_u32(), job_id, ticket_id, runner })
         })
@@ -954,6 +958,17 @@ fn is_wrapper_name(name: &str) -> bool {
     name == "lotar-agent-wrapper" || name == "lotar-agent-wrapper.exe"
 }
 
+/// Whether a wrapper runs a job of this tasks directory: another
+/// worktree's wrapper for the same ticket ID is not this one's job. A
+/// wrapper without `--tasks-dir` (an older lotar) is counted.
+fn wrapper_runs_in(cmd: &[String], tasks_dir: &std::path::Path) -> bool {
+    let Some(value) = cmd.iter().take_while(|arg| *arg != "--").skip_while(|arg| *arg != "--tasks-dir").nth(1) else {
+        return true;
+    };
+    let canonical = |path: &std::path::Path| path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    canonical(std::path::Path::new(value)) == canonical(tasks_dir)
+}
+
 fn parse_wrapper_metadata(cmd: &[String]) -> (Option<String>, Option<String>, Option<String>) {
     let mut job_id = None;
     let mut ticket_id = None;
@@ -987,7 +1002,8 @@ fn parse_wrapper_metadata(cmd: &[String]) -> (Option<String>, Option<String>, Op
 
 #[cfg(test)]
 mod tests {
-    use super::{extract_ticket_from_branch, parse_git_worktree_list, parse_wrapper_metadata};
+    use super::{extract_ticket_from_branch, parse_git_worktree_list, parse_wrapper_metadata, wrapper_runs_in};
+    use std::path::Path;
 
     #[test]
     fn parses_wrapper_metadata() {
@@ -1007,6 +1023,16 @@ mod tests {
         assert_eq!(job_id.as_deref(), Some("job-1"));
         assert_eq!(ticket_id.as_deref(), Some("TEST-1"));
         assert_eq!(runner.as_deref(), Some("codex"));
+    }
+
+    #[test]
+    fn wrappers_of_another_tasks_dir_are_not_counted() {
+        let cmd: Vec<String> = ["lotar-agent-wrapper", "--job-id", "job-1", "--tasks-dir", "/work/a/.tasks", "--", "codex"].map(String::from).to_vec();
+        assert!(wrapper_runs_in(&cmd, Path::new("/work/a/.tasks")));
+        assert!(!wrapper_runs_in(&cmd, Path::new("/work/b/.tasks")));
+        // A wrapper started without the flag (an older lotar) still counts.
+        let legacy: Vec<String> = ["lotar-agent-wrapper", "--job-id", "job-1", "--", "codex"].map(String::from).to_vec();
+        assert!(wrapper_runs_in(&legacy, Path::new("/work/b/.tasks")));
     }
 
     #[test]

@@ -58,7 +58,7 @@ All planned features are implemented. See `docs/help/agent.md` and `docs/help/au
 - **Config format**: Custom statuses must use `issue: states: [...]`, not `statuses: [...]` at the top level. Same for `issue: priorities:` and `issue: types:`. See `src/config/normalization.rs`.
 - **`MatchMode::OnChange`**: For `updated` events, each field in `when` conditions must have actually changed in the update. Single-field CLI commands only include that one field in the changeset. For `created` events, all fields count as "new".
 - **`default: project:`**: The config's default project is only used in certain code paths. `detect_project_name()` returns a value first (from env → project files → git repo → directory name → "default"). Use `-p <project>` to force prefix.
-- **Wrapper process discovery is system-wide**: `running_job_for_ticket()` scans all system processes for `lotar-agent-wrapper` by design (wrapper-based discovery lets `list-running` work without persistence; see `src/cli/handlers/agent.rs`). Ticket matching is alias-aware (DEV-56). Concurrent runs that spawn wrappers can observe each other's jobs.
+- **Wrapper process discovery is per tasks directory**: `running_job_for_ticket()` scans system processes for `lotar-agent-wrapper` (wrapper-based discovery lets `list-running` work without persistence; see `src/cli/handlers/agent.rs`) and counts only wrappers whose `--tasks-dir` is this tasks directory, or that have none (older lotar builds; DEV-349). Ticket matching is alias-aware (DEV-56).
 
 ---
 
@@ -157,7 +157,7 @@ Counts are static source counts (`#[test]` / `#[tokio::test]`), not run results;
 | Mock agent job creation → completion → log capture | ✅ |
 | Job status transitions via REST API | ✅ |
 
-**Known flake source**: `api.agent-jobs.smoke.spec.ts` spawns `lotar-agent-wrapper` processes visible system-wide. When running concurrently, `lotar status` in CLI automation tests scans all processes and may find these wrappers, failing with an "active agent job" error. This is inherent to wrapper-based discovery in `running_job_for_ticket` (system-wide process scan, alias-aware ticket matching per DEV-56), not a persistence bug.
+**Wrapper isolation**: `api.agent-jobs.smoke.spec.ts` spawns `lotar-agent-wrapper` processes visible system-wide. Each wrapper names its tasks directory (`--tasks-dir`), and `running_job_for_ticket` counts only the wrappers of the caller's tasks directory, so concurrent suites in other workspaces or worktrees don't fail CLI tests with an "active agent job" error (DEV-349).
 
 #### WebUI Agent Jobs (`ui.agent-jobs.smoke.spec.ts`) — 6 tests
 | Test | Status |
@@ -244,7 +244,7 @@ The following test scenarios are NOT yet covered. Most require complex setup (sp
 
 | Bug | Severity | Details |
 |-----|----------|---------|
-| Cross-test visibility of wrapper processes | Low | `running_job_for_ticket()` scans all system processes for `lotar-agent-wrapper` by design (wrapper-based discovery, `src/cli/handlers/agent.rs`). Concurrent runs that spawn wrappers can observe each other's jobs; ticket matching is alias-aware (DEV-56). |
+| Cross-test visibility of wrapper processes | Low | `running_job_for_ticket()` scans system processes for `lotar-agent-wrapper` (`src/cli/handlers/agent.rs`) but counts only wrappers of its own tasks directory (DEV-349); wrappers from older builds without `--tasks-dir` are still counted everywhere. Ticket matching is alias-aware (DEV-56). |
 
 ## Fixed (formerly tracked here)
 
