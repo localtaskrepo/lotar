@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-12T09:42:26.800525+00:00
-modified: 2026-11-12T22:52:53.098607+00:00
+modified: 2026-11-12T23:25:08.192520+00:00
 relationships:
   related:
   - DEV-373
@@ -20,6 +20,9 @@ comments:
 - date: 2026-11-12T22:52:53.098607+00:00
   author: claude
   text: 'claude: Owner 2026-11-12: release as v0.14.1 (a patch), after DEV-388 and DEV-389 are merged. Picking the version means he has checked the versions feature (DEV-373).'
+- date: 2026-11-12T23:25:08.192520+00:00
+  author: claude
+  text: 'claude: Step 1: no tickets wait for this release (relationships --kind blocks is empty); DEV-388 (f16bbda) and DEV-389 (cbcc1ff) are on main. Step 2: Cargo.toml and Cargo.lock bumped to 0.14.1; lint, test and smoke running.'
 description: 'Next release, planned with DEV-373 (versions), which the owner verifies first (2026-11-12: ''I''ll verify it tomorrow for the next major release''). The owner picks the bump; rename this ticket if it differs (the title must start with ''Release v''). Steps: .github/skills/release/SKILL.md and docs/release-guide.md. Done when the release is installed here. Tickets that wait for this release are Blocked and depend on it; closing this ticket hands them to @fix to run their checks. Waiting now: none.'
 history:
 - at: 2026-11-12T09:42:26.879084+00:00
@@ -77,6 +80,10 @@ history:
     old: Release v0.15.0
     new: Release v0.14.1
 - at: 2026-11-12T22:52:53.098607+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T23:25:08.192520+00:00
   actor: claude
   changes:
   - field: comment_added

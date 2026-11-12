@@ -1,6 +1,6 @@
 [package]
 name = "lotar"
-version = "0.14.0"
+version = "0.14.1"
 edition = "2024"
 default-run = "lotar"
 # Integration tests are modules of one binary (tests/integration.rs, DEV-302).

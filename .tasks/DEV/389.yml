@@ -1,11 +1,11 @@
 title: 'Web UI: show tasks in another repo with their status and link'
-status: InProgress
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T20:52:33.189344+00:00
-modified: 2026-11-12T23:18:44.121303+00:00
+modified: 2026-11-12T23:23:58.794643+00:00
 relationships:
   depends_on:
   - DEV-386
@@ -19,6 +19,9 @@ comments:
 - date: 2026-11-12T23:18:33.606596+00:00
   author: claude
   text: 'Done on branch agent/DEV-389. New GET /api/relationships/cross-repo?refs=repo:ID,... returns each reference resolved now (reference, title, status, done, url, or unresolved with the reason); in src/api_types.rs (CrossRepoTaskDTO), view/api/types.ts (CrossRepoTask), docs/openapi.json, docs/help/api-quick-reference.md. I used a separate request instead of the task DTO so task lists don''t read other repos. Task panel Relationships tab: a repo:ID chip shows the status (or ''unresolved'', reason on hover) and opens the other repo''s link in a new tab; typing repo:ID adds it as written (no local suggestions take over); typing or dragging one into a category other than Depends on/Related is refused in the UI. Docs: docs/help/task.md (Tasks in another repo). Tests: Rust REST test in tests/dev386_cross_repo_relationships_test.rs, Vitest cases in TaskRelationships.spec.ts, Playwright smoke smoke/tests/ui.cross-repo-relationships.smoke.spec.ts. npm run lint, npm test (2107 Rust, 1505 UI) and npm run smoke (385) pass. Limit: the other repo sends no events, so its status refreshes when the tab opens or the chips change.'
+- date: 2026-11-12T23:23:49.982521+00:00
+  author: claude
+  text: 'claude: Merged. Rebased agent/DEV-389 onto main (f0b34c3). One conflict in docs/help/task.md: main (DEV-388) reworded the sentence about the other repo not notifying this one, and this branch replaced the ''web UI lists these like other IDs'' sentence. I kept both: the new web UI paragraph followed by main''s wording. Checks after the rebase: npm run lint passed, npm test passed (2108 Rust, 1505 UI), npm run smoke passed (385). Fast-forwarded main to cbcc1ff, committed ticket files as 6cacd9a (DEV-389 Ticket updates, including DEV-388''s ticket file), and pushed both to origin/main (f0b34c3..6cacd9a).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Add47aab2-5009-4849-a754-cffb5eb15e59
 description: |-
@@ -96,3 +99,13 @@ history:
   - field: assignee
     old: '@fix'
     new: '@merge'
+- at: 2026-11-12T23:23:49.982521+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T23:23:58.794643+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
