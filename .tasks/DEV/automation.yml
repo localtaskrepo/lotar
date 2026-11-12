@@ -1,6 +1,7 @@
 # Source: standards configs/lotar/automation.yml. Repo-health tickets (tag health, filed by
 # node ~/Development/standards/scripts/repos.ts --report) start a fix agent as a T3 Code thread; tag owner never does.
-# So does a ticket an agent files without an assignee (owner 2026-11-11, skill lotar-workflow).
+# So does a ticket an agent files without an assignee (owner 2026-11-11, skill lotar-workflow). Jobs run in worktrees;
+# a finished fix job goes to @merge, which brings its branch into the main checkout (owner 2026-11-11, STD-35).
 # Goes into each repo's .tasks/<PROJECT>/automation.yml; the repo's own rules follow below these. Setup, retries and
 # the model choice: configs/lotar/README.md. No review status: the owner follows the agents in T3 (2026-11-11).
 automation:
@@ -31,12 +32,11 @@ automation:
                  Before asking him, ask the agents that are running (T3 threads, other sessions) what they know, and
                  file every bug you find in its repo (lotar add --finding). When the fix still needs him, comment one
                  question, set the status to HelpNeeded, assign the ticket to mallox (the owner) and stop.
-              4. When you changed files: commit them signed, never with --no-verify, message "${{ticket.id}} ${{ticket.title}}".
-                 Push only if ~/Development/standards/repos.json lists this repo with "push": true; otherwise the
-                 commit waits for the owner's OK.
-              5. Run the check command again: it must no longer list the finding.
-              6. Comment the outcome: what you changed, the commit hash, pushed or waiting for the owner. The ticket
-                 goes to Done when your job ends.
+              4. When you changed files: commit them on your worktree's branch, signed, never with --no-verify, message
+                 "${{ticket.id}} ${{ticket.title}}". Don't merge or push: the merge agent does that, then reruns the
+                 check command against the main checkout.
+              5. Comment the outcome: what you changed, the commit hash, the checks that ran. When your job ends, the
+                 merge agent takes over.
     - name: "Health: start the light fix agent"
       when:
         all:
@@ -47,7 +47,7 @@ automation:
           set:
             assignee: "@fix-light"
           agent: *fix
-    # An agent's ticket nobody took: @fix works it with lotar's built-in instructions. The filer assigns itself, the
+    # An agent's ticket nobody took: @fix works it. The filer assigns itself, the
     # owner (a question) or @fix-light (mechanical) instead when that fits; proposals, owner and recurring tickets wait.
     # A Change ticket (local's change records) belongs to the agent making that change.
     - name: "Agent tickets: start the fix agent"
@@ -75,13 +75,11 @@ automation:
               1. Never delete or discard work that isn't saved elsewhere, and never decide what only the owner decides.
                  Ask the running agents (T3 threads) first; when it still needs him, comment one question, set the
                  status to HelpNeeded, assign the ticket to mallox and stop.
-              2. Commit only your own files (git status first: other sessions work in this checkout), signed, never
-                 with --no-verify, message "${{ticket.id}} ${{ticket.title}}". Push only if
-                 ~/Development/standards/repos.json lists this repo with "push": true; otherwise the commit waits for
-                 the owner's OK.
+              2. Commit your changes on your worktree's branch, signed, never with --no-verify, message
+                 "${{ticket.id}} ${{ticket.title}}". Don't merge or push: the merge agent does that.
               3. Don't end your turn while tests or other background work still run: the job ends with your turn.
-              4. Comment the outcome: what you changed, the commit hash, pushed or waiting, the checks that ran. The
-                 ticket goes to Done when your job ends.
+              4. Comment the outcome: what you changed, the commit hash, the checks that ran. When your job ends, the
+                 merge agent takes over.
     - name: "Health: fix agent lifecycle"
       when:
         any:
@@ -89,6 +87,46 @@ automation:
           - assignee: "@fix-light"
           - assignee: "@fix-fable"
           - assignee: "@fix-codex"
+      on:
+        job_started:
+          set:
+            status: InProgress
+        # Not the ticket's model fields: they pick the fix agent's model.
+        job_completed:
+          set:
+            assignee: "@merge"
+          agent:
+            prompt: |
+              Merge the work for ticket ${{ticket.id}} ("${{ticket.title}}") into the main checkout (<root>, the
+              first entry of git worktree list). Your worktree's branch holds the fix agent's commits. Run lotar
+              with LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex), and start each comment with it.
+              1. Main is the main checkout's current branch (git -C <root> branch --show-current). No commits
+                 beyond main (git log <main>..HEAD): comment "nothing to merge" and stop.
+              2. Rebase onto main. Resolve a conflict only when you are certain both sides' intent is kept (for
+                 example separate hunks in a list); otherwise git rebase --abort, comment the conflicting files and
+                 what each side wanted, set the status to HelpNeeded, assign the ticket to mallox and stop.
+              3. Run the checks this repo's AGENTS.md names, in your worktree. One fails: hand back as in step 2.
+              4. git -C <root> merge --ff-only <your branch>. Main moved on: back to step 2. Refused
+                 because of uncommitted changes in the main checkout: hand back. Never stash, reset, commit or
+                 check out anything in the main checkout.
+              5. Push only if ~/Development/standards/repos.json lists this repo with "push": true, and only when
+                 git -C <root> log @{u}.. lists nothing but this ticket's commits (others' unpushed
+                 commits wait for their sessions). Never with --no-verify. Refused: hand back.
+              6. A health ticket names a check command: run it again; it must no longer list the finding.
+              7. Comment the outcome: the commits merged, pushed or why not, the checks that ran. The ticket goes
+                 to Done when your job ends.
+        job_failed:
+          set:
+            status: HelpNeeded
+            assignee: mallox
+          comment: >-
+            The fix agent's job ${{agent.job_id}} failed: lotar agent logs ${{agent.job_id}}. Try again with
+            lotar automation run "Health: retry with @fix" --select 'id:${{ticket.id}}' (or @fix-fable, @fix-codex).
+    # A merge agent that stops for a conflict or a failing check hands the ticket to mallox itself; the retry goes to
+    # the fix agent, whose branch the next merge picks up.
+    - name: "Merge agent lifecycle"
+      when:
+        assignee: "@merge"
       on:
         job_started:
           set:
@@ -101,8 +139,9 @@ automation:
             status: HelpNeeded
             assignee: mallox
           comment: >-
-            The fix agent's job ${{agent.job_id}} failed: lotar agent logs ${{agent.job_id}}. Try again with
-            lotar automation run "Health: retry with @fix" --select 'id:${{ticket.id}}' (or @fix-fable, @fix-codex).
+            The merge agent's job ${{agent.job_id}} failed: lotar agent logs ${{agent.job_id}}. The fix is on branch
+            ${{agent.worktree_branch}}. Try again with lotar automation run "Health: retry with @fix" --select
+            'id:${{ticket.id}}', or for an agent's ticket lotar assignee ${{ticket.id}} @fix.
     # Manual: after answering a HelpNeeded question or a failed job. Always pass --select, or every waiting ticket starts.
     - name: "Health: retry with @fix"
       when:
