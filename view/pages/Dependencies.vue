@@ -357,6 +357,7 @@ const {
   scope: configScope,
   tags: configuredTags,
   members,
+  versionFields,
 } = useConfig()
 const { sprints, refresh: refreshSprints } = useSprints()
 const sprintOptions = useSprintFilterOptions(sprints)
@@ -366,7 +367,12 @@ const graphNodes = ref<RelationshipGraphResponse['nodes']>([])
 const filterOptions = useFilterOptions(
   () => graphNodes.value.flatMap((node) => (node.task ? [node.task] : [])),
   () => project.value,
-  { scope: () => configScope.value, tags: () => configuredTags.value, members: () => members.value },
+  {
+    scope: () => configScope.value,
+    tags: () => configuredTags.value,
+    members: () => members.value,
+    versionFields: () => versionFields.value,
+  },
 )
 // Retain the existing per-project field choices when moving details onto cards.
 const cardFields = useColumns({

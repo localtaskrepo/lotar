@@ -111,4 +111,28 @@ describe('project-scoped filter option sources', () => {
         })
         scope.stop()
     })
+
+    it('offers each item of a list value and sorts version fields in version order', () => {
+        const scope = effectScope()
+        scope.run(() => {
+            const options = useFilterOptions(
+                () => [
+                    task('DEV-1', [], { affects: ['0.13.10', '0.9'], team: ['web', 'api'] }),
+                    task('DEV-2', [], { affects: '0.13.2' }),
+                ],
+                () => 'DEV',
+                {
+                    scope: () => 'DEV',
+                    tags: () => [],
+                    members: () => [],
+                    versionFields: () => ['Affects'],
+                },
+            )
+            expect(options.value.customFieldValues).toEqual({
+                affects: ['0.9', '0.13.2', '0.13.10'],
+                team: ['api', 'web'],
+            })
+        })
+        scope.stop()
+    })
 })

@@ -292,6 +292,7 @@ custom:
 - A version is `1.4.2`, `v1.4.2` (stored as `1.4.2`), `1.0.0-rc.1`, or a partial `0.13` or `0.13.x`, which means every 0.13 version, prereleases included. Build metadata (`+build.5`) is kept but ignored when comparing. A field holds one version or a list: `affects: [0.13.2, 0.13.3]`, or `--field affects=0.13.2,0.13.3` on the command line.
 - Writes through the CLI, REST, MCP and the web UI reject a value that is not a version, and store versions as strings. Write versions in a hand-edited task file in quotes (`affects: '0.10'`): YAML reads an unquoted `0.10` as the number 0.1. A hand-written value LoTaR cannot read does not block other edits of the task; searches skip it.
 - Versions compare by semver precedence (`0.9.1` < `0.10.0`, `1.0.0-rc.1` < `1.0.0`). Searches understand ranges (`lotar list 'affects>=0.13' 'affects<0.14'`, see [Version fields](./list.md#version-fields)), sorting by the field follows version order, and automation rules take `version:` conditions ([Version conditions](./automation.md#version-conditions)).
+- In the web UI, the task panel's input for a version field suggests the versions the project's tasks already use in it, and the search box suggests each version of a list, in version order.
 - A project that inherits the global field list types fields under `custom.field_properties` instead, because its own `custom.fields` list would replace the global one:
 
 ```yaml

@@ -413,6 +413,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         preloadPeople,
         resetOwnership,
         syncOwnershipControls,
+        knownFieldValues,
     } = useTaskPanelOwnership({
         form,
         mode,
@@ -754,6 +755,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         newField,
         allowNewCustomFields,
         configVersionFields,
+        knownFieldValues,
         activityTabs,
         activityTab,
         changeLog,

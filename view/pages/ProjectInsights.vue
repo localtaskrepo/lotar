@@ -211,6 +211,7 @@ const {
   scope: configScope,
   tags: configuredTags,
   members,
+  versionFields,
 } = useConfig()
 const { sprints, refresh: refreshSprints } = useSprints()
 const sprintFilterOptions = useSprintFilterOptions(sprints)
@@ -253,7 +254,12 @@ const initialLoading = computed(() => !query.value || (loadingTasks.value && !qu
 const filterOptions = useFilterOptions(
   () => tasks.value,
   () => project.value,
-  { scope: () => configScope.value, tags: () => configuredTags.value, members: () => members.value },
+  {
+    scope: () => configScope.value,
+    tags: () => configuredTags.value,
+    members: () => members.value,
+    versionFields: () => versionFields.value,
+  },
 )
 
 let disposed = false

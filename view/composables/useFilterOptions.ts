@@ -1,5 +1,6 @@
 import { computed, shallowRef, watch } from 'vue'
 import type { TaskDTO } from '../api/types'
+import { compareVersionText } from '../utils/versions'
 
 interface KnownOptions {
     tags: string[]
@@ -10,7 +11,13 @@ interface KnownOptions {
 export function useFilterOptions(
     tasks: () => Pick<TaskDTO, 'id' | 'tags' | 'assignee' | 'custom_fields'>[],
     project: () => string,
-    config: { scope: () => string; tags: () => string[]; members: () => string[] },
+    config: {
+        scope: () => string
+        tags: () => string[]
+        members: () => string[]
+        /** Fields that hold versions: their values sort in version order (DEV-395). */
+        versionFields?: () => string[]
+    },
 ) {
     const known = shallowRef(new Map<string, KnownOptions>())
     const unique = (values: string[]) =>
@@ -29,8 +36,9 @@ export function useFilterOptions(
                 assignee: task.assignee,
                 fields: { ...task.custom_fields },
             })),
+            versionFields: new Set((config.versionFields?.() ?? []).map((name) => name.toLowerCase())),
         }),
-        ({ scope, tasks }) => {
+        ({ scope, tasks, versionFields }) => {
             const previous = known.value.get(scope)
             const tags = [...(previous?.tags ?? [])]
             const assignees = [...(previous?.assignees ?? [])]
@@ -42,9 +50,13 @@ export function useFilterOptions(
                 tags.push(...task.tags)
                 if (task.assignee) assignees.push(task.assignee)
                 for (const [key, value] of Object.entries(task.fields)) {
-                    if (!['string', 'number', 'boolean'].includes(typeof value) || value === '') continue
+                    // A list (a version field's several versions) offers each item.
+                    const items = (Array.isArray(value) ? value : [value]).filter(
+                        (item) => ['string', 'number', 'boolean'].includes(typeof item) && item !== '',
+                    )
+                    if (!items.length) continue
                     const values = fields.get(key) ?? []
-                    values.push(String(value))
+                    values.push(...items.map(String))
                     fields.set(key, values)
                 }
             }
@@ -54,7 +66,13 @@ export function useFilterOptions(
                 customFieldValues: Object.fromEntries(
                     [...fields].map(([key, values]) => [
                         key,
-                        [...new Set(values)].filter((value) => value.length > 0).sort((a, b) => a.localeCompare(b)),
+                        [...new Set(values)]
+                            .filter((value) => value.length > 0)
+                            .sort(
+                                versionFields.has(key.toLowerCase())
+                                    ? compareVersionText
+                                    : (a, b) => a.localeCompare(b),
+                            ),
                     ]),
                 ),
             })

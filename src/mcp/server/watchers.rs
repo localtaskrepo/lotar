@@ -175,7 +175,9 @@ pub(super) fn diff_hint_categories(previous: Option<&EnumHints>, current: Option
     if hint_values_changed(previous.map(|h| h.tags.as_slice()), current.map(|h| h.tags.as_slice())) {
         changed.push("tags".to_string());
     }
-    if hint_values_changed(previous.map(|h| h.custom_fields.as_slice()), current.map(|h| h.custom_fields.as_slice())) {
+    if hint_values_changed(previous.map(|h| h.custom_fields.as_slice()), current.map(|h| h.custom_fields.as_slice()))
+        || previous.map(|h| &h.custom_field_types) != current.map(|h| &h.custom_field_types)
+    {
         changed.push("custom_fields".to_string());
     }
 
@@ -215,6 +217,7 @@ mod tests {
             members: vec!["alice".to_string()],
             tags: vec!["cli".to_string()],
             custom_fields: vec!["severity".to_string()],
+            custom_field_types: Default::default(),
         }
     }
 

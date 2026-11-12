@@ -752,6 +752,38 @@ custom:
 }
 
 #[test]
+fn tools_list_names_custom_field_types() {
+    let _lock = lock_var("LOTAR_TASKS_DIR");
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(tasks_dir.join("MCP")).unwrap();
+    let config_yaml = r#"
+default:
+    project: MCP
+custom:
+    fields:
+        - severity
+        - { name: affects, type: version }
+"#;
+    std::fs::write(tasks_dir.join("config.yml"), config_yaml).unwrap();
+    set_tasks_dir_env(&tasks_dir);
+
+    let req = JsonRpcRequest { jsonrpc: "2.0".into(), id: Some(json!(98)), method: "tools/list".into(), params: json!({}) };
+    let resp = dispatch(req);
+    assert!(resp.error.is_none(), "tools/list failed: {:?}", resp.error);
+    let tools = resp.result.as_ref().and_then(|value| value.get("tools")).and_then(|value| value.as_array()).expect("tools array available");
+
+    for (name, field) in [("task_create", "custom_fields"), ("task_update", "patch.custom_fields"), ("task_list", "custom_fields")] {
+        let tool = tool_by_name(tools, name);
+        assert_eq!(field_values(tool, field), vec!["severity", "affects"], "{name}");
+        assert_eq!(field_hint(tool, field).get("types"), Some(&json!({"affects": "version"})), "{name}");
+    }
+    assert!(tool_description(tool_by_name(tools, "task_create")).contains("Available custom fields: severity, affects (version)."));
+
+    clear_tasks_dir_env();
+}
+
+#[test]
 fn tools_list_skips_enum_hints_with_multiple_projects() {
     let _lock = lock_var("LOTAR_TASKS_DIR");
     let tmp = tempfile::tempdir().unwrap();

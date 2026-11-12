@@ -29,6 +29,9 @@ interface UseTaskPanelOwnershipOptions {
 
 export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
     const knownUsers = ref<string[]>([])
+    // Custom field values the project's tasks hold, by field name: the
+    // version input suggests them (DEV-395).
+    const knownFieldValues = ref<Record<string, string[]>>({})
     const whoami = ref('')
     // Agent profile names; an assignee `@<profile>` starts that agent, so these keep their `@`.
     const agentProfiles = ref<string[]>([])
@@ -236,6 +239,7 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
             const list = Array.isArray(response.tasks) ? response.tasks : []
             const seen = new Set<string>()
             const tags = new Set<string>()
+            const fieldValues = new Map<string, Set<string>>()
             list.forEach((item) => {
                 const assignee = personName(item.assignee)
                 if (assignee) seen.add(assignee)
@@ -246,7 +250,17 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
                     const trimmed = tag.trim()
                     if (trimmed) tags.add(trimmed)
                 })
+                Object.entries(item.custom_fields).forEach(([field, value]) => {
+                    const values = fieldValues.get(field) ?? new Set<string>()
+                    for (const entry of Array.isArray(value) ? value : [value]) {
+                        if (typeof entry !== 'string' && typeof entry !== 'number') continue
+                        const trimmed = String(entry).trim()
+                        if (trimmed) values.add(trimmed)
+                    }
+                    if (values.size) fieldValues.set(field, values)
+                })
             })
+            knownFieldValues.value = Object.fromEntries([...fieldValues].map(([field, values]) => [field, [...values]]))
             baseline.forEach((value) => seen.add(value))
             assignKnownUsersFrom(seen)
             options.mergeKnownTags(Array.from(tags))
@@ -347,6 +361,7 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
 
     return {
         knownUsers,
+        knownFieldValues,
         whoami,
         reporterMode,
         assigneeMode,

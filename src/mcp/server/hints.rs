@@ -1,8 +1,8 @@
 use crate::config::manager::ConfigManager;
-use crate::config::types::ResolvedConfig;
+use crate::config::types::{CustomFieldType, ResolvedConfig};
 use crate::workspace::TasksDirectoryResolver;
 use serde_json::{Map as JsonMap, Value, json};
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 
 #[derive(Debug, Clone)]
 pub(super) struct EnumHints {
@@ -13,6 +13,9 @@ pub(super) struct EnumHints {
     pub(super) members: Vec<String>,
     pub(super) tags: Vec<String>,
     pub(super) custom_fields: Vec<String>,
+    /// Field name to type for custom fields that hold more than text
+    /// (DEV-395), so agents learn a field's type before a write is refused.
+    pub(super) custom_field_types: BTreeMap<String, String>,
 }
 
 pub(super) fn enum_hints_to_value(hints: &EnumHints) -> Value {
@@ -24,6 +27,7 @@ pub(super) fn enum_hints_to_value(hints: &EnumHints) -> Value {
         "members": hints.members,
         "tags": hints.tags,
         "custom_fields": hints.custom_fields,
+        "custom_field_types": hints.custom_field_types,
     })
 }
 
@@ -35,6 +39,12 @@ impl EnumHints {
         let members = collect_labels(&cfg.members, |member| member.as_str());
         let tags = collect_labels(&cfg.tags.values, |tag| tag.as_str());
         let custom_fields = collect_labels(&cfg.custom_fields.values, |field| field.as_str());
+        let custom_field_types = custom_fields
+            .iter()
+            .map(|field| (field, cfg.custom_field_type(field)))
+            .filter(|(_, kind)| *kind != CustomFieldType::Text)
+            .map(|(field, kind)| (field.clone(), kind.as_str().to_string()))
+            .collect();
         let projects = collect_labels(projects, |name| name.as_str());
         if statuses.is_empty()
             && priorities.is_empty()
@@ -46,7 +56,7 @@ impl EnumHints {
         {
             None
         } else {
-            Some(Self { statuses, priorities, types, projects, members, tags, custom_fields })
+            Some(Self { statuses, priorities, types, projects, members, tags, custom_fields, custom_field_types })
         }
     }
 }
@@ -83,6 +93,17 @@ pub(super) fn insert_field_hint(target: &mut JsonMap<String, Value>, field: &str
             hint.insert("acceptsMultiple".into(), Value::Bool(true));
         }
         target.insert(field.to_string(), Value::Object(hint));
+    }
+}
+
+/// Adds the custom field types to the hint of a custom fields argument.
+pub(super) fn insert_custom_field_types(target: &mut JsonMap<String, Value>, field: &str, hints: Option<&EnumHints>) {
+    let Some(hints) = hints else { return };
+    if hints.custom_field_types.is_empty() {
+        return;
+    }
+    if let Some(Value::Object(hint)) = target.get_mut(field) {
+        hint.insert("types".into(), json!(hints.custom_field_types));
     }
 }
 

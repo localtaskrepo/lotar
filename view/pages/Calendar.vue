@@ -344,6 +344,7 @@ const {
   scope: configScope,
   tags: configuredTags,
   members,
+  versionFields,
 } = useConfig()
 const { sprintColorForState } = useSprintFormatting(sprintList)
 
@@ -358,6 +359,7 @@ const filterOptions = useFilterOptions(
     scope: () => configScope.value,
     tags: () => configuredTags.value,
     members: () => members.value,
+    versionFields: () => versionFields.value,
   },
 )
 const cursor = ref<Date>(new Date()) // month cursor

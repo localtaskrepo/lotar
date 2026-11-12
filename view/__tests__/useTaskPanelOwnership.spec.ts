@@ -6,7 +6,9 @@ import { useTaskPanelOwnership } from '../composables/useTaskPanelOwnership'
 vi.mock('../api/client', () => ({
     api: {
         whoami: vi.fn(async () => ''),
-        listTasks: vi.fn(async () => ({ tasks: [{ id: 'A-1', reporter: 'priya', assignee: 'marco', tags: [] }] })),
+        listTasks: vi.fn(async () => ({
+            tasks: [{ id: 'A-1', reporter: 'priya', assignee: 'marco', tags: [], custom_fields: {} }],
+        })),
         listAgentProfiles: vi.fn(async () => ({ profiles: [] })),
     },
 }))
@@ -66,8 +68,8 @@ describe('task panel ownership controls', () => {
         })
         vi.mocked(api.listTasks).mockResolvedValueOnce({
             tasks: [
-                { id: 'A-1', reporter: '@priya', assignee: '@fix', tags: [] },
-                { id: 'A-2', reporter: 'priya', assignee: 'marco', tags: [] },
+                { id: 'A-1', reporter: '@priya', assignee: '@fix', tags: [], custom_fields: {} },
+                { id: 'A-2', reporter: 'priya', assignee: 'marco', tags: [], custom_fields: {} },
             ],
         } as any)
         const { form, ownership } = setup()
@@ -89,5 +91,17 @@ describe('task panel ownership controls', () => {
         const { ownership } = setup()
         await ownership.preloadPeople('A')
         expect(ownership.orderedKnownUsers.value).toEqual(['marco', 'priya'])
+    })
+
+    it('learns the custom field values the project tasks hold, each item of a list', async () => {
+        vi.mocked(api.listTasks).mockResolvedValueOnce({
+            tasks: [
+                { id: 'A-1', tags: [], custom_fields: { affects: ['0.15', '0.15.0'], product: 'web' } },
+                { id: 'A-2', tags: [], custom_fields: { affects: '0.15', nested: {} } },
+            ],
+        } as any)
+        const { ownership } = setup()
+        await ownership.preloadPeople('A')
+        expect(ownership.knownFieldValues.value).toEqual({ affects: ['0.15', '0.15.0'], product: ['web'] })
     })
 })

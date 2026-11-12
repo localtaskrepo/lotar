@@ -15,9 +15,13 @@
             :placeholder="isVersionField(key) ? 'Version, e.g. 0.13.2' : 'Value'"
             :aria-invalid="valueError(key, value) ? 'true' : undefined"
             :aria-describedby="valueError(key, value) ? errorId(key) : undefined"
+            :list="versionSuggestions(key).length ? suggestionsId(key) : undefined"
             @update:modelValue="(val) => emit('updateCustomFieldValue', key, val)"
             @blur="commit"
           />
+          <datalist v-if="versionSuggestions(key).length" :id="suggestionsId(key)">
+            <option v-for="version in versionSuggestions(key)" :key="version" :value="version" />
+          </datalist>
           <UiButton variant="ghost" type="button" @click="emit('removeField', key)">Remove</UiButton>
         </div>
         <p v-if="valueError(key, value)" :id="errorId(key)" class="task-panel__custom-error" role="alert">
@@ -43,7 +47,7 @@
 
 <script setup lang="ts">
 import { computed, ref, useId, watch } from 'vue'
-import { versionValueError } from '../../utils/versions'
+import { compareVersionText, isVersion, versionValueError } from '../../utils/versions'
 import UiButton from '../UiButton.vue'
 import UiInput from '../UiInput.vue'
 
@@ -55,6 +59,8 @@ const props = defineProps<{
   allowNewFields: boolean
   /** Fields that hold versions (DEV-373): their values are checked here. */
   versionFields?: string[]
+  /** Values the project's tasks hold, by field name: a version input suggests them (DEV-395). */
+  knownValues?: Record<string, string[]>
 }>()
 
 const uid = useId()
@@ -66,6 +72,20 @@ function isVersionField(key: string): boolean {
 
 function valueError(key: string, value: string): string | null {
   return isVersionField(key) ? versionValueError(String(value ?? '')) : null
+}
+
+// Versions already used in this field, so `0.15` and `0.15.0` don't drift apart.
+function versionSuggestions(key: string): string[] {
+  if (!isVersionField(key)) return []
+  const name = (props.customFieldKeys[key] || key).trim().toLowerCase()
+  const values = Object.entries(props.knownValues ?? {})
+    .filter(([field]) => field.toLowerCase() === name)
+    .flatMap(([, list]) => list)
+  return [...new Set(values.filter(isVersion))].sort(compareVersionText)
+}
+
+function suggestionsId(key: string): string {
+  return `${errorId(key)}-versions`
 }
 
 function errorId(key: string): string {

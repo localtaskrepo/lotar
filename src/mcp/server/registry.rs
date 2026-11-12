@@ -475,6 +475,7 @@ mod tests {
             members: vec!["alice".to_string()],
             tags: vec!["cli".to_string()],
             custom_fields: vec!["severity".to_string()],
+            custom_field_types: Default::default(),
         };
         let hinted = build_tool_definitions(Some(&hints));
         let hintless = build_tool_definitions(None);

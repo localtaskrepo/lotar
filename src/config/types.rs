@@ -451,6 +451,13 @@ impl CustomFieldType {
             _ => None,
         }
     }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Text => "text",
+            Self::Version => "version",
+        }
+    }
 }
 
 /// Named tag colours; the web UI maps each to a theme-friendly hex value.

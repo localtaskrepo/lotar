@@ -1,8 +1,8 @@
 use serde_json::{Map as JsonMap, Value, json};
 
-use super::hints::{EnumHints, attach_field_hints, insert_field_hint};
+use super::hints::{EnumHints, attach_field_hints, insert_custom_field_types, insert_field_hint};
 
-fn append_hint_descriptions(tool: &mut Value, sections: &[(&[String], &str)]) {
+fn append_hint_descriptions(tool: &mut Value, sections: &[(Vec<String>, &str)]) {
     let mut sentences = Vec::new();
     for (values, label) in sections {
         if values.is_empty() {
@@ -52,6 +52,21 @@ impl Hint {
         }
     }
 
+    /// The values as the tool description lists them: a custom field with
+    /// a type other than text carries it, `affects (version)` (DEV-395).
+    fn described_values(self, hints: &EnumHints) -> Vec<String> {
+        self.values(hints)
+            .iter()
+            .map(|value| match self {
+                Hint::CustomFields => match hints.custom_field_types.get(value) {
+                    Some(kind) => format!("{value} ({kind})"),
+                    None => value.clone(),
+                },
+                _ => value.clone(),
+            })
+            .collect()
+    }
+
     fn label(self) -> &'static str {
         match self {
             Hint::Projects => "projects",
@@ -70,6 +85,9 @@ fn enum_field_hints(enum_hints: Option<&EnumHints>, fields: &[(&str, Hint, bool)
     let mut field_hints = JsonMap::new();
     for (field, list, multiple) in fields {
         insert_field_hint(&mut field_hints, field, enum_hints.map(|h| list.values(h)), *multiple);
+        if matches!(list, Hint::CustomFields) {
+            insert_custom_field_types(&mut field_hints, field, enum_hints);
+        }
     }
     field_hints
 }
@@ -77,7 +95,7 @@ fn enum_field_hints(enum_hints: Option<&EnumHints>, fields: &[(&str, Hint, bool)
 /// Append "Available <label>: ..." sentences for `lists` to the tool description.
 fn describe_enum_hints(tool: &mut Value, enum_hints: Option<&EnumHints>, lists: &[Hint]) {
     if let Some(hints) = enum_hints {
-        let sections: Vec<(&[String], &str)> = lists.iter().map(|list| (list.values(hints), list.label())).collect();
+        let sections: Vec<(Vec<String>, &str)> = lists.iter().map(|list| (list.described_values(hints), list.label())).collect();
         append_hint_descriptions(tool, &sections);
     }
 }

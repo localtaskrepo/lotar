@@ -19,6 +19,7 @@ vi.mock('../composables/useConfig', async () => {
     const { ref } = await import('vue')
     return {
         useConfig: () => ({
+            versionFields: ref<string[]>([]),
             statuses: ref(['Todo', 'Done']),
             priorities: ref(['Low', 'High']),
             types: ref(['Feature', 'Bug']),

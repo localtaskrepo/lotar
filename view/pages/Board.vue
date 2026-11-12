@@ -610,6 +610,7 @@ const filterOptions = useFilterOptions(
     scope: () => configScope.value,
     tags: () => configuredTags.value,
     members: () => members.value,
+    versionFields: () => versionFields.value,
   },
 )
 const draggingId = ref<string>('')

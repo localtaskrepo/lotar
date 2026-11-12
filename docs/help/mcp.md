@@ -137,6 +137,7 @@ Handshake/control methods include:
 - notifications/initialized (notification, no response) — completes the handshake; operational calls are allowed afterwards
 - ping -> `{}` (empty result; answered before and after ready)
 - tools/list -> { tools: [{ name, description, inputSchema }] }
+  - A tool's field hint for `custom_fields` names the fields and, under `types`, those that hold more than text (`{"affects": "version"}`); the tool description lists them as `affects (version)`, and `enumHints` carries the same map as `custom_field_types`.
 - schema/discover(params?: { tool?: string }) -> same payload as tools/list but filtered
 - tools/call (params: { name, arguments }) -> result of the named tool; unknown names — including control-plane methods — return `-32602` `Unknown tool: <name>`
 - logging/setLevel(params: { level }) -> `{}` for an MCP log level (`debug`, `info`, `notice`, `warning`, `error`, `critical`, `alert`, `emergency`), `-32602` otherwise. The server sends no log messages and does not advertise the `logging` capability; the method is accepted for hosts that call it anyway.

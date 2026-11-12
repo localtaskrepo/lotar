@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isVersion, versionFieldNames, versionValueError } from '../utils/versions'
+import { compareVersionText, isVersion, versionFieldNames, versionValueError } from '../utils/versions'
 
 describe('versions', () => {
     it('accepts what the server reads as a version', () => {
@@ -32,5 +32,32 @@ describe('versions', () => {
             'affects',
         ])
         expect(versionFieldNames(undefined)).toEqual([])
+    })
+
+    it('sorts in version order, a partial version just before its first release', () => {
+        const values = [
+            '0.13.10',
+            'soon',
+            '1.0.0',
+            '0.13.2',
+            '1.0.0-rc.1',
+            '0.13',
+            '1.0.0-alpha',
+            '0.13.0',
+            '1.0.0-rc.10',
+            '0.9',
+        ]
+        expect([...values].sort(compareVersionText)).toEqual([
+            '0.9',
+            '0.13',
+            '0.13.0',
+            '0.13.2',
+            '0.13.10',
+            '1.0.0-alpha',
+            '1.0.0-rc.1',
+            '1.0.0-rc.10',
+            '1.0.0',
+            'soon',
+        ])
     })
 })

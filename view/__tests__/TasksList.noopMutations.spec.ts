@@ -146,6 +146,7 @@ vi.mock('../composables/useSprints', () => ({
 
 vi.mock('../composables/useConfig', () => ({
     useConfig: () => ({
+        versionFields: ref<string[]>([]),
         scope: ref(''),
         tags: ref<string[]>([]),
         members: ref<string[]>([]),
