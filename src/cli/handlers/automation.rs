@@ -82,6 +82,9 @@ impl AutomationHandler {
 
         if !result.matched {
             renderer.emit_info(format_args!("No automation rules matched ticket {} for event '{}'.", args.ticket, args.event));
+            for warning in &result.warnings {
+                renderer.emit_info(format_args!("  note: {warning}"));
+            }
             return Ok(());
         }
 

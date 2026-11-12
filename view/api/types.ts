@@ -1613,7 +1613,9 @@ export interface AutomationSimulatedAction {
  * The server always serializes all six keys (hand-built JSON):
  * `rule_name` is `null` when no rule matched and `task_after` is `null`
  * when no rule matched; `task_before` is always a task object; `warnings`
- * lists preview parts only decided when the rule runs (may be empty).
+ * lists preview parts only decided when the rule runs, the fields a change
+ * event has to change, and (when nothing matched) rules that need several
+ * fields to change in the same update (may be empty).
  */
 export interface AutomationSimulateResponse {
     matched: boolean

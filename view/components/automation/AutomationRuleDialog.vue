@@ -506,7 +506,12 @@
           </p>
           <div v-if="tryError" class="rule-dialog__error" role="alert">{{ tryError }}</div>
           <div v-else-if="tryResult" class="rule-dialog__try-result" data-testid="automation-try-result">
-            <p v-if="!tryResult.matched"><strong>No match:</strong> the conditions are not true for this task.</p>
+            <template v-if="!tryResult.matched">
+              <p><strong>No match:</strong> the conditions are not true for this task.</p>
+              <ul v-if="tryResult.warnings?.length" class="rule-dialog__warnings">
+                <li v-for="(warning, index) in tryResult.warnings" :key="index">{{ warning }}</li>
+              </ul>
+            </template>
             <template v-else>
               <p><strong>It would:</strong></p>
               <ul>

@@ -8293,7 +8293,7 @@
             "items": {
               "type": "string"
             },
-            "description": "Preview parts only decided when the rule really runs: event-only template values (previous.*, comment.*, agent.*) shown unexpanded, @round_robin/@random assignees, unknown enum values that would be skipped, and sprint changes not reflected in task_after. Empty when nothing is uncertain."
+            "description": "Preview parts only decided when the rule really runs: event-only template values (previous.*, comment.*, agent.*) shown unexpanded, @round_robin/@random assignees, unknown enum values that would be skipped, and sprint changes not reflected in task_after. For change events (created, updated, assigned, sprint_changed) also which field has to change in the same update for the rule to fire, and, when nothing matched, the rules that only fire when several fields change in the same update. Empty when nothing is uncertain."
           }
         },
         "required": [

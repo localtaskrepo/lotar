@@ -7,7 +7,7 @@ use crate::config::validation::errors::ValidationResult;
 use crate::errors::{LoTaRError, LoTaRResult};
 use crate::services::agent_job_service::{AgentJobService, AgentOrchestratorMode};
 use crate::services::agent_queue_service::AgentQueueService;
-use crate::services::automation_matching::{ChangeSet, MatchMode, matches_rule};
+use crate::services::automation_matching::{ChangeSet, MatchMode, UpdateMatch, matches_rule, update_match};
 use crate::services::automation_validation::{parse_cooldown, validate_rules};
 use crate::services::sprint_service::SprintService;
 use crate::services::task_service::{CommentContext, TaskService, TaskUpdateContext};
@@ -532,25 +532,49 @@ impl AutomationService {
         event: AutomationEvent,
     ) -> LoTaRResult<SimulateResult> {
         let active_sprints = compute_active_sprint_ids(storage);
+        // Rules that only an update changing several fields at once fires.
+        let mut skipped: Vec<String> = Vec::new();
 
-        for rule in rules {
-            if !matches_rule(rule, task, &ChangeSet::empty(task), MatchMode::Current, config, &active_sprints) {
+        for (rule_idx, rule) in rules.iter().enumerate() {
+            let mut notes = Vec::new();
+            // Change events match the way a real update does (DEV-362).
+            let matched = match event {
+                AutomationEvent::Created => matches_rule(rule, task, &ChangeSet::new(None, task), MatchMode::OnChange, config, &active_sprints),
+                AutomationEvent::Updated | AutomationEvent::Assigned | AutomationEvent::SprintChanged => {
+                    let base: &[&str] = if matches!(event, AutomationEvent::Assigned) { &["assignee"] } else { &[] };
+                    match update_match(rule, task, base, config, &active_sprints) {
+                        UpdateMatch::Always => true,
+                        UpdateMatch::OneOf(fields) => {
+                            notes.push(format!("Matches only when {} changes in the same update.", fields.join(" or ")));
+                            true
+                        }
+                        UpdateMatch::Together(fields) => {
+                            if resolve_action_for_event_with_fallback(&rule.on, event).is_some() {
+                                let name = rule.name.clone().unwrap_or_else(|| format!("Rule {}", rule_idx + 1));
+                                skipped.push(format!(
+                                    "{name}: matches only when {} change in the same update; a change of one of them alone does not fire it.",
+                                    join_and(&fields)
+                                ));
+                            }
+                            false
+                        }
+                        UpdateMatch::Never => false,
+                    }
+                }
+                _ => matches_rule(rule, task, &ChangeSet::empty(task), MatchMode::Current, config, &active_sprints),
+            };
+            if !matched {
                 continue;
             }
             if let Some(action) = resolve_action_for_event_with_fallback(&rule.on, event) {
                 let mut preview = PreviewContext::new(task);
                 let actions = describe_action(action, task, config, &mut preview);
                 let task_after = simulate_action(task, action, config, storage, &mut preview);
-                return Ok(SimulateResult {
-                    matched: true,
-                    rule_name: rule.name.clone(),
-                    actions,
-                    task_after: Some(task_after),
-                    warnings: preview.into_warnings(),
-                });
+                notes.extend(preview.into_warnings());
+                return Ok(SimulateResult { matched: true, rule_name: rule.name.clone(), actions, task_after: Some(task_after), warnings: notes });
             }
         }
-        Ok(SimulateResult { matched: false, rule_name: None, actions: vec![], task_after: None, warnings: vec![] })
+        Ok(SimulateResult { matched: false, rule_name: None, actions: vec![], task_after: None, warnings: skipped })
     }
 }
 
@@ -979,6 +1003,14 @@ fn resolve_action_for_event(on: &crate::automation::types::AutomationRuleActions
 
 /// Like `resolve_action_for_event` but falls back to the legacy `start`
 /// catch-all for task events (used by the simulate path).
+/// "a", "a and b", "a, b and c".
+fn join_and(items: &[String]) -> String {
+    match items.split_last() {
+        Some((last, rest)) if !rest.is_empty() => format!("{} and {last}", rest.join(", ")),
+        _ => items.join(""),
+    }
+}
+
 fn resolve_action_for_event_with_fallback(on: &crate::automation::types::AutomationRuleActions, event: AutomationEvent) -> Option<&AutomationAction> {
     resolve_action_for_event(on, event).or(match event {
         AutomationEvent::Created | AutomationEvent::Updated | AutomationEvent::Assigned | AutomationEvent::Commented | AutomationEvent::SprintChanged => {

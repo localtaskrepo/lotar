@@ -3,7 +3,7 @@ use crate::automation::types::{AutomationConditionGroup, AutomationFieldConditio
 use crate::config::types::ResolvedConfig;
 use crate::utils::tags::normalize_tags;
 use regex::Regex;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -97,6 +97,91 @@ fn capture_change(field: &str, before: Option<String>, after: Option<String>, ou
         return;
     }
     out.insert(field.to_lowercase(), FieldChange { before: before.map(AutomationValue::String), after: after.map(AutomationValue::String) });
+}
+
+// ── Change requirements (DEV-362) ───────────────────────────────────────────
+
+/// The fields a [`ChangeSet`] records.
+const CHANGE_FIELDS: [&str; 10] = ["status", "assignee", "reporter", "priority", "type", "title", "description", "due_date", "effort", "tags"];
+
+impl ChangeSet {
+    /// The changes of an update that changed only `fields` and left the task
+    /// as `current`. The values before the update are unknown.
+    fn only(current: &TaskDTO, fields: &[String]) -> Self {
+        let mut all = Self::new(None, current);
+        let mut out = Self { fields: HashMap::new(), custom_fields: HashMap::new() };
+        for field in fields {
+            let key = field.to_lowercase();
+            if let Some(change) = all.fields.remove(&key) {
+                out.fields.insert(key, change);
+            } else if CHANGE_FIELDS.contains(&key.as_str()) {
+                out.fields.insert(key, FieldChange { before: None, after: None });
+            }
+            let change = all.custom_fields.remove(field).unwrap_or(FieldChange { before: None, after: None });
+            out.custom_fields.insert(field.clone(), change);
+        }
+        out
+    }
+}
+
+/// What an update has to change for a rule to fire on a task as it is now.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum UpdateMatch {
+    /// Any update with the event's own changes fires it.
+    Always,
+    /// An update that also changes one of these fields fires it.
+    OneOf(Vec<String>),
+    /// Only an update that changes all of these fields together fires it.
+    Together(Vec<String>),
+    Never,
+}
+
+/// How `rule` matches real updates of `current` that change at least `base`
+/// (`assignee` for the assigned event), as [`MatchMode::OnChange`] judges them.
+pub(crate) fn update_match(rule: &AutomationRule, current: &TaskDTO, base: &[&str], config: &ResolvedConfig, active_sprint_ids: &[u32]) -> UpdateMatch {
+    let fires = |extra: &[String]| {
+        let mut fields: Vec<String> = base.iter().map(|field| field.to_string()).collect();
+        fields.extend_from_slice(extra);
+        matches_rule(rule, current, &ChangeSet::only(current, &fields), MatchMode::OnChange, config, active_sprint_ids)
+    };
+    if fires(&[]) {
+        return UpdateMatch::Always;
+    }
+    let mut referenced = BTreeSet::new();
+    if let Some(group) = rule.when.as_ref() {
+        collect_change_fields(group, &mut referenced);
+    }
+    let fields: Vec<String> = referenced.into_iter().filter(|field| !base.contains(&field.as_str())).collect();
+    let single: Vec<String> = fields.iter().filter(|field| fires(std::slice::from_ref(*field))).cloned().collect();
+    if !single.is_empty() {
+        return UpdateMatch::OneOf(single);
+    }
+    if fields.len() < 2 || !fires(&fields) {
+        return UpdateMatch::Never;
+    }
+    // Drop the fields the rule fires without, so only the needed ones are named.
+    let mut needed = fields.clone();
+    for field in &fields {
+        let without: Vec<String> = needed.iter().filter(|other| *other != field).cloned().collect();
+        if fires(&without) {
+            needed = without;
+        }
+    }
+    UpdateMatch::Together(needed)
+}
+
+fn collect_change_fields(group: &AutomationConditionGroup, out: &mut BTreeSet<String>) {
+    for entry in group.all.iter().flatten().chain(group.any.iter().flatten()) {
+        collect_change_fields(entry, out);
+    }
+    if let Some(not) = group.not.as_ref() {
+        collect_change_fields(not, out);
+    }
+    if let Some(changes) = group.changes.as_ref() {
+        out.extend(changes.keys().map(|field| field.to_lowercase()));
+    }
+    out.extend(group.fields.keys().map(|field| field.to_lowercase()).filter(|field| CHANGE_FIELDS.contains(&field.as_str())));
+    out.extend(group.custom_fields.keys().cloned());
 }
 
 // ── Rule matching ───────────────────────────────────────────────────────────

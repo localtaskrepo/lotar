@@ -92,7 +92,8 @@ fn preview_matches_apply_for_every_set_field() {
     set_automation(&preview_dir, ALL_FIELDS_RULE);
     let result = AutomationService::simulate(&preview_dir, &task.id, AutomationEvent::Updated).expect("simulate");
     assert!(result.matched);
-    assert!(result.warnings.is_empty(), "{:?}", result.warnings);
+    // The rule's status condition is the only thing that is not certain (DEV-362).
+    assert_eq!(result.warnings, vec!["Matches only when status changes in the same update.".to_string()]);
     let preview = result.task_after.expect("preview task");
 
     let (_apply_tmp, apply_dir) = workspace();

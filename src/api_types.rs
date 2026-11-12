@@ -889,7 +889,10 @@ pub struct AutomationSimulateResponse {
     /// Simulated task state (after automation)
     pub task_after: Option<TaskDTO>,
     /// Parts of the preview that are only decided when the rule really runs
-    /// (event-only template values, runtime assignee tokens, sprint changes).
+    /// (event-only template values, runtime assignee tokens, sprint changes),
+    /// the fields a change event has to change for the rule to fire, and,
+    /// when nothing matched, rules that only fire when several fields change
+    /// in the same update.
     #[serde(default)]
     pub warnings: Vec<String>,
 }
