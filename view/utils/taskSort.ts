@@ -2,6 +2,7 @@ import type { TaskDTO } from '../api/types'
 import type { ColKey } from '../composables/useColumns'
 import { itemAt, required } from './lookup'
 import { projectOf } from './text'
+import { compareVersions, lowestVersion } from './versions'
 
 /**
  * Task sort contract shared with the backend query executor (DEV-57).
@@ -14,7 +15,9 @@ import { projectOf } from './text'
  * The comparator mirrors the backend field-by-field, including where missing
  * values land (effort and due dates sort after present values in `asc`;
  * missing assignees and reporters sort first; missing tags/sprints compare
- * as empty vectors, which sort first in `asc`).
+ * as empty vectors, which sort first in `asc`). Version custom fields
+ * (DEV-373) sort by their lowest version, like the backend; the comparator
+ * knows them only from the `versionFields` option.
  *
  * Datetime parity: RFC3339 timestamps are compared as UTC instants parsed to
  * nanosecond precision (JS `Date` only keeps milliseconds, which would
@@ -48,6 +51,11 @@ export type TaskSortBuiltin =
     /** Best text match first for the current search (server-side only). */
     | 'relevance'
 export type TaskSortBy = TaskSortBuiltin | `custom:${string}`
+
+export interface TaskSortOptions {
+    /** Custom fields that hold versions, from the config's `custom_field_properties`. */
+    versionFields?: readonly string[]
+}
 
 export const DEFAULT_TASK_SORT_BY: TaskSortBy = 'modified'
 export const DEFAULT_TASK_SORT_ORDER: TaskSortOrder = 'desc'
@@ -490,20 +498,26 @@ export function customValueToString(value: unknown): string {
     return 'other'
 }
 
+/** A task's raw value for a custom field: exact name, then ignoring case; undefined when absent. */
+function findCustomValue(fields: Record<string, unknown> | null | undefined, name: string): unknown {
+    const custom = fields ?? {}
+    const exact = Object.prototype.hasOwnProperty.call(custom, name) ? custom[name] : undefined
+    if (exact !== undefined) return exact
+    const lower = name.toLowerCase()
+    for (const [key, value] of Object.entries(custom)) {
+        if (key.toLowerCase() === lower) return value
+    }
+    return undefined
+}
+
 /**
  * Exact-name lookup with case-insensitive fallback. Returns null when the
  * field is absent so callers can mirror the backend's `Option<String>`
  * ordering (missing sorts before any present value, including empty strings).
  */
 export function customFieldValue(fields: Record<string, unknown> | null | undefined, name: string): string | null {
-    const custom = fields ?? {}
-    const exact = Object.prototype.hasOwnProperty.call(custom, name) ? custom[name] : undefined
-    if (exact !== undefined) return customValueToString(exact)
-    const lower = name.toLowerCase()
-    for (const [key, value] of Object.entries(custom)) {
-        if (key.toLowerCase() === lower) return customValueToString(value)
-    }
-    return null
+    const value = findCustomValue(fields, name)
+    return value === undefined ? null : customValueToString(value)
 }
 
 /** Rust `Option<String>` ordering for custom values: missing < present. */
@@ -520,6 +534,18 @@ function cmpCustomField(
     return cmpStr(av, bv)
 }
 
+/** Version fields sort by their lowest version; a value without one sorts first, as in the backend. */
+function cmpVersionField(
+    a: Record<string, unknown> | null | undefined,
+    b: Record<string, unknown> | null | undefined,
+    name: string,
+): number {
+    const av = lowestVersion(findCustomValue(a, name))
+    const bv = lowestVersion(findCustomValue(b, name))
+    if (av && bv) return compareVersions(av, bv)
+    return Number(av !== null) - Number(bv !== null)
+}
+
 /** Rust `Vec<T>` Ord parity: element-wise, then shorter-prefix first. */
 function cmpVec<T>(a: readonly T[], b: readonly T[], cmp: (x: T, y: T) => number): number {
     for (const [i, x] of a.slice(0, b.length).entries()) {
@@ -530,7 +556,7 @@ function cmpVec<T>(a: readonly T[], b: readonly T[], cmp: (x: T, y: T) => number
 }
 
 /** Primary-key comparison for a sort_by; ties are handled by {@link sortTasks}. */
-export function compareTasks(a: TaskDTO, b: TaskDTO, sortBy: TaskSortBy): number {
+export function compareTasks(a: TaskDTO, b: TaskDTO, sortBy: TaskSortBy, options: TaskSortOptions = {}): number {
     switch (sortBy) {
         case 'priority':
             return cmpStr(a.priority, b.priority)
@@ -565,6 +591,10 @@ export function compareTasks(a: TaskDTO, b: TaskDTO, sortBy: TaskSortBy): number
             return 0
         default: {
             const name = sortBy.slice('custom:'.length)
+            const lower = name.toLowerCase()
+            if (options.versionFields?.some((field) => field.toLowerCase() === lower)) {
+                return cmpVersionField(a.custom_fields, b.custom_fields, name)
+            }
             return cmpCustomField(a.custom_fields, b.custom_fields, name)
         }
     }
@@ -574,13 +604,18 @@ export function compareTasks(a: TaskDTO, b: TaskDTO, sortBy: TaskSortBy): number
  * Deterministic global sort: primary key in `order` direction, ties broken by
  * natural task ID ASC regardless of direction. Returns a new array.
  */
-export function sortTasks<T extends TaskDTO>(tasks: readonly T[], sortBy: TaskSortBy, order: TaskSortOrder): T[] {
+export function sortTasks<T extends TaskDTO>(
+    tasks: readonly T[],
+    sortBy: TaskSortBy,
+    order: TaskSortOrder,
+    options: TaskSortOptions = {},
+): T[] {
     // Relevance is scored by the server; the input already has that order.
     if (sortBy === 'relevance') return [...tasks]
     const dir = order === 'asc' ? 1 : -1
     const arr = [...tasks]
     arr.sort((a, b) => {
-        const primary = compareTasks(a, b, sortBy) * dir
+        const primary = compareTasks(a, b, sortBy, options) * dir
         if (primary !== 0) return primary
         return compareTaskIds(a.id, b.id)
     })

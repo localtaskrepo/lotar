@@ -923,6 +923,7 @@ const {
   priorities,
   types,
   customFields: availableCustomFields,
+  versionFields,
   scope: configScope,
   tags: configuredTags,
   members,
@@ -2482,14 +2483,15 @@ function countExclusiveSprintTasks(list: TaskDTO[] | undefined | null, sprintId:
 
 // DEV-114: automatic ordering uses the shared task sort contract (the same
 // comparator as standalone task tables and the backend), including effort
-// units, missing-value placement, numeric sprint memberships and canonical ID
-// tie-breaks. Manual order is handled separately by the callers.
+// units, missing-value placement, numeric sprint memberships, canonical ID
+// tie-breaks and version fields (DEV-390). Manual order is handled
+// separately by the callers.
 function sortTasks(list: TaskDTO[] | undefined | null) {
   const arr = Array.isArray(list) ? [...list] : []
   if (!sort.key) return arr
   const sortBy = colKeyToSortBy(sort.key)
   if (!sortBy) return arr
-  return sortTasksByContract(arr, sortBy, sort.dir)
+  return sortTasksByContract(arr, sortBy, sort.dir, { versionFields: versionFields.value })
 }
 
 function getSortedTasksForSprint(id: number) {

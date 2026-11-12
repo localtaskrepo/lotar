@@ -846,6 +846,36 @@ mod tests {
         assert_eq!(ids, vec!["A-2", "B-2", "A-10", "C-1"]);
     }
 
+    /// The cases the web UI comparator is checked against too (DEV-390).
+    #[test]
+    fn sort_tasks_orders_version_fields_like_the_shared_cases() {
+        #[derive(serde::Deserialize)]
+        struct Cases {
+            field: String,
+            tasks: Vec<serde_json::Map<String, serde_json::Value>>,
+            asc: Vec<String>,
+            desc: Vec<String>,
+        }
+        let cases: Cases = serde_json::from_str(include_str!("../../tests/fixtures/version_sort_cases.json")).unwrap();
+        let mut tasks: Vec<(String, TaskDTO)> = cases
+            .tasks
+            .into_iter()
+            .map(|mut fields| {
+                let id = fields.remove("id").and_then(|id| id.as_str().map(str::to_string)).unwrap();
+                let mut task = dto(&id, "2026-01-01T00:00:00Z");
+                for (name, value) in fields {
+                    task.custom_fields.insert(name, serde_json::from_value(value).unwrap());
+                }
+                (id, task)
+            })
+            .collect();
+        let spec = SortSpec::Version(cases.field);
+        sort_tasks(&mut tasks, &spec, SortOrder::Asc);
+        assert_eq!(tasks.iter().map(|(id, _)| id.clone()).collect::<Vec<_>>(), cases.asc);
+        sort_tasks(&mut tasks, &spec, SortOrder::Desc);
+        assert_eq!(tasks.iter().map(|(id, _)| id.clone()).collect::<Vec<_>>(), cases.desc);
+    }
+
     #[test]
     fn sort_tasks_modified_desc_is_default_shape() {
         let mut tasks = vec![

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { TaskDTO } from '../api/types'
 import {
@@ -334,6 +336,32 @@ describe('sortTasks', () => {
         const snapshot = tasks.map((t) => t.id)
         sortTasks(tasks, 'id', 'asc')
         expect(tasks.map((t) => t.id)).toEqual(snapshot)
+    })
+})
+
+describe('version fields (DEV-390)', () => {
+    // The server sort (src/services/task_query.rs) runs the same cases.
+    const cases = JSON.parse(
+        readFileSync(resolve(__dirname, '../../tests/fixtures/version_sort_cases.json'), 'utf8'),
+    ) as { field: string; tasks: Array<Record<string, unknown> & { id: string }>; asc: string[]; desc: string[] }
+    const tasks = cases.tasks.map(({ id, ...custom_fields }) => task({ id, custom_fields }))
+    const ids = (list: TaskDTO[]) => list.map((t) => t.id)
+
+    it('sorts by version order like the server', () => {
+        const options = { versionFields: [cases.field] }
+        expect(ids(sortTasks(tasks, `custom:${cases.field}`, 'asc', options))).toEqual(cases.asc)
+        expect(ids(sortTasks(tasks, `custom:${cases.field}`, 'desc', options))).toEqual(cases.desc)
+    })
+
+    it('matches the version field name ignoring case', () => {
+        const options = { versionFields: [cases.field.toUpperCase()] }
+        expect(ids(sortTasks(tasks, `custom:${cases.field}`, 'asc', options))).toEqual(cases.asc)
+    })
+
+    it('sorts other custom fields as text', () => {
+        const a = task({ id: 'A-1', custom_fields: { affects: '0.10.0' } })
+        const b = task({ id: 'A-2', custom_fields: { affects: '0.9.1' } })
+        expect(ids(sortTasks([b, a], 'custom:affects', 'asc'))).toEqual(['A-1', 'A-2'])
     })
 })
 
