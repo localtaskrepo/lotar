@@ -3,6 +3,8 @@ use crate::api_types::{RelationshipGraphRequest, RelationshipMutationRequest, Re
 use crate::services::relationships;
 use crate::storage::manager::Storage;
 
+const MAX_CROSS_REPO_REFS: usize = 100;
+
 fn storage() -> Result<Storage, HttpResponse> {
     TasksDirectoryResolver::resolve_read_only(None, None).map(|resolver| Storage { root_path: resolver.path }).map_err(internal_error)
 }
@@ -88,6 +90,22 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Ok(response) => ok_json(200, json!({"data": response})),
             Err(error) => map_lotar_error(error),
         }
+    });
+
+    // Tasks in other repos (DEV-386) for the task panel, read now.
+    api_server.register_handler("GET", "/api/relationships/cross-repo", |req| {
+        let refs: Vec<String> =
+            req.query.get("refs").map(|raw| raw.split(',').map(str::trim).filter(|value| !value.is_empty()).map(str::to_string).collect()).unwrap_or_default();
+        if refs.len() > MAX_CROSS_REPO_REFS {
+            return bad_request(format!("refs takes at most {MAX_CROSS_REPO_REFS} references"));
+        }
+        let storage = match storage() {
+            Ok(storage) => storage,
+            Err(response) => return response,
+        };
+        let data: std::collections::BTreeMap<_, _> =
+            refs.into_iter().map(|raw| (raw.clone(), crate::services::external_tasks::lookup(&storage.root_path, &raw))).collect();
+        ok_json(200, json!({ "data": data }))
     });
 
     api_server.register_handler("POST", "/api/relationships/mutate", |req| {

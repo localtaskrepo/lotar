@@ -53,6 +53,23 @@
         }
       }
     },
+    "/api/relationships/cross-repo": {
+      "get": {
+        "summary": "Read tasks in other repos that relationships name",
+        "description": "Resolves each repo:ID reference (DEV-386) against the other repo's LoTaR now, as the CLI's task relationships does: its status, title, done state and link, or why it is unresolved. Only repos registered in the global repos setting are read; nothing is written. The response is keyed by each reference as requested.",
+        "parameters": [ { "name": "refs", "in": "query", "description": "Comma-separated repo:ID references, at most 100", "schema": { "type": "string" } } ],
+        "responses": {
+          "200": {
+            "description": "One entry per requested reference",
+            "content": { "application/json": { "schema": {
+              "type": "object", "properties": { "data": { "type": "object", "additionalProperties": { "$ref": "#/components/schemas/CrossRepoTask" } } }, "required": ["data"]
+            } } }
+          },
+          "400": { "description": "More than 100 references" },
+          "500": { "description": "Tasks directory unavailable" }
+        }
+      }
+    },
     "/api/relationships/mutate": {
       "post": {
         "summary": "Atomically add, remove or change one relationship",
@@ -5851,6 +5868,15 @@
           "revision": { "type": "string" }, "complete": { "type": "boolean" }, "truncated": { "type": "boolean" }
         },
         "required": ["nodes", "edges", "issues", "revision", "complete", "truncated"]
+      },
+      "CrossRepoTask": {
+        "type": "object",
+        "description": "A task in another repo's LoTaR: title, status, done and url when it resolves, unresolved otherwise",
+        "properties": {
+          "reference": { "type": "string" }, "title": { "type": "string" }, "status": { "type": "string" },
+          "done": { "type": "boolean" }, "url": { "type": "string" }, "unresolved": { "type": "string" }
+        },
+        "required": ["reference"]
       },
       "RelationshipCheckResponse": {
         "type": "object",

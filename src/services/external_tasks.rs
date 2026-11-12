@@ -106,6 +106,28 @@ pub fn resolve(local_root: &Path, raw: &str) -> Result<ExternalTask, String> {
     Err(format!("{repo}:{} moves too often", id.canonical()))
 }
 
+/// `raw` resolved for the REST API: the task, or why it is unresolved.
+pub fn lookup(local_root: &Path, raw: &str) -> crate::api_types::CrossRepoTaskDTO {
+    match resolve(local_root, raw) {
+        Ok(task) => crate::api_types::CrossRepoTaskDTO {
+            reference: task.reference,
+            title: Some(task.title),
+            status: Some(task.status),
+            done: Some(task.done),
+            url: task.url,
+            unresolved: None,
+        },
+        Err(reason) => crate::api_types::CrossRepoTaskDTO {
+            reference: canonical(raw).unwrap_or_else(|| raw.trim().to_string()),
+            title: None,
+            status: None,
+            done: None,
+            url: None,
+            unresolved: Some(reason),
+        },
+    }
+}
+
 /// One line for a relationship entry: a cross-repo task with its status,
 /// title and link (or why it is unresolved); any other value as it is.
 pub fn describe(local_root: &Path, raw: &str) -> String {

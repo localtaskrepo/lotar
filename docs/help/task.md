@@ -229,8 +229,12 @@ task missing or deleted) is unresolved: the prerequisite stays open, as for a
 deleted local one, and `task relationships check` warns (`external_unresolved`)
 without failing. Such references are not part of the local graph or its
 repairs, and `lotar:DEV-12` in a description is not linked as a mention.
-The web UI lists these references like other IDs, without the other repo's
-status or link. The other repo cannot notify this one when its ticket closes:
+In the web task panel's Relationships tab such a chip shows the other task's
+status (or `unresolved`, with the reason on hover) and opens its link in a new
+tab; without a `server.public_url` there it is plain text. Type `<repo>:<ID>`
+into Depends on or Related to add one; it can only be dragged between those
+two. The status is read when the tab opens or the chips change. The other repo
+cannot notify this one when its ticket closes:
 the dependency counts as done the next time it is evaluated, for example when
 an agent job for the dependent starts, and `lotar automation run` fires the
 dependent's [`unblocked` rules](./automation.md#when-prerequisites-are-done).

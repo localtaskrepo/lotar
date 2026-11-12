@@ -74,6 +74,15 @@ export interface RelationshipCheckResponse {
     revision: string
     complete: boolean
 }
+/** A task in another repo's LoTaR (DEV-386): resolved fields, or why it is unresolved. */
+export interface CrossRepoTask {
+    reference: string
+    title?: string
+    status?: string
+    done?: boolean
+    url?: string
+    unresolved?: string
+}
 export interface RelationshipMutationRequest {
     source: string
     target: string

@@ -24,7 +24,27 @@
             @dragstart="onDragStart($event, category.key, id)"
             @dragend="dragging = null"
           >
-            <a :href="`/task/${encodeURIComponent(id)}`" @click="navigate($event, id)">{{ id }}</a>
+            <template v-if="crossRepoReference(id)">
+              <a
+                v-if="crossRepo[id]?.url"
+                :href="crossRepo[id].url"
+                target="_blank"
+                rel="noopener noreferrer"
+                :title="crossRepoTitle(id)"
+                >{{ id }}</a
+              >
+              <span v-else :title="crossRepoTitle(id)">{{ id }}</span>
+              <span
+                v-if="crossRepo[id]"
+                class="relationship-status"
+                :class="{
+                  'relationship-status--done': crossRepo[id].done,
+                  'relationship-status--unresolved': crossRepo[id].unresolved,
+                }"
+                >{{ crossRepo[id].unresolved ? 'unresolved' : crossRepo[id].status }}</span
+              >
+            </template>
+            <a v-else :href="`/task/${encodeURIComponent(id)}`" @click="navigate($event, id)">{{ id }}</a>
             <button
               class="relationship-icon"
               type="button"
@@ -65,7 +85,7 @@
           class="input"
           :disabled="blocked"
           :aria-label="`Add ${category.label.toLowerCase()}`"
-          placeholder="Task ID or title"
+          :placeholder="crossRepoKind(category.key) ? 'Task ID, title or repo:ID' : 'Task ID or title'"
           autocomplete="off"
           role="combobox"
           aria-autocomplete="list"
@@ -156,8 +176,11 @@
 import { removeKey } from '../../utils/text'
 import { computed, nextTick, onBeforeUnmount, reactive, ref, useId, watch } from 'vue'
 import { api } from '../../api/client'
+import type { CrossRepoTask } from '../../api/types'
 import { useTaskPanelController } from '../../composables/useTaskPanelController'
 import {
+  crossRepoKind,
+  crossRepoReference,
   relationshipCategories,
   relationshipEntries,
   relationshipMime,
@@ -215,6 +238,36 @@ watch(() => [props.taskId, props.mode, props.project, props.disabled], clear)
 onBeforeUnmount(clear)
 const entries = (kind: RelationshipCategory) => relationshipEntries(props.relationships, kind)
 const label = (kind: RelationshipCategory) => relationshipCategories.find((entry) => entry.key === kind)?.label || kind
+// Tasks in other repos, read when the chips change; the other repo sends no events here.
+const crossRepo = ref<Record<string, CrossRepoTask>>({})
+const crossRepoRefs = computed(() =>
+  [...new Set(relationshipCategories.flatMap(({ key }) => entries(key)).filter(crossRepoReference))].sort(),
+)
+let crossRepoRequest = 0
+watch(
+  () => crossRepoRefs.value.join(','),
+  async () => {
+    const request = ++crossRepoRequest
+    const refs = crossRepoRefs.value
+    if (!refs.length) {
+      crossRepo.value = {}
+      return
+    }
+    try {
+      const result = await api.relationshipCrossRepo(refs)
+      if (request === crossRepoRequest) crossRepo.value = result
+    } catch {
+      if (request === crossRepoRequest) crossRepo.value = {}
+    }
+  },
+  { immediate: true },
+)
+function crossRepoTitle(id: string) {
+  const task = crossRepo.value[id]
+  if (!task) return undefined
+  if (task.unresolved) return `Unresolved: ${task.unresolved}`
+  return `${task.reference} [${task.status}] ${task.title}${task.url ? '' : ' (no link: the other repo sets no server.public_url)'}`
+}
 function navigate(event: MouseEvent, id: string) {
   if (event.button || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return
   event.preventDefault()
@@ -250,7 +303,8 @@ function search(kind: RelationshipCategory) {
   const scope = generation
   const request = (requests[kind] = ++searchSequence)
   const query = (queries[kind] || '').trim()
-  if (!query) return
+  // A typed repo:ID is added as written, never swapped for a local match.
+  if (!query || crossRepoReference(query)) return
   timers.set(
     kind,
     setTimeout(async () => {
@@ -294,6 +348,10 @@ function choose(kind: RelationshipCategory, raw: string, from_kind?: Relationshi
   if (blocked.value || !target || from_kind === kind || (!from_kind && entries(kind).includes(target))) return
   if (target === props.taskId) {
     error.value = 'A task cannot reference itself.'
+    return
+  }
+  if (crossRepoReference(target) && !crossRepoKind(kind)) {
+    error.value = 'A task in another repo can only be in Depends on or Related.'
     return
   }
   dismiss(kind)
@@ -425,6 +483,16 @@ function onDrop(event: DragEvent, kind: RelationshipCategory) {
 .relationship-chips li > a {
   overflow-wrap: anywhere;
   min-width: 0;
+}
+.relationship-status {
+  color: var(--muted);
+  font-size: 0.9em;
+}
+.relationship-status--done {
+  color: var(--color-success-strong);
+}
+.relationship-status--unresolved {
+  color: var(--danger);
 }
 .relationship-icon {
   display: inline-flex;

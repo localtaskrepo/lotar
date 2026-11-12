@@ -173,6 +173,28 @@ pub struct RelationshipCheckResponse {
     pub complete: bool,
 }
 
+/// A task in another repo's LoTaR (DEV-386), read now: its status, title
+/// and link, or why it is unresolved.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct CrossRepoTaskDTO {
+    /// `repo:ID` with the canonical ID; the request's value when unresolved.
+    pub reference: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub status: Option<String>,
+    /// Done by the other repo's done-state policy.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub done: Option<bool>,
+    /// The other repo's web link (its `server.public_url`).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub url: Option<String>,
+    /// Why the reference does not resolve now.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub unresolved: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct RelationshipMutationRequest {

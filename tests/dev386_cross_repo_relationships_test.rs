@@ -142,3 +142,41 @@ fn mentions_of_tasks_in_another_repo_are_not_local_links() {
     let ids = relationships::mentioned_ids("Waits for lotar:DEV-374, unlike DEV-12 and `x` STD-3.");
     assert_eq!(ids.into_iter().collect::<Vec<_>>(), ["DEV-12", "STD-3"]);
 }
+
+/// DEV-389: the web task panel reads the same status, title and link.
+#[test]
+fn rest_reads_tasks_in_another_repo_for_the_task_panel() {
+    use lotar::api_server::{ApiServer, HttpRequest};
+    let sandbox = tempfile::tempdir_in(env!("CARGO_TARGET_TMPDIR")).unwrap();
+    let (_lotar, standards) = repos(sandbox.path());
+    let _env = common::env_mutex::EnvVarGuard::set("LOTAR_TASKS_DIR", standards.to_str().unwrap());
+    let mut api = ApiServer::new();
+    lotar::routes::initialize(&mut api);
+    let get = |refs: &str| {
+        let response = api.handle_request(&HttpRequest {
+            method: "GET".into(),
+            path: "/api/relationships/cross-repo".into(),
+            query: [("refs".to_string(), refs.to_string())].into_iter().collect(),
+            headers: Default::default(),
+            body: Vec::new(),
+        });
+        (response.status, serde_json::from_slice::<Value>(&response.body).unwrap())
+    };
+
+    let (status, body) = get("lotar:DEV-01, gone:DEV-1");
+    assert_eq!(status, 200, "{body}");
+    let spec = common::openapi_semantics::SpecValidator::load_published();
+    for entry in body["data"].as_object().unwrap().values() {
+        assert!(spec.validate(spec.component("CrossRepoTask"), entry).is_ok(), "{entry}");
+    }
+    let found = &body["data"]["lotar:DEV-01"];
+    assert_eq!(found["reference"], "lotar:DEV-1");
+    assert_eq!(found["title"], "Release v1.0.0");
+    assert_eq!(found["status"], "Todo");
+    assert_eq!(found["done"], false);
+    assert_eq!(found["url"], "https://lotar.example/task/DEV-1");
+    assert!(body["data"]["gone:DEV-1"]["unresolved"].as_str().unwrap().contains("no tasks folder"), "{body}");
+
+    let many = vec!["lotar:DEV-1"; 101].join(",");
+    assert_eq!(get(&many).0, 400);
+}

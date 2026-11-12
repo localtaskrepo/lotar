@@ -38,6 +38,7 @@ import type {
     ConfigInspectResult,
     ConfigShowResponse,
     ConfigSetResponse,
+    CrossRepoTask,
     FileReferenceAddRequest,
     FileReferenceAddResponse,
     FileReferenceRemoveRequest,
@@ -237,6 +238,9 @@ export const api = {
     },
     relationshipCheck(project?: string): Promise<RelationshipCheckResponse> {
         return get('/api/relationships/check', { project })
+    },
+    relationshipCrossRepo(refs: string[]): Promise<Record<string, CrossRepoTask>> {
+        return get('/api/relationships/cross-repo', { refs: refs.join(',') })
     },
     relationshipMutate(payload: RelationshipMutationRequest): Promise<RelationshipMutationResponse> {
         return post('/api/relationships/mutate', payload)

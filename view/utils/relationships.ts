@@ -29,6 +29,14 @@ export function relationshipMutation(task: string, intent: RelationshipIntent): 
         ...(intent.expected_current ? { expected_current: intent.expected_current } : {}),
     }
 }
+/** `repo:ID` names a task in another repo's LoTaR (DEV-386). */
+export function crossRepoReference(value: string) {
+    return /^[A-Za-z0-9][A-Za-z0-9._-]*:[^\s:]+-\d+$/.test(value.trim())
+}
+/** The only kinds that may hold a task in another repo. */
+export function crossRepoKind(kind: RelationshipCategory) {
+    return kind === 'depends_on' || kind === 'related'
+}
 export function singletonRelationship(kind: string) {
     return kind === 'parent' || kind === 'duplicate_of'
 }

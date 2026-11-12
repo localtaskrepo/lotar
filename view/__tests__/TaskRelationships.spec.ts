@@ -8,6 +8,7 @@ import { relationshipMime, relationshipMutation } from '../utils/relationships'
 const apiMock = vi.hoisted(() => ({
     suggestTasks: vi.fn(),
     relationshipMutate: vi.fn(async (_request: unknown) => {}),
+    relationshipCrossRepo: vi.fn(async (_refs: string[]) => ({})),
 }))
 const navigateTask = vi.hoisted(() => vi.fn())
 vi.mock('../api/client', () => ({ api: apiMock }))
@@ -308,6 +309,48 @@ describe('Relationship category editor', () => {
         await wrapper.get('input').setValue('dev-1')
         await wrapper.get('section[aria-label="Depends on"] .relationship-add > button').trigger('click')
         expect(mutate).toHaveBeenCalledWith({ action: 'add', kind: 'depends_on', target: 'dev-1' })
+    })
+})
+
+describe('Tasks in another repo (DEV-389)', () => {
+    it('shows status and opens the other repo link in a new tab; unresolved ones say why', async () => {
+        apiMock.relationshipCrossRepo.mockResolvedValueOnce({
+            'lotar:DEV-374': {
+                reference: 'lotar:DEV-374',
+                title: 'Release',
+                status: 'Done',
+                done: true,
+                url: 'https://lotar.example/task/DEV-374',
+            },
+            'gone:X-1': { reference: 'gone:X-1', unresolved: "repo 'gone' is not registered in the repos setting" },
+        })
+        const wrapper = editor({ relationships: { depends_on: 'lotar:DEV-374, DEV-1', related: 'gone:X-1' } })
+        await flushPromises()
+        expect(apiMock.relationshipCrossRepo).toHaveBeenCalledExactlyOnceWith(['gone:X-1', 'lotar:DEV-374'])
+        const link = wrapper.get('a[href="https://lotar.example/task/DEV-374"]')
+        expect(link.attributes('target')).toBe('_blank')
+        expect(link.attributes('title')).toContain('[Done] Release')
+        await link.trigger('click')
+        expect(navigateTask).not.toHaveBeenCalled()
+        const related = wrapper.get('section[aria-label="Related"]')
+        expect(related.find('a').exists()).toBe(false)
+        expect(related.get('.relationship-status').text()).toBe('unresolved')
+        expect(related.get('span[title]').attributes('title')).toContain('not registered')
+        expect(wrapper.get('section[aria-label="Depends on"] .relationship-status').text()).toBe('Done')
+    })
+    it('adds a typed reference as written and keeps it out of other categories', async () => {
+        vi.useFakeTimers()
+        const mutate = vi.fn(async () => {})
+        const wrapper = editor({ mutate, relationships: { depends_on: 'lotar:DEV-374' } })
+        await openAdd(wrapper, 'Related')
+        await wrapper.get('section[aria-label="Related"] input').setValue('lotar:DEV-1')
+        await vi.advanceTimersByTimeAsync(200)
+        expect(apiMock.suggestTasks).not.toHaveBeenCalled()
+        await wrapper.get('section[aria-label="Related"] input').trigger('keydown', { key: 'Enter' })
+        expect(mutate).toHaveBeenCalledWith({ action: 'add', kind: 'related', target: 'lotar:DEV-1' })
+        await drag(wrapper, 'Fixes')
+        expect(mutate).toHaveBeenCalledTimes(1)
+        expect(wrapper.get('[role="alert"]').text()).toContain('only be in Depends on or Related')
     })
 })
 
