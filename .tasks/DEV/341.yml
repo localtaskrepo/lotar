@@ -3,14 +3,22 @@ status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T02:05:58.432027+00:00
-modified: 2026-11-12T02:06:00.144781+00:00
+modified: 2026-11-12T02:18:21.122415+00:00
 relationships:
   related:
   - DEV-339
+  - DEV-335
+  - DEV-340
+comments:
+- date: 2026-11-12T02:12:24.785093+00:00
+  text: 'Claude (agent job DEV-341): Added one sentence to the job-end automation note in src/services/agent_job_service.rs (job_notes): "In your final summary, say that the ticket moves to its next step when this job ends and that you didn''t change its status or assignee." This is the ticket''s proposed wording, used as is; the owner decides the final wording, and it is a one-line change if he wants it different. The test job_notes_describe_the_branch_and_who_moves_the_ticket now checks for the sentence. Commit 1a1eff4 (signed) on agent/DEV-341. Checks: npm run lint:agent, npm test (1995 Rust + 1439 UI tests), npm run smoke (373) all pass. Not run: the live check from the ticket (an agent job on a ticket with job-end automation, then reading its summary); that needs a build with this change. The ticket moves to its next step when this job ends; I didn''t change its status or assignee.'
+- date: 2026-11-12T02:18:20.975366+00:00
+  text: 'claude: merged into main as a fast-forward: 22b7e26 (rebased onto 0a14c46; the only commit). Checks in the worktree after the rebase: npm run lint:agent, npm test (1997 Rust, 1439 UI) and npm run smoke (373) all passed. Not pushed: repos.json allows it, but main has unpushed commits from other tickets (DEV-335, DEV-340, STD-38) that wait for their sessions. Not run: the live check from the ticket (an agent job''s final summary), which needs a lotar build with this change.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa3e111a2-2b28-4e13-b2e2-380984f73f58
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A295c2e68-231c-4e01-a9ff-4e9c3a547d24
 description: |-
   Found (DEV-339, 2026-11-11): agents end their summary with lines like "left its status and assignee for the job to move on". The owner read that as the ticket already being in the merge phase; it only moves when the job ends, through the automation rules. Agents copy the wording from the job prompt in src/services/agent_job_service.rs (the handles_job_end note, "move this ticket to the next step as if you finished ... don't change its status or assignee"), which tells them what to do but not how to report it.
 
@@ -40,3 +48,28 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa3e111a2-2b28-4e13-b2e2-380984f73f58
+- at: 2026-11-12T02:12:24.785093+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T02:12:31.819068+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T02:12:32.753916+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A295c2e68-231c-4e01-a9ff-4e9c3a547d24
+- at: 2026-11-12T02:18:20.975366+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T02:18:21.122415+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-339"]}'
+    new: '{"related":["DEV-339","DEV-335","DEV-340"]}'
