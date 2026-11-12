@@ -1294,6 +1294,36 @@ fn continue_session(
     Ok(ContinuedThread { thread_id, info, command })
 }
 
+/// The ticket's last T3 Code thread when its worktree still holds work the
+/// main checkout lacks: commits that haven't landed, or uncommitted
+/// changes. A new job continues it instead of starting a second thread and
+/// branch for the same ticket (DEV-377).
+fn thread_with_open_work(
+    job_id: &str,
+    profile: &AgentProfileDetail,
+    prompt: &str,
+    tasks_dir: &std::path::Path,
+    ticket_id: &str,
+    config: &ResolvedConfig,
+) -> Option<(ContinuedThread, String)> {
+    let thread = continue_session(job_id, AgentRunnerKind::T3, profile, prompt, tasks_dir, ticket_id, config).ok()?;
+    let worktree = std::path::Path::new(thread.info.worktree_path.as_deref()?);
+    let branch = thread.info.branch.clone()?;
+    let repo_root = resolve_repo_root(tasks_dir)?;
+    let uncommitted = git_command(worktree)
+        .args(["status", "--porcelain"])
+        .current_dir(worktree)
+        .output()
+        .is_ok_and(|output| output.status.success() && !output.stdout.is_empty());
+    if !uncommitted && branch_landed(&repo_root, &branch).unwrap_or(true) {
+        return None;
+    }
+    let reference = thread.info.link.clone().unwrap_or_else(|| thread.thread_id.clone());
+    let reason =
+        format!("The ticket's earlier T3 Code thread {reference} has unmerged work on {branch}; this job continues it instead of starting a new thread.");
+    Some((thread, reason))
+}
+
 /// The session of the ticket's newest earlier job on this runner that has
 /// one: from this process's jobs or the job logs, whichever is newer.
 fn previous_session(job_id: &str, runner_kind: AgentRunnerKind, tasks_dir: &std::path::Path, ticket_id: &str, config: &ResolvedConfig) -> Option<String> {
@@ -1786,12 +1816,18 @@ fn run_job(
     if should_stop_job(&job_id) {
         return;
     }
-    let continuing =
-        (profile.session == Some(AgentSession::Continue)).then(|| continue_session(&job_id, runner_kind, &profile, &prompt, &tasks_dir, &ticket_id, &config));
-    let (mut continued, new_session_reason) = match continuing {
-        Some(Ok(thread)) => (Some(thread), None),
-        Some(Err(reason)) => (None, Some(reason)),
-        None => (None, None),
+    // Why the job runs in the session it does, for the job log.
+    let (mut continued, session_reason) = if profile.session == Some(AgentSession::Continue) {
+        match continue_session(&job_id, runner_kind, &profile, &prompt, &tasks_dir, &ticket_id, &config) {
+            Ok(thread) => (Some(thread), None),
+            Err(reason) => (None, Some(reason)),
+        }
+    } else if runner_kind == AgentRunnerKind::T3
+        && let Some((thread, reason)) = thread_with_open_work(&job_id, &profile, &prompt, &tasks_dir, &ticket_id, &config)
+    {
+        (Some(thread), Some(reason))
+    } else {
+        (None, None)
     };
     // A t3 job asks T3 Code for the worktree: a thread can only run inside a
     // T3 project, which LoTaR's own worktree folder is not (DEV-318). A
@@ -1882,7 +1918,7 @@ fn run_job(
 
     let is_merge_job = JOB_REGISTRY.lock().ok().is_some_and(|registry| registry.jobs.get(&job_id).is_some_and(|state| state.record.is_merge_job));
     let writable_dirs = extra_writable_dirs(&worktree_context.working_dir, &tasks_dir, is_merge_job);
-    if let Some(reason) = new_session_reason {
+    if let Some(reason) = session_reason {
         update_job(&job_id, |state| {
             record_and_emit(state, "agent_job_progress", Some(reason.clone()));
         });

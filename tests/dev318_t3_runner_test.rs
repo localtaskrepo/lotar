@@ -385,3 +385,79 @@ fn a_follow_up_finds_the_thread_in_the_job_logs() {
     assert_eq!(read_lines(&home.out.join("send.args")), ["thread", "send", "thread-old", "-", "--wait"]);
     assert_eq!(job.session_id.as_deref(), Some("thread-old"));
 }
+
+fn wait_for_job(job_id: &str) -> AgentJob {
+    let tasks_dir = PathBuf::from(std::env::var("LOTAR_TASKS_DIR").unwrap());
+    let start = Instant::now();
+    while start.elapsed() < Duration::from_secs(20) {
+        let job = AgentJobService::get_job(job_id).filter(|job| matches!(job.status.as_str(), "completed" | "failed"));
+        if let Some(job) = job.filter(|job| agent_active_jobs::find(&tasks_dir, &job.id).is_none()) {
+            return job;
+        }
+        sleep(Duration::from_millis(50));
+    }
+    panic!("job {job_id} did not finish: {:?}", AgentJobService::get_job(job_id));
+}
+
+#[test]
+fn a_second_job_continues_the_thread_with_unmerged_work_instead_of_a_new_one() {
+    let fixtures = TestFixtures::new();
+    let repo = fixtures.get_temp_path().to_path_buf();
+    let git = |dir: &Path, args: &[&str]| {
+        let output = Command::new("git")
+            .args(["-c", "user.name=T", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false"])
+            .args(args)
+            .current_dir(dir)
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "git {args:?}: {output:?}");
+    };
+    fs::write(repo.join(".gitignore"), "home/\nt3-out/\nwt/\n.tasks/\n").unwrap();
+    git(&repo, &["init", "-q", "-b", "main"]);
+    git(&repo, &["add", "."]);
+    git(&repo, &["commit", "-qm", "init"]);
+    // The first thread's worktree, with a fix main doesn't have yet.
+    let worktree = repo.join("wt");
+    git(&repo, &["worktree", "add", "-q", "-b", "agent/from-t3", worktree.to_str().unwrap()]);
+    fs::write(worktree.join("fix.txt"), "fixed\n").unwrap();
+    git(&worktree, &["add", "fix.txt"]);
+    git(&worktree, &["commit", "-qm", "fix"]);
+
+    let home = home_with_fix_profile(&fixtures, &format!("    env:\n      FAKE_T3_WORKTREE: \"{}\"\n", worktree.display()));
+    fixtures.create_config_in_dir(&fixtures.tasks_root, &format!("{REPO_CONFIG}agent:\n  worktree:\n    enabled: true\n"));
+    // Only the assignment: the ticket stays open between jobs, as after a failed merge.
+    let rules = "automation:\n  rules:\n    - name: Fix new findings\n      when:\n        custom_fields: { finding: { exists: true } }\n      on:\n        created:\n          set:\n            assignee: \"@fix\"\n";
+    fs::write(fixtures.tasks_root.join("automation.yml"), rules).unwrap();
+
+    let id = create(&fixtures, "Retried fix", None);
+    let first = wait_for_finished_agent_job(&id, "fix");
+    assert_eq!(first.status, "completed", "{first:?}");
+    let thread = first.session_id.clone().unwrap();
+    let retry = |prompt: &str| {
+        let req =
+            lotar::api_types::AgentJobCreateRequest { ticket_id: id.clone(), prompt: prompt.to_string(), agent: Some("fix".into()), ..Default::default() };
+        wait_for_job(&AgentJobService::start_job_with_tasks_dir(req, &fixtures.tasks_root).unwrap().id)
+    };
+
+    // A retry while the branch is unmerged: the same thread and branch.
+    let second = retry("Try again");
+    assert_eq!(second.status, "completed", "{second:?}: {:?}", messages(&second));
+    assert_eq!(read_lines(&home.out.join("start.calls")).len(), 1, "no second thread");
+    assert_eq!(read_lines(&home.out.join("send.args")), ["thread", "send", thread.as_str(), "-", "--wait"]);
+    assert_eq!(second.session_id.as_deref(), Some(thread.as_str()));
+    assert_eq!(second.worktree_branch.as_deref(), Some("agent/from-t3"));
+    let link = format!("https://app.t3.codes/threads/env/{thread}");
+    let reason =
+        format!("The ticket's earlier T3 Code thread {link} has unmerged work on agent/from-t3; this job continues it instead of starting a new thread.");
+    assert!(messages(&second).contains(&reason), "{:?}", messages(&second));
+    let log = fs::read_to_string(fixtures.tasks_root.join("@agent-logs").join(format!("{}.jsonl", second.id))).unwrap();
+    assert!(log.contains(&reason), "{log}");
+
+    // Once the fix landed, the next job starts its own thread.
+    git(&repo, &["merge", "-q", "--ff-only", "agent/from-t3"]);
+    let third = retry("Something new");
+    assert_eq!(third.status, "completed", "{third:?}");
+    assert_eq!(read_lines(&home.out.join("start.calls")).len(), 2);
+    assert!(!messages(&third).iter().any(|m| m.contains("unmerged work")), "{:?}", messages(&third));
+}

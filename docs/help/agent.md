@@ -218,6 +218,8 @@ t3 thread send <thread> - --wait
 - The thread keeps its model: `provider`, `model` and `args` aren't passed, and a job that sets any of them logs a note.
 - With no earlier thread on the ticket, or when `t3 thread show` no longer finds it or its worktree is gone, the job starts a new thread and logs why. Other runners log that they can't continue a session and start a new one.
 
+A ticket gets one thread and one branch at a time. A job for a ticket that already has a running job is refused. A `t3` job with `session: new` (the default) also continues the ticket's last thread when its worktree still holds work the main checkout doesn't have: commits that haven't landed, or uncommitted changes. That way a retry after a failed merge builds on the earlier fix and doesn't write a second one on its own branch. The log says `The ticket's earlier T3 Code thread <link> has unmerged work on <branch>; this job continues it instead of starting a new thread.` Once the branch has landed, or when the thread or its worktree is gone, the next job starts a new thread.
+
 A profile in your home config (`~/.lotar`) needs no `lotar trust`, so a repository only needs a rule that assigns tickets to it and one that closes them:
 
 ```yaml
