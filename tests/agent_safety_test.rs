@@ -527,6 +527,43 @@ mod git_required {
         assert!(!branch_exists(root, &branch), "cleanup_delete_branches deletes the rebased branch");
     }
 
+    /// DEV-366: the merge lands the fix reworked (other changes in the same
+    /// commit, so `git cherry` sees no equivalent), and main changes the
+    /// fixed lines again later. Done keeps the worktree while part of the
+    /// branch's work is missing from main and removes it once all of it
+    /// landed.
+    #[test]
+    fn done_removes_the_worktree_once_its_work_landed_reworked_and_keeps_missing_work() {
+        common::require_git();
+        let (fixture, ticket) = setup("echo fix > fix.txt && echo more > more.txt && git add . && git commit -q -m Fix", true);
+        let root = fixture.get_temp_path();
+        let branch = format!("agent/{ticket}");
+        let job = AgentJobService::start_job_with_tasks_dir(request(&ticket), &fixture.tasks_root).unwrap();
+        wait_idle();
+        let job = AgentJobService::get_job(&job.id).unwrap();
+        assert_eq!(job.status, "completed", "{:?}", job.last_message);
+        let worktree = Path::new(job.worktree_path.as_deref().unwrap()).to_path_buf();
+        let commit = |message: &str, files: &[(&str, &str)]| {
+            for (name, content) in files {
+                fs::write(root.join(name), content).unwrap();
+                git(root, &["add", name]);
+            }
+            git(root, &["commit", "-q", "-m", message]);
+        };
+
+        commit("Land part of the fix", &[("fix.txt", "fix\n"), ("notes.txt", "reworked\n")]);
+        set_status(&fixture, &ticket, "Done", TaskUpdateContext::default());
+        assert!(worktree.exists(), "more.txt is missing from main, so the worktree stays");
+        assert!(branch_exists(root, &branch));
+
+        commit("Land the rest", &[("more.txt", "more\n")]);
+        commit("Change the fix again", &[("fix.txt", "fixed again\n")]);
+        set_status(&fixture, &ticket, "Todo", TaskUpdateContext::default());
+        set_status(&fixture, &ticket, "Done", TaskUpdateContext::default());
+        assert!(!worktree.exists(), "Done removes the worktree whose work landed reworked");
+        assert!(!branch_exists(root, &branch));
+    }
+
     /// DEV-343: Done set while a job still runs for the ticket waits for
     /// the job's end.
     #[test]

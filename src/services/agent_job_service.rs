@@ -1431,17 +1431,50 @@ pub(crate) fn check_worktree_cleanup(repo_root: &std::path::Path, path: &std::pa
     }
 }
 
-/// Whether every commit on `branch` is in the checkout's current branch:
-/// merged, or landed rebased or cherry-picked (DEV-343). `git cherry`
-/// marks a commit HEAD has no equivalent of with `+`.
+/// Whether the work on `branch` is in the checkout's current branch: merged,
+/// landed rebased or cherry-picked (DEV-343), or landed reworked (DEV-366).
+/// `git cherry` marks a commit HEAD has no equivalent of with `+`. Failing
+/// that, the branch landed when merging it into HEAD, or into a commit
+/// since the fork that touched the branch's files, adds nothing: that commit
+/// already holds every change the branch makes. Main may have changed those
+/// lines again since, which a merge into HEAD alone would see as a conflict.
 fn branch_landed(repo_root: &std::path::Path, branch: &str) -> LoTaRResult<bool> {
-    let output =
-        git_command(repo_root).args(["cherry", "HEAD", &format!("refs/heads/{branch}")]).current_dir(repo_root).output().map_err(LoTaRError::IoError)?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(LoTaRError::ValidationError(format!("git cherry HEAD {branch} failed: {}", stderr.trim())));
+    let git_output = |args: &[&str]| -> LoTaRResult<String> {
+        let output = git_command(repo_root).args(args).current_dir(repo_root).output().map_err(LoTaRError::IoError)?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(LoTaRError::ValidationError(format!("git {} failed: {}", args.join(" "), stderr.trim())));
+        }
+        Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+    };
+    let branch_ref = format!("refs/heads/{branch}");
+    if !git_output(&["cherry", "HEAD", &branch_ref])?.lines().any(|line| line.starts_with('+')) {
+        return Ok(true);
     }
-    Ok(!String::from_utf8_lossy(&output.stdout).lines().any(|line| line.starts_with('+')))
+    let base = git_output(&["merge-base", "HEAD", &branch_ref])?;
+    let base = base.trim();
+    let changed = git_output(&["diff", "--name-only", "--no-renames", "-z", base, &branch_ref])?;
+    let excluded = format!("^{base}");
+    let mut args = vec!["rev-list", "HEAD", excluded.as_str(), "--"];
+    args.extend(changed.split('\0').filter(|path| !path.is_empty()));
+    let candidates = git_output(&args)?;
+    Ok(std::iter::once("HEAD").chain(candidates.lines()).any(|commit| merge_adds_nothing(repo_root, commit, &branch_ref)))
+}
+
+/// Whether merging `branch` into `commit` yields `commit`'s own tree. A
+/// conflict, or a git without `merge-tree --write-tree`, counts as no.
+fn merge_adds_nothing(repo_root: &std::path::Path, commit: &str, branch: &str) -> bool {
+    let tree = |args: &[&str]| {
+        git_command(repo_root)
+            .args(args)
+            .current_dir(repo_root)
+            .output()
+            .ok()
+            .filter(|output| output.status.success())
+            .and_then(|output| String::from_utf8_lossy(&output.stdout).lines().next().map(str::to_string))
+    };
+    let merged = tree(&["merge-tree", "--write-tree", "--no-messages", commit, branch]);
+    merged.is_some() && merged == tree(&["rev-parse", &format!("{commit}^{{tree}}")])
 }
 
 /// Remove a worktree `check_worktree_cleanup` passed, and its branch when
@@ -2265,7 +2298,7 @@ fn commit_leftover_work(job_id: &str) -> Result<Option<String>, String> {
 /// main checkout's current branch, fast-forwarding it when the agent could
 /// not (a sandbox may keep git metadata read-only). `Ok(Some(note))` when
 /// LoTaR fast-forwarded; `Err` explains why the branch is still unmerged.
-/// A branch whose commits are all on main already (`git cherry`) is merged.
+/// A branch whose work is on main already (`branch_landed`) is merged.
 /// Jobs that are not merge jobs, and states git can't judge, pass.
 fn ensure_branch_merged(job_id: &str, tasks_dir: &std::path::Path) -> Result<Option<String>, String> {
     let Some(branch) = JOB_REGISTRY
@@ -2280,12 +2313,6 @@ fn ensure_branch_merged(job_id: &str, tasks_dir: &std::path::Path) -> Result<Opt
     };
     // A branch git can't judge passes, like a merged one.
     if branch_landed(&repo_root, &branch).unwrap_or(true) {
-        return Ok(None);
-    }
-    // Rebased or cherry-picked onto main elsewhere: every commit's change
-    // is on main already.
-    let cherry = git_command(&repo_root).args(["cherry", "HEAD", &branch]).output().map_err(|err| format!("git cherry: {err}"))?;
-    if cherry.status.success() && !String::from_utf8_lossy(&cherry.stdout).lines().any(|line| line.starts_with('+')) {
         return Ok(None);
     }
     let output = git_command(&repo_root).args(["merge", "--ff-only", "--quiet", &branch]).output().map_err(|err| format!("git merge: {err}"))?;
