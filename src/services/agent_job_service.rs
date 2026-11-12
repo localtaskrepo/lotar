@@ -1218,10 +1218,7 @@ fn on_t3_thread_started(cli: &T3Cli, job_id: &str, tasks_dir: &std::path::Path, 
     update_job(job_id, |state| {
         state.record.session_id = Some(thread_id.to_string());
         state.t3_link = Some(reference.clone());
-        if let Some(path) = info.worktree_path.as_ref() {
-            state.record.worktree_path = Some(path.clone());
-            state.record.worktree_branch = info.branch.clone().or(state.record.worktree_branch.take());
-        }
+        record_t3_worktree(state, &info);
         record_and_emit(state, "agent_job_progress", Some(format!("T3 Code thread: {reference}")));
     });
     let mut storage = Storage::new(tasks_dir);
@@ -1230,6 +1227,24 @@ fn on_t3_thread_started(cli: &T3Cli, job_id: &str, tasks_dir: &std::path::Path, 
             record_and_emit(state, "agent_job_progress", Some(format!("Could not link the T3 Code thread on {ticket_id}: {err}")));
         });
     }
+}
+
+fn record_t3_worktree(state: &mut AgentJobState, info: &T3ThreadInfo) {
+    if let Some(path) = info.worktree_path.as_ref() {
+        state.record.worktree_path = Some(path.clone());
+        state.record.worktree_branch = info.branch.clone().or(state.record.worktree_branch.take());
+    }
+}
+
+/// The thread ended: T3 Code may have renamed its worktree branch while it
+/// worked (`agent/DEV-1` becomes `t3/<topic>`), so the merge check and the
+/// next phase see the branch the thread actually worked on.
+fn on_t3_thread_ended(cli: &T3Cli, job_id: &str) {
+    let thread_id = JOB_REGISTRY.lock().ok().and_then(|registry| registry.jobs.get(job_id).and_then(|state| state.record.session_id.clone()));
+    let Some(info) = thread_id.and_then(|thread_id| cli.thread_info(&thread_id)) else {
+        return;
+    };
+    update_job(job_id, |state| record_t3_worktree(state, &info));
 }
 
 /// The thread waits for an answer: hand the ticket back to its reporter
@@ -1850,6 +1865,9 @@ fn run_job(
         return;
     }
     let exit_code = status.ok().and_then(|status| status.code());
+    if let Some(cli) = t3_cli.as_ref() {
+        on_t3_thread_ended(cli, &job_id);
+    }
     if runner_kind == AgentRunnerKind::T3 && exit_code == Some(T3_WAITS_FOR_ANSWER) {
         hand_back_waiting_t3_job(&job_id, &ticket_id, &tasks_dir, &config);
     }
@@ -2128,6 +2146,7 @@ fn commit_leftover_work(job_id: &str) -> Result<Option<String>, String> {
 /// main checkout's current branch, fast-forwarding it when the agent could
 /// not (a sandbox may keep git metadata read-only). `Ok(Some(note))` when
 /// LoTaR fast-forwarded; `Err` explains why the branch is still unmerged.
+/// A branch whose commits are all on main already (`git cherry`) is merged.
 /// Jobs that are not merge jobs, and states git can't judge, pass.
 fn ensure_branch_merged(job_id: &str, tasks_dir: &std::path::Path) -> Result<Option<String>, String> {
     let Some(branch) = JOB_REGISTRY
@@ -2143,6 +2162,12 @@ fn ensure_branch_merged(job_id: &str, tasks_dir: &std::path::Path) -> Result<Opt
     let merged = git_command(&repo_root).args(["merge-base", "--is-ancestor", &branch, "HEAD"]).status().map_err(|err| format!("git merge-base: {err}"))?;
     // Exit code 1 means "not an ancestor"; anything else is merged or unknown.
     if merged.code() != Some(1) {
+        return Ok(None);
+    }
+    // Rebased or cherry-picked onto main elsewhere: every commit's change
+    // is on main already.
+    let cherry = git_command(&repo_root).args(["cherry", "HEAD", &branch]).output().map_err(|err| format!("git cherry: {err}"))?;
+    if cherry.status.success() && !String::from_utf8_lossy(&cherry.stdout).lines().any(|line| line.starts_with('+')) {
         return Ok(None);
     }
     let output = git_command(&repo_root).args(["merge", "--ff-only", "--quiet", &branch]).output().map_err(|err| format!("git merge: {err}"))?;

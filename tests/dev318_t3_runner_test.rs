@@ -17,7 +17,8 @@ use std::time::{Duration, Instant};
 /// A fake `t3`: `thread start` records its arguments and stdin, prints
 /// Electron's startup note and `Thread <id>` to stderr, the reply to stdout,
 /// and exits with `FAKE_T3_EXIT`; `thread show` answers with the link and
-/// `FAKE_T3_WORKTREE` as the thread's worktree.
+/// `FAKE_T3_WORKTREE` as the thread's worktree, on branch `agent/from-t3`
+/// until the run renames it to `FAKE_T3_RENAME`.
 fn fake_t3(dir: &Path) -> PathBuf {
     let path = dir.join("fake-t3");
     let script = format!(
@@ -25,7 +26,7 @@ fn fake_t3(dir: &Path) -> PathBuf {
 out="{out}"
 if [ "$1" = "thread" ] && [ "$2" = "show" ]; then
   echo "$3" >> "$out/show.calls"
-  if [ -n "$FAKE_T3_WORKTREE" ]; then wt="\"$FAKE_T3_WORKTREE\""; br='"agent/from-t3"'; else wt=null; br='"main"'; fi
+  if [ -n "$FAKE_T3_WORKTREE" ]; then wt="\"$FAKE_T3_WORKTREE\""; br="\"$(cat "$out/branch" 2>/dev/null || echo agent/from-t3)\""; else wt=null; br='"main"'; fi
   printf '{{"thread":{{"threadId":"%s","link":"https://app.t3.codes/threads/env/%s","worktreePath":%s,"branch":%s}},"messages":[]}}\n' "$3" "$3" "$wt" "$br"
   exit 0
 fi
@@ -34,6 +35,7 @@ cat > "$out/start.stdin"
 echo '[1111/090522.026791:ERROR:electron/shell/app/node_main.cc:154] Node.js environment variables are disabled because this process is invoked by other apps.' >&2
 echo "Thread thread-$$" >&2
 sleep 1
+if [ -n "$FAKE_T3_RENAME" ]; then echo "$FAKE_T3_RENAME" > "$out/branch"; fi
 if [ "${{FAKE_T3_EXIT:-0}}" = "1" ]; then echo 'The run failed: provider quota exhausted' >&2; exit 1; fi
 printf 'Fixed it.\nAll tests pass.\n'
 exit "${{FAKE_T3_EXIT:-0}}"
@@ -212,7 +214,8 @@ fn lotar_worktrees_become_t3_worktrees() {
     git(&["-c", "user.name=T", "-c", "user.email=t@example.com", "add", "."]);
     git(&["-c", "user.name=T", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false", "commit", "-qm", "init"]);
     let worktree = repo.join("wt");
-    let home = home_with_fix_profile(&fixtures, &format!("    env:\n      FAKE_T3_WORKTREE: \"{}\"\n", worktree.display()));
+    let home =
+        home_with_fix_profile(&fixtures, &format!("    env:\n      FAKE_T3_WORKTREE: \"{}\"\n      FAKE_T3_RENAME: t3/in-a-worktree\n", worktree.display()));
     fixtures.create_config_in_dir(&fixtures.tasks_root, &format!("{REPO_CONFIG}agent:\n  worktree:\n    enabled: true\n"));
 
     let id = create(&fixtures, "In a worktree", None);
@@ -221,5 +224,6 @@ fn lotar_worktrees_become_t3_worktrees() {
     let args = read_lines(&home.out.join("start.args")).join(" ");
     assert!(args.contains(&format!("--worktree main --branch agent/{id}")), "{args}");
     assert_eq!(job.worktree_path.as_deref(), worktree.to_str());
-    assert_eq!(job.worktree_branch.as_deref(), Some("agent/from-t3"));
+    // T3 Code renamed the thread's branch while it worked (DEV-342).
+    assert_eq!(job.worktree_branch.as_deref(), Some("t3/in-a-worktree"));
 }

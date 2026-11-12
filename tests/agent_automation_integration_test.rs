@@ -2302,6 +2302,67 @@ exit 0
         assert!(!fixtures.get_temp_path().join("feature.txt").exists());
     }
 
+    /// A merge job whose branch was rebased onto main elsewhere (T3 Code
+    /// rebases a renamed copy of the branch) passes: main has every commit's
+    /// change, though not the branch's own commits (DEV-342).
+    #[cfg(unix)]
+    #[test]
+    fn merge_job_whose_branch_was_rebased_elsewhere_passes() {
+        crate::common::require_git();
+        let _guard = lock_agent_tests();
+        enable_server_mode();
+        let fixtures = TestFixtures::new();
+        init_git_repository(fixtures.get_temp_path());
+
+        let agent_script = write_stub_agent_script(
+            fixtures.get_temp_path(),
+            "rebased-agent.sh",
+            r#"#!/bin/sh
+profile="${LOTAR_AGENT_PROFILE:-unknown}"
+sid="${profile}-$$"
+printf '{"type":"system","subtype":"init","session_id":"%s"}\n' "$sid"
+if [ "$profile" = implement ]; then
+  echo feature > feature.txt && git add feature.txt && git commit -qm implement || exit 4
+fi
+if [ "$profile" = merge ]; then
+  git -C "$LOTAR_WORKSPACE_ROOT" commit -q --allow-empty -m "main moves on" || exit 4
+  git -C "$LOTAR_WORKSPACE_ROOT" cherry-pick "agent/$LOTAR_TICKET_ID" >/dev/null || exit 4
+fi
+printf '{"type":"assistant","message":{"content":[{"text":"%s complete"}]},"session_id":"%s"}\n' "$profile" "$sid"
+exit 0
+"#,
+        );
+        install_template_workflow(
+            &fixtures,
+            "RBS",
+            "agent-pipeline",
+            &[("implement", agent_script.as_path()), ("test", agent_script.as_path()), ("merge", agent_script.as_path())],
+        );
+
+        let mut storage = fixtures.create_storage();
+        let created = TaskService::create(
+            &mut storage,
+            TaskCreate {
+                title: "Rebased elsewhere".to_string(),
+                project: Some("RBS".to_string()),
+                reporter: Some("Agent Tests".to_string()),
+                ..Default::default()
+            },
+        )
+        .expect("create task");
+        TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some("@implement".to_string()), ..Default::default() })
+            .expect("assign implementation agent");
+
+        wait_for_task_state(&storage, &created.id, "Done", Some("Agent Tests"), 10_000).expect("the rebased branch counts as merged");
+        let merge_job =
+            AgentJobService::list_jobs().into_iter().find(|job| job.ticket_id == created.id && job.agent.as_deref() == Some("merge")).expect("merge job");
+        assert_eq!(merge_job.status, "completed", "{merge_job:?}");
+        let branch = format!("agent/{}", created.id);
+        let ancestor = Command::new("git").args(["merge-base", "--is-ancestor", &branch, "HEAD"]).current_dir(fixtures.get_temp_path()).status().expect("git");
+        assert!(!ancestor.success(), "the branch's own commit is not on main");
+        assert!(fixtures.get_temp_path().join("feature.txt").exists());
+    }
+
     #[cfg(unix)]
     #[test]
     fn shipped_agent_reviewed_template_handles_hand_back_failure_review_and_merge() {
