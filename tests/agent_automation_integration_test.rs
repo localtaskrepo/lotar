@@ -196,11 +196,18 @@ fn wait_for_task_status(storage: &lotar::Storage, ticket_id: &str, status: &str,
 
 #[cfg(unix)]
 fn wait_for_task_state(storage: &lotar::Storage, ticket_id: &str, status: &str, assignee: Option<&str>, timeout_ms: u64) -> Option<lotar::api_types::TaskDTO> {
+    wait_for_task(storage, ticket_id, timeout_ms, |task| task.status.as_str() == status && assignee.is_none_or(|value| task.assignee.as_deref() == Some(value)))
+}
+
+#[cfg(unix)]
+fn wait_for_task<F>(storage: &lotar::Storage, ticket_id: &str, timeout_ms: u64, predicate: F) -> Option<lotar::api_types::TaskDTO>
+where
+    F: Fn(&lotar::api_types::TaskDTO) -> bool,
+{
     let start = Instant::now();
     while start.elapsed() < Duration::from_millis(timeout_ms) {
         if let Ok(task) = TaskService::get(storage, ticket_id, None)
-            && task.status.as_str() == status
-            && assignee.is_none_or(|value| task.assignee.as_deref() == Some(value))
+            && predicate(&task)
         {
             return Some(task);
         }
@@ -2465,10 +2472,12 @@ exit 0
             sleep(Duration::from_millis(20));
         }
 
-        // A runner failure goes back to the reporter instead of looping.
+        // A runner failure goes back to the reporter instead of looping. The
+        // ticket is still HelpNeeded from the hand-back, so wait for the tag.
         assign(&mut storage, "@test");
-        let failed = wait_for_task_state(&storage, &created.id, "HelpNeeded", Some("Agent Tests"), 6000)
-            .and_then(|task| task.tags.contains(&"agent-failed".to_string()).then_some(task));
+        let failed = wait_for_task(&storage, &created.id, 6000, |task| {
+            task.status.as_str() == "HelpNeeded" && task.assignee.as_deref() == Some("Agent Tests") && task.tags.contains(&"agent-failed".to_string())
+        });
         assert!(failed.is_some(), "runner failure should tag agent-failed");
 
         // Passing tests hand over for review, and review hands over to merge.
