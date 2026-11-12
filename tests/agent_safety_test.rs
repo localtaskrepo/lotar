@@ -483,8 +483,50 @@ mod git_required {
         fs::write(path, serde_yaml_ng::to_string(&task).unwrap()).unwrap();
         let output = cleanup(&fixture);
         assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
-        assert!(!wt.exists(), "configured done state should allow clean merged cleanup");
+        assert!(
+            !wt.exists(),
+            "configured done state should allow clean merged cleanup: {}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
         assert!(!Command::new("git").args(["show-ref", "--verify", &format!("refs/heads/{branch}")]).current_dir(root).output().unwrap().status.success());
+    }
+
+    /// DEV-351: every fixture's ticket is SAFE-1, and other test runs on the
+    /// machine start wrappers for it. Only a wrapper for this tasks
+    /// directory keeps the worktree (DEV-349).
+    #[test]
+    fn cli_cleanup_ignores_a_wrapper_running_for_another_tasks_dir() {
+        common::require_git();
+        let (fixture, ticket) = setup("exit 0", true);
+        let root = fixture.get_temp_path();
+        let wt = root.join("worktrees").join(&ticket);
+        git(root, &["worktree", "add", "-b", &format!("agent/{ticket}"), wt.to_str().unwrap()]);
+        let path = fixture.tasks_root.join("SAFE/1.yml");
+        let mut task: serde_yaml_ng::Value = serde_yaml_ng::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        task["status"] = "Done".into();
+        fs::write(path, serde_yaml_ng::to_string(&task).unwrap()).unwrap();
+        let other = TestFixtures::new();
+        let with_wrapper = |tasks_dir: &Path| {
+            use std::os::unix::process::CommandExt;
+            let mut wrapper = Command::new(env!("CARGO_BIN_EXE_lotar-agent-wrapper"))
+                .args(["--job-id", "foreign", "--ticket-id", &ticket, "--runner", "claude", "--tasks-dir", tasks_dir.to_str().unwrap(), "--", "sleep", "30"])
+                .process_group(0)
+                .spawn()
+                .unwrap();
+            let output = cleanup(&fixture);
+            // SAFETY: signals only the process group this test started.
+            unsafe {
+                libc::kill(-(wrapper.id() as i32), libc::SIGKILL);
+            }
+            wrapper.wait().unwrap();
+            output
+        };
+        assert!(with_wrapper(&fixture.tasks_root).status.success());
+        assert!(wt.exists(), "a wrapper for this tasks directory keeps the worktree");
+        let output = with_wrapper(&other.tasks_root);
+        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        assert!(!wt.exists(), "a wrapper for another tasks directory must not keep the worktree");
     }
 
     fn set_status(fixture: &TestFixtures, ticket: &str, status: &str, context: TaskUpdateContext) {
