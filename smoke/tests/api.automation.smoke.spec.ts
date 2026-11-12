@@ -362,6 +362,9 @@ function monitorOldShapeGuarded(
         child.on('error', reject);
         let killedByGuard = false;
         const guard = setTimeout(() => {
+            if (child.exitCode !== null || child.signalCode !== null) {
+                return;
+            }
             killedByGuard = true;
             child.kill();
         }, guardMs);
@@ -718,10 +721,12 @@ describe.concurrent('REST API automation endpoints', () => {
                 cwd: oldDir,
                 stdio: ['ignore', 'ignore', 'pipe'],
             });
-            // Guard is the child bound (3s) plus slack: on POSIX the child
-            // self-aborts first and close fires normally; on Windows only
-            // the guard can end the wedge.
-            const oldOutcome = await monitorOldShapeGuarded(oldChild, 4_000);
+            // On Windows only the guard can end the wedge, so it is the child
+            // bound (3s) plus slack. On POSIX the child self-aborts; its bound
+            // starts after Node startup, so under suite load a tight guard
+            // could kill it right after it wrote its aborted marker.
+            const guardMs = process.platform === 'win32' ? 4_000 : 15_000;
+            const oldOutcome = await monitorOldShapeGuarded(oldChild, guardMs);
             expect(fs.pathExistsSync(path.join(oldDir, 'completed-old.marker'))).toBe(false);
             expect(fs.pathExistsSync(path.join(oldDir, 'bytes-old.marker'))).toBe(false);
             if (oldOutcome.killedByGuard) {
