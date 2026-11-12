@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-12T01:15:50.184299+00:00
-modified: 2026-11-12T02:30:16.560892+00:00
+modified: 2026-11-12T04:06:04.573039+00:00
 relationships:
   related:
   - DEV-332
@@ -13,6 +13,7 @@ relationships:
   - DEV-340
   - DEV-341
   - DEV-339
+  - DEV-353
 comments:
 - date: 2026-11-12T01:25:26.498781+00:00
   text: |-
@@ -29,6 +30,8 @@ comments:
   text: 'claude: Searched pingdotgg/t3code: no issue covers the CLI''s --wait. Related: #24297, #28114, #32563 (delegate_task finishes before the child''s background-wake run) and #34668, fixed by #34674 (merged 2026-11-12 01:26 UTC), which makes t3_thread_list report these threads as ''waiting''. Draft for review (not filed): https://claude.ai/artifact/QDCfFkBf7NF4KEDviGNLsd. Waiting for mallox to approve or edit it; then it gets filed and this ticket can be Done.'
 - date: 2026-11-12T01:55:16.712782+00:00
   text: 'claude: Filed by mallox as https://github.com/pingdotgg/t3code/issues/34688 (2026-11-12). lotar side: t3 job prompt line, test and docs/help/agent.md, uncommitted. Drop the prompt line once a T3 Code release has --wait waiting for background work.'
+- date: 2026-11-12T04:06:04.573039+00:00
+  text: 'claude: T3 Code closed #34688 as completed: the fix is [PR #34696](https://github.com/pingdotgg/t3code/pull/34696), merged 2026-11-12 03:56 UTC (`671f8541`). It is in the CLI only: `--wait` now waits up to 10 s for the run that the background work wakes. The server-side gap stays open, so a slow wake run can still return early. No release has it yet (latest stable v0.1.9; newest preview predates the merge). Removing the prompt line, its test and the doc note: DEV-353, Blocked until a release has the fix.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aced6d3b1-82b0-46e1-84d9-667698f747a1
 - link: https://github.com/pingdotgg/t3code/issues/34688
@@ -131,3 +134,13 @@ history:
   - field: relationships
     old: '{"related":["DEV-332","DEV-336","DEV-340","DEV-341"]}'
     new: '{"related":["DEV-332","DEV-336","DEV-340","DEV-341","DEV-339"]}'
+- at: 2026-11-12T04:05:45.620196+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-332","DEV-336","DEV-340","DEV-341","DEV-339"]}'
+    new: '{"related":["DEV-332","DEV-336","DEV-340","DEV-341","DEV-339","DEV-353"]}'
+- at: 2026-11-12T04:06:04.573039+00:00
+  actor: claude
+  changes:
+  - field: comment_added

@@ -1,0 +1,41 @@
+title: 'Flaky Rust: web_api_integration_test SSE tests time out reading the POST response under load'
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T04:15:53.349240+00:00
+modified: 2026-11-12T04:15:54.690173+00:00
+relationships:
+  related:
+  - DEV-352
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa6172a17-078b-422c-843a-fe7b2b32ccde
+description: 'Found by DEV-352 (claude, 2026-11-11): in a full npm test run (cargo nextest, machine also running other worktrees'' suites), sse_debounce_emits_all_events, sse_debounce_zero_and_invalid_kind_handling, sse_events_with_kinds_and_project_filter and sse_includes_triggered_by_identity failed at tests/web_api_integration_test.rs:152 (http_post_json_with_origin: stream.read(...).unwrap() returned WouldBlock, os error 35) because net_timeout() is 500 ms or 1.5 s; all 9 sse_ tests passed when rerun alone. Check: cargo nextest run --no-fail-fast passes these tests repeatedly under full-suite load. Done when the POST helper waits for the response the server actually sends (read timeout as a deadline long enough for a loaded machine, not a fixed short budget), with the test still failing fast on a real hang.'
+tags:
+- health
+custom_fields:
+  finding: test:web-api-sse-post-read-timeout
+history:
+- at: 2026-11-12T04:15:53.475024+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-352"]}'
+- at: 2026-11-12T04:15:53.588010+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T04:15:53.854897+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T04:15:54.690173+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa6172a17-078b-422c-843a-fe7b2b32ccde

@@ -1,0 +1,142 @@
+title: Drop the t3 job's foreground-only prompt line once T3 Code's --wait waits for background work
+status: Blocked
+priority: Low
+type: Chore
+reporter: claude
+assignee: mallox
+created: 2026-11-12T04:05:45.260312+00:00
+modified: 2026-11-12T04:06:04.468887+00:00
+relationships:
+  related:
+  - DEV-335
+references:
+- link: https://github.com/pingdotgg/t3code/pull/34696
+- link: https://github.com/pingdotgg/t3code/issues/34688
+- code: src/services/agent_job_service.rs#1170-1181
+- code: tests/dev318_t3_runner_test.rs#147-148
+- file: docs/help/agent.md
+description: |-
+  T3 Code fixed [#34688](https://github.com/pingdotgg/t3code/issues/34688) in [PR #34696](https://github.com/pingdotgg/t3code/pull/34696), merged 2026-11-12 03:56 UTC: `t3 thread start --wait` and `t3 thread send --wait` now wait for background work the agent waits on and print the run it wakes. Until a release has it, lotar keeps the DEV-335 workaround. Once one does, the workaround goes. Filed by claude on mallox's go-ahead (2026-11-12).
+
+  ## Blocked on
+  A T3 Code release that contains merge commit `671f85417c6633f6cbb2965a196c266463392e7f`. On 2026-11-12, v0.1.9 was the latest stable release and the newest preview (`0.1.10-preview.20261112.4560`, 03:22 UTC) predates the merge. Check with:
+
+  ```sh
+  gh release list -R pingdotgg/t3code --exclude-pre-releases --limit 3
+  ~/.t3/bin/t3 --version
+  ```
+
+  When the installed `t3` has the fix: `lotar assignee DEV-353 @fix`.
+
+  ## Limits of the fix (from the PR)
+  - CLI only. The gap itself is in T3 Code's Claude adapter, which drops the awaited background task before it records the run that task wakes. The CLI bridges it by checking for a later run every 500 ms for up to 10 s.
+  - It still returns early when a wake run takes more than 10 s to start, or when the background task ends before the first wait slice times out.
+
+  So the "finish in the foreground" advice may still be worth keeping in a softer form; decide from the check below.
+
+  ## Workaround to remove
+  - `src/services/agent_job_service.rs` `t3_thread_notes`: the line "The job ends when your turn ends…"
+  - `tests/dev318_t3_runner_test.rs`: the assertion on that line
+  - `docs/help/agent.md` (T3 Code threads): the note that names 0.1.9
+  - Not in this repo: standards `configs/lotar/automation.yml`, "Agent tickets" prompt step 3 ("Don't end your turn while tests or other background work still run"). Say in a comment whether it can go too.
+
+  ## Done when
+  - [ ] The installed `t3` has the fix
+  - [ ] DEV-335's check passes on it: a t3 job whose agent runs a long background command, waits on it with `t3_background_wait` and ends its turn completes only after the wake run, with that run's reply (`lotar agent logs <job>`)
+  - [ ] The workaround line, its test assertion and the doc note are removed or reworded to match what the check showed; `npm run lint`, `npm test` and `npm run smoke` pass
+tags:
+- backend
+history:
+- at: 2026-11-12T04:05:45.620984+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-335"]}'
+- at: 2026-11-12T04:06:03.663137+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      T3 Code fixed [#34688](https://github.com/pingdotgg/t3code/issues/34688) in [PR #34696](https://github.com/pingdotgg/t3code/pull/34696), merged 2026-11-12 03:56 UTC: `t3 thread start --wait` and `t3 thread send --wait` now wait for background work the agent waits on and print the run it wakes. Until a release has it, lotar keeps the DEV-335 workaround. Once one does, the workaround goes. Filed by claude on mallox's go-ahead (2026-11-12).
+
+      ## Blocked on
+      A T3 Code release that contains merge commit `671f85417c6633f6cbb2965a196c266463392e7f`. On 2026-11-12, v0.1.9 was the latest stable release and the newest preview (`0.1.10-preview.20261112.4560`, 03:22 UTC) predates the merge. Check with:
+
+      ```sh
+      gh release list -R pingdotgg/t3code --exclude-pre-releases --limit 3
+      ~/.t3/bin/t3 --version
+      ```
+
+      When the installed `t3` has the fix: `lotar assignee DEV-<this> @fix`.
+
+      ## Limits of the fix (from the PR)
+      - CLI only. The gap itself is in T3 Code's Claude adapter, which drops the awaited background task before it records the run that task wakes. The CLI bridges it by checking for a later run every 500 ms for up to 10 s.
+      - It still returns early when a wake run takes more than 10 s to start, or when the background task ends before the first wait slice times out.
+
+      So the "finish in the foreground" advice may still be worth keeping in a softer form; decide from the check below.
+
+      ## Workaround to remove
+      - `src/services/agent_job_service.rs` `t3_thread_notes`: the line "The job ends when your turn ends…"
+      - `tests/dev318_t3_runner_test.rs`: the assertion on that line
+      - `docs/help/agent.md` (T3 Code threads): the note that names 0.1.9
+      - Not in this repo: standards `configs/lotar/automation.yml`, "Agent tickets" prompt step 3 ("Don't end your turn while tests or other background work still run"). Say in a comment whether it can go too.
+
+      ## Done when
+      - [ ] The installed `t3` has the fix
+      - [ ] DEV-335's check passes on it: a t3 job whose agent runs a long background command, waits on it with `t3_background_wait` and ends its turn completes only after the wake run, with that run's reply (`lotar agent logs <job>`)
+      - [ ] The workaround line, its test assertion and the doc note are removed or reworded to match what the check showed; `npm run lint`, `npm test` and `npm run smoke` pass
+    new: |-
+      T3 Code fixed [#34688](https://github.com/pingdotgg/t3code/issues/34688) in [PR #34696](https://github.com/pingdotgg/t3code/pull/34696), merged 2026-11-12 03:56 UTC: `t3 thread start --wait` and `t3 thread send --wait` now wait for background work the agent waits on and print the run it wakes. Until a release has it, lotar keeps the DEV-335 workaround. Once one does, the workaround goes. Filed by claude on mallox's go-ahead (2026-11-12).
+
+      ## Blocked on
+      A T3 Code release that contains merge commit `671f85417c6633f6cbb2965a196c266463392e7f`. On 2026-11-12, v0.1.9 was the latest stable release and the newest preview (`0.1.10-preview.20261112.4560`, 03:22 UTC) predates the merge. Check with:
+
+      ```sh
+      gh release list -R pingdotgg/t3code --exclude-pre-releases --limit 3
+      ~/.t3/bin/t3 --version
+      ```
+
+      When the installed `t3` has the fix: `lotar assignee DEV-353 @fix`.
+
+      ## Limits of the fix (from the PR)
+      - CLI only. The gap itself is in T3 Code's Claude adapter, which drops the awaited background task before it records the run that task wakes. The CLI bridges it by checking for a later run every 500 ms for up to 10 s.
+      - It still returns early when a wake run takes more than 10 s to start, or when the background task ends before the first wait slice times out.
+
+      So the "finish in the foreground" advice may still be worth keeping in a softer form; decide from the check below.
+
+      ## Workaround to remove
+      - `src/services/agent_job_service.rs` `t3_thread_notes`: the line "The job ends when your turn ends…"
+      - `tests/dev318_t3_runner_test.rs`: the assertion on that line
+      - `docs/help/agent.md` (T3 Code threads): the note that names 0.1.9
+      - Not in this repo: standards `configs/lotar/automation.yml`, "Agent tickets" prompt step 3 ("Don't end your turn while tests or other background work still run"). Say in a comment whether it can go too.
+
+      ## Done when
+      - [ ] The installed `t3` has the fix
+      - [ ] DEV-335's check passes on it: a t3 job whose agent runs a long background command, waits on it with `t3_background_wait` and ends its turn completes only after the wake run, with that run's reply (`lotar agent logs <job>`)
+      - [ ] The workaround line, its test assertion and the doc note are removed or reworded to match what the check showed; `npm run lint`, `npm test` and `npm run smoke` pass
+- at: 2026-11-12T04:06:03.870140+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://github.com/pingdotgg/t3code/pull/34696
+- at: 2026-11-12T04:06:03.978942+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://github.com/pingdotgg/t3code/issues/34688
+- at: 2026-11-12T04:06:04.205355+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: code:src/services/agent_job_service.rs#1170-1181
+- at: 2026-11-12T04:06:04.338035+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: code:tests/dev318_t3_runner_test.rs#147-148
+- at: 2026-11-12T04:06:04.468887+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:docs/help/agent.md

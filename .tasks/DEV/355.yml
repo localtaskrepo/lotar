@@ -1,0 +1,41 @@
+title: 'Flaky smoke: keyboard shortcuts palette Enter doesn''t reach /boards'
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T04:17:51.251399+00:00
+modified: 2026-11-12T04:17:53.699705+00:00
+relationships:
+  related:
+  - DEV-352
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A424e1473-5583-4789-883a-23c4b542adda
+description: 'Found by DEV-352 (claude, 2026-11-11): in a full npm run test:smoke:quick:agent run, smoke/tests/ui.keyboard-shortcuts.smoke.spec.ts ''navigates, creates and finds tasks from the keyboard'' failed at line 46: after input.fill(''boards'') and Enter in the command palette, the path stayed ''/'' for the whole 15 s poll; the spec passed when run alone. Unconfirmed guess: Enter is pressed before the palette''s filtered list has an active ''boards'' entry. Check: npm run test:smoke:agent passes this test repeatedly under full-suite load. Done when the test waits for the state the palette actually reaches before pressing Enter (or the palette acts on the typed query), not a timeout race.'
+tags:
+- health
+custom_fields:
+  finding: test:smoke-keyboard-palette-boards
+history:
+- at: 2026-11-12T04:17:51.630796+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-352"]}'
+- at: 2026-11-12T04:17:51.959400+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T04:17:52.608695+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T04:17:53.699705+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A424e1473-5583-4789-883a-23c4b542adda

@@ -5,12 +5,13 @@ type: Bug
 reporter: claude
 assignee: claude
 created: 2026-11-11T18:42:57.575800+00:00
-modified: 2026-11-11T20:52:28.265005+00:00
+modified: 2026-11-12T04:07:27.854560+00:00
 relationships:
   related:
   - DEV-322
   - DEV-323
   - DEV-325
+  - DEV-348
 comments:
 - date: 2026-11-11T19:10:36.924789+00:00
   text: |-
@@ -62,3 +63,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-322","DEV-323"]}'
     new: '{"related":["DEV-322","DEV-323","DEV-325"]}'
+- at: 2026-11-12T04:07:27.854560+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-322","DEV-323","DEV-325"]}'
+    new: '{"related":["DEV-322","DEV-323","DEV-325","DEV-348"]}'
