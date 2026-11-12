@@ -1,0 +1,61 @@
+title: 'Phone: scrolling over a task description opens the editor'
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+created: 2026-11-12T00:30:28.431249+00:00
+modified: 2026-11-12T00:30:33.731369+00:00
+relationships:
+  related:
+  - DEV-188
+references:
+- code: view/components/TaskPanel.vue#195-204
+- file: smoke/tests/ui.description-preview.smoke.spec.ts
+description: |-
+  On a phone, trying to scroll through a task's description opens the description editor. A finger that lands on the description to scroll the panel switches it into edit mode, and the keyboard comes up.
+
+  Reported by the owner on 2026-11-11; it should ship in the next release.
+
+  ## Cause
+
+  `view/components/TaskPanel.vue` starts editing on the press itself, before the browser knows whether the touch is a tap or a scroll:
+
+  ```vue
+  @pointerdown.prevent="startEditingDescription"
+  @click="startEditingDescription"
+  ```
+
+  `pointerdown` fires on touch start, and `.prevent` also suppresses the browser's default handling of that press. The `click` handler alone covers a tap: browsers don't fire `click` after a scroll gesture. The `pointerdown` handler has been there since markdown came to the web UI (`2783833`), with no recorded reason.
+
+  ## Fix
+
+  - Start editing on a tap only: drop the `pointerdown` handler and keep `click`, Enter and Space.
+  - Check that a desktop mouse click still opens the editor on the first click.
+  - Check that DEV-188 (the editor closing on blur before a click lands on a button below it) still holds.
+
+  ## Done when
+
+  - [ ] Scrolling the panel with a finger that starts on the description scrolls and stays in display mode.
+  - [ ] A tap on the description opens the editor with the cursor in the textarea.
+  - [ ] A mouse click and the Enter and Space keys still open the editor.
+  - [ ] A Playwright smoke test with touch emulation (`hasTouch`, 390 px wide) covers the scroll and the tap, next to `smoke/tests/ui.description-preview.smoke.spec.ts`.
+tags:
+- web-ui
+- mobile
+history:
+- at: 2026-11-12T00:30:28.585147+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-188"]}'
+- at: 2026-11-12T00:30:33.699171+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: code:view/components/TaskPanel.vue#195-204
+- at: 2026-11-12T00:30:33.731369+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: file:smoke/tests/ui.description-preview.smoke.spec.ts

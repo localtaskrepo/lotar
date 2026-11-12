@@ -48,6 +48,14 @@ workers report results rather than overwriting its plan.
 If MCP rejects an enum allowed by project config, inspect current state and use a
 validated CLI operation rather than changing configuration to appease the tool.
 
+## Write DEV tickets
+
+Follow "Write a ticket people can read" in the
+[user-facing skill](../../../docs/help/skills/lotar-workflow/SKILL.md): Markdown
+sections, `- [ ]` done criteria, code in backticks. Type Feature, Bug or Chore;
+one or two area tags already in use (`api`, `backend`, `web-ui`, `docs`, `testing`;
+`lotar stats tags`); code references to the files involved. DEV-330 is an example.
+
 ## Lifecycle
 
 1. Mark the task in progress using the configured state. Record a short plan:

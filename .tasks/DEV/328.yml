@@ -1,14 +1,17 @@
 title: Live agent check leaves its temp workspaces in ~/.codex/config.toml
-status: InProgress
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-11T23:37:13.082766+00:00
-modified: 2026-11-11T23:44:28.297521+00:00
+modified: 2026-11-11T23:45:20.902851+00:00
 relationships:
   related:
   - DEV-329
+comments:
+- date: 2026-11-11T23:45:12.678659+00:00
+  text: 'Fixed in a385db8 (pushed to origin/main; repos.json has push: true). scripts/agent-live-check.mjs now calls forgetCodexProjects(dir) after each codex scenario: it removes the [projects."<dir>..."] tables (plain and realpath) from $CODEX_HOME/config.toml (default ~/.codex). I chose this over a temporary CODEX_HOME because Codex may refresh the copied auth.json there, and a rotated refresh token would break the real login. Verified: LOTAR_TRUST_ALL=1 node scripts/agent-live-check.mjs --runner codex --scenario settings --scenario pipeline passed, and config.toml was byte-identical before and after (the count stayed 23). Then I removed the 23 stale lotar-live-codex entries and nothing else (diff checked; backup at the session scratchpad). Check now: grep -c lotar-live-codex ~/.codex/config.toml = 0. npm run lint passed. npm test and smoke were not run because the change only touches the opt-in live script. Found and filed DEV-329: the live check fails on every scenario because its temp repos are not trusted. Its fix agent is already editing the same file.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8ce0f7ba-91df-4a42-9207-ef0462d45cd3
 description: |-
@@ -42,3 +45,13 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-329"]}'
+- at: 2026-11-11T23:45:12.678659+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-11T23:45:20.902851+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

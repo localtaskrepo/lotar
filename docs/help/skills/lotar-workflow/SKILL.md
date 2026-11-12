@@ -58,6 +58,28 @@ and check the current task. Use the CLI for that authorized operation only after
 confirming it supports the value, then read back the result. Do not replace the
 project's workflow with default enums to satisfy a tool; report the mismatch.
 
+## Write a ticket people can read
+
+The web UI renders descriptions and comments as Markdown. Write them for a reader
+who scans, often on a small screen:
+
+- Title: the problem or the outcome, readable on its own in a list.
+- Description: a short opening paragraph (what is wrong or wanted, and why), then
+  `##` sections as the task needs them, such as Context, Plan, Done when and Open
+  questions. Use bullets for lists and `- [ ]` checkboxes for acceptance criteria.
+  Put commands, paths, keys, values and commit hashes in backticks and snippets in
+  fenced blocks with a language. Write ticket IDs as plain text (`DEV-12` without
+  backticks): LoTaR links them, but not inside code.
+- Several lines of Markdown are easier to pass from a file than inline:
+  `add "Title" --description "$(cat notes.md)"`.
+- Fields: type, priority and tags from the project configuration. Reuse tags the
+  project already has (`lotar stats tags`) before adding one. Priority says how
+  soon, not how big; size belongs in effort.
+- References: attach the files, code ranges and links the work touches
+  (`task reference add file|code|link`, MCP `task_reference_add`), so the next
+  session starts from them.
+- Comments use Markdown too, kept short: outcome, evidence, next step.
+
 ## Work and hand off
 
 1. For authorized non-trivial work, create/reuse a task with scope, acceptance

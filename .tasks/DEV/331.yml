@@ -1,0 +1,50 @@
+title: 'Agent skills: how to write a readable ticket'
+status: Done
+priority: Medium
+type: Chore
+reporter: claude
+assignee: mallox
+created: 2026-11-12T00:37:12.375485+00:00
+modified: 2026-11-12T00:37:45.827598+00:00
+comments:
+- date: 2026-11-12T00:37:45.787400+00:00
+  text: 'claude: both sections written; links checked by path, commands checked against `lotar --help` (`stats tags`, `task reference add`, `--description`). Docs only, no build needed (AGENTS.md).'
+references:
+- file: docs/help/skills/lotar-workflow/SKILL.md
+- file: .github/skills/lotar-dev-tracking/SKILL.md
+description: |-
+  Agents write descriptions as one long paragraph, without Markdown, tags or file references, which makes tickets hard to read in the web UI. Requested on 2026-11-11 by the owner, whose own agents now follow the same rule.
+
+  ## Change
+
+  - [x] `docs/help/skills/lotar-workflow/SKILL.md`: section "Write a ticket people can read" (Markdown structure, fields from the project config, references, comments).
+  - [x] `.github/skills/lotar-dev-tracking/SKILL.md`: "Write DEV tickets" points to it, with DEV's types and area tags.
+
+  ## Done when
+
+  - [x] Both relative links resolve and every command in the section exists in the current CLI.
+tags:
+- docs
+history:
+- at: 2026-11-12T00:37:45.719123+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: file:docs/help/skills/lotar-workflow/SKILL.md
+- at: 2026-11-12T00:37:45.761400+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: file:.github/skills/lotar-dev-tracking/SKILL.md
+- at: 2026-11-12T00:37:45.787400+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-12T00:37:45.827598+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox
