@@ -1,0 +1,41 @@
+title: 'Flaky test: shipped_agent_reviewed_template_handles_hand_back_failure_review_and_merge'
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T03:37:59.551010+00:00
+modified: 2026-11-12T03:38:00.874020+00:00
+relationships:
+  related:
+  - DEV-343
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b9e43f1-7f4f-48c8-b1ee-38b482fecc07
+description: 'Found while merging DEV-343 (2026-11-11). tests/agent_automation_integration_test.rs:2465 ''runner failure should tag agent-failed'' fails about 1 run in 8, also on main without DEV-343 (checked at 2f4184a). Cause: after the hand-back the ticket is already HelpNeeded/Agent Tests, so wait_for_task_state returns at once, before the failed @test run has added the agent-failed tag. Check: cargo nextest run -E ''test(shipped_agent_reviewed_template_handles_hand_back_failure_review_and_merge)'' in a loop. Done: the wait includes the tag, loop of 30 passes.'
+tags:
+- health
+custom_fields:
+  finding: test:agent_automation_integration_test
+history:
+- at: 2026-11-12T03:37:59.686565+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-343"]}'
+- at: 2026-11-12T03:37:59.797390+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T03:38:00.234454+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T03:38:00.874020+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b9e43f1-7f4f-48c8-b1ee-38b482fecc07

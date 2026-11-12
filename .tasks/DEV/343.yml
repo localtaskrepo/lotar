@@ -5,13 +5,15 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T02:37:52.182544+00:00
-modified: 2026-11-12T03:08:38.320103+00:00
+modified: 2026-11-12T03:37:59.996369+00:00
 relationships:
   related:
   - DEV-340
   - DEV-341
   - DEV-347
   - TEST-1
+  - DEV-348
+  - DEV-344
 comments:
 - date: 2026-11-12T03:08:20.659456+00:00
   text: |-
@@ -22,6 +24,8 @@ comments:
     - Docs: docs/help/agent.md (cleanup section).
     Checks: npm run lint, npm run test:agent (1999 Rust, 1441 UI, release and hook tests), npm run smoke (377): all pass. One full-suite run hit an environmental failure: a lotar-agent-wrapper process for TEST-1 from elsewhere on the machine made cli_configured_reviewer_can_resolve_an_agent_reported_review refuse. It passed 3 times right after, and the next full run was green.
     Found while testing: the agent-reviewed and agent-pipeline templates count HelpNeeded as done (it is their last state), so this cleanup also runs at HelpNeeded. That is safe (clean and landed only, and the next job recreates the worktree), but wrong. Filed as DEV-347.
+- date: 2026-11-12T03:37:59.921716+00:00
+  text: 'claude: merged into main as bd76b82 (rebased twice, fast-forward, signed). Checks in the worktree after the last rebase: npm run lint, npm test (2000 Rust, 1442 UI, hook tests; one retry on a flaky test), npm run smoke (377): all passed. The flaky test shipped_agent_reviewed_template_handles_hand_back_failure_review_and_merge also fails about 1 in 8 runs on main without this change (2f4184a); filed as a health ticket. Not pushed: main has unpushed commits from other tickets (DEV-344, version bump) that wait for their sessions.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac8bbef48-abb4-4ea3-a102-0aa1b813088b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab8168ee7-4f3b-406a-97a3-127902318a7b
@@ -83,3 +87,19 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab8168ee7-4f3b-406a-97a3-127902318a7b
+- at: 2026-11-12T03:37:59.685975+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-340","DEV-341","DEV-347","TEST-1"]}'
+    new: '{"related":["DEV-340","DEV-341","DEV-347","TEST-1","DEV-348"]}'
+- at: 2026-11-12T03:37:59.921716+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T03:37:59.996369+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-340","DEV-341","DEV-347","TEST-1","DEV-348"]}'
+    new: '{"related":["DEV-340","DEV-341","DEV-347","TEST-1","DEV-348","DEV-344"]}'

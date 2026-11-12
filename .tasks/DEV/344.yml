@@ -1,14 +1,19 @@
 title: Board view column drag moves 2 columns at once
-status: InProgress
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
 assignee: '@merge'
 created: 2026-11-12T02:51:11.809578+00:00
-modified: 2026-11-12T03:04:20.880642+00:00
+modified: 2026-11-12T03:37:59.996700+00:00
+relationships:
+  related:
+  - DEV-343
 comments:
 - date: 2026-11-12T03:03:58.156447+00:00
   text: 'Fixed in 0e19ccd (branch agent/DEV-344). Cause: the Columns dialog used the browser''s default drag image. Chrome paints that image from the element''s stacking context, clipped to the element, so inside the scrolling modal a neighbouring column (Done) could show up in the ghost. The drop logic was always right. Fix: on dragstart the dialog clones the dragged status or column header, places the copy off-screen in document.body and passes it to setDragImage. The copy is removed right after. Checks: new unit test in view/__tests__/BoardColumnsDialog.spec.ts (it failed before the fix). In a temporary Playwright check in Chromium, with the board scrolled, the drag image showed only the dragged status or header and the drops still worked. npm run lint, npm test and npm run smoke all pass. The Rust test dev279 cross-process jobs failed once, then passed on rerun (flaky, unrelated). Not checked: the real OS drag image can''t be captured in automation, and Safari/Firefox weren''t tried by hand.'
+- date: 2026-11-12T03:16:26.915043+00:00
+  text: 'claude: Merged into main as 8fbdc68 (fast-forward after two rebases; main moved once while checks ran). Ticket files committed as 2f4184a. Not pushed: main also holds unpushed commits from other sessions (210d432, 79fc503) that wait for their own sessions. Checks in the worktree: npm run lint passed, npm test passed, npm run smoke passed 376/377 on the first run; the one failure (ui.relationships) is unrelated to this change and passed on its own. After the second rebase (only version/docs/Cargo changes arrived) I re-ran lint and the BoardColumnsDialog spec, not the full test and smoke suites.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acc5efee6-bd66-409d-b0a7-534b40ba7f0f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa7ccd933-e8cc-4e1e-b762-0fa1c9a3d66d
@@ -52,3 +57,19 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa7ccd933-e8cc-4e1e-b762-0fa1c9a3d66d
+- at: 2026-11-12T03:16:26.915043+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T03:16:33.204428+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-11-12T03:37:59.996700+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-343"]}'
