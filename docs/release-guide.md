@@ -54,7 +54,8 @@ automation and the manual checks to run after every tag.
 ## Pre-Release Checklist
 
 1. Update versions in `Cargo.toml`, `package.json`, and any docs that mention the release
-   number.
+   number. Releases stay on 0.13.x (patch bumps) "until we add a major feature or something
+   breaks compatibility" (owner 2026-11-11).
 2. Update `CHANGELOG.md` (or the release notes draft) describing the highlights.
 3. Run the full quality gates locally:
    ```bash
