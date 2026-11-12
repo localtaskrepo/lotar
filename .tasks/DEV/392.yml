@@ -1,11 +1,11 @@
 title: Sync pulls no versions from Jira fixVersions or a GitHub milestone
-status: InProgress
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T20:54:20.979539+00:00
-modified: 2026-11-12T21:26:34.494918+00:00
+modified: 2026-11-12T21:27:13.261446+00:00
 relationships:
   related:
   - DEV-373
@@ -101,3 +101,9 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-12T21:27:13.261446+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

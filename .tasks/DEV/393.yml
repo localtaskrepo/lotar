@@ -5,11 +5,24 @@ type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-12T20:54:21.522017+00:00
-modified: 2026-11-12T20:54:42.336337+00:00
+modified: 2026-11-12T21:38:49.796104+00:00
 relationships:
   related:
   - DEV-373
   - DEV-394
+comments:
+- date: 2026-11-12T21:38:49.796104+00:00
+  author: claude
+  text: |-
+    claude (DEV-393 agent): Decisions where sprints did not fit releases, as the plan asked:
+    1. Membership lives on the ticket (releases: [<id>] in the task YAML), not in the release file as sprint membership does. Why: a ticket keeps its releases when moved, renamed or archived, filtering needs no second file, and no cross-file transaction is needed. Release files hold version, label, notes, planned_date, released_at, history and unknown keys.
+    2. Membership is not exclusive: a fix can ship in 0.15.1 and 0.16.0. add keeps other releases, move replaces them, remove takes one off.
+    3. Release IDs are numeric like sprints (@releases/<id>.yml); commands also take #id, a version (v0.15.0 = 0.15.0, stored without v, unique) or a label. A bare number is an ID, so release:2 means #2 and release:2.0 means version 2.0.x.
+    4. release: search term takes none, an ID, a label, a version or a range (release>=0.15 release<0.16); sort_by=releases sorts by earliest release in version order.
+    5. Backlog = open (not done) tickets in no release. Delete takes the release off its tickets (sprints leave dangling refs; here that would need cleanup tooling for no gain).
+    6. No sprint-style capacity, burndown, velocity, start/close or manual order: releases have planned/released only.
+    7. Automation: release condition (@next/@planned/@released, ID, label, version, range, exists), release_changed event, add/remove release action (with @next), ticket.releases template. Like sprint actions, an automation-made change does not fire further automation.
+    8. No config keys (nothing to configure yet), so config docs are unchanged.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A34b8c971-d1ce-4ec1-9f04-f191b66e3734
 - file: src/storage/sprint.rs
@@ -89,3 +102,7 @@ history:
   changes:
   - field: reference_added
     new: file:docs/help/sprints.md
+- at: 2026-11-12T21:38:49.796104+00:00
+  actor: claude
+  changes:
+  - field: comment_added
