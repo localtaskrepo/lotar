@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T05:21:54.615269+00:00
-modified: 2026-11-12T09:45:09.535393+00:00
+modified: 2026-11-12T10:40:50.389449+00:00
 relationships:
   depends_on:
   - DEV-372
@@ -15,6 +15,7 @@ relationships:
   - DEV-366
   - DEV-370
   - DEV-369
+  - DEV-373
 comments:
 - date: 2026-11-12T05:24:07.203106+00:00
   text: 'claude: the owner approved the fix in Fix (2026-11-11). Build it as described; the space is already freed (see Cleanup done). Reporter thread: the pyxzl.net link reference. The lotar thread that filed this tells the reporter when it is released.'
@@ -368,3 +369,9 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-12T10:40:50.389449+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-372"],"related":["DEV-343","DEV-358","DEV-366","DEV-370","DEV-369"]}'
+    new: '{"depends_on":["DEV-372"],"related":["DEV-343","DEV-358","DEV-366","DEV-370","DEV-369","DEV-373"]}'

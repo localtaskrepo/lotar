@@ -1,0 +1,55 @@
+title: 'Flaky smoke: monitor counterfactual in api.automation'
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@merge'
+created: 2026-11-12T10:40:44.142626+00:00
+modified: 2026-11-12T10:48:53.054032+00:00
+relationships:
+  related:
+  - DEV-373
+comments:
+- date: 2026-11-12T10:48:44.854738+00:00
+  author: claude
+  text: 'claude: Fixed in 082f1c7 (branch agent/DEV-375). Cause: the old-shape guard in the counterfactual test started its 4s kill timer at spawn, but the child''s own 3s abort bound only starts after Node startup. Under suite load the guard could kill the child just after it wrote aborted-old.marker (or fire after it had already exited), so the test took the Windows-wedge branch and asserted the marker absent. Change (smoke/tests/api.automation.smoke.spec.ts only): the guard skips the kill if the child has already exited, and the guard is 15s on POSIX (the child always self-aborts first) and stays 4s on Windows. Checks: npm run smoke (build + full suite) 381/381; full quick smoke 3x more under 6 extra CPU-burning processes, 381/381 each; npm run lint:agent and npm run test:agent pass.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac7e1522e-ee99-4de0-ab13-f76516f52c67
+description: 'Found 2026-11-12 during the DEV-373 merge: npm run smoke failed once in smoke/tests/api.automation.smoke.spec.ts ''monitor counterfactual: wait-then-read wedges a chatty stderr child, concurrent drain completes'' (line 730: expected the aborted-old marker to be absent, it existed). The file passed 3 of 3 runs alone and the full suite passed earlier the same night, so it looks load/timing dependent. Check: npm run smoke (full suite, repeated). Done: the test passes reliably under full-suite load.'
+tags:
+- health
+custom_fields:
+  finding: smoke-flake:api.automation-monitor-counterfactual
+history:
+- at: 2026-11-12T10:40:44.247748+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-373"]}'
+- at: 2026-11-12T10:40:44.349045+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T10:40:44.705449+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T10:40:45.261098+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac7e1522e-ee99-4de0-ab13-f76516f52c67
+- at: 2026-11-12T10:48:44.854738+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T10:48:53.054032+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
