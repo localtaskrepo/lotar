@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T20:54:20.979539+00:00
-modified: 2026-11-12T21:15:26.344420+00:00
+modified: 2026-11-12T21:26:34.494918+00:00
 relationships:
   related:
   - DEV-373
@@ -20,6 +20,9 @@ comments:
     Docs: docs/help/sync.md has the mapping example and notes for both remotes.
     Tests: 5 new tests in provider_tests.rs (mod versions) use recorded payloads against the mock API. The two pull tests failed first. Checks: npm run lint:agent clean, npm test:agent passes (2080 Rust, 1471 UI, release, hooks), smoke 381/381.
     Not checked: a live Jira or GitHub. In particular, the error Jira returns on push for a version the project doesn't have is untested.
+- date: 2026-11-12T21:26:34.494918+00:00
+  author: claude
+  text: 'claude: Merged. Rebased onto main without conflicts and fast-forwarded main to bcedef9 (DEV-392 Sync pulls no versions from Jira fixVersions or a GitHub milestone). Checks on the rebased branch: lint:agent clean; test:agent 2086 Rust, 1472 UI, release and hooks all pass; smoke 381/381. The first test run had one failure in dev60_shared_mutation_test::concurrent_comments_and_references_preserve_all_writes. That test is unrelated to this change and timing-sensitive under load: it passed 5 of 5 alone, and the whole suite passed on the rerun. Main then moved by one ticket-only commit (4b2c3a9), so I rebased again before the fast-forward. Pushed to origin/main together with the ticket updates.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1c0ff9ac-b919-430f-851b-5bbd5d3d8db9
 - file: src/services/sync_service/remote_fields.rs
@@ -94,3 +97,7 @@ history:
   - field: assignee
     old: '@fix'
     new: '@merge'
+- at: 2026-11-12T21:26:34.494918+00:00
+  actor: claude
+  changes:
+  - field: comment_added

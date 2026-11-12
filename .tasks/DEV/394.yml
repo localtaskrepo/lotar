@@ -3,13 +3,23 @@ status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T20:54:22.216856+00:00
-modified: 2026-11-12T20:54:42.428470+00:00
+modified: 2026-11-12T21:23:07.167574+00:00
 relationships:
   related:
   - DEV-373
   - DEV-393
+comments:
+- date: 2026-11-12T21:22:57.561803+00:00
+  author: claude
+  text: |-
+    claude (Opus 5.5): Done in commit 5abfe5d on agent/DEV-394.
+    - Tasks list: bulk menu 'Set field…' picks a declared custom field and a value; empty clears it. Version fields are checked as in the task panel. Finding: a task update's (and MCP task_bulk_update's) custom_fields replaces the whole map, so the page reads each task and sends its own map with the one field changed, guarded by expected_modified (one re-read on a 409). The MCP tool description and mcp-tools.md now say the map is replaced.
+    - Board: Group by lists every declared custom field. One lane per value, a list value in each of its lanes, '(none)' last; version fields in version order (new compareVersions in view/utils/versions.ts, semver precedence like the server).
+    - CLI: lotar edit --select '<query>' makes the same edit on every matching task (reports updated/failed, fails if any failed); -F key= now drops the field, as task move does.
+    - Docs: task.md, serve.md, mcp-tools.md. Also fixed the Tasks dialogs' close button wrapping under a long hint (Set field and Delete).
+    Checks: npm run lint (lint:agent) clean; npm test (test:agent): Rust 2079, UI 1477, release and hooks pass; npm run smoke: 104 files / 383 tests pass, incl. new bulk-set and board-by-field smoke tests with screenshots looked at.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa8e0c08-a022-42ea-b8e6-8c47e4f8181f
 - file: view/pages/TasksList.vue
@@ -74,3 +84,13 @@ history:
   changes:
   - field: reference_added
     new: file:view/pages/Board.vue
+- at: 2026-11-12T21:22:57.561803+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T21:23:07.167574+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'

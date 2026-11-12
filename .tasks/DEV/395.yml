@@ -3,12 +3,22 @@ status: InProgress
 priority: Low
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T20:54:22.994464+00:00
-modified: 2026-11-12T20:54:42.556447+00:00
+modified: 2026-11-12T21:18:19.887356+00:00
 relationships:
   related:
   - DEV-373
+comments:
+- date: 2026-11-12T21:18:06.959926+00:00
+  author: claude
+  text: |-
+    claude (DEV-395 agent job): Done in commit 6c35e00 on agent/DEV-395.
+    - Filter suggestions (useFilterOptions.ts): a list value offers each item; version fields sort in version order (new compareVersions in view/utils/versions.ts, same order as Version::sort_cmp: 0.13 just before 0.13.0, prereleases before the release, non-versions last). Pages pass useConfig's versionFields.
+    - MCP hints: custom_fields field hints carry types ({"affects":"version"}, only non-text fields), descriptions list 'affects (version)', enumHints has custom_field_types; a type change counts as a custom_fields hint change for list_changed. Test: tools_list_names_custom_field_types.
+    - Version input: the task panel learns the field values of the project's tasks it already loads for people/tags (up to 200) and offers the versions used in that field as a datalist, in version order. Tests: TaskPanelCustomFieldsSection.spec.ts, useTaskPanelOwnership.spec.ts.
+    - Docs: config.md (version fields), mcp.md (tools/list). Page test mocks of useConfig got versionFields.
+    Checks: npm run lint (lint:agent) clean; npm test (2076 Rust, 1475 UI, release and hooks tests) pass; npm run smoke (381) passes. Not checked by hand in a browser: the datalist dropdown is covered by the component unit test only.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1b2db749-64df-475b-9b1e-7c3dba96772f
 - file: view/composables/useFilterOptions.ts
@@ -66,3 +76,13 @@ history:
   changes:
   - field: reference_added
     new: file:view/components/task-panel/TaskPanelCustomFieldsSection.vue
+- at: 2026-11-12T21:18:06.959926+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T21:18:19.887356+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
