@@ -1,11 +1,11 @@
 title: Finished agent jobs leave GBs of build output in their worktrees
-status: InProgress
+status: HelpNeeded
 priority: High
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-12T05:21:54.615269+00:00
-modified: 2026-11-12T05:25:15.411751+00:00
+modified: 2026-11-12T05:37:41.714535+00:00
 relationships:
   related:
   - DEV-343
@@ -16,9 +16,14 @@ comments:
   text: 'claude: the owner approved the fix in Fix (2026-11-11). Build it as described; the space is already freed (see Cleanup done). Reporter thread: the pyxzl.net link reference. The lotar thread that filed this tells the reporter when it is released.'
 - date: 2026-11-12T05:25:15.411751+00:00
   text: 'claude: whoever releases this messages the reporter thread (the link reference) with the version, as the last done criterion says. I already sent the step-1 reply (space freed).'
+- date: 2026-11-12T05:36:24.867349+00:00
+  text: 'Claude (@fix job): built as described in Fix. New setting agent.worktree.cleanup_paths (config set, Config page > Agents, project override); lotar''s own .tasks/DEV/config.yml sets [target]. Every job end (finalize_job and cancelled) deletes those paths from the job''s worktree when no other job runs for the ticket, git ignores them and tracks nothing under them; the worktree stays. Lint passes; npm test and smoke are running.'
+- date: 2026-11-12T05:37:34.434111+00:00
+  text: 'claude: Merge not done. agent/DEV-364 has no commits beyond main (main is 5 commits ahead of it). The fix agent''s work (config cleanup_paths setting, agent_job_service.rs, docs, tests, UI, smoke spec) is still uncommitted in its worktree agent-DEV-364-a4468022dfcd537a, and its T3 thread is still running (npm run test:agent was in progress at 21:36). I did not touch that worktree. No checks ran and nothing was merged or pushed. Question: run the merge again once the fix agent has committed, or let it finish first?'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa38f4398-ffb1-4376-9c12-47e5507a143c
 - link: t3-thread://v2/d834978d-9e75-43fb-ba01-45747238fc44/b51ca0ac-1980-485f-a905-ffe6a2c807e5
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aec8f9332-8159-4afa-97b0-d29aebf46b3e
 description: |-
   Finished agent jobs leave their build output behind: every lotar job worktree keeps a 2 to 7 GB `target/`, so 41 lotar worktrees grew to 144 GB and the Mac's disk reached 98% (13 GiB free) on 2026-11-11. The owner: "That's a little too much storage used in parallel. we don't have that much space available actually". Reported by the pyxzl.net thread "Split Repo Binaries to Skip CI Builds".
 
@@ -221,3 +226,31 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-12T05:36:24.867349+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:36:28.639693+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T05:36:34.080269+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aec8f9332-8159-4afa-97b0-d29aebf46b3e
+- at: 2026-11-12T05:37:34.434111+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:37:41.714535+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox

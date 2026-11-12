@@ -3,21 +3,26 @@ status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T05:24:14.222418+00:00
-modified: 2026-11-12T05:24:42.234881+00:00
+modified: 2026-11-12T05:44:34.420148+00:00
 relationships:
   related:
   - DEV-343
   - DEV-346
   - DEV-348
   - DEV-364
+  - DEV-339
+  - DEV-350
 comments:
 - date: 2026-11-12T05:24:21.653717+00:00
   text: 'claude: filed for @fix with the owner''s OK (2026-11-11: "Ticket for @fix"). Pick the check from Open questions and say in the ticket which and why.'
+- date: 2026-11-12T05:44:20.806942+00:00
+  text: 'Claude (DEV-366 agent job): Done in commit 22b2f9c. Proof chosen: merge-tree. branch_landed still tries git cherry first. If that fails, the branch counts as landed when merging it into HEAD, or into a main commit since the fork point that touched the branch''s files, gives that commit''s own tree (git merge-tree --write-tree). This can''t pass for a branch whose changes main lacks. The commit scan covers main changing the same lines again later. ensure_branch_merged (merge jobs) uses the same check; I removed its duplicate git cherry block. Docs: docs/help/agent.md. Run by hand against the real branches: DEV-339, 346 and 348 pass; DEV-350 is kept (work missing). DEV-343 is still kept: main''s bd76b82 holds different content than aa4b664 in agent_job_service.rs (main kept a cherry block the branch removed), so merging conflicts at every main commit. Only a record of what the merge job landed could clear it; that would be a follow-up if wanted. Test: agent_safety_test git_required::done_removes_the_worktree_once_its_work_landed_reworked_and_keeps_missing_work (fails without the fix). Checks: npm run lint, npm test (2006 Rust + 1444 frontend; on the first run dev279 jobs_in_another_process_are_seen_guarded_and_cancelled failed once under load, then passed alone and on the full rerun), npm run smoke (379 passed).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aad7f2d6a-56ad-4a09-904b-adf0cbbae072
 - link: t3-thread://v2/d834978d-9e75-43fb-ba01-45747238fc44/b51ca0ac-1980-485f-a905-ffe6a2c807e5
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4628a7a3-140f-41c0-9f2f-f9020a31326f
 description: |-
   `lotar agent worktree cleanup` and the cleanup at Done (DEV-343) keep worktrees whose work is already on main. The merge job lands the ticket's commit rebased onto a newer main or reworked, so `git cherry` sees no equivalent commit. On 2026-11-11 this kept 3 of 8 Done worktrees (DEV-343, DEV-346, DEV-348, about 15 GB with their build output), with "has commits that are not in the main checkout's current branch".
 
@@ -75,3 +80,24 @@ history:
   - field: relationships
     old: '{"related":["DEV-343","DEV-346","DEV-348"]}'
     new: '{"related":["DEV-343","DEV-346","DEV-348","DEV-364"]}'
+- at: 2026-11-12T05:44:20.806942+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:44:21.073257+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-343","DEV-346","DEV-348","DEV-364"]}'
+    new: '{"related":["DEV-343","DEV-346","DEV-348","DEV-364","DEV-339","DEV-350"]}'
+- at: 2026-11-12T05:44:33.459994+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T05:44:34.420148+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4628a7a3-140f-41c0-9f2f-f9020a31326f

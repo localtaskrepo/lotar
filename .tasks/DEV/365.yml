@@ -3,14 +3,20 @@ status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T05:23:48.738895+00:00
-modified: 2026-11-12T05:23:51.434346+00:00
+modified: 2026-11-12T05:41:46.779518+00:00
 relationships:
   related:
   - DEV-362
+  - DEV-367
+  - TEST-1
+comments:
+- date: 2026-11-12T05:41:33.078682+00:00
+  text: 'claude: Fixed in ebdb85b on agent/DEV-365. Cause as described: ChangeSet records changes as tags/type, but conditions looked them up under the alias. New change_key() in src/services/automation_matching.rs maps labels→tags and task_type→type; it is used for change lookups (field conditions and changes:), in ChangeSet::only and collect_change_fields, so simulate agrees too. The branch is built on DEV-362''s commit 88d95c7 (update_match/simulate code, still being merged) by fast-forward; merge DEV-362 first, or this brings it along. Test: tests/dev365_automation_alias_conditions_test.rs (real update + simulate, field and changes: forms, both aliases); it failed before the fix. Ticket check: all four comments (labels/tags/task_type/type-fired) now added. Checks: lint:agent, test:agent (2010 Rust, 1444 UI, release, hooks), test:smoke:agent (379) all pass. The first test run failed in cli_agent_check_test from a stray lotar-agent-wrapper ''foreign'' TEST-1 process of another session (known: DEV-367); it passed after that process exited. Note: in simulate a changes: from: condition never matches, because the value before is unknown (DEV-362 design, same for tags/type).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3ac5dec7-ebec-4f8c-9960-503be09cc459
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A78efb4ae-e7de-4471-9faa-b47a7dec7e8f
 description: |-
   ## Found
   While fixing DEV-362 (2026-11-11): a rule condition written with the alias `labels:` or `task_type:` never fires on a real update, while the same condition written as `tags:` or `type:` does. docs/help/automation.md uses `labels` as an alias in `set`, and matching accepts both aliases for the current value.
@@ -50,3 +56,24 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3ac5dec7-ebec-4f8c-9960-503be09cc459
+- at: 2026-11-12T05:41:33.078682+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:41:33.392293+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-362"]}'
+    new: '{"related":["DEV-362","DEV-367","TEST-1"]}'
+- at: 2026-11-12T05:41:45.504045+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T05:41:46.779518+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A78efb4ae-e7de-4471-9faa-b47a7dec7e8f

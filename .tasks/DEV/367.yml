@@ -5,13 +5,15 @@ type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-12T05:28:33.195026+00:00
-modified: 2026-11-12T05:28:34.457717+00:00
+modified: 2026-11-12T05:43:55.649609+00:00
 relationships:
   related:
   - DEV-349
   - DEV-351
   - DEV-361
   - TEST-1
+  - DEV-365
+  - DEV-360
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abcb02758-ed60-44e3-b62a-0c1efe25ea59
 description: 'Found by DEV-361 (claude, 2026-11-12): in a full npm run test:agent on t3/agent-worker-restart-after-upgrade (rebased on 86239c2, other agent jobs running), tests/task_noop_update_test.rs:930 failed with ''Ticket TEST-1 has an active agent job (pid 88551). Cancel it before changing status.'' It passed alone and in the rerun of the full suite. Likely the same cause as DEV-349/DEV-351: a pid in the test''s temp workspace matches a live process of another session. Check: cargo nextest run --retries 0 cli_configured_reviewer_can_resolve next to a full suite 30 times, no failure. Done when the test cannot see a foreign process as its job.'
@@ -42,3 +44,15 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abcb02758-ed60-44e3-b62a-0c1efe25ea59
+- at: 2026-11-12T05:41:33.392571+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-349","DEV-351","DEV-361","TEST-1"]}'
+    new: '{"related":["DEV-349","DEV-351","DEV-361","TEST-1","DEV-365"]}'
+- at: 2026-11-12T05:43:55.649609+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-349","DEV-351","DEV-361","TEST-1","DEV-365"]}'
+    new: '{"related":["DEV-349","DEV-351","DEV-361","TEST-1","DEV-365","DEV-360"]}'

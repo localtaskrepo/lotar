@@ -1,11 +1,11 @@
 title: lotar agent worker keeps running its old build after lotar is upgraded
-status: InProgress
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T05:01:21.522818+00:00
-modified: 2026-11-12T05:33:13.944605+00:00
+modified: 2026-11-12T05:34:44.895208+00:00
 relationships:
   related:
   - DEV-342
@@ -26,15 +26,19 @@ comments:
   text: 'claude: Nothing left to change in code. The fix is on main as 06b571f (git cherry main agent/DEV-361 shows 32a8819 as applied; the branch has no diff that main lacks). The merge job job-20261112T051323.505Z-36 failed with ''agent/DEV-361 is not merged ... can''t be fast-forwarded'' only because worker pid 11651 (started 2026-11-11 18:31, before DEV-342''s c55f67c) still runs it. That is this ticket''s bug. Every retry run by that worker fails the same way. No checks ran this pass, because no files changed. The ticket''s check needs a worker started from a build with 06b571f, and the installed lotar is 0.13.2 without it. Question for mallox: may 11651 be stopped once its running jobs finish (e.g. kill 11651 when lotar agent shows none running), with a release containing 06b571f installed first, so the next worker restarts itself on later upgrades and this ticket can be closed?'
 - date: 2026-11-12T05:33:12.437094+00:00
   text: 'claude: Owner decision 2026-11-11 (mallox): ''Yes, you may stop the worker''. Old worker pid 11651 was running 6 other jobs (DEV-360/362/363/364/365/367), so I did not kill it right away. A detached watcher (stop-worker-11651.sh in this session''s scratchpad, log next to it) sends it TERM once it has no running job children. The second worker, pid 53147 (/opt/homebrew/bin/lotar 0.13.2, started 21:24, includes DEV-342''s fix), keeps serving the queue. I cleared the HelpNeeded/mallox outcome so the merge agent retries. The code is already on main (06b571f). A retry picked up by 11651 before it stops would fail the same way. Still open: the ticket''s check needs a lotar release with 06b571f installed (owner''s step), then an upgrade while a worker runs.'
+- date: 2026-11-12T05:33:56.004942+00:00
+  text: 'claude: Retry pass, nothing to change. The fix is on main as 06b571f; git cherry main agent/DEV-361 shows 32a8819 as applied (-), so the branch adds nothing. No files changed, no commit, no checks run. This job itself runs under the old worker 11651, which still has 6 job children (DEV-360/362/364/365/367 and this one), so the stop-worker-11651.sh watcher (pid 57797) has not fired yet. 11651 keeps taking new queue entries while it has children, so it may not go idle on its own; if the merge retry fails again with ''not merged ... can''t be fast-forwarded'', it ran on 11651. Still open: the check needs a release with 06b571f installed, then an upgrade while a worker runs.'
+- date: 2026-11-12T05:34:31.399280+00:00
+  text: 'claude: Nothing to merge. The branch''s only commit (32a8819) is already on main as 06b571f: git cherry main HEAD shows it as applied, and the branch only trails main (its docs/help/agent.md differs just because main has a newer DEV-358 edit). I merged, pushed and ran nothing. The ticket''s check still needs a lotar release that includes 06b571f, installed, and worker 11651 (old build) stopped or replaced; see the earlier comment.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af86593d9-5bfc-43dc-9e6e-504db1577842
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab7be4f58-8651-4692-8cf6-4cb0c810c1c9
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9d6c1af5-42de-408e-bad9-68435488fc61
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa9c6ec5a-b410-4c1d-9139-06490a1ceb9c
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ade4eb3a6-51fc-44ac-835a-0df0126400ed
 description: 'Found by DEV-356 (claude, 2026-11-11): the merge job job-20261112T044319.387Z-24 fast-forwarded main correctly (0a8b272), but LoTaR failed it with ''agent/DEV-356 is not merged into the main checkout''s current branch and can''t be fast-forwarded''. The thread worked on t3/fix-flaky-t3-runner-test, and git cherry main agent/DEV-356 shows the commit as applied, so DEV-342''s fix (c55f67c, in v0.13.2) would have passed it. The ''lotar agent worker'' (pid 11651) started 2026-11-11 18:31 local, before c55f67c (18:42) and before v0.13.2 was installed at /opt/homebrew/opt/lotar/bin/lotar (20:27), so it still runs the old code. Jobs it runs use old merge checks and old rules until someone restarts it. Check: after upgrading lotar while a worker runs, the worker runs the new build for the next job (or ''lotar agent'' status warns that the worker is older than the installed binary). Done when a worker notices its executable changed and restarts between jobs, or reports it clearly, with a test.'
 tags:
 - health
-- merge-retried
 custom_fields:
   finding: stale-process:agent-worker-binary
 history:
@@ -161,3 +165,31 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa9c6ec5a-b410-4c1d-9139-06490a1ceb9c
+- at: 2026-11-12T05:33:56.004942+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:34:02.777655+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T05:34:04.981623+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ade4eb3a6-51fc-44ac-835a-0df0126400ed
+- at: 2026-11-12T05:34:31.399280+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:34:44.895208+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: tags
+    old: health, merge-retried
+    new: health

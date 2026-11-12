@@ -1,27 +1,45 @@
 title: 'Flaky Rust: status_and_assignee_set_during_a_job_win_over_the_job_completed_rule'
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-12T04:55:55.878491+00:00
-modified: 2026-11-12T05:33:52.692172+00:00
+modified: 2026-11-12T05:43:55.648281+00:00
 relationships:
   related:
   - DEV-356
   - DEV-361
   - DEV-358
+  - DEV-342
+  - DEV-367
 comments:
 - date: 2026-11-12T05:16:45.226592+00:00
   text: 'claude: Cause found and fixed in b49019573a6c3e19ba7f8d33337c0c48288d9b8b (branch agent/DEV-360). run_job spawned the runner first and wrote the job''s shared record afterwards. For about 10-15 ms, list-running already showed the lotar-agent-wrapper process, but there was no record yet, so ''lotar status''/''assignee'' refused the change (''has an active agent job ... Cancel it'') instead of deferring it. The test polls every 200 ms, so it landed in that window only rarely. A script that polls without pausing hit it in 24 of 40 runs. Fix: write the record before the spawn (child_pid 0), then rewrite it with the runner''s pid; RunningJobSlot still unregisters it on every exit path. New regression test dev320_job_outcome_test::the_job_record_exists_when_the_runner_starts uses a shell LOTAR_AGENT_WRAPPER that looks for the record the moment it starts: it failed 6/6 before the fix and passes after. Checks: ticket check command (-E ''test(dev320_job_outcome_test::)'', --retries 0) 10/10 passed; race script 40/40; npm run lint:agent, test:agent (2004 Rust, 1444 UI, release and hooks tests), and smoke (379) all passed. I did not rerun the check next to a full suite run started by another session.'
 - date: 2026-11-12T05:33:52.381418+00:00
   text: 'claude: Merged into main as 57d580b (fast-forward, rebased twice because main moved). Checks in the worktree after the last code rebase: lint:agent, test:agent (2007 Rust tests passed), smoke (379 passed). The ticket''s check command (dev320_job_outcome_test, --retries 0) passed 3 of 3, run from the worktree with the same code. Not pushed: main has unpushed commits from other tickets (DEV-358, DEV-361) that wait for their sessions.'
+- date: 2026-11-12T05:34:04.557986+00:00
+  text: The merge agent's job job-20261112T051657.399Z-37 failed (lotar agent logs job-20261112T051657.399Z-37); the fix agent retries it on branch agent/DEV-360.
+- date: 2026-11-12T05:39:55.815201+00:00
+  text: 'claude: Nothing left to fix. The fix is on main as 57d580b; git cherry main b490195 shows the branch commit as already applied. The merge job job-20261112T051657.399Z-37 failed only because agent/DEV-360 still points at the pre-rebase commit b490195, which can''t fast-forward onto main. The merge agent rebased and merged on a different branch, so the code is in. That''s the stale merge check from DEV-361 (old worker, before DEV-342''s cherry check). Check on main''s code (9a39ab7): cargo nextest run --cargo-profile local --retries 0 -E ''test(dev320_job_outcome_test::)'' passed 5 of 5. No new commit.'
+- date: 2026-11-12T05:40:28.118217+00:00
+  text: 'claude: Nothing to merge. This branch''s only commit (b490195) is already on main as a rebased copy (git cherry main HEAD marks it applied; main has the DEV-360 fix at 57d580b). I made no changes.'
+- date: 2026-11-12T05:40:33.866557+00:00
+  text: 'The merge agent''s job job-20261112T054005.394Z-51 failed again: lotar agent logs job-20261112T054005.394Z-51. The fix is on branch agent/DEV-360. Try again with lotar automation run "Health: retry with @fix" --select ''id:DEV-360'', or for an agent''s ticket lotar assignee DEV-360 @fix.'
+- date: 2026-11-12T05:43:55.493029+00:00
+  text: |-
+    Reported again by claude on 2026-11-11.
+
+    Found by DEV-367 (claude, 2026-11-11): in a full npm test on agent/DEV-367, tests/dev320_job_outcome_test.rs:87 failed with "Ticket 'OUTC-1' has an active agent job (pid 80511). Cancel it before changing status." It passed 5 times alone. Likely cause: run_job spawns the lotar-agent-wrapper (src/services/agent_job_service.rs:1765) before it registers the job record (:1801). agent list-running already shows the wrapper, so the test goes on, and status finds a wrapper without a record, which takes_ticket_changes refuses. Check: cargo nextest run --retries 0 --test integration status_and_assignee_set_during_a_job_win next to a full suite 30 times, no failure. Done when a job's wrapper is never visible without its record (or the status guard waits for it).
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1374b68b-4b59-4bba-85b3-9a0b258782d4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aaa2cf252-900b-4fc7-ad60-43ea614197bb
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad289b020-44eb-4cc0-93e5-5d08b3405bc8
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4523c175-9949-4c69-ab55-affc2653a168
 description: 'Found by DEV-356 (claude, 2026-11-11): in npm run test:rust on t3/fix-flaky-t3-runner-test (rebased on efa1c0b) while other sessions ran test suites, tests/dev320_job_outcome_test.rs status_and_assignee_set_during_a_job_win_over_the_job_completed_rule failed once (1.5 s); the run stopped at that test, so I did not see the panic line. It passed on its own 6 times and in the next two full runs. Unconfirmed cause: a fixed sleep or poll deadline too short under load, like DEV-356. Check: cargo nextest run --cargo-profile local --retries 0 -E ''test(dev320_job_outcome_test::)'' passes repeatedly next to the full suite. Done when the cause is found and fixed, with the test passing without retries.'
 tags:
 - health
+- merge-retried
 custom_fields:
   finding: flaky-test:status_and_assignee_set_during_a_job_win_over_the_job_completed_rule
 history:
@@ -78,3 +96,69 @@ history:
   - field: relationships
     old: '{"related":["DEV-356","DEV-361"]}'
     new: '{"related":["DEV-356","DEV-361","DEV-358"]}'
+- at: 2026-11-12T05:34:04.283962+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: health
+    new: health, merge-retried
+- at: 2026-11-12T05:34:04.557986+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:34:06.417500+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad289b020-44eb-4cc0-93e5-5d08b3405bc8
+- at: 2026-11-12T05:39:55.815201+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:39:56.179998+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-356","DEV-361","DEV-358"]}'
+    new: '{"related":["DEV-356","DEV-361","DEV-358","DEV-342"]}'
+- at: 2026-11-12T05:40:04.952315+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T05:40:06.555297+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4523c175-9949-4c69-ab55-affc2653a168
+- at: 2026-11-12T05:40:28.118217+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:40:33.675803+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-12T05:40:33.866557+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:43:55.493029+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:43:55.648281+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-356","DEV-361","DEV-358","DEV-342"]}'
+    new: '{"related":["DEV-356","DEV-361","DEV-358","DEV-342","DEV-367"]}'
