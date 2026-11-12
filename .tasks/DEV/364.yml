@@ -1,11 +1,11 @@
 title: Finished agent jobs leave GBs of build output in their worktrees
-status: InProgress
+status: Done
 priority: High
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T05:21:54.615269+00:00
-modified: 2026-11-12T09:42:08.494950+00:00
+modified: 2026-11-12T09:45:09.535393+00:00
 relationships:
   depends_on:
   - DEV-372
@@ -32,6 +32,12 @@ comments:
   text: 'claude: Merged into main as 66c7060 and pushed (owner OK 2026-11-12). The open question is moot: the fix agent had committed 6144029. Rebased onto main, one conflict in docs/help/agent.md resolved by keeping both sides (DEV-366''s rewritten cleanup bullet and the new cleanup_paths bullet). Checks after the rebase: npm run lint, npm test (Rust 2024, UI 1444), npm run smoke (380), all pass. Not in v0.13.3. Now Blocked, depending on DEV-372 (Release v0.13.4) instead of DEV-369: when it closes, @fix checks that finished jobs drop target/ and tells the reporter thread the version.'
 - date: 2026-11-12T08:05:34.892803+00:00
   text: 'claude: Owner 2026-11-12: no v0.13.4 for this alone (''Wait, clean up by hand''); the fix ships with the next release (DEV-372). Cleanup by hand 2026-11-12: lotar''s worktrees had grown from 24 GB (2026-11-11 cleanup) to 85 GB. With no agent job running and no process in them, I deleted the git-ignored target/ in the 19 worktrees that had one (7 agent-DEV-*, 12 t3-*), so the worktrees went to 17 GB and the free space from 135 to 167 GiB. The local Time Machine snapshot com.apple.TimeMachine.2026-11-11-213344.local still holds the deleted files; thinning it was refused by this session''s permissions and is left to the owner (tmutil thinlocalsnapshots / 200000000000 4).'
+- date: 2026-11-12T09:44:39.235418+00:00
+  author: claude
+  text: 'claude: Check passes against the installed lotar 0.14.0 (/opt/homebrew/bin/lotar, tag v0.14.0 contains the fix 66c7060; .tasks/DEV/config.yml sets cleanup_paths: [target]). No real lotar job has ended under 0.14.0 yet (installed 09:41Z, the only later job is this one), so I ran jobs with the installed binary in a throwaway git repo (isolated HOME, worktrees on, cleanup_paths: [target], .gitignore target/ and keep/, a command-runner profile that writes target/debug/app and keep/log). A job that completes: target/ deleted, keep/log and the worktree stay, log says ''Deleted build output `target` from the worktree''. A job that sets its ticket HelpNeeded: the ticket ends HelpNeeded, target/ deleted the same way, worktree stays. Not rechecked here: the running-job case (covered by tests/agent_safety_test.rs). The agent-DEV-370 worktree still holds a 6.7 GB target/ from 01:18 local, before the install; it is not this job''s to delete. Still open: the last done item, telling the reporter thread (pyxzl.net) the version 0.14.0; I didn''t message it, this job only checks.'
+- date: 2026-11-12T09:45:04.710827+00:00
+  author: claude
+  text: 'claude: nothing to merge. This thread''s branch has no commits beyond main (git log main..HEAD is empty); the fix landed earlier as 66c7060 and shipped in v0.14.0, and the release check passed (comment above). No checks ran, nothing merged or pushed. Still open: telling the reporter thread (pyxzl.net) the version 0.14.0.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa38f4398-ffb1-4376-9c12-47e5507a143c
 - link: t3-thread://v2/d834978d-9e75-43fb-ba01-45747238fc44/b51ca0ac-1980-485f-a905-ffe6a2c807e5
@@ -342,3 +348,23 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0818f9ad-e49b-4c1e-8709-88510533127a
+- at: 2026-11-12T09:44:39.235418+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T09:44:50.492157+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T09:45:04.710827+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T09:45:09.535393+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

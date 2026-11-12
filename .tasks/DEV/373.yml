@@ -3,9 +3,9 @@ status: InProgress
 priority: High
 type: Feature
 reporter: mallox
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T08:53:59.182009+00:00
-modified: 2026-11-12T09:43:24.159055+00:00
+modified: 2026-11-12T10:35:57.162544+00:00
 relationships:
   related:
   - DEV-374
@@ -30,6 +30,28 @@ comments:
 - date: 2026-11-12T09:43:23.354497+00:00
   author: claude
   text: 'claude: Owner 2026-11-12: work this overnight (@fix), take the time it needs; build all of the plan above, not a slice. Do it the way AGENTS.md says, with lint, test and smoke. Run lotar with LOTAR_DEFAULT_REPORTER set to your agent name and start each comment with it. Commit on your worktree''s branch, signed, never --no-verify, message ''DEV-373 Add versions'' (amend while unpushed); don''t merge or push, the merge agent does. Never delete work that isn''t saved elsewhere. A choice the plan leaves open: decide it, say why in a comment, and keep going; only what the owner alone can decide: comment one question, set HelpNeeded and assign mallox. End with a comment the owner can verify from: what to try (commands), what changed, the commit, the checks.'
+- date: 2026-11-12T10:35:46.590246+00:00
+  author: claude
+  text: |-
+    claude: Done on branch agent/DEV-373, commit 741b4eb 'DEV-373 Add versions' (signed, not pushed or merged).
+
+    To try (from the worktree, after cargo build; or after the merge):
+      lotar config set custom_field_properties 'affects=version, fixed_in=version' --global   (or in YAML: custom: { fields: [product, { name: affects, type: version }] })
+      lotar add "Crash" --field affects=v0.13.2        -> stored as '0.13.2'
+      lotar add "Leak" --field affects=0.13.1,0.14.0   -> a list
+      lotar add "Bad" --field affects=later            -> refused: 'later' is not a version
+      lotar list 'affects>=0.13' 'affects<0.14'        (quote: < and > redirect in a shell)
+      lotar list affects=0.13 / affects=^0.13 / affects=~0.13.2 / '-affects>=0.14'
+      lotar list --sort-by affects order=asc           -> version order (0.9.1 before 0.10.0)
+      Web UI: search box takes the same terms; Config > Tags & fields > Version fields; task panel flags 'soon' in a version field and does not save it.
+      Automation: when: { current: { affects: { version: '>=0.13 <0.14' } }, status: InProgress }
+    lotar's own DEV project now declares affects and fixed_in as version fields (.tasks/DEV/config.yml, custom.field_properties).
+
+    What changed: typed custom fields (custom_field_properties, split from/folded into custom.fields like tag colours; config set/inspect/validate); src/utils/version.rs (parse, semver precedence, ranges) and view/utils/versions.ts; writes normalised in task_validation (CLI add/edit, REST, MCP, move); query terms in both search parsers + shared fixture; version filters and sort in task_list; automation 'version' operator + validation, rule dialog option; Config page list; task panel check; docs (config, config-reference, list, add, automation, mcp-tools, task-model), OpenAPI descriptions, MCP tool descriptions.
+
+    Decisions the plan left open: (1) own parser, not the semver crate: semver cannot hold a partial value like 0.13 meaning every 0.13.x, and its bare '0.13' requirement means ^0.13. (2) A value matches when it overlaps the range, so affects: 0.13 matches affects>=0.13.2. (3) Plain precedence for prereleases: <0.14 leaves out 0.14.0-rc.1, <0.14.0 includes it. (4) Up to three numbers (1.2.3.4 is refused). (5) A comma in a CLI value makes a list. (6) An unchanged hand-written value that is not a version passes, so it never blocks other edits; searches skip it. (7) A declared custom field may also stand at the top level of an automation condition. (8) A REST URL key cannot hold '>=': use query=affects>=0.13 or affects=>=0.13.
+
+    Checks: npm run lint (lint:agent) clean; npm test (test:agent): 2061 Rust, 1469 UI, release and hook tests pass; npm run smoke: 104 files / 381 tests pass, including the new ui.version-fields smoke test. New tests: utils::version unit tests, config_custom_field_types_test, custom_field_versions_test (CLI + REST), dev373_automation_version_conditions_test, MCP version test, shared search fixture cases, versions.spec.ts, config form and automation round-trip specs.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa2665ffa-2a99-4ee0-9537-002211dcfb14
 description: We don't have a place to indicate which version a bug affects or when it was found. We should add smart field support and fields with powerful operations for them, such as understanding version ranges.
@@ -70,3 +92,13 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa2665ffa-2a99-4ee0-9537-002211dcfb14
+- at: 2026-11-12T10:35:46.590246+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T10:35:57.162544+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
