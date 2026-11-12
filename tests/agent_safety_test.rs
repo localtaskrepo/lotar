@@ -2,9 +2,9 @@
 
 use crate::common;
 use common::TestFixtures;
-use lotar::api_types::{AgentJobCreateRequest, TaskCreate};
+use lotar::api_types::{AgentJobCreateRequest, TaskCreate, TaskUpdate};
 use lotar::services::agent_job_service::AgentJobService;
-use lotar::services::task_service::TaskService;
+use lotar::services::task_service::{TaskService, TaskUpdateContext};
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
@@ -410,6 +410,14 @@ mod git_required {
         assert!(!cleanup(&fixture).status.success());
         assert!(wt.exists(), "unmerged worktree must be preserved");
         git(root, &["show-ref", "--verify", &format!("refs/heads/{branch}")]);
+        fs::write(root.join("other"), "main moved on").unwrap();
+        git(root, &["add", "other"]);
+        git(root, &["commit", "-m", "Other work"]);
+        git(root, &["cherry-pick", &branch]);
+        let output = cleanup(&fixture);
+        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        assert!(!wt.exists(), "work landed rebased counts as merged");
+        assert!(!branch_exists(root, &branch));
     }
 
     #[test]
@@ -474,6 +482,63 @@ mod git_required {
         assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
         assert!(!wt.exists(), "configured done state should allow clean merged cleanup");
         assert!(!Command::new("git").args(["show-ref", "--verify", &format!("refs/heads/{branch}")]).current_dir(root).output().unwrap().status.success());
+    }
+
+    fn set_status(fixture: &TestFixtures, ticket: &str, status: &str, context: TaskUpdateContext) {
+        let patch = TaskUpdate { status: Some(status.into()), ..Default::default() };
+        TaskService::update_with_context(&mut fixture.create_storage(), ticket, patch, context).unwrap();
+    }
+
+    fn branch_exists(root: &Path, branch: &str) -> bool {
+        Command::new("git").args(["show-ref", "--verify", "--quiet", &format!("refs/heads/{branch}")]).current_dir(root).status().unwrap().success()
+    }
+
+    /// DEV-343: the fix job ends with the ticket handed on, not Done; the
+    /// merge lands its commit rebased. Done, set afterwards by whoever,
+    /// removes the fix job's worktree and branch.
+    #[test]
+    fn done_removes_the_worktree_an_earlier_job_left_once_its_work_landed_rebased() {
+        common::require_git();
+        let (fixture, ticket) = setup("echo fix > fix.txt && git add fix.txt && git commit -q -m Fix", true);
+        let root = fixture.get_temp_path();
+        let branch = format!("agent/{ticket}");
+        let job = AgentJobService::start_job_with_tasks_dir(request(&ticket), &fixture.tasks_root).unwrap();
+        wait_idle();
+        let job = AgentJobService::get_job(&job.id).unwrap();
+        assert_eq!(job.status, "completed", "{:?}", job.last_message);
+        let worktree = Path::new(job.worktree_path.as_deref().unwrap()).to_path_buf();
+        assert!(worktree.exists(), "the ticket is not Done yet");
+
+        fs::write(root.join("other.txt"), "main moved on").unwrap();
+        git(root, &["add", "other.txt"]);
+        git(root, &["commit", "-q", "-m", "Other work"]);
+        set_status(&fixture, &ticket, "Done", TaskUpdateContext::default());
+        assert!(worktree.exists(), "unlanded work keeps the worktree");
+
+        git(root, &["cherry-pick", &branch]);
+        let ancestor = Command::new("git").args(["merge-base", "--is-ancestor", &branch, "HEAD"]).current_dir(root).status().unwrap();
+        assert!(!ancestor.success(), "the fix landed as a new commit");
+        set_status(&fixture, &ticket, "Todo", TaskUpdateContext::default());
+        set_status(&fixture, &ticket, "Done", TaskUpdateContext::default());
+        assert!(!worktree.exists(), "Done removes the landed worktree");
+        assert!(!branch_exists(root, &branch), "cleanup_delete_branches deletes the rebased branch");
+    }
+
+    /// DEV-343: Done set while a job still runs for the ticket waits for
+    /// the job's end.
+    #[test]
+    fn done_during_a_job_leaves_the_worktree_to_the_jobs_end() {
+        common::require_git();
+        let (fixture, ticket) = setup("touch \"$LOTAR_TASKS_DIR/../started\"; sleep 2", true);
+        let root = fixture.get_temp_path();
+        let job = AgentJobService::start_job_with_tasks_dir(request(&ticket), &fixture.tasks_root).unwrap();
+        wait_until(|| root.join("started").exists());
+        let worktree = Path::new(AgentJobService::get_job(&job.id).unwrap().worktree_path.as_deref().unwrap()).to_path_buf();
+        set_status(&fixture, &ticket, "Done", TaskUpdateContext::automation_disabled());
+        assert!(worktree.exists(), "the running job keeps its worktree");
+        wait_idle();
+        assert!(!worktree.exists(), "the job's end removes it");
+        assert!(!branch_exists(root, &format!("agent/{ticket}")));
     }
 
     #[test]

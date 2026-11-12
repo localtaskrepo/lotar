@@ -647,9 +647,10 @@ impl AgentHandler {
                 Ok(output) if output.status.success() => {
                     renderer.emit_success(format!("Removed worktree: {} ({})", wt.ticket_id, wt.path));
 
-                    // Optionally delete the branch
+                    // Optionally delete the branch: its commits are in the main
+                    // checkout, possibly rebased, which `git branch -d` refuses.
                     if args.delete_branches {
-                        let branch_result = git_command(&repo_root).args(["branch", "-d", &wt.branch]).current_dir(&repo_root).output();
+                        let branch_result = git_command(&repo_root).args(["branch", "-D", &wt.branch]).current_dir(&repo_root).output();
 
                         match branch_result {
                             Ok(out) if out.status.success() => {

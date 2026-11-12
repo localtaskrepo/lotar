@@ -352,7 +352,7 @@ agent:
     dir: ".lotar-worktrees"      # Directory for worktrees (relative to repo parent or absolute)
     branch_prefix: "agent/"      # Branch prefix for worktree branches (default: "agent/")
     max_parallel_jobs: 3         # Limit concurrent agent jobs (optional, default: unlimited)
-    cleanup_on_done: true         # Remove worktrees after successful jobs when ticket is done
+    cleanup_on_done: true         # Remove worktrees when the ticket reaches done
     cleanup_on_failure: false     # Remove worktrees after failed jobs (default: false)
     cleanup_on_cancel: false      # Remove worktrees after cancelled jobs (default: false)
     cleanup_delete_branches: true # Delete worktree branches during cleanup
@@ -366,7 +366,8 @@ When enabled:
 - A branch is created at `<branch_prefix><ticket-id>` (e.g., `agent/TEST-1`)
 - Multiple job phases for the same ticket reuse the same worktree
 - The worktree persists after the job completes unless cleanup is enabled
-- Cleanup only removes a worktree whose ticket is done, whose branch is merged into the main checkout, and that has no untracked or modified files. Git-ignored files such as build and test output are removed with it; set `cleanup_ignored_files: false` to keep any worktree that still holds ignored files. When cleanup keeps a worktree, the job log says why.
+- With `cleanup_on_done`, a ticket that reaches a done status loses the worktree on its ticket branch, whoever set the status: a job, automation, the CLI or the web UI. While a job runs for the ticket, its end does the cleanup. A successful job also removes its own worktree when the ticket is done by then.
+- Cleanup only removes a worktree whose ticket is done, whose branch is merged into the main checkout, and that has no untracked or modified files. A branch counts as merged when every commit on it is in the main checkout, also when it landed rebased or cherry-picked (`git cherry`). Git-ignored files such as build and test output are removed with it; set `cleanup_ignored_files: false` to keep any worktree that still holds ignored files. When cleanup keeps a worktree, the job log says why.
 - Merge-profile jobs require worktrees so merges happen on isolated branches
 - When worktrees are enabled, setup failure fails the job; the runner never falls back to the repository checkout.
 - Git setup, checks, cleanup, and runners discard inherited/profile repository-selection overrides (`GIT_DIR`, `GIT_WORK_TREE`, `GIT_COMMON_DIR`, `GIT_INDEX_FILE`, object/discovery overrides, and `GIT_CONFIG*`). Worktree top-level and common-directory identity are verified. SSH/askpass and author/committer identity environment variables are retained.
@@ -396,7 +397,7 @@ lotar agent worktree cleanup --all
 lotar agent worktree cleanup --dry-run
 ```
 
-Worktrees with active jobs are never removed, even with `--all`. Cleanup refuses dirty worktrees (including untracked or ignored files), unknown Git state, and branches not merged into the repository checkout's `HEAD`. Branch deletion uses Git's non-forced deletion checks. `--all` broadens ticket selection only; it is not a force-delete option. Refusals are reported and return a nonzero exit status.
+Worktrees with active jobs are never removed, even with `--all`. Cleanup refuses dirty worktrees (including untracked or ignored files), unknown Git state, and branches with commits that are not in the repository checkout's `HEAD`; a branch that landed rebased or cherry-picked counts as merged (`git cherry`). Branches are deleted with `git branch -D`, because `-d` refuses a rebased branch, and only after these checks pass. `--all` broadens ticket selection only; it is not a force-delete option. Refusals are reported and return a nonzero exit status.
 
 Default CLI cleanup and all automatic cleanup require a readable, valid ticket in a configured done state. Missing, malformed, unreadable, or unknown-status tickets are preserved, even with `--all`. Failure/cancellation cleanup settings only enable cleanup when that same done-state and Git safety check succeeds.
 

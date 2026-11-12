@@ -1269,6 +1269,10 @@ impl TaskService {
             let _ = AutomationService::apply_task_update(storage, Some(&previous_dto), &dto, &config);
         }
 
+        if previous_dto.status != dto.status {
+            crate::services::agent_job_service::cleanup_done_ticket_worktree(storage.root_path.as_path(), &canonical);
+        }
+
         Ok(TaskUpdateReceipt { dto, changed: true, deferred: None })
     }
 

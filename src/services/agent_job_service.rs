@@ -1419,7 +1419,93 @@ pub(crate) fn check_worktree_cleanup(repo_root: &std::path::Path, path: &std::pa
     if !head.status.success() || String::from_utf8_lossy(&head.stdout).trim() != format!("refs/heads/{branch}") {
         return Err(LoTaRError::ValidationError("Worktree branch changed or is unknown".into()));
     }
-    run_git_command(&root, &["merge-base", "--is-ancestor", &format!("refs/heads/{branch}"), "HEAD"])
+    if branch_landed(&root, branch)? {
+        Ok(())
+    } else {
+        Err(LoTaRError::ValidationError(format!("{branch} has commits that are not in the main checkout's current branch")))
+    }
+}
+
+/// Whether every commit on `branch` is in the checkout's current branch:
+/// merged, or landed rebased or cherry-picked (DEV-343). `git cherry`
+/// marks a commit HEAD has no equivalent of with `+`.
+fn branch_landed(repo_root: &std::path::Path, branch: &str) -> LoTaRResult<bool> {
+    let output =
+        git_command(repo_root).args(["cherry", "HEAD", &format!("refs/heads/{branch}")]).current_dir(repo_root).output().map_err(LoTaRError::IoError)?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(LoTaRError::ValidationError(format!("git cherry HEAD {branch} failed: {}", stderr.trim())));
+    }
+    Ok(!String::from_utf8_lossy(&output.stdout).lines().any(|line| line.starts_with('+')))
+}
+
+/// Remove a worktree `check_worktree_cleanup` passed, and its branch when
+/// `delete_branch` is set. The branch's commits are in the main checkout,
+/// possibly rebased, which `git branch -d` would refuse.
+fn remove_worktree(repo_root: &std::path::Path, path: &std::path::Path, branch: Option<&str>, delete_branch: bool) {
+    let worktree_arg = path.to_string_lossy().to_string();
+    if run_git_command(repo_root, &["worktree", "remove", &worktree_arg]).is_ok()
+        && delete_branch
+        && let Some(branch) = branch
+    {
+        let _ = run_git_command(repo_root, &["branch", "-D", branch]);
+    }
+}
+
+/// The worktree that has `branch` checked out, if any.
+fn worktree_on_branch(repo_root: &std::path::Path, branch: &str) -> Option<std::path::PathBuf> {
+    let output = git_command(repo_root).args(["worktree", "list", "--porcelain"]).current_dir(repo_root).output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let wanted = format!("branch refs/heads/{branch}");
+    let mut path = None;
+    for line in String::from_utf8_lossy(&output.stdout).lines() {
+        if let Some(worktree) = line.strip_prefix("worktree ") {
+            path = Some(std::path::PathBuf::from(worktree));
+        } else if line == wanted {
+            return path;
+        }
+    }
+    None
+}
+
+/// A ticket that reached Done loses its agent worktree (DEV-343), whoever
+/// set Done: an earlier phase ends with the ticket handed on, and the
+/// merge job runs in a worktree of its own, so cleanup at the end of a job
+/// alone leaves the ticket branch's worktree behind. Waits while a job
+/// runs for the ticket; its end calls this again.
+pub(crate) fn cleanup_done_ticket_worktree(tasks_dir: &std::path::Path, ticket_id: &str) {
+    if ticket_done_state(tasks_dir, ticket_id) != Some(true) {
+        return;
+    }
+    let Some((prefix, _)) = ticket_id.rsplit_once('-') else {
+        return;
+    };
+    let Ok(config) = crate::config::resolution::config_for_project(tasks_dir, Some(prefix)) else {
+        return;
+    };
+    if !config.agent_worktree.cleanup_on_done {
+        return;
+    }
+    let Some(repo_root) = resolve_repo_root(tasks_dir) else {
+        return;
+    };
+    let branch = build_worktree_branch(&config.agent_worktree.branch_prefix, &sanitize_worktree_token(ticket_id));
+    let Some(path) = worktree_on_branch(&repo_root, &branch) else {
+        return;
+    };
+    // Holding the registry keeps a job from starting in the worktree meanwhile.
+    let Ok(registry) = JOB_REGISTRY.lock() else {
+        return;
+    };
+    if registry.active_by_ticket.contains_key(ticket_id) || crate::services::agent_active_jobs::for_ticket_elsewhere(tasks_dir, ticket_id).is_some() {
+        return;
+    }
+    if check_worktree_cleanup(&repo_root, &path, Some(&branch), config.agent_worktree.cleanup_ignored_files).is_ok() {
+        remove_worktree(&repo_root, &path, Some(&branch), config.agent_worktree.cleanup_delete_branches);
+    }
+    drop(registry);
 }
 
 enum JobOutcome {
@@ -1438,7 +1524,8 @@ fn maybe_cleanup_worktree(job_id: &str, ticket_id: &str, tasks_dir: &std::path::
     if !should_cleanup || ticket_done_state(tasks_dir, ticket_id) != Some(true) {
         return;
     }
-    let Some(target) = resolve_job_worktree(job_id) else {
+    let Some(target) = resolve_job_worktree(job_id).filter(|target| target.path.exists()) else {
+        cleanup_done_ticket_worktree(tasks_dir, ticket_id);
         return;
     };
     let repo_root = match resolve_repo_root(tasks_dir) {
@@ -1461,20 +1548,11 @@ fn maybe_cleanup_worktree(job_id: &str, ticket_id: &str, tasks_dir: &std::path::
         if let Some(state) = registry.jobs.get_mut(job_id) {
             record_and_emit(state, "agent_job_progress", Some(note));
         }
-        return;
-    }
-
-    let worktree_arg = target.path.to_string_lossy().to_string();
-    if run_git_command(&repo_root, &["worktree", "remove", &worktree_arg]).is_err() {
-        return;
-    }
-
-    if config.agent_worktree.cleanup_delete_branches
-        && let Some(branch) = target.branch.as_deref()
-    {
-        let _ = run_git_command(&repo_root, &["branch", "-d", branch]);
+    } else {
+        remove_worktree(&repo_root, &target.path, target.branch.as_deref(), config.agent_worktree.cleanup_delete_branches);
     }
     drop(registry);
+    cleanup_done_ticket_worktree(tasks_dir, ticket_id);
 }
 
 #[expect(
@@ -2159,9 +2237,8 @@ fn ensure_branch_merged(job_id: &str, tasks_dir: &std::path::Path) -> Result<Opt
     let Some(repo_root) = resolve_repo_root(tasks_dir) else {
         return Ok(None);
     };
-    let merged = git_command(&repo_root).args(["merge-base", "--is-ancestor", &branch, "HEAD"]).status().map_err(|err| format!("git merge-base: {err}"))?;
-    // Exit code 1 means "not an ancestor"; anything else is merged or unknown.
-    if merged.code() != Some(1) {
+    // A branch git can't judge passes, like a merged one.
+    if branch_landed(&repo_root, &branch).unwrap_or(true) {
         return Ok(None);
     }
     // Rebased or cherry-picked onto main elsewhere: every commit's change
