@@ -6,6 +6,7 @@ import {
     getEditableRuleState,
     parseAutomationYamlDocument,
 } from '../utils/automationRules'
+import { describeAutomationRule, templateVariables } from '../utils/automationText'
 
 function roundTrip(rule: AutomationRecord) {
     const state = getEditableRuleState(rule)
@@ -110,6 +111,25 @@ describe('automation rule form round trips', () => {
         expect(buildAutomationRuleFromDraft(state.draft)).toEqual(rule)
         state.draft.enabled = true
         expect(buildAutomationRuleFromDraft(state.draft)).not.toHaveProperty('enabled')
+    })
+
+    it('reads and writes the unblocked hook and describes it (DEV-385)', () => {
+        const rule = {
+            name: 'Prerequisites done',
+            when: { status: 'Blocked' },
+            on: {
+                unblocked: {
+                    set: { assignee: '@fix' },
+                    agent: { prompt: 'Waited for ${{unblocked.by}}' },
+                },
+            },
+        }
+        const state = getEditableRuleState(rule)
+        expect(state.editable).toBe(true)
+        expect(buildAutomationRuleFromDraft(state.draft)).toEqual(rule)
+        const described = describeAutomationRule(rule)
+        expect(described.triggers.map((trigger) => trigger.when)).toEqual(["a task's last open prerequisite is done"])
+        expect(templateVariables(['unblocked']).map((variable) => variable.key)).toContain('unblocked.by')
     })
 })
 

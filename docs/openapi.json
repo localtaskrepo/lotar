@@ -8230,7 +8230,7 @@
           },
           "event": {
             "type": "string",
-            "description": "Event to simulate. Canonical events: created, updated, assigned, commented, sprint_changed, job_started, job_completed, job_failed, job_cancelled, manual. Matching is case-insensitive and legacy aliases are accepted (job_start, complete, success, error, failure, cancel).",
+            "description": "Event to simulate. Canonical events: created, updated, assigned, commented, sprint_changed, job_started, job_completed, job_failed, job_cancelled, manual, unblocked. Matching is case-insensitive and legacy aliases are accepted (job_start, complete, success, error, failure, cancel).",
             "examples": [
               "created",
               "updated",

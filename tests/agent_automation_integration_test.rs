@@ -2851,3 +2851,74 @@ exit 0
     };
     assert_eq!(job.status, "completed", "job ended as {} ({:?})", job.status, job.last_message);
 }
+
+/// DEV-385: `unblocked` fires on a ticket when its last open prerequisite
+/// is done, whether a person or a rule (`lotar automation run`) closes it.
+#[cfg(unix)]
+#[test]
+fn unblocked_starts_the_waiting_ticket_agent_when_its_last_prerequisite_is_done() {
+    let _guard = lock_agent_tests();
+    enable_server_mode();
+    let fixtures = TestFixtures::new();
+    let root = fixtures.get_temp_path();
+    let stdin = root.join("fix.stdin");
+    let script = write_stub_agent_script(
+        root,
+        "stub-fix.sh",
+        &format!(
+            "#!/bin/sh\nhead -n 1 > \"{}\"\n\
+echo '{{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"fix\"}}'\n\
+echo '{{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"ok\",\"session_id\":\"fix\"}}'\n",
+            stdin.display()
+        ),
+    );
+    fixtures.create_config_in_dir(
+        &fixtures.tasks_root,
+        &format!("issue:\n  states: [Todo, Blocked, InProgress, Done]\nagents:\n  fix:\n    runner: claude\n    command: \"{}\"\n", script.display()),
+    );
+    AutomationService::set(
+        &fixtures.tasks_root,
+        None,
+        "automation:\n  rules:\n    - name: Prerequisites done\n      when:\n        status: Blocked\n      on:\n        unblocked:\n          set:\n            status: InProgress\n            assignee: \"@fix\"\n          agent:\n            prompt: \"${{ticket.id}} waited for ${{unblocked.by}}\"\n    - name: Ship it\n      when:\n        status: Todo\n      on:\n        manual:\n          set:\n            status: Done\n",
+    )
+    .expect("set automation");
+
+    let mut storage = fixtures.create_storage();
+    let create = |storage: &mut lotar::Storage, title: &str, status: Option<&str>| {
+        TaskService::create(
+            storage,
+            TaskCreate { title: title.to_string(), project: Some("UB".to_string()), status: status.map(Into::into), ..Default::default() },
+        )
+        .expect("create task")
+    };
+    let docs = create(&mut storage, "Docs", None);
+    let release = create(&mut storage, "Release", None);
+    let waiting = create(&mut storage, "Waiting", Some("Blocked"));
+    TaskService::update(
+        &mut storage,
+        &waiting.id,
+        TaskUpdate {
+            relationships: Some(lotar::types::TaskRelationships { depends_on: vec![docs.id.clone(), release.id.clone()], ..Default::default() }),
+            ..Default::default()
+        },
+    )
+    .expect("add prerequisites");
+
+    let simulated = AutomationService::simulate(&fixtures.tasks_root, &waiting.id, AutomationEvent::Unblocked).expect("simulate");
+    assert_eq!(simulated.rule_name.as_deref(), Some("Prerequisites done"));
+
+    // One prerequisite left open: the ticket keeps waiting.
+    TaskService::update(&mut storage, &docs.id, TaskUpdate { status: Some("Done".into()), ..Default::default() }).expect("close docs");
+    sleep(Duration::from_millis(300));
+    assert!(AgentJobService::list_jobs().iter().all(|job| job.ticket_id != waiting.id), "no job while the release is open");
+    assert_eq!(TaskService::get(&storage, &waiting.id, None).unwrap().status.to_string(), "Blocked");
+
+    // The last one, closed by a rule from `lotar automation run`.
+    let report = AutomationService::run_manual(&mut storage, &["Ship it".to_string()], None, false).expect("run manual");
+    assert_eq!(report.entries.len(), 1, "{report:?}");
+
+    let jobs = wait_for_completed_jobs(&waiting.id, 1, 10_000);
+    assert_eq!(jobs.len(), 1, "{jobs:?}");
+    let prompt = fs::read_to_string(&stdin).expect("prompt");
+    assert!(prompt.contains(&format!("{} waited for {} (Docs), {} (Release)", waiting.id, docs.id, release.id)), "{prompt}");
+}

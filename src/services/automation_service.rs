@@ -179,6 +179,9 @@ pub enum AutomationEvent {
 
     // Started on purpose: `lotar automation run`, cron, "Run now" (DEV-241)
     Manual,
+
+    // The ticket's last open prerequisite is done (DEV-385)
+    Unblocked,
 }
 
 impl std::fmt::Display for AutomationEvent {
@@ -194,6 +197,7 @@ impl std::fmt::Display for AutomationEvent {
             Self::JobFailed => "job_failed",
             Self::JobCancelled => "job_cancelled",
             Self::Manual => "manual",
+            Self::Unblocked => "unblocked",
         })
     }
 }
@@ -212,8 +216,9 @@ impl std::str::FromStr for AutomationEvent {
             "job_failed" | "error" | "failure" => Ok(Self::JobFailed),
             "job_cancelled" | "cancel" => Ok(Self::JobCancelled),
             "manual" => Ok(Self::Manual),
+            "unblocked" => Ok(Self::Unblocked),
             _ => Err(format!(
-                "Unknown event: '{}'. Expected: created, updated, assigned, commented, sprint_changed, job_started, job_completed, job_failed, job_cancelled, manual",
+                "Unknown event: '{}'. Expected: created, updated, assigned, commented, sprint_changed, job_started, job_completed, job_failed, job_cancelled, manual, unblocked",
                 s
             )),
         }
@@ -237,6 +242,8 @@ struct AutomationActionContext {
     job: Option<AutomationJobContext>,
     previous: Option<TaskDTO>,
     comment: Option<crate::types::TaskComment>,
+    /// The prerequisites an `unblocked` ticket waited for, all done now.
+    unblocked_by: Vec<TaskDTO>,
 }
 
 #[derive(Debug, Clone)]
@@ -380,7 +387,7 @@ impl AutomationService {
             // Fire event-specific hooks
             for &event in &events {
                 if let Some(action) = resolve_action_for_event(&rule.on, event) {
-                    let action_context = AutomationActionContext { event, job: None, previous: previous.cloned(), comment: None };
+                    let action_context = AutomationActionContext { event, job: None, previous: previous.cloned(), comment: None, unblocked_by: Vec::new() };
                     if let Err(err) = apply_action(storage, current, config, action, &action_context) {
                         failures.push(rule_failure(rule, &rk, &current.id, &err));
                     }
@@ -391,7 +398,8 @@ impl AutomationService {
             // Fire legacy catch-all `start` hook (backward compat)
             if let Some(action) = rule.on.start.as_ref() {
                 let primary_event = events.first().copied().unwrap_or(AutomationEvent::Updated);
-                let action_context = AutomationActionContext { event: primary_event, job: None, previous: previous.cloned(), comment: None };
+                let action_context =
+                    AutomationActionContext { event: primary_event, job: None, previous: previous.cloned(), comment: None, unblocked_by: Vec::new() };
                 if let Err(err) = apply_action(storage, current, config, action, &action_context) {
                     failures.push(rule_failure(rule, &rk, &current.id, &err));
                 }
@@ -424,12 +432,82 @@ impl AutomationService {
                 continue;
             }
             if let Some(action) = resolve_action_for_event(&rule.on, event) {
-                let action_context = AutomationActionContext { event, job: None, previous: None, comment: Some(comment.clone()) };
+                let action_context = AutomationActionContext { event, job: None, previous: None, comment: Some(comment.clone()), unblocked_by: Vec::new() };
                 if let Err(err) = apply_action(storage, task, config, action, &action_context) {
                     failures.push(rule_failure(rule, &rk, &task.id, &err));
                 }
                 cooldown_record(rule, &rk, &task.id, &tasks_dir);
             }
+        }
+        failures_result(&failures)
+    }
+
+    /// Called after every committed update (DEV-385): when `current` went
+    /// from open to done, by its own project's policy, fire `unblocked` on
+    /// each open dependent whose prerequisites are all done now.
+    pub(crate) fn fire_unblocked_dependents(storage: &mut Storage, previous: &TaskDTO, current: &TaskDTO) {
+        let is_done = |task: &TaskDTO| task.task_state.as_ref().is_some_and(|state| state.is_done);
+        if is_done(previous) || !is_done(current) {
+            return;
+        }
+        let mut dependents: Vec<String> = current.relationships.blocks.clone();
+        for (id, task, _) in storage.search_located(&crate::storage::TaskFilter::default()) {
+            if task.deleted_at.is_none()
+                && task.moved_to.is_none()
+                && task.relationships.depends_on.iter().any(|dep| crate::storage::identity::aliases_match(dep, &current.id))
+                && !dependents.iter().any(|known| crate::storage::identity::aliases_match(known, &id))
+            {
+                dependents.push(id);
+            }
+        }
+        for id in dependents {
+            let Ok(dependent) = TaskService::get(storage, &id, None) else {
+                continue;
+            };
+            if is_done(&dependent) || !find_blocked_dependencies(storage, &dependent).is_empty() {
+                continue;
+            }
+            let mut by: Vec<TaskDTO> = dependent
+                .relationships
+                .depends_on
+                .iter()
+                .filter(|dep| !crate::storage::identity::aliases_match(dep, &current.id))
+                .filter_map(|dep| TaskService::get(storage, dep, None).ok())
+                .collect();
+            by.push(current.clone());
+            // Each failed rule already reported itself (rule_failure).
+            let _ = Self::apply_unblocked_event(storage, &dependent.id, &by);
+        }
+    }
+
+    /// Fire the `unblocked` rules of `dependent_id` (DEV-385); `by` are the
+    /// prerequisites it waited for, for `${{unblocked.by}}`.
+    pub fn apply_unblocked_event(storage: &mut Storage, dependent_id: &str, by: &[TaskDTO]) -> LoTaRResult<()> {
+        let tasks_dir = storage.root_path.clone();
+        let project = crate::storage::TaskId::parse(dependent_id).map(|parsed| parsed.project).unwrap_or_default();
+        let config = resolve_config_for_project(&tasks_dir, Some(&project))?;
+        let task = TaskService::get(storage, dependent_id, None)?;
+        let (automation, _) = load_effective_automation(&tasks_dir, Some(project.as_str()), Some(&config))?;
+        let active_sprints = compute_active_sprint_ids(storage);
+        let event = AutomationEvent::Unblocked;
+        let mut failures: Vec<String> = Vec::new();
+
+        for (rule_idx, rule) in automation.automation.rules().iter().enumerate() {
+            let Some(action) = resolve_action_for_event(&rule.on, event) else {
+                continue;
+            };
+            if !matches_rule(rule, &task, &ChangeSet::empty(&task), MatchMode::Current, &config, &active_sprints) {
+                continue;
+            }
+            let rk = rule_identity(rule, rule_idx);
+            if !cooldown_allows(rule, &rk, &task.id, &tasks_dir) {
+                continue;
+            }
+            let action_context = AutomationActionContext { event, job: None, previous: None, comment: None, unblocked_by: by.to_vec() };
+            if let Err(err) = apply_action(storage, &task, &config, action, &action_context) {
+                failures.push(rule_failure(rule, &rk, &task.id, &err));
+            }
+            cooldown_record(rule, &rk, &task.id, &tasks_dir);
         }
         failures_result(&failures)
     }
@@ -448,7 +526,7 @@ impl AutomationService {
             .filter(|_| matches!(event, AutomationEvent::JobCompleted | AutomationEvent::JobFailed | AutomationEvent::JobCancelled))
             .map(|job| job.job_id.clone());
         let recorded = ending_job.as_deref().and_then(|job_id| crate::services::agent_active_jobs::peek_outcome(tasks_dir, job_id));
-        let action_context = AutomationActionContext { event, job: job_context, previous: None, comment: None };
+        let action_context = AutomationActionContext { event, job: job_context, previous: None, comment: None, unblocked_by: Vec::new() };
         let mut failures: Vec<String> = Vec::new();
 
         for (rule_idx, rule) in automation.automation.rules().iter().enumerate() {
@@ -585,6 +663,11 @@ impl AutomationService {
             }
             if let Some(action) = resolve_action_for_event_with_fallback(&rule.on, event) {
                 let mut preview = PreviewContext::new(task);
+                if event == AutomationEvent::Unblocked {
+                    // The ticket's prerequisites stand in for the ones that just finished.
+                    let by: Vec<TaskDTO> = task.relationships.depends_on.iter().filter_map(|dep| TaskService::get(storage, dep, None).ok()).collect();
+                    preview.tmpl = std::mem::take(&mut preview.tmpl).with_unblocked(&by);
+                }
                 let actions = describe_action(action, task, config, &mut preview);
                 let task_after = simulate_action(task, action, config, storage, &mut preview);
                 notes.extend(preview.into_warnings());
@@ -687,7 +770,8 @@ impl AutomationService {
                     error: None,
                 };
                 if !dry_run {
-                    let context = AutomationActionContext { event: AutomationEvent::Manual, job: None, previous: None, comment: None };
+                    let context =
+                        AutomationActionContext { event: AutomationEvent::Manual, job: None, previous: None, comment: None, unblocked_by: Vec::new() };
                     match apply_action(storage, &task, &config, action, &context) {
                         Ok(()) => cooldown_record(rule, &key, &task.id, &tasks_dir),
                         Err(err) => entry.error = Some(err.to_string()),
@@ -1024,6 +1108,7 @@ fn resolve_action_for_event(on: &crate::automation::types::AutomationRuleActions
         AutomationEvent::JobFailed => on.job_failed.as_ref(),
         AutomationEvent::JobCancelled => on.job_cancelled.as_ref(),
         AutomationEvent::Manual => on.manual.as_ref(),
+        AutomationEvent::Unblocked => on.unblocked.as_ref(),
     }
 }
 
@@ -1590,7 +1675,8 @@ fn apply_action(
     let tmpl = TemplateContext::from_task(current)
         .with_previous(action_context.previous.as_ref())
         .with_job(action_context.job.as_ref())
-        .with_comment(action_context.comment.as_ref());
+        .with_comment(action_context.comment.as_ref())
+        .with_unblocked(&action_context.unblocked_by);
 
     let mut patch = TaskUpdate::default();
     let mut updated_tags = base.tags.clone();
@@ -2054,7 +2140,7 @@ fn maybe_queue_agent_on_assignment(
     }
 
     let mut storage = Storage::new(tasks_dir);
-    let blocked_by = find_blocked_dependencies(&storage, task, config);
+    let blocked_by = find_blocked_dependencies(&storage, task);
     if !blocked_by.is_empty() {
         let _ = mark_task_blocked(&mut storage, task, config, &blocked_by);
         return;
@@ -2184,7 +2270,7 @@ fn count_terminal_jobs_for_ticket(ticket_id: &str) -> usize {
         .count()
 }
 
-fn find_blocked_dependencies(storage: &Storage, task: &TaskDTO, _config: &ResolvedConfig) -> Vec<String> {
+fn find_blocked_dependencies(storage: &Storage, task: &TaskDTO) -> Vec<String> {
     crate::services::relationships::blocked_dependencies(storage, &task.id, &task.relationships.depends_on)
         .unwrap_or_else(|error| vec![format!("dependency graph unavailable: {error}")])
 }
@@ -2450,7 +2536,7 @@ mod dev21_cross_root_dependency_tests {
         .unwrap();
         let current = TaskService::get(&storage, "PX-1", None).unwrap();
         let config = TaskService::resolve_config_for_project(&storage.root_path, "PX");
-        let context = AutomationActionContext { event: AutomationEvent::Updated, job: None, previous: None, comment: None };
+        let context = AutomationActionContext { event: AutomationEvent::Updated, job: None, previous: None, comment: None, unblocked_by: Vec::new() };
         let source = storage.root_path.join("PX/1.yml");
         let target = storage.root_path.join("BB/1.yml");
         let before_source = std::fs::read(&source).unwrap();
@@ -2513,7 +2599,7 @@ mod dev21_cross_root_dependency_tests {
                     &current,
                     &config,
                     &action,
-                    &AutomationActionContext { event: AutomationEvent::Updated, job: None, previous: None, comment: None },
+                    &AutomationActionContext { event: AutomationEvent::Updated, job: None, previous: None, comment: None, unblocked_by: Vec::new() },
                 )
             });
             read_rx.recv_timeout(Duration::from_secs(5)).unwrap();
@@ -2541,7 +2627,7 @@ mod dev21_cross_root_dependency_tests {
                     &updated,
                     &config,
                     &invalid,
-                    &AutomationActionContext { event: AutomationEvent::Updated, job: None, previous: None, comment: None }
+                    &AutomationActionContext { event: AutomationEvent::Updated, job: None, previous: None, comment: None, unblocked_by: Vec::new() }
                 )
                 .is_err()
             );
@@ -2628,10 +2714,9 @@ mod dev21_cross_root_dependency_tests {
         write_task(&root_b, "PX", 2, "Done");
 
         let storage = Storage::new(&root_a.join(".tasks"));
-        let config = crate::config::resolution::load_and_merge_configs(Some(&root_a.join(".tasks"))).unwrap();
 
         for deps in [["PX-1", "PX-2"], ["PX-2", "PX-1"]] {
-            let blocked = find_blocked_dependencies(&storage, &dependent_dto("PX-9", &deps), &config);
+            let blocked = find_blocked_dependencies(&storage, &dependent_dto("PX-9", &deps));
             // PX-1 (Done, non-terminal in A) blocks; PX-2 (Done, terminal
             // in its own root B) does not — regardless of input order.
             assert_eq!(blocked, vec!["PX-1".to_string()], "deps: {deps:?}");
@@ -2649,11 +2734,7 @@ mod dev21_cross_root_dependency_tests {
         yaml.push_str("deleted_at: 2026-10-01T00:00:00Z\n");
         std::fs::write(file, yaml).unwrap();
         let storage = Storage::new(&tmp.path().join(".tasks"));
-        let config = crate::config::resolution::config_for_project(&storage.root_path, Some("PX")).unwrap();
-        assert_eq!(
-            find_blocked_dependencies(&storage, &dependent_dto("PX-9", &["PX-1", "PX-2", "PX-3"]), &config),
-            vec!["PX-2".to_string(), "PX-3".to_string()]
-        );
+        assert_eq!(find_blocked_dependencies(&storage, &dependent_dto("PX-9", &["PX-1", "PX-2", "PX-3"])), vec!["PX-2".to_string(), "PX-3".to_string()]);
     }
 }
 

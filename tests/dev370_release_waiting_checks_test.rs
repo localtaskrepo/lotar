@@ -1,5 +1,6 @@
-//! DEV-370: closing a "Release vX.Y.Z" ticket hands every Blocked ticket that
-//! depends on it to @fix, with lotar's own `.tasks/DEV/automation.yml`.
+//! DEV-370, DEV-385: closing a "Release vX.Y.Z" ticket, or any other
+//! prerequisite, hands every Blocked ticket that waited for it to @fix, with
+//! lotar's own `.tasks/DEV/automation.yml`.
 #![cfg(unix)]
 
 use crate::common;
@@ -22,9 +23,11 @@ impl Drop for Finish<'_> {
         while Instant::now() < deadline {
             let out = (self.cmd)().args(["--format", "json", "agent", "list-jobs"]).output();
             let json: serde_json::Value = out.ok().and_then(|out| serde_json::from_slice(&out.stdout).ok()).unwrap_or_default();
-            let ended = json["jobs"]
-                .as_array()
-                .is_some_and(|jobs| jobs.iter().any(|job| job["ticket_id"] == "DEV-2" && !matches!(job["status"].as_str(), Some("queued" | "running"))));
+            let ended = json["jobs"].as_array().is_some_and(|jobs| {
+                ["DEV-2", "DEV-3"]
+                    .iter()
+                    .all(|id| jobs.iter().any(|job| job["ticket_id"] == *id && !matches!(job["status"].as_str(), Some("queued" | "running"))))
+            });
             if ended {
                 return;
             }
@@ -88,17 +91,16 @@ fn closing_a_release_ticket_starts_the_checks_that_wait_for_it() {
     run(&["status", "DEV-2", "Blocked"]);
     run(&["status", "DEV-3", "Blocked"]);
 
-    // Other tickets that go Done start nothing.
+    // Each prerequisite that goes Done starts only the ticket that waited for it.
     run(&["status", "DEV-4", "Done"]);
     let other = std::fs::read_to_string(fixtures.tasks_root.join("DEV/3.yml")).unwrap();
-    assert_eq!(field(&other, "assignee"), "mallox", "{other}");
+    assert_eq!(field(&other, "assignee"), "'@fix'", "{other}");
+    let waiting = std::fs::read_to_string(fixtures.tasks_root.join("DEV/2.yml")).unwrap();
+    assert_eq!(field(&waiting, "assignee"), "mallox", "{waiting}");
 
     let out = cmd().args(["status", "DEV-1", "Done"]).output().unwrap();
     let printed = format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
     assert!(out.status.success(), "{printed}");
     let waiting = std::fs::read_to_string(fixtures.tasks_root.join("DEV/2.yml")).unwrap();
     assert_eq!(field(&waiting, "assignee"), "'@fix'", "{waiting}");
-    assert!(printed.contains("waited for a lotar release (DEV-1)"), "{printed}");
-    let other = std::fs::read_to_string(fixtures.tasks_root.join("DEV/3.yml")).unwrap();
-    assert_eq!(field(&other, "assignee"), "mallox", "{other}");
 }

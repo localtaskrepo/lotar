@@ -16,7 +16,7 @@ Endpoints with quick examples. For full schema see [OpenAPI](../openapi.json).
 - POST /api/sprints/delete ({ sprint, cleanup_missing? }) -> { data: SprintDeleteResponse }; sprint must be >= 1; 404 for unknown sprint ids; tasks keep their data
 - POST /api/tasks/attachments/upload ({ id, filename, content_base64 }) -> { data: { stored_path, attached, task } }; uploads attach typed `attachment` references
 - POST /api/tasks/attachments/remove ({ id, stored_path }) -> { data: { task, deleted, still_referenced } }; 400 when the task lacks the managed `attachment` reference (blob untouched)
-- POST /api/automation/simulate ({ ticket_id, event, project? }) -> { data: { matched, rule_name, actions, task_before, task_after } }; `event` is one of created, updated, assigned, commented, sprint_changed, job_started, job_completed, job_failed, job_cancelled (case-insensitive legacy aliases accepted); automation scope follows the ticket's project (`project` is ignored); `rule_name`/`task_after` are explicit `null` when no rule matched
+- POST /api/automation/simulate ({ ticket_id, event, project? }) -> { data: { matched, rule_name, actions, task_before, task_after } }; `event` is one of created, updated, assigned, commented, sprint_changed, job_started, job_completed, job_failed, job_cancelled, manual, unblocked (case-insensitive legacy aliases accepted); automation scope follows the ticket's project (`project` is ignored); `rule_name`/`task_after` are explicit `null` when no rule matched
 - GET  /api/config/show[?project=PREFIX] -> { data: object }
 - POST /api/config/set ({ values, global?, project? }) -> { data: { updated: bool } }
 - GET  /api/events -> text/event-stream (see SSE Events)

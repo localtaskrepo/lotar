@@ -677,6 +677,7 @@ const title = computed(() => (isNew.value ? 'New automation rule' : 'Edit automa
 // `start` only shows when a rule already uses it.
 const TRIGGER_HELP: Partial<Record<AutomationEventKey, string>> = {
   manual: 'Only when started: Run now, `lotar automation run`, or cron',
+  unblocked: "When the task's last open prerequisite (depends on) is done",
 }
 const triggerOptions = computed(() =>
   automationEventOptions

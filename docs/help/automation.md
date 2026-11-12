@@ -163,6 +163,7 @@ Actions define what happens at different points in the automation lifecycle:
 - `job_failed`: when an agent job fails
 - `job_cancelled`: when an agent job is cancelled
 - `manual`: only when started on purpose: **Run now** in the web UI, `lotar automation run`, `POST /api/automation/run`, or cron calling one of them (see below)
+- `unblocked`: on a ticket whose last open prerequisite (`depends_on`) reaches a done state (see [When prerequisites are done](#when-prerequisites-are-done))
 - `start`: legacy catch-all that fires on every matching task change, after the specific hook
 
 Older files may use `job_start`, `complete`/`success`, `error`/`failure` and `cancel` for the job hooks; they still work.
@@ -368,6 +369,7 @@ Available variables:
 | `previous.*` | Same as `ticket.*` but for the pre-change state (available on the update-derived hooks `updated`, `assigned`, `sprint_changed`, and the legacy `start`, which also covers task creation where no prior state exists; not available on `commented` or job hooks) |
 | `comment.*` | `text`, `author` (available on `commented` events; `author` is empty for a comment without one) |
 | `agent.*` | `job_id`, `runner`, `profile`, `worktree_path`, `worktree_branch` (available on job events); after a job ends also `usage`, `cost_usd`, `input_tokens`, `output_tokens`, `turns` when the CLI reported them |
+| `unblocked.*` | `by` (the prerequisites with their titles: `DEV-1 (Docs), DEV-2 (Release v1.4.0)`) and `ids` (`DEV-1,DEV-2`), on `unblocked` events |
 
 Lists take a selector in square brackets. `[*]` joins every item with ", ", a number picks one item (`[0]` is the first, `[-1]` the last), and `.field` reads a field of each item:
 
@@ -377,6 +379,7 @@ Lists take a selector in square brackets. `[*]` joins every item with ", ", a nu
 | `ticket.relationships.depends_on`, `.blocks`, `.related`, `.children`, `.fixes` | — (`ticket.relationships.parent` and `.duplicate_of` are plain values) |
 | `ticket.comments` | `text`, `date`, `author` (the item itself is the text) |
 | `ticket.references` | `code`, `link`, `file`, `attachment`, `jira`, `github` (the item itself is whichever is set) |
+| `unblocked.by` | `id`, `title`, `status` (the item itself is `ID (title)`) |
 
 For example `${{ticket.references[*].link}}` lists every link, and `${{ticket.comments[-1].text}}` is the latest comment. The same selectors work for `previous.*`. An index out of range or an unknown field expands to nothing.
 
@@ -392,13 +395,39 @@ on:
 
 ## Execution and composition semantics
 
-- Rules run in file order. A matching rule fires its event hook(s) (`created`, `updated`, `assigned`, `sprint_changed`, `commented`, or the job hooks) and then the legacy `start` catch-all. Each action is committed before the next one applies.
+- Rules run in file order. A matching rule fires its event hook(s) (`created`, `updated`, `assigned`, `sprint_changed`, `commented`, `unblocked`, or the job hooks) and then the legacy `start` catch-all. Each action is committed before the next one applies.
 - Reference changes (link/code/file/attachment/platform attach and detach, including uploads, removals, and sync-linked platform references) dispatch the `updated` event with the previous/current task pair. Reference values are not part of the condition vocabulary, so the change set is empty: bare `on.updated` rules and the legacy `start` catch-all fire once per changed operation. Conditions keep their normal semantics — change-dependent predicates (the `changes` group, short-form field conditions, and custom-field conditions, which all require the named field to have changed) cannot match an empty change set and stay silent, while current-state predicates such as `sprint` conditions and date-window checks (`before`/`within`/`older_than` on `due_date`) still evaluate the task as it is and can fire. No-op reference operations (the value was already present or absent) dispatch nothing. Comments written by the automation `comment` action never re-dispatch `on.commented`.
 - Every action composes against the task's latest persisted state: tag and relationship `add`/`remove` operations from earlier rules and hooks accumulate instead of overwriting each other, and `set.custom_fields` writes only the listed keys (existing keys keep their values; writing the same key twice keeps the last write).
 - Explicit replacement still wins: `set.tags`/`set.labels` replaces the whole tag list, and scalar `set` fields overwrite. When several rules set the same field, the last rule in file order wins. Within a single action, `set` applies before `add`, which applies before `remove`.
 - Conditions, template variables (`ticket.*`, `previous.*`, `comment.*`), and assignee alias tokens resolve against the task as it was when the event fired, not against values written by earlier actions in the same dispatch.
 - Actions in one dispatch run sequentially but are not atomic: another writer editing the task between two actions can still interleave with the sequence.
 - When a rule's action fails (a `run` command exits non-zero without `ignore_failure`, a timeout, a missing program), the rules after it still run. The failure is printed to stderr (`Automation rule '<name>' failed on <ID>: ...`) and sent as an `automation_failed` SSE event; the change that triggered the rules is kept.
+
+## When prerequisites are done
+
+A ticket that waits for others (`depends_on`, or another ticket's `blocks`) gets the `unblocked` event when the last of them reaches a done state. Each prerequisite counts as done by its own project's [done states](config.md#done-states), the same way agent assignment checks dependencies. Every way of closing one fires it: the CLI, the web UI, REST, MCP, a rule's `set` (from `lotar automation run` too) and the status an agent job ends with. It fires once per close: closing a prerequisite that is already done, or one while others are still open, does nothing; a ticket that is done itself is skipped.
+
+The rule decides what happens, usually starting the ticket's agent with a prompt that says what it waited for. `session: continue` makes the job the next turn of the ticket's last T3 Code thread, so the agent picks up where it stopped:
+
+```yaml
+automation:
+  rules:
+    - name: Prerequisites done
+      when:
+        status: Blocked
+      on:
+        unblocked:
+          set:
+            status: InProgress
+            assignee: "@fix"
+          agent:
+            session: continue
+            prompt: |
+              ${{ticket.id}} waited for ${{unblocked.by}}, which are done now.
+              Read the ticket and continue the work.
+```
+
+The rule's conditions are checked against the waiting ticket as it is (`status: Blocked` above), and moving it out of that status keeps the rule from running on it again. Prerequisites in another tasks directory do not fire the event.
 
 ## Running rules on a schedule
 
@@ -460,7 +489,7 @@ For the change events (`created`, `updated`, `assigned`, `sprint_changed`) the s
 
 The preview applies the matched action the same way a real run would, without writing anything: every `set` field (including due date, effort, custom fields and the `labels` alias), templates built from the ticket's current values, `@me`/`@reporter`/`@assignee`/`@assignee_or_reporter`/`@least_busy` assignees, and case-insensitive tag adds and removes. A few things can only be known when the rule actually runs; the preview lists them as warnings instead of guessing:
 
-- Template values from the triggering event (`${{previous.*}}`, `${{comment.*}}`, `${{agent.*}}`) stay unexpanded.
+- Template values from the triggering event (`${{previous.*}}`, `${{comment.*}}`, `${{agent.*}}`) stay unexpanded. For `unblocked`, `${{unblocked.*}}` shows the ticket's current prerequisites.
 - `@round_robin` and `@random` assignees are shown as the token (previewing round robin would advance the real rotation).
 - Unknown status, priority or type values are reported as skipped.
 - Sprint additions and removals, comments and run commands are listed as actions but not applied to the previewed task.

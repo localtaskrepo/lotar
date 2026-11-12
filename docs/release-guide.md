@@ -66,14 +66,13 @@ change to how the agent worker restarts after an upgrade). The next release has 
    ([Cutting a Release](#cutting-a-release), step 4), closes the release ticket with
    `lotar status DEV-R Done`.
 
-Closing it runs the rule "Release installed: start the waiting checks" in
-`.tasks/DEV/automation.yml`. The rule follows the release ticket's `blocks` list (which lotar
-fills in from each `depends_on`) and runs "Release installed: run the waiting check" on every
-dependent that is still `Blocked`. That rule assigns it to `@fix` with a prompt to run the check
-against the installed lotar. A passing check ends with the ticket `Done`; a failing one comes
-back to mallox as `HelpNeeded`. The rule runs `lotar` from `PATH` and, like every `run` action,
-only in a trusted repository ([`lotar trust`](help/trust.md)). To start one ticket's check by
-hand: `lotar automation run "Release installed: run the waiting check" --select 'id:/^DEV-N$/'`.
+Closing it fires the `unblocked` event ([When prerequisites are done](help/automation.md#when-prerequisites-are-done))
+on every ticket whose last open prerequisite it was. The rule "Prerequisites done: continue the waiting
+ticket" in `.tasks/DEV/automation.yml` assigns each one that is still `Blocked` to `@fix`, as the next turn
+of its last T3 Code thread, with a prompt to run the check against the installed lotar. A passing check
+ends with the ticket `Done`; a failing one comes back to mallox as `HelpNeeded`. The same rule continues
+tickets that waited for other tickets. To start one ticket's check by hand:
+`lotar automation run "Prerequisites done: continue the waiting ticket" --select 'id:/^DEV-N$/'`.
 
 ## Pre-Release Checklist
 

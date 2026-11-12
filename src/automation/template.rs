@@ -209,6 +209,26 @@ impl TemplateContext {
         self
     }
 
+    /// Add the prerequisites an `unblocked` ticket waited for (DEV-385):
+    /// `unblocked.by` reads "DEV-1 (Title), DEV-2 (Title)", `unblocked.ids`
+    /// "DEV-1,DEV-2", and `unblocked.by[*].title` picks a field.
+    pub fn with_unblocked(mut self, prerequisites: &[TaskDTO]) -> Self {
+        if prerequisites.is_empty() {
+            return self;
+        }
+        let items: Vec<ListItem> = prerequisites
+            .iter()
+            .map(|task| ListItem {
+                value: format!("{} ({})", task.id, task.title),
+                fields: HashMap::from([("id", task.id.clone()), ("title", task.title.clone()), ("status", task.status.to_string())]),
+            })
+            .collect();
+        self.set("unblocked.by", &items.iter().map(|item| item.value.as_str()).collect::<Vec<_>>().join(", "));
+        self.set("unblocked.ids", &prerequisites.iter().map(|task| task.id.as_str()).collect::<Vec<_>>().join(","));
+        self.lists.insert("unblocked.by".to_string(), items);
+        self
+    }
+
     /// Add one variable (for example `lotar.bin` in agent instructions).
     pub fn with_var(mut self, key: &str, value: &str) -> Self {
         self.set(key, value);
@@ -298,7 +318,8 @@ impl TemplateContext {
     }
 
     /// Preview expansion (DEV-118): like `expand`, but placeholders that only
-    /// exist during a real event (`previous.*`, `comment.*`, `agent.*`) and
+    /// exist during a real event (`previous.*`, `comment.*`, `agent.*`,
+    /// `unblocked.*`) and
     /// are not in this context stay literal and are reported in `unresolved`
     /// instead of silently expanding to an empty string.
     pub fn expand_preview(&self, input: &str, unresolved: &mut Vec<String>) -> String {
@@ -383,7 +404,7 @@ fn custom_field_to_string(value: &crate::types::CustomFieldValue) -> String {
 
 /// Template keys provided by the triggering event rather than the task.
 fn is_event_only_key(key: &str) -> bool {
-    ["previous.", "comment.", "agent."].iter().any(|prefix| key.starts_with(prefix))
+    ["previous.", "comment.", "agent.", "unblocked."].iter().any(|prefix| key.starts_with(prefix))
 }
 
 #[cfg(test)]

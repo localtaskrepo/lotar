@@ -19,6 +19,7 @@ const TRIGGER_TEXT: Record<AutomationEventKey, string> = {
     error: 'an agent job fails',
     cancel: 'an agent job is cancelled',
     manual: 'it is run manually or from cron',
+    unblocked: "a task's last open prerequisite is done",
 }
 
 const HOOK_TO_EVENT: Record<string, AutomationEventKey> = {
@@ -43,6 +44,7 @@ const HOOK_TO_EVENT: Record<string, AutomationEventKey> = {
     job_cancel: 'cancel',
     job_cancelled: 'cancel',
     manual: 'manual',
+    unblocked: 'unblocked',
 }
 
 const FIELD_NAMES: Record<string, string> = {
@@ -273,7 +275,7 @@ export interface TemplateVariable {
     /** What goes between `${{` and `}}`. */
     key: string
     label: string
-    group: 'Task' | 'Before the change' | 'Comment' | 'Agent job'
+    group: 'Task' | 'Before the change' | 'Comment' | 'Agent job' | 'Prerequisites'
 }
 
 const TASK_VARIABLES: Array<[string, string]> = [
@@ -314,6 +316,10 @@ export function templateVariables(events: AutomationEventKey[], customFields: st
     if (events.includes('commented')) {
         variables.push({ key: 'comment.text', label: 'The new comment', group: 'Comment' })
         variables.push({ key: 'comment.author', label: 'Who wrote it', group: 'Comment' })
+    }
+    if (events.includes('unblocked')) {
+        variables.push({ key: 'unblocked.by', label: 'Prerequisites with titles', group: 'Prerequisites' })
+        variables.push({ key: 'unblocked.ids', label: 'Prerequisite IDs', group: 'Prerequisites' })
     }
     if (events.some((event) => JOB_EVENTS.has(event))) {
         for (const [key, label] of [

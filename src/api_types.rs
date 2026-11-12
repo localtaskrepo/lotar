@@ -862,7 +862,8 @@ pub struct AutomationSimulateRequest {
     pub ticket_id: String,
     /// The event to simulate. Canonical names: "created", "updated",
     /// "assigned", "commented", "sprint_changed", "job_started",
-    /// "job_completed", "job_failed", "job_cancelled", "manual". Matching
+    /// "job_completed", "job_failed", "job_cancelled", "manual",
+    /// "unblocked". Matching
     /// is case-insensitive and legacy aliases are accepted ("job_start",
     /// "complete", "success", "error", "failure", "cancel").
     pub event: String,

@@ -1284,6 +1284,8 @@ impl TaskService {
         if previous_dto.status != dto.status {
             crate::services::agent_job_service::cleanup_done_ticket_worktree(storage.root_path.as_path(), &canonical);
         }
+        // Every close, automation's own included, can unblock dependents (DEV-385).
+        AutomationService::fire_unblocked_dependents(storage, &previous_dto, &dto);
 
         Ok(TaskUpdateReceipt { dto, changed: true, deferred: None })
     }

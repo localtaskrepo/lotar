@@ -23,7 +23,7 @@ All planned features are implemented. See `docs/help/agent.md` and `docs/help/au
 ### Automation Engine
 
 - [x] Rules engine — Field matching, change detection, regex, `all`/`any`/`not`, list operators, `exists`
-- [x] Event-based `on` hooks — `created`, `updated`, `assigned`, `commented`, `sprint_changed`, job lifecycle
+- [x] Event-based `on` hooks — `created`, `updated`, `assigned`, `commented`, `sprint_changed`, `unblocked`, job lifecycle
 - [x] Template variable expansion — `${{ticket.*}}`, `${{previous.*}}`, `${{agent.*}}`, `${{comment.*}}`, `${{project.*}}`
 - [x] Actions — `set` fields, `add`/`remove` tags, `run` shell commands, `comment`, sprint actions, relationship actions
 - [x] Async `run` actions — Background spawn by default, `wait: true` for blocking

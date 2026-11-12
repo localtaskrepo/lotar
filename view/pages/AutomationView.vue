@@ -135,6 +135,7 @@
                 <option value="error">Job failed</option>
                 <option value="cancel">Job cancelled</option>
                 <option value="manual">Run manually / cron</option>
+                <option value="unblocked">Prerequisites done</option>
               </UiSelect>
             </div>
             <div class="col" style="gap: 4px; flex: 1">

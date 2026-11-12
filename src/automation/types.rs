@@ -107,6 +107,11 @@ pub struct AutomationRuleActions {
     /// is now.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub manual: Option<AutomationAction>,
+
+    /// Runs on a ticket when its last open prerequisite (`depends_on`)
+    /// reaches a done state (DEV-385).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unblocked: Option<AutomationAction>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]

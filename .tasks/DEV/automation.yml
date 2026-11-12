@@ -293,49 +293,30 @@ automation:
           set:
             assignee: "@fix-codex"
           agent: *fix
-    # lotar's own rules (not from standards). Release process (owner 2026-11-11, DEV-370, docs/release-guide.md): a
-    # ticket whose check needs the next release is Blocked and depends on the open "Release vX.Y.Z" ticket. Closing
-    # that ticket after brew upgrade lotar hands each of them to @fix. A field condition needs its field to change in
-    # the update, so the command recognises the release by its title (other tickets that go Done exit there), and
-    # reaches the waiting tickets through the release's blocks list. It runs the lotar on PATH: the release just
-    # installed. --project: without it the status filter knows only the global statuses, which lack Blocked.
-    - name: "Release installed: start the waiting checks"
-      when:
-        status: Done
-      on:
-        updated:
-          run:
-            command: sh
-            args:
-              - -c
-              - |
-                case "$LOTAR_TICKET_TITLE" in "Release v"*) ;; *) exit 0 ;; esac
-                failed=0
-                for id in $(printf '%s' "$1" | tr ',' ' '); do
-                  lotar --tasks-dir "$LOTAR_TASKS_DIR" --project "$LOTAR_TICKET_PROJECT" automation run \
-                    "Release installed: run the waiting check" --select "status:blocked id:/^$id\$/" || failed=1
-                done
-                exit "$failed"
-              - sh
-              - "${{ticket.relationships.blocks[*]}}"
-    # Started by the rule above for one ticket at a time. By hand: always pass --select, or every Blocked ticket starts.
-    - name: "Release installed: run the waiting check"
+    # lotar's own rules (not from standards). A ticket that waits for others is Blocked and depends on them (owner
+    # 2026-11-12, DEV-385: "when a ticket the blocks other tickets is done, it should automatically kick of agents for
+    # those tickets"). Release process (owner 2026-11-11, DEV-370, docs/release-guide.md): a ticket whose check needs
+    # the next release depends on the open "Release vX.Y.Z" ticket, closed after brew upgrade lotar. By hand, for one
+    # ticket: lotar automation run "Prerequisites done: continue the waiting ticket" --select 'id:/^DEV-N$/'.
+    - name: "Prerequisites done: continue the waiting ticket"
       when:
         status: Blocked
       on:
-        manual:
+        unblocked: &unblocked
           set:
             assignee: "@fix"
           agent:
             model: "${{ticket.field:model}}"
             provider: "${{ticket.field:provider}}"
+            session: continue
             prompt: |
-              Ticket ${{ticket.id}} ("${{ticket.title}}") waited for a lotar release (${{ticket.relationships.depends_on[*]}}),
-              which is installed now: lotar --version prints it. Run lotar with LOTAR_DEFAULT_REPORTER set to your
-              agent name (claude, codex), and start each comment with it.
-              1. Read the ticket and its comments: the check it waits to run and what done looks like. Run that check
-                 against the installed lotar.
-              2. It passes: comment the check and its result, and stop. Change no files; when your job ends the merge
-                 agent finds nothing to merge and closes the ticket.
-              3. It still fails: comment what you ran and what still fails, set the status to HelpNeeded, assign the
-                 ticket to mallox and stop. Don't fix it in this job: the owner decides what comes next.
+              Ticket ${{ticket.id}} ("${{ticket.title}}") waited for ${{ticket.relationships.depends_on[*]}}, which
+              is done now. Run lotar with LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex), and start
+              each comment with it. Read the ticket and its comments: what it waited to do and what done looks like.
+              - It waited for a lotar release ("Release v..."): that release is installed now, lotar --version prints
+                it. Run the check the ticket waits to run against it. It passes: comment the check and its result,
+                and stop; change no files, so when your job ends the merge agent finds nothing to merge and closes
+                the ticket. It still fails: comment what you ran and what still fails, set the status to HelpNeeded,
+                assign the ticket to mallox and stop. Don't fix it in this job: the owner decides what comes next.
+              - It waited for other work: continue the ticket from where it stopped, the way AGENTS.md says.
+        manual: *unblocked

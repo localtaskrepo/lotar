@@ -26,6 +26,7 @@ export type AutomationEventKey =
     | 'error'
     | 'cancel'
     | 'manual'
+    | 'unblocked'
 
 export type AutomationConditionOperator =
     | 'equals'
@@ -182,6 +183,7 @@ const EVENT_LABELS: Record<AutomationEventKey, string> = {
     error: 'Job failed',
     cancel: 'Job cancelled',
     manual: 'Run manually or from cron',
+    unblocked: 'Prerequisites done',
 }
 
 const EVENT_ALIAS_TO_KEY: Record<string, AutomationEventKey> = {
@@ -206,6 +208,7 @@ const EVENT_ALIAS_TO_KEY: Record<string, AutomationEventKey> = {
     job_cancel: 'cancel',
     job_cancelled: 'cancel',
     manual: 'manual',
+    unblocked: 'unblocked',
 }
 
 const YAML_EVENT_KEYS: Record<AutomationEventKey, string> = {
@@ -221,6 +224,7 @@ const YAML_EVENT_KEYS: Record<AutomationEventKey, string> = {
     error: 'job_failed',
     cancel: 'job_cancelled',
     manual: 'manual',
+    unblocked: 'unblocked',
 }
 
 const CONDITION_OPERATORS: AutomationConditionOperator[] = [
@@ -1362,6 +1366,7 @@ function denormalizeEventKey(event: AutomationEventKey): string {
         case 'commented':
         case 'sprint_changed':
         case 'manual':
+        case 'unblocked':
         case 'start':
             return event
     }
