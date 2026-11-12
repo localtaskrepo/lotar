@@ -50,12 +50,24 @@ Rules only evaluate on task changes. The short form `status: InProgress` means â
 
 Every field condition needs its field to change in the update that fires the rule, also inside `all`. `all: [ {status: Done}, {tags: {any: [urgent]}} ]` fires only when one update sets the status to Done and changes the tags; setting the status of a ticket that is already tagged `urgent` does not fire it. The exceptions look at the task as it is now: `sprint` conditions, the time conditions below, `before`/`within`/`older_than` on `due_date`, and `assignee: { exists: ... }`. `lotar automation simulate` tells you which fields a rule needs to change ([Simulating rules](#simulating-rules)).
 
+To check a field's value without requiring it to change, put the condition under `current`. It looks at the task as it is now, takes the same conditions as `when`, and works next to change conditions and inside `all`, `any` and `not`. This rule fires when a Change ticket moves to InProgress, although its type did not change:
+
+```yaml
+when:
+  all:
+    - current: { type: Change }
+    - status: InProgress
+```
+
+A rule whose only condition is under `current` fires on every update of a matching task. `changes` inside `current` never matches (nothing changes in the task as it is now), and saving such a rule through LoTaR warns about it. The web UI's rule editor shows rules with `current` but edits them only in YAML, as with `not`.
+
 Supported combinators:
 
 - `all`: all conditions must match (AND)
 - `any`: at least one condition matches (OR)
 - `not`: invert a condition
 - `changes`: explicit from/to checks
+- `current`: conditions on the task as it is now
 
 A field condition can also test the value with a regular expression, e.g. `title: { matches: '^\[ops\]' }`. Patterns use the same syntax as [search text](list.md#search-text); an invalid pattern is rejected when the rules are saved through LoTaR.
 
@@ -379,7 +391,7 @@ lotar automation simulate --ticket PROJ-1 --event manual
 
 The web UI's rule editor runs the same simulation on the rule you are editing (**Try it**), before it is saved.
 
-For the change events (`created`, `updated`, `assigned`, `sprint_changed`) the simulation matches like a real update: `created` treats every field the ticket has as new, and the others look for an update of one field that fires the rule (`assigned` always changes the assignee). A match that needs a field to change says so (`Matches only when status changes in the same update.`). A rule that only fires when several fields change in the same update does not match; when nothing matches, the simulation names it (`Done and tagged: matches only when status and tags change in the same update; ...`).
+For the change events (`created`, `updated`, `assigned`, `sprint_changed`) the simulation matches like a real update: `created` treats every field the ticket has as new, and the others look for an update of one field that fires the rule (`assigned` always changes the assignee). A match that needs a field to change says so (`Matches only when status changes in the same update.`). A rule that only fires when several fields change in the same update does not match; when nothing matches, the simulation names it (`Done and tagged: matches only when status and tags change in the same update; ...`). A rule with `current` conditions also names the fields it checked on the ticket as it is now (`Checked on the ticket as it is now: type.`).
 
 The preview applies the matched action the same way a real run would, without writing anything: every `set` field (including due date, effort, custom fields and the `labels` alias), templates built from the ticket's current values, `@me`/`@reporter`/`@assignee`/`@assignee_or_reporter`/`@least_busy` assignees, and case-insensitive tag adds and removes. A few things can only be known when the rule actually runs; the preview lists them as warnings instead of guessing:
 

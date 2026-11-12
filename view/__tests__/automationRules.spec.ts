@@ -71,6 +71,22 @@ describe('automationRules utilities', () => {
         expect(state.unsupportedReasons.join(' ')).toContain('NOT conditions')
     })
 
+    it('flags current-value conditions as yaml-only', () => {
+        const rule = {
+            name: 'Change starts',
+            when: { all: [{ current: { type: 'Change' } }, { status: 'InProgress' }] },
+            on: { updated: { comment: 'started' } },
+        }
+        const state = getEditableRuleState(rule)
+
+        expect(state.editable).toBe(false)
+        expect(state.unsupportedReasons).toEqual(['Current-value conditions are currently YAML-only.'])
+        expect(
+            summarizeAutomationRule({ ...rule, when: { current: { type: 'Change' }, status: 'InProgress' } })
+                .conditions,
+        ).toEqual(['NOW (...)', 'status = InProgress'])
+    })
+
     it('compacts canonical yaml before building summaries', () => {
         const parsed = parseAutomationYamlDocument(`automation:
   rules:

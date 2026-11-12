@@ -66,6 +66,15 @@ fn validate_condition_group(group: &AutomationConditionGroup, config: &ResolvedC
     if let Some(not) = group.not.as_ref() {
         validate_condition_group(not, config, result);
     }
+    if let Some(now) = group.current.as_ref() {
+        if now.changes.is_some() {
+            result.add_error(ValidationError::warning(
+                Some("automation".to_string()),
+                "Automation condition puts changes inside current; it never matches, since current looks at the task as it is now.".to_string(),
+            ));
+        }
+        validate_condition_group(now, config, result);
+    }
     if let Some(changes) = group.changes.as_ref() {
         for (field, change) in changes {
             if let Some(from) = change.from.as_ref() {
@@ -197,6 +206,18 @@ mod tests {
             "automation:\n  rules:\n    - when:\n        title:\n          matches: '^\\p{L}+ \\w+$'\n      on:\n        updated:\n          add_tags: [x]\n",
         );
         assert!(ok.errors.is_empty(), "{:?}", ok.errors);
+    }
+
+    #[test]
+    fn checks_current_conditions() {
+        let result = validate(
+            "automation:\n  rules:\n    - when:\n        current: { title: { matches: '(unclosed' } }\n      on:\n        updated:\n          comment: x\n",
+        );
+        assert!(result.errors.iter().any(|error| error.to_string().contains("invalid pattern '(unclosed'")), "{:?}", result.errors);
+        let result = validate(
+            "automation:\n  rules:\n    - when:\n        current: { changes: { status: { to: Done } } }\n      on:\n        updated:\n          comment: x\n",
+        );
+        assert!(result.warnings.iter().any(|error| error.to_string().contains("changes inside current")), "{:?}", result.warnings);
     }
 
     /// DEV-221: Unicode classes user patterns (search, scan, validation,

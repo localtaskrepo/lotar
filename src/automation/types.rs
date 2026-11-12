@@ -119,6 +119,10 @@ pub struct AutomationConditionGroup {
     pub not: Option<Box<AutomationConditionGroup>>,
     #[serde(default)]
     pub changes: Option<HashMap<String, AutomationChangeCondition>>,
+    /// Conditions on the task as it is now, whether or not the field changed
+    /// in the update (DEV-298).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current: Option<Box<AutomationConditionGroup>>,
     #[serde(default)]
     pub custom_fields: HashMap<String, AutomationFieldCondition>,
     #[serde(flatten)]

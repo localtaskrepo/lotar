@@ -180,6 +180,28 @@ pub(crate) fn update_match(rule: &AutomationRule, current: &TaskDTO, base: &[&st
     UpdateMatch::Together(needed)
 }
 
+/// The fields `rule` checks on the task as it is now with `current` (DEV-298).
+pub(crate) fn current_fields(rule: &AutomationRule) -> Vec<String> {
+    fn collect(group: &AutomationConditionGroup, inside: bool, out: &mut BTreeSet<String>) {
+        for entry in group.all.iter().flatten().chain(group.any.iter().flatten()).chain(group.not.as_deref()) {
+            collect(entry, inside, out);
+        }
+        if let Some(now) = group.current.as_deref() {
+            collect(now, true, out);
+        }
+        if inside {
+            out.extend(group.fields.keys().map(|field| change_key(field)));
+            out.extend(group.custom_fields.keys().cloned());
+        }
+    }
+    let mut out = BTreeSet::new();
+    if let Some(group) = rule.when.as_ref() {
+        collect(group, false, &mut out);
+    }
+    out.into_iter().collect()
+}
+
+/// Fields under `current` are left out: they need not change.
 fn collect_change_fields(group: &AutomationConditionGroup, out: &mut BTreeSet<String>) {
     for entry in group.all.iter().flatten().chain(group.any.iter().flatten()) {
         collect_change_fields(entry, out);
@@ -233,6 +255,12 @@ fn matches_group(
     }
     if let Some(not) = group.not.as_ref()
         && matches_group(not, current, changes, mode, config, active_sprint_ids)
+    {
+        return false;
+    }
+
+    if let Some(now) = group.current.as_ref()
+        && !matches_group(now, current, changes, MatchMode::Current, config, active_sprint_ids)
     {
         return false;
     }

@@ -483,6 +483,10 @@ function summarizeConditions(when: unknown): string[] {
             conditions.push('NOT (...)')
             continue
         }
+        if (key === 'current') {
+            conditions.push('NOW (...)')
+            continue
+        }
         conditions.push(`${key} ${summarizeFieldCondition(value)}`)
     }
 
@@ -620,10 +624,13 @@ function collectUnsupportedWhenReasons(when: unknown, depth = 0): string[] {
     if ('not' in record) {
         reasons.push('NOT conditions are currently YAML-only.')
     }
+    if ('current' in record) {
+        reasons.push('Current-value conditions are currently YAML-only.')
+    }
 
     for (const key of Object.keys(record)) {
         if (SUPPORTED_WHEN_KEYS.has(key)) continue
-        if (key !== 'not' && !isSupportedFieldCondition(record[key])) {
+        if (key !== 'not' && key !== 'current' && !isSupportedFieldCondition(record[key])) {
             reasons.push(`Condition for ${key} uses an unsupported shape.`)
         }
     }
@@ -855,7 +862,7 @@ function extractLeafConditions(
     }
 
     for (const [field, fieldCondition] of Object.entries(record)) {
-        if (SUPPORTED_WHEN_KEYS.has(field) || field === 'not') continue
+        if (SUPPORTED_WHEN_KEYS.has(field) || field === 'not' || field === 'current') continue
         conditions.push(conditionToDraft(fieldCondition, field, 'field'))
     }
 }

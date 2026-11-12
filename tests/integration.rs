@@ -121,6 +121,7 @@ mod dev286_sync_mentions_test;
 mod dev287_git_integration_test;
 mod dev291_workflow_hardening_test;
 mod dev292_performance_test;
+mod dev298_automation_current_conditions_test;
 mod dev300_cli_sync_followups_test;
 mod dev301_stale_write_test;
 mod dev305_serve_exit_on_upgrade_test;

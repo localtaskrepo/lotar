@@ -7,7 +7,7 @@ use crate::config::validation::errors::ValidationResult;
 use crate::errors::{LoTaRError, LoTaRResult};
 use crate::services::agent_job_service::{AgentJobService, AgentOrchestratorMode};
 use crate::services::agent_queue_service::AgentQueueService;
-use crate::services::automation_matching::{ChangeSet, MatchMode, UpdateMatch, matches_rule, update_match};
+use crate::services::automation_matching::{ChangeSet, MatchMode, UpdateMatch, current_fields, matches_rule, update_match};
 use crate::services::automation_validation::{parse_cooldown, validate_rules};
 use crate::services::sprint_service::SprintService;
 use crate::services::task_service::{CommentContext, TaskService, TaskUpdateContext};
@@ -565,6 +565,12 @@ impl AutomationService {
             };
             if !matched {
                 continue;
+            }
+            let now = current_fields(rule);
+            if !now.is_empty()
+                && matches!(event, AutomationEvent::Created | AutomationEvent::Updated | AutomationEvent::Assigned | AutomationEvent::SprintChanged)
+            {
+                notes.push(format!("Checked on the ticket as it is now: {}.", now.join(", ")));
             }
             if let Some(action) = resolve_action_for_event_with_fallback(&rule.on, event) {
                 let mut preview = PreviewContext::new(task);
