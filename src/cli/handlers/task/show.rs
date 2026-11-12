@@ -11,14 +11,14 @@ pub fn handle_show(id: &str, project: Option<&str>, resolver: &TasksDirectoryRes
     let loaded = load_task_including_deleted(&mut ctx, id, project)?;
     match renderer.format {
         OutputFormat::Json => renderer.emit_json(&loaded.task),
-        OutputFormat::Text => renderer.emit_raw_stdout(render_task_text(&loaded.task)),
+        OutputFormat::Text => renderer.emit_raw_stdout(render_task_text(&loaded.task, &resolver.path)),
     }
     Ok(())
 }
 
 /// Plain-text view of a task: header, fields, relationships, description,
 /// references and comments. Empty sections are left out.
-pub fn render_task_text(task: &TaskDTO) -> String {
+pub fn render_task_text(task: &TaskDTO, tasks_root: &std::path::Path) -> String {
     let mut out = format!("{}  {}\n", task.id, task.title);
     if let Some(url) = &task.url {
         out.push_str(&format!("{url}\n"));
@@ -74,6 +74,7 @@ pub fn render_task_text(task: &TaskDTO) -> String {
     if !links.is_empty() {
         out.push_str("\nRelationships\n");
         for (label, ids) in links {
+            let ids: Vec<_> = ids.iter().map(|id| crate::services::external_tasks::describe(tasks_root, id)).collect();
             out.push_str(&format!("  {label}: {}\n", ids.join(", ")));
         }
     }

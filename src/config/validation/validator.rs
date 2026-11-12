@@ -165,6 +165,13 @@ impl ConfigValidator {
             result.add_error(ValidationError::error(Some("server_public_url".to_string()), problem));
         }
 
+        for name in config.repos.keys().filter(|name| !crate::services::external_tasks::is_repo_name(name)) {
+            result.add_error(ValidationError::error(
+                Some("repos".to_string()),
+                format!("Invalid repo name '{name}': use letters, digits, '.', '_' or '-', starting with a letter or digit"),
+            ));
+        }
+
         // Validate default prefix
         if !config.default_project.is_empty() {
             self.validate_prefix(&config.default_project, &mut result);

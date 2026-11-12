@@ -53,6 +53,20 @@ where
         .collect()
 }
 
+/// Repository names to paths (DEV-386), as a YAML/JSON mapping. Names
+/// prefix cross-repo task IDs (`lotar:DEV-374`).
+fn parse_repos(value: &str) -> Result<BTreeMap<String, String>, ConfigError> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Ok(BTreeMap::new());
+    }
+    let repos = serde_yaml_ng::from_str::<BTreeMap<String, String>>(trimmed).map_err(|err| ConfigError::ParseError(format!("Invalid repos value: {}", err)))?;
+    if let Some(name) = repos.keys().find(|name| !crate::services::external_tasks::is_repo_name(name)) {
+        return Err(ConfigError::ParseError(format!("Invalid repo name '{name}': use letters, digits, '.', '_' or '-', starting with a letter or digit")));
+    }
+    Ok(repos)
+}
+
 fn parse_sync_remotes(value: &str) -> Result<BTreeMap<String, SyncRemoteConfig>, ConfigError> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
@@ -771,6 +785,9 @@ pub fn apply_field_to_global_config(config: &mut GlobalConfig, field: &str, valu
         "sprints_notifications_enabled" => {
             config.sprints.notifications.enabled = parse_bool_flag(value, field)?;
         }
+        "repos" => {
+            config.repos = parse_repos(value)?;
+        }
         "web_ui_path" => {
             let trimmed = value.trim();
             if trimmed.is_empty() {
@@ -1326,6 +1343,9 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
         }
         "remotes" => {
             let _ = parse_sync_remotes(value)?;
+        }
+        "repos" => {
+            let _ = parse_repos(value)?;
         }
         "agents" => {
             let _ = parse_agent_profiles(value)?;

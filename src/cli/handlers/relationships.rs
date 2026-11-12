@@ -74,7 +74,11 @@ pub fn execute_action(
             };
             let source = resolve_id(&id, project.as_deref(), resolver)?;
             let source_project = crate::storage::TaskId::parse(&source).map_err(|e| e.to_string())?.project;
-            let target = resolve_id(&target, Some(&source_project), resolver)?;
+            // `repo:ID` names a task in another repo (DEV-386).
+            let target = match crate::services::external_tasks::canonical(&target) {
+                Some(reference) => reference,
+                None => resolve_id(&target, Some(&source_project), resolver)?,
+            };
             let expected_current = expected.map(|id| resolve_id(&id, Some(&source_project), resolver)).transpose()?;
             let report = relationships::mutate(
                 &storage,
@@ -182,7 +186,7 @@ impl CommandHandler for RelationshipsHandler {
         let LoadedTask { full_id, project_prefix, task } = load_task(&mut ctx, &args.task_id, project_hint)?;
 
         let filtered = filter_relationships(&task.relationships, &args.kinds);
-        render_relationships(renderer, &full_id, &project_prefix, &args.kinds, &filtered);
+        render_relationships(renderer, &resolver.path, &full_id, &project_prefix, &args.kinds, &filtered);
         Ok(())
     }
 }
@@ -285,7 +289,14 @@ fn collect_entries(source: &TaskRelationships) -> Vec<(RelationshipKind, Relatio
     entries
 }
 
-fn render_relationships(renderer: &OutputRenderer, task_id: &str, project: &str, kinds: &[RelationshipKind], relationships: &TaskRelationships) {
+fn render_relationships(
+    renderer: &OutputRenderer,
+    tasks_root: &std::path::Path,
+    task_id: &str,
+    project: &str,
+    kinds: &[RelationshipKind],
+    relationships: &TaskRelationships,
+) {
     let entries = collect_entries(relationships);
 
     let message = if entries.is_empty() {
@@ -327,6 +338,21 @@ fn render_relationships(renderer: &OutputRenderer, task_id: &str, project: &str,
                 }
             }
             root.insert("relationships".to_string(), JsonValue::Object(rel_map));
+            // Tasks in other repos (DEV-386), resolved now.
+            let mut cross_repo = JsonMap::new();
+            for raw in relationships.depends_on.iter().chain(&relationships.related) {
+                let Some(reference) = crate::services::external_tasks::canonical(raw) else {
+                    continue;
+                };
+                let entry = match crate::services::external_tasks::resolve(tasks_root, &reference) {
+                    Ok(task) => serde_json::json!({ "title": task.title, "status": task.status, "done": task.done, "url": task.url }),
+                    Err(reason) => serde_json::json!({ "unresolved": reason }),
+                };
+                cross_repo.insert(reference, entry);
+            }
+            if !cross_repo.is_empty() {
+                root.insert("cross_repo".to_string(), JsonValue::Object(cross_repo));
+            }
 
             let payload = JsonValue::Object(root);
             renderer.emit_json(&payload);
@@ -340,12 +366,12 @@ fn render_relationships(renderer: &OutputRenderer, task_id: &str, project: &str,
             for (kind, value) in entries {
                 match value {
                     RelationshipValue::Single(val) => {
-                        renderer.emit_raw_stdout(format_args!("  {}: {}", kind.as_kebab(), val));
+                        renderer.emit_raw_stdout(format_args!("  {}: {}", kind.as_kebab(), crate::services::external_tasks::describe(tasks_root, &val)));
                     }
                     RelationshipValue::Many(list) => {
                         renderer.emit_raw_stdout(format_args!("  {}:", kind.as_kebab()));
                         for item in list {
-                            renderer.emit_raw_stdout(format_args!("    - {}", item));
+                            renderer.emit_raw_stdout(format_args!("    - {}", crate::services::external_tasks::describe(tasks_root, &item)));
                         }
                     }
                 }

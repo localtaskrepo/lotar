@@ -202,6 +202,36 @@ changes arrive through live backend updates without a manual reload or loss of
 the current panel scroll/draft. Following a task link preserves browser history:
 Back returns to the previous task, including when opened over another view.
 
+#### Tasks in another repo
+
+```bash
+lotar task relationships add STD-54 lotar:DEV-374 --kind depends-on
+lotar task relationships STD-54
+#   depends-on:
+#     - lotar:DEV-374 [Todo] Release v0.15.0 https://lotar.pyxzl.net/task/DEV-374
+```
+
+A ticket can depend on, or be related to, a ticket in another repository's
+LoTaR: write `<repo>:<ID>`, where `<repo>` is a name in the global
+[`repos`](./config-reference.md) setting (`repos: { lotar: ~/Development/lotar }`).
+Only `depends_on` and `related` hold such references, and only the focused
+task changes: the other repo is never written and does not know the dependent.
+Adding one checks that the task exists there. `task relationships`, `show`
+and `task relationships --format json` (as `cross_repo`) show its status,
+title and link (the other repo's `server.public_url`).
+
+Dependency evaluation reads the other repo's task each time, by that repo's
+done-state policy, so a dependent counts as unblocked once the other ticket is
+done. A reference that cannot be read (repo not registered, folder missing,
+task missing or deleted) is unresolved: the prerequisite stays open, as for a
+deleted local one, and `task relationships check` warns (`external_unresolved`)
+without failing. Such references are not part of the local graph or its
+repairs, and `lotar:DEV-12` in a description is not linked as a mention.
+The web UI lists these references like other IDs, without the other repo's
+status or link. Nothing in this repo is notified when the other ticket closes:
+the dependency counts as done the next time it is evaluated, for example when
+an agent job for the dependent starts.
+
 #### Explore dependencies
 
 ```bash

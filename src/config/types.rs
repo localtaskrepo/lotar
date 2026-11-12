@@ -836,6 +836,12 @@ pub struct GlobalConfig {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub web_ui_path: Option<String>,
 
+    /// Other repositories' LoTaR task folders by name, for relationships like
+    /// `depends_on: [lotar:DEV-374]` (DEV-386). A path names the repository
+    /// (its `.tasks` folder is used) or the tasks folder itself.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub repos: BTreeMap<String, String>,
+
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub remotes: BTreeMap<String, SyncRemoteConfig>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -1181,6 +1187,7 @@ impl Default for GlobalConfig {
             ui_icon: None,
             ui_theme_file: None,
             web_ui_path: None,
+            repos: BTreeMap::new(),
             remotes: BTreeMap::new(),
             auth_profiles: BTreeMap::new(),
         }

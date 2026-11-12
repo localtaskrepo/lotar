@@ -445,7 +445,8 @@ fn assertions(id: &str, rel: &TaskRelationships, inventory: &Inventory) -> Vec<(
         ("children", &rel.children, RelationshipKind::Hierarchy, false),
         ("fixes", &rel.fixes, RelationshipKind::Fixes, false),
     ] {
-        for raw in values {
+        // Cross-repo references are outside the local graph (DEV-386).
+        for raw in values.iter().filter(|raw| crate::services::external_tasks::parse(raw).is_none()) {
             let target = inventory.key(raw);
             let (source, target) = if reverse { (target, id.to_string()) } else { (id.to_string(), target) };
             out.push((edge(source, target, kind), field, raw.clone()));
@@ -454,7 +455,7 @@ fn assertions(id: &str, rel: &TaskRelationships, inventory: &Inventory) -> Vec<(
     for (field, raw, kind, reverse) in
         [("parent", &rel.parent, RelationshipKind::Hierarchy, true), ("duplicate_of", &rel.duplicate_of, RelationshipKind::Duplicate, false)]
     {
-        if let Some(raw) = raw {
+        if let Some(raw) = raw.as_ref().filter(|raw| crate::services::external_tasks::parse(raw).is_none()) {
             let target = inventory.key(raw);
             let (source, target) = if reverse { (target, id.to_string()) } else { (id.to_string(), target) };
             out.push((edge(source, target, kind), field, raw.clone()));
@@ -679,6 +680,7 @@ fn inspect_actions(inventory: &Inventory) -> (Vec<RelationshipIssue>, BTreeMap<S
             issues.push(issue(state, vec![id.clone()], false, format!("Task '{id}' is {state}")));
         }
     }
+    issues.extend(cross_repo_issues(inventory));
     for (e, provenance) in &assertions {
         let tasks = vec![e.0.clone(), e.1.clone()];
         let valid = inventory.state(&e.0) == "active" && inventory.state(&e.1) == "active";
@@ -736,6 +738,48 @@ fn inspect_actions(inventory: &Inventory) -> (Vec<RelationshipIssue>, BTreeMap<S
         }
     }
     (issues, actions)
+}
+
+/// Every relationship field with its values.
+fn field_values(rel: &TaskRelationships) -> [(&'static str, Vec<&String>); 7] {
+    [
+        ("depends_on", rel.depends_on.iter().collect()),
+        ("related", rel.related.iter().collect()),
+        ("blocks", rel.blocks.iter().collect()),
+        ("children", rel.children.iter().collect()),
+        ("fixes", rel.fixes.iter().collect()),
+        ("parent", rel.parent.iter().collect()),
+        ("duplicate_of", rel.duplicate_of.iter().collect()),
+    ]
+}
+
+/// Warnings for cross-repo references (DEV-386) that do not resolve now or
+/// sit in a field that cannot hold them. The other repo may only be
+/// unavailable for a while, so they never fail a check.
+fn cross_repo_issues(inventory: &Inventory) -> Vec<RelationshipIssue> {
+    let mut issues = Vec::new();
+    for (id, records) in &inventory.records {
+        let [Record { root, task: Some(task), .. }] = records.as_slice() else {
+            continue;
+        };
+        for (field, values) in field_values(&task.relationships) {
+            for reference in values.into_iter().filter_map(|raw| crate::services::external_tasks::canonical(raw)) {
+                let problem = if matches!(field, "depends_on" | "related") {
+                    crate::services::external_tasks::resolve(root, &reference)
+                        .err()
+                        .map(|reason| ("external_unresolved", format!("{id}.{field} = {reference} is unresolved: {reason}")))
+                } else {
+                    Some(("external_field", format!("{id}.{field} = {reference}: a task in another repo can only be in depends_on or related")))
+                };
+                if let Some((code, message)) = problem {
+                    let mut finding = issue(code, vec![id.clone()], false, message);
+                    finding.severity = "warning".into();
+                    issues.push(finding);
+                }
+            }
+        }
+    }
+    issues
 }
 
 pub fn check(storage: &Storage, project: Option<&str>) -> LoTaRResult<RelationshipCheckResponse> {
@@ -1213,6 +1257,7 @@ pub(crate) fn stage_task_change(
     if previous == candidate {
         return Ok(Vec::new());
     }
+    validate_cross_repo(&storage.root_path, previous, candidate)?;
     let mut inventory = if let Some(external) = external { external.load(storage)? } else { Inventory::load(storage)? };
     // A newly allocated task does not exist physically until the transaction
     // commits; include only its identity in the candidate graph.
@@ -1246,6 +1291,80 @@ pub(crate) fn stage_task_change(
     }
     tasks.remove(id);
     stage_tasks(txn, storage, &inventory, tasks)
+}
+
+/// Cross-repo references (DEV-386) go only in `depends_on` and `related`,
+/// and a new one must name a task that resolves. Existing ones stay as
+/// they are, resolved or not, so they never block unrelated edits.
+fn validate_cross_repo(local_root: &Path, previous: &TaskRelationships, candidate: &TaskRelationships) -> LoTaRResult<()> {
+    let external = |values: Vec<&String>| values.into_iter().filter_map(|raw| crate::services::external_tasks::canonical(raw)).collect::<BTreeSet<_>>();
+    for ((field, old), (_, new)) in field_values(previous).into_iter().zip(field_values(candidate)) {
+        let old = external(old);
+        for reference in external(new).difference(&old) {
+            if !matches!(field, "depends_on" | "related") {
+                return Err(invalid(format!("Task '{reference}' in another repo can only be in depends_on or related, not {field}")));
+            }
+            crate::services::external_tasks::resolve(local_root, reference)
+                .map_err(|reason| invalid(format!("Cross-repo task '{reference}' is unresolved: {reason}")))?;
+        }
+    }
+    Ok(())
+}
+
+/// Add, remove or move a reference to a task in another repo (DEV-386):
+/// only the source task changes; the other repo is never written.
+fn mutate_cross_repo(storage: &Storage, request: &RelationshipMutationRequest, reference: &str) -> LoTaRResult<RelationshipMutationResponse> {
+    let field_name = |field: RelationshipField| match field {
+        RelationshipField::DependsOn => Ok("depends_on"),
+        RelationshipField::Related => Ok("related"),
+        _ => Err(invalid(format!("Task '{reference}' in another repo can only be in depends_on or related"))),
+    };
+    let field = field_name(request.kind)?;
+    let from = match (request.operation, request.from_kind) {
+        (RelationshipOperation::ChangeKind, Some(from)) if from == request.kind => return Err(invalid("change_kind requires a different kind")),
+        (RelationshipOperation::ChangeKind, Some(from)) => Some(field_name(from)?),
+        (RelationshipOperation::ChangeKind, None) => return Err(invalid("change_kind requires from_kind")),
+        (_, Some(_)) => return Err(invalid("from_kind is only valid for change_kind")),
+        (_, None) => None,
+    };
+    if request.expected_current.is_some() {
+        return Err(invalid("expected_current is only valid for parent, children, or duplicate_of"));
+    }
+    if request.operation != RelationshipOperation::Remove {
+        crate::services::external_tasks::resolve(&storage.root_path, reference)
+            .map_err(|reason| invalid(format!("Cross-repo task '{reference}' is unresolved: {reason}")))?;
+    }
+    let external = external_locks(storage)?;
+    let mut txn = MultiFileTransaction::begin_all(&storage.root_path, &[])?;
+    let inventory = external.load(storage)?;
+    let source = inventory.active_local(&storage.root_path, &request.source)?;
+    let mut task = inventory.active_task(&source)?;
+    let same = |raw: &String| crate::services::external_tasks::canonical(raw).as_deref() == Some(reference);
+    if let Some(from) = from {
+        let old = cross_repo_values(&mut task.relationships, from);
+        if !old.iter().any(same) {
+            return Err(invalid("The relationship to change no longer exists"));
+        }
+        old.retain(|raw| !same(raw));
+    }
+    let list = cross_repo_values(&mut task.relationships, field);
+    if request.operation == RelationshipOperation::Remove {
+        list.retain(|raw| !same(raw));
+    } else if !list.iter().any(same) {
+        list.push(reference.to_string());
+    }
+    let changed_tasks = stage_tasks(&mut txn, storage, &inventory, BTreeMap::from([(source, task)]))?;
+    let changed = !changed_tasks.is_empty();
+    let locks = txn.commit_retaining_locks_checked(|| external.verify(storage))?;
+    let revision = external.load(storage)?.revision;
+    drop(locks);
+    drop(external);
+    emit_counterparts(storage, &changed_tasks);
+    Ok(RelationshipMutationResponse { changed, changed_tasks, revision })
+}
+
+fn cross_repo_values<'a>(rel: &'a mut TaskRelationships, field: &str) -> &'a mut Vec<String> {
+    if field == "depends_on" { &mut rel.depends_on } else { &mut rel.related }
 }
 
 fn stage_tasks(txn: &mut MultiFileTransaction, storage: &Storage, inventory: &Inventory, tasks: BTreeMap<String, Task>) -> LoTaRResult<Vec<String>> {
@@ -1305,6 +1424,9 @@ pub(crate) fn emit_counterparts(storage: &Storage, ids: &[String]) {
 }
 
 pub fn mutate(storage: &Storage, request: &RelationshipMutationRequest) -> LoTaRResult<RelationshipMutationResponse> {
+    if let Some(reference) = crate::services::external_tasks::canonical(&request.target) {
+        return mutate_cross_repo(storage, request, &reference);
+    }
     let external = external_locks(storage)?;
     let mut txn = MultiFileTransaction::begin_all(&storage.root_path, &[])?;
     let inventory = external.load(storage)?;
@@ -1522,6 +1644,13 @@ pub fn blocked_dependencies(storage: &Storage, id: &str, declared: &[String]) ->
     }
     let mut blocked = Vec::new();
     for dep in dependencies {
+        if crate::services::external_tasks::parse(&dep).is_some() {
+            // Unresolved counts as open (DEV-386).
+            if !crate::services::external_tasks::resolve(&storage.root_path, &dep).is_ok_and(|task| task.done) {
+                blocked.push(dep);
+            }
+            continue;
+        }
         let done = match inventory.unique(&dep) {
             Some(record) if inventory.state(&dep) == "active" => task_is_done(record, &dep)?,
             _ => false,
@@ -1547,8 +1676,9 @@ fn task_is_done(record: &Record, id: &str) -> LoTaRResult<bool> {
 mod dev15_relationship_cases;
 
 /// Task IDs written in `text` (DEV-7): `DEV-12`, `ABC-OPS-3`. Words glued to
-/// more ID characters (`DEV-12a`, `x-DEV-12`) and text inside inline code or
-/// fenced code blocks do not count.
+/// more ID characters (`DEV-12a`, `x-DEV-12`), tasks in another repo
+/// (`lotar:DEV-12`) and text inside inline code or fenced code blocks do not
+/// count.
 pub fn mentioned_ids(text: &str) -> BTreeSet<String> {
     let mut found = BTreeSet::new();
     let mut in_fence = false;
@@ -1570,6 +1700,11 @@ pub fn mentioned_ids(text: &str) -> BTreeSet<String> {
         }
         let is_id_char = |c: char| c.is_alphanumeric() || c == '_' || c == '-';
         for word in prose.split(|c: char| !is_id_char(c)) {
+            // `lotar:DEV-12` names a task in another repo (DEV-386).
+            let before = &prose[..word.as_ptr() as usize - prose.as_ptr() as usize];
+            if before.strip_suffix(':').and_then(|rest| rest.chars().next_back()).is_some_and(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-')) {
+                continue;
+            }
             let word = word.trim_end_matches(['-', '_']);
             let Some((prefix, number)) = word.rsplit_once('-') else {
                 continue;

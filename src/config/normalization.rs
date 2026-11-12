@@ -16,6 +16,7 @@ fn expand_dotted_keys(value: Value) -> Result<Value, ConfigError> {
                     key.rsplit('.').next().unwrap_or_default(),
                     "auth_profiles"
                         | "remotes"
+                        | "repos"
                         | "agents"
                         | "env"
                         | "type_aliases"
@@ -389,6 +390,9 @@ pub fn to_canonical_global_yaml_with(cfg: &GlobalConfig, options: GlobalYamlOpti
     }
     if let Some(path) = &cfg.web_ui_path {
         root.insert(Y::String("web_ui_path".into()), Y::String(path.clone()));
+    }
+    if !cfg.repos.is_empty() {
+        root.insert(Y::String("repos".into()), serde_yaml_ng::to_value(&cfg.repos).unwrap_or(Y::Null));
     }
 
     // ui (DEV-218)

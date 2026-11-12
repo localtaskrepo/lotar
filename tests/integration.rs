@@ -142,6 +142,7 @@ mod dev365_automation_alias_conditions_test;
 mod dev370_release_waiting_checks_test;
 mod dev373_automation_version_conditions_test;
 mod dev383_automation_comment_author_test;
+mod dev386_cross_repo_relationships_test;
 mod dev3_dev13_recent_and_sum_test;
 mod dev4_archive_test;
 mod dev54_mutation_contract_test;

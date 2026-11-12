@@ -64,6 +64,12 @@ legacy declaration still establishes that logical edge, so dependency evaluation
 and visualization agree before repair. `fixes` and `duplicate_of` stay directional;
 incoming links are computed rather than stored in invented inverse fields.
 
+A `depends_on` or `related` entry may name a task in another repository as
+`<repo>:<ID>` (`lotar:DEV-374`), through the global `repos` setting. It is
+one-sided and outside the local graph; a dependency on it is done when the
+other repo's task is done by that repo's policy, and unresolved (open) while it
+cannot be read. See [tasks in another repo](./task.md#tasks-in-another-repo).
+
 Parenthood does not implicitly block work, and indirect dependencies are not
 saved as extra direct links. Each prerequisite uses its own project's done-state
 policy. Existing dangling or conflicting data remains inspectable and does not
