@@ -5,13 +5,17 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T04:15:53.349240+00:00
-modified: 2026-11-12T04:28:52.549607+00:00
+modified: 2026-11-12T04:47:50.753762+00:00
 relationships:
   related:
   - DEV-352
+  - DEV-359
+  - DEV-348
 comments:
 - date: 2026-11-12T04:28:42.723712+00:00
   text: 'claude: Fixed in ca9aac2 (branch agent/DEV-354). tests/web_api_integration_test.rs: new read_until_deadline helper waits for the server''s response up to RESPONSE_DEADLINE (15 s overall per exchange), retrying WouldBlock/TimedOut, and panics with a clear ''no response within 15s'' message on a real hang. http_post_json_with_origin (headers and body) and the open_sse header read use it; open_sse then restores the short net_timeout() read timeout that read_sse_events polls with. Checks: web_api_integration_test module 3x (35/35 each), npm run lint:agent, npm test (Rust 2002/2002, UI 1444/1444, release, hooks), npm run test:rust again (2002/2002), npm run smoke (378/378). Not reproduced the original failure under extra load from other worktrees during this run, so the ''repeatedly under load'' check rests on two full-suite runs.'
+- date: 2026-11-12T04:47:50.624076+00:00
+  text: 'claude: Merged into main as 10525d0 (fast-forward after two rebases; main moved on once, so all checks ran again on the final rebase in the worktree: npm run lint:agent, npm test (Rust 2003/2003, UI 1444/1444, release, hooks), npm run smoke 378/378). Ticket files committed as 55f9ec2. Not pushed: main holds other tickets'' unpushed commits (DEV-348, DEV-352). Check in main checkout: web_api_integration_test module 4 runs in a row of 35 tests: the 9 sse_ tests pass every time, the DEV-354 finding is gone. Another test in the same module, task_creation_waits_for_fragmented_body_with_case_insensitive_content_length, failed in 4 of 7 runs there with the same WouldBlock on its own response read (line 606, not touched by this fix); filed as DEV-359.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa6172a17-078b-422c-843a-fe7b2b32ccde
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A828833fb-19d7-42f5-a803-6c894fccc805
@@ -58,3 +62,19 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A828833fb-19d7-42f5-a803-6c894fccc805
+- at: 2026-11-12T04:47:42.900078+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-352"]}'
+    new: '{"related":["DEV-352","DEV-359"]}'
+- at: 2026-11-12T04:47:50.624076+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T04:47:50.753762+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-352","DEV-359"]}'
+    new: '{"related":["DEV-352","DEV-359","DEV-348"]}'

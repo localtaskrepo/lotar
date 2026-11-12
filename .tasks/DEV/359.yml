@@ -1,0 +1,41 @@
+title: 'Flaky Rust: task_creation_waits_for_fragmented_body_with_case_insensitive_content_length times out reading the response'
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T04:47:42.443342+00:00
+modified: 2026-11-12T04:47:45.230627+00:00
+relationships:
+  related:
+  - DEV-354
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8a800754-e4a5-4ec5-9daa-e8c4f4cdab68
+description: 'Found by DEV-354 merge (claude, 2026-11-11): in the main checkout, running the web_api_integration_test module with cargo nextest run --no-fail-fast -E ''test(web_api_integration_test::)'' failed this test in 4 of 7 runs at tests/web_api_integration_test.rs:606 (stream.read_to_string(&mut response).unwrap() returned WouldBlock, os error 35) because the stream read timeout is net_timeout() (500 ms). It passes alone and in the DEV-354 worktree. Same cause as DEV-354: the response read uses a short fixed timeout. Check: run that cargo nextest command 5 times; all must pass. Done when this read waits for the response with the read_until_deadline helper added in DEV-354 (deadline, not fixed short budget), still failing fast on a real hang.'
+tags:
+- health
+custom_fields:
+  finding: flaky-test:task_creation_waits_for_fragmented_body_with_case_insensitive_content_length
+history:
+- at: 2026-11-12T04:47:42.900715+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-354"]}'
+- at: 2026-11-12T04:47:43.237071+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T04:47:44.218351+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T04:47:45.230627+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8a800754-e4a5-4ec5-9daa-e8c4f4cdab68
