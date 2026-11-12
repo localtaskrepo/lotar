@@ -143,3 +143,32 @@ fn resolve_context_path(tasks_dir: &Path, ticket_id: &str, extension: &str) -> L
 
     Ok(path)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::types::GlobalConfig;
+
+    // DEV-387: a job reading the context while another job appends to it saw
+    // an empty file.
+    #[test]
+    fn readers_never_see_a_partly_written_context() {
+        let dir = tempfile::tempdir().unwrap();
+        let tasks_dir = dir.path().to_path_buf();
+        let config = ResolvedConfig::from_global(GlobalConfig::default());
+        let message = || vec![build_user_message(&"x".repeat(4096))];
+        AgentContextService::append_messages(&tasks_dir, &config, "CTX-1", message(), None).unwrap();
+        let writer = {
+            let (tasks_dir, config) = (tasks_dir.clone(), config.clone());
+            std::thread::spawn(move || {
+                for _ in 0..30 {
+                    AgentContextService::append_messages(&tasks_dir, &config, "CTX-1", message(), None).unwrap();
+                }
+            })
+        };
+        while !writer.is_finished() {
+            AgentContextService::load(&tasks_dir, &config, "CTX-1").unwrap();
+        }
+        writer.join().unwrap();
+    }
+}
