@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T05:28:33.195026+00:00
-modified: 2026-11-12T05:47:18.886097+00:00
+modified: 2026-11-12T05:59:54.298063+00:00
 relationships:
   related:
   - DEV-349
@@ -14,15 +14,29 @@ relationships:
   - TEST-1
   - DEV-365
   - DEV-360
+  - DEV-342
 comments:
 - date: 2026-11-12T05:47:04.512875+00:00
   text: 'claude: Cause: DEV-349 still counted a lotar-agent-wrapper without --tasks-dir (one started by an older build, e.g. another worktree''s test run on a branch before DEV-349) as a job of every tasks directory, so a foreign wrapper for TEST-1 blocked the test''s status change. Fix (commit f85d395 on agent/DEV-367): wrapper_runs_in no longer counts such wrappers; their jobs'' active-job records still count. Unit test wrappers_of_another_tasks_dir_are_not_counted flipped first (failed, then passes); docs/developers/agent-automation-tracker.md updated. Repro: with a wrapper for TEST-1 started without --tasks-dir, cli_configured_reviewer_can_resolve fails on the old code with the ticket''s exact error and passes with the fix. Checks: npm run lint, npm test (2006 Rust + 1444 UI passed), npm run smoke (379 passed). Not run: the 30x next-to-full-suite loop (the deterministic repro covers the cause). The first npm test run hit dev320 status_and_assignee_set_during_a_job_win once, a separate race already tracked as DEV-360 (added my report there); the rerun passed.'
+- date: 2026-11-12T05:57:50.609435+00:00
+  text: 'claude: Merged into main by fast-forward: 6959d14 (DEV-367 fix, rebased twice onto main, the last time onto 69e4a11) and a71a353 (ticket updates). Not pushed: lotar is not in ~/Development/standards/repos.json, and main holds many other unpushed commits. Checks in the worktree after the last rebase: npm run lint, npm test (2012 Rust passed), npm run smoke (379 passed). The ticket''s check after the merge, in the main checkout: cargo nextest run --retries 0 cli_configured_reviewer_can_resolve, 3 runs, all passed. Not run: the 30x loop next to a full suite.'
+- date: 2026-11-12T05:57:55.775363+00:00
+  text: The merge agent's job job-20261112T054718.250Z-55 failed (lotar agent logs job-20261112T054718.250Z-55); the fix agent retries it on branch agent/DEV-367.
+- date: 2026-11-12T05:59:20.948718+00:00
+  text: 'claude: Nothing left to fix: the fix is on main as 6959d14 (merged 21:56 with a71a353). agent/DEV-367 and t3/fix-flaky-noop-update-test still point at f85d395, the commit before the rebase; git cherry main agent/DEV-367 marks it ''-'', meaning its change is already on main. The merge job''s ''can''t be fast-forwarded'' failure came from the agent worker pid 11651 (/opt/homebrew/opt/lotar/bin/lotar ... agent worker). It started at 18:31, before DEV-342 (c55f67c, 18:42) added the git cherry check for rebased branches. It''s still running that build because the installed 0.13.2 (20:27) predates the DEV-361 restart fix (06b571f, 21:12). Already tracked in DEV-342/DEV-361; it goes away once lotar is reinstalled from main and that worker restarted. No files changed, no commit.'
+- date: 2026-11-12T05:59:45.130020+00:00
+  text: 'claude: Nothing to merge. The fix is already on main as 6959d14 (ticket updates a71a353). The branch commit f85d395 is the same change before the rebase: git cherry main marks it as already applied, and the src/ and docs/ diff between main and this branch is empty. No checks rerun, nothing changed since the last merge job''s checks.'
+- date: 2026-11-12T05:59:54.298063+00:00
+  text: 'claude: Correction to my last comment: the diff between f85d395 and 6959d14 is empty for the two files the fix changed (src/cli/handlers/agent.rs, docs/developers/agent-automation-tracker.md). The branch as a whole is behind main, so a full diff against main is not empty.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abcb02758-ed60-44e3-b62a-0c1efe25ea59
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa7313d32-18d3-4b59-ad90-607ce826ea53
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad78b5fe4-40af-4198-9f2b-d537cb04f529
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A10554b5f-14c0-4c32-8895-666d30fb65e3
 description: 'Found by DEV-361 (claude, 2026-11-12): in a full npm run test:agent on t3/agent-worker-restart-after-upgrade (rebased on 86239c2, other agent jobs running), tests/task_noop_update_test.rs:930 failed with ''Ticket TEST-1 has an active agent job (pid 88551). Cancel it before changing status.'' It passed alone and in the rerun of the full suite. Likely the same cause as DEV-349/DEV-351: a pid in the test''s temp workspace matches a live process of another session. Check: cargo nextest run --retries 0 cli_configured_reviewer_can_resolve next to a full suite 30 times, no failure. Done when the test cannot see a foreign process as its job.'
 tags:
 - health
+- merge-retried
 custom_fields:
   finding: flaky-test:task_noop_update_test::cli_configured_reviewer_can_resolve_an_agent_reported_review
 history:
@@ -75,3 +89,54 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa7313d32-18d3-4b59-ad90-607ce826ea53
+- at: 2026-11-12T05:57:50.609435+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:57:55.588673+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: health
+    new: health, merge-retried
+- at: 2026-11-12T05:57:55.775363+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:57:57.433825+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad78b5fe4-40af-4198-9f2b-d537cb04f529
+- at: 2026-11-12T05:59:20.948718+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:59:21.267528+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-349","DEV-351","DEV-361","TEST-1","DEV-365","DEV-360"]}'
+    new: '{"related":["DEV-349","DEV-351","DEV-361","TEST-1","DEV-365","DEV-360","DEV-342"]}'
+- at: 2026-11-12T05:59:32.515298+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T05:59:33.474991+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A10554b5f-14c0-4c32-8895-666d30fb65e3
+- at: 2026-11-12T05:59:45.130020+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:59:54.298063+00:00
+  actor: claude
+  changes:
+  - field: comment_added

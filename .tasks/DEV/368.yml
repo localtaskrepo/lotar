@@ -1,0 +1,61 @@
+title: 't3 runner: run a follow-up job (merge) as the next turn of the ticket''s last thread'
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T05:58:31.545950+00:00
+modified: 2026-11-12T05:58:37.921545+00:00
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8eb9de4e-e61b-41d2-a1de-00fb2c0f19e0
+- file: docs/help/agent.md
+- file: src/services/agent_runner.rs
+description: |-
+  The standards repo's lotar rules start a second T3 Code thread for every finished fix job: `@merge` runs `t3 thread start ... --worktree ...`. Those merge threads fill the owner's thread list in T3 Code, and the merge agent starts without the fix agent's context. The owner wants the merge to run in the fix agent's thread instead (owner 2026-11-11, standards docs/decisions/2026-11-11-merge-in-fix-thread.md).
+
+  ## Context
+  - t3 v0.1.9 has no way to start a child thread from outside (`t3 thread start` has no parent option), but `t3 thread send <thread> - --wait` exists, with the same exit codes as `start --wait` (0 done, 1 failed, 2 waits for an answer).
+  - lotar already records the thread id as the job's session and the worktree path and branch on the job (docs/help/agent.md, T3 Code threads).
+  - The rules that would use it: `Health: fix agent lifecycle` → `job_completed` → `@merge` in ~/Development/standards/configs/lotar/automation.yml; profiles in configs/lotar/agents.yml there.
+
+  ## Proposed
+  - An agent setting that continues the ticket's previous job's session instead of starting a new one, usable on a profile and in a rule's `agent` action, e.g. `session: continue` (name up to you).
+  - t3 runner: send the prompt with `t3 thread send <previous thread> - --wait` from the previous job's worktree; record that worktree and branch on the new job, so the merge-job check (branch ends up in the main checkout) and `cleanup_on_done` work as before.
+  - `model`/`provider` set on such a job: T3 can't switch them on `send`; log a note and keep the thread's model.
+  - No previous session, or the thread is gone: start a new thread as today and log why.
+  - Other runners: continue where the CLI can resume (claude `--resume`), otherwise the same fallback. Optional for this ticket.
+
+  ## Done when
+  - [ ] A job with the setting runs as the next turn of the ticket's last T3 thread, in its worktree, and no new thread appears.
+  - [ ] Exit codes, summary, job session, worktree and the merge-job check behave as with a new thread.
+  - [ ] Fallback to a new thread when there is no previous session, with a log line.
+  - [ ] docs/help/agent.md and automation.md describe the setting; tests cover the t3 send path and the fallback.
+tags:
+- agent
+history:
+- at: 2026-11-12T05:58:31.639893+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T05:58:31.947986+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T05:58:32.491701+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8eb9de4e-e61b-41d2-a1de-00fb2c0f19e0
+- at: 2026-11-12T05:58:37.888556+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:docs/help/agent.md
+- at: 2026-11-12T05:58:37.921545+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:src/services/agent_runner.rs

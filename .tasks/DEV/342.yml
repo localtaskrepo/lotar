@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T02:31:00.438069+00:00
-modified: 2026-11-12T05:54:01.384976+00:00
+modified: 2026-11-12T05:59:21.267061+00:00
 relationships:
   related:
   - DEV-341
@@ -14,6 +14,7 @@ relationships:
   - DEV-358
   - DEV-360
   - DEV-362
+  - DEV-367
 comments:
 - date: 2026-11-12T02:42:47.348583+00:00
   text: 'Claude (fix agent): Fixed in commit c55f67c on agent/DEV-342. (1) When a t3 job''s thread ends, LoTaR runs ''t3 thread show'' again and records the thread''s final worktree branch, so the merge check and the next phase see a branch T3 Code renamed (e.g. t3/<topic>). (2) ensure_branch_merged counts a branch as merged when ''git cherry HEAD <branch>'' lists no ''+'' commits (rebased or cherry-picked onto main elsewhere). docs/help/agent.md updated. Tests: new merge_job_whose_branch_was_rebased_elsewhere_passes; lotar_worktrees_become_t3_worktrees now has the fake t3 rename the branch mid-run. Both fail without the fix. Checks: npm run lint, npm test (1998 Rust + 1441 UI), npm run smoke (377) all pass. Not covered: the next phase''s t3 worktree base still comes from agent/<ID> when that branch exists (plan_t3_worktree), not from the recorded renamed branch. Status and assignee left unchanged; the ticket moves to its next step when this job ends.'
@@ -106,3 +107,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-341","DEV-361","DEV-356","DEV-358","DEV-360"]}'
     new: '{"related":["DEV-341","DEV-361","DEV-356","DEV-358","DEV-360","DEV-362"]}'
+- at: 2026-11-12T05:59:21.267061+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-341","DEV-361","DEV-356","DEV-358","DEV-360","DEV-362"]}'
+    new: '{"related":["DEV-341","DEV-361","DEV-356","DEV-358","DEV-360","DEV-362","DEV-367"]}'
