@@ -79,6 +79,8 @@ export class SmokeWorkspace {
             LOTAR_TRUST_ALL: '1',
             // Automation cooldown state (DEV-278) stays inside the workspace.
             LOTAR_AUTOMATION_STATE_DIR: path.join(this.root, '.automation-state'),
+            // Agent job records and queue files too (DEV-380).
+            LOTAR_AGENT_QUEUE_DIR: path.join(this.root, '.agent-queue'),
             LOTAR_IGNORE_ENV_TASKS_DIR: '0',
             LOTAR_TEST_MODE: '0',
             LOTAR_TASKS_DIR: this.tasksDir,

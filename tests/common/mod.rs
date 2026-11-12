@@ -154,6 +154,7 @@ unsafe fn cleanup_owned_scratch() {
     // a later process sweeps once this pid is gone.
     if let Some(scratch) = OWNED_SCRATCH.get() {
         let _ = std::fs::remove_dir_all(scratch.join(AUTOMATION_STATE_NAME));
+        let _ = std::fs::remove_dir_all(scratch.join(AGENT_QUEUE_NAME));
         let _ = std::fs::remove_dir(scratch);
         if let Some(base) = scratch.parent() {
             let _ = std::fs::remove_dir(base); // only succeeds once no other process uses it
@@ -162,6 +163,7 @@ unsafe fn cleanup_owned_scratch() {
 }
 
 const AUTOMATION_STATE_NAME: &str = "automation-state";
+const AGENT_QUEUE_NAME: &str = "agent-queue";
 
 /// Remove shared LOTAR environment variables and ignore home config for deterministic tests.
 ///
@@ -211,6 +213,13 @@ pub fn reset_lotar_test_environment() {
     let _guard = env_mutex::lock_var("LOTAR_AUTOMATION_STATE_DIR");
     unsafe {
         std::env::set_var("LOTAR_AUTOMATION_STATE_DIR", state_dir);
+    }
+    // Agent job records and queue files (DEV-380) likewise; tests that
+    // inspect them point the variable at their own fixture instead.
+    let queue_dir = OWNED_SCRATCH.get().cloned().unwrap_or_else(std::env::temp_dir).join(AGENT_QUEUE_NAME);
+    let _guard = env_mutex::lock_var("LOTAR_AGENT_QUEUE_DIR");
+    unsafe {
+        std::env::set_var("LOTAR_AGENT_QUEUE_DIR", queue_dir);
     }
 }
 

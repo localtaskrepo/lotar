@@ -3247,6 +3247,9 @@ mod tests {
         let tasks_dir = dir.path().join(".tasks");
         fs::create_dir_all(&tasks_dir).unwrap();
         fs::write(tasks_dir.join("config.yml"), "default:\n  project: NOTE\nagents:\n  implement: claude\n").unwrap();
+        // SAFETY: test-local override; creating the ticket queues an agent
+        // job, which must not land in the user's cache (DEV-380).
+        unsafe { std::env::set_var("LOTAR_AGENT_QUEUE_DIR", dir.path().join("queue")) };
         let mut storage = Storage::new(&tasks_dir);
         let task = crate::services::task_service::TaskService::create(
             &mut storage,
