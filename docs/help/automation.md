@@ -170,7 +170,7 @@ maintenance and does not itself request a status change or agent launch.
 
 ### Agent run settings
 
-When an action hands the ticket to an agent profile, `agent` sets how that job runs: `model`, `effort`, `provider` (for the [`t3` runner](agent.md#t3-code-threads)) and `prompt`. Each value overrides the profile's own; leave one out to keep the profile's. `prompt` replaces the default request ("work on the ticket") and accepts the same templates as comments. Settings on an action that doesn't assign an agent have no effect.
+When an action hands the ticket to an agent profile, `agent` sets how that job runs: `model`, `effort`, `provider` and `session` (for the [`t3` runner](agent.md#t3-code-threads)) and `prompt`. `session: continue` runs the job as the next turn of the ticket's last T3 Code thread, in its worktree (see [Continuing the ticket's last thread](agent.md#continuing-the-tickets-last-thread)). Each value overrides the profile's own; leave one out to keep the profile's. `prompt` replaces the default request ("work on the ticket") and accepts the same templates as comments. Settings on an action that doesn't assign an agent have no effect.
 
 ```yaml
 - name: Hand over to testing
@@ -198,6 +198,20 @@ When an action hands the ticket to an agent profile, `agent` sets how that job r
       agent:
         provider: "${{ticket.field:provider}}"
         model: "${{ticket.field:model}}"    # the profile's model when the ticket has no `model` field
+```
+
+A merge that runs in the fix agent's thread, with its context, instead of a thread of its own:
+
+```yaml
+- name: Merge the fix
+  when:
+    assignee: "@fix"
+  on:
+    job_completed:
+      set:
+        assignee: "@merge"
+      agent:
+        session: continue
 ```
 
 `lotar automation simulate` lists these settings next to the job it would queue.

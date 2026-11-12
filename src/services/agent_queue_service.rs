@@ -43,6 +43,8 @@ pub struct AgentQueueEntry {
     pub effort: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session: Option<crate::config::types::AgentSession>,
 }
 
 pub struct AgentQueueService;
@@ -82,6 +84,7 @@ impl AgentQueueService {
             model: req.model.clone(),
             effort: req.effort.clone(),
             provider: req.provider.clone(),
+            session: req.session,
         };
 
         let mut inserted = false;
@@ -269,6 +272,7 @@ fn start_entry(tasks_dir: &Path, entry: AgentQueueEntry) -> LoTaRResult<()> {
         model: entry.model,
         effort: entry.effort,
         provider: entry.provider,
+        session: entry.session,
     };
     let _ = AgentJobService::start_job_with_tasks_dir_mode(req, tasks_dir, JobStartMode::Immediate)?;
     Ok(())

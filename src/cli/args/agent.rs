@@ -82,6 +82,10 @@ pub struct AgentRunArgs {
     /// claudeAgent or codex), overriding the profile's
     #[arg(long)]
     pub provider: Option<String>,
+    /// `continue` runs the job as the next turn of the ticket's last T3 Code
+    /// thread (t3 runner), overriding the profile's
+    #[arg(long, value_enum)]
+    pub session: Option<crate::config::types::AgentSession>,
     /// Wait for the job to finish
     #[arg(long)]
     pub wait: bool,

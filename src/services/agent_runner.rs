@@ -556,11 +556,7 @@ fn on_path(program: &str) -> bool {
 /// agent's reply to stdout, and exits 0 (finished), 1 (the run failed) or
 /// 2 (the thread waits for an answer).
 pub fn build_t3_command(profile: &AgentProfileDetail, prompt: &str, launch: &T3Launch) -> LoTaRResult<RunnerCommand> {
-    let program = match profile.command.clone() {
-        Some(command) => command,
-        None if on_path("t3") => "t3".to_string(),
-        None => t3_home_launcher().map(|path| path.to_string_lossy().to_string()).unwrap_or_else(|| "t3".to_string()),
-    };
+    let program = t3_program(profile);
     let own = &profile.args;
     let mut args: Vec<String> = ["thread", "start", ".", "-"].iter().map(|arg| arg.to_string()).collect();
     if !launch.title.trim().is_empty() && !has_flag(own, &["--title"]) {
@@ -591,6 +587,25 @@ pub fn build_t3_command(profile: &AgentProfileDetail, prompt: &str, launch: &T3L
     }
     args.extend(own.iter().cloned());
     Ok(RunnerCommand { program, args, env: expand_env_map(&profile.env), initial_input: Some(prompt.as_bytes().to_vec()) })
+}
+
+/// `t3 thread send <thread> - --wait`, with the prompt on stdin: the job is
+/// the thread's next turn (DEV-368). It prints the reply and exits like
+/// `thread start --wait`. The thread keeps its model and its worktree, so
+/// the profile's provider, model and `args` (made for `thread start`) are
+/// not passed.
+pub fn build_t3_send_command(profile: &AgentProfileDetail, prompt: &str, thread_id: &str) -> RunnerCommand {
+    let args = ["thread", "send", thread_id, "-", "--wait"].iter().map(|arg| arg.to_string()).collect();
+    RunnerCommand { program: t3_program(profile), args, env: expand_env_map(&profile.env), initial_input: Some(prompt.as_bytes().to_vec()) }
+}
+
+/// The profile's `command`, else `t3` on PATH, else T3 Code's own launcher.
+fn t3_program(profile: &AgentProfileDetail) -> String {
+    match profile.command.clone() {
+        Some(command) => command,
+        None if on_path("t3") => "t3".to_string(),
+        None => t3_home_launcher().map(|path| path.to_string_lossy().to_string()).unwrap_or_else(|| "t3".to_string()),
+    }
 }
 
 /// The thread id from a `t3 thread start --wait` stderr line.
@@ -1713,6 +1728,19 @@ mod tests {
         t3.args = vec!["--provider".into(), "claudeAgent".into(), "--model".into(), "x".into()];
         let cmd = build_t3_command(&t3, "p", &T3Launch::default()).unwrap();
         assert_eq!(cmd.args.iter().filter(|a| *a == "--provider").count(), 1);
+    }
+
+    #[test]
+    fn a_continued_t3_job_is_sent_to_its_thread() {
+        let mut t3 = profile("t3");
+        t3.command = Some("/opt/t3".to_string());
+        t3.provider = Some("codex".to_string());
+        t3.model = Some("gpt-5.5".to_string());
+        t3.args = vec!["--title".into(), "x".into()];
+        let cmd = build_t3_send_command(&t3, "the prompt", "thread-1");
+        assert_eq!(cmd.program, "/opt/t3");
+        assert_eq!(cmd.args, ["thread", "send", "thread-1", "-", "--wait"]);
+        assert_eq!(cmd.initial_input.as_deref(), Some("the prompt".as_bytes()));
     }
 
     #[test]

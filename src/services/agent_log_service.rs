@@ -59,6 +59,10 @@ pub struct JobStatusLine {
     pub summary: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub usage: Option<crate::api_types::AgentJobUsage>,
+    /// The runner's session (a T3 Code thread id), for a later job that
+    /// continues it (DEV-368).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub session_id: Option<String>,
 }
 
 pub struct AgentLogService;
@@ -171,7 +175,7 @@ impl AgentLogService {
             workspace_root,
             logs_dir,
             job_id,
-            JobStatusLine { status: status.to_string(), at: at.to_string(), exit_code, summary, usage: None },
+            JobStatusLine { status: status.to_string(), at: at.to_string(), exit_code, summary, usage: None, session_id: None },
         )
     }
 

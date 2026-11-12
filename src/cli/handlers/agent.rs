@@ -59,6 +59,7 @@ impl AgentHandler {
             model: args.model,
             effort: args.effort,
             provider: args.provider,
+            session: args.session,
         };
         let json = matches!(renderer.format, OutputFormat::Json);
         if !(args.wait || args.follow) {

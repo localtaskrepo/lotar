@@ -46,6 +46,7 @@ CLI > project > env > home > global > defaults (commands without a project skip 
   - agents.<name>.permissions: `read-only` | `workspace` | `full` (default `workspace`) — what the agent may do without asking; see [Agent Jobs](./agent.md#permissions)
   - agents.<name>.model / effort: optional strings — model and reasoning effort passed to the CLI; runs and automation actions can override them. See [Agent Jobs](./agent.md#model-and-effort)
   - agents.<name>.provider: optional string — `t3` runner only: the T3 Code provider instance (`claudeAgent`, `codex`, …) the model runs on; set it together with `model`. See [T3 Code threads](./agent.md#t3-code-threads)
+  - agents.<name>.session: `new` | `continue` (default `new`) — `t3` runner only: `continue` runs the job as the next turn of the ticket's last T3 Code thread; see [Continuing the ticket's last thread](./agent.md#continuing-the-tickets-last-thread)
   - agents.<name>.tools.allowed / tools.disallowed: string[] — extra tools to allow or deny (Claude, Copilot); see [Agent Jobs](./agent.md#tools-and-mcp-servers)
   - agents.<name>.mcp.allow: string[] — MCP servers whose tools need no approval (Claude, Copilot)
   - agents.<name>.command: optional string — the executable to run (default: the runner name, `agy` for `antigravity`, `cursor-agent` for `cursor`, and for `t3` `t3` on PATH or else `~/.t3/bin/t3`; required for `command`)

@@ -164,6 +164,19 @@ pub enum AgentPermissions {
     Full,
 }
 
+/// Which agent session a job runs in (DEV-368).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default, clap::ValueEnum)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+#[serde(rename_all = "kebab-case")]
+pub enum AgentSession {
+    /// A new session (for `t3`, a new thread). The default.
+    #[default]
+    New,
+    /// The next turn of the session of the ticket's last job, where the
+    /// runner can continue one (`t3`); otherwise a new session.
+    Continue,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct AgentProfileDetail {
@@ -181,6 +194,9 @@ pub struct AgentProfileDetail {
     /// T3 Code provider instance id such as `claudeAgent` or `codex`.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub provider: Option<String>,
+    /// `continue` runs the job in the ticket's last session (t3 runner).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub session: Option<AgentSession>,
     /// Stop a run once it has cost this many US dollars (Claude only:
     /// `--max-budget-usd`).
     #[serde(skip_serializing_if = "Option::is_none", default)]

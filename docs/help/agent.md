@@ -4,7 +4,7 @@ LoTaR can orchestrate supported agent CLIs (Claude Code, Codex CLI, Copilot CLI,
 
 ## CLI commands
 
-- `lotar agent run <TICKET> <PROMPT> [--runner <RUNNER>] [--agent <profile>] [--model <MODEL>] [--effort <LEVEL>] [--provider <PROVIDER>] [--wait] [--follow] [--timeout-seconds <N>]`
+- `lotar agent run <TICKET> <PROMPT> [--runner <RUNNER>] [--agent <profile>] [--model <MODEL>] [--effort <LEVEL>] [--provider <PROVIDER>] [--session new|continue] [--wait] [--follow] [--timeout-seconds <N>]`
   - `<RUNNER>` is one of the [runners](#runners): `claude`, `codex`, `copilot`, `gemini`, `cursor`, `amp`, `droid`, `opencode`, `kilo`, `antigravity`, `t3` or `command`.
   - Without `--wait` or `--follow`, the job is checked (ticket, profile or runner, settings) and handed to the background queue worker, and the command returns at once with `Queued <TICKET> for <agent>`. Follow it with `lotar agent queue` and `lotar agent list-jobs`. With `--wait`, the job runs in this terminal and the command exits non-zero unless it completes; it returns once the job's end automation (the `job_completed`/`job_failed` rules), context and worktree cleanup are done. With `--format json` it prints the finished job.
 - `lotar agent status <JOB_ID>`
@@ -75,7 +75,7 @@ agents:
 
 ### Model and effort
 
-A profile can pick the model and reasoning effort (and, for `t3`, the provider); a single run can override them with `lotar agent run --model/--effort/--provider`, the `model`/`effort`/`provider` fields of `POST /api/jobs` and the MCP `agent_run` tool, or an automation action's [`agent` settings](automation.md#agent-run-settings).
+A profile can pick the model and reasoning effort (and, for `t3`, the provider and [session](#continuing-the-tickets-last-thread)); a single run can override them with `lotar agent run --model/--effort/--provider`, the `model`/`effort`/`provider` fields of `POST /api/jobs` and the MCP `agent_run` tool, or an automation action's [`agent` settings](automation.md#agent-run-settings).
 
 ```yaml
 agents:
@@ -204,6 +204,19 @@ agents:
 - The thread runs on the T3 Code server, so it doesn't get the job's environment (`LOTAR_TASKS_DIR`, `LOTAR_TICKET_ID`, …). Its "This job" section tells the agent to pass `--tasks-dir "<tasks folder>"` to every lotar command, so a thread in a worktree updates the ticket in the main checkout, not the worktree's copy.
 - `effort`, `permissions`, `tools`, `mcp.allow` and `mcp.lotar` don't apply (the t3 CLI has no such options); a job with `effort` or `permissions` set logs a note. Messages can't be sent to a running t3 job from LoTaR; send them in T3 Code.
 - Profile `args` come after LoTaR's flags; a `--title`, `--provider`/`--model`, `--worktree` or `--wait` there replaces LoTaR's.
+
+#### Continuing the ticket's last thread
+
+`session: continue` runs a job as the next turn of the ticket's last T3 Code thread instead of a new thread, so a follow-up such as a merge sees the earlier agent's work and no second thread appears. Set it on a profile, on a rule's [`agent` settings](automation.md#agent-run-settings), with `lotar agent run --session continue`, or in the `session` field of `POST /api/jobs`; `new` (the default) starts a thread as above.
+
+```bash
+t3 thread send <thread> - --wait
+```
+
+- The thread is the session of the ticket's newest earlier `t3` job that has one: a job of the same LoTaR process, or else one from the job logs, which keep each finished job's session.
+- LoTaR runs the command in the thread's worktree and records that worktree and branch on the job, so the merge-job check (the branch must end up in the main checkout) and the cleanup settings work as with a new thread. Exit codes, the summary and the job's session are the same too; the log says `Continuing the T3 Code thread: <link>`.
+- The thread keeps its model: `provider`, `model` and `args` aren't passed, and a job that sets any of them logs a note.
+- With no earlier thread on the ticket, or when `t3 thread show` no longer finds it or its worktree is gone, the job starts a new thread and logs why. Other runners log that they can't continue a session and start a new one.
 
 A profile in your home config (`~/.lotar`) needs no `lotar trust`, so a repository only needs a rule that assigns tickets to it and one that closes them:
 

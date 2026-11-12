@@ -1617,6 +1617,7 @@ fn apply_action(
             model: expand_run_setting(agent.model.as_deref(), |raw| tmpl.expand(raw)),
             effort: expand_run_setting(agent.effort.as_deref(), |raw| tmpl.expand(raw)),
             provider: expand_run_setting(agent.provider.as_deref(), |raw| tmpl.expand(raw)),
+            session: agent.session,
             prompt: agent.prompt.as_ref().map(|prompt| tmpl.expand(prompt)).filter(|prompt| !prompt.trim().is_empty()),
         });
         maybe_queue_agent_on_assignment(
@@ -1950,6 +1951,7 @@ struct AgentRunSettings {
     model: Option<String>,
     effort: Option<String>,
     provider: Option<String>,
+    session: Option<crate::config::types::AgentSession>,
     prompt: Option<String>,
 }
 
@@ -2027,6 +2029,7 @@ fn maybe_queue_agent_on_assignment(
         model: run.model,
         effort: run.effort,
         provider: run.provider,
+        session: run.session,
     };
 
     let ticket = req.ticket_id.clone();

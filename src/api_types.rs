@@ -738,6 +738,10 @@ pub struct AgentJobCreateRequest {
     /// Overrides the profile's provider for this run (t3 runner).
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub provider: Option<String>,
+    /// Overrides the profile's session for this run: `continue` runs it in
+    /// the ticket's last T3 Code thread.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub session: Option<crate::config::types::AgentSession>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1,11 +1,11 @@
 use crate::api_types::{AgentJob, AgentJobCreateRequest};
-use crate::config::types::{AgentInstructionsConfig, AgentProfileDetail, ResolvedConfig};
+use crate::config::types::{AgentInstructionsConfig, AgentProfileDetail, AgentSession, ResolvedConfig};
 use crate::errors::{LoTaRError, LoTaRResult};
 use crate::services::agent_context_service::{AgentContextService, build_assistant_message, build_user_message};
 use crate::services::agent_log_service::AgentLogService;
 use crate::services::agent_runner::{
-    AgentRunnerKind, RunnerEventKind, T3Launch, T3Worktree, build_runner_command, build_t3_command, format_stdin_message, is_t3_noise, parse_runner_line,
-    supports_stdin, t3_thread_id, validate_runner_command,
+    AgentRunnerKind, RunnerEventKind, T3Launch, T3Worktree, build_runner_command, build_t3_command, build_t3_send_command, format_stdin_message, is_t3_noise,
+    parse_runner_line, supports_stdin, t3_thread_id, validate_runner_command,
 };
 use crate::services::automation_service::{AutomationEvent, AutomationJobContext, AutomationService, build_lotar_env};
 use crate::services::sprint_metrics::determine_done_statuses_from_config;
@@ -808,6 +808,9 @@ fn resolve_profile(config: &ResolvedConfig, req: &AgentJobCreateRequest) -> LoTa
     if let Some(provider) = non_blank(req.provider.as_deref()) {
         profile.provider = Some(provider);
     }
+    if let Some(session) = req.session {
+        profile.session = Some(session);
+    }
     profile.model = non_blank(profile.model.as_deref());
     profile.effort = non_blank(profile.effort.as_deref());
     profile.provider = non_blank(profile.provider.as_deref());
@@ -1252,6 +1255,86 @@ fn on_t3_thread_ended(cli: &T3Cli, job_id: &str) {
     update_job(job_id, |state| record_t3_worktree(state, &info));
 }
 
+/// A `session: continue` job's T3 Code thread: the ticket's last one, still
+/// there (DEV-368).
+struct ContinuedThread {
+    thread_id: String,
+    info: T3ThreadInfo,
+    command: crate::services::agent_runner::RunnerCommand,
+}
+
+/// The thread a `session: continue` job sends its prompt to, or why it
+/// starts a new session as usual (for the job log).
+fn continue_session(
+    job_id: &str,
+    runner_kind: AgentRunnerKind,
+    profile: &AgentProfileDetail,
+    prompt: &str,
+    tasks_dir: &std::path::Path,
+    ticket_id: &str,
+    config: &ResolvedConfig,
+) -> Result<ContinuedThread, String> {
+    if runner_kind != AgentRunnerKind::T3 {
+        return Err(format!("The {} runner can't continue an earlier session; this job starts a new one.", runner_kind.as_str()));
+    }
+    let Some(thread_id) = previous_session(job_id, runner_kind, tasks_dir, ticket_id, config) else {
+        return Err(format!("No earlier T3 Code thread on {ticket_id}; starting a new thread."));
+    };
+    let command = build_t3_send_command(profile, prompt, &thread_id);
+    let cli =
+        T3Cli { program: command.program.clone(), env: command.env.clone(), cwd: resolve_repo_root(tasks_dir).unwrap_or_else(|| tasks_dir.to_path_buf()) };
+    let Some(info) = cli.thread_info(&thread_id) else {
+        return Err(format!("The T3 Code thread {thread_id} is gone; starting a new thread."));
+    };
+    if let Some(path) = info.worktree_path.as_deref()
+        && !std::path::Path::new(path).is_dir()
+    {
+        return Err(format!("The worktree {path} of the T3 Code thread {thread_id} is gone; starting a new thread."));
+    }
+    Ok(ContinuedThread { thread_id, info, command })
+}
+
+/// The session of the ticket's newest earlier job on this runner that has
+/// one: from this process's jobs or the job logs, whichever is newer.
+fn previous_session(job_id: &str, runner_kind: AgentRunnerKind, tasks_dir: &std::path::Path, ticket_id: &str, config: &ResolvedConfig) -> Option<String> {
+    let mut newest: Option<(String, String)> = JOB_REGISTRY.lock().ok().and_then(|registry| {
+        registry
+            .jobs
+            .values()
+            .filter(|state| {
+                let record = &state.record;
+                record.id != job_id && record.tasks_dir == tasks_dir && record.ticket_id == ticket_id && record.runner_kind == runner_kind
+            })
+            .filter_map(|state| state.record.session_id.clone().map(|session| (state.record.created_at.clone(), session)))
+            .max()
+    });
+    let workspace_root = tasks_dir.parent().unwrap_or(tasks_dir);
+    if let Some(logs_dir) = crate::services::agent_log_service::effective_logs_dir(tasks_dir, config.agent_logs_dir.as_deref()) {
+        let logged = AgentLogService::list_logs(workspace_root, &logs_dir).unwrap_or_default().into_iter().filter(|id| id != job_id).find_map(|id| {
+            let header = AgentLogService::load_header(workspace_root, &logs_dir, &id).ok().flatten()?;
+            if header.ticket_id != ticket_id || header.runner != runner_kind.as_str() {
+                return None;
+            }
+            let session = AgentLogService::load_status(workspace_root, &logs_dir, &id).ok().flatten()?.session_id?;
+            Some((header.created_at, session))
+        });
+        newest = newest.into_iter().chain(logged).max();
+    }
+    newest.map(|(_, session)| session)
+}
+
+/// The job continues `thread`: it is the job's session from the start, and
+/// its worktree the job's.
+fn on_t3_thread_continued(job_id: &str, thread: &ContinuedThread) {
+    let reference = thread.info.link.clone().unwrap_or_else(|| thread.thread_id.clone());
+    update_job(job_id, |state| {
+        state.record.session_id = Some(thread.thread_id.clone());
+        state.t3_link = Some(reference.clone());
+        record_t3_worktree(state, &thread.info);
+        record_and_emit(state, "agent_job_progress", Some(format!("Continuing the T3 Code thread: {reference}")));
+    });
+}
+
 /// The thread waits for an answer: hand the ticket back to its reporter
 /// (status HelpNeeded where the project has it) with the thread's link,
 /// and let the job fail, so `job_completed` rules don't treat it as done.
@@ -1613,10 +1696,26 @@ fn run_job(
     if should_stop_job(&job_id) {
         return;
     }
+    let continuing =
+        (profile.session == Some(AgentSession::Continue)).then(|| continue_session(&job_id, runner_kind, &profile, &prompt, &tasks_dir, &ticket_id, &config));
+    let (mut continued, new_session_reason) = match continuing {
+        Some(Ok(thread)) => (Some(thread), None),
+        Some(Err(reason)) => (None, Some(reason)),
+        None => (None, None),
+    };
     // A t3 job asks T3 Code for the worktree: a thread can only run inside a
-    // T3 project, which LoTaR's own worktree folder is not (DEV-318).
+    // T3 project, which LoTaR's own worktree folder is not (DEV-318). A
+    // continued thread stays in its own.
     let mut t3_worktree = None;
-    let prepared = if runner_kind == AgentRunnerKind::T3 && config.agent_worktree.enabled {
+    let prepared = if let Some(thread) = continued.as_ref() {
+        let repo_root = resolve_repo_root(&tasks_dir).unwrap_or_else(|| tasks_dir.clone());
+        let worktree_path = thread.info.worktree_path.as_ref().map(std::path::PathBuf::from);
+        Ok(WorktreeContext {
+            working_dir: worktree_path.clone().unwrap_or(repo_root),
+            worktree_branch: worktree_path.as_ref().and(thread.info.branch.clone()),
+            worktree_path,
+        })
+    } else if runner_kind == AgentRunnerKind::T3 && config.agent_worktree.enabled {
         plan_t3_worktree(&tasks_dir, &ticket_id, &config).map(|(context, plan)| {
             t3_worktree = Some(plan);
             context
@@ -1693,16 +1792,32 @@ fn run_job(
 
     let is_merge_job = JOB_REGISTRY.lock().ok().is_some_and(|registry| registry.jobs.get(&job_id).is_some_and(|state| state.record.is_merge_job));
     let writable_dirs = extra_writable_dirs(&worktree_context.working_dir, &tasks_dir, is_merge_job);
+    if let Some(reason) = new_session_reason {
+        update_job(&job_id, |state| {
+            record_and_emit(state, "agent_job_progress", Some(reason.clone()));
+        });
+    }
     let built = if runner_kind == AgentRunnerKind::T3 {
         for note in t3_profile_notes(&profile) {
             update_job(&job_id, |state| {
                 record_and_emit(state, "agent_job_progress", Some(note.to_string()));
             });
         }
-        let title =
-            Storage::try_open(&tasks_dir).and_then(|storage| TaskService::get(&storage, &ticket_id, None).ok()).map(|task| task.title).unwrap_or_default();
-        let launch = T3Launch { title: format!("{ticket_id} {title}").trim().to_string(), worktree: t3_worktree.take() };
-        build_t3_command(&profile, &prompt, &launch)
+        if let Some(thread) = continued.take() {
+            if profile.model.is_some() || profile.provider.is_some() || !profile.args.is_empty() {
+                update_job(&job_id, |state| {
+                    let note = "A continued T3 Code thread keeps its model; the provider, model and args settings are not passed.";
+                    record_and_emit(state, "agent_job_progress", Some(note.to_string()));
+                });
+            }
+            on_t3_thread_continued(&job_id, &thread);
+            Ok(thread.command)
+        } else {
+            let title =
+                Storage::try_open(&tasks_dir).and_then(|storage| TaskService::get(&storage, &ticket_id, None).ok()).map(|task| task.title).unwrap_or_default();
+            let launch = T3Launch { title: format!("{ticket_id} {title}").trim().to_string(), worktree: t3_worktree.take() };
+            build_t3_command(&profile, &prompt, &launch)
+        }
     } else {
         build_runner_command(runner_kind, &profile, &prompt, &writable_dirs)
     };
@@ -2396,20 +2511,33 @@ fn finalize_job(
 
     // Write final status to persistent log (if logging is enabled)
     let status_str = if success { "completed" } else { "failed" };
-    let (summary, workspace_root, logs_dir, usage) = if let Ok(registry) = JOB_REGISTRY.lock() {
+    let (summary, workspace_root, logs_dir, usage, session_id) = if let Ok(registry) = JOB_REGISTRY.lock() {
         if let Some(state) = registry.jobs.get(job_id) {
-            (state.record.summary.clone(), state.record.workspace_root.clone(), state.record.agent_logs_dir.clone(), state.record.usage.clone())
+            (
+                state.record.summary.clone(),
+                state.record.workspace_root.clone(),
+                state.record.agent_logs_dir.clone(),
+                state.record.usage.clone(),
+                state.record.session_id.clone(),
+            )
         } else {
-            (None, tasks_dir.to_path_buf(), None, None)
+            (None, tasks_dir.to_path_buf(), None, None, None)
         }
     } else {
-        (None, tasks_dir.to_path_buf(), None, None)
+        (None, tasks_dir.to_path_buf(), None, None, None)
     };
     let _ = AgentLogService::write_status_with_usage(
         &workspace_root,
         logs_dir.as_deref(),
         job_id,
-        crate::services::agent_log_service::JobStatusLine { status: status_str.to_string(), at: Utc::now().to_rfc3339(), exit_code, summary, usage },
+        crate::services::agent_log_service::JobStatusLine {
+            status: status_str.to_string(),
+            at: Utc::now().to_rfc3339(),
+            exit_code,
+            summary,
+            usage,
+            session_id,
+        },
     );
 
     let mut job_context = None;
