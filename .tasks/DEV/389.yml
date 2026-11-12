@@ -1,14 +1,23 @@
 title: 'Web UI: show tasks in another repo with their status and link'
-status: Blocked
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
-assignee: claude
+assignee: '@fix'
 created: 2026-11-12T20:52:33.189344+00:00
-modified: 2026-11-12T20:52:40.677152+00:00
+modified: 2026-11-12T22:52:53.811193+00:00
 relationships:
   depends_on:
   - DEV-386
+  related:
+  - DEV-388
+  - DEV-374
+comments:
+- date: 2026-11-12T22:52:52.548259+00:00
+  author: claude
+  text: 'claude: Unblocked: DEV-386 (6238867) is on main. Owner 2026-11-12: build this and DEV-388 before releasing v0.14.1 (DEV-374).'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Add47aab2-5009-4849-a754-cffb5eb15e59
 description: |-
   DEV-386 lets depends_on and related name a task in another repo's LoTaR (repo name, a colon, the ID; see docs/help/task.md, Tasks in another repo). The CLI shows them with status, title and link; the web task panel still lists them like local IDs, so a chip links to a task that does not exist here.
 
@@ -35,3 +44,42 @@ history:
   - field: relationships
     old: '{"related":["DEV-386"]}'
     new: '{"depends_on":["DEV-386"]}'
+- at: 2026-11-12T22:52:52.429454+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-386"]}'
+    new: '{"depends_on":["DEV-386"],"related":["DEV-388"]}'
+- at: 2026-11-12T22:52:52.548259+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T22:52:52.607422+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-386"],"related":["DEV-388"]}'
+    new: '{"depends_on":["DEV-386"],"related":["DEV-388","DEV-374"]}'
+- at: 2026-11-12T22:52:52.907900+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: Todo
+- at: 2026-11-12T22:52:52.963876+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: claude
+    new: '@fix'
+- at: 2026-11-12T22:52:53.242688+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T22:52:53.811193+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Add47aab2-5009-4849-a754-cffb5eb15e59

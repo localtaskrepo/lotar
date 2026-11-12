@@ -1,14 +1,21 @@
 title: 'Version fields: list values in filter suggestions, types in MCP hints, suggestions in the version input'
-status: InProgress
+status: Done
 priority: Low
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T20:54:22.994464+00:00
-modified: 2026-11-12T21:18:19.887356+00:00
+modified: 2026-11-12T22:10:38.681122+00:00
 relationships:
   related:
   - DEV-373
+  - DEV-385
+  - DEV-390
+  - DEV-391
+  - DEV-392
+  - DEV-393
+  - DEV-394
+  - DEV-397
 comments:
 - date: 2026-11-12T21:18:06.959926+00:00
   author: claude
@@ -19,6 +26,14 @@ comments:
     - Version input: the task panel learns the field values of the project's tasks it already loads for people/tags (up to 200) and offers the versions used in that field as a datalist, in version order. Tests: TaskPanelCustomFieldsSection.spec.ts, useTaskPanelOwnership.spec.ts.
     - Docs: config.md (version fields), mcp.md (tools/list). Page test mocks of useConfig got versionFields.
     Checks: npm run lint (lint:agent) clean; npm test (2076 Rust, 1475 UI, release and hooks tests) pass; npm run smoke (381) passes. Not checked by hand in a browser: the datalist dropdown is covered by the component unit test only.
+- date: 2026-11-12T22:10:29.579944+00:00
+  author: claude
+  text: |-
+    claude (merge): Merged and pushed. main is at 3f8fb56 (DEV-395 Version fields...) and e405802 (DEV-395 Ticket updates); pushed 0c5e8c6..e405802 to origin/main.
+    Rebases: main moved five times during the merge (DEV-385, DEV-392, DEV-391, DEV-390, DEV-394, DEV-397, DEV-393). Two needed changes, keeping both sides:
+    - DEV-390 added a stricter version parser and compareVersions(Version, Version) in view/utils/versions.ts (the conflict). I kept main's file and pointed this branch's callers at a string comparator; DEV-390 also destructured versionFields in SprintsList.vue and its spec mocks, so I dropped this branch's duplicate lines.
+    - DEV-394 added the same compareVersionText(a, b), so I dropped this branch's copy and kept theirs, plus duplicate versionFields keys in Board.spec.ts and TasksList.query.spec.ts.
+    Checks after every rebase that changed code: npm run lint (lint:agent) clean, npm test (last run: 2106 Rust, 1503 UI, release and hooks tests) pass, npm run smoke (384) passes. The final rebase brought in only DEV-393's ticket-file commit, so I didn't rerun the checks for it. On one run, agent_automation_integration_test::merge_jobs_are_serialized_even_with_parallel_slots failed under load and passed alone three times and in every later full run; it doesn't touch this change.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1b2db749-64df-475b-9b1e-7c3dba96772f
 - file: view/composables/useFilterOptions.ts
@@ -86,3 +101,19 @@ history:
   - field: assignee
     old: '@fix'
     new: '@merge'
+- at: 2026-11-12T22:10:29.579944+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T22:10:29.736025+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-373"]}'
+    new: '{"related":["DEV-373","DEV-385","DEV-390","DEV-391","DEV-392","DEV-393","DEV-394","DEV-397"]}'
+- at: 2026-11-12T22:10:38.681122+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
