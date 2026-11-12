@@ -290,6 +290,8 @@ impl CommandHandler for ServeHandler {
         renderer.emit_warning("Press Ctrl+C to stop the server");
 
         pin_process_tasks_dir(resolver)?;
+        // Jobs of a worker or server that exited before they ended (DEV-378).
+        crate::services::agent_job_service::AgentJobService::recover_orphaned_jobs(&resolver.path);
 
         // DEV-305: let launchd/systemd start the upgraded binary.
         if exit_on_upgrade {

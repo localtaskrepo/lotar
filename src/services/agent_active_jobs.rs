@@ -6,7 +6,8 @@
 //! see it (status/assignee guards, `agent list-running`, worktree cleanup)
 //! and ask for it to be cancelled, without depending on the
 //! `lotar-agent-wrapper` binary. A record whose owning process is gone is
-//! treated as stale and removed.
+//! an orphan: it no longer counts as running, and stays until the next
+//! worker or server [`claim`]s the job and finishes it (DEV-378).
 
 use crate::api_types::JobOutcomeField;
 use serde::{Deserialize, Serialize};
@@ -24,6 +25,10 @@ pub struct ActiveJob {
     /// The runner process (its own process group on Unix).
     pub child_pid: u32,
     pub started_at: String,
+    /// The runner's session (a T3 Code thread id), so a job whose process
+    /// died can be finished from the thread's state (DEV-378).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
 }
 
 /// What a ticket should be when its job ends, set while the job ran
@@ -174,8 +179,8 @@ fn read_outcome(path: &Path) -> Option<JobOutcome> {
     std::fs::read_to_string(path).ok().and_then(|text| serde_json::from_str(&text).ok())
 }
 
-/// Live records; stale ones (owner gone) are removed on the way.
-pub fn list(tasks_dir: &Path) -> Vec<ActiveJob> {
+/// Every record, live or orphaned; expired end markers are removed on the way.
+fn records(tasks_dir: &Path) -> Vec<ActiveJob> {
     let dir = dir(tasks_dir);
     let Ok(entries) = std::fs::read_dir(&dir) else {
         return Vec::new();
@@ -190,21 +195,61 @@ pub fn list(tasks_dir: &Path) -> Vec<ActiveJob> {
             }
             continue;
         }
-        let is_record = path.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.ends_with(".json") && !n.ends_with(".outcome.json"));
-        if !is_record {
-            continue;
-        }
-        let Some(job) = std::fs::read_to_string(&path).ok().and_then(|text| serde_json::from_str::<ActiveJob>(&text).ok()) else {
-            continue;
-        };
-        if process_alive(job.owner_pid) {
+        if let Some(job) = read_record(&path) {
             jobs.push(job);
-        } else {
-            unregister(tasks_dir, &job.job_id);
         }
     }
     jobs.sort_by(|a, b| a.started_at.cmp(&b.started_at));
     jobs
+}
+
+fn read_record(path: &Path) -> Option<ActiveJob> {
+    let is_record = path.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.ends_with(".json") && !n.ends_with(".outcome.json"));
+    if !is_record {
+        return None;
+    }
+    std::fs::read_to_string(path).ok().and_then(|text| serde_json::from_str::<ActiveJob>(&text).ok())
+}
+
+/// Records of running jobs: their owning process is alive.
+pub fn list(tasks_dir: &Path) -> Vec<ActiveJob> {
+    records(tasks_dir).into_iter().filter(|job| process_alive(job.owner_pid)).collect()
+}
+
+/// Jobs whose owning process exited before they ended (DEV-378).
+pub fn orphaned(tasks_dir: &Path) -> Vec<ActiveJob> {
+    records(tasks_dir).into_iter().filter(|job| !process_alive(job.owner_pid)).collect()
+}
+
+/// Take over an orphaned job: this process becomes its owner, so no other
+/// process finishes it too. `None` when its owner is alive (another
+/// process claimed it first) or the record is gone.
+pub fn claim(tasks_dir: &Path, job_id: &str) -> Option<ActiveJob> {
+    let name = safe_name(job_id)?;
+    let dir = dir(tasks_dir);
+    let _lock = crate::storage::safety::acquire_storage_lock_within(&dir, &format!("{name}.claim"), std::time::Duration::from_secs(5)).ok()?;
+    let mut job = read_record(&dir.join(format!("{name}.json")))?;
+    if process_alive(job.owner_pid) {
+        return None;
+    }
+    job.owner_pid = std::process::id();
+    let json = serde_json::to_string(&job).ok()?;
+    crate::storage::safety::atomic_write_file(&dir.join(format!("{name}.json")), &json).ok()?;
+    Some(job)
+}
+
+/// Record the job's session once the runner reports it.
+pub fn set_session(tasks_dir: &Path, job_id: &str, session_id: &str) {
+    let Some(name) = safe_name(job_id) else {
+        return;
+    };
+    let path = dir(tasks_dir).join(format!("{name}.json"));
+    if let Some(mut job) = read_record(&path) {
+        job.session_id = Some(session_id.to_string());
+        if let Ok(json) = serde_json::to_string(&job) {
+            let _ = crate::storage::safety::atomic_write_file(&path, &json);
+        }
+    }
 }
 
 pub fn for_ticket(tasks_dir: &Path, ticket_id: &str) -> Option<ActiveJob> {
@@ -255,6 +300,7 @@ mod tests {
             owner_pid: std::process::id(),
             child_pid: std::process::id(),
             started_at: "2026-01-01T00:00:00Z".into(),
+            session_id: None,
         };
         register(tasks.path(), &job);
         assert_eq!(for_ticket(tasks.path(), "T-1"), Some(job.clone()));
@@ -264,9 +310,15 @@ mod tests {
         assert!(list(tasks.path()).is_empty());
         assert!(!cancel_requested(tasks.path(), "job-1"));
 
-        let stale = ActiveJob { job_id: "job-2".into(), owner_pid: 0, ..job };
-        register(tasks.path(), &stale);
-        assert!(list(tasks.path()).is_empty(), "dead owner is stale");
+        let orphan = ActiveJob { job_id: "job-2".into(), owner_pid: 0, ..job };
+        register(tasks.path(), &orphan);
+        assert!(list(tasks.path()).is_empty(), "a job whose owner died is not running");
+        assert_eq!(orphaned(tasks.path()), vec![orphan.clone()], "it stays until a process finishes it");
+        set_session(tasks.path(), "job-2", "thread-1");
+        let claimed = claim(tasks.path(), "job-2").expect("claims the orphan");
+        assert_eq!((claimed.owner_pid, claimed.session_id.as_deref()), (std::process::id(), Some("thread-1")));
+        assert!(claim(tasks.path(), "job-2").is_none(), "a live owner keeps it");
+        assert!(orphaned(tasks.path()).is_empty());
         unsafe { std::env::remove_var("LOTAR_AGENT_QUEUE_DIR") };
     }
 

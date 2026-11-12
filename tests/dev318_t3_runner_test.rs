@@ -19,7 +19,8 @@ use std::time::{Duration, Instant};
 /// Electron's startup note and `Thread <id>` to stderr, the reply to stdout,
 /// and exits with `FAKE_T3_EXIT`; `thread show` answers with the link and
 /// `FAKE_T3_WORKTREE` as the thread's worktree, on branch `agent/from-t3`
-/// until the run renames it to `FAKE_T3_RENAME`, or fails with
+/// until the run renames it to `FAKE_T3_RENAME`, with the run's status
+/// from the `status` file (default `completed`), or fails with
 /// `FAKE_T3_GONE`; `thread send` records its arguments, folder and stdin
 /// and replies (DEV-368).
 fn fake_t3(dir: &Path) -> PathBuf {
@@ -31,7 +32,8 @@ if [ "$1" = "thread" ] && [ "$2" = "show" ]; then
   echo "$3" >> "$out/show.calls"
   if [ -n "$FAKE_T3_GONE" ]; then echo "Thread $3 not found" >&2; exit 1; fi
   if [ -n "$FAKE_T3_WORKTREE" ]; then wt="\"$FAKE_T3_WORKTREE\""; br="\"$(cat "$out/branch" 2>/dev/null || echo agent/from-t3)\""; else wt=null; br='"main"'; fi
-  printf '{{"thread":{{"threadId":"%s","link":"https://app.t3.codes/threads/env/%s","worktreePath":%s,"branch":%s}},"messages":[]}}\n' "$3" "$3" "$wt" "$br"
+  st="$(cat "$out/status" 2>/dev/null || echo completed)"; if [ "$st" = running ]; then run='"run:1"'; else run=null; fi
+  printf '{{"thread":{{"threadId":"%s","link":"https://app.t3.codes/threads/env/%s","worktreePath":%s,"branch":%s,"status":"%s","activeRunId":%s,"pendingRequestCount":0}},"messages":[{{"role":"assistant","text":"Fixed it."}}]}}\n' "$3" "$3" "$wt" "$br" "$st" "$run"
   exit 0
 fi
 if [ "$1" = "thread" ] && [ "$2" = "send" ]; then
@@ -460,4 +462,103 @@ fn a_second_job_continues_the_thread_with_unmerged_work_instead_of_a_new_one() {
     assert_eq!(third.status, "completed", "{third:?}");
     assert_eq!(read_lines(&home.out.join("start.calls")).len(), 2);
     assert!(!messages(&third).iter().any(|m| m.contains("unmerged work")), "{:?}", messages(&third));
+}
+
+/// A job whose process died while its thread ran (DEV-378): a pid that no
+/// longer exists owns its record, and its log has no end.
+fn orphaned_t3_job(fixtures: &TestFixtures, ticket_id: &str, job_id: &str) {
+    let mut gone = Command::new("true").spawn().unwrap();
+    let owner_pid = gone.id();
+    gone.wait().unwrap();
+    let job = agent_active_jobs::ActiveJob {
+        job_id: job_id.into(),
+        ticket_id: ticket_id.into(),
+        runner: "t3".into(),
+        agent: Some("fix".into()),
+        owner_pid,
+        child_pid: owner_pid,
+        started_at: "2026-11-12T18:36:42+00:00".into(),
+        session_id: Some("thread-orphan".into()),
+    };
+    agent_active_jobs::register(&fixtures.tasks_root, &job);
+    let logs = fixtures.tasks_root.join("@agent-logs");
+    fs::create_dir_all(&logs).unwrap();
+    let log = format!(
+        "{}\n{}\n",
+        format_args!(r#"{{"type":"header","job_id":"{job_id}","ticket_id":"{ticket_id}","runner":"t3","created_at":"2026-11-12T18:36:42+00:00"}}"#),
+        r#"{"type":"event","kind":"agent_job_started","at":"2026-11-12T18:36:42+00:00"}"#
+    );
+    fs::write(logs.join(format!("{job_id}.jsonl")), log).unwrap();
+}
+
+const END_RULES: &str = "automation:\n  rules:\n    - name: Ends\n      on:\n        job_completed:\n          set: { status: Done }\n          comment: \"completed ${{agent.job_id}}\"\n        job_failed:\n          set: { status: HelpNeeded }\n";
+
+#[test]
+fn a_job_whose_worker_died_ends_from_its_thread_on_the_next_start() {
+    let fixtures = TestFixtures::new();
+    let home = home_with_fix_profile(&fixtures, "");
+    let _queue = EnvVarGuard::set("LOTAR_AGENT_QUEUE_DIR", fixtures.get_temp_path().join("queue").to_str().unwrap());
+    fs::write(fixtures.tasks_root.join("automation.yml"), END_RULES).unwrap();
+    let mut storage = fixtures.create_storage();
+    let id = TaskService::create(&mut storage, TaskCreate { title: "Orphan".into(), project: Some("REPO".into()), ..Default::default() }).unwrap().id;
+    let job_id = "job-20261112T183642.565Z-1";
+    orphaned_t3_job(&fixtures, &id, job_id);
+    // A status set while the job ran is still its outcome.
+    let tasks_dir = fixtures.tasks_root.clone();
+    assert!(agent_active_jobs::list(&tasks_dir).is_empty(), "a dead process's job is not running");
+    agent_active_jobs::record_outcome(
+        &tasks_dir,
+        &lotar::api_types::JobOutcome { job_id: job_id.into(), assignee: Some("mallox".into()), ..Default::default() },
+    )
+    .unwrap();
+    fs::write(home.out.join("status"), "running").unwrap();
+
+    AgentJobService::recover_orphaned_jobs(&tasks_dir);
+    AgentJobService::recover_orphaned_jobs(&tasks_dir);
+    let running = AgentJobService::get_job(job_id).expect("taken over");
+    assert_eq!(running.status, "running");
+    assert!(agent_active_jobs::find(&tasks_dir, job_id).is_some_and(|job| job.owner_pid == std::process::id()));
+    sleep(Duration::from_secs(1));
+    assert_eq!(AgentJobService::get_job(job_id).unwrap().status, "running", "waits while the thread runs");
+    fs::write(home.out.join("status"), "completed").unwrap();
+
+    let job = wait_for_finished_job(&id);
+    assert_eq!(job.id, job_id);
+    assert_eq!(job.status, "completed", "{job:?}: {:?}", messages(&job));
+    assert_eq!(job.summary.as_deref(), Some("Fixed it."));
+    let task = TaskService::get(&fixtures.create_storage(), &id, None).unwrap();
+    assert_eq!(task.status.as_str(), "Done");
+    assert_eq!(task.assignee.as_deref(), Some("mallox"), "the recorded outcome applies");
+    assert_eq!(task.comments.iter().filter(|c| c.text.contains(job_id)).count(), 1, "end rules ran once: {:?}", task.comments);
+    let status = lotar::services::agent_log_service::AgentLogService::load_status(
+        fixtures.tasks_root.parent().unwrap(),
+        fixtures.tasks_root.join("@agent-logs").to_str().unwrap(),
+        job_id,
+    )
+    .unwrap()
+    .expect("the log has its end");
+    assert_eq!((status.status.as_str(), status.session_id.as_deref()), ("completed", Some("thread-orphan")));
+    assert!(messages(&job).iter().any(|m| m.contains("exited before it ended")), "{:?}", messages(&job));
+
+    AgentJobService::recover_orphaned_jobs(&tasks_dir);
+    assert!(agent_active_jobs::orphaned(&tasks_dir).is_empty());
+}
+
+#[test]
+fn a_job_whose_thread_is_unknown_fails_with_the_reason() {
+    let fixtures = TestFixtures::new();
+    let _home = home_with_fix_profile(&fixtures, "");
+    let _queue = EnvVarGuard::set("LOTAR_AGENT_QUEUE_DIR", fixtures.get_temp_path().join("queue").to_str().unwrap());
+    fs::write(fixtures.tasks_root.join("automation.yml"), END_RULES).unwrap();
+    let mut storage = fixtures.create_storage();
+    let id = TaskService::create(&mut storage, TaskCreate { title: "Orphan".into(), project: Some("REPO".into()), ..Default::default() }).unwrap().id;
+    orphaned_t3_job(&fixtures, &id, "job-20261112T183643.341Z-2");
+    let _gone = EnvVarGuard::set("FAKE_T3_GONE", "1");
+
+    AgentJobService::recover_orphaned_jobs(&fixtures.tasks_root);
+    let job = wait_for_finished_job(&id);
+    assert_eq!(job.status, "failed");
+    assert!(job.summary.as_deref().is_some_and(|s| s.contains("Could not read the job's T3 Code thread thread-orphan")), "{job:?}");
+    let task = TaskService::get(&fixtures.create_storage(), &id, None).unwrap();
+    assert_eq!(task.status.as_str(), "HelpNeeded");
 }

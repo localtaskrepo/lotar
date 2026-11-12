@@ -390,6 +390,15 @@ impl AgentJobService {
         }))
     }
 
+    /// Finish the jobs whose process exited before they ended, as a worker
+    /// or server starts (DEV-378). Each one runs here from now on; see
+    /// [`adopt_orphaned_job`].
+    pub fn recover_orphaned_jobs(tasks_dir: &std::path::Path) {
+        for orphan in crate::services::agent_active_jobs::orphaned(tasks_dir) {
+            adopt_orphaned_job(tasks_dir, &orphan);
+        }
+    }
+
     pub fn list_jobs() -> Vec<AgentJob> {
         let registry = JOB_REGISTRY.lock();
         if let Ok(registry) = registry {
@@ -1152,15 +1161,44 @@ struct T3ThreadInfo {
     branch: Option<String>,
 }
 
-fn parse_t3_thread_show(output: &str) -> Option<T3ThreadInfo> {
+/// Where a thread's run stands, for a job whose process died (DEV-378).
+#[derive(Debug, Default, PartialEq, Eq)]
+struct T3ThreadState {
+    info: T3ThreadInfo,
+    status: String,
+    running: bool,
+    waits_for_answer: bool,
+    reply: Option<String>,
+}
+
+fn parse_t3_thread_state(output: &str) -> Option<T3ThreadState> {
     let value: serde_json::Value = serde_json::from_str(output.trim()).ok()?;
     let thread = value.get("thread")?;
     let text = |key: &str| thread.get(key).and_then(|v| v.as_str()).map(str::trim).filter(|v| !v.is_empty()).map(str::to_string);
-    Some(T3ThreadInfo { link: text("link"), worktree_path: text("worktreePath"), branch: text("branch") })
+    let status = text("status").unwrap_or_default();
+    let reply = value
+        .get("messages")
+        .and_then(|messages| messages.as_array())
+        .and_then(|messages| messages.iter().rev().find(|message| message.get("role").and_then(|role| role.as_str()) == Some("assistant")))
+        .and_then(|message| message.get("text").and_then(|text| text.as_str()))
+        .map(str::trim)
+        .filter(|text| !text.is_empty())
+        .map(str::to_string);
+    Some(T3ThreadState {
+        info: T3ThreadInfo { link: text("link"), worktree_path: text("worktreePath"), branch: text("branch") },
+        running: status == "running" || thread.get("activeRunId").is_some_and(|id| !id.is_null()),
+        waits_for_answer: thread.get("pendingRequestCount").and_then(|count| count.as_u64()).is_some_and(|count| count > 0),
+        status,
+        reply,
+    })
 }
 
 impl T3Cli {
     fn thread_info(&self, thread_id: &str) -> Option<T3ThreadInfo> {
+        self.thread_state(thread_id).map(|state| state.info)
+    }
+
+    fn thread_state(&self, thread_id: &str) -> Option<T3ThreadState> {
         let mut cmd = Command::new(&self.program);
         cmd.args(["thread", "show", thread_id, "--json", "--messages", "1"]).envs(&self.env).current_dir(&self.cwd).stdin(Stdio::null()).stderr(Stdio::null());
         clear_repository_env(&mut cmd);
@@ -1168,7 +1206,7 @@ impl T3Cli {
         if !output.status.success() {
             return None;
         }
-        parse_t3_thread_show(&String::from_utf8_lossy(&output.stdout))
+        parse_t3_thread_state(&String::from_utf8_lossy(&output.stdout))
     }
 }
 
@@ -1229,6 +1267,7 @@ fn on_t3_thread_started(cli: &T3Cli, job_id: &str, tasks_dir: &std::path::Path, 
         record_t3_worktree(state, &info);
         record_and_emit(state, "agent_job_progress", Some(format!("T3 Code thread: {reference}")));
     });
+    crate::services::agent_active_jobs::set_session(tasks_dir, job_id, thread_id);
     let mut storage = Storage::new(tasks_dir);
     if let Err(err) = crate::services::reference_service::ReferenceService::attach_link_reference(&mut storage, ticket_id, &reference) {
         update_job(job_id, |state| {
@@ -1388,6 +1427,178 @@ fn hand_back_waiting_t3_job(job_id: &str, ticket_id: &str, tasks_dir: &std::path
         state.record.last_message = Some(message.clone());
         record_and_emit(state, "agent_job_progress", Some(message.clone()));
     });
+}
+
+/// How often a taken-over job reads its T3 Code thread while it runs.
+const ORPHAN_POLL: Duration = Duration::from_secs(5);
+/// Failed `t3 thread show` reads in a row before a taken-over job fails.
+const ORPHAN_READ_ATTEMPTS: u32 = 3;
+
+/// Take over a job whose process exited before it ended (DEV-378): it runs
+/// in this process from now on, so its record, status and end rules work
+/// as if it had started here.
+fn adopt_orphaned_job(tasks_dir: &std::path::Path, orphan: &crate::services::agent_active_jobs::ActiveJob) {
+    let Ok(parsed) = crate::storage::TaskId::parse(&orphan.ticket_id) else {
+        crate::services::agent_active_jobs::unregister(tasks_dir, &orphan.job_id);
+        return;
+    };
+    let Ok(config) = crate::config::resolution::config_for_project(tasks_dir, Some(&parsed.project)) else {
+        return;
+    };
+    let Some(job) = crate::services::agent_active_jobs::claim(tasks_dir, &orphan.job_id) else {
+        return;
+    };
+    let ticket_id = parsed.canonical();
+    let runner_kind = job.runner.parse::<AgentRunnerKind>().unwrap_or(AgentRunnerKind::Command);
+    let workspace_root = tasks_dir.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| tasks_dir.to_path_buf());
+    let agent_logs_dir = crate::services::agent_log_service::effective_logs_dir(tasks_dir, config.agent_logs_dir.as_deref());
+    let header = agent_logs_dir.as_deref().and_then(|dir| AgentLogService::load_header(&workspace_root, dir, &job.job_id).ok().flatten());
+    let task = Storage::try_open(tasks_dir).and_then(|storage| TaskService::get(&storage, &ticket_id, None).ok());
+    let is_merge_job = task.as_ref().is_some_and(|task| is_merge_job_candidate(task, job.agent.as_deref()));
+    {
+        let Ok(mut registry) = JOB_REGISTRY.lock() else {
+            return;
+        };
+        if registry.jobs.contains_key(&job.job_id) {
+            return;
+        }
+        registry.active_by_ticket.insert(ticket_id.clone(), job.job_id.clone());
+        prune_finished_jobs(&mut registry);
+        registry.jobs.insert(
+            job.job_id.clone(),
+            AgentJobState {
+                record: AgentJobRecord {
+                    id: job.job_id.clone(),
+                    ticket_id: ticket_id.clone(),
+                    tasks_dir: tasks_dir.to_path_buf(),
+                    workspace_root,
+                    agent_logs_dir,
+                    runner: runner_kind.as_str().to_string(),
+                    runner_kind,
+                    agent_profile: job.agent.clone(),
+                    status: AgentJobStatus::Running,
+                    created_at: header.as_ref().map(|header| header.created_at.clone()).unwrap_or_else(|| job.started_at.clone()),
+                    started_at: Some(job.started_at.clone()),
+                    finished_at: None,
+                    exit_code: None,
+                    last_message: None,
+                    summary: None,
+                    session_id: job.session_id.clone(),
+                    worktree_path: header.as_ref().and_then(|header| header.worktree_path.clone()),
+                    worktree_branch: header.as_ref().and_then(|header| header.worktree_branch.clone()),
+                    model: header.as_ref().and_then(|header| header.model.clone()),
+                    effort: header.as_ref().and_then(|header| header.effort.clone()),
+                    usage: None,
+                    is_merge_job,
+                },
+                events: Vec::new(),
+                next_sequence: 0,
+                runtime: None,
+                cancellation_finalized: false,
+                runner_failed: false,
+                t3_link: None,
+                worker_running: true,
+            },
+        );
+        registry.running_count += 1;
+    }
+    update_job(&job.job_id, |state| {
+        let note =
+            format!("The lotar process that ran this job (pid {}) exited before it ended; process {} took it over.", orphan.owner_pid, std::process::id());
+        record_and_emit(state, "agent_job_progress", Some(note));
+    });
+    let profile = job
+        .agent
+        .as_deref()
+        .and_then(|name| config.agent_profiles.get(name).cloned())
+        .unwrap_or_else(|| AgentProfileDetail { runner: job.runner.clone(), ..Default::default() });
+    let tasks_dir = tasks_dir.to_path_buf();
+    thread::spawn(move || finish_orphaned_job(&job, runner_kind, &profile, &tasks_dir, &ticket_id, &config));
+}
+
+/// End a taken-over job: a t3 job from its thread's state, once the thread's
+/// run ends; any other runner fails, as its result went with its process.
+fn finish_orphaned_job(
+    job: &crate::services::agent_active_jobs::ActiveJob,
+    runner_kind: AgentRunnerKind,
+    profile: &AgentProfileDetail,
+    tasks_dir: &std::path::Path,
+    ticket_id: &str,
+    config: &ResolvedConfig,
+) {
+    let job_id = job.job_id.as_str();
+    let _slot = RunningJobSlot { job_id, ticket_id, tasks_dir };
+    let thread_id = match job.session_id.as_deref() {
+        Some(thread_id) if runner_kind == AgentRunnerKind::T3 => thread_id,
+        _ => {
+            let message = format!("The lotar process running the job exited before the {} runner finished, so its result is unknown.", job.runner);
+            update_job_failure(job_id, ticket_id, message, tasks_dir);
+            return;
+        }
+    };
+    let repo_root = resolve_repo_root(tasks_dir).unwrap_or_else(|| tasks_dir.to_path_buf());
+    let command = crate::services::agent_runner::build_t3_send_command(profile, "", thread_id);
+    let cli = T3Cli { program: command.program, env: command.env, cwd: repo_root };
+    let mut failed_reads = 0;
+    let mut noted_running = false;
+    let thread = loop {
+        if crate::services::agent_active_jobs::cancel_requested(tasks_dir, job_id) {
+            let _ = AgentJobService::cancel_job(job_id);
+        }
+        if should_stop_job(job_id) {
+            update_job(job_id, |state| {
+                let note = format!("Stopped waiting for the T3 Code thread; it keeps running until it is stopped in T3 Code: {thread_id}");
+                record_and_emit(state, "agent_job_progress", Some(note));
+            });
+            return;
+        }
+        match cli.thread_state(thread_id) {
+            Some(thread) if !thread.running => break thread,
+            Some(_) => {
+                failed_reads = 0;
+                if !noted_running {
+                    noted_running = true;
+                    update_job(job_id, |state| {
+                        record_and_emit(state, "agent_job_progress", Some("The T3 Code thread still runs; the job ends when its run ends.".to_string()));
+                    });
+                }
+            }
+            None => {
+                failed_reads += 1;
+                if failed_reads >= ORPHAN_READ_ATTEMPTS {
+                    update_job_failure(job_id, ticket_id, format!("Could not read the job's T3 Code thread {thread_id} with `t3 thread show`."), tasks_dir);
+                    return;
+                }
+            }
+        }
+        thread::sleep(ORPHAN_POLL);
+    };
+    let link = thread.info.link.clone().unwrap_or_else(|| thread_id.to_string());
+    update_job(job_id, |state| {
+        state.t3_link = Some(link.clone());
+        record_t3_worktree(state, &thread.info);
+        if let Some(reply) = thread.reply.as_ref() {
+            state.record.last_message = Some(reply.clone());
+            record_and_emit(state, "agent_job_message", Some(reply.clone()));
+        }
+    });
+    let exit_code = if thread.waits_for_answer {
+        T3_WAITS_FOR_ANSWER
+    } else if thread.status == "completed" {
+        0
+    } else {
+        update_job(job_id, |state| {
+            let message = format!("The T3 Code thread's run ended with status '{}': {link}", thread.status);
+            state.record.last_message = Some(message.clone());
+            record_and_emit(state, "agent_job_progress", Some(message));
+        });
+        1
+    };
+    if exit_code == T3_WAITS_FOR_ANSWER {
+        hand_back_waiting_t3_job(job_id, ticket_id, tasks_dir, config);
+    }
+    let context_messages: Vec<_> = thread.reply.as_deref().map(build_assistant_message).into_iter().collect();
+    finalize_job(job_id, ticket_id, Some(exit_code), &context_messages, tasks_dir, config);
 }
 
 fn resolve_repo_root(tasks_dir: &std::path::Path) -> Option<std::path::PathBuf> {
@@ -2041,6 +2252,7 @@ fn run_job(
             owner_pid: std::process::id(),
             child_pid: 0,
             started_at: Utc::now().to_rfc3339(),
+            session_id: state.record.session_id.clone(),
         })
     });
     if let Some(record) = active_record.as_ref() {
@@ -3083,16 +3295,30 @@ mod tests {
 
     #[test]
     fn t3_thread_show_gives_the_link_and_worktree() {
-        let info = parse_t3_thread_show(
+        let info = parse_t3_thread_state(
             r#"{"thread":{"threadId":"t1","link":"https://app.t3.codes/threads/e/t1","worktreePath":"/w/DEV-1","branch":"agent/DEV-1"},"messages":[]}"#,
         )
-        .unwrap();
+        .unwrap()
+        .info;
         assert_eq!(info.link.as_deref(), Some("https://app.t3.codes/threads/e/t1"));
         assert_eq!(info.worktree_path.as_deref(), Some("/w/DEV-1"));
         assert_eq!(info.branch.as_deref(), Some("agent/DEV-1"));
-        let root = parse_t3_thread_show(r#"{"thread":{"link":"x","worktreePath":null}}"#).unwrap();
-        assert_eq!(root.worktree_path, None);
-        assert!(parse_t3_thread_show("not json").is_none());
+        let root = parse_t3_thread_state(r#"{"thread":{"link":"x","worktreePath":null}}"#).unwrap();
+        assert_eq!(root.info.worktree_path, None);
+        assert!(parse_t3_thread_state("not json").is_none());
+    }
+
+    #[test]
+    fn t3_thread_show_tells_whether_the_run_ended_and_how() {
+        let running = parse_t3_thread_state(r#"{"thread":{"status":"running","activeRunId":"run:1","pendingRequestCount":0},"messages":[]}"#).unwrap();
+        assert!(running.running && !running.waits_for_answer);
+        let done = parse_t3_thread_state(
+            r#"{"thread":{"status":"completed","activeRunId":null,"pendingRequestCount":0},"messages":[{"role":"user","text":"q"},{"role":"assistant","text":" Done. "}]}"#,
+        )
+        .unwrap();
+        assert_eq!((done.running, done.status.as_str(), done.reply.as_deref()), (false, "completed", Some("Done.")));
+        let waiting = parse_t3_thread_state(r#"{"thread":{"status":"idle","activeRunId":null,"pendingRequestCount":1}}"#).unwrap();
+        assert!(!waiting.running && waiting.waits_for_answer);
     }
 
     #[test]

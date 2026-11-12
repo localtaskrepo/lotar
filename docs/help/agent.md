@@ -251,7 +251,15 @@ A job runs inside the process that started it: `lotar serve`, the background que
 - cancel it with `lotar agent cancel <JOB_ID>`; the owning process stops the agent and finishes the job as cancelled, so `job_cancelled` automation runs
 - hold back `lotar status` and `lotar assignee` changes on its ticket until it ends (see [Status and assignee during a job](#status-and-assignee-during-a-job)), and skip its worktree in `lotar agent worktree cleanup`
 
-Records of a process that died are ignored and cleaned up. When an MCP session ends (or reloads after an upgrade), it cancels and finishes the jobs it started instead of leaving agents running unsupervised.
+When an MCP session ends (or reloads after an upgrade), it cancels and finishes the jobs it started instead of leaving agents running unsupervised.
+
+### Jobs whose process died
+
+A job whose process exited before the job ended (a killed or crashed worker or server) no longer counts as running, and its record stays. The queue worker for the same tasks directory (the running one, or the next to start) or the next `lotar serve` there takes it over and ends it as if it had run there: the job log gets its end, the `job_completed`, `job_failed` or `job_cancelled` rules run once, and the [outcome](#status-and-assignee-during-a-job) recorded during the job applies.
+
+- A `t3` job ends from its T3 Code thread (`t3 thread show`): while the thread's run goes on, the job keeps running in the new process and ends when the run ends. A completed run completes the job with the agent's last reply as its summary, a thread waiting for an answer hands the ticket back as [described above](#t3-code-threads), and any other status fails the job and names it. When `t3 thread show` can't read the thread, the job fails with that reason.
+- A job of any other runner fails: its result went with the process.
+- The job log notes which process took the job over. A worker that waits for its last jobs before an upgrade takes over none.
 
 `list-running` also lists the `lotar-agent-wrapper` processes of this tasks directory if that binary is available (next to `lotar`, on `PATH`, or `LOTAR_AGENT_WRAPPER`). A wrapper started for another tasks directory, such as another worktree's, is not listed and doesn't block changes to a ticket with the same ID.
 

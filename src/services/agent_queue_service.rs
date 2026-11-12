@@ -207,6 +207,11 @@ impl AgentQueueService {
             let mut exhausted_error = None;
             loop {
                 let upgraded = upgraded.load(Ordering::SeqCst);
+                // Jobs of a worker or server that exited before they ended
+                // run here from now on (DEV-378).
+                if !upgraded {
+                    AgentJobService::recover_orphaned_jobs(tasks_dir);
+                }
                 let max_parallel = resolve_max_parallel(tasks_dir)?;
                 let running = AgentJobService::queue_stats().running;
                 let capacity = match max_parallel {
