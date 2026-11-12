@@ -1,11 +1,11 @@
 title: Agent jobs are left without an end when their worker exits
-status: HelpNeeded
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-12T18:53:33.811162+00:00
-modified: 2026-11-12T19:20:33.531873+00:00
+modified: 2026-11-12T19:28:12.414291+00:00
 relationships:
   related:
   - DEV-377
@@ -49,6 +49,9 @@ comments:
     Not done: main isn't fast-forwarded, nothing is pushed, and the ticket check hasn't been rerun against main.
 
     Question for mallox: merge DEV-378 now even though ui.version-fields fails (DEV-379, which fails on main too), or wait until DEV-379 lands and then rerun smoke and merge?
+- date: 2026-11-12T19:28:12.050082+00:00
+  author: claude
+  text: 'claude: Owner 2026-11-12: ''Wait until the ticket lands and then if that didn''t already push both, go ahead and clean up afterwards''. DEV-379 landed on main on top of this branch, so main has 1a6a46b (DEV-378), b8484d2 and 41c1a45 (DEV-379). DEV-379''s merge job pushed nothing, because 1a6a46b was waiting for this session. Checks on main''s content: DEV-379''s merge agent ran npm run lint, npm test (2065 Rust, 1469 UI) and npm run smoke (381 of 381) after its rebase. I reran the dev318 tests (11 pass) and this ticket''s check with the built binary: kill -9 on the worker during a t3 job, then start a worker again. The job got its completed end with the takeover note, and the end rule ran once. Pushing main next, then removing the landed worktrees and branches.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4e76c77c-bfa8-45ce-86c9-4fd1a4c6314c
 description: |-
@@ -130,3 +133,13 @@ history:
   - field: assignee
     old: '@merge'
     new: mallox
+- at: 2026-11-12T19:28:12.050082+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T19:28:12.414291+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done
