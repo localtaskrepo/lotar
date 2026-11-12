@@ -1,11 +1,11 @@
 title: 'Flaky: home_profile_and_repo_rule_run_a_t3_thread_and_set_done'
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-12T04:24:49.286137+00:00
-modified: 2026-11-12T04:55:56.004016+00:00
+modified: 2026-11-12T05:02:06.338677+00:00
 relationships:
   related:
   - DEV-351
@@ -13,15 +13,34 @@ relationships:
   - DEV-355
   - TEST-1
   - DEV-360
+  - DEV-348
+  - DEV-352
+  - DEV-354
+  - DEV-359
+  - DEV-361
+  - DEV-342
 comments:
 - date: 2026-11-12T04:43:07.389692+00:00
   text: 'claude: Fixed in 5fe75f2 on agent/DEV-356 (test-only change). Cause: a job''s status turns completed/failed before its job_completed rules run (finalize writes the status log, then calls AutomationService::apply_job_event). The test''s wait_for_finished_job slept a fixed 300 ms after the status change and then read the ticket; under load the rule''s Done came later. Fix: wait_for_finished_job now also waits until the job''s active-job record is gone (agent_active_jobs::find is None). That record is removed at the end of apply_job_event, after the rules ran. The fixed sleep is gone. This covers all five tests in dev318_t3_runner_test.rs. Reproduced: with a temporary 1 s sleep before apply_job_event, the old test failed exactly as reported (line 152, Todo vs Done); the new test passed all 4 dev318 tests. The delay was reverted. Check: 30 of 30 runs with --retries 0 passed while npm run test:rust ran next to them. That full run stopped early on cli_agent_check_test with ''has an active agent job (pid N)'' for TEST-1: another worktree''s older-build lotar-agent-wrapper without --tasks-dir, which DEV-349 still counts on purpose (noted in its comment), so I didn''t file it again. Later checks: npm run test:rust -- --no-fail-fast 2003/2003; npm run lint passed; test:ui 1444/1444, test:release and test:hooks passed; smoke 377/378: ui.keyboard-shortcuts failed once (already DEV-355) and passed 2/2 on rerun. Guidance: no durable finding.'
+- date: 2026-11-12T04:59:10.225414+00:00
+  text: 'claude: merge agent. Rebased the fix onto main twice (main moved) and fast-forwarded it into main as 0a8b272 (DEV-356 Flaky: home_profile_and_repo_rule_run_a_t3_thread_and_set_done; only tests/dev318_t3_runner_test.rs); ticket files committed as 0c41aef. Not pushed: main has unpushed commits from other tickets (DEV-354, DEV-355, DEV-352, DEV-348) that wait for their sessions. Checks on the rebased branch: npm run lint passed; npm run test:rust 2003/2003 (the first run hit load flakes: the web_api_integration_test WouldBlock flake already tracked in DEV-359, plus one failure in dev320_job_outcome_test, filed as DEV-360; both passed on rerun); test:ui, test:release and test:hooks passed; npm run smoke 378/378. After the last rebase (UI-only changes from main) I reran only dev318_t3_runner_test (passes) and rustfmt. Check command: home_profile_and_repo_rule_run_a_t3_thread_and_set_done 30 runs with --retries 0, 0 failures. Had to rm -rf and npm ci node_modules in this worktree (it was broken).'
+- date: 2026-11-12T04:59:15.216158+00:00
+  text: The merge agent's job job-20261112T044319.387Z-24 failed (lotar agent logs job-20261112T044319.387Z-24); the fix agent retries it on branch agent/DEV-356.
+- date: 2026-11-12T05:01:29.884446+00:00
+  text: 'claude: fix agent retry. Nothing left to fix: the fix is on main as 0a8b272 (patch-identical to 5fe75f2 on agent/DEV-356; git cherry main agent/DEV-356 lists it as ''-''), and its ticket files are in 0c41aef. No files changed, no new commit. The merge job failed falsely: the lotar agent worker (pid 11651) started at 18:31, before DEV-342''s fix (c55f67c, 18:42) that counts a rebased branch as merged, so it still runs the old check against agent/DEV-356. Filed DEV-361. A second merge job under the same worker will fail the same way and hand this ticket to mallox; restarting the worker (after its running jobs end) lets it pass. Check not rerun: the merge agent ran it on the rebased branch (30/30, retries 0) and main has not changed that test since.'
+- date: 2026-11-12T05:02:02.814049+00:00
+  text: 'claude: Nothing to merge. This branch (t3/fix-flaky-t3-runner-test-2) holds only 5fe75f2, which main already has as 0a8b272 (git cherry shows it applied; no diff in tests/dev318_t3_runner_test.rs between main and this branch). Main is at 0c41aef. No rebase, checks, merge or push were needed. Pending ticket-file changes in the main checkout''s .tasks belong to other sessions'' status updates and were left alone.'
+- date: 2026-11-12T05:02:06.338677+00:00
+  text: 'The merge agent''s job job-20261112T050138.959Z-31 failed again: lotar agent logs job-20261112T050138.959Z-31. The fix is on branch agent/DEV-356. Try again with lotar automation run "Health: retry with @fix" --select ''id:DEV-356'', or for an agent''s ticket lotar assignee DEV-356 @fix.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A249d99cd-7c07-495c-be46-39132be3417f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ade9e46ff-a217-43ec-95ac-ef85a994da84
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A93497269-e94b-43c6-94b7-fed057171483
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad2f7743a-a110-4bba-8ca8-bfb2fdc8a3d1
 description: 'Found by DEV-351 (claude, 2026-11-11): tests/dev318_t3_runner_test.rs home_profile_and_repo_rule_run_a_t3_thread_and_set_done failed once in npm run test:agent (retries 0) on agent/DEV-351 under load (another session''s suite was running): tests/dev318_t3_runner_test.rs:152 left "Todo", right "Done", so the job read as completed before the rule''s Done was written. It passed on its own right after. DEV-351 only adds a test, so it did not cause this. Check: run it 30 times under load (cargo nextest run --retries 0 next to the full suite) with no failure. Done when the cause is found and fixed, with the test passing without retries.'
 tags:
 - health
+- merge-retried
 custom_fields:
   finding: flaky-test:dev318_t3_runner_test::home_profile_and_repo_rule_run_a_t3_thread_and_set_done
 history:
@@ -74,3 +93,75 @@ history:
   - field: relationships
     old: '{"related":["DEV-351","DEV-349","DEV-355","TEST-1"]}'
     new: '{"related":["DEV-351","DEV-349","DEV-355","TEST-1","DEV-360"]}'
+- at: 2026-11-12T04:59:10.225414+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T04:59:10.347823+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-351","DEV-349","DEV-355","TEST-1","DEV-360"]}'
+    new: '{"related":["DEV-351","DEV-349","DEV-355","TEST-1","DEV-360","DEV-348","DEV-352","DEV-354","DEV-359"]}'
+- at: 2026-11-12T04:59:15.100365+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: health
+    new: health, merge-retried
+- at: 2026-11-12T04:59:15.216158+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-12T04:59:16.281994+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A93497269-e94b-43c6-94b7-fed057171483
+- at: 2026-11-12T05:01:21.800698+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-351","DEV-349","DEV-355","TEST-1","DEV-360","DEV-348","DEV-352","DEV-354","DEV-359"]}'
+    new: '{"related":["DEV-351","DEV-349","DEV-355","TEST-1","DEV-360","DEV-348","DEV-352","DEV-354","DEV-359","DEV-361"]}'
+- at: 2026-11-12T05:01:29.884446+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:01:30.036979+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-351","DEV-349","DEV-355","TEST-1","DEV-360","DEV-348","DEV-352","DEV-354","DEV-359","DEV-361"]}'
+    new: '{"related":["DEV-351","DEV-349","DEV-355","TEST-1","DEV-360","DEV-348","DEV-352","DEV-354","DEV-359","DEV-361","DEV-342"]}'
+- at: 2026-11-12T05:01:38.393435+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T05:01:41.645674+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad2f7743a-a110-4bba-8ca8-bfb2fdc8a3d1
+- at: 2026-11-12T05:02:02.814049+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:02:06.166865+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-12T05:02:06.338677+00:00
+  actor: automation
+  changes:
+  - field: comment_added

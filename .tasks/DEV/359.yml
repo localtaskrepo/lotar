@@ -3,14 +3,21 @@ status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T04:47:42.443342+00:00
-modified: 2026-11-12T04:47:45.230627+00:00
+modified: 2026-11-12T05:06:57.229605+00:00
 relationships:
   related:
   - DEV-354
+  - DEV-356
+comments:
+- date: 2026-11-12T04:58:54.479545+00:00
+  text: 'claude: Fixed in commit 1d69b61 on agent/DEV-359. tests/web_api_integration_test.rs: after the body is sent, the response is now read to EOF with read_until_deadline (RESPONSE_DEADLINE, 15 s) instead of read_to_string against the 500 ms net_timeout. A real hang still fails with ''no response from test server within 15s''. The early-response check (100 ms read before the body) is unchanged. Checks: the ticket''s cargo nextest command, 5 runs, 35/35 each time; npm run lint:agent passes; npm run test:agent passes (Rust, UI, release, hooks). Smoke: the first run had 1 failure of 378, which I didn''t capture (smoke doesn''t touch this Rust test file), and the 2 reruns passed 378/378.'
+- date: 2026-11-12T05:06:57.229605+00:00
+  text: 'claude: Merged into main (fast-forward) as 4be7d13: the fix commit, rebased onto main. Checks in the worktree: lint:agent, test:agent and smoke (379/379) passed. The ticket''s check in the main checkout, cargo nextest run --no-fail-fast -E ''test(web_api_integration_test::)'', passed 5 of 5 runs (35/35 each).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8a800754-e4a5-4ec5-9daa-e8c4f4cdab68
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae828c50c-0209-44ef-8410-92ca55d914f5
 description: 'Found by DEV-354 merge (claude, 2026-11-11): in the main checkout, running the web_api_integration_test module with cargo nextest run --no-fail-fast -E ''test(web_api_integration_test::)'' failed this test in 4 of 7 runs at tests/web_api_integration_test.rs:606 (stream.read_to_string(&mut response).unwrap() returned WouldBlock, os error 35) because the stream read timeout is net_timeout() (500 ms). It passes alone and in the DEV-354 worktree. Same cause as DEV-354: the response read uses a short fixed timeout. Check: run that cargo nextest command 5 times; all must pass. Done when this read waits for the response with the read_until_deadline helper added in DEV-354 (deadline, not fixed short budget), still failing fast on a real hang.'
 tags:
 - health
@@ -39,3 +46,28 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8a800754-e4a5-4ec5-9daa-e8c4f4cdab68
+- at: 2026-11-12T04:58:54.479545+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T04:59:01.513298+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T04:59:02.850936+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae828c50c-0209-44ef-8410-92ca55d914f5
+- at: 2026-11-12T04:59:10.348080+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-354"]}'
+    new: '{"related":["DEV-354","DEV-356"]}'
+- at: 2026-11-12T05:06:57.229605+00:00
+  actor: claude
+  changes:
+  - field: comment_added

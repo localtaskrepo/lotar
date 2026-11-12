@@ -1,0 +1,40 @@
+title: automation simulate matches updated rules that a real update skips
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T05:03:17.785328+00:00
+modified: 2026-11-12T05:03:19.397224+00:00
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A06a83034-9de4-4f4e-ad88-79a49f4b1eeb
+description: |-
+  ## Found
+  In standards STD-46 (2026-11-12) a rule `when: { all: [ { status: Done }, { tags: { any: [merge-retried] } } ] }` with `on: updated` never fired when `lotar status <ID> Done` ran on a ticket tagged merge-retried, while `lotar automation simulate --ticket <ID> --event updated` reported "Rule matched".
+
+  ## Cause
+  - Real updates match in `MatchMode::OnChange` (src/services/automation_service.rs:365): every field condition, tags included, needs that field to change in the same update (src/services/automation_matching.rs, the `OnChange` branch of the field loop).
+  - `simulate` matches every event with `MatchMode::Current` and `ChangeSet::empty` (automation_service.rs:455), so a change-dependent condition matches on the current value.
+
+  ## Check
+  In a scratch workspace: a ticket with tag `t`, a rule `when: { all: [ {status: Done}, {tags: {any: [t]}} ] }`, `on: updated: comment: fired`. `lotar automation simulate --ticket <ID> --event updated` says matched; `lotar status <ID> Done` adds no comment.
+
+  ## Done
+  simulate for change events (updated, assigned, created, sprint_changed) says which conditions need a change and does not report a match a real update of that field alone would skip (for example: "matches only when tags change in the same update"), with a test. The docs for simulate and for `all` with field conditions say so.
+history:
+- at: 2026-11-12T05:03:18.060519+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T05:03:18.527107+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T05:03:19.397224+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A06a83034-9de4-4f4e-ad88-79a49f4b1eeb

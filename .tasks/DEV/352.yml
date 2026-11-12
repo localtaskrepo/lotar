@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-12T03:58:07.244288+00:00
-modified: 2026-11-12T04:36:38.318672+00:00
+modified: 2026-11-12T04:59:10.347272+00:00
 relationships:
   related:
   - DEV-350
@@ -13,6 +13,7 @@ relationships:
   - DEV-355
   - DEV-349
   - DEV-348
+  - DEV-356
 comments:
 - date: 2026-11-12T04:18:18.963787+00:00
   text: 'claude: Fixed in commit 05c3e96 on agent/DEV-352. Cause: at desktop width the dependency view first shows the dependency-only graph, which has 0 edges, so no diagram and the ''Tasks in this graph'' details is open. The test saw it open and didn''t click it. Then the graph with the related edge arrived, the diagram appeared and the details closed. getByRole(''list'', ''Dependency relationships'') stopped matching, so edgeList.textContent() never resolved. Reproduced with a 1.5 s delay on the related graph response: same ''expect.poll() function didn''t resolve in time'' at that line. Fix: before checking whether the lists are open, the test waits for the ''related (undirected)'' entry in the Relationship legend, which is the related graph being rendered. With the delay it passes at 1440px and 390px (2 runs); the delay is not committed. Checks: npm run lint passes. npm run test:smoke:agent passes 378/378, and test:smoke:quick:agent passes this test again (DEV-355 failed in that run). npm test: UI, release and hook tests pass; Rust nextest --no-fail-fast 1998/2002. Failures not caused by this change, all passing when rerun alone: dev279/dev320 job tests (another worktree''s agent wrapper, DEV-349), 4 web_api SSE tests (filed DEV-354). Also filed DEV-355 (keyboard palette smoke flake).'
@@ -107,3 +108,9 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-12T04:59:10.347272+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-350","DEV-354","DEV-355","DEV-349","DEV-348"]}'
+    new: '{"related":["DEV-350","DEV-354","DEV-355","DEV-349","DEV-348","DEV-356"]}'
