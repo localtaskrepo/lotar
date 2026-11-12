@@ -11,14 +11,7 @@ describe('UI panel scope safety', () => {
             const b = await workspace.addTask('Panel scope B seed', { args: ['--project=PANB'] });
             expect(a.project).toBe('PANA');
             expect(b.project).toBe('PANB');
-            const server = await startLotarServer(workspace, {
-                env: process.env.LOTAR_WEB_UI_PATH
-                    ? {
-                          LOTAR_WEB_UI_EMBEDDED: '0',
-                          LOTAR_WEB_UI_PATH: process.env.LOTAR_WEB_UI_PATH,
-                      }
-                    : undefined,
-            });
+            const server = await startLotarServer(workspace);
             try {
                 await withPage(`${server.url}/?project=PANA`, async (page) => {
                     await page.getByTestId('global-new-task').click();

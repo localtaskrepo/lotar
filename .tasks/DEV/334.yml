@@ -1,0 +1,41 @@
+title: npm run smoke:ui tests the embedded UI, not the fresh build
+status: InProgress
+priority: Medium
+type: Feature
+reporter: mallox
+assignee: '@fix'
+created: 2026-11-12T00:50:42.239349+00:00
+modified: 2026-11-12T00:50:43.976279+00:00
+relationships:
+  related:
+  - DEV-330
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9644a94d-c67d-479d-9315-f2a7fcc65621
+description: 'Found while working on DEV-330: `npm run smoke:ui` builds target/web and sets LOTAR_WEB_UI_EMBEDDED=0 and LOTAR_WEB_UI_PATH, but `startLotarServer` in smoke/helpers/server.ts sets LOTAR_WEB_UI_EMBEDDED=1 after copying the environment, so the server keeps serving the UI embedded in target/smoke/lotar. A UI change tested with smoke:ui runs against the old bundle. Check: run smoke:ui after a UI edit and compare the page''s script src with target/web/assets. Done when smoke:ui serves target/web (let the env win, or drop the script).'
+tags:
+- health
+custom_fields:
+  finding: smoke:smoke-ui-embedded
+history:
+- at: 2026-11-12T00:50:42.415742+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-330"]}'
+- at: 2026-11-12T00:50:42.636068+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T00:50:42.912391+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T00:50:43.976279+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9644a94d-c67d-479d-9315-f2a7fcc65621

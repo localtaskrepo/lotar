@@ -1,5 +1,5 @@
 import type { ChildProcess } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import net from 'node:net';
@@ -322,6 +322,27 @@ describe.skipIf(!lotarBinaryAvailable)('lotar serve readiness contract (real bin
             await server.stop();
             expect(exited(server.raw.nodeChildProcess)).toBe(true);
         } finally {
+            await workspace.dispose();
+        }
+    });
+
+    it('serves the UI from LOTAR_WEB_UI_PATH when the environment sets it (DEV-334)', async () => {
+        const workspace = await SmokeWorkspace.create({ name: 'dev334-web-ui-' });
+        const webUi = path.join(workspace.root, 'fresh-web');
+        mkdirSync(webUi);
+        writeFileSync(path.join(webUi, 'index.html'), '<!doctype html><title>dev334 fresh build</title>');
+        vi.stubEnv('LOTAR_WEB_UI_EMBEDDED', '0');
+        vi.stubEnv('LOTAR_WEB_UI_PATH', webUi);
+        try {
+            const server = await startLotarServer(workspace);
+            try {
+                const response = await fetch(server.url);
+                expect(await response.text()).toContain('dev334 fresh build');
+            } finally {
+                await server.stop();
+            }
+        } finally {
+            vi.unstubAllEnvs();
             await workspace.dispose();
         }
     });
