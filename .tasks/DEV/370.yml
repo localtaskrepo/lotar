@@ -1,17 +1,18 @@
 title: 'Release process: tickets waiting for a release get checked when it ships'
-status: HelpNeeded
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: claude
 created: 2026-11-12T06:34:54.326999+00:00
-modified: 2026-11-12T06:53:43.484071+00:00
+modified: 2026-11-12T07:35:55.083434+00:00
 relationships:
   related:
   - DEV-369
   - DEV-361
   - DEV-364
   - DEV-368
+  - DEV-371
 comments:
 - date: 2026-11-12T06:39:43.328867+00:00
   text: 'claude: Owner 2026-11-11 (mallox), on the trigger: ''we can use the depends on relationship between tickets to standardize the release trigger''. So the standard is: a ticket that waits for a release depends_on that release''s ticket, and closing the release ticket starts the checks of its dependents, found through that relationship (not through tags or a hand-kept list). Current dependents of DEV-369: DEV-361, DEV-364.'
@@ -23,12 +24,12 @@ comments:
   text: 'claude: Merge refused, not pushed. Branch t3/release-process-waiting-checks holds 068c2a2 (DEV-370), already on top of main c724ed9, so no rebase was needed. Checks in the worktree all pass: npm run lint, npm test (2019 Rust, 1444 UI), npm run smoke (379). git -C <root> merge --ff-only refused: the main checkout has an uncommitted edit to .tasks/DEV/automation.yml (the @merge rule gets session: continue and new prompt text, the open item from DEV-368), and the merge would overwrite it. The two changes are in separate hunks (that edit is near line 93, DEV-370 appends rules at the end), so once the edit is committed, main fast-forwards after a rebase with no conflict. I didn''t commit, stash or touch anything in the main checkout. Question: may the merge agent commit that automation.yml edit with the ticket files (DEV-370 Ticket updates), then rebase, fast-forward and push?'
 - date: 2026-11-12T06:53:43.413902+00:00
   text: The merge agent's job job-20261112T064831.342Z-2 failed (lotar agent logs job-20261112T064831.342Z-2); the fix agent retries it on branch t3/release-process-waiting-checks.
+- date: 2026-11-12T07:35:52.229934+00:00
+  text: 'claude: Merged by hand as part of the v0.13.3 release (owner: ''let''s do the release now''). Both merge jobs failed on main''s uncommitted .tasks/DEV/automation.yml (the STD-47 session: continue sync); I committed those .tasks changes as 6300099 ''DEV-370 Ticket updates'', rebased and fast-forwarded: 0e25f1f (this ticket; the test cleanup also waits for the fake job to end, which earlier leaked two runners), pushed. Closing DEV-369 then showed a bug: the nested --select ''status:blocked'' was checked against the global statuses, which lack Blocked, so no check started. My test had put the statuses in the global config. Fixed in f51de7c (the rule passes --project "$LOTAR_TICKET_PROJECT"; the test now keeps the statuses in DEV/config.yml as the real repo does, and failed before the fix), pushed; lotar''s own behavior filed as DEV-371. DEV-361''s check was started by hand with the same rule. Checks before each push: npm run lint, npm test (Rust 2019, UI 1444), npm run smoke (379).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A757d9bf4-8214-467d-9d47-5df92236f012
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A39e8c835-32c8-4f3d-907f-4d81655e1cbb
 description: 'Two tickets now wait for the next release to run their checks (rule of 2, owner 2026-11-11): ''Maybe we should create a ticket for the next release which other agents can check ... They need to be triggered when the release is done, so we need a release process defined and set up for lotar''. Owner decisions 2026-11-11: a waiting ticket is ''Blocked + depends on release'' (status Blocked, depends_on the ''Release vX.Y.Z'' ticket, e.g. DEV-369); the checks start on ''Closing the release ticket'': the last release-guide step, after brew upgrade lotar on this Mac, sets the release ticket Done. Set up: (1) an automation rule in lotar''s .tasks config that, when a release ticket goes Done, hands every Blocked ticket depending on it to @fix with a prompt like ''Release <version> is installed: run your check, close the ticket or report what still fails''; (2) docs/release-guide.md: create the next release ticket, link waiting tickets, close it after installing; (3) the agent guidance (lotar-dev-tracking or development-workflow skill): a ticket whose check needs a release goes Blocked + depends_on the open release ticket, not HelpNeeded. Open for the implementer: rule conditions need their field to change in the update (docs/help/automation.md Triggers), and actions apply to the ticket that fired, so reaching the dependents may need a run: lotar automation run ... --select step or a small lotar change; propose before adding code. Check: create a test release ticket and a Blocked dependent in a temp workspace, close the release ticket, and the dependent is assigned to the check agent. Done when that works with a test, and the docs and guidance describe it.'
-tags:
-- merge-retried
 history:
 - at: 2026-11-12T06:34:54.405518+00:00
   actor: claude
@@ -116,3 +117,31 @@ history:
   - field: assignee
     old: '@merge'
     new: mallox
+- at: 2026-11-12T07:35:38.989537+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-369","DEV-361","DEV-364","DEV-368"]}'
+    new: '{"related":["DEV-369","DEV-361","DEV-364","DEV-368","DEV-371"]}'
+- at: 2026-11-12T07:35:52.229934+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T07:35:52.338890+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done
+- at: 2026-11-12T07:35:52.370274+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: merge-retried
+    new: ''
+- at: 2026-11-12T07:35:55.083434+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: claude

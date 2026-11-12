@@ -1,0 +1,19 @@
+title: Release v0.13.4
+status: Todo
+priority: Medium
+type: Chore
+reporter: claude
+assignee: mallox
+created: 2026-11-12T07:35:39.185106+00:00
+modified: 2026-11-12T07:35:55.221665+00:00
+relationships:
+  related:
+  - DEV-369
+description: 'Ship v0.13.4 with the release skill (.github/skills/release/SKILL.md) and docs/release-guide.md: fixes of the waiting tickets on main, version bump, QA green, signed tag pushed with the owner''s OK, release workflow green, then brew upgrade lotar on this Mac. Done when the release is installed here (lotar --version prints 0.13.4). Tickets that wait for this release are Blocked and depend on it; closing this ticket hands them to @fix to run their checks. Waiting now: none.'
+history:
+- at: 2026-11-12T07:35:55.221665+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-369"]}'

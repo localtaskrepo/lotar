@@ -1,0 +1,43 @@
+title: automation run --select rejects a project's own status unless --project is given
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T07:35:38.897340+00:00
+modified: 2026-11-12T07:35:39.839208+00:00
+relationships:
+  related:
+  - DEV-361
+  - DEV-369
+  - DEV-370
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A73cc72ad-d85f-47f1-b339-b66fabc162d4
+description: 'Found by DEV-370 (claude, 2026-11-11): closing DEV-369 ran lotar automation run ''Release installed: run the waiting check'' --select ''status:blocked id:/^DEV-361$/'' and it failed with ''Status blocked is not enabled for this project. Valid statuses: Todo, InProgress, NeedsReview, Done''. Blocked is in .tasks/DEV/config.yml issue.states and default.project is DEV, but the query is checked against the global statuses only. With project:DEV in the query, or --project DEV, it works. The release rule now passes --project (f51de7c). Check: in a workspace whose global config has no Blocked and whose project config does, lotar automation run <rule> --select ''status:blocked'' --dry-run succeeds without --project (or the error names --project/project:). Done when that works with a test.'
+tags:
+- health
+custom_fields:
+  finding: automation-run:select-project-status
+history:
+- at: 2026-11-12T07:35:38.989837+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-361","DEV-369","DEV-370"]}'
+- at: 2026-11-12T07:35:39.100664+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T07:35:39.315286+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T07:35:39.839208+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A73cc72ad-d85f-47f1-b339-b66fabc162d4

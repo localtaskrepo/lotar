@@ -1,10 +1,11 @@
 title: lotar agent worker keeps running its old build after lotar is upgraded
-status: Blocked
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
+assignee: '@merge'
 created: 2026-11-12T05:01:21.522818+00:00
-modified: 2026-11-12T06:35:01.561504+00:00
+modified: 2026-11-12T07:35:52.304339+00:00
 relationships:
   depends_on:
   - DEV-369
@@ -19,6 +20,9 @@ relationships:
   - DEV-362
   - DEV-369
   - DEV-370
+  - TEST-1
+  - TEST-2
+  - DEV-371
 comments:
 - date: 2026-11-12T05:13:14.012531+00:00
   text: 'claude: Fixed in 32a8819 on agent/DEV-361. The queue worker now watches the binary it was started from (utils::binary_watch, the DEV-305 watcher that lotar mcp uses, so a Homebrew symlink move counts). After a change it takes no new queue entries, lets its running jobs finish, and exits. Its existing exit path then starts a new worker, now from the path lotar was started as (watched_path) and not current_exe, so it runs the upgraded build. New test tests/dev361_worker_restarts_after_upgrade_test.rs: it upgrades a fake install while job 1 runs, then queues job 2, and checks that a different worker process runs job 2. It fails without the fix and passes with it. Documented in docs/help/agent.md (queue section). Checks: npm run lint, npm run test:agent (Rust 2004 passed, UI 1444, release, hooks) and npm run smoke (379 passed) all pass. Note: the running worker (pid 11651) still runs the old code until it next goes idle or is restarted. The fix only applies to workers started from a build that includes it.'
@@ -38,12 +42,17 @@ comments:
   text: 'claude: Old worker pid 11651 exited on its own at 2026-11-11 22:20 local, once it had no jobs left (the watcher saw it go and sent no signal). Owner decision 2026-11-11 (mallox): ''Cancel job, keep waiting''. My earlier change back to @fix started job-20261112T053313.085Z-47 by mistake; it had already finished before I could cancel it, changed nothing, and the merge agent then set Done. I set the ticket back to HelpNeeded for mallox because the check has not run: it needs a lotar release that includes 06b571f, installed, then an upgrade while a worker runs. Question for mallox: when you have released and installed a build that includes 06b571f, should an agent run the check (upgrade while a worker runs, next job runs on a new worker) and close this ticket?'
 - date: 2026-11-12T06:35:01.444477+00:00
   text: 'claude: Owner decision 2026-11-11 (mallox): ''Yes'' to an agent running the check once a release with 06b571f is installed. Following his choice (''Blocked + depends on release''), this ticket is Blocked and depends on DEV-369 (Release v0.13.3). Closing DEV-369 starts the check, once DEV-370 sets up that process. Check to run then: upgrade lotar while a worker runs; the next job runs on a new worker started from the new build.'
+- date: 2026-11-12T07:35:07.148613+00:00
+  text: 'claude: Check passes against installed lotar 0.13.3 (includes 06b571f). Ran it with an isolated temp workspace and queue: copied /opt/homebrew/Cellar/lotar/0.13.3/bin/lotar to install/0.13.3-a, linked install/bin/lotar to it (the Homebrew layout), queued TEST-1 for a command agent that logs its worker''s pid and mapped binary and sleeps 15s. While TEST-1 ran, upgraded by pointing the link at a fresh copy install/0.13.3-b, waited 8s (the default watcher polls every 2s and needs the new file stable for one more poll), then queued TEST-2. Result: TEST-1 ran on worker 67270 (0.13.3-a); TEST-2 ran on a new worker 73271, running 0.13.3-b and started from install/bin/lotar. The old worker took no new entry after the upgrade. A first try that queued TEST-2 only 3s after the upgrade ran on the old worker: that is before the watcher can confirm the change, not a failure. The live worker on this Mac (pid 38330) started after the 0.13.3 install, so it restarts itself on the next upgrade. No files changed. Script: dev361-check.sh in this session''s scratchpad.'
+- date: 2026-11-12T07:35:43.765395+00:00
+  text: 'claude: Nothing to merge. The branch''s only commit 32a8819 was already on main as 06b571f (git cherry main HEAD: ''-''), so rebasing onto main dropped it and the branch now equals main (f51de7c). Merged, pushed and committed nothing; .tasks changes (DEV/361.yml, DEV/369.yml) left uncommitted in the main checkout because no merge happened. No lint/test/smoke run, since no code changed. The ticket''s check ran in the previous pass against installed lotar 0.13.3 and passed (upgrade while a worker runs; the next job ran on a new worker from the upgraded binary).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af86593d9-5bfc-43dc-9e6e-504db1577842
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab7be4f58-8651-4692-8cf6-4cb0c810c1c9
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9d6c1af5-42de-408e-bad9-68435488fc61
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa9c6ec5a-b410-4c1d-9139-06490a1ceb9c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ade4eb3a6-51fc-44ac-835a-0df0126400ed
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1c05324f-575c-49db-8ea2-d505aba4d0fa
 description: 'Found by DEV-356 (claude, 2026-11-11): the merge job job-20261112T044319.387Z-24 fast-forwarded main correctly (0a8b272), but LoTaR failed it with ''agent/DEV-356 is not merged into the main checkout''s current branch and can''t be fast-forwarded''. The thread worked on t3/fix-flaky-t3-runner-test, and git cherry main agent/DEV-356 shows the commit as applied, so DEV-342''s fix (c55f67c, in v0.13.2) would have passed it. The ''lotar agent worker'' (pid 11651) started 2026-11-11 18:31 local, before c55f67c (18:42) and before v0.13.2 was installed at /opt/homebrew/opt/lotar/bin/lotar (20:27), so it still runs the old code. Jobs it runs use old merge checks and old rules until someone restarts it. Check: after upgrading lotar while a worker runs, the worker runs the new build for the next job (or ''lotar agent'' status warns that the worker is older than the installed binary). Done when a worker notices its executable changed and restarts between jobs, or reports it clearly, with a test.'
 tags:
 - health
@@ -256,3 +265,51 @@ history:
   changes:
   - field: assignee
     old: mallox
+- at: 2026-11-12T07:31:33.266203+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T07:31:33.377908+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-12T07:31:33.890819+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1c05324f-575c-49db-8ea2-d505aba4d0fa
+- at: 2026-11-12T07:35:07.148613+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T07:35:07.659010+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-369"],"related":["DEV-342","DEV-356","DEV-305","DEV-358","DEV-367","DEV-354","DEV-360","DEV-362","DEV-369","DEV-370"]}'
+    new: '{"depends_on":["DEV-369"],"related":["DEV-342","DEV-356","DEV-305","DEV-358","DEV-367","DEV-354","DEV-360","DEV-362","DEV-369","DEV-370","TEST-1","TEST-2"]}'
+- at: 2026-11-12T07:35:19.151351+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T07:35:38.988529+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-369"],"related":["DEV-342","DEV-356","DEV-305","DEV-358","DEV-367","DEV-354","DEV-360","DEV-362","DEV-369","DEV-370","TEST-1","TEST-2"]}'
+    new: '{"depends_on":["DEV-369"],"related":["DEV-342","DEV-356","DEV-305","DEV-358","DEV-367","DEV-354","DEV-360","DEV-362","DEV-369","DEV-370","TEST-1","TEST-2","DEV-371"]}'
+- at: 2026-11-12T07:35:43.765395+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T07:35:52.304339+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
