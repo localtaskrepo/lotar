@@ -1,17 +1,24 @@
-title: Release v0.13.4
-status: Todo
+title: Release v0.14.0
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-12T07:35:39.185106+00:00
-modified: 2026-11-12T08:02:58.997642+00:00
+modified: 2026-11-12T09:42:07.699507+00:00
 relationships:
   blocks:
   - DEV-364
   related:
   - DEV-369
-description: 'Ship v0.13.4 with the release skill (.github/skills/release/SKILL.md) and docs/release-guide.md: fixes of the waiting tickets on main, version bump, QA green, signed tag pushed with the owner''s OK, release workflow green, then brew upgrade lotar on this Mac. Done when the release is installed here (lotar --version prints 0.13.4). Tickets that wait for this release are Blocked and depend on it; closing this ticket hands them to @fix to run their checks. Waiting now: DEV-364 (build output cleanup at job end; fix 66c7060 on main).'
+  - DEV-298
+  - DEV-327
+  - DEV-350
+comments:
+- date: 2026-11-12T09:42:07.514482+00:00
+  author: claude
+  text: 'claude: v0.14.0 shipped (minor bump, owner 2026-11-12). Main ba454fa, Quality Assurance run 43190526740 green, signed tag v0.14.0 pushed, Release run 43192176974 green in every job, GitHub marks it Latest. brew upgrade lotar done here: lotar --version prints 0.14.0. Includes DEV-364, DEV-350, DEV-327, DEV-298.'
+description: 'Ship v0.14.0, a minor bump (owner 2026-11-12: ''create a release now with a minor bump''), with the release skill (.github/skills/release/SKILL.md) and docs/release-guide.md: fixes of the waiting tickets on main, version bump, QA green, signed tag pushed with the owner''s OK, release workflow green, then brew upgrade lotar on this Mac. Done when the release is installed here (lotar --version prints 0.14.0). Tickets that wait for this release are Blocked and depend on it; closing this ticket hands them to @fix to run their checks. Waiting now: DEV-364 (build output cleanup at job end; fix 66c7060 on main).'
 history:
 - at: 2026-11-12T07:35:55.221665+00:00
   actor: claude
@@ -31,3 +38,28 @@ history:
   - field: description
     old: 'Ship v0.13.4 with the release skill (.github/skills/release/SKILL.md) and docs/release-guide.md: fixes of the waiting tickets on main, version bump, QA green, signed tag pushed with the owner''s OK, release workflow green, then brew upgrade lotar on this Mac. Done when the release is installed here (lotar --version prints 0.13.4). Tickets that wait for this release are Blocked and depend on it; closing this ticket hands them to @fix to run their checks. Waiting now: none.'
     new: 'Ship v0.13.4 with the release skill (.github/skills/release/SKILL.md) and docs/release-guide.md: fixes of the waiting tickets on main, version bump, QA green, signed tag pushed with the owner''s OK, release workflow green, then brew upgrade lotar on this Mac. Done when the release is installed here (lotar --version prints 0.13.4). Tickets that wait for this release are Blocked and depend on it; closing this ticket hands them to @fix to run their checks. Waiting now: DEV-364 (build output cleanup at job end; fix 66c7060 on main).'
+- at: 2026-11-12T09:16:35.338547+00:00
+  actor: claude
+  changes:
+  - field: title
+    old: Release v0.13.4
+    new: Release v0.14.0
+  - field: description
+    old: 'Ship v0.13.4 with the release skill (.github/skills/release/SKILL.md) and docs/release-guide.md: fixes of the waiting tickets on main, version bump, QA green, signed tag pushed with the owner''s OK, release workflow green, then brew upgrade lotar on this Mac. Done when the release is installed here (lotar --version prints 0.13.4). Tickets that wait for this release are Blocked and depend on it; closing this ticket hands them to @fix to run their checks. Waiting now: DEV-364 (build output cleanup at job end; fix 66c7060 on main).'
+    new: 'Ship v0.14.0, a minor bump (owner 2026-11-12: ''create a release now with a minor bump''), with the release skill (.github/skills/release/SKILL.md) and docs/release-guide.md: fixes of the waiting tickets on main, version bump, QA green, signed tag pushed with the owner''s OK, release workflow green, then brew upgrade lotar on this Mac. Done when the release is installed here (lotar --version prints 0.14.0). Tickets that wait for this release are Blocked and depend on it; closing this ticket hands them to @fix to run their checks. Waiting now: DEV-364 (build output cleanup at job end; fix 66c7060 on main).'
+- at: 2026-11-12T09:42:07.514482+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T09:42:07.578781+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-364"],"related":["DEV-369"]}'
+    new: '{"blocks":["DEV-364"],"related":["DEV-369","DEV-298","DEV-327","DEV-350"]}'
+- at: 2026-11-12T09:42:07.699507+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: Done

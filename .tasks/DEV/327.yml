@@ -5,10 +5,11 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-11T23:36:51.131233+00:00
-modified: 2026-11-12T09:12:50.576922+00:00
+modified: 2026-11-12T09:42:07.578284+00:00
 relationships:
   related:
   - DEV-298
+  - DEV-372
 comments:
 - date: 2026-11-12T08:57:56.677477+00:00
   text: 'claude: Owner 2026-11-12: work this now (@fix). Do it the way AGENTS.md says, with lint, test and smoke. Run lotar with LOTAR_DEFAULT_REPORTER set to your agent name and start each comment with it. Commit on your worktree''s branch, signed, never --no-verify, message ''DEV-N <title>''; don''t merge or push, the merge agent does. Never delete work that isn''t saved elsewhere. A question only the owner can answer: comment one question, set HelpNeeded and assign mallox (not the reporter). REST shape change: src/api_types.rs, view/api/types.ts, docs/openapi.json and docs/help agree (skill api-contract-change-end-to-end). Old task YAML without an author must still load.'
@@ -66,3 +67,9 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-12T09:42:07.578284+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-298"]}'
+    new: '{"related":["DEV-298","DEV-372"]}'

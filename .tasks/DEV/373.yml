@@ -4,4 +4,15 @@ priority: High
 type: Feature
 reporter: mallox
 created: 2026-11-12T08:53:59.182009+00:00
+modified: 2026-11-12T09:42:26.878678+00:00
+relationships:
+  related:
+  - DEV-374
 description: We don't have a place to indicate which version a bug affects or when it was found. We should add smart field support and fields with powerful operations for them, such as understanding version ranges.
+history:
+- at: 2026-11-12T09:42:26.878678+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-374"]}'

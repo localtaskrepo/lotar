@@ -1,11 +1,11 @@
 title: Finished agent jobs leave GBs of build output in their worktrees
-status: Blocked
+status: InProgress
 priority: High
 type: Bug
 reporter: claude
-assignee: claude
+assignee: '@fix'
 created: 2026-11-12T05:21:54.615269+00:00
-modified: 2026-11-12T08:05:34.892803+00:00
+modified: 2026-11-12T09:42:08.494950+00:00
 relationships:
   depends_on:
   - DEV-372
@@ -36,6 +36,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa38f4398-ffb1-4376-9c12-47e5507a143c
 - link: t3-thread://v2/d834978d-9e75-43fb-ba01-45747238fc44/b51ca0ac-1980-485f-a905-ffe6a2c807e5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aec8f9332-8159-4afa-97b0-d29aebf46b3e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0818f9ad-e49b-4c1e-8709-88510533127a
 description: |-
   Finished agent jobs leave their build output behind: every lotar job worktree keeps a 2 to 7 GB `target/`, so 41 lotar worktrees grew to 144 GB and the Mac's disk reached 98% (13 GiB free) on 2026-11-11. The owner: "That's a little too much storage used in parallel. we don't have that much space available actually". Reported by the pyxzl.net thread "Split Repo Binaries to Skip CI Builds".
 
@@ -324,3 +325,20 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-12T09:42:07.768165+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: claude
+    new: '@fix'
+- at: 2026-11-12T09:42:07.887477+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-12T09:42:08.494950+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0818f9ad-e49b-4c1e-8709-88510533127a
