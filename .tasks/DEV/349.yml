@@ -1,0 +1,42 @@
+title: Tests see other worktrees' lotar-agent-wrapper processes as active jobs
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T03:40:57.903870+00:00
+modified: 2026-11-12T03:40:59.613464+00:00
+relationships:
+  related:
+  - DEV-346
+  - TEST-1
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A37ad6ebf-499f-4de9-81da-99a5895c6316
+description: 'Found (DEV-346, 2026-11-11): running_job_for_ticket (src/cli/handlers/agent.rs, list_wrapper_processes) counts every lotar-agent-wrapper process on the machine. While another worktree''s suite runs a wrapper for its TEST-1 or OUTC-1, these tests fail with "has an active agent job (pid N)": dev279_cross_process_jobs_test::jobs_in_another_process_are_seen_guarded_and_cancelled, task_noop_update_test::cli_configured_reviewer_can_resolve_an_agent_reported_review, dev320_job_outcome_test::status_and_assignee_set_during_a_job_win_over_the_job_completed_rule. Failed on both the ci and local profiles in the same runs. Check: run npm run test:rust:agent in two worktrees at once. Done when wrapper processes from another tasks dir are not counted (e.g. match the wrapper''s tasks dir) and the three tests pass while another suite runs.'
+tags:
+- health
+custom_fields:
+  finding: test-isolation:wrapper-processes
+history:
+- at: 2026-11-12T03:40:58.142359+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-346","TEST-1"]}'
+- at: 2026-11-12T03:40:58.314500+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T03:40:58.833019+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T03:40:59.613464+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A37ad6ebf-499f-4de9-81da-99a5895c6316

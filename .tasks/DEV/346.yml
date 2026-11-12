@@ -5,7 +5,12 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T03:02:46.839936+00:00
-modified: 2026-11-12T03:08:26.800451+00:00
+modified: 2026-11-12T03:45:04.161394+00:00
+relationships:
+  related:
+  - DEV-349
+  - DEV-348
+  - TEST-1
 comments:
 - date: 2026-11-12T03:03:52.041576+00:00
   text: 'claude (DEV-346 agent job): measuring ci vs two dev-based candidates (line-tables-only debug, no debug) in worktree agent/DEV-346: cold build with warm sccache, edit-and-rebuild, target size, then full nextest runs. Machine load ~90 on 14 cores, so numbers are noisy.'
@@ -13,6 +18,30 @@ comments:
   text: 'claude (merge agent): not merged. Branch agent/DEV-346 has one commit, 79fc503, which only adds two unused profiles to Cargo.toml: [profile.agent] (inherits dev, debug = line-tables-only) and [profile.agentnodebug] (inherits dev, debug = false). It cannot conflict with main (based on 6dc0247, main''s head). But the ticket''s ''Done when'' list is unmet: no numbers for the profiles are in a comment, test:rust:agent still uses ci (scripts/rust-test-runner.mjs), and no reason for keeping ci is given. The fix agent''s thread ended mid-measurement and can''t be asked. Its cargo builds were still running in /Users/mallox/.t3/worktrees/lotar/agent-DEV-346-7eb694d121cbe8b7 (target/ci, load is high). Merging would put dead profiles on main and close the ticket as Done. Question: should the measuring and the switch be run again as a new fix job, or do you want the two profiles merged as they are and the rest tracked separately?'
 - date: 2026-11-12T03:07:09.564330+00:00
   text: 'claude (merge agent): correction to my last comment: the fix agent''s thread still exists (it had only ended its turn while builds ran), so it can be asked. I asked it to finish: record the measurements, switch test:rust:agent or say why ci stays, run lint/test/smoke, and amend 79fc503. Not handing this to mallox. It goes back to @merge as InProgress; nothing is merged yet.'
+- date: 2026-11-12T03:45:03.997122+00:00
+  text: |-
+    claude: Local agent test runs now use a new `agent` Cargo profile; CI and `npm test` keep `ci`. Commit b6abd48 on t3/c9798be3, not merged.
+
+    Changed:
+    - Cargo.toml: `[profile.agent]` inherits `dev`, `debug = "line-tables-only"`, `split-debuginfo = "unpacked"`. The fix agent's second profile `agentnodebug` is removed (see below).
+    - scripts/rust-test-runner.mjs: `--agent` (npm run test:rust:agent) passes `--cargo-profile agent`, also for the exclusion inventory. Runner tests updated (42/42 pass).
+    - .github/skills/testing-strategy/SKILL.md says that test:rust:agent builds with `agent` and `npm test` stays on `ci`.
+
+    Numbers, `cargo nextest run --cargo-profile <p> --no-run` from scratch with warm sccache. Wall time is not usable: the machine ran at load 40 to 230 (8 agents). CPU time (user+sys) is:
+
+    | Profile | Cold build CPU | Rebuild after touching src/lib.rs, CPU | target/<profile> |
+    |---|---|---|---|
+    | ci | 373 s (390 s in a second run) | 14 s | 1.4 G |
+    | agent | 102 s (107 s in a second run) | 14 s | 1.8 G |
+    | agentnodebug | 91 s | 18 s | 1.5 G |
+
+    So `agent` takes 27% of the `ci` CPU for a cold build (-73%) and the rebuild costs the same. `agentnodebug` saves 10% more cold CPU but rebuilds slower and drops backtraces, so it is removed. (On wall, 8 agents at once: ci 88 to 143 s, agent 97 to 152 s, because the machine was saturated either way.)
+
+    Full nextest run (1998 tests): ci 69 s (one clean run), agent 101 s in the final `npm run test:agent`. With the machine at load 40 to 200 the runs are not comparable on wall time: ci 136 s and 168 s, agent 116 s and 158 s. The suite is no slower at opt-level 0, so the comment in Cargo.toml holds, slow tests included. Nothing in the performance budget tests failed.
+
+    Flaky tests: under this load, full runs failed some tests with BOTH profiles, with the same families (agent jobs, codeowners, SSE): ci 12 and 3 failures, agent 2 and 8, all of them pass when run alone (the two agent-job tests, 5 of 5). One failure was "Ticket 'TEST-1' has an active agent job" from the machine-wide process scan. That is DEV-349 and DEV-348, not a profile effect. I filed nothing new.
+
+    Checks run on the final tree: `npm run lint:agent` pass; `npm run test:agent` pass (Rust 1998/1998, Vitest 1441, release and hook tests); `npm run smoke` pass (377 tests). `npm test` (the `ci` profile) itself was not run on the final tree, only the `test:agent` variant, which the testing-strategy skill accepts for the gate. CI workflow files are unchanged.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5a73e8a5-ea85-4fa2-b0c8-4bdd19af14f3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A16de8fb3-cc50-4a19-850d-6ebf170216ae
@@ -105,3 +134,19 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-12T03:40:58.139045+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-349"]}'
+- at: 2026-11-12T03:45:03.997122+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T03:45:04.161394+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-349"]}'
+    new: '{"related":["DEV-349","DEV-348","TEST-1"]}'
