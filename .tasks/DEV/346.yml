@@ -1,16 +1,17 @@
 title: Lighter Rust profile for local agent test builds
-status: Done
+status: InProgress
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T03:02:46.839936+00:00
-modified: 2026-11-12T03:45:04.161394+00:00
+modified: 2026-11-12T03:49:37.768192+00:00
 relationships:
   related:
   - DEV-349
   - DEV-348
   - TEST-1
+  - DEV-345
 comments:
 - date: 2026-11-12T03:03:52.041576+00:00
   text: 'claude (DEV-346 agent job): measuring ci vs two dev-based candidates (line-tables-only debug, no debug) in worktree agent/DEV-346: cold build with warm sccache, edit-and-rebuild, target size, then full nextest runs. Machine load ~90 on 14 cores, so numbers are noisy.'
@@ -42,6 +43,26 @@ comments:
     Flaky tests: under this load, full runs failed some tests with BOTH profiles, with the same families (agent jobs, codeowners, SSE): ci 12 and 3 failures, agent 2 and 8, all of them pass when run alone (the two agent-job tests, 5 of 5). One failure was "Ticket 'TEST-1' has an active agent job" from the machine-wide process scan. That is DEV-349 and DEV-348, not a profile effect. I filed nothing new.
 
     Checks run on the final tree: `npm run lint:agent` pass; `npm run test:agent` pass (Rust 1998/1998, Vitest 1441, release and hook tests); `npm run smoke` pass (377 tests). `npm test` (the `ci` profile) itself was not run on the final tree, only the `test:agent` variant, which the testing-strategy skill accepts for the gate. CI workflow files are unchanged.
+- date: 2026-11-12T03:49:37.657583+00:00
+  text: |-
+    claude (DEV-346 agent job): Measurements, worktree agent/DEV-346, 14 cores, other sessions running, load 10 to 200 (noisy). sccache warm for dependencies, target dir wiped for each cold build. Edit-and-rebuild = append a comment to src/lib.rs.
+
+    | profile | cold build wall / CPU | rebuild | target size | full nextest |
+    |---|---|---|---|---|
+    | ci (opt 1) | 88 s / 373 s | 13 s | 1.4 GB | 69 s (load 55); 142 s and 153 s (load 17-24) |
+    | dev + line-tables-only debug | 97 s / 102 s | 19 s | 1.8 GB | 51 s, stopped early on DEV-348 flake |
+    | dev, no debug | 88 s / 91 s | 33 s | 1.5 GB | 100 s, 1 fail: stderr-burst test 0.7 s -> 15.5 s, past its 15 s deadline |
+    | local: dev, no debug, dependencies opt 2 | 127 s / 148 s (load 94-123) | 9 s | 1.4 GB | 118 s and 184 s (alternated with ci runs at load 10-24) |
+
+    Per-test times: with lotar AND its dependencies at opt 0, a few CPU-heavy tests got much slower (worker_persists_trailing_stderr 22x, cached thumbnails 9x, git overrides 8x). Keeping dependencies at opt-level 2 removes that: those tests now run at about ci speed (1.2 s vs 1.4 s, 0.9 s vs 1.1 s, 0.7 s vs 1.0 s). Summed test time over the alternated pairs (fastest of 2 per test): ci 1386 s, local 1206 s. So opt-level barely matters for lotar's own code but does matter for dependencies.
+
+    Result: local needs about 60% less CPU per cold build than ci (148 s vs 373 s), the same target size and an equally fast rebuild. Wall time per build doesn't drop at this load; the gain is the CPU shared by parallel agents.
+
+    Changed: new Cargo profile 'local' (inherits dev, debug = false, dependencies opt-level 2). npm run test:rust (so npm test) and test:rust:agent use it. CI calls nextest with --cargo-profile ci directly, so CI, releases and test:rust:perf are unchanged. Removed the candidate profiles. Runner tests, docs/developers/testing.md and the testing-strategy skill updated.
+
+    Unrelated failures seen on both profiles: DEV-348 (shipped_agent_reviewed flake, 2 of 6 isolated runs failed on each profile); EAGAIN socket errors in web_api tests at load 120+; and other worktrees' lotar-agent-wrapper processes counted as active jobs, now filed as DEV-349.
+
+    Commit 44c51976ed30e753f890b61f8f1d4044c806ea5e (signed, amended from 79fc503). Checks: npm run lint:agent passed; npm test passed (1998 Rust, 1 flaky: DEV-348 passed on retry; 1441 UI; release and hook tests); npm run smoke passed (377). Guidance: no durable finding.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5a73e8a5-ea85-4fa2-b0c8-4bdd19af14f3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A16de8fb3-cc50-4a19-850d-6ebf170216ae
@@ -150,3 +171,19 @@ history:
   - field: relationships
     old: '{"related":["DEV-349"]}'
     new: '{"related":["DEV-349","DEV-348","TEST-1"]}'
+- at: 2026-11-12T03:47:49.202829+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-349","DEV-348","TEST-1"]}'
+    new: '{"related":["DEV-349","DEV-348","TEST-1","DEV-345"]}'
+- at: 2026-11-12T03:49:37.657583+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T03:49:37.768192+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Done
+    new: InProgress

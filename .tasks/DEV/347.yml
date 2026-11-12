@@ -3,15 +3,20 @@ status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T03:07:58.357216+00:00
-modified: 2026-11-12T03:43:14.780622+00:00
+modified: 2026-11-12T03:50:06.110513+00:00
 relationships:
   related:
   - DEV-343
   - DEV-350
+  - DEV-351
+comments:
+- date: 2026-11-12T03:49:55.770521+00:00
+  text: 'claude: Fixed in 25d4385 on agent/DEV-347 (signed). Check confirmed the problem first: a project from agent-pipeline had issue_done_states null and HelpNeeded last, so it was inferred as done. Changes: both templates set issue.done_states: [Done]; lotar init now copies a template''s done_states along with its states (it copied only states before, so a template''s done_states never reached the project), except when --states overrides them; docs/help/templates.md says so. Test: cli_init_behavior_test agent_templates_produce_a_project_their_automation_can_drive checks that config show reports issue_done_states [Done] for both templates. With HelpNeeded no longer done, shipped_agent_reviewed_template_handles_hand_back_failure_review_and_merge failed about 1 in 5: it reassigned right after the hand-back job reported completed, while that job was still ending, and the assignment was lost as its outcome. The test now waits for job_settled (0 failures in 30 runs); the product race is filed as DEV-350. Checks: npm run lint, npm test (1998 Rust + 1441 frontend pass; one unrelated flaky retry, filed as DEV-351), npm run smoke (377 pass).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A625e1a2b-f4c8-455d-af86-5352809905c4
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6bd556a0-0103-42c8-a8ff-e17391c8c841
 description: 'Found by DEV-343 (claude, 2026-11-11): agent-reviewed.yml and agent-pipeline.yml list HelpNeeded last under issue.states and set no issue.done_states, so the legacy inference (last state is done, src/services/completion.rs infer_done_statuses) counts HelpNeeded as done. Effects: worktree cleanup at Done also runs at HelpNeeded (safe: clean and landed only, and the next job recreates the worktree), and metrics and dependency checks treat handed-back tickets as finished. Shown by tests/agent_automation_integration_test.rs shipped_agent_reviewed_template_handles_hand_back_failure_review_and_merge, where DEV-343''s Done cleanup removed the worktree at HelpNeeded. Check: a project from either template counts only Done as done. Done when both templates set issue.done_states: [Done] (or order the states so Done is last) and a test checks the effective done states of each template.'
 tags:
 - health
@@ -46,3 +51,24 @@ history:
   - field: relationships
     old: '{"related":["DEV-343"]}'
     new: '{"related":["DEV-343","DEV-350"]}'
+- at: 2026-11-12T03:49:43.023672+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-343","DEV-350"]}'
+    new: '{"related":["DEV-343","DEV-350","DEV-351"]}'
+- at: 2026-11-12T03:49:55.770521+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T03:50:05.196666+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T03:50:06.110513+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6bd556a0-0103-42c8-a8ff-e17391c8c841

@@ -1,0 +1,41 @@
+title: 'Flaky smoke: relationships edits categories atomically at 1440px'
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T03:58:07.244288+00:00
+modified: 2026-11-12T03:58:10.137271+00:00
+relationships:
+  related:
+  - DEV-350
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adc5b1f6d-bcaf-4cd8-a823-41a8dcb723c6
+description: 'Found by DEV-350 (claude, 2026-11-11): in a full npm run test:smoke:agent run, smoke/tests/ui.relationships.smoke.spec.ts ''edits categories atomically and preserves graph navigation at 1440px'' failed at line 208 (expect.poll on the dependency edge list textContent did not resolve in time); the spec passed twice when run alone. Check: npm run test:smoke:agent passes this test repeatedly under full-suite load. Done when the wait follows the state the UI actually reaches, not a timeout race.'
+tags:
+- health
+custom_fields:
+  finding: flaky-test:ui.relationships.smoke.spec.ts edits categories atomically
+history:
+- at: 2026-11-12T03:58:07.541687+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-350"]}'
+- at: 2026-11-12T03:58:07.975914+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T03:58:08.415211+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T03:58:10.137271+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adc5b1f6d-bcaf-4cd8-a823-41a8dcb723c6

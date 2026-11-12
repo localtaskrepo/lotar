@@ -5,11 +5,12 @@ type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-12T03:37:59.551010+00:00
-modified: 2026-11-12T03:45:04.161753+00:00
+modified: 2026-11-12T03:57:11.270643+00:00
 relationships:
   related:
   - DEV-343
   - DEV-346
+  - DEV-349
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b9e43f1-7f4f-48c8-b1ee-38b482fecc07
 description: 'Found while merging DEV-343 (2026-11-11). tests/agent_automation_integration_test.rs:2465 ''runner failure should tag agent-failed'' fails about 1 run in 8, also on main without DEV-343 (checked at 2f4184a). Cause: after the hand-back the ticket is already HelpNeeded/Agent Tests, so wait_for_task_state returns at once, before the failed @test run has added the agent-failed tag. Check: cargo nextest run -E ''test(shipped_agent_reviewed_template_handles_hand_back_failure_review_and_merge)'' in a loop. Done: the wait includes the tag, loop of 30 passes.'
@@ -46,3 +47,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-343"]}'
     new: '{"related":["DEV-343","DEV-346"]}'
+- at: 2026-11-12T03:57:11.270643+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-343","DEV-346"]}'
+    new: '{"related":["DEV-343","DEV-346","DEV-349"]}'

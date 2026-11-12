@@ -3,15 +3,20 @@ status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T03:40:57.903870+00:00
-modified: 2026-11-12T03:40:59.613464+00:00
+modified: 2026-11-12T03:57:25.230893+00:00
 relationships:
   related:
   - DEV-346
   - TEST-1
+  - DEV-348
+comments:
+- date: 2026-11-12T03:57:10.900916+00:00
+  text: 'claude: Fixed in b3323aa on agent/DEV-349. lotar now passes --tasks-dir to lotar-agent-wrapper (the wrapper accepts and ignores it). running_job_for_ticket and list-running count a wrapper only when its --tasks-dir matches this tasks dir (canonical paths). Wrappers from older builds with no --tasks-dir still count, so their real jobs stay guarded. Updated docs/help/agent.md and docs/developers/agent-automation-tracker.md. Check: with foreign wrappers for TEST-1 and OUTC-1 running (--tasks-dir /elsewhere/.tasks), the three named tests pass. With a wrapper that has no --tasks-dir, two of them still fail with ''has an active agent job'', which reproduces the bug. New unit test: wrappers_of_another_tasks_dir_are_not_counted. lint, smoke (377/377), test:ui, test:release and test:hooks pass. test:rust: 1966/1967 passed; the one failure was shipped_agent_reviewed_template_handles_hand_back_failure_review_and_merge, the known flake tracked in DEV-348, which passed 3/3 on rerun. I didn''t run two full test:rust:agent suites in separate worktrees at once; the foreign-wrapper run above stands in for that.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A37ad6ebf-499f-4de9-81da-99a5895c6316
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afc980a0b-ca48-4141-83d1-7b3ee7a36e92
 description: 'Found (DEV-346, 2026-11-11): running_job_for_ticket (src/cli/handlers/agent.rs, list_wrapper_processes) counts every lotar-agent-wrapper process on the machine. While another worktree''s suite runs a wrapper for its TEST-1 or OUTC-1, these tests fail with "has an active agent job (pid N)": dev279_cross_process_jobs_test::jobs_in_another_process_are_seen_guarded_and_cancelled, task_noop_update_test::cli_configured_reviewer_can_resolve_an_agent_reported_review, dev320_job_outcome_test::status_and_assignee_set_during_a_job_win_over_the_job_completed_rule. Failed on both the ci and local profiles in the same runs. Check: run npm run test:rust:agent in two worktrees at once. Done when wrapper processes from another tasks dir are not counted (e.g. match the wrapper''s tasks dir) and the three tests pass while another suite runs.'
 tags:
 - health
@@ -40,3 +45,24 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A37ad6ebf-499f-4de9-81da-99a5895c6316
+- at: 2026-11-12T03:57:10.900916+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T03:57:11.270980+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-346","TEST-1"]}'
+    new: '{"related":["DEV-346","TEST-1","DEV-348"]}'
+- at: 2026-11-12T03:57:23.575843+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T03:57:25.230893+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afc980a0b-ca48-4141-83d1-7b3ee7a36e92

@@ -1,0 +1,41 @@
+title: 'Flaky: cli_cleanup_accepts_clean_merged_worktree_with_project_done_status'
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T03:49:42.921375+00:00
+modified: 2026-11-12T03:49:44.129513+00:00
+relationships:
+  related:
+  - DEV-347
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2c7cfedf-e726-4214-913b-e67414ccf5a4
+description: 'Found by DEV-347 (claude, 2026-11-11): tests/agent_safety_test.rs cli_cleanup_accepts_clean_merged_worktree_with_project_done_status failed its first try and passed on retry (nextest FLAKY 2/3) in a full npm test run on agent/DEV-347; it passed 15 of 15 runs on its own, so it fails only under parallel load. The test writes its own SAFE config, so DEV-347''s template change does not affect it. The low-noise test output kept no failure message. Check: run it 30 times under load (cargo nextest run --retries 0 next to the full suite) with no failure. Done when the cause is found and fixed, with the test passing without retries.'
+tags:
+- health
+custom_fields:
+  finding: flaky-test:cli_cleanup_accepts_clean_merged_worktree_with_project_done_status
+history:
+- at: 2026-11-12T03:49:43.024378+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-347"]}'
+- at: 2026-11-12T03:49:43.140553+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T03:49:43.333032+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T03:49:44.129513+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2c7cfedf-e726-4214-913b-e67414ccf5a4
