@@ -1,0 +1,81 @@
+title: 'Task panel: the assignee select offers agent profiles without @, so choosing one starts nothing'
+status: Done
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T00:44:43.671+00:00
+modified: 2026-11-12T00:52:23.172485+00:00
+relationships:
+  related:
+  - DEV-330
+comments:
+- date: 2026-11-12T00:52:13.531289+00:00
+  text: 'Fixed in view/composables/useTaskPanelOwnership.ts (uncommitted). preloadPeople now also loads api.listAgentProfiles(project) and offers each profile as @<name>. A task assignee or reporter @<profile> keeps its @; other names still drop it as before (@me unchanged). If the profiles fail to load, the list shows people only. Filter bar needs no change: useFilterOptions takes the stored assignee values as they are. Tests: view/__tests__/useTaskPanelOwnership.spec.ts (profiles offered as @fix/@review, no plain fix from a @fix ticket, @fix selection stays in the select, profiles failing to load), plus a smoke test in smoke/tests/ui.agent-jobs.smoke.spec.ts: picking @mock in the panel queues a job. Checks: npm run lint passes; all 1441 frontend tests pass; the full smoke run passes 376 of 377. Two failures come from other sessions'' uncommitted work, not this change: Rust tests config::fields::tests::{alias_paths_match_legacy_table_with_per_field_order, global_settable_fields_match_legacy_list_in_order} (src/config/fields.rs), and the smoke test harness.server.smoke.spec.ts:340, which expects dev334.'
+references:
+- code: view/composables/useTaskPanelOwnership.ts#50-61
+- code: view/composables/useTaskPanelOwnership.ts#211-245
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af275dead-96e3-430d-853c-b44c300c1189
+description: |-
+  In the task panel, the assignee select offers agent profiles without their `@`. Choosing `fix` stores the assignee `fix`, which is not an agent profile, so no agent starts. Typing `@fix` into the custom field works. Reported by the owner on 2026-11-11 on DEV-330: the history shows `fix` at 00:40:46, then `@fix` at 00:41:31, and only the second started a job.
+
+  ## Cause
+
+  `view/composables/useTaskPanelOwnership.ts` builds the list of known people and strips a leading `@` from every name: from existing tasks' assignees and reporters in `preloadPeople`, and from configured members and defaults in `sanitizedConfiguredMembers` and `defaultOwnershipCandidates`. An earlier ticket assigned to `@fix` therefore appears as plain `fix`. Configured agent profiles are not offered at all; they only show up because some ticket already had one.
+
+  ## Fix
+
+  - Keep `@` on agent profile names: offer the configured profiles (`api.listAgentProfiles(project)`) as `@<name>`, and keep a stored `@<profile>` assignee as it is.
+  - Leave the existing user handling as it is (`@me`, members written with `@`).
+  - Check whether the filter bar's assignee options need the same change.
+
+  ## Done when
+
+  - [ ] The assignee select lists each configured agent profile as `@<name>`, and choosing one starts its job, as `lotar assignee <id> @fix` does.
+  - [ ] No plain `fix` option comes from a ticket assigned to `@fix`.
+  - [ ] A unit test in `view/__tests__` covers the options, plus a smoke test that choosing a profile queues a job, if the smoke suite can run agents.
+tags:
+- web-ui
+history:
+- at: 2026-11-12T00:44:44.118246+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-330"]}'
+- at: 2026-11-12T00:44:44.432401+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: code:view/composables/useTaskPanelOwnership.ts#50-61
+- at: 2026-11-12T00:44:44.496887+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: code:view/composables/useTaskPanelOwnership.ts#211-245
+- at: 2026-11-12T00:44:58.097934+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T00:44:58.489185+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T00:44:59.139500+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af275dead-96e3-430d-853c-b44c300c1189
+- at: 2026-11-12T00:52:13.531289+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-12T00:52:23.172485+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

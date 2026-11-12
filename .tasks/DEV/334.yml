@@ -1,14 +1,20 @@
 title: npm run smoke:ui tests the embedded UI, not the fresh build
-status: InProgress
+status: Done
 priority: Medium
 type: Feature
 reporter: mallox
 assignee: '@fix'
 created: 2026-11-12T00:50:42.239349+00:00
-modified: 2026-11-12T00:50:43.976279+00:00
+modified: 2026-11-12T01:01:45.213830+00:00
 relationships:
   related:
   - DEV-330
+  - DEV-331
+comments:
+- date: 2026-11-12T00:58:28.252338+00:00
+  text: 'claude: Fixed. startLotarServer (smoke/helpers/server.ts) now defaults LOTAR_WEB_UI_EMBEDDED to 1 only when the environment doesn''t set it, so npm run smoke:ui (LOTAR_WEB_UI_EMBEDDED=0, LOTAR_WEB_UI_PATH=target/web) serves the fresh build. I removed the workaround in ui.panel-safety.smoke.spec.ts that passed these variables in by hand. New harness test in harness.server.smoke.spec.ts: when the environment sets LOTAR_WEB_UI_PATH, the server serves that index.html. It failed before the fix and passes after. Checks: lint:agent clean, test:agent passed (1995 Rust, 1441 UI), smoke passed (377), smoke:ui passed (377); its run includes the new test. Commit 55101a4, not pushed: main also holds another session''s unpushed commit 03def5d (STD-33, 4 minutes old), and pushing would publish it before that session is done. Push both when that commit is final.'
+- date: 2026-11-12T01:01:45.104608+00:00
+  text: 'claude: Pushed to origin/main after the STD-33 thread finished: 8a6c402 (DEV-331), 03def5d and e8e61df (STD-33), 55101a4 (DEV-334). The STD-33 session briefly amended 55101a4 and then restored it; the hash and content are the originals.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9644a94d-c67d-479d-9315-f2a7fcc65621
 description: 'Found while working on DEV-330: `npm run smoke:ui` builds target/web and sets LOTAR_WEB_UI_EMBEDDED=0 and LOTAR_WEB_UI_PATH, but `startLotarServer` in smoke/helpers/server.ts sets LOTAR_WEB_UI_EMBEDDED=1 after copying the environment, so the server keeps serving the UI embedded in target/smoke/lotar. A UI change tested with smoke:ui runs against the old bundle. Check: run smoke:ui after a UI edit and compare the page''s script src with target/web/assets. Done when smoke:ui serves target/web (let the env win, or drop the script).'
@@ -39,3 +45,23 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9644a94d-c67d-479d-9315-f2a7fcc65621
+- at: 2026-11-12T00:58:28.252338+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T00:58:38.422822+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-11-12T01:01:45.104608+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T01:01:45.213830+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-330"]}'
+    new: '{"related":["DEV-330","DEV-331"]}'

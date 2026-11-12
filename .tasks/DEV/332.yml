@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-12T00:38:22.702869+00:00
-modified: 2026-11-12T01:20:10.241946+00:00
+modified: 2026-11-12T01:21:05.531231+00:00
 relationships:
   related:
   - DEV-1
@@ -15,6 +15,8 @@ comments:
   text: 'Implemented. New global setting server.public_url (for example server: {public_url: https://lotar.pyxzl.net} in .tasks/config.yml, or lotar config set server.public_url <url> --global). It must be http(s) with no ? or #; a trailing / is dropped. When it is set, TaskDTO.url = <public_url>/task/<ID>. The CLI JSON of show, add and list, REST and MCP all carry it. lotar show prints the link as the second header line, and lotar add prints ''  Link: <url>'' under ''Created task''. Text list output is unchanged, and with the setting unset nothing changes. config show and config validate know the field. Contract: src/api_types.rs, view/api/types.ts, docs/openapi.json. Docs: config-reference, task (show), add, task-model, mcp-tools, api-quick-reference. Tests: tests/dev332_task_url_test.rs (CLI text and JSON for show, add and list; unset case; config set check and save; REST /api/tasks/get; MCP task/get and task/list). Checks: cargo nextest passed 1995/1995. Clippy, cargo fmt, prettier and eslint are clean. vitest passed 1441/1441 on rerun (1 failure in the first run did not repeat). test:release 47/47, test:hooks 7/7, smoke 377/377. Manual run with target/debug/lotar: show DEV-1 prints https://lotar.pyxzl.net/task/DEV-1, and --format json show has url. Not clean, other session''s work: vue-tsc and oxlint report errors in view/__tests__/useTaskPanelOwnership.spec.ts and view/composables/useTaskPanelOwnership.ts, which are another session''s uncommitted changes and not part of this ticket. Not committed (the job runs in the main checkout and leaves changes uncommitted), not released (waits for the owner''s OK). Next, in standards: set server.public_url in each served repo and shorten the global link line.'
 - date: 2026-11-12T01:20:09.955979+00:00
   text: 'claude: Committed and pushed to main (commit in the next comment). Question for mallox: release a lotar version with DEV-332 and whatever else is on main? Once it''s installed, standards (STD-34) sets server.public_url in the served repos and shortens its global link line.'
+- date: 2026-11-12T01:21:05.531231+00:00
+  text: 'claude: Commit e699a36 is pushed to main. Checks on the change: cargo nextest 1995/1995, vitest 1441/1441, smoke 377/377, test:release and test:hooks passed; clippy and fmt clean. Waiting for mallox: release?'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4f5de1ad-c69e-4374-88e5-ee0248e05083
 description: |-
@@ -79,3 +81,7 @@ history:
   - field: assignee
     old: claude
     new: mallox
+- at: 2026-11-12T01:21:05.531231+00:00
+  actor: claude
+  changes:
+  - field: comment_added

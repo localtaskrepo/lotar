@@ -1,16 +1,23 @@
 title: Smoke tests fail when LOTAR_DEFAULT_REPORTER is set
-status: InProgress
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T01:33:17.041938+00:00
-modified: 2026-11-12T01:33:17.956029+00:00
+modified: 2026-11-12T01:43:01.054677+00:00
 relationships:
   related:
   - DEV-336
+  - DEV-339
+comments:
+- date: 2026-11-12T01:42:36.965341+00:00
+  text: 'claude: Fixed. smoke/helpers/setup.ts (vitest setupFiles) now deletes every env var listed in ENV_OVERRIDE_DEFINITIONS (read from src/config/env_overrides.rs, so the list stays in sync) before any lotar spawns. LOTAR_WEB_UI_PATH is kept because npm run smoke:ui sets it itself. Check before: 3 failed. After: LOTAR_DEFAULT_REPORTER=claude npm run smoke passes, 102/102 files, 377 tests. npm run lint is clean. npm test fails one Rust lib test because the lib unit tests read ~/.lotar, which is unrelated to this change; with LOTAR_IGNORE_HOME_CONFIG=1 all 1995 pass. Filed as DEV-339. Commit 8d3b672, pushed to origin/main (repos.json push: true).'
+- date: 2026-11-12T01:42:58.997312+00:00
+  text: 'claude: Nothing to merge. Branch agent/DEV-338 is at 8d3b672, which main already contains (the fix commit was made and pushed on main earlier). No checks run, nothing pushed.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6533974e-16d9-4db2-b013-dacb3a1cf1aa
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A09499276-1202-4d7c-b4c2-f6316922350e
 description: 'Found (DEV-336, 2026-11-11): with LOTAR_DEFAULT_REPORTER=claude set, npm run smoke fails in cli.config-agent.smoke.spec.ts (config explain shows field sources: missing explain@example.com), mcp.high-value.smoke.spec.ts (resolves whoami with explain: ''claude'' instead of me@example.com) and ui.agent-jobs.smoke.spec.ts (advances the reviewed template workflow live). env -u LOTAR_DEFAULT_REPORTER npm run smoke passes. The Rust tests now clear config env overrides (DEV-336); the smoke harness doesn''t. Check: LOTAR_DEFAULT_REPORTER=claude npm run smoke. Done: the smoke harness drops the caller''s LOTAR config overrides (config/env_overrides.rs ENV_OVERRIDE_DEFINITIONS) before spawning lotar, so smoke passes with them set.'
 tags:
 - health
@@ -39,3 +46,34 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6533974e-16d9-4db2-b013-dacb3a1cf1aa
+- at: 2026-11-12T01:41:44.218965+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-336"]}'
+    new: '{"related":["DEV-336","DEV-339"]}'
+- at: 2026-11-12T01:42:36.965341+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T01:42:46.309440+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T01:42:47.364906+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A09499276-1202-4d7c-b4c2-f6316922350e
+- at: 2026-11-12T01:42:58.997312+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T01:43:01.054677+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

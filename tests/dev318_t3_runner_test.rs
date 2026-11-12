@@ -142,6 +142,8 @@ fn home_profile_and_repo_rule_run_a_t3_thread_and_set_done() {
     assert!(prompt.contains(&id), "{prompt}");
     let tasks_dir = fs::canonicalize(&fixtures.tasks_root).unwrap();
     assert!(prompt.contains(&format!("--tasks-dir \"{}\"", tasks_dir.display())), "{prompt}");
+    // `--wait` returns at the turn's end, not when awaited background work ends (DEV-335).
+    assert!(prompt.contains("The job ends when your turn ends"), "{prompt}");
 
     let storage = fixtures.create_storage();
     let task = TaskService::get(&storage, &id, None).unwrap();

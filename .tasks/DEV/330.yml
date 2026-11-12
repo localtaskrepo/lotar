@@ -1,16 +1,23 @@
 title: 'Phone: scrolling over a task description opens the editor'
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
+assignee: '@fix'
 created: 2026-11-12T00:30:28.431249+00:00
-modified: 2026-11-12T00:30:33.731369+00:00
+modified: 2026-11-12T00:50:59.267678+00:00
 relationships:
   related:
   - DEV-188
+  - DEV-333
+  - DEV-334
+comments:
+- date: 2026-11-12T00:50:48.923681+00:00
+  text: 'Fixed: removed the pointerdown handler on the description display in view/components/TaskPanel.vue; click, Enter and Space still open the editor. New smoke tests in smoke/tests/ui.description-preview.smoke.spec.ts: a real CDP touch drag at 390 px (hasTouch, isMobile) scrolls the panel and stays in display mode, then a tap opens the editor with the textarea focused; Enter and Space each open it too. withPage takes browser context options for this (smoke/helpers/ui.ts). The drag test failed against the old bundle and passes with the fix; the 1280 px click and DEV-188 tests still pass. Checks: full smoke suite 376 passed, frontend unit tests 1441 passed, oxlint/eslint/prettier/smoke tsc clean on my files. Not green, from other sessions'' uncommitted work: vue-tsc fails in view/__tests__/useTaskPanelOwnership.spec.ts (AgentProfileInfo.permissions), and Rust tests fail in config::fields::tests (src/config/fields.rs). Filed DEV-334: npm run smoke:ui still serves the embedded UI. Changes are uncommitted.'
 references:
 - code: view/components/TaskPanel.vue#195-204
 - file: smoke/tests/ui.description-preview.smoke.spec.ts
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A83071839-2d9f-44cc-aa8d-0780ad76e995
 description: |-
   On a phone, trying to scroll through a task's description opens the description editor. A finger that lands on the description to scroll the panel switches it into edit mode, and the keyboard comes up.
 
@@ -59,3 +66,47 @@ history:
   changes:
   - field: reference_added
     new: file:smoke/tests/ui.description-preview.smoke.spec.ts
+- at: 2026-11-12T00:40:46.030754+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    new: fix
+- at: 2026-11-12T00:41:31.941862+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: fix
+    new: '@fix'
+- at: 2026-11-12T00:41:32.370838+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T00:41:36.394683+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A83071839-2d9f-44cc-aa8d-0780ad76e995
+- at: 2026-11-12T00:44:44.117234+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-188"]}'
+    new: '{"related":["DEV-188","DEV-333"]}'
+- at: 2026-11-12T00:50:42.415359+00:00
+  actor: mallox
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-188","DEV-333"]}'
+    new: '{"related":["DEV-188","DEV-333","DEV-334"]}'
+- at: 2026-11-12T00:50:48.923681+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-12T00:50:59.267678+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

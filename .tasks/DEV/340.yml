@@ -1,0 +1,40 @@
+title: 'Job outcome: setting the assignee back to its current value doesn''t undo a deferred change'
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T01:43:44.864229+00:00
+modified: 2026-11-12T01:43:46.350626+00:00
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acb9d8964-080c-46aa-accf-527e61b00ece
+description: |-
+  During a job, an assignee change is recorded as the job's outcome, and changing it back can't undo that. Found in standards STD-37 (2026-11-11): the fix agent ran `lotar assignee STD-37 claude` by mistake and then `lotar assignee STD-37 @fix`. The second command recorded nothing, because `@fix` is the value the ticket already has ("A change to the value the ticket already has records nothing", docs/help/agent.md). So the job ended with assignee claude, and the `job_completed` rule's `set.assignee: "@merge"` never ran.
+
+  ## Wanted
+
+  - A status or assignee change back to the ticket's current value during a job clears that field's recorded outcome, so the job's own rules decide again.
+  - The command says so (for example `STD-37: deferred assignee cleared; the job's rules decide when job-… ends`); JSON, REST and MCP report it as with `deferred`.
+  - `lotar assignee <ID> --clear` keeps its meaning (records a cleared assignee).
+
+  ## Done when
+
+  - [ ] A test: set another assignee during a job, set the current one back, end the job: the `job_completed` rule's assignee applies.
+  - [ ] docs/help/agent.md (Status and assignee during a job) describes it.
+history:
+- at: 2026-11-12T01:43:44.967663+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T01:43:45.240049+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T01:43:46.350626+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acb9d8964-080c-46aa-accf-527e61b00ece

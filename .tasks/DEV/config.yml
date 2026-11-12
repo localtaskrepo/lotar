@@ -3,6 +3,7 @@ project:
 members:
 - claude
 - codex
+- fix
 - mallox
 issue:
   states:

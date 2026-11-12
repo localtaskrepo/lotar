@@ -5,7 +5,10 @@ type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-12T00:37:12.375485+00:00
-modified: 2026-11-12T00:37:45.827598+00:00
+modified: 2026-11-12T01:01:45.213621+00:00
+relationships:
+  related:
+  - DEV-334
 comments:
 - date: 2026-11-12T00:37:45.787400+00:00
   text: 'claude: both sections written; links checked by path, commands checked against `lotar --help` (`stats tags`, `task reference add`, `--description`). Docs only, no build needed (AGENTS.md).'
@@ -48,3 +51,9 @@ history:
     new: Done
   - field: assignee
     new: mallox
+- at: 2026-11-12T01:01:45.213621+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-334"]}'

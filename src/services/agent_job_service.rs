@@ -273,7 +273,7 @@ impl AgentJobService {
         let lotar_mcp = profile.mcp.as_ref().is_some_and(|mcp| mcp.lotar) && crate::services::agent_runner::supports_lotar_mcp(runner_kind);
         let mut notes = job_notes(tasks_dir, &config, &ticket_id, is_merge_job, read_only, lotar_mcp);
         if runner_kind == AgentRunnerKind::T3 {
-            notes.push_str(&t3_tasks_dir_note(tasks_dir));
+            notes.push_str(&t3_thread_notes(tasks_dir));
         }
         let prompt = build_prompt(&task, &user_prompt, context.as_ref(), instructions.as_deref(), Some(&notes));
 
@@ -1166,11 +1166,15 @@ impl T3Cli {
 /// A T3 Code thread runs on the T3 server and doesn't get the job's
 /// environment (`LOTAR_TASKS_DIR`), so its lotar commands name the tasks
 /// folder; in a worktree they would otherwise change the worktree's copy.
-fn t3_tasks_dir_note(tasks_dir: &std::path::Path) -> String {
+/// `t3 thread start --wait` returns when the turn ends, even while
+/// `t3_background_wait` keeps the thread working (T3 Code 0.1.9, DEV-335).
+fn t3_thread_notes(tasks_dir: &std::path::Path) -> String {
     let dir = fs::canonicalize(tasks_dir).unwrap_or_else(|_| tasks_dir.to_path_buf());
     format!(
         "- This job runs as a T3 Code thread, which doesn't get LoTaR's environment. Add `--tasks-dir \"{}\"` \
-to every lotar command, so it changes this ticket in the main checkout and not a copy in a worktree.\n",
+to every lotar command, so it changes this ticket in the main checkout and not a copy in a worktree.\n\
+- The job ends when your turn ends, even while `t3_background_wait` keeps the thread working. Run tests and other \
+checks in the foreground and finish all work before your final message; don't end your turn to wait for background work.\n",
         dir.display()
     )
 }

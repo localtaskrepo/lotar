@@ -1,0 +1,7 @@
+title: Lotar Meta page that uses the existing interface but feeds it from multiple instances
+status: Todo
+priority: Medium
+type: Feature
+reporter: mallox
+created: 2026-11-12T01:26:11.679656+00:00
+description: Allow a meta view on all repos that combines all known tickets across all running repos and servers, so that a user can see directly everything that needs their attention. This doesn't have to be built into lotar, but could be a new tool like autospec, that we build as optional add-on for users that have many instances running (like we do). Ideally that would reuse the existing web ui to minimize having to reimplement features from there.
