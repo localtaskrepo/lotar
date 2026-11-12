@@ -19,6 +19,8 @@ config:
       - Merging           # Agent merging into main
       - Done              # Complete
       - HelpNeeded        # Waiting for a person
+    done_states:
+      - Done              # Only Done counts as finished; HelpNeeded is a hand-back
     types:
       - Feature
       - Bug

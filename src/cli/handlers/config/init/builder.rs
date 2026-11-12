@@ -92,6 +92,7 @@ pub fn build_global_config(base: Option<GlobalConfig>, workflow: WorkflowPreset,
 pub fn apply_agent_template_project(cfg: &mut ProjectConfig, template: ProjectConfig, o: &InitOverrides) {
     if o.states.is_none() && template.issue_states.is_some() {
         cfg.issue_states = template.issue_states;
+        cfg.issue_done_states = template.issue_done_states;
     }
     if o.types.is_none() && template.issue_types.is_some() {
         cfg.issue_types = template.issue_types;
@@ -114,6 +115,7 @@ pub fn apply_agent_template_project(cfg: &mut ProjectConfig, template: ProjectCo
 pub fn apply_agent_template_global(cfg: &mut GlobalConfig, template: GlobalConfig, o: &InitOverrides) {
     if o.states.is_none() {
         cfg.issue_states = template.issue_states;
+        cfg.issue_done_states = template.issue_done_states;
     }
     if o.types.is_none() {
         cfg.issue_types = template.issue_types;

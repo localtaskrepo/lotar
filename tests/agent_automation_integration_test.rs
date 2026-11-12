@@ -2457,6 +2457,13 @@ exit 0
         let handed_back = wait_for_task_state(&storage, &created.id, "HelpNeeded", Some("Agent Tests"), 6000).expect("agent hand-back should stick");
         assert!(handed_back.comments.iter().any(|c| c.text.contains("Need a decision")));
         assert!(!handed_back.tags.contains(&"agent-failed".to_string()));
+        // The agent's own hand-back applies while its job is still ending; an
+        // assignment before the job settles would be recorded as its outcome.
+        let hand_back_job = jobs.iter().find(|job| job.agent.as_deref() == Some("test")).expect("hand-back job").id.clone();
+        let start = Instant::now();
+        while !AgentJobService::job_settled(&hand_back_job) && start.elapsed() < Duration::from_secs(6) {
+            sleep(Duration::from_millis(20));
+        }
 
         // A runner failure goes back to the reporter instead of looping.
         assign(&mut storage, "@test");

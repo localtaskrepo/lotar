@@ -255,6 +255,9 @@ fn agent_templates_produce_a_project_their_automation_can_drive() {
         for state in ["Testing", "Merging", "HelpNeeded"].into_iter().chain(extra_state) {
             assert!(states.iter().any(|s| s == state), "{template}: {states:?}");
         }
+        // HelpNeeded is listed last, so without an explicit list it would be inferred as done.
+        let shown: serde_json::Value = serde_json::from_str(&run_ok(&["--format", "json", "config", "show", &project], tmp.path())).expect("config show json");
+        assert_eq!(shown["config"]["issue_done_states"], serde_json::json!(["Done"]), "{template}: only Done may count as done");
         assert_eq!(config["agent"]["worktree"]["enabled"].as_bool(), Some(true), "{template}: worktrees must be on for the merge phase:\n{config:?}");
         let agents: Vec<String> = config["agents"]
             .as_mapping()

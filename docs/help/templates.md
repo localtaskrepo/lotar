@@ -83,7 +83,7 @@ Every `init` call serializes the merged YAML, validates it, and writes the canon
 
 `lotar init --template agent-pipeline` (or `agent-reviewed`) sets up a project the agent workflow can run in:
 
-- The project config gets the template's statuses, types, priorities, agent profiles and `agent.worktree` settings. `--states`, `--types`, `--priorities` and `--tags` still override the vocabularies.
+- The project config gets the template's statuses, types, priorities, agent profiles and `agent.worktree` settings, and `issue.done_states: [Done]` so a handed-back `HelpNeeded` ticket doesn't count as finished. `--states`, `--types`, `--priorities` and `--tags` still override the vocabularies; with `--states` the done states are inferred from your list (see [Done States](config.md#done-states)).
 - `.tasks/<PREFIX>/automation.yml` gets the phase rules.
 
 Assign a ticket to `@implement` to start. Each phase works in the ticket's own worktree and branch and commits there (LoTaR commits anything an agent leaves uncommitted); when a job finishes, the automation rules move the ticket to the next phase:
