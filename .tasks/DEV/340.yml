@@ -3,9 +3,9 @@ status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T01:43:44.864229+00:00
-modified: 2026-11-12T02:24:11.995357+00:00
+modified: 2026-11-12T02:25:40.484890+00:00
 relationships:
   related:
   - DEV-1
@@ -19,10 +19,13 @@ comments:
   text: 'claude: Merged into main as ab22fac (rebased onto 3c01b6e, fast-forward, no conflicts). Not pushed: main also holds the unpushed DEV-335 commit (3c01b6e), which waits for its own session. Checks in my worktree, with LOTAR_IGNORE_HOME_CONFIG=1 (DEV-339): npm run lint, npm test (Rust, UI, release, hooks) and npm run smoke (373 tests) all passed. Without that variable, two Rust tests read ~/.lotar and fail (DEV-339); I did not run them without it.'
 - date: 2026-11-12T02:07:29.499410+00:00
   text: 'The merge agent''s job job-20261112T020243.242Z-8 failed: lotar agent logs job-20261112T020243.242Z-8. The fix is on branch agent/DEV-340. Try again with lotar automation run "Health: retry with @fix" --select ''id:DEV-340'', or for an agent''s ticket lotar assignee DEV-340 @fix.'
+- date: 2026-11-12T02:25:29.411663+00:00
+  text: 'claude (Opus 5.5): Nothing left to do. The fix is already on main as ab22fac: the merge did happen; only the merge job was reported as failed. My branch''s commit db898c5 was the same change (git cherry: equivalent), so I rebased the branch onto main and it now has no commits of its own. No new commit. Check: the four dev320 job-outcome tests on main pass (cargo nextest run --test integration dev320, LOTAR_IGNORE_HOME_CONFIG=1), including the ticket''s test. I didn''t rerun the full lint/test/smoke; they passed at the merge. Not pushed yet. Status and assignee unchanged: the ticket moves on when this job ends.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acb9d8964-080c-46aa-accf-527e61b00ece
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A10853b74-1c2f-4b9c-a435-1407d478d850
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aedd5cfca-4667-42aa-9862-d4d4732ae7e0
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A91cc98e8-182b-498a-b452-d41f16f13a5f
 description: |-
   During a job, an assignee change is recorded as the job's outcome, and changing it back can't undo that. Found in standards STD-37 (2026-11-11): the fix agent ran `lotar assignee STD-37 claude` by mistake and then `lotar assignee STD-37 @fix`. The second command recorded nothing, because `@fix` is the value the ticket already has ("A change to the value the ticket already has records nothing", docs/help/agent.md). So the job ended with assignee claude, and the `job_completed` rule's `set.assignee: "@merge"` never ran.
 
@@ -120,3 +123,18 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aedd5cfca-4667-42aa-9862-d4d4732ae7e0
+- at: 2026-11-12T02:25:29.411663+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T02:25:34.681990+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T02:25:40.484890+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A91cc98e8-182b-498a-b452-d41f16f13a5f
