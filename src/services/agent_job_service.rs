@@ -1755,6 +1755,24 @@ fn run_job(
         }
     }
 
+    // Other processes see the job, and can ask to cancel it (DEV-279). The
+    // record comes before the runner: they see its wrapper process from the
+    // start, and a wrapper without a record refuses ticket changes (DEV-360).
+    let mut active_record = JOB_REGISTRY.lock().ok().and_then(|registry| {
+        registry.jobs.get(&job_id).map(|state| crate::services::agent_active_jobs::ActiveJob {
+            job_id: job_id.clone(),
+            ticket_id: ticket_id.clone(),
+            runner: state.record.runner.clone(),
+            agent: state.record.agent_profile.clone(),
+            owner_pid: std::process::id(),
+            child_pid: 0,
+            started_at: Utc::now().to_rfc3339(),
+        })
+    });
+    if let Some(record) = active_record.as_ref() {
+        crate::services::agent_active_jobs::register(&tasks_dir, record);
+    }
+
     // Serialize cancellation with spawn and runtime publication.
     let Ok(mut registry) = JOB_REGISTRY.lock() else {
         return;
@@ -1777,7 +1795,6 @@ fn run_job(
     let stdin = child.lock().ok().and_then(|mut c| c.stdin.take());
     let stdin = stdin.map(|handle| Arc::new(Mutex::new(handle)));
 
-    let mut active_record = None;
     if let Some(state) = registry.jobs.get_mut(&job_id) {
         state.runtime = Some(AgentJobRuntime {
             child: Arc::clone(&child),
@@ -1785,19 +1802,10 @@ fn run_job(
             // dropping it below ends their input after the prompt.
             stdin: stdin.clone().filter(|_| supports_stdin(runner_kind)),
         });
-        active_record = Some(crate::services::agent_active_jobs::ActiveJob {
-            job_id: job_id.clone(),
-            ticket_id: ticket_id.clone(),
-            runner: state.record.runner.clone(),
-            agent: state.record.agent_profile.clone(),
-            owner_pid: std::process::id(),
-            child_pid: child.lock().map(|c| c.id()).unwrap_or_default(),
-            started_at: Utc::now().to_rfc3339(),
-        });
     }
     drop(registry);
-    // Other processes see the job, and can ask to cancel it (DEV-279).
-    if let Some(record) = active_record.as_ref() {
+    if let Some(record) = active_record.as_mut() {
+        record.child_pid = child.lock().map(|c| c.id()).unwrap_or_default();
         crate::services::agent_active_jobs::register(&tasks_dir, record);
     }
 

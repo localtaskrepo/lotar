@@ -114,6 +114,41 @@ fn status_and_assignee_set_during_a_job_win_over_the_job_completed_rule() {
     assert!(stored.contains(&format!("Job {job_id} finished")), "{stored}");
 }
 
+/// DEV-360: the job's record exists before its runner starts. Other
+/// processes see the runner's wrapper process at once; without the record
+/// they refused the agent's status and assignee changes.
+#[test]
+fn the_job_record_exists_when_the_runner_starts() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let fixtures = TestFixtures::new();
+    let root = fixtures.get_temp_path().to_path_buf();
+    let queue = root.join("queue");
+    let seen = root.join("seen");
+    std::fs::write(fixtures.tasks_root.join("config.yml"), "default:\n  project: OUTS\nagents:\n  fix:\n    runner: command\n    command: 'true'\n").unwrap();
+    // A wrapper that only looks for the record, as soon as it runs.
+    let wrapper = root.join("wrapper.sh");
+    std::fs::write(&wrapper, format!("#!/bin/sh\nls \"{}\"/agent-queue/active-*/job-*.json > \"{}\" 2>&1\nexit 0\n", queue.display(), seen.display())).unwrap();
+    std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let cmd = || {
+        let mut cmd = std::process::Command::new(assert_cmd::cargo::cargo_bin!("lotar"));
+        cmd.current_dir(&root)
+            .env_remove("RUST_TEST_THREADS")
+            .env_remove("LOTAR_AGENT_JOB_ID")
+            .env_remove("LOTAR_TICKET_ID")
+            .env("LOTAR_IGNORE_HOME_CONFIG", "1")
+            .env("LOTAR_AGENT_QUEUE_DIR", &queue)
+            .env("LOTAR_AGENT_WRAPPER", &wrapper)
+            .env("LOTAR_TEST_SILENT", "1");
+        cmd
+    };
+    assert!(cmd().args(["add", "hands back at once"]).status().unwrap().success());
+    let run = cmd().args(["agent", "run", "OUTS-1", "go", "--agent", "fix", "--wait"]).output().unwrap();
+    assert!(run.status.success(), "{}", String::from_utf8_lossy(&run.stderr));
+    let seen = std::fs::read_to_string(&seen).unwrap();
+    assert!(seen.trim_end().ends_with(".json") && !seen.contains("No such file"), "{seen}");
+}
+
 /// REST and MCP get the same treatment, and the job's end applies what they
 /// recorded in place of the rule's `set`.
 #[test]
