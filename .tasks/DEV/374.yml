@@ -5,10 +5,12 @@ type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-12T09:42:26.800525+00:00
-modified: 2026-11-12T09:42:26.879084+00:00
+modified: 2026-11-12T20:26:41.103430+00:00
 relationships:
   related:
   - DEV-373
+  - DEV-385
+  - DEV-386
 description: 'Next release, planned with DEV-373 (versions), which the owner verifies first (2026-11-12: ''I''ll verify it tomorrow for the next major release''). The owner picks the bump; rename this ticket if it differs (the title must start with ''Release v''). Steps: .github/skills/release/SKILL.md and docs/release-guide.md. Done when the release is installed here. Tickets that wait for this release are Blocked and depend on it; closing this ticket hands them to @fix to run their checks. Waiting now: none.'
 history:
 - at: 2026-11-12T09:42:26.879084+00:00
@@ -17,3 +19,15 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-373"]}'
+- at: 2026-11-12T20:26:40.815768+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-373"]}'
+    new: '{"related":["DEV-373","DEV-385"]}'
+- at: 2026-11-12T20:26:41.103430+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-373","DEV-385"]}'
+    new: '{"related":["DEV-373","DEV-385","DEV-386"]}'

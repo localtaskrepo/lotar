@@ -1,0 +1,16 @@
+title: 'Proposal: phone notifications for tickets that need the user'
+status: HelpNeeded
+priority: Low
+type: Feature
+reporter: claude
+assignee: mallox
+created: 2026-11-12T20:07:56.581871+00:00
+description: |-
+  The owner's idea (2026-11-12): "We can think about adding phone notifications as a feature to lotar. That probably deserves a feature/idea ticket." Context: standards STD-54, an inbox project where everything that needs him lands; a phone push when a ticket arrives there would mean he doesn't have to check at all.
+
+  ## Questions to settle
+  - Channel: a push service (ntfy, Pushover, Apple push via a small app), or a generic webhook action in automation rules that any service can take.
+  - Trigger: a rule action (e.g. `notify:`) so the user chooses which events push; batching into a digest to avoid noise.
+  - Where the credentials live (not in the repo).
+tags:
+- proposal

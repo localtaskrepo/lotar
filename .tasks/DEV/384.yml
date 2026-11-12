@@ -1,0 +1,81 @@
+title: A person's comment on a ticket reaches its agent
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T20:19:09.503584+00:00
+modified: 2026-11-12T20:27:57.708785+00:00
+relationships:
+  related:
+  - DEV-327
+  - DEV-383
+  - DEV-385
+comments:
+- date: 2026-11-12T20:26:55.335514+00:00
+  author: claude
+  text: 'claude: Owner 2026-11-12 widened the scope: ''if we can configure an automation that a comment on any tickets kicks of or queues for an agent, then we should do that as well. Let''s do it right from the start.'' So: any ticket, not only one with an agent (no agent yet: the rule starts one that reads the comment and acts on it); configurable as a rule action, because standards'' shared automation.yml will turn it on in every repo (STD-56). Related: DEV-385 (unblocked hook) may share the start-or-queue mechanics.'
+- date: 2026-11-12T20:27:57.708785+00:00
+  author: claude
+  text: 'claude: Plan after the owner widened the scope (relayed by the standards thread, 2026-11-12): a rule action `tell_agent: { message, agent }`, usable on any hook (on.commented now, DEV-385''s hook next). Running job on the ticket: the message is queued to it; for the t3 runner it runs as the thread''s next turn inside the same job, so end rules wait for the answer (the job drains an inbox file next to its active-job record, so a comment from any process reaches it). Idle ticket: its agent is the assignee if that is an agent profile, else the last agent profile in its history, else the action''s `agent`; the ticket is assigned to it and a job starts with the message as prompt, as the next turn of its last T3 thread (session: continue) when there is one. Who may trigger it is the rule''s conditions (DEV-383''s author condition); comments from inside an agent job (LOTAR_AGENT_JOB_ID set) never do. Asked the DEV-383 thread for its author field name and told the DEV-385 thread about the shared action.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A29c043b0-c171-4b91-85ae-99969ca704d8
+description: |-
+  The owner's idea (2026-11-12), his words: "I may find something where I comment from browser through the different boards and that should probably generally kick off either an agent to check what I said and how to action on it, or be queued up to the agent currently working on the task so it knows there's a response or comment. Lotar can then actually also become a communication platform focused on project management. A ticket then becomes a watch for a project agent in a way. And maybe that's another feature we want to add to lotar if we don't already have a way to do that."
+
+  Today a person's comment on a ticket reaches no agent: a running job doesn't see it, and nothing starts one.
+
+  ## Plan
+  - Check what exists first (commented hook, `session: continue`, the t3 runner's thread) and what a rule could already do.
+  - A person's comment (not an agent's; comment authors exist since DEV-327) on a ticket with an agent:
+    - job running: deliver it to that job (for the t3 runner, as a message to its thread) so the agent sees it on its next turn;
+    - no job running: start one that reads the comment and acts on it, as the next turn of the ticket's last thread (`session: continue`) where there is one.
+  - Configurable per project (which people, which profiles), off by default; docs.
+  - Depends on the comment-author condition (related ticket) if it's built as a rule.
+
+  ## Done when
+  - [ ] A comment by the owner on a ticket whose agent is running reaches that agent; on an idle ticket it starts one
+  - [ ] Tested and documented
+history:
+- at: 2026-11-12T20:19:09.580118+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-327"]}'
+- at: 2026-11-12T20:19:09.674527+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T20:19:09.855946+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T20:19:10.424382+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A29c043b0-c171-4b91-85ae-99969ca704d8
+- at: 2026-11-12T20:19:31.497755+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-327"]}'
+    new: '{"related":["DEV-327","DEV-383"]}'
+- at: 2026-11-12T20:26:55.165275+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-327","DEV-383"]}'
+    new: '{"related":["DEV-327","DEV-383","DEV-385"]}'
+- at: 2026-11-12T20:26:55.335514+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T20:27:57.708785+00:00
+  actor: claude
+  changes:
+  - field: comment_added

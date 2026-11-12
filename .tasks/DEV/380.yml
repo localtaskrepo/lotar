@@ -1,11 +1,11 @@
 title: Integration tests leave agent-queue folders in the user's cache
-status: InProgress
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T19:12:53.510074+00:00
-modified: 2026-11-12T19:32:34.767156+00:00
+modified: 2026-11-12T19:32:50.093962+00:00
 relationships:
   related:
   - DEV-378
@@ -93,3 +93,9 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-12T19:32:50.093962+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

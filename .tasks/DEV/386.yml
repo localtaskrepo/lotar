@@ -1,0 +1,54 @@
+title: Relationships to tickets in another repo
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T20:26:41.019459+00:00
+modified: 2026-11-12T20:26:54.927786+00:00
+relationships:
+  related:
+  - DEV-374
+  - DEV-385
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A19c84812-c551-4f62-ad53-58b1c7b4fc71
+description: |-
+  Tickets can only depend on tickets in the same tasks directory. Agents in one repo often wait on another repo's ticket: standards STD-54 waits for lotar's release DEV-374, standards tickets wait on lotar features. Today that link is a sentence in the description and nothing wakes the ticket. The owner wants waiting work to continue by itself (2026-11-12, see the related unblocked-hook ticket: "Let's do it right from the start").
+
+  ## Plan
+  - A relationship to a ticket in another local repo's lotar (e.g. `depends_on: lotar:DEV-374` resolved through a registry of repos, or by path/server URL); shown with its link (server.public_url of that repo).
+  - Dependency evaluation reads the other repo's ticket status; closing that ticket fires the unblocked hook in the dependent's repo (the other repo's process may not know the dependent: a reverse index, or the dependent's repo checks on its own events and on `lotar automation run`).
+  - Decide and document what happens when the other repo is missing or unreadable (unresolved, as for deleted prerequisites).
+
+  ## Done when
+  - [ ] A standards ticket can depend on a lotar ticket, shows it with its link, and is unblocked when it closes, with a test
+  - [ ] Documented
+history:
+- at: 2026-11-12T20:26:41.103950+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-374"]}'
+- at: 2026-11-12T20:26:41.207779+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T20:26:41.405679+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T20:26:42.010274+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A19c84812-c551-4f62-ad53-58b1c7b4fc71
+- at: 2026-11-12T20:26:54.927786+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-374"]}'
+    new: '{"related":["DEV-374","DEV-385"]}'

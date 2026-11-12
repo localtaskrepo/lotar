@@ -1,0 +1,82 @@
+title: 'Automation: condition and template for a comment''s author'
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@merge'
+created: 2026-11-12T20:19:09.244690+00:00
+modified: 2026-11-12T20:38:23.431546+00:00
+relationships:
+  related:
+  - DEV-327
+  - DEV-384
+  - DEV-387
+comments:
+- date: 2026-11-12T20:30:56.580238+00:00
+  author: claude
+  text: 'claude: Done in 5f4fc78 (branch agent/DEV-383). New condition comment: { author: ... } for commented rules (same conditions as assignee: name, list, operators, @user/@agent/@any; case-insensitive; works in all/any/not/current; never matches other events; unknown keys under comment are rejected). Templates: ${{comment.author}} on commented events and ${{ticket.comments[N].author}}. lotar automation simulate --event commented checks against the latest comment and notes whose it is. Web UI: rule sentences say ''comment author is X'', the variable picker offers comment.author, the visual editor marks such rules YAML-only (as with not/current). Docs: automation.md (Comment conditions section, template tables); there is no changelog file in the repo, release notes come from commits. Also fixed the simulate --event help text, which listed neither commented nor manual. Tests: tests/dev383_automation_comment_author_test.rs (fires only on that author''s comment, not/any/list/starts_with/current, simulate, other events, unknown key), template unit test, UI specs. Checks: npm run lint, npm run test:agent (2070 Rust, 1470 UI), npm run test:smoke:agent (381) pass; docs example run by hand with the built binary. Not checked in a browser.'
+- date: 2026-11-12T20:38:23.431546+00:00
+  author: claude
+  text: 'claude: Merged. Rebased agent/DEV-383 onto main (clean, now 71984c8) and fast-forwarded main to it. Checks in the worktree after the rebase: npm run lint passes; npm run test:agent failed once in dev318_t3_runner_test::a_second_job_continues_the_thread_with_unmerged_work_instead_of_a_new_one (SerializationError: empty context payload, unrelated to this change), passed five of five runs alone and the full rerun passed (2070 Rust, 1470 UI); filed DEV-387 for the flake. npm run test:smoke:agent passes (381). Ticket files committed as ''DEV-383 Ticket updates''; pushing main with 06efbb3 (STD-55, Done) and this work.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adc79543d-980d-425f-b480-194418918d86
+description: |-
+  Automation rules can't tell who wrote a comment: the `commented` hook only offers `${{comment.text}}`, although comments store their author since DEV-327. Needed for standards STD-54 (the owner's inbox project): a comment by the owner on an inbox ticket is his answer and must start the hand-back, without a status change. Owner 2026-11-12: "We can probably create an automation that can just change status or trigger a command on comment by me."
+
+  ## Plan
+  - `${{comment.author}}` in templates on `commented` events.
+  - A condition on the comment's author for `commented` rules (e.g. `comment: { author: mallox }`, also with `not`/`any`), checked by `lotar automation simulate --event commented` and shown in the web UI's rule sentences.
+  - Docs: automation.md (conditions, template variables), changelog.
+
+  ## Done when
+  - [ ] A rule with an author condition fires on that person's comment only, with a test
+  - [ ] Template variable and condition documented
+history:
+- at: 2026-11-12T20:19:09.324640+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-327"]}'
+- at: 2026-11-12T20:19:09.416737+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T20:19:09.611951+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T20:19:10.139222+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adc79543d-980d-425f-b480-194418918d86
+- at: 2026-11-12T20:19:31.497311+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-327"]}'
+    new: '{"related":["DEV-327","DEV-384"]}'
+- at: 2026-11-12T20:30:56.580238+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T20:31:08.299883+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T20:37:56.663029+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-327","DEV-384"]}'
+    new: '{"related":["DEV-327","DEV-384","DEV-387"]}'
+- at: 2026-11-12T20:38:23.431546+00:00
+  actor: claude
+  changes:
+  - field: comment_added

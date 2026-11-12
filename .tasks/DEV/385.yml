@@ -1,0 +1,66 @@
+title: 'Automation: hook when a ticket''s last prerequisite is done'
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T20:26:40.666774+00:00
+modified: 2026-11-12T20:26:55.165892+00:00
+relationships:
+  related:
+  - DEV-374
+  - DEV-386
+  - DEV-384
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad49ea37f-64bb-40fb-a025-a556a5bca60c
+description: |-
+  The owner (2026-11-12), his words: "when a ticket the blocks other tickets is done, it should automatically kick of agents for those tickets, since the work can now probably continue. Or a review can happen for an integration, or whatever the agent was waiting on. [...] Let's do it right from the start."
+
+  Today only lotar's own release rule does this ("Release installed: start the waiting checks" in .tasks/DEV/automation.yml), as a shell loop over `${{ticket.relationships.blocks[*]}}` that recognises the release by its title. It should be a built-in event instead, so any repo's rules can use it.
+
+  ## Plan
+  - A new automation hook on the dependent ticket (e.g. `unblocked`): fires when its last open prerequisite reaches a done state (each prerequisite by its own project's done-state policy, as dependency evaluation does today). Also from `lotar automation run` and the CLI, REST and MCP edits that close a prerequisite.
+  - Templates for what was resolved (e.g. `${{unblocked.by}}`: the prerequisite IDs and titles), so the prompt tells the agent what it waited for.
+  - The rule then decides: start the ticket's agent with a prompt, as the next turn of its last thread (`session: continue`) where there is one.
+  - Replace the release rule's shell loop with it; simulate and the web UI's rule sentences support it; docs (automation.md, changelog).
+  - Cross-repo prerequisites (a standards ticket waiting on a lotar release, STD-54 on DEV-374) need relationships to tickets in another repo: see the related ticket.
+
+  ## Done when
+  - [ ] A rule on the new hook starts an agent for a Blocked ticket when its last prerequisite goes Done, with a test
+  - [ ] The release rule uses it
+  - [ ] Documented
+history:
+- at: 2026-11-12T20:26:40.816296+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-374"]}'
+- at: 2026-11-12T20:26:40.924318+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T20:26:41.136563+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T20:26:41.754907+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad49ea37f-64bb-40fb-a025-a556a5bca60c
+- at: 2026-11-12T20:26:54.927279+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-374"]}'
+    new: '{"related":["DEV-374","DEV-386"]}'
+- at: 2026-11-12T20:26:55.165892+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-374","DEV-386"]}'
+    new: '{"related":["DEV-374","DEV-386","DEV-384"]}'

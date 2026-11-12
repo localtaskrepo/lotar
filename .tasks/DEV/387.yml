@@ -1,0 +1,41 @@
+title: 'Flaky Rust: dev318_t3_runner_test a_second_job_continues_the_thread_with_unmerged_work_instead_of_a_new_one'
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T20:37:56.488019+00:00
+modified: 2026-11-12T20:37:58.215936+00:00
+relationships:
+  related:
+  - DEV-383
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A805be196-a450-45bd-93c5-fca0f8f9668f
+description: 'Found: while merging DEV-383 (2026-11-12), one full npm run test:agent run failed this test at tests/dev318_t3_runner_test.rs:442 with SerializationError("Invalid context payload: EOF while parsing a value at line 1 column 0"): it read the context payload while it was still empty or half-written. Five runs of the file alone and the next full run passed. Check: cargo nextest run --test integration dev318_t3_runner_test under full-suite load (npm run test:rust:agent). Done: the test, or the code that writes the payload, no longer reads an empty or partial file, and repeated full-suite runs pass.'
+tags:
+- health
+custom_fields:
+  finding: npm test:dev318_t3_runner_test::a_second_job_continues_the_thread_with_unmerged_work_instead_of_a_new_one
+history:
+- at: 2026-11-12T20:37:56.663738+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-383"]}'
+- at: 2026-11-12T20:37:56.933748+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T20:37:57.222665+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T20:37:58.215936+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A805be196-a450-45bd-93c5-fca0f8f9668f
