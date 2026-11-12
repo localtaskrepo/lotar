@@ -3,13 +3,17 @@ status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T20:54:20.317536+00:00
-modified: 2026-11-12T20:54:42.148177+00:00
+modified: 2026-11-12T21:11:31.408662+00:00
 relationships:
   related:
   - DEV-373
   - DEV-374
+comments:
+- date: 2026-11-12T21:11:22.483505+00:00
+  author: claude
+  text: 'claude (Opus 5.5): Done in 8d49ec2 on agent/DEV-391. A list value now counts once per item: new custom_value_items (src/types.rs) feeds stats custom-field, field:<name> grouping (stats effort --by), field filters, and version parsing (which now uses the same helper). For a version field, stats custom-field lists values newest version first, so --limit keeps the latest; values that don''t read as versions come after, by count; JSON uses the same order. Also fixed lotar show, which printed ''affects: [array]'': it now prints the items joined with '', ''. Test first: custom_field_versions_test::stats_count_each_item_of_a_list_value (it failed with [array] before the fix). docs/help/stats.md says how list values count. Checks: lint:agent clean, test:agent (2076 Rust + 1471 UI + release + hooks) passed, smoke 381 passed.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A04006dc7-f937-493d-81e9-819ca8ab91a0
 - file: src/cli/handlers/stats/custom.rs
@@ -73,3 +77,13 @@ history:
   changes:
   - field: reference_added
     new: file:src/cli/handlers/stats/common.rs
+- at: 2026-11-12T21:11:22.483505+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T21:11:31.408662+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'

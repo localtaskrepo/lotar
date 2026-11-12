@@ -3,13 +3,23 @@ status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T20:54:20.979539+00:00
-modified: 2026-11-12T20:54:42.221198+00:00
+modified: 2026-11-12T21:15:26.344420+00:00
 relationships:
   related:
   - DEV-373
   - DEV-374
+comments:
+- date: 2026-11-12T21:15:14.307892+00:00
+  author: claude
+  text: |-
+    Claude (Opus 5.5): Done in commit 199ca7f on agent/DEV-392.
+    Pull: Jira fixVersions/versions read each version's name; a GitHub issue's milestone reads its title. Pull normalises version fields the way task writes do, so milestone v0.15.0 is stored as 0.15.0 and the next pull reports no change.
+    Push: Jira gets fixVersions/versions as [{name}]. GitHub looks up the repo's milestones once per push (state=all, ignoring a leading v) and sends the number. A milestone that doesn't exist is skipped with the warning '<task>: GitHub milestone 'X' does not exist in org/repo; create it on GitHub first'. milestone is now a pushable GitHub field, so config validate no longer warns about it. JiraLookupCache is renamed LookupCache and now holds the milestones too.
+    Docs: docs/help/sync.md has the mapping example and notes for both remotes.
+    Tests: 5 new tests in provider_tests.rs (mod versions) use recorded payloads against the mock API. The two pull tests failed first. Checks: npm run lint:agent clean, npm test:agent passes (2080 Rust, 1471 UI, release, hooks), smoke 381/381.
+    Not checked: a live Jira or GitHub. In particular, the error Jira returns on push for a version the project doesn't have is untested.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1c0ff9ac-b919-430f-851b-5bbd5d3d8db9
 - file: src/services/sync_service/remote_fields.rs
@@ -74,3 +84,13 @@ history:
   changes:
   - field: reference_added
     new: file:src/services/sync_service/payloads.rs
+- at: 2026-11-12T21:15:14.307892+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T21:15:26.344420+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'

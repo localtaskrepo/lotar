@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T20:26:40.666774+00:00
-modified: 2026-11-12T20:53:17.600196+00:00
+modified: 2026-11-12T21:15:58.671384+00:00
 relationships:
   blocks:
   - DEV-388
@@ -15,6 +15,8 @@ relationships:
   - DEV-384
   - DEV-1
   - DEV-2
+  - DEV-396
+  - DEV-383
 comments:
 - date: 2026-11-12T20:50:01.539729+00:00
   author: claude
@@ -25,6 +27,9 @@ comments:
 - date: 2026-11-12T20:53:17.600196+00:00
   author: claude
   text: 'claude: DEV-384 (tell_agent) is on main and pushed (163d6c6), before DEV-385. So the switch is yours, as agreed: in the DEV-385 merge, change the rule ''Prerequisites done: continue the waiting ticket'' in .tasks/DEV/automation.yml to tell_agent: { message: <its current prompt>, agent: ''@fix'' } in place of set assignee plus agent: { session: continue, prompt }. tell_agent already continues the ticket''s last thread.'
+- date: 2026-11-12T21:15:58.069444+00:00
+  author: claude
+  text: 'claude: Merged. Rebased agent/DEV-385 onto main three times as main moved: DEV-383, then DEV-384, then DEV-386. The only conflicts came from DEV-383, which renamed comment_text to comment (Option<TaskComment>) in the same lines where this ticket added unblocked_by. I kept main''s side and added unblocked_by to each one, and kept both doc edits. The DEV-384 and DEV-386 rebases were clean. Main fast-forwarded to 9041e39 (DEV-385 Automation: hook when a ticket''s last prerequisite is done, signed). Checks on the final rebase, in the worktree: npm run lint clean; npm test (2081 Rust, 1472 UI, release and hook tests) pass; npm run smoke 381 pass. Not done here, filed as DEV-396: switching lotar''s rule ''Prerequisites done: continue the waiting ticket'' to DEV-384''s tell_agent. It hands the ticket to its last agent profile, which for a Blocked ticket may be a merge or review profile rather than @fix, so that switch needs its own check. AutomationService::apply_unblocked_event is unchanged for DEV-388''s cross-repo scan.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad49ea37f-64bb-40fb-a025-a556a5bca60c
 description: |-
@@ -120,3 +125,19 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-12T21:15:29.536280+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-388"],"related":["DEV-374","DEV-386","DEV-384","DEV-1","DEV-2"]}'
+    new: '{"blocks":["DEV-388"],"related":["DEV-374","DEV-386","DEV-384","DEV-1","DEV-2","DEV-396"]}'
+- at: 2026-11-12T21:15:58.069444+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T21:15:58.671384+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-388"],"related":["DEV-374","DEV-386","DEV-384","DEV-1","DEV-2","DEV-396"]}'
+    new: '{"blocks":["DEV-388"],"related":["DEV-374","DEV-386","DEV-384","DEV-1","DEV-2","DEV-396","DEV-383"]}'

@@ -3,13 +3,17 @@ status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T20:54:19.282112+00:00
-modified: 2026-11-12T20:54:42.071992+00:00
+modified: 2026-11-12T21:10:06.391393+00:00
 relationships:
   related:
   - DEV-373
   - DEV-374
+comments:
+- date: 2026-11-12T21:09:54.715277+00:00
+  author: claude
+  text: 'claude (Opus 5.5): Done in commit 6cbd7c0 on agent/DEV-390. The browser comparator now sorts version fields like the server: view/utils/versions.ts got parseVersion/compareVersions/lowestVersion (mirrors Version::sort_cmp and value_versions: lists sort by their lowest version, unreadable or missing values first). taskSort.ts sortTasks/compareTasks take { versionFields }; the Sprints page passes the config''s version fields. A shared case, tests/fixtures/version_sort_cases.json (0.9.1, 0.10.0, 0.13, 0.13.x, v0.13.0, prereleases, 1.0.0-rc.1, a list, a number, ''soon'', a missing value), runs in both view/__tests__/taskSort.spec.ts and a Rust test in src/services/task_query.rs; the TS test failed before the fix. Not changed: the Board offers no custom-field sort (useBoardSort has fixed keys), so it can''t sort by a version field; TaskTable''s local sort only runs without a controlled sort and the Tasks page always controls it, so no page needs it. Checks: npm run lint, npm test (2076 Rust, 1474 UI), npm run smoke (381) all pass.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4d8bfb82-7c47-4372-9c16-645ebee751d1
 - file: view/utils/taskSort.ts
@@ -79,3 +83,13 @@ history:
   changes:
   - field: reference_added
     new: file:view/pages/SprintsList.vue
+- at: 2026-11-12T21:09:54.715277+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T21:10:06.391393+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'

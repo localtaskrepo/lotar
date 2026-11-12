@@ -1,0 +1,33 @@
+title: 'Prerequisites rule: start the waiting ticket with tell_agent'
+status: InProgress
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T21:15:29.357861+00:00
+modified: 2026-11-12T21:15:31.402669+00:00
+relationships:
+  related:
+  - DEV-384
+  - DEV-385
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A852e0c4d-48a1-4b52-ade7-3acef748887a
+description: 'Agreed between the DEV-384 and DEV-385 agents: lotar''s rule ''Prerequisites done: continue the waiting ticket'' in .tasks/DEV/automation.yml should use DEV-384''s tell_agent (queue to a running job, else start the ticket''s agent as the next turn of its last thread) instead of set assignee @fix + agent.prompt. Not done in the DEV-385 merge because tell_agent picks the ticket''s last agent profile, which for a Blocked ticket may be a merge or review profile, not @fix. Check which profile a waiting ticket gets (agent history of Blocked DEV tickets), then switch the rule (message = the current prompt, agent: fix, keep model/provider) and update tests/dev370_release_waiting_checks_test.rs. Done when: the rule uses tell_agent, the test passes, and a ticket whose last agent was a merge agent still gets @fix or the choice is documented.'
+history:
+- at: 2026-11-12T21:15:29.536711+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-384","DEV-385"]}'
+- at: 2026-11-12T21:15:30.280218+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T21:15:31.402669+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A852e0c4d-48a1-4b52-ade7-3acef748887a
