@@ -175,6 +175,19 @@ describe('custom field values', () => {
         // Missing (None) sorts before a present empty string (Some("")).
         expect(sortTasks(tasks, 'custom:Risk', 'asc').map((t) => t.id)).toEqual(['A-1', 'A-2'])
     })
+
+    it('reads a list by its first item and an empty list as missing, like the backend', () => {
+        expect(customFieldValue({ Area: ['web', 'api'] }, 'Area')).toBe('web')
+        expect(customFieldValue({ Area: [['cli'], 'web'] }, 'Area')).toBe('cli')
+        expect(customFieldValue({ Area: [] }, 'Area')).toBeNull()
+        const tasks = [
+            task({ id: 'A-1', custom_fields: { Area: ['web', 'api'] } }),
+            task({ id: 'A-2', custom_fields: { Area: ['cli'] } }),
+            task({ id: 'A-3', custom_fields: { Area: [] } }),
+            task({ id: 'A-4', custom_fields: { Area: 'docs' } }),
+        ]
+        expect(sortTasks(tasks, 'custom:Area', 'asc').map((t) => t.id)).toEqual(['A-3', 'A-2', 'A-4', 'A-1'])
+    })
 })
 
 describe('sortTasks', () => {

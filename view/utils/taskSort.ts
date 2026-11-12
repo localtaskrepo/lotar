@@ -510,14 +510,20 @@ function findCustomValue(fields: Record<string, unknown> | null | undefined, nam
     return undefined
 }
 
+/** Mirrors `types::custom_value_items`: a list reads item by item, nested lists flattened. */
+function customValueItems(value: unknown): string[] {
+    return Array.isArray(value) ? value.flatMap(customValueItems) : [customValueToString(value)]
+}
+
 /**
- * Exact-name lookup with case-insensitive fallback. Returns null when the
- * field is absent so callers can mirror the backend's `Option<String>`
- * ordering (missing sorts before any present value, including empty strings).
+ * Exact-name lookup with case-insensitive fallback; a list reads as its first
+ * item, like the backend sort. Returns null when the field is absent or an
+ * empty list so callers can mirror the backend's `Option<String>` ordering
+ * (missing sorts before any present value, including empty strings).
  */
 export function customFieldValue(fields: Record<string, unknown> | null | undefined, name: string): string | null {
     const value = findCustomValue(fields, name)
-    return value === undefined ? null : customValueToString(value)
+    return value === undefined ? null : (customValueItems(value)[0] ?? null)
 }
 
 /** Rust `Option<String>` ordering for custom values: missing < present. */
