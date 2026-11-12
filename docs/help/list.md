@@ -151,7 +151,7 @@ lotar list status:inprogress tag:release --sort-by due-date
 lotar list --tasks-dir /repos/infra/.tasks --project INFRA
 ```
 
-The examples assume the named status/priority values and custom fields exist in your configuration. A status filter also accepts a status that no project configures any more while tasks still hold it (`lotar list status:InProgress` after renaming the workflow), so those tasks can be found and moved to a current status; other unknown values are errors. A custom field named `sprint` is separate from the task's numeric `sprints` membership.
+The examples assume the named status/priority values and custom fields exist in your configuration. A status filter also accepts a status that no project configures any more while tasks still hold it (`lotar list status:InProgress` after renaming the workflow), so those tasks can be found and moved to a current status; other unknown values are errors. A status only some projects configure needs one of them in the query (`project:DEV status:Blocked`); without it the error names those projects. A custom field named `sprint` is separate from the task's numeric `sprints` membership.
 
 ## Performance & etiquette
 

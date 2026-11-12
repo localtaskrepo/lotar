@@ -193,3 +193,17 @@ fn rest_runs_manual_rules_and_simulates_unsaved_ones() {
     assert_eq!(status, 200);
     assert_eq!(body["data"]["matched"], false, "{body}");
 }
+
+#[test]
+fn a_project_only_status_in_the_selection_says_how_to_scope_it() {
+    // DEV-371: Blocked exists only in AM's config; an unscoped query is
+    // checked against the global statuses, so the error names the project.
+    let ws = workspace(RULES);
+    std::fs::write(ws.tasks.join("AM/config.yml"), "issue:\n  states: [Todo, InProgress, Blocked, Done]\n").unwrap();
+    let (ok, out) = run(&ws, &["automation", "run", "--select", "status:blocked", "--dry-run"]);
+    assert!(!ok, "{out}");
+    assert!(out.contains("project:AM"), "{out}");
+
+    let (ok, out) = run(&ws, &["automation", "run", "--select", "project:AM status:blocked", "--dry-run"]);
+    assert!(ok, "{out}");
+}

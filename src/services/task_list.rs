@@ -303,7 +303,7 @@ impl TaskQueryInput {
                 Ok(status) => status,
                 // A status removed from the configuration still finds the
                 // tasks that hold it, so they can be migrated (DEV-271).
-                Err(message) => stored_status(tasks_root, filter.project.as_deref(), raw).ok_or_else(|| invalid_enum("status", raw, message))?,
+                Err(message) => stored_status(tasks_root, filter.project.as_deref(), raw, message).map_err(|message| invalid_enum("status", raw, message))?,
             };
             filter.status.push(status);
         }
@@ -406,11 +406,27 @@ impl TaskQuery {
 /// The spelling of `raw` as some stored task's status, when the status is
 /// no longer configured anywhere but tasks still hold it. A status another
 /// project still defines is not "removed": query that project instead
-/// (DEV-57 keeps project-only values out of the base scope).
-fn stored_status(tasks_root: &Path, project: Option<&str>, raw: &str) -> Option<crate::types::TaskStatus> {
+/// (DEV-57 keeps project-only values out of the base scope), and an
+/// unscoped query's error says so (DEV-371).
+fn stored_status(tasks_root: &Path, project: Option<&str>, raw: &str, message: String) -> Result<crate::types::TaskStatus, String> {
     let wanted = raw.trim();
     if wanted.is_empty() {
-        return None;
+        return Err(message);
+    }
+    let defined_in: Vec<String> = crate::utils::filesystem::list_visible_subdirs(tasks_root)
+        .into_iter()
+        .map(|(prefix, _)| prefix)
+        .filter(|prefix| {
+            crate::config::resolution::config_for_project(tasks_root, Some(prefix))
+                .is_ok_and(|config| config.issue_states.values.iter().any(|status| status.eq_ignore_case(wanted)))
+        })
+        .collect();
+    if !defined_in.is_empty() {
+        if project.is_some() {
+            return Err(message);
+        }
+        let scopes: Vec<String> = defined_in.iter().map(|prefix| format!("project:{prefix}")).collect();
+        return Err(format!("{message}. '{wanted}' is configured only in project {}: add {} to the query", defined_in.join(", "), scopes.join(" or ")));
     }
     let filter = crate::storage::TaskFilter {
         project: project.map(str::to_string),
@@ -418,14 +434,11 @@ fn stored_status(tasks_root: &Path, project: Option<&str>, raw: &str) -> Option<
         archived: crate::storage::layout::ArchiveFilter::All,
         ..Default::default()
     };
-    let configured_somewhere = crate::utils::filesystem::list_visible_subdirs(tasks_root).into_iter().any(|(prefix, _)| {
-        crate::config::resolution::config_for_project(tasks_root, Some(&prefix))
-            .is_ok_and(|config| config.issue_states.values.iter().any(|status| status.eq_ignore_case(wanted)))
-    });
-    if configured_somewhere {
-        return None;
-    }
-    crate::storage::search::StorageSearch::search(tasks_root, &filter).into_iter().map(|(_, task)| task.status).find(|status| status.eq_ignore_case(wanted))
+    crate::storage::search::StorageSearch::search(tasks_root, &filter)
+        .into_iter()
+        .map(|(_, task)| task.status)
+        .find(|status| status.eq_ignore_case(wanted))
+        .ok_or(message)
 }
 
 /// Load, filter and order the tasks a query selects. Pagination is left to
