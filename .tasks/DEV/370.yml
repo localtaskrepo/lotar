@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-12T06:34:54.326999+00:00
-modified: 2026-11-12T07:35:55.083434+00:00
+modified: 2026-11-12T18:39:56.263264+00:00
 relationships:
   related:
   - DEV-369
@@ -13,6 +13,7 @@ relationships:
   - DEV-364
   - DEV-368
   - DEV-371
+  - DEV-376
 comments:
 - date: 2026-11-12T06:39:43.328867+00:00
   text: 'claude: Owner 2026-11-11 (mallox), on the trigger: ''we can use the depends on relationship between tickets to standardize the release trigger''. So the standard is: a ticket that waits for a release depends_on that release''s ticket, and closing the release ticket starts the checks of its dependents, found through that relationship (not through tags or a hand-kept list). Current dependents of DEV-369: DEV-361, DEV-364.'
@@ -145,3 +146,9 @@ history:
   - field: assignee
     old: mallox
     new: claude
+- at: 2026-11-12T18:39:56.263264+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-369","DEV-361","DEV-364","DEV-368","DEV-371"]}'
+    new: '{"related":["DEV-369","DEV-361","DEV-364","DEV-368","DEV-371","DEV-376"]}'

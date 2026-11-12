@@ -1,18 +1,22 @@
 title: 'Flaky smoke: monitor counterfactual in api.automation'
-status: InProgress
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T10:40:44.142626+00:00
-modified: 2026-11-12T10:48:53.054032+00:00
+modified: 2026-11-12T10:52:28.279651+00:00
 relationships:
   related:
   - DEV-373
+  - DEV-364
 comments:
 - date: 2026-11-12T10:48:44.854738+00:00
   author: claude
   text: 'claude: Fixed in 082f1c7 (branch agent/DEV-375). Cause: the old-shape guard in the counterfactual test started its 4s kill timer at spawn, but the child''s own 3s abort bound only starts after Node startup. Under suite load the guard could kill the child just after it wrote aborted-old.marker (or fire after it had already exited), so the test took the Windows-wedge branch and asserted the marker absent. Change (smoke/tests/api.automation.smoke.spec.ts only): the guard skips the kill if the child has already exited, and the guard is 15s on POSIX (the child always self-aborts first) and stays 4s on Windows. Checks: npm run smoke (build + full suite) 381/381; full quick smoke 3x more under 6 extra CPU-burning processes, 381/381 each; npm run lint:agent and npm run test:agent pass.'
+- date: 2026-11-12T10:52:20.955479+00:00
+  author: claude
+  text: 'claude: Merged. The branch was already on main''s tip (7798ae0), so the rebase changed nothing; lint, test and smoke had already passed on 082f1c7 itself. Fast-forwarded main to 082f1c7, committed the pending .tasks changes (DEV-364, DEV-373, DEV-375) as 916b0cd ''DEV-375 Ticket updates'', and pushed 7798ae0..916b0cd to origin/main (repos.json allows push, and the only unpushed commits were these two). Check rerun in the main checkout: npm run smoke (build + full suite) 381/381, plus a second full run 381/381.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac7e1522e-ee99-4de0-ab13-f76516f52c67
 description: 'Found 2026-11-12 during the DEV-373 merge: npm run smoke failed once in smoke/tests/api.automation.smoke.spec.ts ''monitor counterfactual: wait-then-read wedges a chatty stderr child, concurrent drain completes'' (line 730: expected the aborted-old marker to be absent, it existed). The file passed 3 of 3 runs alone and the full suite passed earlier the same night, so it looks load/timing dependent. Check: npm run smoke (full suite, repeated). Done: the test passes reliably under full-suite load.'
@@ -53,3 +57,19 @@ history:
   - field: assignee
     old: '@fix'
     new: '@merge'
+- at: 2026-11-12T10:52:20.955479+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T10:52:21.069804+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-373"]}'
+    new: '{"related":["DEV-373","DEV-364"]}'
+- at: 2026-11-12T10:52:28.279651+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

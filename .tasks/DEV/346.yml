@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T03:02:46.839936+00:00
-modified: 2026-11-12T05:24:14.409801+00:00
+modified: 2026-11-12T18:39:56.260450+00:00
 relationships:
   related:
   - DEV-349
@@ -13,6 +13,7 @@ relationships:
   - TEST-1
   - DEV-345
   - DEV-366
+  - DEV-376
 comments:
 - date: 2026-11-12T03:03:52.041576+00:00
   text: 'claude (DEV-346 agent job): measuring ci vs two dev-based candidates (line-tables-only debug, no debug) in worktree agent/DEV-346: cold build with warm sccache, edit-and-rebuild, target size, then full nextest runs. Machine load ~90 on 14 cores, so numbers are noisy.'
@@ -206,3 +207,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-349","DEV-348","TEST-1","DEV-345"]}'
     new: '{"related":["DEV-349","DEV-348","TEST-1","DEV-345","DEV-366"]}'
+- at: 2026-11-12T18:39:56.260450+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-349","DEV-348","TEST-1","DEV-345","DEV-366"]}'
+    new: '{"related":["DEV-349","DEV-348","TEST-1","DEV-345","DEV-366","DEV-376"]}'

@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-12T04:55:55.878491+00:00
-modified: 2026-11-12T08:56:38.792837+00:00
+modified: 2026-11-12T18:48:29.607917+00:00
 relationships:
   related:
   - DEV-356
@@ -15,6 +15,7 @@ relationships:
   - DEV-367
   - DEV-362
   - DEV-363
+  - DEV-376
 comments:
 - date: 2026-11-12T05:16:45.226592+00:00
   text: 'claude: Cause found and fixed in b49019573a6c3e19ba7f8d33337c0c48288d9b8b (branch agent/DEV-360). run_job spawned the runner first and wrote the job''s shared record afterwards. For about 10-15 ms, list-running already showed the lotar-agent-wrapper process, but there was no record yet, so ''lotar status''/''assignee'' refused the change (''has an active agent job ... Cancel it'') instead of deferring it. The test polls every 200 ms, so it landed in that window only rarely. A script that polls without pausing hit it in 24 of 40 runs. Fix: write the record before the spawn (child_pid 0), then rewrite it with the runner''s pid; RunningJobSlot still unregisters it on every exit path. New regression test dev320_job_outcome_test::the_job_record_exists_when_the_runner_starts uses a shell LOTAR_AGENT_WRAPPER that looks for the record the moment it starts: it failed 6/6 before the fix and passes after. Checks: ticket check command (-E ''test(dev320_job_outcome_test::)'', --retries 0) 10/10 passed; race script 40/40; npm run lint:agent, test:agent (2004 Rust, 1444 UI, release and hooks tests), and smoke (379) all passed. I did not rerun the check next to a full suite run started by another session.'
@@ -199,3 +200,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-356","DEV-361","DEV-358","DEV-342","DEV-367","DEV-362"]}'
     new: '{"related":["DEV-356","DEV-361","DEV-358","DEV-342","DEV-367","DEV-362","DEV-363"]}'
+- at: 2026-11-12T18:48:29.607917+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-356","DEV-361","DEV-358","DEV-342","DEV-367","DEV-362","DEV-363"]}'
+    new: '{"related":["DEV-356","DEV-361","DEV-358","DEV-342","DEV-367","DEV-362","DEV-363","DEV-376"]}'

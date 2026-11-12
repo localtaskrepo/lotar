@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T04:15:53.349240+00:00
-modified: 2026-11-12T05:28:38.966271+00:00
+modified: 2026-11-12T18:39:56.261131+00:00
 relationships:
   related:
   - DEV-352
@@ -14,6 +14,7 @@ relationships:
   - DEV-355
   - DEV-356
   - DEV-361
+  - DEV-376
 comments:
 - date: 2026-11-12T04:28:42.723712+00:00
   text: 'claude: Fixed in ca9aac2 (branch agent/DEV-354). tests/web_api_integration_test.rs: new read_until_deadline helper waits for the server''s response up to RESPONSE_DEADLINE (15 s overall per exchange), retrying WouldBlock/TimedOut, and panics with a clear ''no response within 15s'' message on a real hang. http_post_json_with_origin (headers and body) and the open_sse header read use it; open_sse then restores the short net_timeout() read timeout that read_sse_events polls with. Checks: web_api_integration_test module 3x (35/35 each), npm run lint:agent, npm test (Rust 2002/2002, UI 1444/1444, release, hooks), npm run test:rust again (2002/2002), npm run smoke (378/378). Not reproduced the original failure under extra load from other worktrees during this run, so the ''repeatedly under load'' check rests on two full-suite runs.'
@@ -105,3 +106,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-352","DEV-359","DEV-348","DEV-355","DEV-356"]}'
     new: '{"related":["DEV-352","DEV-359","DEV-348","DEV-355","DEV-356","DEV-361"]}'
+- at: 2026-11-12T18:39:56.261131+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-352","DEV-359","DEV-348","DEV-355","DEV-356","DEV-361"]}'
+    new: '{"related":["DEV-352","DEV-359","DEV-348","DEV-355","DEV-356","DEV-361","DEV-376"]}'

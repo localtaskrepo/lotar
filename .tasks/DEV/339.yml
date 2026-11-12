@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T01:41:44.112862+00:00
-modified: 2026-11-12T05:44:21.072530+00:00
+modified: 2026-11-12T18:46:29.686924+00:00
 relationships:
   related:
   - DEV-338
@@ -13,6 +13,8 @@ relationships:
   - DEV-341
   - DEV-335
   - DEV-366
+  - DEV-376
+  - DEV-377
 comments:
 - date: 2026-11-12T01:50:29.242450+00:00
   text: 'claude: Fixed in 2cefdb2 on agent/DEV-339. Check reproduced first: padded_job_start_registers_canonical_and_holds_back_canonical_updates failed with the current ~/.lotar. Cause: the lib-test constructor in src/lib.rs never set LOTAR_IGNORE_HOME_CONFIG; under nextest RUST_TEST_THREADS is unset, so home_config_honored() returned true and lib tests read ~/.lotar. Change: the constructor now sets LOTAR_IGNORE_HOME_CONFIG=1, as tests/common does. No lib test relies on the home config. Checks: npm run lint passes; npm test passes (Rust 1995/1995, UI 1439/1439, release 47/47, hooks 7/7) with ~/.lotar in place and no override. npm run smoke: 3 failures with LOTAR_DEFAULT_REPORTER=claude set (the DEV-338 bug: its fix 8d3b672 is on main, not on this branch); 373/373 pass with it unset. The merge agent''s rerun on main should pass smoke without that workaround.'
@@ -155,3 +157,15 @@ history:
   - field: relationships
     old: '{"related":["DEV-338","DEV-340","DEV-341","DEV-335"]}'
     new: '{"related":["DEV-338","DEV-340","DEV-341","DEV-335","DEV-366"]}'
+- at: 2026-11-12T18:39:56.259302+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-338","DEV-340","DEV-341","DEV-335","DEV-366"]}'
+    new: '{"related":["DEV-338","DEV-340","DEV-341","DEV-335","DEV-366","DEV-376"]}'
+- at: 2026-11-12T18:46:29.686924+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-338","DEV-340","DEV-341","DEV-335","DEV-366","DEV-376"]}'
+    new: '{"related":["DEV-338","DEV-340","DEV-341","DEV-335","DEV-366","DEV-376","DEV-377"]}'

@@ -1,0 +1,53 @@
+title: Agent jobs are left without an end when their worker exits
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T18:53:33.811162+00:00
+modified: 2026-11-12T18:53:35.319942+00:00
+relationships:
+  related:
+  - DEV-377
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4e76c77c-bfa8-45ce-86c9-4fd1a4c6314c
+description: |-
+  ## Found
+
+  Reported on 2026-11-12 by the LOCA-119 agent (repo local, finding unpushed:branches) to the DEV-377 agent. The LOCA-118 job (log /Users/mallox/Development/local/.tasks/@agent-logs/job-20261112T183642.565Z-1.jsonl) has only started and progress events, with no end event. Its T3 thread (mcp:86dd6b77-396d-484b-8d97-ce0ca1cafdb3) completed at 18:39:59Z. The ticket is still InProgress / @fix, the job_completed rules never ran, and the merge never ran: commit 091d1b0 is unmerged on agent/LOCA-118. Jobs LOCA-120..122 from the same batch (job-20261112T1836{43,44,49,52}*) have no end events either. The worker that ran the 18:36Z jobs for the local tasks dir seems to have exited without finishing them. The only worker left is the one for the lotar tasks dir (pid 24659).
+
+  ## Check
+
+  Kill a worker while its t3 job runs, then start a worker again. The job gets an end event (completed when the thread finished, or failed with a reason), and its end rules run once.
+
+  ## Done when
+
+  - [ ] A job whose worker dies is finished on the next worker or server start: status read from the T3 thread, end rules applied, log closed.
+  - [ ] Tested as above; docs/help/agent.md says how it behaves.
+tags:
+- health
+custom_fields:
+  finding: comms:orphaned-agent-jobs
+history:
+- at: 2026-11-12T18:53:34.182+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-377"]}'
+- at: 2026-11-12T18:53:34.347245+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T18:53:34.694312+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T18:53:35.319942+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4e76c77c-bfa8-45ce-86c9-4fd1a4c6314c

@@ -5,11 +5,12 @@ type: Bug
 reporter: mallox
 assignee: '@merge'
 created: 2026-11-12T02:51:11.809578+00:00
-modified: 2026-11-12T03:47:49.201474+00:00
+modified: 2026-11-12T18:39:56.260234+00:00
 relationships:
   related:
   - DEV-343
   - DEV-345
+  - DEV-376
 comments:
 - date: 2026-11-12T03:03:58.156447+00:00
   text: 'Fixed in 0e19ccd (branch agent/DEV-344). Cause: the Columns dialog used the browser''s default drag image. Chrome paints that image from the element''s stacking context, clipped to the element, so inside the scrolling modal a neighbouring column (Done) could show up in the ghost. The drop logic was always right. Fix: on dragstart the dialog clones the dragged status or column header, places the copy off-screen in document.body and passes it to setDragImage. The copy is removed right after. Checks: new unit test in view/__tests__/BoardColumnsDialog.spec.ts (it failed before the fix). In a temporary Playwright check in Chromium, with the board scrolled, the drag image showed only the dragged status or header and the drops still worked. npm run lint, npm test and npm run smoke all pass. The Rust test dev279 cross-process jobs failed once, then passed on rerun (flaky, unrelated). Not checked: the real OS drag image can''t be captured in automation, and Safari/Firefox weren''t tried by hand.'
@@ -80,3 +81,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-343"]}'
     new: '{"related":["DEV-343","DEV-345"]}'
+- at: 2026-11-12T18:39:56.260234+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-343","DEV-345"]}'
+    new: '{"related":["DEV-343","DEV-345","DEV-376"]}'

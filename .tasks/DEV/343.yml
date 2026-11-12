@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T02:37:52.182544+00:00
-modified: 2026-11-12T05:24:14.409148+00:00
+modified: 2026-11-12T18:46:29.687600+00:00
 relationships:
   related:
   - DEV-340
@@ -17,6 +17,8 @@ relationships:
   - DEV-345
   - DEV-364
   - DEV-366
+  - DEV-376
+  - DEV-377
 comments:
 - date: 2026-11-12T03:08:20.659456+00:00
   text: |-
@@ -130,3 +132,15 @@ history:
   - field: relationships
     old: '{"related":["DEV-340","DEV-341","DEV-347","TEST-1","DEV-348","DEV-344","DEV-345","DEV-364"]}'
     new: '{"related":["DEV-340","DEV-341","DEV-347","TEST-1","DEV-348","DEV-344","DEV-345","DEV-364","DEV-366"]}'
+- at: 2026-11-12T18:39:56.259957+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-340","DEV-341","DEV-347","TEST-1","DEV-348","DEV-344","DEV-345","DEV-364","DEV-366"]}'
+    new: '{"related":["DEV-340","DEV-341","DEV-347","TEST-1","DEV-348","DEV-344","DEV-345","DEV-364","DEV-366","DEV-376"]}'
+- at: 2026-11-12T18:46:29.687600+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-340","DEV-341","DEV-347","TEST-1","DEV-348","DEV-344","DEV-345","DEV-364","DEV-366","DEV-376"]}'
+    new: '{"related":["DEV-340","DEV-341","DEV-347","TEST-1","DEV-348","DEV-344","DEV-345","DEV-364","DEV-366","DEV-376","DEV-377"]}'

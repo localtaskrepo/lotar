@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T01:43:44.864229+00:00
-modified: 2026-11-12T02:37:52.366141+00:00
+modified: 2026-11-12T18:39:56.259634+00:00
 relationships:
   related:
   - DEV-1
@@ -15,6 +15,7 @@ relationships:
   - DEV-330
   - DEV-333
   - DEV-343
+  - DEV-376
 comments:
 - date: 2026-11-12T02:02:32.161100+00:00
   text: 'claude (Opus 5.5): Done in commit db898c5 on agent/DEV-340. During a job, setting the status or assignee back to the ticket''s current value now drops what was recorded for that field, so the job''s rules decide it again. The command says ''DEV-1: deferred assignee cleared; the job''s rules decide when job <id> ends'', and JSON/REST/MCP add the field to deferred.cleared (JobOutcome.cleared in api_types.rs, view/api/types.ts, openapi.json; the web toast uses the same text). With nothing recorded, nothing changes. lotar status/assignee no longer stop at their ''unchanged'' check while a job takes ticket changes, and lotar status no longer resends the current assignee with every status change. lotar assignee --clear always records a cleared assignee, also on a ticket that has none. docs/help/agent.md (Status and assignee during a job) describes this. Tests: tests/dev320_job_outcome_test.rs, setting_the_current_value_back_lets_the_job_completed_rule_decide (set claude, then the current assignee back, then end the job: the job_completed rule''s status and assignee apply) and clearing_the_assignee_during_a_job_records_a_cleared_assignee; vitest jobOutcome.spec. Checks: npm run lint:agent passed; npm test passed (Rust 1997/1997, UI 1439, release 47, hooks 7); npm run test:smoke:agent passed (373). The Rust tests ran with LOTAR_IGNORE_HOME_CONFIG=1. Without it, 2 tests fail on this machine''s ~/.lotar (padded_job_start_registers_canonical..., dev279 jobs_in_another_process...); padded_job_start also fails on the base commit. That is DEV-339 (in merge), not this change.'
@@ -165,3 +166,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-1","DEV-339","DEV-335","DEV-341","DEV-330","DEV-333"]}'
     new: '{"related":["DEV-1","DEV-339","DEV-335","DEV-341","DEV-330","DEV-333","DEV-343"]}'
+- at: 2026-11-12T18:39:56.259634+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-1","DEV-339","DEV-335","DEV-341","DEV-330","DEV-333","DEV-343"]}'
+    new: '{"related":["DEV-1","DEV-339","DEV-335","DEV-341","DEV-330","DEV-333","DEV-343","DEV-376"]}'

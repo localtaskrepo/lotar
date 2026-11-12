@@ -1,0 +1,110 @@
+title: Agent jobs for one ticket start a new thread and branch each time
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@merge'
+created: 2026-11-12T18:46:29.580751+00:00
+modified: 2026-11-12T18:55:34.878991+00:00
+relationships:
+  related:
+  - DEV-339
+  - DEV-343
+  - DEV-361
+  - DEV-365
+  - DEV-368
+  - DEV-376
+  - DEV-378
+  - DEV-366
+comments:
+- date: 2026-11-12T18:55:03.586110+00:00
+  author: claude
+  text: 'claude: Fixed in f1b3ca1 on agent/DEV-377. A running job for a ticket was already refused. The gap was retries after a job ended: T3 Code had renamed the branch to t3/<topic>, so the next job made a fresh agent/<ticket> from main in a new thread. Now a t3 job (session new, the default) continues the ticket''s last thread when that thread''s worktree still holds work main doesn''t have (unlanded commits or uncommitted changes), and logs why. Once the branch has landed, or the thread or worktree is gone, the next job starts a new thread. Not covered: a thread that was deleted in T3 Code while its branch still exists unmerged. Its branch name isn''t recorded in the job log, so that job starts a new thread as before. Test: dev318_t3_runner_test::a_second_job_continues_the_thread_with_unmerged_work_instead_of_a_new_one (fails before the fix, passes after). docs/help/agent.md updated. Checks: npm run lint, npm test, npm run smoke all pass. Standards: the retry rules (''Health: retry with @fix'', the STD-46 failed-merge retry) don''t need session: continue. A retry now continues the thread whenever unmerged work exists, and with session: continue it would also continue a thread whose work already landed. Separately filed DEV-378: jobs are left without an end when their worker exits (LOCA-118, reported by the LOCA-119 agent).'
+- date: 2026-11-12T18:55:34.711235+00:00
+  author: claude
+  text: 'claude: The LOCA-116 case (reported by the LOCA-119 agent) was the old build. Its merge job ran at 03:46Z on 2026-11-12. The check that counts a rebased branch as landed came with DEV-366 (296c975, 06:00Z), so the worker of that time only knew fast-forwards and failed a merge that had landed rebased as 74a1692. With the current check, git cherry 74a1692 962d54f shows the commit as landed (-), so that merge passes now. The worktree cleanup also handles branches that landed rebased (DEV-343, DEV-366). The duplicate second fix branch is what f1b3ca1 fixes. No new ticket.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A755534d2-fdff-4da7-a8e3-3590684f91af
+description: |-
+  ## Found
+
+  On 2026-11-12 several tickets each got several T3 threads, each writing its own fix on its own branch without knowing about the others (reported by the DEV-376 fix agent, thread mcp:9580a0f1-3171-44b1-ae40-b08351230335, passed on at the owner's request):
+
+  - DEV-361: 6 threads (for example mcp:b7be4f58-8651-4692-8cf6-4cb0c810c1c9, mcp:9d6c1af5-42de-408e-bad9-68435488fc61), 3 branches (`t3/restart-agent-worker-after-upgrade`, `-1`, `t3/lotar-worker-restart-on-upgrade`).
+  - DEV-365: 4 threads (mcp:0f2206be-e055-4829-a0bc-79907b8b08b3, mcp:c72b7f37-06d5-4e5b-9de0-97daecfab188, mcp:78efb4ae-e7de-4471-9faa-b47a7dec7e8f, mcp:3ac5dec7-ebec-4f8c-9960-503be09cc459), 3 branches.
+  - DEV-339, 346, 356, 359, 360, 362, 367: 2 or 3 branches each.
+
+  Result: 20 commits only on this Mac ([DEV-376](https://lotar.pyxzl.net/task/DEV-376), finding unpushed:branches). 13 copy what landed. 7 are different fixes for Done tickets (DEV-343, 346, 362, 363, 365, 370) that main landed another way, and an agent now compares them by hand.
+
+  Likely cause: jobs were retried after failed merges while the worker ran an old build (DEV-361). Each retry started a new thread instead of continuing the ticket's earlier thread or building on its open branch. DEV-368 continues the ticket's last thread only for the follow-up merge job, not for a new or retried fix job.
+
+  ## Fix
+
+  Before a job starts for a ticket, check for that ticket's earlier jobs: a thread that is still running or waiting, or an unmerged agent branch or worktree. Then do one of these:
+  - continue that thread (as DEV-368 does for merges), or
+  - start the job on the open branch, with the earlier job named in its prompt, or
+  - refuse the duplicate and comment why.
+
+  A running job for the same ticket should never get a second one. The retry rules in standards `configs/lotar/automation.yml` ("Health: retry with @fix", the failed-merge retry from STD-46) could also set `session: continue` once this works. Say in a comment whether they should, so standards can change them.
+
+  ## Check
+
+  A test: start a job for a ticket that already has a running job, or one with an unmerged agent branch, and assert that no second thread or branch appears. `git branch --list 't3/*' 'agent/*'` per ticket after a day of jobs.
+
+  ## Done when
+
+  - [ ] A second job for the same ticket continues or reuses the first job's thread or branch, or is refused with a comment.
+  - [ ] Tested as above; docs/help/agent.md says how it behaves.
+tags:
+- health
+custom_fields:
+  finding: comms:duplicate-ticket-threads
+history:
+- at: 2026-11-12T18:46:29.689430+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-339","DEV-343","DEV-361","DEV-365","DEV-368","DEV-376"]}'
+- at: 2026-11-12T18:46:29.845541+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T18:46:29.983921+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T18:46:30.518758+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A755534d2-fdff-4da7-a8e3-3590684f91af
+- at: 2026-11-12T18:53:34.181384+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-339","DEV-343","DEV-361","DEV-365","DEV-368","DEV-376"]}'
+    new: '{"related":["DEV-339","DEV-343","DEV-361","DEV-365","DEV-368","DEV-376","DEV-378"]}'
+- at: 2026-11-12T18:55:03.586110+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T18:55:13.245204+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T18:55:34.711235+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T18:55:34.878991+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-339","DEV-343","DEV-361","DEV-365","DEV-368","DEV-376","DEV-378"]}'
+    new: '{"related":["DEV-339","DEV-343","DEV-361","DEV-365","DEV-368","DEV-376","DEV-378","DEV-366"]}'

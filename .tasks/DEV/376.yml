@@ -1,0 +1,114 @@
+title: 'Commits only on this Mac: branches'
+status: Done
+priority: Medium
+type: Chore
+reporter: claude
+assignee: mallox
+created: 2026-11-12T18:36:46.696798+00:00
+modified: 2026-11-12T18:48:29.741317+00:00
+relationships:
+  related:
+  - DEV-339
+  - DEV-340
+  - DEV-343
+  - DEV-344
+  - DEV-346
+  - DEV-348
+  - DEV-354
+  - DEV-361
+  - DEV-362
+  - DEV-363
+  - DEV-365
+  - DEV-367
+  - DEV-370
+  - DEV-377
+  - DEV-360
+  - DEV-366
+comments:
+- date: 2026-11-12T18:39:56.180701+00:00
+  author: claude
+  text: |-
+    claude: Done so far: of the 20 unpushed commits, 13 were already on main (rebased, or main holds the same content). I deleted their 25 local branches and removed the 16 clean worktrees on them, all idle 12-17 h, tickets Done, no processes: agent/DEV-339 2cefdb2, DEV-340 db898c5, DEV-344 0e19ccd, DEV-346 44c5197, DEV-348 1c4db03, DEV-354 ca9aac2, DEV-367 f85d395, plus t3/* copies of 1a1eff4 b490195 1d69b61 f85d395 5fe75f2 32a8819 2cefdb2 db898c5 800f224. The check now reports 7 commits. Those are alternative versions of Done tickets that hold changes main doesn't have (main landed a different fix): 068c2a2 DEV-370 (t3/release-process-waiting-checks: release skill, automation rule, test), ebdb85b+88d95c7 DEV-365 (agent/DEV-365 and 2 t3 branches), 4eaad9d DEV-362 (2 t3 branches), 8e39487 DEV-363 (agent/DEV-363), b6abd48 DEV-346 (t3/lighter-rust-agent-profile), aa4b664 DEV-343 (agent/DEV-343). Their worktrees are clean. No files changed, so no commit. Note: several tickets had 2-3 parallel threads (DEV-361, DEV-362, DEV-365, DEV-367), which is where the duplicate branches came from.
+    Question: delete these 7 superseded commits (branches and worktrees), or push them to origin as archive branches?
+- date: 2026-11-12T18:48:29.534782+00:00
+  author: claude
+  text: 'claude: Owner (2026-11-12, in the thread): ''go through them and check which one is the best and use that, and then discard the others.'' I compared each of the 7 remaining commits with what main holds. On main already, so discarded: DEV-363 8e39487 (main has DEV-360''s 57d580b fix plus this test), DEV-343 aa4b664 (main has all of it, later extended by DEV-366), DEV-346 b6abd48 (main''s local profile is better: it keeps dependencies optimized; unoptimized, tests got up to 20x slower), DEV-362 4eaad9d (same update_match, extended later), DEV-365 ebdb85b+88d95c7 (same commit as main''s 6d62cb7), DEV-370 068c2a2 (main has it plus a sturdier test and f51de7c). Nothing needed combining. I removed their 7 worktrees, which were clean, and their 9 branches. Check: repos.ts localtaskrepo/lotar reports no problems; git log --branches --not --remotes is empty. No files changed, no commit. I passed the duplicate-threads pattern to the Daily communication review thread at the owner''s request.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9580a0f1-3171-44b1-ae40-b08351230335
+description: |-
+  20 commits on no remote, only on this Mac (git log --branches --not --remotes)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `unpushed:branches`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[unpushed:branches]` while the problem is there.
+
+  ## Done when
+
+  git log --branches --not --remotes is empty: the commits are pushed.
+tags:
+- health
+custom_fields:
+  finding: unpushed:branches
+history:
+- at: 2026-11-12T18:36:47.097337+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T18:36:48.797374+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T18:36:56.412705+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9580a0f1-3171-44b1-ae40-b08351230335
+- at: 2026-11-12T18:39:56.180701+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T18:39:56.263601+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-339","DEV-340","DEV-343","DEV-344","DEV-346","DEV-348","DEV-354","DEV-361","DEV-362","DEV-363","DEV-365","DEV-367","DEV-370"]}'
+- at: 2026-11-12T18:39:56.511012+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+- at: 2026-11-12T18:39:56.556064+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-12T18:46:29.689223+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-339","DEV-340","DEV-343","DEV-344","DEV-346","DEV-348","DEV-354","DEV-361","DEV-362","DEV-363","DEV-365","DEV-367","DEV-370"]}'
+    new: '{"related":["DEV-339","DEV-340","DEV-343","DEV-344","DEV-346","DEV-348","DEV-354","DEV-361","DEV-362","DEV-363","DEV-365","DEV-367","DEV-370","DEV-377"]}'
+- at: 2026-11-12T18:48:29.534782+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T18:48:29.608615+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-339","DEV-340","DEV-343","DEV-344","DEV-346","DEV-348","DEV-354","DEV-361","DEV-362","DEV-363","DEV-365","DEV-367","DEV-370","DEV-377"]}'
+    new: '{"related":["DEV-339","DEV-340","DEV-343","DEV-344","DEV-346","DEV-348","DEV-354","DEV-361","DEV-362","DEV-363","DEV-365","DEV-367","DEV-370","DEV-377","DEV-360","DEV-366"]}'
+- at: 2026-11-12T18:48:29.741317+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done
