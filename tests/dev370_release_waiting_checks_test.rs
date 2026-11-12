@@ -1,6 +1,6 @@
-//! DEV-370, DEV-385: closing a "Release vX.Y.Z" ticket, or any other
-//! prerequisite, hands every Blocked ticket that waited for it to @fix, with
-//! lotar's own `.tasks/DEV/automation.yml`.
+//! DEV-370, DEV-385, DEV-396: closing a "Release vX.Y.Z" ticket, or any other
+//! prerequisite, tells every Blocked ticket that waited for it to @fix, with
+//! lotar's own `.tasks/DEV/automation.yml`, also one a merge agent handed back.
 #![cfg(unix)]
 
 use crate::common;
@@ -40,6 +40,16 @@ fn field<'a>(task: &'a str, name: &str) -> &'a str {
     task.lines().find_map(|line| line.strip_prefix(&format!("{name}: "))).unwrap_or("")
 }
 
+/// Records that a merge agent handed the ticket to mallox, as for DEV-361
+/// and DEV-364, without starting a merge job.
+fn handed_back_by_merge(path: &std::path::Path) {
+    let mut task: serde_yaml_ng::Value = serde_yaml_ng::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let entry = serde_yaml_ng::from_str("at: 2026-11-12T00:00:00Z\nactor: merge\nchanges:\n- field: assignee\n  old: '@merge'\n  new: mallox\n").unwrap();
+    let history = task.as_mapping_mut().unwrap().entry("history".into()).or_insert_with(|| serde_yaml_ng::Value::Sequence(Vec::new()));
+    history.as_sequence_mut().unwrap().push(entry);
+    std::fs::write(path, serde_yaml_ng::to_string(&task).unwrap()).unwrap();
+}
+
 #[test]
 fn closing_a_release_ticket_starts_the_checks_that_wait_for_it() {
     let fixtures = TestFixtures::new();
@@ -49,7 +59,7 @@ fn closing_a_release_ticket_starts_the_checks_that_wait_for_it() {
     std::fs::write(
         fixtures.tasks_root.join("config.yml"),
         format!(
-            "default:\n  project: DEV\nagents:\n  fix:\n    runner: command\n    command: sh\n    args: ['-c', 'while [ ! -f \"{}\" ] && [ -d \"{}\" ]; do sleep 0.1; done']\n",
+            "default:\n  project: DEV\nagents:\n  fix: &wait\n    runner: command\n    command: sh\n    args: ['-c', 'while [ ! -f \"{}\" ] && [ -d \"{}\" ]; do sleep 0.1; done']\n  merge: *wait\n",
             go.display(),
             root.display()
         ),
@@ -88,6 +98,7 @@ fn closing_a_release_ticket_starts_the_checks_that_wait_for_it() {
     run(&["add", "Other work", "--assignee", "mallox"]);
     run(&["task", "relationships", "add", "DEV-2", "DEV-1", "--kind", "depends-on"]);
     run(&["task", "relationships", "add", "DEV-3", "DEV-4", "--kind", "depends-on"]);
+    handed_back_by_merge(&fixtures.tasks_root.join("DEV/2.yml"));
     run(&["status", "DEV-2", "Blocked"]);
     run(&["status", "DEV-3", "Blocked"]);
 
@@ -102,5 +113,5 @@ fn closing_a_release_ticket_starts_the_checks_that_wait_for_it() {
     let printed = format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
     assert!(out.status.success(), "{printed}");
     let waiting = std::fs::read_to_string(fixtures.tasks_root.join("DEV/2.yml")).unwrap();
-    assert_eq!(field(&waiting, "assignee"), "'@fix'", "{waiting}");
+    assert_eq!(field(&waiting, "assignee"), "'@fix'", "@fix, not the merge agent that handed it back: {waiting}");
 }

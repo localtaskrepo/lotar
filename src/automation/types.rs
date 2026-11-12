@@ -253,13 +253,13 @@ pub struct AutomationAction {
 /// and accepts the same `${{...}}` templates as comments.
 /// `tell_agent`: a message for the ticket's agent. A running job gets it as
 /// its next turn; otherwise the ticket's agent profile (its assignee, else
-/// the last agent profile it had, else `agent`) starts with it as the
+/// `agent`, else the last agent profile it had) starts with it as the
 /// prompt, as the next turn of the ticket's last session where there is one.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct AutomationTellAgentAction {
     /// Accepts the same `${{...}}` templates as comments.
     pub message: String,
-    /// The profile for a ticket that never had an agent (`fix` or `@fix`).
+    /// The profile for a ticket not assigned to one (`fix` or `@fix`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent: Option<String>,
 }

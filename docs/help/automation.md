@@ -273,7 +273,7 @@ A merge that runs in the fix agent's thread, with its context, instead of a thre
 `tell_agent` hands a message to the ticket's agent, so a comment (or any other event) reaches the agent that works on the ticket:
 
 - A job runs on the ticket: the message is queued to it. A [`t3`](agent.md#t3-code-threads) job sends it to its thread as the next turn once the current turn ends, still in the same job, so the `job_completed` rules run after the agent has dealt with it. A job that runs [in another process](agent.md#jobs-in-other-processes) gets it too. Claude jobs of the same process get it on stdin; for other runners a job with the message is queued and starts when the running one ends.
-- No job runs: the ticket goes to its agent, which starts with the message as its prompt, as the next turn of the ticket's last T3 Code thread where there is one (as `session: continue` does). The ticket's agent is its assignee when that is an agent profile, else the last agent profile it was assigned to, else the profile in `agent`. Without any of them the action fails and says so.
+- No job runs: the ticket goes to its agent, which starts with the message as its prompt, as the next turn of the ticket's last T3 Code thread where there is one (as `session: continue` does). The ticket's agent is its assignee when that is an agent profile, else the profile in `agent`, else the last agent profile it was assigned to. Without any of them the action fails and says so. Name `agent` when the last profile may be the wrong one: a ticket a merge agent handed back was last assigned to `@merge`.
 
 `message` takes the same templates as comments; `agent` (optional) is a profile name, with or without `@`. The `model`, `effort` and `provider` of the action's `agent` settings apply to a job it starts.
 
@@ -289,7 +289,7 @@ Who may talk to the agent is up to the rule's conditions. Pair it with a [commen
         message: |
           ${{comment.author}} commented on ${{ticket.id}}: ${{comment.text}}
           Read it and act on it: answer with a ticket comment, or change the work as it asks.
-        agent: fix   # for a ticket that never had an agent
+        agent: fix   # for a ticket not assigned to an agent
 ```
 
 The web UI describes these rules ("tell the ticket's agent …"); its rule editor edits them only in YAML.

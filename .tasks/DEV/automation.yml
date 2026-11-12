@@ -298,18 +298,20 @@ automation:
     # those tickets"). Release process (owner 2026-11-11, DEV-370, docs/release-guide.md): a ticket whose check needs
     # the next release depends on the open "Release vX.Y.Z" ticket, closed after brew upgrade lotar. By hand, for one
     # ticket: lotar automation run "Prerequisites done: continue the waiting ticket" --select 'id:/^DEV-N$/'.
+    # tell_agent queues the message to a running job, else starts @fix as the next turn of the ticket's last thread.
+    # agent: fix, because a ticket a merge agent handed back was last assigned to @merge, whose finished job sets Done
+    # (DEV-396).
     - name: "Prerequisites done: continue the waiting ticket"
       when:
         status: Blocked
       on:
         unblocked: &unblocked
-          set:
-            assignee: "@fix"
           agent:
             model: "${{ticket.field:model}}"
             provider: "${{ticket.field:provider}}"
-            session: continue
-            prompt: |
+          tell_agent:
+            agent: fix
+            message: |
               Ticket ${{ticket.id}} ("${{ticket.title}}") waited for ${{ticket.relationships.depends_on[*]}}, which
               is done now. Run lotar with LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex), and start
               each comment with it. Read the ticket and its comments: what it waited to do and what done looks like.

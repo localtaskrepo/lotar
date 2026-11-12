@@ -2218,7 +2218,7 @@ fn tell_agent(
         // Queued in this process: the job reads the ticket when it starts.
         return Ok(());
     }
-    let Some(agent) = ticket_agent(&task, config).or_else(|| fallback.map(|name| name.trim().trim_start_matches('@').to_string())) else {
+    let Some(agent) = ticket_agent(&task, config, fallback) else {
         return Err(LoTaRError::ValidationError(format!("{} has no agent to tell: set tell_agent.agent", task.id)));
     };
     if !config.agent_profiles.contains_key(&agent) {
@@ -2237,11 +2237,14 @@ fn tell_agent(
 }
 
 /// The ticket's agent profile: its assignee when that is one, else the
-/// last one it was assigned to.
-fn ticket_agent(task: &TaskDTO, config: &ResolvedConfig) -> Option<String> {
+/// rule's `agent`, else the last one it was assigned to. The rule's profile
+/// comes first, so a ticket a merge agent handed back doesn't go to @merge
+/// (DEV-396).
+fn ticket_agent(task: &TaskDTO, config: &ResolvedConfig, rule_agent: Option<&str>) -> Option<String> {
     let profile =
         |value: Option<&str>| value.and_then(|value| value.strip_prefix('@')).filter(|name| config.agent_profiles.contains_key(*name)).map(str::to_string);
-    profile(task.assignee.as_deref()).or_else(|| {
+    let rule_agent = rule_agent.map(|name| name.trim().trim_start_matches('@').to_string());
+    profile(task.assignee.as_deref()).or(rule_agent).or_else(|| {
         task.history
             .iter()
             .rev()
