@@ -358,16 +358,36 @@ function moveStatus(key: string, targetId: string) {
 
 // -- Drag and drop ------------------------------------------------------------
 
+/**
+ * Drag a copy placed outside the modal. Chrome paints the default drag image from the
+ * element's stacking context, which in this scrolling board can show a neighbouring column.
+ */
+function setDragGhost(event: DragEvent) {
+  const source = event.currentTarget
+  const transfer = event.dataTransfer
+  if (!(source instanceof HTMLElement) || !transfer || typeof transfer.setDragImage !== 'function') return
+  const box = source.getBoundingClientRect()
+  const ghost = source.cloneNode(true) as HTMLElement
+  ghost.classList.add('board-columns-dialog__ghost')
+  ghost.style.width = `${box.width}px`
+  ghost.style.height = `${box.height}px`
+  document.body.append(ghost)
+  transfer.setDragImage(ghost, event.clientX - box.left, event.clientY - box.top)
+  setTimeout(() => ghost.remove(), 0)
+}
+
 function startStatusDrag(key: string, event: DragEvent) {
   drag.value = { kind: 'status', key }
   event.dataTransfer?.setData('text/plain', key)
   if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
+  setDragGhost(event)
 }
 
 function startColumnDrag(id: string, event: DragEvent) {
   drag.value = { kind: 'column', id }
   event.dataTransfer?.setData('text/plain', id)
   if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
+  setDragGhost(event)
 }
 
 function endDrag() {
@@ -546,6 +566,19 @@ function apply() {
   border-bottom: 1px solid var(--border);
   cursor: grab;
   min-height: 40px;
+}
+
+/* Off-screen copy used as the drag image; see setDragGhost. */
+.board-columns-dialog__ghost {
+  position: fixed;
+  top: -10000px;
+  left: -10000px;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg);
+  color: var(--fg);
+  pointer-events: none;
 }
 
 .board-columns-dialog__column-head:active {

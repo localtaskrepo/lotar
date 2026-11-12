@@ -102,6 +102,29 @@ describe('BoardColumnsDialog (DEV-130)', () => {
         expect(stacks(await applied(wrapper))).toEqual(['done+doing+review', 'todo'])
     })
 
+    it('drags a detached copy of the status or column header, not a snapshot of the scrolling board (DEV-344)', async () => {
+        const wrapper = mountDialog()
+        await flushPromises()
+        for (const source of [row(wrapper, 'Doing'), column(wrapper, 3).find('.board-columns-dialog__column-head')]) {
+            const images: { image: Element; inBoard: boolean; text: string }[] = []
+            const dataTransfer = {
+                setData: () => undefined,
+                setDragImage: (image: Element) =>
+                    images.push({
+                        image,
+                        inBoard: wrapper.element.contains(image),
+                        text: image.textContent.trim(),
+                    }),
+            }
+            await source.trigger('dragstart', { dataTransfer })
+            expect(images).toHaveLength(1)
+            expect(images[0]!.inBoard).toBe(false)
+            expect(images[0]!.text).toBe(source.text().trim())
+            expect(images[0]!.image).not.toBe(source.element)
+            await source.trigger('dragend')
+        }
+    })
+
     it('keeps per-column settings with the column and resets to one column per status', async () => {
         const wrapper = mountDialog({
             columns: [
