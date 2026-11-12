@@ -1,0 +1,45 @@
+title: Agent worktrees stay after their ticket reaches Done
+status: InProgress
+priority: High
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-12T02:37:52.182544+00:00
+modified: 2026-11-12T02:37:53.908084+00:00
+relationships:
+  related:
+  - DEV-340
+  - DEV-341
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac8bbef48-abb4-4ea3-a102-0aa1b813088b
+description: |-
+  Found by STD-41 on 2026-11-11 (claude, job thread of STD-41): ~/.t3/worktrees/lotar held 24 GB of agent worktrees, among them agent-DEV-340 (6.4 GB, ticket Done) and agent-DEV-341 (4.7 GB), with agent.worktree.cleanup_on_done: true.
+
+  Two causes in src/services/agent_job_service.rs (maybe_cleanup_worktree, check_worktree_cleanup):
+  - Cleanup runs only when the job that used the worktree ends, and only if the ticket is Done at that moment. The fix job ends with the ticket handed to @merge (InProgress), so it is never Done then; the merge job that sets Done runs in a worktree of its own and cleans only that one. Seen: lotar agent worktree cleanup --dry-run in standards would remove STD-35 and STD-37 (both Done, merged), which their jobs left.
+  - The merged check is git merge-base --is-ancestor. The merge agent lands the work rebased or cherry-picked (agent/DEV-340 db898c5 landed as ab22fac), so lotar agent worktree cleanup preserves DEV-340 and DEV-341: 'git merge-base --is-ancestor refs/heads/agent/DEV-340 HEAD failed'. git cherry main agent/DEV-340 shows every commit as already in main.
+
+  Done when: a ticket that reaches Done (from any job, or by hand) gets its job worktrees removed when they are clean and their commits are in main, also rebased (git cherry), and its branch deleted with cleanup_delete_branches; tests cover the fix-then-merge handoff and a rebased merge. standards repos.ts now counts rebased worktrees as merged and removes them a day later (STD-41), so this is about doing it at Done.
+history:
+- at: 2026-11-12T02:37:52.367259+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-340","DEV-341"]}'
+- at: 2026-11-12T02:37:52.508675+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T02:37:52.952669+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T02:37:53.908084+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac8bbef48-abb4-4ea3-a102-0aa1b813088b

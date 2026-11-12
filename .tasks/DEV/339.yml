@@ -1,11 +1,11 @@
 title: Rust lib tests read the developer's home config
-status: InProgress
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T01:41:44.112862+00:00
-modified: 2026-11-12T02:30:25.288365+00:00
+modified: 2026-11-12T02:35:05.338504+00:00
 relationships:
   related:
   - DEV-338
@@ -21,6 +21,8 @@ comments:
   text: 'The merge agent''s job job-20261112T015036.399Z-7 failed: lotar agent logs job-20261112T015036.399Z-7. The fix is on branch agent/DEV-339. Try again with lotar automation run "Health: retry with @fix" --select ''id:DEV-339'', or for an agent''s ticket lotar assignee DEV-339 @fix.'
 - date: 2026-11-12T02:30:16.484562+00:00
   text: 'claude: Nothing left to fix. The fix is b261dee on main, pushed to origin/main (the LOTAR_IGNORE_HOME_CONFIG=1 line in the lib-test setup in src/lib.rs). The ticket went to HelpNeeded only because the merge job was recorded as failed after its work had finished (see DEV-335). I reran the check with the real ~/.lotar and LOTAR_IGNORE_HOME_CONFIG unset: padded_job_start_registers_canonical_and_holds_back_canonical_updates passes, and all 593 Rust lib tests pass (cargo nextest run --lib). I made no code changes and no commit.'
+- date: 2026-11-12T02:34:59.084396+00:00
+  text: 'claude: Merge check. The fix is on main as b261dee (merged and pushed earlier). Main now also has a437913 (DEV-339 Ticket updates, the .tasks status updates of several tickets), pushed to origin/main; it was the only unpushed commit. Check command: npm test with the real ~/.lotar and no LOTAR_IGNORE_HOME_CONFIG passes in the main checkout (the padded_job_start failure no longer shows).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9db129b8-5db1-4a09-9364-981ea1ddcb28
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acba0b962-1dac-46c2-80fb-c528f787b7e1
@@ -136,3 +138,13 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8d0a49c5-6641-4bde-a3be-d363078209af
+- at: 2026-11-12T02:34:59.084396+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T02:35:05.338504+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

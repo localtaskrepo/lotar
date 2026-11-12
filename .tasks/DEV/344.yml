@@ -1,0 +1,35 @@
+title: Board view column drag moves 2 columns at once
+status: InProgress
+priority: Medium
+type: Bug
+reporter: mallox
+assignee: '@fix'
+created: 2026-11-12T02:51:11.809578+00:00
+modified: 2026-11-12T02:51:44.508920+00:00
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acc5efee6-bd66-409d-b0a7-534b40ba7f0f
+description: |-
+  This is a visual bug where configuring the columns in the board view allow you to drag a status to combine it with another.
+  In 2 projects I moved blocked and help needed, and during drag it looked like I was also dragging the done column. The behavior however was correct once dropping the column.
+history:
+- at: 2026-11-12T02:51:29.655102+00:00
+  actor: mallox
+  changes:
+  - field: effort
+    old: '@fix'
+- at: 2026-11-12T02:51:33.744958+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T02:51:39.112745+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T02:51:44.508920+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acc5efee6-bd66-409d-b0a7-534b40ba7f0f

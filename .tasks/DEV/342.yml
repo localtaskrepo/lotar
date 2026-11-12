@@ -1,0 +1,67 @@
+title: 't3 merge job fails: the thread''s worktree branch isn''t the agent branch LoTaR checks'
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@merge'
+created: 2026-11-12T02:31:00.438069+00:00
+modified: 2026-11-12T02:53:41.272771+00:00
+relationships:
+  related:
+  - DEV-341
+comments:
+- date: 2026-11-12T02:42:47.348583+00:00
+  text: 'Claude (fix agent): Fixed in commit c55f67c on agent/DEV-342. (1) When a t3 job''s thread ends, LoTaR runs ''t3 thread show'' again and records the thread''s final worktree branch, so the merge check and the next phase see a branch T3 Code renamed (e.g. t3/<topic>). (2) ensure_branch_merged counts a branch as merged when ''git cherry HEAD <branch>'' lists no ''+'' commits (rebased or cherry-picked onto main elsewhere). docs/help/agent.md updated. Tests: new merge_job_whose_branch_was_rebased_elsewhere_passes; lotar_worktrees_become_t3_worktrees now has the fake t3 rename the branch mid-run. Both fail without the fix. Checks: npm run lint, npm test (1998 Rust + 1441 UI), npm run smoke (377) all pass. Not covered: the next phase''s t3 worktree base still comes from agent/<ID> when that branch exists (plan_t3_worktree), not from the recorded renamed branch. Status and assignee left unchanged; the ticket moves to its next step when this job ends.'
+- date: 2026-11-12T02:53:41.272771+00:00
+  text: 'claude: merge job. Fast-forwarded main with c55f67c (no rebase needed, branch was already on main a437913). Checks in the worktree: npm run lint, npm test (1998 Rust incl. 1 flaky that passed on retry, 1441 UI), npm run smoke (377): all passed. Pushing to origin/main together with the ticket-files commit.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac9fa1607-a8fa-4de8-b1ff-612d4ebfea9b
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab52ce2eb-f928-4e96-833c-d89ef8f15449
+description: |-
+  Found (DEV-341, 2026-11-11): the merge job job-20261112T021232.193Z-10 rebased and fast-forwarded main correctly (22b7e26), but LoTaR failed it with 'Merge job finished, but agent/DEV-341 is not merged into the main checkout's current branch and can't be fast-forwarded'. The T3 Code thread worked in its own worktree on branch t3/agent-summary-job-end-handoff (T3 renames the thread's branch), so agent/DEV-341 stayed at the pre-rebase commit 1a1eff4. git cherry main agent/DEV-341 shows the commit as already applied. ensure_branch_merged (src/services/agent_job_service.rs) checks state.record.worktree_branch, which still names agent/DEV-341. The fix job showed the same mismatch: its prompt names agent/DEV-341, the thread ran on t3/agent-summary-job-end-handoff-1.
+
+  Wanted: a t3 merge job checks the branch the thread actually worked on, or the thread works on agent/<ID>; a branch whose commits are all already on main (git cherry, no '+' lines) counts as merged.
+
+  Done when: a test where the agent branch's commit was rebased onto main elsewhere, and the merge job passes; a t3 job records the thread's final branch.
+history:
+- at: 2026-11-12T02:31:00.581421+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-341"]}'
+- at: 2026-11-12T02:31:00.681278+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-12T02:31:00.814721+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-12T02:31:01.440608+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac9fa1607-a8fa-4de8-b1ff-612d4ebfea9b
+- at: 2026-11-12T02:42:47.348583+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T02:42:57.873230+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T02:43:00.100818+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab52ce2eb-f928-4e96-833c-d89ef8f15449
+- at: 2026-11-12T02:53:41.272771+00:00
+  actor: claude
+  changes:
+  - field: comment_added
