@@ -102,9 +102,12 @@ impl TemplateContext {
             format!("{prefix}.comments"),
             task.comments
                 .iter()
-                .map(|comment| ListItem {
-                    value: comment.text.clone(),
-                    fields: HashMap::from([("text", comment.text.clone()), ("date", comment.date.clone())]),
+                .map(|comment| {
+                    let mut fields = HashMap::from([("text", comment.text.clone()), ("date", comment.date.clone())]);
+                    if let Some(ref author) = comment.author {
+                        fields.insert("author", author.clone());
+                    }
+                    ListItem { value: comment.text.clone(), fields }
                 })
                 .collect(),
         );
@@ -194,12 +197,15 @@ impl TemplateContext {
         self
     }
 
-    /// Add the comment text that triggered a `commented` event.
-    pub fn with_comment(mut self, text: Option<&str>) -> Self {
-        let Some(text) = text else {
+    /// Add the comment that triggered a `commented` event.
+    pub fn with_comment(mut self, comment: Option<&crate::types::TaskComment>) -> Self {
+        let Some(comment) = comment else {
             return self;
         };
-        self.set("comment.text", text);
+        self.set("comment.text", &comment.text);
+        if let Some(ref author) = comment.author {
+            self.set("comment.author", author);
+        }
         self
     }
 
@@ -398,7 +404,7 @@ mod tests {
             "relationships": { "depends_on": ["WEB-1", "WEB-2"], "parent": "WEB-0" },
             "comments": [
                 { "date": "2026-10-01", "text": "First" },
-                { "date": "2026-10-02", "text": "Latest note" }
+                { "date": "2026-10-02", "author": "mallox", "text": "Latest note" }
             ],
             "references": [
                 { "link": "https://example.com/spec" },
@@ -421,6 +427,8 @@ mod tests {
         assert_eq!(ctx.expand("${{ticket.references[1].code}}"), "src/app.rs#L10");
         assert_eq!(ctx.expand("${{ticket.comments[-1].text}}"), "Latest note");
         assert_eq!(ctx.expand("${{ticket.comments[-1].date}}"), "2026-10-02");
+        assert_eq!(ctx.expand("${{ticket.comments[-1].author}}"), "mallox");
+        assert_eq!(ctx.expand("${{ticket.comments[0].author}}"), "");
         assert_eq!(ctx.expand("${{ticket.relationships.depends_on[*]}}"), "WEB-1, WEB-2");
         assert_eq!(ctx.expand("${{ticket.relationships.parent}}"), "WEB-0");
         assert_eq!(ctx.expand("${{ticket.acceptance_criteria[*]}}"), "Shows the cost, Works offline");

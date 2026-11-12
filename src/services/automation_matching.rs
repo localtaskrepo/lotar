@@ -1,5 +1,5 @@
 use crate::api_types::TaskDTO;
-use crate::automation::types::{AutomationConditionGroup, AutomationFieldCondition, AutomationRule};
+use crate::automation::types::{AutomationCommentCondition, AutomationConditionGroup, AutomationFieldCondition, AutomationRule};
 use crate::config::types::ResolvedConfig;
 use crate::utils::tags::normalize_tags;
 use regex::Regex;
@@ -17,6 +17,13 @@ pub(crate) enum MatchMode {
 pub(crate) struct ChangeSet {
     fields: HashMap<String, FieldChange>,
     custom_fields: HashMap<String, FieldChange>,
+    /// The comment of a `commented` event (DEV-383).
+    comment: Option<CommentFacts>,
+}
+
+#[derive(Debug, Clone)]
+struct CommentFacts {
+    author: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -73,11 +80,16 @@ impl ChangeSet {
             }
         }
 
-        Self { fields, custom_fields }
+        Self { fields, custom_fields, comment: None }
     }
 
     pub(crate) fn empty(current: &TaskDTO) -> Self {
         Self::new(Some(current), current)
+    }
+
+    /// No field changes: a comment by `author` was added to `current`.
+    pub(crate) fn commented(current: &TaskDTO, author: Option<&str>) -> Self {
+        Self { comment: Some(CommentFacts { author: author.map(str::to_string) }), ..Self::empty(current) }
     }
 
     fn changed_field(&self, field: &str) -> Option<&FieldChange> {
@@ -119,7 +131,7 @@ impl ChangeSet {
     /// as `current`. The values before the update are unknown.
     fn only(current: &TaskDTO, fields: &[String]) -> Self {
         let mut all = Self::new(None, current);
-        let mut out = Self { fields: HashMap::new(), custom_fields: HashMap::new() };
+        let mut out = Self { fields: HashMap::new(), custom_fields: HashMap::new(), comment: None };
         for field in fields {
             let key = change_key(field);
             if let Some(change) = all.fields.remove(&key) {
@@ -201,6 +213,15 @@ pub(crate) fn current_fields(rule: &AutomationRule) -> Vec<String> {
     out.into_iter().collect()
 }
 
+/// Whether `rule` has a condition on the comment of a `commented` event.
+pub(crate) fn has_comment_condition(rule: &AutomationRule) -> bool {
+    fn walk(group: &AutomationConditionGroup) -> bool {
+        group.comment.is_some()
+            || group.all.iter().flatten().chain(group.any.iter().flatten()).chain(group.not.as_deref()).chain(group.current.as_deref()).any(walk)
+    }
+    rule.when.as_ref().is_some_and(walk)
+}
+
 /// Fields under `current` are left out: they need not change.
 fn collect_change_fields(group: &AutomationConditionGroup, out: &mut BTreeSet<String>) {
     for entry in group.all.iter().flatten().chain(group.any.iter().flatten()) {
@@ -279,6 +300,12 @@ fn matches_group(
         return false;
     }
 
+    if let Some(comment) = group.comment.as_ref()
+        && !matches_comment(comment, changes, config)
+    {
+        return false;
+    }
+
     if !matches_field_map(&group.fields, current, changes, mode, config, active_sprint_ids) {
         return false;
     }
@@ -310,6 +337,18 @@ fn matches_changes(group: &HashMap<String, crate::automation::types::AutomationC
         }
     }
     true
+}
+
+fn matches_comment(condition: &AutomationCommentCondition, changes: &ChangeSet, config: &ResolvedConfig) -> bool {
+    let Some(comment) = changes.comment.as_ref() else {
+        return false;
+    };
+    let Some(author_condition) = condition.author.as_ref() else {
+        return true;
+    };
+    let author = comment.author.as_deref();
+    matches_assignee_placeholder_str(author_condition, author, config)
+        || matches_value_condition(author_condition, author.map(|value| AutomationValue::String(value.to_string())).as_ref())
 }
 
 fn matches_field_map(

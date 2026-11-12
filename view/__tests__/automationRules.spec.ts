@@ -6,6 +6,7 @@ import {
     parseAutomationYamlDocument,
     summarizeAutomationRule,
 } from '../utils/automationRules'
+import { describeConditions } from '../utils/automationText'
 
 describe('automationRules utilities', () => {
     it('builds any-match rules into an any group', () => {
@@ -85,6 +86,20 @@ describe('automationRules utilities', () => {
             summarizeAutomationRule({ ...rule, when: { current: { type: 'Change' }, status: 'InProgress' } })
                 .conditions,
         ).toEqual(['NOW (...)', 'status = InProgress'])
+    })
+
+    it('flags comment author conditions as yaml-only and describes them', () => {
+        const rule = {
+            name: 'Owner answered',
+            when: { comment: { author: 'mallox' } },
+            on: { commented: { comment: 'thanks ${{comment.author}}' } },
+        }
+        const state = getEditableRuleState(rule)
+
+        expect(state.editable).toBe(false)
+        expect(state.unsupportedReasons).toEqual(['Comment author conditions are currently YAML-only.'])
+        expect(summarizeAutomationRule(rule).conditions).toEqual(['comment author = mallox'])
+        expect(describeConditions(rule.when).items).toEqual(['comment author is mallox'])
     })
 
     it('compacts canonical yaml before building summaries', () => {

@@ -273,7 +273,11 @@ describe('AutomationRuleDialog (DEV-241)', () => {
         await field.trigger('input')
         await flushPromises()
         const options = wrapper.findAll('.template-field__option').map((item) => item.text())
-        expect(options).toEqual(['The new commentcomment.text', 'Latest commentticket.comments[-1].text'])
+        expect(options).toEqual([
+            'The new commentcomment.text',
+            'Who wrote itcomment.author',
+            'Latest commentticket.comments[-1].text',
+        ])
         await field.trigger('keydown', { key: 'Enter' })
         await flushPromises()
         expect(element.value).toBe('Reply: ${{comment.text}}')

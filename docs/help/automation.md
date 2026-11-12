@@ -68,6 +68,7 @@ Supported combinators:
 - `not`: invert a condition
 - `changes`: explicit from/to checks
 - `current`: conditions on the task as it is now
+- `comment`: conditions on the comment of a `commented` event
 
 A field condition can also test the value with a regular expression, e.g. `title: { matches: '^\[ops\]' }`. Patterns use the same syntax as [search text](list.md#search-text); an invalid pattern is rejected when the rules are saved through LoTaR.
 
@@ -123,6 +124,24 @@ when:
   changes:
     status: { from: Todo, to: InProgress }
 ```
+
+### Comment conditions
+
+`comment: { author: ... }` checks who wrote the comment that fired a `commented` rule. The author takes the same conditions as `assignee`: a name, a list of names, operators such as `starts_with` or `exists`, and the placeholders `@user`, `@agent` and `@any`. Names match case-insensitively. It works inside `all`, `any`, `not` and `current`, and never matches on other events, so put it only on rules with a `commented` hook. Comments from versions before 0.14 have no author: they match only `exists: false` (or `not`).
+
+```yaml
+- name: Owner answered
+  when:
+    all:
+      - comment: { author: mallox }
+      - current: { assignee: mallox }
+  on:
+    commented:
+      set: { assignee: "@reporter" }
+      comment: "${{comment.author}} answered; back to the reporter."
+```
+
+`lotar automation simulate --event commented` checks comment conditions against the ticket's latest comment and says whose it is (`Checked against the latest comment, by mallox.`).
 
 ### Special assignee placeholders
 
@@ -320,7 +339,7 @@ Available variables:
 |--------|-----------|
 | `ticket.*` | `id`, `title`, `status`, `priority`, `type`, `assignee`, `reporter`, `description`, `due_date`, `effort`, `tags`, `field:<name>` |
 | `previous.*` | Same as `ticket.*` but for the pre-change state (available on the update-derived hooks `updated`, `assigned`, `sprint_changed`, and the legacy `start`, which also covers task creation where no prior state exists; not available on `commented` or job hooks) |
-| `comment.*` | `text` (available on `commented` events) |
+| `comment.*` | `text`, `author` (available on `commented` events; `author` is empty for a comment without one) |
 | `agent.*` | `job_id`, `runner`, `profile`, `worktree_path`, `worktree_branch` (available on job events); after a job ends also `usage`, `cost_usd`, `input_tokens`, `output_tokens`, `turns` when the CLI reported them |
 
 Lists take a selector in square brackets. `[*]` joins every item with ", ", a number picks one item (`[0]` is the first, `[-1]` the last), and `.field` reads a field of each item:
@@ -329,7 +348,7 @@ Lists take a selector in square brackets. `[*]` joins every item with ", ", a nu
 |------|--------|
 | `ticket.tags`, `ticket.acceptance_criteria`, `ticket.sprints` | — |
 | `ticket.relationships.depends_on`, `.blocks`, `.related`, `.children`, `.fixes` | — (`ticket.relationships.parent` and `.duplicate_of` are plain values) |
-| `ticket.comments` | `text`, `date` (the item itself is the text) |
+| `ticket.comments` | `text`, `date`, `author` (the item itself is the text) |
 | `ticket.references` | `code`, `link`, `file`, `attachment`, `jira`, `github` (the item itself is whichever is set) |
 
 For example `${{ticket.references[*].link}}` lists every link, and `${{ticket.comments[-1].text}}` is the latest comment. The same selectors work for `previous.*`. An index out of range or an unknown field expands to nothing.
@@ -341,7 +360,7 @@ on:
   start:
     comment: "Status changed from ${{previous.status}} to ${{ticket.status}}"
   commented:
-    run: "echo ${{comment.text}}"
+    run: "echo ${{comment.author}} wrote ${{comment.text}}"
 ```
 
 ## Execution and composition semantics
@@ -414,7 +433,7 @@ For the change events (`created`, `updated`, `assigned`, `sprint_changed`) the s
 
 The preview applies the matched action the same way a real run would, without writing anything: every `set` field (including due date, effort, custom fields and the `labels` alias), templates built from the ticket's current values, `@me`/`@reporter`/`@assignee`/`@assignee_or_reporter`/`@least_busy` assignees, and case-insensitive tag adds and removes. A few things can only be known when the rule actually runs; the preview lists them as warnings instead of guessing:
 
-- Template values from the triggering event (`${{previous.*}}`, `${{comment.text}}`, `${{agent.*}}`) stay unexpanded.
+- Template values from the triggering event (`${{previous.*}}`, `${{comment.*}}`, `${{agent.*}}`) stay unexpanded.
 - `@round_robin` and `@random` assignees are shown as the token (previewing round robin would advance the real rotation).
 - Unknown status, priority or type values are reported as skipped.
 - Sprint additions and removals, comments and run commands are listed as actions but not applied to the previewed task.

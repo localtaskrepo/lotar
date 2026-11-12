@@ -490,6 +490,11 @@ function summarizeConditions(when: unknown): string[] {
             conditions.push('NOW (...)')
             continue
         }
+        if (key === 'comment' && value && typeof value === 'object') {
+            const author = (value as AutomationRecord).author
+            if (author != null) conditions.push(`comment author ${summarizeFieldCondition(author)}`)
+            continue
+        }
         conditions.push(`${key} ${summarizeFieldCondition(value)}`)
     }
 
@@ -630,10 +635,13 @@ function collectUnsupportedWhenReasons(when: unknown, depth = 0): string[] {
     if ('current' in record) {
         reasons.push('Current-value conditions are currently YAML-only.')
     }
+    if ('comment' in record) {
+        reasons.push('Comment author conditions are currently YAML-only.')
+    }
 
     for (const key of Object.keys(record)) {
         if (SUPPORTED_WHEN_KEYS.has(key)) continue
-        if (key !== 'not' && key !== 'current' && !isSupportedFieldCondition(record[key])) {
+        if (key !== 'not' && key !== 'current' && key !== 'comment' && !isSupportedFieldCondition(record[key])) {
             reasons.push(`Condition for ${key} uses an unsupported shape.`)
         }
     }

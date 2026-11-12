@@ -7,7 +7,7 @@ use crate::config::validation::errors::ValidationResult;
 use crate::errors::{LoTaRError, LoTaRResult};
 use crate::services::agent_job_service::{AgentJobService, AgentOrchestratorMode};
 use crate::services::agent_queue_service::AgentQueueService;
-use crate::services::automation_matching::{ChangeSet, MatchMode, UpdateMatch, current_fields, matches_rule, update_match};
+use crate::services::automation_matching::{ChangeSet, MatchMode, UpdateMatch, current_fields, has_comment_condition, matches_rule, update_match};
 use crate::services::automation_validation::{parse_cooldown, validate_rules};
 use crate::services::sprint_service::SprintService;
 use crate::services::task_service::{CommentContext, TaskService, TaskUpdateContext};
@@ -236,7 +236,7 @@ struct AutomationActionContext {
     event: AutomationEvent,
     job: Option<AutomationJobContext>,
     previous: Option<TaskDTO>,
-    comment_text: Option<String>,
+    comment: Option<crate::types::TaskComment>,
 }
 
 #[derive(Debug, Clone)]
@@ -380,7 +380,7 @@ impl AutomationService {
             // Fire event-specific hooks
             for &event in &events {
                 if let Some(action) = resolve_action_for_event(&rule.on, event) {
-                    let action_context = AutomationActionContext { event, job: None, previous: previous.cloned(), comment_text: None };
+                    let action_context = AutomationActionContext { event, job: None, previous: previous.cloned(), comment: None };
                     if let Err(err) = apply_action(storage, current, config, action, &action_context) {
                         failures.push(rule_failure(rule, &rk, &current.id, &err));
                     }
@@ -391,7 +391,7 @@ impl AutomationService {
             // Fire legacy catch-all `start` hook (backward compat)
             if let Some(action) = rule.on.start.as_ref() {
                 let primary_event = events.first().copied().unwrap_or(AutomationEvent::Updated);
-                let action_context = AutomationActionContext { event: primary_event, job: None, previous: previous.cloned(), comment_text: None };
+                let action_context = AutomationActionContext { event: primary_event, job: None, previous: previous.cloned(), comment: None };
                 if let Err(err) = apply_action(storage, current, config, action, &action_context) {
                     failures.push(rule_failure(rule, &rk, &current.id, &err));
                 }
@@ -406,11 +406,11 @@ impl AutomationService {
     }
 
     /// Fire automation rules for a comment being added to a task.
-    pub fn apply_comment_event(storage: &mut Storage, task: &TaskDTO, comment_text: &str, config: &ResolvedConfig) -> LoTaRResult<()> {
+    pub fn apply_comment_event(storage: &mut Storage, task: &TaskDTO, comment: &crate::types::TaskComment, config: &ResolvedConfig) -> LoTaRResult<()> {
         let tasks_dir = storage.root_path.clone();
         let project = crate::storage::TaskId::parse(&task.id).map(|parsed| parsed.project).unwrap_or_default();
         let (automation, _) = load_effective_automation(&tasks_dir, if project.is_empty() { None } else { Some(project.as_str()) }, Some(config))?;
-        let changes = ChangeSet::empty(task);
+        let changes = ChangeSet::commented(task, comment.author.as_deref());
         let active_sprints = compute_active_sprint_ids(storage);
         let event = AutomationEvent::Commented;
         let mut failures: Vec<String> = Vec::new();
@@ -424,7 +424,7 @@ impl AutomationService {
                 continue;
             }
             if let Some(action) = resolve_action_for_event(&rule.on, event) {
-                let action_context = AutomationActionContext { event, job: None, previous: None, comment_text: Some(comment_text.to_string()) };
+                let action_context = AutomationActionContext { event, job: None, previous: None, comment: Some(comment.clone()) };
                 if let Err(err) = apply_action(storage, task, config, action, &action_context) {
                     failures.push(rule_failure(rule, &rk, &task.id, &err));
                 }
@@ -448,7 +448,7 @@ impl AutomationService {
             .filter(|_| matches!(event, AutomationEvent::JobCompleted | AutomationEvent::JobFailed | AutomationEvent::JobCancelled))
             .map(|job| job.job_id.clone());
         let recorded = ending_job.as_deref().and_then(|job_id| crate::services::agent_active_jobs::peek_outcome(tasks_dir, job_id));
-        let action_context = AutomationActionContext { event, job: job_context, previous: None, comment_text: None };
+        let action_context = AutomationActionContext { event, job: job_context, previous: None, comment: None };
         let mut failures: Vec<String> = Vec::new();
 
         for (rule_idx, rule) in automation.automation.rules().iter().enumerate() {
@@ -561,10 +561,21 @@ impl AutomationService {
                         UpdateMatch::Never => false,
                     }
                 }
+                // The latest comment stands in for the new one (DEV-383).
+                AutomationEvent::Commented => {
+                    let author = task.comments.last().and_then(|comment| comment.author.as_deref());
+                    matches_rule(rule, task, &ChangeSet::commented(task, author), MatchMode::Current, config, &active_sprints)
+                }
                 _ => matches_rule(rule, task, &ChangeSet::empty(task), MatchMode::Current, config, &active_sprints),
             };
             if !matched {
                 continue;
+            }
+            if matches!(event, AutomationEvent::Commented) && has_comment_condition(rule) {
+                match task.comments.last().and_then(|comment| comment.author.as_deref()) {
+                    Some(author) => notes.push(format!("Checked against the latest comment, by {author}.")),
+                    None => notes.push("Checked against the latest comment, which has no author.".to_string()),
+                }
             }
             let now = current_fields(rule);
             if !now.is_empty()
@@ -676,7 +687,7 @@ impl AutomationService {
                     error: None,
                 };
                 if !dry_run {
-                    let context = AutomationActionContext { event: AutomationEvent::Manual, job: None, previous: None, comment_text: None };
+                    let context = AutomationActionContext { event: AutomationEvent::Manual, job: None, previous: None, comment: None };
                     match apply_action(storage, &task, &config, action, &context) {
                         Ok(()) => cooldown_record(rule, &key, &task.id, &tasks_dir),
                         Err(err) => entry.error = Some(err.to_string()),
@@ -1570,7 +1581,7 @@ fn apply_action(
     let tmpl = TemplateContext::from_task(current)
         .with_previous(action_context.previous.as_ref())
         .with_job(action_context.job.as_ref())
-        .with_comment(action_context.comment_text.as_deref());
+        .with_comment(action_context.comment.as_ref());
 
     let mut patch = TaskUpdate::default();
     let mut updated_tags = base.tags.clone();
@@ -2339,7 +2350,7 @@ mod dev21_cross_root_dependency_tests {
         .unwrap();
         let current = TaskService::get(&storage, "PX-1", None).unwrap();
         let config = TaskService::resolve_config_for_project(&storage.root_path, "PX");
-        let context = AutomationActionContext { event: AutomationEvent::Updated, job: None, previous: None, comment_text: None };
+        let context = AutomationActionContext { event: AutomationEvent::Updated, job: None, previous: None, comment: None };
         let source = storage.root_path.join("PX/1.yml");
         let target = storage.root_path.join("BB/1.yml");
         let before_source = std::fs::read(&source).unwrap();
@@ -2402,7 +2413,7 @@ mod dev21_cross_root_dependency_tests {
                     &current,
                     &config,
                     &action,
-                    &AutomationActionContext { event: AutomationEvent::Updated, job: None, previous: None, comment_text: None },
+                    &AutomationActionContext { event: AutomationEvent::Updated, job: None, previous: None, comment: None },
                 )
             });
             read_rx.recv_timeout(Duration::from_secs(5)).unwrap();
@@ -2430,7 +2441,7 @@ mod dev21_cross_root_dependency_tests {
                     &updated,
                     &config,
                     &invalid,
-                    &AutomationActionContext { event: AutomationEvent::Updated, job: None, previous: None, comment_text: None }
+                    &AutomationActionContext { event: AutomationEvent::Updated, job: None, previous: None, comment: None }
                 )
                 .is_err()
             );

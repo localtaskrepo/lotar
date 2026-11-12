@@ -123,10 +123,23 @@ pub struct AutomationConditionGroup {
     /// in the update (DEV-298).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current: Option<Box<AutomationConditionGroup>>,
+    /// Conditions on the comment of a `commented` event (DEV-383). They
+    /// never match on other events.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub comment: Option<AutomationCommentCondition>,
     #[serde(default)]
     pub custom_fields: HashMap<String, AutomationFieldCondition>,
     #[serde(flatten)]
     pub fields: HashMap<String, AutomationFieldCondition>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct AutomationCommentCondition {
+    /// Who wrote the comment, matched like `assignee` (`@user`, `@agent`,
+    /// `@any` included).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub author: Option<AutomationFieldCondition>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]

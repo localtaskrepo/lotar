@@ -32,7 +32,7 @@ pub struct AutomationSimulateArgs {
     /// Ticket ID to simulate against (e.g. PROJ-1)
     #[arg(long)]
     pub ticket: String,
-    /// Event to simulate: created, updated, assigned, job_started, job_completed, job_failed, job_cancelled
+    /// Event to simulate: created, updated, assigned, commented, sprint_changed, job_started, job_completed, job_failed, job_cancelled, manual
     #[arg(long, default_value = "updated")]
     pub event: String,
 }

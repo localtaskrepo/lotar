@@ -697,12 +697,15 @@ impl TaskService {
 
         let config = Self::resolve_config_for_project(storage.root_path.as_path(), &parsed.project);
         let sprint_lookup = Self::load_sprint_lookup(storage);
+        let comment = outcome.after.comments.last().cloned();
         let mut dto = Self::to_dto(&canonical, outcome.after, Some(&sprint_lookup), &config, chrono::Utc::now());
         if Self::link_mentions(storage, &canonical, Some(text), None) {
             dto = Self::get(storage, &canonical, Some(&parsed.project)).unwrap_or(dto);
         }
-        if context.fire_commented {
-            let _ = AutomationService::apply_comment_event(storage, &dto, text, &config);
+        if context.fire_commented
+            && let Some(comment) = comment
+        {
+            let _ = AutomationService::apply_comment_event(storage, &dto, &comment, &config);
         }
         Ok(dto)
     }

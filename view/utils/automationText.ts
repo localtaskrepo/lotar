@@ -63,6 +63,7 @@ const FIELD_NAMES: Record<string, string> = {
     status_changed: 'time in current status',
     sprint: 'sprint',
     sprints: 'sprint',
+    'comment.author': 'comment author',
 }
 
 export function triggerText(event: AutomationEventKey): string {
@@ -153,6 +154,11 @@ export function describeConditions(when: unknown): { join: 'all' | 'any'; items:
                 for (const [field, condition] of Object.entries(inner as AutomationRecord)) {
                     items.push(describeCondition(`custom_fields.${field}`, condition))
                 }
+                continue
+            }
+            if (key === 'comment' && inner && typeof inner === 'object') {
+                const comment = inner as AutomationRecord
+                if (comment.author != null) items.push(describeCondition('comment.author', comment.author))
                 continue
             }
             items.push(describeCondition(key, inner))
@@ -299,6 +305,7 @@ export function templateVariables(events: AutomationEventKey[], customFields: st
     }
     if (events.includes('commented')) {
         variables.push({ key: 'comment.text', label: 'The new comment', group: 'Comment' })
+        variables.push({ key: 'comment.author', label: 'Who wrote it', group: 'Comment' })
     }
     if (events.some((event) => JOB_EVENTS.has(event))) {
         for (const [key, label] of [
