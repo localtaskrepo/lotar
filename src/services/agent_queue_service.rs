@@ -9,6 +9,8 @@ use std::fs::{File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::Duration;
 
@@ -192,9 +194,16 @@ impl AgentQueueService {
             return Ok(());
         }
 
+        // After an upgrade, take no new entries: once the running jobs end,
+        // this worker exits and the next one starts from the new build
+        // (DEV-361).
+        let upgraded = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&upgraded);
+        crate::utils::binary_watch::spawn_watcher(move || flag.store(true, Ordering::SeqCst));
         let result = (|| {
             let mut exhausted_error = None;
             loop {
+                let upgraded = upgraded.load(Ordering::SeqCst);
                 let max_parallel = resolve_max_parallel(tasks_dir)?;
                 let running = AgentJobService::queue_stats().running;
                 let capacity = match max_parallel {
@@ -202,7 +211,7 @@ impl AgentQueueService {
                     None => usize::MAX,
                 };
 
-                if capacity > 0 {
+                if capacity > 0 && !upgraded {
                     let entries = dequeue_entries(tasks_dir, capacity)?;
                     for entry in entries {
                         match start_entry(tasks_dir, entry.clone()) {
@@ -223,7 +232,7 @@ impl AgentQueueService {
                 }
 
                 let stats = AgentJobService::queue_stats();
-                if stats.running == 0 && stats.queued == 0 && pending_count(tasks_dir)? == 0 {
+                if stats.running == 0 && stats.queued == 0 && (upgraded || pending_count(tasks_dir)? == 0) {
                     break;
                 }
 
@@ -365,7 +374,9 @@ fn resolve_max_parallel(tasks_dir: &Path) -> LoTaRResult<Option<usize>> {
 }
 
 fn spawn_worker(tasks_dir: &Path) -> LoTaRResult<()> {
-    let exe = std::env::current_exe().map_err(LoTaRError::IoError)?;
+    // The path lotar was started as, so an upgraded install starts the new
+    // build (DEV-361).
+    let exe = crate::utils::binary_watch::watched_path().ok_or_else(|| LoTaRError::ValidationError("cannot locate the lotar executable".to_string()))?;
     let mut cmd = Command::new(exe);
     cmd.arg("--tasks-dir").arg(tasks_dir).arg("agent").arg("worker");
     cmd.env("LOTAR_TASKS_DIR", tasks_dir);
