@@ -11,7 +11,7 @@ pub enum AutomationAction {
     /// Simulate automation rules for a ticket and event (dry-run, no side effects)
     #[command(alias = "dry-run")]
     Simulate(AutomationSimulateArgs),
-    /// Run rules' manual actions (on.manual) on the tasks they match now, e.g. from cron
+    /// Run rules' manual actions (on.manual) on the tasks they match now, e.g. from cron, and unblocked rules for prerequisites done in another repo
     Run(AutomationRunArgs),
 }
 

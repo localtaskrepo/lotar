@@ -1,6 +1,6 @@
 use crate::api_types::{AgentJobCreateRequest, TaskDTO, TaskUpdate};
 use crate::automation::persistence as automation_persistence;
-use crate::automation::template::TemplateContext;
+use crate::automation::template::{Prerequisite, TemplateContext};
 use crate::automation::types::{AutomationAction, AutomationActionSet, AutomationFile, AutomationRule, AutomationRunAction, AutomationTagAction, StringOrVec};
 use crate::config::types::ResolvedConfig;
 use crate::config::validation::errors::ValidationResult;
@@ -246,7 +246,7 @@ struct AutomationActionContext {
     previous: Option<TaskDTO>,
     comment: Option<crate::types::TaskComment>,
     /// The prerequisites an `unblocked` ticket waited for, all done now.
-    unblocked_by: Vec<TaskDTO>,
+    unblocked_by: Vec<Prerequisite>,
 }
 
 #[derive(Debug, Clone)]
@@ -474,14 +474,9 @@ impl AutomationService {
             if is_done(&dependent) || !find_blocked_dependencies(storage, &dependent).is_empty() {
                 continue;
             }
-            let mut by: Vec<TaskDTO> = dependent
-                .relationships
-                .depends_on
-                .iter()
-                .filter(|dep| !crate::storage::identity::aliases_match(dep, &current.id))
-                .filter_map(|dep| TaskService::get(storage, dep, None).ok())
-                .collect();
-            by.push(current.clone());
+            let mut by: Vec<Prerequisite> =
+                prerequisites_of(storage, &dependent).into_iter().filter(|dep| !crate::storage::identity::aliases_match(&dep.id, &current.id)).collect();
+            by.push(Prerequisite::from(current));
             // Each failed rule already reported itself (rule_failure).
             let _ = Self::apply_unblocked_event(storage, &dependent.id, &by);
         }
@@ -489,7 +484,7 @@ impl AutomationService {
 
     /// Fire the `unblocked` rules of `dependent_id` (DEV-385); `by` are the
     /// prerequisites it waited for, for `${{unblocked.by}}`.
-    pub fn apply_unblocked_event(storage: &mut Storage, dependent_id: &str, by: &[TaskDTO]) -> LoTaRResult<()> {
+    pub fn apply_unblocked_event(storage: &mut Storage, dependent_id: &str, by: &[Prerequisite]) -> LoTaRResult<()> {
         let tasks_dir = storage.root_path.clone();
         let project = crate::storage::TaskId::parse(dependent_id).map(|parsed| parsed.project).unwrap_or_default();
         let config = resolve_config_for_project(&tasks_dir, Some(&project))?;
@@ -679,7 +674,7 @@ impl AutomationService {
                 let mut preview = PreviewContext::new(task);
                 if event == AutomationEvent::Unblocked {
                     // The ticket's prerequisites stand in for the ones that just finished.
-                    let by: Vec<TaskDTO> = task.relationships.depends_on.iter().filter_map(|dep| TaskService::get(storage, dep, None).ok()).collect();
+                    let by = prerequisites_of(storage, task);
                     preview.tmpl = std::mem::take(&mut preview.tmpl).with_unblocked(&by);
                 }
                 let actions = describe_action(action, task, config, &mut preview);
@@ -710,7 +705,8 @@ pub struct ManualRunEntry {
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ManualRunReport {
     pub dry_run: bool,
-    /// Rules with an `on.manual` action that were considered.
+    /// Rules with an `on.manual` action that were considered, and
+    /// `unblocked` rules run for a prerequisite in another repo (DEV-388).
     pub rules: Vec<String>,
     /// How many tasks were checked against them.
     pub checked: usize,
@@ -752,9 +748,9 @@ impl AutomationService {
             }
             let (config, file) = cache.get(&project).expect("cached above").clone();
             for (index, rule) in file.automation.rules().iter().enumerate() {
-                let Some(action) = rule.on.manual.as_ref() else {
+                if rule.on.manual.is_none() && rule.on.unblocked.is_none() {
                     continue;
-                };
+                }
                 let name = rule.name.clone().unwrap_or_else(|| format!("Rule {}", index + 1));
                 if !wanted.is_empty() && !wanted.contains(&name.to_lowercase()) {
                     continue;
@@ -766,6 +762,9 @@ impl AutomationService {
                 if !rules_seen.contains(&name) {
                     rules_seen.push(name.clone());
                 }
+                let Some(action) = rule.on.manual.as_ref() else {
+                    continue;
+                };
                 let changes = ChangeSet::empty(&task);
                 if !matches_rule(rule, &task, &changes, MatchMode::Current, &config, &active_sprints) {
                     continue;
@@ -793,13 +792,96 @@ impl AutomationService {
                 }
                 entries.push(entry);
             }
+            entries.extend(Self::run_cross_repo_unblocked(storage, &task.id, &config, &file, &wanted, dry_run));
         }
 
         if let Some(missing) = wanted.iter().find(|name| !ids.is_empty() && !found.contains(*name)) {
-            return Err(LoTaRError::ValidationError(format!("No rule named '{missing}' with a manual action (on.manual) applies to the selected tasks")));
+            return Err(LoTaRError::ValidationError(format!(
+                "No rule named '{missing}' with a manual or unblocked action (on.manual, on.unblocked) applies to the selected tasks"
+            )));
         }
         Ok(ManualRunReport { dry_run, rules: rules_seen, checked: ids.len(), entries })
     }
+}
+
+impl AutomationService {
+    /// A prerequisite in another repo never tells this one it closed
+    /// (DEV-388), so a manual run fires `unblocked` on each open ticket that
+    /// waits for one and has no open prerequisite left. The rule's own
+    /// conditions (`when: status: Blocked` plus a `set` that leaves Blocked)
+    /// keep it from firing on every run.
+    fn run_cross_repo_unblocked(
+        storage: &mut Storage,
+        id: &str,
+        config: &ResolvedConfig,
+        file: &AutomationFile,
+        wanted: &[String],
+        dry_run: bool,
+    ) -> Vec<ManualRunEntry> {
+        let tasks_dir = storage.root_path.clone();
+        let mut entries = Vec::new();
+        // Read again: a manual rule may just have changed it.
+        let Ok(task) = TaskService::get(storage, id, None) else {
+            return entries;
+        };
+        let task = &task;
+        if !task.relationships.depends_on.iter().any(|dep| crate::services::external_tasks::parse(dep).is_some())
+            || task.task_state.as_ref().is_some_and(|state| state.is_done)
+            || !find_blocked_dependencies(storage, task).is_empty()
+        {
+            return entries;
+        }
+        let by = prerequisites_of(storage, task);
+        let active_sprints = compute_active_sprint_ids(storage);
+        for (index, rule) in file.automation.rules().iter().enumerate() {
+            let Some(action) = rule.on.unblocked.as_ref() else {
+                continue;
+            };
+            let name = rule.name.clone().unwrap_or_else(|| format!("Rule {}", index + 1));
+            if !wanted.is_empty() && !wanted.contains(&name.to_lowercase()) {
+                continue;
+            }
+            if !rule.is_enabled() || !matches_rule(rule, task, &ChangeSet::empty(task), MatchMode::Current, config, &active_sprints) {
+                continue;
+            }
+            let key = rule_identity(rule, index);
+            if !dry_run && !cooldown_allows(rule, &key, &task.id, &tasks_dir) {
+                continue;
+            }
+            let mut preview = PreviewContext::new(task);
+            preview.tmpl = std::mem::take(&mut preview.tmpl).with_unblocked(&by);
+            let actions = describe_action(action, task, config, &mut preview);
+            let mut entry = ManualRunEntry {
+                rule: name,
+                task: task.id.clone(),
+                actions,
+                warnings: if dry_run { preview.into_warnings() } else { Vec::new() },
+                error: None,
+            };
+            if !dry_run {
+                let context = AutomationActionContext { event: AutomationEvent::Unblocked, job: None, previous: None, comment: None, unblocked_by: by.clone() };
+                match apply_action(storage, task, config, action, &context) {
+                    Ok(()) => cooldown_record(rule, &key, &task.id, &tasks_dir),
+                    Err(err) => entry.error = Some(err.to_string()),
+                }
+            }
+            entries.push(entry);
+        }
+        entries
+    }
+}
+
+/// The ticket's prerequisites for `${{unblocked.by}}`: local tasks and
+/// tasks in another repo (DEV-388) that can be read.
+fn prerequisites_of(storage: &Storage, task: &TaskDTO) -> Vec<Prerequisite> {
+    task.relationships
+        .depends_on
+        .iter()
+        .filter_map(|dep| match crate::services::external_tasks::parse(dep) {
+            Some(_) => crate::services::external_tasks::resolve(&storage.root_path, dep).ok().map(Prerequisite::from),
+            None => TaskService::get(storage, dep, None).ok().map(|task| Prerequisite::from(&task)),
+        })
+        .collect()
 }
 
 /// Result of simulating automation rules

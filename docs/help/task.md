@@ -230,9 +230,10 @@ deleted local one, and `task relationships check` warns (`external_unresolved`)
 without failing. Such references are not part of the local graph or its
 repairs, and `lotar:DEV-12` in a description is not linked as a mention.
 The web UI lists these references like other IDs, without the other repo's
-status or link. Nothing in this repo is notified when the other ticket closes:
+status or link. The other repo cannot notify this one when its ticket closes:
 the dependency counts as done the next time it is evaluated, for example when
-an agent job for the dependent starts.
+an agent job for the dependent starts, and `lotar automation run` fires the
+dependent's [`unblocked` rules](./automation.md#when-prerequisites-are-done).
 
 #### Explore dependencies
 

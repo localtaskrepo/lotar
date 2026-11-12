@@ -37,7 +37,7 @@ impl AutomationHandler {
             }));
         } else {
             if report.rules.is_empty() {
-                renderer.emit_info(format_args!("No enabled rule has a manual action (on.manual); nothing to run."));
+                renderer.emit_info(format_args!("No enabled rule has a manual action (on.manual) or an unblocked one; nothing to run."));
             } else if report.entries.is_empty() {
                 renderer.emit_info(format_args!("Checked {} task(s) against {}: none match.", report.checked, report.rules.join(", ")));
             }

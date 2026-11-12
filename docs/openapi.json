@@ -3697,7 +3697,7 @@
     "/api/automation/run": {
       "post": {
         "summary": "Run manual automation rules now",
-        "description": "Runs the on.manual actions of the named rules (or of every rule that has one) on each task their conditions match right now (DEV-241). This is how automations run on a schedule: call it, or `lotar automation run`, from cron. query narrows the tasks with the task-list search syntax; dry_run reports without changing anything. Switched-off rules (enabled: false) never run; each task's own project rules apply.",
+        "description": "Runs the on.manual actions of the named rules (or of every rule that has one) on each task their conditions match right now (DEV-241), and the unblocked rules of open tasks whose prerequisites in another repo are all done (DEV-388). This is how automations run on a schedule: call it, or `lotar automation run`, from cron. query narrows the tasks with the task-list search syntax; dry_run reports without changing anything. Switched-off rules (enabled: false) never run; each task's own project rules apply.",
         "requestBody": {
           "required": false,
           "content": {

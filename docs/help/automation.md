@@ -439,7 +439,9 @@ automation:
               Read the ticket and continue the work.
 ```
 
-The rule's conditions are checked against the waiting ticket as it is (`status: Blocked` above), and moving it out of that status keeps the rule from running on it again. Prerequisites in another tasks directory do not fire the event.
+The rule's conditions are checked against the waiting ticket as it is (`status: Blocked` above), and moving it out of that status keeps the rule from running on it again.
+
+A prerequisite in another repo (`lotar:DEV-374`, see [Tasks in another repo](task.md#tasks-in-another-repo)) cannot tell this repo it closed. [`lotar automation run`](#running-rules-on-a-schedule) fires the event instead: on each open ticket that waits for a task in another repo and has no open prerequisite left, it runs the `unblocked` rules whose conditions match. It does so on every run while that holds, so such a rule needs the conditions above: a `when` the ticket stops matching once handled, such as `status: Blocked` with a `set` that moves it out. Run it from cron to pick up closes in other repos.
 
 ## Running rules on a schedule
 
@@ -464,7 +466,7 @@ automation:
 0 2 * * * cd /path/to/repo && lotar automation run "Archive finished work"
 ```
 
-- `lotar automation run [RULE...] [--select '<query>'] [--dry-run|-n]` runs the `manual` action of the named rules (all rules that have one when no name is given) on every task their conditions match right now. `--select` narrows the tasks with the [search syntax of `lotar list`](list.md#filters-in-the-query); `--dry-run` lists what would change. Each task's own project rules apply, and `--format json` gives a report for scripts. It exits with an error when an action fails.
+- `lotar automation run [RULE...] [--select '<query>'] [--dry-run|-n]` runs the `manual` action of the named rules (all rules that have one when no name is given) on every task their conditions match right now, and fires `unblocked` rules for prerequisites in another repo that are done ([When prerequisites are done](#when-prerequisites-are-done)). `--select` narrows the tasks with the [search syntax of `lotar list`](list.md#filters-in-the-query); `--dry-run` lists what would change. Each task's own project rules apply, and `--format json` gives a report for scripts. It exits with an error when an action fails.
 - `POST /api/automation/run` (`{ rules?, query?, dry_run? }`) does the same over REST; the web UI's **Run now** previews first, then runs on confirmation.
 - Manual rules never run on events, and switched-off rules never run at all. Cooldowns apply as usual, so a rule with `cooldown: 1d` skips tasks it already handled within a day.
 - Write conditions so a task stops matching once it is handled (for example, archived tasks drop out of the default task set, and a tag can mark tasks already processed). Then running a rule twice, or from two machines, changes nothing the second time.

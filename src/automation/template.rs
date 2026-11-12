@@ -14,6 +14,27 @@ pub struct TemplateContext {
     lists: HashMap<String, Vec<ListItem>>,
 }
 
+/// A prerequisite of an `unblocked` ticket: a local task or, as `repo:ID`,
+/// one in another repo (DEV-388).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Prerequisite {
+    pub id: String,
+    pub title: String,
+    pub status: String,
+}
+
+impl From<&TaskDTO> for Prerequisite {
+    fn from(task: &TaskDTO) -> Self {
+        Self { id: task.id.clone(), title: task.title.clone(), status: task.status.to_string() }
+    }
+}
+
+impl From<crate::services::external_tasks::ExternalTask> for Prerequisite {
+    fn from(task: crate::services::external_tasks::ExternalTask) -> Self {
+        Self { id: task.reference, title: task.title, status: task.status }
+    }
+}
+
 /// One list item: its plain value plus named fields (references, comments).
 #[derive(Default, Clone)]
 struct ListItem {
@@ -213,7 +234,7 @@ impl TemplateContext {
     /// Add the prerequisites an `unblocked` ticket waited for (DEV-385):
     /// `unblocked.by` reads "DEV-1 (Title), DEV-2 (Title)", `unblocked.ids`
     /// "DEV-1,DEV-2", and `unblocked.by[*].title` picks a field.
-    pub fn with_unblocked(mut self, prerequisites: &[TaskDTO]) -> Self {
+    pub fn with_unblocked(mut self, prerequisites: &[Prerequisite]) -> Self {
         if prerequisites.is_empty() {
             return self;
         }
@@ -221,7 +242,7 @@ impl TemplateContext {
             .iter()
             .map(|task| ListItem {
                 value: format!("{} ({})", task.id, task.title),
-                fields: HashMap::from([("id", task.id.clone()), ("title", task.title.clone()), ("status", task.status.to_string())]),
+                fields: HashMap::from([("id", task.id.clone()), ("title", task.title.clone()), ("status", task.status.clone())]),
             })
             .collect();
         self.set("unblocked.by", &items.iter().map(|item| item.value.as_str()).collect::<Vec<_>>().join(", "));

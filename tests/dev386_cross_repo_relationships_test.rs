@@ -76,6 +76,41 @@ fn a_ticket_depends_on_a_ticket_in_another_repo_and_is_unblocked_when_it_closes(
     assert!(!std::fs::read_to_string(standards.join("STD/1.yml")).unwrap().contains("- lotar:DEV-1"));
 }
 
+/// DEV-388: the other repo never learns of the dependent, so `lotar
+/// automation run` fires its `unblocked` rule once the prerequisite is done.
+#[test]
+fn automation_run_fires_unblocked_once_a_prerequisite_in_another_repo_is_done() {
+    let sandbox = tempfile::tempdir_in(env!("CARGO_TARGET_TMPDIR")).unwrap();
+    let (lotar, standards) = repos(sandbox.path());
+    std::fs::write(standards.join("config.yml"), "default:\n  project: STD\nissue:\n  states: [Todo, Blocked, InProgress, Done]\nrepos:\n  lotar: ../lotar\n")
+        .unwrap();
+    std::fs::write(
+        standards.join("automation.yml"),
+        "automation:\n  rules:\n    - name: Prerequisites done\n      when:\n        status: Blocked\n      on:\n        unblocked:\n          set:\n            status: InProgress\n          comment: \"Waited for ${{unblocked.by}}\"\n",
+    )
+    .unwrap();
+    ok(run(&standards, &["task", "relationships", "add", "STD-1", "lotar:DEV-1", "--kind", "depends-on"]));
+    ok(run(&standards, &["status", "STD-1", "Blocked"]));
+
+    let pending = ok(run(&standards, &["automation", "run"]));
+    assert!(pending.contains("against Prerequisites done: none match"), "{pending}");
+    assert!(ok(run(&standards, &["automation", "run", "Prerequisites done"])).contains("none match"));
+
+    ok(run(&lotar, &["status", "DEV-1", "Done"]));
+    let dry = ok(run(&standards, &["automation", "run", "--dry-run"]));
+    assert!(dry.contains("Would run 'Prerequisites done' on STD-1"), "{dry}");
+    let ran = ok(run(&standards, &["automation", "run"]));
+    assert!(ran.contains("Ran 'Prerequisites done' on STD-1"), "{ran}");
+    let stored = std::fs::read_to_string(standards.join("STD/1.yml")).unwrap();
+    assert!(stored.contains("status: InProgress"), "{stored}");
+    assert!(stored.contains("Waited for lotar:DEV-1 (Release v1.0.0)"), "{stored}");
+
+    // Out of Blocked, the rule's own condition keeps it from firing again.
+    let again = ok(run(&standards, &["automation", "run"]));
+    assert!(again.contains("none match"), "{again}");
+    assert_eq!(std::fs::read_to_string(standards.join("STD/1.yml")).unwrap().matches("Waited for").count(), 1);
+}
+
 #[test]
 fn unresolved_cross_repo_tasks_are_refused_on_write_and_stay_open() {
     let sandbox = tempfile::tempdir_in(env!("CARGO_TARGET_TMPDIR")).unwrap();
