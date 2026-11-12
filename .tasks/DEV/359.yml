@@ -5,16 +5,19 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T04:47:42.443342+00:00
-modified: 2026-11-12T05:06:57.229605+00:00
+modified: 2026-11-12T05:07:08.535894+00:00
 relationships:
   related:
   - DEV-354
   - DEV-356
+  - DEV-348
 comments:
 - date: 2026-11-12T04:58:54.479545+00:00
   text: 'claude: Fixed in commit 1d69b61 on agent/DEV-359. tests/web_api_integration_test.rs: after the body is sent, the response is now read to EOF with read_until_deadline (RESPONSE_DEADLINE, 15 s) instead of read_to_string against the 500 ms net_timeout. A real hang still fails with ''no response from test server within 15s''. The early-response check (100 ms read before the body) is unchanged. Checks: the ticket''s cargo nextest command, 5 runs, 35/35 each time; npm run lint:agent passes; npm run test:agent passes (Rust, UI, release, hooks). Smoke: the first run had 1 failure of 378, which I didn''t capture (smoke doesn''t touch this Rust test file), and the 2 reruns passed 378/378.'
 - date: 2026-11-12T05:06:57.229605+00:00
   text: 'claude: Merged into main (fast-forward) as 4be7d13: the fix commit, rebased onto main. Checks in the worktree: lint:agent, test:agent and smoke (379/379) passed. The ticket''s check in the main checkout, cargo nextest run --no-fail-fast -E ''test(web_api_integration_test::)'', passed 5 of 5 runs (35/35 each).'
+- date: 2026-11-12T05:07:07.909633+00:00
+  text: 'claude: Not pushed: main has unpushed commits from other tickets (DEV-348, 352, 354, 355, 356), which wait for their sessions. Ticket files committed as 01e55b0.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8a800754-e4a5-4ec5-9daa-e8c4f4cdab68
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae828c50c-0209-44ef-8410-92ca55d914f5
@@ -71,3 +74,13 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-12T05:07:07.909633+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T05:07:08.535894+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-354","DEV-356"]}'
+    new: '{"related":["DEV-354","DEV-356","DEV-348"]}'
