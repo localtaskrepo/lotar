@@ -238,7 +238,7 @@ automation:
     # that ticket after brew upgrade lotar hands each of them to @fix. A field condition needs its field to change in
     # the update, so the command recognises the release by its title (other tickets that go Done exit there), and
     # reaches the waiting tickets through the release's blocks list. It runs the lotar on PATH: the release just
-    # installed.
+    # installed. --project: without it the status filter knows only the global statuses, which lack Blocked.
     - name: "Release installed: start the waiting checks"
       when:
         status: Done
@@ -252,8 +252,8 @@ automation:
                 case "$LOTAR_TICKET_TITLE" in "Release v"*) ;; *) exit 0 ;; esac
                 failed=0
                 for id in $(printf '%s' "$1" | tr ',' ' '); do
-                  lotar --tasks-dir "$LOTAR_TASKS_DIR" automation run "Release installed: run the waiting check" \
-                    --select "status:blocked id:/^$id\$/" || failed=1
+                  lotar --tasks-dir "$LOTAR_TASKS_DIR" --project "$LOTAR_TICKET_PROJECT" automation run \
+                    "Release installed: run the waiting check" --select "status:blocked id:/^$id\$/" || failed=1
                 done
                 exit "$failed"
               - sh

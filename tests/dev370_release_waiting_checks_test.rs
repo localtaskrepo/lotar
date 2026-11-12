@@ -46,13 +46,15 @@ fn closing_a_release_ticket_starts_the_checks_that_wait_for_it() {
     std::fs::write(
         fixtures.tasks_root.join("config.yml"),
         format!(
-            "default:\n  project: DEV\nissue:\n  states: [Todo, InProgress, HelpNeeded, Blocked, Done, WontDo]\nagents:\n  fix:\n    runner: command\n    command: sh\n    args: ['-c', 'while [ ! -f \"{}\" ] && [ -d \"{}\" ]; do sleep 0.1; done']\n",
+            "default:\n  project: DEV\nagents:\n  fix:\n    runner: command\n    command: sh\n    args: ['-c', 'while [ ! -f \"{}\" ] && [ -d \"{}\" ]; do sleep 0.1; done']\n",
             go.display(),
             root.display()
         ),
     )
     .unwrap();
+    // As in lotar's own .tasks: only the project has a Blocked status.
     std::fs::create_dir_all(fixtures.tasks_root.join("DEV")).unwrap();
+    std::fs::write(fixtures.tasks_root.join("DEV/config.yml"), "issue:\n  states: [Todo, InProgress, HelpNeeded, Blocked, Done, WontDo]\n").unwrap();
     std::fs::copy(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(".tasks/DEV/automation.yml"), fixtures.tasks_root.join("DEV/automation.yml")).unwrap();
     // The rule runs the lotar on PATH: here the one under test.
     let lotar = assert_cmd::cargo::cargo_bin!("lotar");
