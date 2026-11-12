@@ -121,6 +121,48 @@ pub(super) fn github_fetch_issue(client: &SyncClient, repo: &str, number: u64) -
     send_json_request(client, req, None)
 }
 
+/// The number of the milestone titled `title`, listing the repository's
+/// milestones once per push. A leading `v` is ignored on both sides, so
+/// version `0.15.0` finds milestone `v0.15.0`.
+pub(super) fn resolve_github_milestone(client: &SyncClient, repo: &str, title: &str, lookup: &mut LookupCache) -> Result<u64, String> {
+    let milestones = lookup
+        .github_milestones
+        .get_or_insert_with(|| github_list_milestones(client, repo).map_err(|err| format!("Failed to list GitHub milestones in {repo}: {err}")))
+        .as_ref()
+        .map_err(Clone::clone)?;
+    let wanted = without_version_prefix(title);
+    milestones
+        .iter()
+        .find(|(name, _)| name.trim() == title)
+        .or_else(|| milestones.iter().find(|(name, _)| without_version_prefix(name).eq_ignore_ascii_case(wanted)))
+        .map(|(_, number)| *number)
+        .ok_or_else(|| format!("GitHub milestone '{title}' does not exist in {}; create it on GitHub first", normalize_github_repo(repo)))
+}
+
+fn without_version_prefix(value: &str) -> &str {
+    let trimmed = value.trim();
+    match trimmed.strip_prefix(['v', 'V']) {
+        Some(rest) if rest.starts_with(|c: char| c.is_ascii_digit()) => rest,
+        _ => trimmed,
+    }
+}
+
+pub(super) fn github_list_milestones(client: &SyncClient, repo: &str) -> LoTaRResult<Vec<(String, u64)>> {
+    let mut milestones = Vec::new();
+    let mut page = 1u32;
+    loop {
+        let url = format!("{}/repos/{}/milestones", client.auth.api_base, normalize_github_repo(repo));
+        let req = client.agent.get(&url).query("state", "all").query("per_page", "100").query("page", page.to_string()).force_send_body();
+        let batch = send_json_request(client, req, None)?.as_array().cloned().unwrap_or_default();
+        milestones.extend(batch.iter().filter_map(|item| Some((item.get("title")?.as_str()?.to_string(), item.get("number")?.as_u64()?))));
+        if batch.len() < 100 {
+            break;
+        }
+        page += 1;
+    }
+    Ok(milestones)
+}
+
 pub(super) fn normalize_github_repo(value: &str) -> String {
     value.trim().trim_start_matches('/').trim_end_matches('/').to_ascii_lowercase()
 }

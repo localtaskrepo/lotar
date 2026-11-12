@@ -582,7 +582,7 @@ mod tests {
         );
         remote.mapping.insert("tags".to_string(), SyncFieldMapping::Simple("labels".to_string()));
 
-        let payload = build_github_payload(&remote, &sample_task(), SyncOperation::Update);
+        let payload = build_github_payload(&remote, &sample_task(), SyncOperation::Update, None, &mut LookupCache::default(), &mut Vec::new());
         assert_eq!(payload.state.as_deref(), Some("open"));
         assert_eq!(payload.labels, vec!["alpha".to_string()]);
     }
@@ -605,7 +605,7 @@ mod tests {
                 "status": {"name": "In Progress"}
             }
         });
-        let update = build_task_update_from_issue(SyncProvider::Jira, &remote, &issue, None);
+        let update = build_task_update_from_issue(SyncProvider::Jira, &remote, &issue, None, None);
         assert_eq!(update.status.unwrap().to_string(), "In Progress");
     }
 

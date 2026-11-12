@@ -256,7 +256,7 @@ pub(super) fn lookup_mapping_value(map: &std::collections::BTreeMap<String, Stri
 pub(super) fn field_expects_list(provider: SyncProvider, remote_field: &str) -> bool {
     let name = remote_field.to_ascii_lowercase();
     match provider {
-        SyncProvider::Jira => matches!(name.as_str(), "labels"),
+        SyncProvider::Jira => matches!(name.as_str(), "labels" | "fixversions" | "versions"),
         SyncProvider::Github => matches!(name.as_str(), "labels" | "assignees"),
     }
 }
@@ -393,7 +393,7 @@ mod sync_mapping_tests {
             ]
         });
 
-        let update = build_task_update_from_issue(SyncProvider::Github, &remote, &issue, None);
+        let update = build_task_update_from_issue(SyncProvider::Github, &remote, &issue, None, None);
         assert_eq!(update.task_type.unwrap().to_string(), "Feature");
         assert_eq!(update.priority.unwrap().to_string(), "Medium");
     }
@@ -421,7 +421,7 @@ mod sync_mapping_tests {
         let mut existing = sample_task();
         existing.status = TaskStatus::from("Todo");
 
-        let update = build_task_update_from_issue(SyncProvider::Github, &remote, &issue, Some(&existing));
+        let update = build_task_update_from_issue(SyncProvider::Github, &remote, &issue, Some(&existing), None);
         assert!(update.status.is_none());
     }
 

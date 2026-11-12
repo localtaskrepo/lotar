@@ -13,6 +13,10 @@ pub(super) struct GithubIssuePayload {
     pub(super) assignees: Vec<String>,
     pub(super) labels_explicit: bool,
     pub(super) assignees_explicit: bool,
+    /// Milestone title to set; empty clears the milestone.
+    pub(super) milestone: Option<String>,
+    /// The milestone's number, which GitHub takes instead of the title.
+    pub(super) milestone_number: Option<u64>,
 }
 
 impl GithubIssuePayload {
@@ -23,6 +27,7 @@ impl GithubIssuePayload {
             && self.assignees.is_empty()
             && !self.labels_explicit
             && !self.assignees_explicit
+            && self.milestone.is_none()
             && (!include_state || self.state.is_none())
     }
 
@@ -42,6 +47,13 @@ impl GithubIssuePayload {
         }
         if self.labels_explicit || !self.labels.is_empty() {
             map.insert("labels".to_string(), JsonValue::Array(self.labels.iter().map(|label| JsonValue::String(label.clone())).collect()));
+        }
+        if let Some(title) = self.milestone.as_ref() {
+            if title.is_empty() {
+                map.insert("milestone".to_string(), JsonValue::Null);
+            } else if let Some(number) = self.milestone_number {
+                map.insert("milestone".to_string(), json!(number));
+            }
         }
         if self.assignees_explicit || !self.assignees.is_empty() {
             map.insert("assignees".to_string(), JsonValue::Array(self.assignees.iter().map(|assignee| JsonValue::String(assignee.clone())).collect()));
@@ -67,7 +79,7 @@ pub(super) fn build_jira_payload(
     task: &TaskDTO,
     op: SyncOperation,
     client: Option<&SyncClient>,
-    lookup: &mut JiraLookupCache,
+    lookup: &mut LookupCache,
     warnings: &mut Vec<String>,
 ) -> JiraIssuePayload {
     let mut payload = JiraIssuePayload::default();
@@ -103,7 +115,14 @@ pub(super) fn build_jira_payload(
     payload
 }
 
-pub(super) fn build_github_payload(remote: &SyncRemoteConfig, task: &TaskDTO, op: SyncOperation) -> GithubIssuePayload {
+pub(super) fn build_github_payload(
+    remote: &SyncRemoteConfig,
+    task: &TaskDTO,
+    op: SyncOperation,
+    client: Option<&SyncClient>,
+    lookup: &mut LookupCache,
+    warnings: &mut Vec<String>,
+) -> GithubIssuePayload {
     let mut payload = GithubIssuePayload::default();
     for (local_key, mapping) in &remote.mapping {
         let detail = normalize_mapping_detail(local_key, mapping);
@@ -122,6 +141,18 @@ pub(super) fn build_github_payload(remote: &SyncRemoteConfig, task: &TaskDTO, op
 
     payload.labels = dedupe_list(payload.labels);
     payload.assignees = dedupe_list(payload.assignees);
+    // A dry run without a client keeps the title unresolved.
+    if let (Some(client), Some(title), Some(repo)) = (client, payload.milestone.clone(), remote.repo.as_deref())
+        && !title.is_empty()
+    {
+        match resolve_github_milestone(client, repo, &title, lookup) {
+            Ok(number) => payload.milestone_number = Some(number),
+            Err(message) => {
+                warnings.push(format!("{}: {message}", task.id));
+                payload.milestone = None;
+            }
+        }
+    }
     payload
 }
 
@@ -130,7 +161,7 @@ pub(super) fn apply_jira_field(
     field: &str,
     value: FieldValue,
     client: Option<&SyncClient>,
-    lookup: &mut JiraLookupCache,
+    lookup: &mut LookupCache,
     warnings: &mut Vec<String>,
 ) {
     let field_lower = field.to_ascii_lowercase();
@@ -163,6 +194,10 @@ pub(super) fn apply_jira_field(
             } else {
                 fields.insert(field.to_string(), JsonValue::Null);
             }
+        }
+        "fixversions" | "versions" => {
+            let names = dedupe_list(value.to_list_value());
+            fields.insert(field.to_string(), JsonValue::Array(names.into_iter().map(|name| json!({"name": name})).collect()));
         }
         "labels" => {
             let mut list = value.to_list_value();
@@ -207,12 +242,13 @@ pub(super) fn apply_github_field(payload: &mut GithubIssuePayload, field: &str, 
             payload.assignees_explicit = true;
             payload.assignees.extend(value.to_list_value());
         }
+        "milestone" => payload.milestone = Some(value.to_string_value().unwrap_or_default()),
         _ => {}
     }
 }
 
 /// Issue fields a GitHub mapping can write; others are not sent.
-pub(crate) const GITHUB_PUSH_FIELDS: &[&str] = &["title", "body", "description", "state", "status", "state_reason", "labels", "assignees"];
+pub(crate) const GITHUB_PUSH_FIELDS: &[&str] = &["title", "body", "description", "state", "status", "state_reason", "labels", "assignees", "milestone"];
 
 pub(super) fn jira_payload_field_names(payload: &JiraIssuePayload) -> Vec<String> {
     let mut names = payload.fields.keys().cloned().collect::<Vec<_>>();
@@ -238,6 +274,9 @@ pub(super) fn github_payload_field_names(payload: &GithubIssuePayload) -> Vec<St
     }
     if payload.assignees_explicit || !payload.assignees.is_empty() {
         names.push("assignees".to_string());
+    }
+    if payload.milestone.is_some() {
+        names.push("milestone".to_string());
     }
     names
 }
@@ -335,6 +374,17 @@ pub(super) fn filter_github_payload_against_issue(issue: &JsonValue, payload: &m
             payload.assignees_explicit = false;
         } else {
             changed.push("assignees".to_string());
+        }
+    }
+
+    if let Some(title) = payload.milestone.as_deref() {
+        let current = issue.get("milestone").and_then(|milestone| milestone.get("number")).and_then(|v| v.as_u64());
+        let matches = if title.is_empty() { current.is_none() } else { current.is_some() && current == payload.milestone_number };
+        if matches {
+            payload.milestone = None;
+            payload.milestone_number = None;
+        } else {
+            changed.push("milestone".to_string());
         }
     }
 

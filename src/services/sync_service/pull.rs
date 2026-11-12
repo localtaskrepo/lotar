@@ -15,6 +15,9 @@ pub(super) fn perform_pull(target: SyncTarget<'_>, project: &str, client: &SyncC
         return Err(LoTaRError::ValidationError("GitHub remote must define repo".to_string()));
     }
 
+    // Used to store pulled values the way task writes do.
+    let config = crate::config::resolution::config_for_project(&resolver.path, Some(project)).ok();
+
     if let Some(task_id) = task_id {
         let trimmed = task_id.trim();
         if trimmed.is_empty() {
@@ -52,7 +55,7 @@ pub(super) fn perform_pull(target: SyncTarget<'_>, project: &str, client: &SyncC
             }
         };
 
-        let update = build_task_update_from_issue(remote.provider, remote, &issue, Some(&existing));
+        let update = build_task_update_from_issue(remote.provider, remote, &issue, Some(&existing), config.as_ref());
         if task_update_is_empty(&update) {
             recorder.record(
                 SyncEntryStatus::Skipped,
@@ -185,7 +188,7 @@ pub(super) fn perform_pull(target: SyncTarget<'_>, project: &str, client: &SyncC
                 );
                 continue;
             }
-            let update = build_task_update_from_issue(remote.provider, remote, &issue, existing.as_ref());
+            let update = build_task_update_from_issue(remote.provider, remote, &issue, existing.as_ref(), config.as_ref());
             if task_update_is_empty(&update) {
                 recorder.record(
                     SyncEntryStatus::Skipped,
@@ -329,8 +332,24 @@ pub(super) fn resolve_pull_project_prefix(project_prefix: Option<String>, remote
     Err(LoTaRError::ValidationError("Pull sync requires --project or default_project".to_string()))
 }
 
-pub(super) fn build_task_update_from_issue(provider: SyncProvider, remote: &SyncRemoteConfig, issue: &JsonValue, existing: Option<&TaskDTO>) -> TaskUpdate {
-    let local = map_issue_to_local_fields(provider, remote, issue, existing);
+pub(super) fn build_task_update_from_issue(
+    provider: SyncProvider,
+    remote: &SyncRemoteConfig,
+    issue: &JsonValue,
+    existing: Option<&TaskDTO>,
+    config: Option<&crate::config::types::ResolvedConfig>,
+) -> TaskUpdate {
+    let mut local = map_issue_to_local_fields(provider, remote, issue, existing);
+    // A version field stores milestone `v0.15.0` as `0.15.0`; normalised
+    // here, an unchanged remote value is no change. A value the field
+    // rejects is left for the task update to report.
+    if let (Some(fields), Some(config)) = (local.custom_fields.as_mut(), config) {
+        for (name, value) in fields.iter_mut() {
+            if let Ok(normalized) = crate::services::task_validation::normalize_custom_field_value(name, value, config) {
+                *value = normalized;
+            }
+        }
+    }
     let custom_fields = local.custom_fields.map(|fields| merge_custom_fields(existing.map(|task| &task.custom_fields), fields));
     let mut update = TaskUpdate {
         title: local.title,

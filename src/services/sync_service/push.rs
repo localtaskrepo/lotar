@@ -23,7 +23,7 @@ pub(super) fn perform_push(target: SyncTarget<'_>, project: Option<&str>, client
     };
 
     let mut failures = Vec::new();
-    let mut jira_lookup = JiraLookupCache::default();
+    let mut lookup = LookupCache::default();
     let mut selected = HashSet::new();
     let label = provider_display_name(remote.provider);
 
@@ -43,9 +43,9 @@ pub(super) fn perform_push(target: SyncTarget<'_>, project: Option<&str>, client
         match determine_reference_state(remote, &task) {
             ReferenceState::Matching(reference) => {
                 if remote.provider == SyncProvider::Jira && !dry_run {
-                    ensure_jira_issue_types(&mut jira_lookup, client, remote, warnings);
+                    ensure_jira_issue_types(&mut lookup, client, remote, warnings);
                 }
-                let mut payload = PushPayload::build(remote, &task, SyncOperation::Update, client, &mut jira_lookup, warnings);
+                let mut payload = PushPayload::build(remote, &task, SyncOperation::Update, client, &mut lookup, warnings);
                 let mut changed_fields = payload.field_names();
                 if payload.is_empty() {
                     skipped(recorder, &reference, "No changes to push");
@@ -100,7 +100,7 @@ pub(super) fn perform_push(target: SyncTarget<'_>, project: Option<&str>, client
             }
             ReferenceState::None => {
                 if dry_run {
-                    let payload = PushPayload::build(remote, &task, SyncOperation::Create, client, &mut jira_lookup, warnings);
+                    let payload = PushPayload::build(remote, &task, SyncOperation::Create, client, &mut lookup, warnings);
                     let message = format_field_list(&payload.field_names()).map(|fields| format!("Dry run: would create {}", fields));
                     recorder.record(
                         SyncEntryStatus::Created,
@@ -127,9 +127,9 @@ pub(super) fn perform_push(target: SyncTarget<'_>, project: Option<&str>, client
                     return Err(LoTaRError::ValidationError("Local task directory is read-only; cannot attach sync reference".into()));
                 }
                 if remote.provider == SyncProvider::Jira {
-                    ensure_jira_issue_types(&mut jira_lookup, Some(client), remote, warnings);
+                    ensure_jira_issue_types(&mut lookup, Some(client), remote, warnings);
                 }
-                let payload = PushPayload::build(remote, &task, SyncOperation::Create, Some(client), &mut jira_lookup, warnings);
+                let payload = PushPayload::build(remote, &task, SyncOperation::Create, Some(client), &mut lookup, warnings);
                 let destination = create_destination(remote)?;
                 // Journal order is the recovery contract: begin before the
                 // non-idempotent create, save_result once the remote identity is
@@ -229,6 +229,15 @@ impl PushTarget {
     }
 }
 
+/// Remote lookups made once per push and reused for every task.
+#[derive(Default)]
+pub(super) struct LookupCache {
+    pub(super) issue_types: Option<Vec<String>>,
+    pub(super) user_cache: HashMap<String, String>,
+    /// GitHub milestones as (title, number), or why listing them failed.
+    pub(super) github_milestones: Option<Result<Vec<(String, u64)>, String>>,
+}
+
 /// Provider payload for one push; the orchestration in `perform_push` is
 /// shared and these adapters only translate to provider requests (DEV-117).
 pub(super) enum PushPayload {
@@ -242,12 +251,12 @@ impl PushPayload {
         task: &TaskDTO,
         op: SyncOperation,
         client: Option<&SyncClient>,
-        lookup: &mut JiraLookupCache,
+        lookup: &mut LookupCache,
         warnings: &mut Vec<String>,
     ) -> Self {
         match remote.provider {
             SyncProvider::Jira => PushPayload::Jira(build_jira_payload(remote, task, op, client, lookup, warnings)),
-            SyncProvider::Github => PushPayload::Github(build_github_payload(remote, task, op)),
+            SyncProvider::Github => PushPayload::Github(build_github_payload(remote, task, op, client, lookup, warnings)),
         }
     }
 

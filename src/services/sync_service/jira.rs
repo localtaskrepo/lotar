@@ -3,12 +3,6 @@
 
 use super::*;
 
-#[derive(Default)]
-pub(super) struct JiraLookupCache {
-    pub(super) issue_types: Option<Vec<String>>,
-    pub(super) user_cache: HashMap<String, String>,
-}
-
 pub(super) fn jira_query_for_remote(remote: &SyncRemoteConfig) -> LoTaRResult<String> {
     let jql = if let Some(filter) = remote.filter.as_deref() {
         let trimmed = filter.trim();
@@ -133,7 +127,7 @@ pub(super) fn jira_user_value(
     value: &str,
     field: &str,
     client: Option<&SyncClient>,
-    lookup: &mut JiraLookupCache,
+    lookup: &mut LookupCache,
     warnings: &mut Vec<String>,
 ) -> Option<JsonValue> {
     let trimmed = value.trim();
@@ -153,7 +147,7 @@ pub(super) fn jira_user_value(
     None
 }
 
-pub(super) fn lookup_jira_account_id(value: &str, client: Option<&SyncClient>, lookup: &mut JiraLookupCache, warnings: &mut Vec<String>) -> Option<String> {
+pub(super) fn lookup_jira_account_id(value: &str, client: Option<&SyncClient>, lookup: &mut LookupCache, warnings: &mut Vec<String>) -> Option<String> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
         return None;
@@ -230,7 +224,7 @@ pub(super) fn normalize_jira_account_id(value: &str) -> Option<String> {
     if candidate.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == ':') { Some(candidate.to_string()) } else { None }
 }
 
-pub(super) fn resolve_jira_issue_type(value: &str, lookup: &JiraLookupCache, warnings: &mut Vec<String>) -> String {
+pub(super) fn resolve_jira_issue_type(value: &str, lookup: &LookupCache, warnings: &mut Vec<String>) -> String {
     let trimmed = value.trim();
     if trimmed.is_empty() {
         return trimmed.to_string();
@@ -251,7 +245,7 @@ pub(super) fn resolve_jira_issue_type(value: &str, lookup: &JiraLookupCache, war
     trimmed.to_string()
 }
 
-pub(super) fn ensure_jira_issue_types(lookup: &mut JiraLookupCache, client: Option<&SyncClient>, remote: &SyncRemoteConfig, warnings: &mut Vec<String>) {
+pub(super) fn ensure_jira_issue_types(lookup: &mut LookupCache, client: Option<&SyncClient>, remote: &SyncRemoteConfig, warnings: &mut Vec<String>) {
     if lookup.issue_types.is_some() {
         return;
     }

@@ -233,7 +233,7 @@ mod http {
             _ => (500, json!({"message": "down"})),
         });
         let client = api.client(SyncProvider::Jira);
-        let mut cache = JiraLookupCache::default();
+        let mut cache = LookupCache::default();
         let mut warnings = Vec::new();
         let mut lookup = |value: &str, warnings: &mut Vec<String>| jira_user_value(value, "assignee", Some(&client), &mut cache, warnings);
 
@@ -285,16 +285,16 @@ mod jira_values {
     #[test]
     fn issue_types_match_case_insensitively_then_fall_back() {
         let mut warnings = Vec::new();
-        let unknown = JiraLookupCache::default();
+        let unknown = LookupCache::default();
         assert_eq!(resolve_jira_issue_type("Bug", &unknown, &mut warnings), "Bug");
 
-        let known = JiraLookupCache { issue_types: Some(vec!["Story".into(), "Task".into(), "Bug".into()]), ..Default::default() };
+        let known = LookupCache { issue_types: Some(vec!["Story".into(), "Task".into(), "Bug".into()]), ..Default::default() };
         assert_eq!(resolve_jira_issue_type("bug", &known, &mut warnings), "Bug");
         assert!(warnings.is_empty());
         assert_eq!(resolve_jira_issue_type("Epic", &known, &mut warnings), "Task");
         assert!(warnings[0].contains("falling back to 'Task'"));
 
-        let no_task = JiraLookupCache { issue_types: Some(vec!["Story".into()]), ..Default::default() };
+        let no_task = LookupCache { issue_types: Some(vec!["Story".into()]), ..Default::default() };
         assert_eq!(resolve_jira_issue_type("Epic", &no_task, &mut warnings), "Story");
     }
 }
@@ -465,5 +465,144 @@ mod entry_points {
         };
         let response = SyncService::validate(&resolver, None, None, Some(override_config), None);
         assert!(err(response).contains("Auth profile is required for sync validation"));
+    }
+}
+
+mod versions {
+    use super::*;
+
+    // Recorded shapes: Jira's `fixVersions` is a list of version objects,
+    // a GitHub issue's `milestone` an object (DEV-392).
+    fn jira_issue() -> JsonValue {
+        json!({"key": "ENG-7", "fields": {"summary": "Crash", "fixVersions": [
+            {"self": "https://jira.example.com/rest/api/3/version/10001", "id": "10001", "name": "0.15.0", "archived": false, "released": false},
+        ]}})
+    }
+
+    fn github_issue() -> JsonValue {
+        json!({"number": 7, "title": "Crash", "state": "open", "milestone": {
+            "url": "https://api.github.com/repos/org/repo/milestones/3", "number": 3, "title": "v0.15.0", "state": "open",
+        }})
+    }
+
+    fn github_milestones() -> JsonValue {
+        json!([{"number": 2, "title": "v0.14.0", "state": "closed"}, {"number": 3, "title": "v0.15.0", "state": "open"}])
+    }
+
+    /// Workspace whose `fixed_in` field holds versions, with a remote that
+    /// maps it to `remote_field`.
+    fn versioned(provider: SyncProvider, remote_field: &str) -> (tempfile::TempDir, TasksDirectoryResolver, SyncRemoteConfig) {
+        let (temp, resolver, mut remote) = workspace(provider);
+        let path = crate::utils::paths::global_config_path(temp.path());
+        let mut config = fs::read_to_string(&path).unwrap();
+        config.push_str("custom:\n  fields:\n    - { name: fixed_in, type: version }\n");
+        fs::write(path, config).unwrap();
+        remote.mapping.insert("fixed_in".into(), SyncFieldMapping::Simple(remote_field.into()));
+        (temp, resolver, remote)
+    }
+
+    fn task(resolver: &TasksDirectoryResolver, provider: &str, reference: &str, fixed_in: Option<&str>) -> TaskDTO {
+        let mut storage = Storage::new(&resolver.path);
+        let mut create = TaskCreate { title: "Crash".into(), project: Some("TEST".into()), ..Default::default() };
+        if let Some(version) = fixed_in {
+            create.custom_fields = Some(CustomFields::from_iter([("fixed_in".to_string(), crate::types::custom_value_string(version))]));
+        }
+        let task = TaskService::create(&mut storage, create).unwrap();
+        attach_sync_reference(&mut storage, &task.id, provider, reference).unwrap().0
+    }
+
+    fn pull(resolver: &TasksDirectoryResolver, remote: &SyncRemoteConfig, api: &MockApi, task_id: &str) -> SyncReportRecorder {
+        let mut recorder = recorder(SyncDirection::Pull, false);
+        let mut journal = SyncJournal::open(&resolver.path, false).unwrap();
+        perform_pull(
+            SyncTarget { resolver, remote, task_id: Some(task_id), dry_run: false },
+            "TEST",
+            &api.client(remote.provider),
+            SyncSinks { recorder: &mut recorder, warnings: &mut Vec::new(), journal: &mut journal },
+        )
+        .unwrap();
+        recorder
+    }
+
+    fn fixed_in(resolver: &TasksDirectoryResolver, id: &str) -> Option<Vec<String>> {
+        let task = TaskService::get(&Storage::new(&resolver.path), id, None).unwrap();
+        crate::utils::custom_fields::find_value(&task.custom_fields, "fixed_in").map(crate::utils::version::value_strings)
+    }
+
+    #[test]
+    fn jira_fix_versions_pull_by_name() {
+        let (_temp, resolver, remote) = versioned(SyncProvider::Jira, "fixVersions");
+        let task = task(&resolver, "jira", "ENG-7", None);
+        let api = MockApi::start(|_| ok(jira_issue()));
+
+        pull(&resolver, &remote, &api, &task.id);
+        assert_eq!(fixed_in(&resolver, &task.id), Some(vec!["0.15.0".to_string()]));
+        assert!(query_param(&api.requests()[0], "fields").unwrap().contains("fixVersions"));
+
+        let again = pull(&resolver, &remote, &api, &task.id);
+        assert_eq!(again.entries[0].message.as_deref(), Some("No changes to apply"));
+    }
+
+    #[test]
+    fn github_milestone_pulls_its_title_as_a_version() {
+        let (_temp, resolver, remote) = versioned(SyncProvider::Github, "milestone");
+        let task = task(&resolver, "github", "org/repo#7", None);
+        let api = MockApi::start(|_| ok(github_issue()));
+
+        pull(&resolver, &remote, &api, &task.id);
+        assert_eq!(fixed_in(&resolver, &task.id), Some(vec!["0.15.0".to_string()]), "the leading v is dropped");
+
+        let again = pull(&resolver, &remote, &api, &task.id);
+        assert_eq!(again.entries[0].message.as_deref(), Some("No changes to apply"), "v0.15.0 is the stored 0.15.0");
+    }
+
+    #[test]
+    fn jira_push_sends_version_names_and_skips_an_unchanged_issue() {
+        let (_temp, resolver, remote) = versioned(SyncProvider::Jira, "fixVersions");
+        let task = task(&resolver, "jira", "ENG-7", Some("0.15.0"));
+
+        let mut payload = build_jira_payload(&remote, &task, SyncOperation::Update, None, &mut LookupCache::default(), &mut Vec::new());
+        assert_eq!(payload.fields.get("fixVersions"), Some(&json!([{"name": "0.15.0"}])));
+        assert!(filter_jira_payload_against_issue(&jira_issue(), &mut payload).is_empty(), "already fixed in 0.15.0");
+
+        let mut payload = build_jira_payload(&remote, &task, SyncOperation::Update, None, &mut LookupCache::default(), &mut Vec::new());
+        let other = json!({"fields": {"fixVersions": [{"id": "10000", "name": "0.14.0"}]}});
+        assert_eq!(filter_jira_payload_against_issue(&other, &mut payload), vec!["fixVersions".to_string()]);
+    }
+
+    #[test]
+    fn github_push_sends_the_milestone_number() {
+        let (_temp, resolver, remote) = versioned(SyncProvider::Github, "milestone");
+        let task = task(&resolver, "github", "org/repo#7", Some("0.15.0"));
+        let api = MockApi::start(|request| {
+            if request.path.starts_with("/repos/org/repo/milestones") { ok(github_milestones()) } else { (404, json!({"message": "unexpected"})) }
+        });
+        let client = api.client(SyncProvider::Github);
+        let mut lookup = LookupCache::default();
+        let mut warnings = Vec::new();
+
+        let mut payload = build_github_payload(&remote, &task, SyncOperation::Update, Some(&client), &mut lookup, &mut warnings);
+        assert_eq!(payload.to_json(true)["milestone"], json!(3), "0.15.0 is milestone v0.15.0");
+        assert_eq!(github_payload_field_names(&payload), vec!["milestone".to_string()]);
+        assert!(filter_github_payload_against_issue(&github_issue(), &mut payload).is_empty(), "already on milestone 3");
+
+        build_github_payload(&remote, &task, SyncOperation::Update, Some(&client), &mut lookup, &mut warnings);
+        assert_eq!(api.requests().len(), 1, "milestones are listed once per push");
+        assert_eq!(query_param(&api.requests()[0], "state"), Some("all"));
+        assert!(warnings.is_empty(), "{warnings:?}");
+    }
+
+    #[test]
+    fn github_push_refuses_a_milestone_that_does_not_exist() {
+        let (_temp, resolver, remote) = versioned(SyncProvider::Github, "milestone");
+        let task = task(&resolver, "github", "org/repo#7", Some("0.16.0"));
+        let api = MockApi::start(|_| ok(github_milestones()));
+        let mut warnings = Vec::new();
+
+        let payload =
+            build_github_payload(&remote, &task, SyncOperation::Update, Some(&api.client(SyncProvider::Github)), &mut LookupCache::default(), &mut warnings);
+        assert!(payload.to_json(true).get("milestone").is_none());
+        assert!(payload.is_empty(true));
+        assert_eq!(warnings, vec![format!("{}: GitHub milestone '0.16.0' does not exist in org/repo; create it on GitHub first", task.id)]);
     }
 }

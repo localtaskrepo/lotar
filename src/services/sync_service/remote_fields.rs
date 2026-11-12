@@ -47,6 +47,7 @@ pub(super) fn jira_payload_field_value(field: &str, value: &JsonValue) -> Option
             .and_then(|v| v.as_str())
             .map(|text| FieldValue::String(text.to_string())),
         "labels" => json_array_to_list(value),
+        "fixversions" | "versions" => jira_versions_to_list(value),
         _ => read_generic_field(Some(value)),
     }
 }
@@ -71,6 +72,7 @@ pub(super) fn read_jira_field(issue: &JsonValue, field: &str) -> Option<FieldVal
         "assignee" => jira_user_to_string(fields.get("assignee")),
         "reporter" => jira_user_to_string(fields.get("reporter")),
         "labels" => fields.get("labels").and_then(json_array_to_list),
+        "fixversions" | "versions" => fields.get(field).and_then(jira_versions_to_list),
         _ => read_generic_field(fields.get(field)),
     }
 }
@@ -94,6 +96,7 @@ pub(super) fn read_github_field(issue: &JsonValue, field: &str) -> Option<FieldV
         "state" | "status" => issue.get("state").and_then(|v| v.as_str()).map(|v| FieldValue::String(v.to_string())),
         "labels" => issue.get("labels").and_then(github_labels_to_list),
         "assignees" => issue.get("assignees").and_then(github_assignees_to_list),
+        "milestone" => issue.get("milestone").and_then(|v| v.get("title")).and_then(|v| v.as_str()).map(|v| FieldValue::String(v.to_string())),
         _ => read_generic_field(issue.get(field)),
     }
 }
@@ -106,6 +109,13 @@ pub(super) fn read_generic_field(value: Option<&JsonValue>) -> Option<FieldValue
         JsonValue::Array(values) => Some(FieldValue::List(values.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())),
         _ => None,
     }
+}
+
+/// Jira sends versions as objects (`{"id": "10001", "name": "0.15.0"}`);
+/// the name is the version.
+pub(super) fn jira_versions_to_list(value: &JsonValue) -> Option<FieldValue> {
+    let list = value.as_array()?;
+    Some(FieldValue::List(list.iter().filter_map(|item| item.get("name").and_then(|v| v.as_str())).map(|name| name.to_string()).collect()))
 }
 
 pub(super) fn github_labels_to_list(value: &JsonValue) -> Option<FieldValue> {
