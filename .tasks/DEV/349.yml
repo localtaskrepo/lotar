@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-12T03:40:57.903870+00:00
-modified: 2026-11-12T04:37:29.493025+00:00
+modified: 2026-11-12T04:44:40.147050+00:00
 relationships:
   blocks:
   - DEV-351
@@ -16,6 +16,8 @@ relationships:
   - DEV-352
   - DEV-358
   - DEV-355
+  - DEV-356
+  - DEV-357
 comments:
 - date: 2026-11-12T03:57:10.900916+00:00
   text: 'claude: Fixed in b3323aa on agent/DEV-349. lotar now passes --tasks-dir to lotar-agent-wrapper (the wrapper accepts and ignores it). running_job_for_ticket and list-running count a wrapper only when its --tasks-dir matches this tasks dir (canonical paths). Wrappers from older builds with no --tasks-dir still count, so their real jobs stay guarded. Updated docs/help/agent.md and docs/developers/agent-automation-tracker.md. Check: with foreign wrappers for TEST-1 and OUTC-1 running (--tasks-dir /elsewhere/.tasks), the three named tests pass. With a wrapper that has no --tasks-dir, two of them still fail with ''has an active agent job'', which reproduces the bug. New unit test: wrappers_of_another_tasks_dir_are_not_counted. lint, smoke (377/377), test:ui, test:release and test:hooks pass. test:rust: 1966/1967 passed; the one failure was shipped_agent_reviewed_template_handles_hand_back_failure_review_and_merge, the known flake tracked in DEV-348, which passed 3/3 on rerun. I didn''t run two full test:rust:agent suites in separate worktrees at once; the foreign-wrapper run above stands in for that.'
@@ -122,3 +124,15 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-351"],"related":["DEV-346","TEST-1","DEV-348","DEV-352","DEV-358"]}'
     new: '{"blocks":["DEV-351"],"related":["DEV-346","TEST-1","DEV-348","DEV-352","DEV-358","DEV-355"]}'
+- at: 2026-11-12T04:43:07.540890+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-351"],"related":["DEV-346","TEST-1","DEV-348","DEV-352","DEV-358","DEV-355"]}'
+    new: '{"blocks":["DEV-351"],"related":["DEV-346","TEST-1","DEV-348","DEV-352","DEV-358","DEV-355","DEV-356"]}'
+- at: 2026-11-12T04:44:40.147050+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-351"],"related":["DEV-346","TEST-1","DEV-348","DEV-352","DEV-358","DEV-355","DEV-356"]}'
+    new: '{"blocks":["DEV-351"],"related":["DEV-346","TEST-1","DEV-348","DEV-352","DEV-358","DEV-355","DEV-356","DEV-357"]}'

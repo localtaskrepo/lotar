@@ -3,14 +3,21 @@ status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T04:24:49.286137+00:00
-modified: 2026-11-12T04:24:50.888441+00:00
+modified: 2026-11-12T04:43:20.393726+00:00
 relationships:
   related:
   - DEV-351
+  - DEV-349
+  - DEV-355
+  - TEST-1
+comments:
+- date: 2026-11-12T04:43:07.389692+00:00
+  text: 'claude: Fixed in 5fe75f2 on agent/DEV-356 (test-only change). Cause: a job''s status turns completed/failed before its job_completed rules run (finalize writes the status log, then calls AutomationService::apply_job_event). The test''s wait_for_finished_job slept a fixed 300 ms after the status change and then read the ticket; under load the rule''s Done came later. Fix: wait_for_finished_job now also waits until the job''s active-job record is gone (agent_active_jobs::find is None). That record is removed at the end of apply_job_event, after the rules ran. The fixed sleep is gone. This covers all five tests in dev318_t3_runner_test.rs. Reproduced: with a temporary 1 s sleep before apply_job_event, the old test failed exactly as reported (line 152, Todo vs Done); the new test passed all 4 dev318 tests. The delay was reverted. Check: 30 of 30 runs with --retries 0 passed while npm run test:rust ran next to them. That full run stopped early on cli_agent_check_test with ''has an active agent job (pid N)'' for TEST-1: another worktree''s older-build lotar-agent-wrapper without --tasks-dir, which DEV-349 still counts on purpose (noted in its comment), so I didn''t file it again. Later checks: npm run test:rust -- --no-fail-fast 2003/2003; npm run lint passed; test:ui 1444/1444, test:release and test:hooks passed; smoke 377/378: ui.keyboard-shortcuts failed once (already DEV-355) and passed 2/2 on rerun. Guidance: no durable finding.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A249d99cd-7c07-495c-be46-39132be3417f
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ade9e46ff-a217-43ec-95ac-ef85a994da84
 description: 'Found by DEV-351 (claude, 2026-11-11): tests/dev318_t3_runner_test.rs home_profile_and_repo_rule_run_a_t3_thread_and_set_done failed once in npm run test:agent (retries 0) on agent/DEV-351 under load (another session''s suite was running): tests/dev318_t3_runner_test.rs:152 left "Todo", right "Done", so the job read as completed before the rule''s Done was written. It passed on its own right after. DEV-351 only adds a test, so it did not cause this. Check: run it 30 times under load (cargo nextest run --retries 0 next to the full suite) with no failure. Done when the cause is found and fixed, with the test passing without retries.'
 tags:
 - health
@@ -39,3 +46,24 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A249d99cd-7c07-495c-be46-39132be3417f
+- at: 2026-11-12T04:43:07.389692+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T04:43:07.541494+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-351"]}'
+    new: '{"related":["DEV-351","DEV-349","DEV-355","TEST-1"]}'
+- at: 2026-11-12T04:43:18.977853+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-12T04:43:20.393726+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ade9e46ff-a217-43ec-95ac-ef85a994da84
