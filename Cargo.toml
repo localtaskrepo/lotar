@@ -130,6 +130,15 @@ panic = "unwind"
 strip = "none"
 split-debuginfo = "unpacked"
 
+[profile.agent]
+inherits = "dev"
+debug = "line-tables-only"
+split-debuginfo = "unpacked"
+
+[profile.agentnodebug]
+inherits = "dev"
+debug = false
+
 [dev-dependencies]
 assert_cmd = "2.2.2"
 predicates = "3.1.4"
