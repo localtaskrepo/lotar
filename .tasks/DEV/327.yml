@@ -3,12 +3,14 @@ status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-11T23:36:51.131233+00:00
-modified: 2026-11-12T08:57:57.616715+00:00
+modified: 2026-11-12T09:08:02.553067+00:00
 comments:
 - date: 2026-11-12T08:57:56.677477+00:00
   text: 'claude: Owner 2026-11-12: work this now (@fix). Do it the way AGENTS.md says, with lint, test and smoke. Run lotar with LOTAR_DEFAULT_REPORTER set to your agent name and start each comment with it. Commit on your worktree''s branch, signed, never --no-verify, message ''DEV-N <title>''; don''t merge or push, the merge agent does. Never delete work that isn''t saved elsewhere. A question only the owner can answer: comment one question, set HelpNeeded and assign mallox (not the reporter). REST shape change: src/api_types.rs, view/api/types.ts, docs/openapi.json and docs/help agree (skill api-contract-change-end-to-end). Old task YAML without an author must still load.'
+- date: 2026-11-12T09:07:52.044905+00:00
+  text: 'Done in f977e8b (branch agent/DEV-327). Comments now store an optional author: the same identity the history''s comment_added entry records as actor (TaskService::add_comment_with_context), so CLI, REST and MCP all set it. lotar show and lotar comment <ID> print ''date  author: text''; JSON (comment add/list, show, REST and MCP DTOs) carries author; the web UI shows ''author · date''. Comments stored without an author read and print as before, and the field is left out when empty. Contract: types.rs, view/api/types.ts, docs/openapi.json, help docs updated. Tests: tests/dev327_comment_author_test.rs (CLI with LOTAR_DEFAULT_REPORTER=claude, legacy YAML, REST, MCP) and view/__tests__/TaskPanelCommentsTab.spec.ts. npm run lint, npm run test:agent (2032 Rust + 1444 UI) and npm run test:smoke:agent (380) pass. Not checked by hand in a browser. Follow-up for standards: drop the ''start each comment with your agent name'' line (configs/lotar/automation.yml, skills/lotar-workflow) once this ships.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad2cd205d-125a-442b-b000-9717311be2b3
 description: 'From the standards ticket-process review (STD-27, 2026-11-11). A comment stores only date and text (docs/help/comment.md: ''Author attribution isn''t stored''); the author is only in the history''s actor, and lotar show doesn''t print it. Agents now start comments with ''claude:'' by hand, and the fix-agent prompt asks for that until this lands. Wanted: store the author on each comment from the same identity the history uses (LOTAR_DEFAULT_REPORTER, the agent job''s profile, a project''s default.reporter), show it in lotar show, the JSON, the web UI and MCP, and keep old comments without an author readable. Done: lotar comment X -m hi with LOTAR_DEFAULT_REPORTER=claude shows ''claude'' next to the comment in show and JSON; tests cover CLI, REST and MCP. Afterwards standards drops the ''start each comment with your agent name'' line (configs/lotar/automation.yml, skills/lotar-workflow).'
@@ -33,3 +35,13 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad2cd205d-125a-442b-b000-9717311be2b3
+- at: 2026-11-12T09:07:52.044905+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T09:08:02.553067+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
