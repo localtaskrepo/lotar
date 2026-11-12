@@ -1,11 +1,11 @@
 title: Unblocked hook for prerequisites in another repo
-status: InProgress
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T20:50:49.799402+00:00
-modified: 2026-11-12T23:04:50.726749+00:00
+modified: 2026-11-12T23:08:53.096649+00:00
 relationships:
   depends_on:
   - DEV-385
@@ -26,6 +26,9 @@ comments:
 - date: 2026-11-12T23:04:40.655332+00:00
   author: claude
   text: 'Done on branch t3/dev-388-unblocked-hook-cross-repo (fast-forwarded to main first for DEV-385/386), commit DEV-388. lotar automation run (and POST /api/automation/run, which shares run_manual) now fires the unblocked rules of each open ticket that has a repo:ID in depends_on and no open prerequisite left; --dry-run, --select, -p and rule names apply. Guard: the rule''s own conditions (when status: Blocked plus a set that leaves Blocked), as DEV-385 suggested; no marker, since a rule without such a condition is documented to fire on every run. ${{unblocked.by}} now includes cross-repo tasks (new Prerequisite type in template.rs), also in simulate and the local hook. Not done: the dependent repo''s own events (no cheap trigger). Test: dev386 automation_run_fires_unblocked_once_a_prerequisite_in_another_repo_is_done. Docs: automation.md (When prerequisites are done, automation run), task.md (Tasks in another repo), CLI help, openapi description. Checks: lint, test (2107 Rust, 1503 UI), smoke (384) all pass.'
+- date: 2026-11-12T23:08:47.724761+00:00
+  author: claude
+  text: 'claude: Merged and pushed. The branch was already on main (e405802), so no rebase was needed. main fast-forwarded to f16bbda (DEV-388 Unblocked hook for prerequisites in another repo), then f0b34c3 (DEV-388 Ticket updates, the pending .tasks changes); pushed e405802..f0b34c3 to origin/main, pre-push hook passed. Checks in the worktree before the merge: lint, test (2107 Rust, 1503 UI, release and hook scripts), smoke (384), all pass.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A17cafb4c-9478-44d7-a563-ba3bd10c3bf5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A53509f36-6904-4ae5-b2e0-4c118df9483b
@@ -207,3 +210,13 @@ history:
   - field: assignee
     old: '@fix'
     new: '@merge'
+- at: 2026-11-12T23:08:47.724761+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T23:08:53.096649+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

@@ -3,9 +3,9 @@ status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T20:52:33.189344+00:00
-modified: 2026-11-12T22:52:53.811193+00:00
+modified: 2026-11-12T23:18:44.121303+00:00
 relationships:
   depends_on:
   - DEV-386
@@ -16,6 +16,9 @@ comments:
 - date: 2026-11-12T22:52:52.548259+00:00
   author: claude
   text: 'claude: Unblocked: DEV-386 (6238867) is on main. Owner 2026-11-12: build this and DEV-388 before releasing v0.14.1 (DEV-374).'
+- date: 2026-11-12T23:18:33.606596+00:00
+  author: claude
+  text: 'Done on branch agent/DEV-389. New GET /api/relationships/cross-repo?refs=repo:ID,... returns each reference resolved now (reference, title, status, done, url, or unresolved with the reason); in src/api_types.rs (CrossRepoTaskDTO), view/api/types.ts (CrossRepoTask), docs/openapi.json, docs/help/api-quick-reference.md. I used a separate request instead of the task DTO so task lists don''t read other repos. Task panel Relationships tab: a repo:ID chip shows the status (or ''unresolved'', reason on hover) and opens the other repo''s link in a new tab; typing repo:ID adds it as written (no local suggestions take over); typing or dragging one into a category other than Depends on/Related is refused in the UI. Docs: docs/help/task.md (Tasks in another repo). Tests: Rust REST test in tests/dev386_cross_repo_relationships_test.rs, Vitest cases in TaskRelationships.spec.ts, Playwright smoke smoke/tests/ui.cross-repo-relationships.smoke.spec.ts. npm run lint, npm test (2107 Rust, 1505 UI) and npm run smoke (385) pass. Limit: the other repo sends no events, so its status refreshes when the tab opens or the chips change.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Add47aab2-5009-4849-a754-cffb5eb15e59
 description: |-
@@ -83,3 +86,13 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Add47aab2-5009-4849-a754-cffb5eb15e59
+- at: 2026-11-12T23:18:33.606596+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-12T23:18:44.121303+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
