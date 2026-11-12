@@ -10,6 +10,7 @@ fn make_resolver() -> ProjectResolver {
     let cfg = ResolvedConfig {
         review_reviewers: vec![],
         server_port: 8080,
+        server_public_url: None,
         default_project: "TEST".to_string(),
         issue_states: ConfigurableField { values: vec![TaskStatus::from("Todo"), TaskStatus::from("Done")] },
         issue_done_states: None,

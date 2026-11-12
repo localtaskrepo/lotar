@@ -57,6 +57,9 @@ impl LogLevel {
 #[derive(Debug, Clone, Serialize)]
 pub struct TaskDisplayInfo {
     pub id: String,
+    /// The task's web link (DEV-332); JSON only, omitted while unset.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
     pub title: String,
     pub status: String,
     pub priority: String,

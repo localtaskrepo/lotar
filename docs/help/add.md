@@ -94,9 +94,12 @@ Control output with global `--format` option:
 lotar add "New task" 
 # 📋 Created task AUTH-001: New task
 
+# With server.public_url set, the link follows: "  Link: https://lotar.example.com/task/AUTH-001"
+
 # JSON for scripting
 lotar add "New task" --format=json
 # {"status":"success","message":"Created task: AUTH-001","task":{"id":"AUTH-001", ...}}
+# (with server.public_url set, "task" also has "url")
 
 # JSON dry-run preview
 lotar add "Preview task" --dry-run --format=json

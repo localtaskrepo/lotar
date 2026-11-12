@@ -20,6 +20,9 @@ pub fn handle_show(id: &str, project: Option<&str>, resolver: &TasksDirectoryRes
 /// references and comments. Empty sections are left out.
 pub fn render_task_text(task: &TaskDTO) -> String {
     let mut out = format!("{}  {}\n", task.id, task.title);
+    if let Some(url) = &task.url {
+        out.push_str(&format!("{url}\n"));
+    }
     let mut state = vec![format!("Status: {}", task.status), format!("Priority: {}", task.priority), format!("Type: {}", task.task_type)];
     if task.deleted_at.is_some() {
         state.push("Deleted".into());

@@ -21,6 +21,7 @@ Canonical fields, enums, and invariants for tasks returned by REST, MCP, and CLI
 Field | Type | Notes
 ----- | ---- | -----
 `id` | `string` | Canonical task identifier (`PROJECT-N`).
+`url` | `string?` | The task's web link `<server.public_url>/task/<ID>`; present only while the workspace sets [`server.public_url`](./config-reference.md). Computed, never stored in task YAML.
 `title` | `string` | Required summary/title.
 `status` | `TaskStatus` | Validated against `config.issue_states` (see below). Stored as user-provided casing.
 `priority` | `Priority` | Validated against `config.issue_priorities`.

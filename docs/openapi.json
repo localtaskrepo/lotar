@@ -4213,6 +4213,11 @@
           "id": {
             "type": "string"
           },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "The task's web link `<server.public_url>/task/<ID>`; omitted while the workspace sets no public URL"
+          },
           "title": {
             "type": "string"
           },

@@ -6,6 +6,7 @@ fn cfg() -> ResolvedConfig {
     ResolvedConfig {
         review_reviewers: vec![],
         server_port: 8080,
+        server_public_url: None,
         default_project: "TEST".to_string(),
         issue_states: ConfigurableField {
             values: vec![

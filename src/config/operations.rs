@@ -119,6 +119,16 @@ fn parse_optional_string(value: &str) -> Option<String> {
     if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("inherit") { None } else { Some(trimmed.to_string()) }
 }
 
+/// `server.public_url` is empty (unset) or an http(s) address without
+/// query or fragment, since `/task/<ID>` is appended to it.
+fn validate_public_url(value: &str) -> Result<(), ConfigError> {
+    let value = value.trim();
+    if value.is_empty() {
+        return Ok(());
+    }
+    crate::config::types::public_url_problem(value).map_or(Ok(()), |problem| Err(ConfigError::ParseError(problem)))
+}
+
 fn parse_review_reviewers(value: &str) -> Result<Vec<String>, ConfigError> {
     let trimmed = value.trim();
     let values = if trimmed.starts_with('[') || trimmed.starts_with('{') {
@@ -702,6 +712,10 @@ pub fn apply_field_to_global_config(config: &mut GlobalConfig, field: &str, valu
             crate::services::theme_file::validate_path(value).map_err(ConfigError::ParseError)?;
             config.ui_theme_file = parse_optional_string(value);
         }
+        "server_public_url" => {
+            validate_public_url(value)?;
+            config.server_public_url = parse_optional_string(value).map(|url| url.trim_end_matches('/').to_string());
+        }
         "ui_theme" | "ui_name" | "ui_logo" | "ui_logo_dark" | "ui_icon" => {
             crate::services::branding_service::validate_ui_field(field, value).map_err(ConfigError::ParseError)?;
             let next = parse_optional_string(value);
@@ -1198,6 +1212,9 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
         }
         "ui_theme_file" => {
             crate::services::theme_file::validate_path(value).map_err(ConfigError::ParseError)?;
+        }
+        "server_public_url" => {
+            validate_public_url(value)?;
         }
         "agent_instructions" | "agent_instructions_file" => {
             // Accept any string; empty values clear the override.

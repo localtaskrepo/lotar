@@ -79,6 +79,7 @@ pub const CONFIG_FIELDS: &[ConfigFieldMeta] = &[
     field("project_name").project().aliases(&["config.project_name", "project.id", "project.name"]),
     field("review_reviewers").project().aliases(&["review.reviewers"]).source("review.reviewers"),
     field("server_port").global().aliases(&["server.port"]).source("server.port"),
+    field("server_public_url").global().aliases(&["server.public_url"]),
     field("default_project").global().aliases(&["default.project"]).source("default.project"),
     field("default_assignee").both().aliases(&["default.assignee"]).source("default.assignee"),
     field("default_reporter").both().aliases(&["default.reporter"]).source("default.reporter"),
@@ -191,6 +192,7 @@ mod tests {
     // keep accepting and rejecting exactly these names.
     const LEGACY_GLOBAL: &[&str] = &[
         "server_port",
+        "server_public_url",
         "default_project",
         "default_assignee",
         "default_reporter",
@@ -324,6 +326,7 @@ mod tests {
         ("project.id", "project_name"),
         ("project.name", "project_name"),
         ("server.port", "server_port"),
+        ("server.public_url", "server_public_url"),
         ("default.project", "default_project"),
         ("default.assignee", "default_assignee"),
         ("default.reporter", "default_reporter"),

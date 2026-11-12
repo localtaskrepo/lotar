@@ -2428,6 +2428,7 @@ mod dev21_cross_root_dependency_tests {
 
     fn dependent_dto(id: &str, deps: &[&str]) -> TaskDTO {
         TaskDTO {
+            url: None,
             task_state: None,
             deleted_at: None,
             archived: false,

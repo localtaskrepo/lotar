@@ -157,6 +157,10 @@ impl ConfigValidator {
 
         // Note: u16 max value is 65535, so no need to check config.server_port > 65535
 
+        if let Some(problem) = config.server_public_url.as_deref().and_then(crate::config::types::public_url_problem) {
+            result.add_error(ValidationError::error(Some("server_public_url".to_string()), problem));
+        }
+
         // Validate default prefix
         if !config.default_project.is_empty() {
             self.validate_prefix(&config.default_project, &mut result);

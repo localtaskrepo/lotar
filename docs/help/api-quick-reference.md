@@ -7,7 +7,7 @@ Endpoints with quick examples. For full schema see [OpenAPI](../openapi.json).
   omitted when the page is empty (treat missing as `[]`); empty page:
   `{ "data": { "total": 0, "limit": 50, "offset": 0 } }`, populated page:
   `{ "data": { "total": 1, "limit": 50, "offset": 0, "tasks": [ { "id": "QA-1", "title": "Wire contract tests", "status": "Todo", "priority": "Medium", "task_type": "Feature", "created": "2026-09-15T10:00:00+00:00", "modified": "2026-09-15T11:30:00+00:00" } ] } }`
-- GET  /api/tasks/get?id=ID[&project=PREFIX][&include_deleted=true] -> { data: TaskDTO }; deleted tasks are hidden unless explicitly included
+- GET  /api/tasks/get?id=ID[&project=PREFIX][&include_deleted=true] -> { data: TaskDTO }; deleted tasks are hidden unless explicitly included. Every `TaskDTO` has `url` (`<server.public_url>/task/<ID>`) while [`server.public_url`](./config-reference.md) is set
 - POST /api/tasks/update (TaskUpdateRequest) -> { data: TaskDTO, deferred?: JobOutcome }; `deferred` when an agent job runs on the ticket and holds the status/assignee change for its end ([details](agent.md#status-and-assignee-during-a-job)); optional `expected_modified` -> 409 CONFLICT if the task changed since
 - POST /api/tasks/delete ({ id, hard?: bool }[?project=PREFIX]) -> { data: { deleted: bool, hard: bool, warnings: string[] } }; defaults to soft delete; hard deletion retains attachment blobs and warns about their references and incoming task relationships
 - POST /api/tasks/restore ({ id }[?project=PREFIX]) -> { data: TaskDTO }; restores a soft-deleted task without changing `modified`

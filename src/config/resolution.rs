@@ -647,6 +647,9 @@ pub fn merge_global_config_with(base: &mut GlobalConfig, override_config: Global
     if override_config.ui_theme_file.is_some() {
         base.ui_theme_file = override_config.ui_theme_file;
     }
+    if override_config.server_public_url.is_some() {
+        base.server_public_url = override_config.server_public_url;
+    }
     if override_config.agent_instructions.is_some() {
         base.agent_instructions = override_config.agent_instructions;
     }
@@ -831,6 +834,9 @@ pub fn overlay_global_into_resolved_with(resolved: &mut ResolvedConfig, override
     }
     if override_config.ui_theme_file.is_some() {
         resolved.ui.theme_file = override_config.ui_theme_file;
+    }
+    if override_config.server_public_url.is_some() {
+        resolved.server_public_url = override_config.server_public_url;
     }
     if override_config.agent_instructions.is_some() {
         resolved.agent_instructions = override_config.agent_instructions;
@@ -1149,6 +1155,7 @@ impl ResolvedConfig {
     pub fn from_global(global: GlobalConfig) -> Self {
         Self {
             server_port: global.server_port,
+            server_public_url: global.server_public_url,
             default_project: global.default_project,
             issue_states: global.issue_states,
             issue_done_states: global.issue_done_states,

@@ -401,6 +401,7 @@ fn query_predicates_evaluate_injected_clock_not_snapshots() {
     // Stale snapshot claims a different calendar day and bucket; predicates
     // must ignore it and classify from the raw due value + injected clock.
     let dto = |due: Option<String>| TaskDTO {
+        url: None,
         id: "X-1".to_string(),
         title: "clock".to_string(),
         status: lotar::types::TaskStatus::from("Todo"),

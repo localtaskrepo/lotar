@@ -87,7 +87,11 @@ fn render_resolved_config_yaml(resolved: &ResolvedConfig, sources: &HashMap<Stri
     let mut sections: Vec<String> = Vec::new();
 
     let mut server_body = String::new();
-    if write_scalar_line(&mut server_body, 2, "port", &yaml_scalar(&resolved.server_port), sources.get("server.port"), options) {
+    let mut server_written = write_scalar_line(&mut server_body, 2, "port", &yaml_scalar(&resolved.server_port), sources.get("server.port"), options);
+    if let Some(url) = &resolved.server_public_url {
+        server_written |= write_scalar_line(&mut server_body, 2, "public_url", &yaml_scalar(url), sources.get("server.public_url"), options);
+    }
+    if server_written {
         sections.push(format!("server:\n{}", server_body));
     }
 

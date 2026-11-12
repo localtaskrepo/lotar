@@ -35,7 +35,7 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 
 ### `task_get`
 - **Params:** `id` (required), optional `project` override to disambiguate numeric IDs, and `include_deleted` (bool, default false).
-- **Response:** Pretty-printed `TaskDTO` for the requested record.
+- **Response:** Pretty-printed `TaskDTO` for the requested record. Every `TaskDTO` has `url`, the ticket's web link, while the workspace sets [`server.public_url`](./config-reference.md).
 
 ### `task_update`
 - **Params:** `id` (required) and `patch` object. Patch keys mirror `task_create` fields (including the `task_type` alias for `type`) plus `acceptance_criteria` and `sprints`.

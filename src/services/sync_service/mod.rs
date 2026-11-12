@@ -472,6 +472,7 @@ mod tests {
 
     fn sample_task() -> TaskDTO {
         TaskDTO {
+            url: None,
             task_state: None,
             deleted_at: None,
             archived: false,

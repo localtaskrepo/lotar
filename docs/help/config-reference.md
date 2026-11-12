@@ -7,6 +7,7 @@ CLI > project > env > home > global > defaults (commands without a project skip 
 
 ## Canonical keys (nested)
 - server.port: number (default 8080)
+- server.public_url: string (unset by default) — the address people open the web UI at, like `https://lotar.example.com`. When set, `lotar show` and `lotar add` print each ticket's link `<public_url>/task/<ID>` (the link the web UI's "copy link" builds), and the task JSON of `show`, `add`, `list`, REST and MCP has it as `url`. Unset, no link is printed or returned. It must start with `http://` or `https://` and have no `?` or `#`; a trailing `/` is dropped.
 - default.project: string (default project prefix)
 - default.assignee: string
 - default.reporter: string
@@ -103,7 +104,7 @@ CLI > project > env > home > global > defaults (commands without a project skip 
 - auth_profiles.<name>.api_url: string (API address override, such as GitHub Enterprise; GitHub defaults to https://api.github.com)
 
 ## Home and Project keys
-Home/global/project schemas are not identical. Project values override inherited fields for that project; `project.name` is an optional label, not the folder identifier. `server.port`, `default.project`, sprint defaults, `web_ui_path` and `ui.*` are global-only; sprint notifications and the listed project automation flags can be overridden. See [config scope](./config.md) before copying fields between files.
+Home/global/project schemas are not identical. Project values override inherited fields for that project; `project.name` is an optional label, not the folder identifier. `server.port`, `server.public_url`, `default.project`, sprint defaults, `web_ui_path` and `ui.*` are global-only; sprint notifications and the listed project automation flags can be overridden. See [config scope](./config.md) before copying fields between files.
 
 Auth profiles are home-only: `auth_profiles` is ignored in project configs (secrets never live in the repo). Remotes can be configured globally or per-project; project remotes override/extend global remotes.
 

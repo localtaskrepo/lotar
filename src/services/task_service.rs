@@ -1919,6 +1919,7 @@ impl TaskService {
         let task_state = Some(crate::services::completion::compute_task_state(&task.status, task.due_date.as_deref(), config, now));
         TaskDTO {
             id: id.to_string(),
+            url: config.task_url(id),
             title: task.title,
             status: task.status,
             task_state,

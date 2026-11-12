@@ -651,6 +651,10 @@ impl AddHandler {
                     }
                     _ => {
                         renderer.emit_success(format_args!("Created task: {}", task_id));
+                        let config = crate::services::task_service::TaskService::resolve_config_for_project(read_root.as_path(), &project_prefix);
+                        if let Some(url) = config.task_url(task_id) {
+                            renderer.emit_raw_stdout(format_args!("  Link: {}", url));
+                        }
                         renderer.emit_raw_stdout(format_args!("  Title: {}", task.title));
                         renderer.emit_raw_stdout(format_args!("  Status: {}", task.status));
                         renderer.emit_raw_stdout(format_args!("  Priority: {}", task.priority));

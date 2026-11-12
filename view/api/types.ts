@@ -127,6 +127,8 @@ export interface TaskRuntimeState {
 
 export interface TaskDTO {
     id: string
+    /** The task's web link `<server.public_url>/task/<ID>`; absent while no public URL is set. */
+    url?: string
     title: string
     status: TaskStatus
     priority: Priority
@@ -1056,6 +1058,8 @@ export interface ResolvedConfigDTO {
     /** Project-only named reviewers; empty keeps reporter-only review authorization. */
     review_reviewers: string[]
     server_port: number
+    /** The web UI's public address (`server.public_url`), when set. */
+    server_public_url?: string | null
     default_project: string
     attachments_dir: string
     attachments_max_upload_mb: number
@@ -1118,6 +1122,8 @@ export interface ResolvedConfigDTO {
 
 export interface GlobalConfigRaw {
     server_port: number
+    /** The web UI's public address (`server.public_url`), when set. */
+    server_public_url?: string | null
     default_project: string
     attachments_dir: string
     attachments_max_upload_mb: number

@@ -344,9 +344,14 @@ pub fn to_canonical_global_yaml_with(cfg: &GlobalConfig, options: GlobalYamlOpti
     let mut root = serde_yaml_ng::Mapping::new();
 
     // server
+    let mut server = serde_yaml_ng::Mapping::new();
     if options.explicit_server_port || cfg.server_port != defaults.server_port {
-        let mut server = serde_yaml_ng::Mapping::new();
         server.insert(Y::String("port".into()), Y::Number(cfg.server_port.into()));
+    }
+    if let Some(url) = &cfg.server_public_url {
+        server.insert(Y::String("public_url".into()), Y::String(url.clone()));
+    }
+    if !server.is_empty() {
         root.insert(Y::String("server".into()), Y::Mapping(server));
     }
     if let Some(path) = &cfg.web_ui_path {

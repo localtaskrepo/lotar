@@ -604,6 +604,10 @@ impl ProjectConfig {
 pub struct GlobalConfig {
     #[serde(default = "default_port")]
     pub server_port: u16,
+    /// The web UI's public address (`server.public_url`, DEV-332). When set,
+    /// tasks carry their link `<public_url>/task/<ID>`.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub server_public_url: Option<String>,
     #[serde(default = "default_project_name", rename = "default_project")]
     pub default_project: String,
 
@@ -764,6 +768,8 @@ pub struct ResolvedConfig {
     /// Project-only named reviewers; empty preserves reporter-only authorization.
     pub review_reviewers: Vec<String>,
     pub server_port: u16,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub server_public_url: Option<String>,
     pub default_project: String,
     pub issue_states: ConfigurableField<TaskStatus>,
     /// Effective explicit terminal states (project override > env > home >
@@ -857,6 +863,13 @@ pub struct UiSettings {
 }
 
 impl ResolvedConfig {
+    /// The task's web link when `server.public_url` is set: the same link
+    /// the web UI's "copy link" builds (DEV-332).
+    pub fn task_url(&self, id: &str) -> Option<String> {
+        let base = self.server_public_url.as_deref().filter(|base| public_url_problem(base).is_none())?;
+        Some(format!("{}/task/{}", base.trim_end_matches('/'), id))
+    }
+
     pub fn effective_default_status(&self) -> Option<TaskStatus> {
         if self.issue_states.values.is_empty() {
             return None;
@@ -890,6 +903,17 @@ impl ResolvedConfig {
         }
 
         Some(self.issue_types.values[0].clone())
+    }
+}
+
+/// Why a `server.public_url` value cannot prefix task links, if it cannot.
+pub fn public_url_problem(value: &str) -> Option<String> {
+    let host = value.strip_prefix("https://").or_else(|| value.strip_prefix("http://"));
+    match host {
+        Some(rest) if !rest.is_empty() && !rest.starts_with('/') && !value.contains(['?', '#']) && !value.contains(char::is_whitespace) => None,
+        _ => {
+            Some(format!("server.public_url must be an http:// or https:// address without query or fragment, like https://lotar.example.com (got '{value}')"))
+        }
     }
 }
 
@@ -994,6 +1018,7 @@ impl Default for GlobalConfig {
     fn default() -> Self {
         Self {
             server_port: default_port(),
+            server_public_url: None,
             default_project: default_project_name(),
             issue_states: default_issue_states(),
             issue_done_states: None,

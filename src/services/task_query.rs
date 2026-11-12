@@ -778,6 +778,7 @@ mod tests {
 
     fn dto(id: &str, modified: &str) -> crate::api_types::TaskDTO {
         crate::api_types::TaskDTO {
+            url: None,
             task_state: None,
             deleted_at: None,
             archived: false,

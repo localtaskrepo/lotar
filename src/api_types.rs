@@ -216,6 +216,10 @@ pub struct RelationshipRepairResponse {
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct TaskDTO {
     pub id: String,
+    /// The task's web link `<server.public_url>/task/<ID>` (DEV-332);
+    /// omitted while the workspace sets no public URL.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub url: Option<String>,
     pub title: String,
     pub status: crate::types::TaskStatus,
     pub priority: crate::types::Priority,

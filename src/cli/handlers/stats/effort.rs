@@ -195,6 +195,7 @@ pub(crate) fn run(
                         let task = crate::storage::task::parse_task_yaml_tolerant(&fs::read_to_string(&abs_file).unwrap_or_default()).unwrap_or_default();
                         let sprints: Vec<u32> = sprint_lookup.get(&id).map(|orders| orders.keys().copied().collect::<Vec<u32>>()).unwrap_or_default();
                         let dto = crate::api_types::TaskDTO {
+                            url: None,
                             task_state: None,
                             archived: false,
                             moved_from: Vec::new(),

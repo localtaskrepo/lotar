@@ -73,6 +73,7 @@ lotar --format json show <TASK_ID>
 - Prints the task's fields, relationships, description, acceptance criteria, references and comments. Empty sections are left out.
 - Accepts the same IDs as other commands: `DEV-12`, `12` inside a project, an old ID of a moved task, or a soft-deleted task.
 - `--format json` prints the full task as the REST API returns it.
+- With [`server.public_url`](./config-reference.md) set, the second line is the ticket's web link (`https://lotar.example.com/task/DEV-12`), and the JSON has it as `url`.
 
 ### edit
 

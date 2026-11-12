@@ -184,6 +184,7 @@ impl SearchHandler {
 
                 crate::output::TaskDisplayInfo {
                     id: task_id,
+                    url: task.url,
                     title: task.title,
                     status: task.status.to_string(),
                     priority: task.priority.to_string(),
