@@ -65,6 +65,12 @@ mod test_environment {
     unsafe fn isolate_tmpdir_under_owned_scratch() {
         scrub_repository_routing_env();
         scrub_config_override_env();
+        // Ignore the developer's ~/.lotar (DEV-339), as `tests/common` does.
+        // Manipulating process-wide env vars requires `unsafe`. Keep scope
+        // tiny; the ctor runs before any test thread exists.
+        unsafe {
+            std::env::set_var("LOTAR_IGNORE_HOME_CONFIG", "1");
+        }
         if OWNED_SCRATCH.get().is_some() {
             return;
         }
