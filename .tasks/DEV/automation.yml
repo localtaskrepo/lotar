@@ -112,6 +112,9 @@ automation:
         job_started:
           set:
             status: InProgress
+          # A rule's own change fires no other rule: a job that a rule starts on a HelpNeeded ticket (a manual retry,
+          # his comment) closes its inbox ticket here. The status is set before the command runs (STD-103).
+          run: &inbox 'node "$HOME/Development/standards/scripts/repos.ts" --inbox ${{ticket.id}}'
     # A fix job's work goes to an agent reviewer before the merge (owner 2026-11-12, STD-59: "Yes, I agree with your
     # recommendations", docs/decisions/2026-11-12-qa-step.md): a new thread on another provider than the author, the
     # cheap model after @fix-light (lotar 0.14.3 for session: fresh). Not the ticket's model fields: they pick the fix agent's model. Work that commits
@@ -427,7 +430,7 @@ automation:
             The review found blocking problems again after one rework (the comments above). Should an agent rework it
             once more (lotar assignee ${{ticket.id}} @fix), will you decide the findings, or is it WontDo?
           # A rule's own change fires no other rule, so this one files the ticket in the inbox itself.
-          run: &inbox 'node "$HOME/Development/standards/scripts/repos.ts" --inbox ${{ticket.id}}'
+          run: *inbox
     # A failed fix job goes to @fix-codex once before it waits for mallox (owner 2026-11-12, STD-55): STD-18's job
     # failed only because the agent ended its turn while the commit hook ran. Codex, because it is another provider
     # and model: a Claude outage, rate limit or habit doesn't fail the retry too. The retry keeps the branch and runs on
