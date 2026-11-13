@@ -49,6 +49,20 @@ pub(super) fn field_values_match(a: &FieldValue, b: &FieldValue) -> bool {
     normalize_field_values(a) == normalize_field_values(b)
 }
 
+/// Version names compare without a leading `v`, which a pull drops.
+pub(super) fn version_values_match(a: &FieldValue, b: &FieldValue) -> bool {
+    let unprefixed = |value: &FieldValue| FieldValue::List(value.to_list_value().iter().map(|name| without_version_prefix(name).to_string()).collect());
+    field_values_match(&unprefixed(a), &unprefixed(b))
+}
+
+pub(super) fn without_version_prefix(value: &str) -> &str {
+    let trimmed = value.trim();
+    match trimmed.strip_prefix(['v', 'V']) {
+        Some(rest) if rest.starts_with(|c: char| c.is_ascii_digit()) => rest,
+        _ => trimmed,
+    }
+}
+
 #[derive(Default)]
 pub(super) struct LocalFieldValues {
     pub(super) title: Option<String>,

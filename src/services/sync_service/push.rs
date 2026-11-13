@@ -236,6 +236,8 @@ pub(super) struct LookupCache {
     pub(super) user_cache: HashMap<String, String>,
     /// GitHub milestones as (title, number), or why listing them failed.
     pub(super) github_milestones: Option<Result<Vec<(String, u64)>, String>>,
+    /// Jira project version names, or why listing them failed.
+    pub(super) jira_versions: Option<Result<Vec<String>, String>>,
 }
 
 /// Provider payload for one push; the orchestration in `perform_push` is

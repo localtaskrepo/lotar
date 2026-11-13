@@ -168,7 +168,7 @@ mapping:
   affects: versions       # Jira only
 ```
 
-A pull stores the version's name, or the milestone's title without a leading `v` (milestone `v0.15.0` becomes `0.15.0`). A title that is not a version fails that issue with the field's error.
+A pull stores the Jira version's name or the milestone's title without a leading `v` (version `v0.15.0` becomes `0.15.0`). A title that is not a version fails that issue with the field's error.
 
 A pulled status, priority or type must exist in the project. If it does not, that issue fails and the report lists the allowed values. Extend `values` or the project config to fix it. When several local values map to the same remote value, a pull keeps the task's current value.
 
@@ -180,7 +180,7 @@ A pulled status, priority or type must exist in the project. If it does not, tha
 - Descriptions become Markdown-style text on pull: blank lines between paragraphs, `- ` and `1. ` lists, `#` headings, fenced code, `> ` quotes and `[text](url)` links. Mentions, emoji, dates and status labels become plain text. A push turns the text back into Jira's format. Bold, colors and mention links are lost when you edit a description locally and push it.
 - A push changes the Jira status through a workflow transition. The mapped status value must match the name of a transition that is available for the issue.
 - New issues get the `Task` issue type unless you map `type`. If the mapped type does not exist in the Jira project, LoTaR uses `Task` and warns.
-- A push sends `fixVersions` and `versions` by name. Jira rejects a version that does not exist in the project, and the report shows its error.
+- A push sends `fixVersions` and `versions` by name, spelled as in the Jira project and ignoring a leading `v`: `0.15.0` is sent as `v0.15.0` when the project has that version. An issue whose versions differ only by that `v` is not changed. Jira rejects a version that does not exist in the project, and the report shows its error.
 - Jira needs account IDs for the assignee and reporter. A pull stores the user's email or display name. A push looks that up and uses an account only when the name or email matches exactly; otherwise it skips the field with a warning. Use account IDs in `values` to avoid the lookup.
 
 **GitHub**

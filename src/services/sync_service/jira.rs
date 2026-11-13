@@ -277,6 +277,36 @@ pub(super) fn jira_fetch_issue_types(client: &SyncClient, project: &str) -> LoTa
     Ok(types)
 }
 
+/// The project's spelling of version `name`, listing the project's versions
+/// once per push. A leading `v` is ignored on both sides, so version `0.15.0`
+/// finds `v0.15.0`; a name the project lacks is sent as is and Jira rejects it.
+pub(super) fn resolve_jira_version(client: &SyncClient, project: &str, name: &str, lookup: &mut LookupCache, warnings: &mut Vec<String>) -> String {
+    let versions = lookup.jira_versions.get_or_insert_with(|| {
+        jira_list_versions(client, project).map_err(|err| {
+            let message = format!("Failed to list Jira versions in {project}: {err}");
+            warnings.push(message.clone());
+            message
+        })
+    });
+    let Ok(versions) = versions else {
+        return name.to_string();
+    };
+    let wanted = without_version_prefix(name);
+    versions
+        .iter()
+        .find(|version| version.trim() == name.trim())
+        .or_else(|| versions.iter().find(|version| without_version_prefix(version).eq_ignore_ascii_case(wanted)))
+        .cloned()
+        .unwrap_or_else(|| name.to_string())
+}
+
+pub(super) fn jira_list_versions(client: &SyncClient, project: &str) -> LoTaRResult<Vec<String>> {
+    let url = format!("{}/rest/api/3/project/{}/versions", client.auth.api_base, project.trim());
+    let req = client.agent.get(&url).force_send_body();
+    let payload = send_json_request(client, req, None)?;
+    Ok(payload.as_array().into_iter().flatten().filter_map(|entry| entry.get("name").and_then(|v| v.as_str())).map(str::to_string).collect())
+}
+
 pub(super) fn jira_resolve_project_id(client: &SyncClient, project: &str) -> LoTaRResult<String> {
     let trimmed = project.trim();
     if trimmed.is_empty() {

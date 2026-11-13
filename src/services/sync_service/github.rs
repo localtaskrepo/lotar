@@ -139,14 +139,6 @@ pub(super) fn resolve_github_milestone(client: &SyncClient, repo: &str, title: &
         .ok_or_else(|| format!("GitHub milestone '{title}' does not exist in {}; create it on GitHub first", normalize_github_repo(repo)))
 }
 
-fn without_version_prefix(value: &str) -> &str {
-    let trimmed = value.trim();
-    match trimmed.strip_prefix(['v', 'V']) {
-        Some(rest) if rest.starts_with(|c: char| c.is_ascii_digit()) => rest,
-        _ => trimmed,
-    }
-}
-
 pub(super) fn github_list_milestones(client: &SyncClient, repo: &str) -> LoTaRResult<Vec<(String, u64)>> {
     let mut milestones = Vec::new();
     let mut page = 1u32;

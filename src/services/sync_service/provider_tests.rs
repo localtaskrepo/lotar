@@ -571,6 +571,37 @@ mod versions {
     }
 
     #[test]
+    fn jira_push_uses_the_projects_v_named_version() {
+        let (_temp, resolver, remote) = versioned(SyncProvider::Jira, "fixVersions");
+        let task = task(&resolver, "jira", "ENG-7", Some("0.15.0"));
+        let api = MockApi::start(|request| {
+            if request.path == "/rest/api/3/project/ENG/versions" {
+                ok(json!([{"id": "10000", "name": "v0.14.0"}, {"id": "10001", "name": "v0.15.0"}]))
+            } else {
+                (404, json!({"errorMessages": ["unexpected"]}))
+            }
+        });
+        let client = api.client(SyncProvider::Jira);
+        let mut lookup = LookupCache::default();
+        let mut warnings = Vec::new();
+
+        let mut payload = build_jira_payload(&remote, &task, SyncOperation::Update, Some(&client), &mut lookup, &mut warnings);
+        assert_eq!(payload.fields.get("fixVersions"), Some(&json!([{"name": "v0.15.0"}])), "0.15.0 is the project's v0.15.0");
+        let unchanged = json!({"fields": {"fixVersions": [{"id": "10001", "name": "v0.15.0"}]}});
+        assert!(filter_jira_payload_against_issue(&unchanged, &mut payload).is_empty(), "already fixed in v0.15.0");
+
+        let mut payload = build_jira_payload(&remote, &task, SyncOperation::Update, None, &mut LookupCache::default(), &mut Vec::new());
+        assert!(filter_jira_payload_against_issue(&unchanged, &mut payload).is_empty(), "a stored 0.15.0 matches v0.15.0");
+
+        let mut payload = build_jira_payload(&remote, &task, SyncOperation::Update, Some(&client), &mut lookup, &mut warnings);
+        let older = json!({"fields": {"fixVersions": [{"id": "10000", "name": "v0.14.0"}]}});
+        assert_eq!(filter_jira_payload_against_issue(&older, &mut payload), vec!["fixVersions".to_string()]);
+        assert_eq!(payload.fields.get("fixVersions"), Some(&json!([{"name": "v0.15.0"}])));
+        assert_eq!(api.requests().len(), 1, "versions are listed once per push");
+        assert!(warnings.is_empty(), "{warnings:?}");
+    }
+
+    #[test]
     fn github_push_sends_the_milestone_number() {
         let (_temp, resolver, remote) = versioned(SyncProvider::Github, "milestone");
         let task = task(&resolver, "github", "org/repo#7", Some("0.15.0"));

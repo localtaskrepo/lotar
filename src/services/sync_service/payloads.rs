@@ -112,6 +112,22 @@ pub(super) fn build_jira_payload(
         }
     }
 
+    // A dry run without a client sends the names as stored.
+    if let (Some(client), Some(project)) = (client, remote.project.as_deref()) {
+        for (field, value) in &mut payload.fields {
+            if matches!(field.to_ascii_lowercase().as_str(), "fixversions" | "versions")
+                && let JsonValue::Array(items) = value
+            {
+                for item in items {
+                    if let Some(name) = item.get("name").and_then(|v| v.as_str()) {
+                        let resolved = resolve_jira_version(client, project, name, lookup, warnings);
+                        *item = json!({"name": resolved});
+                    }
+                }
+            }
+        }
+    }
+
     payload
 }
 
@@ -298,7 +314,9 @@ pub(super) fn filter_jira_payload_against_issue(issue: &JsonValue, payload: &mut
         } else {
             read_jira_field(issue, field)
         };
+        let is_version = matches!(field.to_ascii_lowercase().as_str(), "fixversions" | "versions");
         let matches = match (desired.as_ref(), current.as_ref()) {
+            (Some(desired), Some(current)) if is_version => version_values_match(desired, current),
             (Some(desired), Some(current)) => field_values_match(desired, current),
             _ => false,
         };
