@@ -25,9 +25,10 @@ automation:
             prompt: &fix-prompt |
               Fix the repo problem in ticket ${{ticket.id}} ("${{ticket.title}}"). Run lotar with
               LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex): lotar records it as the comment's author.
-              1. Read the ticket: what was found, how to check it, what done looks like. Run its check command. If the
-                 problem is gone already, say so in a comment and stop. After a failed merge your branch may hold
-                 earlier commits (git log <main>..HEAD): build on them.
+              First rename this thread to "${{ticket.id}} fix: ${{ticket.title}}" (T3 Code tool t3_thread_update,
+              action rename, no threadId).
+              1. Read the ticket: what was found, how to check it, what done looks like. Run its check command. After
+                 a failed merge your branch may hold earlier commits (git log <main>..HEAD): build on them.
               2. Fix it the way this repo's AGENTS.md says: the smallest change, with the tests and checks it names.
               3. Never delete or discard work that isn't saved elsewhere (unmerged commits, uncommitted changes,
                  files a tool or another session may still use), and never decide what only the owner decides.
@@ -37,8 +38,12 @@ automation:
               4. When you changed files: commit them on your worktree's branch, signed, never with --no-verify, message
                  "${{ticket.id}} ${{ticket.title}}". Don't merge or push: the merge agent does that, then reruns the
                  check command against the main checkout.
-              5. Comment the outcome: what you changed, the commit hash, the checks that ran. When your job ends, an
-                 agent on another model reviews it, then the merge agent takes over.
+              5. Nothing to commit (the problem is gone already, or the fix needs no file change) and no commits beyond
+                 main (git log <main>..HEAD, main being the main checkout's branch): comment the reason in one line,
+                 then lotar status ${{ticket.id}} Done (WontDo when the ticket's "Done when" says so) and
+                 lotar assignee ${{ticket.id}} --clear, and stop. No review or merge follows.
+              6. Otherwise comment the outcome: what you changed, the commit hash, the checks that ran. When your job
+                 ends, an agent on another model reviews it, then the merge agent takes over.
     - name: "Health: start the light fix agent"
       when:
         all:
@@ -74,15 +79,20 @@ automation:
               Work ticket ${{ticket.id}} ("${{ticket.title}}"): read it and its relationships, then do it the way this
               repo's AGENTS.md says, with the tests and checks it names. Run lotar with LOTAR_DEFAULT_REPORTER set to
               your agent name (claude, codex). After a failed merge your branch may hold earlier commits
-              (git log <main>..HEAD): build on them; when the work is done already, comment that and stop.
+              (git log <main>..HEAD): build on them. First rename this thread to "${{ticket.id}} fix: ${{ticket.title}}"
+              (T3 Code tool t3_thread_update, action rename, no threadId).
               1. Never delete or discard work that isn't saved elsewhere, and never decide what only the owner decides.
                  Ask the running agents (T3 threads) first; when it still needs him, comment one question, set the
                  status to HelpNeeded, assign the ticket to mallox and stop.
               2. Commit your changes on your worktree's branch, signed, never with --no-verify, message
                  "${{ticket.id}} ${{ticket.title}}". Don't merge or push: the merge agent does that.
               3. Don't end your turn while tests or other background work still run: the job ends with your turn.
-              4. Comment the outcome: what you changed, the commit hash, the checks that ran. When your job ends, an
-                 agent on another model reviews it, then the merge agent takes over.
+              4. Nothing to commit (the work is done already, or needs no file change) and no commits beyond main
+                 (git log <main>..HEAD, main being the main checkout's branch): comment the reason in one line, then
+                 lotar status ${{ticket.id}} Done (WontDo when the ticket's "Done when" says so) and
+                 lotar assignee ${{ticket.id}} --clear, and stop. No review or merge follows.
+              5. Otherwise comment the outcome: what you changed, the commit hash, the checks that ran. When your job
+                 ends, an agent on another model reviews it, then the merge agent takes over.
     - name: "Health: fix agent lifecycle"
       when:
         any:
@@ -98,7 +108,8 @@ automation:
     # recommendations", docs/decisions/2026-11-12-qa-step.md): a new thread on another provider than the author, the
     # cheap model after @fix-light (lotar 0.14.3 for session: fresh). Not the ticket's model fields: they pick the fix agent's model. Work that commits
     # only .tasks passes at once. A fix agent that hands the ticket back (HelpNeeded, Blocked) sets status and assignee
-    # itself, which replaces these, so no review starts.
+    # itself, which replaces these, so no review starts. So does one that commits nothing: it sets Done (or WontDo) and
+    # clears the assignee (owner 2026-11-13, STD-87, docs/decisions/2026-11-13-no-change-closes.md).
     - name: "Fix done: review on Codex"
       when:
         any:
@@ -116,7 +127,9 @@ automation:
               Review the work for ticket ${{ticket.id}} ("${{ticket.title}}") before it is merged. A fix agent
               committed it on your worktree's branch; you didn't write it. Run lotar with LOTAR_DEFAULT_REPORTER set
               to your agent name (claude, codex). Change no files, commit nothing and leave status and assignee as
-              they are: when your job ends the rules send the work on by tag review-blocked.
+              they are: when your job ends the rules send the work on by tag review-blocked. First rename this thread
+              to "${{ticket.id}} review: ${{ticket.title}}" (T3 Code tool t3_thread_update, action rename, no
+              threadId).
               1. The work: git log <main>..HEAD and its diff, main being the main checkout's branch (git -C <root>
                  branch --show-current, <root> the first entry of git worktree list). No commits, or only .tasks
                  changed: comment "Review: nothing to review" and stop.
@@ -188,6 +201,8 @@ automation:
               first entry of git worktree list). When this thread did the fix or its review, this turn is the merge:
               it replaces the earlier "Don't merge or push" and "Change no files". Your worktree's branch holds the
               fix agent's commits. Run lotar with LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex).
+              First rename this thread to "${{ticket.id}} merge: ${{ticket.title}}" (T3 Code tool t3_thread_update,
+              action rename, no threadId).
               1. Main is the main checkout's current branch (git -C <root> branch --show-current). No commits
                  beyond main (git log <main>..HEAD): comment "nothing to merge" and stop.
               2. Rebase onto main. Resolve a conflict only when you are certain both sides' intent is kept (for
@@ -244,7 +259,8 @@ automation:
             prompt: |
               The review of ticket ${{ticket.id}} ("${{ticket.title}}") found blocking problems: its last comments name
               them. Run lotar with LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex). Your worktree's
-              branch holds the earlier commits (git log <main>..HEAD): build on them.
+              branch holds the earlier commits (git log <main>..HEAD): build on them. First rename this thread to
+              "${{ticket.id}} rework: ${{ticket.title}}" (T3 Code tool t3_thread_update, action rename, no threadId).
               1. Fix each finding the way this repo's AGENTS.md says, with the tests and checks it names, or answer in
                  a comment why it isn't a problem. Never delete or discard work that isn't saved elsewhere. A finding
                  only the owner can decide: comment one question, set the status to HelpNeeded, assign the ticket to
@@ -458,8 +474,8 @@ automation:
               with LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex). Read the ticket and its comments:
               what it waited to do and what done looks like.
               - It waited only to run a check against a lotar release ("Release v..."): that release is installed
-                now, lotar --version prints it. Run the check. It passes: comment the check and its result, and stop;
-                change no files, so when your job ends the merge agent finds nothing to merge and closes the ticket.
+                now, lotar --version prints it. Run the check. It passes: change no files, comment the check and its
+                result, then lotar status ${{ticket.id}} Done and lotar assignee ${{ticket.id}} --clear, and stop.
                 It still fails: comment what you ran and what still fails, set the status to HelpNeeded, assign the
                 ticket to mallox and stop. Don't fix it in this job: the owner decides what comes next.
               - Otherwise continue the ticket from where it stopped, the way this repo's AGENTS.md says. Commit on
