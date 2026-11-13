@@ -785,13 +785,13 @@ fn mutating_requests_with_foreign_origin_are_rejected() {
 /// Send one raw request and return (status, lowercased header text).
 fn raw_request(port: u16, request: &str) -> (u16, String) {
     let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
-    stream.set_read_timeout(Some(net_timeout())).unwrap();
     stream.write_all(request.as_bytes()).unwrap();
     stream.flush().unwrap();
     let mut buf = Vec::new();
     let mut tmp = [0u8; 1024];
+    let deadline = Instant::now() + RESPONSE_DEADLINE;
     loop {
-        let n = stream.read(&mut tmp).unwrap_or(0);
+        let n = read_until_deadline(&mut stream, &mut tmp, deadline);
         if n == 0 {
             break;
         }
