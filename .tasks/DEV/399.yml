@@ -1,17 +1,18 @@
 title: Smoke tests time out under machine load
-status: InProgress
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T23:59:31.409842+00:00
-modified: 2026-11-13T01:09:17.186716+00:00
+modified: 2026-11-13T01:18:49.519481+00:00
 relationships:
   related:
   - DEV-374
   - DEV-388
   - DEV-389
   - DEV-402
+  - DEV-401
 comments:
 - date: 2026-11-13T01:09:06.635660+00:00
   author: claude
@@ -21,6 +22,9 @@ comments:
     Two UI bugs that load exposed in ui.board-state (with a failing unit test first for each): (1) TasksList pushed an extra history entry when a filter change (the default project filling in) came before the page's first apply, so Back stayed on Tasks. The page's first apply now takes that change and replaces the URL. (2) FilterBar showed the project chip until its project list loaded, then hid it in a single-project workspace. The 33 px row moving shifted a restored scroll position to 368 instead of 400 (the ticket's failure). The chip now waits for the project list.
     Checks: npm run lint ok. npm test ok (2108 Rust, 1507 UI). npm run smoke 385/385 twice with 20 niced busy loops added (1-min load 16-52 and 32-72), no temp leftovers. ui.board-state 6/6 after the fix vs 1/4 before at load ~13.
     Filed DEV-402: view unit tests hit Vitest's 5 s timeout at load ~20 (seen while checking, passed on rerun).
+- date: 2026-11-13T01:18:43.036138+00:00
+  author: claude
+  text: 'claude: Merged. Rebased agent/DEV-399 onto main (no conflicts; DEV-401 and ticket commits came in) as f740703, fast-forwarded main, committed ticket files as 58c21ad (DEV-399 Ticket updates, includes other tickets'' status changes), pushed a7fdea8..58c21ad to origin/main (pre-push checks passed). Checks on f740703 in the worktree: npm run lint ok; npm test ok (2109 Rust, 1507 UI); check command npm run smoke 385/385 at 1-min load 26-76, no temp-folder leftovers: the finding no longer shows.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa7b76f2-f98f-41b4-839c-9462ebd77970
 description: 'Found while releasing v0.14.1 (DEV-374): npm run smoke on 8d0dedb failed 8 of 385 at load average 34 on 14 cores, all timeouts: harness.server.smoke.spec.ts (5 tests, ''server did not advertise readiness within 5000ms'' where the test expects a specific failure), fixtures.agent.smoke.spec.ts (gate agent: started-probe.sentinel not seen in 10 s), api.automation.smoke.spec.ts (descendant-held stderr within the bounded grace), ui.board-state.smoke.spec.ts (expected 400, got 368: scroll position). The four files passed 36/36 on a re-run right after, and the full suite passed for the DEV-388 and DEV-389 agents the same evening. Check: npm run smoke while other agents build (load over 20). Done: those tests wait on the event they need instead of a fixed deadline that load breaks, or their deadlines scale, and smoke passes under that load; also the ''Tests left 1 entries in the temp folder: fixture-gate-*'' teardown error after the gate test fails.'
@@ -67,3 +71,19 @@ history:
   - field: assignee
     old: '@fix'
     new: '@merge'
+- at: 2026-11-13T01:18:43.036138+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T01:18:43.349858+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-374","DEV-388","DEV-389","DEV-402"]}'
+    new: '{"related":["DEV-374","DEV-388","DEV-389","DEV-402","DEV-401"]}'
+- at: 2026-11-13T01:18:49.519481+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

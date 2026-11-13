@@ -1,14 +1,20 @@
 title: Delete test leftovers in ~/Library/Caches/lotar/agent-queue?
-status: HelpNeeded
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-12T19:22:45.549361+00:00
-modified: 2026-11-12T19:22:55.783026+00:00
+modified: 2026-11-13T01:22:57.233463+00:00
 relationships:
   related:
   - DEV-380
+comments:
+- date: 2026-11-13T01:22:55.975350+00:00
+  author: claude
+  text: 'claude: Owner 2026-11-13, asked whether to delete the test leftovers in ~/Library/Caches/lotar/agent-queue: "Yes". Delete only entries whose tasks_dir is a temporary test folder (under /var/folders or /tmp) and that no running job uses; keep the rest; comment the counts before and after.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4e27d150-05fb-4e44-9e10-15adc4c8a0c6
 description: 'claude (DEV-380 agent), 2026-11-12: ~/Library/Caches/lotar/agent-queue has 12863 entries, almost all of them leftovers from tests (empty active-<hash> folders and queue-<hash>.json files whose tasks_dir is a temporary test folder under /var/folders or /tmp). DEV-380 stops new ones from appearing. Some entries belong to real tasks dirs (for example /Users/mallox/Development/gairola/.tasks) and must stay. Question: may an agent delete the entries whose queue file or job record points to a tasks dir that no longer exists, and keep everything else?'
 tags:
 - owner
@@ -25,3 +31,30 @@ history:
   - field: status
     old: Todo
     new: HelpNeeded
+- at: 2026-11-13T01:22:55.975350+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T01:22:56.185208+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Todo
+- at: 2026-11-13T01:22:56.230498+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-13T01:22:56.629992+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T01:22:57.233463+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4e27d150-05fb-4e44-9e10-15adc4c8a0c6

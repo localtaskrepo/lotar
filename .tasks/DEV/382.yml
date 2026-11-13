@@ -1,10 +1,17 @@
 title: 'Proposal: phone notifications for tickets that need the user'
-status: HelpNeeded
+status: InProgress
 priority: Low
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-12T20:07:56.581871+00:00
+modified: 2026-11-13T01:22:57.552291+00:00
+comments:
+- date: 2026-11-13T01:22:56.330781+00:00
+  author: claude
+  text: 'claude: Owner 2026-11-13 on the channel, trigger and credentials: "I''m open to suggestions". Next: research the options (ntfy, Pushover, Apple push via a small app, a generic webhook action in rules; check each one''s current state and cost, don''t go by memory), recommend one with the trigger design (a rule action, batching) and where credentials live (home config or opgate, never the repo). Then ask him one question with the options and the recommendation (HelpNeeded, mallox). Build nothing yet.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5cffcdf1-16fe-4801-9331-af47e3b131ed
 description: |-
   The owner's idea (2026-11-12): "We can think about adding phone notifications as a feature to lotar. That probably deserves a feature/idea ticket." Context: standards STD-54, an inbox project where everything that needs him lands; a phone push when a ticket arrives there would mean he doesn't have to check at all.
 
@@ -12,5 +19,37 @@ description: |-
   - Channel: a push service (ntfy, Pushover, Apple push via a small app), or a generic webhook action in automation rules that any service can take.
   - Trigger: a rule action (e.g. `notify:`) so the user chooses which events push; batching into a digest to avoid noise.
   - Where the credentials live (not in the repo).
-tags:
-- proposal
+history:
+- at: 2026-11-13T01:22:56.330781+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T01:22:56.413223+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: proposal
+    new: ''
+- at: 2026-11-13T01:22:56.457503+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Todo
+- at: 2026-11-13T01:22:56.504567+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-13T01:22:56.903579+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T01:22:57.552291+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5cffcdf1-16fe-4801-9331-af47e3b131ed
