@@ -31,7 +31,7 @@ Rules do not merge across scopes; the first file found wins.
 ## Identity resolution and @me
 
 Anywhere a person field is accepted (assignee, reporter, default_reporter), the special value @me is allowed. Detectors run in this order:
-1) `default_reporter`: a CLI override, then `LOTAR_DEFAULT_REPORTER`, then the effective config (selected project → home → global). The environment outranks a project's `default.reporter` here, so an agent that sets `LOTAR_DEFAULT_REPORTER` is never recorded as the project's owner
+1) `default_reporter`, with the running process first: CLI `--config default.reporter=NAME` → `LOTAR_DEFAULT_REPORTER` → selected project → home → global. Unlike ordinary configuration, the environment outranks the project here, because a project's default reporter names who reports unattributed tickets, not who is writing now. This identity is a comment's author and a history entry's actor.
 2) Git user (user.name or user.email at repo root) — gated by `auto.identity_git`
 3) System user ($USER or $USERNAME)
 4) Project manifest author (package.json author, Cargo.toml authors, or .csproj `<Authors>`) — last resort only, since manifest authors are a static guess that may not be the current user
@@ -59,7 +59,7 @@ Project context is determined in this order:
 
 ## Automation semantics
 
-- `auto.set_reporter`: When true, reporter is auto-populated during task creation whenever an explicit value is absent. The service first honors `default_reporter`, then falls back to the identity detectors above.
+- `auto.set_reporter`: When true, reporter is auto-populated during task creation whenever an explicit value is absent. The service first honors the merged `default_reporter` in the configuration precedence above (project over environment), then falls back to the identity detectors above.
 - `auto.assign_on_status`: When true, the first time a task moves away from the default/first status and has no assignee, it is set to the resolved current user. The logic is shared across CLI, REST, and MCP updates.
 
 Both settings honor the configuration precedence chain, and they can be toggled globally, per-project, or at runtime through `LOTAR_AUTO_SET_REPORTER` / `LOTAR_AUTO_ASSIGN_ON_STATUS`.

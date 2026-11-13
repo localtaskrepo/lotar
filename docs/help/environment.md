@@ -30,7 +30,7 @@ All rows below are defined inside the same override table and map directly to th
 | `server_port` | `LOTAR_PORT`, `LOTAR_SERVER_PORT` | Integer | Forces the HTTP/SSE server to a specific port. |
 | `default_project` | `LOTAR_PROJECT`, `LOTAR_DEFAULT_PROJECT` | Project prefix/slug | Sets the fallback project for CLI commands that omit `-p/--project`. |
 | `default_assignee` | `LOTAR_DEFAULT_ASSIGNEE` | username / `@me` | Auto-populates the assignee on new tasks. |
-| `default_reporter` | `LOTAR_DEFAULT_REPORTER` | username / email | Sets the reporter used when resolving `@me`. |
+| `default_reporter` | `LOTAR_DEFAULT_REPORTER` | username / email | Names the current user (`@me`, comment author, history actor) ahead of a project's `default.reporter`; also a default reporter for new tickets below project config. |
 | `default_tags` | `LOTAR_DEFAULT_TAGS` | JSON/YAML list or comma string | Extra tags added to every new task. |
 | `default_priority` | `LOTAR_DEFAULT_PRIORITY` | Priority slug | Sets the initial priority when not provided. |
 | `default_status` | `LOTAR_DEFAULT_STATUS` | Status slug | Sets the initial workflow status. |

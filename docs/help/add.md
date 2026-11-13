@@ -77,7 +77,7 @@ Types and priorities are whatever your configuration defines, so there are no sh
 - `LOTAR_DEFAULT_ASSIGNEE` - Default assignee for new tasks
 - `LOTAR_DEFAULT_REPORTER` - Default reporter identity when not provided
 
-Reporter auto-set is driven by configuration: set `default_reporter` and ensure `auto.set_reporter: true` (default). The environment variable can provide a default reporter value.
+Reporter auto-set is driven by configuration: set `default_reporter` and ensure `auto.set_reporter: true` (default). The environment variable can provide a default reporter value; a project's `default.reporter` outranks it, as in the [configuration precedence](./config.md#configuration-precedence). Without a configured `default.reporter`, the reporter is the current user (`@me`, where `LOTAR_DEFAULT_REPORTER` comes first).
 
 Providing `--reporter` overrides all defaults (including `LOTAR_DEFAULT_REPORTER`) after validation.
 

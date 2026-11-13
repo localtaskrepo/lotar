@@ -80,7 +80,7 @@ fn env_reporter_outranks_project_default_reporter() {
     assert!(!stored.contains("mallox"), "neither the comment nor the history names the project reporter:\n{stored}");
 
     let second: Value = serde_json::from_str(&run(dir, &["--format", "json", "add", "Second", "--project", prefix])).unwrap();
-    assert_eq!(second["task"]["reporter"], "claude", "{second}");
+    assert_eq!(second["task"]["reporter"], "mallox", "a configured default.reporter names a new ticket's reporter (DEV-405): {second}");
 
     let out = common::lotar_cmd().unwrap().current_dir(dir).env_remove("LOTAR_DEFAULT_REPORTER").args(["whoami", "--project", prefix]).output().unwrap();
     assert!(String::from_utf8_lossy(&out.stdout).contains("mallox"), "without the env var the project reporter still applies");
@@ -158,4 +158,30 @@ fn mcp_comment_returns_author() {
     let id = created["task"]["id"].as_str().unwrap_or_else(|| panic!("{created}")).to_string();
     let commented = mcp_call(2, "task_comment_add", &json!({"id": id, "text": "via MCP"}));
     assert_eq!(commented["task"]["comments"][0]["author"], "claude", "{commented}");
+}
+
+/// DEV-405: the writing process's explicit identity names a comment's author
+/// and the history's actor, even where the project sets `default.reporter`;
+/// that default still names the reporter of a ticket created without one.
+#[test]
+fn env_reporter_outranks_project_default_for_comment_author_and_history() {
+    let tf = TestFixtures::new();
+    let dir = tf.get_temp_path();
+    std::fs::create_dir_all(dir.join(".tasks/X")).unwrap();
+    std::fs::write(dir.join(".tasks/config.yml"), "default:\n  project: X\n  reporter: alice\n").unwrap();
+    std::fs::write(dir.join(".tasks/X/config.yml"), "project:\n  name: X\ndefault:\n  reporter: alice\n").unwrap();
+
+    let created: Value = serde_json::from_str(&run(dir, &["--format", "json", "add", "Scratch", "--project", "X"])).unwrap();
+    let id = created["task"]["id"].as_str().expect("created id").to_string();
+    assert_eq!(created["task"]["reporter"], "alice", "a new ticket's reporter keeps the project default: {created}");
+
+    let added: Value = serde_json::from_str(&run(dir, &["--format", "json", "comment", &id, "hi"])).unwrap();
+    assert_eq!(added["added_comment"]["author"], "claude", "{added}");
+    let stored = std::fs::read_to_string(dir.join(".tasks/X/1.yml")).unwrap();
+    assert!(stored.contains("author: claude"), "{stored}");
+    assert!(!stored.contains("actor: alice"), "history records the writing process, not the project default:\n{stored}");
+    assert!(run(dir, &["whoami"]).contains("claude"));
+
+    let out = common::lotar_cmd().unwrap().current_dir(dir).env_remove("LOTAR_DEFAULT_REPORTER").args(["whoami"]).output().unwrap();
+    assert!(String::from_utf8_lossy(&out.stdout).contains("alice"), "without the variable, the project default names the user");
 }

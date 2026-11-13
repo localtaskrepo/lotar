@@ -274,9 +274,15 @@ impl AddHandler {
         task.reporter = if let Some(reporter) = explicit_reporter {
             crate::utils::identity::resolve_me_alias_for_project(&reporter, Some(resolver.path.as_path()), Some(&project_for_storage))
         } else if config.auto_set_reporter {
-            // Identity resolution starts with default.reporter and lets
-            // LOTAR_DEFAULT_REPORTER outrank a project's value (DEV-403).
-            crate::utils::identity::resolve_current_user_for_project(Some(resolver.path.as_path()), Some(&project_for_storage))
+            // A configured default.reporter names the reporter, project above
+            // env (owner, DEV-405); the current user only fills in without one.
+            let from_config = config
+                .default_reporter
+                .as_deref()
+                .map(str::trim)
+                .filter(|raw| !raw.is_empty())
+                .and_then(|raw| crate::utils::identity::resolve_me_alias_for_project(raw, Some(resolver.path.as_path()), Some(&project_for_storage)));
+            from_config.or_else(|| crate::utils::identity::resolve_current_user_for_project(Some(resolver.path.as_path()), Some(&project_for_storage)))
         } else {
             None
         };
