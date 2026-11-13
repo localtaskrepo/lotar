@@ -69,7 +69,7 @@ describe('api contract type shapes', () => {
     it('simulate always carries all six keys', () => {
         const unmatched: AutomationSimulateResponse = {
             matched: false,
-            rule_name: null,
+            rules: [],
             actions: [],
             task_before: task,
             task_after: null,
@@ -109,8 +109,8 @@ const updateRequest: SprintUpdateRequest = {
     actual_started_at: null,
 }
 
-// @ts-expect-error rule_name is always present (null when unmatched)
-const missingRuleName: AutomationSimulateResponse = {
+// @ts-expect-error rules is always present (empty when unmatched)
+const missingRules: AutomationSimulateResponse = {
     matched: false,
     actions: [],
     task_before: task,
@@ -120,14 +120,14 @@ const missingRuleName: AutomationSimulateResponse = {
 // @ts-expect-error task_after is required, null when unmatched
 const missingTaskAfter: AutomationSimulateResponse = {
     matched: true,
-    rule_name: 'r',
+    rules: [{ name: 'r', actions: [], warnings: [] }],
     actions: [],
     task_before: task,
 }
 
 const stringTaskAfter: AutomationSimulateResponse = {
     matched: true,
-    rule_name: 'r',
+    rules: [{ name: 'r', actions: [], warnings: [] }],
     actions: [],
     task_before: task,
     // @ts-expect-error task_after must be a task or null, never a string
@@ -137,7 +137,7 @@ const stringTaskAfter: AutomationSimulateResponse = {
 // @ts-expect-error task_before is required and always a task object
 const missingTaskBefore: AutomationSimulateResponse = {
     matched: true,
-    rule_name: 'r',
+    rules: [{ name: 'r', actions: [], warnings: [] }],
     actions: [],
     task_after: null,
 }
@@ -154,7 +154,7 @@ const nullSkipDefaults: SprintCreateRequest = { skip_defaults: null }
 void [
     createRequest,
     updateRequest,
-    missingRuleName,
+    missingRules,
     missingTaskAfter,
     stringTaskAfter,
     missingTaskBefore,

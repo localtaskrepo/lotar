@@ -150,6 +150,7 @@ mod dev394_cli_edit_select_test;
 mod dev3_dev13_recent_and_sum_test;
 mod dev407_auto_config_comments_test;
 mod dev470_comment_author_prefix_test;
+mod dev477_simulate_all_rules_test;
 mod dev482_macos_signing_test;
 mod dev485_offered_custom_fields_test;
 mod dev488_question_comments_test;
@@ -157,6 +158,7 @@ mod dev489_review_comments_test;
 mod dev490_report_comment_test;
 mod dev494_add_relationships_test;
 mod dev497_cargo_install_root_test;
+
 mod dev4_archive_test;
 mod dev503_harness_jobs_test;
 mod dev54_mutation_contract_test;

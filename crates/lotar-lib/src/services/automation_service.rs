@@ -643,6 +643,11 @@ impl AutomationService {
         let active_sprints = compute_active_sprint_ids(storage);
         // Rules that only an update changing several fields at once fires.
         let mut skipped: Vec<String> = Vec::new();
+        // Like a real event (DEV-477): every rule is matched on the ticket as
+        // it was, and each matching rule acts on the result of the ones before.
+        let mut matched_rules: Vec<SimulatedRule> = Vec::new();
+        let mut task_after = task.clone();
+        let mut warnings: Vec<String> = Vec::new();
 
         for (rule_idx, rule) in rules.iter().enumerate() {
             let mut notes = Vec::new();
@@ -706,12 +711,18 @@ impl AutomationService {
                     preview.tmpl = std::mem::take(&mut preview.tmpl).with_unblocked(&by);
                 }
                 let actions = describe_action(action, task, config, &mut preview);
-                let task_after = simulate_action(task, action, config, storage, &mut preview);
+                task_after = simulate_action(task, &task_after, action, config, storage, &mut preview);
                 notes.extend(preview.into_warnings());
-                return Ok(SimulateResult { matched: true, rule_name: rule.name.clone(), actions, task_after: Some(task_after), warnings: notes });
+                warnings.extend(notes.iter().cloned());
+                let name = rule.name.clone().unwrap_or_else(|| format!("Rule {}", rule_idx + 1));
+                matched_rules.push(SimulatedRule { name, actions, warnings: notes });
             }
         }
-        Ok(SimulateResult { matched: false, rule_name: None, actions: vec![], task_after: None, warnings: skipped })
+        if matched_rules.is_empty() {
+            return Ok(SimulateResult { matched: false, rules: vec![], actions: vec![], task_after: None, warnings: skipped });
+        }
+        let actions = matched_rules.iter().flat_map(|rule| rule.actions.iter().cloned()).collect();
+        Ok(SimulateResult { matched: true, rules: matched_rules, actions, task_after: Some(task_after), warnings })
     }
 }
 
@@ -958,10 +969,21 @@ fn prerequisites_of(storage: &Storage, task: &TaskDTO) -> Vec<Prerequisite> {
 /// Result of simulating automation rules
 pub struct SimulateResult {
     pub matched: bool,
-    pub rule_name: Option<String>,
+    /// Every rule the event fires, in file order.
+    pub rules: Vec<SimulatedRule>,
+    /// The actions of all those rules, in the same order.
     pub actions: Vec<SimulatedAction>,
     pub task_after: Option<TaskDTO>,
     /// Parts of the preview that cannot be known until the rule really runs.
+    pub warnings: Vec<String>,
+}
+
+/// One rule the simulated event fires (DEV-477)
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct SimulatedRule {
+    /// The rule's name, or `Rule <position>` when it has none.
+    pub name: String,
+    pub actions: Vec<SimulatedAction>,
     pub warnings: Vec<String>,
 }
 
@@ -1176,8 +1198,17 @@ fn is_runtime_assignee(value: &str) -> bool {
 /// Preview what the task would look like after applying an action, with the
 /// same field coverage as `apply_action` (DEV-118). Nothing is written:
 /// sprint membership, comments and run commands are listed in the described
-/// actions but not applied to the preview.
-fn simulate_action(current: &TaskDTO, action: &AutomationAction, config: &ResolvedConfig, storage: &Storage, preview: &mut PreviewContext) -> TaskDTO {
+/// actions but not applied to the preview. Like `apply_action`, aliases such
+/// as `@assignee` resolve against `event_task`, the ticket the event fired on,
+/// while the changes build on `current`, the result of earlier rules.
+fn simulate_action(
+    event_task: &TaskDTO,
+    current: &TaskDTO,
+    action: &AutomationAction,
+    config: &ResolvedConfig,
+    storage: &Storage,
+    preview: &mut PreviewContext,
+) -> TaskDTO {
     let mut simulated = current.clone();
 
     if let Some(set) = action.set.as_ref() {
@@ -1211,12 +1242,12 @@ fn simulate_action(current: &TaskDTO, action: &AutomationAction, config: &Resolv
             if is_runtime_assignee(value) {
                 preview.warn(format!("Assignee '{}' is chosen when the rule runs; the preview shows the token", value.trim()));
                 simulated.assignee = Some(value.trim().to_string());
-            } else if let Some(resolved) = resolve_assignee_value(value, current, config, storage) {
+            } else if let Some(resolved) = resolve_assignee_value(value, event_task, config, storage) {
                 simulated.assignee = Some(resolved);
             }
         }
         if let Some(value) = plan.reporter.as_deref()
-            && let Some(resolved) = resolve_reporter_value(value, current, storage.root_path.as_path())
+            && let Some(resolved) = resolve_reporter_value(value, event_task, storage.root_path.as_path())
         {
             simulated.reporter = Some(resolved);
         }

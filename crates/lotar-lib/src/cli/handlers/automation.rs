@@ -69,11 +69,8 @@ impl AutomationHandler {
         if matches!(renderer.format, OutputFormat::Json) {
             renderer.emit_json(&serde_json::json!({
                 "matched": result.matched,
-                "rule_name": result.rule_name,
-                "actions": result.actions.iter().map(|a| serde_json::json!({
-                    "action": a.action,
-                    "description": a.description,
-                })).collect::<Vec<_>>(),
+                "rules": result.rules,
+                "actions": result.actions,
                 "task_after": result.task_after,
                 "warnings": result.warnings,
             }));
@@ -88,20 +85,17 @@ impl AutomationHandler {
             return Ok(());
         }
 
-        if let Some(name) = &result.rule_name {
-            renderer.emit_info(format_args!("Rule matched: {}", name));
-        }
-
-        if result.actions.is_empty() {
-            renderer.emit_info(format_args!("Rule matched but no actions defined for this event."));
-        } else {
-            renderer.emit_info(format_args!("Actions that would be performed:"));
-            for action in &result.actions {
+        for rule in &result.rules {
+            renderer.emit_info(format_args!("Rule matched: {}", rule.name));
+            if rule.actions.is_empty() {
+                renderer.emit_info(format_args!("  No actions defined for this event."));
+            }
+            for action in &rule.actions {
                 renderer.emit_info(format_args!("  {} — {}", action.action, action.description));
             }
-        }
-        for warning in &result.warnings {
-            renderer.emit_warning(format_args!("{}", warning));
+            for warning in &rule.warnings {
+                renderer.emit_warning(format_args!("{}", warning));
+            }
         }
 
         Ok(())

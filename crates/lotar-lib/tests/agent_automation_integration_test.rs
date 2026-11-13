@@ -1202,7 +1202,7 @@ automation:
     let result = AutomationService::simulate(&fixtures.tasks_root, &created.id, AutomationEvent::Updated).expect("simulate");
 
     assert!(result.matched, "rule should match");
-    assert_eq!(result.rule_name.as_deref(), Some("Auto-tag bugs"));
+    assert_eq!(result.rules.iter().map(|rule| rule.name.as_str()).collect::<Vec<_>>(), vec!["Auto-tag bugs"]);
     assert!(result.actions.iter().any(|a| a.action == "set_priority"), "expected set_priority action");
     assert!(result.actions.iter().any(|a| a.action == "add_tags"), "expected add_tags action");
 
@@ -2806,7 +2806,7 @@ echo '{{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\
     .expect("add prerequisites");
 
     let simulated = AutomationService::simulate(&fixtures.tasks_root, &waiting.id, AutomationEvent::Unblocked).expect("simulate");
-    assert_eq!(simulated.rule_name.as_deref(), Some("Prerequisites done"));
+    assert_eq!(simulated.rules.iter().map(|rule| rule.name.as_str()).collect::<Vec<_>>(), vec!["Prerequisites done"]);
 
     // One prerequisite left open: the ticket keeps waiting.
     TaskService::update(&mut storage, &docs.id, TaskUpdate { status: Some("Done".into()), ..Default::default() }).expect("close docs");

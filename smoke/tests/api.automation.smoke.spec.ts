@@ -54,7 +54,7 @@ interface AutomationSetResponse {
 interface AutomationSimulateResponse {
     data: {
         matched: boolean;
-        rule_name: string | null;
+        rules: Array<{ name: string; actions: Array<{ action: string; description: string }>; warnings: string[] }>;
         actions: Array<{ action: string; description: string }>;
         task_before: Record<string, unknown> | null;
         task_after: Record<string, unknown> | null;
@@ -549,7 +549,7 @@ describe.concurrent('REST API automation endpoints', () => {
 
                 const body = (await res.json()) as AutomationSimulateResponse;
                 expect(body.data.matched).toBe(true);
-                expect(body.data.rule_name).toBe('Auto-tag bugs');
+                expect(body.data.rules.map((rule) => rule.name)).toEqual(['Auto-tag bugs']);
                 expect(body.data.actions.length).toBeGreaterThan(0);
                 expect(body.data.actions.some((a) => a.action === 'set_priority')).toBe(true);
                 expect(body.data.actions.some((a) => a.action === 'add_tags')).toBe(true);
@@ -582,7 +582,7 @@ describe.concurrent('REST API automation endpoints', () => {
 
                 const body = (await res.json()) as AutomationSimulateResponse;
                 expect(body.data.matched).toBe(false);
-                expect(body.data.rule_name).toBeNull();
+                expect(body.data.rules).toHaveLength(0);
                 expect(body.data.actions).toHaveLength(0);
             } finally {
                 await server.stop();

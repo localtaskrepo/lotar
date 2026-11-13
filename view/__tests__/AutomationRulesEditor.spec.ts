@@ -231,7 +231,13 @@ describe('AutomationRuleDialog (DEV-241)', () => {
         api.getTask.mockResolvedValue({ id: 'DEV-7', title: 'Fix login', tags: [], status: 'Todo' })
         api.simulateAutomation.mockResolvedValue({
             matched: true,
-            rule_name: null,
+            rules: [
+                {
+                    name: 'Rule 1',
+                    actions: [{ action: 'comment', description: 'Add comment: Done with Fix login' }],
+                    warnings: [],
+                },
+            ],
             actions: [{ action: 'comment', description: 'Add comment: Done with Fix login' }],
             task_before: {},
             task_after: { status: 'Done', tags: [] },

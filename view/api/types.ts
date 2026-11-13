@@ -1891,17 +1891,28 @@ export interface AutomationSimulatedAction {
     description: string
 }
 
+export interface AutomationSimulatedRule {
+    /** The rule's name, or `Rule <position>` when it has none. */
+    name: string
+    /** What this rule would do, on top of the rules before it. */
+    actions: AutomationSimulatedAction[]
+    /** This rule's part of the response's warnings. */
+    warnings: string[]
+}
+
 /**
  * The server always serializes all six keys (hand-built JSON):
- * `rule_name` is `null` when no rule matched and `task_after` is `null`
- * when no rule matched; `task_before` is always a task object; `warnings`
+ * `rules` lists every rule the event fires, in file order (empty when no
+ * rule matched); `actions` holds all their actions in the same order;
+ * `task_after` is `null` when no rule matched and otherwise shows the
+ * ticket after all of them; `task_before` is always a task object; `warnings`
  * lists preview parts only decided when the rule runs, the fields a change
  * event has to change, and (when nothing matched) rules that need several
  * fields to change in the same update (may be empty).
  */
 export interface AutomationSimulateResponse {
     matched: boolean
-    rule_name: string | null
+    rules: AutomationSimulatedRule[]
     actions: AutomationSimulatedAction[]
     task_before: TaskDTO
     task_after: TaskDTO | null

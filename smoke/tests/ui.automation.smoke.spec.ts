@@ -185,6 +185,7 @@ describe.concurrent('UI Automation page smoke tests', () => {
                     expect(warningText).toContain("Assignee '@round_robin' is chosen when the rule runs");
                     expect(warningText).toContain('previous.status');
                     const results = (await page.locator('.result-card').allTextContents()).join('\n');
+                    expect(results).toContain('Job start preview');
                     expect(results).toContain("Set effort to '90m'");
                     expect(results).toContain('Started Preview target after ${{previous.status}}');
                     expect(results).toContain('Due 2026-12-01');

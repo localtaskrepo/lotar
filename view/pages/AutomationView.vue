@@ -167,16 +167,17 @@
           <div v-if="!simResult.actions.length" class="muted">No rules matched for this event.</div>
 
           <div v-else class="col" style="gap: 12px">
-            <div v-for="(action, idx) in simResult.actions" :key="idx" class="simulated-action">
-              <div class="row" style="gap: 8px; align-items: center">
-                <span v-if="simResult.rule_name" class="rule-ref">{{ simResult.rule_name }}</span>
-                <span v-else class="rule-ref muted">Unnamed rule</span>
-                <span class="action-chip">{{ action.action }}</span>
+            <template v-for="(rule, ruleIdx) in simResult.rules" :key="ruleIdx">
+              <div v-for="(action, idx) in rule.actions" :key="idx" class="simulated-action">
+                <div class="row" style="gap: 8px; align-items: center">
+                  <span class="rule-ref">{{ rule.name }}</span>
+                  <span class="action-chip">{{ action.action }}</span>
+                </div>
+                <p v-if="action.description" class="action-description">
+                  {{ action.description }}
+                </p>
               </div>
-              <p v-if="action.description" class="action-description">
-                {{ action.description }}
-              </p>
-            </div>
+            </template>
           </div>
 
           <ul v-if="simResult.warnings?.length" class="simulation-warnings" data-testid="simulation-warnings">

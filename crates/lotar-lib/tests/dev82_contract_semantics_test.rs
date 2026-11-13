@@ -257,20 +257,20 @@ fn published_response_examples_deserialize_into_response_dtos() {
     assert_eq!(simulate.len(), 2, "simulate must publish matched and no-rules examples");
     for (name, example) in &simulate {
         let data = example.get("data").expect("simulate example must envelope data");
-        for key in ["matched", "rule_name", "actions", "task_before", "task_after"] {
+        for key in ["matched", "rules", "actions", "task_before", "task_after"] {
             assert!(data.get(key).is_some(), "simulate example {name} must always carry {key}");
         }
         let parsed: AutomationSimulateResponse = serde_json::from_value(data.clone()).unwrap_or_else(|e| panic!("automation/simulate example {name}: {e}"));
         match name.as_str() {
             "matched" => {
                 assert!(parsed.matched);
-                assert_eq!(parsed.rule_name.as_deref(), Some("Move verify work forward"));
+                assert_eq!(parsed.rules.iter().map(|rule| rule.name.as_str()).collect::<Vec<_>>(), vec!["Move verify work forward"]);
                 assert_eq!(parsed.actions.len(), 1);
                 assert!(parsed.task_after.is_some());
             }
             "noRules" => {
                 assert!(!parsed.matched);
-                assert!(parsed.rule_name.is_none());
+                assert!(parsed.rules.is_empty());
                 assert!(parsed.actions.is_empty());
                 assert!(parsed.task_after.is_none());
             }
@@ -457,7 +457,7 @@ fn validator_catches_contract_drift() {
         .validate_component(
             "AutomationSimulateResponse",
             &json!({
-                "matched": true, "rule_name": "r", "actions": [],
+                "matched": true, "rules": [], "actions": [],
                 "task_before": {"id": "QA-1", "title": "t", "status": "Todo",
                                 "priority": "Medium", "task_type": "Feature",
                                 "created": "x", "modified": "y"},
@@ -495,7 +495,7 @@ fn validator_catches_contract_drift() {
         &spec,
         spec.component("AutomationSimulateResponse"),
         &json!({
-            "matched": false, "rule_name": null, "actions": [],
+            "matched": false, "rules": [], "actions": [],
             "task_before": {"id": "QA-1", "title": "t", "status": "Todo",
                             "priority": "Medium", "task_type": "Feature",
                             "created": "x", "modified": "y"},
@@ -862,13 +862,13 @@ fn actual_automation_simulate_responses_match_declared_contract() {
     keys.sort_unstable();
     assert_eq!(
         keys,
-        vec!["actions", "matched", "rule_name", "task_after", "task_before", "warnings"],
+        vec!["actions", "matched", "rules", "task_after", "task_before", "warnings"],
         "simulate response must always carry exactly the six contract keys"
     );
     assert_eq!(body["data"]["matched"], json!(false));
-    assert_eq!(body["data"]["rule_name"], json!(null));
+    assert_eq!(body["data"]["rules"], json!([]));
     assert_eq!(body["data"]["task_after"], json!(null));
-    assert!(data.contains_key("rule_name") && data.contains_key("task_after"), "unmatched simulate must emit EXPLICIT nulls, not omitted keys");
+    assert!(data.contains_key("task_after"), "unmatched simulate must emit an EXPLICIT null, not an omitted key");
     assert_same_keys(data, named(&simulate_examples, "noRules")["data"].as_object().unwrap(), "no-rules simulate data keys vs published noRules example");
     let parsed: AutomationSimulateResponse = serde_json::from_value(body["data"].clone()).unwrap();
     assert!(!parsed.matched);
@@ -894,7 +894,11 @@ fn actual_automation_simulate_responses_match_declared_contract() {
     let body = body_of(&resp);
     assert_valid(&spec, &envelope, &body, "simulate with project rule");
     let parsed: AutomationSimulateResponse = serde_json::from_value(body["data"].clone()).unwrap();
-    assert_eq!(parsed.rule_name.as_deref(), Some("QA verify flow"), "scope must follow the ticket's project, and body project must be ignored");
+    assert_eq!(
+        parsed.rules.iter().map(|rule| rule.name.as_str()).collect::<Vec<_>>(),
+        vec!["QA verify flow"],
+        "scope must follow the ticket's project, and body project must be ignored"
+    );
     assert!(parsed.matched);
     assert_eq!(parsed.actions.len(), 1);
     assert_eq!(parsed.actions[0].action, "set_status");
@@ -913,7 +917,7 @@ fn actual_automation_simulate_responses_match_declared_contract() {
     let resp = api.handle_request(&req("POST", "/api/automation/simulate", json!({"ticket_id": ticket, "event": "JOB_START"})));
     assert_eq!(resp.status, 200, "legacy alias must be accepted");
     let parsed: AutomationSimulateResponse = serde_json::from_value(body_of(&resp)["data"].clone()).unwrap();
-    assert_eq!(parsed.rule_name.as_deref(), Some("QA job kickoff"));
+    assert_eq!(parsed.rules.iter().map(|rule| rule.name.as_str()).collect::<Vec<_>>(), vec!["QA job kickoff"]);
     assert_eq!(parsed.task_after.as_ref().unwrap().priority.to_string(), "High");
 
     // The retired `change` request shape: 400.

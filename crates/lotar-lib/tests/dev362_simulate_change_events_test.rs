@@ -87,7 +87,7 @@ fn simulate_says_which_field_has_to_change() {
 
     let result = AutomationService::simulate(&ws.tasks, "SC-1", AutomationEvent::Updated).unwrap();
     assert!(result.matched);
-    assert_eq!(result.rule_name.as_deref(), Some("Done"));
+    assert_eq!(result.rules.iter().map(|rule| rule.name.as_str()).collect::<Vec<_>>(), vec!["Done"]);
     assert_eq!(result.warnings, vec!["Matches only when status changes in the same update.".to_string()]);
 }
 

@@ -3855,7 +3855,18 @@
                     "value": {
                       "data": {
                         "matched": true,
-                        "rule_name": "Move verify work forward",
+                        "rules": [
+                          {
+                            "name": "Move verify work forward",
+                            "actions": [
+                              {
+                                "action": "set_status",
+                                "description": "Set status to 'InProgress'"
+                              }
+                            ],
+                            "warnings": []
+                          }
+                        ],
                         "actions": [
                           {
                             "action": "set_status",
@@ -3897,7 +3908,7 @@
                     "value": {
                       "data": {
                         "matched": false,
-                        "rule_name": null,
+                        "rules": [],
                         "actions": [],
                         "task_before": {
                           "id": "DEV-42",
@@ -3954,7 +3965,7 @@
             }
           }
         },
-        "description": "Previews which automation rule would match the ticket's current state for the given event and the actions it would perform, without applying any changes. The automation scope (project vs global rules) is resolved from the ticket's project prefix; the optional project field is ignored. Event names are case-insensitive and accept the legacy aliases job_start, complete, success, error, failure, and cancel. The response always carries matched, rule_name, actions, task_before, and task_after (null when no rule matched)."
+        "description": "Previews which automation rules would match the ticket's current state for the given event and the actions they would perform, without applying any changes. Like a real event, every matching rule applies, in file order, each on top of the ones before it. The automation scope (project vs global rules) is resolved from the ticket's project prefix; the optional project field is ignored. Event names are case-insensitive and accept the legacy aliases job_start, complete, success, error, failure, and cancel. The response always carries matched, rules, actions, task_before, and task_after (null when no rule matched)."
       }
     },
     "/api/sprints/create": {
@@ -9732,19 +9743,19 @@
             "type": "boolean",
             "description": "Whether any rule matched."
           },
-          "rule_name": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Name of the matched rule; null when no rule matched."
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutomationSimulatedRule"
+            },
+            "description": "Every rule the event fires, in file order, as a real event applies them; empty when no rule matched."
           },
           "actions": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/AutomationSimulatedAction"
             },
-            "description": "Actions the matched rule would perform; empty when no rule matched."
+            "description": "The actions of all matched rules, in the same order; empty when no rule matched."
           },
           "task_before": {
             "$ref": "#/components/schemas/TaskDTO"
@@ -9770,10 +9781,38 @@
         },
         "required": [
           "matched",
-          "rule_name",
+          "rules",
           "actions",
           "task_before",
           "task_after",
+          "warnings"
+        ]
+      },
+      "AutomationSimulatedRule": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The rule's name, or Rule <position> when it has none."
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutomationSimulatedAction"
+            },
+            "description": "What this rule would do, on top of the rules before it."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "This rule's part of the response's warnings."
+          }
+        },
+        "required": [
+          "name",
+          "actions",
           "warnings"
         ]
       },

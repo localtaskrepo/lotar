@@ -994,10 +994,9 @@ pub struct AutomationSimulateRequest {
 pub struct AutomationSimulateResponse {
     /// Whether any rules matched
     pub matched: bool,
-    /// Name of the matched rule, if any
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub rule_name: Option<String>,
-    /// Actions that would be performed
+    /// Every rule the event fires, in file order (DEV-477)
+    pub rules: Vec<AutomationSimulatedRule>,
+    /// Actions of all those rules, in the same order
     pub actions: Vec<AutomationSimulatedAction>,
     /// Current task state (before automation)
     pub task_before: Option<TaskDTO>,
@@ -1013,6 +1012,19 @@ pub struct AutomationSimulateResponse {
 }
 
 /// A single action that would be performed by automation
+/// One rule a simulated event fires
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AutomationSimulatedRule {
+    /// The rule's name, or `Rule <position>` when it has none
+    pub name: String,
+    /// What this rule would do, on top of the rules before it
+    pub actions: Vec<AutomationSimulatedAction>,
+    /// This rule's part of the response's warnings
+    #[serde(default)]
+    pub warnings: Vec<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct AutomationSimulatedAction {

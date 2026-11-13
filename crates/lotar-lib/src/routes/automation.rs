@@ -76,27 +76,19 @@ pub(super) fn register(api_server: &mut ApiServer) {
             None => AutomationService::simulate(resolver.path.as_path(), ticket_id, event),
         };
         match outcome {
-            Ok(result) => {
-                let actions: Vec<crate::api_types::AutomationSimulatedAction> = result
-                    .actions
-                    .iter()
-                    .map(|a| crate::api_types::AutomationSimulatedAction { action: a.action.clone(), description: a.description.clone() })
-                    .collect();
-
-                ok_json(
-                    200,
-                    json!({
-                        "data": {
-                            "matched": result.matched,
-                            "rule_name": result.rule_name,
-                            "actions": actions,
-                            "task_before": task_before,
-                            "task_after": result.task_after,
-                            "warnings": result.warnings,
-                        }
-                    }),
-                )
-            }
+            Ok(result) => ok_json(
+                200,
+                json!({
+                    "data": {
+                        "matched": result.matched,
+                        "rules": result.rules,
+                        "actions": result.actions,
+                        "task_before": task_before,
+                        "task_after": result.task_after,
+                        "warnings": result.warnings,
+                    }
+                }),
+            ),
             Err(e) => bad_request(e.to_string()),
         }
     });
