@@ -5,7 +5,7 @@ Central reference for identity resolution and people fields.
 ## Sources and resolution order
 
 Used wherever a person is needed (assignee, reporter, default_reporter):
-1) Effective config `default_reporter` (same precedence chain described in [config.md](./config.md): CLI overrides → selected project → env vars like `LOTAR_DEFAULT_REPORTER` → home → global → defaults)
+1) Effective config `default_reporter` (same precedence chain described in [config.md](./config.md): CLI overrides → env vars like `LOTAR_DEFAULT_REPORTER` → selected project → home → global → defaults)
 2) Git user (user.name or user.email at repo root) — gated by `auto.identity_git`
 3) System user ($USER or $USERNAME)
 4) Project manifest author (package.json author, Cargo.toml authors, or .csproj `<Authors>`) — last resort only, since manifest authors are a static guess that may not be the current user

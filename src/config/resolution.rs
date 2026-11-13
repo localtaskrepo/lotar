@@ -273,8 +273,8 @@ pub fn preview_base_resolved(global_layer: &GlobalConfig) -> ResolvedConfig {
 }
 
 /// Project-resolution preview for config-set candidate validation (DEV-71):
-/// defaults -> candidate global layer -> home -> env -> candidate project
-/// config -> CLI overrides. Same precedence as [`get_project_config`], pure
+/// defaults -> candidate global layer -> home -> candidate project config ->
+/// env -> CLI overrides. Same precedence as [`get_project_config`], pure
 /// with respect to the cache and the filesystem.
 pub fn preview_project_resolved(global_layer: &GlobalConfig, project_config: &ProjectConfig) -> ResolvedConfig {
     let mut base_global = GlobalConfig::default();
@@ -283,10 +283,10 @@ pub fn preview_project_resolved(global_layer: &GlobalConfig, project_config: &Pr
     if let Ok(home_config) = crate::config::persistence::load_home_config() {
         overlay_global_into_resolved_with(&mut resolved, home_config, &home_layer_keys());
     }
+    apply_project_config_overrides(&mut resolved, project_config.clone());
     let env_snapshot = crate::config::env_overrides::capture_env_override_snapshot();
     let env_keys = env_layer_keys(&env_snapshot);
-    overlay_global_into_resolved_with(&mut resolved, env_snapshot.global.clone(), &env_keys);
-    apply_project_config_overrides(&mut resolved, project_config.clone());
+    overlay_global_into_resolved_with(&mut resolved, env_snapshot.global, &env_keys);
     apply_cli_overrides(&mut resolved);
     apply_server_port_presence(&mut resolved, None);
     resolved
@@ -395,7 +395,7 @@ fn load_merged_global_chain(tasks_dir: Option<&Path>) -> ResolvedConfig {
 
 /// Resolve the effective configuration for an optional project scope.
 ///
-/// Precedence: CLI > project > env > home > global > defaults.
+/// Precedence: CLI > env > project > home > global > defaults.
 /// Uses the same in-process cache as [`load_and_merge_configs`]; falls back to
 /// the merged base config when the project config cannot be loaded.
 pub fn config_for_project(tasks_dir: &Path, project: Option<&str>) -> Result<ResolvedConfig, ConfigError> {
@@ -911,10 +911,9 @@ pub fn get_project_config(_resolved_config: &ResolvedConfig, project_name: &str,
         return Ok(cached.resolved.clone());
     }
 
-    // Desired precedence: CLI > project > env > home > global > defaults
-    // We don't re-handle CLI here (handled by command handlers). Implement the
-    // remainder by building a fresh chain where project config is the most local
-    // layer applied after env/home/global baselines.
+    // Precedence: CLI > env > project > home > global > defaults. Env names
+    // the current process (an agent job, CI), so it outranks the shared
+    // project file (DEV-404).
 
     // 1) Start from defaults -> global
     let mut base_global = GlobalConfig::default();
@@ -929,14 +928,14 @@ pub fn get_project_config(_resolved_config: &ResolvedConfig, project_name: &str,
         overlay_global_into_resolved_with(&mut resolved, home_config, &home_layer_keys());
     }
 
-    // 3) Overlay environment variables (higher than home/global)
-    let env_snapshot = crate::config::env_overrides::capture_env_override_snapshot();
-    let env_keys = env_layer_keys(&env_snapshot);
-    overlay_global_into_resolved_with(&mut resolved, env_snapshot.global.clone(), &env_keys);
-
-    // 4) Apply project-specific config last so it overrides env/home/global
+    // 3) Apply project-specific config over home/global
     let project_config = crate::config::persistence::load_project_config_from_dir(project_name, tasks_dir)?;
     apply_project_config_overrides(&mut resolved, project_config);
+
+    // 4) Overlay environment variables (higher than project/home/global)
+    let env_snapshot = crate::config::env_overrides::capture_env_override_snapshot();
+    let env_keys = env_layer_keys(&env_snapshot);
+    overlay_global_into_resolved_with(&mut resolved, env_snapshot.global, &env_keys);
     apply_cli_overrides(&mut resolved);
 
     // DEV-21 read-time enforcement for the project-resolved chain (show/

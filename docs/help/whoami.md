@@ -19,7 +19,7 @@ the workspace configuration. Looking up an identity does not create a project.
 
 The CLI runs a detector stack and stops at the first hit:
 
-1. `default_reporter` from the effective configuration (CLI overrides -> selected project config -> env such as `LOTAR_DEFAULT_REPORTER` -> home directory config -> workspace-global config -> compiled defaults).
+1. `default_reporter` from the effective configuration (CLI overrides -> env such as `LOTAR_DEFAULT_REPORTER` -> selected project config -> home directory config -> workspace-global config -> compiled defaults).
 2. Git metadata (`user.name`, then `user.email`) from the repo root when `auto.identity_git` is true (default).
 3. Environment fallbacks: `$USER`, then `$USERNAME`.
 4. Project manifest author as a last resort. We read `package.json` (`author` string/object or first `contributors` entry), `Cargo.toml` (`authors` array), and any `.csproj` file's `<Authors>` tag. Manifest authors are a static guess, so they only apply when no git or system identity exists.

@@ -3,7 +3,7 @@
 All configuration keys by scope with types and notes. Canonical YAML uses nested groups and only emits values that differ from the built-in defaults. If `.tasks/config.yml` contains just a comment, you're still using the defaults listed below.
 
 ## Precedence
-CLI > project > env > home > global > defaults (commands without a project skip the project step). See [Resolution & Precedence](./precedence.md).
+CLI > env > project > home > global > defaults (commands without a project skip the project step). See [Resolution & Precedence](./precedence.md).
 
 ## Canonical keys (nested)
 - server.port: number (default 8080)

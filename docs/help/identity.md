@@ -5,8 +5,8 @@ Central reference for identity resolution and people fields.
 
 ## Sources and resolution order
 
-Used for the current user: `@me`, `whoami`, a comment's author, a history entry's actor, and a new ticket's reporter when no `default.reporter` is configured:
-1) `default.reporter` from the running process first: a `--config default.reporter=NAME` override, then `LOTAR_DEFAULT_REPORTER`. These outrank the project, so an agent that sets the variable is recorded as itself even where the project names a default reporter. Without them, the merged config `default_reporter` (project → home → global, as described in [config.md](./config.md))
+Used for the current user: `@me`, `whoami`, a comment's author, a history entry's actor, and a new ticket's reporter when `--reporter` isn't given:
+1) The merged config `default_reporter`, in the order every setting uses ([config.md](./config.md)): a `--config default.reporter=NAME` override, then `LOTAR_DEFAULT_REPORTER`, then project → home → global. So an agent that sets the variable is recorded as itself, also as the reporter of the tickets it creates, even where the project names a default reporter
 2) Git user (user.name or user.email at repo root) — gated by `auto.identity_git`
 3) System user ($USER or $USERNAME)
 4) Project manifest author (package.json author, Cargo.toml authors, or .csproj `<Authors>`) — last resort only, since manifest authors are a static guess that may not be the current user
@@ -50,7 +50,7 @@ lotar whoami --explain --format=json
 - MCP task operations and REST task mutations rely on the same helper, so `@me` aliases and default reporter fallbacks behave identically across interfaces.
 
 ## Reporter vs Assignee
-- reporter: who created or owns reporting responsibility; can be auto-set if missing when `auto.set_reporter: true`. A new ticket without a reporter gets the merged `default.reporter` in the ordinary [configuration precedence](./config.md#configuration-precedence) (project above environment), and the current user only when none is configured. Comments and history entries always record the current user from the order above.
+- reporter: who created or owns reporting responsibility; can be auto-set if missing when `auto.set_reporter: true`. A new ticket without a reporter gets the merged `default.reporter` in the [configuration precedence](./config.md#configuration-precedence) (environment above project), and the current user only when none is configured. Comments and history entries record the current user from the order above.
 - assignee: who should execute the task; can be set explicitly or inferred via first-change semantics (below).
 
 ## First-change auto-assign

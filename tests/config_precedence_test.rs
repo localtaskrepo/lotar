@@ -34,7 +34,7 @@ impl Drop for CliOverrideGuard {
 }
 
 #[test]
-fn project_config_overrides_environment_defaults() {
+fn environment_overrides_project_defaults() {
     let tmp = TempDir::new().unwrap();
     let tasks_dir = ensure_tasks_dir(tmp.path());
     let resolver = resolver_for(&tasks_dir);
@@ -52,7 +52,7 @@ fn project_config_overrides_environment_defaults() {
     let baseline = load_and_merge_configs(Some(tasks_dir.as_path())).expect("resolved base config");
     let resolved = get_project_config(&baseline, "ENG", tasks_dir.as_path()).expect("project config");
 
-    assert_eq!(resolved.default_status, Some(TaskStatus::from("InProgress")), "project-specific default should win over env override");
+    assert_eq!(resolved.default_status, Some(TaskStatus::from("Done")), "env override should win over the project default (DEV-404)");
 }
 
 #[test]

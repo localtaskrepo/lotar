@@ -184,18 +184,18 @@ lotar config normalize --project=DEMO --write
 ### Configuration Precedence
 When resolving configuration, LoTaR uses this order (highest wins):
 1. Command-line flags (per command)
-2. Project config (.tasks/<PROJECT>/config.yml) when a project context is resolved
-3. Environment variables
+2. Environment variables
+3. Project config (.tasks/<PROJECT>/config.yml) when a project context is resolved
 4. Home config (~/.lotar)
 5. Global config (.tasks/config.yml)
 6. Built-in defaults
 
-Commands that do not operate on a specific project simply skip step 2, so they evaluate CLI → env → home → global → defaults.
+Commands that do not operate on a specific project simply skip step 3, so they evaluate CLI → env → home → global → defaults.
 
 Notes:
-- Project config overrides env/home/global, so use env/home for broad defaults and commit per-project differences inside `.tasks/<PROJECT>/config.yml`.
+- Environment variables override project config: they describe the running process (an agent job, CI, a one-off shell), such as `LOTAR_DEFAULT_REPORTER` for who is acting. Project config overrides home/global, so use home for broad personal defaults and commit per-project differences inside `.tasks/<PROJECT>/config.yml`.
 - CLI flags are applied by each command and always win for that invocation.
- - Identity resolution (`@me`, a comment's author, a history entry's actor) is the exception: an explicit `--config default.reporter=` or `LOTAR_DEFAULT_REPORTER` outranks the project's `default.reporter`. A new ticket without a reporter still gets the merged `default.reporter` from this chain. See [Identity & Users](./identity.md).
+- Identity (`@me`, a comment's author, a history entry's actor, a new ticket's reporter) follows the same chain: `LOTAR_DEFAULT_REPORTER` outranks the project's `default.reporter`. See [Identity & Users](./identity.md).
 
 ### Canonical YAML shape
 LoTaR accepts shipped flat fields (such as `default_project`, `default_assignee`, and `server_port`), dotted keys, and nested sections in YAML. Canonical nested/dotted fields take precedence over their flat equivalents regardless of YAML key order. Conflicting dotted and nested definitions of the same path are rejected. Internally, values are canonicalized to sections such as server, default, project, members, review, issue, custom, scan, auto, sprints, and branch. Use `lotar config normalize` to rewrite files into this canonical form.

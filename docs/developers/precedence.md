@@ -6,23 +6,23 @@ This page explains how LoTaR resolves values for configuration, identity (for @m
 
 `src/config/resolution.rs` is the single merge engine for configuration layers (`ConfigManager` delegates to its cached resolver) in a fixed order (highest wins):
 1. Command-line flags for the current invocation (e.g., `lotar config set --project`, `--tasks-dir`, `--format`) plus the global `--config KEY=VALUE` overrides. These are evaluated inside each command handler, scoped to the running process, and never persisted.
-2. Project config (`.tasks/<PROJECT>/config.yml`) when a project has been resolved. These files represent the most local settings and override everything except explicit CLI flags.
-3. Environment overrides defined in `src/config/env_overrides.rs` (see `docs/help/environment.md` for the full table). The first set variable wins per key and applies globally across projects.
+2. Environment overrides defined in `src/config/env_overrides.rs` (see `docs/help/environment.md` for the full table). The first set variable wins per key. `get_project_config` overlays them after the project file, so the running process (an agent job, CI) wins over committed project config (DEV-404).
+3. Project config (`.tasks/<PROJECT>/config.yml`) when a project has been resolved. Overrides home and global config.
 4. Home config (`~/.lotar`, on Windows `%USERPROFILE%\.lotar`). Read via `ConfigManager::load_home_config*` and allowed to override the workspace-global config.
 5. Global config (`.tasks/config.yml` in the resolved workspace). Provides the shared baseline for every project.
 6. Built-in defaults from `src/config/types.rs`.
 
-Commands that do not operate on a project simply skip step 2, so they evaluate CLI → env → home → global → defaults.
+Commands that do not operate on a project simply skip step 3, so they evaluate CLI → env → home → global → defaults.
 
 Notes:
-- The same chain powers CLI, REST, and MCP. Project-aware commands always call `ProjectResolver::resolve_project` and then `ConfigManager::get_project_config`, so they inherit project-level overrides while still respecting user/home/env/CLI tweaks. `--config KEY=VALUE` is implemented via `configure_cli_overrides` in `src/config/resolution.rs` and sits above everything else, while existing per-command flags remain available as shorthands.
+- The same chain powers CLI, REST, and MCP. Project-aware commands always call `ProjectResolver::resolve_project` and then `ConfigManager::get_project_config`, so they inherit project-level overrides while env and CLI values still win. `--config KEY=VALUE` is implemented via `configure_cli_overrides` in `src/config/resolution.rs` and sits above everything else, while existing per-command flags remain available as shorthands.
 - Automation toggles (`auto.set_reporter`, `auto.assign_on_status`, `auto.identity`, `auto.identity_git`, `auto.branch_infer_*`, etc.) default to true when unspecified (see `src/config/types.rs`) and honor the same precedence chain.
 - Fields that cannot be set per project skip the project layer. `tasks_folder` is read only from the home config.
 
 ## Identity resolution and @me
 
 Anywhere a person field is accepted (assignee, reporter, default_reporter), the special value @me is allowed. `src/utils/identity_detectors.rs` runs detectors in this order:
-1) Effective config `default_reporter` (same precedence chain described in [config.md](./config.md): CLI overrides → selected project → env vars like `LOTAR_DEFAULT_REPORTER` → home → global → defaults)
+1) Effective config `default_reporter` (same precedence chain described in [config.md](./config.md): CLI overrides → env vars like `LOTAR_DEFAULT_REPORTER` → selected project → home → global → defaults)
 2) Git user (user.name or user.email at repo root) — gated by `auto.identity_git`
 3) System user ($USER or $USERNAME)
 4) Project manifest author (package.json author, Cargo.toml authors, or .csproj `<Authors>`) — last resort only, since manifest authors are a static guess that may not be the current user

@@ -5,7 +5,7 @@ LoTaR reads environment variables for workspace discovery, configuration overrid
 
 ## Resolution & Precedence
 
-- CLI flags → project config (when applicable) → environment variables → home config (`~/.lotar`) → global config (`.tasks/config.yml`) → built-in defaults. Commands without a project context skip the project step. See [Configuration Reference](./config-reference.md) and [Resolution & Precedence](./precedence.md) for resolver details.
+- CLI flags → environment variables → project config (when applicable) → home config (`~/.lotar`) → global config (`.tasks/config.yml`) → built-in defaults. Commands without a project context skip the project step. See [Configuration Reference](./config-reference.md) and [Resolution & Precedence](./precedence.md) for resolver details.
 - Override variables feed directly into the configuration system; provide values in the same shape used in YAML (simple scalars) or JSON/YAML strings for lists and maps.
 - Changes require restarting the CLI/server so the fresh environment is read.
 

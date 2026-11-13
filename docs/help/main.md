@@ -82,7 +82,7 @@ LoTaR stores data in `.tasks/<PROJECT>` folders. Discovery order:
 
 Run `lotar config show` to see which folder was picked.
 
-Configuration precedence follows the same idea: CLI flag → project → environment → home → global → defaults. Learn the full chain in [Resolution & Precedence](./precedence.md).
+Configuration precedence follows the same idea: CLI flag → environment → project → home → global → defaults. Learn the full chain in [Resolution & Precedence](./precedence.md).
 
 ## Output Styles
 

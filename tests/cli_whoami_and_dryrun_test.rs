@@ -241,6 +241,16 @@ fn project_identity_cache_is_scoped_and_precedence_is_preserved() {
     std::fs::create_dir_all(second.join("OTHER")).unwrap();
     std::fs::write(second.join("OTHER/config.yml"), "default.reporter: carol\n").unwrap();
     assert_eq!(resolve_current_user_for_project(Some(&second), Some("OTHER")).as_deref(), Some("carol"));
+    // The environment names the current process and outranks project config (DEV-404).
+    // EnvVarGuard holds the variable's mutex and restores its original value.
+    unsafe {
+        std::env::set_var("LOTAR_DEFAULT_REPORTER", "environment-user");
+    }
+    for project in ["OTHER", "TEST", "INHERIT"] {
+        assert_eq!(resolve_current_user_for_project(Some(&tasks), Some(project)).as_deref(), Some("environment-user"));
+    }
+    let found = resolve_current_user_explain_for_project(Some(&tasks), Some("OTHER")).unwrap();
+    assert!(found.details.unwrap().contains("environment configuration"));
 
     // DEV-403: the environment outranks a project's default.reporter, and the CLI outranks both.
     // EnvVarGuard holds the variable's mutex and restores its original value.

@@ -274,8 +274,9 @@ impl AddHandler {
         task.reporter = if let Some(reporter) = explicit_reporter {
             crate::utils::identity::resolve_me_alias_for_project(&reporter, Some(resolver.path.as_path()), Some(&project_for_storage))
         } else if config.auto_set_reporter {
-            // A configured default.reporter names the reporter, project above
-            // env (owner, DEV-405); the current user only fills in without one.
+            // A configured default.reporter names the reporter, env above
+            // project like every setting (owner, DEV-404); the current user
+            // only fills in without one.
             let from_config = config
                 .default_reporter
                 .as_deref()

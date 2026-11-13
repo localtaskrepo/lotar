@@ -38,6 +38,21 @@ fn cli_comment_stores_author_and_show_prints_it() {
     assert_eq!(comments[0]["text"], "hi");
 }
 
+/// DEV-404: the environment names the process (an agent job) and outranks a
+/// project `default.reporter`, which names the project's default owner.
+#[test]
+fn cli_comment_author_prefers_env_over_project_default_reporter() {
+    let tf = TestFixtures::new();
+    let dir = tf.get_temp_path();
+    let created: Value = serde_json::from_str(&run(dir, &["--format", "json", "add", "Env author"])).unwrap();
+    let id = created["task"]["id"].as_str().expect("created id").to_string();
+    let (prefix, _) = id.split_once('-').unwrap();
+    std::fs::write(dir.join(".tasks").join(prefix).join("config.yml"), "default:\n  reporter: owner1\n").unwrap();
+
+    let added: Value = serde_json::from_str(&run(dir, &["--format", "json", "comment", &id, "-m", "hello"])).unwrap();
+    assert_eq!(added["added_comment"]["author"], "claude", "{added}");
+}
+
 #[test]
 fn cli_reads_comments_stored_without_author() {
     let tf = TestFixtures::new();
@@ -80,7 +95,7 @@ fn env_reporter_outranks_project_default_reporter() {
     assert!(!stored.contains("mallox"), "neither the comment nor the history names the project reporter:\n{stored}");
 
     let second: Value = serde_json::from_str(&run(dir, &["--format", "json", "add", "Second", "--project", prefix])).unwrap();
-    assert_eq!(second["task"]["reporter"], "mallox", "a configured default.reporter names a new ticket's reporter (DEV-405): {second}");
+    assert_eq!(second["task"]["reporter"], "claude", "the env outranks the project's default.reporter for a new ticket too (DEV-404): {second}");
 
     let out = common::lotar_cmd().unwrap().current_dir(dir).env_remove("LOTAR_DEFAULT_REPORTER").args(["whoami", "--project", prefix]).output().unwrap();
     assert!(String::from_utf8_lossy(&out.stdout).contains("mallox"), "without the env var the project reporter still applies");
@@ -160,9 +175,9 @@ fn mcp_comment_returns_author() {
     assert_eq!(commented["task"]["comments"][0]["author"], "claude", "{commented}");
 }
 
-/// DEV-405: the writing process's explicit identity names a comment's author
-/// and the history's actor, even where the project sets `default.reporter`;
-/// that default still names the reporter of a ticket created without one.
+/// DEV-405, DEV-404: the writing process's explicit identity names a comment's
+/// author, the history's actor and a new ticket's reporter, even where the
+/// project sets `default.reporter`; without it, that default applies.
 #[test]
 fn env_reporter_outranks_project_default_for_comment_author_and_history() {
     let tf = TestFixtures::new();
@@ -173,7 +188,7 @@ fn env_reporter_outranks_project_default_for_comment_author_and_history() {
 
     let created: Value = serde_json::from_str(&run(dir, &["--format", "json", "add", "Scratch", "--project", "X"])).unwrap();
     let id = created["task"]["id"].as_str().expect("created id").to_string();
-    assert_eq!(created["task"]["reporter"], "alice", "a new ticket's reporter keeps the project default: {created}");
+    assert_eq!(created["task"]["reporter"], "claude", "the env outranks the project default for a new ticket's reporter: {created}");
 
     let added: Value = serde_json::from_str(&run(dir, &["--format", "json", "comment", &id, "hi"])).unwrap();
     assert_eq!(added["added_comment"]["author"], "claude", "{added}");

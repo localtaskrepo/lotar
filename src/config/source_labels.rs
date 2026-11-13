@@ -72,7 +72,17 @@ impl<'a> GlobalScopeContext<'a> {
     }
 }
 
-fn project_scope_with_global(key: &str, has_project_override: bool, values_differ: bool, context: &GlobalScopeContext<'_>) -> String {
+fn project_scope_with_global(
+    key: &str,
+    resolved_project: &ResolvedConfig,
+    has_project_override: bool,
+    values_differ: bool,
+    context: &GlobalScopeContext<'_>,
+) -> String {
+    // Env outranks project config (DEV-404).
+    if context.env_applied.iter().any(|candidate| *candidate == key) && env_value_matches(resolved_project, context.env_resolved, key) {
+        return "env".to_string();
+    }
     if has_project_override || values_differ { "project".to_string() } else { context.global_label(key).to_string() }
 }
 
@@ -380,7 +390,7 @@ fn source_label_for_project(key: &str, resolved_project: &ResolvedConfig, projec
 
     macro_rules! project_scope {
         ($key_literal:literal, $has_override:expr, $diff:expr) => {
-            project_scope_with_global($key_literal, $has_override, $diff, context)
+            project_scope_with_global($key_literal, resolved_project, $has_override, $diff, context)
         };
     }
 

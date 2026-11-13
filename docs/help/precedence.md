@@ -7,16 +7,16 @@ This page explains how LoTaR resolves values for configuration, identity (for @m
 
 Configuration layers merge in a fixed order (highest wins):
 1. Command-line flags for the current invocation (e.g., `lotar config set --project`, `--tasks-dir`, `--format`) plus the global `--config KEY=VALUE` overrides. These are evaluated inside each command handler, apply only to the current process, and are never persisted.
-2. Project config (`.tasks/<PROJECT>/config.yml`) when a project context is resolved. These are the most local settings and override everything except explicit CLI flags.
-3. Environment overrides (see `docs/help/environment.md` for the full table). The first set variable wins per key and applies across every project on the machine.
+2. Environment overrides (see `docs/help/environment.md` for the full table). The first set variable wins per key. They describe the running process (an agent job, CI, a one-off shell), so they override the committed project config; a variable exported in a shell profile applies to every project.
+3. Project config (`.tasks/<PROJECT>/config.yml`) when a project context is resolved. Overrides home and global config.
 4. Home config (`~/.lotar`, on Windows `%USERPROFILE%\.lotar`). User-wide defaults that sit above global config but below env/project.
 5. Global config (`.tasks/config.yml` in the resolved workspace). Provides the shared baseline for every project.
 6. Built-in defaults.
 
-Commands that do not operate on a specific project simply skip step 2, so they evaluate CLI → env → home → global → defaults.
+Commands that do not operate on a specific project simply skip step 3, so they evaluate CLI → env → home → global → defaults.
 
 Notes:
-- The same chain powers CLI, REST, and MCP. Project-aware commands always resolve the project context first, so they inherit project-level overrides while still respecting higher-level env and CLI tweaks. Use `--config KEY=VALUE` to temporarily override any field without editing YAML (existing per-command flags stay available as shorthands).
+- The same chain powers CLI, REST, and MCP. Project-aware commands always resolve the project context first, so they inherit project-level overrides while env and CLI values still win. Use `--config KEY=VALUE` to temporarily override any field without editing YAML (existing per-command flags stay available as shorthands).
 - Automation toggles (`auto.set_reporter`, `auto.assign_on_status`, `auto.identity`, `auto.identity_git`, `auto.branch_infer_*`, etc.) default to true when unspecified and honor the same precedence chain.
 - Fields that cannot be set per project skip the project layer. `tasks_folder` is a special case: only the home config can set it (see [Tasks directory resolution](#tasks-directory-resolution)).
 
@@ -31,7 +31,7 @@ Rules do not merge across scopes; the first file found wins.
 ## Identity resolution and @me
 
 Anywhere a person field is accepted (assignee, reporter, default_reporter), the special value @me is allowed. Detectors run in this order:
-1) `default_reporter`, with the running process first: CLI `--config default.reporter=NAME` → `LOTAR_DEFAULT_REPORTER` → selected project → home → global. Unlike ordinary configuration, the environment outranks the project here, because a project's default reporter names who reports unattributed tickets, not who is writing now. This identity is a comment's author and a history entry's actor.
+1) `default_reporter`, in the order every setting uses: CLI `--config default.reporter=NAME` → `LOTAR_DEFAULT_REPORTER` → selected project → home → global. This identity is a comment's author, a history entry's actor and the reporter of a new ticket without `--reporter`.
 2) Git user (user.name or user.email at repo root) — gated by `auto.identity_git`
 3) System user ($USER or $USERNAME)
 4) Project manifest author (package.json author, Cargo.toml authors, or .csproj `<Authors>`) — last resort only, since manifest authors are a static guess that may not be the current user
