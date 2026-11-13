@@ -1206,7 +1206,44 @@ fn parse_t3_thread_state(output: &str) -> Option<T3ThreadState> {
     })
 }
 
+/// How long after its job started the thread `t3 thread start` made for
+/// it can have been created (DEV-478). `thread start` makes it within
+/// seconds; a short window leaves out threads the agent starts later.
+const T3_THREAD_START_WINDOW: chrono::Duration = chrono::Duration::minutes(2);
+
+/// The threads, from `t3 thread list --json`, that may be the one a job
+/// started, for a job that never recorded it (DEV-478): created within
+/// the window after the job started, with a title that starts with the
+/// ticket id. The agent may rename its thread but keeps the id in front.
+/// Only a single match identifies the job's thread.
+fn job_thread_candidates(output: &str, ticket_id: &str, started_at: &str) -> Vec<String> {
+    let Ok(started) = chrono::DateTime::parse_from_rfc3339(started_at) else {
+        return Vec::new();
+    };
+    let threads: Vec<serde_json::Value> = serde_json::from_str(output.trim()).unwrap_or_default();
+    let prefix = format!("{ticket_id} ");
+    threads
+        .iter()
+        .filter(|thread| thread.get("title").and_then(|title| title.as_str()).is_some_and(|title| title.starts_with(&prefix)))
+        .filter_map(|thread| {
+            let created = chrono::DateTime::parse_from_rfc3339(thread.get("createdAt")?.as_str()?).ok()?;
+            let id = thread.get("threadId")?.as_str()?;
+            (created >= started && created - started <= T3_THREAD_START_WINDOW).then(|| id.to_string())
+        })
+        .collect()
+}
+
 impl T3Cli {
+    fn job_thread_candidates(&self, ticket_id: &str, started_at: &str) -> Vec<String> {
+        let mut cmd = Command::new(&self.program);
+        cmd.args(["thread", "list", "--json"]).envs(&self.env).current_dir(&self.cwd).stdin(Stdio::null()).stderr(Stdio::null());
+        clear_repository_env(&mut cmd);
+        match cmd.output() {
+            Ok(output) if output.status.success() => job_thread_candidates(&String::from_utf8_lossy(&output.stdout), ticket_id, started_at),
+            _ => Vec::new(),
+        }
+    }
+
     fn thread_info(&self, thread_id: &str) -> Option<T3ThreadInfo> {
         self.thread_state(thread_id).map(|state| state.info)
     }
@@ -1732,6 +1769,8 @@ fn t3_run_exit_code(job_id: &str, thread_id: &str, thread: &T3ThreadState) -> i3
 
 /// End a taken-over job: a t3 job from its thread's state, once the thread's
 /// run ends; any other runner fails, as its result went with its process.
+/// A t3 job whose process died before it recorded its thread looks for it
+/// in T3 Code (DEV-478).
 fn finish_orphaned_job(
     job: &crate::services::agent_active_jobs::ActiveJob,
     runner_kind: AgentRunnerKind,
@@ -1742,17 +1781,39 @@ fn finish_orphaned_job(
 ) {
     let job_id = job.job_id.as_str();
     let _slot = RunningJobSlot { job_id, ticket_id, tasks_dir };
-    let thread_id = match job.session_id.as_deref() {
-        Some(thread_id) if runner_kind == AgentRunnerKind::T3 => thread_id,
-        _ => {
-            let message = format!("The lotar process running the job exited before the {} runner finished, so its result is unknown.", job.runner);
-            update_job_failure(job_id, ticket_id, message, tasks_dir);
-            return;
-        }
-    };
+    if runner_kind != AgentRunnerKind::T3 {
+        let message = format!("The lotar process running the job exited before the {} runner finished, so its result is unknown.", job.runner);
+        update_job_failure(job_id, ticket_id, message, tasks_dir);
+        return;
+    }
     let repo_root = resolve_repo_root(tasks_dir).unwrap_or_else(|| tasks_dir.to_path_buf());
-    let command = crate::services::agent_runner::build_t3_send_command(profile, "", thread_id);
+    let command = crate::services::agent_runner::build_t3_send_command(profile, "", "");
     let cli = T3Cli { program: command.program, env: command.env, cwd: repo_root };
+    let thread_id = match job.session_id.clone() {
+        Some(thread_id) => thread_id,
+        None => match cli.job_thread_candidates(ticket_id, &job.started_at).as_slice() {
+            [thread_id] => {
+                on_t3_thread_started(&cli, job_id, tasks_dir, ticket_id, thread_id);
+                thread_id.clone()
+            }
+            [] => {
+                let message = format!(
+                    "The lotar process running the job exited before the t3 runner recorded its T3 Code thread, and T3 Code has no thread for {ticket_id} started right after the job, so its result is unknown."
+                );
+                update_job_failure(job_id, ticket_id, message, tasks_dir);
+                return;
+            }
+            candidates => {
+                let message = format!(
+                    "The lotar process running the job exited before the t3 runner recorded its T3 Code thread, and T3 Code has several threads for {ticket_id} started right after the job ({}), so its result is unknown.",
+                    candidates.join(", ")
+                );
+                update_job_failure(job_id, ticket_id, message, tasks_dir);
+                return;
+            }
+        },
+    };
+    let thread_id = thread_id.as_str();
     let thread = match wait_for_t3_run(&cli, job_id, tasks_dir, thread_id) {
         Some(Ok(thread)) => thread,
         Some(Err(message)) => {

@@ -24,6 +24,7 @@ use std::time::{Duration, Instant};
 /// `FAKE_T3_GONE`, on claudeAgent's claude-opus-5-5; `thread send` records its arguments, folder and stdin,
 /// runs `FAKE_T3_SEND_RUN` and replies (DEV-368). `thread start` runs while a `hold` file exists,
 /// runs `FAKE_T3_START_RUN`, and keeps its thread's `FAKE_T3_WORKTREE` for `thread show` (DEV-472).
+/// `thread list` prints the `threads.json` file, else no threads (DEV-478).
 fn fake_t3(dir: &Path) -> PathBuf {
     let path = dir.join("fake-t3");
     let script = format!(
@@ -36,6 +37,10 @@ if [ "$1" = "thread" ] && [ "$2" = "show" ]; then
   if [ -n "$FAKE_T3_WORKTREE" ]; then wt="\"$FAKE_T3_WORKTREE\""; br="\"$(cat "$out/branch" 2>/dev/null || echo agent/from-t3)\""; else wt=null; br='"main"'; fi
   st="$(cat "$out/status" 2>/dev/null || echo completed)"; if [ "$st" = running ]; then run='"run:1"'; else run=null; fi
   printf '{{"thread":{{"threadId":"%s","link":"https://app.t3.codes/threads/env/%s","worktreePath":%s,"branch":%s,"status":"%s","activeRunId":%s,"pendingRequestCount":0,"providerInstanceId":"claudeAgent","model":"claude-opus-5-5"}},"messages":[{{"role":"assistant","text":"Fixed it."}}]}}\n' "$3" "$3" "$wt" "$br" "$st" "$run"
+  exit 0
+fi
+if [ "$1" = "thread" ] && [ "$2" = "list" ]; then
+  cat "$out/threads.json" 2>/dev/null || echo '[]'
   exit 0
 fi
 if [ "$1" = "thread" ] && [ "$2" = "send" ]; then
@@ -748,7 +753,7 @@ fn a_rework_continues_the_fix_thread_after_a_fresh_review_took_its_branch() {
 
 /// A job whose process died while its thread ran (DEV-378): a pid that no
 /// longer exists owns its record, and its log has no end.
-fn orphaned_t3_job(fixtures: &TestFixtures, ticket_id: &str, job_id: &str) {
+fn orphaned_t3_job(fixtures: &TestFixtures, ticket_id: &str, job_id: &str, session_id: Option<&str>) {
     let mut gone = Command::new("true").spawn().unwrap();
     let owner_pid = gone.id();
     gone.wait().unwrap();
@@ -760,7 +765,7 @@ fn orphaned_t3_job(fixtures: &TestFixtures, ticket_id: &str, job_id: &str) {
         owner_pid,
         child_pid: owner_pid,
         started_at: "2026-11-12T18:36:42+00:00".into(),
-        session_id: Some("thread-orphan".into()),
+        session_id: session_id.map(str::to_string),
     };
     agent_active_jobs::register(&fixtures.tasks_root, &job);
     let logs = fixtures.tasks_root.join("@agent-logs");
@@ -784,7 +789,7 @@ fn a_job_whose_worker_died_ends_from_its_thread_on_the_next_start() {
     let mut storage = fixtures.create_storage();
     let id = TaskService::create(&mut storage, TaskCreate { title: "Orphan".into(), project: Some("REPO".into()), ..Default::default() }).unwrap().id;
     let job_id = "job-20261112T183642.565Z-1";
-    orphaned_t3_job(&fixtures, &id, job_id);
+    orphaned_t3_job(&fixtures, &id, job_id, Some("thread-orphan"));
     // A status set while the job ran is still its outcome.
     let tasks_dir = fixtures.tasks_root.clone();
     assert!(agent_active_jobs::list(&tasks_dir).is_empty(), "a dead process's job is not running");
@@ -834,7 +839,7 @@ fn a_job_whose_thread_is_unknown_fails_with_the_reason() {
     fs::write(fixtures.tasks_root.join("automation.yml"), END_RULES).unwrap();
     let mut storage = fixtures.create_storage();
     let id = TaskService::create(&mut storage, TaskCreate { title: "Orphan".into(), project: Some("REPO".into()), ..Default::default() }).unwrap().id;
-    orphaned_t3_job(&fixtures, &id, "job-20261112T183643.341Z-2");
+    orphaned_t3_job(&fixtures, &id, "job-20261112T183643.341Z-2", Some("thread-orphan"));
     let _gone = EnvVarGuard::set("FAKE_T3_GONE", "1");
 
     AgentJobService::recover_orphaned_jobs(&fixtures.tasks_root);
@@ -843,6 +848,77 @@ fn a_job_whose_thread_is_unknown_fails_with_the_reason() {
     assert!(job.summary.as_deref().is_some_and(|s| s.contains("Could not read the job's T3 Code thread thread-orphan")), "{job:?}");
     let task = TaskService::get(&fixtures.create_storage(), &id, None).unwrap();
     assert_eq!(task.status.as_str(), "HelpNeeded");
+}
+
+/// DEV-478: the worker died before it recorded the thread id; the job
+/// finds the thread T3 Code started for its ticket after the job began.
+#[test]
+fn a_job_without_its_thread_id_ends_from_the_tickets_thread() {
+    let fixtures = TestFixtures::new();
+    let home = home_with_fix_profile(&fixtures, "");
+    let _queue = EnvVarGuard::set("LOTAR_AGENT_QUEUE_DIR", fixtures.get_temp_path().join("queue").to_str().unwrap());
+    fs::write(fixtures.tasks_root.join("automation.yml"), END_RULES).unwrap();
+    let mut storage = fixtures.create_storage();
+    let id = TaskService::create(&mut storage, TaskCreate { title: "Orphan".into(), project: Some("REPO".into()), ..Default::default() }).unwrap().id;
+    let job_id = "job-20261112T183644.112Z-3";
+    orphaned_t3_job(&fixtures, &id, job_id, None);
+    let threads = format!(
+        r#"[{{"threadId":"thread-later","title":"{id} Orphan","createdAt":"2026-11-12T19:40:00.000Z"}},
+{{"threadId":"thread-found","title":"{id} fix: Orphan","createdAt":"2026-11-12T18:36:44.020Z"}},
+{{"threadId":"thread-other","title":"REPO-99 Other","createdAt":"2026-11-12T18:36:43.000Z"}},
+{{"threadId":"thread-before","title":"{id} Orphan","createdAt":"2026-11-12T18:30:00.000Z"}}]"#
+    );
+    fs::write(home.out.join("threads.json"), threads).unwrap();
+
+    AgentJobService::recover_orphaned_jobs(&fixtures.tasks_root);
+    let job = wait_for_finished_job(&id);
+    assert_eq!(job.status, "completed", "{job:?}: {:?}", messages(&job));
+    assert_eq!(job.session_id.as_deref(), Some("thread-found"));
+    assert_eq!(job.summary.as_deref(), Some("Fixed it."));
+    let task = TaskService::get(&fixtures.create_storage(), &id, None).unwrap();
+    assert_eq!(task.status.as_str(), "Done");
+    assert!(messages(&job).iter().any(|m| m == "T3 Code thread: https://app.t3.codes/threads/env/thread-found"), "{:?}", messages(&job));
+}
+
+#[test]
+fn a_job_without_its_thread_id_and_no_thread_for_its_ticket_fails() {
+    let fixtures = TestFixtures::new();
+    let _home = home_with_fix_profile(&fixtures, "");
+    let _queue = EnvVarGuard::set("LOTAR_AGENT_QUEUE_DIR", fixtures.get_temp_path().join("queue").to_str().unwrap());
+    fs::write(fixtures.tasks_root.join("automation.yml"), END_RULES).unwrap();
+    let mut storage = fixtures.create_storage();
+    let id = TaskService::create(&mut storage, TaskCreate { title: "Orphan".into(), project: Some("REPO".into()), ..Default::default() }).unwrap().id;
+    orphaned_t3_job(&fixtures, &id, "job-20261112T183645.201Z-4", None);
+
+    AgentJobService::recover_orphaned_jobs(&fixtures.tasks_root);
+    let job = wait_for_finished_job(&id);
+    assert_eq!(job.status, "failed");
+    assert!(job.summary.as_deref().is_some_and(|s| s.contains("before the t3 runner recorded its T3 Code thread")), "{job:?}");
+}
+
+/// DEV-478: two threads for the ticket started right after the job (the
+/// agent started one, or another job ran on the ticket); neither is known
+/// to be the job's, so the job fails instead of taking either's outcome.
+#[test]
+fn a_job_without_its_thread_id_and_several_threads_for_its_ticket_fails() {
+    let fixtures = TestFixtures::new();
+    let home = home_with_fix_profile(&fixtures, "");
+    let _queue = EnvVarGuard::set("LOTAR_AGENT_QUEUE_DIR", fixtures.get_temp_path().join("queue").to_str().unwrap());
+    fs::write(fixtures.tasks_root.join("automation.yml"), END_RULES).unwrap();
+    let mut storage = fixtures.create_storage();
+    let id = TaskService::create(&mut storage, TaskCreate { title: "Orphan".into(), project: Some("REPO".into()), ..Default::default() }).unwrap().id;
+    orphaned_t3_job(&fixtures, &id, "job-20261112T183646.310Z-5", None);
+    let threads = format!(
+        r#"[{{"threadId":"thread-second","title":"{id} review: Orphan","createdAt":"2026-11-12T18:37:30.000Z"}},
+{{"threadId":"thread-first","title":"{id} Orphan","createdAt":"2026-11-12T18:36:44.020Z"}}]"#
+    );
+    fs::write(home.out.join("threads.json"), threads).unwrap();
+
+    AgentJobService::recover_orphaned_jobs(&fixtures.tasks_root);
+    let job = wait_for_finished_job(&id);
+    assert_eq!(job.status, "failed", "{job:?}");
+    assert!(job.summary.as_deref().is_some_and(|s| s.contains("several threads") && s.contains("thread-first") && s.contains("thread-second")), "{job:?}");
+    assert_eq!(job.session_id, None);
 }
 
 /// DEV-384: the owner's comments reach the ticket's agent through a
