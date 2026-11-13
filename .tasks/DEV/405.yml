@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-13T01:27:46.932016+00:00
-modified: 2026-11-13T01:45:47.606470+00:00
+modified: 2026-11-13T01:48:22.523839+00:00
 relationships:
   related:
   - DEV-403
@@ -19,6 +19,9 @@ comments:
 - date: 2026-11-13T01:45:47.455461+00:00
   author: automation
   text: The merge agent's job job-20261113T013914.147Z-17 failed (lotar agent logs job-20261113T013914.147Z-17); the fix agent retries it on branch agent/DEV-405.
+- date: 2026-11-13T01:48:22.523839+00:00
+  author: claude
+  text: 'Owner decision 2026-11-12: ''If a default reporter is set then that''s the reporter. If an agent makes a mistake then that''s just something we have to deal with hopefully agents won''t make this mistake or we need to set up the general environment so that the default is the agent and I''m only default on the server instances.'' So a new ticket without --reporter gets the configured default.reporter (project above env); comment author and history actor stay the writing process (LOTAR_DEFAULT_REPORTER). Rebasing onto main with that.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aae6d836d-243c-436c-846b-76d44e457c63
 description: 'Found 2026-11-13 in quarter-inch-studio (lotar 0.14.1): its .tasks/config.yml and .tasks/QIS/config.yml set default.reporter: mallox. lotar comment QIS-55 ... run with LOTAR_DEFAULT_REPORTER=claude stored author mallox. With standards'' rule ''Comments: the owner''s comment reaches the agent'' (comment author mallox starts the ticket''s agent, STD-56), every agent comment there started an agent: QIS-55 and QIS-170 each got a job from a closing note. The rule is switched off in QIS for now. docs/help/config.md says project configuration outranks env for merged defaults; for who wrote a comment (and the history''s actor), the explicit environment variable of the process writing it should win over a project''s default, since the default is for tickets people create without naming a reporter. Check: in a scratch repo with default.reporter: alice in the project config, LOTAR_DEFAULT_REPORTER=bob lotar comment X-1 hi stores author bob. Done: that, with a test; docs (identity.md, config.md precedence) say which identity a comment and a history entry get; the reporter of a new ticket follows the documented precedence.'
@@ -83,3 +86,7 @@ history:
   - field: assignee
     old: '@merge'
     new: mallox
+- at: 2026-11-13T01:48:22.523839+00:00
+  actor: claude
+  changes:
+  - field: comment_added
