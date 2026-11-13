@@ -1,0 +1,94 @@
+title: Version-fields UI smoke intermittently fails under full-suite load
+status: Merging
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@merge'
+created: 2026-11-13T20:12:31.295335+00:00
+modified: 2026-11-13T20:46:51.918507+00:00
+relationships:
+  related:
+  - DEV-481
+  - DEV-243
+comments:
+- date: 2026-11-13T20:38:53.056699+00:00
+  author: claude
+  text: 'Reproduced and fixed in fa738a66. Failure (1 of 12 three-file runs under load): locator.waitFor timed out on bulk-field-dialog at the second setField(''product'', ''''). Cause: after a bulk update the Tasks list refreshes the same query in the background; while it ran, selectionReady was false (it also required !loading), so the selection counted as empty and Bulk actions / Set field were disabled, and a click in that window was dropped. A real UI flaw, not test timing. Fix: view/pages/TasksList.vue selectionReady now requires only that the current filter has loaded (and no error); a new filter still waits for its rows (DEV-243 holds). The smoke now holds that background /api/tasks/list refresh and opens Set field while it is held: it failed before the fix (Bulk actions disabled for 30s) and passes after. Checks: npm run lint ok; npm run test:agent ok (2137 Rust, 1515 UI, release, hooks); version-fields + global-actions + query-isolation smokes 3/3; npm run test:smoke:agent 390/390 three times. Also seen while looping: harness.server.smoke.spec.ts:409 registry race, already fixed in DEV-481 (3784d308), so no new ticket.'
+- date: 2026-11-13T20:41:33.530752+00:00
+  author: codex
+  text: 'Review: passed. Reviewed fa738a66, both changed files, ticket/comments, DEV-243 and DEV-481, repository guidance, recent main history and query-store refresh behavior. No findings or new tickets. Retained query membership supports background selection; filter-generation invalidation still gates new filters. Regression test holds the request open without retries; pre-fix failure is documented by the fix agent. Reran frontend/smoke typechecking successfully, fresh smoke build with RUSTC_WRAPPER=, and all 10 version-fields/global-actions/query-isolation smoke tests passed with local-server execution permission. Initial sandbox attempts failed on sccache and server binding. Full lint/test/full-suite repetitions were not repeated; prior successes are recorded in the fix comment. No files changed, no commits, status and assignee unchanged. No durable guidance finding.'
+- date: 2026-11-13T20:46:51.918507+00:00
+  author: codex
+  text: 'Merged: rebased fa738a66 onto main without conflicts as 3dce9bbc, fast-forwarded main, then included pending .tasks updates as instructed in signed commit 4952b956. Required checks passed on rebased code: lint:agent; test:agent (2137 Rust, 1515 UI, release/hook tests); test:smoke:agent 390/390. Post-merge health check npm run test:smoke:agent on main also passed 390/390. RUSTC_WRAPPER= used for sandbox-incompatible sccache. Nothing skipped. Not pushed: earliest unpushed commit 7d85722b belongs to STD-88, currently Blocked; later commits include STD-95, currently Todo, so no finished prefix can be pushed. Status/assignee unchanged; job automation moves ticket to Done. No guidance changes.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A23ed9780-d027-48c4-8a0a-8fd0017ba71e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5b289ff8-a3f4-42ab-a916-d0dcc19ae2a3
+description: 'Found in DEV-481 on 2026-11-13: one full npm run test:smoke:agent run failed 389/390 at ui.version-fields.smoke.spec.ts ''sets and clears a field on the selected tasks and keeps their other fields''. That output did not keep the assertion. The file alone passed 3 of 3 runs and the next full smoke run passed 390/390. Check: npm run test:smoke:agent repeatedly under concurrent agent activity and save the failure output. Done when the race is reproduced and fixed without masking a behavior failure.'
+tags:
+- health
+custom_fields:
+  finding: smoke-flake:ui.version-fields-bulk-set
+history:
+- at: 2026-11-13T20:12:31.408736+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-481"]}'
+- at: 2026-11-13T20:12:31.533380+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T20:12:31.869477+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T20:12:32.538651+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A23ed9780-d027-48c4-8a0a-8fd0017ba71e
+- at: 2026-11-13T20:38:53.056699+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T20:38:53.268941+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-481"]}'
+    new: '{"related":["DEV-481","DEV-243"]}'
+- at: 2026-11-13T20:39:11.363838+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T20:39:12.715884+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5b289ff8-a3f4-42ab-a916-d0dcc19ae2a3
+- at: 2026-11-13T20:41:33.530752+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T20:41:38.233830+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-13T20:46:51.918507+00:00
+  actor: codex
+  changes:
+  - field: comment_added

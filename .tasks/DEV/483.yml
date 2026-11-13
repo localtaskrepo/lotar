@@ -1,0 +1,66 @@
+title: Soft-delete UI smoke intermittently misses the deleted task row
+status: HelpNeeded
+priority: Medium
+type: Feature
+reporter: claude
+assignee: mallox
+created: 2026-11-13T20:12:30.897761+00:00
+modified: 2026-11-13T20:29:45.817948+00:00
+relationships:
+  related:
+  - DEV-467
+  - DEV-481
+comments:
+- date: 2026-11-13T20:29:25.139447+00:00
+  author: claude
+  text: 'Not reproduced, so no fix (2026-11-13). Runs: 5 full smoke runs (npm run test:smoke:quick:agent, 390/390 each; 4 of them with yes on every core, one alongside 6 parallel copies of the spec), 24 targeted runs of the test under full CPU load, and runs that widen each race window: 1.5s delays on /api/tasks/get, include_deleted gets, active and trash /api/tasks/list, /api/config; random 0-4s delivery delays on task_updated/task_deleted SSE events; Chrome CPU throttling 4x-30x; and all combined. Every run passed. Read and ruled out: store guards (applyResponseEntity/markDeleted/deletionRevisions keep the local entity deleted, the trash refresh replaces stub entities), the FilterBar to TasksList filter flow (debounce, lastFilterJson, filterGeneration, route watcher), panel close and lifecycle reload, the server''s content-validated parse cache and the per-run server reaper. The original failure left no trace, screenshot or console, and the DEV-481 thread holds no more detail. No commit; worktree clean.'
+- date: 2026-11-13T20:29:25.238897+00:00
+  author: claude
+  text: 'Question for mallox: should I add a failure dump to this smoke test (on a failed poll at :176 it saves the page URL, the Task visibility value, the table text, the received SSE events, the trash list API response and the browser console under target/smoke-artifacts/soft-delete/) and keep the ticket open until the flake recurs with that evidence, or close it as not reproducible?'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4250e962-63f4-4869-b0f2-953cfb334415
+description: 'Found in DEV-481 (first seen in DEV-467 verification, 2026-11-13): ui.soft-delete.smoke.spec.ts:176 timed out (15s poll budget) waiting for the deleted task row after switching Task visibility to Deleted tasks, during a full smoke run under concurrent agent load. Not reproduced: 5 sequential runs plus 6 parallel runs under full CPU load (yes on every core) all passed. Ruled out by reading the code: a repeat task_deleted SSE event (useTaskStore markDeleted is idempotent) and the Escape/taskPanel route change (the route watcher ignores taskPanel). Check: npm run test:smoke:agent under concurrent agent activity; on failure keep the Playwright trace/screenshot and the browser console. Done when the cause is found and fixed, without masking it with a longer timeout.'
+tags:
+- health
+custom_fields:
+  finding: smoke-flake:ui.soft-delete-trash-row
+history:
+- at: 2026-11-13T20:12:31.040076+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-467","DEV-481"]}'
+- at: 2026-11-13T20:12:31.175857+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T20:12:31.645653+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T20:12:32.347567+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4250e962-63f4-4869-b0f2-953cfb334415
+- at: 2026-11-13T20:29:25.139447+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T20:29:25.238897+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T20:29:45.817948+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox

@@ -938,9 +938,9 @@ type PagingUpdate = {
 let filterGeneration = 0
 let hydrateQueue: Promise<void> = Promise.resolve()
 const loadedFilterGeneration = ref(-1)
-const selectionReady = computed(
-  () => loadedFilterGeneration.value === filterGeneration && !loading.value && !error.value,
-)
+// A background refresh of the loaded filter keeps its rows and the selection
+// on them; only a new filter waits for its rows (DEV-484).
+const selectionReady = computed(() => loadedFilterGeneration.value === filterGeneration && !error.value)
 
 async function applyFilter(raw: Record<string, string>, nav: NavMode = 'push', paging: PagingUpdate = {}) {
   const request = ++filterGeneration

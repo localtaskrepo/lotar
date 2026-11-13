@@ -5,16 +5,21 @@ type: Bug
 reporter: codex
 assignee: '@fix'
 created: 2026-11-13T19:35:44.905131+00:00
-modified: 2026-11-13T19:36:50.837570+00:00
+modified: 2026-11-13T20:12:42.464363+00:00
 relationships:
   related:
   - DEV-467
   - DEV-471
   - DEV-477
+  - DEV-483
+  - DEV-484
 comments:
 - date: 2026-11-13T19:36:50.553507+00:00
   author: claude
   text: 'Seen again 2026-11-13 in DEV-477 rework: test:smoke:agent 389/390, harness.server.smoke.spec.ts:409 killed-run registry still present; the spec alone passed 3/3 and a full rerun passed 390/390.'
+- date: 2026-11-13T20:12:42.464363+00:00
+  author: claude
+  text: 'Fixed 2 of the 3 flakes in commit 3784d308. (1) merge_jobs_are_serialized_even_with_parallel_slots: the stub agent used sleep 1, and the test waited only 1.5s for the first job to reach running, so a slow worktree startup failed it. The stub now waits on a release file (bounded at ~30s, opened by a Drop guard). The test checks that the second job is still queued while the first runs, then opens the gate. The serialization check is now stronger, not just given a longer timeout. (2) harness.server.smoke.spec.ts:409: the reaper kills the servers and only then removes the registry, but the test checked the registry as soon as the server exited. It now polls until the registry is gone. (3) ui.soft-delete:176 did not reproduce in 5 sequential and 6 parallel runs under full CPU load, and reading the code found no cause, so it is filed as DEV-483 rather than masked. A new flake seen once in ui.version-fields under full load is filed as DEV-484. Checks: npm run lint ok, npm run test:agent ok (2133 Rust tests plus UI, release and hooks), npm run test:smoke:agent 389/390 (the DEV-484 flake), then 390/390 on rerun.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6c227a71-21a4-46cb-8af4-a68a07438dc9
 description: 'Found during DEV-467 verification on 2026-11-13: initial test:agent failed merge_jobs_are_serialized_even_with_parallel_slots at tests/agent_automation_integration_test.rs:2637 waiting 1500ms for running; full retry passed all 2139 Rust tests. First smoke run passed 389/390 but harness.server.smoke.spec.ts:409 found a killed-run registry still present. Second smoke run passed 389/390 but ui.soft-delete.smoke.spec.ts:176 timed out waiting for the deleted task row. These are observed intermittent verification failures, not established product root causes. Check: npm run test:agent and npm run test:smoke:agent under concurrent agent activity. Done when the timing and cleanup races are reproduced and corrected without masking behavior failures. Related DEV-467 and DEV-471.'
@@ -61,3 +66,19 @@ history:
   - field: relationships
     old: '{"related":["DEV-467","DEV-471"]}'
     new: '{"related":["DEV-467","DEV-471","DEV-477"]}'
+- at: 2026-11-13T20:12:31.039869+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-467","DEV-471","DEV-477"]}'
+    new: '{"related":["DEV-467","DEV-471","DEV-477","DEV-483"]}'
+- at: 2026-11-13T20:12:31.408359+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-467","DEV-471","DEV-477","DEV-483"]}'
+    new: '{"related":["DEV-467","DEV-471","DEV-477","DEV-483","DEV-484"]}'
+- at: 2026-11-13T20:12:42.464363+00:00
+  actor: claude
+  changes:
+  - field: comment_added

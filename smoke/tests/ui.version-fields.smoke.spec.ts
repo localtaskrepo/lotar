@@ -1,6 +1,7 @@
 import fs from 'fs-extra';
 import path from 'node:path';
 import { parse, stringify } from 'yaml';
+import type { Route } from '@playwright/test';
 import { describe, it } from 'vitest';
 import { startLotarServer } from '../helpers/server.js';
 import { withPage } from '../helpers/ui.js';
@@ -151,6 +152,14 @@ describe.concurrent('UI version fields (DEV-373)', () => {
                         .toContain('"soon" is not a version');
                     expect(await page.getByTestId('bulk-field-submit').isDisabled()).toBe(true);
                     await page.screenshot({ path: path.join(artifacts, 'bulk-set-field.png'), animations: 'disabled' });
+                    // The update makes the list refresh in the background. Hold that
+                    // refresh: the selection stays usable meanwhile (DEV-484).
+                    const held: Route[] = [];
+                    let hold = true;
+                    await page.route('**/api/tasks/list*', async (route) => {
+                        if (hold) held.push(route);
+                        else await route.continue();
+                    });
                     await page.getByTestId('bulk-field-value').fill('v0.14.0');
                     await page.getByTestId('bulk-field-submit').click();
                     await dialog.waitFor({ state: 'hidden' });
@@ -159,8 +168,11 @@ describe.concurrent('UI version fields (DEV-373)', () => {
                         .toEqual({ affects: '0.14.0', product: 'web' });
                     await expect.poll(() => fields('VER-3')).toEqual({ affects: '0.14.0', product: 'web' });
                     expect(await fields('VER-2')).toEqual({ affects: '0.13', product: 'web' });
+                    await expect.poll(() => held.length).toBeGreaterThan(0);
 
                     await setField('product', '');
+                    hold = false;
+                    for (const route of held) await route.continue();
                     await expect
                         .poll(() => page.getByTestId('bulk-field-submit').textContent())
                         .toContain('Clear field');

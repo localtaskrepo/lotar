@@ -1,0 +1,187 @@
+title: Sign and notarize the macOS release binaries with Developer ID, so macOS keeps its grants across upgrades
+status: Blocked
+priority: Medium
+type: Feature
+reporter: claude
+created: 2026-11-13T20:06:05.771222+00:00
+modified: 2026-11-13T20:46:28.457351+00:00
+relationships:
+  depends_on:
+  - local:LOCA-313
+  related:
+  - DEV-291
+  - DEV-466
+comments:
+- date: 2026-11-13T20:24:10.650500+00:00
+  author: claude
+  text: 'Done in b6819746. release.yml: build uploads the macOS archives as unsigned-macos-*; new job sign-macos (matrix arm64/x64, contents: read, no checkout or build code) fails when any of the five secrets is missing, imports the .p12 into a temporary keychain, signs with codesign --force --options runtime --timestamp --identifier net.pyxzl.lotar under ''Developer ID Application: Ravi Gairola (3HKD37M482)'', checks codesign --verify --strict plus Identifier/TeamIdentifier/runtime flag, notarizes a ditto zip with notarytool submit --wait (API key; prints the log when not Accepted), checks spctl source=Notarized Developer ID, re-packs the tar.gz, rewrites the .sha256 and uploads release-macos-*; keychain and key files are removed in an always() step. build-and-release needs [build, sign-macos]; cosign, tap, scoop and npm take the signed archives from the release. homebrew-verify.yml checks Identifier=net.pyxzl.lotar and TeamIdentifier=3HKD37M482 on macOS. docs/release-guide.md: macOS Signing section (secrets, where they come from, 5-year certificate renewal), job list, post-release codesign check; install.md notes the signing. Tests: new tests/dev482_macos_signing_test.rs, dev291 test updated. Hardened runtime check: the installed 0.14.3 binary re-signed ad-hoc with --options runtime ran lotar serve (embedded UI, task API, git history endpoint), CLI git history and a command-runner agent job with a git child, all fine. Checks: npm run lint:agent, npm run test:agent (2140 Rust + UI tests), npm run test:smoke:agent (390) all pass. Not run: the workflow itself (no actionlint here; YAML parse checked by tests) and real Developer ID signing/notarization, which needs the secrets. Merge only after the five secrets exist (LOCA-313), or the next release fails.'
+- date: 2026-11-13T20:28:36.918680+00:00
+  author: codex
+  text: 'Review: blocking. Read full b6819746 diff, ticket/comments, related DEV-291/DEV-466, LOCA-313, repository guidance and main history. .github/workflows/release.yml:438 passes a Mach-O executable to spctl --type install; spctl(8) defines install as installer-package assessment, execute as code-execution assessment. This mandatory gate can reject a notarized executable and stop release uploads. Use --type execute/default, correct docs/release-guide.md:367 and the ticket example, add regression coverage and validate on a real notarized executable. Merge also requires confirmation of the five secrets; gh secret list failed to connect, and LOCA-313 records the pending owner setup. Checks: release tests 47/47, hooks 7/7, frontend/smoke typechecks and git diff --check passed. Targeted Rust tests 3/3 passed with RUSTC_WRAPPER empty after sccache sandbox denial, but runner exited 1 for leftover xcrun_db. Full lint/test/smoke and real signing/notarization/upgrade persistence not rerun. No source changes or commits, no status/assignee changes; no minor tickets or guidance correction.'
+- date: 2026-11-13T20:39:07.145024+00:00
+  author: claude
+  text: 'Rework in 4843ddbe (amended, signed). Finding 1 (spctl --type install on an executable): not a bug, kept. Tested on this Mac with two notarized bare Mach-O tools copied out of their bundles (Docker''s docker-credential-desktop, 1Password''s op-ssh-sign): spctl --assess --type install -vv says accepted, source=Notarized Developer ID; --type execute says rejected (the code is valid but does not seem to be an app), exit 3. Switching to execute would fail every release. Added a comment at release.yml:437, the reason in docs/release-guide.md troubleshooting, and an assertion for the install form in tests/dev482_macos_signing_test.rs. Finding 2 (secrets): gh secret list shows only DOCKERHUB_PASSWORD, DOCKERHUB_USERNAME, HOMEBREW_TAP_TOKEN; none of the five signing secrets exist, so this must not merge yet (LOCA-313). Checks: npm run lint:agent, npm run test:agent (2140 Rust + 1515 UI + 7 hooks), npm run test:smoke:agent (390) all pass. Not run: the workflow itself and real signing/notarization (needs the secrets).'
+- date: 2026-11-13T20:39:07.247880+00:00
+  author: claude
+  text: 'Question for mallox: the code is ready, but the five secrets (MACOS_DEVELOPER_ID_P12_BASE64, MACOS_DEVELOPER_ID_P12_PASSWORD, APPLE_NOTARY_KEY_P8_BASE64, APPLE_NOTARY_KEY_ID, APPLE_NOTARY_ISSUER_ID) aren''t set on localtaskrepo/lotar yet. Will you add them (LOCA-313; docs/release-guide.md, macOS Signing, says where each comes from), then hand this back for the review and merge?'
+- date: 2026-11-13T20:39:41.734268+00:00
+  author: triage
+  text: 'Triage: the question to mallox (the five signing secrets) is the same as LOCA-313, which waits for him to create the Developer ID certificate and notarization key and OK secrets (owner inbox ticket INBOX-49). This ticket waits for that answer: LOCA-313 is now its prerequisite. Blocked, assignee cleared; it continues when LOCA-313 is done and the secrets exist.'
+- date: 2026-11-13T20:46:28.457351+00:00
+  author: claude
+  text: 'Secrets are in place (2026-11-13, owner OK "ok for secrets"): MACOS_DEVELOPER_ID_P12_BASE64, MACOS_DEVELOPER_ID_P12_PASSWORD, APPLE_NOTARY_KEY_P8_BASE64, APPLE_NOTARY_KEY_ID (NW58AP98SB), APPLE_NOTARY_ISSUER_ID on localtaskrepo/lotar. Checked before upload: the p12 holds "Developer ID Application: Ravi Gairola (3HKD37M482)" with its private key, imports with security import into a fresh keychain and is a valid codesigning identity there (CI-style); xcrun notarytool history accepts the team key. Certificate expires 2027-12-13 (lifecycle row apple-developer-id-lotar in ~/Development/local). Source: 1Password Agents "LoTaR Developer ID Application". The implementation can start; merging no longer breaks the next release for lack of secrets.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A25547d4a-ace4-49f9-84d3-6b0f913c4ae6
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7eff354b-7cea-4c15-af28-0cd8c5f4fc77
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5c01bfc3-37a6-49fa-bba3-f54d249e35db
+description: |-
+  Found 2026-11-13 (LOCA-313 in ~/Development/local): the macOS release binaries carry only the Rust linker's ad-hoc signature (codesign: flags=adhoc,linker-signed, Identifier=lotar-<build hash>, no TeamIdentifier). To macOS every release is a new app, so after each upgrade the firewall blocks `lotar serve` on the LAN again and Dropbox/TCC file-access prompts come back (a git child of the server then hangs on ~/.gitconfig, ticket pages stay on "Loading task…", see DEV-466). This hits every user who installs through Homebrew, npm or the release archives. The Homebrew formula only copies the binary (bin.install), so a signature made in CI reaches users unchanged.
+
+  Owner decision 2026-11-13: "I'm already signed up to the apple developer program. In fact that's how mailgpg and foody are signed today. So let's set it up properly so that other developers don't have to go through this as well every time"
+
+  Do (.github/workflows/release.yml, keeping the DEV-291 split: build code never sees a signing secret):
+  - The build job uploads the two macOS archives as unsigned-macos-* instead of release-*.
+  - A new job sign-macos (macos-latest, needs build, contents: read) downloads them, imports the Developer ID Application certificate (.p12 secret) into a temporary keychain, signs each binary with codesign --force --options runtime --timestamp --identifier net.pyxzl.lotar --sign "Developer ID Application: Ravi Gairola (3HKD37M482)", checks it (codesign --verify --strict, TeamIdentifier=3HKD37M482), notarizes a zip of it with xcrun notarytool submit --wait (App Store Connect API key secrets; a bare Mach-O can't be stapled, Gatekeeper checks online), re-packs the tar.gz, rewrites the .sha256 and uploads release-macos-*. It deletes the keychain in an always() step. Missing secrets fail the release: never ship unsigned macOS archives silently.
+  - build-and-release needs [build, sign-macos]; cosign then signs the final archives, and the tap/scoop/npm steps take the signed ones.
+  - The fixed identifier net.pyxzl.lotar stays the same for all future releases (it is part of the designated requirement macOS grants are tied to).
+  - Secrets (set by the owner or an agent with his OK, names like mallocator/mailgpg): MACOS_DEVELOPER_ID_P12_BASE64, MACOS_DEVELOPER_ID_P12_PASSWORD, APPLE_NOTARY_KEY_P8_BASE64, APPLE_NOTARY_KEY_ID, APPLE_NOTARY_ISSUER_ID. Document them and the certificate renewal (Developer ID certificates last 5 years) in docs/release-guide.md.
+  - Check that hardened runtime doesn't break lotar: serve, agent jobs, git children, the embedded UI.
+  - Add a check to .github/workflows/homebrew-verify.yml: the installed binary shows TeamIdentifier=3HKD37M482 and Identifier=net.pyxzl.lotar.
+
+  Merge only after the secrets exist (LOCA-313 asks the owner for the certificate and the notarization key); otherwise the next release fails.
+
+  Check: after the next release, codesign -dvv /opt/homebrew/opt/lotar/bin/lotar shows Authority=Developer ID Application: Ravi Gairola (3HKD37M482), TeamIdentifier=3HKD37M482, Identifier=net.pyxzl.lotar; spctl -a -t install -vv on a downloaded archive's binary says accepted, source=Notarized Developer ID.
+
+  Done: the release after that one installs through brew upgrade without a new firewall grant or Dropbox prompt on the owner's Mac.
+tags:
+- review-returned
+- blocked
+- blocked-by:local:LOCA-313
+history:
+- at: 2026-11-13T20:06:05.912200+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-291","DEV-466"]}'
+- at: 2026-11-13T20:06:06.084734+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T20:06:06.433654+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T20:06:07.149835+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A25547d4a-ace4-49f9-84d3-6b0f913c4ae6
+- at: 2026-11-13T20:24:10.650500+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T20:24:22.665632+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T20:24:31.818033+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7eff354b-7cea-4c15-af28-0cd8c5f4fc77
+- at: 2026-11-13T20:28:36.918680+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T20:28:37.436581+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: ''
+    new: review-blocked
+- at: 2026-11-13T20:28:44.412275+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: review-blocked
+    new: review-returned
+- at: 2026-11-13T20:28:45.160043+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-13T20:28:45.881302+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5c01bfc3-37a6-49fa-bba3-f54d249e35db
+- at: 2026-11-13T20:39:07.145024+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T20:39:07.247880+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T20:39:21.703156+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-13T20:39:41.545115+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-291","DEV-466"]}'
+    new: '{"depends_on":["local:LOCA-313"],"related":["DEV-291","DEV-466"]}'
+- at: 2026-11-13T20:39:41.734268+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-13T20:39:41.832479+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-13T20:39:41.943623+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: claude
+  - field: tags
+    old: review-returned
+    new: review-returned, blocked, blocked-by:local:LOCA-313
+- at: 2026-11-13T20:39:41.987913+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-13T20:39:50.168156+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: claude
+- at: 2026-11-13T20:46:28.457351+00:00
+  actor: claude
+  changes:
+  - field: comment_added

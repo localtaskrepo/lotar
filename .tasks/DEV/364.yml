@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T05:21:54.615269+00:00
-modified: 2026-11-13T08:30:37.996308+00:00
+modified: 2026-11-13T20:13:06.845394+00:00
 relationships:
   depends_on:
   - DEV-372
@@ -47,6 +47,9 @@ comments:
 - date: 2026-11-13T08:30:37.996308+00:00
   author: claude
   text: 'Reporter thread told 2026-11-13 (from DEV-460): sent the thread ''Split Repo Binaries to Skip CI Builds'' (t3-thread b51ca0ac) the release v0.14.0, fix 66c7060, what the cleanup_paths setting does and that T3 thread worktrees are STD-41''s. The last done item is finished; nothing remains open.'
+- date: 2026-11-13T20:13:06.845394+00:00
+  author: claude
+  text: 'cleanup_paths: [target] removed from .tasks/DEV/config.yml (owner 2026-11-13, standards STD-95): deleting target/ at every job end made each review, merge and rework rebuild lotar''s own crate. Build output now stays until Done (cleanup_on_done), and lotar runs at most 2 jobs at a time.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa38f4398-ffb1-4376-9c12-47e5507a143c
 - link: t3-thread://v2/d834978d-9e75-43fb-ba01-45747238fc44/b51ca0ac-1980-485f-a905-ffe6a2c807e5
@@ -414,6 +417,10 @@ history:
     old: '{"depends_on":["DEV-372"],"related":["DEV-343","DEV-358","DEV-366","DEV-370","DEV-369","DEV-373","DEV-375","DEV-396","DEV-460","DEV-423"]}'
     new: '{"depends_on":["DEV-372"],"related":["DEV-343","DEV-358","DEV-366","DEV-370","DEV-369","DEV-373","DEV-375","DEV-396","DEV-460","DEV-423","DEV-446"]}'
 - at: 2026-11-13T08:30:37.996308+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T20:13:06.845394+00:00
   actor: claude
   changes:
   - field: comment_added

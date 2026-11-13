@@ -1,11 +1,11 @@
 title: 'A taken-over session: continue t3 job fails: its thread id isn''t in the active-job record'
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T19:28:50.779737+00:00
-modified: 2026-11-13T19:55:10.668605+00:00
+modified: 2026-11-13T20:00:58.428828+00:00
 relationships:
   related:
   - DEV-478
@@ -22,6 +22,9 @@ comments:
 - date: 2026-11-13T19:55:04.044163+00:00
   author: codex
   text: 'Review: passed. Reviewed amended diff, ticket comments, related DEV-478, recent main history, registration ordering and recovery. No findings. Test now waits during running state then uses interrupted outcome. Targeted Rust: 23 passed; runner exit 1 for leftover xcrun_db (sccache sandbox denial retried with RUSTC_WRAPPER=). git diff --check passed. Full lint/UI/smoke not rerun. No files, commits, status or assignee changed. No minor tickets or durable guidance findings.'
+- date: 2026-11-13T20:00:53.076914+00:00
+  author: codex
+  text: 'Merged into main: rebased 195a5deb to 867f0574, preserving main optional-session helper, fast-forwarded then amended requested .tasks changes as a6c7d17e. Passed lint:agent, test:agent (2137 Rust plus UI/release/hooks), test:smoke:agent (390), and takeover regression on main (1 passed). Sandbox socket denial resolved by unrestricted rerun. Pushed finished prefix through 91013e15 only; later commits including this ticket wait behind STD-88 (Blocked) and DEV-478 (HelpNeeded). No status or assignee changes; automation moves ticket when job ends. No durable guidance finding.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af90f5fc4-327f-4386-a5a4-1dcdcea75c0a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A404f0f42-47f6-4ea1-ad87-97dea878a58b
@@ -30,7 +33,6 @@ references:
 description: 'Found while doing DEV-478: on_t3_thread_continued (src/services/agent_job_service.rs) sets the job''s session_id in memory but never calls agent_active_jobs::set_session, so a process that takes the job over has no thread id. The DEV-478 lookup can''t help, because it only finds threads created after the job started. Check: a continue job whose worker dies ends from the continued thread''s state, not from the run before it. Done when a test covers this takeover.'
 tags:
 - health
-- review-returned
 custom_fields:
   finding: review:continued-t3-thread-takeover
 history:
@@ -135,3 +137,16 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-13T20:00:53.076914+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T20:00:58.428828+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, review-returned
+    new: health

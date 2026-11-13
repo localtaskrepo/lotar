@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: claude
 created: 2026-11-13T10:33:47.286204+00:00
-modified: 2026-11-13T19:37:32.304459+00:00
+modified: 2026-11-13T20:12:31.038872+00:00
 relationships:
   related:
   - DEV-401
@@ -25,6 +25,7 @@ relationships:
   - DEV-478
   - DEV-479
   - DEV-481
+  - DEV-483
 comments:
 - date: 2026-11-13T10:37:16.946574+00:00
   author: claude
@@ -545,3 +546,9 @@ history:
   - field: tags
     old: health, review-returned, merge-retried, review-blocked
     new: 'health, review-returned, merge-retried, review-blocked, blocked, blocked-by:dependency graph unavailable: Validation error: Validation error: Relationship snapshot unavailable: lock /Users/mallox/Development/@localtaskrepo/lotar/.tasks/@sprints/.sprints.lock is busy or unsupported: Resource temporarily unavailable (os error 35); still busy after the 500 ms snapshot wait budget; retry after the writer finishes'
+- at: 2026-11-13T20:12:31.038872+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481"]}'
+    new: '{"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483"]}'

@@ -5,7 +5,10 @@ type: Bug
 reporter: mallox
 assignee: mallox
 created: 2026-10-29T22:27:42.103246+00:00
-modified: 2026-10-30T00:51:09.218551+00:00
+modified: 2026-11-13T20:38:53.268708+00:00
+relationships:
+  related:
+  - DEV-484
 comments:
 - date: 2026-10-30T00:39:27.216748+00:00
   text: 'Cause: opening Tasks filled in the default project, which scheduled a debounced reload 150ms later even though the same filter had just been loaded; that reload reset the selection state mid-click. Fixed: the debounced reload re-checks the loaded filter (page now loads tasks once, verified in a browser), and a tick made while the list is loading now visibly clears instead of staying ticked (ticks on a loading list stay rejected so bulk actions never hit rows of the previous list). ui.global-actions smoke no longer re-ticks. Note: the screenshot that was attached here belonged to DEV-245 and was moved there.'
@@ -48,3 +51,9 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-13T20:38:53.268708+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-484"]}'
