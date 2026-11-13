@@ -1,17 +1,18 @@
 title: lotar automation run hangs in the lotar repo
-status: InProgress
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T00:06:31.927029+00:00
-modified: 2026-11-13T01:09:10.521107+00:00
+modified: 2026-11-13T01:23:25.821408+00:00
 relationships:
   related:
   - DEV-388
   - DEV-401
   - DEV-123
   - DEV-353
+  - DEV-399
 comments:
 - date: 2026-11-13T00:19:14.550271+00:00
   author: automation
@@ -28,6 +29,9 @@ comments:
 - date: 2026-11-13T01:08:59.006294+00:00
   author: claude
   text: 'claude: Fixed in commit 5b0c1cf on agent/DEV-400. Cause: AutomationService::run_manual read every task on its own with TaskService::get, twice per task (once more for the DEV-388 cross-repo check). Each read loaded all sprints again (following move stubs for every sprint entry) and walked the project tree, about 90 ms per task. In this repo that came to minutes. Fix: run_manual now takes the tasks from one listing (TaskService::list, or the new task_list::select when --select is given), with tombstones skipped and links to moved tasks shown by their current IDs, as a single read did. run_cross_repo_unblocked reads the task again only when a manual action has just changed it. The cross-repo unblocked scan otherwise works as before. Check on the main checkout''s .tasks with the fixed binary: ''Merge agent lifecycle'' --dry-run ends in 0.7 s with the expected validation error (before: killed after 30 s). ''Prerequisites done: continue the waiting ticket'' --dry-run takes 0.7 s, and its JSON output matches the old binary''s exactly (566 checked, entries DEV-123 and DEV-353; the old binary needed minutes). New test performance_test::test_automation_run_over_a_large_repo (600 tasks in 6 sprints) has a 3 s budget: it runs in 0.09 s, while the old binary needed 157 s on the same layout. Checks that passed: npm run lint:agent, npm run test:agent (Rust 2109, UI 1505), npm run test:smoke:agent (385), and the new test with LOTAR_TEST_PERF_BUDGETS=1. The installed /opt/homebrew/bin/lotar is still 0.14.1 without the fix, so the check against the main checkout needs a build with this commit.'
+- date: 2026-11-13T01:23:15.663623+00:00
+  author: claude
+  text: 'claude: Merged. I rebased the fix onto main twice, because main moved during the checks (DEV-401, STD-56, then DEV-399). Main is now at df85817 ''DEV-400 lotar automation run hangs in the lotar repo'', a fast-forward with no merge commit, signed. On the first rebase all checks passed: npm run lint:agent, npm run test:agent, and npm run test:smoke:agent (385 passed). After the second rebase I ran clippy -D warnings, cargo fmt --check, the automation tests (149 passed), and performance_test with LOTAR_TEST_PERF_BUDGETS=1 (19 passed; the new automation_run_x600 test takes 0.18 s). Check on the main checkout with a release build of df85817: ''Merge agent lifecycle'' --dry-run ends in 0.06 s with the expected validation error, and ''Prerequisites done: continue the waiting ticket'' --dry-run ends in 0.05 s (567 checked). The installed /opt/homebrew/bin/lotar is still 0.14.1, so the daily STD-56 job gets the fix only with the next release or install. The agent/DEV-400 branch still points at the pre-rebase 5b0c1cf; its content is in main.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3a430fd3-78b4-4fdb-b726-de027a7cccef
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A45347697-096a-4e97-9c49-12ff2b47b04a
@@ -35,7 +39,6 @@ references:
 description: 'Found 2026-11-12 with lotar 0.14.1 (installed), while setting up STD-56: in ~/Development/@localtaskrepo/lotar, lotar automation run "Merge agent lifecycle" --dry-run printed nothing for 40 s (killed; user 1.6 s, sys 4.6 s, so it waits or does file IO, not CPU), and lotar automation run "Prerequisites done: continue the waiting ticket" --dry-run printed its preview and then did not exit within 60 s (sys 12.9 s). The same ''Merge agent lifecycle'' run in ~/Development/standards (56 tickets) fails at once with ''No rule named ... with a manual or unblocked action'', as it should. Suspect DEV-388''s scan for prerequisites in another repo (it runs on every automation run). Check: time lotar automation run "Merge agent lifecycle" --dry-run in this repo. Done: it ends in a few seconds (the validation error here), a test covers a repo of this size or the slow step, and the cross-repo unblocked scan stays as DEV-388 built it. STD-56 runs this command from a daily job in every repo, so it has to be quick.'
 tags:
 - health
-- fix-retried
 custom_fields:
   finding: automation-run:slow
 history:
@@ -139,3 +142,22 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0652f0f3-09a2-4158-a0a9-445c728db4b8
+- at: 2026-11-13T01:23:15.663623+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T01:23:15.767242+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-388","DEV-401","DEV-123","DEV-353"]}'
+    new: '{"related":["DEV-388","DEV-401","DEV-123","DEV-353","DEV-399"]}'
+- at: 2026-11-13T01:23:25.821408+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: tags
+    old: health, fix-retried
+    new: health

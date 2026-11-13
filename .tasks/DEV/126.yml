@@ -5,7 +5,10 @@ type: Bug
 reporter: mallox
 assignee: mallox
 created: 2026-10-20T03:20:20.913445+00:00
-modified: 2026-10-20T17:44:14.827097+00:00
+modified: 2026-11-13T01:26:36.283420+00:00
+relationships:
+  related:
+  - DEV-404
 comments:
 - date: 2026-10-20T17:27:39.404124+00:00
   text: 'Plan: reproduce project-only default.reporter identity failure through public boundaries, then resolve identity using active/default project configuration with existing precedence. Preserve fallback toggles and @me handling, partition identity cache by project, and make whoami --explain identify the winning configuration tier without changing API shapes. Cover explicit/default projects, isolation/precedence and review-owner behavior. Keep DEV-127 live cache invalidation and DEV-128 review-policy redesign separate. Run targeted tests then full lint/tests/fresh smoke; no Git writes or release operations. Routine user summaries will omit unchanged baseline exclusions; verification details stay in this ticket.'
@@ -45,3 +48,9 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-13T01:26:36.283420+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-404"]}'

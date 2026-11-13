@@ -1,0 +1,57 @@
+title: Project default.reporter overrides LOTAR_DEFAULT_REPORTER as comment author
+status: InProgress
+priority: High
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-13T01:25:40.718079+00:00
+modified: 2026-11-13T01:26:36.284059+00:00
+relationships:
+  related:
+  - DEV-126
+comments:
+- date: 2026-11-13T01:26:35.870717+00:00
+  author: claude
+  text: |-
+    Current behaviour is deliberate: docs/help/precedence.md, identity.md, whoami.md and environment.md all put the project config above env (CLI > project > env > home > global), and DEV-126 tests it (tests/cli_whoami_and_dryrun_test.rs:224-237: project reporters alice/bob beat LOTAR_DEFAULT_REPORTER=environment-user). Only comment.md's wording suggests env wins. So the fix is a precedence decision.
+    Question: should the env var (LOTAR_DEFAULT_REPORTER, and --config) win over project default.reporter for identity (comment author, history actor, @me), while project default.reporter still sets the reporter of new tasks? Or keep the documented order, fix comment.md, and have quarter-inch-studio drop default.reporter from its project config (STD-57)? I'd recommend the first: the env var names who is acting, project config names a default owner.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac3630db6-06aa-4bb6-afd5-8ee580fca286
+description: |-
+  Found 2026-11-12 (claude, QIS-55 fix job), lotar 0.14.1.
+
+  **Repro**
+  1. Project config `.tasks/TST/config.yml` with `default: { reporter: owner1 }`.
+  2. `LOTAR_DEFAULT_REPORTER=claude lotar --tasks-dir <dir> comment TST-1 "hello"`
+  3. The comment has `author: owner1`. Without the project `default.reporter` the same command records `author: claude`.
+
+  **Expected** (lotar comment --help, Identity & Users): the author is `default_reporter` such as `LOTAR_DEFAULT_REPORTER`, before other sources, so `claude`.
+
+  **Impact** In quarter-inch-studio (`default.reporter: mallox`) every agent comment is recorded as the owner, so the standards rule "Comments: the owner's comment reaches the agent" starts jobs on agents' own comments: QIS-55, QIS-33 and QIS-170 reopened from Done, and QIS-55's fix job got its own comment back as an owner comment (loop). Possibly a side effect of the fix for "Identity detection ignores project-level default.reporter". Standards follow-up: STD-57.
+history:
+- at: 2026-11-13T01:25:40.847198+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T01:25:41.286222+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T01:25:41.903392+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac3630db6-06aa-4bb6-afd5-8ee580fca286
+- at: 2026-11-13T01:26:35.870717+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T01:26:36.284059+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-126"]}'

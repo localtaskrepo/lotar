@@ -1,0 +1,39 @@
+title: Comment author ignores LOTAR_DEFAULT_REPORTER when the project sets default.reporter
+status: InProgress
+priority: High
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-13T01:24:37.163521+00:00
+modified: 2026-11-13T01:24:38.704245+00:00
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A358a231a-453a-4405-8dd5-9a240fa727b1
+description: |-
+  ## Found
+  On QIS-170 (quarter-inch-studio), agent comments made with `LOTAR_DEFAULT_REPORTER=claude` were stored as `author: mallox`. QIS's `config.yml` sets `default.reporter: mallox`. The `commented` rule then took each agent comment for an owner comment and started another agent turn: a loop (2026-11-13, lotar 0.14.1).
+
+  ## Reproduce
+  1. Run `git init` in an empty directory, then `lotar --tasks-dir <dir>/.tasks add t --project T`.
+  2. Run `LOTAR_DEFAULT_REPORTER=claude lotar --tasks-dir <dir>/.tasks comment T-1 x`. Result: `author: claude` (correct).
+  3. Add `default: { reporter: mallox }` to `.tasks/T/config.yml` and comment again. Result: `author: mallox` (wrong).
+
+  ## Done when
+  - [ ] `LOTAR_DEFAULT_REPORTER` wins over a project's `default.reporter` for comment authors and history actors (or the agent identity comes from another source that config can't override), with a test.
+  - [ ] Automation prompts that say 'set LOTAR_DEFAULT_REPORTER' produce agent-authored comments in a repo like QIS.
+history:
+- at: 2026-11-13T01:24:37.418176+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T01:24:37.897274+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T01:24:38.704245+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A358a231a-453a-4405-8dd5-9a240fa727b1
