@@ -22,8 +22,7 @@ automation:
             provider: "${{ticket.field:provider}}"
             prompt: &fix-prompt |
               Fix the repo problem in ticket ${{ticket.id}} ("${{ticket.title}}"). Run lotar with
-              LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex), and start each comment with it: lotar
-              doesn't record who wrote a comment yet.
+              LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex): lotar records it as the comment's author.
               1. Read the ticket: what was found, how to check it, what done looks like. Run its check command. If the
                  problem is gone already, say so in a comment and stop. After a failed merge your branch may hold
                  earlier commits (git log <main>..HEAD): build on them.
@@ -71,8 +70,8 @@ automation:
             provider: "${{ticket.field:provider}}"
             prompt: &work-prompt |
               Work ticket ${{ticket.id}} ("${{ticket.title}}"): read it and its relationships, then do it the way this
-              repo's AGENTS.md says, with the tests and checks it names. Start each comment with your agent name: lotar
-              doesn't record who wrote a comment yet. After a failed merge your branch may hold earlier commits
+              repo's AGENTS.md says, with the tests and checks it names. Run lotar with LOTAR_DEFAULT_REPORTER set to
+              your agent name (claude, codex). After a failed merge your branch may hold earlier commits
               (git log <main>..HEAD): build on them; when the work is done already, comment that and stop.
               1. Never delete or discard work that isn't saved elsewhere, and never decide what only the owner decides.
                  Ask the running agents (T3 threads) first; when it still needs him, comment one question, set the
@@ -105,7 +104,7 @@ automation:
               Merge the work for ticket ${{ticket.id}} ("${{ticket.title}}") into the main checkout (<root>, the
               first entry of git worktree list). When this thread did the fix, this turn is the merge: it replaces
               the earlier "Don't merge or push". Your worktree's branch holds the fix agent's commits. Run lotar
-              with LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex), and start each comment with it.
+              with LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex).
               1. Main is the main checkout's current branch (git -C <root> branch --show-current). No commits
                  beyond main (git log <main>..HEAD): comment "nothing to merge" and stop.
               2. Rebase onto main. Resolve a conflict only when you are certain both sides' intent is kept (for
@@ -262,6 +261,70 @@ automation:
         updated:
           remove:
             tags: [merge-retried, fix-retried]
+    # A ticket that waits for others is Blocked and depends on them. When the last one is done its agent continues
+    # (owner 2026-11-12, STD-56: "when a ticket the blocks other tickets is done, it should automatically kick of
+    # agents for those tickets"). tell_agent queues the message to a running job, else starts @fix as the next turn of
+    # the ticket's last T3 thread; agent: fix, because a ticket a merge agent handed back was last assigned to @merge
+    # (lotar DEV-396). Proposals and owner tickets wait for him. A prerequisite in another repo (lotar:DEV-374) can't
+    # notify this one: the daily repos.ts --fix runs this rule in every repo (lotar automation run <name>). No manual
+    # action: a manual run would start every Blocked ticket.
+    - name: "Prerequisites done: continue the waiting ticket"
+      when:
+        all:
+          - status: Blocked
+          - not: { tags: { any: [proposal, owner] } }
+      on:
+        unblocked:
+          agent:
+            model: "${{ticket.field:model}}"
+            provider: "${{ticket.field:provider}}"
+          tell_agent:
+            agent: fix
+            message: |
+              Ticket ${{ticket.id}} ("${{ticket.title}}") waited for ${{unblocked.by}}, which is done now. Run lotar
+              with LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex). Read the ticket and its comments:
+              what it waited to do and what done looks like.
+              - It waited only to run a check against a lotar release ("Release v..."): that release is installed
+                now, lotar --version prints it. Run the check. It passes: comment the check and its result, and stop;
+                change no files, so when your job ends the merge agent finds nothing to merge and closes the ticket.
+                It still fails: comment what you ran and what still fails, set the status to HelpNeeded, assign the
+                ticket to mallox and stop. Don't fix it in this job: the owner decides what comes next.
+              - Otherwise continue the ticket from where it stopped, the way this repo's AGENTS.md says. Commit on
+                your worktree's branch, signed, never with --no-verify, message "${{ticket.id}} ${{ticket.title}}";
+                don't merge or push: the merge agent does that when your job ends. Don't end your turn while tests
+                still run. Comment the outcome: what you changed, the commit hash, the checks that ran.
+              Never delete work that isn't saved elsewhere, and never decide what only the owner decides: then
+              comment one question, set the status to HelpNeeded, assign the ticket to mallox and stop.
+    # The owner's comment on any ticket reaches its agent (owner 2026-11-12, STD-56: "a comment on any tickets kicks of
+    # or queues for an agent, then we should do that as well. Let's do it right from the start"): queued to a running
+    # job, else @fix starts with it as the next turn of the ticket's last T3 thread. Only his comments: an agent's own
+    # would come back to it. An answer that changes nothing sets status and assignee back, so no merge follows.
+    - name: "Comments: the owner's comment reaches the agent"
+      when:
+        comment: { author: mallox }
+      on:
+        commented:
+          agent:
+            model: "${{ticket.field:model}}"
+            provider: "${{ticket.field:provider}}"
+          tell_agent:
+            agent: fix
+            message: |
+              mallox (the owner) commented on ticket ${{ticket.id}} ("${{ticket.title}}"), which was ${{ticket.status}}
+              and assigned to "${{ticket.assignee}}":
+              ${{comment.text}}
+              Run lotar with LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex). Read the ticket and act on
+              his comment:
+              - The ticket was InProgress with an agent (@...) as assignee: this is a further turn of the job that
+                runs on it. Answer in a comment, change the work as he asks and carry on as before.
+              - It answers what the ticket waits for, or asks for a change: do the work the way this repo's AGENTS.md
+                says. Commit on your worktree's branch, signed, never with --no-verify, message "${{ticket.id}}
+                ${{ticket.title}}"; don't merge or push: the merge agent does that when your job ends. Don't end your
+                turn while tests still run. Comment the outcome: what you changed, the commit hash, the checks that ran.
+              - It asks something or needs no change: answer in one comment, then set the status back to
+                ${{ticket.status}} and the assignee back to "${{ticket.assignee}}" (empty: none), so no merge follows.
+              Never delete work that isn't saved elsewhere, and never decide what only he decides: then comment one
+              question, set the status to HelpNeeded, assign the ticket to mallox and stop.
     # Manual: after answering a HelpNeeded question or a failed job. Always pass --select, or every waiting ticket starts.
     - name: "Health: retry with @fix"
       when:
@@ -293,32 +356,3 @@ automation:
           set:
             assignee: "@fix-codex"
           agent: *fix
-    # lotar's own rules (not from standards). A ticket that waits for others is Blocked and depends on them (owner
-    # 2026-11-12, DEV-385: "when a ticket the blocks other tickets is done, it should automatically kick of agents for
-    # those tickets"). Release process (owner 2026-11-11, DEV-370, docs/release-guide.md): a ticket whose check needs
-    # the next release depends on the open "Release vX.Y.Z" ticket, closed after brew upgrade lotar. By hand, for one
-    # ticket: lotar automation run "Prerequisites done: continue the waiting ticket" --select 'id:/^DEV-N$/'.
-    # tell_agent queues the message to a running job, else starts @fix as the next turn of the ticket's last thread.
-    # agent: fix, because a ticket a merge agent handed back was last assigned to @merge, whose finished job sets Done
-    # (DEV-396).
-    - name: "Prerequisites done: continue the waiting ticket"
-      when:
-        status: Blocked
-      on:
-        unblocked: &unblocked
-          agent:
-            model: "${{ticket.field:model}}"
-            provider: "${{ticket.field:provider}}"
-          tell_agent:
-            agent: fix
-            message: |
-              Ticket ${{ticket.id}} ("${{ticket.title}}") waited for ${{ticket.relationships.depends_on[*]}}, which
-              is done now. Run lotar with LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex), and start
-              each comment with it. Read the ticket and its comments: what it waited to do and what done looks like.
-              - It waited for a lotar release ("Release v..."): that release is installed now, lotar --version prints
-                it. Run the check the ticket waits to run against it. It passes: comment the check and its result,
-                and stop; change no files, so when your job ends the merge agent finds nothing to merge and closes
-                the ticket. It still fails: comment what you ran and what still fails, set the status to HelpNeeded,
-                assign the ticket to mallox and stop. Don't fix it in this job: the owner decides what comes next.
-              - It waited for other work: continue the ticket from where it stopped, the way AGENTS.md says.
-        manual: *unblocked

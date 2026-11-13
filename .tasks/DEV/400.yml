@@ -1,0 +1,114 @@
+title: lotar automation run hangs in the lotar repo
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: claude
+created: 2026-11-13T00:06:31.927029+00:00
+modified: 2026-11-13T00:32:28.995141+00:00
+relationships:
+  related:
+  - DEV-388
+  - DEV-401
+comments:
+- date: 2026-11-13T00:19:14.550271+00:00
+  author: automation
+  text: The fix agent's job job-20261113T000634.087Z-2 failed (lotar agent logs job-20261113T000634.087Z-2); @fix-codex retries it on branch agent/DEV-400.
+- date: 2026-11-13T00:25:15.337479+00:00
+  author: codex
+  text: 'codex: Reproduced installed check: 2m26.032s to expected validation error. No edits or commits; tests not run. Original Claude DEV-400 job is still running in another worktree on agent/DEV-400; asked it and coordinator about ownership. Which job should own implementation? Holding retry to avoid overlapping branch changes.'
+- date: 2026-11-13T00:31:34.665279+00:00
+  author: claude
+  text: 'claude: The first job''s thread (Claude, https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3a430fd3-78b4-4fdb-b726-de027a7cccef) is still working: lotar marked its job failed at 00:19 while the thread ran, which started the @fix-codex retry. The Claude thread owns the fix and will hand to @merge itself; the Codex thread stays out. No question for the owner.'
+- date: 2026-11-13T00:32:28.995141+00:00
+  author: claude
+  text: 'claude: still working on this in agent-DEV-400-f9f31fbcdef17ee8 (the coordinator confirmed I own it). The slow part: AutomationService::run_manual calls TaskService::get twice for each of the ~610 tasks, and every get re-resolves config and reloads sprints from all task roots.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3a430fd3-78b4-4fdb-b726-de027a7cccef
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A45347697-096a-4e97-9c49-12ff2b47b04a
+description: 'Found 2026-11-12 with lotar 0.14.1 (installed), while setting up STD-56: in ~/Development/@localtaskrepo/lotar, lotar automation run "Merge agent lifecycle" --dry-run printed nothing for 40 s (killed; user 1.6 s, sys 4.6 s, so it waits or does file IO, not CPU), and lotar automation run "Prerequisites done: continue the waiting ticket" --dry-run printed its preview and then did not exit within 60 s (sys 12.9 s). The same ''Merge agent lifecycle'' run in ~/Development/standards (56 tickets) fails at once with ''No rule named ... with a manual or unblocked action'', as it should. Suspect DEV-388''s scan for prerequisites in another repo (it runs on every automation run). Check: time lotar automation run "Merge agent lifecycle" --dry-run in this repo. Done: it ends in a few seconds (the validation error here), a test covers a repo of this size or the slow step, and the cross-repo unblocked scan stays as DEV-388 built it. STD-56 runs this command from a daily job in every repo, so it has to be quick.'
+tags:
+- health
+- fix-retried
+custom_fields:
+  finding: automation-run:slow
+history:
+- at: 2026-11-13T00:06:32.622726+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-388"]}'
+- at: 2026-11-13T00:06:33.465520+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T00:06:34.419179+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T00:06:39.172892+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3a430fd3-78b4-4fdb-b726-de027a7cccef
+- at: 2026-11-13T00:19:11.798104+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-codex'
+  - field: tags
+    old: health
+    new: health, fix-retried
+- at: 2026-11-13T00:19:14.550271+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-13T00:19:58.423345+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A45347697-096a-4e97-9c49-12ff2b47b04a
+- at: 2026-11-13T00:25:15.337479+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T00:25:44.700990+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-codex'
+    new: mallox
+- at: 2026-11-13T00:31:34.665279+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T00:31:34.994198+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-13T00:31:35.509354+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: claude
+- at: 2026-11-13T00:31:55.001177+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-388"]}'
+    new: '{"related":["DEV-388","DEV-401"]}'
+- at: 2026-11-13T00:32:28.995141+00:00
+  actor: claude
+  changes:
+  - field: comment_added

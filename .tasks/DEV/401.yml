@@ -1,0 +1,70 @@
+title: t3 job marked failed while its thread still runs, so a retry works the same branch
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@merge'
+created: 2026-11-13T00:31:54.569411+00:00
+modified: 2026-11-13T01:06:37.647355+00:00
+relationships:
+  related:
+  - DEV-353
+  - DEV-378
+  - DEV-400
+comments:
+- date: 2026-11-13T01:06:27.963575+00:00
+  author: claude
+  text: |-
+    claude: Fixed in 45767b3 on agent/DEV-401 (signed, not merged).
+
+    Cause: the job log has exit_code 130. Something sent SIGINT to the `t3 thread start --wait` process, and t3 exited while its thread kept running. lotar treated any non-zero exit as the end of the run, so the job failed. finalize_job only gave agent_job_failed a message for commit or merge failures, so a plain exit failure had none.
+
+    Change (src/services/agent_job_service.rs):
+    - When t3 exits with anything other than 0 or 2 and `t3 thread show` reports the thread still running, the job logs 't3 exited (exited with code N) before its thread's run ended.', waits for the run, and then ends from the thread's state: completed, waits for an answer, or failed with the status named. This reuses DEV-378's orphan wait, now pulled out as wait_for_t3_run and t3_run_exit_code. A thread that has already ended keeps t3's exit code, as before.
+    - Every agent_job_failed now carries a reason: LoTaR's commit or merge note, else 'The <runner> runner reported a failure.' or 'The <runner> runner exited with code N.' or '... was ended by a signal.' The agent's own last message stays the summary. The reason becomes the summary only when there is no message.
+    - docs/help/agent.md (T3 Code threads) describes both.
+
+    Checks:
+    - New test a_t3_that_exits_while_its_thread_runs_waits_for_the_run: fake t3 exits 130 while the thread runs, the job stays running, then completes with the thread's reply and runs the job_completed rule (Done). a_failed_run_fails_the_job_with_t3s_error now also asserts the failure event's reason.
+    - npm run lint (lint:agent): clean. npm test (test:agent): 2109 Rust and 1505 UI tests pass, plus the release and hook tests. npm run smoke: 385 of 385 pass.
+    - I didn't rerun the ticket check against a real T3 thread. The historic log of job-20261113T000634.087Z-2 doesn't change.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6f33f02e-8d3e-4f02-8f49-5e779aafd51e
+description: 'Found 2026-11-13 on DEV-400 with lotar 0.14.1: job job-20261113T000634.087Z-2 (t3 runner, Claude) logged agent_job_failed at 00:19:11, with no message, while its T3 thread (mcp:3a430fd3-78b4-4fdb-b726-de027a7cccef) was still running and working (T3 status running, no completedAt). The failure fired ''Fix failed: retry on @fix-codex'', which started a second agent on branch agent/DEV-400 while the first was still on it; the Codex agent noticed, held off and asked who owns the work. Two faults: (1) the job ended as failed while the thread ran (compare DEV-378, DEV-353: T3''s --wait and background work), and (2) the failure event has no reason, so neither the log nor the retry says why. Check: lotar agent logs job-20261113T000634.087Z-2 has agent_job_failed with no message while t3 thread mcp:3a430fd3-... was running at that time. Done: a t3 job whose thread still runs is not reported as failed (it waits, or ends with a status that starts no retry), every agent_job_failed carries its reason, with tests.'
+tags:
+- health
+custom_fields:
+  finding: agent-job:false-failure
+history:
+- at: 2026-11-13T00:31:55.002206+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-353","DEV-378","DEV-400"]}'
+- at: 2026-11-13T00:31:55.412031+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T00:31:56.447591+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T00:32:01.201161+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6f33f02e-8d3e-4f02-8f49-5e779aafd51e
+- at: 2026-11-13T01:06:27.963575+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T01:06:37.647355+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'

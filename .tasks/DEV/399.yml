@@ -5,12 +5,14 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-12T23:59:31.409842+00:00
-modified: 2026-11-12T23:59:32.862902+00:00
+modified: 2026-11-12T23:59:38.126767+00:00
 relationships:
   related:
   - DEV-374
   - DEV-388
   - DEV-389
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa7b76f2-f98f-41b4-839c-9462ebd77970
 description: 'Found while releasing v0.14.1 (DEV-374): npm run smoke on 8d0dedb failed 8 of 385 at load average 34 on 14 cores, all timeouts: harness.server.smoke.spec.ts (5 tests, ''server did not advertise readiness within 5000ms'' where the test expects a specific failure), fixtures.agent.smoke.spec.ts (gate agent: started-probe.sentinel not seen in 10 s), api.automation.smoke.spec.ts (descendant-held stderr within the bounded grace), ui.board-state.smoke.spec.ts (expected 400, got 368: scroll position). The four files passed 36/36 on a re-run right after, and the full suite passed for the DEV-388 and DEV-389 agents the same evening. Check: npm run smoke while other agents build (load over 20). Done: those tests wait on the event they need instead of a fixed deadline that load breaks, or their deadlines scale, and smoke passes under that load; also the ''Tests left 1 entries in the temp folder: fixture-gate-*'' teardown error after the gate test fails.'
 tags:
 - health
@@ -34,3 +36,8 @@ history:
   - field: status
     old: Todo
     new: InProgress
+- at: 2026-11-12T23:59:38.126767+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa7b76f2-f98f-41b4-839c-9462ebd77970

@@ -5,10 +5,11 @@ type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-12T04:05:45.260312+00:00
-modified: 2026-11-12T04:06:04.468887+00:00
+modified: 2026-11-13T00:31:54.997475+00:00
 relationships:
   related:
   - DEV-335
+  - DEV-401
 references:
 - link: https://github.com/pingdotgg/t3code/pull/34696
 - link: https://github.com/pingdotgg/t3code/issues/34688
@@ -140,3 +141,9 @@ history:
   changes:
   - field: reference_added
     new: file:docs/help/agent.md
+- at: 2026-11-13T00:31:54.997475+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-335"]}'
+    new: '{"related":["DEV-335","DEV-401"]}'
