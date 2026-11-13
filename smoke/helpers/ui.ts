@@ -102,3 +102,12 @@ export async function withPage<T>(
         }
     });
 }
+
+/**
+ * Phones get the compact Board and Tasks layout (DEV-419). A test of the wide
+ * layout at phone width chooses Classic, as Preferences would, and reloads.
+ */
+export async function chooseClassicLayout(page: Page): Promise<void> {
+    await page.evaluate(() => localStorage.setItem('lotar.preferences.layout.narrow', 'classic'));
+    await page.reload();
+}

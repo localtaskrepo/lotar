@@ -151,6 +151,24 @@
 
       <div class="preference-column">
         <UiCard>
+          <h3>Narrow screens</h3>
+          <div class="col" style="gap: 8px">
+            <label class="row" style="gap: 8px; align-items: center; flex-wrap: wrap">
+              <span class="muted">Boards and Tasks layout</span>
+              <UiSelect v-model="narrowLayout" data-testid="preferences-narrow-layout">
+                <option v-for="opt in NARROW_LAYOUT_OPTIONS" :key="opt.value" :value="opt.value">
+                  {{ opt.label }}
+                </option>
+              </UiSelect>
+            </label>
+            <p class="muted" style="margin: 0">
+              On a phone, Compact shows one board column at a time and tasks as rows. Classic keeps the wide desktop
+              layout, which you scroll sideways.
+            </p>
+          </div>
+        </UiCard>
+
+        <UiCard>
           <h3>Tasks list</h3>
           <div class="col" style="gap: 8px">
             <label class="row" style="gap: 8px; align-items: center; flex-wrap: wrap">
@@ -251,6 +269,10 @@ import {
   type TaskViewMode,
   readTaskPanelShowLinksInAttachmentsPreference,
   readTasksPageSizePreference,
+  NARROW_LAYOUT_OPTIONS,
+  readNarrowLayoutPreference,
+  storeNarrowLayoutPreference,
+  type NarrowLayout,
   STARTUP_DESTINATION_OPTIONS,
   storeShareFiltersPreference,
   storeSingleKeyShortcutsPreference,
@@ -339,6 +361,7 @@ const paletteLabel = paletteShortcutLabel()
 
 const tasksPageSizeOptions = [25, 50, 100, 200]
 const tasksPageSize = ref(String(DEFAULT_TASKS_PAGE_SIZE))
+const narrowLayout = ref<NarrowLayout>(readNarrowLayoutPreference())
 
 onMounted(() => {
   const storedTheme = readThemePreference()
@@ -440,6 +463,7 @@ watch(autoDetectLinks, (value) => {
   storeTaskPanelAutoDetectLinksPreference(!!value)
 })
 
+watch(narrowLayout, (value) => storeNarrowLayoutPreference(value))
 watch(tasksPageSize, (value) => {
   const parsed = Number.parseInt(value, 10)
   storeTasksPageSizePreference(Number.isFinite(parsed) ? parsed : DEFAULT_TASKS_PAGE_SIZE)

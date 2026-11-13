@@ -448,6 +448,10 @@ describe.concurrent('Filter autocomplete and search help (DEV-103)', () => {
                             '/sprints?project=ALPHA',
                         ]) {
                             await page.goto(`${server.url}${route}`);
+                            // DEV-419: a phone shows one board column; the task is In Progress.
+                            if (route.startsWith('/boards') && viewport.label === 'mobile') {
+                                await page.getByRole('tab').filter({ hasText: 'In Progress' }).click();
+                            }
                             const titles = page.locator(
                                 route.startsWith('/boards')
                                     ? 'article.task .title'

@@ -5,10 +5,11 @@ type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-13T08:12:00.342661+00:00
-modified: 2026-11-13T09:18:36.523556+00:00
+modified: 2026-11-13T10:11:48.547518+00:00
 relationships:
   related:
   - DEV-418
+  - DEV-465
 comments:
 - date: 2026-11-13T08:15:59.780833+00:00
   author: claude
@@ -22,6 +23,9 @@ comments:
 - date: 2026-11-13T09:18:36.381697+00:00
   author: claude
   text: 'Outcome: compact phone layout for Board and Tasks, as planned; Preferences > Narrow screens switches to Classic. Evidence: `npm run lint` ok, `npm test` ok (2126 Rust, 1510 UI), `npm run smoke` 386 of 386 after scoping the theme option in `ui.theming` (my new ''Classic'' option matched its /Classic/ locator). New: `view/components/BoardCard.vue`, `view/composables/useCompactLayout.ts`, `view/__tests__/useCompactLayout.spec.ts`, `smoke/tests/ui.compact-layout.smoke.spec.ts` (screenshots in `target/smoke-artifacts/compact-layout/`). Adapted mobile parts of board-groups (opts into Classic), board-other, sprints-responsive, filter-autocomplete. Docs: `docs/help/preferences.md#narrow-screens`, `docs/help/serve.md`. Remaining: uncommitted in worktree `t3-4ce6a7ad`; on the owner''s go-ahead commit, rebase onto DEV-418 (`ae7c8edd`, see the comment above) and land. Guidance: no durable finding.'
+- date: 2026-11-13T10:11:48.469153+00:00
+  author: claude
+  text: 'On local main as the DEV-419 commit (rebased onto DEV-418 `ae7c8edd` and DEV-465; conflicts resolved by keeping both sides in `Board.vue` imports and the `serve.md` Boards paragraph). After the rebase: vue-tsc, oxlint, eslint, prettier, 1513 UI tests pass; smoke 386 of 387 with `harness.server` occupied-port flaking under load, which passed on rerun together with `ui.board-relationships` and `ui.compact-layout`. Not pushed.'
 references:
 - file: view/pages/Board.vue
 - file: view/components/TaskTable.vue
@@ -193,3 +197,13 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-13T10:11:48.469153+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T10:11:48.547518+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-418"]}'
+    new: '{"related":["DEV-418","DEV-465"]}'

@@ -69,7 +69,9 @@ describe('UI theming and repository branding (DEV-218)', () => {
 
                     // Picking the configured theme follows the configuration again.
                     await page.getByTestId('theme-select').click();
-                    const configured = page.getByRole('option', { name: /Classic/ });
+                    const configured = page
+                        .getByRole('listbox', { name: 'Theme' })
+                        .getByRole('option', { name: /Classic/ });
                     await expect(configured.locator('.theme-select__tag')).toHaveText('Configured');
                     await configured.click();
                     expect(await page.evaluate(() => localStorage.getItem('lotar.themeName'))).toBeNull();

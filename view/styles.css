@@ -644,6 +644,15 @@ main {
 	padding: var(--space-5);
 }
 
+/* Compact phone layout (DEV-419): less padding around the page leaves room for full-width cards. */
+.layout-compact main.container {
+	padding: var(--space-2);
+}
+
+.layout-compact .surface {
+	padding: var(--space-3);
+}
+
 /* Scan UI -------------------------------------------------------------- */
 .scan-page {
 	display: flex;

@@ -69,7 +69,8 @@
         storage-key="lotar.boards.filter"
         @update:value="onFilterUpdate"
       >
-        <template #actions>
+        <!-- On a phone, Group by and Sort by move into the filter panel's View options (DEV-419) -->
+        <template #[filterBarSlot]>
           <label class="toolbar-field">
             <span class="toolbar-field__label">Group by</span>
             <select v-model="groupBy" class="input toolbar-select" data-testid="board-groupby">
@@ -167,6 +168,123 @@
       </UiEmptyState>
     </div>
 
+    <!-- DEV-419: on a phone, one board column at a time; tabs or a sideways swipe change it -->
+    <div v-else-if="compactLayout" class="board-compact" data-testid="board-compact">
+      <div class="board-tabs" role="tablist" aria-label="Board columns" @keydown="onTabsKeydown">
+        <button
+          v-for="lane in boardLanes"
+          :key="lane.key"
+          type="button"
+          role="tab"
+          class="board-tab"
+          :class="{ 'board-tab--active': lane.key === activeLane?.key, 'board-tab--warn': laneOverLimit(lane) }"
+          :aria-selected="lane.key === activeLane?.key"
+          :tabindex="lane.key === activeLane?.key ? 0 : -1"
+          :data-lane="lane.key"
+          @click="selectLane(lane.key)"
+        >
+          <span class="board-tab__label">{{ lane.title }}</span>
+          <span class="board-tab__count">
+            <template v-if="laneLimit(lane) > 0">{{ laneCount(lane) }} / {{ laneLimit(lane) }}</template>
+            <template v-else>{{ laneCount(lane) }}</template>
+          </span>
+        </button>
+      </div>
+      <div
+        v-if="activeLane"
+        class="board-compact__lane"
+        role="tabpanel"
+        :aria-label="activeLane.title"
+        :data-lane="activeLane.key"
+        :data-column-kind="activeLane.stacked ? 'stack' : kindAttr(activeLane.lead)"
+        @touchstart.passive="onSwipeStart"
+        @touchend="onSwipeEnd"
+      >
+        <div class="row board-compact__head">
+          <span class="muted">{{ activeLaneIndex + 1 }} of {{ boardLanes.length }}</span>
+          <UiButton
+            variant="ghost"
+            type="button"
+            class="board-compact__add"
+            data-testid="board-compact-add"
+            @click="activeLane.lead.synthetic ? openCreateInBoard() : openCreateInStatus(activeLane.lead.label)"
+          >
+            <IconGlyph name="plus" aria-hidden="true" />
+            Add task
+          </UiButton>
+        </div>
+        <template v-if="groupBy !== 'none'">
+          <section v-for="group in compactGroups" :key="group" class="board-compact__group">
+            <button
+              type="button"
+              class="swimlane-header"
+              :class="{ collapsed: collapsedGroups.has(group) }"
+              @click="toggleGroup(group)"
+            >
+              <span class="swimlane-chevron" :class="{ open: !collapsedGroups.has(group) }">▶</span>
+              <span
+                v-if="groupBy === 'assignee'"
+                class="member-badge"
+                :style="{ background: memberColor(group === '(none)' ? '' : group) }"
+                :title="group"
+                >{{ memberInitials(group === '(none)' ? '' : group) }}</span
+              >
+              <span class="swimlane-label">{{ group }}</span>
+              <span class="muted swimlane-count">{{ laneGroupCount(activeLane, group) }}</span>
+            </button>
+            <template v-if="!collapsedGroups.has(group)">
+              <div v-for="col in activeLane.columns" :key="col.key" class="column-section" :data-section-key="col.key">
+                <div v-if="activeLane.stacked" class="column-section__label muted">{{ col.label }}</div>
+                <div class="col-cards">
+                  <BoardCard
+                    v-for="task in groupedColumnTasks(col, group)"
+                    :key="task.id"
+                    compact
+                    :task="task"
+                    :selected="selectedTaskId === task.id"
+                    :cover="cardCover(task)"
+                    :due-info="taskDueInfo(task)"
+                    :modified-info="taskModifiedInfo(task)"
+                    :sprint="boardSprintHelpers"
+                    @open="openTask"
+                    @actions="openCardActions"
+                  />
+                </div>
+              </div>
+            </template>
+          </section>
+          <p v-if="!compactGroups.length" class="muted board-compact__empty">No tasks</p>
+        </template>
+        <template v-else>
+          <div v-for="col in activeLane.columns" :key="col.key" class="column-section" :data-section-key="col.key">
+            <div v-if="activeLane.stacked" class="row column-section__head">
+              <span class="column-section__label muted">{{ col.label }}</span>
+              <span class="muted column-section__count">{{ countOf(col) }}</span>
+            </div>
+            <div class="col-cards">
+              <BoardCard
+                v-for="task in visibleFlatTasks(col)"
+                :key="task.id"
+                compact
+                :task="task"
+                :selected="selectedTaskId === task.id"
+                :cover="cardCover(task)"
+                :due-info="taskDueInfo(task)"
+                :modified-info="taskModifiedInfo(task)"
+                :sprint="boardSprintHelpers"
+                @open="openTask"
+                @actions="openCardActions"
+              />
+              <p v-if="!columnTasks(col).length" class="muted board-compact__empty">No tasks</p>
+            </div>
+            <button v-if="hiddenFlatCount(col) > 0" type="button" class="show-more-btn" @click="showMore(col.key)">
+              Show {{ hiddenFlatCount(col) }} more…
+            </button>
+          </div>
+        </template>
+      </div>
+    </div>
+
     <div v-else class="board grid" :style="gridStyle">
       <template v-if="groupBy !== 'none'">
         <template v-for="group in allGroupLabels" :key="group">
@@ -213,62 +331,19 @@
               >
                 <div v-if="lane.stacked" class="column-section__label muted">{{ col.label }}</div>
                 <TransitionGroup name="task-list" tag="div" class="col-cards">
-                  <article
+                  <BoardCard
                     v-for="task in groupedColumnTasks(col, group)"
                     :key="task.id"
-                    class="card task"
-                    :class="[priorityClass(task.priority), { 'task--selected': selectedTaskId === task.id }]"
-                    draggable="true"
-                    @dragstart="onDragStart(task)"
-                    @dblclick="openTask(task.id)"
-                    @click.exact="selectTask(task.id)"
-                    @keydown.enter.prevent="openTask(task.id)"
-                    tabindex="0"
-                    data-board-card
-                  >
-                    <div
-                      v-for="cover in asList(cardCover(task))"
-                      :key="cover.path"
-                      class="task-cover"
-                      aria-hidden="true"
-                    >
-                      <AttachmentTile :attachment="cover" cover :cover-height="120" />
-                    </div>
-                    <header v-if="hasTaskHeader(task)" class="row task-header">
-                      <template v-if="hasTaskIdentity(task)">
-                        <div class="row task-header__left">
-                          <span v-if="boardFields.isVisible('id') && (task.id || '').trim()" class="muted id">{{
-                            task.id
-                          }}</span>
-                          <AgentActivityIndicator :task-id="task.id" />
-                          <strong v-if="boardFields.isVisible('title') && (task.title || '').trim()" class="title">{{
-                            task.title
-                          }}</strong>
-                        </div>
-                        <span
-                          v-if="boardFields.isVisible('priority') && (task.priority || '').trim()"
-                          class="priority"
-                          :class="priorityClass(task.priority)"
-                          >{{ task.priority }}</span
-                        >
-                      </template>
-                      <template v-else>
-                        <span
-                          v-if="boardFields.isVisible('priority') && (task.priority || '').trim()"
-                          class="priority"
-                          :class="priorityClass(task.priority)"
-                          >{{ task.priority }}</span
-                        >
-                      </template>
-                    </header>
-                    <BoardCardMeta
-                      :task="task"
-                      :has-header="hasTaskHeader(task)"
-                      :due-info="taskDueInfo(task)"
-                      :modified-info="taskModifiedInfo(task)"
-                      :sprint="boardSprintHelpers"
-                    />
-                  </article>
+                    :task="task"
+                    :selected="selectedTaskId === task.id"
+                    :cover="cardCover(task)"
+                    :due-info="taskDueInfo(task)"
+                    :modified-info="taskModifiedInfo(task)"
+                    :sprint="boardSprintHelpers"
+                    @drag-start="onDragStart"
+                    @open="openTask"
+                    @select="selectTask"
+                  />
                   <div
                     v-if="!groupedColumnTasks(col, group).length"
                     key="__group-empty__"
@@ -439,57 +514,19 @@
               </span>
             </div>
             <TransitionGroup name="task-list" tag="div" class="col-cards">
-              <article
+              <BoardCard
                 v-for="task in visibleFlatTasks(col)"
                 :key="task.id"
-                class="card task"
-                :class="[priorityClass(task.priority), { 'task--selected': selectedTaskId === task.id }]"
-                draggable="true"
-                @dragstart="onDragStart(task)"
-                @dblclick="openTask(task.id)"
-                @click.exact="selectTask(task.id)"
-                @keydown.enter.prevent="openTask(task.id)"
-                tabindex="0"
-                data-board-card
-              >
-                <div v-for="cover in asList(cardCover(task))" :key="cover.path" class="task-cover" aria-hidden="true">
-                  <AttachmentTile :attachment="cover" cover :cover-height="120" />
-                </div>
-                <header v-if="hasTaskHeader(task)" class="row task-header">
-                  <template v-if="hasTaskIdentity(task)">
-                    <div class="row task-header__left">
-                      <span v-if="boardFields.isVisible('id') && (task.id || '').trim()" class="muted id">{{
-                        task.id
-                      }}</span>
-                      <AgentActivityIndicator :task-id="task.id" />
-                      <strong v-if="boardFields.isVisible('title') && (task.title || '').trim()" class="title">{{
-                        task.title
-                      }}</strong>
-                    </div>
-                    <span
-                      v-if="boardFields.isVisible('priority') && (task.priority || '').trim()"
-                      class="priority"
-                      :class="priorityClass(task.priority)"
-                      >{{ task.priority }}</span
-                    >
-                  </template>
-                  <template v-else>
-                    <span
-                      v-if="boardFields.isVisible('priority') && (task.priority || '').trim()"
-                      class="priority"
-                      :class="priorityClass(task.priority)"
-                      >{{ task.priority }}</span
-                    >
-                  </template>
-                </header>
-                <BoardCardMeta
-                  :task="task"
-                  :has-header="hasTaskHeader(task)"
-                  :due-info="taskDueInfo(task)"
-                  :modified-info="taskModifiedInfo(task)"
-                  :sprint="boardSprintHelpers"
-                />
-              </article>
+                :task="task"
+                :selected="selectedTaskId === task.id"
+                :cover="cardCover(task)"
+                :due-info="taskDueInfo(task)"
+                :modified-info="taskModifiedInfo(task)"
+                :sprint="boardSprintHelpers"
+                @drag-start="onDragStart"
+                @open="openTask"
+                @select="selectTask"
+              />
               <div v-if="!columnTasks(col).length" key="__empty__" class="muted" style="padding: 8px">No tasks</div>
             </TransitionGroup>
             <button v-if="hiddenFlatCount(col) > 0" type="button" class="show-more-btn" @click="showMore(col.key)">
@@ -499,6 +536,47 @@
         </div>
       </template>
     </div>
+    <UiModal
+      :open="cardActionsTask !== null"
+      :aria-label="cardActionsTask ? `Actions for ${cardActionsTask.id}` : 'Task actions'"
+      size="sm"
+      @close="cardActionsTask = null"
+    >
+      <div v-if="cardActionsTask" class="card-actions" data-testid="board-card-actions-dialog">
+        <header class="row card-actions__header">
+          <div class="card-actions__title">
+            <span class="muted">{{ cardActionsTask.id }}</span>
+            <strong>{{ cardActionsTask.title }}</strong>
+          </div>
+          <UiButton
+            variant="ghost"
+            icon-only
+            type="button"
+            aria-label="Close dialog"
+            title="Close dialog"
+            @click="cardActionsTask = null"
+          >
+            <IconGlyph name="close" />
+          </UiButton>
+        </header>
+        <p class="muted card-actions__label">Move to</p>
+        <div class="card-actions__list" role="group" aria-label="Move to">
+          <button
+            v-for="col in moveTargets"
+            :key="col.key"
+            type="button"
+            class="card-actions__item"
+            :aria-pressed="isCurrentStatus(cardActionsTask, col)"
+            @click="moveFromSheet(col)"
+          >
+            <span>{{ col.label }}</span>
+            <IconGlyph v-if="isCurrentStatus(cardActionsTask, col)" name="check" aria-hidden="true" />
+            <span v-else class="muted">{{ countOf(col) }}</span>
+          </button>
+        </div>
+        <UiButton type="button" class="card-actions__open" @click="openFromSheet">Open task</UiButton>
+      </div>
+    </UiModal>
     <BoardColumnsDialog
       :open="columnsDialogOpen"
       :statuses="layoutStatuses"
@@ -511,27 +589,26 @@
 
 <script setup lang="ts">
 import { errorMessage } from '../utils/errors'
-import { asList } from '../utils/lookup'
 import { useProjectNames } from '../composables/useProjectNames'
 import { formatProjectLabel } from '../utils/projectLabels'
 import PageHeader from '../components/PageHeader.vue'
-import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from '../api/client'
 import type { TaskDTO } from '../api/types'
 import FilterBar from '../components/FilterBar.vue'
-import AttachmentTile from '../components/AttachmentTile.vue'
 import { firstPreviewImage } from '../utils/taskAttachments'
-import BoardCardMeta from '../components/BoardCardMeta.vue'
-import AgentActivityIndicator from '../components/AgentActivityIndicator.vue'
+import BoardCard from '../components/BoardCard.vue'
 import ColumnsMenu from '../components/ColumnsMenu.vue'
 import IconGlyph from '../components/IconGlyph.vue'
 import { showToast } from '../components/toast'
 import UiButton from '../components/UiButton.vue'
 import UiEmptyState from '../components/UiEmptyState.vue'
 import UiLoader from '../components/UiLoader.vue'
+import UiModal from '../components/UiModal.vue'
 import UiSelect from '../components/UiSelect.vue'
 import { BUILTIN_COLUMNS, useColumns, provideColumnStore } from '../composables/useColumns'
+import { useCompactLayout } from '../composables/useCompactLayout'
 import { useBoardSort, type BoardSortKey } from '../composables/useBoardSort'
 import { computeBoardLanes, useBoardLayout, type BoardLane, type BoardLayout } from '../composables/useBoardLayout'
 import BoardColumnsDialog from '../components/BoardColumnsDialog.vue'
@@ -744,14 +821,6 @@ function parseDateLike(value?: string | null) {
   return parseTaskDate(value)
 }
 
-function priorityClass(value: string | undefined): string {
-  const v = (value || '').trim().toLowerCase()
-  if (v === 'critical') return 'priority--critical'
-  if (v === 'high') return 'priority--high'
-  if (v === 'low') return 'priority--low'
-  return ''
-}
-
 function taskDueInfo(task: TaskDTO): { label: string; overdue: boolean } {
   const raw = (task.due_date || '').trim()
   if (!raw) return { label: '', overdue: false }
@@ -796,21 +865,6 @@ function taskModifiedInfo(task: TaskDTO): string {
     year: sameYear ? undefined : 'numeric',
   })
   return `Updated ${dateLabel}`
-}
-
-function hasTaskHeader(task: TaskDTO): boolean {
-  return Boolean(
-    (boardFields.isVisible('id') && (task.id || '').trim()) ||
-    (boardFields.isVisible('title') && (task.title || '').trim()) ||
-    (boardFields.isVisible('priority') && (task.priority || '').trim()),
-  )
-}
-
-function hasTaskIdentity(task: TaskDTO): boolean {
-  return Boolean(
-    (boardFields.isVisible('id') && (task.id || '').trim()) ||
-    (boardFields.isVisible('title') && (task.title || '').trim()),
-  )
 }
 
 const hasAnyFilters = computed(() => hasFilters.value || groupBy.value !== 'none')
@@ -1115,6 +1169,92 @@ function countOf(col: BoardColumnDescriptor): number {
   return columnTasks(col).length
 }
 
+// -- Compact phone board (DEV-419): one lane at a time -----------------------
+const compactLayout = useCompactLayout()
+const filterBarSlot = computed(() => (compactLayout.value ? 'panel' : 'actions'))
+function compactLaneKey() {
+  return `lotar.boards.compactLane::${project.value || 'default'}`
+}
+const activeLaneKey = ref(storageGet(compactLaneKey()) ?? '')
+watch(project, () => {
+  activeLaneKey.value = storageGet(compactLaneKey()) ?? ''
+})
+const activeLaneIndex = computed(() =>
+  Math.max(
+    0,
+    boardLanes.value.findIndex((lane) => lane.key === activeLaneKey.value),
+  ),
+)
+const activeLane = computed(() => boardLanes.value[activeLaneIndex.value] ?? null)
+
+function selectLane(key: string) {
+  activeLaneKey.value = key
+  storageSet(compactLaneKey(), key)
+  void nextTick(() => {
+    const tab = document.querySelector<HTMLElement>(`.board-tab[data-lane="${CSS.escape(key)}"]`)
+    tab?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  })
+}
+
+function stepLane(delta: number) {
+  const next = boardLanes.value[activeLaneIndex.value + delta]
+  if (next) selectLane(next.key)
+}
+
+function onTabsKeydown(event: KeyboardEvent) {
+  const delta = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
+  if (!delta) return
+  event.preventDefault()
+  stepLane(delta)
+  void nextTick(() => document.querySelector<HTMLElement>('.board-tab--active')?.focus())
+}
+
+// A sideways swipe over the cards changes the lane; mostly vertical moves stay scrolls.
+let swipeStart: { x: number; y: number } | null = null
+function onSwipeStart(event: TouchEvent) {
+  const touch = event.touches[0]
+  swipeStart = event.touches.length === 1 && touch ? { x: touch.clientX, y: touch.clientY } : null
+}
+function onSwipeEnd(event: TouchEvent) {
+  const touch = event.changedTouches[0]
+  const start = swipeStart
+  swipeStart = null
+  if (!start || !touch) return
+  const dx = touch.clientX - start.x
+  const dy = touch.clientY - start.y
+  if (Math.abs(dx) < 60 || Math.abs(dx) < 2 * Math.abs(dy)) return
+  stepLane(dx < 0 ? 1 : -1)
+}
+
+function laneGroupCount(lane: BoardLane<BoardColumnDescriptor>, group: string): number {
+  return lane.columns.reduce((sum, col) => sum + groupedColumnTasks(col, group).length, 0)
+}
+/** Groups with at least one task in the shown lane. */
+const compactGroups = computed(() => {
+  const lane = activeLane.value
+  return lane ? allGroupLabels.value.filter((group) => laneGroupCount(lane, group) > 0) : []
+})
+
+// The card's ⋯ sheet: move without dragging, or open the task.
+const cardActionsTask = ref<TaskDTO | null>(null)
+const moveTargets = computed(() => boardColumns.value.filter((col) => !col.synthetic))
+function openCardActions(task: TaskDTO) {
+  cardActionsTask.value = task
+}
+function isCurrentStatus(task: TaskDTO, col: BoardColumnDescriptor): boolean {
+  return completionStatusKey(task.status) === completionStatusKey(col.label)
+}
+function moveFromSheet(col: BoardColumnDescriptor) {
+  const task = cardActionsTask.value
+  cardActionsTask.value = null
+  if (task) void moveTask(task.id, col)
+}
+function openFromSheet() {
+  const task = cardActionsTask.value
+  cardActionsTask.value = null
+  if (task) openTask(task.id)
+}
+
 watch(groupBy, () => {
   saveGroupBy()
   collapsedGroups.value = loadCollapsed()
@@ -1174,6 +1314,10 @@ async function onDrop(target: BoardColumnDescriptor) {
   const id = draggingId.value
   if (!id) return
   draggingId.value = ''
+  await moveTask(id, target)
+}
+
+async function moveTask(id: string, target: BoardColumnDescriptor) {
   // The synthetic fallback column is presentation-only: a drop there must
   // never write a status. Configured columns carry real workflow statuses —
   // including a legitimate configured literal "__other__", which must keep
@@ -1349,61 +1493,6 @@ onUnmounted(() => {
   gap: 8px;
   position: relative;
 }
-.task-cover {
-  margin: -8px -8px 8px;
-  overflow: hidden;
-  border-radius: var(--radius-base) var(--radius-base) 0 0;
-  background: var(--color-surface);
-}
-.task {
-  padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-base);
-  cursor: grab;
-  user-select: none;
-}
-.task:active {
-  cursor: grabbing;
-}
-.task .id {
-  font-family: var(--font-mono);
-  margin-right: 6px;
-  line-height: var(--line-tight);
-  white-space: nowrap;
-  overflow-wrap: normal;
-  word-break: keep-all;
-}
-.task .title {
-  display: block;
-  min-width: 0;
-  white-space: normal;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-  line-height: 1.35;
-}
-.priority {
-  font-size: 12px;
-  color: var(--muted);
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-.priority.priority--critical {
-  color: var(--color-danger);
-  font-weight: 600;
-}
-.priority.priority--high {
-  color: var(--color-warning-strong);
-  font-weight: 600;
-}
-.priority.priority--low {
-  opacity: 0.6;
-}
-.task.priority--critical {
-  border-left: 3px solid var(--color-danger);
-}
-.task.priority--high {
-  border-left: 3px solid var(--color-warning);
-}
 .column:focus {
   outline: 2px solid color-mix(in oklab, var(--fg) 30%, transparent);
   outline-offset: 2px;
@@ -1438,89 +1527,6 @@ onUnmounted(() => {
 .board-chips-row__sortdir {
   height: var(--control-height);
   min-height: var(--control-height);
-}
-
-.task-header {
-  justify-content: space-between;
-  gap: 6px;
-  align-items: flex-start;
-}
-
-.task-header__left {
-  gap: 6px;
-  align-items: baseline;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.task-header__left .title {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.task-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 6px;
-}
-
-.task-meta.task-meta--no-header {
-  margin-top: 0;
-}
-
-.task-meta__tags,
-.task-meta__sprints,
-.task-meta__custom-field {
-  gap: 6px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.task-meta__custom-field__label {
-  font-weight: 500;
-}
-
-.task-meta__custom-field__value {
-  color: var(--fg);
-}
-
-.task-meta__due {
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.task-meta__due.is-overdue {
-  color: var(--color-danger-strong);
-  font-weight: 600;
-}
-
-.chip.sprint-chip {
-  font-size: var(--text-xs, 0.75rem);
-  padding: calc(var(--space-1, 0.25rem)) var(--space-2, 0.5rem);
-  background: color-mix(in oklab, var(--color-surface, var(--bg)) 85%, transparent);
-  border-radius: var(--radius-pill);
-}
-
-.chip.sprint--active {
-  background: color-mix(in oklab, var(--color-accent) 18%, transparent);
-  color: var(--color-accent-strong);
-}
-
-.chip.sprint--overdue {
-  background: color-mix(in oklab, var(--color-danger) 18%, transparent);
-  color: var(--color-danger);
-}
-
-.chip.sprint--complete {
-  background: color-mix(in oklab, var(--color-success) 18%, transparent);
-  color: var(--color-success-strong);
-}
-
-.chip.sprint--pending,
-.chip.sprint--unknown {
-  background: color-mix(in oklab, var(--color-muted) 18%, transparent);
-  color: var(--color-muted);
 }
 
 /* -- Swimlane headers --------------------------------------------------- */
@@ -1722,13 +1728,6 @@ onUnmounted(() => {
   color: var(--color-danger-strong);
 }
 
-/* -- Ticket selection --------------------------------------------------- */
-.task--selected {
-  outline: 2px solid var(--color-accent);
-  outline-offset: -1px;
-  background: color-mix(in oklab, var(--color-accent) 6%, var(--bg));
-}
-
 /* -- Member badges (assignee colour dots) ------------------------------- */
 .member-badge {
   display: inline-flex;
@@ -1743,20 +1742,6 @@ onUnmounted(() => {
   color: #fff;
   flex-shrink: 0;
   line-height: 1;
-}
-
-.member-badge.small {
-  width: 18px;
-  height: 18px;
-  font-size: 9px;
-}
-
-.member-inline {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: inherit;
-  color: var(--muted);
 }
 
 /* -- Show more / progressive disclosure --------------------------------- */
@@ -1775,5 +1760,146 @@ onUnmounted(() => {
 
 .show-more-btn:hover {
   background: color-mix(in oklab, var(--color-accent) 8%, transparent);
+}
+
+/* -- Compact phone board (DEV-419) -------------------------------------- */
+.board-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px 2px 8px;
+  margin: 0 -2px;
+}
+
+.board-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.board-tab {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--control-height);
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface, var(--bg));
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--text-sm, 0.875rem);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.board-tab__count {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.board-tab--active {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-contrast, #fff);
+  font-weight: 600;
+}
+
+.board-tab--active .board-tab__count {
+  color: inherit;
+  opacity: 0.85;
+}
+
+.board-tab--warn:not(.board-tab--active) {
+  border-color: var(--color-warning);
+}
+
+.board-tab--warn .board-tab__count {
+  color: var(--color-danger-strong);
+  font-weight: 600;
+}
+
+.board-tab--active.board-tab--warn .board-tab__count {
+  color: inherit;
+}
+
+.board-compact__lane {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 50vh;
+}
+
+.board-compact__head {
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--text-sm, 0.875rem);
+}
+
+.board-compact .col-cards {
+  padding: 8px 0;
+}
+
+.board-compact .column-section__head {
+  padding: 6px 0 0;
+}
+
+.board-compact__empty {
+  margin: 0;
+  padding: 8px 0;
+}
+
+.card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card-actions__header {
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.card-actions__title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.card-actions__label {
+  margin: 4px 0 0;
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.card-actions__list {
+  display: flex;
+  flex-direction: column;
+}
+
+.card-actions__item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 4px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.card-actions__item[aria-pressed='true'] {
+  color: var(--color-accent-strong, var(--color-accent));
+  font-weight: 600;
 }
 </style>

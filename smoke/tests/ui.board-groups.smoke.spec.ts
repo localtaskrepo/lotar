@@ -3,7 +3,7 @@ import path from 'node:path';
 import { describe, it } from 'vitest';
 import { stringify } from 'yaml';
 import { startLotarServer } from '../helpers/server.js';
-import { withPage } from '../helpers/ui.js';
+import { chooseClassicLayout, withPage } from '../helpers/ui.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
 function projectConfig(priorities: string[], types: string[]) {
@@ -71,6 +71,8 @@ describe.concurrent('Project-configured Board swimlane order (DEV-87)', () => {
                 try {
                     await withPage(`${server.url}/boards?project=BRD`, async (page) => {
                         await page.setViewportSize(viewport);
+                        // Swimlanes across all columns are the classic board's layout.
+                        if (viewport.name === 'mobile') await chooseClassicLayout(page);
                         const group = page.getByTestId('board-groupby');
                         const labels = () => page.locator('.swimlane-label').allTextContents();
                         const writes: string[] = [];

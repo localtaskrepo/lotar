@@ -122,6 +122,7 @@ import ToastHost from './components/ToastHost.vue'
 import UiButton from './components/UiButton.vue'
 import { showToast } from './components/toast'
 import { useActiveFilterBar } from './composables/useFilterCommands'
+import { useCompactLayout } from './composables/useCompactLayout'
 import { useGlobalShortcuts } from './composables/useGlobalShortcuts'
 import { useTaskPanelController } from './composables/useTaskPanelController'
 import { NAV_TABS, useNavTabs } from './composables/useNavTabs'
@@ -225,6 +226,10 @@ onMounted(() => {
   })
 })
 onUnmounted(() => stopPreferences?.())
+
+// DEV-419: pages tighten their padding while the compact phone layout is on.
+const compactLayout = useCompactLayout()
+watch(compactLayout, (on) => document.documentElement.classList.toggle('layout-compact', on), { immediate: true })
 
 function goKeys(path: string): string | undefined {
   const entry = GO_SHORTCUTS.find((shortcut) => shortcut.path === path)

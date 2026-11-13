@@ -1,5 +1,5 @@
 <template>
-  <div class="table-wrap" ref="rootRef">
+  <div class="table-wrap" :class="{ 'task-table--compact': compactLayout }" ref="rootRef">
     <div
       v-if="showToolbar"
       class="table-toolbar row"
@@ -107,6 +107,41 @@
         </UiButton>
       </div>
     </div>
+    <!-- DEV-419: on a phone the header row is hidden, so sorting and select-all move here -->
+    <div v-if="compactLayout && sortOptions.length" class="row task-table__sortbar" data-testid="task-table-sortbar">
+      <input
+        v-if="selectable"
+        aria-label="Select all"
+        type="checkbox"
+        :checked="allSelected"
+        @change="toggleAll($event)"
+      />
+      <label class="toolbar-field">
+        <span class="toolbar-field__label">Sort by</span>
+        <select
+          class="input toolbar-select"
+          :value="sort.key ?? ''"
+          data-testid="task-table-sort"
+          @change="onCompactSort(($event.target as HTMLSelectElement).value)"
+        >
+          <option v-if="!sort.key" value="" disabled>Choose a field</option>
+          <option v-for="col in sortOptions" :key="col" :value="col">{{ headerLabel(col) }}</option>
+        </select>
+      </label>
+      <UiButton
+        icon-only
+        type="button"
+        :disabled="!sort.key"
+        :aria-label="
+          sort.dir === 'asc' ? 'Ascending order (click for descending)' : 'Descending order (click for ascending)'
+        "
+        :title="sort.dir === 'asc' ? 'Ascending' : 'Descending'"
+        data-testid="task-table-sortdir"
+        @click="onCompactSort(sort.key ?? '')"
+      >
+        <IconGlyph :name="sort.dir === 'asc' ? 'chevron-up' : 'chevron-down'" aria-hidden="true" />
+      </UiButton>
+    </div>
     <UiCard>
       <div class="table-scroll">
         <table class="table">
@@ -178,10 +213,19 @@
                 @click="$emit('open', t.id)"
                 @keydown.enter.self.prevent="$emit('open', t.id)"
               >
-                <td v-if="selectable" @click.stop style="text-align: center">
+                <td v-if="selectable" class="task-table__select" @click.stop style="text-align: center">
                   <input type="checkbox" :checked="isSelected(t.id)" @change="toggleOne(t.id, $event)" />
                 </td>
-                <td v-for="col in visibleColumns" :key="col" :class="['task-table__cell', `task-table__cell--${col}`]">
+                <td
+                  v-for="col in visibleColumns"
+                  :key="col"
+                  :class="[
+                    'task-table__cell',
+                    `task-table__cell--${col}`,
+                    { 'task-table__cell--empty': isEmptyCell(t, col) },
+                  ]"
+                  :data-label="compactLabel(col)"
+                >
                   <template v-if="col === 'id'">
                     <span class="muted">{{ projectOf(t.id) }}</span>
                     <strong style="margin-left: 6px">{{ numericOf(t.id) }}</strong>
@@ -444,6 +488,8 @@ import ColumnsMenu from './ColumnsMenu.vue'
 import IconGlyph from './IconGlyph.vue'
 import UiButton from './UiButton.vue'
 import UiCard from './UiCard.vue'
+import { useCompactLayout } from '../composables/useCompactLayout'
+import type { ColKey } from '../composables/useColumns'
 
 const props = withDefaults(defineProps<TaskTableProps & { showToolbar?: boolean }>(), {
   showBulkControls: true,
@@ -485,6 +531,46 @@ const {
   touchBadge,
   isOverdue,
 } = useTaskTableState(props, emit)
+
+// -- Compact phone rows (DEV-419) -------------------------------------------
+const compactLayout = useCompactLayout()
+const sortOptions = computed(() => visibleColumns.value.filter((col) => isSortableCol(col)))
+
+/** A new field sorts ascending; the current one flips direction (the same rule as a header click). */
+function onCompactSort(value: string) {
+  const col = sortOptions.value.find((entry) => entry === value)
+  if (col) onSort(col)
+}
+
+/** Rows hide empty fields instead of showing a dash. */
+function isEmptyCell(task: TaskDTO, col: ColKey): boolean {
+  if (col === 'reporter') return !task.reporter
+  if (col === 'assignee') return !task.assignee
+  if (col === 'priority') return !(task.priority || '').trim()
+  if (col === 'task_type') return !(task.task_type || '').trim()
+  if (col === 'effort') return !(task.effort || '').trim()
+  if (col === 'tags') return !task.tags?.length
+  if (col === 'sprints') return !task.sprints?.length
+  if (col === 'releases') return !task.releases?.length
+  if (col === 'due_date') return !task.due_date
+  if (col === 'attachments') return !taskAttachments(task).length
+  if (customFieldKey(col)) return customFieldText(task, col) === '—'
+  return false
+}
+
+const COMPACT_LABELS: Record<string, string> = {
+  reporter: 'Reporter',
+  assignee: 'Assignee',
+  task_type: 'Type',
+  effort: 'Effort',
+  due_date: 'Due',
+  modified: 'Updated',
+}
+
+/** In rows, fields whose value alone is ambiguous get a short label. */
+function compactLabel(col: ColKey): string | undefined {
+  return COMPACT_LABELS[col] ?? (customFieldKey(col) ? headerLabel(col) : undefined)
+}
 
 const rowsKey = computed(() => sorted.value.map((t) => t.id).join('|'))
 
@@ -1060,5 +1146,99 @@ tbody tr.is-recent {
 .task-table__attachments-more {
   font-size: 12px;
   margin-left: 2px;
+}
+
+/* -- Compact phone rows (DEV-419): each task stacks into ID, status,
+   priority and actions, then the title, then the remaining fields. -- */
+.task-table__sortbar {
+  gap: var(--space-2, 0.5rem);
+  margin-bottom: var(--space-2, 0.5rem);
+  flex-wrap: wrap;
+}
+
+.task-table--compact .table-scroll {
+  overflow: visible;
+}
+
+.task-table--compact .table,
+.task-table--compact tbody {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.task-table--compact thead {
+  display: none;
+}
+
+.task-table--compact tbody tr {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-border, var(--border));
+}
+
+.task-table--compact tbody tr:first-child {
+  padding-top: 0;
+}
+
+.task-table--compact tbody tr:last-child {
+  border-bottom: none;
+}
+
+.task-table--compact tbody td {
+  order: 20;
+  display: block;
+  padding: 0;
+  border: 0;
+  width: auto;
+  min-width: 0;
+  max-width: 100%;
+  font-size: var(--text-sm, 0.875rem);
+}
+
+.task-table--compact td.task-table__cell--empty {
+  display: none;
+}
+
+.task-table--compact .task-table__select {
+  order: 0;
+}
+
+.task-table--compact .task-table__cell--id {
+  order: 1;
+  white-space: nowrap;
+}
+
+.task-table--compact .task-table__cell--status {
+  order: 2;
+}
+
+.task-table--compact .task-table__cell--priority {
+  order: 3;
+}
+
+.task-table--compact .actions-cell {
+  order: 5;
+  margin-left: auto;
+}
+
+.task-table--compact .task-table__cell--title {
+  order: 10;
+  flex-basis: 100%;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.task-table--compact .task-table__cell--title .task-table__title-text {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.task-table--compact td[data-label]::before {
+  content: attr(data-label) ' ';
+  color: var(--color-muted);
 }
 </style>

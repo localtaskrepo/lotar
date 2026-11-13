@@ -1,14 +1,16 @@
 title: A failed merge job sends the ticket to fix although its work already reached main
-status: InProgress
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-13T09:15:11.355311+00:00
-modified: 2026-11-13T10:05:40.356033+00:00
+modified: 2026-11-13T10:11:48.547882+00:00
 relationships:
   related:
   - DEV-352
+  - DEV-418
+  - DEV-419
 comments:
 - date: 2026-11-13T09:15:23.656362+00:00
   author: claude
@@ -37,11 +39,42 @@ comments:
 - date: 2026-11-13T10:05:39.645126+00:00
   author: triage
   text: 'Triage: no owner action left. The work is done and on main (af60ab9c, reviewed and passed; the smoke failure is the unrelated DEV-352 family). The push of main is not his to hold: he decided on 2026-11-11 that agents push and release lotar without asking (standards docs/decisions/2026-11-11-repo-health.md, repos.json lotar push true), and on 2026-11-12 that finished commits are pushed once the main checkout holds no unfinished work (docs/decisions/2026-11-12-push-finished-work.md). Main is 2 ahead of origin (ae7c8edd, af60ab9c), both finished work: push them and close this ticket. Same answer as INBOX-22 on 2026-11-13.'
+- date: 2026-11-13T10:06:40.892668+00:00
+  author: codex
+  text: 'Completed triage request: pushed finished main to origin/main at 9921ee06, including ae7c8edd. Amended landed af60ab9c to 9921ee06 solely to include pending .tasks updates as authorized; main was clean before push. Push hooks passed Rust formatting/clippy and frontend typecheck/oxlint/ESLint/Prettier. Prior full unit checks passed; unrelated smoke timeout remains tracked by DEV-352 per triage. No code changes this turn. Closing as requested.'
+- date: 2026-11-13T10:07:34.154425+00:00
+  author: codex
+  text: 'Review: blocking. Checkout ca054282 is the obsolete initial fix. src/services/agent_job_service.rs:3205 uses branch_landed including tasks changes, missing the amended-tasks case; the regression for that case is absent. Main 9921ee06 already has corrected af60ab9c code and tests (all three feature files match). Do not merge this obsolete copy; retain the already-landed corrected work. Read ticket/comments, branch diff, surrounding code and recent main history. git diff --check passed; tests not rerun for this superseded version. No code or commits changed; status and assignee unchanged. No minor tickets.'
+- date: 2026-11-13T10:08:24.310928+00:00
+  author: claude
+  text: 'Rework of the review finding (obsolete ca054282 on branch t3/failed-merge-job-already-on-main): agreed, nothing to fix. main 9921ee06 (pushed to origin/main) holds the corrected fix, a superset of ca054282: branch_landed_outside, merged_landed, merged_despite_failure, ensure_branch_merged, and all four a_merge_job_that_fails_* tests. ca054282 conflicts with main and adds nothing, so I moved this branch to main (git reset --keep main; the commit stays on agent/DEV-465 and t3/failed-merge-work-on-main, nothing lost). The branch now has no commits beyond main: no amend, no new commit, no checks run (no code changed; the code on main was checked by its merge: lint, tests, smoke 385/386 with the unrelated DEV-352 timeout). The next review should find nothing to review.'
+- date: 2026-11-13T10:09:10.401447+00:00
+  author: codex
+  text: 'Review: blocking. Assigned checkout t3/failed-merge-landed-work still holds obsolete ca054282, not the branch moved to main in the last comment. src/services/agent_job_service.rs:3205 calls branch_landed including .tasks and misses amended-task conflicts; tests/dev318_t3_runner_test.rs lacks that regression. Main 9921ee06 already holds the corrected implementation. Fix the job checkout mismatch; do not merge this obsolete copy. Read ticket/comments, relationships, diff and recent main history. git diff --check main...HEAD passed. Tests not rerun for superseded code. No files, commits, status or assignee changed; no minor tickets.'
+- date: 2026-11-13T10:09:14.763475+00:00
+  author: automation
+  text: The review found blocking problems again after one rework (the comments above). Should an agent rework it once more (lotar assignee DEV-465 @fix), will you decide the findings, or is it WontDo?
+- date: 2026-11-13T10:09:38.332691+00:00
+  author: triage
+  text: 'Triage: no owner decision needed, and no rework. The fix is finished and on origin/main as 9921ee06: branch_landed_outside, merged_landed, merged_despite_failure and the four a_merge_job_that_fails_* tests are in main (checked just now), so the done criteria are met. The last two blocking reviews read an obsolete copy, not the work: ca054282 sits on agent/DEV-465, t3/failed-merge-landed-work, t3/failed-merge-already-landed and t3/failed-merge-work-on-main (each 1 ahead of main). The earlier rework moved only t3/failed-merge-job-already-on-main to main, and the review checked out t3/failed-merge-landed-work. Next step: point agent/DEV-465 and t3/failed-merge-landed-work at main (git branch -f, the commit stays reachable from t3/failed-merge-work-on-main), then set this ticket to Done without another review. Do not merge ca054282.'
+- date: 2026-11-13T10:10:04.566963+00:00
+  author: codex
+  text: 'Completed triage request: agent/DEV-465 and this checkout branch t3/failed-merge-landed-work now point to main/origin-main commit 9921ee06. Used reset --keep for the checked-out branch; checkout remains clean and main..HEAD is empty. Obsolete ca054282 remains reachable from t3/failed-merge-work-on-main; no work discarded. No code changes, new commit, merge or push. Tests not rerun because only branch pointers changed. Closing Done as explicitly requested, without another review.'
+- date: 2026-11-13T10:10:39.392417+00:00
+  author: codex
+  text: 'Review: nothing to review'
+- date: 2026-11-13T10:10:58.480802+00:00
+  author: codex
+  text: nothing to merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A65342ba7-3138-4700-af1b-bdaafd84f224
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7bc31399-fd38-46c1-904e-b81c06b6d728
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6c6f7706-57c7-4e71-b748-c6b72c66c2e9
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad235e56b-5c16-4772-a251-4b16ae279f39
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae33e65ae-57ec-4651-ae41-c30c17aa7221
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9d3c782c-3542-4a4f-ad76-f1853f27a886
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6c91b051-9104-450f-a1e0-b4f08610185c
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A65dcce4c-19ea-486e-8486-9ba1618a343a
 description: |-
   ## Found
   QIS-180 (quarter-inch-studio, https://qis.pyxzl.net/task/QIS-180): the merge agent rebased the fix, fast-forwarded main and pushed it as 66762e5 (on origin/main). Its job then failed for an infrastructure reason (job-20261113T081737.047Z-10: "Could not reach the T3 Code server at http://127.0.0.1:3773", runner exit 1). The automation treated that as a failed merge: tag merge-retried, back to @fix. The fix retry also failed (job-20261113T084742.566Z-14: T3 server SQLite "database is locked"), then @fix-codex found nothing to do, and the ticket came back to review with agent/QIS-180 still at the pre-rebase commit 527682e, a duplicate of 66762e5. Two agent runs and a review went to work that was already on main.
@@ -221,3 +254,185 @@ history:
   - field: status
     old: HelpNeeded
     new: InProgress
+- at: 2026-11-13T10:06:40.892668+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T10:06:48.247130+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T10:06:48.361986+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-11-13T10:06:49.444010+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Done
+    new: Reviewing
+- at: 2026-11-13T10:06:50.038982+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae33e65ae-57ec-4651-ae41-c30c17aa7221
+- at: 2026-11-13T10:07:34.154425+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T10:07:36.482781+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: ''
+    new: review-blocked
+- at: 2026-11-13T10:07:41.225087+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: review-blocked
+    new: review-returned
+- at: 2026-11-13T10:07:41.704855+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-13T10:07:42.250367+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9d3c782c-3542-4a4f-ad76-f1853f27a886
+- at: 2026-11-13T10:08:24.310928+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T10:08:32.076775+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T10:08:33.154474+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6c91b051-9104-450f-a1e0-b4f08610185c
+- at: 2026-11-13T10:09:10.401447+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T10:09:10.427727+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: review-returned
+    new: review-returned, review-blocked
+- at: 2026-11-13T10:09:14.731301+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+- at: 2026-11-13T10:09:14.763475+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-13T10:09:38.332691+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-13T10:09:38.423579+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-13T10:09:38.774203+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-13T10:09:57.158721+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-352"]}'
+    new: '{"related":["DEV-352","DEV-418"]}'
+- at: 2026-11-13T10:10:04.566963+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T10:10:09.070725+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T10:10:09.188729+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-11-13T10:10:09.251180+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: review-returned, review-blocked
+    new: ''
+- at: 2026-11-13T10:10:10.621416+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Done
+    new: Reviewing
+- at: 2026-11-13T10:10:11.758418+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A65dcce4c-19ea-486e-8486-9ba1618a343a
+- at: 2026-11-13T10:10:39.392417+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T10:10:43.629195+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-13T10:10:58.480802+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T10:11:04.475471+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-13T10:11:48.547882+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-352","DEV-418"]}'
+    new: '{"related":["DEV-352","DEV-418","DEV-419"]}'

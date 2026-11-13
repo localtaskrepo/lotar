@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import BoardSource from '../pages/Board.vue?raw'
+// The card and its styles live in BoardCard since DEV-419.
+import BoardSource from '../components/BoardCard.vue?raw'
 
 function extractStyle(source: string): string {
     const start = source.indexOf('<style')

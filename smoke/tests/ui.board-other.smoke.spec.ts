@@ -98,17 +98,27 @@ describe.concurrent('Board Other across supported rendering modes', () => {
                         path: path.join(process.cwd(), 'target/smoke-artifacts/board-other/grouped-desktop.png'),
                         animations: 'disabled',
                     });
+                    // DEV-419: a phone shows one column at a time; Group by sits in the filter panel.
                     await page.setViewportSize({ width: 375, height: 812 });
+                    await page.getByTestId('filter-toggle').click();
                     const control = await page.getByTestId('board-groupby').boundingBox();
                     expect(control).not.toBeNull();
                     expect(control!.width).toBeLessThanOrEqual(375);
-                    await page.locator('.column-group-cell[data-column-kind="other"]').first().scrollIntoViewIfNeeded();
-                    await page.evaluate(() => window.scrollTo(window.scrollX, 0));
+                    await page.getByTestId('filter-toggle').click();
+                    await page
+                        .getByRole('tab')
+                        .filter({ hasText: /^Other/ })
+                        .click();
+                    await expect
+                        .poll(() => page.locator('[role="tabpanel"][data-column-kind="other"] article.task').count())
+                        .toBeGreaterThan(0);
+                    await page.evaluate(() => window.scrollTo(0, 0));
                     await page.screenshot({
                         path: path.join(process.cwd(), 'target/smoke-artifacts/board-other/grouped-mobile.png'),
                         animations: 'disabled',
                     });
 
+                    await page.setViewportSize({ width: 1280, height: 900 });
                     await page.goto(`${server.url}/boards?project=ALT`);
                     await expect.poll(() => page.locator('[data-column-kind="other"] article.task').count()).toBe(1);
                     expect(await page.locator('article.task .title').allTextContents()).toEqual(['Alternate unknown']);

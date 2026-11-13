@@ -278,7 +278,8 @@ describe.concurrent('Responsive sprint controls and standardized pagination (DEV
                         await panel.waitFor({ state: 'detached' });
 
                         await page.goto(`${server.url}/boards?project=UX`);
-                        const boardAdd = page.locator('.board-col-add').first();
+                        // DEV-419: phones show one board column with a single Add task button.
+                        const boardAdd = page.locator('[data-testid="board-compact-add"], .board-col-add').first();
                         await boardAdd.waitFor({ state: 'attached' });
                         expect(
                             await boardAdd.evaluate((element) => element.getBoundingClientRect().height),

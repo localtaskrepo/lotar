@@ -29,6 +29,15 @@ export const AUTO_TAG_COLORS_KEY = 'lotar.preferences.tags.autoColors'
 /** Saved search and filters used by every page when sharing is on (DEV-142). */
 export const SHARED_FILTER_STORAGE_KEY = 'lotar.shared.filter'
 
+/** How Boards and Tasks lay out on narrow screens (DEV-419). */
+export const NARROW_LAYOUT_KEY = 'lotar.preferences.layout.narrow'
+/** Compact: one board column at a time and task rows; Classic: the wide desktop layout, scrolled sideways. */
+export type NarrowLayout = 'compact' | 'classic'
+export const NARROW_LAYOUT_OPTIONS: Array<{ value: NarrowLayout; label: string }> = [
+    { value: 'compact', label: 'Compact' },
+    { value: 'classic', label: 'Classic (wide, scroll sideways)' },
+]
+
 const TASKS_PAGE_SIZE_KEY = 'lotar.preferences.tasks.pageSize'
 export const DEFAULT_TASKS_PAGE_SIZE = 50
 const TASKS_PAGE_SIZE_CHOICES = new Set([25, 50, 100, 200])
@@ -198,6 +207,15 @@ export function readTaskPanelAutoDetectLinksPreference(): boolean {
 
 export function storeTaskPanelAutoDetectLinksPreference(value: boolean) {
     storeBooleanPreference(TASK_PANEL_AUTO_DETECT_LINKS_KEY, value)
+}
+
+export function readNarrowLayoutPreference(): NarrowLayout {
+    return storageGet(NARROW_LAYOUT_KEY) === 'classic' ? 'classic' : 'compact'
+}
+
+export function storeNarrowLayoutPreference(value: NarrowLayout) {
+    storageSet(NARROW_LAYOUT_KEY, value === 'classic' ? 'classic' : 'compact')
+    emitPreferencesChanged(NARROW_LAYOUT_KEY)
 }
 
 /** The view a task opens in: `existing` for saved tasks, `new` for the create form. */
