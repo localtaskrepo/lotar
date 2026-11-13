@@ -10,14 +10,14 @@ Make API changes once, but keep all consumers consistent (CLI/server, UI, docs).
 ## Checklist
 
 1. Locate the endpoint
-- Routing/handlers: `src/routes/`, `src/api_server.rs`, `src/web_server.rs`
+- Routing/handlers: `crates/lotar-lib/src/routes/`, `crates/lotar-lib/src/api_server.rs`, `crates/lotar-lib/src/web_server.rs`
 
 2. Update Rust contract types
-- DTOs: `src/api_types.rs`
-- If you adjust validation/errors, keep behavior consistent with existing API error shapes (`src/errors.rs`).
+- DTOs: `crates/lotar-lib/src/api_types.rs`
+- If you adjust validation/errors, keep behavior consistent with existing API error shapes (`crates/lotar-lib/src/errors.rs`).
 
 3. Update UI types + API client
-- DTOs: `view/api/types.ts` (explicit note at top: aligned with `src/api_types.rs`)
+- DTOs: `view/api/types.ts` (explicit note at top: aligned with `crates/lotar-lib/src/api_types.rs`)
 - Calls: `view/api/client.ts`
 
 4. Update OpenAPI + help docs
@@ -25,7 +25,7 @@ Make API changes once, but keep all consumers consistent (CLI/server, UI, docs).
 - If it’s user-visible, update relevant guides under `docs/help/*` (often `docs/help/api-quick-reference.md`, plus the feature-specific page).
 
 5. Add/adjust tests
-- Rust behavior: `tests/*.rs` (integration-heavy, many use `assert_cmd`).
+- Rust behavior: `crates/lotar-lib/tests/*.rs` (integration-heavy, many use `assert_cmd`).
 - UI behavior: `npm run test:ui` (Vitest).
 - Cross-cutting behavior: consider adding/updating smoke coverage under `smoke/tests/`.
 

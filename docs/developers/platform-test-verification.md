@@ -32,7 +32,7 @@ real `lotar.exe` through the smoke helpers only.
 
 The nextest module selection and coverage gate in this lane follow the shared
 naming, runner, and coverage-enforcement policy documented in
-[tests/README.md](../../tests/README.md).
+[crates/lotar-lib/tests/README.md](../../crates/lotar-lib/tests/README.md).
 
 Environment contract on the runner:
 
@@ -46,7 +46,7 @@ Environment contract on the runner:
 - Node comes from `engines.node` in `package.json` via the same
   determine-then-setup steps as the other jobs, and `npm ci` requires the
   lockfile. `npm run build:web` must precede the ci-profile cargo build
-  because `include_dir!("target/web-embed")` (src/web_server.rs) requires the
+  because `include_dir!("target/web-embed")` (crates/lotar-web-assets) requires the
   generated directory at compile time; the API-only smoke specs never serve
   UI assets, but the binary must still compile on a cold runner.
 
@@ -113,7 +113,7 @@ npm run test:smoke:quick -- `
 
 POSIX mirror (macOS/Linux; proves selection, env contract, and Unix paths
 only — not the Windows branches). Build a fresh binary first (`npm run
-build:smoke`) whenever `src/` changed after the last build:
+build:smoke`) whenever `crates/lotar-lib/src/` changed after the last build:
 
 ```sh
 export LOTAR_BINARY_PATH="$PWD/target/smoke/lotar"

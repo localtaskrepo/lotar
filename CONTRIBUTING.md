@@ -42,7 +42,7 @@ npm run dev
 
 If you change any REST request/response shapes, keep these in sync:
 
-- `src/api_types.rs`
+- `crates/lotar-lib/src/api_types.rs`
 - `view/api/types.ts`
 - `docs/openapi.json`
 

@@ -1,6 +1,6 @@
 # Performance budgets
 
-Wall-clock budgets for the CLI live in `tests/performance_test.rs` and are
+Wall-clock budgets for the CLI live in `crates/lotar-lib/tests/performance_test.rs` and are
 enforced **only in the dedicated perf mode**. Ordinary correctness runs never
 fail due solely to host load, while performance regressions stay measurable.
 
@@ -11,7 +11,7 @@ fail due solely to host load, while performance regressions stay measurable.
 | Correctness (default) | `npm run test:rust` | Not evaluated; each budget logs `[perf-budget] SKIP ... reason=flag-unset` | `profile.default` (`num-cpus`, configured retries) |
 | Perf (opt-in) | `npm run test:rust:perf` | Enforced; failure fails the run | `profile.perf`: serial (`test-threads = 1`), `--retries 0`, no fail-fast |
 
-Both modes run **all** tests in `tests/performance_test.rs`, including every
+Both modes run **all** tests in `crates/lotar-lib/tests/performance_test.rs`, including every
 functional success/data assertion. There are no ignored or cfg-compiled-out
 performance tests; the only difference is whether absolute wall-clock
 assertions fire.

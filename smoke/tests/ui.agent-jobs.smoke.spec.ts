@@ -10,7 +10,7 @@ import { startLotarServer } from '../helpers/server.js';
 import { withPage } from '../helpers/ui.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
-const reviewedTemplatePath = path.resolve(__dirname, '../../src/config/templates/agent-reviewed.yml');
+const reviewedTemplatePath = path.resolve(__dirname, '../../crates/lotar-lib/src/config/templates/agent-reviewed.yml');
 
 interface JobRecord {
     readonly id: string;

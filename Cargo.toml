@@ -1,20 +1,48 @@
-[package]
-name = "lotar"
+# DEV-497: a workspace, so a web-only change rebuilds only the embedded assets
+# (crates/lotar-web-assets) and the `lotar` binary (this package). The library
+# and its tests (crates/lotar-lib) don't depend on the assets. The binary's
+# package is the root one, named `lotar`, so `cargo install lotar` and
+# `cargo install --path .` install the `lotar` command.
+[workspace]
+members = [".", "crates/lotar-lib", "crates/lotar-web-assets"]
+# Without this, cargo at the root builds and tests only the binary's package.
+default-members = [".", "crates/lotar-lib", "crates/lotar-web-assets"]
+resolver = "3"
+
+[workspace.package]
 version = "0.14.3"
 edition = "2024"
-default-run = "lotar"
-# Integration tests are modules of one binary (tests/integration.rs, DEV-302).
-autotests = false
 authors = ["Ravi Gairola <mallox@pyxzl.net>"]
-description = "A git-native task management CLI that stores issues as YAML files in your repository"
 license = "MIT"
 repository = "https://github.com/localtaskrepo/lotar"
 homepage = "https://localtaskrepo.github.io/lotar/"
+
+[workspace.dependencies]
+tempfile = "3.27.0"
+serde_json = { version = "1.0.154", features = ["std"], default-features = false }
+clap = { version = "4.6.7", features = ["derive", "std", "env", "error-context", "suggestions"], default-features = false }
+# The workspace crates, published together at the workspace version: bump
+# these with [workspace.package] (docs/release-guide.md).
+lotar-lib = { path = "crates/lotar-lib", version = "=0.14.3" }
+lotar-web-assets = { path = "crates/lotar-web-assets", version = "=0.14.3" }
+
+[package]
+name = "lotar"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description = "A git-native task management CLI that stores issues as YAML files in your repository"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 documentation = "https://github.com/localtaskrepo/lotar/tree/main/docs"
 readme = "README.md"
 keywords = ["cli", "task-management", "git", "yaml", "issue-tracker"]
 categories = ["command-line-utilities", "development-tools"]
+default-run = "lotar"
 
+# `cargo install --path .` installs both: `lotar agent list-running` needs the
+# wrapper (docs/help/install.md). It uses only std, not the library.
 [[bin]]
 name = "lotar"
 path = "src/main.rs"
@@ -23,51 +51,27 @@ path = "src/main.rs"
 name = "lotar-agent-wrapper"
 path = "src/bin/lotar_agent_wrapper.rs"
 
-# Lint levels for every target (lib, bins, tests). CI and the pre-push hook
-# run clippy with -D warnings, so "warn" blocks merges. Suppress with
+# Lint levels for every target (lib, bins, tests) of every workspace package.
+# CI and the pre-push hook run clippy with -D warnings, so "warn" blocks merges. Suppress with
 # #[expect(lint, reason = "...")] so stale suppressions are reported.
-# (needless_pass_by_value is enabled for the library only, in src/lib.rs.)
-[lints.clippy]
+# (needless_pass_by_value is enabled for the library only, in crates/lotar-lib/src/lib.rs.)
+[workspace.lints.clippy]
 allow_attributes_without_reason = "warn"
 dbg_macro = "warn"
 todo = "warn"
 unwrap_used = "warn" # no unwrap outside tests (clippy.toml allows it there); use ? or expect("why it cannot fail")
 
-[build-dependencies]
-# build.rs compresses the embedded help docs and OpenAPI spec (DEV-221).
-flate2 = { version = "1.1.10", default-features = false, features = ["rust_backend"] }
+[lints]
+workspace = true
 
-# Optimize dependencies for smaller binaries
 [dependencies]
-# Unicode-aware \w \d \s \b, case folding and general categories (\p{L}, \p{Lu}…)
-# in every script; script/boolean/age/segment property classes (\p{Greek},
-# \p{Emoji}…) are left out to save ~180 KB (DEV-221).
-regex = { version = "1.13.1", default-features = false, features = ["std", "unicode-perl", "unicode-case", "unicode-gencat"] }
-include_dir = "0.7.4"
-chrono = { version = "0.4.45", features = ["serde", "clock"], default-features = false }
-serde = { version = "1.0.229", features = ["derive"], default-features = false }
-serde_yaml_ng = "0.10.0"
-serde_json = { version = "1.0.154", features = ["std"], default-features = false }
-thiserror = "2.0.21"
-dirs = "7.0.0"
-clap = { version = "4.6.7", features = ["derive", "std", "env", "error-context", "suggestions"], default-features = false }
-clap_complete = "4.6.11"
-rayon = { version = "1.12.0", default-features = false, optional = true }
-ignore = { version = "0.4.33" }
-notify = "8.2.0"
-pulldown-cmark = { version = "0.13.6", default-features = false }
-blake3 = { version = "1.8.7", default-features = false, features = ["std"] }
-image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp", "ico", "tiff"] }
-base64 = { version = "0.23.1", default-features = false, features = ["std"] }
-ureq = { version = "3.4.2", features = ["json"] }
-flate2 = { version = "1.1.10", default-features = false, features = ["rust_backend"] }
-libc = "0.2.191"
-sysinfo = { version = "0.40.1", default-features = false, features = ["system"] }
-fs2 = "0.4.3"
-# Not used directly: enables the features assert_cmd turns on, so test targets
-# reuse the library `cargo build` made instead of compiling it again (DEV-495).
-# The extra code is never called; release LTO removes it.
-bstr = "1.13.1"
+lotar-lib.workspace = true
+lotar-web-assets.workspace = true
+clap.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
 
 # Production release profile optimized for minimal binary size
 [profile.release]
@@ -146,41 +150,3 @@ debug = false
 
 [profile.local.package."*"]
 opt-level = 2
-
-[dev-dependencies]
-assert_cmd = "2.2.2"
-# No default features: its regex feature would turn on regex defaults (DEV-495).
-predicates = { version = "3.1.4", default-features = false }
-tempfile = "3.27.0"
-ctor = "1.0.13"
-dtor = "1.0.6"
-
-[features]
-default = ["parallel"]
-schema = ["schemars"]
-
-# Optional features
-parallel = ["dep:rayon"]
-
-[dependencies.schemars]
-version = "1.2.3"
-optional = true
-
-# DEV-302: one binary for the integration tests (each tests/*.rs file is a
-# module of tests/integration.rs); the guard, the performance budgets and the
-# tests the Windows CI job runs (DEV-495) keep their own binaries.
-[[test]]
-name = "integration"
-path = "tests/integration.rs"
-
-[[test]]
-name = "nextest_guard_test"
-path = "tests/nextest_guard_test.rs"
-
-[[test]]
-name = "performance_test"
-path = "tests/performance_test.rs"
-
-[[test]]
-name = "windows_regressions"
-path = "tests/windows_regressions.rs"

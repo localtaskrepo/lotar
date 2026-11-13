@@ -11,7 +11,7 @@
 // fallback: an inherited non-opt-in flag value is rejected instead of
 // overridden, cargo-nextest must be on PATH, and a run that produces no
 // (or incomplete) per-budget lines is an error, never a pass. Thresholds
-// live in tests/performance_test.rs and must not be raised to make a run
+// live in crates/lotar-lib/tests/performance_test.rs and must not be raised to make a run
 // pass; local results come from an uncontrolled runner - CI measurements
 // come from .github/workflows/performance.yml. See
 // docs/developers/performance-budgets.md for the mode rationale.
@@ -30,7 +30,7 @@ const ENV_FLAG = 'LOTAR_TEST_PERF_BUDGETS';
 const JUNIT_PATH = 'target/nextest/perf/perf-junit.xml';
 const RUN_LOG_PATH = 'target/nextest/perf-run.log';
 
-// Canonical budgets emitted by tests/performance_test.rs (label -> budget ms).
+// Canonical budgets emitted by crates/lotar-lib/tests/performance_test.rs (label -> budget ms).
 // The runner treats a run that does not report each of these exactly once as
 // incomplete, so budget lines and this list cannot drift apart silently.
 const EXPECTED_BUDGETS = new Map([
@@ -185,7 +185,7 @@ for (const [label, budgetMs] of EXPECTED_BUDGETS) {
         }
         if (e.budgetMs !== budgetMs) {
             problems.push(
-                `budget ${e.label} reported budget_ms=${e.budgetMs}, runner expects ${budgetMs} (tests/performance_test.rs and scripts/perf-runner.mjs disagree)`,
+                `budget ${e.label} reported budget_ms=${e.budgetMs}, runner expects ${budgetMs} (crates/lotar-lib/tests/performance_test.rs and scripts/perf-runner.mjs disagree)`,
             );
         }
     }

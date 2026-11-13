@@ -870,6 +870,17 @@ checksum = "5d15f86d12da44cd8d4ec3c73984537eb7f4cadcb9776a575a0a8a05ca11005c"
 name = "lotar"
 version = "0.14.3"
 dependencies = [
+ "clap",
+ "lotar-lib",
+ "lotar-web-assets",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "lotar-lib"
+version = "0.14.3"
+dependencies = [
  "assert_cmd",
  "base64",
  "blake3",
@@ -884,7 +895,6 @@ dependencies = [
  "fs2",
  "ignore",
  "image",
- "include_dir",
  "libc",
  "notify",
  "predicates",
@@ -899,6 +909,13 @@ dependencies = [
  "tempfile",
  "thiserror",
  "ureq",
+]
+
+[[package]]
+name = "lotar-web-assets"
+version = "0.14.3"
+dependencies = [
+ "include_dir",
 ]
 
 [[package]]

@@ -4,7 +4,7 @@
 // Invoked by `npm run test:rust` / `npm run test:rust:agent` (package.json).
 // Cross-platform Node replacement for the previous bash wrapper: it probes the
 // real Git capability with an isolated `git init` (same contract as
-// tests/common/mod.rs `require_git`), and when the capability is unavailable
+// crates/lotar-lib/tests/common/mod.rs `require_git`), and when the capability is unavailable
 // selects the `gitless` nextest profile (.config/nextest.toml), whose
 // default-filter excludes exactly the source-local `git_required` test
 // modules. Excluded tests are REPORTED (never counted as passed): nextest
@@ -407,7 +407,7 @@ async function realGitLaunch(cwd, gitBinary, env, timeoutMs) {
     });
 }
 
-// Probe Git the way tests/common/mod.rs does: real `git init` in an isolated
+// Probe Git the way crates/lotar-lib/tests/common/mod.rs does: real `git init` in an isolated
 // temporary directory with system and global config disabled, then verify the
 // .git artifact exists. The parent environment is never mutated; the
 // isolation variables are child-scoped only.

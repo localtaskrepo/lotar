@@ -46,7 +46,7 @@ and report without edits, task mutations, or implementation gates.
 - Documentation-only changes need link, example, and consistency checks, not a
   full application build. Embedded prompts, executable examples, and configuration
   that changes runtime behavior also need the relevant behavior checks.
-- REST shape changes require `src/api_types.rs`, `view/api/types.ts`,
+- REST shape changes require `crates/lotar-lib/src/api_types.rs`, `view/api/types.ts`,
   `docs/openapi.json`, and relevant help docs to agree.
 - Keep user-owned task YAML backwards-compatible. Only the DEV project under
   `.tasks/` is the tracked development backlog; other projects and `@sprints/`

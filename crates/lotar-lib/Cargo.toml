@@ -1,0 +1,93 @@
+# The lotar library (crate name `lotar`). The root package builds the `lotar`
+# binary from it plus the embedded web UI (DEV-497).
+[package]
+name = "lotar-lib"
+description = "The lotar library: tasks, storage, services, CLI handlers and the web server"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+# Integration tests are modules of one binary (tests/integration.rs, DEV-302).
+autotests = false
+autobins = false
+
+[lib]
+name = "lotar"
+
+[lints]
+workspace = true
+
+[build-dependencies]
+# build.rs compresses the embedded help docs and OpenAPI spec (DEV-221).
+flate2 = { version = "1.1.10", default-features = false, features = ["rust_backend"] }
+
+# Optimize dependencies for smaller binaries
+[dependencies]
+# Unicode-aware \w \d \s \b, case folding and general categories (\p{L}, \p{Lu}…)
+# in every script; script/boolean/age/segment property classes (\p{Greek},
+# \p{Emoji}…) are left out to save ~180 KB (DEV-221).
+regex = { version = "1.13.1", default-features = false, features = ["std", "unicode-perl", "unicode-case", "unicode-gencat"] }
+chrono = { version = "0.4.45", features = ["serde", "clock"], default-features = false }
+serde = { version = "1.0.229", features = ["derive"], default-features = false }
+serde_yaml_ng = "0.10.0"
+serde_json.workspace = true
+thiserror = "2.0.21"
+dirs = "7.0.0"
+clap.workspace = true
+clap_complete = "4.6.11"
+rayon = { version = "1.12.0", default-features = false, optional = true }
+ignore = { version = "0.4.33" }
+notify = "8.2.0"
+pulldown-cmark = { version = "0.13.6", default-features = false }
+blake3 = { version = "1.8.7", default-features = false, features = ["std"] }
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp", "ico", "tiff"] }
+base64 = { version = "0.23.1", default-features = false, features = ["std"] }
+ureq = { version = "3.4.2", features = ["json"] }
+flate2 = { version = "1.1.10", default-features = false, features = ["rust_backend"] }
+libc = "0.2.191"
+sysinfo = { version = "0.40.1", default-features = false, features = ["system"] }
+fs2 = "0.4.3"
+# Not used directly: enables the features assert_cmd turns on, so test targets
+# reuse the library `cargo build` made instead of compiling it again (DEV-495).
+# The extra code is never called; release LTO removes it.
+bstr = "1.13.1"
+
+[dev-dependencies]
+assert_cmd = "2.2.2"
+# No default features: its regex feature would turn on regex defaults (DEV-495).
+predicates = { version = "3.1.4", default-features = false }
+tempfile.workspace = true
+ctor = "1.0.13"
+dtor = "1.0.6"
+
+[features]
+default = ["parallel"]
+schema = ["schemars"]
+
+# Optional features
+parallel = ["dep:rayon"]
+
+[dependencies.schemars]
+version = "1.2.3"
+optional = true
+
+# DEV-302: one binary for the integration tests (each tests/*.rs file is a
+# module of tests/integration.rs); the guard, the performance budgets and the
+# tests the Windows CI job runs (DEV-495) keep their own binaries.
+[[test]]
+name = "integration"
+path = "tests/integration.rs"
+
+[[test]]
+name = "nextest_guard_test"
+path = "tests/nextest_guard_test.rs"
+
+[[test]]
+name = "performance_test"
+path = "tests/performance_test.rs"
+
+[[test]]
+name = "windows_regressions"
+path = "tests/windows_regressions.rs"

@@ -8,12 +8,12 @@ excludeAgent: ["code-review"]
 ## Tech + structure
 
 - Rust (edition 2024), single `lotar` binary: CLI + HTTP server.
-- CLI commands: `src/cli/` (args under `src/cli/args/`, handlers under `src/cli/handlers/`).
-- API/server surface: `src/api_server.rs`, `src/web_server.rs`, `src/routes/` (custom HTTP transport, not Axum).
-- DTOs/contracts: `src/api_types.rs`.
-- Storage/domain: `src/storage/`, `src/project.rs`, `src/workspace.rs`.
-- Services: `src/services/` (task, sprint, sync, agent, automation, …).
-- MCP server (stdio): `src/mcp/`.
+- CLI commands: `crates/lotar-lib/src/cli/` (args under `crates/lotar-lib/src/cli/args/`, handlers under `crates/lotar-lib/src/cli/handlers/`).
+- API/server surface: `crates/lotar-lib/src/api_server.rs`, `crates/lotar-lib/src/web_server.rs`, `crates/lotar-lib/src/routes/` (custom HTTP transport, not Axum).
+- DTOs/contracts: `crates/lotar-lib/src/api_types.rs`.
+- Storage/domain: `crates/lotar-lib/src/storage/`, `crates/lotar-lib/src/project.rs`, `crates/lotar-lib/src/workspace.rs`.
+- Services: `crates/lotar-lib/src/services/` (task, sprint, sync, agent, automation, …).
+- MCP server (stdio): `crates/lotar-lib/src/mcp/`.
 
 ## Tests + lint
 
@@ -23,10 +23,10 @@ excludeAgent: ["code-review"]
 ## Contract sync
 
 Changing a REST input/output shape means updating **all three** together:
-`src/api_types.rs`, `view/api/types.ts`, `docs/openapi.json`. See the
+`crates/lotar-lib/src/api_types.rs`, `view/api/types.ts`, `docs/openapi.json`. See the
 `api-contract-change-end-to-end` skill.
 
 ## Change discipline
 
 - Keep task YAML storage backwards compatible (user-owned files under `.tasks/`).
-- Prefer existing error/validation patterns (`thiserror`, `src/errors.rs`) over new ad-hoc types.
+- Prefer existing error/validation patterns (`thiserror`, `crates/lotar-lib/src/errors.rs`) over new ad-hoc types.

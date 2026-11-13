@@ -41,13 +41,13 @@ of its own after the switch.
 
 ## What lotar has today
 
-- `src/services/agent_runner.rs` (1771 lines): 12 runner kinds (`codex`, `claude`, `copilot`, `gemini`, `cursor`,
+- `crates/lotar-lib/src/services/agent_runner.rs` (1771 lines): 12 runner kinds (`codex`, `claude`, `copilot`, `gemini`, `cursor`,
   `amp`, `droid`, `opencode`, `kilo`, `antigravity`, `t3`, `command`), flag mapping for model, effort, permissions
   and MCP, and one stream parser per CLI. Almost none of it is lotar-specific.
-- `src/services/agent_job_service.rs` (4629 lines): mostly lotar's own job logic (queue, prompts, worktrees,
+- `crates/lotar-lib/src/services/agent_job_service.rs` (4629 lines): mostly lotar's own job logic (queue, prompts, worktrees,
   landing, rules), plus generic process handling: spawn through the wrapper, kill the process tree, read pipes,
   write stdin messages.
-- `AgentProfileDetail` (`src/config/types.rs`): runner, permissions, model, effort, provider, session, budget,
+- `AgentProfileDetail` (`crates/lotar-lib/src/config/types.rs`): runner, permissions, model, effort, provider, session, budget,
   command, args, env, tools.
 - Only the t3 runner continues sessions. Claude, Codex, OpenCode and Cursor session ids are parsed but never resumed.
   Only Claude takes messages while it runs (stream-json on stdin).
@@ -237,7 +237,7 @@ One change, no transition period:
 3. `session: continue` works through the tool's named sessions, one per ticket (named `DEV-492` and so on), for all
    agents.
 4. Removed in the same change: the per-CLI command builders and parsers in `agent_runner.rs` (about 1700 lines),
-   the stream fixtures under `tests/fixtures/agent-streams/`, the t3 runner and its thread handling in
+   the stream fixtures under `crates/lotar-lib/tests/fixtures/agent-streams/`, the t3 runner and its thread handling in
    `agent_job_service.rs` (about 770 of its 4000 non-test lines), and the runner docs that describe single CLIs
    (`docs/developers/agent-cli-research.md` moves to the tool's repo).
 5. After the switch, a review ticket goes through what stays in `agent_job_service.rs`: queue, worktrees, landing,

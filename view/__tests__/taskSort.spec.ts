@@ -354,9 +354,9 @@ describe('sortTasks', () => {
 })
 
 describe('version fields (DEV-390)', () => {
-    // The server sort (src/services/task_query.rs) runs the same cases.
+    // The server sort (crates/lotar-lib/src/services/task_query.rs) runs the same cases.
     const cases = JSON.parse(
-        readFileSync(resolve(__dirname, '../../tests/fixtures/version_sort_cases.json'), 'utf8'),
+        readFileSync(resolve(__dirname, '../../crates/lotar-lib/tests/fixtures/version_sort_cases.json'), 'utf8'),
     ) as { field: string; tasks: Array<Record<string, unknown> & { id: string }>; asc: string[]; desc: string[] }
     const tasks = cases.tasks.map(({ id, ...custom_fields }) => task({ id, custom_fields }))
     const ids = (list: TaskDTO[]) => list.map((t) => t.id)

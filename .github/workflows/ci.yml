@@ -61,7 +61,7 @@ jobs:
         # docs/help and docs/openapi.json are embedded in the binary; the
         # other non-code paths are files Rust tests read (workflow contracts,
         # API reference, lotar's own automation rules) or packaging.
-        rust=$(any '^(src/|tests/|build\.rs|Cargo\.(toml|lock)|clippy\.toml|rustfmt\.toml|deny\.toml|Cross\.toml|\.config/nextest\.toml|docs/help/|docs/openapi\.json|docs/developers/api-quick-reference\.md|\.github/workflows/|\.tasks/DEV/automation\.yml|packaging/|Dockerfile)')
+        rust=$(any '^(src/|tests/|crates/|Cargo\.(toml|lock)|clippy\.toml|rustfmt\.toml|deny\.toml|Cross\.toml|\.config/nextest\.toml|docs/help/|docs/openapi\.json|docs/developers/api-quick-reference\.md|\.github/workflows/|\.tasks/DEV/automation\.yml|packaging/|Dockerfile)')
         # The UI unit test job also typechecks, lints and formats every
         # TypeScript and JavaScript file, so web covers their tool configs.
         web=$(any '^(view/|[^/]+\.m[jt]s$|\.oxlintrc\.json|oxlintrc\.standard\.json|\.prettier(rc\.json|ignore)|\.editorconfig|tsconfig[^/]*\.json|scripts/compress-web\.mjs)')
@@ -182,7 +182,7 @@ jobs:
       with:
         tool: nextest
 
-    # include_dir! embeds target/web-embed (src/web_server.rs), so every
+    # include_dir! embeds target/web-embed (crates/lotar-web-assets), so every
     # Rust compile step on this cold runner needs freshly generated web
     # assets first; same Node engine/setup pattern as build_artifacts and
     # windows_checks (docs/developers/testing.md). No cache reliance: the
@@ -532,7 +532,7 @@ jobs:
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
     # Target selection, not a name list: every test in the windows_regressions
-    # binary (tests/windows_regressions.rs: storage safety, scan, async-run
+    # binary (crates/lotar-lib/tests/windows_regressions.rs: storage safety, scan, async-run
     # monitoring) and in lotar-agent-wrapper runs here, so platform-specific
     # cases (the Windows atomic-readonly one included) and future additions
     # are covered without maintaining witness names. A small binary of its own

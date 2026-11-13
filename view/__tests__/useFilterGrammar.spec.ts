@@ -874,9 +874,9 @@ describe('repeated colon filters (DEV-231)', () => {
 })
 
 describe('shared search syntax cases (DEV-231)', () => {
-    // The CLI parser (src/utils/search_syntax.rs) runs the same cases.
+    // The CLI parser (crates/lotar-lib/src/utils/search_syntax.rs) runs the same cases.
     const cases = JSON.parse(
-        readFileSync(resolve(__dirname, '../../tests/fixtures/search_syntax_cases.json'), 'utf8'),
+        readFileSync(resolve(__dirname, '../../crates/lotar-lib/tests/fixtures/search_syntax_cases.json'), 'utf8'),
     ) as Array<{ input: string; text: string; filters: Record<string, string>; errors?: string[] }>
 
     it('has cases', () => expect(cases.length).toBeGreaterThan(20))

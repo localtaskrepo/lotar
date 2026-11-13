@@ -1,13 +1,13 @@
 # Task Model
 
-Canonical fields, enums, and invariants for tasks returned by REST, MCP, and CLI renderers. Sources of truth live in `src/api_types.rs` (DTO definitions), `src/types.rs` (strongly-typed enums/records), and the [OpenAPI spec](../openapi.json).
+Canonical fields, enums, and invariants for tasks returned by REST, MCP, and CLI renderers. Sources of truth live in `crates/lotar-lib/src/api_types.rs` (DTO definitions), `crates/lotar-lib/src/types.rs` (strongly-typed enums/records), and the [OpenAPI spec](../openapi.json).
 
 ## Identity and IDs
 
-- Tasks are stored under `.tasks/<PROJECT>/TASK.yml`. The project prefix is derived from the project name unless overridden (see `generate_project_prefix` in `src/project.rs`).
+- Tasks are stored under `.tasks/<PROJECT>/TASK.yml`. The project prefix is derived from the project name unless overridden (see `generate_project_prefix` in `crates/lotar-lib/src/project.rs`).
 - IDs always follow `PREFIX-<NUMBER>` (e.g. `AUTH-42`). CLI commands accept the numeric portion when the active project is unambiguous (`lotar status 42`), otherwise pass the fully-qualified ID or `--project`.
 - Content updates retain `created` and bump `modified` to the wall-clock time recorded by `TaskService`. Soft deletion and restoration preserve `modified` and append timestamped history only when the lifecycle changes.
-- **ID grammar (canonical parse):** the numeric suffix is the FINAL dash-separated segment, so prefixes may themselves contain dashes, digits, underscores, or Unicode letters (`ABC-OPS-12` -> project `ABC-OPS`, task `12`; `dev-ops-4` -> project `dev-ops`). Prefix grammar = `is_valid_project_prefix` in `src/storage/safety.rs`; the parser lives in `src/storage/identity.rs` (`TaskId::parse`).
+- **ID grammar (canonical parse):** the numeric suffix is the FINAL dash-separated segment, so prefixes may themselves contain dashes, digits, underscores, or Unicode letters (`ABC-OPS-12` -> project `ABC-OPS`, task `12`; `dev-ops-4` -> project `dev-ops`). Prefix grammar = `is_valid_project_prefix` in `crates/lotar-lib/src/storage/safety.rs`; the parser lives in `crates/lotar-lib/src/storage/identity.rs` (`TaskId::parse`).
 - **Exact case, no folding:** IDs and project prefixes match exactly (`abc` and `ABC` are different projects).
 - **Padded aliases are deliberate:** `TP-001` and `TP-1` denote the same task file (`TP/1.yml`); reads surface the canonical unpadded spelling in DTO `id` fields. Malformed IDs (empty, missing numeric suffix, non-digit suffix such as `TP-+12` or `TP-1-extra`, path traversal, `u64` overflow) fail closed.
 - **Multiple storage roots:** `StorageLocator::candidate_task_roots` (primary + sibling workspace `.tasks`) drives unfiltered search, project-filtered search, full-ID get, and numeric resolution consistently. Config, sprint memberships, and attachments for a nested-root task come from the root that actually holds it.
@@ -45,7 +45,7 @@ Field | Type | Notes
 
 - `TaskRelationships` exposes dedicated arrays for `depends_on`, `blocks`, `related`, `children`, `fixes`, plus single-value `parent` and `duplicate_of`. All properties are optional; empty collections are dropped on serialization.
 - `TaskComment` holds `{ date: RFC3339, author?: string, text: string }`. `author` is the identity the history records as actor for the `comment_added` entry; comments written before DEV-327 have none.
-- `ReferenceEntry` supports `code` (e.g., `src/lib.rs#120`, stored canonically as `path#line` or `path#start-end`), `link` (URL), `file` (repository-relative path; store paths rejected), `attachment` (managed attachments-store blob name), and `jira`/`github` platform references. The two file-ish kinds are distinct: managed blobs live only under `attachment`, repository files only under `file`.
+- `ReferenceEntry` supports `code` (e.g., `crates/lotar-lib/src/lib.rs#120`, stored canonically as `path#line` or `path#start-end`), `link` (URL), `file` (repository-relative path; store paths rejected), `attachment` (managed attachments-store blob name), and `jira`/`github` platform references. The two file-ish kinds are distinct: managed blobs live only under `attachment`, repository files only under `file`.
 - `TaskChangeLogEntry` captures `{ at, actor?, changes[] }`, where each `TaskChange` includes `field`, `old`, and `new` values for audit review.
 
 Relationship storage remains in each task's existing YAML. The shared relationship
@@ -103,7 +103,7 @@ metadata bytes and timestamps. General task-list sorting is unchanged.
 
 ## Enumerations & config-driven values
 
-- `TaskStatus`, `Priority`, and `TaskType` are thin wrappers around strings (see `src/types.rs`). They validate against the arrays declared in `config.yml` under `issue_states`, `issue_priorities`, and `issue_types`. The examples below are defaults; workspaces routinely customize them.
+- `TaskStatus`, `Priority`, and `TaskType` are thin wrappers around strings (see `crates/lotar-lib/src/types.rs`). They validate against the arrays declared in `config.yml` under `issue_states`, `issue_priorities`, and `issue_types`. The examples below are defaults; workspaces routinely customize them.
 	- `issue_states`: e.g., `TODO`, `IN_PROGRESS`, `VERIFY`, `BLOCKED`, `DONE`, `CANCELED`.
 	- `issue_priorities`: e.g., `Low`, `Medium`, `High`, `Critical`, `Blocker`.
 	- `issue_types`: e.g., `feature`, `bug`, `epic`, `spike`, `chore`.
@@ -114,7 +114,7 @@ metadata bytes and timestamps. General task-list sorting is unchanged.
 - `TaskCreate` accepts `title`, optional `project`, and optional metadata for `priority`, `task_type`, `reporter`, `assignee`, `due_date`, `effort`, `description`, `tags`, `relationships`, `custom_fields`, and `sprints`. Missing properties are defaulted downstream.
 - `TaskUpdate` treats every field as optional and only patches values that are present in the JSON body. Passing `tags` replaces the entire list; omitting it leaves tags untouched.
 - Task creation/update does not set collection order. `TaskOrderRequest` supplies `task`, optional `sprint` (omitted/null means backlog), exactly one of `before`/`after`, and optional `allow_closed`. The response includes the full current `tasks` order and `changed`; caller-visible page subsets are never an authoritative replacement list.
-- Both structs live in `src/api_types.rs` and share the same schema in `docs/openapi.json`.
+- Both structs live in `crates/lotar-lib/src/api_types.rs` and share the same schema in `docs/openapi.json`.
 
 ## Invariants & best practices
 
@@ -146,7 +146,7 @@ change. Ordinary writes and existing task YAML remain unchanged.
 
 ### Current Behavior and Scope
 
-[`atomic_write_file`](../../src/storage/safety.rs) reserves a sibling
+[`atomic_write_file`](../../crates/lotar-lib/src/storage/safety.rs) reserves a sibling
 `.<name>.tmp-<pid>-<counter>` with exclusive creation, syncs it, and renames it over
 the target. Preparation/publication errors attempt to remove only that write's
 own temp. A crash can leave the temp behind. A filename, PID, age, hash, or free
@@ -160,10 +160,10 @@ task lock cannot prove that such a file is abandoned or was created by LoTaR.
 | Transaction and sync journals | Coordinated transaction locks or a separate sync lock | Recovery data and journal-purpose staging are always protected |
 | Scanner source replacement | Source locks; outer `.lotar-scan-*` stage plus inner atomic temp | Separate explicit source-parent scope; never inferred from a recursive workspace scan |
 
-The current production call sites are in [storage operations](../../src/storage/operations.rs),
-[sprint service](../../src/services/sprint_service.rs), [config operations](../../src/config/operations.rs),
-[init scaffolds](../../src/cli/handlers/config/init/scaffolds.rs),
-[sync service](../../src/services/sync_service/mod.rs), and [source preparation](../../src/utils/scan.rs).
+The current production call sites are in [storage operations](../../crates/lotar-lib/src/storage/operations.rs),
+[sprint service](../../crates/lotar-lib/src/services/sprint_service.rs), [config operations](../../crates/lotar-lib/src/config/operations.rs),
+[init scaffolds](../../crates/lotar-lib/src/cli/handlers/config/init/scaffolds.rs),
+[sync service](../../crates/lotar-lib/src/services/sync_service/mod.rs), and [source preparation](../../crates/lotar-lib/src/utils/scan.rs).
 These atomic helpers do not establish ownership of home artifacts, agent logs,
 queue data, reports, attachments, worktrees, or arbitrary operating-system temp
 directories. Those remain outside this operation and keep their existing owners.
@@ -267,7 +267,7 @@ power-loss durability guarantee.
 
 This is a coordination/accidental-data-loss design, not a security boundary against
 malicious code with the same account's access to private control data. POSIX
-component checks from [transactions](../../src/storage/transaction.rs) and current
+component checks from [transactions](../../crates/lotar-lib/src/storage/transaction.rs) and current
 source inode revalidation are precedents, not proof of race-free collection.
 Unix descriptor-relative operations and Windows handle identities/reparse refusal
 must be implemented and tested natively. Unsupported/network filesystem locking
@@ -295,9 +295,9 @@ implemented collector:
 
 Existing `lock_acquisition_preserves_live_atomic_writer_temp_and_rename` and
 `held_lock_times_out_without_running_callback_or_removing_temp_files` in
-`src/storage/safety.rs` prove why lock-time sweeping must not return.
+`crates/lotar-lib/src/storage/safety.rs` prove why lock-time sweeping must not return.
 `corrupt_journal_fails_closed_and_is_kept` and the recovery lock/path tests in
-`src/storage/transaction.rs` remain baseline guards. They do **not** test the
+`crates/lotar-lib/src/storage/transaction.rs` remain baseline guards. They do **not** test the
 proposed capsule protocol. The implementation must keep those guards and pass
 new native Linux/Windows cases plus the ordinary lint/test/smoke gates before
 enabling apply. No destructive implementation is authorized by this design alone.

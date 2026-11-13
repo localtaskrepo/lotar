@@ -1,19 +1,19 @@
 # lotar mcp internals
 
-`lotar mcp` spawns the JSON-RPC/stdio server described in `src/mcp/server.rs`. The process reuses the same services as the CLI and REST API, exits for a supervising host to relaunch when the binary changes, and notifies hosts whenever configuration tweaks alter enum hints. User-facing instructions live in [../help/mcp.md](../help/mcp.md); this file focuses on how the subsystem is wired.
+`lotar mcp` spawns the JSON-RPC/stdio server described in `crates/lotar-lib/src/mcp/server.rs`. The process reuses the same services as the CLI and REST API, exits for a supervising host to relaunch when the binary changes, and notifies hosts whenever configuration tweaks alter enum hints. User-facing instructions live in [../help/mcp.md](../help/mcp.md); this file focuses on how the subsystem is wired.
 
 ## Components
 
-- `src/mcp/server.rs` – stdio main loop (`run_stdio_server`), message routing, request dispatcher, and the binary-change auto-restart watcher thread.
-- `src/mcp/server/transport.rs` – bounded stdio frame reader: NDJSON lines are primary, and a message whose first line is a `Content-Length:` header is read as an LSP-style framed compatibility body (same 10 MiB ceiling).
+- `crates/lotar-lib/src/mcp/server.rs` – stdio main loop (`run_stdio_server`), message routing, request dispatcher, and the binary-change auto-restart watcher thread.
+- `crates/lotar-lib/src/mcp/server/transport.rs` – bounded stdio frame reader: NDJSON lines are primary, and a message whose first line is a `Content-Length:` header is read as an LSP-style framed compatibility body (same 10 MiB ceiling).
 - NDJSON limits exclude line terminators (LF or CRLF). Oversized lines are drained without unbounded accumulation, return a parse error, and leave the following message intact.
-- `src/mcp/server/session.rs` – initialize → awaiting-initialized → ready state machine. Only `notifications/initialized` after `initialize` grants readiness; deferred tool-list changes coalesce here until the session is ready.
-- `src/mcp/server/registry.rs` – the single tool registry governing all dispatch: resolves direct methods and `tools/call` names (control-plane names never resolve), validates arguments against advertised schemas (fail-closed on unenforceable schemas), and converts recoverable domain failures into `isError` tool results. A test enforces registry parity with the 38 `tools/list` entries.
-- `src/mcp/server/schema.rs` – the fail-closed schema validator (required, types, nullability, enum, oneOf, nested arrays/maps, numeric bounds); any keyword outside the enforced set rejects the schema rather than running unvalidated.
-- `src/mcp/server/watchers.rs` – best-effort kernel file watcher plus a 2-second polling fallback; diffs enum hints and emits `notifications/tools/list_changed` whenever `.tasks/**` updates change enum hint categories (projects, statuses, priorities, types, members, tags, custom fields).
-- `src/mcp/server/tools.rs` – tool definition/schema builder that feeds `tools/list`, `schema_discover`, and the registry's argument validation.
-- `src/mcp/server/hints.rs` – gathers the current enum hints from the resolved workspace configuration.
-- `src/mcp/server/handlers/*` – business logic layers that call into `services::*` and emit pretty-printed payloads for MCP hosts.
+- `crates/lotar-lib/src/mcp/server/session.rs` – initialize → awaiting-initialized → ready state machine. Only `notifications/initialized` after `initialize` grants readiness; deferred tool-list changes coalesce here until the session is ready.
+- `crates/lotar-lib/src/mcp/server/registry.rs` – the single tool registry governing all dispatch: resolves direct methods and `tools/call` names (control-plane names never resolve), validates arguments against advertised schemas (fail-closed on unenforceable schemas), and converts recoverable domain failures into `isError` tool results. A test enforces registry parity with the 38 `tools/list` entries.
+- `crates/lotar-lib/src/mcp/server/schema.rs` – the fail-closed schema validator (required, types, nullability, enum, oneOf, nested arrays/maps, numeric bounds); any keyword outside the enforced set rejects the schema rather than running unvalidated.
+- `crates/lotar-lib/src/mcp/server/watchers.rs` – best-effort kernel file watcher plus a 2-second polling fallback; diffs enum hints and emits `notifications/tools/list_changed` whenever `.tasks/**` updates change enum hint categories (projects, statuses, priorities, types, members, tags, custom fields).
+- `crates/lotar-lib/src/mcp/server/tools.rs` – tool definition/schema builder that feeds `tools/list`, `schema_discover`, and the registry's argument validation.
+- `crates/lotar-lib/src/mcp/server/hints.rs` – gathers the current enum hints from the resolved workspace configuration.
+- `crates/lotar-lib/src/mcp/server/handlers/*` – business logic layers that call into `services::*` and emit pretty-printed payloads for MCP hosts.
 
 ## Request lifecycle
 
@@ -41,7 +41,7 @@
 
 ## Testing & diagnostics
 
-- Unit coverage: `tests/mcp_server_unit_test.rs` focuses on framing, error propagation, and watcher notifications; `src/mcp/server/mcp_server_tests.rs` covers workspace-aware server behavior in-tree.
+- Unit coverage: `crates/lotar-lib/tests/mcp_server_unit_test.rs` focuses on framing, error propagation, and watcher notifications; `crates/lotar-lib/src/mcp/server/mcp_server_tests.rs` covers workspace-aware server behavior in-tree.
 - Smoke tests: `smoke/tests/mcp.*.smoke.spec.ts` spawn the server via CLI, run real JSON-RPC calls over stdio, and assert responses/enum hints.
 - `logging/setLevel` accepts a level name, validates it, and records it for the session; unknown levels fall back to `info`. Log output stays on stderr.
 

@@ -5,31 +5,31 @@ LoTaR reads environment variables for workspace discovery, configuration overrid
 ## Resolution & Precedence
 
 - CLI flags → project config (when applicable) → environment variables → home config (`~/.lotar`) → global config (`.tasks/config.yml`) → built-in defaults. Commands without a project context skip the project step. See [Configuration Reference](./config-reference.md) and [Resolution & Precedence](./precedence.md) for resolver details.
-- Override variables feed directly into `src/config/env_overrides.rs`; provide values in the same shape used in YAML (simple scalars) or JSON/YAML strings for lists and maps.
+- Override variables feed directly into `crates/lotar-lib/src/config/env_overrides.rs`; provide values in the same shape used in YAML (simple scalars) or JSON/YAML strings for lists and maps.
 - Changes require restarting the CLI/server so the fresh environment is read.
 
 ## Tasks Directory & Config Discovery
 
 | Variable | Values | Behavior/Source |
 | --- | --- | --- |
-| `LOTAR_TASKS_DIR` | Absolute path or simple folder name | Highest-priority location for the `.tasks` workspace (`src/workspace.rs`). When a simple relative name is provided the resolver searches parent directories; missing paths are created automatically. |
+| `LOTAR_TASKS_DIR` | Absolute path or simple folder name | Highest-priority location for the `.tasks` workspace (`crates/lotar-lib/src/workspace.rs`). When a simple relative name is provided the resolver searches parent directories; missing paths are created automatically. |
 | `LOTAR_IGNORE_ENV_TASKS_DIR` | `1` | Test helper that forces the resolver to ignore `LOTAR_TASKS_DIR` even when set, preventing cross-test bleed. |
-| `LOTAR_IGNORE_HOME_CONFIG` | `1` | Skips loading `~/.lotar` (`src/config/persistence.rs` and `src/workspace.rs`). Useful for hermetic CI runs. |
+| `LOTAR_IGNORE_HOME_CONFIG` | `1` | Skips loading `~/.lotar` (`crates/lotar-lib/src/config/persistence.rs` and `crates/lotar-lib/src/workspace.rs`). Useful for hermetic CI runs. |
 | `LOTAR_TEST_MODE` | `1` | Enables the test heuristics: disables `LOTAR_TASKS_DIR`, ignores home config, and constrains parent-directory discovery boundaries. |
-| `LOTAR_PROJECT` | Project name/prefix | Overrides project auto-detection (`src/project.rs`) and acts as an alias when overriding `default_project`. |
+| `LOTAR_PROJECT` | Project name/prefix | Overrides project auto-detection (`crates/lotar-lib/src/project.rs`) and acts as an alias when overriding `default_project`. |
 
 ## Config Overrides (global config replacements)
 
-All rows below are defined in `src/config/env_overrides.rs`. Each variable maps to the indicated key within `config.yml`.
+All rows below are defined in `crates/lotar-lib/src/config/env_overrides.rs`. Each variable maps to the indicated key within `config.yml`.
 
 ### Server defaults & identity
 
 | Config key | Env var(s) | Accepted values | Purpose |
 | --- | --- | --- | --- |
-| `server_port` | `LOTAR_PORT`, `LOTAR_SERVER_PORT` | Integer | Locks the HTTP/SSE server to a specific port when `serve` runs without `--port` (`--config server.port` and `--port` win). A busy configured port fails rather than moving; only the untouched built-in default (8080) falls back to an OS-assigned port (`src/cli/handlers/serve_handler.rs`). |
+| `server_port` | `LOTAR_PORT`, `LOTAR_SERVER_PORT` | Integer | Locks the HTTP/SSE server to a specific port when `serve` runs without `--port` (`--config server.port` and `--port` win). A busy configured port fails rather than moving; only the untouched built-in default (8080) falls back to an OS-assigned port (`crates/lotar-lib/src/cli/handlers/serve_handler.rs`). |
 | `default_project` | `LOTAR_PROJECT`, `LOTAR_DEFAULT_PROJECT` | Project prefix/slug | Sets the fallback project for CLI commands that omit `-p/--project`. |
 | `default_assignee` | `LOTAR_DEFAULT_ASSIGNEE` | username / `@me` | Auto-populates the assignee on new tasks. |
-| `default_reporter` | `LOTAR_DEFAULT_REPORTER` | username / email | Sets the reporter used when resolving `@me` (`src/utils/identity.rs`). |
+| `default_reporter` | `LOTAR_DEFAULT_REPORTER` | username / email | Sets the reporter used when resolving `@me` (`crates/lotar-lib/src/utils/identity.rs`). |
 | `default_tags` | `LOTAR_DEFAULT_TAGS` | JSON/YAML list or comma string | Extra tags added to every new task. |
 | `default_priority` | `LOTAR_DEFAULT_PRIORITY` | Priority slug | Sets the initial priority when not provided. |
 | `default_status` | `LOTAR_DEFAULT_STATUS` | Status slug | Sets the initial workflow status. |
@@ -90,23 +90,23 @@ All rows below are defined in `src/config/env_overrides.rs`. Each variable maps 
 
 | Variable | Values | Effect |
 | --- | --- | --- |
-| `LOTAR_SSE_DEBOUNCE_MS` | Integer milliseconds | Default debounce for `/api/events` when clients omit `?debounce_ms=` (`src/web_server.rs`). |
+| `LOTAR_SSE_DEBOUNCE_MS` | Integer milliseconds | Default debounce for `/api/events` when clients omit `?debounce_ms=` (`crates/lotar-lib/src/web_server.rs`). |
 | `LOTAR_SSE_READY` | `1` | Allows clients to request an immediate `ready` SSE event; primarily used by integration tests. |
-| `LOTAR_STATS_EFFORT_CAP` | Integer | Caps the rolling window size used by `lotar stats effort` (`src/cli/handlers/stats/effort.rs`). |
-| `LOTAR_MCP_AUTORELOAD` | `0`/`1` (default `1`) | Controls whether the MCP stdio server restarts when the binary changes (`src/mcp/server.rs`). |
-| `LOTAR_DOCS_BASE_URL` | URL | Overrides the base used when rendering hyperlinks inside `lotar help` (`src/help/mod.rs`). |
+| `LOTAR_STATS_EFFORT_CAP` | Integer | Caps the rolling window size used by `lotar stats effort` (`crates/lotar-lib/src/cli/handlers/stats/effort.rs`). |
+| `LOTAR_MCP_AUTORELOAD` | `0`/`1` (default `1`) | Controls whether the MCP stdio server restarts when the binary changes (`crates/lotar-lib/src/mcp/server.rs`). |
+| `LOTAR_DOCS_BASE_URL` | URL | Overrides the base used when rendering hyperlinks inside `lotar help` (`crates/lotar-lib/src/help/mod.rs`). |
 | `LOTAR_HELP_STYLE` | `ansi`/`plain` | Forces colored (`ansi`) or plain-text help output regardless of TTY detection. |
 
 ## Diagnostics & Test Helpers
 
 | Variable | Values | Effect |
 | --- | --- | --- |
-| `LOTAR_TEST_SILENT` | `1` | Suppresses most warnings during automated tests (`src/output/mod.rs`, CLI handlers). |
+| `LOTAR_TEST_SILENT` | `1` | Suppresses most warnings during automated tests (`crates/lotar-lib/src/output/mod.rs`, CLI handlers). |
 | `LOTAR_VERBOSE` | `1` | Re-enables informational logs (such as config creation) even when tests are silenced. |
-| `LOTAR_DEBUG` | Any non-empty | Appends `stats effort --transitions` internals to `/tmp/lotar_transitions_debug.log` (`src/cli/handlers/stats/effort.rs`) and prints mention-linking failures to stderr (`src/services/task_service.rs`). |
+| `LOTAR_DEBUG` | Any non-empty | Appends `stats effort --transitions` internals to `/tmp/lotar_transitions_debug.log` (`crates/lotar-lib/src/cli/handlers/stats/effort.rs`) and prints mention-linking failures to stderr (`crates/lotar-lib/src/services/task_service.rs`). |
 | `LOTAR_DEBUG_ADD` | `1` | Emits detailed payload logs for `lotar add` into `/tmp/lotar_add_debug.log`. |
 | `LOTAR_DEBUG_STATUS` | Any non-empty | Emits verbose `status` command and storage logs. |
-| `LOTAR_TEST_FAST_IO` | `1` | Shortens SSE debounce timers and heartbeats for local tests (`src/web_server.rs`). |
-| `LOTAR_TEST_FAST_NET` | `1` | Integration-test helper that shrinks HTTP client timeouts (`tests/web_api_integration_test.rs`). |
+| `LOTAR_TEST_FAST_IO` | `1` | Shortens SSE debounce timers and heartbeats for local tests (`crates/lotar-lib/src/web_server.rs`). |
+| `LOTAR_TEST_FAST_NET` | `1` | Integration-test helper that shrinks HTTP client timeouts (`crates/lotar-lib/tests/web_api_integration_test.rs`). |
 
 Related docs: [Configuration Reference](./config-reference.md), [Precedence](./precedence.md), [serve](./serve.md), and [sse](./sse.md).

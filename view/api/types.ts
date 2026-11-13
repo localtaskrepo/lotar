@@ -1,4 +1,4 @@
-// DTO shapes aligned with src/api_types.rs
+// DTO shapes aligned with crates/lotar-lib/src/api_types.rs
 export type TaskStatus = string
 export type Priority = string
 export type TaskType = string
@@ -179,7 +179,7 @@ export interface TaskDTO {
 
 /**
  * Typed external reference entry aligned with `ReferenceEntry` in
- * src/types.rs. Each entry carries exactly one kind: `code` and `file` are
+ * crates/lotar-lib/src/types.rs. Each entry carries exactly one kind: `code` and `file` are
  * repository-relative paths (`code` carries a `#N[-M]` line anchor),
  * `attachment` is a managed attachments-store blob name, and
  * `link`/`jira`/`github` are external values. The file-ish kinds are

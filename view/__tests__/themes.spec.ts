@@ -14,7 +14,7 @@ import { LEGACY_THEME_ALIASES, THEMES, type ThemeInfo } from '../utils/themes'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const themesCss = readFileSync(resolve(__dirname, '../themes.css'), 'utf8')
 const stylesCss = readFileSync(resolve(__dirname, '../styles.css'), 'utf8')
-const brandingRs = readFileSync(resolve(__dirname, '../../src/config/branding.rs'), 'utf8')
+const brandingRs = readFileSync(resolve(__dirname, '../../crates/lotar-lib/src/config/branding.rs'), 'utf8')
 
 const skins = THEMES as readonly ThemeInfo[]
 

@@ -35,7 +35,7 @@ When `localStorage`/`sessionStorage` are unavailable (private mode, CSP), the UI
 
 ## CLI/server considerations
 
-`lotar serve` in `src/cli/handlers/serve_handler.rs` merely hosts the built assets and REST API; it does not persist preference changes. The browser always talks to `localStorage`/`sessionStorage` directly, so there is no API surface to migrate.
+`lotar serve` in `crates/lotar-lib/src/cli/handlers/serve_handler.rs` merely hosts the built assets and REST API; it does not persist preference changes. The browser always talks to `localStorage`/`sessionStorage` directly, so there is no API surface to migrate.
 
 When introducing a new preference:
 

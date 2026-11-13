@@ -14,7 +14,7 @@ Legacy per-command files (`add.md`, `status.md`, …) are intentionally slim poi
 
 ## Working guidelines
 
-1. When changing behavior, update the relevant developer doc at the same time. Call out modules (`src/...`) and tests (`tests/...` or `smoke/tests/...`) so future maintainers know where to look.
+1. When changing behavior, update the relevant developer doc at the same time. Call out modules (`crates/lotar-lib/src/...`) and tests (`crates/lotar-lib/tests/...` or `smoke/tests/...`) so future maintainers know where to look.
 2. Summarize the user-facing impact separately under `docs/help/` and link back to the developer doc if engineers need more context.
 3. If you introduce a brand-new subsystem, add a short section to `main.md` or `cli.md` and reference it from `index.md` so it’s discoverable.
 4. Keep the docs current as part of your feature definition; reviewers should be able to rely on this folder as the single source of truth for implementation notes.

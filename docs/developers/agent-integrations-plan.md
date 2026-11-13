@@ -1,6 +1,6 @@
 # Agent CLI integration plan
 
-> **Historical document (supersession note).** This is the original pre-implementation design plan, preserved as written. Current implementation status lives in `docs/developers/agent-automation-tracker.md`; the SSE contract lives in `docs/developers/sse.md`. Code references below to `src/routes.rs` predate its split into the `src/routes/` modules (job endpoints in `src/routes/jobs.rs`, automation endpoints in `src/routes/automation.rs`), and job state is no longer purely ephemeral (see the Storage note).
+> **Historical document (supersession note).** This is the original pre-implementation design plan, preserved as written. Current implementation status lives in `docs/developers/agent-automation-tracker.md`; the SSE contract lives in `docs/developers/sse.md`. Code references below to `crates/lotar-lib/src/routes.rs` predate its split into the `crates/lotar-lib/src/routes/` modules (job endpoints in `crates/lotar-lib/src/routes/jobs.rs`, automation endpoints in `crates/lotar-lib/src/routes/automation.rs`), and job state is no longer purely ephemeral (see the Storage note).
 
 ## Goal
 Enable LoTaR to orchestrate installed agent CLIs (Copilot CLI, Claude Code, Codex CLI, Gemini CLI) and capture reliable job status/progress without relying on the model to self-report.
@@ -22,7 +22,7 @@ Enable LoTaR to orchestrate installed agent CLIs (Copilot CLI, Claude Code, Code
 
 ## Runner event mapping (observed)
 
-Checked against live runs of claude 2.1.308, codex-cli 0.163 and copilot 1.0.69 (DEV-199); sanitised captures are replayed by the parser tests from `tests/fixtures/agent-streams/`. Gemini follows its headless docs only.
+Checked against live runs of claude 2.1.308, codex-cli 0.163 and copilot 1.0.69 (DEV-199); sanitised captures are replayed by the parser tests from `crates/lotar-lib/tests/fixtures/agent-streams/`. Gemini follows its headless docs only.
 
 ### Claude Code
 - `-p --output-format stream-json --input-format stream-json --verbose`. In stream-json input mode the positional prompt is ignored: the prompt is written to stdin as a `{"type":"user",...}` line and stdin is closed after the `result` line, which is what ends the process.
@@ -67,7 +67,7 @@ Checked against live runs of claude 2.1.308, codex-cli 0.163 and copilot 1.0.69 
 - Minimal context storage per ticket (e.g., `.context` with last N messages)
 - Optional event log (bounded) for troubleshooting; avoid full raw logs by default
 - **No job persistence in repo**: job state is ephemeral; web UI can cache last-seen state in browser storage only.
-  - *Superseded:* job events are now appended to persistent per-job log files (`src/services/agent_log_service.rs`, surfaced via `GET /api/jobs/logs`); job records themselves stay outside the repo.
+  - *Superseded:* job events are now appended to persistent per-job log files (`crates/lotar-lib/src/services/agent_log_service.rs`, surfaced via `GET /api/jobs/logs`); job records themselves stay outside the repo.
 
 ## UI
 - Job panel for running/completed jobs
@@ -326,10 +326,10 @@ agents:
 
 ## Technical spec (implementation plan)
 ### Integration points in the codebase
-- **Config**: extend `src/config/types.rs` + `src/config/operations.rs` + `src/config/resolution.rs` + `src/config/env_overrides.rs` to add agent profiles + context storage flag.
-- **REST**: add job endpoints in `src/routes.rs` and DTOs in `src/api_types.rs`; update `docs/openapi.json` and `view/api/types.ts`. (*Historical path: `src/routes.rs` has since been split into `src/routes/` modules — jobs in `src/routes/jobs.rs`, automation in `src/routes/automation.rs`.)
-- **SSE**: reuse `src/api_events.rs` to emit `agent_job_*` events; `src/web_server.rs` already forwards events.
-- **CLI**: add `lotar agent` args under `src/cli/args/` and handlers under `src/cli/handlers/`.
+- **Config**: extend `crates/lotar-lib/src/config/types.rs` + `crates/lotar-lib/src/config/operations.rs` + `crates/lotar-lib/src/config/resolution.rs` + `crates/lotar-lib/src/config/env_overrides.rs` to add agent profiles + context storage flag.
+- **REST**: add job endpoints in `crates/lotar-lib/src/routes.rs` and DTOs in `crates/lotar-lib/src/api_types.rs`; update `docs/openapi.json` and `view/api/types.ts`. (*Historical path: `crates/lotar-lib/src/routes.rs` has since been split into `crates/lotar-lib/src/routes/` modules — jobs in `crates/lotar-lib/src/routes/jobs.rs`, automation in `crates/lotar-lib/src/routes/automation.rs`.)
+- **SSE**: reuse `crates/lotar-lib/src/api_events.rs` to emit `agent_job_*` events; `crates/lotar-lib/src/web_server.rs` already forwards events.
+- **CLI**: add `lotar agent` args under `crates/lotar-lib/src/cli/args/` and handlers under `crates/lotar-lib/src/cli/handlers/`.
 - **Services**: add `agent_job_service` (job lifecycle + supervisor), `agent_runner` (CLI adapters), and `agent_context_service` (per-ticket `.context` storage).
 - **UI**: add job dashboard + ticket job widgets under `view/pages/` + `view/components/` and reuse `view/composables/useSse.ts` for live status.
 
@@ -370,7 +370,7 @@ agents:
 ## Implementation task list (tracking)
 ### Completed
 - [x] Define job DTOs and API routes (POST/GET/stream/cancel)
-	- Notes: update `src/api_types.rs`, `docs/openapi.json`, `view/api/types.ts`, and `src/routes.rs`; streaming uses `/api/events` SSE.
+	- Notes: update `crates/lotar-lib/src/api_types.rs`, `docs/openapi.json`, `view/api/types.ts`, and `crates/lotar-lib/src/routes.rs`; streaming uses `/api/events` SSE.
 - [x] Create job supervisor + registry (in-memory)
 	- Notes: include PID, timestamps, status, session id, and ticket id.
 - [x] Add SSE events for agent jobs (`agent_job_*`)

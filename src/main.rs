@@ -66,6 +66,7 @@ fn is_valid_command(command: &str) -> bool {
     )
 }
 fn main() {
+    lotar::web_server::set_embedded_assets(lotar_web_assets::get);
     let args: Vec<String> = env::args().collect();
 
     // No arguments: print usage/help to stderr and exit with failure (tests expect "Usage")

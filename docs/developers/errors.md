@@ -19,17 +19,17 @@ HTTP/1.1 400 Bad Request
 
 | HTTP status | `error.code` | When it is returned | Source |
 | --- | --- | --- | --- |
-| `400` | `INVALID_ARGUMENT` | Request validation failures: missing parameters, malformed JSON bodies, invalid filters, priority/type parsing errors, invalid task IDs, or git preconditions. Raised through `bad_request(..)` in `src/routes/mod.rs`. |
-| `404` | `NOT_FOUND` | Task or sprint lookups that miss (e.g., comment edits, sprint lifecycle updates). Uses `not_found(..)` in `src/routes/mod.rs`. |
-| `500` | `INTERNAL` | Storage/config IO, YAML parsing, or service errors mapped as internal failures. Sourced via `internal(..)` and the domain mapper in `src/routes/mod.rs`. |
-| `500` | `SERIALIZE` | Server JSON encoding failure (`json_serialize_error` in `src/routes/mod.rs`); an implementation error, not a promised transient retry condition. |
+| `400` | `INVALID_ARGUMENT` | Request validation failures: missing parameters, malformed JSON bodies, invalid filters, priority/type parsing errors, invalid task IDs, or git preconditions. Raised through `bad_request(..)` in `crates/lotar-lib/src/routes/mod.rs`. |
+| `404` | `NOT_FOUND` | Task or sprint lookups that miss (e.g., comment edits, sprint lifecycle updates). Uses `not_found(..)` in `crates/lotar-lib/src/routes/mod.rs`. |
+| `500` | `INTERNAL` | Storage/config IO, YAML parsing, or service errors mapped as internal failures. Sourced via `internal(..)` and the domain mapper in `crates/lotar-lib/src/routes/mod.rs`. |
+| `500` | `SERIALIZE` | Server JSON encoding failure (`json_serialize_error` in `crates/lotar-lib/src/routes/mod.rs`); an implementation error, not a promised transient retry condition. |
 
 `details` is optional; it appears when a handler adds structured context to the `internal(..)` payload. Conflicts (`409`) remain unused today—they are reserved for future optimistic concurrency features.
 
 ## CLI
 
 - Commands exit with `0` on success and `1` on any error path. The exit points in `src/main.rs` call `std::process::exit(1)` after logging the failure.
-- Errors are rendered through `OutputRenderer::emit_error` (`src/output/mod.rs`):
+- Errors are rendered through `OutputRenderer::emit_error` (`crates/lotar-lib/src/output/mod.rs`):
 	- Text mode writes `❌ message` to `stderr`.
 	- `--format=json` still writes to `stderr`, but the payload becomes `{"status":"error","message":"..."}` so scripts can parse it. Standard output stays clean for successful JSON payloads.
 - Warnings and validation hints also go to `stderr`, so automation should treat `stdout` as the canonical data channel.
@@ -50,7 +50,7 @@ The MCP server implements JSON-RPC 2.0 and mirrors the spec’s error structure:
 }
 ```
 
-Standard JSON-RPC codes used in `src/mcp/server.rs`:
+Standard JSON-RPC codes used in `crates/lotar-lib/src/mcp/server.rs`:
 
 | Code | Meaning |
 | --- | --- |
@@ -59,7 +59,7 @@ Standard JSON-RPC codes used in `src/mcp/server.rs`:
 | `-32602` | Invalid or missing params (used extensively across handlers).
 | `-32603` | Internal error (resolver/storage failures, serialization issues).
 
-Domain-specific codes introduced in `src/mcp/server/handlers/*`:
+Domain-specific codes introduced in `crates/lotar-lib/src/mcp/server/handlers/*`:
 
 | Code | Meaning |
 | --- | --- |

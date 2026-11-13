@@ -4,34 +4,34 @@ This page explains how LoTaR resolves values for configuration, identity (for @m
 
 ## Configuration precedence
 
-`src/config/resolution.rs` is the single merge engine for configuration layers (`ConfigManager` delegates to its cached resolver) in a fixed order (highest wins):
+`crates/lotar-lib/src/config/resolution.rs` is the single merge engine for configuration layers (`ConfigManager` delegates to its cached resolver) in a fixed order (highest wins):
 1. Command-line flags for the current invocation (e.g., `lotar config set --project`, `--tasks-dir`, `--format`) plus the global `--config KEY=VALUE` overrides. These are evaluated inside each command handler, scoped to the running process, and never persisted.
-2. Environment overrides defined in `src/config/env_overrides.rs` (see `docs/help/environment.md` for the full table). The first set variable wins per key. `get_project_config` overlays them after the project file, so the running process (an agent job, CI) wins over committed project config (DEV-404).
+2. Environment overrides defined in `crates/lotar-lib/src/config/env_overrides.rs` (see `docs/help/environment.md` for the full table). The first set variable wins per key. `get_project_config` overlays them after the project file, so the running process (an agent job, CI) wins over committed project config (DEV-404).
 3. Project config (`.tasks/<PROJECT>/config.yml`) when a project has been resolved. Overrides home and global config.
 4. Home config (`~/.lotar`, on Windows `%USERPROFILE%\.lotar`). Read via `ConfigManager::load_home_config*` and allowed to override the workspace-global config.
 5. Global config (`.tasks/config.yml` in the resolved workspace). Provides the shared baseline for every project.
-6. Built-in defaults from `src/config/types.rs`.
+6. Built-in defaults from `crates/lotar-lib/src/config/types.rs`.
 
 Commands that do not operate on a project simply skip step 3, so they evaluate CLI → env → home → global → defaults.
 
 Notes:
-- The same chain powers CLI, REST, and MCP. Project-aware commands always call `ProjectResolver::resolve_project` and then `ConfigManager::get_project_config`, so they inherit project-level overrides while env and CLI values still win. `--config KEY=VALUE` is implemented via `configure_cli_overrides` in `src/config/resolution.rs` and sits above everything else, while existing per-command flags remain available as shorthands.
-- Automation toggles (`auto.set_reporter`, `auto.assign_on_status`, `auto.identity`, `auto.identity_git`, `auto.branch_infer_*`, etc.) default to true when unspecified (see `src/config/types.rs`) and honor the same precedence chain.
+- The same chain powers CLI, REST, and MCP. Project-aware commands always call `ProjectResolver::resolve_project` and then `ConfigManager::get_project_config`, so they inherit project-level overrides while env and CLI values still win. `--config KEY=VALUE` is implemented via `configure_cli_overrides` in `crates/lotar-lib/src/config/resolution.rs` and sits above everything else, while existing per-command flags remain available as shorthands.
+- Automation toggles (`auto.set_reporter`, `auto.assign_on_status`, `auto.identity`, `auto.identity_git`, `auto.branch_infer_*`, etc.) default to true when unspecified (see `crates/lotar-lib/src/config/types.rs`) and honor the same precedence chain.
 - Fields that cannot be set per project skip the project layer. `tasks_folder` is read only from the home config.
 
 ## Identity resolution and @me
 
-Anywhere a person field is accepted (assignee, reporter, default_reporter), the special value @me is allowed. `src/utils/identity_detectors.rs` runs detectors in this order:
+Anywhere a person field is accepted (assignee, reporter, default_reporter), the special value @me is allowed. `crates/lotar-lib/src/utils/identity_detectors.rs` runs detectors in this order:
 1) Effective config `default_reporter` (same precedence chain described in [config.md](./config.md): CLI overrides → env vars like `LOTAR_DEFAULT_REPORTER` → selected project → home → global → defaults)
 2) Git user (user.name or user.email at repo root) — gated by `auto.identity_git`
 3) System user ($USER or $USERNAME)
 4) Project manifest author (package.json author, Cargo.toml authors, or .csproj `<Authors>`) — last resort only, since manifest authors are a static guess that may not be the current user
 
-`src/utils/identity.rs` caches these results per workspace and effective project, so CLI/REST/MCP share the same answer for the same scope. Task operations use the task's project; unscoped identity lookups use configured `default.project` when present. Explicit CLI `whoami --project` accepts a name or prefix without initializing a project. Set `auto.identity=false` to disable the git/manifest detectors (config and system user remain); set `auto.identity_git=false` to skip git-based fallbacks while still honoring env and manifest values. `lotar whoami --explain` surfaces the same project-resolved toggles and configuration-tier details.
+`crates/lotar-lib/src/utils/identity.rs` caches these results per workspace and effective project, so CLI/REST/MCP share the same answer for the same scope. Task operations use the task's project; unscoped identity lookups use configured `default.project` when present. Explicit CLI `whoami --project` accepts a name or prefix without initializing a project. Set `auto.identity=false` to disable the git/manifest detectors (config and system user remain); set `auto.identity_git=false` to skip git-based fallbacks while still honoring env and manifest values. `lotar whoami --explain` surfaces the same project-resolved toggles and configuration-tier details.
 
 ## Tasks directory resolution
 
-`src/workspace.rs` (`TasksDirectoryResolver`) discovers the workspace root using these steps:
+`crates/lotar-lib/src/workspace.rs` (`TasksDirectoryResolver`) discovers the workspace root using these steps:
 1. `--tasks-dir <PATH>` (highest priority). The directory is created automatically when missing so initialization commands can run in fresh folders.
 2. `LOTAR_TASKS_DIR` environment variable (skipped when `LOTAR_TEST_MODE=1`, `RUST_TEST_THREADS` is set, or `LOTAR_IGNORE_ENV_TASKS_DIR=1`). Relative single-segment values first try to match parent directories before falling back to creating the path.
 3. Home config `tasks_folder` setting (in `~/.lotar` unless overridden by `LOTAR_IGNORE_HOME_CONFIG=1`). There is no workspace-level `tasks_folder`: `main.rs` passes `None` as the global folder name, and the setting could not work there anyway because `.tasks/config.yml` lives inside the folder being searched for.
@@ -42,7 +42,7 @@ These rules apply everywhere (CLI, REST server, MCP). `lotar config show` prints
 
 ## Project resolution (short guide)
 
-Project context is determined by `src/cli/project.rs`/`ProjectResolver`:
+Project context is determined by `crates/lotar-lib/src/cli/project.rs`/`ProjectResolver`:
 - Explicit `--project` flag (highest). Accepts either a prefix or the full project name; both are normalized via `resolve_project_input`.
 - Task ID prefix (e.g., AUTH-123 → AUTH) when present.
 - Auto-detection from the current `.tasks/<PREFIX>` directory name when the repo has a single initialized project.

@@ -31,4 +31,4 @@ regexes = ['''1Password: "[^"]+"''', '''password"?\s*[:=]\s*"\{env\}[A-Z0-9_]+"'
 # Recorded agent streams used as test fixtures carry opaque apiCallId values, not credentials (2026-11-10 sweep).
 [[allowlists]]
 description = "recorded agent stream fixtures"
-paths = ['''^tests/fixtures/agent-streams/''']
+paths = ['''^crates/lotar-lib/tests/fixtures/agent-streams/''']

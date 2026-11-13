@@ -26,14 +26,15 @@ description: Choose meaningful behavior checks and run targeted Rust, UI, or smo
 
 ## Rust (nextest)
 
-- Full (local profile; CI uses `ci`): `npm run test:rust` (runtime Git probe: default profile when Git works, else the `gitless` profile with reported `git_required` exclusions — see [tests README](../../../tests/README.md))
+- Full (local profile; CI uses `ci`): `npm run test:rust` (runtime Git probe: default profile when Git works, else the `gitless` profile with reported `git_required` exclusions — see [tests README](../../../crates/lotar-lib/tests/README.md))
 - Filter by substring: `npm run test:rust -- <substring>`
-- Integration tests build into one binary (`tests/integration.rs`, DEV-302); each `tests/<file>.rs` is a module, so test names start with the file name. Select one file with `-E 'test(/^<file>::/)'`, and list new test files in `tests/integration.rs`.
+- Integration tests build into one binary (`crates/lotar-lib/tests/integration.rs`, DEV-302); each `crates/lotar-lib/tests/<file>.rs` is a module, so test names start with the file name. Select one file with `-E 'test(/^<file>::/)'`, and list new test files in `crates/lotar-lib/tests/integration.rs`.
 - List exact test names: `cargo nextest list --cargo-profile local`
 - Pass-through test-binary args (e.g. `--nocapture`): `cargo nextest run --cargo-profile local <filter> -- --nocapture`
 - Raw nextest (no npm runner) still selects `git_required` tests; they fail closed via `require_git()` when Git is unavailable — never a silent pass.
 - Fast clippy-only loop (lib+bins, no `--all-targets`/`--all-features`): `npm run lint:backend:fast`
-- Fresh worktree: run `npm run build:web` before compiling Rust; `include_dir!` requires the generated `target/web-embed` directory.
+- Fresh worktree: run `npm run build:web` before compiling Rust; `include_dir!` (crates/lotar-web-assets) requires the generated `target/web-embed` directory.
+- Don't narrow Rust runs with `-p lotar-lib`: its tests run the `lotar` binary of the root package, which only a workspace run rebuilds. Filter with `-E` instead.
 - Sandbox denial is not a code failure: when cargo stops before compiling with `sccache` (the `rustc-wrapper` in `~/.cargo/config.toml`) and `Operation not permitted`, the agent sandbox blocked the cache server. Rerun the same command with the harness's approval for unsandboxed execution; if that is refused, rerun it with `RUSTC_WRAPPER=` (empty disables the wrapper; a slower, uncached build). Report which retry ran.
 
 ## UI unit tests (vitest)

@@ -14,7 +14,7 @@ excludeAgent: ["code-review"]
 ## API connectivity
 
 - Use the existing API client: `view/api/client.ts`.
-- Use the shared DTOs: `view/api/types.ts` (kept aligned with `src/api_types.rs`).
+- Use the shared DTOs: `view/api/types.ts` (kept aligned with `crates/lotar-lib/src/api_types.rs`).
 - Prefer same-origin `/api/*` URLs (the Rust server serves both the SPA and the API).
 
 ## Tests + lint

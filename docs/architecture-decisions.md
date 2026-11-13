@@ -10,7 +10,7 @@ LoTaR follows a clean, modular architecture built around Rust's type safety and 
 
 ### Core Components
 
-**Storage Layer (`src/storage/*`)**
+**Storage Layer (`crates/lotar-lib/src/storage/*`)**
 - YAML-based persistence with human-readable `.yml` files
 - Project isolation with separate directories
 - Automatic ID generation (`PROJ-1` format with 4-character prefixes)
@@ -23,7 +23,7 @@ LoTaR follows a clean, modular architecture built around Rust's type safety and 
 - Relationships struct for dependencies and hierarchies
 - Custom fields HashMap for team-specific data
 
-**Search & Filtering (`src/storage/search.rs`)**
+**Search & Filtering (`crates/lotar-lib/src/storage/search.rs`)**
 - Query helpers over on-disk tasks without a DB
 - Filtering by status, priority, task type, tags, text
 - Case-insensitive fuzzy matching utilities for flexible queries
@@ -34,7 +34,7 @@ LoTaR follows a clean, modular architecture built around Rust's type safety and 
 - UUID tracking for persistent TODO identification
 - File type recognition via extension mapping
 
-**CLI Interface (`src/cli/*`)**
+**CLI Interface (`crates/lotar-lib/src/cli/*`)**
 - Command pattern for extensible command structure
 - Robust enum-based argument validation
 - Custom error types with proper propagation

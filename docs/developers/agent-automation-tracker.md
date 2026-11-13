@@ -39,7 +39,7 @@ All planned features are implemented. See `docs/help/agent.md` and `docs/help/au
 
 - [x] CLI — `agent run`, `status`, `logs`, `cancel`, `check`, `list-running`, `list-jobs`, `worktree list/cleanup`, `worker`, `queue`
 - [x] CLI — `automation simulate` / `dry-run`
-- [x] REST API — Job create/list/get/logs/cancel/cancel-all/message (`src/routes/jobs.rs`), queue stats, automation inspect/set/simulate (`src/routes/automation.rs`)
+- [x] REST API — Job create/list/get/logs/cancel/cancel-all/message (`crates/lotar-lib/src/routes/jobs.rs`), queue stats, automation inspect/set/simulate (`crates/lotar-lib/src/routes/automation.rs`)
 - [x] SSE events — `agent_job_started`, `agent_job_progress`, `agent_job_message`, `agent_job_input`, `agent_job_completed`, `agent_job_failed`, `agent_job_cancelled` (payloads in `docs/developers/sse.md`). The push-only kinds `agent_job_raw`, `agent_job_init`, and `agent_job_result` consume sequence numbers and appear in the REST log (`GET /api/jobs/logs`) but are never streamed over SSE.
 - [x] MCP tools — Job creation and management (`agent_run`, `agent_status`, `agent_cancel`, `agent_list_jobs`, `agent_send_message`)
 - [x] Web UI — Agent Jobs page with queue stats, job creation, profile picker, live log viewer, cancel/remove
@@ -50,15 +50,15 @@ All planned features are implemented. See `docs/help/agent.md` and `docs/help/au
 - [x] **Agent profile names added to member list** — Fixed in `missing_members_for_task` and Vue `preloadPeople`.
 - [x] **CLI `add` missing automation trigger** — `AddHandler` bypassed `AutomationService`. Fixed: automation now fires after `storage.add()`.
 - [x] **Home config interference in tests** — `~/.lotar` overriding workspace config. Fixed: `LOTAR_IGNORE_HOME_CONFIG=1` in smoke env.
-- [x] **`lotar init --project` broken** — Fixed: project init writes the project config under the tasks root and `ensure_global_config_has_default` always sets `default.project` in the global config (`src/cli/handlers/config/init/mod.rs`).
-- [x] **CLI single-field commands skip automation** — Fixed: `lotar priority`, `lotar status`, `lotar assignee`, `lotar due`, and `lotar effort` route through `TaskService::update` and fire automation; covered by `tests/cli_single_field_automation_test.rs`.
+- [x] **`lotar init --project` broken** — Fixed: project init writes the project config under the tasks root and `ensure_global_config_has_default` always sets `default.project` in the global config (`crates/lotar-lib/src/cli/handlers/config/init/mod.rs`).
+- [x] **CLI single-field commands skip automation** — Fixed: `lotar priority`, `lotar status`, `lotar assignee`, `lotar due`, and `lotar effort` route through `TaskService::update` and fire automation; covered by `crates/lotar-lib/tests/cli_single_field_automation_test.rs`.
 
 ## Known Gotchas
 
-- **Config format**: Custom statuses must use `issue: states: [...]`, not `statuses: [...]` at the top level. Same for `issue: priorities:` and `issue: types:`. See `src/config/normalization.rs`.
+- **Config format**: Custom statuses must use `issue: states: [...]`, not `statuses: [...]` at the top level. Same for `issue: priorities:` and `issue: types:`. See `crates/lotar-lib/src/config/normalization.rs`.
 - **`MatchMode::OnChange`**: For `updated` events, each field in `when` conditions must have actually changed in the update. Single-field CLI commands only include that one field in the changeset. For `created` events, all fields count as "new".
 - **`default: project:`**: The config's default project is only used in certain code paths. `detect_project_name()` returns a value first (from env → project files → git repo → directory name → "default"). Use `-p <project>` to force prefix.
-- **Wrapper process discovery is per tasks directory**: `running_job_for_ticket()` scans system processes for `lotar-agent-wrapper` (wrapper-based discovery lets `list-running` work without persistence; see `src/cli/handlers/agent.rs`) and counts only wrappers whose `--tasks-dir` is this tasks directory (DEV-349). A wrapper from an older build has no `--tasks-dir` and is not counted; its job's record still is (DEV-367). Ticket matching is alias-aware (DEV-56).
+- **Wrapper process discovery is per tasks directory**: `running_job_for_ticket()` scans system processes for `lotar-agent-wrapper` (wrapper-based discovery lets `list-running` work without persistence; see `crates/lotar-lib/src/cli/handlers/agent.rs`) and counts only wrappers whose `--tasks-dir` is this tasks directory (DEV-349). A wrapper from an older build has no `--tasks-dir` and is not counted; its job's record still is (DEV-367). Ticket matching is alias-aware (DEV-56).
 
 ---
 
@@ -68,10 +68,10 @@ All planned features are implemented. See `docs/help/agent.md` and `docs/help/au
 
 Counts are static source counts (`#[test]` / `#[tokio::test]`), not run results; git-gated tests are included in the count.
 
-- 1498 test functions across `src/` and `tests/`
-- 35 agent automation integration tests (`tests/agent_automation_integration_test.rs`): lifecycle, failure, cancel, multi-phase chaining
-- Related suites: `tests/agent_safety_test.rs`, `tests/cli_agent_check_test.rs`, `tests/cli_single_field_automation_test.rs`, `tests/dev59_automation_composition_test.rs`, `tests/dev102_automation_noop_test.rs`
-- `on.commented` is implemented and covered: `AutomationEvent::Commented` exists in `src/services/automation_service.rs` and is dispatched by `TaskService::add_comment_with_context` (`src/services/task_service.rs`); automation's own comment actions use `CommentContext::automation()` and never re-dispatch it (recursion guard). Tested in `tests/dev60_shared_mutation_test.rs` and the CLI comment tests.
+- 1498 test functions across `crates/lotar-lib/src/` and `crates/lotar-lib/tests/`
+- 35 agent automation integration tests (`crates/lotar-lib/tests/agent_automation_integration_test.rs`): lifecycle, failure, cancel, multi-phase chaining
+- Related suites: `crates/lotar-lib/tests/agent_safety_test.rs`, `crates/lotar-lib/tests/cli_agent_check_test.rs`, `crates/lotar-lib/tests/cli_single_field_automation_test.rs`, `crates/lotar-lib/tests/dev59_automation_composition_test.rs`, `crates/lotar-lib/tests/dev102_automation_noop_test.rs`
+- `on.commented` is implemented and covered: `AutomationEvent::Commented` exists in `crates/lotar-lib/src/services/automation_service.rs` and is dispatched by `TaskService::add_comment_with_context` (`crates/lotar-lib/src/services/task_service.rs`); automation's own comment actions use `CommentContext::automation()` and never re-dispatch it (recursion guard). Tested in `crates/lotar-lib/tests/dev60_shared_mutation_test.rs` and the CLI comment tests.
 
 ### Smoke Tests (278 tests across 71 files; static `it(` count)
 
@@ -212,22 +212,22 @@ The following test scenarios are NOT yet covered. Most require complex setup (sp
 
 | Area | Files |
 |------|-------|
-| Runner adapters | `src/services/agent_runner.rs` |
-| Job lifecycle | `src/services/agent_job_service.rs` |
-| Job event logs | `src/services/agent_log_service.rs` |
-| File-backed queue | `src/services/agent_queue_service.rs` |
-| Automation engine | `src/services/automation_service.rs`, `src/services/automation_matching.rs` |
-| Automation types | `src/automation/types.rs`, `src/automation/persistence.rs`, `src/automation/template.rs` |
-| Config types | `src/config/types.rs` (agent profiles, automation config, worktree config) |
-| Config normalization | `src/config/normalization.rs` (parses dotted aliases such as `issue.states/types/priorities` listed in `src/config/fields.rs`) |
-| CLI args/handlers | `src/cli/args/agent.rs`, `src/cli/handlers/agent.rs`, `src/cli/handlers/mod.rs` |
-| REST routes | `src/routes/jobs.rs` (job endpoints), `src/routes/automation.rs` (automation endpoints) |
-| API DTOs | `src/api_types.rs` |
-| MCP handlers | `src/mcp/server/handlers/agent.rs` |
+| Runner adapters | `crates/lotar-lib/src/services/agent_runner.rs` |
+| Job lifecycle | `crates/lotar-lib/src/services/agent_job_service.rs` |
+| Job event logs | `crates/lotar-lib/src/services/agent_log_service.rs` |
+| File-backed queue | `crates/lotar-lib/src/services/agent_queue_service.rs` |
+| Automation engine | `crates/lotar-lib/src/services/automation_service.rs`, `crates/lotar-lib/src/services/automation_matching.rs` |
+| Automation types | `crates/lotar-lib/src/automation/types.rs`, `crates/lotar-lib/src/automation/persistence.rs`, `crates/lotar-lib/src/automation/template.rs` |
+| Config types | `crates/lotar-lib/src/config/types.rs` (agent profiles, automation config, worktree config) |
+| Config normalization | `crates/lotar-lib/src/config/normalization.rs` (parses dotted aliases such as `issue.states/types/priorities` listed in `crates/lotar-lib/src/config/fields.rs`) |
+| CLI args/handlers | `crates/lotar-lib/src/cli/args/agent.rs`, `crates/lotar-lib/src/cli/handlers/agent.rs`, `crates/lotar-lib/src/cli/handlers/mod.rs` |
+| REST routes | `crates/lotar-lib/src/routes/jobs.rs` (job endpoints), `crates/lotar-lib/src/routes/automation.rs` (automation endpoints) |
+| API DTOs | `crates/lotar-lib/src/api_types.rs` |
+| MCP handlers | `crates/lotar-lib/src/mcp/server/handlers/agent.rs` |
 | UI page | `view/pages/AgentJobs.vue` |
 | UI types | `view/api/types.ts` |
-| Templates | `src/config/templates/agent-pipeline.yml`, `src/config/templates/agent-reviewed.yml` |
-| Integration tests | `tests/agent_automation_integration_test.rs`, `tests/agent_safety_test.rs`, `tests/cli_agent_check_test.rs`, `tests/cli_single_field_automation_test.rs`, `tests/dev59_automation_composition_test.rs`, `tests/dev102_automation_noop_test.rs` |
+| Templates | `crates/lotar-lib/src/config/templates/agent-pipeline.yml`, `crates/lotar-lib/src/config/templates/agent-reviewed.yml` |
+| Integration tests | `crates/lotar-lib/tests/agent_automation_integration_test.rs`, `crates/lotar-lib/tests/agent_safety_test.rs`, `crates/lotar-lib/tests/cli_agent_check_test.rs`, `crates/lotar-lib/tests/cli_single_field_automation_test.rs`, `crates/lotar-lib/tests/dev59_automation_composition_test.rs`, `crates/lotar-lib/tests/dev102_automation_noop_test.rs` |
 | Smoke: CLI automation | `smoke/tests/cli.automation.smoke.spec.ts` |
 | Smoke: CLI agent commands | `smoke/tests/cli.agent-commands.smoke.spec.ts` |
 | Smoke: CLI config/agent | `smoke/tests/cli.config-agent.smoke.spec.ts` |
@@ -244,13 +244,13 @@ The following test scenarios are NOT yet covered. Most require complex setup (sp
 
 | Bug | Severity | Details |
 |-----|----------|---------|
-| Cross-test visibility of wrapper processes | Low | `running_job_for_ticket()` scans system processes for `lotar-agent-wrapper` (`src/cli/handlers/agent.rs`) but counts only wrappers of its own tasks directory (DEV-349); wrappers from older builds without `--tasks-dir` are not counted (DEV-367). Ticket matching is alias-aware (DEV-56). |
+| Cross-test visibility of wrapper processes | Low | `running_job_for_ticket()` scans system processes for `lotar-agent-wrapper` (`crates/lotar-lib/src/cli/handlers/agent.rs`) but counts only wrappers of its own tasks directory (DEV-349); wrappers from older builds without `--tasks-dir` are not counted (DEV-367). Ticket matching is alias-aware (DEV-56). |
 
 ## Fixed (formerly tracked here)
 
 | Former bug | Resolution |
 |-----|---------|
 | `on.commented` not implemented | `AutomationEvent::Commented` exists and is dispatched by `TaskService::add_comment_with_context`; automation comment actions cannot recurse (`CommentContext::automation()`). |
-| `TaskService::create` returned pre-automation DTO | `create()` re-fetches the task after `apply_task_update` and returns the post-automation state (`src/services/task_service.rs`). |
+| `TaskService::create` returned pre-automation DTO | `create()` re-fetches the task after `apply_task_update` and returns the post-automation state (`crates/lotar-lib/src/services/task_service.rs`). |
 | `lotar init --project` mis-placed configs / unset default project | Project config written under the tasks root; `ensure_global_config_has_default` always sets `default.project`. |
-| CLI single-field commands bypassed automation | `priority`/`status`/`assignee`/`due`/`effort` route through `TaskService::update`; covered by `tests/cli_single_field_automation_test.rs`. |
+| CLI single-field commands bypassed automation | `priority`/`status`/`assignee`/`due`/`effort` route through `TaskService::update`; covered by `crates/lotar-lib/tests/cli_single_field_automation_test.rs`. |

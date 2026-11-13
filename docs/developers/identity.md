@@ -42,8 +42,8 @@ lotar whoami --explain --format=json
 
 ### REST / MCP
 
-- `GET /api/whoami` returns `{ "data": "..." }` using the same resolver and the workspace's default project (`src/routes/whoami.rs`). MCP `whoami` also uses that default project; neither endpoint adds an explicit project parameter.
-- MCP task operations (`src/mcp/server/handlers/tasks.rs`) and REST task mutations rely on the same helper, so `@me` aliases and default reporter fallbacks behave identically across interfaces.
+- `GET /api/whoami` returns `{ "data": "..." }` using the same resolver and the workspace's default project (`crates/lotar-lib/src/routes/whoami.rs`). MCP `whoami` also uses that default project; neither endpoint adds an explicit project parameter.
+- MCP task operations (`crates/lotar-lib/src/mcp/server/handlers/tasks.rs`) and REST task mutations rely on the same helper, so `@me` aliases and default reporter fallbacks behave identically across interfaces.
 
 ## Reporter vs Assignee
 - reporter: who created or owns reporting responsibility; can be auto-set if missing when `auto.set_reporter: true`.

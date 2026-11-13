@@ -20,13 +20,13 @@ if (!process.env.LOTAR_BINARY_PATH) {
 // ENV_OVERRIDE_DEFINITIONS; `npm run smoke:ui` sets LOTAR_WEB_UI_PATH itself.
 const KEPT_OVERRIDES = new Set(['LOTAR_WEB_UI_PATH']);
 const overridesSource = fs.readFileSync(
-    path.join(resolveRepositoryRoot(), '..', 'src/config/env_overrides.rs'),
+    path.join(resolveRepositoryRoot(), '..', 'crates/lotar-lib/src/config/env_overrides.rs'),
     'utf8',
 );
 const definitions = /ENV_OVERRIDE_DEFINITIONS[^=]*=\s*&\[([\s\S]*?)\n\];/.exec(overridesSource)?.[1] ?? '';
 const overrideVars = [...definitions.matchAll(/"(LOTAR_[A-Z0-9_]+)"/g)].map(([, name]) => name as string);
 if (overrideVars.length === 0) {
-    throw new Error('Found no env vars in ENV_OVERRIDE_DEFINITIONS (src/config/env_overrides.rs)');
+    throw new Error('Found no env vars in ENV_OVERRIDE_DEFINITIONS (crates/lotar-lib/src/config/env_overrides.rs)');
 }
 for (const name of overrideVars) {
     if (!KEPT_OVERRIDES.has(name)) {
