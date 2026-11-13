@@ -664,6 +664,9 @@ function customFieldsFrom(value: Record<string, unknown>): Record<string, string
 const { projects, refresh } = useProjects()
 const singleProject = computed(() => (projects.value.length === 1 ? projects.value[0] : null))
 const hasSingleProject = computed(() => !!singleProject.value)
+// Until the project list loads, a lone project would show as a chip that
+// vanishes a moment later and shifts the page (DEV-399).
+const projectsLoaded = ref(false)
 const singleProjectLabel = computed(() => {
   const p = singleProject.value
   return p ? formatProjectLabel(p) : ''
@@ -1065,8 +1068,12 @@ onUnmounted(() => {
   if (searchBlurTimer !== undefined) window.clearTimeout(searchBlurTimer)
 })
 
-onMounted(() => {
-  refresh()
+onMounted(async () => {
+  try {
+    await refresh()
+  } finally {
+    projectsLoaded.value = true
+  }
 })
 
 watchEffect(() => {
@@ -1478,7 +1485,7 @@ function applySearchDraft() {
 
 const structuredFilterValue = computed<Record<string, string>>(() => {
   const v: Record<string, string> = { ...customFilters.value }
-  if (!hasSingleProject.value && project.value) v.project = project.value
+  if (projectsLoaded.value && !hasSingleProject.value && project.value) v.project = project.value
   if (status.value) v.status = status.value
   if (priority.value) v.priority = priority.value
   if (type.value) v.type = type.value

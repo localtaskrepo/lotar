@@ -391,6 +391,28 @@ describe('TasksList keyed query presentation (DEV-65)', () => {
         }
     })
 
+    it('a filter change while the page still loads replaces the opening URL instead of pushing (DEV-399)', async () => {
+        realRouter = true
+        const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/', component: TasksList }] })
+        await router.push('/')
+        await router.isReady()
+        const push = vi.spyOn(router, 'push')
+        // Under machine load the opening apply waits on slow project and
+        // sprint reads longer than the filter debounce.
+        projectsStore.refresh.mockImplementationOnce(() => new Promise((resolve) => setTimeout(resolve, 1_000)))
+        const wrapper = mount(TasksList, { global: { plugins: [router], stubs: { Teleport: true } } })
+        try {
+            await flushPromises()
+            // FilterBar fills in the default project before the opening apply.
+            wrapper.findComponent({ name: 'FilterBar' }).vm.$emit('update:value', { project: 'PRJ' })
+            await settle()
+            expect(router.currentRoute.value.query).toMatchObject({ project: 'PRJ' })
+            expect(push).not.toHaveBeenCalled()
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
     it('a pending new query shows a loader, never the previous key rows, and disables actions', async () => {
         const wrapper = mount(TasksList, { global: { stubs: { Teleport: true } } })
         await settle()

@@ -27,7 +27,7 @@ interface TrackedScript {
  * fully-reaped exit, so a hung child can never leak past the bound: the
  * timeout kills the child and the close listener still settles the outcome.
  */
-function startExecutable(program: string, args: readonly string[], timeoutMs = 15_000): TrackedScript {
+function startExecutable(program: string, args: readonly string[], timeoutMs = 60_000): TrackedScript {
     const outcome = new Promise<SpawnOutcome>((resolve, reject) => {
         const child = spawn(program, args, {
             stdio: ['ignore', 'pipe', 'pipe'],
@@ -74,7 +74,7 @@ function startExecutable(program: string, args: readonly string[], timeoutMs = 1
 }
 
 /** Spawn a fixture script with the real Node runtime. */
-function startNodeScript(script: string, args: readonly string[], timeoutMs = 15_000): TrackedScript {
+function startNodeScript(script: string, args: readonly string[], timeoutMs = 60_000): TrackedScript {
     return startExecutable(nodeExecutable(), [script, ...args], timeoutMs);
 }
 
@@ -114,10 +114,17 @@ describe('agent fixture behavior', () => {
 
     it('gate agent holds until released, then completes with both phases', async () => {
         const gate = await createGateFixture('fixture-gate-');
+        let child: TrackedScript | undefined;
         try {
-            const child = startNodeScript(GATE_AGENT_SCRIPT, gate.agentArgs({ mode: 'copilot', label: 'probe' }));
+            child = startNodeScript(GATE_AGENT_SCRIPT, gate.agentArgs({ mode: 'copilot', label: 'probe' }));
 
-            await gate.waitForStarted('probe', 10_000);
+            // Wait for the started sentinel or the child's exit, whichever
+            // comes first; the bound only guards against a hang, since
+            // under heavy load Node can take seconds just to boot.
+            const exitedEarly = child.outcome.then((early) => {
+                throw new Error(`gate agent exited before starting: code=${early.code} stderr=${early.stderr}`);
+            });
+            await Promise.race([gate.waitForStarted('probe', 60_000), exitedEarly]);
             // The child cannot complete before the release file exists; the
             // hold bound is far larger than this check, so absence here is a
             // protocol property, not a timing race.
@@ -139,6 +146,7 @@ describe('agent fixture behavior', () => {
             expect(await gate.drain(1_000)).toEqual([]);
         } finally {
             await gate.dispose();
+            await child?.outcome.catch(() => undefined);
         }
     });
 

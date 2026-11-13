@@ -1892,6 +1892,7 @@ onMounted(async () => {
   }
   await refreshProjects()
   await refreshSprints(true)
+  openingApplyStarted = true
   await applyFilter(filter.value, 'replace')
   sse = useSse('/api/events', { kinds: 'task_created,task_updated,task_deleted' })
   registerSseHandlers()
@@ -2005,6 +2006,10 @@ let debounceTimer: ReturnType<typeof setTimeout> | null = null
 // guard the echo re-applies the query with resetOffset and yanks the user back
 // to page 1 right after a pagination click.
 let lastFilterJson = ''
+// Set once the opening apply reads the filter. A change made before then
+// (the default project filling in while projects still load) is part of
+// opening the page: that apply replaces the URL with it.
+let openingApplyStarted = false
 
 function filterJson(value: Record<string, string>): string {
   return JSON.stringify(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)))
@@ -2035,7 +2040,7 @@ watch(
       // Opening the page applies the filter right away; the change that
       // scheduled this (the default project filling in) is then already
       // loaded. Loading it again reset the selection mid-click (DEV-243).
-      if (filterJson(snapshot) === lastFilterJson) return
+      if (!openingApplyStarted || filterJson(snapshot) === lastFilterJson) return
       applyFilter(snapshot, 'push', { resetOffset: true }).catch((err) => {
         console.warn('Failed to apply filter', err)
       })

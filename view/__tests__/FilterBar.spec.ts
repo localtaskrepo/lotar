@@ -4,6 +4,7 @@ import { defineComponent, h, nextTick, onMounted, ref } from 'vue'
 
 const projectState = vi.hoisted(() => ({
     projectsRef: null as null | { value: Array<{ name: string; prefix: string }> },
+    refresh: null as null | (() => Promise<void>),
 }))
 
 vi.mock('../composables/useProjects', async () => {
@@ -12,7 +13,7 @@ vi.mock('../composables/useProjects', async () => {
     return {
         useProjects: () => ({
             projects: projectState.projectsRef!,
-            refresh: async () => {},
+            refresh: () => projectState.refresh?.() ?? Promise.resolve(),
         }),
     }
 })
@@ -67,6 +68,44 @@ describe('FilterBar', () => {
             { name: 'api-service', prefix: 'AS' },
             { name: 'frontend-app', prefix: 'FA' },
         ]
+    })
+
+    afterEach(() => {
+        projectState.refresh = null
+    })
+
+    it('shows no project chip until the project list says there is more than one project (DEV-399)', async () => {
+        // The chip row appearing and vanishing on page load shifts the page,
+        // so a restored scroll position lands off by the row's height.
+        projectState.projectsRef!.value = []
+        let finishLoading = () => {}
+        projectState.refresh = () =>
+            new Promise<void>((resolve) => {
+                finishLoading = resolve
+            })
+        const wrapper = mount(FilterBar, { props: { value: { project: 'AS' } } })
+        await flushPromises()
+        expect(wrapper.find('.filter-bar__chips-row').exists()).toBe(false)
+        projectState.projectsRef!.value = [{ name: 'api-service', prefix: 'AS' }]
+        finishLoading()
+        await flushPromises()
+        expect(wrapper.find('.filter-bar__chips-row').exists()).toBe(false)
+        wrapper.unmount()
+
+        projectState.projectsRef!.value = []
+        const multi = mount(FilterBar, { props: { value: { project: 'AS' } } })
+        await flushPromises()
+        expect(multi.find('.filter-bar__chips-row').exists()).toBe(false)
+        projectState.projectsRef!.value = [
+            { name: 'api-service', prefix: 'AS' },
+            { name: 'frontend-app', prefix: 'FA' },
+        ]
+        finishLoading()
+        await flushPromises()
+        expect(multi.findAll('.filter-bar__chip').map((chip) => chip.text())).toEqual([
+            expect.stringContaining('api-service'),
+        ])
+        multi.unmount()
     })
 
     it('preserves incoming assignee when emitting after edits', async () => {

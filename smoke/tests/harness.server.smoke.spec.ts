@@ -57,6 +57,11 @@ async function* partialThenHold(partial: string): AsyncIterable<string> {
     await new Promise<never>(() => {});
 }
 
+// Bound for tests that wait on a child's exit, EOF or banner rather than on
+// the readiness timeout. It only guards against a hang, so it is generous:
+// under heavy machine load a Node child can take seconds just to start.
+const HANG_GUARD_MS = 60_000;
+
 function tempCwd(): string {
     return mkdtempSync(path.join(tmpdir(), 'dev76-harness-'));
 }
@@ -171,7 +176,7 @@ describe('server launch readiness against real child processes', () => {
             const error = await launchAndWaitReady(process.execPath, ['-e', 'process.exit(3)'], {
                 cwd,
                 env: { ...process.env },
-                readyTimeoutMs: 5_000,
+                readyTimeoutMs: HANG_GUARD_MS,
             }).then(
                 () => undefined,
                 (failure: unknown) => failure as Error & { node?: ChildProcess },
@@ -191,7 +196,7 @@ describe('server launch readiness against real child processes', () => {
             const error = await launchAndWaitReady(
                 process.execPath,
                 ['-e', "process.stdout.write('   URL: http://127.0.0.1:54'); process.exit(0);"],
-                { cwd, env: { ...process.env }, readyTimeoutMs: 5_000 },
+                { cwd, env: { ...process.env }, readyTimeoutMs: HANG_GUARD_MS },
             ).then(
                 () => undefined,
                 (failure: unknown) => failure as Error & { node?: ChildProcess },
@@ -233,7 +238,7 @@ describe('server launch readiness against real child processes', () => {
             const server = await launchAndWaitReady(process.execPath, ['-e', script], {
                 cwd,
                 env: { ...process.env },
-                readyTimeoutMs: 5_000,
+                readyTimeoutMs: HANG_GUARD_MS,
             });
             expect(server.host).toBe('127.0.0.1');
             expect(server.port).toBe(45678);
@@ -254,7 +259,7 @@ describe('server launch readiness against real child processes', () => {
             const server = await launchAndWaitReady(process.execPath, ['-e', script], {
                 cwd,
                 env: { ...process.env },
-                readyTimeoutMs: 5_000,
+                readyTimeoutMs: HANG_GUARD_MS,
             });
             await new Promise((resolve) => setTimeout(resolve, 300));
             await expect(server.stop()).resolves.toBeUndefined();
@@ -273,7 +278,7 @@ describe('server launch readiness against real child processes', () => {
             const error = await launchAndWaitReady(process.execPath, ['-e', script], {
                 cwd,
                 env: { ...process.env },
-                readyTimeoutMs: 5_000,
+                readyTimeoutMs: HANG_GUARD_MS,
                 expectedPort: 59_999,
             }).then(
                 () => undefined,

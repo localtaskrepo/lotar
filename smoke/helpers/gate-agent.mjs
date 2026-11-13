@@ -27,7 +27,7 @@
 // path never waits for the bound. Sentinel writes are best-effort so a
 // removed gate directory cannot crash an orphaned child.
 
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 function parseArgs(argv) {
@@ -56,7 +56,6 @@ const exitCode = Number.isInteger(requestedExit) ? requestedExit : 0;
 
 function writeMarker(name, payload) {
     try {
-        mkdirSync(gateDir, { recursive: true });
         writeFileSync(path.join(gateDir, name), `${JSON.stringify(payload)}\n`);
     } catch {
         // Best effort: diagnostics must never crash the fixture.
@@ -86,8 +85,9 @@ if (!['copilot', 'hold', 'plain'].includes(mode)) {
 const sessionId = `gate-${label}-${process.pid}`;
 
 function writeSentinel(name) {
+    // The owning test creates the gate directory. Never recreate it: a child
+    // that outlives its test would leave the removed directory behind.
     try {
-        mkdirSync(gateDir, { recursive: true });
         writeFileSync(path.join(gateDir, name), `${process.pid}\n`);
     } catch {
         // Best effort: an orphaned child must not crash on a removed directory.

@@ -296,7 +296,7 @@ function finish() {
     finished = true;
     (async () => {
         const holdingMarker = path.join(markerDir, \`descendant-holding-\${label}.marker\`);
-        const deadline = Date.now() + 5000;
+        const deadline = Date.now() + holdMs;
         while (!existsSync(holdingMarker) && Date.now() < deadline) {
             await sleep(10);
         }
@@ -322,7 +322,7 @@ function afterPayload() {
     );
     child.on('error', () => finish());
     child.on('spawn', () => finish());
-    setTimeout(() => finish(), Math.min(holdMs, 5000)).unref();
+    setTimeout(() => finish(), holdMs).unref();
 }
 
 function writeNext(index) {
@@ -828,6 +828,9 @@ ${indentBlock(
         const tailSentinel = `TAIL-${label}-c9d1-END`;
         const releaseRel = `${markerDirRel}/release-${label}.marker`;
         const marker = (name: string) => path.join(workspace.root, markerDirRel, `${name}-${label}.marker`);
+        // The descendant holds the pipe until the test releases it or this
+        // bound elapses; an EOF-waiting monitor would log only after that.
+        const holdMs = 60_000;
         const workspace = await SmokeWorkspace.create({
             seedFiles: {
                 '.tasks/config.yml': BASE_CONFIG,
@@ -855,7 +858,7 @@ ${indentBlock(
             '--release-file',
             releaseRel,
             '--hold-ms',
-            '20000',
+            String(holdMs),
         ],
         { wait: false },
     ),
@@ -888,20 +891,22 @@ ${indentBlock(
             expect(createRes.status).toBe(201);
             const createBody = (await createRes.json()) as { data: { id: string } };
 
-            await waitForMarker(marker('primary-started'), 10_000);
-            await waitForMarker(marker('primary-exited'), 10_000);
-            const primaryExitedAt = Date.now();
+            await waitForMarker(marker('primary-started'), 30_000);
+            await waitForMarker(marker('primary-exited'), 30_000);
 
-            // Bounded poll scaled to the 1s monitor grace (plus scheduler
-            // slack): an EOF-waiting monitor would sit out the 20s hold.
+            // The monitor must log within its 1s grace, not wait for the
+            // descendant's EOF. Under machine load the grace alone says
+            // little about wall time, so the poll waits for the diagnostic
+            // itself, bounded well below the descendant's hold: a diagnostic
+            // seen while the descendant still holds the pipe proves the
+            // monitor did not wait for EOF.
             // The diagnostic spans two physical lines (the dropped-byte
             // notice embeds a newline before the retained payload), so it
             // is extracted from prefix line through sentinel, not by
             // single-line matching.
             const prefixMarker = `Async automation run for task ${createBody.data.id}`;
-            const diagnosticDeadline = Date.now() + 5_000;
+            const diagnosticDeadline = Date.now() + holdMs / 2;
             let line: string | undefined;
-            let diagnosticSeenAt = 0;
             while (Date.now() < diagnosticDeadline) {
                 const full = stderrChunks.join('');
                 const prefixIndex = full.indexOf(prefixMarker);
@@ -909,7 +914,6 @@ ${indentBlock(
                 if (prefixIndex >= 0 && tailIndex > prefixIndex) {
                     const lineEnd = full.indexOf('\n', tailIndex + tailSentinel.length);
                     line = full.slice(prefixIndex, lineEnd === -1 ? undefined : lineEnd);
-                    diagnosticSeenAt = Date.now();
                     break;
                 }
                 await new Promise((resolve) => setTimeout(resolve, 25));
@@ -920,7 +924,7 @@ ${indentBlock(
             // the release and its holding marker is present.
             expect(fs.pathExistsSync(path.join(workspace.root, releaseRel))).toBe(false);
             expect(fs.pathExistsSync(marker('descendant-holding'))).toBe(true);
-            expect(diagnosticSeenAt - primaryExitedAt).toBeLessThanOrEqual(5_000);
+            expect(fs.pathExistsSync(marker('descendant-bailed'))).toBe(false);
 
             expect(/exited with exit (?:status|code):? 7/.test(line ?? '')).toBe(true);
             expect(line).toContain('(stderr pipe still open, likely held by a descendant; tail truncated)');
@@ -940,7 +944,7 @@ ${indentBlock(
             // assertions keep their evidence.
             await fs.writeFile(path.join(workspace.root, releaseRel), `${process.pid}\n`).catch(() => undefined);
             if (server) {
-                await waitForMarker(marker('descendant-released'), 10_000)
+                await waitForMarker(marker('descendant-released'), 30_000)
                     .then(() => {
                         releasedSeen = true;
                     })
