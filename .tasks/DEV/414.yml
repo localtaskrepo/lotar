@@ -1,0 +1,70 @@
+title: A job can ask for a new T3 thread on the ticket's open branch, also on the same model
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@merge'
+created: 2026-11-13T06:20:58.670352+00:00
+modified: 2026-11-13T06:30:15.370330+00:00
+relationships:
+  blocks:
+  - DEV-415
+  related:
+  - DEV-377
+  - DEV-408
+comments:
+- date: 2026-11-13T06:30:06.991646+00:00
+  author: claude
+  text: 'Done in f646cb08 on agent/DEV-414. New session value `fresh` (AgentSession::Fresh) for profiles, a rule''s agent settings, `lotar agent run --session fresh` and POST /api/jobs: when the ticket''s last t3 thread has unmerged work, the job starts a new thread on that branch whatever its provider and model, frees the branch as DEV-408 does, and its prompt names the earlier thread; log: ''... and the job asks for a fresh thread (session: fresh); this job starts a new thread on <branch>.'' Without unmerged work it behaves like `new`; `new` is unchanged. If git can''t free the branch it continues the earlier thread and logs why, as DEV-408 does. Docs: agent.md, automation.md, openapi.json, view/api/types.ts. Test: a_fresh_session_starts_a_new_thread_on_the_unmerged_branch_on_the_same_model (rule-driven reviewer on the same model; also checks that session: new still continues). Checks: lint:agent, test:agent (2126 Rust, 1507 UI, release, hooks) and test:smoke:agent (385) all passed.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A44cef934-b359-4836-8412-5bb359c86114
+description: |-
+  A t3 job with session: new continues the ticket's last thread when its worktree holds unmerged work (DEV-377), unless its provider or model differs; then it starts a new thread on that branch (DEV-408). A reviewer needs a fresh context on the author's branch even on the same provider and model. Found while wiring in the review stage in standards (STD-59, owner 2026-11-12: "Yes, I agree with your recommendations"): @fix-light runs on claude-sonnet-5-5 and its reviewer @review-light on the same cheap model, so with DEV-408 alone the review would run as a further turn of the author's thread and check its own work. A ticket whose fields set the fix agent's provider to the reviewer's has the same problem.
+
+  ## Evidence
+  - src/services/agent_job_service.rs thread_with_open_work (around line 1366) and runs_other_model (around line 1408): a new thread on the branch only when the provider or model differs.
+  - docs/help/agent.md, Continuing the ticket's last thread.
+
+  ## Done when
+  - [ ] A setting on a profile and on a rule's agent settings (for example session: fresh) starts a new thread on the ticket's open branch whatever its provider and model, freeing the branch as DEV-408 does, and its prompt names the earlier thread
+  - [ ] session: new keeps today's behaviour
+  - [ ] Docs (docs/help/agent.md, automation.md) and tests
+history:
+- at: 2026-11-13T06:20:58.757141+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-377","DEV-408"]}'
+- at: 2026-11-13T06:20:58.869742+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T06:20:59.051105+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T06:20:59.616800+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A44cef934-b359-4836-8412-5bb359c86114
+- at: 2026-11-13T06:21:27.832273+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-377","DEV-408"]}'
+    new: '{"blocks":["DEV-415"],"related":["DEV-377","DEV-408"]}'
+- at: 2026-11-13T06:30:06.991646+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T06:30:15.370330+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'

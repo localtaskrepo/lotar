@@ -1,0 +1,42 @@
+title: Release v0.14.3
+status: Todo
+priority: Medium
+type: Chore
+reporter: claude
+assignee: mallox
+created: 2026-11-13T06:21:17.897723+00:00
+modified: 2026-11-13T06:21:28.145029+00:00
+relationships:
+  depends_on:
+  - DEV-414
+  related:
+  - DEV-408
+  - DEV-398
+comments:
+- date: 2026-11-13T06:21:27.996501+00:00
+  author: claude
+  text: 'Includes DEV-408 (04966bcc, after the v0.14.2 tag) and waits for DEV-414. standards STD-59 depends on this release: the review stage needs both installed.'
+description: 'Next release after v0.14.2. The owner picks the bump; rename this ticket if it differs (the title must start with ''Release v''). Steps: .github/skills/release/SKILL.md and docs/release-guide.md. Done when the release is installed here. Tickets that wait for this release are Blocked and depend on it; closing this ticket hands them to @fix to run their checks. Opened before v0.14.2 shipped, because DEV-408 landed after the v0.14.2 tag and standards STD-59 (the review stage) waits for it. Waiting now: standards:STD-59.'
+history:
+- at: 2026-11-13T06:21:17.985126+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-408"]}'
+- at: 2026-11-13T06:21:27.832791+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-408"]}'
+    new: '{"depends_on":["DEV-414"],"related":["DEV-408"]}'
+- at: 2026-11-13T06:21:27.996501+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T06:21:28.145029+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-414"],"related":["DEV-408"]}'
+    new: '{"depends_on":["DEV-414"],"related":["DEV-408","DEV-398"]}'
