@@ -175,6 +175,11 @@ pub enum AgentSession {
     /// The next turn of the session of the ticket's last job, where the
     /// runner can continue one (`t3`); otherwise a new session.
     Continue,
+    /// A new session, also when the ticket's last `t3` thread holds
+    /// unmerged work: a new thread on that thread's branch instead of its
+    /// next turn, whatever its provider and model (DEV-414). For a
+    /// reviewer that must not check its own work.
+    Fresh,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]

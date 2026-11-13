@@ -546,6 +546,41 @@ fn a_job_on_another_model_starts_a_new_thread_on_the_unmerged_branch() {
     assert!(!output.status.success(), "the earlier worktree is detached");
 }
 
+#[test]
+fn a_fresh_session_starts_a_new_thread_on_the_unmerged_branch_on_the_same_model() {
+    let fixtures = TestFixtures::new();
+    let review =
+        "  review:\n    runner: t3\n    command: \"{T3}\"\n    provider: claudeAgent\n    model: claude-opus-5-5\n    env:\n      FAKE_T3_WORKTREE: \"{WT}\"\n";
+    let (home, worktree, id) = ticket_with_unmerged_work(&fixtures, review);
+    let earlier = AgentJobService::list_jobs().into_iter().find(|job| job.ticket_id == id).and_then(|job| job.session_id).unwrap();
+    // The fix's reviewer runs on the fix's provider and model, in a thread of its own.
+    let rules = "automation:\n  rules:\n    - name: Review the fix\n      when:\n        assignee: \"@fix\"\n      on:\n        job_completed:\n          set:\n            assignee: \"@review\"\n          agent:\n            session: fresh\n";
+    fs::write(fixtures.tasks_root.join("automation.yml"), rules).unwrap();
+
+    // session: new (the default) still continues the thread with unmerged work.
+    let fix = run_agent(&fixtures, &id, "fix", "Try again");
+    assert_eq!(fix.status, "completed", "{fix:?}: {:?}", messages(&fix));
+    assert_eq!(fix.session_id.as_deref(), Some(earlier.as_str()));
+    let review = wait_for_finished_agent_job(&id, "review");
+    assert_eq!(review.status, "completed", "{review:?}: {:?}", messages(&review));
+
+    assert_eq!(read_lines(&home.out.join("start.calls")).len(), 2, "a new thread for the review");
+    let args = read_lines(&home.out.join("start.args"));
+    let pairs: Vec<_> = args.windows(2).map(|pair| (pair[0].as_str(), pair[1].as_str())).collect();
+    assert!(pairs.contains(&("--worktree", "agent/from-t3")), "{args:?}");
+    assert!(!args.contains(&"--branch".to_string()), "{args:?}");
+    assert_ne!(review.session_id.as_deref(), Some(earlier.as_str()));
+    let link = format!("https://app.t3.codes/threads/env/{earlier}");
+    let stdin = fs::read_to_string(home.out.join("start.stdin")).unwrap();
+    assert!(stdin.contains(&format!("The ticket's earlier T3 Code thread {link} worked on branch `agent/from-t3`")), "{stdin}");
+    let reason = format!(
+        "The ticket's earlier T3 Code thread {link} has unmerged work on agent/from-t3 and the job asks for a fresh thread (session: fresh); this job starts a new thread on agent/from-t3."
+    );
+    assert!(messages(&review).contains(&reason), "{:?}", messages(&review));
+    let output = Command::new("git").args(["symbolic-ref", "-q", "HEAD"]).current_dir(&worktree).output().unwrap();
+    assert!(!output.status.success(), "the earlier worktree is detached");
+}
+
 /// A job whose process died while its thread ran (DEV-378): a pid that no
 /// longer exists owns its record, and its log has no end.
 fn orphaned_t3_job(fixtures: &TestFixtures, ticket_id: &str, job_id: &str) {

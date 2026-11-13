@@ -275,7 +275,8 @@ pub struct AutomationAgentAction {
     /// Provider for the job (t3 runner), like `model`.
     #[serde(default)]
     pub provider: Option<String>,
-    /// `continue` runs the job in the ticket's last T3 Code thread.
+    /// `continue` runs the job in the ticket's last T3 Code thread, `fresh`
+    /// in a new thread also when that thread has unmerged work.
     #[serde(default)]
     pub session: Option<crate::config::types::AgentSession>,
     #[serde(default)]

@@ -9606,9 +9606,9 @@
           },
           "session": {
             "type": "string",
-            "enum": ["new", "continue"],
+            "enum": ["new", "continue", "fresh"],
             "nullable": true,
-            "description": "Overrides the profile's session for this run: continue runs the job as the next turn of the ticket's last T3 Code thread (t3 runner)."
+            "description": "Overrides the profile's session for this run: continue runs the job as the next turn of the ticket's last T3 Code thread (t3 runner); fresh starts a new thread on that thread's branch when it holds unmerged work, whatever its provider and model."
           }
         },
         "required": [

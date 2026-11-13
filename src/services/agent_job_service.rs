@@ -1353,8 +1353,9 @@ enum OpenWork {
     /// Continue the thread (DEV-377).
     Continue(Box<ContinuedThread>),
     /// The profile runs another provider or model, which a continued thread
-    /// can't take: start a new thread on the earlier thread's branch, its
-    /// prompt naming that thread (DEV-408).
+    /// can't take (DEV-408), or asks for `session: fresh` (DEV-414): start a
+    /// new thread on the earlier thread's branch, its prompt naming that
+    /// thread.
     NewThread { earlier: String, branch: String },
 }
 
@@ -1362,7 +1363,8 @@ enum OpenWork {
 /// main checkout lacks: commits that haven't landed, or uncommitted
 /// changes. A new job builds on it instead of starting a second branch for
 /// the same ticket: it continues the thread, or, when its profile runs
-/// another provider or model, starts a new thread on the thread's branch.
+/// another provider or model or asks for `session: fresh`, starts a new
+/// thread on the thread's branch.
 fn thread_with_open_work(
     job_id: &str,
     profile: &AgentProfileDetail,
@@ -1386,14 +1388,17 @@ fn thread_with_open_work(
     let reference = thread.info.link.clone().unwrap_or_else(|| thread.thread_id.clone());
     let reason =
         format!("The ticket's earlier T3 Code thread {reference} has unmerged work on {branch}; this job continues it instead of starting a new thread.");
-    let Some(runs_on) = runs_other_model(&thread.info, profile) else {
+    let why = if profile.session == Some(AgentSession::Fresh) {
+        "the job asks for a fresh thread (session: fresh)".to_string()
+    } else if let Some(runs_on) = runs_other_model(&thread.info, profile) {
+        format!("runs {runs_on}, not this job's provider and model")
+    } else {
         return Some((OpenWork::Continue(Box::new(thread)), reason));
     };
     match release_branch(worktree, &branch, ticket_id) {
         Ok(committed) => {
-            let mut reason = format!(
-                "The ticket's earlier T3 Code thread {reference} has unmerged work on {branch} and runs {runs_on}, not this job's provider and model; this job starts a new thread on {branch}."
-            );
+            let mut reason =
+                format!("The ticket's earlier T3 Code thread {reference} has unmerged work on {branch} and {why}; this job starts a new thread on {branch}.");
             if let Some(note) = committed {
                 reason = format!("{reason} {note}");
             }

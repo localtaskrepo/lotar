@@ -1614,8 +1614,8 @@ export interface AgentJobCreateRequest {
     effort?: string
     /** Overrides the profile's provider for this run (t3 runner). */
     provider?: string
-    /** `continue` runs the job as the next turn of the ticket's last T3 Code thread. */
-    session?: 'new' | 'continue'
+    /** `continue` runs the job as the next turn of the ticket's last T3 Code thread; `fresh` starts a new thread on its branch when that holds unmerged work. */
+    session?: 'new' | 'continue' | 'fresh'
 }
 
 export interface AgentJobCreateResponse {
