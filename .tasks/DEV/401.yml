@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T00:31:54.569411+00:00
-modified: 2026-11-13T01:06:37.647355+00:00
+modified: 2026-11-13T01:07:27.223074+00:00
 relationships:
   related:
   - DEV-353
@@ -28,6 +28,14 @@ comments:
     - New test a_t3_that_exits_while_its_thread_runs_waits_for_the_run: fake t3 exits 130 while the thread runs, the job stays running, then completes with the thread's reply and runs the job_completed rule (Done). a_failed_run_fails_the_job_with_t3s_error now also asserts the failure event's reason.
     - npm run lint (lint:agent): clean. npm test (test:agent): 2109 Rust and 1505 UI tests pass, plus the release and hook tests. npm run smoke: 385 of 385 pass.
     - I didn't rerun the ticket check against a real T3 thread. The historic log of job-20261113T000634.087Z-2 doesn't change.
+- date: 2026-11-13T01:07:27.223074+00:00
+  author: claude
+  text: |-
+    claude: Merged and pushed. The main checkout fast-forwarded to 45767b3 (the fix), then 5d77bdd 'DEV-401 Ticket updates' committed the pending .tasks changes (DEV-353, 378, 388, 399, 400, 401 and automation.yml). Both are pushed to origin/main (6fcebec..5d77bdd).
+
+    No rebase was needed: main hadn't moved since the fix. I didn't rerun lint, test and smoke: the commit is unchanged since they passed on it (lint clean, 2109 Rust and 1505 UI tests, smoke 385/385). The pre-push hook's formatting and clippy check passed.
+
+    Ticket check rerun: 'lotar agent logs job-20261113T000634.087Z-2' still shows agent_job_failed with no message. That is the old job's saved log from 0.14.1 and can't change. New jobs get the fix once lotar is rebuilt or released from main.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6f33f02e-8d3e-4f02-8f49-5e779aafd51e
 description: 'Found 2026-11-13 on DEV-400 with lotar 0.14.1: job job-20261113T000634.087Z-2 (t3 runner, Claude) logged agent_job_failed at 00:19:11, with no message, while its T3 thread (mcp:3a430fd3-78b4-4fdb-b726-de027a7cccef) was still running and working (T3 status running, no completedAt). The failure fired ''Fix failed: retry on @fix-codex'', which started a second agent on branch agent/DEV-400 while the first was still on it; the Codex agent noticed, held off and asked who owns the work. Two faults: (1) the job ended as failed while the thread ran (compare DEV-378, DEV-353: T3''s --wait and background work), and (2) the failure event has no reason, so neither the log nor the retry says why. Check: lotar agent logs job-20261113T000634.087Z-2 has agent_job_failed with no message while t3 thread mcp:3a430fd3-... was running at that time. Done: a t3 job whose thread still runs is not reported as failed (it waits, or ends with a status that starts no retry), every agent_job_failed carries its reason, with tests.'
@@ -68,3 +76,7 @@ history:
   - field: assignee
     old: '@fix'
     new: '@merge'
+- at: 2026-11-13T01:07:27.223074+00:00
+  actor: claude
+  changes:
+  - field: comment_added
