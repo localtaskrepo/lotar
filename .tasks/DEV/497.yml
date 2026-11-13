@@ -1,11 +1,11 @@
 title: 'Cargo workspace step 1: a web-only change rebuilds only the embedded assets and the binary'
-status: InProgress
+status: Reviewing
 priority: High
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-13T22:21:42.991432+00:00
-modified: 2026-11-13T23:22:43.758662+00:00
+modified: 2026-11-13T23:42:29.663793+00:00
 relationships:
   blocks:
   - DEV-499
@@ -18,6 +18,9 @@ comments:
 - date: 2026-11-13T23:10:54.911901+00:00
   author: codex
   text: 'Review: blocking. P1 Cargo.toml:38-42 and crates/lotar-cli/Cargo.toml:2: moving the binary breaks required repository-root installation. Reproduced RUSTC_WRAPPER= cargo install --path . --root /tmp/dev497-review-install --offline --bin lotar: no bin target named lotar in package lotar. Default root installation selects only lotar-agent-wrapper. Preserve repository installation and add an install regression check. Read diff 06ecd227 versus main, ticket comments, DEV-493 approval, DEV-499, release/Cross/Docker tooling and recent main history. Reran cargo run -- --version (passed with sandbox-blocked sccache disabled), release/npm tests 47/47 and hooks 7/7. Full lint, nextest, smoke, release cross builds, nfpm and incremental timings not independently rerun. No UI changes, source edits or commits; status and assignee unchanged. No minor tickets.'
+- date: 2026-11-13T23:42:18.497102+00:00
+  author: claude
+  text: 'Rework of the blocking review, amended as 4431702a. Finding (cargo install --path . installs no lotar): fixed. The root Cargo.toml is the lotar binary''s package again (bin lotar from src/main.rs, which moved back; tests/embedded_web_ui_test.rs), depending on crates/lotar-lib and crates/lotar-web-assets. The library''s manifest is crates/lotar-lib/Cargo.toml (package lotar-lib, crate name lotar, lotar-agent-wrapper, the tests); its sources stay in src/, tests/ and build.rs at the root, so DEV-499''s plan and paths hold. build.rs sets REPO_ROOT, which replaces CARGO_MANIFEST_DIR in 8 source/test files. crates/lotar-cli is gone. Regression check: tests/dev497_cargo_install_root_test.rs asserts via cargo metadata that the root package builds the lotar binary; it failed with the bin renamed away from the root package, passes now. cargo install --path . --locked installs lotar (the legacy wrapper isn''t installed from the root any more; release packaging never shipped it). The root package is publish = false (README: not on crates.io), and deny.toml gets allow-wildcard-paths = true: cargo-deny only checks the root manifest''s dependencies, so the path dependencies there were flagged; registry wildcards stay denied. Timings after a change in target/web-embed, only lotar-web-assets and lotar compile: cargo build 0.54 s, cargo nextest run --no-run 0.55 s, cargo build --profile smoke 1.13 s. Checks: npm run lint:agent, npm run test:agent (2142 Rust, 1515 UI, 47 release/npm, 7 hook tests), npm run smoke 390/390, cargo deny check, cargo build --release --locked --all-features (both binaries), cargo install --path . from the worktree. Not run: cross (x86_64-only images on this arm64 Mac) and nfpm (not installed).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aece2a03a-cf09-4340-9bd6-4b7ecf0e4547
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aeb427d8b-11c2-4310-9c31-3447004ca1e2
@@ -120,3 +123,16 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A497017e8-eba8-4d0b-a8ad-fdafc5b71a4b
+- at: 2026-11-13T23:42:18.497102+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:42:29.663793+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

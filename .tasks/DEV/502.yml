@@ -1,11 +1,11 @@
 title: Filter the Comments and History tabs by author and type
-status: Reviewing
+status: InProgress
 priority: Low
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-13T22:41:10.367004+00:00
-modified: 2026-11-13T23:20:32.666797+00:00
+modified: 2026-11-13T23:38:20.166552+00:00
 relationships:
   blocks:
   - DEV-488
@@ -62,6 +62,7 @@ references:
 - attachment: dev502-history-before-390-dark.9bb4d68679b6b3aa2c306b9ea9cdfbc0.webp
 - attachment: dev502-history-before-390-light.72fd6a8310da81f314387429e59812fd.webp
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A03750fd7-9350-48ab-b423-d773fa69d752
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ada32e006-d8b4-439a-b36c-ce0c42aa530d
 description: |-
   The task panel's Comments and History tabs list every entry with no way to narrow them; the only control is the reload button. On a long ticket (DEV-466, STD-82) the owner can't pick out what the agents said or what changed a field. Owner asked on 2026-11-13 whether this exists and said to file it.
 
@@ -251,3 +252,14 @@ history:
   - field: tags
     old: web-ui, ui, review-blocked
     new: web-ui, ui, review-returned
+- at: 2026-11-13T23:38:19.279872+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-13T23:38:20.166552+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ada32e006-d8b4-439a-b36c-ce0c42aa530d

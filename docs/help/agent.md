@@ -9,7 +9,10 @@ LoTaR can orchestrate supported agent CLIs (Claude Code, Codex CLI, Copilot CLI,
   - Without `--wait` or `--follow`, the job is checked (ticket, profile or runner, settings) and handed to the background queue worker, and the command returns at once with `Queued <TICKET> for <agent>`. Follow it with `lotar agent queue` and `lotar agent list-jobs`. With `--wait`, the job runs in this terminal and the command exits non-zero unless it completes; it returns once the job's end automation (the `job_completed`/`job_failed` rules), context and worktree cleanup are done. With `--format json` it prints the finished job.
 - `lotar agent status <JOB_ID>`
 - `lotar agent logs <JOB_ID>`
-- `lotar agent cancel <JOB_ID>`
+- `lotar agent cancel <JOB_ID>` — stop a job that has started; a ticket still waiting in the queue has no job yet, so remove it with `lotar agent queue remove`
+- `lotar agent queue` — list the tickets waiting in the queue and whether the queue worker runs
+- `lotar agent queue remove <TICKET>` — take one ticket out of the queue before its job starts, for example `lotar agent queue remove DEV-501`
+- `lotar agent queue flush` — take every waiting ticket out of the queue; running jobs go on
 - `lotar agent list-running`
 - `lotar agent list-jobs [-n <LIMIT>]` — list job logs from disk
 - `lotar agent check [--status <value>] [--assignee <handle>]`

@@ -3,9 +3,9 @@ status: Reviewing
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-13T21:27:58.028716+00:00
-modified: 2026-11-13T23:12:45.546794+00:00
+modified: 2026-11-13T23:31:24.199063+00:00
 relationships:
   blocks:
   - DEV-496
@@ -78,9 +78,13 @@ comments:
 - date: 2026-11-13T23:12:36.005420+00:00
   author: codex
   text: 'Review: blocking. .github/workflows/ci.yml:255 skips ui_tests for smoke-only changes, losing the only smoke TypeScript check and smoke lint/format gates. Include smoke output in the condition or run equivalent checks separately; add job-selection regression coverage. Read diff, ticket comments, owner decision, related context, release gate and main history. Targeted Rust rerun blocked by sandbox sccache; cold wrapper-disabled retry stopped, no pass claimed. No files, status or assignee changed.'
+- date: 2026-11-13T23:31:14.008372+00:00
+  author: claude
+  text: 'Rework of the review finding: a smoke-only change now runs ui_tests (ci.yml), so the smoke typecheck, oxlint and Prettier checks still run. The same gap existed for packaging/npm/ (its launcher is linted and tested only in ui_tests) and for the Prettier and editorconfig files: added them to the node and web patterns. Regression coverage in tests/ci_windows_reporting_contract_test.rs: one test runs every TypeScript/JavaScript/Vue file the UI job checks through the path filters and asserts ui_tests runs, one checks which jobs run for a docs, ticket, view, smoke, scripts, Rust, ci.yml and package.json change. Both fail against the previous ci.yml (smoke and packaging/npm/lotar/bin/lotar.js), pass now. docs/developers/testing.md updated. Amended commit abff246c (signed). Checks: npm run lint passed; tests 2140 Rust, 1515 Vitest, 47 release, 7 hooks passed; smoke 390 of 390 passed; ran the classify step locally on a smoke+view commit from main. Not run: ci.yml on GitHub (nothing pushed).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A33be852d-9b46-4b5c-81fe-67f9a885d51d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0b14a557-527e-4d20-a080-74d39e17b4ff
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A04cac92e-2c04-4b10-9855-5cb94b1c9df2
 description: |-
   Measure whether a cargo workspace and path-filtered CI make lotar's CI faster, before deciding on any split. The owner, 2026-11-13: "we may want to think about what part of lotar we could split into their own projects, even if just to speed up the CI steps." He chose to measure this (standards docs/decisions/2026-11-13-harness-tool.md).
 
@@ -248,3 +252,27 @@ history:
   - field: tags
     old: review-blocked
     new: review-returned
+- at: 2026-11-13T23:23:24.659979+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-13T23:23:25.541980+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A04cac92e-2c04-4b10-9855-5cb94b1c9df2
+- at: 2026-11-13T23:31:14.008372+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:31:24.199063+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

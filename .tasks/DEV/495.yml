@@ -1,11 +1,11 @@
 title: Windows CI runs its 40 selected tests without building the library's unit-test binary
-status: Merging
+status: HelpNeeded
 priority: High
 type: Chore
 reporter: claude
-assignee: '@merge'
+assignee: '@fix'
 created: 2026-11-13T22:21:42.297785+00:00
-modified: 2026-11-13T23:16:22.136358+00:00
+modified: 2026-11-13T23:32:39.871383+00:00
 relationships:
   related:
   - DEV-493
@@ -17,6 +17,15 @@ comments:
 - date: 2026-11-13T23:16:20.264631+00:00
   author: claude
   text: 'Follow-up done at the owner''s request (2026-11-13: ''let''s please do the follow up and switch of the features''): f4395ec1 (auto-committed from my worktree as ''uncommitted changes from the earlier thread''; please squash into the DEV-495 commit when merging). Cargo.toml: predicates default-features = false (tests use only str::contains, str::is_empty, function; its regex feature turned on regex defaults), plus bstr = "1.13.1" as a normal dependency so its default+unicode features match what assert_cmd turns on. cargo tree now shows identical features for normal and dev builds (all-features, default, and the Windows msvc target). Result, measured locally on the Mac (not CI), after cargo clean -p lotar + cargo build --profile ci --all-features: nextest --no-run --test windows_regressions --bin lotar-agent-wrapper 26.1 s -> 1.1 s, one liblotar rlib instead of two. Release binary 7,212,144 -> 7,212,160 bytes (wrapper unchanged). Linux still differs in bitflags/std (tempfile -> rustix); left alone because no Linux job builds the binary and the tests in the same profile. Checks: npm run lint, npm test (2140 Rust + 1515 UI), npm run smoke (390) passed. Merge note: review commit 952950c3 only adds scripts/__pycache__/check-test-coverage.cpython-315.pyc and scripts/tests/__pycache__/test_check_test_coverage.cpython-315.pyc. That''s build output; please drop it, don''t merge it.'
+- date: 2026-11-13T23:32:12.255698+00:00
+  author: codex
+  text: 'Merge blocked: rebase onto main conflicts in src/utils/scan.rs. Main retains a changed inline scan_utils_tests module; c0461ccb removes that module and relocates tests into tests/utils_scan_test.rs for windows_regressions. I could not confidently reconcile the changed tests with the relocation, so aborted the rebase; original commits preserved, nothing merged or pushed. Required checks were not run because rebase did not complete. Also preserve the follow-up verification comment and exclude generated pycache files in 952950c3 when preparing the final branch. Question: should the fix agent reconcile the scan-test relocation against current main before another merge attempt?'
+- date: 2026-11-13T23:32:17.567785+00:00
+  author: automation
+  text: The merge agent's job job-20261113T233124.530Z-44 failed (lotar agent logs job-20261113T233124.530Z-44); the fix agent retries it on branch t3/windows-ci-skip-lib-unit-build.
+- date: 2026-11-13T23:32:39.514863+00:00
+  author: triage
+  text: 'Triage: the merge agent''s question (reconcile the scan-test relocation against current main before another merge attempt?) needs no owner answer. Yes: rebasing onto main and reconciling the conflict in src/utils/scan.rs is in scope and reversible. Main''s changed inline scan_utils_tests tests move along into tests/utils_scan_test.rs (windows_regressions) so no change on main is lost; then rerun the required checks and the Windows selection run. Drop the generated __pycache__ .pyc files from 952950c3 (DEV-506 untracks them) and keep the follow-up f4395ec1 squashed into the DEV-495 commit. Basis: the owner''s 2026-11-13 ''Yes on all of those ideas'' and the ''let''s please do the follow up'' on this ticket. Nothing here is a choice between designs or an irreversible step.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0a7952ff-8d56-49c9-ab90-fa87a5b57230
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A348ac5bc-1a1b-4d65-80c0-250fd960cea7
@@ -41,6 +50,7 @@ description: |-
   - [ ] Wall time of the Windows job before and after, from a CI run or measured locally and marked as such.
 tags:
 - backend
+- merge-retried
 history:
 - at: 2026-11-13T22:21:42.485681+00:00
   actor: claude
@@ -101,3 +111,36 @@ history:
   - field: relationships
     old: '{"related":["DEV-493"]}'
     new: '{"related":["DEV-493","DEV-506"]}'
+- at: 2026-11-13T23:32:12.255698+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:32:17.512724+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: backend
+    new: backend, merge-retried
+- at: 2026-11-13T23:32:17.567785+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:32:17.800291+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-13T23:32:39.514863+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:32:39.871383+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'

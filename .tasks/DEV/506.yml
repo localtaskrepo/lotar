@@ -1,14 +1,20 @@
 title: Python __pycache__ files are tracked and not ignored, so job auto-commits pick up new .pyc files
-status: Todo
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-13T23:16:21.313989+00:00
-modified: 2026-11-13T23:16:23.058075+00:00
+modified: 2026-11-13T23:33:09.543525+00:00
 relationships:
   related:
   - DEV-495
+comments:
+- date: 2026-11-13T23:33:02.168637+00:00
+  author: claude
+  text: 'Removed the two tracked .pyc files (git rm --cached; local copies kept) and added __pycache__/ to .gitignore. Commit 9be309fb. Checks: git ls-files | grep __pycache__ lists nothing; git check-ignore matches scripts/__pycache__/*.pyc via .gitignore:9. The cpython-315 files from 952950c3 aren''t on this branch''s base; if main has them, the merge must drop them too (the rule now ignores them). No lint/test/smoke run: ignore-file and untracking only, no code change.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3666565f-d65d-4b5b-bda0-e36206a47bc1
 description: 'Found: scripts/__pycache__/check-test-coverage.cpython-314.pyc and scripts/tests/__pycache__/test_check_test_coverage.cpython-314.pyc have been tracked since 1f0c9de7, and .gitignore has no __pycache__ entry. The DEV-495 review job''s auto-commit (952950c3) added the cpython-315 versions. Check: git ls-files | grep __pycache__ lists nothing, and .gitignore ignores __pycache__/. Done: tracked .pyc files removed, __pycache__/ ignored.'
 tags:
 - health
@@ -26,3 +32,27 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-13T23:32:18.715626+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T23:32:19.534993+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3666565f-d65d-4b5b-bda0-e36206a47bc1
+- at: 2026-11-13T23:33:02.168637+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:33:09.543525+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
