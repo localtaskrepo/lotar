@@ -1159,6 +1159,9 @@ struct T3ThreadInfo {
     link: Option<String>,
     worktree_path: Option<String>,
     branch: Option<String>,
+    /// The provider instance and model the thread runs on.
+    provider: Option<String>,
+    model: Option<String>,
 }
 
 /// Where a thread's run stands, for a job whose process died (DEV-378).
@@ -1185,7 +1188,13 @@ fn parse_t3_thread_state(output: &str) -> Option<T3ThreadState> {
         .filter(|text| !text.is_empty())
         .map(str::to_string);
     Some(T3ThreadState {
-        info: T3ThreadInfo { link: text("link"), worktree_path: text("worktreePath"), branch: text("branch") },
+        info: T3ThreadInfo {
+            link: text("link"),
+            worktree_path: text("worktreePath"),
+            branch: text("branch"),
+            provider: text("providerInstanceId"),
+            model: text("model"),
+        },
         running: status == "running" || thread.get("activeRunId").is_some_and(|id| !id.is_null()),
         waits_for_answer: thread.get("pendingRequestCount").and_then(|count| count.as_u64()).is_some_and(|count| count > 0),
         status,
@@ -1333,10 +1342,22 @@ fn continue_session(
     Ok(ContinuedThread { thread_id, info, command })
 }
 
+/// What a new t3 job does with the ticket's earlier thread that holds
+/// unmerged work.
+enum OpenWork {
+    /// Continue the thread (DEV-377).
+    Continue(Box<ContinuedThread>),
+    /// The profile runs another provider or model, which a continued thread
+    /// can't take: start a new thread on the earlier thread's branch, its
+    /// prompt naming that thread (DEV-408).
+    NewThread { earlier: String, branch: String },
+}
+
 /// The ticket's last T3 Code thread when its worktree still holds work the
 /// main checkout lacks: commits that haven't landed, or uncommitted
-/// changes. A new job continues it instead of starting a second thread and
-/// branch for the same ticket (DEV-377).
+/// changes. A new job builds on it instead of starting a second branch for
+/// the same ticket: it continues the thread, or, when its profile runs
+/// another provider or model, starts a new thread on the thread's branch.
 fn thread_with_open_work(
     job_id: &str,
     profile: &AgentProfileDetail,
@@ -1344,7 +1365,7 @@ fn thread_with_open_work(
     tasks_dir: &std::path::Path,
     ticket_id: &str,
     config: &ResolvedConfig,
-) -> Option<(ContinuedThread, String)> {
+) -> Option<(OpenWork, String)> {
     let thread = continue_session(job_id, AgentRunnerKind::T3, profile, prompt, tasks_dir, ticket_id, config).ok()?;
     let worktree = std::path::Path::new(thread.info.worktree_path.as_deref()?);
     let branch = thread.info.branch.clone()?;
@@ -1360,7 +1381,54 @@ fn thread_with_open_work(
     let reference = thread.info.link.clone().unwrap_or_else(|| thread.thread_id.clone());
     let reason =
         format!("The ticket's earlier T3 Code thread {reference} has unmerged work on {branch}; this job continues it instead of starting a new thread.");
-    Some((thread, reason))
+    let Some(runs_on) = runs_other_model(&thread.info, profile) else {
+        return Some((OpenWork::Continue(Box::new(thread)), reason));
+    };
+    match release_branch(worktree, &branch, ticket_id) {
+        Ok(committed) => {
+            let mut reason = format!(
+                "The ticket's earlier T3 Code thread {reference} has unmerged work on {branch} and runs {runs_on}, not this job's provider and model; this job starts a new thread on {branch}."
+            );
+            if let Some(note) = committed {
+                reason = format!("{reason} {note}");
+            }
+            Some((OpenWork::NewThread { earlier: reference, branch }, reason))
+        }
+        Err(err) => Some((OpenWork::Continue(Box::new(thread)), format!("{reason} {err}"))),
+    }
+}
+
+/// The thread's `provider/model` when the profile sets another provider or
+/// model. What T3 Code doesn't report counts as the same.
+fn runs_other_model(info: &T3ThreadInfo, profile: &AgentProfileDetail) -> Option<String> {
+    let differs = |wanted: Option<&str>, runs: Option<&str>| wanted.zip(runs).is_some_and(|(wanted, runs)| wanted != runs);
+    (differs(profile.provider.as_deref(), info.provider.as_deref()) || differs(profile.model.as_deref(), info.model.as_deref()))
+        .then(|| format!("{}/{}", info.provider.as_deref().unwrap_or("?"), info.model.as_deref().unwrap_or("?")))
+}
+
+/// Free `branch` for a new thread's worktree, as git checks a branch out in
+/// one worktree only: commit what the earlier thread left uncommitted, then
+/// detach its worktree, which keeps its files. `Ok(Some(note))` when LoTaR
+/// made a commit.
+fn release_branch(worktree: &std::path::Path, branch: &str, ticket_id: &str) -> Result<Option<String>, String> {
+    let git = |args: &[&str]| -> Result<(), String> {
+        let output = git_command(worktree).args(args).output().map_err(|err| err.to_string())?;
+        if output.status.success() {
+            Ok(())
+        } else {
+            Err(format!("LoTaR could not free {branch} for a new thread (git {}: {}).", args.join(" "), String::from_utf8_lossy(&output.stderr).trim()))
+        }
+    };
+    let uncommitted = git_command(worktree).args(["status", "--porcelain"]).output().is_ok_and(|output| output.status.success() && !output.stdout.is_empty());
+    let mut note = None;
+    if uncommitted {
+        let message = format!("{ticket_id}: uncommitted changes from the earlier thread");
+        git(&["add", "--all"])?;
+        git(&["commit", "--quiet", "-m", &message])?;
+        note = Some(format!("Committed what the earlier thread left uncommitted: {message}"));
+    }
+    git(&["switch", "--quiet", "--detach"])?;
+    Ok(note)
 }
 
 /// The session of the ticket's newest earlier job on this runner that has
@@ -2177,23 +2245,43 @@ fn run_job(
         return;
     }
     // Why the job runs in the session it does, for the job log.
+    let mut open_branch = None;
     let (mut continued, session_reason) = if profile.session == Some(AgentSession::Continue) {
         match continue_session(&job_id, runner_kind, &profile, &prompt, &tasks_dir, &ticket_id, &config) {
             Ok(thread) => (Some(thread), None),
             Err(reason) => (None, Some(reason)),
         }
     } else if runner_kind == AgentRunnerKind::T3
-        && let Some((thread, reason)) = thread_with_open_work(&job_id, &profile, &prompt, &tasks_dir, &ticket_id, &config)
+        && let Some((open, reason)) = thread_with_open_work(&job_id, &profile, &prompt, &tasks_dir, &ticket_id, &config)
     {
-        (Some(thread), Some(reason))
+        match open {
+            OpenWork::Continue(thread) => (Some(*thread), Some(reason)),
+            OpenWork::NewThread { earlier, branch } => {
+                open_branch = Some((earlier, branch));
+                (None, Some(reason))
+            }
+        }
     } else {
         (None, None)
+    };
+    let prompt = match open_branch.as_ref() {
+        Some((earlier, branch)) => format!(
+            "{prompt}\n\nEarlier thread:\nThe ticket's earlier T3 Code thread {earlier} worked on branch `{branch}`, and its work hasn't landed. This thread runs on that branch: build on its commits.\n"
+        ),
+        None => prompt,
     };
     // A t3 job asks T3 Code for the worktree: a thread can only run inside a
     // T3 project, which LoTaR's own worktree folder is not (DEV-318). A
     // continued thread stays in its own.
     let mut t3_worktree = None;
-    let prepared = if let Some(thread) = continued.as_ref() {
+    let prepared = if let Some((_, branch)) = open_branch {
+        t3_worktree = Some(T3Worktree { base: branch.clone(), branch: None });
+        Ok(WorktreeContext {
+            working_dir: resolve_repo_root(&tasks_dir).unwrap_or_else(|| tasks_dir.clone()),
+            worktree_path: None,
+            worktree_branch: Some(branch),
+        })
+    } else if let Some(thread) = continued.as_ref() {
         let repo_root = resolve_repo_root(&tasks_dir).unwrap_or_else(|| tasks_dir.clone());
         let worktree_path = thread.info.worktree_path.as_ref().map(std::path::PathBuf::from);
         Ok(WorktreeContext {
@@ -3494,13 +3582,14 @@ mod tests {
     #[test]
     fn t3_thread_show_gives_the_link_and_worktree() {
         let info = parse_t3_thread_state(
-            r#"{"thread":{"threadId":"t1","link":"https://app.t3.codes/threads/e/t1","worktreePath":"/w/DEV-1","branch":"agent/DEV-1"},"messages":[]}"#,
+            r#"{"thread":{"threadId":"t1","link":"https://app.t3.codes/threads/e/t1","worktreePath":"/w/DEV-1","branch":"agent/DEV-1","providerInstanceId":"codex","model":"gpt-5.5"},"messages":[]}"#,
         )
         .unwrap()
         .info;
         assert_eq!(info.link.as_deref(), Some("https://app.t3.codes/threads/e/t1"));
         assert_eq!(info.worktree_path.as_deref(), Some("/w/DEV-1"));
         assert_eq!(info.branch.as_deref(), Some("agent/DEV-1"));
+        assert_eq!((info.provider.as_deref(), info.model.as_deref()), (Some("codex"), Some("gpt-5.5")));
         let root = parse_t3_thread_state(r#"{"thread":{"link":"x","worktreePath":null}}"#).unwrap();
         assert_eq!(root.info.worktree_path, None);
         assert!(parse_t3_thread_state("not json").is_none());
