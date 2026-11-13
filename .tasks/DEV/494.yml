@@ -1,17 +1,18 @@
 title: lotar add sets relationships (--depends-on, --blocks, ...) in the same write, so created rules see them
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T21:53:33.995050+00:00
-modified: 2026-11-13T22:52:36.988171+00:00
+modified: 2026-11-13T23:19:06.701081+00:00
 relationships:
   related:
   - DEV-488
   - DEV-489
   - DEV-490
   - standards:STD-102
+  - DEV-478
 comments:
 - date: 2026-11-13T22:15:29.865898+00:00
   author: claude
@@ -25,6 +26,9 @@ comments:
 - date: 2026-11-13T22:52:32.149377+00:00
   author: codex
   text: 'Review: passed. No blocking findings in 639995f8 after reading full diff, ticket/rework and related context, guidance and touched-file main history. Previous condition finding fixed with positive and negative created-rule coverage. Lint passed uncached. Targeted DEV-494 tests 3/3 passed; runner failed on xcrun_db residue. Full tests and smoke failed on sandbox-denied socket binding (smoke 146 passed, 244 failed); full verification not confirmed here. No files or commits changed, no tickets filed, status and assignee unchanged. No durable guidance finding.'
+- date: 2026-11-13T23:18:55.082388+00:00
+  author: codex
+  text: 'Merged: rebased 639995f8 onto main without conflicts as a81c8972, fast-forwarded main, then included pending .tasks files per owner instructions in signed amended commit add3fb5e. Required checks passed with sandbox escalation: lint:agent; test:agent (2143 Rust, 1515 UI, release and hooks); test:smoke:agent (390). Nothing skipped. Main was clean after amendment. Not pushed: earliest unpushed commit 5fc697e1 belongs to DEV-478, currently HelpNeeded and assigned mallox, so there is no finished unpushed prefix before it. Left all commits local for that decision. Status and assignee unchanged; automation completes this ticket when the job ends.'
 references:
 - file: src/cli/args/task.rs
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa69ef4ed-5439-421d-98b8-119cc67b48d0
@@ -52,7 +56,6 @@ description: |-
   - [ ] Help docs agree; lint, test and smoke pass.
 tags:
 - backend
-- review-returned
 history:
 - at: 2026-11-13T21:53:34.165787+00:00
   actor: claude
@@ -166,3 +169,22 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-13T23:18:55.082388+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:18:56.387762+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-488","DEV-489","DEV-490","standards:STD-102"]}'
+    new: '{"related":["DEV-488","DEV-489","DEV-490","standards:STD-102","DEV-478"]}'
+- at: 2026-11-13T23:19:06.701081+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: backend, review-returned
+    new: backend

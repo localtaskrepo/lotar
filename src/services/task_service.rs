@@ -389,7 +389,7 @@ impl TaskService {
         // LoTaR's own field, so it is stored even where the project limits
         // custom fields; later edits keep it as an existing field.
         if let Some(key) = options.finding {
-            t.custom_fields.insert(crate::services::finding_service::FINDING_FIELD.to_string(), crate::types::custom_value_string(key));
+            t.custom_fields.insert(crate::utils::custom_fields::FINDING_FIELD.to_string(), crate::types::custom_value_string(key));
         }
         t.acceptance_criteria = acceptance_criteria.into_iter().map(|item| item.trim().to_string()).filter(|item| !item.is_empty()).collect();
 

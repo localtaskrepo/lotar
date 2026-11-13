@@ -77,6 +77,9 @@ pub struct SyncFieldMappingDetail {
     pub when_empty: Option<SyncWhenEmpty>,
 }
 
+/// Issue fields a GitHub mapping can write; others are not sent.
+pub const GITHUB_PUSH_FIELDS: &[&str] = &["title", "body", "description", "state", "status", "state_reason", "labels", "assignees", "milestone"];
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 #[serde(untagged)]
@@ -181,6 +184,96 @@ pub enum AgentSession {
     /// next turn, whatever its provider and model (DEV-414). For a
     /// reviewer that must not check its own work.
     Fresh,
+}
+
+/// The CLI an agent profile runs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AgentRunnerKind {
+    Codex,
+    Claude,
+    Copilot,
+    Gemini,
+    /// Cursor CLI (`cursor-agent -p`); from its docs, not run live.
+    Cursor,
+    /// Sourcegraph Amp (`amp -x --stream-json`); from its docs, not run live.
+    Amp,
+    /// Factory Droid (`droid exec -o json`); from its docs, not run live.
+    Droid,
+    /// OpenCode (`opencode run --format json`); from its docs, not run live.
+    Opencode,
+    /// Kilo Code CLI, an OpenCode fork (`kilo run --format json`); not run live.
+    Kilo,
+    /// Google Antigravity CLI (`agy -p --output-format stream-json`); not run live.
+    Antigravity,
+    /// A T3 Code thread (`t3 thread start … --wait`), DEV-318.
+    T3,
+    Command,
+}
+
+impl AgentRunnerKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Codex => "codex",
+            Self::Claude => "claude",
+            Self::Copilot => "copilot",
+            Self::Gemini => "gemini",
+            Self::Cursor => "cursor",
+            Self::Amp => "amp",
+            Self::Droid => "droid",
+            Self::Opencode => "opencode",
+            Self::Kilo => "kilo",
+            Self::Antigravity => "antigravity",
+            Self::T3 => "t3",
+            Self::Command => "command",
+        }
+    }
+
+    /// The program LoTaR runs when a profile sets no `command`.
+    pub fn default_program(&self) -> &'static str {
+        match self {
+            Self::Cursor => "cursor-agent",
+            Self::Antigravity => "agy",
+            other => other.as_str(),
+        }
+    }
+
+    /// Every runner a profile may name.
+    pub const ALL: [AgentRunnerKind; 12] = [
+        Self::Claude,
+        Self::Codex,
+        Self::Copilot,
+        Self::Gemini,
+        Self::Cursor,
+        Self::Amp,
+        Self::Droid,
+        Self::Opencode,
+        Self::Kilo,
+        Self::Antigravity,
+        Self::T3,
+        Self::Command,
+    ];
+}
+
+impl std::str::FromStr for AgentRunnerKind {
+    type Err = ();
+
+    fn from_str(raw: &str) -> Result<Self, Self::Err> {
+        match raw.trim().to_lowercase().as_str() {
+            "codex" => Ok(Self::Codex),
+            "claude" => Ok(Self::Claude),
+            "copilot" => Ok(Self::Copilot),
+            "gemini" => Ok(Self::Gemini),
+            "cursor" | "cursor-agent" => Ok(Self::Cursor),
+            "amp" => Ok(Self::Amp),
+            "droid" => Ok(Self::Droid),
+            "opencode" => Ok(Self::Opencode),
+            "kilo" | "kilocode" => Ok(Self::Kilo),
+            "antigravity" | "agy" => Ok(Self::Antigravity),
+            "t3" | "t3code" => Ok(Self::T3),
+            "command" => Ok(Self::Command),
+            _ => Err(()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -682,6 +775,11 @@ impl ProjectConfig {
             auth_profiles: BTreeMap::new(),
         }
     }
+}
+
+/// `repos` names (DEV-386): a letter or digit, then letters, digits, `.`, `_` or `-`.
+pub fn is_repo_name(name: &str) -> bool {
+    name.chars().next().is_some_and(|c| c.is_ascii_alphanumeric()) && name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'))
 }
 
 /// Equality is the no-op boundary for config mutations (DEV-102); see

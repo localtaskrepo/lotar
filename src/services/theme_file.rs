@@ -9,7 +9,8 @@
 //! resource loads — is dropped, so a shared skin can change how LoTaR looks
 //! but cannot load outside resources or restyle the app's internals.
 
-use std::path::{Component, Path, PathBuf};
+use crate::config::branding::validate_theme_file_path;
+use std::path::{Path, PathBuf};
 
 /// Largest skin file read.
 pub const MAX_SKIN_BYTES: u64 = 64 * 1024;
@@ -18,26 +19,6 @@ const MAX_VALUE_CHARS: usize = 512;
 
 /// Selector the kept declarations are scoped to.
 pub const SKIN_SELECTOR: &str = "[data-theme-name='custom']";
-
-/// `ui.theme_file` must be a relative `.css` path inside the repository.
-pub fn validate_path(value: &str) -> Result<(), String> {
-    let value = value.trim();
-    if value.is_empty() {
-        return Ok(());
-    }
-    let path = Path::new(value);
-    if path.is_absolute() || value.starts_with('~') {
-        return Err(format!("'{value}' must be a path relative to the repository (for example assets/lotar-theme.css)"));
-    }
-    if path.components().any(|component| !matches!(component, Component::Normal(_) | Component::CurDir)) {
-        return Err(format!("'{value}' must stay inside the repository"));
-    }
-    let is_css = path.extension().and_then(|ext| ext.to_str()).is_some_and(|ext| ext.eq_ignore_ascii_case("css"));
-    if !is_css {
-        return Err(format!("'{value}' is not a CSS file (expected .css)"));
-    }
-    Ok(())
-}
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Skin {
@@ -237,7 +218,7 @@ pub enum SkinError {
 
 /// Read and sanitise the skin at `relative` inside `root`.
 pub fn read_skin(root: &Path, relative: &str) -> Result<(PathBuf, Skin), SkinError> {
-    validate_path(relative).map_err(SkinError::Invalid)?;
+    validate_theme_file_path(relative).map_err(SkinError::Invalid)?;
     let root = root.canonicalize().map_err(|_| SkinError::Missing)?;
     let path = root.join(relative).canonicalize().map_err(|_| SkinError::Missing)?;
     // Symlinks may point anywhere; only files really inside the workspace count.
@@ -297,15 +278,6 @@ mod tests {
         assert!(!skin.css.contains("image-set"));
         assert!(skin.css.contains("--ok: linear-gradient(90deg, #000, #fff);"));
         assert!(skin.dropped >= 5, "{skin:?}");
-    }
-
-    #[test]
-    fn validates_paths() {
-        assert!(validate_path("assets/lotar-theme.css").is_ok());
-        assert!(validate_path("").is_ok());
-        for bad in ["/etc/x.css", "~/x.css", "../x.css", "assets/x.scss", "x"] {
-            assert!(validate_path(bad).is_err(), "{bad}");
-        }
     }
 
     #[test]

@@ -27,12 +27,12 @@ pub fn load_home_automation() -> LoTaRResult<Option<AutomationFile>> {
 
 pub fn save_global_automation(tasks_dir: &Path, file: &AutomationFile) -> LoTaRResult<()> {
     let path = crate::utils::paths::global_automation_path(tasks_dir);
-    crate::services::trust_service::TrustService::rewrite(tasks_dir, || write_automation_file(&path, file))
+    crate::config::trust::TrustService::rewrite(tasks_dir, || write_automation_file(&path, file))
 }
 
 pub fn save_project_automation(tasks_dir: &Path, project: &str, file: &AutomationFile) -> LoTaRResult<()> {
     let path = crate::utils::paths::project_automation_path(tasks_dir, project);
-    crate::services::trust_service::TrustService::rewrite(tasks_dir, || write_automation_file(&path, file))
+    crate::config::trust::TrustService::rewrite(tasks_dir, || write_automation_file(&path, file))
 }
 
 pub fn save_home_automation(file: &AutomationFile) -> LoTaRResult<()> {

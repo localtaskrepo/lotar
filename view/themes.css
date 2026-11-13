@@ -28,7 +28,7 @@
  * Derived tokens (focus rings, chart slots 1-3, semantic and legacy aliases)
  * are recomputed per themed element in styles.css. Skins and palettes must
  * match THEMES in view/utils/themes.ts and UI_THEMES in
- * src/services/branding_service.rs; `npm run check:themes` verifies
+ * src/config/branding.rs; `npm run check:themes` verifies
  * completeness and contrast for every skin × palette × mode, including every
  * colour stop of patterned backgrounds and the header text tokens.
  */

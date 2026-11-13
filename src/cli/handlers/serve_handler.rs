@@ -296,7 +296,7 @@ impl CommandHandler for ServeHandler {
         // DEV-305: let launchd/systemd start the upgraded binary.
         if exit_on_upgrade {
             // Same watcher and exit as lotar mcp's default autoreload.
-            if !crate::utils::binary_watch::exit_when_replaced() {
+            if !crate::services::agent_job_service::AgentJobService::exit_when_binary_replaced() {
                 renderer.emit_warning("Cannot watch the lotar binary; --exit-on-upgrade has no effect");
             }
         }

@@ -855,7 +855,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
                 }
                 break
             }
-            // DEV-218: same rules as the server (src/services/branding_service.rs).
+            // DEV-218: same rules as the server (src/config/branding.rs).
             case 'ui_theme': {
                 const value = form.uiTheme.trim()
                 errors.ui_theme = value && !parseThemeValue(value, true) ? 'Pick one of the listed themes.' : null

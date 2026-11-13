@@ -1400,7 +1400,7 @@ fn run_allowed(tasks_dir: &Path, task: &TaskDTO) -> bool {
     if !project_file && matches!(automation_persistence::load_home_automation(), Ok(Some(_))) {
         return true;
     }
-    crate::services::trust_service::TrustService::allows_commands(tasks_dir)
+    crate::config::trust::TrustService::allows_commands(tasks_dir)
 }
 
 /// Say once per process that repository run commands were held back.
@@ -1409,7 +1409,7 @@ fn warn_untrusted_run_once(tasks_dir: &Path) {
     if WARNED.swap(true, std::sync::atomic::Ordering::Relaxed) {
         return;
     }
-    eprintln!("[lotar][warn] {}", crate::services::trust_service::TrustService::untrusted_message(tasks_dir, "automation run commands"));
+    eprintln!("[lotar][warn] {}", crate::config::trust::TrustService::untrusted_message(tasks_dir, "automation run commands"));
 }
 
 /// Default time a waited-for `run` command may take.

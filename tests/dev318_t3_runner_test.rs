@@ -153,7 +153,7 @@ fn read_lines(path: &Path) -> Vec<String> {
 fn home_profile_and_repo_rule_run_a_t3_thread_and_set_done() {
     let fixtures = TestFixtures::new();
     let home = home_with_fix_profile(&fixtures, "");
-    assert!(!lotar::services::trust_service::TrustService::allows_commands(&fixtures.tasks_root), "the repository is not trusted");
+    assert!(!lotar::config::trust::TrustService::allows_commands(&fixtures.tasks_root), "the repository is not trusted");
 
     let id = create(&fixtures, "Leftover worktrees", None);
     let job = wait_for_finished_job(&id);

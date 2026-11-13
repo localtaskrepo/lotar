@@ -1,6 +1,12 @@
 use crate::config::types::ResolvedConfig;
 use crate::types::{CustomFields, custom_value_items};
 
+/// The custom field that holds a ticket's finding key.
+pub const FINDING_FIELD: &str = "finding";
+
+/// The custom field with the date a finding was last reported without news.
+pub const FINDING_SEEN_FIELD: &str = "finding_seen";
+
 /// Task types that can feed filter-value resolution (reserved or custom keys).
 /// Implemented for `TaskDTO`, the shape every task query works on.
 pub trait TaskFilterSource {
@@ -65,8 +71,8 @@ pub fn resolve_filter_name(raw_key: &str, config: &ResolvedConfig) -> Option<Str
     // `finding` and `finding_seen` are LoTaR's own fields (DEV-317,
     // DEV-321), declared or not.
     if config.custom_fields.has_wildcard()
-        || trimmed.eq_ignore_ascii_case(crate::services::finding_service::FINDING_FIELD)
-        || trimmed.eq_ignore_ascii_case(crate::services::finding_service::FINDING_SEEN_FIELD)
+        || trimmed.eq_ignore_ascii_case(FINDING_FIELD)
+        || trimmed.eq_ignore_ascii_case(FINDING_SEEN_FIELD)
         || config.custom_fields.values.iter().any(|value| value.eq_ignore_ascii_case(trimmed))
     {
         return Some(trimmed.to_string());

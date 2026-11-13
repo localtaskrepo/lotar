@@ -19,12 +19,7 @@ use crate::services::task_service::{CommentContext, CreateOptions, TaskService};
 use crate::storage::layout::ArchiveFilter;
 use crate::storage::manager::Storage;
 use crate::storage::{TaskFilter, TaskId};
-
-/// The custom field that holds a ticket's finding key.
-pub const FINDING_FIELD: &str = "finding";
-
-/// The custom field with the date a finding was last reported without news.
-pub const FINDING_SEEN_FIELD: &str = "finding_seen";
+use crate::utils::custom_fields::{FINDING_FIELD, FINDING_SEEN_FIELD};
 
 /// How a repeated report's comment starts.
 const REPORT_PREFIX: &str = "Reported again by ";

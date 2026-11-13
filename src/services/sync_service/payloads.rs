@@ -263,9 +263,6 @@ pub(super) fn apply_github_field(payload: &mut GithubIssuePayload, field: &str, 
     }
 }
 
-/// Issue fields a GitHub mapping can write; others are not sent.
-pub(crate) const GITHUB_PUSH_FIELDS: &[&str] = &["title", "body", "description", "state", "status", "state_reason", "labels", "assignees", "milestone"];
-
 pub(super) fn jira_payload_field_names(payload: &JiraIssuePayload) -> Vec<String> {
     let mut names = payload.fields.keys().cloned().collect::<Vec<_>>();
     if payload.desired_status.is_some() {

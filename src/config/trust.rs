@@ -44,6 +44,13 @@ pub struct CommandSource {
     content: String,
 }
 
+impl CommandSource {
+    /// The file's command part: the whole automation file, or the `agents` block.
+    pub fn content(&self) -> &str {
+        &self.content
+    }
+}
+
 /// Trust state of a tasks directory.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TrustState {
@@ -186,36 +193,6 @@ impl TrustService {
             "Skipped {what}: this repository's automation rules and agent profiles {reason}. Review them with `lotar trust --status`, then run `lotar trust` (or set {TRUST_ALL_ENV}=1 in CI)."
         )
     }
-
-    /// Lines describing what trusting would allow: every `run` action and
-    /// every repository agent profile.
-    pub fn describe(tasks_dir: &Path) -> Vec<String> {
-        let mut lines = Vec::new();
-        for source in Self::sources(tasks_dir) {
-            match source.kind {
-                "automation" => {
-                    let runs = run_commands(&source.content);
-                    if runs.is_empty() {
-                        lines.push(format!("{}: no run commands", source.path));
-                    }
-                    for (rule, event, command) in runs {
-                        lines.push(format!("{}: rule '{rule}' on {event} runs {command}", source.path));
-                    }
-                }
-                _ => {
-                    let Ok(serde_yaml_ng::Value::Mapping(map)) = serde_yaml_ng::from_str::<serde_yaml_ng::Value>(&source.content) else {
-                        continue;
-                    };
-                    for (name, profile) in map {
-                        let name = name.as_str().unwrap_or_default().to_string();
-                        let detail = serde_yaml_ng::to_string(&profile).unwrap_or_default().trim().replace('\n', ", ");
-                        lines.push(format!("{}: agent profile '{name}' ({detail})", source.path));
-                    }
-                }
-            }
-        }
-        lines
-    }
 }
 
 fn trust_all() -> bool {
@@ -236,31 +213,6 @@ fn agents_block(config_path: &Path) -> Option<String> {
         return None;
     }
     serde_yaml_ng::to_string(agents).ok()
-}
-
-/// (rule name, event, command) for every `run` in an automation file.
-fn run_commands(content: &str) -> Vec<(String, String, String)> {
-    let Ok(file) = serde_yaml_ng::from_str::<crate::automation::types::AutomationFile>(content) else {
-        return vec![("?".to_string(), "?".to_string(), "(file does not parse)".to_string())];
-    };
-    let mut out = Vec::new();
-    for (index, rule) in file.automation.rules().iter().enumerate() {
-        let name = rule.name.clone().unwrap_or_else(|| format!("#{}", index + 1));
-        let value = serde_yaml_ng::to_value(&rule.on).unwrap_or_default();
-        let Some(map) = value.as_mapping() else {
-            continue;
-        };
-        for (event, action) in map {
-            if let Some(run) = action.get("run") {
-                let command = match run {
-                    serde_yaml_ng::Value::String(raw) => raw.clone(),
-                    other => serde_json::to_string(other).unwrap_or_default(),
-                };
-                out.push((name.clone(), event.as_str().unwrap_or_default().to_string(), command));
-            }
-        }
-    }
-    out
 }
 
 fn trust_file_path() -> LoTaRResult<PathBuf> {
@@ -331,9 +283,5 @@ mod tests {
         assert_eq!(TrustService::fingerprint(&TrustService::sources(tasks)), before);
         assert!(TrustService::profile_from_repository(tasks, "bot"));
         assert!(!TrustService::profile_from_repository(tasks, "other"));
-
-        let described = TrustService::describe(tasks).join("\n");
-        assert!(described.contains("rule 'hi' on created runs echo hi"), "{described}");
-        assert!(described.contains("agent profile 'bot'"), "{described}");
     }
 }

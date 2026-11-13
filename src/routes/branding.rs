@@ -251,9 +251,9 @@ fn branding_response(resolver: &crate::workspace::TasksDirectoryResolver, config
         Some(relative) => branding_service::read_image(&root, relative).ok().map(|(_, bytes)| image_url(BrandingImage::Icon, &bytes)),
         None => url_for(BrandingImage::Icon),
     };
-    let theme = config.ui.theme.clone().filter(|theme| branding_service::is_valid_ui_theme(theme));
+    let theme = config.ui.theme.clone().filter(|theme| crate::config::branding::is_valid_ui_theme(theme));
     // ~/.lotar overrides the repository's config.yml (see resolution.rs).
-    let valid = |theme: Option<String>| theme.filter(|theme| branding_service::is_valid_ui_theme(theme));
+    let valid = |theme: Option<String>| theme.filter(|theme| crate::config::branding::is_valid_ui_theme(theme));
     let home_theme = valid(crate::config::persistence::load_home_config().ok().and_then(|home| home.ui_theme));
     let repository_theme = valid(crate::config::persistence::load_global_config(Some(resolver.path.as_path())).ok().and_then(|global| global.ui_theme));
     let theme_source = match (&theme, &home_theme, &repository_theme) {

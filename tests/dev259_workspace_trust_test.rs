@@ -75,7 +75,7 @@ fn lotar_writes_keep_a_trusted_workspace_trusted() {
     let marker = env.root().join("RAN");
     env.write_rule(&marker);
     let tasks = env.fixtures.tasks_root.clone();
-    use lotar::services::trust_service::{TrustService, TrustState};
+    use lotar::config::trust::{TrustService, TrustState};
 
     // An untrusted workspace stays untrusted through LoTaR's own writes.
     let yaml = format!("automation:\n  rules:\n    - name: mark2\n      on:\n        created:\n          run: \"touch {}\"\n", marker.display());

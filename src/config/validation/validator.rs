@@ -165,7 +165,7 @@ impl ConfigValidator {
             result.add_error(ValidationError::error(Some("server_public_url".to_string()), problem));
         }
 
-        for name in config.repos.keys().filter(|name| !crate::services::external_tasks::is_repo_name(name)) {
+        for name in config.repos.keys().filter(|name| !crate::config::types::is_repo_name(name)) {
             result.add_error(ValidationError::error(
                 Some("repos".to_string()),
                 format!("Invalid repo name '{name}': use letters, digits, '.', '_' or '-', starting with a letter or digit"),
@@ -665,12 +665,12 @@ impl ConfigValidator {
                             crate::config::types::SyncFieldMapping::Detailed(detail) => detail.field.clone().unwrap_or_else(|| local.clone()),
                         };
                         let target = target.trim().to_ascii_lowercase();
-                        if !target.is_empty() && !crate::services::sync_service::GITHUB_PUSH_FIELDS.contains(&target.as_str()) {
+                        if !target.is_empty() && !crate::config::types::GITHUB_PUSH_FIELDS.contains(&target.as_str()) {
                             result.add_error(ValidationError::warning(
                                 Some(format!("remotes.{trimmed}.mapping.{local}")),
                                 format!(
                                     "GitHub field '{target}' is pulled but never pushed; pushable fields: {}",
-                                    crate::services::sync_service::GITHUB_PUSH_FIELDS.join(", ")
+                                    crate::config::types::GITHUB_PUSH_FIELDS.join(", ")
                                 ),
                             ));
                         }

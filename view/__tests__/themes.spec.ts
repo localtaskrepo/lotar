@@ -14,14 +14,14 @@ import { LEGACY_THEME_ALIASES, THEMES, type ThemeInfo } from '../utils/themes'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const themesCss = readFileSync(resolve(__dirname, '../themes.css'), 'utf8')
 const stylesCss = readFileSync(resolve(__dirname, '../styles.css'), 'utf8')
-const brandingRs = readFileSync(resolve(__dirname, '../../src/services/branding_service.rs'), 'utf8')
+const brandingRs = readFileSync(resolve(__dirname, '../../src/config/branding.rs'), 'utf8')
 
 const skins = THEMES as readonly ThemeInfo[]
 
-/** The body of a `pub const NAME: … = &[ … ];` list in branding_service.rs. */
+/** The body of a `pub const NAME: … = &[ … ];` list in branding.rs. */
 function rustList(name: string): string {
     const list = brandingRs.match(new RegExp(`pub const ${name}: [^=]+= &\\[([\\s\\S]*?)\\n\\];`))
-    expect(list, `${name} in branding_service.rs`).not.toBeNull()
+    expect(list, `${name} in branding.rs`).not.toBeNull()
     return list?.[1] ?? ''
 }
 
@@ -83,7 +83,7 @@ describe('colour themes (themes.css)', () => {
         }
     })
 
-    it('matches UI_THEMES and UI_THEME_ALIASES in branding_service.rs, in the same order', () => {
+    it('matches UI_THEMES and UI_THEME_ALIASES in branding.rs, in the same order', () => {
         expect(rustThemes()).toEqual(
             skins.map((theme) => [theme.id, (theme.palettes ?? []).map((palette) => palette.id)]),
         )

@@ -61,7 +61,7 @@ fn parse_repos(value: &str) -> Result<BTreeMap<String, String>, ConfigError> {
         return Ok(BTreeMap::new());
     }
     let repos = serde_yaml_ng::from_str::<BTreeMap<String, String>>(trimmed).map_err(|err| ConfigError::ParseError(format!("Invalid repos value: {}", err)))?;
-    if let Some(name) = repos.keys().find(|name| !crate::services::external_tasks::is_repo_name(name)) {
+    if let Some(name) = repos.keys().find(|name| !crate::config::types::is_repo_name(name)) {
         return Err(ConfigError::ParseError(format!("Invalid repo name '{name}': use letters, digits, '.', '_' or '-', starting with a letter or digit")));
     }
     Ok(repos)
@@ -91,7 +91,7 @@ fn parse_agent_profiles(value: &str) -> Result<BTreeMap<String, crate::config::t
             return Err(ConfigError::ParseError(format!("Invalid agent name '{name}': use letters, digits, '-', '_' or '.'")));
         }
         let runner = profile.to_detail().runner;
-        if runner.parse::<crate::services::agent_runner::AgentRunnerKind>().is_err() {
+        if runner.parse::<crate::config::types::AgentRunnerKind>().is_err() {
             return Err(ConfigError::ParseError(format!("Agent '{name}' has unsupported runner '{runner}'. Expected {}", AGENT_RUNNERS.join(", "))));
         }
     }
@@ -400,7 +400,7 @@ pub fn save_global_config_with_port(tasks_dir: &Path, config: &GlobalConfig, por
 
     // Agent profiles are command sources (DEV-259): keep a trusted
     // workspace trusted across LoTaR's own config writes.
-    crate::services::trust_service::TrustService::rewrite(tasks_dir, || crate::storage::safety::atomic_write_file(&config_path, &config_yaml))
+    crate::config::trust::TrustService::rewrite(tasks_dir, || crate::storage::safety::atomic_write_file(&config_path, &config_yaml))
         .map_err(|e| ConfigError::IoError(format!("Failed to write global config: {}", e)))?;
 
     // Invalidate cache for this tasks_dir
@@ -424,7 +424,7 @@ pub fn save_project_config(tasks_dir: &Path, project_prefix: &str, config: &Proj
     // Serialize in canonical nested format
     let config_yaml = crate::config::normalization::to_canonical_project_yaml(config);
 
-    crate::services::trust_service::TrustService::rewrite(tasks_dir, || crate::storage::safety::atomic_write_file(&config_path, &config_yaml))
+    crate::config::trust::TrustService::rewrite(tasks_dir, || crate::storage::safety::atomic_write_file(&config_path, &config_yaml))
         .map_err(|e| ConfigError::IoError(format!("Failed to write project config: {}", e)))?;
 
     // Invalidate cache for this tasks_dir
@@ -788,7 +788,7 @@ pub fn apply_field_to_global_config(config: &mut GlobalConfig, field: &str, valu
             }
         }
         "ui_theme_file" => {
-            crate::services::theme_file::validate_path(value).map_err(ConfigError::ParseError)?;
+            crate::config::branding::validate_theme_file_path(value).map_err(ConfigError::ParseError)?;
             config.ui_theme_file = parse_optional_string(value);
         }
         "server_public_url" => {
@@ -796,7 +796,7 @@ pub fn apply_field_to_global_config(config: &mut GlobalConfig, field: &str, valu
             config.server_public_url = parse_optional_string(value).map(|url| url.trim_end_matches('/').to_string());
         }
         "ui_theme" | "ui_name" | "ui_logo" | "ui_logo_dark" | "ui_icon" => {
-            crate::services::branding_service::validate_ui_field(field, value).map_err(ConfigError::ParseError)?;
+            crate::config::branding::validate_ui_field(field, value).map_err(ConfigError::ParseError)?;
             let next = parse_optional_string(value);
             match field {
                 "ui_theme" => config.ui_theme = next,
@@ -1298,11 +1298,11 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
             // Accept any string; empty clears the setting.
         }
         "ui_theme" | "ui_name" | "ui_logo" | "ui_logo_dark" | "ui_icon" => {
-            crate::services::branding_service::validate_ui_field(field, value)
+            crate::config::branding::validate_ui_field(field, value)
                 .map_err(ConfigError::ParseError)?;
         }
         "ui_theme_file" => {
-            crate::services::theme_file::validate_path(value).map_err(ConfigError::ParseError)?;
+            crate::config::branding::validate_theme_file_path(value).map_err(ConfigError::ParseError)?;
         }
         "server_public_url" => {
             validate_public_url(value)?;

@@ -3,9 +3,9 @@ status: Reviewing
 priority: Low
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-13T22:41:10.367004+00:00
-modified: 2026-11-13T23:17:18.517455+00:00
+modified: 2026-11-13T23:20:32.666797+00:00
 relationships:
   blocks:
   - DEV-488
@@ -37,6 +37,9 @@ comments:
 - date: 2026-11-13T23:17:18.517455+00:00
   author: claude
   text: 'Owner decision 2026-11-13, on keeping unanswered questions visible when their author or type is hidden: "actually just make that a separate filter option that you can toggle on and off." So: a separate toggle in the Comments filter (e.g. "Always show open questions"), on/off, saved with the other comment-filter choices; not a fixed rule. DEV-502 has no question data, so DEV-488 builds the toggle. Merge order (agreed 2026-11-13, coordinated by the DEV-502 agent): 1) DEV-502 merges first; it waits on nobody (review, then merge). 2) DEV-488 waits for DEV-502 only for its filter part: keep working on the rest, then rebase onto main and add the Type chips and the open-questions toggle. 3) DEV-489 and DEV-490 wait for DEV-488 (existing depends-on), then rebase and add Review / Hand-off to the Type row. 4) DEV-491 waits on nobody; whichever of it and DEV-502 merges second resolves the textual conflict on the comment <li>.'
+- date: 2026-11-13T23:20:24.487459+00:00
+  author: codex
+  text: 'Review: blocking. TaskPanelHistoryTab.vue:127-131 counts only fully removed updates. For one update with status and tags, hiding Status removes changes but leaves hiddenText empty, also hiding Show all (TaskPanelActivityFilter.vue:19). Count hidden changes and retain Show all whenever filtering is active; add mixed-field coverage. Reviewed branch diff, ticket comments/related plans and recent tab history. Focused unit tests passed (3); frontend typecheck passed. Full lint/test/smoke and independent visual review not completed. No files edited or commits made; status and assignee unchanged.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0dc4db1c-afdc-4589-a3bc-1ae9580009ce
 - attachment: dev502-comments-after-1440-dark.d23878379059d92bd378765d0b3fb433.webp
@@ -58,6 +61,7 @@ references:
 - attachment: dev502-history-before-1920-light.153adf86ef293697f0abf24f867f04a2.webp
 - attachment: dev502-history-before-390-dark.9bb4d68679b6b3aa2c306b9ea9cdfbc0.webp
 - attachment: dev502-history-before-390-light.72fd6a8310da81f314387429e59812fd.webp
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A03750fd7-9350-48ab-b423-d773fa69d752
 description: |-
   The task panel's Comments and History tabs list every entry with no way to narrow them; the only control is the reload button. On a long ticket (DEV-466, STD-82) the owner can't pick out what the agents said or what changed a field. Owner asked on 2026-11-13 whether this exists and said to file it.
 
@@ -75,6 +79,7 @@ description: |-
 tags:
 - web-ui
 - ui
+- review-returned
 history:
 - at: 2026-11-13T22:41:10.738027+00:00
   actor: claude
@@ -222,3 +227,27 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-13T23:19:20.246782+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A03750fd7-9350-48ab-b423-d773fa69d752
+- at: 2026-11-13T23:20:24.487459+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:20:24.513951+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: web-ui, ui
+    new: web-ui, ui, review-blocked
+- at: 2026-11-13T23:20:32.666797+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: web-ui, ui, review-blocked
+    new: web-ui, ui, review-returned

@@ -524,7 +524,7 @@ pub fn run_stdio_server() {
     if autoreload_enabled {
         // Watches the path lotar was started from, so Homebrew upgrades
         // (a new Cellar path behind the same symlink) are noticed (DEV-305).
-        crate::utils::binary_watch::exit_when_replaced();
+        crate::services::agent_job_service::AgentJobService::exit_when_binary_replaced();
     }
 
     let stdin = io::stdin();

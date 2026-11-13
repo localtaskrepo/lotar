@@ -5,16 +5,11 @@
 //! relationship graph. A reference that cannot be read, for a repo that is
 //! not registered, missing, or without the task, is unresolved: a
 //! prerequisite stays open, as for a deleted local one.
-use crate::config::types::GlobalConfig;
+use crate::config::types::{GlobalConfig, is_repo_name};
 use crate::storage::TaskId;
 use crate::storage::task::Task;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-
-/// Repo names: a letter or digit, then letters, digits, `.`, `_` or `-`.
-pub fn is_repo_name(name: &str) -> bool {
-    name.chars().next().is_some_and(|c| c.is_ascii_alphanumeric()) && name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'))
-}
 
 /// The repo name and canonical task ID of `repo:ID`, or `None` for anything else.
 pub fn parse(raw: &str) -> Option<(String, String)> {

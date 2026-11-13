@@ -108,7 +108,8 @@ impl AddHandler {
         resolver: &TasksDirectoryResolver,
         renderer: &OutputRenderer,
     ) -> Result<AddedTask, String> {
-        use crate::services::finding_service::{FINDING_FIELD, FindingReport, FindingService, FindingState, Prior};
+        use crate::services::finding_service::{FindingReport, FindingService, FindingState, Prior};
+        use crate::utils::custom_fields::FINDING_FIELD;
         renderer.log_info("add: begin validation and project resolution");
         // Like REST and MCP: no task without a title (DEV-285).
         if args.title.trim().is_empty() {

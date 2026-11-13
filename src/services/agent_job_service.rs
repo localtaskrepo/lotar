@@ -1,11 +1,11 @@
 use crate::api_types::{AgentJob, AgentJobCreateRequest};
-use crate::config::types::{AgentInstructionsConfig, AgentProfileDetail, AgentSession, ResolvedConfig};
+use crate::config::types::{AgentInstructionsConfig, AgentProfileDetail, AgentRunnerKind, AgentSession, ResolvedConfig};
 use crate::errors::{LoTaRError, LoTaRResult};
 use crate::services::agent_context_service::{AgentContextService, build_assistant_message, build_user_message};
 use crate::services::agent_log_service::AgentLogService;
 use crate::services::agent_runner::{
-    AgentRunnerKind, RunnerEventKind, T3Launch, T3Worktree, build_runner_command, build_t3_command, build_t3_send_command, format_stdin_message, is_t3_noise,
-    parse_runner_line, supports_stdin, t3_thread_id, validate_runner_command,
+    RunnerEventKind, T3Launch, T3Worktree, build_runner_command, build_t3_command, build_t3_send_command, format_stdin_message, is_t3_noise, parse_runner_line,
+    supports_stdin, t3_thread_id, validate_runner_command,
 };
 use crate::services::automation_service::{AutomationEvent, AutomationJobContext, AutomationService, build_lotar_env};
 use crate::services::sprint_metrics::determine_done_statuses_from_config;
@@ -529,6 +529,19 @@ impl AgentJobService {
         }
     }
 
+    /// The one upgrade reaction for long-running commands (`lotar mcp`, `lotar
+    /// serve --exit-on-upgrade`): once the binary is replaced, stop running
+    /// agent jobs and exit with status 0, so whatever started this process runs
+    /// the new version. The note goes to stderr; stdout may carry a protocol.
+    /// Returns false when there is nothing to watch.
+    pub fn exit_when_binary_replaced() -> bool {
+        crate::utils::binary_watch::spawn_watcher(|| {
+            eprintln!("The lotar binary changed; exiting so the new version can start");
+            Self::shutdown_jobs(Duration::from_secs(10));
+            std::process::exit(0);
+        })
+    }
+
     pub fn events_for(id: &str) -> Vec<AgentJobEvent> {
         if let Ok(registry) = JOB_REGISTRY.lock()
             && let Some(state) = registry.jobs.get(id)
@@ -784,7 +797,7 @@ fn descendant_pids(root: u32) -> Vec<u32> {
 /// repository chose; they need a trusted workspace (DEV-259). Bare
 /// `--runner` jobs and home-config profiles are the user's own choice.
 fn ensure_profile_trusted(tasks_dir: &std::path::Path, req: &AgentJobCreateRequest) -> LoTaRResult<()> {
-    use crate::services::trust_service::TrustService;
+    use crate::config::trust::TrustService;
     let Some(name) = req.agent.as_deref() else {
         return Ok(());
     };
@@ -808,7 +821,7 @@ fn resolve_profile(config: &ResolvedConfig, req: &AgentJobCreateRequest) -> LoTa
     let run_model = non_blank(req.model.as_deref());
     let run_effort = non_blank(req.effort.as_deref());
     if (run_model.is_some() || run_effort.is_some())
-        && let Ok(kind) = profile.runner.parse::<crate::services::agent_runner::AgentRunnerKind>()
+        && let Ok(kind) = profile.runner.parse::<AgentRunnerKind>()
     {
         profile.args = crate::services::agent_runner::drop_overridden_args(kind, &profile.args, run_model.is_some(), run_effort.is_some());
     }

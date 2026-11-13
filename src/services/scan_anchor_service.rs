@@ -22,6 +22,7 @@ use crate::errors::LoTaRResult;
 use crate::storage::TaskFilter;
 use crate::storage::manager::Storage;
 use crate::types::ReferenceEntry;
+use crate::utils::scan::{dedupe_code_references, is_user_attached};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -237,37 +238,6 @@ fn apply_plan(references: &mut Vec<ReferenceEntry>, plan: &[(String, AnchorChang
     }
     *references = kept;
     changed
-}
-
-/// Drop plain code references (nothing but `code`) that repeat an earlier
-/// plain one. Entries that carry more data are never touched, nor is a
-/// plain anchor that shares its line with such an entry. Returns whether
-/// anything was removed.
-pub(crate) fn dedupe_code_references(references: &mut Vec<ReferenceEntry>) -> bool {
-    let bare = |r: &ReferenceEntry| ReferenceEntry { code: None, ..r.clone() } == ReferenceEntry::default();
-    let mut seen = std::collections::HashSet::new();
-    let before = references.len();
-    references.retain(|r| match r.code.as_deref() {
-        Some(code) if bare(r) => seen.insert(code.to_string()),
-        _ => true,
-    });
-    references.len() != before
-}
-
-/// Whether a code reference was attached by a person rather than by scan.
-/// Scan only ever writes single-line `path#N` anchors and records no history
-/// for them, while explicit attachments (CLI, REST, MCP, UI) record a
-/// `reference_added` entry. Path-only and ranged references (`path#A-B`)
-/// therefore always count as user-attached.
-pub(crate) fn is_user_attached(history: &[crate::types::TaskChangeLogEntry], code_ref: &str) -> bool {
-    let Some((_, anchor)) = code_ref.rsplit_once('#') else {
-        return true;
-    };
-    if anchor.parse::<usize>().is_err() {
-        return true;
-    }
-    let recorded = format!("code:{code_ref}");
-    history.iter().any(|entry| entry.changes.iter().any(|change| change.field == "reference_added" && change.new.as_deref() == Some(recorded.as_str())))
 }
 
 fn is_under_any(path: &Path, roots: &[PathBuf]) -> bool {

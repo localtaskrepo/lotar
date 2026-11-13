@@ -17,6 +17,7 @@
 //! - `validation`: Configuration validation system
 
 pub mod bootstrap;
+pub mod branding;
 pub mod candidate;
 pub mod env_overrides;
 pub mod fields;
@@ -26,6 +27,7 @@ pub mod operations;
 pub mod persistence;
 pub mod resolution;
 pub mod source_labels;
+pub mod trust;
 pub mod types;
 pub mod validation;
 

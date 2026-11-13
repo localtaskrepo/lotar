@@ -13,7 +13,7 @@
  * A choice is written `skin` or `skin:palette` (e.g. `terminal:red`) in
  * `ui.theme` and in the browser. The first palette is the skin's default.
  * Keep skins and palettes in sync with `UI_THEMES` in
- * src/services/branding_service.rs; the theme spec checks this.
+ * src/config/branding.rs; the theme spec checks this.
  */
 import { itemAt } from './lookup'
 

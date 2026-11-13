@@ -1,11 +1,11 @@
 title: Question comments with options the owner answers by click, and answers that set the ticket's fields
-status: HelpNeeded
+status: Blocked
 priority: High
 type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-13T21:13:42.890310+00:00
-modified: 2026-11-13T23:17:18.363307+00:00
+modified: 2026-11-13T23:20:00.390487+00:00
 relationships:
   depends_on:
   - DEV-502
@@ -63,6 +63,9 @@ comments:
 - date: 2026-11-13T23:17:18.363307+00:00
   author: claude
   text: 'Owner decision 2026-11-13, on keeping unanswered questions visible when their author or type is hidden: "actually just make that a separate filter option that you can toggle on and off." So: a separate toggle in the Comments filter (e.g. "Always show open questions"), on/off, saved with the other comment-filter choices; not a fixed rule. Built in DEV-488 (it has the question/answer model), after DEV-502 lands. Merge order (agreed 2026-11-13, coordinated by the DEV-502 agent): 1) DEV-502 merges first; it waits on nobody (review, then merge). 2) DEV-488 waits for DEV-502 only for its filter part: keep working on the rest, then rebase onto main and add the Type chips and the open-questions toggle. 3) DEV-489 and DEV-490 wait for DEV-488 (existing depends-on), then rebase and add Review / Hand-off to the Type row. 4) DEV-491 waits on nobody; whichever of it and DEV-502 merges second resolves the textual conflict on the comment <li>.'
+- date: 2026-11-13T23:19:49.772542+00:00
+  author: codex
+  text: 'Rework persistence fix committed as 5eb948ed (signed), on the assigned branch; no push or merge. Answer validation and option fields now use the same locked update transaction, so failed routing leaves the question open and the task bytes unchanged. Existing answerer history, post-commit automation and active-job outcome handling are preserved. Added CLI regression coverage (reproduced failure before fix; six focused tests pass) and documented retry behavior. Checks passed: lint:agent; test:agent (2148 Rust, 1517 UI, 47 release, 7 hook tests); test:smoke:agent (391); git diff --check. Working tree clean. No UI edits in this rework; no new visual screenshots required for the persistence fix. No durable guidance correction. Owner 2026-11-13: Hold for DEV-502, then finish chips. INCOMPLETE: filter portion waits for DEV-502 to land first; do not merge DEV-488 yet. Next: rebase onto main after DEV-502 lands, add Question/Answer Type chips via hiddenFields/toggleField and a separate saved Always show open questions toggle in lotar.preferences.taskPanel.commentFilter; add unit/smoke and visual coverage. Do not copy DEV-502 files. Requesting Blocked/claude while waiting, per this job handback instructions.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afd2c6919-e5a0-41a8-9c0f-8916f5a62fea
 - file: src/types.rs
@@ -599,3 +602,13 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-13T23:19:49.772542+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:20:00.390487+00:00
+  actor: codex
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked

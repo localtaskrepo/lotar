@@ -73,6 +73,7 @@ mod config_sprint_defaults_test;
 mod config_tag_properties_test;
 mod config_validate_integration_test;
 mod config_validation_test;
+mod core_layering_test;
 mod custom_field_versions_test;
 mod default_category_and_tags_test;
 mod dev102_automation_noop_test;
