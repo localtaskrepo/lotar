@@ -24,5 +24,3 @@ attachments:
 agent:
   worktree:
     max_parallel_jobs: 2
-    cleanup_paths:
-    - target
