@@ -2756,14 +2756,23 @@ exit 0\n",
         let fixtures = TestFixtures::new();
         init_git_repository(fixtures.get_temp_path());
 
+        // The merge stub holds until the test opens the gate, so the
+        // serialization check does not race the first job's startup time
+        // (worktree creation is slow under concurrent load). The loop is
+        // bounded (~30s) so a failed test leaves no runaway child.
+        let release = fixtures.get_temp_path().join("merge_serial_release.txt");
         let merge_script = write_stub_agent_script(
             fixtures.get_temp_path(),
             "stub-agent-merge-serial.sh",
-            "#!/bin/sh\n\
-echo '{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"merge-serial\"}'\n\
-sleep 1\n\
-echo '{\"type\":\"assistant\",\"message\":{\"content\":[{\"text\":\"serialized merge done\"}]},\"session_id\":\"merge-serial\"}'\n\
+            &format!(
+                "#!/bin/sh\n\
+echo '{{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"merge-serial\"}}'\n\
+i=0\n\
+while [ ! -f \"{}\" ] && [ $i -lt 1500 ]; do sleep 0.02; i=$((i + 1)); done\n\
+echo '{{\"type\":\"assistant\",\"message\":{{\"content\":[{{\"text\":\"serialized merge done\"}}]}},\"session_id\":\"merge-serial\"}}'\n\
 exit 0\n",
+                release.display()
+            ),
         );
 
         fixtures.create_config_in_dir(
@@ -2831,11 +2840,23 @@ exit 0\n",
         )
         .expect("start second merge job");
 
-        assert!(wait_for_job_status(&first_job.id, "running", 1500));
-        assert!(wait_for_job_status(&second_job.id, "queued", 500));
+        // Open the gate on every exit path so a failed assertion leaves no gated child.
+        struct ReleaseGate(std::path::PathBuf);
+        impl Drop for ReleaseGate {
+            fn drop(&mut self) {
+                let _ = std::fs::write(&self.0, "release\n");
+            }
+        }
+        let _release_gate = ReleaseGate(release.clone());
+        assert!(wait_for_job_status(&first_job.id, "running", 10_000), "first merge job should start");
+        // With four free slots, only merge serialization keeps the second job waiting.
+        sleep(Duration::from_millis(300));
+        let second_status = AgentJobService::get_job(&second_job.id).map(|job| job.status);
+        assert_eq!(second_status.as_deref(), Some("queued"), "second merge job must wait while the first runs");
 
-        assert!(wait_for_job_status(&first_job.id, "completed", 4000));
-        assert!(wait_for_job_status(&second_job.id, "completed", 5000));
+        fs::write(&release, "release\n").expect("open merge gate");
+        assert!(wait_for_job_status(&first_job.id, "completed", 10_000), "first merge job should complete");
+        assert!(wait_for_job_status(&second_job.id, "completed", 10_000), "second merge job should complete");
     }
 }
 
