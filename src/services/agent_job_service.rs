@@ -1429,9 +1429,9 @@ fn hand_back_waiting_t3_job(job_id: &str, ticket_id: &str, tasks_dir: &std::path
     });
 }
 
-/// How often a taken-over job reads its T3 Code thread while it runs.
+/// How often a job reads its T3 Code thread while it waits for its run.
 const ORPHAN_POLL: Duration = Duration::from_secs(5);
-/// Failed `t3 thread show` reads in a row before a taken-over job fails.
+/// Failed `t3 thread show` reads in a row before a job stops waiting.
 const ORPHAN_READ_ATTEMPTS: u32 = 3;
 
 /// Take over a job whose process exited before it ended (DEV-378): it runs
@@ -1516,6 +1516,72 @@ fn adopt_orphaned_job(tasks_dir: &std::path::Path, orphan: &crate::services::age
     thread::spawn(move || finish_orphaned_job(&job, runner_kind, &profile, &tasks_dir, &ticket_id, &config));
 }
 
+/// Wait until a job's T3 Code thread ends its run. `None` when the job is
+/// stopped meanwhile (the thread keeps running); `Err` when the thread
+/// can't be read.
+fn wait_for_t3_run(cli: &T3Cli, job_id: &str, tasks_dir: &std::path::Path, thread_id: &str) -> Option<Result<T3ThreadState, String>> {
+    let mut failed_reads = 0;
+    let mut noted_running = false;
+    loop {
+        if crate::services::agent_active_jobs::cancel_requested(tasks_dir, job_id) {
+            let _ = AgentJobService::cancel_job(job_id);
+        }
+        if should_stop_job(job_id) {
+            update_job(job_id, |state| {
+                let note = format!("Stopped waiting for the T3 Code thread; it keeps running until it is stopped in T3 Code: {thread_id}");
+                record_and_emit(state, "agent_job_progress", Some(note));
+            });
+            return None;
+        }
+        match cli.thread_state(thread_id) {
+            Some(thread) if !thread.running => return Some(Ok(thread)),
+            Some(_) => {
+                failed_reads = 0;
+                if !noted_running {
+                    noted_running = true;
+                    update_job(job_id, |state| {
+                        record_and_emit(state, "agent_job_progress", Some("The T3 Code thread still runs; the job ends when its run ends.".to_string()));
+                    });
+                }
+            }
+            None => {
+                failed_reads += 1;
+                if failed_reads >= ORPHAN_READ_ATTEMPTS {
+                    return Some(Err(format!("Could not read the job's T3 Code thread {thread_id} with `t3 thread show`.")));
+                }
+            }
+        }
+        thread::sleep(ORPHAN_POLL);
+    }
+}
+
+/// Record how a thread's run ended on its job and give the exit code
+/// `t3 thread start --wait` would have: 0 when it completed, 2 when it
+/// waits for an answer, 1 otherwise.
+fn t3_run_exit_code(job_id: &str, thread_id: &str, thread: &T3ThreadState) -> i32 {
+    let link = thread.info.link.clone().unwrap_or_else(|| thread_id.to_string());
+    update_job(job_id, |state| {
+        state.t3_link = Some(link.clone());
+        record_t3_worktree(state, &thread.info);
+        if let Some(reply) = thread.reply.as_ref() {
+            state.record.last_message = Some(reply.clone());
+            record_and_emit(state, "agent_job_message", Some(reply.clone()));
+        }
+    });
+    if thread.waits_for_answer {
+        T3_WAITS_FOR_ANSWER
+    } else if thread.status == "completed" {
+        0
+    } else {
+        update_job(job_id, |state| {
+            let message = format!("The T3 Code thread's run ended with status '{}': {link}", thread.status);
+            state.record.last_message = Some(message.clone());
+            record_and_emit(state, "agent_job_progress", Some(message));
+        });
+        1
+    }
+}
+
 /// End a taken-over job: a t3 job from its thread's state, once the thread's
 /// run ends; any other runner fails, as its result went with its process.
 fn finish_orphaned_job(
@@ -1539,61 +1605,15 @@ fn finish_orphaned_job(
     let repo_root = resolve_repo_root(tasks_dir).unwrap_or_else(|| tasks_dir.to_path_buf());
     let command = crate::services::agent_runner::build_t3_send_command(profile, "", thread_id);
     let cli = T3Cli { program: command.program, env: command.env, cwd: repo_root };
-    let mut failed_reads = 0;
-    let mut noted_running = false;
-    let thread = loop {
-        if crate::services::agent_active_jobs::cancel_requested(tasks_dir, job_id) {
-            let _ = AgentJobService::cancel_job(job_id);
-        }
-        if should_stop_job(job_id) {
-            update_job(job_id, |state| {
-                let note = format!("Stopped waiting for the T3 Code thread; it keeps running until it is stopped in T3 Code: {thread_id}");
-                record_and_emit(state, "agent_job_progress", Some(note));
-            });
+    let thread = match wait_for_t3_run(&cli, job_id, tasks_dir, thread_id) {
+        Some(Ok(thread)) => thread,
+        Some(Err(message)) => {
+            update_job_failure(job_id, ticket_id, message, tasks_dir);
             return;
         }
-        match cli.thread_state(thread_id) {
-            Some(thread) if !thread.running => break thread,
-            Some(_) => {
-                failed_reads = 0;
-                if !noted_running {
-                    noted_running = true;
-                    update_job(job_id, |state| {
-                        record_and_emit(state, "agent_job_progress", Some("The T3 Code thread still runs; the job ends when its run ends.".to_string()));
-                    });
-                }
-            }
-            None => {
-                failed_reads += 1;
-                if failed_reads >= ORPHAN_READ_ATTEMPTS {
-                    update_job_failure(job_id, ticket_id, format!("Could not read the job's T3 Code thread {thread_id} with `t3 thread show`."), tasks_dir);
-                    return;
-                }
-            }
-        }
-        thread::sleep(ORPHAN_POLL);
+        None => return,
     };
-    let link = thread.info.link.clone().unwrap_or_else(|| thread_id.to_string());
-    update_job(job_id, |state| {
-        state.t3_link = Some(link.clone());
-        record_t3_worktree(state, &thread.info);
-        if let Some(reply) = thread.reply.as_ref() {
-            state.record.last_message = Some(reply.clone());
-            record_and_emit(state, "agent_job_message", Some(reply.clone()));
-        }
-    });
-    let exit_code = if thread.waits_for_answer {
-        T3_WAITS_FOR_ANSWER
-    } else if thread.status == "completed" {
-        0
-    } else {
-        update_job(job_id, |state| {
-            let message = format!("The T3 Code thread's run ended with status '{}': {link}", thread.status);
-            state.record.last_message = Some(message.clone());
-            record_and_emit(state, "agent_job_progress", Some(message));
-        });
-        1
-    };
+    let exit_code = t3_run_exit_code(job_id, thread_id, &thread);
     let mut context_messages: Vec<_> = thread.reply.as_deref().map(build_assistant_message).into_iter().collect();
     let exit_code = run_queued_turns(&cli, job_id, tasks_dir, Some(exit_code), &mut context_messages);
     if should_stop_job(job_id) {
@@ -2572,6 +2592,30 @@ fn run_job(
     }
     let mut exit_code = status.ok().and_then(|status| status.code());
     if let Some(cli) = t3_cli.as_ref() {
+        // `t3 thread start --wait` can exit (a signal, a lost connection)
+        // while its thread still runs (DEV-401): the job waits for the run.
+        let thread_id = JOB_REGISTRY.lock().ok().and_then(|registry| registry.jobs.get(&job_id).and_then(|state| state.record.session_id.clone()));
+        if let Some(thread_id) = thread_id.filter(|_| !matches!(exit_code, Some(0 | T3_WAITS_FOR_ANSWER)))
+            && cli.thread_state(&thread_id).is_some_and(|thread| thread.running)
+        {
+            update_job(&job_id, |state| {
+                let note = format!("t3 exited ({}) before its thread's run ended.", exit_description(exit_code));
+                record_and_emit(state, "agent_job_progress", Some(note));
+            });
+            match wait_for_t3_run(cli, &job_id, &tasks_dir, &thread_id) {
+                Some(Ok(thread)) => {
+                    exit_code = Some(t3_run_exit_code(&job_id, &thread_id, &thread));
+                    context_messages.extend(thread.reply.as_deref().map(build_assistant_message));
+                }
+                Some(Err(message)) => update_job(&job_id, |state| {
+                    record_and_emit(state, "agent_job_progress", Some(message.clone()));
+                }),
+                None => {
+                    let _ = AgentContextService::append_messages(&tasks_dir, &config, &ticket_id, context_messages, None);
+                    return;
+                }
+            }
+        }
         on_t3_thread_ended(cli, &job_id);
         exit_code = run_queued_turns(cli, &job_id, &tasks_dir, exit_code, &mut context_messages);
         if should_stop_job(&job_id) {
@@ -2961,6 +3005,14 @@ fn finalize_job(
     if failure_note.is_some() {
         success = false;
     }
+    // Every failure says why (DEV-401); the agent's own last words stay
+    // the summary unless LoTaR's note explains the failure.
+    let failure_reason = failure_note.clone().or_else(|| {
+        let runner = JOB_REGISTRY.lock().ok().and_then(|registry| registry.jobs.get(job_id).map(|state| state.record.runner.clone())).unwrap_or_default();
+        (!success).then(|| {
+            if runner_failed { format!("The {runner} runner reported a failure.") } else { format!("The {runner} runner {}.", exit_description(exit_code)) }
+        })
+    });
     let mut finalized = false;
     update_job(job_id, |state| {
         if state.record.status == AgentJobStatus::Cancelled {
@@ -2969,13 +3021,13 @@ fn finalize_job(
         state.record.exit_code = exit_code;
         state.record.finished_at = Some(now.clone());
         state.record.status = if success { AgentJobStatus::Completed } else { AgentJobStatus::Failed };
-        if let Some(message) = failure_note.as_ref() {
+        if let Some(message) = failure_note.as_ref().or(failure_reason.as_ref().filter(|_| state.record.last_message.is_none())) {
             state.record.last_message = Some(message.clone());
         }
         state.record.summary = state.record.last_message.clone();
         finalized = true;
         let event_kind = if success { "agent_job_completed" } else { "agent_job_failed" };
-        record_and_emit(state, event_kind, failure_note.clone());
+        record_and_emit(state, event_kind, failure_reason.clone());
     });
     if !finalized {
         let _ = AgentContextService::append_messages(tasks_dir, config, ticket_id, context_messages.to_vec(), None);
@@ -3044,6 +3096,14 @@ fn finalize_job(
 
     maybe_cleanup_worktree(job_id, ticket_id, tasks_dir, config, if success { JobOutcome::Success } else { JobOutcome::Failure });
     remove_build_output(job_id, ticket_id, tasks_dir, config);
+}
+
+/// How a runner process ended, for a failure's reason.
+fn exit_description(exit_code: Option<i32>) -> String {
+    match exit_code {
+        Some(code) => format!("exited with code {code}"),
+        None => "was ended by a signal".to_string(),
+    }
 }
 
 fn update_job_failure(job_id: &str, ticket_id: &str, message: String, tasks_dir: &std::path::Path) {

@@ -214,9 +214,41 @@ fn a_failed_run_fails_the_job_with_t3s_error() {
     assert_eq!(job.status, "failed", "{job:?}");
     assert_eq!(job.exit_code, Some(1));
     assert_eq!(job.summary.as_deref(), Some("The run failed: provider quota exhausted"));
+    let failed = AgentJobService::events_for(&job.id).into_iter().find(|event| event.kind == "agent_job_failed").unwrap();
+    assert_eq!(failed.message.as_deref(), Some("The t3 runner exited with code 1."), "DEV-401: every failure says why");
     let storage = fixtures.create_storage();
     let task = TaskService::get(&storage, &id, None).unwrap();
     assert_eq!(task.status.as_str(), "Todo", "the Done rule did not run");
+}
+
+/// DEV-401: `t3 thread start --wait` interrupted (exit 130) while the
+/// thread works on: the job waits for the run instead of failing.
+#[test]
+fn a_t3_that_exits_while_its_thread_runs_waits_for_the_run() {
+    let fixtures = TestFixtures::new();
+    let home = home_with_fix_profile(&fixtures, "    env:\n      FAKE_T3_EXIT: \"130\"\n");
+    fs::write(home.out.join("status"), "running").unwrap();
+    let id = create(&fixtures, "Interrupted", None);
+    let start = Instant::now();
+    while !messages_for_ticket(&id).iter().any(|m| m.contains("before its thread's run ended")) {
+        assert!(start.elapsed() < Duration::from_secs(10), "{:?}", AgentJobService::list_jobs());
+        sleep(Duration::from_millis(50));
+    }
+    sleep(Duration::from_secs(1));
+    let running = AgentJobService::list_jobs().into_iter().find(|job| job.ticket_id == id).unwrap();
+    assert_eq!(running.status, "running", "waits while the thread runs");
+    fs::write(home.out.join("status"), "completed").unwrap();
+
+    let job = wait_for_finished_job(&id);
+    assert_eq!(job.status, "completed", "{job:?}: {:?}", messages(&job));
+    assert_eq!(job.exit_code, Some(0));
+    assert_eq!(job.summary.as_deref(), Some("Fixed it."));
+    let task = TaskService::get(&fixtures.create_storage(), &id, None).unwrap();
+    assert_eq!(task.status.as_str(), "Done", "the completed rules ran, not the failed ones");
+}
+
+fn messages_for_ticket(ticket_id: &str) -> Vec<String> {
+    AgentJobService::list_jobs().iter().filter(|job| job.ticket_id == ticket_id).flat_map(messages).collect()
 }
 
 #[test]
