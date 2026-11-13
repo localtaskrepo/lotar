@@ -454,6 +454,12 @@ fn ticket_with_unmerged_work(fixtures: &TestFixtures, profile_extra: &str) -> (H
     let repo = fixtures.get_temp_path().to_path_buf();
     fs::write(repo.join(".gitignore"), "home/\nt3-out/\nwt/\n.tasks/\n").unwrap();
     git(&repo, &["init", "-q", "-b", "main"]);
+    // LoTaR commits the earlier thread's leftovers without the -c flags
+    // above: on a machine without a git identity (CI) that commit fails
+    // and the job continues the earlier thread instead (DEV-416).
+    for (key, value) in [("user.name", "T"), ("user.email", "t@example.com"), ("commit.gpgsign", "false")] {
+        git(&repo, &["config", key, value]);
+    }
     git(&repo, &["add", "."]);
     git(&repo, &["commit", "-qm", "init"]);
     let worktree = repo.join("wt");
