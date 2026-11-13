@@ -531,7 +531,7 @@ import UiButton from '../components/UiButton.vue'
 import UiEmptyState from '../components/UiEmptyState.vue'
 import UiLoader from '../components/UiLoader.vue'
 import UiSelect from '../components/UiSelect.vue'
-import { useColumns, provideColumnStore } from '../composables/useColumns'
+import { BUILTIN_COLUMNS, useColumns, provideColumnStore } from '../composables/useColumns'
 import { useBoardSort, type BoardSortKey } from '../composables/useBoardSort'
 import { computeBoardLanes, useBoardLayout, type BoardLane, type BoardLayout } from '../composables/useBoardLayout'
 import BoardColumnsDialog from '../components/BoardColumnsDialog.vue'
@@ -1134,6 +1134,7 @@ const DEFAULT_BOARD_FIELDS: Record<string, boolean> = {
   due_date: true,
   modified: false,
   attachments: true,
+  relationships: false,
 }
 
 /** First image attachment that loads, when the Attachments field is shown. */
@@ -1144,6 +1145,7 @@ function cardCover(task: TaskDTO) {
 
 const boardFields = useColumns({
   storagePrefix: 'lotar.boardFields',
+  builtinColumns: [...BUILTIN_COLUMNS, 'relationships'],
   defaultVisible: Object.entries(DEFAULT_BOARD_FIELDS)
     .filter(([, on]) => on)
     .map(([key]) => key),

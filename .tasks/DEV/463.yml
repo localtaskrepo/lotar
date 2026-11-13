@@ -1,0 +1,52 @@
+title: 'Done with an open step no ticket tracks: DEV-368'
+status: InProgress
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-13T08:17:52.313618+00:00
+modified: 2026-11-13T08:21:38.707210+00:00
+relationships:
+  related:
+  - DEV-368
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6987b40d-f84f-48ea-85fc-83adaeddaf71
+description: |-
+  DEV-368 (t3 runner: run a follow-up job (merge) as the next turn of the ticket's last thread) is Done, but a comment names a step still open and no open ticket is linked: "Still open for the owner: the @merge rule in standards configs/lotar/automation.yml needs agent: { session: continue }." (lotar show DEV-368)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `untracked:DEV-368`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[untracked:DEV-368]` while the problem is there.
+
+  ## Done when
+
+  The open step is a ticket of its own, linked to the Done ticket (lotar task relationships add <new> <ID> --kind related), or the Done ticket is reopened when its own work is not finished. When the step needs nothing more (done, or dropped), say so in a comment and set this ticket WontDo: the finding is then not filed again.
+tags:
+- health
+custom_fields:
+  finding: untracked:DEV-368
+history:
+- at: 2026-11-13T08:17:52.671449+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-368"]}'
+- at: 2026-11-13T08:17:53.268838+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T08:17:54.265932+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T08:21:38.707210+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6987b40d-f84f-48ea-85fc-83adaeddaf71

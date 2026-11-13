@@ -1,0 +1,52 @@
+title: 'Done with an open step no ticket tracks: DEV-393'
+status: InProgress
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-13T08:17:45.021914+00:00
+modified: 2026-11-13T08:20:46.889651+00:00
+relationships:
+  related:
+  - DEV-393
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af12cb807-c0d0-459e-aab2-2b3d346259d6
+description: |-
+  DEV-393 (Releases like sprints: release records, a ticket's releases, Releases page) is Done, but a comment names a step still open and no open ticket is linked: "Not done (follow-up if wanted): per-row Add to release in the task table row menu, a project filter on the Releases pag…" (lotar show DEV-393)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `untracked:DEV-393`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[untracked:DEV-393]` while the problem is there.
+
+  ## Done when
+
+  The open step is a ticket of its own, linked to the Done ticket (lotar task relationships add <new> <ID> --kind related), or the Done ticket is reopened when its own work is not finished. When the step needs nothing more (done, or dropped), say so in a comment and set this ticket WontDo: the finding is then not filed again.
+tags:
+- health
+custom_fields:
+  finding: untracked:DEV-393
+history:
+- at: 2026-11-13T08:17:45.672470+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-393"]}'
+- at: 2026-11-13T08:17:46.318012+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T08:17:47.891958+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T08:20:46.889651+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af12cb807-c0d0-459e-aab2-2b3d346259d6

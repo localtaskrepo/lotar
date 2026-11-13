@@ -1,0 +1,43 @@
+title: 'Leftover worktree: /Users/mallox/.t3/worktrees/lotar/t3-b798c984-a0203974177e48f1'
+status: InProgress
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-13T08:17:34.413111+00:00
+modified: 2026-11-13T08:18:27.844417+00:00
+references:
+- link: mcp:15ecc1ce-72e4-4b05-ac3d-65ebe3c58585
+description: |-
+  /Users/mallox/.t3/worktrees/lotar/t3-b798c984-a0203974177e48f1 (t3/clean-agent-worktree-build-output) is clean and merged into main: safe to remove (--fix)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `worktree:/Users/mallox/.t3/worktrees/lotar/t3-b798c984-a0203974177e48f1`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[worktree:/Users/mallox/.t3/worktrees/lotar/t3-b798c984-a0203974177e48f1]` while the problem is there.
+
+  ## Done when
+
+  The worktree is removed (git worktree remove) and nothing in it was lost: its commits are merged or on a pushed branch, its uncommitted changes committed or dropped with the owner's OK. A worktree a tool still uses stays; say so in a comment and ask the owner (HelpNeeded) whether to keep it.
+tags:
+- health
+custom_fields:
+  finding: worktree:/Users/mallox/.t3/worktrees/lotar/t3-b798c984-a0203974177e48f1
+history:
+- at: 2026-11-13T08:17:34.561672+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T08:17:35.251923+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T08:18:27.844417+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:mcp:15ecc1ce-72e4-4b05-ac3d-65ebe3c58585

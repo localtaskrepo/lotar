@@ -1,0 +1,43 @@
+title: 'Leftover worktree: /Users/mallox/.t3/worktrees/lotar/t3-c253af75-3f82e2b7848caff4'
+status: InProgress
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-13T08:17:34.864883+00:00
+modified: 2026-11-13T08:19:50.408393+00:00
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa4c09da9-cbb4-4a0f-96d7-2719d6ecc446
+description: |-
+  /Users/mallox/.t3/worktrees/lotar/t3-c253af75-3f82e2b7848caff4 (t3/fix-flaky-hand-back-test-wait) is clean and merged into main: safe to remove (--fix)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `worktree:/Users/mallox/.t3/worktrees/lotar/t3-c253af75-3f82e2b7848caff4`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[worktree:/Users/mallox/.t3/worktrees/lotar/t3-c253af75-3f82e2b7848caff4]` while the problem is there.
+
+  ## Done when
+
+  The worktree is removed (git worktree remove) and nothing in it was lost: its commits are merged or on a pushed branch, its uncommitted changes committed or dropped with the owner's OK. A worktree a tool still uses stays; say so in a comment and ask the owner (HelpNeeded) whether to keep it.
+tags:
+- health
+custom_fields:
+  finding: worktree:/Users/mallox/.t3/worktrees/lotar/t3-c253af75-3f82e2b7848caff4
+history:
+- at: 2026-11-13T08:17:35.015700+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T08:17:35.649936+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T08:19:50.408393+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa4c09da9-cbb4-4a0f-96d7-2719d6ecc446

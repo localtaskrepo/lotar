@@ -1,0 +1,177 @@
+title: 'Board cards: optional field showing a ticket''s relationships (blocks, depends on, ...)'
+status: Done
+priority: Medium
+type: Feature
+reporter: claude
+assignee: claude
+created: 2026-11-13T08:06:43.253125+00:00
+modified: 2026-11-13T08:23:34.090987+00:00
+relationships:
+  related:
+  - DEV-419
+comments:
+- date: 2026-11-13T08:14:45.615636+00:00
+  author: claude
+  text: 'Done: board cards get a **Relationships** field (Fields menu, off by default). Chips per kind, Blocks first and highlighted in amber, first 3 IDs then +N with all IDs in the tooltip. Checked in a browser in light, dark and at 390px. Checks: `npm run lint`, `npm test` (2126 Rust, 1510 UI), `npm run smoke` (386, incl. new ui.board-relationships) all pass. Not committed: waiting for the owner''s go.'
+- date: 2026-11-13T08:15:31.175936+00:00
+  author: claude
+  text: Coordinating with DEV-419 (compact mobile board), which will reuse `BoardCardMeta`. I sent its thread what changed and asked it to keep the relationships row in compact cards. Whichever lands second rebases onto the other.
+- date: 2026-11-13T08:23:34.090987+00:00
+  author: claude
+  text: 'Merged to main 2026-11-13 in the commit titled "DEV-418 Board cards: optional field ...", which also holds this ticket. Not pushed.'
+references:
+- file: view/components/BoardCardMeta.vue
+- file: view/pages/Board.vue
+- file: view/composables/useColumns.ts
+- file: docs/help/serve.md
+- file: view/__tests__/BoardCardMeta.spec.ts
+- file: smoke/tests/ui.board-relationships.smoke.spec.ts
+description: |-
+  Board cards don't show a ticket's relationships, so you can't see at a glance which tickets block others. The owner asked (2026-11-13) for a card field that can be turned on and off like the others and lists the related IDs, e.g. "Blocks" followed by the IDs of the blocked tickets.
+
+  ## Plan
+
+  - New field `relationships` ("Relationships") in the board's card-field menu, off by default; only the board offers it (the task table and hover cards are unchanged).
+  - `BoardCardMeta.vue` shows one chip per kind with the IDs: Blocks (highlighted), Depends on, Parent, Children, Fixes, Duplicate of, Related. Long lists show the first IDs and `+N`, the tooltip lists all.
+
+  ## Done when
+
+  - [x] The field toggles relationship chips on board cards and is saved like the other fields
+  - [x] Unit test for BoardCardMeta, smoke coverage on the board
+  - [x] Help doc (serve.md, Boards) mentions it
+  - [x] `npm run lint`, `npm test`, `npm run smoke` pass
+
+  Merged to main 2026-11-13, commit titled "DEV-418 Board cards: optional field ...". Not pushed.
+tags:
+- ui
+history:
+- at: 2026-11-13T08:06:49.373579+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T08:14:45.409193+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Board cards don't show a ticket's relationships, so you can't see at a glance which tickets block others. The owner asked (2026-11-13) for a card field that can be turned on and off like the others and lists the related IDs, e.g. "Blocks" followed by the IDs of the blocked tickets.
+
+      ## Plan
+
+      - New field `relationships` ("Relationships") in the board's card-field menu, off by default; only the board offers it (the task table and hover cards are unchanged).
+      - `BoardCardMeta.vue` shows one chip per kind with the IDs: Blocks (highlighted), Depends on, Parent, Children, Fixes, Duplicate of, Related. Long lists show the first IDs and `+N`, the tooltip lists all.
+
+      ## Done when
+
+      - [ ] The field toggles relationship chips on board cards and is saved like the other fields
+      - [ ] Unit test for BoardCardMeta, smoke coverage on the board
+      - [ ] Help doc (serve.md, Boards) mentions it
+      - [ ] `npm run lint`, `npm test`, `npm run smoke` pass
+    new: |-
+      Board cards don't show a ticket's relationships, so you can't see at a glance which tickets block others. The owner asked (2026-11-13) for a card field that can be turned on and off like the others and lists the related IDs, e.g. "Blocks" followed by the IDs of the blocked tickets.
+
+      ## Plan
+
+      - New field `relationships` ("Relationships") in the board's card-field menu, off by default; only the board offers it (the task table and hover cards are unchanged).
+      - `BoardCardMeta.vue` shows one chip per kind with the IDs: Blocks (highlighted), Depends on, Parent, Children, Fixes, Duplicate of, Related. Long lists show the first IDs and `+N`, the tooltip lists all.
+
+      ## Done when
+
+      - [x] The field toggles relationship chips on board cards and is saved like the other fields
+      - [x] Unit test for BoardCardMeta, smoke coverage on the board
+      - [x] Help doc (serve.md, Boards) mentions it
+      - [x] `npm run lint`, `npm test`, `npm run smoke` pass
+
+      Implemented in worktree branch `t3/show-ticket-relationships-on-cards`, not committed yet.
+- at: 2026-11-13T08:14:45.480257+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:view/components/BoardCardMeta.vue
+- at: 2026-11-13T08:14:45.511090+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:view/pages/Board.vue
+- at: 2026-11-13T08:14:45.542136+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:view/composables/useColumns.ts
+- at: 2026-11-13T08:14:45.588762+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:docs/help/serve.md
+- at: 2026-11-13T08:14:45.615636+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T08:14:45.650299+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-11-13T08:15:31.175936+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T08:15:31.254591+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-419"]}'
+- at: 2026-11-13T08:23:33.664015+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Board cards don't show a ticket's relationships, so you can't see at a glance which tickets block others. The owner asked (2026-11-13) for a card field that can be turned on and off like the others and lists the related IDs, e.g. "Blocks" followed by the IDs of the blocked tickets.
+
+      ## Plan
+
+      - New field `relationships` ("Relationships") in the board's card-field menu, off by default; only the board offers it (the task table and hover cards are unchanged).
+      - `BoardCardMeta.vue` shows one chip per kind with the IDs: Blocks (highlighted), Depends on, Parent, Children, Fixes, Duplicate of, Related. Long lists show the first IDs and `+N`, the tooltip lists all.
+
+      ## Done when
+
+      - [x] The field toggles relationship chips on board cards and is saved like the other fields
+      - [x] Unit test for BoardCardMeta, smoke coverage on the board
+      - [x] Help doc (serve.md, Boards) mentions it
+      - [x] `npm run lint`, `npm test`, `npm run smoke` pass
+
+      Implemented in worktree branch `t3/show-ticket-relationships-on-cards`, not committed yet.
+    new: |-
+      Board cards don't show a ticket's relationships, so you can't see at a glance which tickets block others. The owner asked (2026-11-13) for a card field that can be turned on and off like the others and lists the related IDs, e.g. "Blocks" followed by the IDs of the blocked tickets.
+
+      ## Plan
+
+      - New field `relationships` ("Relationships") in the board's card-field menu, off by default; only the board offers it (the task table and hover cards are unchanged).
+      - `BoardCardMeta.vue` shows one chip per kind with the IDs: Blocks (highlighted), Depends on, Parent, Children, Fixes, Duplicate of, Related. Long lists show the first IDs and `+N`, the tooltip lists all.
+
+      ## Done when
+
+      - [x] The field toggles relationship chips on board cards and is saved like the other fields
+      - [x] Unit test for BoardCardMeta, smoke coverage on the board
+      - [x] Help doc (serve.md, Boards) mentions it
+      - [x] `npm run lint`, `npm test`, `npm run smoke` pass
+
+      Merged to main 2026-11-13, commit titled "DEV-418 Board cards: optional field ...". Not pushed.
+- at: 2026-11-13T08:23:33.818487+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:view/__tests__/BoardCardMeta.spec.ts
+- at: 2026-11-13T08:23:33.957077+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:smoke/tests/ui.board-relationships.smoke.spec.ts
+- at: 2026-11-13T08:23:34.090987+00:00
+  actor: claude
+  changes:
+  - field: comment_added

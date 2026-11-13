@@ -1,0 +1,44 @@
+title: 'Merged branch: t3/clear-deferred-assignee-on-revert'
+status: InProgress
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix-light'
+created: 2026-11-13T08:17:38.344+00:00
+modified: 2026-11-13T08:20:28.720711+00:00
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad06af77f-c6e3-4a04-ad0c-47cb7512d050
+description: |-
+  t3/clear-deferred-assignee-on-revert is merged into main: safe to delete (--fix)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `branch:t3/clear-deferred-assignee-on-revert`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[branch:t3/clear-deferred-assignee-on-revert]` while the problem is there.
+
+  ## Done when
+
+  The branch is deleted (git branch -d).
+tags:
+- health
+- light
+custom_fields:
+  finding: branch:t3/clear-deferred-assignee-on-revert
+history:
+- at: 2026-11-13T08:17:38.484221+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix-light'
+- at: 2026-11-13T08:17:39.286656+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T08:20:28.720711+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad06af77f-c6e3-4a04-ad0c-47cb7512d050

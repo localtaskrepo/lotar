@@ -1,0 +1,52 @@
+title: 'Done with an open step no ticket tracks: DEV-366'
+status: InProgress
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-13T08:17:40.261309+00:00
+modified: 2026-11-13T08:20:37.940733+00:00
+relationships:
+  related:
+  - DEV-366
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8ba56db3-7074-40a9-b235-581509991722
+description: |-
+  DEV-366 (Worktree cleanup keeps worktrees whose commit landed rebased or reworked) is Done, but a comment names a step still open and no open ticket is linked: "that would be a follow-up if wanted." (lotar show DEV-366)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `untracked:DEV-366`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[untracked:DEV-366]` while the problem is there.
+
+  ## Done when
+
+  The open step is a ticket of its own, linked to the Done ticket (lotar task relationships add <new> <ID> --kind related), or the Done ticket is reopened when its own work is not finished. When the step needs nothing more (done, or dropped), say so in a comment and set this ticket WontDo: the finding is then not filed again.
+tags:
+- health
+custom_fields:
+  finding: untracked:DEV-366
+history:
+- at: 2026-11-13T08:17:40.674590+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-366"]}'
+- at: 2026-11-13T08:17:41.125406+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T08:17:42.387864+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T08:20:37.940733+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8ba56db3-7074-40a9-b235-581509991722

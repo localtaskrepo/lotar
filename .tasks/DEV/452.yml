@@ -1,0 +1,44 @@
+title: 'Merged branch: t3/agent-summary-job-end-handoff'
+status: InProgress
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix-light'
+created: 2026-11-13T08:17:37.927298+00:00
+modified: 2026-11-13T08:20:23.089915+00:00
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A19ee9fbc-a063-47f5-ad43-b893e06edbb8
+description: |-
+  t3/agent-summary-job-end-handoff is merged into main: safe to delete (--fix)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `branch:t3/agent-summary-job-end-handoff`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[branch:t3/agent-summary-job-end-handoff]` while the problem is there.
+
+  ## Done when
+
+  The branch is deleted (git branch -d).
+tags:
+- health
+- light
+custom_fields:
+  finding: branch:t3/agent-summary-job-end-handoff
+history:
+- at: 2026-11-13T08:17:38.077791+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix-light'
+- at: 2026-11-13T08:17:38.593825+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T08:20:23.089915+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A19ee9fbc-a063-47f5-ad43-b893e06edbb8

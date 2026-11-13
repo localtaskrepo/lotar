@@ -18,6 +18,7 @@ export type BuiltinColKey =
     | 'created'
     | 'modified'
     | 'attachments'
+    | 'relationships'
 
 export type ColKey = BuiltinColKey | `custom:${string}`
 
@@ -69,6 +70,7 @@ const BUILTIN_LABELS: Record<BuiltinColKey, string> = {
     created: 'Created',
     modified: 'Updated',
     attachments: 'Attachments',
+    relationships: 'Relationships',
 }
 
 export interface UseColumnsOptions {

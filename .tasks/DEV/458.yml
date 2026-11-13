@@ -1,0 +1,52 @@
+title: 'Done with an open step no ticket tracks: DEV-388'
+status: InProgress
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-13T08:17:43.162028+00:00
+modified: 2026-11-13T08:20:32.263794+00:00
+relationships:
+  related:
+  - DEV-388
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aba544abb-f870-44d7-a74a-523c76d91e8e
+description: |-
+  DEV-388 (Unblocked hook for prerequisites in another repo) is Done, but a comment names a step still open and no open ticket is linked: "Not done: the dependent repo's own events (no cheap trigger)." (lotar show DEV-388)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `untracked:DEV-388`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[untracked:DEV-388]` while the problem is there.
+
+  ## Done when
+
+  The open step is a ticket of its own, linked to the Done ticket (lotar task relationships add <new> <ID> --kind related), or the Done ticket is reopened when its own work is not finished. When the step needs nothing more (done, or dropped), say so in a comment and set this ticket WontDo: the finding is then not filed again.
+tags:
+- health
+custom_fields:
+  finding: untracked:DEV-388
+history:
+- at: 2026-11-13T08:17:43.618806+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-388"]}'
+- at: 2026-11-13T08:17:44.388831+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T08:17:45.338965+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T08:20:32.263794+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aba544abb-f870-44d7-a74a-523c76d91e8e

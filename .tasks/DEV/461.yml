@@ -1,0 +1,52 @@
+title: 'Done with an open step no ticket tracks: DEV-327'
+status: InProgress
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-13T08:17:48.969072+00:00
+modified: 2026-11-13T08:21:42.951572+00:00
+relationships:
+  related:
+  - DEV-327
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af127ccd7-6f8d-44c2-a6fc-4339d64e5545
+description: |-
+  DEV-327 (Comments record who wrote them) is Done, but a comment names a step still open and no open ticket is linked: "Follow-up for standards: drop the 'start each comment with your agent name' line (configs/lotar/automation.yml, skills/…" (lotar show DEV-327)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `untracked:DEV-327`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[untracked:DEV-327]` while the problem is there.
+
+  ## Done when
+
+  The open step is a ticket of its own, linked to the Done ticket (lotar task relationships add <new> <ID> --kind related), or the Done ticket is reopened when its own work is not finished. When the step needs nothing more (done, or dropped), say so in a comment and set this ticket WontDo: the finding is then not filed again.
+tags:
+- health
+custom_fields:
+  finding: untracked:DEV-327
+history:
+- at: 2026-11-13T08:17:49.668166+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-327"]}'
+- at: 2026-11-13T08:17:50.184049+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T08:17:51.352918+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T08:21:42.951572+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af127ccd7-6f8d-44c2-a6fc-4339d64e5545

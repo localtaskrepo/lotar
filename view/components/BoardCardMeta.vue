@@ -4,6 +4,7 @@ import { computed } from 'vue'
 import type { TaskDTO } from '../api/types'
 import { customFieldEntriesFromTask, injectColumnStore } from '../composables/useColumns'
 import { formatMember, memberColor, memberInitials } from '../utils/member'
+import { relationshipCategories, relationshipEntries } from '../utils/relationships'
 import { taskAttachments } from '../utils/taskAttachments'
 import IconGlyph from './IconGlyph.vue'
 
@@ -22,7 +23,7 @@ const props = defineProps<{
     | 'sprints'
     | 'custom_fields'
   > &
-    Partial<Pick<TaskDTO, 'references'>>
+    Partial<Pick<TaskDTO, 'references' | 'relationships'>>
   fields?: Partial<Record<string, boolean>>
   hasHeader: boolean
   dueInfo: { label: string; overdue: boolean }
@@ -67,7 +68,31 @@ const hasPrimaryMeta = computed(() => {
 })
 
 const showSprints = computed(() => Boolean(visibleFields.value?.isVisible('sprints') && props.task.sprints?.length))
-const hasMeta = computed(() => hasPrimaryMeta.value || showSprints.value)
+
+// Blocks first: it is what a reader scanning the board needs most.
+const RELATIONSHIP_ORDER = ['blocks', 'depends_on', 'parent', 'children', 'fixes', 'duplicate_of', 'related'] as const
+const RELATIONSHIP_IDS_SHOWN = 3
+
+const relationships = computed(() => {
+  const rel = props.task.relationships
+  if (!rel || !visibleFields.value?.isVisible('relationships')) return []
+  return RELATIONSHIP_ORDER.flatMap((kind) => {
+    const ids = relationshipEntries(rel, kind)
+    if (!ids.length) return []
+    const label = relationshipCategories.find((c) => c.key === kind)?.label ?? kind
+    return [
+      {
+        kind,
+        label,
+        ids: ids.slice(0, RELATIONSHIP_IDS_SHOWN),
+        more: ids.length - RELATIONSHIP_IDS_SHOWN,
+        title: `${label} ${ids.join(', ')}`,
+      },
+    ]
+  })
+})
+
+const hasMeta = computed(() => hasPrimaryMeta.value || showSprints.value || relationships.value.length > 0)
 </script>
 
 <template>
@@ -117,6 +142,20 @@ const hasMeta = computed(() => hasPrimaryMeta.value || showSprints.value)
         <span class="task-meta__custom-field__value">{{ cf.value }}</span>
       </span>
     </div>
+    <div v-if="relationships.length" class="row task-meta__relations">
+      <span
+        v-for="rel in relationships"
+        :key="rel.kind"
+        class="relation-chip"
+        :class="`relation-chip--${rel.kind}`"
+        :title="rel.title"
+        :aria-label="rel.title"
+      >
+        <span class="relation-chip__label">{{ rel.label }}</span>
+        <span v-for="id in rel.ids" :key="id" class="relation-chip__id">{{ id }}</span>
+        <span v-if="rel.more > 0" class="relation-chip__more">+{{ rel.more }}</span>
+      </span>
+    </div>
     <div v-if="showSprints" class="row task-meta__sprints">
       <span
         v-for="sprintId in task.sprints"
@@ -131,6 +170,43 @@ const hasMeta = computed(() => hasPrimaryMeta.value || showSprints.value)
 </template>
 
 <style scoped>
+.task-meta__relations {
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.relation-chip {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px;
+  max-width: 100%;
+  padding: 1px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--muted);
+}
+
+.relation-chip__label {
+  font-weight: 500;
+}
+
+.relation-chip__id {
+  color: var(--color-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.relation-chip--blocks {
+  border-color: color-mix(in oklab, var(--color-warning) 70%, var(--color-border));
+  background: color-mix(in oklab, var(--color-warning) 14%, transparent);
+  color: var(--color-fg);
+}
+
+.relation-chip--blocks .relation-chip__label {
+  font-weight: 600;
+}
+
 .task-meta__attachments {
   display: inline-flex;
   align-items: center;

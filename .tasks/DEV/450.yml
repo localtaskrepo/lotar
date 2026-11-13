@@ -1,0 +1,53 @@
+title: 'Merged branch: agent/DEV-342'
+status: InProgress
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix-light'
+created: 2026-11-13T08:17:36.070360+00:00
+modified: 2026-11-13T08:20:07.106560+00:00
+relationships:
+  related:
+  - DEV-342
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1de6469e-4820-4479-ae46-377f248631e8
+description: |-
+  agent/DEV-342 is merged into main: safe to delete (--fix)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `branch:agent/DEV-342`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[branch:agent/DEV-342]` while the problem is there.
+
+  ## Done when
+
+  The branch is deleted (git branch -d).
+tags:
+- health
+- light
+custom_fields:
+  finding: branch:agent/DEV-342
+history:
+- at: 2026-11-13T08:17:36.337107+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-342"]}'
+- at: 2026-11-13T08:17:36.665596+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix-light'
+- at: 2026-11-13T08:17:37.507252+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T08:20:07.106560+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1de6469e-4820-4479-ae46-377f248631e8

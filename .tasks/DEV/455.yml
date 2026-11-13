@@ -1,0 +1,44 @@
+title: 'Large Rust build output: target'
+status: InProgress
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix-light'
+created: 2026-11-13T08:17:39.561654+00:00
+modified: 2026-11-13T08:20:27.138790+00:00
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acb910160-d882-48ff-ad32-428f9822885a
+description: |-
+  /Users/mallox/Development/@localtaskrepo/lotar/target holds 14 GB, over 10 GB: safe to remove its cargo build profiles debug, local, smoke (--fix)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `target:target`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[target:target]` while the problem is there.
+
+  ## Done when
+
+  target/ in the main checkout is under 10 GB: --fix removed its cargo build profiles, or a comment says what keeps it big.
+tags:
+- health
+- light
+custom_fields:
+  finding: target:target
+history:
+- at: 2026-11-13T08:17:39.688663+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix-light'
+- at: 2026-11-13T08:17:40.940647+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T08:20:27.138790+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acb910160-d882-48ff-ad32-428f9822885a
