@@ -3,9 +3,13 @@ status: InProgress
 priority: High
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-13T01:24:37.163521+00:00
-modified: 2026-11-13T01:24:38.704245+00:00
+modified: 2026-11-13T01:37:59.321702+00:00
+comments:
+- date: 2026-11-13T01:37:41.787036+00:00
+  author: claude
+  text: 'Fixed in 1a7b7d9 (branch agent/DEV-403). Identity resolution now takes default_reporter from a --config override first, then LOTAR_DEFAULT_REPORTER, then the merged config (project > home > global). An agent''s env identity therefore outranks a project''s committed default.reporter for comment authors, history actors, @me and auto-set reporters on add. The add handler now uses that same identity chain instead of reading config.default_reporter directly. Without the env var, project default.reporter still applies. Tests: new dev327_comment_author_test::env_reporter_outranks_project_default_reporter (fails before the fix, passes after); cli_whoami_and_dryrun_test::project_identity_cache_is_scoped_and_precedence_is_preserved updated for the new precedence (env > project, CLI > env). Docs updated: identity.md, precedence.md, config.md, add.md, plus the whoami --explain text. Checks: npm run lint:agent, npm run test:agent (2111 Rust + 1507 UI tests), npm run test:smoke:agent (385 tests): all pass. Manual repro from the ticket (T project with default.reporter: mallox, LOTAR_DEFAULT_REPORTER=claude) now stores author: claude and actor: claude. Automation prompts that set LOTAR_DEFAULT_REPORTER now produce agent-authored comments in a repo like QIS.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A358a231a-453a-4405-8dd5-9a240fa727b1
 description: |-
@@ -37,3 +41,13 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A358a231a-453a-4405-8dd5-9a240fa727b1
+- at: 2026-11-13T01:37:41.787036+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T01:37:59.321702+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'

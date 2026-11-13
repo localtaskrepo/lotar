@@ -1,19 +1,23 @@
 title: UI unit tests hit the 5 s test timeout under machine load
-status: InProgress
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T01:08:50.490324+00:00
-modified: 2026-11-13T01:19:06.684522+00:00
+modified: 2026-11-13T01:28:57.744683+00:00
 relationships:
   related:
   - DEV-288
   - DEV-399
+  - DEV-400
 comments:
 - date: 2026-11-13T01:18:58.461870+00:00
   author: claude
   text: 'Reproduced: four parallel test:ui runs at load ~68 each failed ''SprintsList pagination > applies persisted manual backlog order before paging without resetting sprint pages'' with ''Test timed out in 5000ms''. That test takes ~0.8 s on a quiet machine and uses no real timers (renders + flushPromises), so it is CPU-bound, not waiting on anything. Fix: view/vitest.config.ts sets testTimeout and hookTimeout to 30 s. After it: four parallel runs at load ~73 passed 1505/1505 each; at load ~124 the slowest test took 7.0 s and all passed. Commit ab6f9ce on agent/DEV-402. Checks: npm run lint, npm test (2109 Rust + 1505 UI + release + hooks), npm run smoke (385) all pass.'
+- date: 2026-11-13T01:28:50.910924+00:00
+  author: claude
+  text: 'Merged: rebased onto main (main moved twice: DEV-399/DEV-400 then STD-55 ticket updates), fast-forwarded main to d1225a5 ''DEV-402 UI unit tests hit the 5 s test timeout under machine load'', ticket files committed as 2ea1cfd and e972f09 ''DEV-402 Ticket updates''. Pushed 3da882a..e972f09 to origin/main (repos.json push: true, main clean, no unfinished commits). Checks on the rebased branch after DEV-400 landed: npm run lint, npm test (2110 Rust + 1507 UI + release + hooks), npm run smoke (385) all pass. Ticket check rerun in the main checkout: four parallel test:ui runs at load ~35, 1507/1507 each, no timeouts.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A13bd2776-3d83-4543-9133-0432ebbd2cfe
 description: 'Found while fixing DEV-399: `npx vitest run --config view/vitest.config.ts` at load average ~20 on 14 cores failed about 20 tests across Board, Calendar, ConfigView, SprintsList, TaskPanel and useProjects specs, each after 5-9 s (Vitest''s default 5 s testTimeout), e.g. ''joins the 200-event snapshot suffix with the 1000-entry live buffer'', ''opens the overflow day dialog from the keyboard (DEV-288)'', ''notifies every live projects snapshot after creating a project''. The same files passed on a rerun right after, and npm test passed 1507/1507 a few minutes later. Check: npm run test:ui while other agents build (load over 20). Done: view/vitest.config.ts gives tests a budget that holds under that load (the smoke config uses 120 s), or the slow tests wait on what they need; test:ui passes under that load.'
@@ -54,3 +58,19 @@ history:
   - field: assignee
     old: '@fix'
     new: '@merge'
+- at: 2026-11-13T01:28:50.910924+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T01:28:51.123489+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-288","DEV-399"]}'
+    new: '{"related":["DEV-288","DEV-399","DEV-400"]}'
+- at: 2026-11-13T01:28:57.744683+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

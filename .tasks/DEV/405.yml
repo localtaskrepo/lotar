@@ -1,0 +1,46 @@
+title: A comment's author ignores LOTAR_DEFAULT_REPORTER when the project sets default.reporter
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@merge'
+created: 2026-11-13T01:27:46.932016+00:00
+modified: 2026-11-13T01:39:13.934329+00:00
+comments:
+- date: 2026-11-13T01:39:02.168885+00:00
+  author: claude
+  text: 'Fixed in 5bafc1f (branch agent/DEV-405). The identity detector (src/utils/identity_detectors.rs) now takes default.reporter from the running process first (--config default.reporter=, then LOTAR_DEFAULT_REPORTER), ahead of project/home/workspace config. So @me, whoami, a comment''s author and a history entry''s actor are the writing process. A new ticket''s reporter still gets the merged default.reporter in the ordinary order, project above env. Check: scratch repo with default.reporter: alice in workspace and project config; LOTAR_DEFAULT_REPORTER=bob lotar add + lotar comment X-1 hi stores reporter alice, author bob, actor bob. New test env_reporter_outranks_project_default_for_comment_author_and_history (tests/dev327_comment_author_test.rs). Updated project_identity_cache_is_scoped_and_precedence_is_preserved, which pinned the old order (project above env for identity). Docs: identity.md, precedence.md, config.md, environment.md. Checks: npm run lint, npm run test:agent (2111 Rust + 1507 UI + release + hooks), npm run smoke (385) all pass.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aae6d836d-243c-436c-846b-76d44e457c63
+description: 'Found 2026-11-13 in quarter-inch-studio (lotar 0.14.1): its .tasks/config.yml and .tasks/QIS/config.yml set default.reporter: mallox. lotar comment QIS-55 ... run with LOTAR_DEFAULT_REPORTER=claude stored author mallox. With standards'' rule ''Comments: the owner''s comment reaches the agent'' (comment author mallox starts the ticket''s agent, STD-56), every agent comment there started an agent: QIS-55 and QIS-170 each got a job from a closing note. The rule is switched off in QIS for now. docs/help/config.md says project configuration outranks env for merged defaults; for who wrote a comment (and the history''s actor), the explicit environment variable of the process writing it should win over a project''s default, since the default is for tickets people create without naming a reporter. Check: in a scratch repo with default.reporter: alice in the project config, LOTAR_DEFAULT_REPORTER=bob lotar comment X-1 hi stores author bob. Done: that, with a test; docs (identity.md, config.md precedence) say which identity a comment and a history entry get; the reporter of a new ticket follows the documented precedence.'
+tags:
+- health
+custom_fields:
+  finding: identity:comment-author-env
+history:
+- at: 2026-11-13T01:27:47.134472+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T01:27:47.552796+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T01:27:59.087834+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aae6d836d-243c-436c-846b-76d44e457c63
+- at: 2026-11-13T01:39:02.168885+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T01:39:13.934329+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'

@@ -1,0 +1,55 @@
+title: 'Automation: a job''s outcome fires the change rules when it applies'
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@merge'
+created: 2026-11-13T01:31:31.408867+00:00
+modified: 2026-11-13T01:41:38.068354+00:00
+comments:
+- date: 2026-11-13T01:41:26.950652+00:00
+  author: claude
+  text: 'Done in c858ddf on agent/DEV-406. apply_job_outcome (src/services/automation_service.rs) now applies the outcome without automation and then dispatches apply_task_update with previous = the ticket after the job_completed/failed/cancelled rules ran, so updated and assigned rules fire (an agent profile as assignee still starts its job, via the same path). A no-op outcome fires nothing. A rule''s own set/add/remove/comment still fires no change rules (only unblocked), as before. Docs: agent.md (Status and assignee during a job) and automation.md (job hooks, plus a new Execution semantics bullet on which changes fire rules). Test: dev320_job_outcome_test::the_outcome_fires_the_updated_and_assigned_rules covers outcome HelpNeeded + mallox, an updated rule with all/current (fires, previous.status/priority from after the end rule), an assigned rule (previous.assignee), and a rule on the end rule''s priority set (doesn''t fire). It fails without the fix. Checks: lint:agent, test:agent (Rust, UI, release, hooks), test:smoke:agent (385 passed), all green.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A27b5b1da-362c-4587-aac1-8c0387f31859
+description: |-
+  Found by STD-54 (the owner's inbox, https://standards.pyxzl.net/task/STD-54): a status or assignee an agent sets during its job (docs/help/agent.md, Status and assignee during a job) applies when the job ends, but fires no updated or assigned rule. The common hand-back, HelpNeeded and assignee mallox from a T3 thread, therefore never reaches a rule like
+
+      when: { all: [ { status: HelpNeeded }, { current: { assignee: mallox } } ] }
+      on: { updated: { run: ... } }
+
+  Reproduced with lotar 0.14.1: a command-runner profile whose script runs lotar status <ID> HelpNeeded and lotar assignee <ID> mallox without the LOTAR_* environment (as a T3 thread does); both are deferred, applied at job end, and the updated rule never runs, while the same two commands outside a job fire it.
+
+  ## Done when
+  - Applying a job's outcome dispatches the change events (updated, assigned) for the fields it changed, with previous.* the state before, after the job_completed/job_failed/job_cancelled rules ran.
+  - A rule's own set still fires no other rule (loop safety), and docs/help/agent.md and automation.md say which changes fire rules.
+  - A test with a job whose outcome sets status and assignee and a rule on updated.
+
+  Until then the standards inbox relies on its daily sweep (repos.ts --report).
+history:
+- at: 2026-11-13T01:31:31.815247+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T01:31:32.383549+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T01:31:33.134201+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A27b5b1da-362c-4587-aac1-8c0387f31859
+- at: 2026-11-13T01:41:26.950652+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T01:41:38.068354+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'

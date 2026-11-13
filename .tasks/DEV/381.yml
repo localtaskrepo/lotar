@@ -5,16 +5,27 @@ type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-12T19:22:45.549361+00:00
-modified: 2026-11-13T01:22:57.233463+00:00
+modified: 2026-11-13T01:42:53.488943+00:00
 relationships:
   related:
   - DEV-380
+  - TEST-1
 comments:
 - date: 2026-11-13T01:22:55.975350+00:00
   author: claude
   text: 'claude: Owner 2026-11-13, asked whether to delete the test leftovers in ~/Library/Caches/lotar/agent-queue: "Yes". Delete only entries whose tasks_dir is a temporary test folder (under /var/folders or /tmp) and that no running job uses; keep the rest; comment the counts before and after.'
+- date: 2026-11-13T01:28:51.211517+00:00
+  author: claude
+  text: 'claude, 2026-11-13: Cleaned ~/Library/Caches/lotar/agent-queue: 13104 entries before, 32 after. Moved 13072 entries into ~/Library/Caches/lotar/agent-queue-DEV-381-removed (8.6 MB): 1083 queue-*.json and 1083 worker-*.lock whose tasks_dir is under /var/folders or /tmp, plus 10906 active-* folders whose hash (blake3 of the canonical tasks dir) matches a temp tasks dir or no tasks dir on disk (searched ~ to depth 8). Their job records are test projects (CAN, REV, UIAG, AUTO, TEST-1 with agent mock...). None is used by a running job: every PID still alive in a record belongs to an unrelated process started after the job, and only the lotar and standards worker locks are held (kept). Kept: entries for the real tasks dirs (lotar, gairola, standards, foundera, local, quarter-inch-studio, decorator-depdenency-injection, relative .tasks) and 5 entries from a running STD-54 e2e test (changed in the last 30 min). The final rm -rf was refused by the agent''s permission check as irreversible, so the moved entries are still on disk.'
+- date: 2026-11-13T01:28:51.469813+00:00
+  author: claude
+  text: 'Question for mallox: may I delete ~/Library/Caches/lotar/agent-queue-DEV-381-removed (13072 moved test leftovers), or will you run: rm -rf ~/Library/Caches/lotar/agent-queue-DEV-381-removed ?'
+- date: 2026-11-13T01:42:51.578262+00:00
+  author: claude
+  text: 'Owner 2026-11-13: "Why not just move the folder to trash and the system will take care of it with the chance to recover". Done: moved ~/Library/Caches/lotar/agent-queue-DEV-381-removed to the Trash via Finder (recoverable with Put Back). Question above is answered; nothing left to do.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4e27d150-05fb-4e44-9e10-15adc4c8a0c6
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1f4ff5cf-4651-437c-9cb0-19edcf1d84f9
 description: 'claude (DEV-380 agent), 2026-11-12: ~/Library/Caches/lotar/agent-queue has 12863 entries, almost all of them leftovers from tests (empty active-<hash> folders and queue-<hash>.json files whose tasks_dir is a temporary test folder under /var/folders or /tmp). DEV-380 stops new ones from appearing. Some entries belong to real tasks dirs (for example /Users/mallox/Development/gairola/.tasks) and must stay. Question: may an agent delete the entries whose queue file or job record points to a tasks dir that no longer exists, and keep everything else?'
 tags:
 - owner
@@ -58,3 +69,47 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4e27d150-05fb-4e44-9e10-15adc4c8a0c6
+- at: 2026-11-13T01:28:51.211517+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T01:28:51.314636+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-380"]}'
+    new: '{"related":["DEV-380","TEST-1"]}'
+- at: 2026-11-13T01:28:51.469813+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T01:29:01.379655+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-13T01:42:51.578262+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T01:42:52.052332+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-13T01:42:52.185878+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-13T01:42:53.488943+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1f4ff5cf-4651-437c-9cb0-19edcf1d84f9
