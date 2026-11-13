@@ -655,6 +655,7 @@ impl AgentHandler {
 
                         match branch_result {
                             Ok(out) if out.status.success() => {
+                                crate::services::agent_job_service::forget_landings(&repo_root, &wt.branch);
                                 renderer.emit_success(format!("Deleted branch: {}", wt.branch));
                             }
                             Ok(out) => {

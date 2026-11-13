@@ -606,6 +606,97 @@ mod git_required {
         assert!(!branch_exists(root, &branch));
     }
 
+    /// DEV-411: main changed the fixed lines, and the merge job lands the
+    /// fix reworked in the main checkout, so the branch conflicts with main
+    /// at every commit. The merge job succeeds and records the branch's
+    /// commit as landed; Done removes the worktree and branch then, but
+    /// keeps them while the branch holds a commit added after the record.
+    #[test]
+    fn done_removes_a_branch_the_merge_job_landed_in_a_conflicting_form() {
+        common::require_git();
+        let (fixture, ticket) = setup("echo fix > fix.txt && git add fix.txt && git commit -q -m Fix", true);
+        let root = fixture.get_temp_path();
+        let branch = format!("agent/{ticket}");
+        add_merge_agent(&fixture, &format!("echo 'fix, reworked' > fix.txt && git add fix.txt && git commit -q -m '{ticket} Fix'"));
+        let job = AgentJobService::start_job_with_tasks_dir(request(&ticket), &fixture.tasks_root).unwrap();
+        wait_idle();
+        let job = AgentJobService::get_job(&job.id).unwrap();
+        assert_eq!(job.status, "completed", "{:?}", job.last_message);
+        let worktree = Path::new(job.worktree_path.as_deref().unwrap()).to_path_buf();
+        let fixed = String::from_utf8(Command::new("git").args(["rev-parse", &branch]).current_dir(root).output().unwrap().stdout).unwrap();
+        conflicting_main_commit(root);
+        let merge_job = run_merge_job(&fixture, &ticket);
+        assert_eq!(merge_job.status, "completed", "{:?}", merge_job.last_message);
+        let record = format!("refs/lotar/landed/{branch}/{}", fixed.trim());
+        assert!(
+            Command::new("git").args(["show-ref", "--verify", "--quiet", &record]).current_dir(root).status().unwrap().success(),
+            "the merge job records the landing"
+        );
+        let conflicts = Command::new("git").args(["merge-tree", "--write-tree", "HEAD", &branch]).current_dir(root).output().unwrap();
+        assert!(!conflicts.status.success(), "the branch conflicts with main's version of the fix");
+
+        fs::write(worktree.join("later.txt"), "later\n").unwrap();
+        git(&worktree, &["add", "later.txt"]);
+        git(&worktree, &["commit", "-q", "-m", "Work after the merge"]);
+        set_status(&fixture, &ticket, "Done", TaskUpdateContext::default());
+        assert!(worktree.exists(), "a commit after the record keeps the worktree");
+        assert!(branch_exists(root, &branch));
+
+        git(&worktree, &["reset", "-q", "--hard", "HEAD~1"]);
+        set_status(&fixture, &ticket, "Todo", TaskUpdateContext::default());
+        set_status(&fixture, &ticket, "Done", TaskUpdateContext::default());
+        assert!(!worktree.exists(), "Done removes the worktree the merge job landed reworked");
+        assert!(!branch_exists(root, &branch));
+        assert!(
+            !Command::new("git").args(["show-ref", "--verify", "--quiet", &record]).current_dir(root).status().unwrap().success(),
+            "cleanup deletes the record"
+        );
+    }
+
+    /// DEV-411: a merge job whose commits for the ticket leave out a file the
+    /// branch changes fails and records nothing, so the branch stays.
+    #[test]
+    fn merge_job_that_lands_part_of_a_conflicting_branch_fails() {
+        common::require_git();
+        let (fixture, ticket) = setup("echo fix > fix.txt && echo more > more.txt && git add . && git commit -q -m Fix", true);
+        let root = fixture.get_temp_path();
+        add_merge_agent(&fixture, &format!("echo 'fix, reworked' > fix.txt && git add fix.txt && git commit -q -m '{ticket} Fix'"));
+        let job = AgentJobService::start_job_with_tasks_dir(request(&ticket), &fixture.tasks_root).unwrap();
+        wait_idle();
+        assert_eq!(AgentJobService::get_job(&job.id).unwrap().status, "completed");
+        conflicting_main_commit(root);
+        let merge_job = run_merge_job(&fixture, &ticket);
+        assert_eq!(merge_job.status, "failed", "more.txt is missing from main");
+        let records = Command::new("git").args(["for-each-ref", "refs/lotar/landed/"]).current_dir(root).output().unwrap();
+        assert!(records.stdout.is_empty(), "nothing is recorded as landed");
+    }
+
+    /// A `merge` agent that runs `body` in the main checkout.
+    fn add_merge_agent(fixture: &TestFixtures, body: &str) {
+        let root = fixture.get_temp_path();
+        let merge = root.join("merge.sh");
+        fs::write(&merge, format!("#!/bin/sh\ncd '{}' && {body}\n", root.display())).unwrap();
+        fs::set_permissions(&merge, fs::Permissions::from_mode(0o755)).unwrap();
+        let config_path = fixture.tasks_root.join("config.yml");
+        let mut config: serde_yaml_ng::Value = serde_yaml_ng::from_str(&fs::read_to_string(&config_path).unwrap()).unwrap();
+        config["agents"]["merge"] = serde_yaml_ng::from_str(&format!("runner: claude\ncommand: '{}'", merge.display())).unwrap();
+        fs::write(&config_path, serde_yaml_ng::to_string(&config).unwrap()).unwrap();
+    }
+
+    /// Main changes the lines the fix changes.
+    fn conflicting_main_commit(root: &Path) {
+        fs::write(root.join("fix.txt"), "main's own fix\n").unwrap();
+        git(root, &["add", "fix.txt"]);
+        git(root, &["commit", "-q", "-m", "Other work on the same lines"]);
+    }
+
+    fn run_merge_job(fixture: &TestFixtures, ticket: &str) -> lotar::api_types::AgentJob {
+        let job =
+            AgentJobService::start_job_with_tasks_dir(AgentJobCreateRequest { agent: Some("merge".into()), ..request(ticket) }, &fixture.tasks_root).unwrap();
+        wait_idle();
+        AgentJobService::get_job(&job.id).unwrap()
+    }
+
     /// DEV-343: Done set while a job still runs for the ticket waits for
     /// the job's end.
     #[test]

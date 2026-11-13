@@ -120,6 +120,9 @@ struct AgentJobState {
     /// A worker thread runs the job; it clears this only after the job's
     /// end automation, context and worktree cleanup (DEV-322).
     worker_running: bool,
+    /// The main checkout's commit when a merge job started, so its end
+    /// knows which of main's commits the job landed (DEV-411).
+    main_head_at_start: Option<String>,
 }
 
 /// Data needed to start a queued job when a slot becomes available
@@ -338,6 +341,7 @@ impl AgentJobService {
                     runner_failed: false,
                     t3_link: None,
                     worker_running: false,
+                    main_head_at_start: None,
                 },
             );
 
@@ -932,11 +936,12 @@ Commit your work to this branch before you finish. If git refuses to commit (for
 leave the changes in place: LoTaR commits them when the job ends. Don't switch branches.\n"
         ));
         if is_merge_job {
-            notes.push_str(
+            notes.push_str(&format!(
                 "- This is a merge job: it succeeds only if the branch ends up in the main checkout's current branch. \
 If git refuses to fast-forward the main checkout (for example inside a sandbox), leave it: LoTaR fast-forwards it when the job ends, \
-as long as the branch is rebased onto it.\n",
-            );
+as long as the branch is rebased onto it. If you land the work in another form instead (for example you resolve conflicts \
+in the main checkout), start each of those commits' messages with `{ticket_id}`, so LoTaR counts the branch as landed.\n"
+            ));
         }
     } else {
         notes.push_str("- You are working in the main checkout. Leave your changes uncommitted unless the ticket or your instructions ask for a commit.\n");
@@ -1566,6 +1571,7 @@ fn adopt_orphaned_job(tasks_dir: &std::path::Path, orphan: &crate::services::age
                 runner_failed: false,
                 t3_link: None,
                 worker_running: true,
+                main_head_at_start: None,
             },
         );
         registry.running_count += 1;
@@ -1975,8 +1981,10 @@ pub(crate) fn check_worktree_cleanup(repo_root: &std::path::Path, path: &std::pa
 /// Whether the work on `branch` is in the checkout's current branch: merged,
 /// landed rebased or cherry-picked (DEV-343), or landed reworked (DEV-366).
 /// `git cherry` marks a commit HEAD has no equivalent of with `+`. Failing
-/// that, the branch landed when merging it into HEAD, or into a commit
-/// since the fork that touched the branch's files, adds nothing: that commit
+/// that, the branch landed when a merge job recorded its current commit as
+/// landed in a commit of HEAD (DEV-411), or when merging it into HEAD, or
+/// into a commit since the fork that touched the branch's files, adds
+/// nothing: that commit
 /// already holds every change the branch makes. Main may have changed those
 /// lines again since, which a merge into HEAD alone would see as a conflict.
 fn branch_landed(repo_root: &std::path::Path, branch: &str) -> LoTaRResult<bool> {
@@ -1990,6 +1998,9 @@ fn branch_landed(repo_root: &std::path::Path, branch: &str) -> LoTaRResult<bool>
     };
     let branch_ref = format!("refs/heads/{branch}");
     if !git_output(&["cherry", "HEAD", &branch_ref])?.lines().any(|line| line.starts_with('+')) {
+        return Ok(true);
+    }
+    if landing_recorded(repo_root, branch) {
         return Ok(true);
     }
     let base = git_output(&["merge-base", "HEAD", &branch_ref])?;
@@ -2018,6 +2029,99 @@ fn merge_adds_nothing(repo_root: &std::path::Path, commit: &str, branch: &str) -
     merged.is_some() && merged == tree(&["rev-parse", &format!("{commit}^{{tree}}")])
 }
 
+/// The commit `rev` names, if git knows it.
+fn rev_parse(repo_root: &std::path::Path, rev: &str) -> Option<String> {
+    let output = git_command(repo_root).args(["rev-parse", "--verify", "--quiet", rev]).current_dir(repo_root).output().ok()?;
+    output.status.success().then(|| String::from_utf8_lossy(&output.stdout).trim().to_string()).filter(|commit| !commit.is_empty())
+}
+
+/// Where a merge job records that `branch` landed (DEV-411):
+/// `refs/lotar/landed/<branch>/<branch commit>` points at main's commit
+/// once the job ended. Named after the commit, so a branch that moved
+/// since has no record.
+fn landing_ref(branch: &str, commit: &str) -> String {
+    format!("refs/lotar/landed/{branch}/{commit}")
+}
+
+/// Whether a merge job recorded the branch's current commit as landed, and
+/// the main commit it landed as is in the checkout's current branch. Work
+/// a merge job reworked so it conflicts with the branch (DEV-343's branch)
+/// counts as landed this way only.
+fn landing_recorded(repo_root: &std::path::Path, branch: &str) -> bool {
+    let Some(tip) = rev_parse(repo_root, &format!("refs/heads/{branch}")) else {
+        return false;
+    };
+    let Some(landed) = rev_parse(repo_root, &landing_ref(branch, &tip)) else {
+        return false;
+    };
+    git_command(repo_root).args(["merge-base", "--is-ancestor", &landed, "HEAD"]).current_dir(repo_root).status().is_ok_and(|status| status.success())
+}
+
+/// Record that the branch's current commit landed as main's `HEAD`.
+fn record_landing(repo_root: &std::path::Path, branch: &str) -> Option<String> {
+    let tip = rev_parse(repo_root, &format!("refs/heads/{branch}"))?;
+    let head = rev_parse(repo_root, "HEAD")?;
+    run_git_command(repo_root, &["update-ref", &landing_ref(branch, &tip), &head]).ok()?;
+    Some(head)
+}
+
+/// Drop the landing records of a deleted branch.
+pub(crate) fn forget_landings(repo_root: &std::path::Path, branch: &str) {
+    let Ok(output) =
+        git_command(repo_root).args(["for-each-ref", "--format=%(refname)", &format!("refs/lotar/landed/{branch}/")]).current_dir(repo_root).output()
+    else {
+        return;
+    };
+    for reference in String::from_utf8_lossy(&output.stdout).lines() {
+        let _ = run_git_command(repo_root, &["update-ref", "-d", reference]);
+    }
+}
+
+/// The commits a merge job added to main since `start` that land the
+/// ticket's branch reworked: their subject starts with the ticket ID, and
+/// together they change every file the branch changes. Empty when any
+/// file is left out, or when git can't tell.
+fn reworked_landing(repo_root: &std::path::Path, start: &str, branch: &str, ticket_id: &str) -> Vec<String> {
+    let git_output = |args: &[&str]| {
+        git_command(repo_root)
+            .args(args)
+            .current_dir(repo_root)
+            .output()
+            .ok()
+            .filter(|output| output.status.success())
+            .map(|output| String::from_utf8_lossy(&output.stdout).into_owned())
+    };
+    let branch_ref = format!("refs/heads/{branch}");
+    let Some(base) = git_output(&["merge-base", "HEAD", &branch_ref]) else {
+        return Vec::new();
+    };
+    let Some(changed) = git_output(&["diff", "--name-only", "--no-renames", "-z", base.trim(), &branch_ref]) else {
+        return Vec::new();
+    };
+    let range = format!("{start}..HEAD");
+    let Some(log) = git_output(&["log", "--format=%H %s", &range]) else {
+        return Vec::new();
+    };
+    let commits: Vec<String> = log
+        .lines()
+        .filter_map(|line| line.split_once(' '))
+        .filter(|(_, subject)| subject.split_whitespace().next().is_some_and(|word| word.eq_ignore_ascii_case(ticket_id)))
+        .map(|(commit, _)| commit.to_string())
+        .collect();
+    let mut touched = std::collections::HashSet::new();
+    for commit in &commits {
+        let Some(files) = git_output(&["diff-tree", "--no-commit-id", "--name-only", "--no-renames", "-r", "-z", commit]) else {
+            return Vec::new();
+        };
+        touched.extend(files.split('\0').filter(|path| !path.is_empty()).map(str::to_string));
+    }
+    let mut changed = changed.split('\0').filter(|path| !path.is_empty()).peekable();
+    if changed.peek().is_none() || !changed.all(|path| touched.contains(path)) {
+        return Vec::new();
+    }
+    commits
+}
+
 /// Remove a worktree `check_worktree_cleanup` passed, and its branch when
 /// `delete_branch` is set. The branch's commits are in the main checkout,
 /// possibly rebased, which `git branch -d` would refuse.
@@ -2026,8 +2130,9 @@ fn remove_worktree(repo_root: &std::path::Path, path: &std::path::Path, branch: 
     if run_git_command(repo_root, &["worktree", "remove", &worktree_arg]).is_ok()
         && delete_branch
         && let Some(branch) = branch
+        && run_git_command(repo_root, &["branch", "-D", branch]).is_ok()
     {
-        let _ = run_git_command(repo_root, &["branch", "-D", branch]);
+        forget_landings(repo_root, branch);
     }
 }
 
@@ -2366,6 +2471,9 @@ fn run_job(
 
     let is_merge_job = JOB_REGISTRY.lock().ok().is_some_and(|registry| registry.jobs.get(&job_id).is_some_and(|state| state.record.is_merge_job));
     let writable_dirs = extra_writable_dirs(&worktree_context.working_dir, &tasks_dir, is_merge_job);
+    if is_merge_job && let Some(head) = resolve_repo_root(&tasks_dir).and_then(|root| rev_parse(&root, "HEAD")) {
+        update_job(&job_id, |state| state.main_head_at_start = Some(head.clone()));
+    }
     if let Some(reason) = session_reason {
         update_job(&job_id, |state| {
             record_and_emit(state, "agent_job_progress", Some(reason.clone()));
@@ -3017,27 +3125,52 @@ fn commit_leftover_work(job_id: &str) -> Result<Option<String>, String> {
 /// For a merge job on a worktree branch: make sure the branch is in the
 /// main checkout's current branch, fast-forwarding it when the agent could
 /// not (a sandbox may keep git metadata read-only). `Ok(Some(note))` when
-/// LoTaR fast-forwarded; `Err` explains why the branch is still unmerged.
-/// A branch whose work is on main already (`branch_landed`) is merged.
-/// Jobs that are not merge jobs, and states git can't judge, pass.
-fn ensure_branch_merged(job_id: &str, tasks_dir: &std::path::Path) -> Result<Option<String>, String> {
-    let Some(branch) = JOB_REGISTRY
-        .lock()
-        .ok()
-        .and_then(|registry| registry.jobs.get(job_id).filter(|state| state.record.is_merge_job).and_then(|state| state.record.worktree_branch.clone()))
-    else {
+/// LoTaR fast-forwarded or the agent landed the branch reworked; `Err`
+/// explains why the branch is still unmerged. A branch whose work is on
+/// main already (`branch_landed`) is merged. So is one the agent landed in
+/// a form that conflicts with it: commits on main since the job started,
+/// named after the ticket, that change every file the branch changes. A
+/// merged branch's commit is recorded as landed, so cleanup at Done can
+/// remove it (DEV-411). Jobs that are not merge jobs, and states git can't
+/// judge, pass.
+fn ensure_branch_merged(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Path) -> Result<Option<String>, String> {
+    let Some((branch, start)) = JOB_REGISTRY.lock().ok().and_then(|registry| {
+        registry
+            .jobs
+            .get(job_id)
+            .filter(|state| state.record.is_merge_job)
+            .and_then(|state| state.record.worktree_branch.clone().map(|branch| (branch, state.main_head_at_start.clone())))
+    }) else {
         return Ok(None);
     };
     let Some(repo_root) = resolve_repo_root(tasks_dir) else {
         return Ok(None);
     };
-    // A branch git can't judge passes, like a merged one.
-    if branch_landed(&repo_root, &branch).unwrap_or(true) {
-        return Ok(None);
+    match branch_landed(&repo_root, &branch) {
+        Ok(true) => {
+            record_landing(&repo_root, &branch);
+            return Ok(None);
+        }
+        // A branch git can't judge passes, like a merged one.
+        Err(_) => return Ok(None),
+        Ok(false) => {}
     }
     let output = git_command(&repo_root).args(["merge", "--ff-only", "--quiet", &branch]).output().map_err(|err| format!("git merge: {err}"))?;
     if output.status.success() {
+        record_landing(&repo_root, &branch);
         return Ok(Some(format!("Fast-forwarded the main checkout to {branch}")));
+    }
+    let reworked = start.map(|start| reworked_landing(&repo_root, &start, &branch, ticket_id)).unwrap_or_default();
+    if !reworked.is_empty()
+        && let Some(head) = record_landing(&repo_root, &branch)
+    {
+        let short = |commit: &str| commit.get(..12).unwrap_or(commit).to_string();
+        return Ok(Some(format!(
+            "{branch} conflicts with the main checkout, but this job landed its work reworked as {}; recorded {branch} at {} as landed in {}",
+            reworked.iter().map(|commit| short(commit)).collect::<Vec<_>>().join(", "),
+            rev_parse(&repo_root, &format!("refs/heads/{branch}")).map_or_else(String::new, |tip| short(&tip)),
+            short(&head)
+        )));
     }
     Err(format!(
         "Merge job finished, but {branch} is not merged into the main checkout's current branch and can't be fast-forwarded: {}",
@@ -3077,7 +3210,7 @@ fn finalize_job(
     // fast-forwards when the agent couldn't, and fails the job otherwise so
     // automation doesn't treat the ticket as merged.
     let failure_note = if success {
-        match ensure_branch_merged(job_id, tasks_dir) {
+        match ensure_branch_merged(job_id, ticket_id, tasks_dir) {
             Ok(Some(message)) => {
                 update_job(job_id, |state| {
                     record_and_emit(state, "agent_job_progress", Some(message.clone()));
@@ -3704,6 +3837,7 @@ mod tests {
             runner_failed: false,
             t3_link: None,
             worker_running: false,
+            main_head_at_start: None,
         }
     }
 
