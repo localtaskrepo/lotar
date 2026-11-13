@@ -135,6 +135,42 @@ impl CommentContext {
     }
 }
 
+/// The comment text without a leading "<author>:", "<author>,",
+/// "<author> (...):" or "<author>, <date>:": the comment records its author
+/// already, so the name would show twice (DEV-470). Text that is only the
+/// name is refused.
+pub(crate) fn strip_author_prefix<'a>(text: &'a str, author: Option<&str>) -> LoTaRResult<&'a str> {
+    let Some(author) = author.map(str::trim).filter(|author| !author.is_empty()) else {
+        return Ok(text);
+    };
+    let start = text.trim_start();
+    if !start.get(..author.len()).is_some_and(|head| head.eq_ignore_ascii_case(author)) {
+        return Ok(text);
+    }
+    let rest = &start[author.len()..];
+    let body = if let Some(after) = rest.strip_prefix(" (") {
+        let Some(close) = after.find(')').filter(|&close| !after[..close].contains('\n')) else {
+            return Ok(text);
+        };
+        let after = &after[close + 1..];
+        after.strip_prefix(':').or_else(|| after.strip_prefix(',')).unwrap_or(after)
+    } else if let Some(after) = rest.strip_prefix(',') {
+        match after.trim_start().split_once(':') {
+            Some((date, body)) if !date.is_empty() && date.chars().all(|c| c.is_ascii_digit() || c == '-') => body,
+            _ => after,
+        }
+    } else if let Some(after) = rest.strip_prefix(':') {
+        after
+    } else {
+        return Ok(text);
+    };
+    let body = body.trim_start();
+    if body.is_empty() {
+        return Err(LoTaRError::ValidationError(format!("the comment is only its author's name; lotar records the author ({author}) already")));
+    }
+    Ok(body)
+}
+
 #[cfg(test)]
 #[path = "../../tests/common/dev55_transaction_cases.rs"]
 mod dev55_transaction_cases;
@@ -686,6 +722,7 @@ impl TaskService {
             Self::ensure_not_deleted(task, &canonical_guard)?;
             let now = chrono::Utc::now().to_rfc3339();
             let actor = context.actor_override.clone().or_else(|| resolve_current_user_for_project(Some(root_path.as_path()), Some(&identity_project)));
+            let text = strip_author_prefix(text, actor.as_deref())?;
             task.comments.push(crate::types::TaskComment { extra: Default::default(), date: now.clone(), author: actor.clone(), text: text.to_string() });
             // Record that a comment was added without copying the body into
             // the changelog (the comment itself is the audit trail).

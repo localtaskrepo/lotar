@@ -85,7 +85,8 @@ fn handle_add_comment(ctx: &mut TaskCommandContext, renderer: &OutputRenderer, f
         let timestamp = chrono::Utc::now().to_rfc3339();
         let prefix = crate::storage::TaskId::parse(full_id).ok().map(|parsed| parsed.project);
         let author = crate::utils::identity::resolve_current_user_for_project(Some(ctx.storage.root_path.as_path()), prefix.as_deref());
-        let entry = TaskComment { extra: Default::default(), date: timestamp, author, text: inputs.text.clone() };
+        let text = crate::services::task_service::strip_author_prefix(&inputs.text, author.as_deref()).map_err(|e| e.to_string())?.to_string();
+        let entry = TaskComment { extra: Default::default(), date: timestamp, author, text };
         render_comment_preview(renderer, full_id, inputs.project.as_deref(), &entry, inputs.task.comments.len() + 1, inputs.explain);
         return Ok(());
     }
