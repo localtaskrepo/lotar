@@ -6,6 +6,7 @@ node_modules/
 /.history/
 .playwright-mcp/
 /.kilo/
+__pycache__/
 
 # .tasks/ is the version-controlled backlog. Only the DEV project is tracked; every other
 # project + runtime dir (LOTA, TEST, @sprints, @attachments, scenario data from

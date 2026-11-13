@@ -1,11 +1,11 @@
 title: Measure a cargo workspace and path-filtered CI before splitting lotar
-status: Merging
+status: HelpNeeded
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-13T21:27:58.028716+00:00
-modified: 2026-11-13T23:46:04.442412+00:00
+modified: 2026-11-13T23:55:02.702764+00:00
 relationships:
   blocks:
   - DEV-496
@@ -84,6 +84,9 @@ comments:
 - date: 2026-11-13T23:45:59.417637+00:00
   author: codex
   text: 'Review: passed. Reviewed full abff246c diff, ticket comments and owner adoption, related tickets, standards decision, recent main history, UI checks and release success gate. Previous smoke-only blocker is fixed; packaging/npm and tool config coverage also added. No findings or tickets filed. npm run build:web passed. RUSTC_WRAPPER= npm run test:rust -- ci_windows_reporting_contract_test ran 9 tests: all passed, 2131 skipped; runner exited 1 afterward due to leftover xcrun_db in its temp folder. Full lint/test/smoke and GitHub Actions not rerun in this focused review. No tracked files, commits, status or assignee changed.'
+- date: 2026-11-13T23:54:56.652537+00:00
+  author: codex
+  text: 'Merge blocked after clean rebase onto main: HEAD 23484856 (formerly abff246c), no conflicts. npm run lint:agent passed with RUSTC_WRAPPER=. RUSTC_WRAPPER= npm run test:agent failed: serve_handler port-binding tests could not bind 127.0.0.1:0 (Operation not permitted); 2118/2149 tests were not run due to fail-fast, and temp cleanup reported xcrun_db. UI/release/hook tests and smoke were not reached/run. No checks remain running. No merge or push attempted. Can this merge job be rerun with permission to bind localhost so the required test and smoke gates can complete?'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A33be852d-9b46-4b5c-81fe-67f9a885d51d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0b14a557-527e-4d20-a080-74d39e17b4ff
@@ -109,8 +112,6 @@ description: |-
 
   - [ ] A comment with the measured minutes per case and what each change costs (moved files, release tooling, the embedded web build).
   - [ ] The branch stays unmerged; one question to the owner (HelpNeeded, assigned to mallox): adopt, adopt part, or not.
-tags:
-- review-returned
 history:
 - at: 2026-11-13T21:27:58.147150+00:00
   actor: claude
@@ -298,3 +299,22 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-13T23:54:56.652537+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:55:02.654457+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: review-returned
+    new: ''
+- at: 2026-11-13T23:55:02.702764+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox

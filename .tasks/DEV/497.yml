@@ -1,11 +1,11 @@
 title: 'Cargo workspace step 1: a web-only change rebuilds only the embedded assets and the binary'
-status: Reviewing
+status: HelpNeeded
 priority: High
 type: Chore
 reporter: claude
-assignee: '@review'
+assignee: mallox
 created: 2026-11-13T22:21:42.991432+00:00
-modified: 2026-11-13T23:51:51.389809+00:00
+modified: 2026-11-13T23:53:20.762749+00:00
 relationships:
   blocks:
   - DEV-499
@@ -21,6 +21,12 @@ comments:
 - date: 2026-11-13T23:42:18.497102+00:00
   author: claude
   text: 'Rework of the blocking review, amended as 4431702a. Finding (cargo install --path . installs no lotar): fixed. The root Cargo.toml is the lotar binary''s package again (bin lotar from src/main.rs, which moved back; tests/embedded_web_ui_test.rs), depending on crates/lotar-lib and crates/lotar-web-assets. The library''s manifest is crates/lotar-lib/Cargo.toml (package lotar-lib, crate name lotar, lotar-agent-wrapper, the tests); its sources stay in src/, tests/ and build.rs at the root, so DEV-499''s plan and paths hold. build.rs sets REPO_ROOT, which replaces CARGO_MANIFEST_DIR in 8 source/test files. crates/lotar-cli is gone. Regression check: tests/dev497_cargo_install_root_test.rs asserts via cargo metadata that the root package builds the lotar binary; it failed with the bin renamed away from the root package, passes now. cargo install --path . --locked installs lotar (the legacy wrapper isn''t installed from the root any more; release packaging never shipped it). The root package is publish = false (README: not on crates.io), and deny.toml gets allow-wildcard-paths = true: cargo-deny only checks the root manifest''s dependencies, so the path dependencies there were flagged; registry wildcards stay denied. Timings after a change in target/web-embed, only lotar-web-assets and lotar compile: cargo build 0.54 s, cargo nextest run --no-run 0.55 s, cargo build --profile smoke 1.13 s. Checks: npm run lint:agent, npm run test:agent (2142 Rust, 1515 UI, 47 release/npm, 7 hook tests), npm run smoke 390/390, cargo deny check, cargo build --release --locked --all-features (both binaries), cargo install --path . from the worktree. Not run: cross (x86_64-only images on this arm64 Mac) and nfpm (not installed).'
+- date: 2026-11-13T23:53:15.058431+00:00
+  author: codex
+  text: 'Review: blocking. deny.toml:46 changes dependency security policy with allow-wildcard-paths=true without owner approval required by repository guidance. Use explicit versions on internal path dependencies and restore deny.toml, or obtain approval. Second blocking review: route to owner. Read ticket comments, DEV-493 approval, DEV-499, workspace/build/assets/test changes and release/Cross/Docker contracts and main history. Passed cargo check --offline --features schema with RUSTC_WRAPPER disabled, 47 release/npm and 7 hook tests. Full lint/nextest/smoke, install, timings, cross and nfpm not independently rerun. No files, commits, status or assignee changed; no minor tickets.'
+- date: 2026-11-13T23:53:20.762749+00:00
+  author: automation
+  text: The review found blocking problems again after one rework (the comments above). Should an agent rework it once more (lotar assignee DEV-497 @fix), will you decide the findings, or is it WontDo?
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aece2a03a-cf09-4340-9bd6-4b7ecf0e4547
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aeb427d8b-11c2-4310-9c31-3447004ca1e2
@@ -142,3 +148,29 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A61d67abe-6798-4c17-958b-442bd90607aa
+- at: 2026-11-13T23:53:15.058431+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:53:15.167152+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: backend, review-returned
+    new: backend, review-returned, review-blocked
+- at: 2026-11-13T23:53:20.720902+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+  - field: tags
+    old: backend, review-returned, review-blocked
+    new: backend, review-returned
+- at: 2026-11-13T23:53:20.762749+00:00
+  actor: automation
+  changes:
+  - field: comment_added
