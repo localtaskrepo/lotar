@@ -575,10 +575,15 @@ fn dto_matches_list_filter(storage: &Storage, id: &str, task: &TaskDTO, filter: 
 /// IDs of the tasks a search in the web syntax selects, for commands that
 /// act on a selection (sprint add/remove over REST and MCP, DEV-236).
 pub fn select_ids(storage: &Storage, base: &ResolvedConfig, tasks_root: &Path, search: &str) -> Result<Vec<String>, TaskQueryError> {
+    Ok(select(storage, base, tasks_root, search)?.into_iter().map(|(id, _)| id).collect())
+}
+
+/// The tasks a search in the web syntax selects, read in one pass.
+pub fn select(storage: &Storage, base: &ResolvedConfig, tasks_root: &Path, search: &str) -> Result<Vec<(String, TaskDTO)>, TaskQueryError> {
     let mut input = TaskQueryInput::default();
     input.add_search(&crate::utils::search_syntax::parse(search))?;
     let query = input.resolve(base, tasks_root)?;
-    Ok(run(storage, &query, chrono::Utc::now()).into_iter().map(|(id, _)| id).collect())
+    Ok(run(storage, &query, chrono::Utc::now()))
 }
 
 /// Keep tasks whose field values loosely match every field filter. Version

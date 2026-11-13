@@ -723,12 +723,17 @@ impl AutomationService {
         let tasks_dir = storage.root_path.clone();
         let base = resolve_config_for_project(&tasks_dir, None)?;
         let _least_busy = LeastBusyMemo::new();
-        let ids: Vec<String> = match query.map(str::trim).filter(|q| !q.is_empty()) {
+        // One listing for the whole run: reading each task on its own
+        // reloaded the sprints and walked the project tree per task, which
+        // took minutes in a repo with hundreds of tasks (DEV-400).
+        let tasks: Vec<(String, TaskDTO)> = match query.map(str::trim).filter(|q| !q.is_empty()) {
             Some(search) => {
-                crate::services::task_list::select_ids(storage, &base, &tasks_dir, search).map_err(|err| LoTaRError::ValidationError(err.cli_message()))?
+                crate::services::task_list::select(storage, &base, &tasks_dir, search).map_err(|err| LoTaRError::ValidationError(err.cli_message()))?
             }
-            None => TaskService::list(storage, &crate::api_types::TaskListFilter::default()).into_iter().map(|(id, _)| id).collect(),
+            None => TaskService::list(storage, &crate::api_types::TaskListFilter::default()),
         };
+        let checked = tasks.len();
+        let moves = crate::storage::moves::MoveResolver::new(&tasks_dir);
         let wanted: Vec<String> = rule_names.iter().map(|name| name.trim().to_lowercase()).filter(|name| !name.is_empty()).collect();
         let active_sprints = compute_active_sprint_ids(storage);
         let mut rules_seen: Vec<String> = Vec::new();
@@ -736,10 +741,14 @@ impl AutomationService {
         let mut entries = Vec::new();
         let mut cache: HashMap<String, (ResolvedConfig, AutomationFile)> = HashMap::new();
 
-        for id in &ids {
-            let Ok(task) = TaskService::get(storage, id, None) else {
+        for (_, mut task) in tasks {
+            // As a single read would: tombstones stay out, links to moved
+            // tasks show their current IDs.
+            if task.deleted_at.is_some() {
                 continue;
-            };
+            }
+            crate::storage::moves::current_relationships(&moves, &mut task.relationships);
+            let mut changed = false;
             let project = crate::storage::TaskId::parse(&task.id).map(|parsed| parsed.project).unwrap_or_default();
             if !cache.contains_key(&project) {
                 let config = resolve_config_for_project(&tasks_dir, Some(&project))?;
@@ -786,21 +795,24 @@ impl AutomationService {
                     let context =
                         AutomationActionContext { event: AutomationEvent::Manual, job: None, previous: None, comment: None, unblocked_by: Vec::new() };
                     match apply_action(storage, &task, &config, action, &context) {
-                        Ok(()) => cooldown_record(rule, &key, &task.id, &tasks_dir),
+                        Ok(()) => {
+                            changed = true;
+                            cooldown_record(rule, &key, &task.id, &tasks_dir);
+                        }
                         Err(err) => entry.error = Some(err.to_string()),
                     }
                 }
                 entries.push(entry);
             }
-            entries.extend(Self::run_cross_repo_unblocked(storage, &task.id, &config, &file, &wanted, dry_run));
+            entries.extend(Self::run_cross_repo_unblocked(storage, &task, changed, &config, &file, &wanted, dry_run));
         }
 
-        if let Some(missing) = wanted.iter().find(|name| !ids.is_empty() && !found.contains(*name)) {
+        if let Some(missing) = wanted.iter().find(|name| checked > 0 && !found.contains(*name)) {
             return Err(LoTaRError::ValidationError(format!(
                 "No rule named '{missing}' with a manual or unblocked action (on.manual, on.unblocked) applies to the selected tasks"
             )));
         }
-        Ok(ManualRunReport { dry_run, rules: rules_seen, checked: ids.len(), entries })
+        Ok(ManualRunReport { dry_run, rules: rules_seen, checked, entries })
     }
 }
 
@@ -812,7 +824,8 @@ impl AutomationService {
     /// keep it from firing on every run.
     fn run_cross_repo_unblocked(
         storage: &mut Storage,
-        id: &str,
+        task: &TaskDTO,
+        changed: bool,
         config: &ResolvedConfig,
         file: &AutomationFile,
         wanted: &[String],
@@ -820,11 +833,17 @@ impl AutomationService {
     ) -> Vec<ManualRunEntry> {
         let tasks_dir = storage.root_path.clone();
         let mut entries = Vec::new();
-        // Read again: a manual rule may just have changed it.
-        let Ok(task) = TaskService::get(storage, id, None) else {
-            return entries;
+        // Read again when a manual rule just changed it.
+        let reread;
+        let task = if changed {
+            let Ok(current) = TaskService::get(storage, &task.id, None) else {
+                return entries;
+            };
+            reread = current;
+            &reread
+        } else {
+            task
         };
-        let task = &task;
         if !task.relationships.depends_on.iter().any(|dep| crate::services::external_tasks::parse(dep).is_some())
             || task.task_state.as_ref().is_some_and(|state| state.is_done)
             || !find_blocked_dependencies(storage, task).is_empty()

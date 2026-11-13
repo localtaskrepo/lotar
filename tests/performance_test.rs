@@ -306,6 +306,46 @@ mod large_datasets {
         perf_budget::check("large_project_list_x2000", &start, Duration::from_secs(3));
     }
 
+    /// DEV-400: `automation run` read every task on its own, and each read
+    /// loaded all sprints again, so a repo of 600 tasks in sprints took over
+    /// a minute. It lists the tasks once now.
+    #[test]
+    fn test_automation_run_over_a_large_repo() {
+        let test_fixtures = TestFixtures::new();
+        let temp_dir = test_fixtures.temp_dir.path();
+        let tasks_dir = temp_dir.join(".tasks");
+        let project_dir = tasks_dir.join("BIG");
+        let sprints_dir = tasks_dir.join("@sprints");
+        fs::create_dir_all(&project_dir).unwrap();
+        fs::create_dir_all(&sprints_dir).unwrap();
+        let task_count = 600;
+        for i in 1..=task_count {
+            fs::write(
+                project_dir.join(format!("{i}.yml")),
+                format!("title: Task {i}\nstatus: Todo\npriority: Medium\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-01-01T00:00:00Z\n"),
+            )
+            .unwrap();
+        }
+        for sprint in 1..=6 {
+            let members: String = (1..=100).map(|n| format!("- BIG-{}\n", (sprint - 1) * 100 + n)).collect();
+            fs::write(sprints_dir.join(format!("{sprint}.yml")), format!("plan:\n  label: Sprint {sprint}\ntasks:\n{members}")).unwrap();
+        }
+        fs::write(
+            tasks_dir.join("automation.yml"),
+            "automation:\n  rules:\n    - name: Sweep\n      when:\n        status: Done\n      on:\n        manual:\n          add:\n            tags: [swept]\n",
+        )
+        .unwrap();
+
+        let start = Instant::now();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
+        let output = cmd.current_dir(temp_dir).args(["--format", "json", "automation", "run", "Sweep", "--dry-run"]).output().unwrap();
+        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(report["report"]["checked"], task_count, "{report}");
+        println!("Checked {task_count} tasks in {:?}", start.elapsed());
+        perf_budget::check("automation_run_x600", &start, Duration::from_secs(3));
+    }
+
     #[test]
     fn test_complex_task_data_handling() {
         let test_fixtures = TestFixtures::new();
