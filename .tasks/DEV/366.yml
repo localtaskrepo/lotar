@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T05:24:14.222418+00:00
-modified: 2026-11-12T18:55:34.878659+00:00
+modified: 2026-11-13T03:13:32.082922+00:00
 relationships:
   related:
   - DEV-343
@@ -17,6 +17,7 @@ relationships:
   - DEV-367
   - DEV-376
   - DEV-377
+  - DEV-411
 comments:
 - date: 2026-11-12T05:24:21.653717+00:00
   text: 'claude: filed for @fix with the owner''s OK (2026-11-11: "Ticket for @fix"). Pick the check from Open questions and say in the ticket which and why.'
@@ -140,3 +141,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-343","DEV-346","DEV-348","DEV-364","DEV-339","DEV-350","DEV-367","DEV-376"]}'
     new: '{"related":["DEV-343","DEV-346","DEV-348","DEV-364","DEV-339","DEV-350","DEV-367","DEV-376","DEV-377"]}'
+- at: 2026-11-13T03:13:32.082922+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-343","DEV-346","DEV-348","DEV-364","DEV-339","DEV-350","DEV-367","DEV-376","DEV-377"]}'
+    new: '{"related":["DEV-343","DEV-346","DEV-348","DEV-364","DEV-339","DEV-350","DEV-367","DEV-376","DEV-377","DEV-411"]}'

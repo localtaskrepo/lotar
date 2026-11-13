@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T18:46:29.580751+00:00
-modified: 2026-11-12T18:59:50.471596+00:00
+modified: 2026-11-13T03:13:31.149534+00:00
 relationships:
   related:
   - DEV-339
@@ -16,6 +16,7 @@ relationships:
   - DEV-376
   - DEV-378
   - DEV-366
+  - DEV-408
 comments:
 - date: 2026-11-12T18:55:03.586110+00:00
   author: claude
@@ -121,3 +122,9 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-13T03:13:31.149534+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-339","DEV-343","DEV-361","DEV-365","DEV-368","DEV-376","DEV-378","DEV-366"]}'
+    new: '{"related":["DEV-339","DEV-343","DEV-361","DEV-365","DEV-368","DEV-376","DEV-378","DEV-366","DEV-408"]}'

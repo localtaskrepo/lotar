@@ -1,0 +1,64 @@
+title: Jira sync pushes a v-named version without its v
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@merge'
+created: 2026-11-13T03:13:31.357022+00:00
+modified: 2026-11-13T03:23:17.565453+00:00
+relationships:
+  related:
+  - DEV-392
+comments:
+- date: 2026-11-13T03:23:10.442482+00:00
+  author: claude
+  text: 'Done in 164d8483 on agent/DEV-409. Push compare for fixVersions/versions now ignores a leading v (version_values_match in fields.rs; without_version_prefix moved there from github.rs and shared). build_jira_payload lists the Jira project''s versions once per push (GET /rest/api/3/project/{key}/versions, cached in LookupCache.jira_versions) and sends each name in the project''s spelling, so 0.15.0 goes out as v0.15.0; a name the project lacks is sent as is, a failed listing warns once. Dry runs (no client) send names as stored. Test: provider_tests versions::jira_push_uses_the_projects_v_named_version (failed before the fix). docs/help/sync.md pull and Jira push lines corrected. Checks: npm run lint, npm run test:agent, npm run smoke all pass.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abe3f7cfa-473f-4cb6-b321-68a78cf7333b
+description: |-
+  Jira sync can't push back a version whose Jira name starts with `v`. Pull stores `v0.15.0` as `0.15.0` (version fields drop the `v`), push sends `{"name": "0.15.0"}`, and the compare before the push doesn't ignore the `v`, so every push of such an issue sends a version the Jira project doesn't have. GitHub milestones got this handling in DEV-392, Jira didn't. Found by the QA test run in standards (STD-59, 2026-11-12).
+
+  ## Evidence
+  - `src/services/sync_service/pull.rs` `build_task_update_from_issue`: `normalize_custom_field_value` ends in `version::normalize_value`, which drops the `v`.
+  - `src/services/sync_service/payloads.rs` around line 198: `fixversions` / `versions` sent as stored.
+  - `src/services/sync_service/fields.rs` `field_values_match`: trims and lowercases only.
+  - `github.rs` `without_version_prefix`: the GitHub side ignores the `v` both ways.
+  - `docs/help/sync.md` "A pull stores the version's name" is wrong for these names.
+
+  ## Done when
+  - [ ] An unchanged Jira issue with `v`-named versions sends no version change on push
+  - [ ] A changed version is sent with the spelling the Jira project uses
+  - [ ] Provider test with a `v`-named Jira version; docs line corrected
+history:
+- at: 2026-11-13T03:13:31.441991+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-392"]}'
+- at: 2026-11-13T03:13:31.545245+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T03:13:31.771843+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T03:13:32.367151+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abe3f7cfa-473f-4cb6-b321-68a78cf7333b
+- at: 2026-11-13T03:23:10.442482+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T03:23:17.565453+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'

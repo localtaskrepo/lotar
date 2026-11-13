@@ -1,0 +1,43 @@
+title: Worktree cleanup keeps a branch whose work landed in a conflicting form
+status: InProgress
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-13T03:13:31.986812+00:00
+modified: 2026-11-13T03:13:33.339378+00:00
+relationships:
+  related:
+  - DEV-343
+  - DEV-366
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad54e514d-2f5a-4de7-8a11-2c664f0f31b5
+description: |-
+  Worktree cleanup still keeps a branch whose work landed on main in a reworked form that conflicts at every commit. DEV-366 handled rebased and reworked branches but named this case (DEV-343's real branch) as left over, with "a record of what the merge job landed" as the fix, "a follow-up if wanted". No ticket tracked it. Found by the QA test run in standards (STD-59, 2026-11-12).
+
+  ## Done when
+  - [ ] The merge job records what it landed for a ticket, and cleanup removes a Done ticket's worktree and branch when that record is on main
+  - [ ] Test with a branch whose commits conflict with main's version of the same change
+history:
+- at: 2026-11-13T03:13:32.083222+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-343","DEV-366"]}'
+- at: 2026-11-13T03:13:32.242285+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T03:13:32.689742+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T03:13:33.339378+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad54e514d-2f5a-4de7-8a11-2c664f0f31b5

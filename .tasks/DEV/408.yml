@@ -1,0 +1,50 @@
+title: A continued T3 thread drops the new profile's provider and model
+status: InProgress
+priority: High
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-13T03:13:31.064415+00:00
+modified: 2026-11-13T03:13:32.167556+00:00
+relationships:
+  related:
+  - DEV-377
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Add3daf95-86e6-43a5-9271-bbf9c5227026
+description: |-
+  A new job continues the ticket's earlier T3 Code thread whenever that thread's worktree still holds unmerged work (DEV-377), whatever profile the new job uses. A continued thread keeps its model, so the new profile's provider and model are dropped. Found by the QA test run in standards (STD-59, 2026-11-12).
+
+  ## Why it matters
+  standards' automation retries a failed fix job on `@fix-codex` "because it is another provider and model" (owner 2026-11-12, STD-55). A failed job usually leaves uncommitted or unlanded work, so the retry continues the Claude thread whose job just failed, the case the retry exists for.
+
+  ## Evidence
+  - `src/services/agent_job_service.rs` `thread_with_open_work` (around line 1340) and its call in `run_job` (around line 2180): applied for every t3 job with `session: new`.
+  - Same file around line 2292: the job only logs "A continued T3 Code thread keeps its model; the provider, model and args settings are not passed."
+
+  ## Done when
+  - [ ] A job whose profile sets another provider or model than the earlier thread starts a new thread on the open branch (naming the earlier thread in its prompt) instead of continuing it
+  - [ ] Same profile: continues as DEV-377 made it
+  - [ ] Test for both
+history:
+- at: 2026-11-13T03:13:31.150082+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-377"]}'
+- at: 2026-11-13T03:13:31.256656+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T03:13:31.478798+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T03:13:32.167556+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Add3daf95-86e6-43a5-9271-bbf9c5227026

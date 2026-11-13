@@ -1,0 +1,61 @@
+title: automation run matches later tasks against state from before its own writes
+status: InProgress
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@merge'
+created: 2026-11-13T03:13:31.646907+00:00
+modified: 2026-11-13T03:29:01.962245+00:00
+relationships:
+  related:
+  - DEV-400
+comments:
+- date: 2026-11-13T03:28:52.571017+00:00
+  author: claude
+  text: 'Fixed in commit 522763f9 on agent/DEV-410. Reproduced first: a new test (tests/dev241_automation_test.rs, a_run_matches_tasks_an_earlier_action_changed_as_they_are_now) has ''Ship'' close AM-3, which unblocks AM-4 back to Todo; without the fix the run left AM-4 at Todo. New src/storage/write_log.rs: a thread-local log of the task IDs written while it is open, fed by StorageOperations edit/mutate/delete/move_archive and transaction publishes. run_manual opens it and re-reads (TaskService::get) only the tasks it names before matching; every other task still uses the one listing, so DEV-400''s budget holds (performance_test: 19 passed). Not covered: a second manual rule on the same task still sees that task as listed, as it did before DEV-400. Checks: npm run lint (lint:agent), npm test (2121 Rust + 1507 UI + others, exit 0), npm run smoke (385 passed).'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac0804822-c39e-481a-8820-667d111410c7
+description: |-
+  A real (not dry) `lotar automation run` matches each task against a snapshot read before the loop (DEV-400). When an earlier action in the same run changes a later task (closing A fires B's `unblocked` rules through `fire_unblocked_dependents`), the loop matches B's manual rule against B's old state. Before DEV-400 each task was re-read when the loop reached it. Found by the QA test run in standards (STD-59, 2026-11-12); medium confidence, read from the code, not reproduced.
+
+  ## Evidence
+  - `src/services/automation_service.rs` `run_manual`, around lines 729-751.
+  - `src/services/task_service.rs` around line 1302 (`fire_unblocked_dependents`).
+  - DEV-400's checks were dry runs, which write nothing.
+
+  ## Done when
+  - [ ] A test where a manual action on one task changes another task that the same run matches later; the later match sees the new state
+  - [ ] Re-read only tasks an earlier action in the run wrote to, so DEV-400's performance budget holds
+history:
+- at: 2026-11-13T03:13:31.733621+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-400"]}'
+- at: 2026-11-13T03:13:31.850150+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T03:13:32.132992+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T03:13:32.735741+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac0804822-c39e-481a-8820-667d111410c7
+- at: 2026-11-13T03:28:52.571017+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T03:29:01.962245+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'

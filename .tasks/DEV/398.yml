@@ -5,13 +5,14 @@ type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-12T23:59:19.550608+00:00
-modified: 2026-11-13T03:08:02.154025+00:00
+modified: 2026-11-13T03:21:19.042765+00:00
 relationships:
   depends_on:
   - DEV-407
   related:
   - DEV-400
   - DEV-407
+  - DEV-412
 comments:
 - date: 2026-11-13T03:07:40.917461+00:00
   author: claude
@@ -19,6 +20,12 @@ comments:
 - date: 2026-11-13T03:08:02.154025+00:00
   author: claude
   text: 'claude: Step 1: DEV-407 (e2f502be) and the rest are on main; nothing else depends on this release. Step 2: Cargo.toml and Cargo.lock bumped to 0.14.2; lint, test, smoke running.'
+- date: 2026-11-13T03:11:51.665646+00:00
+  author: claude
+  text: 'claude: Step 2 done: 451d609d (bump to 0.14.2), pushed. npm run lint, npm test (2119 Rust, 1507 UI) and npm run smoke (385) passed. Waiting for QA on 451d609d.'
+- date: 2026-11-13T03:21:19.042765+00:00
+  author: claude
+  text: 'claude: Step 3: QA run 43357300915 succeeded on 451d609d. Step 4: signed tag v0.14.2 pushed (owner 2026-11-13: release once DEV-407 is merged). Waiting for the Release workflow.'
 description: 'Next release. The owner picks the bump; rename this ticket if it differs (the title must start with ''Release v''). Steps: .github/skills/release/SKILL.md and docs/release-guide.md. Done when the release is installed here. Tickets that wait for this release are Blocked and depend on it; closing this ticket hands them to @fix to run their checks. Waiting now: none.'
 history:
 - at: 2026-11-13T03:07:40.917461+00:00
@@ -38,6 +45,20 @@ history:
     old: '{"related":["DEV-400","DEV-407"]}'
     new: '{"depends_on":["DEV-407"],"related":["DEV-400","DEV-407"]}'
 - at: 2026-11-13T03:08:02.154025+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T03:11:51.665646+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T03:18:28.467975+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-407"],"related":["DEV-400","DEV-407"]}'
+    new: '{"depends_on":["DEV-407"],"related":["DEV-400","DEV-407","DEV-412"]}'
+- at: 2026-11-13T03:21:19.042765+00:00
   actor: claude
   changes:
   - field: comment_added

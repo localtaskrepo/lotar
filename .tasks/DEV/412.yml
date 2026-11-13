@@ -1,0 +1,83 @@
+title: Adding a project member rewrites its config.yml, dropping comments and renaming the project
+status: Done
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@merge'
+created: 2026-11-13T03:17:03.817809+00:00
+modified: 2026-11-13T03:18:48.862943+00:00
+relationships:
+  related:
+  - DEV-398
+  - DEV-407
+comments:
+- date: 2026-11-13T03:18:28.279941+00:00
+  author: claude
+  text: 'Already done by DEV-407 (commit e2f502be, on main and in this branch; ships in v0.14.2, DEV-398). The rewrite came from the installed lotar 0.14.1 (/opt/homebrew/bin/lotar, built 2026-11-12 15:51 local, before the fix). Since DEV-407, automatic writes patch only the members block and keep comments and hand-written values. A project.name that matches the prefix except for case (inbox vs INBOX) is no longer overwritten. Test with a commented config: tests/dev407_auto_config_comments_test.rs. Checked again with a debug build of this branch in a scratch repo: a commented INBOX/config.yml with name ''inbox'', then add as claude, status HelpNeeded, assignee mallox, and a comment by a new user. The file kept every comment and ''name: inbox'', and only got ''members: [claude, mallox]'' appended. No code change, no commit. Not run: lint, test or smoke, since nothing changed. The ''Done when'' items are met once v0.14.2 is installed here.'
+- date: 2026-11-13T03:18:45.189161+00:00
+  author: claude
+  text: 'nothing to merge: agent/DEV-412 has no commits beyond main. The fix is DEV-407 (e2f502be), already on main.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A43e8fc32-c0f8-4d23-a3c3-71f35bf4c4b6
+description: |-
+  lotar rewrote standards' `.tasks/INBOX/config.yml` on its own while tickets went to the owner's inbox (2026-11-13, around 03:20 UTC, after STD-59 was set HelpNeeded for mallox). The rewrite dropped the file's comments, changed `project.name` from `inbox` to `INBOX` and added `members: [claude]`. Restored by hand; the diff is below. Likely the automatic members list (a new reporter or assignee is added to the project's members) saving the whole config through the serializer.
+
+  ```diff
+  -# The owner's inbox (STD-54, configs/lotar/README.md). Its tickets aren't tracked (.tasks/.gitignore): each holds a
+  -# question for him, and his answer goes to the source ticket, which keeps the record.
+   project:
+  -  name: inbox
+  +  name: INBOX
+  +members:
+  +- claude
+  ...
+  -# Triage only reads and comments: no worktree, so a job leaves nothing to merge or clean up.
+  ```
+
+  ## Done when
+  - [ ] Adding a member keeps the file's comments and other values as written (edit the key in place), or doesn't write a config the project didn't opt into
+  - [ ] `project.name` is never rewritten
+  - [ ] Test with a commented project config
+history:
+- at: 2026-11-13T03:17:03.931862+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T03:17:04.347555+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T03:17:05.027113+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A43e8fc32-c0f8-4d23-a3c3-71f35bf4c4b6
+- at: 2026-11-13T03:18:28.279941+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T03:18:28.468498+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-398","DEV-407"]}'
+- at: 2026-11-13T03:18:35.655767+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-13T03:18:45.189161+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T03:18:48.862943+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
