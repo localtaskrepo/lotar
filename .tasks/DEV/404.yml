@@ -1,11 +1,11 @@
 title: Project default.reporter overrides LOTAR_DEFAULT_REPORTER as comment author
-status: InProgress
+status: HelpNeeded
 priority: High
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-13T01:25:40.718079+00:00
-modified: 2026-11-13T01:26:36.284059+00:00
+modified: 2026-11-13T01:26:45.695780+00:00
 relationships:
   related:
   - DEV-126
@@ -55,3 +55,12 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-126"]}'
+- at: 2026-11-13T01:26:45.695780+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
