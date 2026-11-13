@@ -2,8 +2,9 @@
 # node ~/Development/standards/scripts/repos.ts --report) start a fix agent as a T3 Code thread; tag owner never does.
 # So does a ticket an agent files without an assignee (owner 2026-11-11, skill lotar-workflow). Jobs run in worktrees;
 # a finished fix job goes to @merge, which brings its branch into the main checkout (owner 2026-11-11, STD-35).
-# Goes into each repo's .tasks/<PROJECT>/automation.yml; the repo's own rules follow below these. Setup, retries and
-# the model choice: configs/lotar/README.md. No review status: the owner follows the agents in T3 (2026-11-11).
+# What waits for the owner goes to his inbox in standards (STD-54). Goes into each repo's
+# .tasks/<PROJECT>/automation.yml; the repo's own rules follow below these. Setup, retries and the model choice:
+# configs/lotar/README.md. No review status: the owner follows the agents in T3 (2026-11-11).
 automation:
   rules:
     - name: "Health: start the fix agent"
@@ -189,6 +190,8 @@ automation:
             The fix agent's job ${{agent.job_id}} failed again: lotar agent logs ${{agent.job_id}}. Should an agent try
             again (lotar automation run "Health: retry with @fix" --select 'id:${{ticket.id}}', or @fix-fable,
             @fix-codex; for an agent's ticket lotar assignee ${{ticket.id}} @fix), or is it WontDo?
+          # A rule's own change fires no other rule, so this one files the ticket in the inbox itself.
+          run: &inbox 'node "$HOME/Development/standards/scripts/repos.ts" --inbox ${{ticket.id}}'
     # A merge agent that stops for a conflict or a failing check hands the ticket to mallox itself; the retry goes to
     # the fix agent, whose branch the next merge picks up.
     - name: "Merge agent lifecycle"
@@ -253,6 +256,7 @@ automation:
             branch ${{agent.worktree_branch}}. Should an agent try again (lotar automation run "Health: retry with @fix"
             --select 'id:${{ticket.id}}', or for an agent's ticket lotar assignee ${{ticket.id}} @fix), or will you
             merge it yourself?
+          run: *inbox
     # Not "and tagged": on updated every field condition needs that field to change in the same update.
     - name: "Retries: clear the tags when done"
       when:
@@ -297,11 +301,12 @@ automation:
               comment one question, set the status to HelpNeeded, assign the ticket to mallox and stop.
     # The owner's comment on any ticket reaches its agent (owner 2026-11-12, STD-56: "a comment on any tickets kicks of
     # or queues for an agent, then we should do that as well. Let's do it right from the start"): queued to a running
-    # job, else @fix starts with it as the next turn of the ticket's last T3 thread. Only his comments: an agent's own
-    # would come back to it. An answer that changes nothing sets status and assignee back, so no merge follows.
+    # job, else @fix starts with it as the next turn of the ticket's last T3 thread. Only his comments, and the inbox
+    # triage agent's answers for him (STD-54): an agent's own would come back to it. An answer that changes nothing
+    # sets status and assignee back, so no merge follows.
     - name: "Comments: the owner's comment reaches the agent"
       when:
-        comment: { author: mallox }
+        comment: { author: [mallox, triage] }
       on:
         commented:
           agent:
@@ -310,8 +315,9 @@ automation:
           tell_agent:
             agent: fix
             message: |
-              mallox (the owner) commented on ticket ${{ticket.id}} ("${{ticket.title}}"), which was ${{ticket.status}}
-              and assigned to "${{ticket.assignee}}":
+              ${{comment.author}} commented on ticket ${{ticket.id}} ("${{ticket.title}}"), which was ${{ticket.status}}
+              and assigned to "${{ticket.assignee}}" (mallox is the owner; triage answers for him from what he decided
+              before and names where the answer comes from):
               ${{comment.text}}
               Run lotar with LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex). Read the ticket and act on
               his comment:
@@ -325,6 +331,25 @@ automation:
                 ${{ticket.status}} and the assignee back to "${{ticket.assignee}}" (empty: none), so no merge follows.
               Never delete work that isn't saved elsewhere, and never decide what only he decides: then comment one
               question, set the status to HelpNeeded, assign the ticket to mallox and stop.
+    # What waits for the owner goes to his inbox, project INBOX in standards (owner 2026-11-12, STD-54,
+    # docs/decisions/2026-11-12-owner-inbox.md): HelpNeeded with assignee mallox, in either order, or tag owner. A
+    # status an agent sets during its job applies when the job ends and fires no rule; the daily repos.ts --report
+    # files those.
+    - name: "Inbox: file what waits for the owner"
+      when:
+        any:
+          - all:
+              - status: HelpNeeded
+              - current: { assignee: mallox }
+          - all:
+              - assignee: mallox
+              - current: { status: HelpNeeded }
+          - tags: { any: [owner] }
+      on:
+        created:
+          run: *inbox
+        updated:
+          run: *inbox
     # Manual: after answering a HelpNeeded question or a failed job. Always pass --select, or every waiting ticket starts.
     - name: "Health: retry with @fix"
       when:
