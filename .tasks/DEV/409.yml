@@ -5,14 +5,19 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T03:13:31.357022+00:00
-modified: 2026-11-13T03:23:17.565453+00:00
+modified: 2026-11-13T05:18:28.128397+00:00
 relationships:
   related:
   - DEV-392
+  - DEV-408
+  - DEV-410
 comments:
 - date: 2026-11-13T03:23:10.442482+00:00
   author: claude
   text: 'Done in 164d8483 on agent/DEV-409. Push compare for fixVersions/versions now ignores a leading v (version_values_match in fields.rs; without_version_prefix moved there from github.rs and shared). build_jira_payload lists the Jira project''s versions once per push (GET /rest/api/3/project/{key}/versions, cached in LookupCache.jira_versions) and sends each name in the project''s spelling, so 0.15.0 goes out as v0.15.0; a name the project lacks is sent as is, a failed listing warns once. Dry runs (no client) send names as stored. Test: provider_tests versions::jira_push_uses_the_projects_v_named_version (failed before the fix). docs/help/sync.md pull and Jira push lines corrected. Checks: npm run lint, npm run test:agent, npm run smoke all pass.'
+- date: 2026-11-13T05:18:27.804635+00:00
+  author: claude
+  text: 'Merged: rebased onto main (c6b4cf56, DEV-408/DEV-410 commits, no conflicts) and fast-forwarded main to 793ad78a ''DEV-409 Jira sync pushes a v-named version without its v''. Checks on the rebased tree: npm run lint ok, npm run test:agent ok (Rust 2120, UI 1507, release 47, hooks 7), npm run smoke 376/385 with 9 timeouts under load average 30-120 (other sessions, Time Machine). All 9 failing files passed on rerun; the full smoke had passed 385/385 on the same change before the rebase. Pushed together with the ticket update commit.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abe3f7cfa-473f-4cb6-b321-68a78cf7333b
 description: |-
@@ -62,3 +67,13 @@ history:
   - field: assignee
     old: '@fix'
     new: '@merge'
+- at: 2026-11-13T05:18:27.804635+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T05:18:28.128397+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-392"]}'
+    new: '{"related":["DEV-392","DEV-408","DEV-410"]}'

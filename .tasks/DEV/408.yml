@@ -1,14 +1,15 @@
 title: A continued T3 thread drops the new profile's provider and model
-status: InProgress
+status: Done
 priority: High
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T03:13:31.064415+00:00
-modified: 2026-11-13T04:39:01.382724+00:00
+modified: 2026-11-13T05:18:28.127372+00:00
 relationships:
   related:
   - DEV-377
+  - DEV-409
 comments:
 - date: 2026-11-13T03:34:23.894208+00:00
   author: claude
@@ -69,3 +70,15 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-13T04:40:56.058216+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-11-13T05:18:28.127372+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-377"]}'
+    new: '{"related":["DEV-377","DEV-409"]}'
