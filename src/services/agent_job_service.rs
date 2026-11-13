@@ -950,7 +950,6 @@ in the main checkout), start each of those commits' messages with `{ticket_id}`,
         notes.push_str(
             "- When this job ends, LoTaR's automation rules move this ticket to the next step as if you finished. \
 If you finished, don't change its status or assignee; add a comment that says what you did. \
-In your final summary, say that the ticket moves to its next step when this job ends and that you didn't change its status or assignee. \
 If you could not finish (you are blocked, something fails that you can't fix, or you need a decision), \
 hand the ticket back as described under \"Clarifications, blockers and feedback\" so it doesn't move on.\n",
         );
@@ -3045,7 +3044,7 @@ fn finalize_cancelled_job(job_id: &str) {
         record.exit_code,
         record.summary.clone(),
     );
-    let _ = AutomationService::apply_job_event(&record.tasks_dir, &record.ticket_id, AutomationEvent::JobCancelled, job_context_for(job_id));
+    apply_job_end_rules(job_id, &record.ticket_id, &record.tasks_dir, AutomationEvent::JobCancelled, job_context_for(job_id));
     let prefix = crate::storage::TaskId::parse(&record.ticket_id).ok().map(|parsed| parsed.project);
     if let Ok(config) = crate::config::resolution::config_for_project(&record.tasks_dir, prefix.as_deref()) {
         maybe_cleanup_worktree(job_id, &record.ticket_id, &record.tasks_dir, &config, JobOutcome::Cancelled);
@@ -3411,7 +3410,7 @@ fn finalize_job(
 
     if !should_stop_job(job_id) {
         let event = if success { AutomationEvent::JobCompleted } else { AutomationEvent::JobFailed };
-        let _ = AutomationService::apply_job_event(tasks_dir, ticket_id, event, job_context);
+        apply_job_end_rules(job_id, ticket_id, tasks_dir, event, job_context);
     }
 
     let _ = AgentContextService::append_messages(tasks_dir, config, ticket_id, context_messages.to_vec(), None);
@@ -3465,7 +3464,32 @@ fn update_job_failure(job_id: &str, ticket_id: &str, message: String, tasks_dir:
         registry.active_by_ticket.remove(ticket_id);
     }
     drop(registry);
-    let _ = AutomationService::apply_job_event(tasks_dir, ticket_id, AutomationEvent::JobFailed, job_context_for(job_id));
+    apply_job_end_rules(job_id, ticket_id, tasks_dir, AutomationEvent::JobFailed, job_context_for(job_id));
+}
+
+/// Runs the rules for the job's end and logs where they moved the ticket,
+/// so the agent's summary needn't say it (DEV-469).
+fn apply_job_end_rules(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Path, event: AutomationEvent, job_context: Option<AutomationJobContext>) {
+    let ticket_state = || TaskService::get(&Storage::new(tasks_dir), ticket_id, None).ok().map(|task| (task.status.to_string(), task.assignee));
+    let before = ticket_state();
+    let _ = AutomationService::apply_job_event(tasks_dir, ticket_id, event, job_context);
+    if let (Some(before), Some(after)) = (before, ticket_state())
+        && let Some(message) = ticket_move_note(ticket_id, &before, &after)
+    {
+        update_job(job_id, |state| {
+            push_event(state, "agent_job_progress", Some(message.clone()));
+        });
+    }
+}
+
+/// "DEV-1 is now Review, assigned to mallox" when the job's end changed the
+/// ticket's status or assignee.
+fn ticket_move_note(ticket_id: &str, before: &(String, Option<String>), after: &(String, Option<String>)) -> Option<String> {
+    if before == after {
+        return None;
+    }
+    let assignee = after.1.as_deref().map_or_else(|| "unassigned".to_string(), |assignee| format!("assigned to {assignee}"));
+    Some(format!("{ticket_id} is now {}, {assignee}", after.0))
 }
 
 fn update_job<F>(job_id: &str, mut updater: F)
@@ -3751,7 +3775,7 @@ mod tests {
         assert!(!builtin.contains("${{"), "{builtin}");
         assert!(builtin.contains("list TPL-1"), "{builtin}");
         assert!(builtin.contains("--project TPL"), "{builtin}");
-        assert!(builtin.contains("assignee TPL-1 \"Sam Example\""), "{builtin}");
+        assert!(builtin.contains("to its reporter (Sam Example)"), "{builtin}");
 
         let merge = template.expand("git -C \"${{workspace.root}}\" merge --ff-only ${{agent.worktree_branch}} (${{agent.profile}})");
         assert!(merge.ends_with("merge --ff-only agent/TPL-1 (merge)"), "{merge}");
@@ -3794,7 +3818,7 @@ mod tests {
         assert!(notes.contains("branch `agent/NOTE-1`"), "{notes}");
         assert!(notes.contains("Commit your work"), "{notes}");
         assert!(notes.contains("move this ticket to the next step"), "{notes}");
-        assert!(notes.contains("the ticket moves to its next step when this job ends"), "{notes}");
+        assert!(!notes.contains("final summary"), "LoTaR logs the next step itself: {notes}");
         assert!(notes.contains("hand the ticket back"), "{notes}");
 
         let notes = job_notes(&tasks_dir, &config, &task.id, false, true, false);
@@ -3940,6 +3964,22 @@ mod tests {
             worker_running: false,
             main_head_at_start: None,
         }
+    }
+
+    #[test]
+    fn the_job_end_logs_where_the_rules_moved_the_ticket() {
+        let todo = ("Todo".to_string(), Some("claude".to_string()));
+        assert_eq!(ticket_move_note("DEV-1", &todo, &todo), None, "nothing moved, nothing logged");
+        let review = ("Review".to_string(), Some("mallox".to_string()));
+        assert_eq!(ticket_move_note("DEV-1", &todo, &review).as_deref(), Some("DEV-1 is now Review, assigned to mallox"));
+        let unassigned = ("Done".to_string(), None);
+        assert_eq!(ticket_move_note("DEV-1", &todo, &unassigned).as_deref(), Some("DEV-1 is now Done, unassigned"));
+    }
+
+    #[test]
+    fn built_in_instructions_let_the_request_name_who_gets_a_question() {
+        assert!(DEFAULT_AGENT_INSTRUCTIONS.contains("the person your request below names for questions; if it names no one, to its reporter"));
+        assert!(!DEFAULT_AGENT_INSTRUCTIONS.contains("Summarize changes and tests"));
     }
 
     #[test]

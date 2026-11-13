@@ -1,0 +1,82 @@
+title: Jobs that failed during the T3 Code outage left 15 tickets InProgress and lost their agents' outcome
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-13T10:33:47.286204+00:00
+modified: 2026-11-13T10:37:16.946574+00:00
+relationships:
+  related:
+  - DEV-401
+  - DEV-456
+  - DEV-458
+  - DEV-459
+  - DEV-460
+  - DEV-461
+  - DEV-462
+  - DEV-463
+  - DEV-464
+  - DEV-465
+comments:
+- date: 2026-11-13T10:37:16.946574+00:00
+  author: claude
+  text: 'Two more from the same outage, now in the owner''s queue as "failed again": standards STD-82 (job-20261113T084716.188Z-39) and quarter-inch-studio QIS-188 (job-20261113T084720.254Z-13). Both failed with the T3 Code server unreachable, not in the work. Check their threads and last comments before asking him to retry.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8a51060f-8f0e-40eb-8309-91840a4fac93
+description: |-
+  On 2026-11-13 about 265 t3 jobs started at once (a manual `repos.ts --report` without `--fix`, STD-86). The T3 Code server stopped answering, and jobs whose threads went on to finish were marked failed ("Could not reach the T3 Code server at http://127.0.0.1:3773", runner exit 1). Afterwards 15 tickets are left InProgress or Reviewing with an agent assignee and no job running (`lotar agent list-running`: none, queue empty, 10:40Z):
+
+  - standards: STD-83 (@fix-codex), STD-85 (@fix)
+  - local: LOCA-312 (@fix), LOCA-134 (@review, Reviewing)
+  - quarter-inch-studio: QIS-185 (@fix), QIS-186 (@fix-codex)
+  - lotar: DEV-456 (@fix-codex), DEV-458, DEV-459, DEV-460, DEV-461, DEV-462, DEV-463, DEV-464 (@fix)
+  - gairola: G-14 (@fix, since 2026-11-12)
+
+  ## Found
+
+  - STD-85: job-20261113T081718.404Z-21 failed at 09:05Z. Its thread finished at 09:09Z, after the agent recorded WontDo (`lotar status STD-85 WontDo` answered that it would be set when the job ends). The ticket is still InProgress, assigned to @fix, without the fix-retried tag, so neither the outcome nor the "Fix failed: retry on @fix-codex" rule was applied.
+  - STD-83 and QIS-186 got the retry (@fix-codex, fix-retried), and they are also stuck with no job running.
+  - Most of these agents' last comments say the work is done or needs nothing more.
+  - DEV-401 (false failure while the thread runs) and DEV-465 (failed merge job whose work landed) cover parts of this, but not a fix job's recorded outcome.
+  - Thread: STD-85 https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af3df814d-35e9-4d29-a8c1-9f0a5dede9f4
+
+  ## Check
+
+  `lotar agent list-running` shows no job, while `lotar show STD-85` shows InProgress @fix (likewise for the tickets above).
+
+  ## Done when
+
+  - [ ] A job that ends while T3 Code is unreachable still applies its end rules and the outcome its agent recorded, or retries them once the server answers, and has a test.
+  - [ ] The tickets above are moved to the state their last comment and branch call for.
+tags:
+- health
+custom_fields:
+  finding: comms:job-end-lost-in-t3-outage
+history:
+- at: 2026-11-13T10:33:47.415412+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465"]}'
+- at: 2026-11-13T10:33:47.629367+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T10:33:47.922139+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T10:33:48.618730+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8a51060f-8f0e-40eb-8309-91840a4fac93
+- at: 2026-11-13T10:37:16.946574+00:00
+  actor: claude
+  changes:
+  - field: comment_added

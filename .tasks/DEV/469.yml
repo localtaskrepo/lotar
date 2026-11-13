@@ -1,0 +1,101 @@
+title: 'Built-in job instructions: drop the status sentence in every summary and the reassign-to-reporter conflict'
+status: Merging
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@merge'
+created: 2026-11-13T10:33:48.095335+00:00
+modified: 2026-11-13T10:50:22.366305+00:00
+comments:
+- date: 2026-11-13T10:43:14.141712+00:00
+  author: claude
+  text: |-
+    Done in f25eea82 (signed, agent/DEV-469).
+    - Job notes: the final-summary sentence about status and assignee is gone. Instead every job end (completed, failed, cancelled) logs where the rules moved the ticket, e.g. `DEV-1 is now Review, assigned to mallox` (agent_job_progress in the job log), when status or assignee changed.
+    - docs/help/agent-instructions.md: question goes to the person the request names, else the reporter; waiting status from the request, else a configured one. Dropped 'Summarize changes and tests', the tag/list examples and the separate waiting-status example (2,248 instead of 3,016 chars). docs/help/agent.md updated to match.
+    - Checks: npm run lint:agent, npm test (2132 Rust + 1513 UI), npm run smoke (387) pass. New unit tests for the log line and the instruction wording. Not run: the ticket's live check (a t3 job from a rule prompt); it needs a build with this change.
+- date: 2026-11-13T10:46:34.940857+00:00
+  author: codex
+  text: 'Review: passed. Reviewed f25eea82, ticket/comments, relationships (none), changed files and recent main history, finalization/logging and standards prompts. No findings or follow-up tickets. Focused agent_job_service tests: 24 passed; diff check passed; checkout unchanged. Full lint/smoke blocked by sandbox sccache denial. Full tests without sccache: 34 passed, 4 port-binding tests failed with sandbox Operation not permitted, remainder not run. Live rule-started T3 check unverified. Status and assignee unchanged.'
+- date: 2026-11-13T10:50:22.366305+00:00
+  author: codex
+  text: 'Merged f25eea82 by fast-forward into main. Checks passed with sandbox restrictions lifted: lint:agent, npm test (2132 Rust, 1513 UI plus release/hooks), npm run smoke (387). No code changes during merge. Built-in prompt wording and main source verified; a live T3 job from a rule remains unverified (requires the installed/running build to include this change). Including pending .tasks updates as requested, then pushing main if clean.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae151f7df-9d40-4739-a36f-48a4dd5074e4
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac3d09d47-54fb-44bd-b7ae-b70c2546a7b5
+description: |-
+  The built-in agent instructions make every t3 job's final message and prompt longer than the work needs (seen on about 75 jobs on 2026-11-13):
+
+  - "In your final summary, say that the ticket moves to its next step when this job ends and that you didn't change its status or assignee." Every summary ends with that paragraph, also for a job that set WontDo itself (STD-85, where it is wrong). It is about lotar's mechanics, which the owner doesn't need in each reply. Lotar can print the ticket's next step itself when the job ends.
+  - "Reassign the ticket to its reporter (claude)" under "Clarifications, blockers and feedback" contradicts the request that follows it in the standards rules ("assign the ticket to mallox"). The agent has to work out which one wins.
+  - The prompt is about 6,000 characters before the ticket. The CLI quick reference, the waiting-status example and "Summarize changes and tests" repeat what the request says again.
+
+  ## Found
+
+  Threads: STD-85 https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af3df814d-35e9-4d29-a8c1-9f0a5dede9f4, QIS-185 https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adb3e88ac-f849-454f-9c99-0efd6ef11208, LOCA-242 https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aed38c483-927e-4e4e-b347-34963cf42c79. Source: docs/help/agent-instructions.md and the code that builds the job prompt.
+
+  ## Check
+
+  The prompt of a t3 job started with `prompt:` from a rule (for example standards configs/lotar/automation.yml "Health: start the fix agent").
+
+  ## Done when
+
+  - [ ] The final-summary sentence about status and assignee is gone; the job's end says the next step itself (job log or ticket comment).
+  - [ ] A rule's prompt that names who gets a question wins without a contradicting built-in line (for example "hand it back as the request below says, else to its reporter").
+  - [ ] Parts that repeat the request are dropped or shortened.
+tags:
+- health
+custom_fields:
+  finding: comms:job-prompt-boilerplate
+history:
+- at: 2026-11-13T10:33:48.241347+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T10:33:48.586847+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T10:33:49.175074+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae151f7df-9d40-4739-a36f-48a4dd5074e4
+- at: 2026-11-13T10:43:14.141712+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T10:43:23.496558+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T10:43:25.251275+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac3d09d47-54fb-44bd-b7ae-b70c2546a7b5
+- at: 2026-11-13T10:46:34.940857+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T10:46:43.444340+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-13T10:50:22.366305+00:00
+  actor: codex
+  changes:
+  - field: comment_added

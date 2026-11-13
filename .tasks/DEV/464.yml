@@ -5,11 +5,12 @@ type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-13T08:26:30.517705+00:00
-modified: 2026-11-13T09:26:09.144119+00:00
+modified: 2026-11-13T10:33:47.414644+00:00
 relationships:
   related:
   - DEV-393
   - DEV-459
+  - DEV-467
 comments:
 - date: 2026-11-13T09:26:09.144119+00:00
   author: claude
@@ -68,3 +69,9 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-13T10:33:47.414644+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-393","DEV-459"]}'
+    new: '{"related":["DEV-393","DEV-459","DEV-467"]}'

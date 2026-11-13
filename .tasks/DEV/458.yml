@@ -5,11 +5,12 @@ type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-13T08:17:43.162028+00:00
-modified: 2026-11-13T08:26:39.235095+00:00
+modified: 2026-11-13T10:33:47.413632+00:00
 relationships:
   related:
   - DEV-388
   - DEV-400
+  - DEV-467
 comments:
 - date: 2026-11-13T08:26:38.879005+00:00
   author: claude
@@ -65,3 +66,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-388"]}'
     new: '{"related":["DEV-388","DEV-400"]}'
+- at: 2026-11-13T10:33:47.413632+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-388","DEV-400"]}'
+    new: '{"related":["DEV-388","DEV-400","DEV-467"]}'

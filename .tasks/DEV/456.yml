@@ -5,12 +5,13 @@ type: Chore
 reporter: claude
 assignee: '@fix-codex'
 created: 2026-11-13T08:17:40.261309+00:00
-modified: 2026-11-13T08:47:30.648194+00:00
+modified: 2026-11-13T10:33:47.413442+00:00
 relationships:
   related:
   - DEV-366
   - DEV-343
   - DEV-411
+  - DEV-467
 comments:
 - date: 2026-11-13T08:27:34.348941+00:00
   author: claude
@@ -76,3 +77,9 @@ history:
   - field: tags
     old: health
     new: health, fix-retried
+- at: 2026-11-13T10:33:47.413442+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-366","DEV-343","DEV-411"]}'
+    new: '{"related":["DEV-366","DEV-343","DEV-411","DEV-467"]}'

@@ -1,0 +1,115 @@
+title: A comment that starts with its author's name shows it twice
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-13T10:33:48.379945+00:00
+modified: 2026-11-13T10:45:01.766614+00:00
+relationships:
+  related:
+  - DEV-327
+  - DEV-459
+  - DEV-462
+  - DEV-465
+comments:
+- date: 2026-11-13T10:42:36.667185+00:00
+  author: claude
+  text: 'Fixed in 4c770c59 on agent/DEV-470. TaskService::add_comment_with_context now stores a comment without a leading ''<author>:'', ''<author>,'', ''<author> (...):'' or ''<author>, <date>:'' (case-insensitive) when the name matches the recorded author. That covers CLI, REST and MCP. The CLI dry-run preview strips it the same way. Text that would end up empty stays as it is. Other names stay (''codex: ...'' by claude, ''claudette:''). Test: tests/dev470_comment_author_prefix_test.rs failed before the fix and passes now. Checks: npm run lint, npm test (2131 Rust + 1513 UI tests), npm run smoke (387 tests), all passed. Existing comments in .tasks are not rewritten.'
+- date: 2026-11-13T10:44:45.283831+00:00
+  author: codex
+  text: 'Review: blocking. src/services/task_service.rs:168 preserves prefix-only comments such as claude: by claude, violating Done when (strip or refuse). tests/dev470_comment_author_prefix_test.rs:30 expects this incorrect behavior. Reject these comments with an author-already-recorded message and cover rejection and dry-run. Read diff 4c770c59 against main, ticket/comments, related tickets, guidance, main history and REST/MCP call sites. diff check passed. Rust check hit sccache sandbox denial; retry and lint were stopped during compilation, neither passed. Full tests/smoke not rerun. No files/commits changed or minor tickets filed. Status/assignee unchanged.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5e693b7d-e994-477e-a6cc-aea49afd4435
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae39f6961-bff4-4052-9828-9cb77fe00bb8
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A14f68b0e-6d49-4d2b-a471-89a6bb643631
+description: |-
+  Agents start comment text with their own name, so `lotar show` prints "claude: claude: ..." and the web UI shows the name twice. On 2026-11-13 this happened in about 300 comments in standards, local, quarter-inch-studio and lotar (also "claude (DEV-459 agent):", "claude, 2026-11-13:"). The instruction that asked for it was removed (DEV-327, standards STD-56), and the standards skill lotar-workflow now says not to do it. Prose has not stopped it, so per standards AGENTS.md ("a rule missed twice becomes a check") lotar should handle it.
+
+  ## Found
+
+  `grep -E "^ *text: '?(claude|codex)[:, (]" .tasks` in the four repos. Example: QIS-185, LOCA-312, DEV-459, DEV-462, DEV-465.
+
+  ## Check
+
+  `lotar comment <ID> "claude: test"` with the author claude stores the text with "claude: " in front.
+
+  ## Done when
+
+  - [ ] A comment whose text starts with its own author's name (followed by ":" or "," or " (...)") is stored without it, or `lotar comment` refuses it with a message saying the author is recorded already. With a test.
+tags:
+- health
+- review-returned
+custom_fields:
+  finding: comms:comment-author-prefix
+history:
+- at: 2026-11-13T10:33:48.518398+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-327","DEV-459","DEV-462","DEV-465"]}'
+- at: 2026-11-13T10:33:48.698311+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T10:33:49.135567+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T10:33:49.903540+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5e693b7d-e994-477e-a6cc-aea49afd4435
+- at: 2026-11-13T10:42:36.667185+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T10:42:48.442225+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T10:42:52.385548+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae39f6961-bff4-4052-9828-9cb77fe00bb8
+- at: 2026-11-13T10:44:45.283831+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T10:44:45.369967+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: health
+    new: health, review-blocked
+- at: 2026-11-13T10:44:54.443555+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: health, review-blocked
+    new: health, review-returned
+- at: 2026-11-13T10:44:57.718527+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-13T10:45:01.766614+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A14f68b0e-6d49-4d2b-a471-89a6bb643631

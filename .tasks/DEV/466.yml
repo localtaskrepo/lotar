@@ -1,0 +1,102 @@
+title: 'Task panel stays on ''Loading task…'' while git hangs: the server''s git calls have no timeout'
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-13T10:33:22.263037+00:00
+modified: 2026-11-13T10:47:35.751536+00:00
+comments:
+- date: 2026-11-13T10:45:55.825737+00:00
+  author: claude
+  text: |-
+    Fixed in e40e7eef (branch agent/DEV-466).
+    Server: new src/utils/git.rs output()/output_within(): runs git with empty stdin in its own process group, kills the group after GIT_TIMEOUT (20s) and returns a TimedOut error. Every git call in audit_service (history, activity feed, ls-files, show, diff, rev-list) goes through it; /api/tasks/history answers 500 'Failed to run git: git did not finish within 20s'.
+    Panel: loadTask no longer awaits loadCommitHistory, so the task shows as soon as /api/tasks/get answers; the Commits tab has its own loading state and now an error line (commitsError).
+    Tests: Rust unit test with a hanging child (sleep 600) checks it is killed at the timeout; vitest test in TaskPanel.integration.spec.ts with a never-resolving history (fails before the fix, passes after).
+    Ticket check run with a git shim that sleeps 600: /api/tasks/get answered in 0.02s, /api/tasks/history answered 500 after 20.06s, no git/sleep children left.
+    Checks: npm run lint, npm run test:agent (Rust, UI, release, hooks), npm run smoke (387 passed) all pass.
+    Not covered: the long-lived git cat-file --batch reader (BlobBatch) has no timeout; it only starts after a git log has answered. /api/activity/feed with a hanging git takes up to 40s (ls-files, then log). No browser check beyond the smoke suite.
+- date: 2026-11-13T10:47:22.677522+00:00
+  author: codex
+  text: 'Review: blocking. In e40e7eef, src/services/audit_service.rs:22-27 and :44-56 still spawn git cat-file --batch and read its pipes without any deadline. A shim that lets log/ls-files succeed but hangs cat-file leaves the activity request and child alive indefinitely. Earlier log success does not bound a separate process. Add a deadline, child cleanup and endpoint error propagation to BlobBatch, with a regression where only cat-file hangs. This is unfinished explicit ticket scope. Read the diff against main, ticket/comments, relationships (none), guidance and recent main history; docs/decisions does not exist. TaskPanel integration: 17 passed; diff whitespace check passed. Rust attempt failed on sandbox-denied sccache; retry without wrapper was stopped during a cold dependency build before tests ran. Full lint, smoke and live shim reproduction were not rerun. No source edits or commits; status and assignee unchanged.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad8d79e8d-6688-4da4-a3a5-516b2d4c3b76
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afcbae329-3a86-478f-818f-b3877e1b72d7
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac2e933bb-1feb-4f01-8a66-70350d219f88
+description: |-
+  Found 2026-11-13 on all six launchd servers (0.14.3): every ticket page stayed on 'Loading task…'. /api/tasks/history and /api/activity/feed never answered; the servers had a pile of git children (git log --follow ..., git ls-files .tasks) that had been waiting for minutes. Cause of the hang: git blocks in open() of ~/.gitconfig (a symlink into Dropbox) while macOS TCC asks whether the upgraded, unsigned lotar binary may read Dropbox files (same thing as 2026-11-05 with 0.12.0). That is the Mac's problem; lotar's problem is that one hanging git call blocks the whole panel: loadTask (view/composables/task-panel/useTaskPanelPersistence.ts) awaits loadCommitHistory before it sets ready, and the server runs git with no timeout, so requests and git processes pile up.
+
+  Check: put a git on PATH that sleeps (e.g. a shim running 'sleep 600'), start lotar serve, open a task: today the panel never leaves 'Loading task…' and curl /api/tasks/history?id=<ID> does not return.
+
+  Done: the task panel shows the task as soon as /api/tasks/get answers; commit history loads on its own and shows its own loading and error state. The server's git calls have a timeout, kill the child when it runs out and answer with an error, so git processes don't pile up. A test covers both with a git that hangs.
+tags:
+- health
+- review-returned
+custom_fields:
+  finding: hang:task-history-git
+history:
+- at: 2026-11-13T10:33:22.384071+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T10:33:22.607026+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T10:33:23.150887+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad8d79e8d-6688-4da4-a3a5-516b2d4c3b76
+- at: 2026-11-13T10:45:55.825737+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T10:46:04.552095+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T10:46:05.784050+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afcbae329-3a86-478f-818f-b3877e1b72d7
+- at: 2026-11-13T10:47:22.677522+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T10:47:23.180612+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: health
+    new: health, review-blocked
+- at: 2026-11-13T10:47:32.753752+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: health, review-blocked
+    new: health, review-returned
+- at: 2026-11-13T10:47:34.064235+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-13T10:47:35.751536+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac2e933bb-1feb-4f01-8a66-70350d219f88

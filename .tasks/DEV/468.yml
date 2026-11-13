@@ -1,0 +1,117 @@
+title: A rework commits off the ticket's branch, so the next fresh review reads the old commit
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-13T10:33:47.729859+00:00
+modified: 2026-11-13T10:50:01.388383+00:00
+relationships:
+  related:
+  - DEV-342
+  - DEV-408
+  - DEV-414
+  - DEV-465
+comments:
+- date: 2026-11-13T10:48:16.585852+00:00
+  author: claude
+  text: 'Fixed in a6682318 on agent/DEV-468. Cause (from DEV-465''s comments): the rework thread committed on T3 Code''s own branch t3/failed-merge-landed-skip-fix; once that landed, the fresh review found no open work and fell back to plan_t3_worktree, which starts from agent/DEV-465, still at the first fix ca054282. Change: when a T3 Code thread ends (run_job and the taken-over orphan path), follow_thread_branch in src/services/agent_job_service.rs points the ticket''s agent branch at the commit of the branch the thread ended on, creating it if missing. It leaves the branch alone and logs why when the agent branch holds commits the thread''s branch lacks (git cherry), or when git refuses (for example, the branch is checked out elsewhere). The job log notes the move. Documented in docs/help/agent.md. Test: a_rework_in_a_new_thread_moves_the_ticket_branch_so_a_fresh_review_reads_its_commit (tests/dev318_t3_runner_test.rs): a rework on another model in a new thread commits on t3/rework, agent/REPO-1 then points to it, the work lands, and the session: fresh review starts with --worktree agent/REPO-1 at the rework commit. It fails without the fix. Checks: npm run lint:agent, npm run test:agent (Rust, UI, release, hooks) and npm run smoke (387 tests) all passed.'
+- date: 2026-11-13T10:49:48.589863+00:00
+  author: codex
+  text: 'Review: blocking. src/services/agent_job_service.rs:2925 calls follow_thread_branch before finalize_job:3356 commits leftover work. An agent unable to commit leaves a fallback commit on the T3 branch after synchronization, so the ticket branch stays stale. Synchronize after commit_leftover_work in finalization for normal and orphan jobs; add a regression leaving rework uncommitted and checking the next fresh job reads its fallback commit. Read diff, ticket/comments, related DEV-342/408/414/465, guidance and recent main history; docs/decisions absent. git diff --check passed. Focused dev318 Rust suite could not start: sccache Operation not permitted. Full lint/tests/smoke not rerun. No files or commits changed; no minor tickets; status/assignee unchanged.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1ab3c1d7-0ce9-4c25-a520-275cf8b42ec4
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae7d11a9f-4237-40dd-a146-a91f4cc63276
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab144db0b-cd5a-4b5a-8c17-60dd941c7848
+description: |-
+  DEV-465's own run on 2026-11-13 shows reviews reading an obsolete commit. The rework after the first blocking review committed `af60ab9c` on a branch T3 Code named for that thread (`t3/failed-merge-landed-skip-fix`), not on `agent/DEV-465`. `agent/DEV-465` stayed at the first fix `ca054282`. Later `session: fresh` review threads checked out `ca054282` and blocked twice on code that main (9921ee06) had already replaced. That sent the ticket to the owner's inbox (INBOX-22, INBOX-23, INBOX-24 within 7 minutes), and the triage agent had to explain that the work was already on main. One fix ended up on six branches: agent/DEV-465, t3/failed-merge-job-already-on-main, t3/failed-merge-already-landed, t3/failed-merge-work-on-main, t3/failed-merge-landed-skip-fix, t3/failed-merge-landed-work.
+
+  ## Found
+
+  - Comments on DEV-465 from 09:54Z (rework) to 10:10Z (the second blocking review, then the triage that reset the branches).
+  - Threads: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad235e56b-5c16-4772-a251-4b16ae279f39 (rework), https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9d3c782c-3542-4a4f-ad76-f1853f27a886 and https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6c91b051-9104-450f-a1e0-b4f08610185c (the reviews of the obsolete copy).
+  - DEV-342 (Done) fixed the merge job's branch check; DEV-414 (Done) added the fresh thread on the open branch.
+
+  ## Check
+
+  A test: a rework job in a new thread (DEV-408) commits; the next `session: fresh` job checks out that commit, and the ticket's agent branch points to it.
+
+  ## Done when
+
+  - [ ] Every job of a ticket, in any thread, commits to and reads from one branch (the ticket's agent branch), with a test.
+tags:
+- health
+- review-returned
+custom_fields:
+  finding: comms:rework-off-ticket-branch
+history:
+- at: 2026-11-13T10:33:47.837546+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-342","DEV-408","DEV-414","DEV-465"]}'
+- at: 2026-11-13T10:33:47.986321+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T10:33:48.209798+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T10:33:48.816279+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1ab3c1d7-0ce9-4c25-a520-275cf8b42ec4
+- at: 2026-11-13T10:48:16.585852+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T10:48:30.415274+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T10:48:32.916367+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae7d11a9f-4237-40dd-a146-a91f4cc63276
+- at: 2026-11-13T10:49:48.589863+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T10:49:51.059432+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: health
+    new: health, review-blocked
+- at: 2026-11-13T10:49:58.314596+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: health, review-blocked
+    new: health, review-returned
+- at: 2026-11-13T10:50:00.108366+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-13T10:50:01.388383+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab144db0b-cd5a-4b5a-8c17-60dd941c7848

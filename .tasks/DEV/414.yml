@@ -5,13 +5,14 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T06:20:58.670352+00:00
-modified: 2026-11-13T06:31:23.241762+00:00
+modified: 2026-11-13T10:33:47.836622+00:00
 relationships:
   blocks:
   - DEV-415
   related:
   - DEV-377
   - DEV-408
+  - DEV-468
 comments:
 - date: 2026-11-13T06:30:06.991646+00:00
   author: claude
@@ -81,3 +82,9 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-13T10:33:47.836622+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-415"],"related":["DEV-377","DEV-408"]}'
+    new: '{"blocks":["DEV-415"],"related":["DEV-377","DEV-408","DEV-468"]}'
