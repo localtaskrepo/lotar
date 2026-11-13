@@ -1,0 +1,32 @@
+title: Adding project members rewrites the project config and drops its YAML comments
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-13T02:47:52.153512+00:00
+modified: 2026-11-13T02:47:53.218590+00:00
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7fa63678-6276-4844-8458-e1fe313410fc
+description: 'Found 2026-11-13 in ~/Development/standards (lotar 0.14.1): .tasks/INBOX/config.yml, committed in 5ff623f (STD-54) with three comment lines, was rewritten while the inbox was in use: members [claude, mallox] added (auto.populate_members), project.name changed from inbox to INBOX, and every comment line gone (git -C ~/Development/standards diff .tasks/INBOX/config.yml). The comments explained why the project''s tickets aren''t tracked and why triage has no worktree. Check: in a scratch repo, a project config.yml with a comment line and auto.populate_members on; lotar comment or add as a new user; the comment line is still there. Done: an automatic write to a config file keeps its comments and doesn''t change values nobody asked to change (project.name), with a test; or members live somewhere that doesn''t rewrite a hand-written file.'
+tags:
+- health
+custom_fields:
+  finding: config:members-drop-comments
+history:
+- at: 2026-11-13T02:47:52.262856+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T02:47:52.662092+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T02:47:53.218590+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7fa63678-6276-4844-8458-e1fe313410fc

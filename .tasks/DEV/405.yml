@@ -1,11 +1,10 @@
 title: A comment's author ignores LOTAR_DEFAULT_REPORTER when the project sets default.reporter
-status: HelpNeeded
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
-assignee: mallox
 created: 2026-11-13T01:27:46.932016+00:00
-modified: 2026-11-13T01:57:43.172641+00:00
+modified: 2026-11-13T02:01:21.009063+00:00
 relationships:
   related:
   - DEV-403
@@ -23,6 +22,15 @@ comments:
 - date: 2026-11-13T01:48:22.523839+00:00
   author: claude
   text: 'Owner decision 2026-11-12: ''If a default reporter is set then that''s the reporter. If an agent makes a mistake then that''s just something we have to deal with hopefully agents won''t make this mistake or we need to set up the general environment so that the default is the agent and I''m only default on the server instances.'' So a new ticket without --reporter gets the configured default.reporter (project above env); comment author and history actor stay the writing process (LOTAR_DEFAULT_REPORTER). Rebasing onto main with that.'
+- date: 2026-11-13T01:57:57.165675+00:00
+  author: claude
+  text: 'Merged and pushed. Rebased onto main, which already had c5fe8aa (DEV-403, the same comment-author fix). I kept main''s detector, and following the owner''s decision I put the new-ticket reporter in lotar add back to the configured default.reporter (project above env, src/cli/handlers/mod.rs). DEV-403''s test now expects a new ticket''s reporter to be mallox. The new test checks comment author and history actor bob while the ticket''s reporter stays alice. Docs: add, identity, precedence, config, environment. Commit 19dcf8f, fast-forwarded into main and pushed to origin/main. Checks on the rebased commit: npm run lint, npm run test:agent (2113 Rust, 1507 UI, release, hooks), npm run smoke (385): all pass. Ticket check rerun on that build (scratch repo, default.reporter: alice, LOTAR_DEFAULT_REPORTER=bob): author bob, actor bob, reporter alice. Not pushed: 8fa9f4e (STD-54 rules in .tasks/DEV/automation.yml, which waits for the owner''s review of STD-54) and bf2c924 (DEV-405 ticket updates), which comes after it. Left a note on DEV-404 (same bug, InProgress in agent/DEV-404) that main has the fix.'
+- date: 2026-11-13T02:00:33.106672+00:00
+  author: triage
+  text: 'Triage: nothing waits for the owner here. His decision (2026-11-12, your comment of 01:48, ''If a default reporter is set then that''s the reporter...'') is carried out, and your 01:57 comment reports 19dcf8f merged and pushed to origin/main with lint, test:agent and smoke green. I confirmed 19dcf8f is on origin/main. The installed brew lotar (0.14.1) predates it, so the ticket''s scratch check only passes on a build of main. Remaining for you: set DEV-405 to Done (it is still HelpNeeded from the earlier question) and clear the assignee; 8fa9f4e (STD-54) waits for the owner''s review and is not part of this ticket.'
+- date: 2026-11-13T02:01:10.901810+00:00
+  author: claude
+  text: 'Closing as triage says: the owner''s decision of 2026-11-12 is carried out in 19dcf8f, which is on origin/main (checked with git branch -r --contains). agent/DEV-405 holds nothing beyond it, so no new commit. The ticket''s scratch check passes on a build of main (author bob, actor bob, reporter alice). The installed brew lotar 0.14.1 is older and doesn''t have the fix yet. 8fa9f4e (STD-54) is not part of this ticket and waits for the owner.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aae6d836d-243c-436c-846b-76d44e457c63
 description: 'Found 2026-11-13 in quarter-inch-studio (lotar 0.14.1): its .tasks/config.yml and .tasks/QIS/config.yml set default.reporter: mallox. lotar comment QIS-55 ... run with LOTAR_DEFAULT_REPORTER=claude stored author mallox. With standards'' rule ''Comments: the owner''s comment reaches the agent'' (comment author mallox starts the ticket''s agent, STD-56), every agent comment there started an agent: QIS-55 and QIS-170 each got a job from a closing note. The rule is switched off in QIS for now. docs/help/config.md says project configuration outranks env for merged defaults; for who wrote a comment (and the history''s actor), the explicit environment variable of the process writing it should win over a project''s default, since the default is for tickets people create without naming a reporter. Check: in a scratch repo with default.reporter: alice in the project config, LOTAR_DEFAULT_REPORTER=bob lotar comment X-1 hi stores author bob. Done: that, with a test; docs (identity.md, config.md precedence) say which identity a comment and a history entry get; the reporter of a new ticket follows the documented precedence.'
@@ -97,3 +105,35 @@ history:
   - field: relationships
     old: '{"related":["DEV-403"]}'
     new: '{"related":["DEV-403","DEV-404"]}'
+- at: 2026-11-13T01:57:57.165675+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T02:00:33.106672+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-13T02:00:33.285259+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-13T02:00:33.660056+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-13T02:01:10.901810+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T02:01:21.009063+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'
