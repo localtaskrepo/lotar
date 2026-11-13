@@ -1,11 +1,11 @@
 title: Automation's comments render muted in the Comments tab
-status: Reviewing
+status: HelpNeeded
 priority: Low
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-13T21:14:14.411039+00:00
-modified: 2026-11-13T21:34:18.744410+00:00
+modified: 2026-11-13T22:04:18.537805+00:00
 relationships:
   related:
   - DEV-466
@@ -21,10 +21,43 @@ comments:
 - date: 2026-11-13T21:34:09.023512+00:00
   author: codex
   text: 'Review: blocking. Missing required ticket-attached light/dark before/after screenshots at 1920, 1440 and 390px for TaskPanelCommentsTab.vue:155-159; report only cites temporary phone images. Upload and link complete sets for re-review. Reviewed full diff, ticket/comments, related tickets and component main history. No code defect identified. Targeted unit tests 2/2 and frontend/smoke typecheck passed. Own app startup failed listen EPERM on 127.0.0.1:5191; browser preview unavailable. Full gates not rerun. No files or commits changed; status and assignee unchanged.'
+- date: 2026-11-13T21:59:55.089216+00:00
+  author: claude
+  text: |-
+    Rework of the review finding (missing screenshots): attached 12 screenshots to this ticket, before and after, light and dark, at 1920, 1440 and 390 px, of the Comments tab with two automation comments (one with a link) between claude, codex and mallox comments. Before = HEAD~1 component built into a separate web folder; after = 6c090386. I read all 12: automation comments are smaller and muted, the link stays link-coloured, nothing else changed or overflows at 390 px.
+
+    ![before light 1920](attachment:before-light-1920.76f4a806f567b43f9881ca2b5c04a913.png) ![after light 1920](attachment:after-light-1920.a14c2dc578664390519f1c6f7fc5395a.png)
+    ![before light 1440](attachment:before-light-1440.bd557a0486826e7efe89054223f28794.png) ![after light 1440](attachment:after-light-1440.2a6dd8353c9c94506a614ae636c7c93b.png)
+    ![before light 390](attachment:before-light-390.416b0db362a111a8284440ebbea014e4.png) ![after light 390](attachment:after-light-390.fbc33ea2188a6dca8b18b06d6afb1fc0.png)
+    ![before dark 1920](attachment:before-dark-1920.5b3d8c0686597aa6c6f1fa7d45a8d1d6.png) ![after dark 1920](attachment:after-dark-1920.3a82fd6d156ef44f1b46eebef66fbde9.png)
+    ![before dark 1440](attachment:before-dark-1440.903c7f1757015b70c137d3b8a1b5a985.png) ![after dark 1440](attachment:after-dark-1440.20931c1c1dbdbaa70ff9de266f776e9b.png)
+    ![before dark 390](attachment:before-dark-390.b0e4546b04e33b2823d7e5166706288a.png) ![after dark 390](attachment:after-dark-390.7c6fd4316b21212716e99d9ff45a02f4.png)
+
+    No code change was needed, so the commit stays 6c090386 (nothing to amend). Checks rerun: smoke/tests/ui.comments.smoke.spec.ts 2/2 and view/__tests__/TaskPanelCommentsTab.spec.ts 2/2 on a fresh build:smoke. Full lint/test/smoke not rerun: same commit that passed them before. The reviewer's server EPERM was its sandbox; the smoke server started fine here.
+- date: 2026-11-13T22:04:13.391878+00:00
+  author: codex
+  text: 'Review: blocking verification only; no confirmed code defect. Read diff, ticket comments, DEV-488 and component history. Twelve attachments exist but visual inspection and independent screenshots remain incomplete: browser preview unavailable. Unit tests 2/2 pass. Smoke rerun blocked by missing target/smoke/lotar. Full gates not rerun. Requires visual review with working browser before approval. No files or commits changed; status and assignee unchanged.'
+- date: 2026-11-13T22:04:18.537805+00:00
+  author: automation
+  text: The review found blocking problems again after one rework (the comments above). Should an agent rework it once more (lotar assignee DEV-491 @fix), will you decide the findings, or is it WontDo?
 references:
 - file: view/components/task-panel/TaskPanelCommentsTab.vue
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae010a927-d153-4e58-a0fa-41c391832f1e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A21fa2849-92d7-4f93-9879-7c64d33c8264
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5dd70bec-579e-4008-81b1-53384dba3bd7
+- attachment: before-light-1920.76f4a806f567b43f9881ca2b5c04a913.png
+- attachment: before-light-1440.bd557a0486826e7efe89054223f28794.png
+- attachment: before-light-390.416b0db362a111a8284440ebbea014e4.png
+- attachment: before-dark-1920.5b3d8c0686597aa6c6f1fa7d45a8d1d6.png
+- attachment: before-dark-1440.903c7f1757015b70c137d3b8a1b5a985.png
+- attachment: before-dark-390.b0e4546b04e33b2823d7e5166706288a.png
+- attachment: after-light-1920.a14c2dc578664390519f1c6f7fc5395a.png
+- attachment: after-light-1440.2a6dd8353c9c94506a614ae636c7c93b.png
+- attachment: after-light-390.fbc33ea2188a6dca8b18b06d6afb1fc0.png
+- attachment: after-dark-1920.3a82fd6d156ef44f1b46eebef66fbde9.png
+- attachment: after-dark-1440.20931c1c1dbdbaa70ff9de266f776e9b.png
+- attachment: after-dark-390.7c6fd4316b21212716e99d9ff45a02f4.png
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9559ba6f-c815-48a4-8bfa-0d77fa0f6e79
 description: |-
   Comments by the author `automation` (job failed, retry started, thread waits for an answer) sit between the agents' and the owner's comments at the same weight, so the conversation is hard to follow on a ticket like DEV-466 or STD-82. Owner chose to show them de-emphasized on 2026-11-13.
 
@@ -122,3 +155,118 @@ history:
   - field: tags
     old: web-ui, light, review-blocked
     new: web-ui, light, review-returned
+- at: 2026-11-13T21:56:35.564412+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-13T21:56:36.127434+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5dd70bec-579e-4008-81b1-53384dba3bd7
+- at: 2026-11-13T21:59:26.656769+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-light-1920.76f4a806f567b43f9881ca2b5c04a913.png
+- at: 2026-11-13T21:59:26.704145+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-light-1440.bd557a0486826e7efe89054223f28794.png
+- at: 2026-11-13T21:59:26.744111+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-light-390.416b0db362a111a8284440ebbea014e4.png
+- at: 2026-11-13T21:59:26.778189+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-dark-1920.5b3d8c0686597aa6c6f1fa7d45a8d1d6.png
+- at: 2026-11-13T21:59:26.811141+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-dark-1440.903c7f1757015b70c137d3b8a1b5a985.png
+- at: 2026-11-13T21:59:26.843948+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-dark-390.b0e4546b04e33b2823d7e5166706288a.png
+- at: 2026-11-13T21:59:26.877787+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-light-1920.a14c2dc578664390519f1c6f7fc5395a.png
+- at: 2026-11-13T21:59:26.911341+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-light-1440.2a6dd8353c9c94506a614ae636c7c93b.png
+- at: 2026-11-13T21:59:26.944780+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-light-390.fbc33ea2188a6dca8b18b06d6afb1fc0.png
+- at: 2026-11-13T21:59:26.976895+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-dark-1920.3a82fd6d156ef44f1b46eebef66fbde9.png
+- at: 2026-11-13T21:59:27.009880+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-dark-1440.20931c1c1dbdbaa70ff9de266f776e9b.png
+- at: 2026-11-13T21:59:27.045137+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-dark-390.7c6fd4316b21212716e99d9ff45a02f4.png
+- at: 2026-11-13T21:59:55.089216+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T22:00:03.170987+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T22:03:20.111051+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9559ba6f-c815-48a4-8bfa-0d77fa0f6e79
+- at: 2026-11-13T22:04:13.391878+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T22:04:13.503476+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: web-ui, light, review-returned
+    new: web-ui, light, review-returned, review-blocked
+- at: 2026-11-13T22:04:18.485953+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+  - field: tags
+    old: web-ui, light, review-returned, review-blocked
+    new: web-ui, light, review-returned
+- at: 2026-11-13T22:04:18.537805+00:00
+  actor: automation
+  changes:
+  - field: comment_added

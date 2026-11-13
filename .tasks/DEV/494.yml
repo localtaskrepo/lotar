@@ -1,0 +1,72 @@
+title: lotar add sets relationships (--depends-on, --blocks, ...) in the same write, so created rules see them
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-13T21:53:33.995050+00:00
+modified: 2026-11-13T22:00:07.723928+00:00
+relationships:
+  related:
+  - DEV-488
+  - DEV-489
+  - DEV-490
+  - standards:STD-102
+references:
+- file: src/cli/args/task.rs
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa69ef4ed-5439-421d-98b8-119cc67b48d0
+description: |-
+  `lotar add` can't set relationships, so an agent that files a ticket waiting on another adds the `depends_on` link in a second command. The `created` rules have already run by then, and a fix agent starts on a ticket that has to wait. MCP `task_create` and REST create already take `relationships` in the same write; the CLI should too. The owner chose this on 2026-11-13 over a general `--no-automation` flag.
+
+  ## Found
+
+  2026-11-13: DEV-489, DEV-490 and STD-100 were filed `--status Blocked`, then linked to DEV-488 with `lotar task relationships add`. Three fix jobs started in between, and each one found the dependency and stopped. STD-102 makes the shared rule skip Blocked tickets; this ticket makes the link exist when the ticket is created.
+
+  ## Plan
+
+  - `lotar add` options for the kinds `lotar task relationships add` knows (`--depends-on`, `--blocks`, `--related`, `--parent`, `--fixes`, `--duplicate-of`), repeatable where the kind is a list, with the same ID forms (`DEV-12`, `lotar:DEV-374`).
+  - Pass them as `TaskCreate.relationships`, so they are stored in the same write and `created` rules see them. Reciprocal links on the other ticket as `relationships add` writes them today.
+  - `--dry-run` shows them; unknown or missing IDs fail the same way `relationships add` does.
+  - Help docs for `lotar add`; lotar's `lotar-workflow` skill: file a waiting ticket with `--status Blocked --depends-on <id>`.
+
+  ## Done when
+
+  - [ ] `lotar add "x" --status Blocked --depends-on DEV-1` stores the link and its reciprocal in one write; the history shows it at creation.
+  - [ ] A `created` rule's condition sees the relationship (test).
+  - [ ] Help docs agree; lint, test and smoke pass.
+tags:
+- backend
+history:
+- at: 2026-11-13T21:53:34.165787+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-488","DEV-489","DEV-490"]}'
+- at: 2026-11-13T21:53:34.552890+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T21:53:40.090550+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-488","DEV-489","DEV-490"]}'
+    new: '{"related":["DEV-488","DEV-489","DEV-490","standards:STD-102"]}'
+- at: 2026-11-13T21:53:40.378288+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:src/cli/args/task.rs
+- at: 2026-11-13T22:00:07.118208+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T22:00:07.723928+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa69ef4ed-5439-421d-98b8-119cc67b48d0

@@ -1,11 +1,18 @@
 title: 'Design a harness tool of its own: start, follow, message and resume Claude, Codex, Kilo and other agent CLIs'
-status: InProgress
+status: HelpNeeded
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-13T21:27:57.663811+00:00
-modified: 2026-11-13T21:34:19.873665+00:00
+modified: 2026-11-13T22:00:06.429031+00:00
+comments:
+- date: 2026-11-13T21:59:51.621605+00:00
+  author: claude
+  text: 'Design doc written: docs/developers/harness-tool-design.md (linked from docs/developers/index.md), commit abf819de on agent/DEV-492. Recommendation: a Rust tool harnessmux on ACP with the official Rust SDK, modelled on acpx, followed and answered from lotar''s web UI, adopted as a new runner until Claude and Codex with resume replace the t3 runner. Tried, not just read: acpx 0.22.0 ran Claude (one-shot, named session, queue and cancel from a second process, resume after killing the agent, live follow via its stream file) and Copilot; Codex failed with the codex-acp 1.x acpx pins (model_not_found reported as success) and worked with codex-acp 2.6.0 incl. resume and effort. HarnessRouter v0.41.15 ran in Docker on loopback: 31 harnesses installed, 0 usable without a provider API key, no subscription sign-in; container, volume and image removed. Not tried: Kilo, Gemini, OpenCode, Cursor, Droid (not installed). Checks: docs-only change, relative links resolve, referenced paths exist; lint/test/smoke not run (no code changed).'
+- date: 2026-11-13T21:59:51.829626+00:00
+  author: claude
+  text: '@mallox Approve this design (docs/developers/harness-tool-design.md): a Rust tool harnessmux on ACP in its own MIT repo next to lotar, modelled on acpx, followed from lotar''s web UI, adopted as a new runner until Claude and Codex with resume replace the t3 runner?'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9cf75e47-e8d0-45e5-88ad-eb92ada61a1f
 description: |-
@@ -47,3 +54,20 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9cf75e47-e8d0-45e5-88ad-eb92ada61a1f
+- at: 2026-11-13T21:59:51.621605+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T21:59:51.829626+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T22:00:06.429031+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox

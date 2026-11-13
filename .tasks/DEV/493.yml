@@ -1,11 +1,54 @@
 title: Measure a cargo workspace and path-filtered CI before splitting lotar
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-13T21:27:58.028716+00:00
-modified: 2026-11-13T21:36:26.488928+00:00
+modified: 2026-11-13T22:08:28.492633+00:00
+relationships:
+  related:
+  - DEV-471
+  - DEV-481
+comments:
+- date: 2026-11-13T22:08:01.550984+00:00
+  author: claude
+  text: |-
+    Measured (2026-11-13). Branch agent/DEV-493, commit 66879b3b, unmerged.
+
+    ## What the CI time is spent on (from real CI logs)
+    - The Windows job is the critical path in 71 of 88 green runs on main over the last 30 days.
+    - It compiles lotar three times: the binary (24 to 189 s), cargo check of all targets (25 to 34 s), and the library's unit-test build for nextest (2m44 to 4m58). That last build runs 40 tests that take 2 to 3 s.
+    - Linux Rust job: the test build takes 2m19 to 2m59, the tests themselves 45 to 48 s.
+    - The web build is not the cost. Vite takes 1 to 2 s in the Rust jobs. A web change costs Rust time only because build.rs then rebuilds the whole lotar crate.
+    - Locally (Mac, 14 cores, load 12 to 47 from other sessions, so noisy). With dependencies cached: lotar binary from scratch 29 to 49 s. Library unit-test build 43 to 76 s. The 52.8k-line integration test binary is cheap: 11.5 s. One file changed: binary 4 s, test targets 2 to 4 s.
+
+    ## Path filters (prototype in ci.yml on the branch)
+    A "Changed paths" job uses git diff to choose the jobs that run. Every push still gets a green run, which release.yml needs.
+    Simulated on the 88 green main runs with their real job times (median wall time, now -> filtered):
+    - Docs or tickets only (10 runs): 6.7 -> 0.2 min
+    - Web without Rust (5): 9.5 -> 6.5 min
+    - Scripts or smoke only (6): 6.5 -> 6.3 min
+    - Rust without web (36): 8.0 -> 8.0 min. Only the UI unit tests are skipped, and they are not on the critical path.
+    - Rust and web (31): 9.0 -> 9.0 min
+    - Runner minutes: 2177 -> 1704 (-22%).
+    What it changes: ci.yml gets 60 lines. The Rust pattern also has to list every file a Rust test reads (workflow files, docs/help, docs/openapi.json, .tasks/DEV/automation.yml). A new contract test enforces that (rust_path_filter_covers_the_repository_files_rust_tests_read; I checked that it fails when a path is missing). docs/developers/testing.md describes the filters. Releases are unaffected.
+
+    ## Cargo workspace (probe in a scratch copy, not on the branch)
+    - Module dependencies have cycles. config, storage, utils, types and output depend on each other, and parts of them call up into services 17 times and into cli twice (in tests). services depends on cli. There are 370 pub(crate) items.
+    - Probe: I copied config, storage, utils, types, output, errors, workspace, project, scanner, api_types and api_events (23.4k of 95k lines) into a separate crate. I stubbed the 17 calls into services and moved out one test module that needs cli. It compiles, unit tests included.
+    - Measured back to back against today's single crate. Core library from scratch: 8 to 16 s (lotar's: 29 to 49 s). Core unit-test build: 8 to 24 s (lotar's: 43 to 44 s). The Windows selectors storage::safety and utils::scan run from the core crate (22 tests in 2 s; one failure comes from my stub).
+    - Estimate, not measured: the Windows selection also needs services::automation_service tests, so services' unit-test build stays (36k lines). The Windows test build would shrink to about 55 to 65 percent, saving about 1.5 to 2 min. A change to services or cli (most Rust commits) still rebuilds those crates.
+    - Caching: CI keeps no build output of lotar's own crates today. rust-cache drops workspace members, and the ci profile sets incremental = true, which sccache does not cache. A workspace saves time on unchanged crates only if that changes (needs checking).
+    - Cost: moving about 23k lines into crates/, breaking the cycles (moving the 17 helpers down), and pub(crate) turning into pub across crate borders. Release tooling has to build the workspace's binary package (cross, nfpm, npm, Homebrew and Scoop paths use the crate). The web embed would go into a small crate of its own, so that a web change rebuilds only that crate and the link. It conflicts with every open branch that touches src/.
+
+    ## Cheaper lever found along the way (not built)
+    The Windows job's longest step builds the whole library as a unit-test binary for 40 tests. If those tests ran from the integration test binary or a small crate, that step would drop from about 3 to 5 min to well under 1 min. Then Windows would be 2.5 to 4 min shorter, without a workspace. Most of these tests use private functions, so they would need small public hooks or a move.
+
+    Checks: npm run lint:agent passed. npm run test:agent passed (2138 Rust, 1515 Vitest, release and hook tests). npm run smoke: 389 of 390. harness.server.smoke.spec.ts "stops the servers of a run that is killed (DEV-471)" failed under load (machine load 28) and passed twice when run alone (19/19); I added this to DEV-481. Not run: the changed ci.yml on GitHub, since nothing is pushed. Its classify step was run locally against all 153 push ranges.
+- date: 2026-11-13T22:08:14.510865+00:00
+  author: claude
+  text: 'Question: adopt the path filters only (they save on docs and web pushes, not on Rust pushes), adopt the path filters plus moving the 40 Windows tests out of the library''s unit tests (about 2.5 to 4 min off every Rust push), or also start the cargo workspace split (core crate first, estimated 1.5 to 2 min more on Windows, a large move)?'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A33be852d-9b46-4b5c-81fe-67f9a885d51d
 description: |-
@@ -45,3 +88,26 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A33be852d-9b46-4b5c-81fe-67f9a885d51d
+- at: 2026-11-13T22:08:01.550984+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T22:08:01.736930+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-471","DEV-481"]}'
+- at: 2026-11-13T22:08:14.510865+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T22:08:28.492633+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox

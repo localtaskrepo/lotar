@@ -5,7 +5,7 @@ type: Bug
 reporter: codex
 assignee: '@fix'
 created: 2026-11-13T19:35:44.905131+00:00
-modified: 2026-11-13T21:26:03.403019+00:00
+modified: 2026-11-13T22:08:14.305089+00:00
 relationships:
   related:
   - DEV-467
@@ -14,6 +14,7 @@ relationships:
   - DEV-483
   - DEV-484
   - DEV-491
+  - DEV-493
 comments:
 - date: 2026-11-13T19:36:50.553507+00:00
   author: claude
@@ -24,6 +25,9 @@ comments:
 - date: 2026-11-13T21:26:03.227632+00:00
   author: claude
   text: 'Seen again 2026-11-13 in DEV-491 (branch without 3784d308): smoke 391/392, harness.server.smoke.spec.ts:409 killed-run registry still present; the file alone 19/19, full rerun 392/392.'
+- date: 2026-11-13T22:08:14.305089+00:00
+  author: claude
+  text: 'Seen again 2026-11-13 (DEV-493, full npm run smoke at machine load 28): harness.server.smoke.spec.ts ''stops the servers of a run that is killed (DEV-471)'' failed: expect(existsSync(registry)).toBe(false) got true, at line 409, right after the exit poll. The spec passed twice when run alone (19/19). It looks like the registry file is removed after the process exits, and the assertion does not wait for that.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6c227a71-21a4-46cb-8af4-a68a07438dc9
 description: 'Found during DEV-467 verification on 2026-11-13: initial test:agent failed merge_jobs_are_serialized_even_with_parallel_slots at tests/agent_automation_integration_test.rs:2637 waiting 1500ms for running; full retry passed all 2139 Rust tests. First smoke run passed 389/390 but harness.server.smoke.spec.ts:409 found a killed-run registry still present. Second smoke run passed 389/390 but ui.soft-delete.smoke.spec.ts:176 timed out waiting for the deleted task row. These are observed intermittent verification failures, not established product root causes. Check: npm run test:agent and npm run test:smoke:agent under concurrent agent activity. Done when the timing and cleanup races are reproduced and corrected without masking behavior failures. Related DEV-467 and DEV-471.'
@@ -96,3 +100,13 @@ history:
   - field: relationships
     old: '{"related":["DEV-467","DEV-471","DEV-477","DEV-483","DEV-484"]}'
     new: '{"related":["DEV-467","DEV-471","DEV-477","DEV-483","DEV-484","DEV-491"]}'
+- at: 2026-11-13T22:08:01.736670+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-467","DEV-471","DEV-477","DEV-483","DEV-484","DEV-491"]}'
+    new: '{"related":["DEV-467","DEV-471","DEV-477","DEV-483","DEV-484","DEV-491","DEV-493"]}'
+- at: 2026-11-13T22:08:14.305089+00:00
+  actor: claude
+  changes:
+  - field: comment_added

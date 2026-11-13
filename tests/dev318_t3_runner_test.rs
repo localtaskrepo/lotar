@@ -689,6 +689,73 @@ fn a_fresh_session_starts_a_new_thread_on_the_unmerged_branch_on_the_same_model(
     assert!(!output.status.success(), "the earlier worktree is detached");
 }
 
+/// Leaves work uncommitted in the earlier thread's worktree and makes git
+/// refuse to commit it, so LoTaR can't free the branch for a new thread.
+fn branch_that_cant_be_freed(fixtures: &TestFixtures, worktree: &Path) {
+    let hooks = fixtures.get_temp_path().join("t3-out").join("hooks");
+    fs::create_dir_all(&hooks).unwrap();
+    let hook = hooks.join("pre-commit");
+    fs::write(&hook, "#!/bin/sh\necho 'commits refused' >&2\nexit 1\n").unwrap();
+    fs::set_permissions(&hook, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
+    git(worktree, &["config", "core.hooksPath", hooks.to_str().unwrap()]);
+    fs::write(worktree.join("half.txt"), "half done\n").unwrap();
+}
+
+/// DEV-486: a fresh review whose branch can't be freed fails instead of
+/// continuing the author's thread and reviewing its own work.
+#[test]
+fn a_fresh_session_whose_branch_cant_be_freed_fails() {
+    let fixtures = TestFixtures::new();
+    let review =
+        "  review:\n    runner: t3\n    command: \"{T3}\"\n    provider: claudeAgent\n    model: claude-opus-5-5\n    env:\n      FAKE_T3_WORKTREE: \"{WT}\"\n";
+    let (home, worktree, id) = ticket_with_unmerged_work(&fixtures, review);
+    let earlier = AgentJobService::list_jobs().into_iter().find(|job| job.ticket_id == id).and_then(|job| job.session_id).unwrap();
+    branch_that_cant_be_freed(&fixtures, &worktree);
+
+    let req = lotar::api_types::AgentJobCreateRequest {
+        ticket_id: id.clone(),
+        prompt: "Review".to_string(),
+        agent: Some("review".into()),
+        session: Some(lotar::config::types::AgentSession::Fresh),
+        ..Default::default()
+    };
+    let job = wait_for_job(&AgentJobService::start_job_with_tasks_dir(req, &fixtures.tasks_root).unwrap().id);
+    assert_eq!(job.status, "failed", "{job:?}: {:?}", messages(&job));
+    assert!(!home.out.join("send.args").exists(), "the earlier thread isn't continued");
+    assert_eq!(read_lines(&home.out.join("start.calls")).len(), 1, "no new thread");
+    let link = format!("https://app.t3.codes/threads/env/{earlier}");
+    let summary = job.summary.clone().unwrap_or_default();
+    assert!(summary.starts_with("LoTaR could not free agent/from-t3 for a new thread (git commit"), "{summary}");
+    assert!(summary.contains("commits refused"), "{summary}");
+    assert!(
+        summary.ends_with(&format!("The job asks for a fresh thread (session: fresh), so it doesn't continue the earlier thread {link} and fails.")),
+        "{summary}"
+    );
+    let log = fs::read_to_string(fixtures.tasks_root.join("@agent-logs").join(format!("{}.jsonl", job.id))).unwrap();
+    assert!(log.contains("commits refused") && log.contains("\"status\":\"failed\""), "{log}");
+}
+
+/// DEV-408's fallback: a job on another model whose branch can't be freed
+/// continues the earlier thread.
+#[test]
+fn a_job_on_another_model_whose_branch_cant_be_freed_continues_the_thread() {
+    let fixtures = TestFixtures::new();
+    let codex = "  fix-codex:\n    runner: t3\n    command: \"{T3}\"\n    provider: codex\n    model: gpt-5.5\n    env:\n      FAKE_T3_WORKTREE: \"{WT}\"\n";
+    let (home, worktree, id) = ticket_with_unmerged_work(&fixtures, codex);
+    let earlier = AgentJobService::list_jobs().into_iter().find(|job| job.ticket_id == id).and_then(|job| job.session_id).unwrap();
+    branch_that_cant_be_freed(&fixtures, &worktree);
+
+    // The job still fails at its end: git refuses LoTaR's commit there too.
+    let retry = run_agent(&fixtures, &id, "fix-codex", "Try again");
+    assert_eq!(read_lines(&home.out.join("send.args")), ["thread", "send", earlier.as_str(), "-", "--wait"]);
+    assert_eq!(retry.session_id.as_deref(), Some(earlier.as_str()));
+    assert!(
+        messages(&retry).iter().any(|m| m.contains("this job continues it instead of starting a new thread. LoTaR could not free")),
+        "{:?}",
+        messages(&retry)
+    );
+}
+
 #[test]
 fn a_rework_continues_the_fix_thread_after_a_fresh_review_took_its_branch() {
     let fixtures = TestFixtures::new();

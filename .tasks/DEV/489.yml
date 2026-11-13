@@ -5,12 +5,13 @@ type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-13T21:14:10.488871+00:00
-modified: 2026-11-13T21:36:12.971553+00:00
+modified: 2026-11-13T21:53:34.165232+00:00
 relationships:
   depends_on:
   - DEV-488
   related:
   - DEV-490
+  - DEV-494
 comments:
 - date: 2026-11-13T21:16:11.569283+00:00
   author: claude
@@ -79,3 +80,9 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-488"]}'
     new: '{"depends_on":["DEV-488"],"related":["DEV-490"]}'
+- at: 2026-11-13T21:53:34.165232+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-488"],"related":["DEV-490"]}'
+    new: '{"depends_on":["DEV-488"],"related":["DEV-490","DEV-494"]}'

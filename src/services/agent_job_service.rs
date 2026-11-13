@@ -1396,6 +1396,9 @@ enum OpenWork {
     /// new thread on the earlier thread's branch, its prompt naming that
     /// thread.
     NewThread { earlier: String, branch: String },
+    /// A `session: fresh` job whose branch git can't free: it fails, as
+    /// continuing would have it check its own work (DEV-486).
+    Fail,
 }
 
 /// The ticket's last T3 Code thread when its worktree still holds work the
@@ -1403,7 +1406,8 @@ enum OpenWork {
 /// changes. A new job builds on it instead of starting a second branch for
 /// the same ticket: it continues the thread, or, when its profile runs
 /// another provider or model or asks for `session: fresh`, starts a new
-/// thread on the thread's branch.
+/// thread on the thread's branch. When git can't free that branch, the job
+/// continues the thread, or fails for `session: fresh`.
 fn thread_with_open_work(
     job_id: &str,
     profile: &AgentProfileDetail,
@@ -1443,6 +1447,10 @@ fn thread_with_open_work(
             }
             Some((OpenWork::NewThread { earlier: reference, branch }, reason))
         }
+        Err(err) if profile.session == Some(AgentSession::Fresh) => Some((
+            OpenWork::Fail,
+            format!("{err} The job asks for a fresh thread (session: fresh), so it doesn't continue the earlier thread {reference} and fails."),
+        )),
         Err(err) => Some((OpenWork::Continue(Box::new(thread)), format!("{reason} {err}"))),
     }
 }
@@ -2745,6 +2753,38 @@ fn remove_path(path: &std::path::Path) -> std::io::Result<()> {
     if fs::symlink_metadata(path)?.is_dir() { fs::remove_dir_all(path) } else { fs::remove_file(path) }
 }
 
+/// Initializes the job's persistent log file (if logging is enabled).
+#[expect(clippy::too_many_arguments, reason = "the log header's independent fields from run_job")]
+fn init_job_log(
+    job_id: &str,
+    runner_kind: AgentRunnerKind,
+    profile: &AgentProfileDetail,
+    tasks_dir: &std::path::Path,
+    ticket_id: &str,
+    config: &ResolvedConfig,
+    created_at: &str,
+    worktree_path: Option<String>,
+    worktree_branch: Option<String>,
+) {
+    let workspace_root = tasks_dir.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| tasks_dir.to_path_buf());
+    let logs_dir = crate::services::agent_log_service::effective_logs_dir(tasks_dir, config.agent_logs_dir.as_deref());
+    let _ = AgentLogService::init_log(
+        &workspace_root,
+        logs_dir.as_deref(),
+        crate::services::agent_log_service::JobLogHeader {
+            job_id: job_id.to_string(),
+            ticket_id: ticket_id.to_string(),
+            runner: runner_kind.as_str().to_string(),
+            created_at: created_at.to_string(),
+            worktree_path,
+            worktree_branch,
+            model: profile.model.clone(),
+            effort: profile.effort.clone(),
+            agent_profile: JOB_REGISTRY.lock().ok().and_then(|registry| registry.jobs.get(job_id).and_then(|state| state.record.agent_profile.clone())),
+        },
+    );
+}
+
 #[expect(
     clippy::too_many_arguments,
     clippy::needless_pass_by_value,
@@ -2780,6 +2820,12 @@ fn run_job(
             OpenWork::NewThread { earlier, branch } => {
                 open_branch = Some((earlier, branch));
                 (None, Some(reason))
+            }
+            OpenWork::Fail => {
+                // The log holds git's error (DEV-486).
+                init_job_log(&job_id, runner_kind, &profile, &tasks_dir, &ticket_id, &config, &Utc::now().to_rfc3339(), None, None);
+                update_job_failure(&job_id, &ticket_id, reason, &tasks_dir);
+                return;
             }
         }
     } else {
@@ -2859,26 +2905,17 @@ fn run_job(
 
     let started_at = Utc::now().to_rfc3339();
 
-    // Compute workspace root (parent of tasks_dir)
-    let workspace_root = tasks_dir.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| tasks_dir.clone());
-
-    // Initialize persistent log file (if logging is enabled)
     let worktree_path_str = worktree_context.worktree_path.as_ref().map(|p| p.to_string_lossy().to_string());
-    let logs_dir = crate::services::agent_log_service::effective_logs_dir(&tasks_dir, config.agent_logs_dir.as_deref());
-    let _ = AgentLogService::init_log(
-        &workspace_root,
-        logs_dir.as_deref(),
-        crate::services::agent_log_service::JobLogHeader {
-            job_id: job_id.clone(),
-            ticket_id: ticket_id.clone(),
-            runner: runner_kind.as_str().to_string(),
-            created_at: started_at.clone(),
-            worktree_path: worktree_path_str.clone(),
-            worktree_branch: worktree_context.worktree_branch.clone(),
-            model: profile.model.clone(),
-            effort: profile.effort.clone(),
-            agent_profile: JOB_REGISTRY.lock().ok().and_then(|registry| registry.jobs.get(&job_id).and_then(|state| state.record.agent_profile.clone())),
-        },
+    init_job_log(
+        &job_id,
+        runner_kind,
+        &profile,
+        &tasks_dir,
+        &ticket_id,
+        &config,
+        &started_at,
+        worktree_path_str.clone(),
+        worktree_context.worktree_branch.clone(),
     );
 
     let mut cancelled = false;

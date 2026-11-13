@@ -1,11 +1,11 @@
 title: Question comments with options the owner answers by click, and answers that set the ticket's fields
-status: Reviewing
+status: InProgress
 priority: High
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-13T21:13:42.890310+00:00
-modified: 2026-11-13T21:43:53.971865+00:00
+modified: 2026-11-13T22:04:21.180268+00:00
 relationships:
   blocks:
   - DEV-489
@@ -16,6 +16,7 @@ relationships:
   - DEV-483
   - DEV-485
   - DEV-491
+  - DEV-494
 comments:
 - date: 2026-11-13T21:43:40.367443+00:00
   author: claude
@@ -32,10 +33,15 @@ comments:
 
     Checks: npm run lint (lint:agent) clean; npm test (test:agent): 2147 Rust, 1515 UI, release and hook tests pass; npm run smoke (test:smoke:agent): 391 pass, incl. new ui.question-comments smoke (screenshots checked). New tests: tests/dev488_question_comments_test.rs (CLI, REST, MCP, automation, old YAML), unit tests in task_questions/task_query, view/__tests__/questions.spec.ts.
     Not done here (follow-ups in the ticket): STD inbox triage copying questions and forwarding answers.
+- date: 2026-11-13T22:00:50.035965+00:00
+  author: codex
+  text: 'Review: blocking. Mandatory before/after UI screenshots are absent from ticket attachments and outcome links (QuestionPrompt.vue:2, BoardCard.vue, TaskTable.vue, Comments tab). Attach every changed page in light/dark at 1920, 1440, 390 px per ui-review and review instructions. Focused questions.spec.ts rerun passes (2 tests). Review incomplete: full diff/history/related tickets, independent rendering, lint, Rust and smoke not completed. No code approval, minor tickets, file changes or commits; status and assignee unchanged.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afd2c6919-e5a0-41a8-9c0f-8916f5a62fea
 - file: src/types.rs
 - file: view/components/task-panel/TaskPanelCommentsTab.vue
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5de430a4-3a23-44a1-9dcf-c31d127fb791
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8846d532-c3b5-47ef-b0e8-73ddb1f5318e
 description: |-
   Agents and automation ask the owner multiple-choice questions in prose ("Question for mallox: A, B, C or none?"); he answers in a line and an agent has to read his words back and do the routing. A `question` comment with options, and an `answer` comment that records the choice, lets the UI show buttons and lets an option set the ticket's fields itself. The owner asked for it on 2026-11-13 and chose the full scope (options that set fields, open questions on cards).
 
@@ -74,6 +80,7 @@ description: |-
 tags:
 - web-ui
 - backend
+- review-returned
 history:
 - at: 2026-11-13T21:13:43.100686+00:00
   actor: claude
@@ -138,3 +145,44 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-13T21:53:34.163805+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-489","DEV-490"],"related":["DEV-466","DEV-478","DEV-483","DEV-485","DEV-491"]}'
+    new: '{"blocks":["DEV-489","DEV-490"],"related":["DEV-466","DEV-478","DEV-483","DEV-485","DEV-491","DEV-494"]}'
+- at: 2026-11-13T22:00:05.193670+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5de430a4-3a23-44a1-9dcf-c31d127fb791
+- at: 2026-11-13T22:00:50.035965+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T22:00:50.073550+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: web-ui, backend
+    new: web-ui, backend, review-blocked
+- at: 2026-11-13T22:00:54.901247+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: web-ui, backend, review-blocked
+    new: web-ui, backend, review-returned
+- at: 2026-11-13T22:04:20.198926+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-13T22:04:21.180268+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8846d532-c3b5-47ef-b0e8-73ddb1f5318e
