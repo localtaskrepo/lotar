@@ -1,11 +1,11 @@
 title: Jobs that failed during the T3 Code outage left 15 tickets InProgress and lost their agents' outcome
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: claude
 created: 2026-11-13T10:33:47.286204+00:00
-modified: 2026-11-13T19:21:29.680342+00:00
+modified: 2026-11-13T19:37:32.304459+00:00
 relationships:
   related:
   - DEV-401
@@ -24,6 +24,7 @@ relationships:
   - DEV-473
   - DEV-478
   - DEV-479
+  - DEV-481
 comments:
 - date: 2026-11-13T10:37:16.946574+00:00
   author: claude
@@ -114,6 +115,12 @@ comments:
 - date: 2026-11-13T19:21:28.064491+00:00
   author: triage
   text: 'Answer to the 19:20 question (rework once more, owner decides the findings, or WontDo): an agent reworks it (@fix); no decision of the owner is needed. The new finding is a defect inside the ticket''s own first Done-when item: replay_end_actions (automation_service.rs ~1947) runs pending rules in read_dir order, so two matching job_completed rules can end with the wrong status (rule 1 Reviewing, rule 2 Done: normal run ends Done, replay can end Reviewing with no job). Fix: replay in dispatch/rule order and do not let a later rule run past an unfinished earlier one; add a multi-rule contention regression that fails without it; rerun lint:agent, test:agent and smoke, then send it to review again. WontDo is ruled out by the owner''s 2026-11-13 19:16 comment (INBOX-35: file a ticket for the issues, then retry), and he asked for the work to continue, not to be dropped. The sccache blocker is filed as DEV-479; until it is fixed, a reviewer or fix agent runs the targeted tests with the authorized execution that worked at 19:18 (npm run test:rust -- pending_outcome_tests). Source: DEV-467 description Done when item 1; INBOX-35 comment of 2026-11-13 19:16.'
+- date: 2026-11-13T19:28:24.368990+00:00
+  author: codex
+  text: 'Implemented ordered job-end dispatch checkpoints: all matching rules are saved together, and replay cannot run a later rule ahead of an unfinished earlier step. Added multi-rule contention coverage and updated help. Initial lint and targeted recovery tests passed. Full Rust run hit merge_jobs_are_serialized_even_with_parallel_slots startup deadline; initial smoke passed 389/390 with a killed-run registry cleanup failure. Repeating gates without concurrent smoke load; final results and commit follow.'
+- date: 2026-11-13T19:37:09.394149+00:00
+  author: codex
+  text: Addressed the ordering finding in signed commit 887e36ef on t3/job-outcome-survives-t3-outage. Matching job-end rules share one durable dispatch checkpoint containing their steps in configuration order. A blocked earlier step stops the dispatch, so later rules cannot overtake it during initial execution or recovery. Help text updated. Regression end_rules_resume_in_order_without_overtaking_a_blocked_comment failed against the old dispatcher (Done instead of Reviewing while the first comment remained blocked), then passed restored; all three pending_outcome_tests pass. Final lint:agent passed; test:agent passed all 2139 Rust tests plus UI, 47 release and 7 hook tests; final build-first test:smoke:agent passed 390/390. Earlier full Rust attempt failed a merge-job startup deadline and two smoke attempts each failed a different timing assertion; recorded separately in related DEV-481, rather than claiming first-pass clean gates. git diff --check passed, worktree clean, signature verified G. No merge or push. Status and assignee unchanged; job-end automation sends the work to review. No durable guidance correction.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8a51060f-8f0e-40eb-8309-91840a4fac93
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa70d136-71c4-42cc-8c60-e9566c5a27b6
@@ -152,6 +159,8 @@ tags:
 - review-returned
 - merge-retried
 - review-blocked
+- blocked
+- 'blocked-by:dependency graph unavailable: Validation error: Validation error: Relationship snapshot unavailable: lock /Users/mallox/Development/@localtaskrepo/lotar/.tasks/@sprints/.sprints.lock is busy or unsupported: Resource temporarily unavailable (os error 35); still busy after the 500 ms snapshot wait budget; retry after the writer finishes'
 custom_fields:
   finding: comms:job-end-lost-in-t3-outage
 history:
@@ -501,3 +510,38 @@ history:
   - field: status
     old: HelpNeeded
     new: InProgress
+- at: 2026-11-13T19:28:24.368990+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:35:45.275065+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479"]}'
+    new: '{"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481"]}'
+- at: 2026-11-13T19:37:09.394149+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:37:29.391225+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T19:37:32.304459+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: claude
+  - field: tags
+    old: health, review-returned, merge-retried, review-blocked
+    new: 'health, review-returned, merge-retried, review-blocked, blocked, blocked-by:dependency graph unavailable: Validation error: Validation error: Relationship snapshot unavailable: lock /Users/mallox/Development/@localtaskrepo/lotar/.tasks/@sprints/.sprints.lock is busy or unsupported: Resource temporarily unavailable (os error 35); still busy after the 500 ms snapshot wait budget; retry after the writer finishes'

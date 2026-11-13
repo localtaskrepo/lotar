@@ -1,17 +1,40 @@
 title: A taken-over t3 job without a recorded thread fails although its agent finished
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-13T19:12:58.132272+00:00
-modified: 2026-11-13T19:12:59.515480+00:00
+modified: 2026-11-13T19:49:11.447056+00:00
 relationships:
   related:
   - DEV-378
   - DEV-467
+  - DEV-480
+comments:
+- date: 2026-11-13T19:28:42.100162+00:00
+  author: claude
+  text: 'Fixed in 30840f78. A taken-over t3 job without a recorded thread id now looks the thread up with `t3 thread list --json` (in the job''s T3 project): the first thread created within 10 minutes after the job started whose title starts with the ticket ID. It records and links that thread, then ends from its state as before. With no such thread the job fails and names why. In the INBOX-37 case the thread ''INBOX-37 …'' was created 1.7 s after the job started, so the job would have ended from its completed run, and the inbox failure rule would not have handed INBOX-37 back. Tests: two new integration tests in tests/dev318_t3_runner_test.rs (thread found among decoys; no thread → fails); the first failed before the fix. docs/help/agent.md updated. Checks: npm run lint, npm test (2135 Rust, 1515 UI, release and hook tests), npm run smoke (390): all pass. Not changed: a session: continue job''s thread id (on_t3_thread_continued) still isn''t written to the active-job record, so a takeover of such a job still can''t find its thread; I left that out because a continued thread''s state can still show the previous run before the queued turn starts. Not checked: why process 25885 lost the thread line.'
+- date: 2026-11-13T19:32:14.275887+00:00
+  author: codex
+  text: 'Review: blocking. src/services/agent_job_service.rs:1223-1229 matches only ticket prefix and creation window, then selects the earliest thread. Multiple same-ticket attempts or agent-created same-ticket threads within ten minutes are indistinguishable: takeover can apply another run outcome and fire incorrect end rules. Recover using a persisted job-specific identity, or at least reject ambiguous matches; add a regression with two matching threads and different outcomes. Read full commit, ticket/comments, related DEV-378/467/480, runner/takeover paths, docs and recent main history. No docs/decisions directory exists. git diff --check passed. Targeted dev318 suite compiling after authorized retry of sccache denial; result follows. No files or commits changed; status and assignee unchanged.'
+- date: 2026-11-13T19:34:52.873108+00:00
+  author: codex
+  text: 'Review: blocking (verification complete). Authorized npm run test:rust -- dev318_t3_runner_test passed all 24 tests (2111 skipped). git diff --check passed. Existing tests do not cover multiple same-ticket candidates. Full lint/UI/smoke not rerun. No minor tickets filed, source edits or commits; status and assignee unchanged. review-blocked remains for job-end routing.'
+- date: 2026-11-13T19:44:23.198390+00:00
+  author: claude
+  text: 'Rework of the review finding (agent_job_service.rs thread lookup could pick another same-ticket thread): amended as 36519457. The lookup no longer takes the earliest match. job_thread_candidates returns every thread whose title starts with the ticket ID and that was created within 2 minutes (was 10) after the job started. A single match is the job''s thread. With several (the agent started one, or another job ran on the ticket), the job fails and names them, so it never applies another run''s outcome. With none, it fails as before. T3 Code has no job-specific identity to match on (thread start/list take no request id or tag, and the prompt holds no job id), so rejecting ambiguity is the safe option; the narrower window keeps threads the agent starts later out of the match. New test a_job_without_its_thread_id_and_several_threads_for_its_ticket_fails: it failed against the previous commit''s code (that code completed the job from thread-first) and passes now. docs/help/agent.md updated. Checks: npm run lint, npm test (2136 Rust, 1515 UI), npm run smoke (390): all pass.'
+- date: 2026-11-13T19:46:20.699743+00:00
+  author: codex
+  text: 'Review: passed. Reviewed 36519457 full diff, ticket/comments, related DEV-378/467/480, runner/takeover paths, help and main history. Previous blocker addressed by rejecting multiple candidates with regression coverage. No further findings or minor tickets. All 25 targeted dev318 tests passed, 2111 skipped; runner reported leftover xcrun_db temp entry. Default sccache attempt denied; retry used RUSTC_WRAPPER=. git diff --check passed. Full lint/UI/smoke not rerun. No files, commits, status or assignee changed.'
+- date: 2026-11-13T19:49:01.546015+00:00
+  author: codex
+  text: 'Merge blocked: rebased cleanly onto main as 5fc697e1; lint:agent passed. test:agent failed because sandbox denied reserving an ephemeral port in serve_handler tests (Operation not permitted); UI phase did not run. Smoke also failed and reported leftover temp workspaces. All checks have ended. No merge or push performed. Can this merge be rerun with local port access so the required test gates can complete?'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A30af34fc-98ff-4d1d-a68f-9c9ec335f26c
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A87654657-2811-4fc9-91e7-f692ac776b70
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3ff00162-f42e-43ec-bec6-8a8ddedfee02
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A90ade1c9-6888-4c9e-9046-f0d9da1728b9
 description: |-
   ## Found
 
@@ -54,3 +77,111 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A30af34fc-98ff-4d1d-a68f-9c9ec335f26c
+- at: 2026-11-13T19:28:42.100162+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:28:50.988157+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-378","DEV-467"]}'
+    new: '{"related":["DEV-378","DEV-467","DEV-480"]}'
+- at: 2026-11-13T19:29:03.419161+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T19:29:05.179646+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A87654657-2811-4fc9-91e7-f692ac776b70
+- at: 2026-11-13T19:32:14.275887+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:32:14.573085+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: ''
+    new: review-blocked
+- at: 2026-11-13T19:34:52.873108+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:35:03.761351+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: review-blocked
+    new: review-returned
+- at: 2026-11-13T19:35:05.499366+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-13T19:35:09.764517+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3ff00162-f42e-43ec-bec6-8a8ddedfee02
+- at: 2026-11-13T19:44:23.198390+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:44:32.141943+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T19:44:34.845701+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A90ade1c9-6888-4c9e-9046-f0d9da1728b9
+- at: 2026-11-13T19:46:20.699743+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:46:26.013577+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-13T19:49:01.546015+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:49:11.393133+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: review-returned
+    new: ''
+- at: 2026-11-13T19:49:11.447056+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox

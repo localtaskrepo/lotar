@@ -1577,7 +1577,8 @@ fn take_back_branch(thread: &ContinuedThread, tasks_dir: &std::path::Path, ticke
 }
 
 /// The job continues `thread`: it is the job's session from the start, and
-/// its worktree the job's.
+/// its worktree the job's. The job's active record, written after this,
+/// takes the thread from the job (DEV-480).
 fn on_t3_thread_continued(job_id: &str, thread: &ContinuedThread) {
     let reference = thread.info.link.clone().unwrap_or_else(|| thread.thread_id.clone());
     update_job(job_id, |state| {

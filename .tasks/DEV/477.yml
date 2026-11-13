@@ -1,11 +1,14 @@
 title: automation simulate shows only the first matching rule; a real event applies all of them
-status: InProgress
+status: HelpNeeded
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: claude
 created: 2026-11-13T19:02:46.329827+00:00
-modified: 2026-11-13T19:14:15.183187+00:00
+modified: 2026-11-13T19:37:29.968373+00:00
+relationships:
+  related:
+  - DEV-481
 comments:
 - date: 2026-11-13T19:12:17.547351+00:00
   author: claude
@@ -16,6 +19,9 @@ comments:
 - date: 2026-11-13T19:14:08.869831+00:00
   author: codex
   text: 'Additional verification: with RUSTC_WRAPPER cleared, the targeted dev477 regression passed (1 test), but the runner exited nonzero because xcrun_db remained in its temporary folder. No source files changed.'
+- date: 2026-11-13T19:37:00.639539+00:00
+  author: claude
+  text: 'Rework: fixed the review finding. simulate_action now takes the ticket the event fired on for alias resolution (@assignee, @reporter, @assignee_or_reporter, as apply_set_action does) and builds the changes on the result of earlier rules. New test simulate_resolves_aliases_against_the_ticket_the_event_fired_on (tests/dev477_simulate_all_rules_test.rs: assignee alice, rule 1 sets bob, rule 2 sets reporter @assignee; preview and real creation both give reporter alice) failed before the fix (preview bob) and passes now. Amended commit dd5de134. Checks: lint:agent, test:agent (2135 Rust, 1515 UI) pass; test:smoke:agent 390/390 on rerun; the first run''s one failure was the known flaky harness.server.smoke.spec.ts:409, noted on DEV-481.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6f77277c-e969-4904-93a8-17a4456d01b8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A22e7b280-3492-484a-8da6-fe203bfcbda7
@@ -32,6 +38,8 @@ description: |-
   - [ ] simulate lists every matching rule with its actions, in file order, and the preview applies them all as a real event would, with a test.
 tags:
 - review-returned
+- blocked
+- 'blocked-by:dependency graph unavailable: Validation error: Validation error: Relationship snapshot unavailable: lock /Users/mallox/Development/@localtaskrepo/lotar/.tasks/@sprints/.sprints.lock is busy or unsupported: Resource temporarily unavailable (os error 35); still busy after the 500 ms snapshot wait budget; retry after the writer finishes'
 history:
 - at: 2026-11-13T19:02:46.541295+00:00
   actor: claude
@@ -101,3 +109,34 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8744f08c-fc67-4800-b043-9bd6a29a4f97
+- at: 2026-11-13T19:36:50.837177+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-481"]}'
+- at: 2026-11-13T19:37:00.639539+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:37:29.069836+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T19:37:29.968373+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: claude
+  - field: tags
+    old: review-returned
+    new: 'review-returned, blocked, blocked-by:dependency graph unavailable: Validation error: Validation error: Relationship snapshot unavailable: lock /Users/mallox/Development/@localtaskrepo/lotar/.tasks/@sprints/.sprints.lock is busy or unsupported: Resource temporarily unavailable (os error 35); still busy after the 500 ms snapshot wait budget; retry after the writer finishes'

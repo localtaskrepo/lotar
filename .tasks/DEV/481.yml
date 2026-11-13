@@ -1,0 +1,63 @@
+title: Verification gates intermittently fail on startup and cleanup timing
+status: InProgress
+priority: Medium
+type: Bug
+reporter: codex
+assignee: '@fix'
+created: 2026-11-13T19:35:44.905131+00:00
+modified: 2026-11-13T19:36:50.837570+00:00
+relationships:
+  related:
+  - DEV-467
+  - DEV-471
+  - DEV-477
+comments:
+- date: 2026-11-13T19:36:50.553507+00:00
+  author: claude
+  text: 'Seen again 2026-11-13 in DEV-477 rework: test:smoke:agent 389/390, harness.server.smoke.spec.ts:409 killed-run registry still present; the spec alone passed 3/3 and a full rerun passed 390/390.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6c227a71-21a4-46cb-8af4-a68a07438dc9
+description: 'Found during DEV-467 verification on 2026-11-13: initial test:agent failed merge_jobs_are_serialized_even_with_parallel_slots at tests/agent_automation_integration_test.rs:2637 waiting 1500ms for running; full retry passed all 2139 Rust tests. First smoke run passed 389/390 but harness.server.smoke.spec.ts:409 found a killed-run registry still present. Second smoke run passed 389/390 but ui.soft-delete.smoke.spec.ts:176 timed out waiting for the deleted task row. These are observed intermittent verification failures, not established product root causes. Check: npm run test:agent and npm run test:smoke:agent under concurrent agent activity. Done when the timing and cleanup races are reproduced and corrected without masking behavior failures. Related DEV-467 and DEV-471.'
+tags:
+- health
+custom_fields:
+  finding: checks:intermittent-gates-20261113
+history:
+- at: 2026-11-13T19:35:45.277848+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-467","DEV-471"]}'
+- at: 2026-11-13T19:35:45.984441+00:00
+  actor: codex
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T19:35:48.028073+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T19:35:52.511569+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6c227a71-21a4-46cb-8af4-a68a07438dc9
+- at: 2026-11-13T19:36:08.930154+00:00
+  actor: codex
+  changes:
+  - field: task_type
+    old: Feature
+    new: Bug
+- at: 2026-11-13T19:36:50.553507+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:36:50.837570+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-467","DEV-471"]}'
+    new: '{"related":["DEV-467","DEV-471","DEV-477"]}'

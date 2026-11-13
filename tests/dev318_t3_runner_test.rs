@@ -751,6 +751,62 @@ fn a_rework_continues_the_fix_thread_after_a_fresh_review_took_its_branch() {
     assert_eq!(read_lines(&home.out.join("start.calls")).len(), 3, "the fix thread and two review threads");
 }
 
+/// DEV-480: a job that continues a thread records that thread in its active
+/// record, so the process that takes the job over ends it from that thread's
+/// continued run, not from the run before it.
+#[test]
+fn a_continue_job_whose_worker_died_ends_from_the_continued_thread() {
+    let fixtures = TestFixtures::new();
+    let hold = fixtures.get_temp_path().join("t3-out").join("hold");
+    let extra = format!("      FAKE_T3_SEND_RUN: \"while [ -f {} ]; do sleep 0.1; done\"\n", hold.display());
+    let (home, _, id) = ticket_with_unmerged_work(&fixtures, &extra);
+    let _queue = EnvVarGuard::set("LOTAR_AGENT_QUEUE_DIR", fixtures.get_temp_path().join("queue").to_str().unwrap());
+    // The run before: it completed.
+    let earlier = AgentJobService::list_jobs().into_iter().find(|job| job.ticket_id == id).unwrap();
+    assert_eq!(earlier.status, "completed");
+    let thread = earlier.session_id.unwrap();
+    let tasks_dir = fixtures.tasks_root.clone();
+
+    fs::write(&hold, "").unwrap();
+    let req = lotar::api_types::AgentJobCreateRequest {
+        ticket_id: id.clone(),
+        prompt: "Go on".to_string(),
+        agent: Some("fix".into()),
+        session: Some(lotar::config::types::AgentSession::Continue),
+        ..Default::default()
+    };
+    let job_id = AgentJobService::start_job_with_tasks_dir(req, &tasks_dir).unwrap().id;
+    let start = Instant::now();
+    while !home.out.join("send.args").exists() {
+        assert!(start.elapsed() < Duration::from_secs(20), "the job never sent its turn");
+        sleep(Duration::from_millis(50));
+    }
+    let record = agent_active_jobs::find(&tasks_dir, &job_id).expect("the running job's record");
+    assert_eq!(record.session_id.as_deref(), Some(thread.as_str()), "{record:?}");
+    fs::remove_file(&hold).unwrap();
+    assert_eq!(wait_for_job(&job_id).status, "completed");
+
+    // The worker of a job with that record dies while the continued run
+    // still runs: the process that takes it over waits for that run.
+    fs::write(fixtures.tasks_root.join("automation.yml"), END_RULES).unwrap();
+    fs::write(home.out.join("status"), "running").unwrap();
+    let orphan = "job-20261113T193000.000Z-1";
+    orphaned_t3_job(&fixtures, &id, orphan, record.session_id.as_deref());
+    AgentJobService::recover_orphaned_jobs(&tasks_dir);
+    sleep(Duration::from_secs(1));
+    assert_eq!(AgentJobService::get_job(orphan).unwrap().status, "running", "waits while the continued run runs");
+
+    // The continued run ends otherwise than the run before: the job ends from it.
+    fs::write(home.out.join("status"), "interrupted").unwrap();
+    let job = wait_for_job(orphan);
+    assert_eq!(job.status, "failed", "{job:?}: {:?}", messages(&job));
+    assert_eq!(job.session_id.as_deref(), Some(thread.as_str()));
+    assert!(messages(&job).iter().any(|m| m.contains("ended with status 'interrupted'")), "{:?}", messages(&job));
+    assert_eq!(read_lines(&home.out.join("show.calls")).last().map(String::as_str), Some(thread.as_str()));
+    let task = TaskService::get(&fixtures.create_storage(), &id, None).unwrap();
+    assert_eq!(task.status.as_str(), "HelpNeeded");
+}
+
 /// A job whose process died while its thread ran (DEV-378): a pid that no
 /// longer exists owns its record, and its log has no end.
 fn orphaned_t3_job(fixtures: &TestFixtures, ticket_id: &str, job_id: &str, session_id: Option<&str>) {

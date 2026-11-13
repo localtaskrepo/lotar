@@ -1,11 +1,11 @@
 title: 'Task panel stays on ''Loading task…'' while git hangs: the server''s git calls have no timeout'
-status: Reviewing
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: mallox
 created: 2026-11-13T10:33:22.263037+00:00
-modified: 2026-11-13T19:22:41.273711+00:00
+modified: 2026-11-13T19:38:53.112002+00:00
 relationships:
   related:
   - DEV-472
@@ -46,12 +46,41 @@ comments:
 - date: 2026-11-13T19:20:48.498042+00:00
   author: codex
   text: 'Shared retry-policy coordination accepted with DEV-468 (INBOX-28). Owner model choice is resolved: mallox on 2026-11-13 at 19:20:15Z chose fable for one round (INBOX-40). No further model-selection question is needed. Shared policy: allow multiple reworks, assess stronger model around round 2/3, avoid endless loops (INBOX-29). Current policy work is decision recording and coordination; no shared automation/config change has been implemented or validated. DEV-468 retains its separate branch-synchronization failure implementation; this thread will not duplicate it.'
+- date: 2026-11-13T19:24:25.470561+00:00
+  author: codex
+  text: 'Review: blocking. HEAD 03db11a4 adds a regression but leaves src/utils/git.rs:74-86 unchanged: after git exits the deadline stops and pipe-reader joins can hang indefinitely while descendants hold output open. Enforce the deadline through output collection and kill remaining descendants on expiry. Panel integration 17 passed; diff check passed. Rust regression blocked before compilation by sccache Operation not permitted; full lint/smoke not rerun. Read diff, ticket/comments, related tickets, guidance and main history. No source edits or commits; status/assignee unchanged. Further rework is permitted by owner decision INBOX-29.'
+- date: 2026-11-13T19:24:37.254419+00:00
+  author: automation
+  text: The review found blocking problems again after one rework (the comments above). Should an agent rework it once more (lotar assignee DEV-466 @fix), will you decide the findings, or is it WontDo?
+- date: 2026-11-13T19:28:54.402929+00:00
+  author: mallox
+  text: I see Dev-466 in waiting state still working on the issue. Double-check before we kick off another agent (answered in INBOX-44)
+- date: 2026-11-13T19:29:29.033499+00:00
+  author: codex
+  text: 'Confirmed INBOX-44: the existing Claude Fable 5.2 delegate is still running on t3/task-panel-git-timeout-2, with no pending input request. Its latest message reports the inherited-pipe regression failed as expected and it is implementing the fix. The earlier review inspected an intermediate snapshot (03db11a4), before this rework finished; it must not trigger another implementation agent or be treated as review of the completed Fable round. No new agent started, no source changes or tests this turn. Current ticket is InProgress/@fix; preserve the existing implementation owner and await its completed commit/checks before a fresh review.'
+- date: 2026-11-13T19:32:11.383742+00:00
+  author: automation
+  text: The review found blocking problems again after one rework (the comments above). Should an agent rework it once more (lotar assignee DEV-466 @fix), will you decide the findings, or is it WontDo?
+- date: 2026-11-13T19:33:04.136181+00:00
+  author: triage
+  text: 'Triage: the 19:32 question (rework once more, decide the findings, or WontDo) is already answered, no new agent needed. (1) Owner mallox 2026-11-13: more rework rounds are fine, escalate to a stronger model on round 2 or 3 (INBOX-29); Fable for one round (INBOX-40); on 19:28 he saw DEV-466 still in a waiting state while an agent worked and asked to double-check before starting another (INBOX-44). (2) The Fable 5.2 rework thread ''DEV-466 Fable rework: bound pipe collection'' (t3/task-panel-git-timeout-2) is still running, no pending request; its first test (pipe held by a descendant) failed as expected and it is now changing src/utils/git.rs. The 19:24 and 19:32 reviews and automation comments read the intermediate commit 03db11a4 (only the regression test), not the finished round. Next: do not start another fix agent and do not set WontDo; let the Fable round commit and run its checks, then run a fresh review of that commit. If that review blocks again, this is round 3 of the owner''s rule: ask him then with the model choice (INBOX-29).'
+- date: 2026-11-13T19:33:34.807397+00:00
+  author: codex
+  text: 'Acknowledged triage: owner decisions in INBOX-29, INBOX-40 and INBOX-44 authorize the existing Fable round; no replacement agent or WontDo. Current ticket is InProgress / @fix. My review examined intermediate 03db11a4, not the completed Fable result; it must not trigger another rework. Wait for that round''s final commit and checks, then review that exact commit. Direct thread read returned thread_not_found, so I cannot independently confirm its runtime state here. No code changes or tests this turn; status and assignee unchanged.'
+- date: 2026-11-13T19:35:26.571663+00:00
+  author: automation
+  text: The review found blocking problems again after one rework (the comments above). Should an agent rework it once more (lotar assignee DEV-466 @fix), will you decide the findings, or is it WontDo?
+- date: 2026-11-13T19:38:53.112002+00:00
+  author: claude
+  text: "Fable rework done: 896309c0 (signed, hooks on), on top of 03db11a4. Review this commit, not 03db11a4.\nFix (src/utils/git.rs): output_within now holds one deadline through output collection. The pipe readers send their bytes over a channel and are never joined; after the process exits, stdout and stderr are awaited only until the deadline. When it passes (process still running, or a descendant still holding a pipe), the process group is killed and the call returns TimedOut. A failing try_wait now kills the group too.\nRegression: timeout_tests::child_holding_the_output_open_is_killed_at_the_timeout (sh -c 'sleep 3 & echo $! > pid; exit 0', 300ms timeout). Before the fix it failed after 3.1s with Ok(Output); after it passes in about 0.3s and the sleep is gone.\nChecks on the final tree, all in the foreground, sccache not in the way: npm run lint:agent exit 0; npm run test:agent exit 0 (Rust, UI, release 47, hooks 7); npm run smoke 387 passed in 108 files.\nNot run: a live lotar serve with a git shim (sleep 600 & exit 0).\nLimits: a descendant that leaves the process group (setsid) and keeps the pipe is not killed; the call still returns at the deadline. \nRef state: at 19:22Z automation committed my still-red regression test as 03db11a4 ('changes from the fix agent'), detached this checkout's HEAD and removed target/. 896309c0 therefore sits on a detached HEAD in /Users/mallox/.t3/worktrees/lotar/t3-f896dc82-1dcb0918420f7648; branch t3/task-panel-git-timeout-2 still points at 03db11a4 (fast-forwarding it was denied by the permission check). The rework is two commits (03db11a4 test, 896309c0 fix), not squashed, because -3/-4/-5 branches point at 03db11a4. Status and assignee untouched."
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad8d79e8d-6688-4da4-a3a5-516b2d4c3b76
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afcbae329-3a86-478f-818f-b3877e1b72d7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac2e933bb-1feb-4f01-8a66-70350d219f88
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acace9e2f-6f5e-48c9-a5ef-b40b7a3ebe16
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A498a8a45-5df8-49c7-9522-d8d6c3a6f5a9
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa299dba-86ab-42ec-a04a-87cfbe2640f7
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A089483d8-08d8-4608-aec1-944e859ac6b6
 description: |-
   Found 2026-11-13 on all six launchd servers (0.14.3): every ticket page stayed on 'Loading task…'. /api/tasks/history and /api/activity/feed never answered; the servers had a pile of git children (git log --follow ..., git ls-files .tasks) that had been waiting for minutes. Cause of the hang: git blocks in open() of ~/.gitconfig (a symlink into Dropbox) while macOS TCC asks whether the upgraded, unsigned lotar binary may read Dropbox files (same thing as 2026-11-05 with 0.12.0). That is the Mac's problem; lotar's problem is that one hanging git call blocks the whole panel: loadTask (view/composables/task-panel/useTaskPanelPersistence.ts) awaits loadCommitHistory before it sets ready, and the server runs git with no timeout, so requests and git processes pile up.
 
@@ -251,3 +280,118 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A498a8a45-5df8-49c7-9522-d8d6c3a6f5a9
+- at: 2026-11-13T19:24:25.470561+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:24:37.107519+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+- at: 2026-11-13T19:24:37.254419+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:28:54.402929+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:28:55.089414+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-13T19:28:57.035499+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-13T19:29:29.033499+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:29:36.777765+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T19:29:39.692867+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa299dba-86ab-42ec-a04a-87cfbe2640f7
+- at: 2026-11-13T19:32:11.018752+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+- at: 2026-11-13T19:32:11.383742+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:33:04.136181+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:33:05.601069+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-13T19:33:08.423862+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-13T19:33:34.807397+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:33:41.197344+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T19:33:54.452355+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A089483d8-08d8-4608-aec1-944e859ac6b6
+- at: 2026-11-13T19:35:25.796536+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+- at: 2026-11-13T19:35:26.571663+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:38:53.112002+00:00
+  actor: claude
+  changes:
+  - field: comment_added

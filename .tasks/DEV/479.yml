@@ -1,11 +1,11 @@
 title: Sandboxed agent checks cannot start configured sccache
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: codex
 assignee: '@merge'
 created: 2026-11-13T19:16:59.162304+00:00
-modified: 2026-11-13T19:22:59.085769+00:00
+modified: 2026-11-13T19:26:25.575869+00:00
 relationships:
   related:
   - DEV-467
@@ -16,6 +16,9 @@ comments:
 - date: 2026-11-13T19:22:51.654523+00:00
   author: codex
   text: 'Review: passed. Reviewed ef985f19 against main, ticket and comments, related DEV-467 owner request and verification history, AGENTS.md, testing/review/instruction guidance, and last five main commits touching the skill. Only one guidance bullet changes; no blocking findings. Independently reproduced restricted sccache Operation not permitted, then reran the identical npm run test:rust -- pending_outcome_tests with approved unsandboxed execution: compilation completed successfully in 2m06s; nextest exited 4 because this branch has zero matching tests (2133 skipped), as disclosed by the fix agent. This verifies the authorized retry clears the sandbox blocker, not a Rust test pass. Prettier and git diff --check pass. Full lint/test/smoke not run for this documentation-only change. No files, commits, status or assignee changed.'
+- date: 2026-11-13T19:26:17.263547+00:00
+  author: codex
+  text: 'Merged ef985f19 into main by fast-forward, then included pending .tasks records as requested in signed amended commit 4126330d. Rebase was already current. Documentation checks passed: Prettier and git diff --check; full application gates not applicable to this one-bullet guidance change. Main-checkout health command npm run test:rust -- pending_outcome_tests rerun with approved execution: compiled successfully in 2m30s, no sccache denial; nextest exited 4 for zero matching tests (2133 skipped), the already-reviewed filter limitation because DEV-467 is not landed. No test pass claimed. Not pushed: main acquired concurrent .tasks edits after amendment, so clean-checkout push condition is unmet. No status or assignee change; job-end automation handles completion.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A76b9a6d9-371b-49cb-aef3-3751a429aef9
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A567c5784-c61c-4ba9-aa1e-9373b3281926
@@ -78,3 +81,13 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-13T19:26:17.263547+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:26:25.575869+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

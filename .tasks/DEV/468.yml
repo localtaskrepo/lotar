@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: claude
 created: 2026-11-13T10:33:47.729859+00:00
-modified: 2026-11-13T19:23:24.548335+00:00
+modified: 2026-11-13T19:40:30.387965+00:00
 relationships:
   related:
   - DEV-342
@@ -46,12 +46,43 @@ comments:
 - date: 2026-11-13T19:23:24.548335+00:00
   author: automation
   text: The review found blocking problems again after one rework (the comments above). Should an agent rework it once more (lotar assignee DEV-468 @fix), will you decide the findings, or is it WontDo?
+- date: 2026-11-13T19:23:58.941116+00:00
+  author: triage
+  text: 'Triage: answered already, no owner decision needed. Owner decision 2026-11-13 (INBOX-28 comment 19:19Z, same answer on DEV-466 via INBOX-29): rework more than once is fine, no endless loop; on round 2 or 3 consider a stronger model before cutting off (DEV-466 handles that shared policy). The 19:23Z automation question repeats the one he answered at 19:19Z. Next: @fix reworks the one open finding (a failed ticket-branch move, e.g. branch checked out elsewhere, must fail finalize_job or stop on the stale branch, with a refused-update regression test). Keep ccc96841 (fallback-commit order is fixed). Assigning @fix.'
+- date: 2026-11-13T19:24:24.856418+00:00
+  author: codex
+  text: Acknowledged the approved rework. This thread will preserve ccc96841, propagate ticket-branch synchronization refusal into failed finalization, and add a refused-update regression before running the required gates. No new owner decision is needed.
+- date: 2026-11-13T19:31:14.849977+00:00
+  author: codex
+  text: 'Rework implemented: follow_thread_branch returns its error, and finalize_job marks synchronization refusal as a failed job after the fallback commit. Regression first failed with completed instead of failed when agent/REPO-1 was checked out elsewhere; now passes and verifies the stale branch remains unchanged and the fallback commit is retained. Existing T3 worktree fixture needed a real branch matching its fake report under the stricter check. Lint passed; full tests and build-first smoke still running.'
+- date: 2026-11-13T19:35:30.290108+00:00
+  author: codex
+  text: 'Rework complete in signed commit 9d77abc6, preserving ccc96841 as its parent. Refused ticket-branch synchronization now fails finalize_job with the reason, preventing job_completed advancement on a stale branch. Added a refused-update regression (ticket branch checked out elsewhere) that failed before the fix with completed instead of failed; it checks failure, unchanged ticket tip and preserved fallback commit. Corrected an older fake T3 fixture to create the branch/worktree it reports; updated help. Final checks passed: npm run lint:agent; npm run test:agent (2133 Rust, 1513 UI, 47 release, 7 hooks); npm run test:smoke:agent (387 smoke); git diff --check. Initial test attempt exposed the old fixture and was rerun successfully after correction. Checks required sandbox escalation for sccache. No push, merge, status or assignee change. Job automation handles the next step. No durable guidance finding.'
+- date: 2026-11-13T19:37:15.359689+00:00
+  author: codex
+  text: 'Review: passed. Reviewed both commits against main, full diff, ticket/comments, related tickets, guidance and recent main history. No findings or minor tickets. Refused branch synchronization now fails finalization; regression verifies unchanged ticket tip and preserved fallback commit. Ordering fix retained. git diff --check passed. Focused dev318 Rust suite could not start: sccache Operation not permitted. Full lint/tests/smoke not independently rerun; implementation reports passing. No files, commits, status or assignee changed.'
+- date: 2026-11-13T19:37:29.874406+00:00
+  author: automation
+  text: The review found blocking problems again after one rework (the comments above). Should an agent rework it once more (lotar assignee DEV-468 @fix), will you decide the findings, or is it WontDo?
+- date: 2026-11-13T19:38:54.003059+00:00
+  author: triage
+  text: 'Triage: no owner decision needed, the 19:37Z question is stale. (1) The review at 19:37Z PASSED with no findings (codex comment above: both commits ccc96841 and 9d77abc6 reviewed, refused-branch-sync finding fixed). (2) The automation asked its ''blocked again, rework once more?'' question anyway because the old tag review-blocked from the 11:01Z review was never removed (the escalation rule leaves both review-blocked and review-returned on the ticket). (3) The owner already allowed more rework rounds (mallox 2026-11-13, INBOX-28; same on DEV-466 via INBOX-29), so nothing is left for him here. Next: remove the stale tag (lotar task edit DEV-468 --remove-tag review-blocked), then continue as after a passed review: assignee @merge. The tag rule is filed as a standards ticket.'
+- date: 2026-11-13T19:39:14.041397+00:00
+  author: codex
+  text: 'Acknowledged triage: the 19:37 review passed for ccc96841 and 9d77abc6; the escalation was caused by the stale review-blocked tag. Removed that tag and handing the passed work to @merge as requested. No code changes, new commits or tests in this routing turn; prior verification limits remain recorded in the review.'
+- date: 2026-11-13T19:40:22.077030+00:00
+  author: codex
+  text: 'Merge blocked: rebasing ccc96841 and 9d77abc6 onto current main conflicts in tests/dev318_t3_runner_test.rs with the newer continued-thread fixture/coverage. Aborted the rebase; both commits and main work remain preserved, with no code changes or merge. Next: reconcile the fake T3 per-thread worktree reporting and both sets of regression tests, then rerun required lint/tests/smoke before fast-forwarding main. No tests ran in this merge attempt. Returning to reporter for integration follow-up.'
+- date: 2026-11-13T19:40:30.116458+00:00
+  author: automation
+  text: The merge agent's job job-20261113T193938.781Z-34 failed (lotar agent logs job-20261113T193938.781Z-34); the fix agent retries it on branch t3/fix-rework-commits-ticket-branch.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1ab3c1d7-0ce9-4c25-a520-275cf8b42ec4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae7d11a9f-4237-40dd-a146-a91f4cc63276
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab144db0b-cd5a-4b5a-8c17-60dd941c7848
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aedb44bfa-f5c3-49bc-92d4-425790a0c62e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0b8adae8-1b60-44f1-813b-ca071e380fad
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A155afdd3-43ca-4967-a6ae-9899afe01599
 description: |-
   DEV-465's own run on 2026-11-13 shows reviews reading an obsolete commit. The rework after the first blocking review committed `af60ab9c` on a branch T3 Code named for that thread (`t3/failed-merge-landed-skip-fix`), not on `agent/DEV-465`. `agent/DEV-465` stayed at the first fix `ca054282`. Later `session: fresh` review threads checked out `ca054282` and blocked twice on code that main (9921ee06) had already replaced. That sent the ticket to the owner's inbox (INBOX-22, INBOX-23, INBOX-24 within 7 minutes), and the triage agent had to explain that the work was already on main. One fix ended up on six branches: agent/DEV-465, t3/failed-merge-job-already-on-main, t3/failed-merge-already-landed, t3/failed-merge-work-on-main, t3/failed-merge-landed-skip-fix, t3/failed-merge-landed-work.
 
@@ -71,7 +102,7 @@ description: |-
 tags:
 - health
 - review-returned
-- review-blocked
+- merge-retried
 custom_fields:
   finding: comms:rework-off-ticket-branch
 history:
@@ -280,3 +311,129 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-13T19:23:58.941116+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:23:59.634062+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-13T19:24:02.078101+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-13T19:24:24.856418+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:31:14.849977+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:35:30.290108+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:35:37.670563+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T19:35:45.739138+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A155afdd3-43ca-4967-a6ae-9899afe01599
+- at: 2026-11-13T19:37:15.359689+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:37:29.232310+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+- at: 2026-11-13T19:37:29.874406+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:38:54.003059+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:38:54.109630+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-13T19:38:54.761385+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-13T19:39:14.041397+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:39:34.010677+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: health, review-returned, review-blocked
+    new: health, review-returned
+- at: 2026-11-13T19:39:37.924928+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+- at: 2026-11-13T19:39:38.092281+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-13T19:39:39.764009+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+- at: 2026-11-13T19:40:22.077030+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:40:30.051131+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, review-returned
+    new: health, review-returned, merge-retried
+- at: 2026-11-13T19:40:30.116458+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:40:30.387965+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: claude
