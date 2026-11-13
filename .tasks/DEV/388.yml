@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T20:50:49.799402+00:00
-modified: 2026-11-13T08:26:38.330622+00:00
+modified: 2026-11-14T00:20:36.102586+00:00
 relationships:
   depends_on:
   - DEV-385
@@ -38,6 +38,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A17cafb4c-9478-44d7-a563-ba3bd10c3bf5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A53509f36-6904-4ae5-b2e0-4c118df9483b
+releases:
+- 2
 description: |-
   DEV-386 added cross-repo prerequisites (`depends_on: [lotar:DEV-374]`, resolved through the global `repos` setting). The other repo never learns about the dependent, so DEV-385's `unblocked` hook, which fires on a local prerequisite's close, never fires for them.
 
@@ -248,3 +250,8 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-14T00:20:36.102586+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#2'

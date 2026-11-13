@@ -1,11 +1,11 @@
 title: 'Create harnessmux: a Rust crate and CLI that run agent CLI sessions over ACP'
-status: InProgress
+status: HelpNeeded
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-13T22:45:12.815612+00:00
-modified: 2026-11-13T23:11:50.027428+00:00
+modified: 2026-11-14T00:30:41.988177+00:00
 relationships:
   blocks:
   - DEV-503
@@ -19,6 +19,42 @@ comments:
 - date: 2026-11-13T23:11:50.027428+00:00
   author: claude
   text: 'Owner decision 2026-11-13 (on DEV-492), on grouping chats under their projects: "harnessmux only". Add to scope: every session records its project (the repo it belongs to, from git''s common dir, also when cwd is a worktree) next to its cwd; list and attach filter by project; the t3 agent starts threads in that T3 project; the event stream carries it so lotar''s UI can group by it. Claude and Codex get no project of their own: Claude files a session by its cwd (a worktree is its own project; docs: code.claude.com/docs/en/sessions.md), and Codex''s app keeps project assignments in its own state with no public app-server request to set one (codex-cli 0.169). No upstream requests (his choice).'
+- date: 2026-11-14T00:07:13.062402+00:00
+  author: claude
+  text: |-
+    Done except the crates.io publish (question below).
+
+    Built: https://github.com/localtaskrepo/harnessmux (public, MIT, README, LICENSE, AGENTS.md, CHANGELOG). Commits on its main: da4e176 (first version), 768420c, 8daffc1 and c143d0d (fixes CI found on Windows; v0.1.0 is c143d0d). CI is green on Linux, macOS and Windows (fmt, clippy -D warnings, cargo deny, nextest). Release v0.1.0 is out on GitHub Releases: binaries for Linux musl x64/arm64, macOS arm64/x64, Windows x64/arm64, with SHA256SUMS; the macOS arm64 binary was downloaded, checked and run. `cargo publish --dry-run` passes. lotar: this branch has 24fea9c6, the design doc updated with the two later decisions (t3 agent, projects); Prettier checked, no code change in lotar.
+
+    What it does: named sessions with a registry and a versioned JSONL event log (v1; every event carries session, project, seq, turn, raw); the owner (a linking process, or `harnessmux serve` started in the background by the CLI) holds the ACP connection and serves a Unix socket or Windows named pipe for send, cancel, answer, set, status, close; idle TTL 30 min, then the next send resumes (session/resume, else session/load); model, effort (low…max) and permissions (read-only, workspace, full) mapped from agents.toml, read at run time and overridable per user; a permission policy (deny, allow-reads, allow, ask + `answer`); MCP servers per session; `capabilities`; `harnessmux mcp` (start, send, wait, cancel, status, list, close for child sessions); `run --record` and `replay` for recorded sessions; project per session from git's common dir (a worktree belongs to its repo), `list --project` and `attach --project`. Pinned adapters are installed with npm into harnessmux's data dir on first use. The agent-client-protocol crate is 5.2.0 (with its `unstable_end_turn_token_usage` feature for token counts in turn.finished).
+
+    Ran live on 2026-11-13 (owner's Mac, his sign-ins, scratch HARNESSMUX_HOME):
+    - claude (claude-agent-acp 0.107.0): capabilities (resume, load, list, close; options mode, model, effort, fast, ultracode, agent); two turns that remember; model, effort and mode applied; owner killed with -9 and the adapter killed, then `send` resumed through session/resume and still remembered; cancel during a long turn ended `cancelled`, exit 2; a model it doesn't list is refused with its list.
+    - codex (codex-acp 2.6.0): capabilities (resume, load; reasoning_effort low…max and ultra, mode read-only/workspace-write/agent/agent-full-access); two turns; effort applied.
+    - copilot (1.0.111, `--acp --stdio`): capabilities (load, no resume; modes are URLs; model only `auto`); one turn with `--model auto`. Without it the account's default model failed and Copilot sent the error as an ordinary reply ("Error: Execution failed: Model gpt-5.4 is not available"); harnessmux now reports that as turn.failed, exit 1.
+    - t3 (T3 Code 0.1.9): a thread "DEV-504 harnessmux t3 live check" started in lotar's T3 project with --provider claudeAgent --model claude-haiku-5-5, and a second turn in it. That thread is still in T3.
+    - Not run live, set up from their docs: gemini, cursor, droid, opencode, kilo, antigravity, amp. Not tried live either: a permission request (Claude's own settings allowed the command, so none came; covered by a recorded test), MCP servers passed to a real agent, interactive attach, `harnessmux mcp` against a real agent.
+
+    Found on the way: a user table entry that set `command` kept the built-in pinned adapter, so a "replay" test ran the real Claude; a user command now replaces the adapter. On Windows the background owner inherited the CLI's stdout/stderr, so anyone reading `harnessmux run` output waited 30 minutes; fixed. `interprocess` pulled in 0BSD crates that deny.toml doesn't allow; replaced by tokio's sockets and pipes instead of adding a license.
+
+    What DEV-503 (the lotar switch) needs:
+    1. The dependency: `harnessmux = "0.1"` once it is on crates.io (question below). A git dependency would need an allow-git entry in lotar's deny.toml.
+    2. Profile conversion AgentProfileDetail -> harnessmux::Profile: model, effort (lotar's free string becomes Effort; anything else is an error), permissions, mcp (lotar's own `lotar mcp` as a stdio server), writable dirs -> add_dirs, env; for t3 provider, worktree base, branch, title. No ACP equivalent: max_budget_usd, tools.allowed/disallowed, a profile's own `args`/`command` for ACP agents (those go into an agents.toml override).
+    3. Jobs: Session::start (name = ticket id, so `session: continue` is Session::open/resume of that name), Session::events() -> job events (message, tool.started, usage, turn.finished -> AgentJobUsage, turn.failed), cancel, send for the message box, answer for permission requests shown as questions. Choose the job permission policy (allow for workspace/full is the default).
+    4. Restarts: lotar's sessions die with its process; on start, resume the sessions of running jobs (Session::resume). Pass idle_ttl None while a job holds the session.
+    5. Remove the per-CLI runners, stream parsers, fixtures and the t3 runner; `runner: t3` becomes the t3 agent. T3's CLI can't cancel a thread (harnessmux stops waiting, the thread keeps running) and has no effort or child threads.
+    6. lotar's sessions live in the same state dir as the CLI's, so `harnessmux list/attach/send` reach them.
+
+    Not done: adding harnessmux to standards repos.json (another repo; the daily repo-health check covers public repos listed there).
+- date: 2026-11-14T00:07:25.575604+00:00
+  author: claude
+  text: 'Question for mallox: the last step of "Done when" is the crate on crates.io, and only you can make the crates.io token (no token exists in opgate; lotar is not on crates.io either). Publishing is permanent: a version can be yanked but never removed. Which way? (a, recommended) You create an API token on crates.io (Account settings > API tokens, scopes publish-new and publish-update, crate harnessmux) and put it in the Agents vault as an opgate entry "crates-io"; an agent then runs `cargo publish` for 0.1.0 through opgate and sets up crates.io Trusted Publishing, so later releases publish from release.yml without a token. (b) You run `cargo login` and `cargo publish` yourself in ~/Development/@localtaskrepo/harnessmux. (c) No crates.io for now: lotar (DEV-503) depends on the git tag v0.1.0, which needs an allow-git entry in lotar''s deny.toml.'
+- date: 2026-11-14T00:10:05.340571+00:00
+  author: claude
+  text: 'Later on harnessmux main, after v0.1.0: b27e7fe, a session whose agent fails to start no longer leaves its socket file behind (test first, CI green on all three systems; CHANGELOG under Unreleased). Whoever publishes to crates.io should tag 0.1.1 from main rather than publish the 0.1.0 tag.'
+- date: 2026-11-14T00:30:41.988177+00:00
+  author: claude
+  text: 'mallox 2026-11-13: "Okay I created a token under the 1password item LoTaR Crates.io publish token ... We can now publish any lotar rust package there". harnessmux 0.1.1 (044d7a9, socket fix) is tagged and on GitHub Releases (6 binaries + SHA256SUMS, CI green). `cargo publish` through opgate with that token was refused by crates.io: "A verified email address is required to publish crates to crates.io" (https://crates.io/settings/profile). Waiting for the email verification, then `cargo publish` of 0.1.1 again; nothing reached crates.io yet.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1d141b3f-b2f2-448d-b3f0-5ea7a2827f40
 description: 'Approved design: docs/developers/harness-tool-design.md (DEV-492; on main once DEV-492 merges, until then on branch agent/DEV-492). The owner, 2026-11-13, approved it and chose "Start now" for this ticket, including creating the public GitHub repo. Create ~/Development/@localtaskrepo/harnessmux and the public repo localtaskrepo/harnessmux (MIT, like lotar; self-contained: set up, checked and run from a clone alone, shared configs from ~/Development/standards copied in). Build on ACP with the agent-client-protocol crate at its latest stable release (look it up, 5.2.0 on 2026-11-13). What it does, from the design: session registry with names; the session owner (lotar''s process or a harnessmux process) holds the ACP connection and serves a Unix socket (named pipe on Windows) for send, cancel, answer, set, status; resume via session/resume, fallback session/load; one mapping for model, effort and permissions (read-only, workspace, full); a versioned JSONL event stream; MCP servers per session; capabilities; the agent table (command, pinned adapter version, option ids) as TOML data read at run time. CLI: run, send, attach, resume, cancel, answer, set, list, status, close, capabilities, mcp. Agents: every one lotar runs today (claude, codex, copilot, gemini, cursor, amp without ACP as a legacy adapter, droid, opencode, kilo, antigravity); live-check Claude, Codex and Copilot (installed here), the rest from their docs, marked as not run live. Lessons from the acpx trial in the design doc: pin current adapters (codex-acp 1.x failed, 2.6.0 works), adapter errors sent as text become turn.failed. Tests from recorded ACP sessions; CI on macOS, Linux and Windows. Done when: the repo exists with README, LICENSE and CI passing, a first release of the crate and CLI is out, and a comment lists what ran live and what DEV-503 (the lotar switch) needs.'
@@ -56,6 +92,31 @@ history:
   changes:
   - field: comment_added
 - at: 2026-11-13T23:11:50.027428+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T00:07:13.062402+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T00:07:25.575604+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T00:10:05.340571+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T00:10:22.181449+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-14T00:30:41.988177+00:00
   actor: claude
   changes:
   - field: comment_added

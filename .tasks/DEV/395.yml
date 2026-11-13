@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T20:54:22.994464+00:00
-modified: 2026-11-12T22:10:38.681122+00:00
+modified: 2026-11-14T00:20:36.373227+00:00
 relationships:
   related:
   - DEV-373
@@ -39,6 +39,8 @@ references:
 - file: view/composables/useFilterOptions.ts
 - file: src/mcp/server/hints.rs
 - file: view/components/task-panel/TaskPanelCustomFieldsSection.vue
+releases:
+- 2
 description: |-
   Three small gaps in version support that make version fields harder to use than they need to be. Found by claude in an audit of version support, 2026-11-12.
 
@@ -117,3 +119,8 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-14T00:20:36.373227+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#2'

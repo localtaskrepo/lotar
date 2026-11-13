@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T19:12:53.152773+00:00
-modified: 2026-11-12T19:25:52.543744+00:00
+modified: 2026-11-14T00:20:35.842850+00:00
 relationships:
   related:
   - DEV-373
@@ -21,6 +21,8 @@ comments:
   text: 'claude: Merged. Rebased agent/DEV-379 onto main (1a6a46b, DEV-378) with no conflicts, fast-forwarded main to b8484d2, and committed ticket files as 41c1a45 ''DEV-379 Ticket updates'' (DEV-373, 375, 377, 378, 379, 380, 381). Not pushed: main also holds DEV-378''s unpushed commit 1a6a46b, which waits for its own session. Checks after the rebase: npm run lint, npm test (2065 Rust + 1469 UI) and npm run smoke (381) pass. The ticket''s check command (build:smoke, then the spec) passed 3 runs in a row.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae3020e0d-e4a9-4233-bea7-0941358c96f0
+releases:
+- 2
 description: |-
   ## Found
 
@@ -86,3 +88,8 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-14T00:20:35.842850+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#2'

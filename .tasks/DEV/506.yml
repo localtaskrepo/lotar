@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T23:16:21.313989+00:00
-modified: 2026-11-13T23:55:41.361740+00:00
+modified: 2026-11-14T00:20:38.269735+00:00
 relationships:
   related:
   - DEV-495
@@ -23,6 +23,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3666565f-d65d-4b5b-bda0-e36206a47bc1
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b0e3e88-d860-4cb2-9003-4d61f98dbd31
+releases:
+- 5
 description: 'Found: scripts/__pycache__/check-test-coverage.cpython-314.pyc and scripts/tests/__pycache__/test_check_test_coverage.cpython-314.pyc have been tracked since 1f0c9de7, and .gitignore has no __pycache__ entry. The DEV-495 review job''s auto-commit (952950c3) added the cpython-315 versions. Check: git ls-files | grep __pycache__ lists nothing, and .gitignore ignores __pycache__/. Done: tracked .pyc files removed, __pycache__/ ignored.'
 tags:
 - health
@@ -98,3 +100,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-14T00:20:38.269735+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#5'

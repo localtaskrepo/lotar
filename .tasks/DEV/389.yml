@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T20:52:33.189344+00:00
-modified: 2026-11-12T23:59:31.836533+00:00
+modified: 2026-11-14T00:20:36.142173+00:00
 relationships:
   depends_on:
   - DEV-386
@@ -25,6 +25,8 @@ comments:
   text: 'claude: Merged. Rebased agent/DEV-389 onto main (f0b34c3). One conflict in docs/help/task.md: main (DEV-388) reworded the sentence about the other repo not notifying this one, and this branch replaced the ''web UI lists these like other IDs'' sentence. I kept both: the new web UI paragraph followed by main''s wording. Checks after the rebase: npm run lint passed, npm test passed (2108 Rust, 1505 UI), npm run smoke passed (385). Fast-forwarded main to cbcc1ff, committed ticket files as 6cacd9a (DEV-389 Ticket updates, including DEV-388''s ticket file), and pushed both to origin/main (f0b34c3..6cacd9a).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Add47aab2-5009-4849-a754-cffb5eb15e59
+releases:
+- 2
 description: |-
   DEV-386 lets depends_on and related name a task in another repo's LoTaR (repo name, a colon, the ID; see docs/help/task.md, Tasks in another repo). The CLI shows them with status, title and link; the web task panel still lists them like local IDs, so a chip links to a task that does not exist here.
 
@@ -116,3 +118,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-386"],"related":["DEV-388","DEV-374"]}'
     new: '{"depends_on":["DEV-386"],"related":["DEV-388","DEV-374","DEV-399"]}'
+- at: 2026-11-14T00:20:36.142173+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#2'

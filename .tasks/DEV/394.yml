@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T20:54:22.216856+00:00
-modified: 2026-11-12T22:10:29.735781+00:00
+modified: 2026-11-14T00:20:36.336158+00:00
 relationships:
   related:
   - DEV-373
@@ -33,6 +33,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa8e0c08-a022-42ea-b8e6-8c47e4f8181f
 - file: view/pages/TasksList.vue
 - file: view/pages/Board.vue
+releases:
+- 2
 description: |-
   Setting a custom field on many tickets takes one edit per ticket in the web UI, and the Board can't group by a custom field. With version fields (DEV-373), "set `fixed_in=0.15.0` on these 15 tickets" and "a board per `fixed_in`" are common needs. Found by claude in an audit of version support, 2026-11-12.
 
@@ -125,3 +127,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-373","DEV-393","DEV-390","DEV-396"]}'
     new: '{"related":["DEV-373","DEV-393","DEV-390","DEV-396","DEV-395"]}'
+- at: 2026-11-14T00:20:36.336158+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#2'

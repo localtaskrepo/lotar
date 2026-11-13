@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T20:54:20.317536+00:00
-modified: 2026-11-12T22:10:29.734979+00:00
+modified: 2026-11-14T00:20:36.218503+00:00
 relationships:
   related:
   - DEV-373
@@ -27,6 +27,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A04006dc7-f937-493d-81e9-819ca8ab91a0
 - file: src/cli/handlers/stats/custom.rs
 - file: src/cli/handlers/stats/common.rs
+releases:
+- 2
 description: |-
   `lotar stats custom-field --field affects` counts every ticket that holds a list of versions under one value, `[array]`, and ranks values by count, not version. So the stats can't answer "how many tickets does 0.13.2 affect". Found by claude in an audit of version support, 2026-11-12.
 
@@ -136,3 +138,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-373","DEV-374","DEV-385","DEV-392","DEV-397","DEV-390","DEV-396"]}'
     new: '{"related":["DEV-373","DEV-374","DEV-385","DEV-392","DEV-397","DEV-390","DEV-396","DEV-395"]}'
+- at: 2026-11-14T00:20:36.218503+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#2'

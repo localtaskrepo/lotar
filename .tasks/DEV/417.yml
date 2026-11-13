@@ -1,8 +1,155 @@
-title: Release v0.14.4
+title: Release v0.15.0
 status: Todo
 priority: Medium
 type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-13T07:10:08.883832+00:00
-description: 'Next release. The owner picks the bump; rename this ticket if it differs (the title must start with ''Release v''). Steps: .github/skills/release/SKILL.md and docs/release-guide.md. Done when the release is installed here. Tickets that wait for this release are Blocked and depend on it; closing this ticket hands them to @fix to run their checks. Waiting now: none.'
+modified: 2026-11-14T00:28:17.250958+00:00
+relationships:
+  depends_on:
+  - DEV-482
+  - DEV-502
+  - DEV-488
+  - DEV-489
+  - DEV-490
+  - DEV-497
+  related:
+  - DEV-418
+  - DEV-419
+  - DEV-464
+  - DEV-472
+  - DEV-476
+  - DEV-478
+  - DEV-480
+  - DEV-482
+  - DEV-486
+  - DEV-488
+  - DEV-494
+  - DEV-497
+  - DEV-502
+  - DEV-493
+comments:
+- date: 2026-11-14T00:18:44.424046+00:00
+  author: claude
+  text: 'mallox in the thread (2026-11-14): minor bump, so v0.15.0. Scope: DEV-482 (signing), DEV-502 (comment filters), DEV-488/489/490 (question, review and hand-off comments) and DEV-497 (cargo workspace step 1) go into this release. Releases: "Track and use now": track `.tasks/@releases/` in git, record 0.14.0 to 0.14.3 as released and 0.15.0 as planned, with their DEV tickets.'
+- date: 2026-11-14T00:28:17.075713+00:00
+  author: claude
+  text: |-
+    Prepared (2026-11-14):
+    - Waiting for this release: LOCA-313 (depends on lotar DEV-482 and DEV-417) and STD-100 (depends on lotar DEV-488 and DEV-417).
+    - Scope as depends-on: DEV-482, DEV-502, DEV-488, DEV-489, DEV-490, DEV-497. DEV-482: removed its loop with LOCA-313, rebased (bd1d61c1, checks pass), Codex review running. DEV-502, DEV-497: reworked by @fix (owner chose them). DEV-488 waits for DEV-502, DEV-489/490 for DEV-488 (DEV-490 set from HelpNeeded to Blocked so it continues by itself).
+    - Release records: `.tasks/@releases/` tracked (`.gitignore`), releases 0.14.0 to 0.14.3 recorded as released with their DEV tickets, 0.15.0 planned with 30 tickets. Steps added to the release skill and docs/release-guide.md (Release records). The rules copy `.tasks/DEV/automation.yml` updated from standards (STD-109, owner OK), `lotar trust` rerun.
+    - Uncommitted in the main checkout: those files; they go into the version bump commit.
+    - Also in 0.15.0 but HelpNeeded on mallox: DEV-478 and DEV-493 (code on main; their merge jobs asked to rerun checks with localhost access).
+    Next: when the six are Done, the release steps (bump to 0.15.0, QA, tag with the owner OK).
+releases:
+- 5
+description: |-
+  Next lotar release, a **minor** bump to v0.15.0: the owner asked for a minor because it brings new features (2026-11-14, "This is a minor version bump as this introduces a bunch new features").
+
+  Steps: `.github/skills/release/SKILL.md` and `docs/release-guide.md`. Tickets that wait for this release are Blocked and depend on it; closing this ticket hands them to @fix to run their checks.
+
+  ## On main since v0.14.3
+
+  25 tickets, among them DEV-418 (relationships on board cards), DEV-419 (phone layout for Board and Tasks), DEV-464 (releases follow-ups), DEV-494 (`lotar add --depends-on` and the other relationship options), DEV-486, DEV-472, DEV-476, DEV-478, DEV-480 (agent job fixes).
+
+  ## Waiting for this release
+
+  - LOCA-313 (local): the check that macOS keeps its grants after a `brew upgrade` needs a Developer ID signed release, which needs DEV-482 in it.
+  - STD-100 (standards): needs the question comments of DEV-488, if DEV-488 ships in this release.
+
+  ## Open before the release
+
+  - [ ] Owner decides which in-flight tickets go in (DEV-482, DEV-502, DEV-488/489/490, DEV-497).
+  - [ ] Those are merged on main.
+  - [ ] Version bump, QA green, signed tag (owner OK), Release workflow green, `brew upgrade lotar` here.
+history:
+- at: 2026-11-14T00:16:07.574371+00:00
+  actor: claude
+  changes:
+  - field: title
+    old: Release v0.14.4
+    new: Release v0.15.0
+  - field: description
+    old: 'Next release. The owner picks the bump; rename this ticket if it differs (the title must start with ''Release v''). Steps: .github/skills/release/SKILL.md and docs/release-guide.md. Done when the release is installed here. Tickets that wait for this release are Blocked and depend on it; closing this ticket hands them to @fix to run their checks. Waiting now: none.'
+    new: |-
+      Next lotar release, a **minor** bump to v0.15.0: the owner asked for a minor because it brings new features (2026-11-14, "This is a minor version bump as this introduces a bunch new features").
+
+      Steps: `.github/skills/release/SKILL.md` and `docs/release-guide.md`. Tickets that wait for this release are Blocked and depend on it; closing this ticket hands them to @fix to run their checks.
+
+      ## On main since v0.14.3
+
+      25 tickets, among them DEV-418 (relationships on board cards), DEV-419 (phone layout for Board and Tasks), DEV-464 (releases follow-ups), DEV-494 (`lotar add --depends-on` and the other relationship options), DEV-486, DEV-472, DEV-476, DEV-478, DEV-480 (agent job fixes).
+
+      ## Waiting for this release
+
+      - LOCA-313 (local): the check that macOS keeps its grants after a `brew upgrade` needs a Developer ID signed release, which needs DEV-482 in it.
+      - STD-100 (standards): needs the question comments of DEV-488, if DEV-488 ships in this release.
+
+      ## Open before the release
+
+      - [ ] Owner decides which in-flight tickets go in (DEV-482, DEV-502, DEV-488/489/490, DEV-497).
+      - [ ] Those are merged on main.
+      - [ ] Version bump, QA green, signed tag (owner OK), Release workflow green, `brew upgrade lotar` here.
+- at: 2026-11-14T00:16:07.733573+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-418","DEV-419","DEV-464","DEV-472","DEV-476","DEV-478","DEV-480","DEV-482","DEV-486","DEV-488","DEV-494","DEV-497","DEV-502"]}'
+- at: 2026-11-14T00:18:44.424046+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T00:19:40.587080+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-418","DEV-419","DEV-464","DEV-472","DEV-476","DEV-478","DEV-480","DEV-482","DEV-486","DEV-488","DEV-494","DEV-497","DEV-502"]}'
+    new: '{"depends_on":["DEV-482"],"related":["DEV-418","DEV-419","DEV-464","DEV-472","DEV-476","DEV-478","DEV-480","DEV-482","DEV-486","DEV-488","DEV-494","DEV-497","DEV-502"]}'
+- at: 2026-11-14T00:19:40.852846+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-482"],"related":["DEV-418","DEV-419","DEV-464","DEV-472","DEV-476","DEV-478","DEV-480","DEV-482","DEV-486","DEV-488","DEV-494","DEV-497","DEV-502"]}'
+    new: '{"depends_on":["DEV-482","DEV-502"],"related":["DEV-418","DEV-419","DEV-464","DEV-472","DEV-476","DEV-478","DEV-480","DEV-482","DEV-486","DEV-488","DEV-494","DEV-497","DEV-502"]}'
+- at: 2026-11-14T00:19:41.112871+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-482","DEV-502"],"related":["DEV-418","DEV-419","DEV-464","DEV-472","DEV-476","DEV-478","DEV-480","DEV-482","DEV-486","DEV-488","DEV-494","DEV-497","DEV-502"]}'
+    new: '{"depends_on":["DEV-482","DEV-502","DEV-488"],"related":["DEV-418","DEV-419","DEV-464","DEV-472","DEV-476","DEV-478","DEV-480","DEV-482","DEV-486","DEV-488","DEV-494","DEV-497","DEV-502"]}'
+- at: 2026-11-14T00:19:41.386715+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-482","DEV-502","DEV-488"],"related":["DEV-418","DEV-419","DEV-464","DEV-472","DEV-476","DEV-478","DEV-480","DEV-482","DEV-486","DEV-488","DEV-494","DEV-497","DEV-502"]}'
+    new: '{"depends_on":["DEV-482","DEV-502","DEV-488","DEV-489"],"related":["DEV-418","DEV-419","DEV-464","DEV-472","DEV-476","DEV-478","DEV-480","DEV-482","DEV-486","DEV-488","DEV-494","DEV-497","DEV-502"]}'
+- at: 2026-11-14T00:19:41.649260+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-482","DEV-502","DEV-488","DEV-489"],"related":["DEV-418","DEV-419","DEV-464","DEV-472","DEV-476","DEV-478","DEV-480","DEV-482","DEV-486","DEV-488","DEV-494","DEV-497","DEV-502"]}'
+    new: '{"depends_on":["DEV-482","DEV-502","DEV-488","DEV-489","DEV-490"],"related":["DEV-418","DEV-419","DEV-464","DEV-472","DEV-476","DEV-478","DEV-480","DEV-482","DEV-486","DEV-488","DEV-494","DEV-497","DEV-502"]}'
+- at: 2026-11-14T00:19:41.914840+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-482","DEV-502","DEV-488","DEV-489","DEV-490"],"related":["DEV-418","DEV-419","DEV-464","DEV-472","DEV-476","DEV-478","DEV-480","DEV-482","DEV-486","DEV-488","DEV-494","DEV-497","DEV-502"]}'
+    new: '{"depends_on":["DEV-482","DEV-502","DEV-488","DEV-489","DEV-490","DEV-497"],"related":["DEV-418","DEV-419","DEV-464","DEV-472","DEV-476","DEV-478","DEV-480","DEV-482","DEV-486","DEV-488","DEV-494","DEV-497","DEV-502"]}'
+- at: 2026-11-14T00:20:37.208748+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#5'
+- at: 2026-11-14T00:28:17.075713+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T00:28:17.250958+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-482","DEV-502","DEV-488","DEV-489","DEV-490","DEV-497"],"related":["DEV-418","DEV-419","DEV-464","DEV-472","DEV-476","DEV-478","DEV-480","DEV-482","DEV-486","DEV-488","DEV-494","DEV-497","DEV-502"]}'
+    new: '{"depends_on":["DEV-482","DEV-502","DEV-488","DEV-489","DEV-490","DEV-497"],"related":["DEV-418","DEV-419","DEV-464","DEV-472","DEV-476","DEV-478","DEV-480","DEV-482","DEV-486","DEV-488","DEV-494","DEV-497","DEV-502","DEV-493"]}'

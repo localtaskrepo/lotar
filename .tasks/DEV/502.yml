@@ -1,20 +1,22 @@
 title: Filter the Comments and History tabs by author and type
-status: HelpNeeded
+status: Merging
 priority: Low
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@merge'
 created: 2026-11-13T22:41:10.367004+00:00
-modified: 2026-11-13T23:54:50.913523+00:00
+modified: 2026-11-14T00:37:50.162770+00:00
 relationships:
   blocks:
   - DEV-488
+  - DEV-417
   related:
   - DEV-466
   - DEV-488
   - DEV-489
   - DEV-490
   - DEV-491
+  - DEV-417
 comments:
 - date: 2026-11-13T23:05:36.846916+00:00
   author: claude
@@ -49,6 +51,15 @@ comments:
 - date: 2026-11-13T23:54:50.913523+00:00
   author: automation
   text: The review found blocking problems again after one rework (the comments above). Should an agent rework it once more (lotar assignee DEV-502 @fix), will you decide the findings, or is it WontDo?
+- date: 2026-11-14T00:19:09.388506+00:00
+  author: claude
+  text: 'mallox in the thread (2026-11-14): this goes into v0.15.0 (DEV-417), so an agent reworks it once more (his answer to the question above: `lotar assignee DEV-502 @fix`). Fix the review findings above, then the review and merge follow by the rules.'
+- date: 2026-11-14T00:30:14.308117+00:00
+  author: claude
+  text: 'Rework of the second review finding (TaskPanelCommentsTab.vue:145, a task with only automation comments had no filter, so no Hide automation): fixed. Both tabs now show their chip rows whenever the tab has entries, even with a single author or field; the History tab had the same rule, so an automation-only history couldn''t hide automation either. Test first: view/__tests__/TaskPanelActivityFilter.spec.ts has an automation-only comments test and a one-field, one-author history test; both failed before the fix and pass now. docs/help/serve.md updated. Amended signed commit a9119b01. Checks: npm run lint passed; npm run test:agent passed (2140 Rust, 1520 UI, release, hooks); npm run test:smoke:agent 392/392. Screenshots, task with one automation comment and one automation status change, 390/1440/1920 px, light and dark; before = 13a744a9 (no chips), after = a9119b01: ![](attachment:after-comments-automation-only-1440-dark.77d7d3ff35878f59f210dd06d72fa598.png) ![](attachment:after-comments-automation-only-1440-light.00081769dd08db600fac8df4bcbb166e.png) ![](attachment:after-comments-automation-only-1920-dark.51eeee7c525a69f022c304310b49dfd3.png) ![](attachment:after-comments-automation-only-1920-light.d615957c0a9549a3b3b57ec484ffc15e.png) ![](attachment:after-comments-automation-only-390-dark.e581bea2f871cc8a5e8ab905dda02970.png) ![](attachment:after-comments-automation-only-390-light.9cda6cbbe2b97873ff531a434144d98d.png) ![](attachment:after-history-automation-only-1440-dark.e29474e32e80379f79c6fca70a455420.png) ![](attachment:after-history-automation-only-1440-light.a13160e35913d07305153dd47f3b53bf.png) ![](attachment:after-history-automation-only-1920-dark.69ec25112decbc474ee3a4cb63f31c45.png) ![](attachment:after-history-automation-only-1920-light.42cbc07dfefc2b00298886bc2191265f.png) ![](attachment:after-history-automation-only-390-dark.8df75d3e0c6a74ecc662213918fa8d1f.png) ![](attachment:after-history-automation-only-390-light.c51eecc6c1007c212391eec908f98f5b.png) ![](attachment:before-comments-automation-only-1440-dark.d6ddc350d071511f8b9eebbc8aa2bfc5.png) ![](attachment:before-comments-automation-only-1440-light.2dafec0355830be4dca156152d3315be.png) ![](attachment:before-comments-automation-only-1920-dark.a6eb7af0ed8db969fda7f4bb41a9b8f1.png) ![](attachment:before-comments-automation-only-1920-light.7c4576bf4aa65ed079ab3a8c84a0db37.png) ![](attachment:before-comments-automation-only-390-dark.978d6e38e00cd3e6213cf3bbd8bd92c4.png) ![](attachment:before-comments-automation-only-390-light.b3b1fc9efeb59281eb34a468a604df35.png) ![](attachment:before-history-automation-only-1440-dark.98479dd7d120f491a0d7735e9644429e.png) ![](attachment:before-history-automation-only-1440-light.cd08263fa5cf8193d6224198d76ef6a5.png) ![](attachment:before-history-automation-only-1920-dark.feda7cdfec5309abb0e115277afc5943.png) ![](attachment:before-history-automation-only-1920-light.71d736a112cbdd06bad6e83d0042bcf3.png) ![](attachment:before-history-automation-only-390-dark.d090b107cde21685e3091dd460a3c7da.png) ![](attachment:before-history-automation-only-390-light.49dc8091d7d47896c78eab4f581bf991.png) '
+- date: 2026-11-14T00:37:50.162770+00:00
+  author: codex
+  text: 'Merged by fast-forward into main as 2a29804e after rebasing onto the latest main. Required checks passed on that rebase: npm run lint:agent, npm run test:agent, npm run test:smoke:agent (392 smoke tests). Initial sandbox cache failures were retried successfully with permission. No push: main contains unrelated unfinished working-tree changes. Ticket status and assignee unchanged; job completion advances the ticket.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0dc4db1c-afdc-4589-a3bc-1ae9580009ce
 - attachment: dev502-comments-after-1440-dark.d23878379059d92bd378765d0b3fb433.webp
@@ -79,6 +90,34 @@ references:
 - attachment: after-history-mixed-390-dark.70955863276f78f977c2ab615510601f.png
 - attachment: after-history-mixed-390-light.8b0620263f475b41e8b30873d6d5870e.png
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad764128a-ad4d-41cb-8389-385336ef9996
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A40350cbf-572f-4fb4-b12e-030fdae81bf0
+- attachment: after-comments-automation-only-1440-dark.77d7d3ff35878f59f210dd06d72fa598.png
+- attachment: after-comments-automation-only-1440-light.00081769dd08db600fac8df4bcbb166e.png
+- attachment: after-comments-automation-only-1920-dark.51eeee7c525a69f022c304310b49dfd3.png
+- attachment: after-comments-automation-only-1920-light.d615957c0a9549a3b3b57ec484ffc15e.png
+- attachment: after-comments-automation-only-390-dark.e581bea2f871cc8a5e8ab905dda02970.png
+- attachment: after-comments-automation-only-390-light.9cda6cbbe2b97873ff531a434144d98d.png
+- attachment: after-history-automation-only-1440-dark.e29474e32e80379f79c6fca70a455420.png
+- attachment: after-history-automation-only-1440-light.a13160e35913d07305153dd47f3b53bf.png
+- attachment: after-history-automation-only-1920-dark.69ec25112decbc474ee3a4cb63f31c45.png
+- attachment: after-history-automation-only-1920-light.42cbc07dfefc2b00298886bc2191265f.png
+- attachment: after-history-automation-only-390-dark.8df75d3e0c6a74ecc662213918fa8d1f.png
+- attachment: after-history-automation-only-390-light.c51eecc6c1007c212391eec908f98f5b.png
+- attachment: before-comments-automation-only-1440-dark.d6ddc350d071511f8b9eebbc8aa2bfc5.png
+- attachment: before-comments-automation-only-1440-light.2dafec0355830be4dca156152d3315be.png
+- attachment: before-comments-automation-only-1920-dark.a6eb7af0ed8db969fda7f4bb41a9b8f1.png
+- attachment: before-comments-automation-only-1920-light.7c4576bf4aa65ed079ab3a8c84a0db37.png
+- attachment: before-comments-automation-only-390-dark.978d6e38e00cd3e6213cf3bbd8bd92c4.png
+- attachment: before-comments-automation-only-390-light.b3b1fc9efeb59281eb34a468a604df35.png
+- attachment: before-history-automation-only-1440-dark.98479dd7d120f491a0d7735e9644429e.png
+- attachment: before-history-automation-only-1440-light.cd08263fa5cf8193d6224198d76ef6a5.png
+- attachment: before-history-automation-only-1920-dark.feda7cdfec5309abb0e115277afc5943.png
+- attachment: before-history-automation-only-1920-light.71d736a112cbdd06bad6e83d0042bcf3.png
+- attachment: before-history-automation-only-390-dark.d090b107cde21685e3091dd460a3c7da.png
+- attachment: before-history-automation-only-390-light.49dc8091d7d47896c78eab4f581bf991.png
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abdec37f8-5d58-4dda-89f6-60fe3ef6a57f
+releases:
+- 5
 description: |-
   The task panel's Comments and History tabs list every entry with no way to narrow them; the only control is the reload button. On a long ticket (DEV-466, STD-82) the owner can't pick out what the agents said or what changed a field. Owner asked on 2026-11-13 whether this exists and said to file it.
 
@@ -351,5 +390,194 @@ history:
     new: web-ui, ui, review-returned
 - at: 2026-11-13T23:54:50.913523+00:00
   actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-14T00:16:07.737974+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-488"],"related":["DEV-466","DEV-488","DEV-489","DEV-490","DEV-491"]}'
+    new: '{"blocks":["DEV-488"],"related":["DEV-466","DEV-488","DEV-489","DEV-490","DEV-491","DEV-417"]}'
+- at: 2026-11-14T00:19:09.388506+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T00:19:09.494737+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-14T00:19:10.046942+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T00:19:10.948081+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A40350cbf-572f-4fb4-b12e-030fdae81bf0
+- at: 2026-11-14T00:19:40.853164+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-488"],"related":["DEV-466","DEV-488","DEV-489","DEV-490","DEV-491","DEV-417"]}'
+    new: '{"blocks":["DEV-488","DEV-417"],"related":["DEV-466","DEV-488","DEV-489","DEV-490","DEV-491","DEV-417"]}'
+- at: 2026-11-14T00:20:38.192883+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#5'
+- at: 2026-11-14T00:30:07.428408+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-comments-automation-only-1440-dark.77d7d3ff35878f59f210dd06d72fa598.png
+- at: 2026-11-14T00:30:07.470596+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-comments-automation-only-1440-light.00081769dd08db600fac8df4bcbb166e.png
+- at: 2026-11-14T00:30:07.508564+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-comments-automation-only-1920-dark.51eeee7c525a69f022c304310b49dfd3.png
+- at: 2026-11-14T00:30:07.546627+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-comments-automation-only-1920-light.d615957c0a9549a3b3b57ec484ffc15e.png
+- at: 2026-11-14T00:30:07.583081+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-comments-automation-only-390-dark.e581bea2f871cc8a5e8ab905dda02970.png
+- at: 2026-11-14T00:30:07.619968+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-comments-automation-only-390-light.9cda6cbbe2b97873ff531a434144d98d.png
+- at: 2026-11-14T00:30:07.661500+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-history-automation-only-1440-dark.e29474e32e80379f79c6fca70a455420.png
+- at: 2026-11-14T00:30:07.697468+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-history-automation-only-1440-light.a13160e35913d07305153dd47f3b53bf.png
+- at: 2026-11-14T00:30:07.732891+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-history-automation-only-1920-dark.69ec25112decbc474ee3a4cb63f31c45.png
+- at: 2026-11-14T00:30:07.769461+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-history-automation-only-1920-light.42cbc07dfefc2b00298886bc2191265f.png
+- at: 2026-11-14T00:30:07.805654+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-history-automation-only-390-dark.8df75d3e0c6a74ecc662213918fa8d1f.png
+- at: 2026-11-14T00:30:07.841561+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-history-automation-only-390-light.c51eecc6c1007c212391eec908f98f5b.png
+- at: 2026-11-14T00:30:07.877489+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-comments-automation-only-1440-dark.d6ddc350d071511f8b9eebbc8aa2bfc5.png
+- at: 2026-11-14T00:30:07.912495+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-comments-automation-only-1440-light.2dafec0355830be4dca156152d3315be.png
+- at: 2026-11-14T00:30:07.948478+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-comments-automation-only-1920-dark.a6eb7af0ed8db969fda7f4bb41a9b8f1.png
+- at: 2026-11-14T00:30:07.984459+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-comments-automation-only-1920-light.7c4576bf4aa65ed079ab3a8c84a0db37.png
+- at: 2026-11-14T00:30:08.020586+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-comments-automation-only-390-dark.978d6e38e00cd3e6213cf3bbd8bd92c4.png
+- at: 2026-11-14T00:30:08.056510+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-comments-automation-only-390-light.b3b1fc9efeb59281eb34a468a604df35.png
+- at: 2026-11-14T00:30:08.092428+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-history-automation-only-1440-dark.98479dd7d120f491a0d7735e9644429e.png
+- at: 2026-11-14T00:30:08.127686+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-history-automation-only-1440-light.cd08263fa5cf8193d6224198d76ef6a5.png
+- at: 2026-11-14T00:30:08.164505+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-history-automation-only-1920-dark.feda7cdfec5309abb0e115277afc5943.png
+- at: 2026-11-14T00:30:08.202206+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-history-automation-only-1920-light.71d736a112cbdd06bad6e83d0042bcf3.png
+- at: 2026-11-14T00:30:08.239747+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-history-automation-only-390-dark.d090b107cde21685e3091dd460a3c7da.png
+- at: 2026-11-14T00:30:08.275634+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-history-automation-only-390-light.49dc8091d7d47896c78eab4f581bf991.png
+- at: 2026-11-14T00:30:14.308117+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T00:30:25.272668+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T00:30:26.651651+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abdec37f8-5d58-4dda-89f6-60fe3ef6a57f
+- at: 2026-11-14T00:31:03.609475+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-14T00:37:50.162770+00:00
+  actor: codex
   changes:
   - field: comment_added

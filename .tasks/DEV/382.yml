@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-12T20:07:56.581871+00:00
-modified: 2026-11-13T01:49:49.017686+00:00
+modified: 2026-11-14T00:20:36.504131+00:00
 relationships:
   related:
   - DEV-406
@@ -23,6 +23,8 @@ comments:
   text: 'Decision (mallox, 2026-11-12): "Yeah let''s only build it if we need it". No built-in notify: action; the run + curl recipe in docs/help/automation.md (commit 83e9a29 on agent/DEV-382) is the answer. Not yet merged to main.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5cffcdf1-16fe-4801-9331-af47e3b131ed
+releases:
+- 3
 description: |-
   The owner's idea (2026-11-12): "We can think about adding phone notifications as a feature to lotar. That probably deserves a feature/idea ticket." Context: standards STD-54, an inbox project where everything that needs him lands; a phone push when a ticket arrives there would mean he doesn't have to check at all.
 
@@ -93,3 +95,8 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-406"]}'
+- at: 2026-11-14T00:20:36.504131+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#3'

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T03:13:31.646907+00:00
-modified: 2026-11-13T05:18:28.129306+00:00
+modified: 2026-11-14T00:20:36.985846+00:00
 relationships:
   related:
   - DEV-400
@@ -19,6 +19,8 @@ comments:
   text: 'Merged: branch was already on main (451d609d), fast-forwarded main to 522763f9 (fix), then committed ticket files as 008e58c9 ''DEV-410 Ticket updates''. Pushed both to origin/main (451d609d..008e58c9); the pre-push hook (Rust formatting and clippy) passed. Checks: npm run lint, npm test, npm run smoke all passed on this same tree in the fix job (no rebase changes, so not repeated).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac0804822-c39e-481a-8820-667d111410c7
+releases:
+- 4
 description: |-
   A real (not dry) `lotar automation run` matches each task against a snapshot read before the loop (DEV-400). When an earlier action in the same run changes a later task (closing A fires B's `unblocked` rules through `fire_unblocked_dependents`), the loop matches B's manual rule against B's old state. Before DEV-400 each task was re-read when the loop reached it. Found by the QA test run in standards (STD-59, 2026-11-12); medium confidence, read from the code, not reproduced.
 
@@ -79,3 +81,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-400"]}'
     new: '{"related":["DEV-400","DEV-409"]}'
+- at: 2026-11-14T00:20:36.985846+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#4'

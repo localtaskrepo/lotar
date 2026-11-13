@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T10:40:44.142626+00:00
-modified: 2026-11-12T19:12:53.288986+00:00
+modified: 2026-11-14T00:20:35.726736+00:00
 relationships:
   related:
   - DEV-373
@@ -20,6 +20,8 @@ comments:
   text: 'claude: Merged. The branch was already on main''s tip (7798ae0), so the rebase changed nothing; lint, test and smoke had already passed on 082f1c7 itself. Fast-forwarded main to 082f1c7, committed the pending .tasks changes (DEV-364, DEV-373, DEV-375) as 916b0cd ''DEV-375 Ticket updates'', and pushed 7798ae0..916b0cd to origin/main (repos.json allows push, and the only unpushed commits were these two). Check rerun in the main checkout: npm run smoke (build + full suite) 381/381, plus a second full run 381/381.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac7e1522e-ee99-4de0-ab13-f76516f52c67
+releases:
+- 2
 description: 'Found 2026-11-12 during the DEV-373 merge: npm run smoke failed once in smoke/tests/api.automation.smoke.spec.ts ''monitor counterfactual: wait-then-read wedges a chatty stderr child, concurrent drain completes'' (line 730: expected the aborted-old marker to be absent, it existed). The file passed 3 of 3 runs alone and the full suite passed earlier the same night, so it looks load/timing dependent. Check: npm run smoke (full suite, repeated). Done: the test passes reliably under full-suite load.'
 tags:
 - health
@@ -80,3 +82,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-373","DEV-364"]}'
     new: '{"related":["DEV-373","DEV-364","DEV-379"]}'
+- at: 2026-11-14T00:20:35.726736+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#2'

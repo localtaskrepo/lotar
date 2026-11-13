@@ -4,7 +4,7 @@ priority: Medium
 type: Bug
 reporter: claude
 created: 2026-11-13T01:27:46.932016+00:00
-modified: 2026-11-13T02:01:21.009063+00:00
+modified: 2026-11-14T00:20:36.788515+00:00
 relationships:
   related:
   - DEV-403
@@ -33,6 +33,8 @@ comments:
   text: 'Closing as triage says: the owner''s decision of 2026-11-12 is carried out in 19dcf8f, which is on origin/main (checked with git branch -r --contains). agent/DEV-405 holds nothing beyond it, so no new commit. The ticket''s scratch check passes on a build of main (author bob, actor bob, reporter alice). The installed brew lotar 0.14.1 is older and doesn''t have the fix yet. 8fa9f4e (STD-54) is not part of this ticket and waits for the owner.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aae6d836d-243c-436c-846b-76d44e457c63
+releases:
+- 3
 description: 'Found 2026-11-13 in quarter-inch-studio (lotar 0.14.1): its .tasks/config.yml and .tasks/QIS/config.yml set default.reporter: mallox. lotar comment QIS-55 ... run with LOTAR_DEFAULT_REPORTER=claude stored author mallox. With standards'' rule ''Comments: the owner''s comment reaches the agent'' (comment author mallox starts the ticket''s agent, STD-56), every agent comment there started an agent: QIS-55 and QIS-170 each got a job from a closing note. The rule is switched off in QIS for now. docs/help/config.md says project configuration outranks env for merged defaults; for who wrote a comment (and the history''s actor), the explicit environment variable of the process writing it should win over a project''s default, since the default is for tickets people create without naming a reporter. Check: in a scratch repo with default.reporter: alice in the project config, LOTAR_DEFAULT_REPORTER=bob lotar comment X-1 hi stores author bob. Done: that, with a test; docs (identity.md, config.md precedence) say which identity a comment and a history entry get; the reporter of a new ticket follows the documented precedence.'
 tags:
 - health
@@ -137,3 +139,8 @@ history:
     new: Done
   - field: assignee
     old: '@fix'
+- at: 2026-11-14T00:20:36.788515+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#3'

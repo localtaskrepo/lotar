@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-13T06:21:17.897723+00:00
-modified: 2026-11-13T07:09:58.886577+00:00
+modified: 2026-11-14T00:20:37.118534+00:00
 relationships:
   depends_on:
   - DEV-414
@@ -20,6 +20,8 @@ comments:
 - date: 2026-11-13T07:09:58.799421+00:00
   author: claude
   text: 'Owner 2026-11-13: "Release v0.14.3 now, so the review stage can go live", then "Yes, go ahead with the release". Step 1: DEV-408 (04966bcc) and DEV-414 (f646cb08) are on main. Step 2: patch bump in 67061d0a; npm run lint, npm test (2126 Rust, 1507 UI, release, hooks) and npm run smoke (385) passed. Step 3: QA on 05050960 failed, the same test that has failed since DEV-408 (CI has no git identity for LoTaR''s commit); fixed as DEV-416 in 25cb89e4, and QA run 43381803290 passed there. Step 4: signed tag v0.14.3 on 25cb89e4, pushed. Step 5: Release run 43382494975, every job passed. Step 6: brew upgrade lotar, lotar --version prints 0.14.3, and the six lotar servers restarted on it. Step 7: closing; standards STD-59 waits for this and continues from here. Step 8: next ticket follows.'
+releases:
+- 4
 description: 'Next release after v0.14.2. The owner picks the bump; rename this ticket if it differs (the title must start with ''Release v''). Steps: .github/skills/release/SKILL.md and docs/release-guide.md. Done when the release is installed here. Tickets that wait for this release are Blocked and depend on it; closing this ticket hands them to @fix to run their checks. Opened before v0.14.2 shipped, because DEV-408 landed after the v0.14.2 tag and standards STD-59 (the review stage) waits for it. Waiting now: standards:STD-59.'
 history:
 - at: 2026-11-13T06:21:17.985126+00:00
@@ -60,3 +62,8 @@ history:
   - field: status
     old: Todo
     new: Done
+- at: 2026-11-14T00:20:37.118534+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#4'

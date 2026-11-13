@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T20:19:09.503584+00:00
-modified: 2026-11-12T21:15:29.535098+00:00
+modified: 2026-11-14T00:20:35.953267+00:00
 relationships:
   related:
   - DEV-327
@@ -28,6 +28,8 @@ comments:
   text: 'claude: Merged and pushed. DEV-383 had already landed as 71984c8 (the same change as the 5f4fc78 this branch was built on), so I replayed only this ticket''s commit onto main: 163d6c6 (signed). Fast-forwarded main to it, committed the ticket files as dcc5d79 (DEV-384 Ticket updates), and pushed 167fcf1..dcc5d79 to origin; the pre-push hooks passed. Checks in the worktree after the rebase: npm run lint passed, npm test passed (2075 Rust, 1471 UI, release and hook tests), npm run smoke 381/381. Left for DEV-385, which lands after this: switch lotar''s rule ''Prerequisites done: continue the waiting ticket'' in .tasks/DEV/automation.yml to tell_agent (message = its current prompt, agent ''@fix''), as agreed with the DEV-385 agent.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A29c043b0-c171-4b91-85ae-99969ca704d8
+releases:
+- 2
 description: |-
   The owner's idea (2026-11-12), his words: "I may find something where I comment from browser through the different boards and that should probably generally kick off either an agent to check what I said and how to action on it, or be queued up to the agent currently working on the task so it knows there's a response or comment. Lotar can then actually also become a communication platform focused on project management. A ticket then becomes a watch for a project agent in a way. And maybe that's another feature we want to add to lotar if we don't already have a way to do that."
 
@@ -119,3 +121,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-327","DEV-383","DEV-385","DEV-387"]}'
     new: '{"related":["DEV-327","DEV-383","DEV-385","DEV-387","DEV-396"]}'
+- at: 2026-11-14T00:20:35.953267+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#2'

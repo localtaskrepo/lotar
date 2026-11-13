@@ -35,6 +35,9 @@ automation:
                  Before asking him, ask the agents that are running (T3 threads, other sessions) what they know, and
                  file every bug you find in its repo (lotar add --finding). When the fix still needs him, comment one
                  question, set the status to HelpNeeded, assign the ticket to mallox (the owner) and stop.
+                 He answers in this thread after your job ended: finish steps 4 to 6, then start the review with
+                 lotar automation run "Answered in the thread: review on Codex" --select 'id:${{ticket.id}}' (you on
+                 Claude Sonnet: "... light review"; on Codex: "... review on Claude").
               4. When you changed files: commit them on your worktree's branch, signed, never with --no-verify, message
                  "${{ticket.id}} ${{ticket.title}}". Don't merge or push: the merge agent does that, then reruns the
                  check command against the main checkout.
@@ -89,6 +92,9 @@ automation:
               1. Never delete or discard work that isn't saved elsewhere, and never decide what only the owner decides.
                  Ask the running agents (T3 threads) first; when it still needs him, comment one question, set the
                  status to HelpNeeded, assign the ticket to mallox and stop.
+                 He answers in this thread after your job ended: finish steps 2 to 5, then start the review with
+                 lotar automation run "Answered in the thread: review on Codex" --select 'id:${{ticket.id}}' (you on
+                 Claude Sonnet: "... light review"; on Codex: "... review on Claude").
               2. Commit your changes on your worktree's branch, signed, never with --no-verify, message
                  "${{ticket.id}} ${{ticket.title}}". Don't merge or push: the merge agent does that.
               3. Don't end your turn while tests or other background work still run: the job ends with your turn.
@@ -380,6 +386,9 @@ automation:
                  a comment why it isn't a problem. Never delete or discard work that isn't saved elsewhere. A finding
                  only the owner can decide: comment one question, set the status to HelpNeeded, assign the ticket to
                  mallox and stop.
+                 He answers in this thread after your job ended: finish steps 2 and 3, then start the review with
+                 lotar automation run "Answered in the thread: review on Codex" --select 'id:${{ticket.id}}' (you on
+                 Claude Sonnet: "... light review"; on Codex: "... review on Claude").
               2. Amend the earlier commit (it isn't pushed), signed, never with --no-verify, message
                  "${{ticket.id}} ${{ticket.title}}". Don't merge or push.
               3. Don't end your turn while tests still run. Comment the outcome: what you did about each finding, the
@@ -694,3 +703,40 @@ automation:
           set:
             assignee: "@fix-codex"
           agent: *fix
+    # Manual: the owner answered in the agent's T3 thread after its job had ended (it handed the ticket back), and the
+    # agent finished the work there. No job ends then, so no "Fix done" rule fires (STD-109, LOCA-319). The agent runs
+    # the one for its own model, as its prompt says: on Codex after Claude, on Claude after Codex, light after Sonnet.
+    # A new review thread also with tag review-child: the fix thread is still in its turn. Always pass --select.
+    - name: "Answered in the thread: review on Codex"
+      when: &answered
+        all:
+          - any:
+              - status: InProgress
+              - status: HelpNeeded
+          - not: { assignee: "@agent" }
+      on:
+        manual:
+          set:
+            assignee: "@review"
+            status: Reviewing
+          agent: *review
+          # A rule's own change fires no other rule: this one closes the inbox ticket itself.
+          run: *inbox
+    - name: "Answered in the thread: review on Claude"
+      when: *answered
+      on:
+        manual:
+          set:
+            assignee: "@review-claude"
+            status: Reviewing
+          agent: *review
+          run: *inbox
+    - name: "Answered in the thread: light review"
+      when: *answered
+      on:
+        manual:
+          set:
+            assignee: "@review-light"
+            status: Reviewing
+          agent: *review
+          run: *inbox

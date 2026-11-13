@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T20:54:21.522017+00:00
-modified: 2026-11-13T18:02:40.981628+00:00
+modified: 2026-11-14T00:20:36.299552+00:00
 relationships:
   related:
   - DEV-373
@@ -40,6 +40,8 @@ references:
 - file: src/storage/sprint.rs
 - file: view/pages/SprintsList.vue
 - file: docs/help/sprints.md
+releases:
+- 2
 description: |-
   Releases become records of their own, built the way sprints are: a release file, a ticket's list of releases, a CLI command, REST and MCP endpoints, and a Releases page that shows which tickets are in which release and lets you manage them. Today a version is only a value in a custom field (DEV-373), so nothing records which releases exist, when they ship, or whether they are out.
 
@@ -168,3 +170,8 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-14T00:20:36.299552+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#2'

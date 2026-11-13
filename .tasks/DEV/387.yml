@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T20:37:56.488019+00:00
-modified: 2026-11-12T21:03:04.880568+00:00
+modified: 2026-11-14T00:20:36.065363+00:00
 relationships:
   related:
   - DEV-383
@@ -23,6 +23,8 @@ comments:
   text: 'claude: Pushed main dcc5d79..3681bd5 (564135b fix test, 3681bd5 ticket updates). Reran the ticket''s check on the main checkout: cargo nextest run --test integration dev318_t3_runner_test, 14/14 pass.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A805be196-a450-45bd-93c5-fca0f8f9668f
+releases:
+- 2
 description: 'Found: while merging DEV-383 (2026-11-12), one full npm run test:agent run failed this test at tests/dev318_t3_runner_test.rs:442 with SerializationError("Invalid context payload: EOF while parsing a value at line 1 column 0"): it read the context payload while it was still empty or half-written. Five runs of the file alone and the next full run passed. Check: cargo nextest run --test integration dev318_t3_runner_test under full-suite load (npm run test:rust:agent). Done: the test, or the code that writes the payload, no longer reads an empty or partial file, and repeated full-suite runs pass.'
 tags:
 - health
@@ -87,3 +89,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-383","DEV-384"]}'
     new: '{"related":["DEV-383","DEV-384","DEV-386"]}'
+- at: 2026-11-14T00:20:36.065363+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#2'

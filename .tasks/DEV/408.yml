@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T03:13:31.064415+00:00
-modified: 2026-11-13T21:05:37.403178+00:00
+modified: 2026-11-14T00:20:36.917214+00:00
 relationships:
   related:
   - DEV-377
@@ -26,6 +26,8 @@ comments:
   text: 'Merged: rebased agent/DEV-408 onto main 008e58c9 with no conflicts and fast-forwarded main to 04966bcc (DEV-408 A continued T3 thread drops the new profile''s provider and model). Ticket files committed as ''DEV-408 Ticket updates'' and pushed to origin/main. Checks on the rebased branch: npm run lint:agent clean; npm run smoke passed (385); Rust tests 2122 passed (done_during_a_job_leaves_the_worktree_to_the_jobs_end flaky, passed on retry). The machine was heavily loaded (load average 30 to 75): one full run failed merge_job_whose_branch_was_rebased_elsewhere_passes on its 10 s wait, and it passed when run alone. Another run had 13 UI tests time out after 30 s. A rerun of test:ui (1507 passed), test:release and test:hooks passed.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Add3daf95-86e6-43a5-9271-bbf9c5227026
+releases:
+- 4
 description: |-
   A new job continues the ticket's earlier T3 Code thread whenever that thread's worktree still holds unmerged work (DEV-377), whatever profile the new job uses. A continued thread keeps its model, so the new profile's provider and model are dropped. Found by the QA test run in standards (STD-59, 2026-11-12).
 
@@ -131,3 +133,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-377","DEV-409","DEV-411","DEV-414","DEV-415","DEV-398","DEV-416","DEV-468"]}'
     new: '{"related":["DEV-377","DEV-409","DEV-411","DEV-414","DEV-415","DEV-398","DEV-416","DEV-468","DEV-486"]}'
+- at: 2026-11-14T00:20:36.917214+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#4'

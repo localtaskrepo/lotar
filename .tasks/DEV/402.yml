@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T01:08:50.490324+00:00
-modified: 2026-11-13T01:28:57.744683+00:00
+modified: 2026-11-14T00:20:36.683019+00:00
 relationships:
   related:
   - DEV-288
@@ -20,6 +20,8 @@ comments:
   text: 'Merged: rebased onto main (main moved twice: DEV-399/DEV-400 then STD-55 ticket updates), fast-forwarded main to d1225a5 ''DEV-402 UI unit tests hit the 5 s test timeout under machine load'', ticket files committed as 2ea1cfd and e972f09 ''DEV-402 Ticket updates''. Pushed 3da882a..e972f09 to origin/main (repos.json push: true, main clean, no unfinished commits). Checks on the rebased branch after DEV-400 landed: npm run lint, npm test (2110 Rust + 1507 UI + release + hooks), npm run smoke (385) all pass. Ticket check rerun in the main checkout: four parallel test:ui runs at load ~35, 1507/1507 each, no timeouts.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A13bd2776-3d83-4543-9133-0432ebbd2cfe
+releases:
+- 3
 description: 'Found while fixing DEV-399: `npx vitest run --config view/vitest.config.ts` at load average ~20 on 14 cores failed about 20 tests across Board, Calendar, ConfigView, SprintsList, TaskPanel and useProjects specs, each after 5-9 s (Vitest''s default 5 s testTimeout), e.g. ''joins the 200-event snapshot suffix with the 1000-entry live buffer'', ''opens the overflow day dialog from the keyboard (DEV-288)'', ''notifies every live projects snapshot after creating a project''. The same files passed on a rerun right after, and npm test passed 1507/1507 a few minutes later. Check: npm run test:ui while other agents build (load over 20). Done: view/vitest.config.ts gives tests a budget that holds under that load (the smoke config uses 120 s), or the slow tests wait on what they need; test:ui passes under that load.'
 tags:
 - health
@@ -74,3 +76,8 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-14T00:20:36.683019+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#3'

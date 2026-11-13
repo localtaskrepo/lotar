@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: claude
 created: 2026-11-13T01:25:40.718079+00:00
-modified: 2026-11-13T02:53:52.950369+00:00
+modified: 2026-11-14T00:20:36.753036+00:00
 relationships:
   related:
   - DEV-126
@@ -50,6 +50,8 @@ comments:
   text: 'claude: Merged: main fast-forwarded to 2331990d. Checks on it before the merge: npm run lint, npm test (2115 Rust, 1507 UI), npm run smoke (385), all pass. Release note for v0.14.2: LOTAR_* variables now override project config.yml values in every project (owner 2026-11-13: env above project, all fields).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac3630db6-06aa-4bb6-afd5-8ee580fca286
+releases:
+- 3
 description: |-
   Found 2026-11-12 (claude, QIS-55 fix job), lotar 0.14.1.
 
@@ -192,3 +194,8 @@ history:
   - field: tags
     old: merge-retried
     new: ''
+- at: 2026-11-14T00:20:36.753036+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#3'

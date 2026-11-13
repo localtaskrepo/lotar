@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T21:53:33.995050+00:00
-modified: 2026-11-13T23:44:50.830028+00:00
+modified: 2026-11-14T00:20:38.001515+00:00
 relationships:
   related:
   - DEV-488
@@ -14,6 +14,7 @@ relationships:
   - standards:STD-102
   - DEV-478
   - DEV-505
+  - DEV-417
 comments:
 - date: 2026-11-13T22:15:29.865898+00:00
   author: claude
@@ -36,6 +37,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abad9c393-1d17-4c90-a594-960c4ab74a7a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3a5dfb04-36a4-4e42-9def-f6db9903cd1b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0a21f311-2a3c-4409-b9aa-5a6c45d67c49
+releases:
+- 5
 description: |-
   `lotar add` can't set relationships, so an agent that files a ticket waiting on another adds the `depends_on` link in a second command. The `created` rules have already run by then, and a fix agent starts on a ticket that has to wait. MCP `task_create` and REST create already take `relationships` in the same write; the CLI should too. The owner chose this on 2026-11-13 over a general `--no-automation` flag.
 
@@ -195,3 +198,14 @@ history:
   - field: relationships
     old: '{"related":["DEV-488","DEV-489","DEV-490","standards:STD-102","DEV-478"]}'
     new: '{"related":["DEV-488","DEV-489","DEV-490","standards:STD-102","DEV-478","DEV-505"]}'
+- at: 2026-11-14T00:16:07.737263+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-488","DEV-489","DEV-490","standards:STD-102","DEV-478","DEV-505"]}'
+    new: '{"related":["DEV-488","DEV-489","DEV-490","standards:STD-102","DEV-478","DEV-505","DEV-417"]}'
+- at: 2026-11-14T00:20:38.001515+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#5'

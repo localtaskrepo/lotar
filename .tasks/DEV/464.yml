@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T08:26:30.517705+00:00
-modified: 2026-11-13T18:06:30.596967+00:00
+modified: 2026-11-14T00:20:37.314018+00:00
 relationships:
   related:
   - DEV-393
@@ -15,6 +15,7 @@ relationships:
   - DEV-473
   - DEV-475
   - DEV-476
+  - DEV-417
 comments:
 - date: 2026-11-13T09:26:09.144119+00:00
   author: claude
@@ -40,6 +41,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa5d32f85-dc57-486d-b533-db54e5599c75
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adadb2f55-82ff-4780-b8d5-b1121e46bec1
+releases:
+- 5
 description: |-
   Steps DEV-393 left open (merge comment, 2026-11-12: "Not done (follow-up if wanted)").
 
@@ -161,3 +164,14 @@ history:
   - field: relationships
     old: '{"related":["DEV-393","DEV-459","DEV-467","DEV-470","DEV-473","DEV-475"]}'
     new: '{"related":["DEV-393","DEV-459","DEV-467","DEV-470","DEV-473","DEV-475","DEV-476"]}'
+- at: 2026-11-14T00:16:07.734325+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-393","DEV-459","DEV-467","DEV-470","DEV-473","DEV-475","DEV-476"]}'
+    new: '{"related":["DEV-393","DEV-459","DEV-467","DEV-470","DEV-473","DEV-475","DEV-476","DEV-417"]}'
+- at: 2026-11-14T00:20:37.314018+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#5'

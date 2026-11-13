@@ -5,11 +5,12 @@ type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-13T08:12:00.342661+00:00
-modified: 2026-11-13T10:11:48.547518+00:00
+modified: 2026-11-14T00:20:37.278518+00:00
 relationships:
   related:
   - DEV-418
   - DEV-465
+  - DEV-417
 comments:
 - date: 2026-11-13T08:15:59.780833+00:00
   author: claude
@@ -31,6 +32,8 @@ references:
 - file: view/components/TaskTable.vue
 - file: view/pages/Preferences.vue
 - link: t3-thread://v2/d834978d-9e75-43fb-ba01-45747238fc44/e71d85ba-3e12-4516-86ae-e80ecd808e14
+releases:
+- 5
 description: |-
   On a phone the Board and the Tasks list are wider than the screen: board columns are at least 260 px wide (about 1.2 fit at 390 px) and the task table is about 1,570 px wide, so status, priority and assignee sit three screens to the right. The owner asked on 2026-11-13 for a more digestible phone layout, with a preference to keep the classic one.
 
@@ -207,3 +210,14 @@ history:
   - field: relationships
     old: '{"related":["DEV-418"]}'
     new: '{"related":["DEV-418","DEV-465"]}'
+- at: 2026-11-14T00:16:07.734036+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-418","DEV-465"]}'
+    new: '{"related":["DEV-418","DEV-465","DEV-417"]}'
+- at: 2026-11-14T00:20:37.278518+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#5'

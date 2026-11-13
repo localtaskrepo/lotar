@@ -5,13 +5,14 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T18:06:30.287428+00:00
-modified: 2026-11-13T18:55:17.638302+00:00
+modified: 2026-11-14T00:20:37.530627+00:00
 relationships:
   related:
   - DEV-464
   - DEV-473
   - DEV-470
   - DEV-472
+  - DEV-417
 comments:
 - date: 2026-11-13T18:23:09.001940+00:00
   author: claude
@@ -33,6 +34,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7f0512fe-ca4e-4264-ba1c-1880010a7ba6
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A94f2a8c8-9a27-4852-ac4f-cb4bf50f1c00
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab36fe889-a037-47bb-bb45-2cf11b2fe27a
+releases:
+- 5
 description: |-
   Found (DEV-473, 2026-11-13): when a later job starts a new T3 Code thread on the ticket branch, release_branch (src/services/agent_job_service.rs:1442) detaches the earlier thread's worktree. Every job worktree here ends up detached minutes after its job (reflog 'checkout: moving from agent/DEV-464 to HEAD'). At Done, cleanup_done_ticket_worktree (:2299) only looks for a worktree with agent/<ticket> checked out, finds none and returns, so neither the detached worktrees nor agent/<ticket> are removed, although cleanup_on_done and cleanup_delete_branches are on. lotar agent worktree list/cleanup don't see detached worktrees or T3 Code's own t3/* branches either. Result: DEV-464, 469, 470 and 471 are Done and on main, but 7 clean worktrees and 9 branches stay, and the repo-health check reports them as unpushed:branches (DEV-473).
 
@@ -170,3 +173,14 @@ history:
   - field: tags
     old: health, review-returned
     new: health
+- at: 2026-11-14T00:16:07.734912+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-464","DEV-473","DEV-470","DEV-472"]}'
+    new: '{"related":["DEV-464","DEV-473","DEV-470","DEV-472","DEV-417"]}'
+- at: 2026-11-14T00:20:37.530627+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#5'

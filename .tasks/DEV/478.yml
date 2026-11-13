@@ -1,11 +1,11 @@
 title: A taken-over t3 job without a recorded thread fails although its agent finished
-status: HelpNeeded
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-13T19:12:58.132272+00:00
-modified: 2026-11-13T23:52:57.209765+00:00
+modified: 2026-11-14T00:28:47.274210+00:00
 relationships:
   related:
   - DEV-378
@@ -19,6 +19,7 @@ relationships:
   - DEV-498
   - DEV-505
   - DEV-500
+  - DEV-417
 comments:
 - date: 2026-11-13T19:28:42.100162+00:00
   author: claude
@@ -38,11 +39,16 @@ comments:
 - date: 2026-11-13T19:49:01.546015+00:00
   author: codex
   text: 'Merge blocked: rebased cleanly onto main as 5fc697e1; lint:agent passed. test:agent failed because sandbox denied reserving an ephemeral port in serve_handler tests (Operation not permitted); UI phase did not run. Smoke also failed and reported leftover temp workspaces. All checks have ended. No merge or push performed. Can this merge be rerun with local port access so the required test gates can complete?'
+- date: 2026-11-14T00:28:47.008251+00:00
+  author: claude
+  text: 'Done: the fix is on main and pushed (5fc697e1, with its follow-up DEV-480 a6c7d17e). The Quality Assurance run on main at DEV-500 (7fa24fb1, which contains it) passed (run 43531910285). The merge job''s question about rerunning with localhost access is moot. Ships in v0.15.0 (DEV-417).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A30af34fc-98ff-4d1d-a68f-9c9ec335f26c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A87654657-2811-4fc9-91e7-f692ac776b70
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3ff00162-f42e-43ec-bec6-8a8ddedfee02
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A90ade1c9-6888-4c9e-9046-f0d9da1728b9
+releases:
+- 5
 description: |-
   ## Found
 
@@ -241,3 +247,24 @@ history:
   - field: relationships
     old: '{"related":["DEV-378","DEV-467","DEV-480","DEV-488","DEV-487","DEV-486","DEV-492","DEV-494","DEV-498","DEV-505"]}'
     new: '{"related":["DEV-378","DEV-467","DEV-480","DEV-488","DEV-487","DEV-486","DEV-492","DEV-494","DEV-498","DEV-505","DEV-500"]}'
+- at: 2026-11-14T00:16:07.735220+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-378","DEV-467","DEV-480","DEV-488","DEV-487","DEV-486","DEV-492","DEV-494","DEV-498","DEV-505","DEV-500"]}'
+    new: '{"related":["DEV-378","DEV-467","DEV-480","DEV-488","DEV-487","DEV-486","DEV-492","DEV-494","DEV-498","DEV-505","DEV-500","DEV-417"]}'
+- at: 2026-11-14T00:20:37.565886+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#5'
+- at: 2026-11-14T00:28:47.008251+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T00:28:47.274210+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done

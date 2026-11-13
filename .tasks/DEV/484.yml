@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T20:12:31.295335+00:00
-modified: 2026-11-13T23:44:50.828969+00:00
+modified: 2026-11-14T00:20:37.709687+00:00
 relationships:
   related:
   - DEV-481
@@ -24,6 +24,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A23ed9780-d027-48c4-8a0a-8fd0017ba71e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5b289ff8-a3f4-42ab-a916-d0dcc19ae2a3
+releases:
+- 5
 description: 'Found in DEV-481 on 2026-11-13: one full npm run test:smoke:agent run failed 389/390 at ui.version-fields.smoke.spec.ts ''sets and clears a field on the selected tasks and keeps their other fields''. That output did not keep the assertion. The file alone passed 3 of 3 runs and the next full smoke run passed 390/390. Check: npm run test:smoke:agent repeatedly under concurrent agent activity and save the failure output. Done when the race is reproduced and fixed without masking a behavior failure.'
 tags:
 - health
@@ -105,3 +107,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-481","DEV-243"]}'
     new: '{"related":["DEV-481","DEV-243","DEV-505"]}'
+- at: 2026-11-14T00:20:37.709687+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#5'

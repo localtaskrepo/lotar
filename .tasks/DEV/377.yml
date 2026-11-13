@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T18:46:29.580751+00:00
-modified: 2026-11-13T11:19:56.533417+00:00
+modified: 2026-11-14T00:20:35.766423+00:00
 relationships:
   related:
   - DEV-339
@@ -31,6 +31,8 @@ comments:
   text: 'claude: Merged and pushed. main 916b0cd..8195112: f1b3ca1 (the fix) and 8195112 (DEV-377 Ticket updates, all pending .tasks changes). Rebase: none needed, main hadn''t moved. Checks in the worktree before the merge: npm run lint, npm test, npm run smoke (104 files, 381 tests) all pass. Ticket check: git branch --list ''t3/*'' ''agent/*'' shows one branch for DEV-377, agent/DEV-377, which is merged. Related: the LOCA-118 rerun with --session continue still started a new thread, because its earlier job was orphaned and never logged its session. Added to DEV-378.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A755534d2-fdff-4da7-a8e3-3590684f91af
+releases:
+- 2
 description: |-
   ## Found
 
@@ -142,3 +144,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-339","DEV-343","DEV-361","DEV-365","DEV-368","DEV-376","DEV-378","DEV-366","DEV-408","DEV-414"]}'
     new: '{"related":["DEV-339","DEV-343","DEV-361","DEV-365","DEV-368","DEV-376","DEV-378","DEV-366","DEV-408","DEV-414","DEV-472"]}'
+- at: 2026-11-14T00:20:35.766423+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#2'

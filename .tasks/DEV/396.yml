@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T21:15:29.357861+00:00
-modified: 2026-11-12T21:57:02.071179+00:00
+modified: 2026-11-14T00:20:36.410160+00:00
 relationships:
   related:
   - DEV-384
@@ -25,6 +25,8 @@ comments:
   text: 'claude: Merged and pushed. Rebased onto main twice (main moved on with DEV-391, then DEV-390) without conflicts. 1df18ce DEV-396 Prerequisites rule: start the waiting ticket with tell_agent, and 7183f7e DEV-396 Ticket updates are on main and pushed (d732178..7183f7e). Checks after the first rebase: lint:agent clean, npm test passed (2087 Rust, 1472 UI, release, hooks), npm run smoke 381/381. After the second rebase (DEV-390 changes only frontend files): lint:agent clean, UI tests 1475 passed, the dev370 and tell_agent Rust tests passed.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A852e0c4d-48a1-4b52-ade7-3acef748887a
+releases:
+- 2
 description: 'Agreed between the DEV-384 and DEV-385 agents: lotar''s rule ''Prerequisites done: continue the waiting ticket'' in .tasks/DEV/automation.yml should use DEV-384''s tell_agent (queue to a running job, else start the ticket''s agent as the next turn of its last thread) instead of set assignee @fix + agent.prompt. Not done in the DEV-385 merge because tell_agent picks the ticket''s last agent profile, which for a Blocked ticket may be a merge or review profile, not @fix. Check which profile a waiting ticket gets (agent history of Blocked DEV tickets), then switch the rule (message = the current prompt, agent: fix, keep model/provider) and update tests/dev370_release_waiting_checks_test.rs. Done when: the rule uses tell_agent, the test passes, and a ticket whose last agent was a merge agent still gets @fix or the choice is documented.'
 history:
 - at: 2026-11-12T21:15:29.536711+00:00
@@ -82,3 +84,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-384","DEV-385","DEV-2","DEV-361","DEV-364","DEV-390","DEV-391"]}'
     new: '{"related":["DEV-384","DEV-385","DEV-2","DEV-361","DEV-364","DEV-390","DEV-391","DEV-394"]}'
+- at: 2026-11-14T00:20:36.410160+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#2'

@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-11T23:36:51.131233+00:00
-modified: 2026-11-13T21:05:37.751756+00:00
+modified: 2026-11-14T00:20:35.282824+00:00
 relationships:
   related:
   - DEV-298
@@ -24,6 +24,8 @@ comments:
   text: 'claude: Merged. Rebased agent/DEV-327 onto main (clean), fast-forwarded main to 3066987 ''DEV-327 Comments record who wrote them'', committed ticket files as 66b0755 ''DEV-327 Ticket updates'' (DEV-327 and DEV-298 status changes), pushed to origin/main (ae2a6f9..66b0755). Checks in the worktree after rebase: npm run lint, npm run test:agent (2032 Rust, 1445 UI) and npm run test:smoke:agent (380) all pass.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad2cd205d-125a-442b-b000-9717311be2b3
+releases:
+- 1
 description: 'From the standards ticket-process review (STD-27, 2026-11-11). A comment stores only date and text (docs/help/comment.md: ''Author attribution isn''t stored''); the author is only in the history''s actor, and lotar show doesn''t print it. Agents now start comments with ''claude:'' by hand, and the fix-agent prompt asks for that until this lands. Wanted: store the author on each comment from the same identity the history uses (LOTAR_DEFAULT_REPORTER, the agent job''s profile, a project''s default.reporter), show it in lotar show, the JSON, the web UI and MCP, and keep old comments without an author readable. Done: lotar comment X -m hi with LOTAR_DEFAULT_REPORTER=claude shows ''claude'' next to the comment in show and JSON; tests cover CLI, REST and MCP. Afterwards standards drops the ''start each comment with your agent name'' line (configs/lotar/automation.yml, skills/lotar-workflow).'
 history:
 - at: 2026-11-12T08:57:56.677477+00:00
@@ -108,3 +110,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-298","DEV-372","DEV-383","DEV-384","DEV-461","DEV-470"]}'
     new: '{"related":["DEV-298","DEV-372","DEV-383","DEV-384","DEV-461","DEV-470","DEV-487"]}'
+- at: 2026-11-14T00:20:35.282824+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#1'

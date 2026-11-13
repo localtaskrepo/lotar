@@ -5,12 +5,14 @@ type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-13T22:21:42.991432+00:00
-modified: 2026-11-13T23:53:20.762749+00:00
+modified: 2026-11-14T00:34:55.230240+00:00
 relationships:
   blocks:
   - DEV-499
+  - DEV-417
   related:
   - DEV-493
+  - DEV-417
 comments:
 - date: 2026-11-13T22:48:06.295902+00:00
   author: claude
@@ -27,11 +29,30 @@ comments:
 - date: 2026-11-13T23:53:20.762749+00:00
   author: automation
   text: The review found blocking problems again after one rework (the comments above). Should an agent rework it once more (lotar assignee DEV-497 @fix), will you decide the findings, or is it WontDo?
+- date: 2026-11-14T00:19:09.621212+00:00
+  author: claude
+  text: 'mallox in the thread (2026-11-14): this goes into v0.15.0 (DEV-417), so an agent reworks it once more (his answer to the question above: `lotar assignee DEV-497 @fix`). Fix the review findings above, then the review and merge follow by the rules.'
+- date: 2026-11-14T00:32:28.414654+00:00
+  author: claude
+  text: 'Second rework, amended as 5799fdf6. Finding (deny.toml:46 allow-wildcard-paths without owner approval): fixed. deny.toml is back to main''s version, unchanged by this branch. Instead the root package''s path dependencies carry the workspace version (Cargo.toml: lotar-lib and lotar-web-assets, version = "0.14.3"), so cargo deny''s wildcards = "deny" passes as is. The root package''s publish = false, added only for that policy, is removed again (main''s state). New test path_dependencies_carry_the_workspace_version in tests/dev497_cargo_install_root_test.rs fails when those versions differ from [workspace.package] (checked by setting one to 0.14.2); docs/release-guide.md''s version-bump step names them. Checks: cargo deny check, npm run lint:agent, npm run test:agent (2143 Rust, 1515 UI), test:release 47, test:hooks 7, npm run smoke 390/390, cargo build --release --locked --all-features, cargo install --path . --locked (installs lotar). After a change in target/web-embed only lotar-web-assets and lotar compile: cargo build 0.85 s, cargo nextest run --no-run 1.20 s. Note: tests/embedded_web_ui_test.rs needs npm run build:web first (it says so; CI builds web before nextest). Not run: cross (x86_64-only images on this arm64 Mac), nfpm (not installed).'
+- date: 2026-11-14T00:33:39.461694+00:00
+  author: claude
+  text: 'mallox, 2026-11-13: "We''re actually currently working on publishing in crates. The token has already been added". Asked which layout then; he chose "Move library": the root package lotar is the binary (cargo install lotar, cargo install --path .), the library moves with its files into crates/lotar-lib (src/, tests/, build.rs), web assets in crates/lotar-web-assets, all publishable; publish = false and the deny.toml allow-wildcard-paths change are undone. On the library''s name he asked whether lotar stays an executable tool like nextest (it does: the lotar package holds the binary, like cargo-nextest with its library nextest-runner); crate name lotar-lib (lib name lotar) is a proposal until the first publish.'
+- date: 2026-11-14T00:34:50.190284+00:00
+  author: codex
+  text: 'Review: blocking. Cargo.toml:48-50 removes lotar-agent-wrapper from root installation by moving it to crates/lotar-lib/Cargo.toml. cargo install --path . previously installed both binaries; docs/help/install.md:130-132 says agent list-running needs the wrapper. Preserve both installed binaries and test the installed binary set, or obtain owner approval to remove that behavior. deny.toml is restored. Passed: cargo check --features schema --offline (RUSTC_WRAPPER cleared), 47 release/npm tests, 7 hook tests. Full lint, nextest, smoke, release/install and timing checks not rerun. No files, commits, status or assignee changed; no minor tickets filed.'
+- date: 2026-11-14T00:34:55.230240+00:00
+  author: automation
+  text: The review found blocking problems again after one rework (the comments above). Should an agent rework it once more (lotar assignee DEV-497 @fix), will you decide the findings, or is it WontDo?
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aece2a03a-cf09-4340-9bd6-4b7ecf0e4547
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aeb427d8b-11c2-4310-9c31-3447004ca1e2
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A497017e8-eba8-4d0b-a8ad-fdafc5b71a4b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A61d67abe-6798-4c17-958b-442bd90607aa
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3d3574f1-27f3-4348-b62d-131acda1ef87
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3b6a47a9-70f1-44d7-bed2-52ffa6c42311
+releases:
+- 5
 description: |-
   First step of the cargo workspace the owner approved (DEV-493, 2026-11-13: "Yes on all of those ideas"). A web-only change should rebuild only the embedded assets and the link, not the library and its tests.
 
@@ -171,6 +192,92 @@ history:
     old: backend, review-returned, review-blocked
     new: backend, review-returned
 - at: 2026-11-13T23:53:20.762749+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-14T00:16:07.737628+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-499"],"related":["DEV-493"]}'
+    new: '{"blocks":["DEV-499"],"related":["DEV-493","DEV-417"]}'
+- at: 2026-11-14T00:19:09.621212+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T00:19:09.731817+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-14T00:19:10.493211+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T00:19:11.441873+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3d3574f1-27f3-4348-b62d-131acda1ef87
+- at: 2026-11-14T00:19:41.915187+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-499"],"related":["DEV-493","DEV-417"]}'
+    new: '{"blocks":["DEV-499","DEV-417"],"related":["DEV-493","DEV-417"]}'
+- at: 2026-11-14T00:20:38.079939+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#5'
+- at: 2026-11-14T00:32:28.414654+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T00:32:37.951039+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T00:32:43.403454+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3b6a47a9-70f1-44d7-bed2-52ffa6c42311
+- at: 2026-11-14T00:33:39.461694+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T00:34:50.190284+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T00:34:50.215553+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: backend, review-returned
+    new: backend, review-returned, review-blocked
+- at: 2026-11-14T00:34:55.189897+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+  - field: tags
+    old: backend, review-returned, review-blocked
+    new: backend, review-returned
+- at: 2026-11-14T00:34:55.230240+00:00
   actor: automation
   changes:
   - field: comment_added

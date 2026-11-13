@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T06:20:58.670352+00:00
-modified: 2026-11-13T21:05:37.403630+00:00
+modified: 2026-11-14T00:20:37.085031+00:00
 relationships:
   blocks:
   - DEV-415
@@ -23,6 +23,8 @@ comments:
   text: 'Merged: main fast-forwarded to f646cb08 (feature), plus 4e59deac DEV-414 Ticket updates (.tasks status files, incl. DEV-377/398/408/413/415). Pushed to origin/main (647cb6a3..4e59deac). The branch already sat on main, so the rebase was a no-op; lint:agent, test:agent (2126 Rust, 1507 UI, release, hooks) and test:smoke:agent (385) had passed on that exact tree in the fix turn and weren''t rerun. The pre-push hook''s frontend checks passed.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A44cef934-b359-4836-8412-5bb359c86114
+releases:
+- 4
 description: |-
   A t3 job with session: new continues the ticket's last thread when its worktree holds unmerged work (DEV-377), unless its provider or model differs; then it starts a new thread on that branch (DEV-408). A reviewer needs a fresh context on the author's branch even on the same provider and model. Found while wiring in the review stage in standards (STD-59, owner 2026-11-12: "Yes, I agree with your recommendations"): @fix-light runs on claude-sonnet-5-5 and its reviewer @review-light on the same cheap model, so with DEV-408 alone the review would run as a further turn of the author's thread and check its own work. A ticket whose fields set the fix agent's provider to the reviewer's has the same problem.
 
@@ -95,3 +97,8 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-415"],"related":["DEV-377","DEV-408","DEV-468"]}'
     new: '{"blocks":["DEV-415"],"related":["DEV-377","DEV-408","DEV-468","DEV-486"]}'
+- at: 2026-11-14T00:20:37.085031+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#4'

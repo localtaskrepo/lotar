@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-12T05:17:25.629363+00:00
-modified: 2026-11-13T08:25:15.930929+00:00
+modified: 2026-11-14T00:20:35.394246+00:00
 relationships:
   related:
   - DEV-358
@@ -25,6 +25,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2c8fa46a-572d-4b0f-acb2-8f67616c1184
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8b41df6e-a512-4c29-afe9-43e4c0633457
+releases:
+- 1
 description: 'Found by claude while merging DEV-358 (2026-11-11): in one full npm run test:agent, jobs_in_another_process_are_seen_guarded_and_cancelled failed at tests/dev279_cross_process_jobs_test.rs:56 (assert status.status.success() after ''status TEST-1 Done'') at 0.68s; a rerun of the full suite passed and the test passed 3 of 3 alone. Check: cargo nextest run --cargo-profile local jobs_in_another_process repeatedly under full-suite load. Done when the status command''s failure cause is known and the test no longer races.'
 tags:
 - health
@@ -119,3 +121,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-358","TEST-1","DEV-360","DEV-376"]}'
     new: '{"related":["DEV-358","TEST-1","DEV-360","DEV-376","DEV-440"]}'
+- at: 2026-11-14T00:20:35.394246+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#1'

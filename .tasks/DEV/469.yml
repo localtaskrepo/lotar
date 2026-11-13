@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T10:33:48.095335+00:00
-modified: 2026-11-13T18:01:49.482222+00:00
+modified: 2026-11-14T00:20:37.385679+00:00
 relationships:
   related:
   - DEV-473
@@ -29,6 +29,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae151f7df-9d40-4739-a36f-48a4dd5074e4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac3d09d47-54fb-44bd-b7ae-b70c2546a7b5
+releases:
+- 5
 description: |-
   The built-in agent instructions make every t3 job's final message and prompt longer than the work needs (seen on about 75 jobs on 2026-11-13):
 
@@ -121,3 +123,8 @@ history:
   - field: relationships
     old: '{}'
     new: '{"related":["DEV-473"]}'
+- at: 2026-11-14T00:20:37.385679+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#5'

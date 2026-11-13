@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T09:15:11.355311+00:00
-modified: 2026-11-13T18:06:52.907039+00:00
+modified: 2026-11-14T00:20:37.349431+00:00
 relationships:
   related:
   - DEV-352
@@ -79,6 +79,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9d3c782c-3542-4a4f-ad76-f1853f27a886
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6c91b051-9104-450f-a1e0-b4f08610185c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A65dcce4c-19ea-486e-8486-9ba1618a343a
+releases:
+- 5
 description: |-
   ## Found
   QIS-180 (quarter-inch-studio, https://qis.pyxzl.net/task/QIS-180): the merge agent rebased the fix, fast-forwarded main and pushed it as 66762e5 (on origin/main). Its job then failed for an infrastructure reason (job-20261113T081737.047Z-10: "Could not reach the T3 Code server at http://127.0.0.1:3773", runner exit 1). The automation treated that as a failed merge: tag merge-retried, back to @fix. The fix retry also failed (job-20261113T084742.566Z-14: T3 server SQLite "database is locked"), then @fix-codex found nothing to do, and the ticket came back to review with agent/QIS-180 still at the pre-rebase commit 527682e, a duplicate of 66762e5. Two agent runs and a review went to work that was already on main.
@@ -464,3 +466,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-352","DEV-418","DEV-419","DEV-467","DEV-468","DEV-470"]}'
     new: '{"related":["DEV-352","DEV-418","DEV-419","DEV-467","DEV-468","DEV-470","DEV-473"]}'
+- at: 2026-11-14T00:20:37.349431+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#5'

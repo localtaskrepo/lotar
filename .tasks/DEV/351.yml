@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-12T03:49:42.921375+00:00
-modified: 2026-11-12T08:56:39.955463+00:00
+modified: 2026-11-14T00:20:35.357472+00:00
 relationships:
   depends_on:
   - DEV-349
@@ -22,6 +22,8 @@ comments:
   text: 'claude: Merged the regression test into main as 92d0391 (owner OK 2026-11-12), pushed; the fix itself is DEV-349''s (on main). Checks: npm run lint, npm test (Rust 2028, UI 1444), npm run smoke (380).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2c7cfedf-e726-4214-913b-e67414ccf5a4
+releases:
+- 1
 description: 'Found by DEV-347 (claude, 2026-11-11): tests/agent_safety_test.rs cli_cleanup_accepts_clean_merged_worktree_with_project_done_status failed its first try and passed on retry (nextest FLAKY 2/3) in a full npm test run on agent/DEV-347; it passed 15 of 15 runs on its own, so it fails only under parallel load. The test writes its own SAFE config, so DEV-347''s template change does not affect it. The low-noise test output kept no failure message. Check: run it 30 times under load (cargo nextest run --retries 0 next to the full suite) with no failure. Done when the cause is found and fixed, with the test passing without retries.'
 tags:
 - health
@@ -114,3 +116,8 @@ history:
   - field: status
     old: HelpNeeded
     new: Done
+- at: 2026-11-14T00:20:35.357472+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#1'

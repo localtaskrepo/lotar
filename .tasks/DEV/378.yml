@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-12T18:53:33.811162+00:00
-modified: 2026-11-13T19:12:58.247818+00:00
+modified: 2026-11-14T00:20:35.804061+00:00
 relationships:
   related:
   - DEV-377
@@ -63,6 +63,8 @@ comments:
   text: 'The step listed under ''Not done'' on 2026-11-12 19:20 was finished afterwards: main was pushed (8195112..ae839df, 19:29) and the ticket check was rerun on main''s content (19:28). The other leftover, ending the orphaned LOCA-120..122 jobs by hand, is now LOCA-312 in the local repo (LOCA-118 is already Done).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4e76c77c-bfa8-45ce-86c9-4fd1a4c6314c
+releases:
+- 2
 description: |-
   ## Found
 
@@ -178,3 +180,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-377","DEV-379","DEV-380","DEV-401","DEV-457"]}'
     new: '{"related":["DEV-377","DEV-379","DEV-380","DEV-401","DEV-457","DEV-478"]}'
+- at: 2026-11-14T00:20:35.804061+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#2'

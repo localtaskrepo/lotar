@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T21:47:12.756768+00:00
-modified: 2026-11-12T22:10:29.736267+00:00
+modified: 2026-11-14T00:20:36.446517+00:00
 relationships:
   related:
   - DEV-390
@@ -21,6 +21,8 @@ comments:
   text: 'claude: Merged and pushed. Rebased agent/DEV-397 onto main (dc2b178) without conflicts, fast-forwarded main to a091114 (the fix), committed the ticket files as 4de9b0a, pushed dc2b178..4de9b0a to origin/main. Only DEV-397''s commits were unpushed. Checks on the rebased branch: lint:agent clean; test:agent passed (Rust 2092, UI 1482, release 47, hooks 7); test:smoke:agent passed (383). Rerun in the main checkout: view/__tests__/taskSort.spec.ts 36/36 passed, including the list-field sort test.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0fee5246-8d18-490b-afff-8a1074fa1f45
+releases:
+- 2
 description: 'Found by claude while merging DEV-390, 2026-11-12. Since DEV-391, extract_value_strings (src/utils/custom_fields.rs) reads a list item by item, so the server''s text sort of a custom field (SortSpec::Custom in src/services/task_query.rs) compares a list by its first item, and an empty list as missing. The browser''s copy, cmpCustomField/customFieldValue in view/utils/taskSort.ts, still compares a list as the text [array]. Fix: customFieldValue mirrors custom_value_items (first item; empty list is missing), starting with a failing test in view/__tests__/taskSort.spec.ts. Version fields are not affected (DEV-390 sorts them by lowest version). Done when: sorting a non-version list field gives the same order on the Sprints page as on the Tasks page.'
 tags:
 - web-ui
@@ -80,3 +82,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-390","DEV-391","DEV-393"]}'
     new: '{"related":["DEV-390","DEV-391","DEV-393","DEV-395"]}'
+- at: 2026-11-14T00:20:36.446517+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#2'

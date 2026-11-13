@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T07:35:38.897340+00:00
-modified: 2026-11-12T07:46:12.825997+00:00
+modified: 2026-11-14T00:20:35.553473+00:00
 relationships:
   related:
   - DEV-361
@@ -20,6 +20,8 @@ comments:
   text: 'claude: Merged. Rebased onto main (clean), fast-forwarded main to ca6e17b (fix) and committed 9ea1c0e (DEV-371 Ticket updates, also the DEV-57/DEV-271 relationship edits). Pushed 654df68..9ea1c0e to origin/main (repos.json push: true; only this ticket''s commits were unpushed). Checks after the rebase: npm run lint, npm run test:agent (2020 Rust, 1444 UI, release and hook tests), npm run smoke (379): all pass. Ticket check rerun with a binary built from ca6e17b in a workspace where only the project config has Blocked: automation run --select ''status:blocked'' --dry-run now fails with "... ''blocked'' is configured only in project AM: add project:AM to the query"; with project:AM it runs. Note: the main checkout''s target/debug/lotar is from before the fix and needs a rebuild.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A73cc72ad-d85f-47f1-b339-b66fabc162d4
+releases:
+- 1
 description: 'Found by DEV-370 (claude, 2026-11-11): closing DEV-369 ran lotar automation run ''Release installed: run the waiting check'' --select ''status:blocked id:/^DEV-361$/'' and it failed with ''Status blocked is not enabled for this project. Valid statuses: Todo, InProgress, NeedsReview, Done''. Blocked is in .tasks/DEV/config.yml issue.states and default.project is DEV, but the query is checked against the global statuses only. With project:DEV in the query, or --project DEV, it works. The release rule now passes --project (f51de7c). Check: in a workspace whose global config has no Blocked and whose project config does, lotar automation run <rule> --select ''status:blocked'' --dry-run succeeds without --project (or the error names --project/project:). Done when that works with a test.'
 tags:
 - health
@@ -74,3 +76,8 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-14T00:20:35.553473+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#1'

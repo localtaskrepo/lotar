@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-03T21:12:54.993705+00:00
-modified: 2026-11-12T09:43:09.855558+00:00
+modified: 2026-11-14T00:20:35.246079+00:00
 relationships:
   related:
   - DEV-327
@@ -21,6 +21,8 @@ comments:
   text: 'claude: Merged into main and pushed (66b0755..5f03d73): 3ddd792 DEV-298 Automation conditions on the current value of a field, 5f03d73 DEV-298 Ticket updates (also carried DEV-327''s pending ticket change). Rebased twice, no conflicts (main gained DEV-350/DEV-327 ticket updates and DEV-327 code). Checks on the rebased branch: npm run lint:agent, test:agent (2037 Rust, 1446 UI, release, hooks), test:smoke:agent (380) all pass; pre-push hook passed.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8690acd3-fb82-4e74-918b-1a57f1bf4b52
+releases:
+- 1
 description: |-
   Short-form conditions ('type: Change', 'status: InProgress') mean 'changed to'. A rule like 'when a Change ticket moves to InProgress' can't express 'type is Change' without type itself changing, so the run script has to check LOTAR_TICKET_TYPE itself (that's what the home-network repo does now).
 
@@ -90,3 +92,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-327","DEV-350","DEV-372"]}'
     new: '{"related":["DEV-327","DEV-350","DEV-372","DEV-373"]}'
+- at: 2026-11-14T00:20:35.246079+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#1'

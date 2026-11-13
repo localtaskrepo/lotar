@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T11:19:41.648456+00:00
-modified: 2026-11-13T19:24:25.221303+00:00
+modified: 2026-11-14T00:20:37.494097+00:00
 relationships:
   related:
   - DEV-466
@@ -14,6 +14,7 @@ relationships:
   - DEV-377
   - DEV-473
   - DEV-476
+  - DEV-417
 comments:
 - date: 2026-11-13T11:33:27.407315+00:00
   author: claude
@@ -40,6 +41,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab44c36d8-896d-47bf-99ef-71f2524691a8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acf93d678-e4a5-4da4-94a8-5c308073cc64
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A858f89d9-9738-4f7c-ba62-3a887db6c0f8
+releases:
+- 5
 description: |-
   A rework after a blocking review starts a new T3 Code thread instead of going back to the fix agent's thread. Together with the fresh review thread and the inbox triage this gives each ticket 3 to 9 top-level threads, which the owner can't follow or tell apart (owner 2026-11-13, standards STD-88: "every task creates 3 threads in t3 so that it becomes overwhelming to handle and read and keep correlated").
 
@@ -205,3 +208,14 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-14T00:16:07.734593+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-466","DEV-468","DEV-470","DEV-377","DEV-473","DEV-476"]}'
+    new: '{"related":["DEV-466","DEV-468","DEV-470","DEV-377","DEV-473","DEV-476","DEV-417"]}'
+- at: 2026-11-14T00:20:37.494097+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#5'

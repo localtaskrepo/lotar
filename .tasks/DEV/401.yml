@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T00:31:54.569411+00:00
-modified: 2026-11-13T10:33:47.413043+00:00
+modified: 2026-11-14T00:20:36.646928+00:00
 relationships:
   related:
   - DEV-353
@@ -40,6 +40,8 @@ comments:
     Ticket check rerun: 'lotar agent logs job-20261113T000634.087Z-2' still shows agent_job_failed with no message. That is the old job's saved log from 0.14.1 and can't change. New jobs get the fix once lotar is rebuilt or released from main.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6f33f02e-8d3e-4f02-8f49-5e779aafd51e
+releases:
+- 3
 description: 'Found 2026-11-13 on DEV-400 with lotar 0.14.1: job job-20261113T000634.087Z-2 (t3 runner, Claude) logged agent_job_failed at 00:19:11, with no message, while its T3 thread (mcp:3a430fd3-78b4-4fdb-b726-de027a7cccef) was still running and working (T3 status running, no completedAt). The failure fired ''Fix failed: retry on @fix-codex'', which started a second agent on branch agent/DEV-400 while the first was still on it; the Codex agent noticed, held off and asked who owns the work. Two faults: (1) the job ended as failed while the thread ran (compare DEV-378, DEV-353: T3''s --wait and background work), and (2) the failure event has no reason, so neither the log nor the retry says why. Check: lotar agent logs job-20261113T000634.087Z-2 has agent_job_failed with no message while t3 thread mcp:3a430fd3-... was running at that time. Done: a t3 job whose thread still runs is not reported as failed (it waits, or ends with a status that starts no retry), every agent_job_failed carries its reason, with tests.'
 tags:
 - health
@@ -100,3 +102,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-353","DEV-378","DEV-400","DEV-399"]}'
     new: '{"related":["DEV-353","DEV-378","DEV-400","DEV-399","DEV-467"]}'
+- at: 2026-11-14T00:20:36.646928+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#3'

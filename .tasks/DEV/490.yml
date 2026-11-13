@@ -1,14 +1,16 @@
 title: 'Hand-off report comments: commits, checks passed, failed and not run, next step'
-status: HelpNeeded
+status: Blocked
 priority: Medium
 type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-13T21:14:11.750735+00:00
-modified: 2026-11-13T23:17:19.185093+00:00
+modified: 2026-11-14T00:28:06.148232+00:00
 relationships:
   depends_on:
   - DEV-488
+  blocks:
+  - DEV-417
   related:
   - DEV-466
   - DEV-489
@@ -25,8 +27,13 @@ comments:
 - date: 2026-11-13T23:17:19.053487+00:00
   author: claude
   text: 'Merge order (agreed 2026-11-13, coordinated by the DEV-502 agent): 1) DEV-502 merges first; it waits on nobody (review, then merge). 2) DEV-488 waits for DEV-502 only for its filter part: keep working on the rest, then rebase onto main and add the Type chips and the open-questions toggle. 3) DEV-489 and DEV-490 wait for DEV-488 (existing depends-on), then rebase and add Review / Hand-off to the Type row. 4) DEV-491 waits on nobody; whichever of it and DEV-502 merges second resolves the textual conflict on the comment <li>.'
+- date: 2026-11-14T00:28:06.148232+00:00
+  author: claude
+  text: 'Set to Blocked: this waits for DEV-488 (depends-on, tag blocked-by:DEV-488), not for the owner. As Blocked, the "Prerequisites done" rule continues it once DEV-488 is done; in HelpNeeded nothing would. It is in v0.15.0 (DEV-417, owner 2026-11-14).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A92f9648a-c12b-4124-9284-32c1807b437d
+releases:
+- 5
 description: |-
   Agents end their work with long prose comments that list the commit, the checks that passed and failed and the checks that did not run (e.g. DEV-466's 19:38 comment). The owner's rule is "say which checks didn't run". A `report` comment with those parts as fields shows them as a checklist and makes a missing "not run" visible. Owner chose it on 2026-11-13 together with the question comment type.
 
@@ -135,3 +142,24 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-488"],"related":["DEV-466","DEV-489","DEV-494","DEV-502"]}'
     new: '{"depends_on":["DEV-488"],"related":["DEV-466","DEV-489","DEV-494","DEV-502","DEV-491"]}'
+- at: 2026-11-14T00:19:41.649617+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-488"],"related":["DEV-466","DEV-489","DEV-494","DEV-502","DEV-491"]}'
+    new: '{"depends_on":["DEV-488"],"blocks":["DEV-417"],"related":["DEV-466","DEV-489","DEV-494","DEV-502","DEV-491"]}'
+- at: 2026-11-14T00:20:37.888158+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#5'
+- at: 2026-11-14T00:28:05.127380+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-14T00:28:06.148232+00:00
+  actor: claude
+  changes:
+  - field: comment_added

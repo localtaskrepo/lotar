@@ -5,13 +5,14 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T21:05:37.278437+00:00
-modified: 2026-11-13T23:44:50.829303+00:00
+modified: 2026-11-14T00:20:37.745171+00:00
 relationships:
   related:
   - DEV-408
   - DEV-414
   - DEV-478
   - DEV-505
+  - DEV-417
 comments:
 - date: 2026-11-13T21:16:00.871468+00:00
   author: claude
@@ -33,6 +34,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af94fce2a-f9b9-4d1c-92d6-ed98fda5ecef
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9d0d3759-3f46-481b-b5c9-4046da28753f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af9d46836-ef0d-4145-8229-0f7dde9d62ba
+releases:
+- 5
 description: |-
   Found by the refine pilot (standards STD-96, docs/evidence/refine-pilot.md), 2026-11-13. src/services/agent_job_service.rs thread_with_open_work: when release_branch fails, the Err arm returns OpenWork::Continue for every profile, also for session: fresh. DEV-414 chose this to match DEV-408. But fresh exists for the @review stage (STD-59): a reviewer that continues the author's thread reviews its own work in the author's context, the case DEV-414 was made to prevent.
 
@@ -171,3 +174,14 @@ history:
   - field: relationships
     old: '{"related":["DEV-408","DEV-414","DEV-478"]}'
     new: '{"related":["DEV-408","DEV-414","DEV-478","DEV-505"]}'
+- at: 2026-11-14T00:16:07.736202+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-408","DEV-414","DEV-478","DEV-505"]}'
+    new: '{"related":["DEV-408","DEV-414","DEV-478","DEV-505","DEV-417"]}'
+- at: 2026-11-14T00:20:37.745171+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#5'

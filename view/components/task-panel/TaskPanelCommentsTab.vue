@@ -11,9 +11,17 @@
       />
     </div>
     <template v-if="mode === 'edit'">
+      <TaskPanelActivityFilter
+        v-if="filterGroups.length"
+        label="Filter comments"
+        :groups="filterGroups"
+        :hidden-text="hiddenText"
+        @toggle="(_group, author) => filter.toggleAuthor(author)"
+        @show-all="filter.showAll"
+      />
       <ul class="task-panel__comments">
         <li
-          v-for="(comment, commentIndex) in task.comments || []"
+          v-for="{ comment, index: commentIndex } in visibleComments"
           :key="`${comment.date}-${commentIndex}`"
           class="task-panel__comment"
         >
@@ -65,7 +73,8 @@
             @keydown.ctrl.enter.prevent="$emit('saveEdit', commentIndex)"
           ></textarea>
         </li>
-        <li v-if="!(task.comments && task.comments.length)" class="muted">No comments yet</li>
+        <li v-if="!comments.length" class="muted">No comments yet</li>
+        <li v-else-if="!visibleComments.length" class="muted">All comments are hidden by the filter</li>
       </ul>
       <div class="task-panel__comment-editor">
         <textarea :value="newComment" rows="3" placeholder="Add a comment…" @input="onNewCommentInput"></textarea>
@@ -87,11 +96,13 @@
 </template>
 
 <script setup lang="ts">
-import type { ComponentPublicInstance } from 'vue'
+import { computed, type ComponentPublicInstance } from 'vue'
+import { COMMENT_FILTER_KEY, useActivityFilter } from '../../composables/task-panel/useActivityFilter'
 import IconGlyph from '../IconGlyph.vue'
 import MarkdownContent from '../MarkdownContent.vue'
 import ReloadButton from '../ReloadButton.vue'
 import UiButton from '../UiButton.vue'
+import TaskPanelActivityFilter, { type ActivityFilterGroup } from './TaskPanelActivityFilter.vue'
 
 interface TaskComment {
   date: string
@@ -120,6 +131,36 @@ const emit = defineEmits<{
   (e: 'update:newComment', value: string): void
   (e: 'update:editingCommentText', value: string): void
 }>()
+
+const filter = useActivityFilter(COMMENT_FILTER_KEY)
+
+const comments = computed(() => (props.task.comments || []).map((comment, index) => ({ comment, index })))
+const visibleComments = computed(() =>
+  comments.value.filter(({ comment }) => !filter.hiddenAuthors.value.has(comment.author || '')),
+)
+
+/** One chip per author on this task, even a single one, so a task with only automation's comments can hide them. */
+const filterGroups = computed<ActivityFilterGroup[]>(() => {
+  const authors = [...new Set(comments.value.map(({ comment }) => comment.author || ''))]
+  if (!authors.length) return []
+  return [
+    {
+      id: 'author',
+      name: 'Author',
+      items: authors.map((author) => ({
+        value: author,
+        label: author || 'No author',
+        hidden: filter.hiddenAuthors.value.has(author),
+      })),
+    },
+  ]
+})
+
+const hiddenText = computed(() => {
+  const hidden = comments.value.length - visibleComments.value.length
+  if (!hidden) return ''
+  return `${hidden} of ${comments.value.length} ${comments.value.length === 1 ? 'comment' : 'comments'} hidden.`
+})
 
 function onEditingTextInput(event: Event) {
   emit('update:editingCommentText', (event.target as HTMLTextAreaElement).value)

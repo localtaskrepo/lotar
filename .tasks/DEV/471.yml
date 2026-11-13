@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T11:02:08.051420+00:00
-modified: 2026-11-13T22:08:01.736257+00:00
+modified: 2026-11-14T00:20:37.457005+00:00
 relationships:
   related:
   - DEV-467
@@ -38,6 +38,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A68db10bd-eee1-4e4b-ae5e-7eeb2f02d38b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad41a50c9-dba4-4cd6-8e57-eedece08eb19
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1fa97ac8-1288-4d57-9f5a-2de259918e64
+releases:
+- 5
 description: 'Found 2026-11-13 11:00Z while working on DEV-467: 40 ''target/smoke/lotar serve --port 0 --host 127.0.0.1'' processes from the worktrees agent-DEV-409-b5589b2cd370b848 and agent-DEV-411-b5a25146b846a18e, started 2026-11-12 20:19 to 21:43 local, still run with parent pid 1 (their smoke runs ended long ago). Check: ps -axo pid,ppid,lstart,command | grep ''target/smoke/lotar serve'' lists servers whose smoke run is gone. Done when: a smoke run that ends, fails or is killed stops the servers it started, with a test; the leftover processes are stopped.'
 tags:
 - health
@@ -194,3 +196,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-467","DEV-473","DEV-481"]}'
     new: '{"related":["DEV-467","DEV-473","DEV-481","DEV-493"]}'
+- at: 2026-11-14T00:20:37.457005+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#5'

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T21:05:37.639521+00:00
-modified: 2026-11-13T23:44:50.829730+00:00
+modified: 2026-11-14T00:20:37.781837+00:00
 relationships:
   related:
   - DEV-327
@@ -27,6 +27,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac2daa539-a817-4111-b0cc-4c85abc7c275
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9d2921a5-b6c4-4060-a763-72958d8c54e3
+releases:
+- 5
 description: |-
   Found by the refine pilot (standards STD-96, docs/evidence/refine-pilot.md), 2026-11-13. src/cli/handlers/stats/comments.rs run_by_author still says 'Comments carry no author, so this ranks tasks by comment count'. Since DEV-327 every new comment has an author field.
 
@@ -118,3 +120,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-327","DEV-478"]}'
     new: '{"related":["DEV-327","DEV-478","DEV-505"]}'
+- at: 2026-11-14T00:20:37.781837+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#5'

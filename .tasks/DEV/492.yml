@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T21:27:57.663811+00:00
-modified: 2026-11-13T22:55:07.445999+00:00
+modified: 2026-11-14T00:20:37.924605+00:00
 relationships:
   related:
   - DEV-501
@@ -35,6 +35,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9cf75e47-e8d0-45e5-88ad-eb92ada61a1f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A09ad63ea-121e-4188-bbf1-5d58b7ccde3d
+releases:
+- 5
 description: |-
   Design a harness tool of its own, next to lotar in the localtaskrepo group: one way for lotar, agents and other apps to start, follow, message and resume sessions of Claude, Codex, Kilo and other coding-agent CLIs. The owner, 2026-11-13: "Why not pull it out and put it in its own repo next to lotar as a tool that allows multiplexing between harnesses. Then lotar can use, we can use it, any other app that needs it could use it. And we have a separate codebase that we can update at a higher frequency (for when the apis change) and faster than rebuilding lotar each time." He chose a design ticket first (standards docs/decisions/2026-11-13-harness-tool.md). Design only: no code, no new repo yet.
 
@@ -172,3 +174,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-14T00:20:37.924605+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#5'

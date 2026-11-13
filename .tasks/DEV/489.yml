@@ -5,10 +5,12 @@ type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-13T21:14:10.488871+00:00
-modified: 2026-11-13T23:17:18.805330+00:00
+modified: 2026-11-14T00:20:37.853233+00:00
 relationships:
   depends_on:
   - DEV-488
+  blocks:
+  - DEV-417
   related:
   - DEV-490
   - DEV-494
@@ -26,6 +28,8 @@ comments:
   text: 'Merge order (agreed 2026-11-13, coordinated by the DEV-502 agent): 1) DEV-502 merges first; it waits on nobody (review, then merge). 2) DEV-488 waits for DEV-502 only for its filter part: keep working on the rest, then rebase onto main and add the Type chips and the open-questions toggle. 3) DEV-489 and DEV-490 wait for DEV-488 (existing depends-on), then rebase and add Review / Hand-off to the Type row. 4) DEV-491 waits on nobody; whichever of it and DEV-502 merges second resolves the textual conflict on the comment <li>.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A74f7ed3c-4dde-4352-9136-60c3c1d347ed
+releases:
+- 5
 description: |-
   Review agents write their verdict as prose ("Review: passed. ...", "The review found blocking problems") and automation finds it through the tags `review-returned` and `review-blocked`. A `review` comment with a verdict and findings makes the result readable at a glance and lets rules key on the verdict instead of tags. Owner chose it on 2026-11-13 together with the question comment type.
 
@@ -114,3 +118,14 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-488"],"related":["DEV-490","DEV-494","DEV-502"]}'
     new: '{"depends_on":["DEV-488"],"related":["DEV-490","DEV-494","DEV-502","DEV-491"]}'
+- at: 2026-11-14T00:19:41.387118+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-488"],"related":["DEV-490","DEV-494","DEV-502","DEV-491"]}'
+    new: '{"depends_on":["DEV-488"],"blocks":["DEV-417"],"related":["DEV-490","DEV-494","DEV-502","DEV-491"]}'
+- at: 2026-11-14T00:20:37.853233+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#5'

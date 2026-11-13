@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T20:54:19.282112+00:00
-modified: 2026-11-12T22:10:29.734701+00:00
+modified: 2026-11-14T00:20:36.180511+00:00
 relationships:
   related:
   - DEV-373
@@ -32,6 +32,8 @@ references:
 - file: view/utils/taskSort.ts
 - file: view/utils/versions.ts
 - file: view/pages/SprintsList.vue
+releases:
+- 2
 description: |-
   The Sprints page and the Board sort a version field (`affects`, `fixed_in`) as text, so `0.10.0` sorts before `0.9.1`. The server sorts version fields by version order since DEV-373, but the browser's copy of the sort was not updated. Found by claude in an audit of version support, 2026-11-12.
 
@@ -150,3 +152,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-373","DEV-374","DEV-397","DEV-385","DEV-391","DEV-392","DEV-396","DEV-394"]}'
     new: '{"related":["DEV-373","DEV-374","DEV-397","DEV-385","DEV-391","DEV-392","DEV-396","DEV-394","DEV-395"]}'
+- at: 2026-11-14T00:20:36.180511+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#2'

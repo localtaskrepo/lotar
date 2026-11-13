@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-12T06:34:54.326999+00:00
-modified: 2026-11-12T18:39:56.263264+00:00
+modified: 2026-11-14T00:20:35.515652+00:00
 relationships:
   related:
   - DEV-369
@@ -30,6 +30,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A757d9bf4-8214-467d-9d47-5df92236f012
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A39e8c835-32c8-4f3d-907f-4d81655e1cbb
+releases:
+- 1
 description: 'Two tickets now wait for the next release to run their checks (rule of 2, owner 2026-11-11): ''Maybe we should create a ticket for the next release which other agents can check ... They need to be triggered when the release is done, so we need a release process defined and set up for lotar''. Owner decisions 2026-11-11: a waiting ticket is ''Blocked + depends on release'' (status Blocked, depends_on the ''Release vX.Y.Z'' ticket, e.g. DEV-369); the checks start on ''Closing the release ticket'': the last release-guide step, after brew upgrade lotar on this Mac, sets the release ticket Done. Set up: (1) an automation rule in lotar''s .tasks config that, when a release ticket goes Done, hands every Blocked ticket depending on it to @fix with a prompt like ''Release <version> is installed: run your check, close the ticket or report what still fails''; (2) docs/release-guide.md: create the next release ticket, link waiting tickets, close it after installing; (3) the agent guidance (lotar-dev-tracking or development-workflow skill): a ticket whose check needs a release goes Blocked + depends_on the open release ticket, not HelpNeeded. Open for the implementer: rule conditions need their field to change in the update (docs/help/automation.md Triggers), and actions apply to the ticket that fired, so reaching the dependents may need a run: lotar automation run ... --select step or a small lotar change; propose before adding code. Check: create a test release ticket and a Blocked dependent in a temp workspace, close the release ticket, and the dependent is assigned to the check agent. Done when that works with a test, and the docs and guidance describe it.'
 history:
 - at: 2026-11-12T06:34:54.405518+00:00
@@ -152,3 +154,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-369","DEV-361","DEV-364","DEV-368","DEV-371"]}'
     new: '{"related":["DEV-369","DEV-361","DEV-364","DEV-368","DEV-371","DEV-376"]}'
+- at: 2026-11-14T00:20:35.515652+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#1'

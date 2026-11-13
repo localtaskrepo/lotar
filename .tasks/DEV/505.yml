@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T22:45:44.077860+00:00
-modified: 2026-11-13T23:57:14.708091+00:00
+modified: 2026-11-14T00:20:38.232245+00:00
 relationships:
   related:
   - DEV-492
@@ -44,6 +44,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A28fec7dc-34ea-4966-bd7c-9797738d89ee
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab77286cc-0e9d-4702-aae3-ba4a9636b56e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3594f6e0-b8ed-4888-954a-4868c6e2a85c
+releases:
+- 5
 description: 'Found by claude on DEV-492, 2026-11-13: lotar agent --help and docs/help/agent.md say you can remove a queued job but name no command; lotar agent cancel DEV-501 answered "Job not found". The command exists: lotar agent queue remove <TICKET> (and queue flush), src/cli/handlers/agent.rs:373-392. Check: grep -n ''queue remove'' docs/help/agent.md finds nothing. Done: docs/help/agent.md and the agent help list queue remove and queue flush with an example.'
 tags:
 - health
@@ -194,3 +196,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-14T00:20:38.232245+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#5'

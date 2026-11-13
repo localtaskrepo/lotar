@@ -5,7 +5,7 @@ type: Feature
 reporter: mallox
 assignee: '@merge'
 created: 2026-11-12T08:53:59.182009+00:00
-modified: 2026-11-12T20:54:40.395541+00:00
+modified: 2026-11-14T00:20:35.652174+00:00
 relationships:
   related:
   - DEV-374
@@ -66,6 +66,8 @@ comments:
   text: 'claude: Merged. Rebased agent/DEV-373 onto main (clean, no conflicts) and fast-forwarded main: 23cefb1 DEV-373 Add versions, plus 7798ae0 DEV-373 Ticket updates (DEV-364 and DEV-373 ticket files). Pushed to origin/main (ae6d567..7798ae0), pre-push hooks ran, nothing but this ticket''s commits was unpushed. Checks in the worktree after the rebase: npm run lint clean; npm test passes (2061 Rust, 1469 UI, release 47, hooks 7); npm run smoke 380 of 381: api.automation.smoke.spec.ts ''monitor counterfactual'' failed once and then passed 3 of 3 runs of that file alone and in the earlier full run tonight, so it is a load-dependent flake unrelated to versions; filed as DEV-375 (health).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa2665ffa-2a99-4ee0-9537-002211dcfb14
+releases:
+- 2
 description: We don't have a place to indicate which version a bug affects or when it was found. We should add smart field support and fields with powerful operations for them, such as understanding version ranges.
 history:
 - at: 2026-11-12T09:42:26.878678+00:00
@@ -178,3 +180,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-374","DEV-298","DEV-375","DEV-364","DEV-379","DEV-390","DEV-391","DEV-393","DEV-394","DEV-392"]}'
     new: '{"related":["DEV-374","DEV-298","DEV-375","DEV-364","DEV-379","DEV-390","DEV-391","DEV-393","DEV-394","DEV-392","DEV-395"]}'
+- at: 2026-11-14T00:20:35.652174+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#2'

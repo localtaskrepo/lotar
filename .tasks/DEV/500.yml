@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T22:21:44.054473+00:00
-modified: 2026-11-13T23:58:32.566918+00:00
+modified: 2026-11-14T00:20:38.154587+00:00
 relationships:
   related:
   - DEV-493
@@ -56,6 +56,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acb4bc02c-bf5b-4a46-8904-8dee7196316d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8349d317-032e-4852-a32f-e2a010e8a453
+releases:
+- 5
 description: |-
   Make the slowest Rust tests faster, so the suite is cheap to run often. The owner, 2026-11-13: "The faster tests can run, the cheaper it is to run them more often."
 
@@ -150,3 +152,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-493","DEV-478","DEV-505"]}'
     new: '{"related":["DEV-493","DEV-478","DEV-505","DEV-495"]}'
+- at: 2026-11-14T00:20:38.154587+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#5'

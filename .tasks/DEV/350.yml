@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-12T03:43:14.648117+00:00
-modified: 2026-11-13T08:25:03.845239+00:00
+modified: 2026-11-14T00:20:35.319402+00:00
 relationships:
   related:
   - DEV-347
@@ -25,6 +25,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A627ccc61-c4a9-4cc6-a210-7cb9860ff5eb
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2570ed37-c6bf-4cb9-a2a5-012d7f053df8
+releases:
+- 1
 description: 'Found by DEV-347 (claude, 2026-11-11): TaskService::update_composed_inner checks running_job_id before the update and calls agent_active_jobs::record_outcome after it, so the window is the length of the whole update, not the one file read the end_and_take_outcome doc comment says. If finalize_job removes the job from active_by_ticket and apply_job_event runs end_and_take_outcome in between, the outcome file is written after it was read; nobody applies it and the receipt still says deferred. Shown by tests/agent_automation_integration_test.rs shipped_agent_reviewed_template_handles_hand_back_failure_review_and_merge failing about 1 in 5 (assignee stays at the reporter, the second @test job never starts) when the test reassigned right after the hand-back job reported completed; DEV-347 now waits for job_settled there. Check: an assignment made while a job is ending is either applied directly or applied as its outcome, never dropped (a unit test that records an outcome after end_and_take_outcome). Done when record_outcome refuses or applies directly for an ended job, and a test covers it.'
 tags:
 - health
@@ -133,3 +135,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-347","DEV-352","DEV-348","DEV-366","DEV-298","DEV-372"]}'
     new: '{"related":["DEV-347","DEV-352","DEV-348","DEV-366","DEV-298","DEV-372","DEV-422"]}'
+- at: 2026-11-14T00:20:35.319402+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#1'

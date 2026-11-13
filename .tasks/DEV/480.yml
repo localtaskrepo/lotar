@@ -5,11 +5,12 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T19:28:50.779737+00:00
-modified: 2026-11-13T23:44:50.828526+00:00
+modified: 2026-11-14T00:20:37.640382+00:00
 relationships:
   related:
   - DEV-478
   - DEV-505
+  - DEV-417
 comments:
 - date: 2026-11-13T19:43:29.641222+00:00
   author: claude
@@ -31,6 +32,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A404f0f42-47f6-4ea1-ad87-97dea878a58b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7c9dd217-1e5c-458c-885d-8bcc93b3e953
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A517beb29-503f-4387-ad32-9875e8582059
+releases:
+- 5
 description: 'Found while doing DEV-478: on_t3_thread_continued (src/services/agent_job_service.rs) sets the job''s session_id in memory but never calls agent_active_jobs::set_session, so a process that takes the job over has no thread id. The DEV-478 lookup can''t help, because it only finds threads created after the job started. Check: a continue job whose worker dies ends from the continued thread''s state, not from the run before it. Done when a test covers this takeover.'
 tags:
 - health
@@ -157,3 +160,14 @@ history:
   - field: relationships
     old: '{"related":["DEV-478"]}'
     new: '{"related":["DEV-478","DEV-505"]}'
+- at: 2026-11-14T00:16:07.735586+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-478","DEV-505"]}'
+    new: '{"related":["DEV-478","DEV-505","DEV-417"]}'
+- at: 2026-11-14T00:20:37.640382+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#5'

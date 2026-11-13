@@ -5,7 +5,7 @@ type: Feature
 reporter: codex
 assignee: '@merge'
 created: 2026-11-13T19:16:59.162304+00:00
-modified: 2026-11-13T19:26:25.575869+00:00
+modified: 2026-11-14T00:20:37.602259+00:00
 relationships:
   related:
   - DEV-467
@@ -22,6 +22,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A76b9a6d9-371b-49cb-aef3-3751a429aef9
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A567c5784-c61c-4ba9-aa1e-9373b3281926
+releases:
+- 5
 description: 'Found during DEV-467 review: npm run test:rust fails before compilation because /opt/homebrew/bin/sccache rustc -vV returns Operation not permitted in the restricted agent sandbox. Repeated reviews stopped without trying authorized execution. Check: run npm run test:rust -- pending_outcome_tests in the restricted harness. Done when agent verification guidance or harness permissions provide a working authorized retry and distinguish sandbox denial from a code failure. Related DEV-467.'
 tags:
 - health
@@ -91,3 +93,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-14T00:20:37.602259+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#5'

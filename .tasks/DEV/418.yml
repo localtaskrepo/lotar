@@ -5,11 +5,12 @@ type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-13T08:06:43.253125+00:00
-modified: 2026-11-13T10:09:57.158377+00:00
+modified: 2026-11-14T00:20:37.243454+00:00
 relationships:
   related:
   - DEV-419
   - DEV-465
+  - DEV-417
 comments:
 - date: 2026-11-13T08:14:45.615636+00:00
   author: claude
@@ -33,6 +34,8 @@ references:
 - file: docs/help/serve.md
 - file: view/__tests__/BoardCardMeta.spec.ts
 - file: smoke/tests/ui.board-relationships.smoke.spec.ts
+releases:
+- 5
 description: |-
   Board cards don't show a ticket's relationships, so you can't see at a glance which tickets block others. The owner asked (2026-11-13) for a card field that can be turned on and off like the others and lists the related IDs, e.g. "Blocks" followed by the IDs of the blocked tickets.
 
@@ -196,3 +199,14 @@ history:
   - field: relationships
     old: '{"related":["DEV-419"]}'
     new: '{"related":["DEV-419","DEV-465"]}'
+- at: 2026-11-14T00:16:07.733763+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-419","DEV-465"]}'
+    new: '{"related":["DEV-419","DEV-465","DEV-417"]}'
+- at: 2026-11-14T00:20:37.243454+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#5'

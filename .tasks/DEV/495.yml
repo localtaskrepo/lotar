@@ -1,11 +1,11 @@
 title: Windows CI runs its 40 selected tests without building the library's unit-test binary
-status: Merging
+status: Done
 priority: High
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T22:21:42.297785+00:00
-modified: 2026-11-14T00:05:26.778166+00:00
+modified: 2026-11-14T00:20:38.040558+00:00
 relationships:
   related:
   - DEV-493
@@ -48,11 +48,16 @@ comments:
 - date: 2026-11-14T00:05:22.113+00:00
   author: codex
   text: 'Review: passed. Reviewed 7e9b7e13 diff, ticket comments and approvals, related tickets and main history. No findings. Permission tests and lock-timeout optimization preserved. Reran 41 selected tests plus manifest/JUnit gate, nine CI contract tests, 47 checker self-tests and diff check: passed. RUSTC_WRAPPER= used after sandbox denial. Native Windows and full lint/test/smoke not repeated; fix comment records full passes on this head. No files, commits, status or assignee changed.'
+- date: 2026-11-14T00:06:40.926800+00:00
+  author: codex
+  text: 'Merged 7e9b7e13 by fast-forward into main; included pending .tasks updates in signed amended main commit 860539ae. Rebase was a no-op with identical HEAD: skipped lint:agent, test:agent and test:smoke:agent per exact-head fix verification; review also passed 41 selected tests, manifest/JUnit gate, nine contract tests and 47 checker self-tests. Native Windows not run. Main was clean after amend. Pushed finished prefix through 7fa24fb1; push hook formatting/clippy passed. DEV-493 measurement work at 23484856 is HelpNeeded awaiting owner adoption decision, so it and subsequent DEV-506/DEV-495 commits remain local under finished-work-only push policy. No status or assignee changes; job automation completes ticket.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0a7952ff-8d56-49c9-ab90-fa87a5b57230
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A348ac5bc-1a1b-4d65-80c0-250fd960cea7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A45776dde-086c-4b15-a00d-169148dbe874
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1d2a7356-5e4e-4bd8-a143-ef3803129158
+releases:
+- 5
 description: |-
   The Windows CI job is the critical path in 71 of 88 green runs (DEV-493). Its longest step builds the whole lotar library as a unit-test binary (2m44 to 4m58) to run 40 tests that take 2 to 3 s. The owner, 2026-11-13: "Yes on all of those ideas. We really need to try and optimize the build and CI time. The faster tests can run, the cheaper it is to run them more often."
 
@@ -74,7 +79,6 @@ description: |-
   - [ ] Wall time of the Windows job before and after, from a CI run or measured locally and marked as such.
 tags:
 - backend
-- merge-retried
 history:
 - at: 2026-11-13T22:21:42.485681+00:00
   actor: claude
@@ -275,3 +279,21 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-14T00:06:40.926800+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T00:06:46.132455+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: backend, merge-retried
+    new: backend
+- at: 2026-11-14T00:20:38.040558+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#5'

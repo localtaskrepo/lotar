@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T01:24:37.163521+00:00
-modified: 2026-11-13T01:57:43.172129+00:00
+modified: 2026-11-14T00:20:36.718078+00:00
 relationships:
   related:
   - DEV-381
@@ -21,6 +21,8 @@ comments:
   text: 'Merged and pushed. Rebased agent/DEV-403 onto main (clean, now c5fe8aa, signed), fast-forwarded main, committed ticket files as 912646e ''DEV-403 Ticket updates'' (includes the pending DEV-381/400/402/405/406 ticket changes), pushed e972f09..912646e to origin/main. Checks after the rebase: npm run lint:agent, npm run test:agent (2111 Rust + 1507 UI), npm run test:smoke:agent (385): all pass. Note: DEV-405 (health ticket, finding identity:comment-author-env, at @merge) reports the same bug. Its Done-when differs on one point: it wants a new ticket''s reporter to keep the documented precedence (project over env), while this fix also makes LOTAR_DEFAULT_REPORTER win for the auto-set reporter on add. DEV-405''s merge will likely conflict with c5fe8aa in src/utils/identity_detectors.rs and the docs.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A358a231a-453a-4405-8dd5-9a240fa727b1
+releases:
+- 3
 description: |-
   ## Found
   On QIS-170 (quarter-inch-studio), agent comments made with `LOTAR_DEFAULT_REPORTER=claude` were stored as `author: mallox`. QIS's `config.yml` sets `default.reporter: mallox`. The `commented` rule then took each agent comment for an owner comment and started another agent turn: a loop (2026-11-13, lotar 0.14.1).
@@ -88,3 +90,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-381","DEV-405","DEV-406"]}'
     new: '{"related":["DEV-381","DEV-405","DEV-406","DEV-404"]}'
+- at: 2026-11-14T00:20:36.718078+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#3'

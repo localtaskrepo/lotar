@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-12T09:42:26.800525+00:00
-modified: 2026-11-12T23:59:31.832538+00:00
+modified: 2026-11-14T00:20:35.690421+00:00
 relationships:
   related:
   - DEV-373
@@ -33,6 +33,8 @@ comments:
 - date: 2026-11-12T23:59:11.550061+00:00
   author: claude
   text: 'claude: Step 5: Release run 43331639720, every job succeeded (builds, signing, npm, deb/rpm, Homebrew, Scoop, Docker). Step 6: brew upgrade lotar, lotar --version prints 0.14.1; the six lotar servers restarted on it (--exit-on-upgrade, 15:58). Closing.'
+releases:
+- 2
 description: 'Next release, planned with DEV-373 (versions), which the owner verifies first (2026-11-12: ''I''ll verify it tomorrow for the next major release''). The owner picks the bump; rename this ticket if it differs (the title must start with ''Release v''). Steps: .github/skills/release/SKILL.md and docs/release-guide.md. Done when the release is installed here. Tickets that wait for this release are Blocked and depend on it; closing this ticket hands them to @fix to run their checks. Waiting now: none.'
 history:
 - at: 2026-11-12T09:42:26.879084+00:00
@@ -121,3 +123,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-373","DEV-385","DEV-386","DEV-390","DEV-391","DEV-392","DEV-388","DEV-389"]}'
     new: '{"related":["DEV-373","DEV-385","DEV-386","DEV-390","DEV-391","DEV-392","DEV-388","DEV-389","DEV-399"]}'
+- at: 2026-11-14T00:20:35.690421+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#2'

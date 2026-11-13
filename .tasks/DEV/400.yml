@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T00:06:31.927029+00:00
-modified: 2026-11-13T08:26:39.234460+00:00
+modified: 2026-11-14T00:20:36.611046+00:00
 relationships:
   related:
   - DEV-388
@@ -40,6 +40,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3a430fd3-78b4-4fdb-b726-de027a7cccef
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A45347697-096a-4e97-9c49-12ff2b47b04a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0652f0f3-09a2-4158-a0a9-445c728db4b8
+releases:
+- 3
 description: 'Found 2026-11-12 with lotar 0.14.1 (installed), while setting up STD-56: in ~/Development/@localtaskrepo/lotar, lotar automation run "Merge agent lifecycle" --dry-run printed nothing for 40 s (killed; user 1.6 s, sys 4.6 s, so it waits or does file IO, not CPU), and lotar automation run "Prerequisites done: continue the waiting ticket" --dry-run printed its preview and then did not exit within 60 s (sys 12.9 s). The same ''Merge agent lifecycle'' run in ~/Development/standards (56 tickets) fails at once with ''No rule named ... with a manual or unblocked action'', as it should. Suspect DEV-388''s scan for prerequisites in another repo (it runs on every automation run). Check: time lotar automation run "Merge agent lifecycle" --dry-run in this repo. Done: it ends in a few seconds (the validation error here), a test covers a repo of this size or the slow step, and the cross-repo unblocked scan stays as DEV-388 built it. STD-56 runs this command from a daily job in every repo, so it has to be quick.'
 tags:
 - health
@@ -189,3 +191,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-388","DEV-401","DEV-123","DEV-353","DEV-399","DEV-402","DEV-398","DEV-410"]}'
     new: '{"related":["DEV-388","DEV-401","DEV-123","DEV-353","DEV-399","DEV-402","DEV-398","DEV-410","DEV-458"]}'
+- at: 2026-11-14T00:20:36.611046+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#3'

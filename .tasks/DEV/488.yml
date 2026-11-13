@@ -5,13 +5,14 @@ type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-13T21:13:42.890310+00:00
-modified: 2026-11-13T23:20:00.390487+00:00
+modified: 2026-11-14T00:20:37.817014+00:00
 relationships:
   depends_on:
   - DEV-502
   blocks:
   - DEV-489
   - DEV-490
+  - DEV-417
   related:
   - DEV-466
   - DEV-478
@@ -20,6 +21,7 @@ relationships:
   - DEV-491
   - DEV-494
   - DEV-502
+  - DEV-417
 comments:
 - date: 2026-11-13T21:43:40.367443+00:00
   author: claude
@@ -121,6 +123,8 @@ references:
 - attachment: before-tasks-light-1920.0bebdaecf1007ab9828704ad35a91ccc.png
 - attachment: before-tasks-light-390.bc593ca94443b29919edbd3fe11ffdbf.png
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acaf0b13d-f674-4f85-83a5-6706f6c01497
+releases:
+- 5
 description: |-
   Agents and automation ask the owner multiple-choice questions in prose ("Question for mallox: A, B, C or none?"); he answers in a line and an agent has to read his words back and do the routing. A `question` comment with options, and an `answer` comment that records the choice, lets the UI show buttons and lets an option set the ticket's fields itself. The owner asked for it on 2026-11-13 and chose the full scope (options that set fields, open questions on cards).
 
@@ -612,3 +616,20 @@ history:
   - field: status
     old: HelpNeeded
     new: Blocked
+- at: 2026-11-14T00:16:07.736496+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-502"],"blocks":["DEV-489","DEV-490"],"related":["DEV-466","DEV-478","DEV-483","DEV-485","DEV-491","DEV-494","DEV-502"]}'
+    new: '{"depends_on":["DEV-502"],"blocks":["DEV-489","DEV-490"],"related":["DEV-466","DEV-478","DEV-483","DEV-485","DEV-491","DEV-494","DEV-502","DEV-417"]}'
+- at: 2026-11-14T00:19:41.113207+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-502"],"blocks":["DEV-489","DEV-490"],"related":["DEV-466","DEV-478","DEV-483","DEV-485","DEV-491","DEV-494","DEV-502","DEV-417"]}'
+    new: '{"depends_on":["DEV-502"],"blocks":["DEV-489","DEV-490","DEV-417"],"related":["DEV-466","DEV-478","DEV-483","DEV-485","DEV-491","DEV-494","DEV-502","DEV-417"]}'
+- at: 2026-11-14T00:20:37.817014+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#5'

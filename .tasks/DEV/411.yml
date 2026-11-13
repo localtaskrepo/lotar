@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T03:13:31.986812+00:00
-modified: 2026-11-13T11:02:28.830561+00:00
+modified: 2026-11-14T00:20:37.019249+00:00
 relationships:
   related:
   - DEV-343
@@ -32,6 +32,8 @@ comments:
   text: 'Pushed to origin main (15bf3621..9d092a72): 3d4db183 and the ticket updates 9d092a72. The pre-push hook passed. No health check applies, because this isn''t a health ticket.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad54e514d-2f5a-4de7-8a11-2c664f0f31b5
+releases:
+- 4
 description: |-
   Worktree cleanup still keeps a branch whose work landed on main in a reworked form that conflicts at every commit. DEV-366 handled rebased and reworked branches but named this case (DEV-343's real branch) as left over, with "a record of what the merge job landed" as the fix, "a follow-up if wanted". No ticket tracked it. Found by the QA test run in standards (STD-59, 2026-11-12).
 
@@ -109,3 +111,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-343","DEV-366","DEV-413","DEV-408","DEV-456"]}'
     new: '{"related":["DEV-343","DEV-366","DEV-413","DEV-408","DEV-456","DEV-467"]}'
+- at: 2026-11-14T00:20:37.019249+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#4'

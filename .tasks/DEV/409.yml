@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T03:13:31.357022+00:00
-modified: 2026-11-13T11:02:28.830256+00:00
+modified: 2026-11-14T00:20:36.951776+00:00
 relationships:
   related:
   - DEV-392
@@ -24,6 +24,8 @@ comments:
   text: 'Pushed: origin/main c6b4cf56..15bf3621 (793ad78a fix, 15bf3621 ticket updates).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abe3f7cfa-473f-4cb6-b321-68a78cf7333b
+releases:
+- 4
 description: |-
   Jira sync can't push back a version whose Jira name starts with `v`. Pull stores `v0.15.0` as `0.15.0` (version fields drop the `v`), push sends `{"name": "0.15.0"}`, and the compare before the push doesn't ignore the `v`, so every push of such an issue sends a version the Jira project doesn't have. GitHub milestones got this handling in DEV-392, Jira didn't. Found by the QA test run in standards (STD-59, 2026-11-12).
 
@@ -97,3 +99,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-392","DEV-408","DEV-410"]}'
     new: '{"related":["DEV-392","DEV-408","DEV-410","DEV-467"]}'
+- at: 2026-11-14T00:20:36.951776+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#4'

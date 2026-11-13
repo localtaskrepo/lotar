@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T01:31:31.408867+00:00
-modified: 2026-11-13T01:49:56.425805+00:00
+modified: 2026-11-14T00:20:36.823561+00:00
 relationships:
   related:
   - DEV-382
@@ -19,6 +19,8 @@ comments:
   text: 'Merged: rebased agent/DEV-406 onto main (it had moved on with DEV-403 and DEV-382; no conflicts), fast-forwarded main to 078fb78 (DEV-406 Automation: a job''s outcome fires the change rules when it applies), then committed the ticket files as c80a6ce (DEV-406 Ticket updates, including a pending .tasks/DEV/405.yml change). Pushed 8e7cb78..c80a6ce to origin/main (repos.json push: true, main checkout clean, no other unpushed work). Checks on the rebased branch: lint:agent, test:agent (2112 Rust tests, UI, release, hooks) and test:smoke:agent (385), all passed.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A27b5b1da-362c-4587-aac1-8c0387f31859
+releases:
+- 3
 description: |-
   Found by STD-54 (the owner's inbox, https://standards.pyxzl.net/task/STD-54): a status or assignee an agent sets during its job (docs/help/agent.md, Status and assignee during a job) applies when the job ends, but fires no updated or assigned rule. The common hand-back, HelpNeeded and assignee mallox from a T3 thread, therefore never reaches a rule like
 
@@ -76,3 +78,8 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-14T00:20:36.823561+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#3'

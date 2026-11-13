@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T20:26:40.666774+00:00
-modified: 2026-11-12T22:10:29.734326+00:00
+modified: 2026-11-14T00:20:35.991939+00:00
 relationships:
   blocks:
   - DEV-388
@@ -39,6 +39,8 @@ comments:
   text: 'claude: Pushed main a96a399..4b2c3a9 to origin: 9041e39 (the feature) and 4b2c3a9 (DEV-385 Ticket updates, which also carries the other tickets'' pending status files and the new DEV-396). The pre-push hook passed.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad49ea37f-64bb-40fb-a025-a556a5bca60c
+releases:
+- 2
 description: |-
   The owner (2026-11-12), his words: "when a ticket the blocks other tickets is done, it should automatically kick of agents for those tickets, since the work can now probably continue. Or a review can happen for an integration, or whatever the agent was waiting on. [...] Let's do it right from the start."
 
@@ -182,3 +184,8 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-388"],"related":["DEV-374","DEV-386","DEV-384","DEV-1","DEV-2","DEV-396","DEV-383","DEV-391","DEV-390","DEV-393"]}'
     new: '{"blocks":["DEV-388"],"related":["DEV-374","DEV-386","DEV-384","DEV-1","DEV-2","DEV-396","DEV-383","DEV-391","DEV-390","DEV-393","DEV-395"]}'
+- at: 2026-11-14T00:20:35.991939+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#2'

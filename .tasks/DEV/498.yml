@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T22:21:43.366702+00:00
-modified: 2026-11-13T23:44:50.830463+00:00
+modified: 2026-11-14T00:20:38.117327+00:00
 relationships:
   blocks:
   - DEV-499
@@ -26,6 +26,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abfc8dd44-dac3-4c7d-a0a0-0e2f1436b0e8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad52bfe06-ac2b-48ef-9606-cd8791702350
+releases:
+- 5
 description: |-
   Preparation for a core crate in the cargo workspace the owner approved (DEV-493, 2026-11-13: "Yes on all of those ideas"). The core modules depend on the layers above them, so they can't be a crate of their own yet.
 
@@ -130,3 +132,8 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-499"],"related":["DEV-493","DEV-478"]}'
     new: '{"blocks":["DEV-499"],"related":["DEV-493","DEV-478","DEV-505"]}'
+- at: 2026-11-14T00:20:38.117327+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#5'

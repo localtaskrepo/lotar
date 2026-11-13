@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T20:26:41.019459+00:00
-modified: 2026-11-12T21:03:13.764918+00:00
+modified: 2026-11-14T00:20:36.028981+00:00
 relationships:
   blocks:
   - DEV-388
@@ -37,6 +37,8 @@ comments:
   text: 'claude: merged and pushed. I rebased the fix onto main as 6238867 (the old 73facec). One conflict in tests/integration.rs: DEV-383 and DEV-386 each added a test module line, and I kept both. I fast-forwarded main to it and committed the ticket files as a96a399 (DEV-386 Ticket updates, also DEV-387''s ticket). Pushed: 3681bd5..a96a399. Checks after the first rebase: npm run lint (lint:agent), npm test (2079 Rust and 1471 UI tests, plus the release and hooks suites) and npm run smoke (381), all passed. Main then gained one change, DEV-387''s fix in agent_context_service.rs, so I rebased again and re-ran clippy and the related Rust tests (99, passed). Still open: DEV-388 and DEV-389 (Blocked on this ticket), and registering lotar under repos in the standards config.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A19c84812-c551-4f62-ad53-58b1c7b4fc71
+releases:
+- 2
 description: |-
   Tickets can only depend on tickets in the same tasks directory. Agents in one repo often wait on another repo's ticket: standards STD-54 waits for lotar's release DEV-374, standards tickets wait on lotar features. Today that link is a sentence in the description and nothing wakes the ticket. The owner wants waiting work to continue by itself (2026-11-12, see the related unblocked-hook ticket: "Let's do it right from the start").
 
@@ -145,3 +147,8 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-14T00:20:36.028981+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#2'
