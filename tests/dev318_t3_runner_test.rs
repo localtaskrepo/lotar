@@ -22,7 +22,8 @@ use std::time::{Duration, Instant};
 /// until the run renames it to `FAKE_T3_RENAME`, with the run's status
 /// from the `status` file (default `completed`), or fails with
 /// `FAKE_T3_GONE`, on claudeAgent's claude-opus-5-5; `thread send` records its arguments, folder and stdin,
-/// runs `FAKE_T3_SEND_RUN` and replies (DEV-368). `thread start` runs while a `hold` file exists.
+/// runs `FAKE_T3_SEND_RUN` and replies (DEV-368). `thread start` runs while a `hold` file exists,
+/// runs `FAKE_T3_START_RUN`, and keeps its thread's `FAKE_T3_WORKTREE` for `thread show` (DEV-472).
 fn fake_t3(dir: &Path) -> PathBuf {
     let path = dir.join("fake-t3");
     let script = format!(
@@ -31,6 +32,7 @@ out="{out}"
 if [ "$1" = "thread" ] && [ "$2" = "show" ]; then
   echo "$3" >> "$out/show.calls"
   if [ -n "$FAKE_T3_GONE" ]; then echo "Thread $3 not found" >&2; exit 1; fi
+  if [ -s "$out/wt.$3" ]; then FAKE_T3_WORKTREE="$(cat "$out/wt.$3")"; fi
   if [ -n "$FAKE_T3_WORKTREE" ]; then wt="\"$FAKE_T3_WORKTREE\""; br="\"$(cat "$out/branch" 2>/dev/null || echo agent/from-t3)\""; else wt=null; br='"main"'; fi
   st="$(cat "$out/status" 2>/dev/null || echo completed)"; if [ "$st" = running ]; then run='"run:1"'; else run=null; fi
   printf '{{"thread":{{"threadId":"%s","link":"https://app.t3.codes/threads/env/%s","worktreePath":%s,"branch":%s,"status":"%s","activeRunId":%s,"pendingRequestCount":0,"providerInstanceId":"claudeAgent","model":"claude-opus-5-5"}},"messages":[{{"role":"assistant","text":"Fixed it."}}]}}\n' "$3" "$3" "$wt" "$br" "$st" "$run"
@@ -47,6 +49,8 @@ fi
 printf '%s\n' "$@" > "$out/start.args"
 echo start >> "$out/start.calls"
 cat > "$out/start.stdin"
+if [ -n "$FAKE_T3_WORKTREE" ]; then echo "$FAKE_T3_WORKTREE" > "$out/wt.thread-$$"; fi
+if [ -n "$FAKE_T3_START_RUN" ]; then sh -c "$FAKE_T3_START_RUN"; fi
 echo '[1111/090522.026791:ERROR:electron/shell/app/node_main.cc:154] Node.js environment variables are disabled because this process is invoked by other apps.' >&2
 echo "Thread thread-$$" >&2
 sleep 1
@@ -678,6 +682,68 @@ fn a_fresh_session_starts_a_new_thread_on_the_unmerged_branch_on_the_same_model(
     assert!(messages(&review).contains(&reason), "{:?}", messages(&review));
     let output = Command::new("git").args(["symbolic-ref", "-q", "HEAD"]).current_dir(&worktree).output().unwrap();
     assert!(!output.status.success(), "the earlier worktree is detached");
+}
+
+#[test]
+fn a_rework_continues_the_fix_thread_after_a_fresh_review_took_its_branch() {
+    let fixtures = TestFixtures::new();
+    let out = fixtures.get_temp_path().join("t3-out");
+    let review_wt = out.join("review-wt");
+    // The fix's rework commits in its thread's worktree; the review's new
+    // thread checks the branch out in a worktree of its own, as T3 Code
+    // does, and notes the commit it reads.
+    let extra = format!(
+        "      FAKE_T3_SEND_RUN: \"echo rework >> rework.txt && git add rework.txt && git commit -qm rework\"\n  review:\n    runner: t3\n    command: \"{{T3}}\"\n    provider: codex\n    model: gpt-5.5\n    env:\n      FAKE_T3_WORKTREE: \"{wt}\"\n      FAKE_T3_START_RUN: \"git -C {wt} switch -q agent/from-t3 && git -C {wt} log -1 --format=%s >> {out}/review.heads\"\n",
+        wt = review_wt.display(),
+        out = out.display()
+    );
+    let (home, worktree, id) = ticket_with_unmerged_work(&fixtures, &extra);
+    let repo = fixtures.get_temp_path().to_path_buf();
+    git(&repo, &["worktree", "add", "-q", "--detach", review_wt.to_str().unwrap()]);
+    let fix_thread = AgentJobService::list_jobs().into_iter().find(|job| job.ticket_id == id).and_then(|job| job.session_id).unwrap();
+    let run = |agent: &str, session: Option<lotar::config::types::AgentSession>| {
+        let req = lotar::api_types::AgentJobCreateRequest {
+            ticket_id: id.clone(),
+            prompt: "Go on".to_string(),
+            agent: Some(agent.into()),
+            session,
+            ..Default::default()
+        };
+        let job = wait_for_job(&AgentJobService::start_job_with_tasks_dir(req, &fixtures.tasks_root).unwrap().id);
+        assert_eq!(job.status, "completed", "{job:?}: {:?}", messages(&job));
+        job
+    };
+    let fix_cwd = fs::canonicalize(&worktree).unwrap().display().to_string();
+    let branch_in = |dir: &Path| git(dir, &["symbolic-ref", "--quiet", "--short", "HEAD"]);
+
+    use lotar::config::types::AgentSession;
+    let review = run("review", Some(AgentSession::Fresh));
+    assert_ne!(review.session_id.as_deref(), Some(fix_thread.as_str()));
+    assert_eq!(branch_in(&review_wt), "agent/from-t3");
+
+    // The rework goes back to the fix thread, not the newer review thread.
+    let rework = run("fix", Some(AgentSession::Continue));
+    assert_eq!(read_lines(&home.out.join("send.args")), ["thread", "send", fix_thread.as_str(), "-", "--wait"]);
+    assert_eq!(read_lines(&home.out.join("send.cwd")), [fix_cwd.as_str()]);
+    assert_eq!(rework.session_id.as_deref(), Some(fix_thread.as_str()));
+    assert_eq!(branch_in(&worktree), "agent/from-t3");
+    assert!(messages(&rework).iter().any(|m| m.contains("Checked agent/from-t3 out again in the thread's worktree")), "{:?}", messages(&rework));
+
+    // The next fresh review reads the rework commit.
+    run("review", Some(AgentSession::Fresh));
+    assert_eq!(read_lines(&home.out.join("review.heads")), ["fix", "rework"]);
+
+    // The unmerged-work continuation (session: new) also picks the fix thread.
+    fs::remove_file(home.out.join("send.args")).unwrap();
+    let again = run("fix", None);
+    assert_eq!(read_lines(&home.out.join("send.args")), ["thread", "send", fix_thread.as_str(), "-", "--wait"]);
+    assert_eq!(read_lines(&home.out.join("send.cwd")), [fix_cwd.as_str()]);
+    assert_eq!(branch_in(&worktree), "agent/from-t3");
+    let link = format!("https://app.t3.codes/threads/env/{fix_thread}");
+    let reason =
+        format!("The ticket's earlier T3 Code thread {link} has unmerged work on agent/from-t3; this job continues it instead of starting a new thread.");
+    assert!(messages(&again).iter().any(|m| m.starts_with(&reason)), "{:?}", messages(&again));
+    assert_eq!(read_lines(&home.out.join("start.calls")).len(), 3, "the fix thread and two review threads");
 }
 
 /// A job whose process died while its thread ran (DEV-378): a pid that no

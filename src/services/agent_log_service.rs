@@ -36,6 +36,10 @@ pub struct JobLogHeader {
     pub model: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub effort: Option<String>,
+    /// The job's agent profile, so a later job continues its own profile's
+    /// thread (DEV-472).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub agent_profile: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -366,6 +370,7 @@ mod tests {
             worktree_branch: None,
             model: None,
             effort: None,
+            agent_profile: None,
         };
         AgentLogService::init_log(dir.path(), Some("logs"), header).unwrap();
         assert!(fs::read_to_string(logs.join(".gitignore")).unwrap().contains('*'));
@@ -394,6 +399,7 @@ mod tests {
                 worktree_branch: Some("agent/DICE-1".to_string()),
                 model: Some("sonnet".to_string()),
                 effort: None,
+                agent_profile: None,
             },
         )
         .unwrap();
@@ -462,6 +468,7 @@ mod tests {
                 worktree_branch: None,
                 model: None,
                 effort: None,
+                agent_profile: None,
             },
         )
         .unwrap();

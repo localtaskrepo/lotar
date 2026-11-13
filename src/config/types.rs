@@ -172,7 +172,8 @@ pub enum AgentSession {
     /// A new session (for `t3`, a new thread). The default.
     #[default]
     New,
-    /// The next turn of the session of the ticket's last job, where the
+    /// The next turn of the session of the ticket's last job of the same
+    /// profile (else its last job, DEV-472), where the
     /// runner can continue one (`t3`); otherwise a new session.
     Continue,
     /// A new session, also when the ticket's last `t3` thread holds

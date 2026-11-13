@@ -1316,7 +1316,9 @@ struct ContinuedThread {
 }
 
 /// The thread a `session: continue` job sends its prompt to, or why it
-/// starts a new session as usual (for the job log).
+/// starts a new session as usual (for the job log). Unless the job asks for
+/// a fresh thread, that is the newest thread of its own agent profile when
+/// there is one (DEV-472).
 fn continue_session(
     job_id: &str,
     runner_kind: AgentRunnerKind,
@@ -1329,7 +1331,8 @@ fn continue_session(
     if runner_kind != AgentRunnerKind::T3 {
         return Err(format!("The {} runner can't continue an earlier session; this job starts a new one.", runner_kind.as_str()));
     }
-    let Some(thread_id) = previous_session(job_id, runner_kind, tasks_dir, ticket_id, config) else {
+    let own_profile = profile.session != Some(AgentSession::Fresh);
+    let Some(thread_id) = previous_session(job_id, runner_kind, tasks_dir, ticket_id, config, own_profile) else {
         return Err(format!("No earlier T3 Code thread on {ticket_id}; starting a new thread."));
     };
     let command = build_t3_send_command(profile, prompt, &thread_id);
@@ -1441,32 +1444,99 @@ fn release_branch(worktree: &std::path::Path, branch: &str, ticket_id: &str) -> 
 }
 
 /// The session of the ticket's newest earlier job on this runner that has
-/// one: from this process's jobs or the job logs, whichever is newer.
-fn previous_session(job_id: &str, runner_kind: AgentRunnerKind, tasks_dir: &std::path::Path, ticket_id: &str, config: &ResolvedConfig) -> Option<String> {
-    let mut newest: Option<(String, String)> = JOB_REGISTRY.lock().ok().and_then(|registry| {
-        registry
-            .jobs
-            .values()
-            .filter(|state| {
-                let record = &state.record;
-                record.id != job_id && record.tasks_dir == tasks_dir && record.ticket_id == ticket_id && record.runner_kind == runner_kind
-            })
-            .filter_map(|state| state.record.session_id.clone().map(|session| (state.record.created_at.clone(), session)))
-            .max()
-    });
+/// one: from this process's jobs or the job logs, whichever is newer. With
+/// `own_profile`, the newest one of the job's own agent profile when there
+/// is one (DEV-472).
+fn previous_session(
+    job_id: &str,
+    runner_kind: AgentRunnerKind,
+    tasks_dir: &std::path::Path,
+    ticket_id: &str,
+    config: &ResolvedConfig,
+    own_profile: bool,
+) -> Option<String> {
+    // (created at, session, agent profile) of each earlier job.
+    let mut earlier: Vec<(String, String, Option<String>)> = Vec::new();
+    let mut profile = None;
+    if let Ok(registry) = JOB_REGISTRY.lock() {
+        profile = registry.jobs.get(job_id).and_then(|state| state.record.agent_profile.clone());
+        earlier.extend(
+            registry
+                .jobs
+                .values()
+                .filter(|state| {
+                    let record = &state.record;
+                    record.id != job_id && record.tasks_dir == tasks_dir && record.ticket_id == ticket_id && record.runner_kind == runner_kind
+                })
+                .filter_map(|state| {
+                    state.record.session_id.clone().map(|session| (state.record.created_at.clone(), session, state.record.agent_profile.clone()))
+                }),
+        );
+    }
+    let profile = profile.filter(|_| own_profile);
     let workspace_root = tasks_dir.parent().unwrap_or(tasks_dir);
     if let Some(logs_dir) = crate::services::agent_log_service::effective_logs_dir(tasks_dir, config.agent_logs_dir.as_deref()) {
-        let logged = AgentLogService::list_logs(workspace_root, &logs_dir).unwrap_or_default().into_iter().filter(|id| id != job_id).find_map(|id| {
-            let header = AgentLogService::load_header(workspace_root, &logs_dir, &id).ok().flatten()?;
+        // Logs come newest first: the first one, and with a profile the
+        // first of that profile, are all a later pick can use.
+        let mut found_newest = false;
+        for id in AgentLogService::list_logs(workspace_root, &logs_dir).unwrap_or_default().into_iter().filter(|id| id != job_id) {
+            let Some(header) = AgentLogService::load_header(workspace_root, &logs_dir, &id).ok().flatten() else {
+                continue;
+            };
             if header.ticket_id != ticket_id || header.runner != runner_kind.as_str() {
-                return None;
+                continue;
             }
-            let session = AgentLogService::load_status(workspace_root, &logs_dir, &id).ok().flatten()?.session_id?;
-            Some((header.created_at, session))
-        });
-        newest = newest.into_iter().chain(logged).max();
+            let Some(session) = AgentLogService::load_status(workspace_root, &logs_dir, &id).ok().flatten().and_then(|status| status.session_id) else {
+                continue;
+            };
+            let own = profile.is_some() && header.agent_profile == profile;
+            if found_newest && !own {
+                continue;
+            }
+            found_newest = true;
+            earlier.push((header.created_at, session, header.agent_profile));
+            if profile.is_none() || own {
+                break;
+            }
+        }
     }
-    newest.map(|(_, session)| session)
+    let newest_own = earlier.iter().filter(|(_, _, of)| profile.is_some() && *of == profile).max();
+    newest_own.or_else(|| earlier.iter().max()).map(|(_, session, _)| session.clone())
+}
+
+/// Check the continued thread's branch out again in its worktree when a
+/// later thread's worktree took it (a fresh review, DEV-472): free it there
+/// as for a new thread, then switch the thread's worktree back to it.
+/// `Ok(Some(note))` when LoTaR moved the branch.
+fn take_back_branch(thread: &ContinuedThread, tasks_dir: &std::path::Path, ticket_id: &str) -> Result<Option<String>, String> {
+    let (Some(worktree), Some(branch)) = (thread.info.worktree_path.as_deref().map(std::path::Path::new), thread.info.branch.as_deref()) else {
+        return Ok(None);
+    };
+    let head = git_command(worktree).args(["symbolic-ref", "--quiet", "--short", "HEAD"]).output().map_err(|err| err.to_string())?;
+    if head.status.success() && String::from_utf8_lossy(&head.stdout).trim() == branch {
+        return Ok(None);
+    }
+    let holder = resolve_repo_root(tasks_dir).and_then(|repo_root| worktree_on_branch(&repo_root, branch));
+    let mut note = format!("Checked {branch} out again in the thread's worktree {}", worktree.display());
+    if let Some(holder) = holder {
+        let committed = release_branch(&holder, branch, ticket_id)?;
+        note = format!("{note}, freed from {}.", holder.display());
+        if let Some(committed) = committed {
+            note = format!("{note} {committed}");
+        }
+    } else {
+        note.push('.');
+    }
+    let output = git_command(worktree).args(["switch", "--quiet", branch]).output().map_err(|err| err.to_string())?;
+    if !output.status.success() {
+        return Err(format!(
+            "LoTaR could not check {branch} out again in the worktree {} of the T3 Code thread {} (git switch: {}).",
+            worktree.display(),
+            thread.info.link.as_deref().unwrap_or(&thread.thread_id),
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    Ok(Some(note))
 }
 
 /// The job continues `thread`: it is the job's session from the start, and
@@ -2402,7 +2472,7 @@ fn run_job(
     }
     // Why the job runs in the session it does, for the job log.
     let mut open_branch = None;
-    let (mut continued, session_reason) = if profile.session == Some(AgentSession::Continue) {
+    let (mut continued, mut session_reason) = if profile.session == Some(AgentSession::Continue) {
         match continue_session(&job_id, runner_kind, &profile, &prompt, &tasks_dir, &ticket_id, &config) {
             Ok(thread) => (Some(thread), None),
             Err(reason) => (None, Some(reason)),
@@ -2420,6 +2490,18 @@ fn run_job(
     } else {
         (None, None)
     };
+    if let Some(thread) = continued.as_ref() {
+        let note = match take_back_branch(thread, &tasks_dir, &ticket_id) {
+            Ok(note) => note,
+            Err(err) => {
+                continued = None;
+                Some(format!("{err} This job starts a new thread."))
+            }
+        };
+        if let Some(note) = note {
+            session_reason = Some(session_reason.map_or(note.clone(), |reason| format!("{reason} {note}")));
+        }
+    }
     let prompt = match open_branch.as_ref() {
         Some((earlier, branch)) => format!(
             "{prompt}\n\nEarlier thread:\nThe ticket's earlier T3 Code thread {earlier} worked on branch `{branch}`, and its work hasn't landed. This thread runs on that branch: build on its commits.\n"
@@ -2500,6 +2582,7 @@ fn run_job(
             worktree_branch: worktree_context.worktree_branch.clone(),
             model: profile.model.clone(),
             effort: profile.effort.clone(),
+            agent_profile: JOB_REGISTRY.lock().ok().and_then(|registry| registry.jobs.get(&job_id).and_then(|state| state.record.agent_profile.clone())),
         },
     );
 
