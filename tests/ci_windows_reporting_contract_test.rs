@@ -206,3 +206,151 @@ fn release_signing_stays_on_cosign_v2() {
         assert!(release.starts_with("v2."), "cosign-release must pin the v2 line, got {release:?}");
     }
 }
+
+/// DEV-493: the path filters of ci.yml's `changes` job and the jobs each push
+/// runs: `jobs_for(path)` names the jobs a push changing only `path` starts.
+struct PathFilters {
+    outputs: Vec<(String, regex::Regex)>,
+    all: regex::Regex,
+    jobs: Vec<(String, Vec<String>)>,
+}
+
+impl PathFilters {
+    fn load() -> Self {
+        let workflow: serde_yaml_ng::Value = serde_yaml_ng::from_str(include_str!("../.github/workflows/ci.yml")).unwrap();
+        let classify = workflow["jobs"]["changes"]["steps"]
+            .as_sequence()
+            .unwrap()
+            .iter()
+            .find(|step| step["id"].as_str() == Some("paths"))
+            .expect("changes job classifies paths")["run"]
+            .as_str()
+            .unwrap();
+        let pattern = |name: &str| {
+            let pattern = classify.split(&format!("{name}=$(any '")).nth(1).and_then(|rest| rest.split("')").next()).expect(name);
+            regex::Regex::new(pattern).unwrap()
+        };
+        let outputs = workflow["jobs"]["changes"]["outputs"]
+            .as_mapping()
+            .unwrap()
+            .keys()
+            .map(|name| name.as_str().unwrap().to_string())
+            .map(|name| {
+                let regex = pattern(&name);
+                (name, regex)
+            })
+            .collect();
+        let condition = regex::Regex::new(r"^needs\.changes\.outputs\.(\w+) == 'true'$").unwrap();
+        let jobs = workflow["jobs"]
+            .as_mapping()
+            .unwrap()
+            .iter()
+            .filter(|(name, _)| name.as_str() != Some("changes"))
+            .map(|(name, job)| {
+                let when = job["if"].as_str().unwrap_or_else(|| panic!("job {name:?} has no path condition"));
+                let needs = when
+                    .split("||")
+                    .map(|part| condition.captures(part.trim()).unwrap_or_else(|| panic!("unexpected condition {part:?}"))[1].to_string())
+                    .collect();
+                (name.as_str().unwrap().to_string(), needs)
+            })
+            .collect();
+        Self { outputs, all: pattern("all"), jobs }
+    }
+
+    fn jobs_for(&self, path: &str) -> Vec<&str> {
+        let all = self.all.is_match(path);
+        let set: Vec<&str> = self.outputs.iter().filter(|(_, regex)| all || regex.is_match(path)).map(|(name, _)| name.as_str()).collect();
+        self.jobs.iter().filter(|(_, needs)| needs.iter().any(|need| set.contains(&need.as_str()))).map(|(name, _)| name.as_str()).collect()
+    }
+}
+
+/// Every file under `dirs` (relative to the repository root) whose extension is
+/// in `extensions`, skipping dependencies, build output and dot directories.
+fn repository_files(dirs: &[&str], extensions: &[&str], skip: &[&str]) -> Vec<std::path::PathBuf> {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let mut pending: Vec<_> = dirs.iter().map(|dir| root.join(dir)).collect();
+    let mut files = Vec::new();
+    while let Some(path) = pending.pop() {
+        let name = path.file_name().unwrap().to_string_lossy();
+        if path.is_dir() {
+            if path == root || !(name.starts_with('.') || ["node_modules", "target"].contains(&name.as_ref()) || skip.contains(&name.as_ref())) {
+                pending.extend(std::fs::read_dir(&path).unwrap().map(|entry| entry.unwrap().path()));
+            }
+        } else if path.extension().is_some_and(|ext| extensions.contains(&ext.to_string_lossy().as_ref())) {
+            files.push(path);
+        }
+    }
+    files
+}
+
+/// Path-filtered jobs must still run for every repository file a Rust test
+/// reads, or a docs-only change could break a test that CI then skips.
+#[test]
+fn rust_path_filter_covers_the_repository_files_rust_tests_read() {
+    let filters = PathFilters::load();
+    let reads = regex::Regex::new(r#"include_str!\("([^"]+)"\)|CARGO_MANIFEST_DIR"\)\)\.join\("([^"]+)"\)"#).unwrap();
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).canonicalize().unwrap();
+    let mut checked = 0;
+    for path in repository_files(&["src", "tests"], &["rs"], &[]) {
+        for capture in reads.captures_iter(&std::fs::read_to_string(&path).unwrap()) {
+            let target = match (capture.get(1), capture.get(2)) {
+                (Some(relative), _) => path.parent().unwrap().join(relative.as_str()),
+                (_, Some(relative)) => root.join(relative.as_str()),
+                _ => continue,
+            };
+            let Ok(target) = target.canonicalize() else { continue };
+            let relative = target.strip_prefix(&root).unwrap().to_string_lossy().replace('\\', "/");
+            checked += 1;
+            assert!(
+                filters.jobs_for(&relative).contains(&"rust_checks"),
+                "{} reads {relative}, which ci.yml's Rust path filter does not match",
+                path.display()
+            );
+        }
+    }
+    assert!(checked > 10, "found only {checked} repository files read by Rust sources");
+}
+
+/// The UI unit test job is the only one that typechecks, lints and formats
+/// the TypeScript and JavaScript sources (smoke/ and packaging/npm/ included),
+/// so a change to any of them must start it.
+#[test]
+fn ui_job_runs_for_every_typescript_and_javascript_file_it_checks() {
+    let filters = PathFilters::load();
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    // The same directories .oxlintrc.json ignores.
+    let files = repository_files(&["."], &["ts", "mts", "cts", "vue", "js", "mjs", "cjs"], &["docs", "site"]);
+    assert!(files.iter().any(|path| path.starts_with(root.join("smoke"))), "no smoke sources found");
+    for path in &files {
+        let relative = path.strip_prefix(root).unwrap().to_string_lossy().replace('\\', "/");
+        assert!(filters.jobs_for(&relative).contains(&"ui_tests"), "a change to {relative} must run ui_tests");
+    }
+    for config in
+        [".oxlintrc.json", "oxlintrc.standard.json", ".prettierrc.json", ".prettierignore", ".editorconfig", "eslint.config.mjs", "smoke/tsconfig.json"]
+    {
+        assert!(filters.jobs_for(config).contains(&"ui_tests"), "a change to {config} must run ui_tests");
+    }
+}
+
+#[test]
+fn path_filters_pick_the_jobs_each_kind_of_change_needs() {
+    let filters = PathFilters::load();
+    let every_job: Vec<&str> = filters.jobs.iter().map(|(name, _)| name.as_str()).collect();
+    for (path, expected) in [
+        ("docs/developers/testing.md", vec![]),
+        (".tasks/DEV/493.yml", vec![]),
+        ("view/components/TaskList.vue", vec!["build_artifacts", "ui_tests", "smoke_tests"]),
+        ("smoke/tests/ui.spec.ts", vec!["build_artifacts", "ui_tests", "smoke_tests", "windows_checks"]),
+        ("scripts/release.mjs", vec!["ui_tests", "windows_checks"]),
+        ("src/lib.rs", vec!["build_artifacts", "rust_checks", "smoke_tests", "windows_checks", "release_targets", "security"]),
+        (".github/workflows/ci.yml", every_job.clone()),
+        ("package.json", every_job.clone()),
+    ] {
+        let mut actual = filters.jobs_for(path);
+        let mut expected = expected;
+        actual.sort_unstable();
+        expected.sort_unstable();
+        assert_eq!(actual, expected, "jobs for a change to {path}");
+    }
+}

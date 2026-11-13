@@ -25,6 +25,8 @@ These commands keep CI and local development aligned. Treat them as the required
 | Code scanning | CodeQL for Rust, TypeScript/Vue and workflows | CI on push, pull request and weekly |
 | Coverage (report only) | `npm run coverage:rust` (cargo-llvm-cov), `npm run coverage:ui` (Vitest v8); reports under `target/coverage/` | Locally, and the Coverage workflow after pushes to `main` |
 
+The Quality Assurance workflow (`.github/workflows/ci.yml`) runs only the jobs a push's paths need: its `Changed paths` job sorts the changed files into Rust (also `docs/help/`, `docs/openapi.json`, the workflows and other files Rust tests read), web (`view/` and the TypeScript tool configs), Node scripts (also `packaging/npm/`) and smoke. The UI unit test job typechecks, lints and formats all TypeScript and JavaScript, so it runs for web, Node and smoke changes. A Rust change skips the UI unit tests, a web change skips the Rust, Windows and release-target jobs, and a change to docs or tickets alone runs no job but still reports a green run, which the release workflow requires for the tagged commit. A change to `ci.yml`, `rust-toolchain.toml` or `package.json` runs everything. When you add a test that reads a file outside these paths, add the file to the Rust pattern; `tests/ci_windows_reporting_contract_test.rs` fails when you forget.
+
 Git hooks are opt-in (`npm run hooks:install`) and take seconds; see [.githooks/SETUP.md](../../.githooks/SETUP.md). Editor defaults are in `.editorconfig`.
 
 ## Targeted runs

@@ -23,9 +23,62 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # DEV-493: run only the jobs a push's paths need. Jobs are skipped instead
+  # of filtering the whole workflow, so every commit still gets a green
+  # Quality Assurance run (release.yml requires one for the tagged commit).
+  changes:
+    name: Changed paths
+    runs-on: ubuntu-latest
+    outputs:
+      rust: ${{ steps.paths.outputs.rust }}
+      web: ${{ steps.paths.outputs.web }}
+      node: ${{ steps.paths.outputs.node }}
+      smoke: ${{ steps.paths.outputs.smoke }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        fetch-depth: 0
+        persist-credentials: false
+
+    - name: Classify changed paths
+      id: paths
+      shell: bash
+      env:
+        BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+      run: |
+        set -euo pipefail
+        # A new branch or a force push has no usable base: run everything.
+        if [[ -z "$BASE" || "$BASE" =~ ^0+$ ]] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+          files='.github/workflows/ci.yml'
+        else
+          files=$(git diff --name-only "$BASE" "$GITHUB_SHA")
+        fi
+        printf '%s\n' "$files"
+        any() { grep -qE "$1" <<<"$files" && echo true || echo false; }
+        # This workflow and the shared tool versions change every job.
+        all=$(any '^(\.github/workflows/ci\.yml|rust-toolchain\.toml|package(-lock)?\.json)$')
+        # docs/help and docs/openapi.json are embedded in the binary; the
+        # other non-code paths are files Rust tests read (workflow contracts,
+        # API reference, lotar's own automation rules) or packaging.
+        rust=$(any '^(src/|tests/|build\.rs|Cargo\.(toml|lock)|clippy\.toml|rustfmt\.toml|deny\.toml|Cross\.toml|\.config/nextest\.toml|docs/help/|docs/openapi\.json|docs/developers/api-quick-reference\.md|\.github/workflows/|\.tasks/DEV/automation\.yml|packaging/|Dockerfile)')
+        # The UI unit test job also typechecks, lints and formats every
+        # TypeScript and JavaScript file, so web covers their tool configs.
+        web=$(any '^(view/|[^/]+\.m[jt]s$|\.oxlintrc\.json|oxlintrc\.standard\.json|\.prettier(rc\.json|ignore)|\.editorconfig|tsconfig[^/]*\.json|scripts/compress-web\.mjs)')
+        node=$(any '^(scripts/|\.githooks/|docs/releases/|packaging/npm/)')
+        smoke=$(any '^smoke/')
+        {
+          echo "rust=$([[ $all == true ]] && echo true || echo "$rust")"
+          echo "web=$([[ $all == true ]] && echo true || echo "$web")"
+          echo "node=$([[ $all == true ]] && echo true || echo "$node")"
+          echo "smoke=$([[ $all == true ]] && echo true || echo "$smoke")"
+        } | tee -a "$GITHUB_OUTPUT"
+
   build_artifacts:
     name: Build Frontend & Release Binary
     runs-on: ubuntu-latest
+    needs: [changes]
+    if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.web == 'true' || needs.changes.outputs.smoke == 'true'
     env:
       # Designated git-capable runner: build.rs refuses to compile git
       # behavior out (panics if creating .git is denied).
@@ -98,6 +151,8 @@ jobs:
   rust_checks:
     name: Rust Quality Checks
     runs-on: ubuntu-latest
+    needs: [changes]
+    if: needs.changes.outputs.rust == 'true'
     env:
       USER: mallox
       USERNAME: mallox
@@ -198,6 +253,8 @@ jobs:
   ui_tests:
     name: UI Unit Tests
     runs-on: ubuntu-latest
+    needs: [changes]
+    if: needs.changes.outputs.web == 'true' || needs.changes.outputs.node == 'true' || needs.changes.outputs.smoke == 'true'
     steps:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -258,7 +315,8 @@ jobs:
   smoke_tests:
     name: Smoke Tests
     runs-on: ubuntu-latest
-    needs: [build_artifacts]
+    needs: [changes, build_artifacts]
+    if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.web == 'true' || needs.changes.outputs.smoke == 'true'
     steps:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -353,6 +411,8 @@ jobs:
   windows_checks:
     name: Windows Binary Sanity and Portable Smoke
     runs-on: windows-latest
+    needs: [changes]
+    if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.node == 'true' || needs.changes.outputs.smoke == 'true'
     env:
       USER: mallox
       USERNAME: mallox
@@ -585,6 +645,8 @@ jobs:
   release_targets:
     name: Release target build (${{ matrix.label }})
     runs-on: ${{ matrix.os }}
+    needs: [changes]
+    if: needs.changes.outputs.rust == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -680,6 +742,8 @@ jobs:
   security:
     name: Security Audit
     runs-on: ubuntu-latest
+    needs: [changes]
+    if: needs.changes.outputs.rust == 'true'
     steps:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
