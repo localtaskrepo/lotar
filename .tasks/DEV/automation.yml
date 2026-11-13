@@ -44,6 +44,9 @@ automation:
                  lotar assignee ${{ticket.id}} --clear, and stop. No review or merge follows.
               6. Otherwise comment the outcome: what you changed, the commit hash, the checks that ran. When your job
                  ends, an agent on another model reviews it, then the merge agent takes over.
+                 Changed pages, components or styles: tag the ticket ui (lotar task edit ${{ticket.id}} --tag ui)
+                 and attach the before and after screenshots of skill ui-review (lotar task reference add upload
+                 ${{ticket.id}} <file>), linked in that comment; the reviewer blocks without them.
     - name: "Health: start the light fix agent"
       when:
         all:
@@ -93,6 +96,9 @@ automation:
                  lotar assignee ${{ticket.id}} --clear, and stop. No review or merge follows.
               5. Otherwise comment the outcome: what you changed, the commit hash, the checks that ran. When your job
                  ends, an agent on another model reviews it, then the merge agent takes over.
+                 Changed pages, components or styles: tag the ticket ui (lotar task edit ${{ticket.id}} --tag ui)
+                 and attach the before and after screenshots of skill ui-review (lotar task reference add upload
+                 ${{ticket.id}} <file>), linked in that comment; the reviewer blocks without them.
     - name: "Health: fix agent lifecycle"
       when:
         any:
@@ -110,6 +116,9 @@ automation:
     # only .tasks passes at once. A fix agent that hands the ticket back (HelpNeeded, Blocked) sets status and assignee
     # itself, which replaces these, so no review starts. So does one that commits nothing: it sets Done (or WontDo) and
     # clears the assignee (owner 2026-11-13, STD-87, docs/decisions/2026-11-13-no-change-closes.md).
+    # UI work (tag ui, or a diff that changes pages, components or styles) also gets the ui-review step with screenshots
+    # (owner 2026-11-13, STD-97, docs/decisions/2026-11-13-agent-roles.md). lotar's conditions match ticket fields, not
+    # changed files, so the review prompt checks both instead of a rule per tag.
     - name: "Fix done: review on Codex"
       when:
         all:
@@ -144,13 +153,19 @@ automation:
                  covered"); it decides nothing only the owner decides; a bug fix has a test that failed before it; no
                  stray files, no second branch or copy of the same fix. Rerun the checks the fix agent names that
                  finish in a few minutes, and put back whatever they change.
-              4. Blocking: the merge would put a bug, a decision the owner didn't make or unfinished work on main.
+              4. UI work (tag ui, the ticket's tags: ${{ticket.tags}}; or the diff changes pages, components or
+                 styles): follow skill ui-review. The fix agent's comments link screenshots of every changed page,
+                 before and after, in light and dark mode at 1920, 1440 and 390 px wide (ticket attachments): read
+                 them. Then start the app in this worktree as the repo's AGENTS.md says, take your own after
+                 screenshots into a scratch folder outside the repo and read them. Missing screenshots, or a visible
+                 problem in either set, is blocking. An app that won't start here: say why in the outcome.
+              5. Blocking: the merge would put a bug, a decision the owner didn't make or unfinished work on main.
                  Comment the findings, each with file and line, what is wrong and what would fix it, then
                  lotar task edit ${{ticket.id}} --tag review-blocked. The fix agent reworks it once; a second
                  blocking review goes to the owner.
-              5. Minor (real, but the merge can go ahead): file each as a ticket in its repo, related to
+              6. Minor (real, but the merge can go ahead): file each as a ticket in its repo, related to
                  ${{ticket.id}} (skill lotar-workflow). Noise and taste: leave out.
-              6. Don't end your turn while checks still run: the job ends with your turn. Comment the outcome, starting
+              7. Don't end your turn while checks still run: the job ends with your turn. Comment the outcome, starting
                  "Review: passed" or "Review: blocking": what you read and reran, the findings, the tickets filed.
     - name: "Fix done: review on Claude"
       when:
@@ -224,13 +239,19 @@ automation:
                  covered"); it decides nothing only the owner decides; a bug fix has a test that failed before it; no
                  stray files, no second branch or copy of the same fix. Rerun the checks the fix agent names that
                  finish in a few minutes, and put back whatever they change.
-              4. Blocking: the merge would put a bug, a decision the owner didn't make or unfinished work on main.
+              4. UI work (tag ui, the ticket's tags: ${{ticket.tags}}; or the diff changes pages, components or
+                 styles): follow skill ui-review. The fix agent's comments link screenshots of every changed page,
+                 before and after, in light and dark mode at 1920, 1440 and 390 px wide (ticket attachments): read
+                 them. Then start the app in this worktree as the repo's AGENTS.md says, take your own after
+                 screenshots into a scratch folder outside the repo and read them. Missing screenshots, or a visible
+                 problem in either set, is blocking. An app that won't start here: say why in the outcome.
+              5. Blocking: the merge would put a bug, a decision the owner didn't make or unfinished work on main.
                  Comment the findings, each with file and line, what is wrong and what would fix it, then
                  lotar task edit ${{ticket.id}} --tag review-blocked. The fix agent reworks it once; a second
                  blocking review goes to the owner.
-              5. Minor (real, but the merge can go ahead): file each as a ticket in its repo, related to
+              6. Minor (real, but the merge can go ahead): file each as a ticket in its repo, related to
                  ${{ticket.id}} (skill lotar-workflow). Noise and taste: leave out.
-              6. Don't end your turn while checks still run: your reply goes to the fix thread. Comment the outcome,
+              7. Don't end your turn while checks still run: your reply goes to the fix thread. Comment the outcome,
                  starting "Review: passed" or "Review: blocking": what you read and reran, the findings, the tickets
                  filed.
     - name: "Fix done: review on Claude in a child thread"
