@@ -1933,22 +1933,19 @@ fn without_outcome_fields<'a>(action: &'a AutomationAction, outcome: Option<&cra
     std::borrow::Cow::Owned(action)
 }
 
-/// Apply the status/assignee recorded while a job ran, as a rule's `set`
-/// would: no update automation, and an agent profile as the new assignee
-/// starts its job.
+/// Apply the status/assignee recorded while a job ran. The agent made
+/// that change, so it fires the change rules (updated, assigned) as the
+/// same change outside a job would, with `previous` the ticket after the
+/// end rules ran (DEV-406); an agent profile as the new assignee starts
+/// its job.
 fn apply_job_outcome(storage: &mut Storage, ticket_id: &str, config: &ResolvedConfig, outcome: &crate::api_types::JobOutcome) -> LoTaRResult<()> {
     let base = TaskService::get(storage, ticket_id, None)?;
     let patch = TaskUpdate { status: outcome.status.clone(), assignee: outcome.assignee.clone(), ..TaskUpdate::default() };
-    let updated = TaskService::update_with_context(storage, &base.id, patch, TaskUpdateContext::automation_disabled())?;
-    maybe_queue_agent_on_assignment(
-        storage.root_path.as_path(),
-        base.assignee.as_deref(),
-        updated.assignee.as_deref(),
-        &updated,
-        config,
-        AgentRunSettings::default(),
-    );
-    Ok(())
+    let receipt = TaskService::update_with_receipt(storage, &base.id, patch, TaskUpdateContext::automation_disabled())?;
+    if !receipt.changed {
+        return Ok(());
+    }
+    AutomationService::apply_task_update(storage, Some(&base), &receipt.dto, config)
 }
 
 /// Enum fields of a `set` block, named as in automation YAML.

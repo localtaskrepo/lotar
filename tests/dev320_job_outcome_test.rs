@@ -409,3 +409,89 @@ fn an_assignment_recorded_after_the_job_ended_applies_directly() {
     assert!(agent_active_jobs::peek_outcome(&tasks_dir, "job-ending").is_none(), "nothing is left for nobody to apply");
     agent_active_jobs::unregister(&tasks_dir, "job-ending");
 }
+
+/// DEV-406: the outcome applied at the job's end fires the change rules,
+/// with `previous` the ticket after the job's rules ran. A rule's own `set`
+/// still fires none.
+#[test]
+fn the_outcome_fires_the_updated_and_assigned_rules() {
+    use lotar::services::agent_active_jobs::{self, ActiveJob};
+    use lotar::services::automation_service::{AutomationEvent, AutomationJobContext, AutomationService};
+    use lotar::services::task_service::TaskService;
+
+    let fixtures = TestFixtures::new();
+    let tasks_dir = fixtures.tasks_root.clone();
+    std::fs::write(tasks_dir.join("config.yml"), "default:\n  project: OUTF\nissue:\n  states: [Todo, InProgress, HelpNeeded, Done]\n").unwrap();
+    std::fs::write(
+        tasks_dir.join("automation.yml"),
+        r#"automation:
+  rules:
+    - name: Finish
+      on:
+        job_completed:
+          set:
+            status: InProgress
+            assignee: merger
+            priority: High
+    - name: Inbox
+      when: { all: [ { status: HelpNeeded }, { current: { assignee: mallox } } ] }
+      on:
+        updated:
+          add: { tags: [inbox] }
+          comment: "From ${{previous.status}} (${{previous.priority}}) to ${{ticket.status}}"
+    - name: Assigned
+      on:
+        assigned:
+          comment: "Was ${{previous.assignee}}"
+    - name: Prioritized
+      when: { priority: High }
+      on:
+        updated:
+          add: { tags: [rule-fired] }
+"#,
+    )
+    .unwrap();
+    let _queue_env = crate::common::env_mutex::EnvVarGuard::set("LOTAR_AGENT_QUEUE_DIR", fixtures.get_temp_path().join("queue").to_str().unwrap());
+    let mut storage = fixtures.create_storage();
+    TaskService::create(&mut storage, lotar::api_types::TaskCreate { title: "Hand it back".into(), assignee: Some("fixer".into()), ..Default::default() })
+        .unwrap();
+    agent_active_jobs::register(
+        &tasks_dir,
+        &ActiveJob {
+            job_id: "job-back".into(),
+            ticket_id: "OUTF-1".into(),
+            runner: "t3".into(),
+            agent: Some("fix".into()),
+            owner_pid: 1,
+            child_pid: 1,
+            started_at: "2026-11-11T00:00:00Z".into(),
+            session_id: None,
+        },
+    );
+    let patch = lotar::api_types::TaskUpdate { status: Some("HelpNeeded".into()), assignee: Some("mallox".into()), ..Default::default() };
+    let receipt = TaskService::update_with_receipt(&mut storage, "OUTF-1", patch, Default::default()).unwrap();
+    assert!(receipt.deferred.is_some(), "recorded as the outcome");
+
+    AutomationService::apply_job_event(
+        &tasks_dir,
+        "OUTF-1",
+        AutomationEvent::JobCompleted,
+        Some(AutomationJobContext {
+            job_id: "job-back".into(),
+            runner: "t3".into(),
+            agent: Some("fix".into()),
+            worktree_path: None,
+            worktree_branch: None,
+            usage: None,
+        }),
+    )
+    .unwrap();
+    let task = TaskService::get(&storage, "OUTF-1", None).unwrap();
+    assert_eq!(task.status.as_str(), "HelpNeeded");
+    assert_eq!(task.assignee.as_deref(), Some("mallox"));
+    // previous is the ticket after the job's rule set the priority, which
+    // fired no rule itself.
+    assert_eq!(task.tags, vec!["inbox".to_string()]);
+    let comments: Vec<&str> = task.comments.iter().map(|comment| comment.text.as_str()).collect();
+    assert_eq!(comments, ["From Todo (High) to HelpNeeded", "Was fixer"]);
+}
