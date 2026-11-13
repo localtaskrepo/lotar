@@ -25,6 +25,11 @@ export default mergeConfig(
             globals: true,
             globalSetup: ['../scripts/vitest-temp-guard.mjs'],
             setupFiles: ['__tests__/vitest.setup.ts'],
+            // The slowest specs render for ~1 s on an idle machine and took
+            // 5-9 s at load 20+ while other agents build; Vitest's 5 s default
+            // failed them (DEV-402). 30 s still catches a hung test quickly.
+            testTimeout: 30_000,
+            hookTimeout: 30_000,
             // Report-only coverage (DEV-164): `npm run coverage:ui`. No
             // thresholds; the numbers inform where tests are missing.
             coverage: {
