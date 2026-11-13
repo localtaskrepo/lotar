@@ -62,6 +62,30 @@ fn cli_reads_comments_stored_without_author() {
     assert_eq!(stored.matches("author:").count(), 1, "the old comment keeps no author:\n{stored}");
 }
 
+#[test]
+fn env_reporter_outranks_project_default_reporter() {
+    // DEV-403: a project's committed default.reporter (the owner) must not
+    // override the agent identity from LOTAR_DEFAULT_REPORTER.
+    let tf = TestFixtures::new();
+    let dir = tf.get_temp_path();
+    let created: Value = serde_json::from_str(&run(dir, &["--format", "json", "add", "First", "--project", "PR"])).unwrap();
+    let id = created["task"]["id"].as_str().expect("created id").to_string();
+    let (prefix, number) = id.split_once('-').unwrap();
+    let project = dir.join(".tasks").join(prefix);
+    std::fs::write(project.join("config.yml"), "default:\n  reporter: mallox\n").unwrap();
+
+    run(dir, &["comment", &id, "-m", "agent note"]);
+    let stored = std::fs::read_to_string(project.join(format!("{number}.yml"))).unwrap();
+    assert!(stored.contains("author: claude"), "{stored}");
+    assert!(!stored.contains("mallox"), "neither the comment nor the history names the project reporter:\n{stored}");
+
+    let second: Value = serde_json::from_str(&run(dir, &["--format", "json", "add", "Second", "--project", prefix])).unwrap();
+    assert_eq!(second["task"]["reporter"], "claude", "{second}");
+
+    let out = common::lotar_cmd().unwrap().current_dir(dir).env_remove("LOTAR_DEFAULT_REPORTER").args(["whoami", "--project", prefix]).output().unwrap();
+    assert!(String::from_utf8_lossy(&out.stdout).contains("mallox"), "without the env var the project reporter still applies");
+}
+
 struct ServerFixture {
     _temp: tempfile::TempDir,
     _env: Vec<EnvVarGuard>,

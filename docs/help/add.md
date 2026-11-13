@@ -82,7 +82,7 @@ Reporter auto-set is driven by configuration: set `default_reporter` and ensure 
 Providing `--reporter` overrides all defaults (including `LOTAR_DEFAULT_REPORTER`) after validation.
 
 Notes:
-- `@me` resolution order: config.default_reporter (merged with precedence) → git user.name/email → $USER/$USERNAME.
+- `@me` resolution order: `default_reporter` (CLI override → `LOTAR_DEFAULT_REPORTER` → project/home/global config) → git user.name/email → $USER/$USERNAME.
 - When `--assignee=@me` is provided, it is resolved at the CLI layer so previews and persisted values match.
  - See also: [Resolution & Precedence](./precedence.md).
 

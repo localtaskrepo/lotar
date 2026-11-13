@@ -195,7 +195,7 @@ Commands that do not operate on a specific project simply skip step 2, so they e
 Notes:
 - Project config overrides env/home/global, so use env/home for broad defaults and commit per-project differences inside `.tasks/<PROJECT>/config.yml`.
 - CLI flags are applied by each command and always win for that invocation.
- - Identity resolution uses the merged configuration from this precedence chain.
+ - Identity resolution uses the merged configuration from this precedence chain, except that `LOTAR_DEFAULT_REPORTER` outranks a project's `default.reporter` (see [Identity & Users](./identity.md)).
 
 ### Canonical YAML shape
 LoTaR accepts shipped flat fields (such as `default_project`, `default_assignee`, and `server_port`), dotted keys, and nested sections in YAML. Canonical nested/dotted fields take precedence over their flat equivalents regardless of YAML key order. Conflicting dotted and nested definitions of the same path are rejected. Internally, values are canonicalized to sections such as server, default, project, members, review, issue, custom, scan, auto, sprints, and branch. Use `lotar config normalize` to rewrite files into this canonical form.

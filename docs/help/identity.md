@@ -6,7 +6,7 @@ Central reference for identity resolution and people fields.
 ## Sources and resolution order
 
 Used wherever a person is needed (assignee, reporter, default_reporter):
-1) Merged config `default_reporter` (same precedence chain described in [config.md](./config.md): CLI overrides → project → env vars like `LOTAR_DEFAULT_REPORTER` → home → global → defaults)
+1) `default_reporter`: a CLI override, then `LOTAR_DEFAULT_REPORTER`, then the merged config (project → home → global). The environment outranks a project's committed `default.reporter` here, unlike the general [config precedence](./config.md), so agents that set `LOTAR_DEFAULT_REPORTER` write comments, history and new reporters under their own name
 2) Git user (user.name or user.email at repo root) — gated by `auto.identity_git`
 3) System user ($USER or $USERNAME)
 4) Project manifest author (package.json author, Cargo.toml authors, or .csproj `<Authors>`) — last resort only, since manifest authors are a static guess that may not be the current user

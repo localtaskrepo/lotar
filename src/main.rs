@@ -831,7 +831,9 @@ fn main() {
                             } else if !cfg.auto_identity_git {
                                 renderer.emit_info("Git identity auto-detection disabled");
                             } else {
-                                renderer.emit_info("Resolution order: config.default_reporter → git user.name/email → system USER/USERNAME");
+                                renderer.emit_info(
+                                    "Resolution order: default_reporter (CLI → LOTAR_DEFAULT_REPORTER → config) → git user.name/email → system USER/USERNAME",
+                                );
                             }
                         }
                     }

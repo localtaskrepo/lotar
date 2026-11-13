@@ -31,7 +31,7 @@ Rules do not merge across scopes; the first file found wins.
 ## Identity resolution and @me
 
 Anywhere a person field is accepted (assignee, reporter, default_reporter), the special value @me is allowed. Detectors run in this order:
-1) Effective config `default_reporter` (same precedence chain described in [config.md](./config.md): CLI overrides → selected project → env vars like `LOTAR_DEFAULT_REPORTER` → home → global → defaults)
+1) `default_reporter`: a CLI override, then `LOTAR_DEFAULT_REPORTER`, then the effective config (selected project → home → global). The environment outranks a project's `default.reporter` here, so an agent that sets `LOTAR_DEFAULT_REPORTER` is never recorded as the project's owner
 2) Git user (user.name or user.email at repo root) — gated by `auto.identity_git`
 3) System user ($USER or $USERNAME)
 4) Project manifest author (package.json author, Cargo.toml authors, or .csproj `<Authors>`) — last resort only, since manifest authors are a static guess that may not be the current user

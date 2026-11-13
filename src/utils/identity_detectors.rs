@@ -59,29 +59,33 @@ pub struct ConfigDefaultReporterDetector;
 
 impl IdentityDetector for ConfigDefaultReporterDetector {
     fn detect(&self, ctx: &DetectContext) -> Option<IdentityDetection> {
-        let cfg = ctx.config()?;
-
-        let rep = cfg.default_reporter.and_then(|s| {
+        let usable = |s: String| {
             let t = s.trim().to_string();
             // "@me" is a self-referential placeholder, never a usable identity
             if t.is_empty() || t.eq_ignore_ascii_case("@me") { None } else { Some(t) }
-        })?;
-
-        let root = ctx.tasks_root.map(Path::to_path_buf).unwrap_or_else(|| crate::utils::paths::tasks_root_from(Path::new(".")));
-        let project_reporter = ctx
-            .project
-            .and_then(|project| crate::config::persistence::load_project_config_from_dir(project, &root).ok())
-            .and_then(|config| config.default_reporter);
-        let scope = if crate::config::resolution::active_cli_reporter_override().is_some() {
-            "CLI".to_string()
-        } else if project_reporter.is_some() {
-            format!("project {}", ctx.project?)
-        } else if crate::config::env_overrides::capture_env_override_snapshot().global.default_reporter.is_some() {
-            "environment".to_string()
-        } else if crate::config::persistence::load_home_config().ok().and_then(|config| config.default_reporter).is_some() {
-            "home".to_string()
+        };
+        // The person running lotar is a per-process fact: a CLI override or
+        // LOTAR_DEFAULT_REPORTER outranks a project's committed default.reporter,
+        // or agents would write comments and history as the project owner (DEV-403).
+        let (rep, scope) = if let Some(rep) = crate::config::resolution::active_cli_reporter_override().and_then(usable) {
+            (rep, "CLI".to_string())
+        } else if let Some(rep) = crate::config::env_overrides::capture_env_override_snapshot().global.default_reporter.and_then(usable) {
+            (rep, "environment".to_string())
         } else {
-            "workspace".to_string()
+            let rep = ctx.config()?.default_reporter.and_then(usable)?;
+            let root = ctx.tasks_root.map(Path::to_path_buf).unwrap_or_else(|| crate::utils::paths::tasks_root_from(Path::new(".")));
+            let project_reporter = ctx
+                .project
+                .and_then(|project| crate::config::persistence::load_project_config_from_dir(project, &root).ok())
+                .and_then(|config| config.default_reporter);
+            let scope = if project_reporter.is_some() {
+                format!("project {}", ctx.project?)
+            } else if crate::config::persistence::load_home_config().ok().and_then(|config| config.default_reporter).is_some() {
+                "home".to_string()
+            } else {
+                "workspace".to_string()
+            };
+            (rep, scope)
         };
         Some(IdentityDetection {
             user: rep,

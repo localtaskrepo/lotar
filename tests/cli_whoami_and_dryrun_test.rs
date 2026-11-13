@@ -221,7 +221,7 @@ fn project_identity_cache_is_scoped_and_precedence_is_preserved() {
     use lotar::utils::identity::{resolve_current_user, resolve_current_user_explain_for_project, resolve_current_user_for_project};
     let temp = TempDir::new().unwrap();
     let _home = EnvVarGuard::set("HOME", temp.path().to_str().unwrap());
-    let _env = EnvVarGuard::set("LOTAR_DEFAULT_REPORTER", "environment-user");
+    let _env = EnvVarGuard::clear("LOTAR_DEFAULT_REPORTER");
     let _user = EnvVarGuard::set("USER", "fallback-user");
     let tasks = temp.path().join("workspace/.tasks");
     for (project, reporter) in [("TEST", "alice"), ("OTHER", "bob"), ("INHERIT", ""), ("SELF", "\"@me\"")] {
@@ -234,13 +234,24 @@ fn project_identity_cache_is_scoped_and_precedence_is_preserved() {
     }
     write_minimal_config(&tasks, "default.reporter: workspace-user\n");
     assert_eq!(resolve_current_user(Some(&tasks)).as_deref(), Some("alice"));
-    for (project, expected) in [("OTHER", "bob"), ("TEST", "alice"), ("INHERIT", "environment-user"), ("SELF", "fallback-user"), ("OTHER", "bob")] {
+    for (project, expected) in [("OTHER", "bob"), ("TEST", "alice"), ("INHERIT", "workspace-user"), ("SELF", "fallback-user"), ("OTHER", "bob")] {
         assert_eq!(resolve_current_user_for_project(Some(&tasks), Some(project)).as_deref(), Some(expected));
     }
     let second = temp.path().join("second/.tasks");
     std::fs::create_dir_all(second.join("OTHER")).unwrap();
     std::fs::write(second.join("OTHER/config.yml"), "default.reporter: carol\n").unwrap();
     assert_eq!(resolve_current_user_for_project(Some(&second), Some("OTHER")).as_deref(), Some("carol"));
+
+    // DEV-403: the environment outranks a project's default.reporter, and the CLI outranks both.
+    // EnvVarGuard holds the variable's mutex and restores its original value.
+    unsafe {
+        std::env::set_var("LOTAR_DEFAULT_REPORTER", "environment-user");
+    }
+    for project in ["OTHER", "SELF"] {
+        let found = resolve_current_user_explain_for_project(Some(&tasks), Some(project)).unwrap();
+        assert_eq!(found.user, "environment-user");
+        assert!(found.details.unwrap().contains("environment configuration"));
+    }
 
     lotar::config::resolution::configure_cli_overrides(&[("default.reporter".into(), "cli-user".into())]).unwrap();
     let found = resolve_current_user_explain_for_project(Some(&tasks), Some("OTHER"));
