@@ -59,7 +59,8 @@ automation:
           agent: *fix
     # An agent's ticket nobody took: @fix works it. The filer assigns itself, the
     # owner (a question) or @fix-light (mechanical) instead when that fits; proposals, owner and recurring tickets wait.
-    # A Change ticket (local's change records) belongs to the agent making that change.
+    # A Change ticket (local's change records) belongs to the agent making that change. A ticket filed Blocked waits:
+    # its depends_on follows the add, and "Prerequisites done" starts it (STD-102).
     - name: "Agent tickets: start the fix agent"
       when:
         all:
@@ -69,6 +70,7 @@ automation:
           - not: { assignee: "@any" }
           - not: { tags: { any: [health, proposal, owner, recurring] } }
           - not: { type: Change }
+          - not: { status: Blocked }
       on:
         created:
           set:
@@ -600,12 +602,14 @@ automation:
     # or queues for an agent, then we should do that as well. Let's do it right from the start"): queued to a running
     # job, else @fix starts with it as the next turn of the ticket's last T3 thread. Only his comments, and the inbox
     # triage agent's answers for him (STD-54): an agent's own would come back to it. An answer that changes nothing
-    # sets status and assignee back, so no merge follows.
+    # sets status and assignee back, so no merge follows. His comment closes the ticket's inbox ticket (repos.ts
+    # --inbox): the job it starts sets the status by rule, which fires no other rule (STD-101).
     - name: "Comments: the owner's comment reaches the agent"
       when:
         comment: { author: [mallox, triage] }
       on:
         commented:
+          run: *inbox
           agent:
             model: "${{ticket.field:model}}"
             provider: "${{ticket.field:provider}}"
@@ -630,8 +634,8 @@ automation:
               question, set the status to HelpNeeded, assign the ticket to mallox and stop.
     # What waits for the owner goes to his inbox, project INBOX in standards (owner 2026-11-12, STD-54,
     # docs/decisions/2026-11-12-owner-inbox.md): HelpNeeded with assignee mallox, in either order, or tag owner. A
-    # status an agent sets during its job applies when the job ends and fires no rule; the daily repos.ts --report
-    # files those.
+    # status an agent sets during its job fires these rules when the job ends; the daily repos.ts --report files what
+    # a rule's own change set.
     - name: "Inbox: file what waits for the owner"
       when:
         any:
@@ -645,6 +649,15 @@ automation:
       on:
         created:
           run: *inbox
+        updated:
+          run: *inbox
+    # Its inbox ticket closes as soon as the ticket leaves HelpNeeded, also when he answered in the agent's thread and
+    # not on a ticket (STD-101); --inbox leaves it open while the ticket still waits (tag owner).
+    - name: "Inbox: close what no longer waits"
+      when:
+        changes:
+          status: { from: HelpNeeded }
+      on:
         updated:
           run: *inbox
     # Manual: after answering a HelpNeeded question or a failed job. Always pass --select, or every waiting ticket starts.
