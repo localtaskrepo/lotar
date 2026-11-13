@@ -66,7 +66,9 @@ vi.mock('vue-router', async (importOriginal) => ({
     useRouter: () => ({ replace: mocks.replace }),
 }))
 vi.mock('../composables/useSse', () => ({
-    useSse: (_path: string, _params: unknown, options: { onReconnect: () => void }) => {
+    useSse: (_path: string, params: { kinds?: string }, options: { onReconnect: () => void }) => {
+        // The shared release list keeps a stream of its own (DEV-464).
+        if (params.kinds === 'release_changed') return { on: vi.fn(), off: vi.fn(), close: vi.fn() }
         mocks.reconnect = options.onReconnect
         return { on: mocks.on, off: vi.fn(), close: mocks.close }
     },

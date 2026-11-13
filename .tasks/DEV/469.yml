@@ -1,11 +1,11 @@
 title: 'Built-in job instructions: drop the status sentence in every summary and the reassign-to-reporter conflict'
-status: Merging
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T10:33:48.095335+00:00
-modified: 2026-11-13T10:50:22.366305+00:00
+modified: 2026-11-13T10:51:11.209715+00:00
 comments:
 - date: 2026-11-13T10:43:14.141712+00:00
   author: claude
@@ -20,6 +20,9 @@ comments:
 - date: 2026-11-13T10:50:22.366305+00:00
   author: codex
   text: 'Merged f25eea82 by fast-forward into main. Checks passed with sandbox restrictions lifted: lint:agent, npm test (2132 Rust, 1513 UI plus release/hooks), npm run smoke (387). No code changes during merge. Built-in prompt wording and main source verified; a live T3 job from a rule remains unverified (requires the installed/running build to include this change). Including pending .tasks updates as requested, then pushing main if clean.'
+- date: 2026-11-13T10:50:58.777131+00:00
+  author: codex
+  text: Final merge commit b95a5c24 (signed) includes f25eea82 and pending ticket updates. All required lint/test/smoke checks passed. Main source confirms the removed summary instruction and request-named question recipient; no live rule-started T3 job was launched. Push attempted after confirming clean main and only this finished commit ahead of upstream.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae151f7df-9d40-4739-a36f-48a4dd5074e4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac3d09d47-54fb-44bd-b7ae-b70c2546a7b5
@@ -99,3 +102,13 @@ history:
   actor: codex
   changes:
   - field: comment_added
+- at: 2026-11-13T10:50:58.777131+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T10:51:11.209715+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

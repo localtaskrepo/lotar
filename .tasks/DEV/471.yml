@@ -1,0 +1,41 @@
+title: Smoke runs leave lotar serve processes running after they end
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-13T11:02:08.051420+00:00
+modified: 2026-11-13T11:02:09.227752+00:00
+relationships:
+  related:
+  - DEV-467
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A68db10bd-eee1-4e4b-ae5e-7eeb2f02d38b
+description: 'Found 2026-11-13 11:00Z while working on DEV-467: 40 ''target/smoke/lotar serve --port 0 --host 127.0.0.1'' processes from the worktrees agent-DEV-409-b5589b2cd370b848 and agent-DEV-411-b5a25146b846a18e, started 2026-11-12 20:19 to 21:43 local, still run with parent pid 1 (their smoke runs ended long ago). Check: ps -axo pid,ppid,lstart,command | grep ''target/smoke/lotar serve'' lists servers whose smoke run is gone. Done when: a smoke run that ends, fails or is killed stops the servers it started, with a test; the leftover processes are stopped.'
+tags:
+- health
+custom_fields:
+  finding: smoke:leaked-serve-processes
+history:
+- at: 2026-11-13T11:02:08.165035+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-467"]}'
+- at: 2026-11-13T11:02:08.282911+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T11:02:08.680027+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T11:02:09.227752+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A68db10bd-eee1-4e4b-ae5e-7eeb2f02d38b

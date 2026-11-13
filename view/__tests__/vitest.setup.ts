@@ -38,6 +38,23 @@ beforeAll(() => {
     vi.stubGlobal('localStorage', new MemoryStorage())
     // jsdom has no layout, so it leaves out scrollIntoView; every browser has it.
     Element.prototype.scrollIntoView = () => {}
+    // jsdom has no EventSource; pages subscribe to /api/events on mount. This
+    // one never connects. Tests that drive events stub their own.
+    vi.stubGlobal(
+        'EventSource',
+        class extends EventTarget {
+            static CONNECTING = 0
+            static OPEN = 1
+            static CLOSED = 2
+            readyState = 0
+            constructor(public url: string) {
+                super()
+            }
+            close() {
+                this.readyState = 2
+            }
+        },
+    )
 
     vi.stubGlobal(
         'fetch',

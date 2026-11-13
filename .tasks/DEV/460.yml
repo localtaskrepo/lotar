@@ -1,11 +1,10 @@
 title: 'Done with an open step no ticket tracks: DEV-364'
-status: InProgress
+status: WontDo
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
 created: 2026-11-13T08:17:47.078861+00:00
-modified: 2026-11-13T10:33:47.413987+00:00
+modified: 2026-11-13T11:01:23.353455+00:00
 relationships:
   related:
   - DEV-364
@@ -14,6 +13,9 @@ comments:
 - date: 2026-11-13T08:30:38.301118+00:00
   author: claude
   text: 'The open step is done, not a ticket of its own: I sent the reporter thread of DEV-364 (''Split Repo Binaries to Skip CI Builds'', t3-thread b51ca0ac) the notice that the fix shipped in v0.14.0 (commit 66c7060), with what changed and what it doesn''t cover. Its last update was 2026-11-12 06:42Z, before 0.14.0 was installed, so it had not been told. Comment added on DEV-364. No files changed, no commit. Check: repos.ts localtaskrepo/lotar does not list untracked:DEV-364 now (DEV-460 is open and linked); with the step done and recorded on DEV-364, it does not come back. Set WontDo as the Done-when says, so the finding is not filed again.'
+- date: 2026-11-13T11:01:23.177726+00:00
+  author: claude
+  text: 'Ended after the 2026-11-13 T3 Code outage (lotar DEV-467): the job failed with ''Could not reach the T3 Code server'', so its end rules and the outcome its agent recorded were never applied. Applied by hand: WontDo, as the agent''s last comment says (no commits on its branch); assignee cleared, as for a fix that commits nothing (STD-87).'
 references:
 - link: mcp:0a2379b4-8a02-4f7d-99d4-f4cdd417cf08
 description: |-
@@ -65,3 +67,18 @@ history:
   - field: relationships
     old: '{"related":["DEV-364"]}'
     new: '{"related":["DEV-364","DEV-467"]}'
+- at: 2026-11-13T11:01:23.177726+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:01:23.277640+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: WontDo
+- at: 2026-11-13T11:01:23.353455+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'

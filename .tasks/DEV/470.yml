@@ -1,17 +1,18 @@
 title: A comment that starts with its author's name shows it twice
-status: InProgress
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-13T10:33:48.379945+00:00
-modified: 2026-11-13T10:45:01.766614+00:00
+modified: 2026-11-13T11:11:15.892442+00:00
 relationships:
   related:
   - DEV-327
   - DEV-459
   - DEV-462
   - DEV-465
+  - DEV-464
 comments:
 - date: 2026-11-13T10:42:36.667185+00:00
   author: claude
@@ -19,10 +20,47 @@ comments:
 - date: 2026-11-13T10:44:45.283831+00:00
   author: codex
   text: 'Review: blocking. src/services/task_service.rs:168 preserves prefix-only comments such as claude: by claude, violating Done when (strip or refuse). tests/dev470_comment_author_prefix_test.rs:30 expects this incorrect behavior. Reject these comments with an author-already-recorded message and cover rejection and dry-run. Read diff 4c770c59 against main, ticket/comments, related tickets, guidance, main history and REST/MCP call sites. diff check passed. Rust check hit sccache sandbox denial; retry and lint were stopped during compilation, neither passed. Full tests/smoke not rerun. No files/commits changed or minor tickets filed. Status/assignee unchanged.'
+- date: 2026-11-13T10:55:25.229546+00:00
+  author: claude
+  text: 'Review finding fixed in 813370d6 (amended 4c770c59). A comment that is only its author''s name (claude:, claude (agent):) is now refused with ''the comment is only its author''s name; lotar records the author (claude) already'', in strip_author_prefix (src/services/task_service.rs), so CLI, REST, MCP and the CLI dry run all refuse it and nothing is stored. tests/dev470_comment_author_prefix_test.rs now expects the refusal, also for --dry-run, and checks no comment was stored. Checks: npm run lint, npm test (2131 Rust + 1513 UI), npm run smoke (387), all passed.'
+- date: 2026-11-13T10:57:36.954408+00:00
+  author: codex
+  text: 'Review: passed. Reviewed 813370d6 diff against main, ticket/comments, related tickets, repository guidance, recent main history and CLI/REST/MCP call sites. Previous blocker fixed: author-only comments rejected before storage and in dry-run, covered by regression assertions. No findings or minor tickets. Diff check passed. Targeted tests blocked by sccache sandbox denial; wrapper-free retry stopped during fresh dependency compilation (runner reported xcrun_db temp entry on interruption). No tests passed independently; full lint/test/smoke not rerun. No files or commits changed; status/assignee unchanged. No durable guidance finding.'
+- date: 2026-11-13T10:58:41.682198+00:00
+  author: codex
+  text: 'Merge blocked: rebased the reviewed fix onto current main successfully. npm run lint:agent failed at Rust clippy because sccache returned Operation not permitted (sandbox); no lint pass claimed. Tests and smoke not run after this failed gate; nothing merged or pushed. May this merge job rerun the required checks with sandbox escalation so sccache can execute?'
+- date: 2026-11-13T11:00:25.987710+00:00
+  author: triage
+  text: 'Answer, no owner decision needed: the reviewed fix is already on main as 656cdd7a (it includes the refusal of author-only comments and the test tests/dev470_comment_author_prefix_test.rs). The merge-blocked question (sandbox escalation for sccache) is moot: I ran ''cargo test --test integration author_prefix'' in the main checkout with RUSTC_WRAPPER empty and it passed. If you still need lint or the full test run, run cargo with RUSTC_WRAPPER empty, which avoids the sccache sandbox denial. Done-when criterion is met; close the ticket.'
+- date: 2026-11-13T11:00:44.201286+00:00
+  author: codex
+  text: Confirmed 656cdd7a is an ancestor of current main and contains the reviewed fix, author-only refusal and regression test. The merge blocker is moot. Closing as triage requested; relying on the recorded fix-agent full checks and triage targeted test pass, with no new test pass claimed this turn. No code changes, commits, merge or push needed.
+- date: 2026-11-13T11:01:31.276935+00:00
+  author: codex
+  text: 'Review: blocking. Checkout holds stale 4c770c59; main already contains corrected 656cdd7a. src/services/task_service.rs:168 preserves author-only claude: and tests/dev470_comment_author_prefix_test.rs:29 expects preservation, violating done criteria and repeating the prior blocker. Use the already-integrated rework rather than this stale branch. Read ticket/comments, branch diff and main implementation/history. Diff check passed; tests not rerun. No files or commits changed; status/assignee unchanged. No minor tickets.'
+- date: 2026-11-13T11:03:09.985637+00:00
+  author: claude
+  text: 'Review finding (stale 4c770c59 on this branch) fixed: the branch t3/strip-author-name-from-comments-2 held the first version, which keeps a name-only comment like ''claude:''. Main already has the reworked commit 656cdd7a, which refuses it; range-diff shows 656cdd7a contains all of 4c770c59 plus the refusal. I moved the branch to main (git reset --keep main), so it holds 656cdd7a and nothing beyond main: no amend, no new commit, nothing left to merge. Check: RUSTC_WRAPPER= cargo nextest run --test integration dev470 passed (1 test) on 656cdd7a. Not rerun: npm run lint, npm test, npm run smoke, since the branch has no change beyond main.'
+- date: 2026-11-13T11:03:57.719959+00:00
+  author: codex
+  text: 'Review: blocking. Assigned checkout still holds stale 4c770c59; the last fix updated a different branch. src/services/task_service.rs:168 preserves author-only comments, and tests/dev470_comment_author_prefix_test.rs:29 expects preservation, violating Done when. Main already contains corrected 656cdd7a. Reconcile this assigned branch with that reviewed fix before merge. Read branch log/diff, ticket/comments and main history; diff check passed. Tests not rerun. No files or commits changed; status/assignee unchanged. No minor tickets.'
+- date: 2026-11-13T11:04:05.241689+00:00
+  author: automation
+  text: The review found blocking problems again after one rework (the comments above). Should an agent rework it once more (lotar assignee DEV-470 @fix), will you decide the findings, or is it WontDo?
+- date: 2026-11-13T11:04:32.174822+00:00
+  author: triage
+  text: 'Answer, no owner decision needed: do not rework again and do not mark WontDo. All findings in the last reviews point at the stale commit 4c770c59 (detached worktree agent-DEV-470-b2c47e1f103334cb), not at main. Main holds the corrected 656cdd7a: strip_author_prefix refuses an author-only comment (''the comment is only its author''s name; lotar records the author (claude) already'', src/services/task_service.rs:169), and tests/dev470_comment_author_prefix_test.rs expects the refusal. Re-checked 2026-11-13: RUSTC_WRAPPER= cargo nextest run --test integration dev470 passed on main. Done when is met, nothing is left to merge: close the ticket as Done (the stale worktree is leftover to remove).'
+- date: 2026-11-13T11:04:55.919310+00:00
+  author: codex
+  text: Confirmed main is 656cdd7a and its implementation rejects author-only comments; regression test expects refusal and verifies refused comments are not stored. Done when is met. Following triage instruction to close Done, with nothing left to merge or rework. Test evidence is triage successful RUSTC_WRAPPER= cargo nextest run --test integration dev470 on main; no new tests run this turn. No code changes or new commit. Stale worktrees left untouched.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5e693b7d-e994-477e-a6cc-aea49afd4435
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae39f6961-bff4-4052-9828-9cb77fe00bb8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A14f68b0e-6d49-4d2b-a471-89a6bb643631
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A97da6d6b-1378-4100-bbaf-03b37fc3238c
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1f90d03d-4a8d-47b1-ae08-8aadb528a31a
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0e3ccc8a-5f76-49d5-9db7-31326a8ae500
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A980f6fae-aa0f-4598-b14d-6dab3bcba5e5
 description: |-
   Agents start comment text with their own name, so `lotar show` prints "claude: claude: ..." and the web UI shows the name twice. On 2026-11-13 this happened in about 300 comments in standards, local, quarter-inch-studio and lotar (also "claude (DEV-459 agent):", "claude, 2026-11-13:"). The instruction that asked for it was removed (DEV-327, standards STD-56), and the standards skill lotar-workflow now says not to do it. Prose has not stopped it, so per standards AGENTS.md ("a rule missed twice becomes a check") lotar should handle it.
 
@@ -39,7 +77,7 @@ description: |-
   - [ ] A comment whose text starts with its own author's name (followed by ":" or "," or " (...)") is stored without it, or `lotar comment` refuses it with a message saying the author is recorded already. With a test.
 tags:
 - health
-- review-returned
+- automation-limit-reached
 custom_fields:
   finding: comms:comment-author-prefix
 history:
@@ -113,3 +151,217 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A14f68b0e-6d49-4d2b-a471-89a6bb643631
+- at: 2026-11-13T10:55:25.229546+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T10:55:33.172315+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T10:55:34.997199+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A97da6d6b-1378-4100-bbaf-03b37fc3238c
+- at: 2026-11-13T10:57:36.954408+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T10:57:42.992105+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-13T10:58:41.682198+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T10:58:51.399021+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, review-returned
+    new: health
+- at: 2026-11-13T10:58:51.447661+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-13T11:00:25.987710+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:00:26.018719+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-13T11:00:26.497489+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-13T11:00:44.201286+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:00:52.196882+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T11:00:52.313984+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-11-13T11:00:53.353995+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Done
+    new: Reviewing
+- at: 2026-11-13T11:00:53.928181+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1f90d03d-4a8d-47b1-ae08-8aadb528a31a
+- at: 2026-11-13T11:01:31.276935+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:01:31.300620+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: health
+    new: health, review-blocked
+- at: 2026-11-13T11:01:37.396680+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: health, review-blocked
+    new: health, review-returned
+- at: 2026-11-13T11:01:37.838892+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-13T11:01:38.395628+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0e3ccc8a-5f76-49d5-9db7-31326a8ae500
+- at: 2026-11-13T11:03:09.985637+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:03:17.103532+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T11:03:19.729810+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A980f6fae-aa0f-4598-b14d-6dab3bcba5e5
+- at: 2026-11-13T11:03:57.719959+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:03:57.751864+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: health, review-returned
+    new: health, review-returned, review-blocked
+- at: 2026-11-13T11:04:05.194073+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+- at: 2026-11-13T11:04:05.241689+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:04:32.174822+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:04:32.350392+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-13T11:04:33.098274+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-13T11:04:55.919310+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:04:59.692841+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T11:04:59.730471+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, review-returned, review-blocked
+    new: health, review-returned, review-blocked, automation-limit-reached
+- at: 2026-11-13T11:04:59.774205+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-11-13T11:04:59.845064+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, review-returned, review-blocked, automation-limit-reached
+    new: health, automation-limit-reached
+- at: 2026-11-13T11:11:15.892442+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-327","DEV-459","DEV-462","DEV-465"]}'
+    new: '{"related":["DEV-327","DEV-459","DEV-462","DEV-465","DEV-464"]}'

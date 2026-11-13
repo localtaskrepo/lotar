@@ -1,11 +1,10 @@
 title: 'Done with an open step no ticket tracks: DEV-380'
-status: InProgress
+status: WontDo
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
 created: 2026-11-13T08:17:50.627347+00:00
-modified: 2026-11-13T10:33:48.517461+00:00
+modified: 2026-11-13T11:01:23.775133+00:00
 relationships:
   related:
   - DEV-380
@@ -16,6 +15,9 @@ comments:
 - date: 2026-11-13T08:31:52.056794+00:00
   author: claude
   text: 'claude, 2026-11-13: The open step needs nothing more. DEV-380''s ''Not done: the existing leftovers in the cache are untouched'' became DEV-381 (linked to DEV-380), which is Done: the owner approved the cleanup on 2026-11-13 and 13072 leftovers went to the Trash; the cache now has 35 entries. The check still lists [untracked:DEV-380] only because DEV-381 is closed rather than open. Noted the outcome on DEV-380 too. No repo changes, no commit. Setting WontDo so the finding isn''t filed again.'
+- date: 2026-11-13T11:01:23.602359+00:00
+  author: claude
+  text: 'Ended after the 2026-11-13 T3 Code outage (lotar DEV-467): the job failed with ''Could not reach the T3 Code server'', so its end rules and the outcome its agent recorded were never applied. Applied by hand: WontDo, as the agent''s last comment says (no commits on its branch); assignee cleared, as for a fix that commits nothing (STD-87).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac9f92204-d37a-4cb6-a5a7-b41bbb476339
 description: |-
@@ -79,3 +81,18 @@ history:
   - field: relationships
     old: '{"related":["DEV-380","DEV-381","DEV-467"]}'
     new: '{"related":["DEV-380","DEV-381","DEV-467","DEV-470"]}'
+- at: 2026-11-13T11:01:23.602359+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:01:23.698709+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: WontDo
+- at: 2026-11-13T11:01:23.775133+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'

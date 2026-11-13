@@ -1,8 +1,25 @@
 <template>
   <section class="col releases-page" style="gap: 16px">
     <PageHeader reload-label="Refresh releases" :reloading="busy" @reload="refreshAll">
-      <template #title>Releases</template>
+      <template #title>
+        Releases
+        <span v-if="project" class="muted app-page-header__project" :title="projectLabel(project)"
+          >— {{ projectName(project) }}</span
+        >
+      </template>
       <template #toolbar>
+        <UiSelect
+          v-if="projects.length > 1 || project"
+          :model-value="project"
+          aria-label="Project"
+          data-testid="release-project"
+          @update:model-value="setProject"
+        >
+          <option value="">All projects</option>
+          <option v-for="item in projects" :key="item.prefix" :value="item.prefix">
+            {{ formatProjectLabel(item) }}
+          </option>
+        </UiSelect>
         <UiButton class="releases-create" type="button" data-testid="release-create" @click="openCreate">
           <IconGlyph name="plus" aria-hidden="true" />
           <span>Release</span>
@@ -120,15 +137,15 @@
             </div>
             <div class="release-progress-block">
               <span class="group-count" data-testid="release-counts"
-                >{{ release.open_count }} open · {{ release.done_count }} done</span
+                >{{ countsOf(release).open }} open · {{ countsOf(release).done }} done</span
               >
               <div
                 class="release-progress"
                 role="progressbar"
                 :aria-label="`${release.display_name} progress`"
                 aria-valuemin="0"
-                :aria-valuemax="release.task_count"
-                :aria-valuenow="release.done_count"
+                :aria-valuemax="countsOf(release).total"
+                :aria-valuenow="countsOf(release).done"
               >
                 <span class="release-progress__bar" :style="{ width: `${progressPercent(release)}%` }"></span>
               </div>
@@ -179,12 +196,13 @@
           </header>
           <div v-show="isExpanded(release.id)" class="group-body">
             <p v-if="tasksLoading && !releaseTasks[release.id]" class="muted empty-placeholder">Loading tickets…</p>
-            <p v-else-if="!(releaseTasks[release.id] ?? []).length" class="muted empty-placeholder">
-              No tickets in this release. Drag tickets here from the backlog or another release.
+            <p v-else-if="!shownTasks(release.id).length" class="muted empty-placeholder">
+              {{ project ? `No ${projectName(project)} tickets in this release.` : 'No tickets in this release.' }}
+              Drag tickets here from the backlog or another release.
             </p>
             <ReleaseTaskTable
               v-else
-              :tasks="releaseTasks[release.id] ?? []"
+              :tasks="shownTasks(release.id)"
               :source="release.id"
               :caption="`Tickets in ${release.display_name}`"
               :is-selected="isSelected"
@@ -356,7 +374,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api/client'
 import type { ReleaseListItem, ReleaseUpdateRequest, TaskDTO } from '../api/types'
 import IconGlyph from '../components/IconGlyph.vue'
@@ -369,18 +388,26 @@ import UiEmptyState from '../components/UiEmptyState.vue'
 import UiLoader from '../components/UiLoader.vue'
 import UiModal from '../components/UiModal.vue'
 import UiPagination from '../components/UiPagination.vue'
+import UiSelect from '../components/UiSelect.vue'
+import { useProjectNames } from '../composables/useProjectNames'
+import { useProjects } from '../composables/useProjects'
 import { useReleases } from '../composables/useReleases'
 import { useSse } from '../composables/useSse'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
 import { formatTaskDate, toDateInputValue } from '../utils/date'
 import { errorMessage } from '../utils/errors'
 import { readTasksPageSizePreference } from '../utils/preferences'
+import { formatProjectLabel } from '../utils/projectLabels'
 import { projectOf } from '../utils/text'
 
 type Section = number | 'backlog'
 
 const { releases, refresh: refreshReleases } = useReleases()
 const { openTaskPanel } = useTaskPanelController()
+const { projects, refresh: refreshProjects } = useProjects()
+const { projectName, projectLabel } = useProjectNames()
+const route = useRoute()
+const router = useRouter()
 
 const initialized = ref(false)
 const busy = ref(false)
@@ -408,8 +435,45 @@ function formatDay(value: string): string {
   return formatTaskDate(value, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
+// The project filter (`?project=`) narrows the tickets shown; releases span projects.
+const project = ref(typeof route.query.project === 'string' ? route.query.project : '')
+
+function setProject(next: string) {
+  if (next === project.value) return
+  const query = { ...route.query }
+  if (next) query.project = next
+  else delete query.project
+  void router.replace({ query })
+}
+
+watch(
+  () => route.query.project,
+  (value) => {
+    const next = typeof value === 'string' ? value : ''
+    if (next === project.value) return
+    project.value = next
+    backlogOffset.value = 0
+    clearSelection()
+    void refreshAll()
+  },
+)
+
+function shownTasks(id: number): TaskDTO[] {
+  const tasks = releaseTasks.value[id] ?? []
+  return project.value ? tasks.filter((task) => projectOf(task.id) === project.value) : tasks
+}
+
+/** Counts over the shown tickets when a project is picked, else the release's own. */
+function countsOf(release: ReleaseListItem): { open: number; done: number; total: number } {
+  if (!project.value) return { open: release.open_count, done: release.done_count, total: release.task_count }
+  const tasks = shownTasks(release.id)
+  const done = tasks.filter((task) => task.task_state?.is_done).length
+  return { open: tasks.length - done, done, total: tasks.length }
+}
+
 function progressPercent(release: ReleaseListItem): number {
-  return release.task_count ? Math.round((release.done_count / release.task_count) * 100) : 0
+  const { done, total } = countsOf(release)
+  return total ? Math.round((done / total) * 100) : 0
 }
 
 let loadGeneration = 0
@@ -431,8 +495,11 @@ async function loadReleaseTasks(ids: number[]) {
 }
 
 async function loadBacklog() {
-  const response = await api.releaseBacklog({ limit: pageSize.value, offset: backlogOffset.value })
-  return response
+  return api.releaseBacklog({
+    limit: pageSize.value,
+    offset: backlogOffset.value,
+    ...(project.value ? { project: project.value } : {}),
+  })
 }
 
 async function refreshAll() {
@@ -522,8 +589,8 @@ function clearSelection() {
 /** Drop selections whose ticket left the section it was selected in. */
 function pruneSelection() {
   const present = new Set<string>()
-  for (const [id, tasks] of Object.entries(releaseTasks.value)) {
-    for (const task of tasks) present.add(selectionKey(task.id, Number(id)))
+  for (const release of releases.value) {
+    for (const task of shownTasks(release.id)) present.add(selectionKey(task.id, release.id))
   }
   for (const task of backlog.value) present.add(selectionKey(task.id, null))
   const next = new Map([...selection.value].filter(([key]) => present.has(key)))
@@ -833,6 +900,7 @@ onMounted(() => {
     { onReconnect: scheduleRefresh },
   )
   for (const kind of ['release_changed', 'task_created', 'task_updated', 'task_deleted']) sse.on(kind, scheduleRefresh)
+  void refreshProjects()
   void refreshAll()
 })
 

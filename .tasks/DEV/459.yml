@@ -1,11 +1,10 @@
 title: 'Done with an open step no ticket tracks: DEV-393'
-status: InProgress
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
 created: 2026-11-13T08:17:45.021914+00:00
-modified: 2026-11-13T10:33:48.517233+00:00
+modified: 2026-11-13T11:01:24.213347+00:00
 relationships:
   related:
   - DEV-393
@@ -16,6 +15,9 @@ comments:
 - date: 2026-11-13T08:27:29.452450+00:00
   author: claude
   text: 'claude (DEV-459 agent): Filed the open steps from DEV-393''s merge comment as DEV-464 (row-menu Add to release, project filter on the Releases page, release list refresh on release_changed; Low, Todo) and linked it to DEV-393 as related. No repo files changed, so no commit. Check: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar no longer lists [untracked:DEV-393]. lint/test/smoke not run (ticket-only change).'
+- date: 2026-11-13T11:01:24.037492+00:00
+  author: claude
+  text: 'Ended after the 2026-11-13 T3 Code outage (lotar DEV-467): the job failed with ''Could not reach the T3 Code server'', so its end rules and the outcome its agent recorded were never applied. Applied by hand: Done, as the agent''s last comment says (no commits on its branch); assignee cleared, as for a fix that commits nothing (STD-87).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af12cb807-c0d0-459e-aab2-2b3d346259d6
 description: |-
@@ -79,3 +81,18 @@ history:
   - field: relationships
     old: '{"related":["DEV-393","DEV-464","DEV-467"]}'
     new: '{"related":["DEV-393","DEV-464","DEV-467","DEV-470"]}'
+- at: 2026-11-13T11:01:24.037492+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:01:24.133898+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-11-13T11:01:24.213347+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'

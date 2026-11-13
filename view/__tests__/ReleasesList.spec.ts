@@ -35,6 +35,25 @@ vi.mock('../components/ReloadButton.vue', () => ({
     default: { emits: ['click'], template: '<button type="button" class="reload" @click="$emit(\'click\')" />' },
 }))
 
+const router = vi.hoisted(() => ({ query: {} as Record<string, string>, replace: vi.fn() }))
+vi.mock('vue-router', async () => {
+    const { reactive } = await import('vue')
+    const route = reactive({ query: router.query })
+    router.replace.mockImplementation(async ({ query }: { query: Record<string, string> }) => {
+        route.query = query
+    })
+    return { useRoute: () => route, useRouter: () => ({ replace: router.replace }) }
+})
+
+vi.mock('../composables/useProjects', async () => {
+    const { ref } = await import('vue')
+    const projects = ref([
+        { name: 'Alpha', prefix: 'A' },
+        { name: 'Beta', prefix: 'B' },
+    ])
+    return { useProjects: () => ({ projects, status: ref('ready'), refresh: vi.fn() }) }
+})
+
 const openTaskPanel = vi.fn()
 vi.mock('../composables/useTaskPanelController', () => ({
     useTaskPanelController: () => ({ state: { open: false }, openTaskPanel }),
@@ -57,8 +76,9 @@ function release(id: number, version: string, overrides: Partial<ReleaseListItem
     }
 }
 
-function task(id: string, releases: number[] = []): TaskDTO {
+function task(id: string, releases: number[] = [], done = false): TaskDTO {
     return {
+        task_state: { is_done: done, due_bucket: null, calendar_day: '2026-01-01' },
         id,
         title: `Task ${id}`,
         status: 'Todo',
@@ -92,7 +112,11 @@ const RELEASES = [
     release(2, '0.11.0'),
 ]
 
-const TASKS: Record<number, TaskDTO[]> = { 3: [task('A-1', [3])], 1: [task('A-2', [1]), task('A-3', [1])], 2: [] }
+const TASKS: Record<number, TaskDTO[]> = {
+    3: [task('A-1', [3])],
+    1: [task('A-2', [1]), task('A-3', [1]), task('B-1', [1], true), task('B-2', [1])],
+    2: [],
+}
 
 function assignment(action: 'add' | 'move' | 'remove', id: number, modified: string[]) {
     return { status: 'ok', action, release_id: id, release_version: '0.11.0', modified, unchanged: [] }
@@ -135,6 +159,7 @@ describe('ReleasesList', () => {
     beforeEach(() => {
         events.handlers.clear()
         openTaskPanel.mockReset()
+        router.replace.mockClear()
         vi.mocked(api.releaseList).mockReset().mockResolvedValue({ status: 'ok', total: 3, releases: RELEASES })
         vi.mocked(api.releaseGet)
             .mockReset()
@@ -163,7 +188,12 @@ describe('ReleasesList', () => {
         expect(autumn.text()).toContain('Planned')
         expect(autumn.get('[data-testid="release-counts"]').text()).toBe('3 open · 1 done')
         expect(autumn.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('1')
-        expect(autumn.findAll('tbody tr').map((row) => row.attributes('data-task-id'))).toEqual(['A-2', 'A-3'])
+        expect(autumn.findAll('tbody tr').map((row) => row.attributes('data-task-id'))).toEqual([
+            'A-2',
+            'A-3',
+            'B-1',
+            'B-2',
+        ])
 
         const shipped = groupOf(wrapper, 3)
         expect(shipped.get('[data-testid="release-state"]').text()).toBe('released')
@@ -262,6 +292,26 @@ describe('ReleasesList', () => {
         form.dispatchEvent(new Event('submit'))
         await flushPromises()
         expect(api.releaseCreate).toHaveBeenCalledWith({ version: 'v0.12.0', planned_date: '2026-12-01' })
+    })
+
+    it('narrows the tickets and counts to the project picked (DEV-464)', async () => {
+        const wrapper = await mountPage()
+        await wrapper.get('[data-testid="release-project"]').setValue('B')
+        await flushPromises()
+        expect(router.replace).toHaveBeenCalledWith({ query: { project: 'B' } })
+        expect(wrapper.get('h1, .app-page-header').text()).toContain('Beta')
+
+        const autumn = groupOf(wrapper, 1)
+        expect(autumn.findAll('tbody tr').map((row) => row.attributes('data-task-id'))).toEqual(['B-1', 'B-2'])
+        expect(autumn.get('[data-testid="release-counts"]').text()).toBe('1 open · 1 done')
+        expect(autumn.get('[role="progressbar"]').attributes('aria-valuemax')).toBe('2')
+        expect(groupOf(wrapper, 3).text()).toContain('No Beta tickets in this release.')
+        expect(api.releaseBacklog).toHaveBeenLastCalledWith(expect.objectContaining({ project: 'B', offset: 0 }))
+
+        await wrapper.get('[data-testid="release-project"]').setValue('')
+        await flushPromises()
+        expect(groupOf(wrapper, 1).findAll('tbody tr')).toHaveLength(4)
+        expect(vi.mocked(api.releaseBacklog).mock.lastCall?.[0]).not.toHaveProperty('project')
     })
 
     it('reloads on a release_changed event', async () => {

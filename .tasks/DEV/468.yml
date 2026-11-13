@@ -1,11 +1,11 @@
 title: A rework commits off the ticket's branch, so the next fresh review reads the old commit
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-13T10:33:47.729859+00:00
-modified: 2026-11-13T10:50:01.388383+00:00
+modified: 2026-11-13T11:01:25.455845+00:00
 relationships:
   related:
   - DEV-342
@@ -19,10 +19,20 @@ comments:
 - date: 2026-11-13T10:49:48.589863+00:00
   author: codex
   text: 'Review: blocking. src/services/agent_job_service.rs:2925 calls follow_thread_branch before finalize_job:3356 commits leftover work. An agent unable to commit leaves a fallback commit on the T3 branch after synchronization, so the ticket branch stays stale. Synchronize after commit_leftover_work in finalization for normal and orphan jobs; add a regression leaving rework uncommitted and checking the next fresh job reads its fallback commit. Read diff, ticket/comments, related DEV-342/408/414/465, guidance and recent main history; docs/decisions absent. git diff --check passed. Focused dev318 Rust suite could not start: sccache Operation not permitted. Full lint/tests/smoke not rerun. No files or commits changed; no minor tickets; status/assignee unchanged.'
+- date: 2026-11-13T11:00:21.336719+00:00
+  author: claude
+  text: 'Rework of the blocking review: fixed. follow_thread_branch now runs inside finalize_job, right after commit_leftover_work, instead of before it in run_job and finish_orphaned_job (both reach finalize_job), so the ticket branch also gets LoTaR''s fallback commit. New regression a_rework_left_uncommitted_moves_the_ticket_branch_to_lotars_commit (tests/dev318_t3_runner_test.rs): the rework thread leaves its file uncommitted, LoTaR commits it, agent/<ticket> points to that commit and the fresh review starts from it; it fails on the earlier commit and passes now. The two rework tests share one helper. docs/help/agent.md says the move comes after that commit. Amended, signed: ccc96841 on t3/rework-commits-on-ticket-branch. Checks: npm run lint:agent, npm run test:agent (Rust, UI, release, hooks), npm run smoke (387 tests), all passed.'
+- date: 2026-11-13T11:01:18.815046+00:00
+  author: codex
+  text: 'Review: blocking. src/services/agent_job_service.rs:1336-1341 logs branch synchronization failure but finalize_job:3366 still completes successfully. If the ticket branch is checked out elsewhere, git branch --force refuses the update, leaving fresh jobs able to read obsolete code. Propagate this failure to job failure or prevent advancement on a stale branch; add a refused-update regression. Prior fallback-commit ordering is fixed. Reviewed diff, ticket/comments, related tickets, guidance and main history; docs/decisions absent. git diff --check passed. Focused dev318 Rust tests could not start: sccache Operation not permitted. Full lint/tests/smoke not rerun. No files/commits/status/assignee changed; no minor tickets.'
+- date: 2026-11-13T11:01:25.455845+00:00
+  author: automation
+  text: The review found blocking problems again after one rework (the comments above). Should an agent rework it once more (lotar assignee DEV-468 @fix), will you decide the findings, or is it WontDo?
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1ab3c1d7-0ce9-4c25-a520-275cf8b42ec4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae7d11a9f-4237-40dd-a146-a91f4cc63276
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab144db0b-cd5a-4b5a-8c17-60dd941c7848
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aedb44bfa-f5c3-49bc-92d4-425790a0c62e
 description: |-
   DEV-465's own run on 2026-11-13 shows reviews reading an obsolete commit. The rework after the first blocking review committed `af60ab9c` on a branch T3 Code named for that thread (`t3/failed-merge-landed-skip-fix`), not on `agent/DEV-465`. `agent/DEV-465` stayed at the first fix `ca054282`. Later `session: fresh` review threads checked out `ca054282` and blocked twice on code that main (9921ee06) had already replaced. That sent the ticket to the owner's inbox (INBOX-22, INBOX-23, INBOX-24 within 7 minutes), and the triage agent had to explain that the work was already on main. One fix ended up on six branches: agent/DEV-465, t3/failed-merge-job-already-on-main, t3/failed-merge-already-landed, t3/failed-merge-work-on-main, t3/failed-merge-landed-skip-fix, t3/failed-merge-landed-work.
 
@@ -42,6 +52,7 @@ description: |-
 tags:
 - health
 - review-returned
+- review-blocked
 custom_fields:
   finding: comms:rework-off-ticket-branch
 history:
@@ -115,3 +126,44 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab144db0b-cd5a-4b5a-8c17-60dd941c7848
+- at: 2026-11-13T11:00:21.336719+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:00:30.286884+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T11:00:31.506011+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aedb44bfa-f5c3-49bc-92d4-425790a0c62e
+- at: 2026-11-13T11:01:18.815046+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:01:20.806016+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: health, review-returned
+    new: health, review-returned, review-blocked
+- at: 2026-11-13T11:01:25.425686+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+- at: 2026-11-13T11:01:25.455845+00:00
+  actor: automation
+  changes:
+  - field: comment_added

@@ -1,11 +1,11 @@
 title: 'Task panel stays on ''Loading task…'' while git hangs: the server''s git calls have no timeout'
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-13T10:33:22.263037+00:00
-modified: 2026-11-13T10:47:35.751536+00:00
+modified: 2026-11-13T11:01:46.344104+00:00
 comments:
 - date: 2026-11-13T10:45:55.825737+00:00
   author: claude
@@ -20,10 +20,20 @@ comments:
 - date: 2026-11-13T10:47:22.677522+00:00
   author: codex
   text: 'Review: blocking. In e40e7eef, src/services/audit_service.rs:22-27 and :44-56 still spawn git cat-file --batch and read its pipes without any deadline. A shim that lets log/ls-files succeed but hangs cat-file leaves the activity request and child alive indefinitely. Earlier log success does not bound a separate process. Add a deadline, child cleanup and endpoint error propagation to BlobBatch, with a regression where only cat-file hangs. This is unfinished explicit ticket scope. Read the diff against main, ticket/comments, relationships (none), guidance and recent main history; docs/decisions does not exist. TaskPanel integration: 17 passed; diff whitespace check passed. Rust attempt failed on sandbox-denied sccache; retry without wrapper was stopped during a cold dependency build before tests ran. Full lint, smoke and live shim reproduction were not rerun. No source edits or commits; status and assignee unchanged.'
+- date: 2026-11-13T11:00:35.706894+00:00
+  author: claude
+  text: 'Review finding fixed (git cat-file --batch had no deadline). BlobBatch now reads responses on a reader thread, and each read waits at most GIT_TIMEOUT (20s). When that runs out, it kills the batch process group (shared spawn_in_process_group/kill_process_group helpers in src/utils/git.rs) and returns TimedOut. load_task_version_batched passes a timeout up as an error and does not fall back to git show, so /api/activity/feed answers 500 ''Failed to run git: git cat-file did not finish within 20s''. New regression test blob_batch_tests::hanging_cat_file_fails_the_activity_feed_at_the_timeout: only the batch process hangs, the feed fails within the timeout, and the hanging child is gone. Live check: a git shim on PATH that hangs only cat-file, lotar serve: /api/tasks/get answered 200 in 0.01s, /api/activity/feed answered 500 after 20.0s, no sleep or cat-file left running. Amended commit 35883139 (signed). Checks: npm run lint:agent, npm run test:agent (Rust, UI, release, hooks) and npm run smoke (387) all pass.'
+- date: 2026-11-13T11:01:38.718725+00:00
+  author: codex
+  text: 'Review: blocking. src/utils/git.rs:74-86 stops checking the deadline when the direct process exits and then joins pipe readers without a timeout. A git shim running sleep 600 & exit 0 leaves its child holding stdout open, so the request waits 600 seconds and the child survives beyond the deadline. Verified pipe behavior: parent exits in 0.003s, EOF waits for its child (2.015s in a short reproduction). Enforce the deadline through output collection, kill remaining process-group children on expiry, and test a parent that exits while a child retains stdout. Earlier cat-file finding is addressed. Read full diff, ticket/comments, relationships (none), guidance and recent main history; docs/decisions absent. Panel integration: 17 passed. Rust attempt blocked before compilation by sandbox-denied sccache. Full lint/tests/smoke and live server reproduction not rerun. No source edits or commits; status and assignee unchanged. Second blocking review: owner routing required by requested workflow.'
+- date: 2026-11-13T11:01:46.344104+00:00
+  author: automation
+  text: The review found blocking problems again after one rework (the comments above). Should an agent rework it once more (lotar assignee DEV-466 @fix), will you decide the findings, or is it WontDo?
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad8d79e8d-6688-4da4-a3a5-516b2d4c3b76
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afcbae329-3a86-478f-818f-b3877e1b72d7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac2e933bb-1feb-4f01-8a66-70350d219f88
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acace9e2f-6f5e-48c9-a5ef-b40b7a3ebe16
 description: |-
   Found 2026-11-13 on all six launchd servers (0.14.3): every ticket page stayed on 'Loading task…'. /api/tasks/history and /api/activity/feed never answered; the servers had a pile of git children (git log --follow ..., git ls-files .tasks) that had been waiting for minutes. Cause of the hang: git blocks in open() of ~/.gitconfig (a symlink into Dropbox) while macOS TCC asks whether the upgraded, unsigned lotar binary may read Dropbox files (same thing as 2026-11-05 with 0.12.0). That is the Mac's problem; lotar's problem is that one hanging git call blocks the whole panel: loadTask (view/composables/task-panel/useTaskPanelPersistence.ts) awaits loadCommitHistory before it sets ready, and the server runs git with no timeout, so requests and git processes pile up.
 
@@ -33,6 +43,7 @@ description: |-
 tags:
 - health
 - review-returned
+- review-blocked
 custom_fields:
   finding: hang:task-history-git
 history:
@@ -100,3 +111,44 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac2e933bb-1feb-4f01-8a66-70350d219f88
+- at: 2026-11-13T11:00:35.706894+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:00:44.799832+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T11:00:46.003073+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acace9e2f-6f5e-48c9-a5ef-b40b7a3ebe16
+- at: 2026-11-13T11:01:38.718725+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:01:40.891650+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: health, review-returned
+    new: health, review-returned, review-blocked
+- at: 2026-11-13T11:01:46.313166+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+- at: 2026-11-13T11:01:46.344104+00:00
+  actor: automation
+  changes:
+  - field: comment_added

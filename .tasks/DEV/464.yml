@@ -1,16 +1,17 @@
 title: 'Releases follow-ups: Add to release in the task row menu, project filter on the Releases page, refresh on release_changed'
-status: InProgress
+status: Merging
 priority: Low
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-13T08:26:30.517705+00:00
-modified: 2026-11-13T10:33:47.414644+00:00
+modified: 2026-11-13T11:11:15.892113+00:00
 relationships:
   related:
   - DEV-393
   - DEV-459
   - DEV-467
+  - DEV-470
 comments:
 - date: 2026-11-13T09:26:09.144119+00:00
   author: claude
@@ -21,8 +22,18 @@ comments:
     3. release_changed: the shared release list (useReleases) subscribes to release_changed while any page uses it and reloads, so task panel, Tasks list filters/column/row menu, Calendar, Board, Insights, Dependencies and filter bars update.
     Tests: useReleases.spec.ts (new), ReleasesList.spec.ts project filter case; jsdom gets an inert EventSource stub in vitest.setup.ts. Smoke: two new cases in ui.releases.smoke.spec.ts (row menu enabled after a release is created over REST, then adds the ticket; project filter). The row-menu smoke case fails with the subscription disabled (checked). Docs: docs/help/releases.md Web UI section.
     Checks: npm run lint, npm test (2126 Rust, 1512 UI), npm run smoke (388) all pass.
+- date: 2026-11-13T11:02:08.464230+00:00
+  author: claude
+  text: 'Checked: agent/DEV-464 holds commit 24fb128d (git log main..HEAD) and the worktree is clean; ready for review.'
+- date: 2026-11-13T11:06:22.019306+00:00
+  author: codex
+  text: 'Review: passed. No code findings or follow-up tickets. Reviewed commit 24fb128d and surrounding code, ticket/comments, related DEV-393/459/467 and owner decisions, repo guidance and touched-file main history. Lint passed with compiler cache disabled; UI tests 1512/1512 passed. Full Rust and build-first smoke attempted: sandbox denies localhost binding (Operation not permitted); Rust stopped early, smoke 146 passed/242 failed plus cleanup errors. Browser behavior could not be independently verified here; fix agent records full passing checks and negative subscription test. Worktree clean, no files edited or commits, status and assignee unchanged. No durable guidance finding.'
+- date: 2026-11-13T11:11:15.556237+00:00
+  author: codex
+  text: 'Merged by fast-forward after clean rebase: original 24fb128d became 138d8084; main commit 3442855a includes pending .tasks updates as instructed. Required gates passed outside sandbox: lint:agent, test:agent (Rust, UI, release and hooks), test:smoke:agent (389/389). DEV-470 preceding it is Done. Preparing authorized push after final clean-main check; no status or assignee change. No durable guidance finding.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa5d32f85-dc57-486d-b533-db54e5599c75
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adadb2f55-82ff-4780-b8d5-b1121e46bec1
 description: |-
   Steps DEV-393 left open (merge comment, 2026-11-12: "Not done (follow-up if wanted)").
 
@@ -75,3 +86,44 @@ history:
   - field: relationships
     old: '{"related":["DEV-393","DEV-459"]}'
     new: '{"related":["DEV-393","DEV-459","DEV-467"]}'
+- at: 2026-11-13T11:02:08.464230+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:02:14.246485+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T11:02:15.434276+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adadb2f55-82ff-4780-b8d5-b1121e46bec1
+- at: 2026-11-13T11:06:22.019306+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:06:26.220054+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-13T11:11:15.556237+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:11:15.892113+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-393","DEV-459","DEV-467"]}'
+    new: '{"related":["DEV-393","DEV-459","DEV-467","DEV-470"]}'

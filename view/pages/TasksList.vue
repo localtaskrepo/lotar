@@ -273,6 +273,7 @@
         @unassign="unassignOne"
         @sprint-add="openSingleSprintAdd"
         @sprint-remove="openSingleSprintRemove"
+        @release-add="openReleaseDialog([$event], 'add')"
       />
     </div>
 

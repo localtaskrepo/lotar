@@ -52,6 +52,7 @@ export interface TaskTableEmit {
     (event: 'unassign', id: string): void
     (event: 'sprint-add', id: string): void
     (event: 'sprint-remove', id: string): void
+    (event: 'release-add', id: string): void
     (event: 'update:selectedIds', value: string[]): void
     (event: 'update:bulk', value: boolean): void
     (event: 'bulk-assign'): void

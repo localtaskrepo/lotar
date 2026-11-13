@@ -112,7 +112,7 @@ The schemas are in [openapi.json](../openapi.json). A change to a release file s
 
 ## Web UI
 
-The Releases page lists the releases in version order, each with its tickets, a progress bar of done tickets, and its planned and release dates. The backlog holds open tickets in no release. Drag a ticket from the backlog onto a release to add it, from one release to another to move it, or back to the backlog to take it out of that release; select several to add, move or remove them at once. A release's menu edits, deletes, marks it released or reopens it. The task panel shows a ticket's releases and sets them.
+The Releases page lists the releases in version order, each with its tickets, a progress bar of done tickets, and its planned and release dates. The backlog holds open tickets in no release. Drag a ticket from the backlog onto a release to add it, from one release to another to move it, or back to the backlog to take it out of that release; select several to add, move or remove them at once. A release's menu edits, deletes, marks it released or reopens it. The project picker in the header shows only that project's tickets, in the releases, their counts and the backlog; the releases themselves span projects. The task panel shows a ticket's releases and sets them, and on the Tasks page a row's actions menu and the bulk actions add tickets to a release. Pages update their list of releases when one is created, changed or deleted elsewhere.
 
 ## Automation
 

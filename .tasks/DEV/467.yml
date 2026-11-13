@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-13T10:33:47.286204+00:00
-modified: 2026-11-13T10:37:16.946574+00:00
+modified: 2026-11-13T11:03:44.978169+00:00
 relationships:
   related:
   - DEV-401
@@ -18,12 +18,41 @@ relationships:
   - DEV-463
   - DEV-464
   - DEV-465
+  - DEV-471
+  - DEV-409
+  - DEV-411
 comments:
 - date: 2026-11-13T10:37:16.946574+00:00
   author: claude
   text: 'Two more from the same outage, now in the owner''s queue as "failed again": standards STD-82 (job-20261113T084716.188Z-39) and quarter-inch-studio QIS-188 (job-20261113T084720.254Z-13). Both failed with the T3 Code server unreachable, not in the work. Check their threads and last comments before asking him to retry.'
+- date: 2026-11-13T11:02:28.711371+00:00
+  author: claude
+  text: |-
+    Fixed in 70e7e98d on agent/DEV-467 (signed, not merged).
+
+    Cause: STD-85's t3 exited 1 ('Could not reach the T3 Code server'). DEV-401's wait only covered a thread that `t3 thread show` reports running; with the server down that read failed too, so the job failed at once while its thread worked on. Its end rules and the agent's recorded WontDo were then lost without a trace: the job's outcome file was taken (only the .ended marker is left) but the ticket never changed. That happened in a burst of about 20 jobs ending within a second in the same repos at 09:05Z (STD-74/81/83/84/85 within 1s), so most likely the ticket's storage lock stayed busy past its 2 s wait. apply_job_event's errors were dropped (let _), so this is inferred, not shown in a log.
+
+    Change:
+    - src/services/agent_job_service.rs: `t3 thread show` now tells 'server unreachable' (stderr 'Could not reach the T3 Code server') from other failures. A t3 that exits while the server doesn't answer, or a wait whose reads hit an unreachable server, waits up to 60 minutes for the server, then ends from the thread's state (completed / waits for an answer / failed), as DEV-401 does for a running thread. Other read failures still give up after 3 reads. End-rule failures are now logged on the job ('The end rules for X failed: ...') instead of dropped.
+    - src/services/automation_service.rs: a job end's rule actions and recorded outcome run again (up to 10 times, 0.5 s apart) while the storage lock is busy (io WouldBlock means the write did not run).
+    - docs/help/agent.md describes both.
+
+    Tickets moved (comment on each): WontDo, assignee cleared (the agent recorded WontDo, no commits; STD-87: a fix that commits nothing closes itself): STD-83, STD-85, LOCA-134, DEV-456, DEV-458, DEV-460, DEV-461, DEV-462, DEV-463. Done, assignee cleared: LOCA-312, QIS-185, QIS-186, DEV-459 (their Done-when is met per the last comment). DEV-464 (24fb128d) and G-14 (5957b03) have an unmerged commit: I queued a short continuation turn of their @fix thread (job-20261113T110147.043Z-21, job-20261113T110146.909Z-1), told to change nothing, so its end runs the normal 'Fix done: review' rule with the review prompt. No CLI fires job_completed by hand. Running when I finished; not checked to the end.
+
+    Checks:
+    - New test a_t3_that_loses_its_server_waits_for_it_and_applies_the_outcome (tests/dev318_t3_runner_test.rs): fake t3 exits 1 while thread show answers 'Could not reach the T3 Code server'; the job keeps running, then completes from the thread once the server answers, runs the completed rule and applies the agent's recorded status. It failed before the change (ticket left Todo). Unit test a_busy_lock_is_retried_and_other_errors_are_not.
+    - npm run lint:agent clean; npm run test:agent: 2132 Rust, 1513 UI, plus release and hook tests pass; npm run smoke: 387/387.
+    - Not checked: no real T3 outage reproduced; the lock-contention cause above is inferred.
+
+    Also filed DEV-471: 40 smoke 'lotar serve' processes from the DEV-409/DEV-411 worktrees still run since 2026-11-12.
+    Guidance: no durable finding.
+- date: 2026-11-13T11:03:37.234482+00:00
+  author: codex
+  text: 'Review: blocking. automation_service.rs:574-575 deletes the durable recorded outcome before writing it. Exhausting the bounded WouldBlock retries permanently loses it; apply_end_rules only logs the failure. Preserve pending outcomes/end events until successful application and test contention exhaustion followed by recovery. Read full diff, ticket/comments, recent main history and backend/testing guidance. Targeted Rust test blocked by sccache permissions; retry without wrapper required fresh compilation and was interrupted, no pass claimed. Full lint/UI/smoke and cross-repo recovery not independently verified. No files, status or assignee changed.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8a51060f-8f0e-40eb-8309-91840a4fac93
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa70d136-71c4-42cc-8c60-e9566c5a27b6
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5beeebcd-a7cb-4464-9f6c-6499226724dc
 description: |-
   On 2026-11-13 about 265 t3 jobs started at once (a manual `repos.ts --report` without `--fix`, STD-86). The T3 Code server stopped answering, and jobs whose threads went on to finish were marked failed ("Could not reach the T3 Code server at http://127.0.0.1:3773", runner exit 1). Afterwards 15 tickets are left InProgress or Reviewing with an agent assignee and no job running (`lotar agent list-running`: none, queue empty, 10:40Z):
 
@@ -51,6 +80,7 @@ description: |-
   - [ ] The tickets above are moved to the state their last comment and branch call for.
 tags:
 - health
+- review-returned
 custom_fields:
   finding: comms:job-end-lost-in-t3-outage
 history:
@@ -80,3 +110,63 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-13T11:02:08.164685+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465"]}'
+    new: '{"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471"]}'
+- at: 2026-11-13T11:02:28.711371+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:02:28.830841+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471"]}'
+    new: '{"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411"]}'
+- at: 2026-11-13T11:02:43.056283+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T11:02:44.432608+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa70d136-71c4-42cc-8c60-e9566c5a27b6
+- at: 2026-11-13T11:03:37.234482+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:03:37.259162+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: health
+    new: health, review-blocked
+- at: 2026-11-13T11:03:43.862901+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: health, review-blocked
+    new: health, review-returned
+- at: 2026-11-13T11:03:44.392678+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-13T11:03:44.978169+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5beeebcd-a7cb-4464-9f6c-6499226724dc

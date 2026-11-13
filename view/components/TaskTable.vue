@@ -447,6 +447,19 @@
                         <span class="menu-item__label">Remove from sprint…</span>
                       </button>
                       <button
+                        class="menu-item"
+                        :disabled="!hasReleases"
+                        @click="
+                          () => {
+                            $emit('release-add', t.id)
+                            closeRowMenu(t.id)
+                          }
+                        "
+                      >
+                        <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="flag" /></span>
+                        <span class="menu-item__label">Add to release…</span>
+                      </button>
+                      <button
                         class="menu-item danger"
                         @click="
                           () => {
@@ -597,6 +610,7 @@ const {
 
 const sprintLookup = computed(() => props.sprintLookup ?? {})
 const releaseLookupLocal = computed(() => props.releaseLookup ?? {})
+const hasReleases = computed(() => Object.keys(releaseLookupLocal.value).length > 0)
 const hasSprintsLocal = computed(() => props.hasSprints ?? false)
 const sprintsLoadingLocal = computed(() => props.sprintsLoading ?? false)
 

@@ -1,11 +1,10 @@
 title: 'Done with an open step no ticket tracks: DEV-327'
-status: InProgress
+status: WontDo
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
 created: 2026-11-13T08:17:48.969072+00:00
-modified: 2026-11-13T10:33:47.414155+00:00
+modified: 2026-11-13T11:01:23.562759+00:00
 relationships:
   related:
   - DEV-327
@@ -14,6 +13,9 @@ comments:
 - date: 2026-11-13T08:27:45.182765+00:00
   author: claude
   text: 'The open step is already done, so no new ticket. DEV-327''s follow-up was to drop the ''start each comment with your agent name'' line from standards configs/lotar/automation.yml and skills/lotar-workflow. Standards commit c057e77 (STD-56) removed it: both files now say to set LOTAR_DEFAULT_REPORTER because lotar records it as the comment''s author. grep finds the old wording only in docs/decisions/2026-11-11-ticket-process.md, a dated decision record that stays as written. No files changed and no commit. Check: repos.ts localtaskrepo/lotar still lists untracked:DEV-327 before this change. Setting WontDo as the ticket says, so the finding is not filed again.'
+- date: 2026-11-13T11:01:23.392541+00:00
+  author: claude
+  text: 'Ended after the 2026-11-13 T3 Code outage (lotar DEV-467): the job failed with ''Could not reach the T3 Code server'', so its end rules and the outcome its agent recorded were never applied. Applied by hand: WontDo, as the agent''s last comment says (no commits on its branch); assignee cleared, as for a fix that commits nothing (STD-87).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af127ccd7-6f8d-44c2-a6fc-4339d64e5545
 description: |-
@@ -65,3 +67,18 @@ history:
   - field: relationships
     old: '{"related":["DEV-327"]}'
     new: '{"related":["DEV-327","DEV-467"]}'
+- at: 2026-11-13T11:01:23.392541+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:01:23.487876+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: WontDo
+- at: 2026-11-13T11:01:23.562759+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
