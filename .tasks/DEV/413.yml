@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T05:33:41.035316+00:00
-modified: 2026-11-13T06:03:44.501987+00:00
+modified: 2026-11-13T06:11:02.732046+00:00
 relationships:
   related:
   - DEV-354
@@ -15,6 +15,9 @@ comments:
 - date: 2026-11-13T06:03:36.394183+00:00
   author: claude
   text: 'Fixed in d1e1e637 (agent/DEV-413). raw_request in tests/web_api_integration_test.rs now reads through read_until_deadline with RESPONSE_DEADLINE (15 s), like the other helpers, instead of a 500 ms net_timeout. Before: the check command failed responses_forbid_cross_site_framing and rebound_host_headers_are_rejected_for_every_route (both use raw_request) at load ~58. After: the check command passed 5 of 5 runs (35/35, load ~18-22). Also: cargo clippy --all-targets -D warnings clean, rustfmt clean, npm run test:rust:agent 2123/2123 passed. Not run: test:ui, smoke, frontend lint (test-only Rust change, no frontend or product code touched).'
+- date: 2026-11-13T06:11:02.732046+00:00
+  author: claude
+  text: 'Merged: rebased onto main twice (main moved on to 9d092a72 during the first check run), fast-forwarded main to 8ae2f000 (the fix, rebased from d1e1e637). Checks on the rebased branch: npm run lint:agent clean, test:rust:agent 2125/2125, smoke 106 files / 385 tests passed; before the second rebase also test:ui, test:release 47/47, test:hooks 7/7. Health check in the main checkout: cargo nextest run -E ''test(/web_api_integration_test/)'' passed 5 of 5 (35/35), finding gone. Pushed main with the DEV-413 ticket updates commit (it also has DEV-411''s pending ticket file).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A45e4ca71-6049-4d44-bd57-938516b2b557
 description: 'Found 2026-11-12 by the DEV-411 merge job. cargo nextest run -E ''test(/web_api_integration_test/)'' fails web_api_integration_test::responses_forbid_cross_site_framing 4 of 4 times (2 of 2 on main 008e58c9 too) at load ~20: tests/web_api_integration_test.rs:841, headers empty. Alone it passes in 0.6 s. raw_request (line 786) reads with net_timeout(), 500 ms with LOTAR_TEST_FAST_NET, so a slow GET /api/tasks/list returns nothing; the other helpers use the generous exchange bound (DEV-354, DEV-359). Check: the command above passes 5 times in a row. Done: raw_request waits as long as the other helpers.'
@@ -55,3 +58,7 @@ history:
   - field: assignee
     old: '@fix'
     new: '@merge'
+- at: 2026-11-13T06:11:02.732046+00:00
+  actor: claude
+  changes:
+  - field: comment_added

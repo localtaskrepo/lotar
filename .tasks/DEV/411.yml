@@ -1,11 +1,11 @@
 title: Worktree cleanup keeps a branch whose work landed in a conflicting form
-status: InProgress
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T03:13:31.986812+00:00
-modified: 2026-11-13T06:04:23.120302+00:00
+modified: 2026-11-13T06:04:57.040865+00:00
 relationships:
   related:
   - DEV-343
@@ -25,6 +25,9 @@ comments:
 - date: 2026-11-13T06:04:23.040206+00:00
   author: claude
   text: 'Merged into main as 3d4db183 (rebased twice onto a moving main without conflicts, fast-forward, signed). Checks in the worktree on the final rebase: npm run lint passed; cargo nextest 2125 of 2125 passed; the 14 agent, automation and review smoke specs passed (94 tests), because DEV-408 changed agent_job_service.rs since the last full smoke. Earlier on the first rebase: frontend 1507/1507, release 47 and hooks 7 passed; full smoke had 11 UI failures at load ~45 that all passed on rerun. Full Rust runs at load 25 to 35 failed merge-pipeline tests on their 6 to 10 s waits; they timed the same on main''s code as on this branch (2.4 to 3.2 s each, 3 runs apiece), so load caused them, not this change. responses_forbid_cross_site_framing failed next to the other web tests on main''s code too; filed as DEV-413.'
+- date: 2026-11-13T06:04:48.036397+00:00
+  author: claude
+  text: 'Pushed to origin main (15bf3621..9d092a72): 3d4db183 and the ticket updates 9d092a72. The pre-push hook passed. No health check applies, because this isn''t a health ticket.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad54e514d-2f5a-4de7-8a11-2c664f0f31b5
 description: |-
@@ -82,3 +85,13 @@ history:
   - field: relationships
     old: '{"related":["DEV-343","DEV-366","DEV-413"]}'
     new: '{"related":["DEV-343","DEV-366","DEV-413","DEV-408"]}'
+- at: 2026-11-13T06:04:48.036397+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T06:04:57.040865+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
