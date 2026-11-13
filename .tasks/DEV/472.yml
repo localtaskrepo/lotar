@@ -1,11 +1,11 @@
 title: A rework continues the fix agent's T3 thread instead of starting a new one
-status: HelpNeeded
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@review'
 created: 2026-11-13T11:19:41.648456+00:00
-modified: 2026-11-13T18:06:52.908857+00:00
+modified: 2026-11-13T19:22:57.260596+00:00
 relationships:
   related:
   - DEV-466
@@ -13,6 +13,7 @@ relationships:
   - DEV-470
   - DEV-377
   - DEV-473
+  - DEV-476
 comments:
 - date: 2026-11-13T11:33:27.407315+00:00
   author: claude
@@ -23,9 +24,16 @@ comments:
 - date: 2026-11-13T11:37:36.541181+00:00
   author: codex
   text: 'Merge blocked by verification environment. Branch 91013e15 is already based on current main 355b380e; rebase confirmed up to date. RUSTC_WRAPPER= npm run lint:agent passed. Full test:agent failed in serve_handler port-binding tests with Operation not permitted; fail-fast skipped 2100 tests and UI/release/hooks did not run; temp guard also reported xcrun_db. Build-first test:smoke:agent finished: 146 passed, 244 failed, with server bind to 127.0.0.1:0 denied by sandbox and temporary-folder cleanup errors. Nothing merged or pushed, no code changes. May this merge job rerun verification with sandbox escalation so tests can bind local ports?'
+- date: 2026-11-13T19:15:29.769780+00:00
+  author: mallox
+  text: Option 1. but also, I'm at the desk right now and can allow any firewall requests that may pop up. (answered in INBOX-36)
+- date: 2026-11-13T19:22:49.559820+00:00
+  author: codex
+  text: 'Owner answer acted on: reran verification with sandbox escalation and RUSTC_WRAPPER empty. All required gates passed: lint:agent; test:agent (2134 Rust, 1515 UI, 47 release and 7 hook tests); build-first test:smoke:agent (390 tests). No port-binding or temp-cleanup failures this run. The existing fix commit 91013e15 is already an ancestor of current main 2797aa06, so nothing to merge and no new code or commit needed. Worktree clean. No merge or push performed in this turn; status and assignee left to job automation. Release-number notification remains for the release agent once shipped.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab44c36d8-896d-47bf-99ef-71f2524691a8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acf93d678-e4a5-4da4-94a8-5c308073cc64
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A858f89d9-9738-4f7c-ba62-3a887db6c0f8
 description: |-
   A rework after a blocking review starts a new T3 Code thread instead of going back to the fix agent's thread. Together with the fresh review thread and the inbox triage this gives each ticket 3 to 9 top-level threads, which the owner can't follow or tell apart (owner 2026-11-13, standards STD-88: "every task creates 3 threads in t3 so that it becomes overwhelming to handle and read and keep correlated").
 
@@ -128,3 +136,43 @@ history:
   - field: relationships
     old: '{"related":["DEV-466","DEV-468","DEV-470","DEV-377"]}'
     new: '{"related":["DEV-466","DEV-468","DEV-470","DEV-377","DEV-473"]}'
+- at: 2026-11-13T18:55:13.543987+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-466","DEV-468","DEV-470","DEV-377","DEV-473"]}'
+    new: '{"related":["DEV-466","DEV-468","DEV-470","DEV-377","DEV-473","DEV-476"]}'
+- at: 2026-11-13T19:15:29.769780+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:15:30.716343+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-13T19:15:31.549898+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-13T19:22:49.559820+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:22:55.261794+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T19:22:57.260596+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A858f89d9-9738-4f7c-ba62-3a887db6c0f8

@@ -1,11 +1,11 @@
 title: 'Commits only on this Mac: branches'
-status: HelpNeeded
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
-assignee: mallox
+assignee: '@merge'
 created: 2026-11-13T18:01:46.294423+00:00
-modified: 2026-11-13T18:07:06.208460+00:00
+modified: 2026-11-13T19:12:13.826970+00:00
 relationships:
   related:
   - DEV-376
@@ -34,8 +34,31 @@ comments:
     No files changed, no commit.
 
     Question: may I (or the next job) delete the 9 branches and remove the 7 worktrees in group 1? If yes, allow it for the job, e.g. a Bash permission rule for git branch -D and git worktree remove in this repo.
+- date: 2026-11-13T19:09:18.995658+00:00
+  author: mallox
+  text: Yes, and in general when branches and workspaces are no longer needed they can be removed. (answered in INBOX-38)
+- date: 2026-11-13T19:11:09.395363+00:00
+  author: claude
+  text: |-
+    Done as the owner allowed (INBOX-38, 2026-11-13: 'Yes, and in general when branches and workspaces are no longer needed they can be removed.'). I rechecked them first: clean, no processes, no running job.
+
+    Removed 9 worktrees: agent-DEV-464, agent-DEV-469, agent-DEV-470, agent-DEV-471, t3-563e924f, t3-a580f850, t3-fb6d26b5, plus DEV-470's two remaining T3 worktrees t3-75cc8a2a (first version 4c770c59) and t3-7e6aedc2 (main's 656cdd7a). Deleted 11 branches, all with their work on main: agent/DEV-464 24fb128d, agent/DEV-469 f25eea82, agent/DEV-470 4c770c59, agent/DEV-471 defc3022, t3/failed-merge-already-landed and t3/failed-merge-work-on-main ca054282, t3/strip-author-name-comment-prefix and -1, t3/strip-author-name-from-comments-1 (4c770c59), t3/strip-author-name-from-comments 813370d6, t3/strip-author-name-from-comments-2 656cdd7a.
+
+    The check now lists 13 commits (was 14), none of them from the removed set. Left on purpose:
+    - DEV-466, DEV-467 and DEV-468 (agent/DEV-466..468, t3/task-panel-git-timeout(-1), t3/job-outcome-*, t3/review-rework-ticket-branch, t3/rework-commits-on-ticket-branch): their work isn't on main, and each ticket is HelpNeeded with its own question to the owner.
+    - main's 4 commits (DEV-472, DEV-476, STD-88 x2): the merge agent pushes them.
+    - agent/DEV-476 and t3/cleanup-done-detached-worktrees (51c24399): DEV-476 landed minutes ago in a different version (947080ba). 51c24399 holds code main lacks, and DEV-476's new cleanup removes it once the installed lotar has that change.
+
+    No files changed, so no commit. Check run: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar.
+- date: 2026-11-13T19:11:51.852218+00:00
+  author: codex
+  text: 'Review: nothing to review'
+- date: 2026-11-13T19:12:10.188056+00:00
+  author: codex
+  text: nothing to merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A01b13bac-0f83-4535-bcc2-d80cb19bca62
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aabe39cad-3434-4c47-9954-854df7858f8c
 description: |-
   14 commits on no remote, only on this Mac: agent/DEV-464 1, agent/DEV-466 1, agent/DEV-467 1, agent/DEV-468 1, agent/DEV-469 1, agent/DEV-470 1, main 2, t3/failed-merge-already-landed 1, t3/failed-merge-work-on-main 1, t3/job-outcome-server-outage 1, t3/job-outcome-t3-outage 1, t3/job-outcome-t3-outage-1 1, t3/job-outcome-t3-outage-2 1, t3/review-rework-ticket-branch 1, t3/rework-commits-on-ticket-branch 1, t3/strip-author-name-comment-prefix 1, t3/strip-author-name-from-comments-1 1, t3/task-panel-git-timeout 1, t3/task-panel-git-timeout-1 1 (git log <branch> --not --remotes)
 
@@ -100,3 +123,60 @@ history:
   - field: assignee
     old: '@fix'
     new: mallox
+- at: 2026-11-13T19:09:18.995658+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:09:19.824984+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-13T19:09:20.768606+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-13T19:11:09.395363+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:11:18.872496+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T19:11:22.060321+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aabe39cad-3434-4c47-9954-854df7858f8c
+- at: 2026-11-13T19:11:51.852218+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:11:55.425290+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-13T19:12:10.188056+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:12:13.826970+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

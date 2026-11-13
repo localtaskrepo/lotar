@@ -1,11 +1,11 @@
 title: Jobs that failed during the T3 Code outage left 15 tickets InProgress and lost their agents' outcome
-status: HelpNeeded
+status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-13T10:33:47.286204+00:00
-modified: 2026-11-13T18:01:49.473235+00:00
+modified: 2026-11-13T19:21:29.680342+00:00
 relationships:
   related:
   - DEV-401
@@ -22,6 +22,8 @@ relationships:
   - DEV-409
   - DEV-411
   - DEV-473
+  - DEV-478
+  - DEV-479
 comments:
 - date: 2026-11-13T10:37:16.946574+00:00
   author: claude
@@ -94,6 +96,24 @@ comments:
 - date: 2026-11-13T11:33:21.665972+00:00
   author: automation
   text: The review found blocking problems again after one rework (the comments above). Should an agent rework it once more (lotar assignee DEV-467 @fix), will you decide the findings, or is it WontDo?
+- date: 2026-11-13T19:16:21.939039+00:00
+  author: mallox
+  text: File a ticket to fix the issues. Once fixed or if already fixed, then retry. (answered in INBOX-35)
+- date: 2026-11-13T19:18:00.525164+00:00
+  author: codex
+  text: 'Owner INBOX-35 request handled: filed DEV-479 (checks:sccache-sandbox-permission) for repeated restricted-harness verification failures. Retried npm run test:rust -- pending_outcome_tests with approved execution permissions: compilation succeeded and both recovery regression tests passed (2 passed, 2136 skipped). The prior sccache blocker is bypassed through authorized execution; no source change or commit needed. Existing commit 9439eafe remains unchanged, no merge or push. Ready for another independent review; this targeted pass is not a completed full review.'
+- date: 2026-11-13T19:20:35.704075+00:00
+  author: codex
+  text: 'Review: blocking. In src/services/automation_service.rs:1947 replay_end_actions iterates read_dir order over hashed per-rule filenames, losing configured rule ordering. apply_job_event continues after a busy rule, so two matching job_completed rules can both become pending. With rule 1 setting status Reviewing and rule 2 setting status Done, normal execution ends Done, but replay can run rule 2 then rule 1 and end Reviewing with no job. Preserve dispatch/rule ordering in durable recovery (including preventing later rules overtaking unfinished earlier steps), and add a multi-rule contention regression. Inspected 9439eafe against main, ticket comments and triage scope, related DEV-401/DEV-465, checkpoint/outcome paths, docs and recent main handler history. Targeted recovery checks are running with authorized execution after sandbox sccache denial; final result follows. No source changes or commits.'
+- date: 2026-11-13T19:20:47.142580+00:00
+  author: codex
+  text: 'Review: blocking (verification complete). Authorized npm run test:rust -- pending_outcome_tests passed both tests (2136 skipped); git diff --check passed. These single-rule regressions do not cover the ordering finding above. Full lint/UI/smoke were not rerun for this read-only review. No minor tickets filed, no files or commits changed, status and assignee unchanged. Retained review-blocked for job-end routing.'
+- date: 2026-11-13T19:20:56.040756+00:00
+  author: automation
+  text: The review found blocking problems again after one rework (the comments above). Should an agent rework it once more (lotar assignee DEV-467 @fix), will you decide the findings, or is it WontDo?
+- date: 2026-11-13T19:21:28.064491+00:00
+  author: triage
+  text: 'Answer to the 19:20 question (rework once more, owner decides the findings, or WontDo): an agent reworks it (@fix); no decision of the owner is needed. The new finding is a defect inside the ticket''s own first Done-when item: replay_end_actions (automation_service.rs ~1947) runs pending rules in read_dir order, so two matching job_completed rules can end with the wrong status (rule 1 Reviewing, rule 2 Done: normal run ends Done, replay can end Reviewing with no job). Fix: replay in dispatch/rule order and do not let a later rule run past an unfinished earlier one; add a multi-rule contention regression that fails without it; rerun lint:agent, test:agent and smoke, then send it to review again. WontDo is ruled out by the owner''s 2026-11-13 19:16 comment (INBOX-35: file a ticket for the issues, then retry), and he asked for the work to continue, not to be dropped. The sccache blocker is filed as DEV-479; until it is fixed, a reviewer or fix agent runs the targeted tests with the authorized execution that worked at 19:18 (npm run test:rust -- pending_outcome_tests). Source: DEV-467 description Done when item 1; INBOX-35 comment of 2026-11-13 19:16.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8a51060f-8f0e-40eb-8309-91840a4fac93
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa70d136-71c4-42cc-8c60-e9566c5a27b6
@@ -101,6 +121,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A751c0fab-0cb6-45d0-b80c-cef58b130bfc
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2c03ade0-0206-4164-b472-2ca467bc83a2
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8aeb63c7-93c0-49d1-9778-f136836471e6
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A19b85aa7-bc70-4cfa-9b1f-2c60f757c3f8
 description: |-
   On 2026-11-13 about 265 t3 jobs started at once (a manual `repos.ts --report` without `--fix`, STD-86). The T3 Code server stopped answering, and jobs whose threads went on to finish were marked failed ("Could not reach the T3 Code server at http://127.0.0.1:3773", runner exit 1). Afterwards 15 tickets are left InProgress or Reviewing with an agent assignee and no job running (`lotar agent list-running`: none, queue empty, 10:40Z):
 
@@ -397,3 +418,86 @@ history:
   - field: relationships
     old: '{"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411"]}'
     new: '{"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473"]}'
+- at: 2026-11-13T19:12:58.248329+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473"]}'
+    new: '{"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478"]}'
+- at: 2026-11-13T19:16:21.939039+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:16:22.507254+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-13T19:16:23.404006+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-13T19:16:59.386492+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478"]}'
+    new: '{"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479"]}'
+- at: 2026-11-13T19:18:00.525164+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:18:06.478782+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T19:18:08.730891+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A19b85aa7-bc70-4cfa-9b1f-2c60f757c3f8
+- at: 2026-11-13T19:20:35.704075+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:20:47.142580+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:20:55.956473+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+- at: 2026-11-13T19:20:56.040756+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:21:28.064491+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:21:28.407225+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-13T19:21:29.680342+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress

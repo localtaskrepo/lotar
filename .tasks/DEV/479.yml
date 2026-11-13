@@ -1,0 +1,80 @@
+title: Sandboxed agent checks cannot start configured sccache
+status: Merging
+priority: Medium
+type: Feature
+reporter: codex
+assignee: '@merge'
+created: 2026-11-13T19:16:59.162304+00:00
+modified: 2026-11-13T19:22:59.085769+00:00
+relationships:
+  related:
+  - DEV-467
+comments:
+- date: 2026-11-13T19:19:42.775921+00:00
+  author: claude
+  text: 'Fix in ef985f19: testing-strategy skill (Rust section) says that sccache + ''Operation not permitted'' before compiling is a sandbox denial, not a code failure. The retry it gives is the harness''s approval for unsandboxed execution, or if that is refused RUSTC_WRAPPER= (empty disables the ~/.cargo/config.toml wrapper; I checked this on a scratch crate: no sccache in cargo -v). Checks: npm run test:rust -- pending_outcome_tests compiled and ran, both normally and with RUSTC_WRAPPER=; Prettier passes on the skill. My harness doesn''t restrict sccache, so I couldn''t reproduce the denial. Note: the filter matches 0 of 2133 tests (''no tests to run''), and no test named pending_outcome exists in src/ or tests/, so the merge agent''s rerun will end the same way.'
+- date: 2026-11-13T19:22:51.654523+00:00
+  author: codex
+  text: 'Review: passed. Reviewed ef985f19 against main, ticket and comments, related DEV-467 owner request and verification history, AGENTS.md, testing/review/instruction guidance, and last five main commits touching the skill. Only one guidance bullet changes; no blocking findings. Independently reproduced restricted sccache Operation not permitted, then reran the identical npm run test:rust -- pending_outcome_tests with approved unsandboxed execution: compilation completed successfully in 2m06s; nextest exited 4 because this branch has zero matching tests (2133 skipped), as disclosed by the fix agent. This verifies the authorized retry clears the sandbox blocker, not a Rust test pass. Prettier and git diff --check pass. Full lint/test/smoke not run for this documentation-only change. No files, commits, status or assignee changed.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A76b9a6d9-371b-49cb-aef3-3751a429aef9
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A567c5784-c61c-4ba9-aa1e-9373b3281926
+description: 'Found during DEV-467 review: npm run test:rust fails before compilation because /opt/homebrew/bin/sccache rustc -vV returns Operation not permitted in the restricted agent sandbox. Repeated reviews stopped without trying authorized execution. Check: run npm run test:rust -- pending_outcome_tests in the restricted harness. Done when agent verification guidance or harness permissions provide a working authorized retry and distinguish sandbox denial from a code failure. Related DEV-467.'
+tags:
+- health
+custom_fields:
+  finding: checks:sccache-sandbox-permission
+history:
+- at: 2026-11-13T19:16:59.387544+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-467"]}'
+- at: 2026-11-13T19:16:59.630654+00:00
+  actor: codex
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T19:17:00.622286+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T19:17:01.957648+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A76b9a6d9-371b-49cb-aef3-3751a429aef9
+- at: 2026-11-13T19:19:42.775921+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:19:52.567701+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T19:19:55.562460+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A567c5784-c61c-4ba9-aa1e-9373b3281926
+- at: 2026-11-13T19:22:51.654523+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:22:59.085769+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

@@ -1,15 +1,16 @@
 title: 'Task panel stays on ''Loading task…'' while git hangs: the server''s git calls have no timeout'
-status: HelpNeeded
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@review'
 created: 2026-11-13T10:33:22.263037+00:00
-modified: 2026-11-13T18:01:49.471649+00:00
+modified: 2026-11-13T19:22:41.273711+00:00
 relationships:
   related:
   - DEV-472
   - DEV-473
+  - DEV-468
 comments:
 - date: 2026-11-13T10:45:55.825737+00:00
   author: claude
@@ -33,11 +34,24 @@ comments:
 - date: 2026-11-13T11:01:46.344104+00:00
   author: automation
   text: The review found blocking problems again after one rework (the comments above). Should an agent rework it once more (lotar assignee DEV-466 @fix), will you decide the findings, or is it WontDo?
+- date: 2026-11-13T19:18:11.913402+00:00
+  author: mallox
+  text: Agents should be able to rework more than once. This is normal for developers. We should however check in cases where multiple errors happen whether a stronger model might not be better suited for a task. So that we escalate on the 2 or 3rd round before we cut of the attempts for a confirmation. We don't want endless loops, but a few back and forth turns for a complicated implementation are absolutely valid. (answered in INBOX-29)
+- date: 2026-11-13T19:18:44.393249+00:00
+  author: codex
+  text: 'Owner decision, 2026-11-13 (mallox, answered in INBOX-29): agents may rework more than once; assess whether a stronger model is appropriate on the second or third round before asking the owner to stop further attempts. This supersedes my earlier statement that a second blocking review inherently requires owner routing. The outstanding pipe-reader deadline finding remains valid and still needs implementation and regression coverage. This comment records the workflow answer only; no code changed or checks rerun. Which model should take the next rework round?'
+- date: 2026-11-13T19:20:15.825645+00:00
+  author: mallox
+  text: Let's try fable for a round and see if it's stronger (answered in INBOX-40)
+- date: 2026-11-13T19:20:48.498042+00:00
+  author: codex
+  text: 'Shared retry-policy coordination accepted with DEV-468 (INBOX-28). Owner model choice is resolved: mallox on 2026-11-13 at 19:20:15Z chose fable for one round (INBOX-40). No further model-selection question is needed. Shared policy: allow multiple reworks, assess stronger model around round 2/3, avoid endless loops (INBOX-29). Current policy work is decision recording and coordination; no shared automation/config change has been implemented or validated. DEV-468 retains its separate branch-synchronization failure implementation; this thread will not duplicate it.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad8d79e8d-6688-4da4-a3a5-516b2d4c3b76
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afcbae329-3a86-478f-818f-b3877e1b72d7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac2e933bb-1feb-4f01-8a66-70350d219f88
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acace9e2f-6f5e-48c9-a5ef-b40b7a3ebe16
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A498a8a45-5df8-49c7-9522-d8d6c3a6f5a9
 description: |-
   Found 2026-11-13 on all six launchd servers (0.14.3): every ticket page stayed on 'Loading task…'. /api/tasks/history and /api/activity/feed never answered; the servers had a pile of git children (git log --follow ..., git ls-files .tasks) that had been waiting for minutes. Cause of the hang: git blocks in open() of ~/.gitconfig (a symlink into Dropbox) while macOS TCC asks whether the upgraded, unsigned lotar binary may read Dropbox files (same thing as 2026-11-05 with 0.12.0). That is the Mac's problem; lotar's problem is that one hanging git call blocks the whole panel: loadTask (view/composables/task-panel/useTaskPanelPersistence.ts) awaits loadCommitHistory before it sets ready, and the server runs git with no timeout, so requests and git processes pile up.
 
@@ -168,3 +182,72 @@ history:
   - field: relationships
     old: '{"related":["DEV-472"]}'
     new: '{"related":["DEV-472","DEV-473"]}'
+- at: 2026-11-13T19:18:11.913402+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:18:12.983723+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-13T19:18:14.244990+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-13T19:18:44.393249+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:18:48.671341+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-13T19:20:15.825645+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:20:18.607628+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-13T19:20:20.060022+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-13T19:20:28.841823+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-472","DEV-473"]}'
+    new: '{"related":["DEV-472","DEV-473","DEV-468"]}'
+- at: 2026-11-13T19:20:48.498042+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:22:37.811690+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T19:22:41.273711+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A498a8a45-5df8-49c7-9522-d8d6c3a6f5a9

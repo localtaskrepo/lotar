@@ -1,0 +1,103 @@
+title: automation simulate shows only the first matching rule; a real event applies all of them
+status: InProgress
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-13T19:02:46.329827+00:00
+modified: 2026-11-13T19:14:15.183187+00:00
+comments:
+- date: 2026-11-13T19:12:17.547351+00:00
+  author: claude
+  text: 'Done in a8655607. simulate now goes through every rule in file order, like a real event: each one is matched on the ticket as it was, and each acts on the result of the ones before it, so task_after shows the ticket after all of them and the last rule wins a shared field. The response has rules [{name, actions, warnings}] in place of rule_name (an unnamed rule is ''Rule <position>''); actions holds the actions of all matched rules. Updated the CLI output (one block per rule), the REST route, api_types.rs, view/api/types.ts, openapi.json, the help docs and AutomationView. New test tests/dev477_simulate_all_rules_test.rs compares the simulation with a real create. Checks: npm run lint, npm test and npm run smoke (agent variants) all pass; UI smoke now also checks that the rule name shows. I did not run the new test against the old code; it asserts priority Low, and the old code previewed High.'
+- date: 2026-11-13T19:13:50.274741+00:00
+  author: codex
+  text: 'Review: blocking. automation_service.rs:686 passes accumulated state to simulate_action, whose alias resolution at 1194-1200 uses that state. Real apply_action uses original event state. Original assignee alice; rule 1 sets assignee bob; rule 2 sets reporter @assignee: preview bob, real alice. Separate original alias context from accumulated writes and add real-event regression. Read ticket/comments, relationships, implementation and contracts. Required check reruns failed at sccache Operation not permitted. Status and assignee unchanged.'
+- date: 2026-11-13T19:14:08.869831+00:00
+  author: codex
+  text: 'Additional verification: with RUSTC_WRAPPER cleared, the targeted dev477 regression passed (1 test), but the runner exited nonzero because xcrun_db remained in its temporary folder. No source files changed.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6f77277c-e969-4904-93a8-17a4456d01b8
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A22e7b280-3492-484a-8da6-fe203bfcbda7
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8744f08c-fc67-4800-b043-9bd6a29a4f97
+description: |-
+  `lotar automation simulate` stops at the first rule that matches, while a real event applies every matching rule ("When several rules set the same field, the last rule in file order wins", docs/help/automation.md). So a rule further down can't be checked at all when an earlier rule matches the same event.
+
+  ## Found
+
+  2026-11-13, standards: `lotar automation simulate --ticket STD-91 --event created` names only "Health: start the fix agent"; the rule "STD: review in a child thread (pilot)" at the end of `.tasks/STD/automation.yml` (adds tag `review-child` on created) never shows. Cause: `simulate_rules` in `src/services/automation_service.rs` returns on the first match.
+
+  ## Done when
+
+  - [ ] simulate lists every matching rule with its actions, in file order, and the preview applies them all as a real event would, with a test.
+tags:
+- review-returned
+history:
+- at: 2026-11-13T19:02:46.541295+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T19:02:46.751792+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T19:02:47.332427+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6f77277c-e969-4904-93a8-17a4456d01b8
+- at: 2026-11-13T19:12:17.547351+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:12:26.303283+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T19:12:27.603220+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A22e7b280-3492-484a-8da6-fe203bfcbda7
+- at: 2026-11-13T19:13:50.274741+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:13:50.592654+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: ''
+    new: review-blocked
+- at: 2026-11-13T19:14:08.869831+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:14:13.925151+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: review-blocked
+    new: review-returned
+- at: 2026-11-13T19:14:14.599508+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-13T19:14:15.183187+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8744f08c-fc67-4800-b043-9bd6a29a4f97

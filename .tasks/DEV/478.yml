@@ -1,0 +1,56 @@
+title: A taken-over t3 job without a recorded thread fails although its agent finished
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-13T19:12:58.132272+00:00
+modified: 2026-11-13T19:12:59.515480+00:00
+relationships:
+  related:
+  - DEV-378
+  - DEV-467
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A30af34fc-98ff-4d1d-a68f-9c9ec335f26c
+description: |-
+  ## Found
+
+  Standards INBOX-37, job job-20261113T180201.652Z-3 (lotar 0.14.3, runner t3, triage, claude-sonnet-5-5), 2026-11-13:
+
+  - 18:02:01 job started. 18:02:25 the triage agent did its work: comment and tag `triaged` on INBOX-37, comment on qis QIS-188.
+  - The job log has no `T3 Code thread:` event, so the job never recorded a session (thread id).
+  - 18:03:25 `The lotar process that ran this job (pid 25885) exited before it ended; process 58070 took it over.`, then failed: `The lotar process running the job exited before the t3 runner finished, so its result is unknown.`
+  - The inbox failure rule then handed INBOX-37 back to the owner (Todo, mallox: "the source asks its question as it is"), although triage had already answered and tagged it. The owner had to ask why it was there (QIS-188, 19:11).
+
+  `finish_orphaned_job` (src/services/agent_job_service.rs) fails any job without `session_id`, even a t3 job. The thread id only gets recorded when t3 prints it on stderr (`t3_thread_id` in the stderr reader); here that never happened or was lost.
+
+  ## Check
+
+  A t3 job whose worker exits before its thread id is recorded, while its thread finishes, ends from the thread's state, not as failed; and an inbox ticket the triage agent already answered (tag `triaged`) is not handed back to the owner.
+
+  ## Not done
+
+  Not reproduced in a scratch tasks dir; the evidence is the job log and ticket histories above. Related: DEV-378 (takeover of worker exits), DEV-467.
+history:
+- at: 2026-11-13T19:12:58.248961+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-378","DEV-467"]}'
+- at: 2026-11-13T19:12:58.380657+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T19:12:58.877852+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T19:12:59.515480+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A30af34fc-98ff-4d1d-a68f-9c9ec335f26c

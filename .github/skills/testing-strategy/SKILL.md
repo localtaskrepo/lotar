@@ -34,6 +34,7 @@ description: Choose meaningful behavior checks and run targeted Rust, UI, or smo
 - Raw nextest (no npm runner) still selects `git_required` tests; they fail closed via `require_git()` when Git is unavailable — never a silent pass.
 - Fast clippy-only loop (lib+bins, no `--all-targets`/`--all-features`): `npm run lint:backend:fast`
 - Fresh worktree: run `npm run build:web` before compiling Rust; `include_dir!` requires the generated `target/web-embed` directory.
+- Sandbox denial is not a code failure: when cargo stops before compiling with `sccache` (the `rustc-wrapper` in `~/.cargo/config.toml`) and `Operation not permitted`, the agent sandbox blocked the cache server. Rerun the same command with the harness's approval for unsandboxed execution; if that is refused, rerun it with `RUSTC_WRAPPER=` (empty disables the wrapper; a slower, uncached build). Report which retry ran.
 
 ## UI unit tests (vitest)
 

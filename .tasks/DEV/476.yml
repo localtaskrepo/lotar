@@ -1,16 +1,17 @@
 title: Cleanup at Done keeps the worktrees lotar detached and the T3 Code threads' branches
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T18:06:30.287428+00:00
-modified: 2026-11-13T18:38:18.345685+00:00
+modified: 2026-11-13T18:55:17.638302+00:00
 relationships:
   related:
   - DEV-464
   - DEV-473
   - DEV-470
+  - DEV-472
 comments:
 - date: 2026-11-13T18:23:09.001940+00:00
   author: claude
@@ -24,6 +25,9 @@ comments:
 - date: 2026-11-13T18:38:11.922841+00:00
   author: codex
   text: 'Review: passed. Reviewed 4aa84f30 full diff, surrounding cleanup/ownership/landing code, ticket/comments, related DEV-464/473/470, guidance and main history. Persistent ownership and the two-pass regression address the previous blocker. No findings or follow-up tickets. Diff check passed. Targeted two-pass regression passed (1/1), but npm runner exited 1 on leftover xcrun_db. Full lint/test/smoke not independently rerun; fix agent records passing gates. No files/commits/status/assignee changed. No durable guidance finding.'
+- date: 2026-11-13T18:55:13.343862+00:00
+  author: codex
+  text: 'Merged: rebased reviewed 4aa84f30 onto main as a39729b2, fast-forwarded main, then included pending .tasks updates as requested: main 947080ba. Required gates passed: lint:agent; test:agent (2133 Rust, 1515 UI, release/hooks); test:smoke:agent (390). Initial sandbox test/smoke attempts failed on local-port permissions; unrestricted retries passed. Main cleanup dry-run recognizes landed detached worktrees and thread branches; preserves old DEV-470 4c770c59 work it cannot prove landed. No live worktrees deleted. End-to-end Done cleanup is covered by the two-pass regression; this ticket is still Merging until job end. Push of this fix waits behind unfinished DEV-472 (91013e15, HelpNeeded); only preceding finished 355b380e is being pushed. No status or assignee change; automation moves ticket to Done at job end. No durable guidance finding.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A184ae472-2c4a-403f-8962-8327c6e8fe94
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7f0512fe-ca4e-4264-ba1c-1880010a7ba6
@@ -37,7 +41,6 @@ description: |-
   Done when: the cleanup at Done (and lotar agent worktree cleanup) also removes the ticket's clean detached worktrees and its thread branches (t3/*) whose work is on main, keeps any with work missing from main, with a test for both.
 tags:
 - health
-- review-returned
 custom_fields:
   finding: cleanup:detached-worktrees
 history:
@@ -148,3 +151,22 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-13T18:55:13.343862+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T18:55:13.544289+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-464","DEV-473","DEV-470"]}'
+    new: '{"related":["DEV-464","DEV-473","DEV-470","DEV-472"]}'
+- at: 2026-11-13T18:55:17.638302+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, review-returned
+    new: health

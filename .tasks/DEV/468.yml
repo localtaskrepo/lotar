@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-13T10:33:47.729859+00:00
-modified: 2026-11-13T18:01:49.478862+00:00
+modified: 2026-11-13T19:23:24.548335+00:00
 relationships:
   related:
   - DEV-342
@@ -14,6 +14,7 @@ relationships:
   - DEV-465
   - DEV-472
   - DEV-473
+  - DEV-466
 comments:
 - date: 2026-11-13T10:48:16.585852+00:00
   author: claude
@@ -30,11 +31,27 @@ comments:
 - date: 2026-11-13T11:01:25.455845+00:00
   author: automation
   text: The review found blocking problems again after one rework (the comments above). Should an agent rework it once more (lotar assignee DEV-468 @fix), will you decide the findings, or is it WontDo?
+- date: 2026-11-13T19:19:31.671258+00:00
+  author: mallox
+  text: Same answer as task/thread 466 is already handling (coordinate). Multiple rework attempts are fine if needed, just don't let it become an endless loop. (answered in INBOX-28)
+- date: 2026-11-13T19:20:28.499639+00:00
+  author: codex
+  text: 'Owner decision recorded, 2026-11-13: mallox says multiple rework attempts are fine, without an endless loop (INBOX-28), referring to DEV-466 / INBOX-29: assess a stronger model on the second or third round before cutting off attempts for confirmation. Coordinated with the DEV-466 thread, which is handling the shared workflow policy. This supersedes automatic owner escalation merely because a second review blocked; it does not resolve the outstanding branch-update failure finding. No code changed, no commit or tests this turn. Returning this policy-answer turn to HelpNeeded/mallox as instructed so it cannot merge unfinished code; the next implementation round must address refused synchronization and its regression.'
+- date: 2026-11-13T19:21:19.435424+00:00
+  author: triage
+  text: 'Triage: this is already answered, no new question for the owner. Owner decision 2026-11-13 (INBOX-28, his comment 19:19Z; same answer on DEV-466 via INBOX-29, 19:18Z): agents may rework more than once, as developers normally do; no endless loop; on the 2nd or 3rd round check whether a stronger model suits the task before cutting off for confirmation (DEV-466 is handling that shared policy). So rework is approved. Next step: set assignee to @fix (lotar assignee DEV-468 @fix) and rework the open finding: when moving the ticket branch fails (for example, checked out elsewhere), finalize_job must fail the job or stop on a stale branch, with a refused-update regression test. The earlier finding about fallback-commit order is fixed (ccc96841).'
+- date: 2026-11-13T19:21:33.804033+00:00
+  author: codex
+  text: 'Acknowledged triage: owner approval in INBOX-28/29 authorizes another rework; no further owner decision is needed. Handing implementation to @fix as explicitly requested. Preserve ccc96841 and fix the remaining finding: propagate refused ticket-branch synchronization into failed finalization or otherwise prevent stale-branch advancement, with a refused-update regression. The fallback-commit ordering fix remains in place. No code changes or checks in this routing turn.'
+- date: 2026-11-13T19:23:24.548335+00:00
+  author: automation
+  text: The review found blocking problems again after one rework (the comments above). Should an agent rework it once more (lotar assignee DEV-468 @fix), will you decide the findings, or is it WontDo?
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1ab3c1d7-0ce9-4c25-a520-275cf8b42ec4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae7d11a9f-4237-40dd-a146-a91f4cc63276
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab144db0b-cd5a-4b5a-8c17-60dd941c7848
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aedb44bfa-f5c3-49bc-92d4-425790a0c62e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0b8adae8-1b60-44f1-813b-ca071e380fad
 description: |-
   DEV-465's own run on 2026-11-13 shows reviews reading an obsolete commit. The rework after the first blocking review committed `af60ab9c` on a branch T3 Code named for that thread (`t3/failed-merge-landed-skip-fix`), not on `agent/DEV-465`. `agent/DEV-465` stayed at the first fix `ca054282`. Later `session: fresh` review threads checked out `ca054282` and blocked twice on code that main (9921ee06) had already replaced. That sent the ticket to the owner's inbox (INBOX-22, INBOX-23, INBOX-24 within 7 minutes), and the triage agent had to explain that the work was already on main. One fix ended up on six branches: agent/DEV-465, t3/failed-merge-job-already-on-main, t3/failed-merge-already-landed, t3/failed-merge-work-on-main, t3/failed-merge-landed-skip-fix, t3/failed-merge-landed-work.
 
@@ -181,3 +198,85 @@ history:
   - field: relationships
     old: '{"related":["DEV-342","DEV-408","DEV-414","DEV-465","DEV-472"]}'
     new: '{"related":["DEV-342","DEV-408","DEV-414","DEV-465","DEV-472","DEV-473"]}'
+- at: 2026-11-13T19:19:31.671258+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:19:35.544366+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-13T19:19:36.501870+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-13T19:20:28.499639+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:20:28.842308+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-342","DEV-408","DEV-414","DEV-465","DEV-472","DEV-473"]}'
+    new: '{"related":["DEV-342","DEV-408","DEV-414","DEV-465","DEV-472","DEV-473","DEV-466"]}'
+- at: 2026-11-13T19:20:51.462306+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-13T19:21:19.435424+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:21:19.800080+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-13T19:21:20.789276+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-13T19:21:33.804033+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T19:21:44.593028+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T19:21:48.011039+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0b8adae8-1b60-44f1-813b-ca071e380fad
+- at: 2026-11-13T19:23:24.501347+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+- at: 2026-11-13T19:23:24.548335+00:00
+  actor: automation
+  changes:
+  - field: comment_added
