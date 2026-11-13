@@ -1,20 +1,36 @@
 title: lotar add sets relationships (--depends-on, --blocks, ...) in the same write, so created rules see them
-status: InProgress
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-13T21:53:33.995050+00:00
-modified: 2026-11-13T22:00:07.723928+00:00
+modified: 2026-11-13T22:52:36.988171+00:00
 relationships:
   related:
   - DEV-488
   - DEV-489
   - DEV-490
   - standards:STD-102
+comments:
+- date: 2026-11-13T22:15:29.865898+00:00
+  author: claude
+  text: 'Done in ae59218a. `lotar add` and `lotar task add` take `--depends-on`, `--blocks`, `--related`, `--fixes` (repeatable), `--parent` and `--duplicate-of`, with the ID forms of `relationships add` (`DEV-12`, `12`, `lotar:DEV-374`). They go into the creating write with their reciprocals (same transaction REST/MCP create use), so `created` rules see them. `--dry-run` lists them and fails on missing IDs or cycles, like the real add. Docs: `docs/help/add.md`, `lotar-workflow` skill (create a waiting ticket with `--status <waiting> --depends-on <id>`). Test: `tests/dev494_add_relationships_test.rs` (links + reciprocals at creation, a `created` rule with `when: status: Blocked` comments `${{ticket.relationships.depends_on[*]}}` = RL-1, every kind, missing/invalid IDs create nothing). Note: rule conditions have no relationship field (only status, tags, ...), so the test checks the rule''s template sees the link; a `depends_on` condition would be a separate ticket. Checks: npm run lint:agent, test:agent (Rust 2141, UI 1515, release, hooks), test:smoke:agent (390) all pass.'
+- date: 2026-11-13T22:16:27.819568+00:00
+  author: codex
+  text: 'Review: blocking. tests/dev494_add_relationships_test.rs:43 tests a created action template rather than the required relationship condition. Add a condition-based test and support, or obtain owner acceptance of narrower scope. Targeted test blocked by sccache sandbox; uncached compilation stopped. Full gates not rerun. No files or commits changed; status and assignee unchanged.'
+- date: 2026-11-13T22:29:46.452945+00:00
+  author: claude
+  text: 'Rework, commit 639995f8 (amended, signed). Review finding (rules'' conditions can''t see relationships): fixed. Rule conditions now take depends_on, blocks, related, children, fixes, parent and duplicate_of, checked on the ticket as it is now like sprint/release (src/services/automation_matching.rs relationship_value; a declared custom field of the same name still wins). The test''s created rule now has the condition ''status: Blocked, depends_on: { exists: true }'': it fires for ''lotar add --status Blocked --depends-on RL-1'' and not for a Blocked ticket with only --related (tests/dev494_add_relationships_test.rs). The test failed before the matcher change. Docs: docs/help/automation.md ''Relationship conditions'', link from docs/help/add.md. The UI rule editor doesn''t offer these fields yet (YAML only). Checks: npm run lint:agent passed; npm run test:agent passed (Rust 2141, UI 1515, release, hooks); npm run test:smoke:agent: 1 of 390 failed on the first run (I didn''t capture which test), then 390/390 passed on two reruns.'
+- date: 2026-11-13T22:52:32.149377+00:00
+  author: codex
+  text: 'Review: passed. No blocking findings in 639995f8 after reading full diff, ticket/rework and related context, guidance and touched-file main history. Previous condition finding fixed with positive and negative created-rule coverage. Lint passed uncached. Targeted DEV-494 tests 3/3 passed; runner failed on xcrun_db residue. Full tests and smoke failed on sandbox-denied socket binding (smoke 146 passed, 244 failed); full verification not confirmed here. No files or commits changed, no tickets filed, status and assignee unchanged. No durable guidance finding.'
 references:
 - file: src/cli/args/task.rs
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa69ef4ed-5439-421d-98b8-119cc67b48d0
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abad9c393-1d17-4c90-a594-960c4ab74a7a
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3a5dfb04-36a4-4e42-9def-f6db9903cd1b
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0a21f311-2a3c-4409-b9aa-5a6c45d67c49
 description: |-
   `lotar add` can't set relationships, so an agent that files a ticket waiting on another adds the `depends_on` link in a second command. The `created` rules have already run by then, and a fix agent starts on a ticket that has to wait. MCP `task_create` and REST create already take `relationships` in the same write; the CLI should too. The owner chose this on 2026-11-13 over a general `--no-automation` flag.
 
@@ -36,6 +52,7 @@ description: |-
   - [ ] Help docs agree; lint, test and smoke pass.
 tags:
 - backend
+- review-returned
 history:
 - at: 2026-11-13T21:53:34.165787+00:00
   actor: claude
@@ -70,3 +87,82 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa69ef4ed-5439-421d-98b8-119cc67b48d0
+- at: 2026-11-13T22:15:29.865898+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T22:15:39.528515+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T22:15:40.675157+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abad9c393-1d17-4c90-a594-960c4ab74a7a
+- at: 2026-11-13T22:16:27.819568+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T22:16:27.842492+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: backend
+    new: backend, review-blocked
+- at: 2026-11-13T22:16:32.625110+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: backend, review-blocked
+    new: backend, review-returned
+- at: 2026-11-13T22:16:33.270866+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-13T22:16:34.017344+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3a5dfb04-36a4-4e42-9def-f6db9903cd1b
+- at: 2026-11-13T22:29:46.452945+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T22:29:57.430506+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T22:49:15.948993+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0a21f311-2a3c-4409-b9aa-5a6c45d67c49
+- at: 2026-11-13T22:52:32.149377+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T22:52:36.988171+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

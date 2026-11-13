@@ -28,5 +28,6 @@ Use this page to jump into the implementation notes you need while building LoTa
 - [SSE events](./sse.md)
 - [API quick reference](./api-quick-reference.md) + `docs/openapi.json`
 - [Preferences](./preferences.md) for browser-only state management
+- [Harness tool design](./harness-tool-design.md): proposal for a separate tool that starts, follows, messages and resumes agent CLIs over ACP (DEV-492)
 
 Need end-user guidance? See `docs/help/` and link back to these files when you need to cite modules or tests.

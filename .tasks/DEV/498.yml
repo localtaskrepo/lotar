@@ -1,0 +1,83 @@
+title: Core modules no longer call up into services and cli
+status: Reviewing
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@review'
+created: 2026-11-13T22:21:43.366702+00:00
+modified: 2026-11-13T22:44:57.898009+00:00
+relationships:
+  blocks:
+  - DEV-499
+  related:
+  - DEV-493
+comments:
+- date: 2026-11-13T22:44:48.794454+00:00
+  author: claude
+  text: 'Done in b001cb17. Core modules (config, storage, utils, types, output, errors, workspace, project, scanner, api_types, api_events) no longer reference services, cli, automation, routes, mcp, web_server, api_server or help; tests/core_layering_test.rs enforces it, grouped imports included. Moved down: AgentRunnerKind, is_repo_name and GITHUB_PUSH_FIELDS to config::types; ui.* validators and theme lists to the new config::branding (view theme spec/comments point there); FINDING_FIELD/FINDING_SEEN_FIELD to utils::custom_fields; dedupe_code_references and is_user_attached to utils::scan. TrustService moved whole to config::trust (it needed nothing above core) except describe(), which uses automation types and moved to cli/handlers/trust.rs, the only caller. binary_watch::exit_when_replaced moved up as AgentJobService::exit_when_binary_replaced. utils::scan::reference_mutation_tests moved to services/scan_service.rs. No hooks were needed, so behaviour is unchanged. Not done: agent_job_service tests still call cli::handlers::agent (services to cli, outside the core and outside Done when). Checks: npm run lint, npm run test:agent (2143 Rust, 1515 UI, release and hooks tests passed), npm run smoke (390 passed).'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abfc8dd44-dac3-4c7d-a0a0-0e2f1436b0e8
+description: |-
+  Preparation for a core crate in the cargo workspace the owner approved (DEV-493, 2026-11-13: "Yes on all of those ideas"). The core modules depend on the layers above them, so they can't be a crate of their own yet.
+
+  ## Context (DEV-493)
+
+  - config, storage, utils, types and output depend on each other (one strongly connected group, about 23k lines with errors, workspace, project, scanner, api_types and api_events).
+  - They call up into services 17 times: `config/operations.rs` (external_tasks::is_repo_name, agent_runner::AgentRunnerKind, trust_service::TrustService::rewrite, theme_file::validate_path, branding_service::validate_ui_field), `config/validation/validator.rs` (is_repo_name, sync_service::GITHUB_PUSH_FIELDS), `utils/binary_watch.rs` (AgentJobService::shutdown_jobs), `utils/scan.rs` (scan_anchor_service helpers), `utils/custom_fields.rs` (finding_service field names).
+  - The test module `utils::scan::reference_mutation_tests` uses cli and services. In services, `agent_job_service.rs` tests call `cli::handlers::agent`.
+  - A scratch copy of these modules with the 17 calls stubbed compiled as a crate on its own; its unit-test build took 8 to 24 s against 43 to 44 s for the whole crate.
+
+  ## Plan
+
+  - Move the small helpers and constants down into core modules. Turn the stateful ones (TrustService::rewrite, AgentJobService::shutdown_jobs) into hooks the upper layers register, or move their callers up.
+  - Move tests that need upper layers to where those layers are.
+  - No crate split in this ticket; behaviour stays the same.
+
+  ## Done when
+
+  - [ ] No `crate::services`, `crate::cli`, `crate::automation`, `crate::routes`, `crate::mcp` or `crate::web_server` reference left in the core modules, enforced by a test.
+  - [ ] `npm run lint`, `npm test` and `npm run smoke` pass.
+tags:
+- backend
+history:
+- at: 2026-11-13T22:21:43.473766+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-493"]}'
+- at: 2026-11-13T22:21:43.612025+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T22:21:51.432215+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-493"]}'
+    new: '{"blocks":["DEV-499"],"related":["DEV-493"]}'
+- at: 2026-11-13T22:29:57.936204+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T22:29:58.724209+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abfc8dd44-dac3-4c7d-a0a0-0e2f1436b0e8
+- at: 2026-11-13T22:44:48.794454+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T22:44:57.898009+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

@@ -5,12 +5,13 @@ type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-13T21:14:14.411039+00:00
-modified: 2026-11-13T22:04:18.537805+00:00
+modified: 2026-11-13T22:41:10.737531+00:00
 relationships:
   related:
   - DEV-466
   - DEV-488
   - DEV-481
+  - DEV-502
 comments:
 - date: 2026-11-13T21:26:16.645800+00:00
   author: claude
@@ -270,3 +271,9 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-13T22:41:10.737531+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-466","DEV-488","DEV-481"]}'
+    new: '{"related":["DEV-466","DEV-488","DEV-481","DEV-502"]}'

@@ -1,0 +1,54 @@
+title: CI caches lotar's own build output between runs
+status: Blocked
+priority: High
+type: Chore
+reporter: claude
+created: 2026-11-13T22:21:42.733070+00:00
+modified: 2026-11-13T22:21:51.980829+00:00
+relationships:
+  depends_on:
+  - DEV-493
+  blocks:
+  - DEV-499
+  related:
+  - DEV-107
+  - DEV-493
+description: |-
+  CI keeps no build output of lotar's own code between runs, so every Rust job compiles the lotar crate from scratch, even when a push changed nothing in it (DEV-493). The owner, 2026-11-13: "We really need to try and optimize the build and CI time."
+
+  ## Context (DEV-493)
+
+  - `Swatinem/rust-cache` caches dependencies but drops the build output of the workspace's own packages.
+  - `[profile.ci]` sets `incremental = true`. sccache (Windows job only) does not cache incremental builds, so the lotar crate is never an sccache hit.
+  - Windows "Build binary (ci profile)" varies from 24 s to 189 s; Linux "Run tests" takes 2m19 to 2m59 of compiling before 45 s of tests.
+
+  ## Plan
+
+  - Measure on a branch: `CARGO_INCREMENTAL=0` (or `incremental = false` in `[profile.ci]`) with sccache on the Linux Rust jobs too. Check the rust-cache options for workspace crates (look up the current release, don't go from memory). Respect the 10 GB Actions cache limit (DEV-107, the sccache caps in `ci.yml` and `tests/ci_windows_reporting_contract_test.rs`).
+  - Keep what makes repeat builds faster; this also pays off once the workspace split (the related tickets) has crates that don't change.
+
+  ## Done when
+
+  - [ ] Rust job wall times before and after, for a push that changes Rust and one that doesn't touch `src/`.
+  - [ ] The change is adopted or dropped with the numbers in a comment.
+tags:
+- backend
+history:
+- at: 2026-11-13T22:21:42.840566+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-107","DEV-493"]}'
+- at: 2026-11-13T22:21:51.160443+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-107","DEV-493"]}'
+    new: '{"depends_on":["DEV-493"],"related":["DEV-107","DEV-493"]}'
+- at: 2026-11-13T22:21:51.980829+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-493"],"related":["DEV-107","DEV-493"]}'
+    new: '{"depends_on":["DEV-493"],"blocks":["DEV-499"],"related":["DEV-107","DEV-493"]}'

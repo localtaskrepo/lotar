@@ -1,11 +1,11 @@
 title: Question comments with options the owner answers by click, and answers that set the ticket's fields
-status: InProgress
+status: HelpNeeded
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-13T21:13:42.890310+00:00
-modified: 2026-11-13T22:04:21.180268+00:00
+modified: 2026-11-13T22:41:10.735971+00:00
 relationships:
   blocks:
   - DEV-489
@@ -17,6 +17,7 @@ relationships:
   - DEV-485
   - DEV-491
   - DEV-494
+  - DEV-502
 comments:
 - date: 2026-11-13T21:43:40.367443+00:00
   author: claude
@@ -36,12 +37,70 @@ comments:
 - date: 2026-11-13T22:00:50.035965+00:00
   author: codex
   text: 'Review: blocking. Mandatory before/after UI screenshots are absent from ticket attachments and outcome links (QuestionPrompt.vue:2, BoardCard.vue, TaskTable.vue, Comments tab). Attach every changed page in light/dark at 1920, 1440, 390 px per ui-review and review instructions. Focused questions.spec.ts rerun passes (2 tests). Review incomplete: full diff/history/related tickets, independent rendering, lint, Rust and smoke not completed. No code approval, minor tickets, file changes or commits; status and assignee unchanged.'
+- date: 2026-11-13T22:17:08.844393+00:00
+  author: claude
+  text: 'Rework of the review finding (missing UI screenshots): fixed. Attached 48 screenshots to this ticket. Pages: the Comments tab with an open question (comments), the Comments tab with an answered question (answered), the Tasks list with the question expanded (tasks) and a board card with the question expanded (board). Before is main''s UI and after is this branch, each in light and dark at 1920, 1440 and 390 px. File names follow <before|after>-<page>-<theme>-<width>.png. The before set shows the question only as prose with an Options list. The after set shows option buttons with the recommended option marked, the Other field, the answer under its question, and the open-question line on rows and cards. I read them and found no visual problems: dark-mode controls and inputs are readable, and at 390 px nothing overflows. The before UI was built from main (vite) and served with --web-ui-path from the same build:smoke binary, over a scratch QST workspace with made-up example tickets. No code changed, so the commit stays 0e5d1651; nothing to amend. Checks: npm run build:smoke, smoke ui.question-comments (1 passed). lint, npm test and the full smoke suite did not run again here; they passed on 0e5d1651 before, and no code has changed since.'
+- date: 2026-11-13T22:18:13.760665+00:00
+  author: codex
+  text: 'Review: blocking. src/services/task_questions.rs:103-122 persists the answer before applying option fields. If the update fails, the question remains answered and retries are rejected. Make answer and field persistence atomic or leave the question retryable on failure, with a regression test. Focused UI tests: 2 passed. Broader review and mandatory visual verification incomplete. No files changed or commits; status and assignee unchanged.'
+- date: 2026-11-13T22:18:22.125328+00:00
+  author: automation
+  text: The review found blocking problems again after one rework (the comments above). Should an agent rework it once more (lotar assignee DEV-488 @fix), will you decide the findings, or is it WontDo?
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afd2c6919-e5a0-41a8-9c0f-8916f5a62fea
 - file: src/types.rs
 - file: view/components/task-panel/TaskPanelCommentsTab.vue
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5de430a4-3a23-44a1-9dcf-c31d127fb791
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8846d532-c3b5-47ef-b0e8-73ddb1f5318e
+- attachment: after-board-dark-390.c920d84d7c21f91e32995e702b536de1.png
+- attachment: after-answered-dark-1440.8e5a7ba24f5547b50f280ed91d6dc47a.png
+- attachment: after-answered-dark-1920.e24ea04fd7f5745df223a0ab6d2556e0.png
+- attachment: after-answered-dark-390.1ce53464981ccc4f4f9ccf0360d4ca56.png
+- attachment: after-answered-light-1440.e55d7ad01281041e8ede25efc44b854e.png
+- attachment: after-answered-light-1920.b9c2018eecd12f41664684bff1162ed7.png
+- attachment: after-answered-light-390.184dc249ec0b37626d7bf9831e646f5a.png
+- attachment: after-board-dark-1440.619ebbf26f1300deabd6a9cc76658090.png
+- attachment: after-board-dark-1920.2701f0b67e05add8a670a9e5edc18a01.png
+- attachment: after-board-light-1440.58c1794a6ea3e5926ee6f27299d088c3.png
+- attachment: after-board-light-1920.700a94dda7a670e7020c5a667bfc2f2f.png
+- attachment: after-board-light-390.f0d16f36a0e98468a85eb9d84c89c7e0.png
+- attachment: after-comments-dark-1440.bb11c61dce59715dc06abe517fb9997f.png
+- attachment: after-comments-dark-1920.f933337e5346592dae289e5032be6755.png
+- attachment: after-comments-dark-390.7538da1d63b5f9306253a737209d0232.png
+- attachment: after-comments-light-1440.3537bff4c61eb3492b934d1abffdfb30.png
+- attachment: after-comments-light-1920.3fd86bb2e236317d713122187d4cf020.png
+- attachment: after-comments-light-390.71aff9afff0654113d4ca666d2901b2b.png
+- attachment: after-tasks-dark-1440.129a28874d3dcec5b8de014a0d9df72f.png
+- attachment: after-tasks-dark-1920.160b8ae9531b4049bc6af1f0a4f41827.png
+- attachment: after-tasks-dark-390.ef80e7df16dbe43f78a4feb2d4be290d.png
+- attachment: after-tasks-light-1440.a8a94eb145abd0e9da30aeda4f9f177e.png
+- attachment: after-tasks-light-1920.84276299ee3ac92f8c727d5841d32928.png
+- attachment: after-tasks-light-390.a1e4545107a1e8d558154ef6060be961.png
+- attachment: before-answered-dark-1440.845cf80aecc7c334e54787c29d15a998.png
+- attachment: before-answered-dark-1920.cfed5d64127ea47f60073304276d5ce5.png
+- attachment: before-answered-dark-390.a8213aa070234f9138efc3caa0f238f8.png
+- attachment: before-answered-light-1440.d335bf27489bad8adce444b72da7f02b.png
+- attachment: before-answered-light-1920.bded8e84d245c216567bb7cf9742d47c.png
+- attachment: before-answered-light-390.5db0527917a72559b77aee7b90e35643.png
+- attachment: before-board-dark-1440.4766983ea9f76a82b21615bf53fbe836.png
+- attachment: before-board-dark-1920.726451bd133637e172898cbf8b2fc475.png
+- attachment: before-board-dark-390.1bd3201e8ba49ed03c49b2f023931276.png
+- attachment: before-board-light-1440.0dee2a5aafd22d8cd4896177f75b8416.png
+- attachment: before-board-light-1920.7fdef8816b70bef9682eae4129157c48.png
+- attachment: before-board-light-390.d0381ea98d2940cb6b7974ecb68883c9.png
+- attachment: before-comments-dark-1440.1c45fba16ca7ef592f2f0156a49f7359.png
+- attachment: before-comments-dark-1920.9e5fc7a76bd922de2aa78dab224c8b5d.png
+- attachment: before-comments-dark-390.c14bc1c65670a3a60507d1a0722e6f67.png
+- attachment: before-comments-light-1440.d27e82783a263dca8c4e190a4f9fb651.png
+- attachment: before-comments-light-1920.e68332a2173e4cf63ca70df817e72b69.png
+- attachment: before-comments-light-390.552a0b7a4672ab4aee3875e297939793.png
+- attachment: before-tasks-dark-1440.456f428ca58f9666550a2264af7429a2.png
+- attachment: before-tasks-dark-1920.f88fe3979058b9c2e2a7fa724b8deedf.png
+- attachment: before-tasks-dark-390.a12d24630cd70786ffd61c3dac2dead2.png
+- attachment: before-tasks-light-1440.ef7702688142583ba5ce161977ddc1de.png
+- attachment: before-tasks-light-1920.0bebdaecf1007ab9828704ad35a91ccc.png
+- attachment: before-tasks-light-390.bc593ca94443b29919edbd3fe11ffdbf.png
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acaf0b13d-f674-4f85-83a5-6706f6c01497
 description: |-
   Agents and automation ask the owner multiple-choice questions in prose ("Question for mallox: A, B, C or none?"); he answers in a line and an agent has to read his words back and do the routing. A `question` comment with options, and an `answer` comment that records the choice, lets the UI show buttons and lets an option set the ticket's fields itself. The owner asked for it on 2026-11-13 and chose the full scope (options that set fields, open questions on cards).
 
@@ -186,3 +245,293 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8846d532-c3b5-47ef-b0e8-73ddb1f5318e
+- at: 2026-11-13T22:16:43.170042+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-board-dark-390.c920d84d7c21f91e32995e702b536de1.png
+- at: 2026-11-13T22:16:49.223191+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-answered-dark-1440.8e5a7ba24f5547b50f280ed91d6dc47a.png
+- at: 2026-11-13T22:16:49.261857+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-answered-dark-1920.e24ea04fd7f5745df223a0ab6d2556e0.png
+- at: 2026-11-13T22:16:49.299781+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-answered-dark-390.1ce53464981ccc4f4f9ccf0360d4ca56.png
+- at: 2026-11-13T22:16:49.339163+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-answered-light-1440.e55d7ad01281041e8ede25efc44b854e.png
+- at: 2026-11-13T22:16:49.377915+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-answered-light-1920.b9c2018eecd12f41664684bff1162ed7.png
+- at: 2026-11-13T22:16:49.414581+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-answered-light-390.184dc249ec0b37626d7bf9831e646f5a.png
+- at: 2026-11-13T22:16:49.454640+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-board-dark-1440.619ebbf26f1300deabd6a9cc76658090.png
+- at: 2026-11-13T22:16:49.494198+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-board-dark-1920.2701f0b67e05add8a670a9e5edc18a01.png
+- at: 2026-11-13T22:16:49.535907+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-board-light-1440.58c1794a6ea3e5926ee6f27299d088c3.png
+- at: 2026-11-13T22:16:49.575044+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-board-light-1920.700a94dda7a670e7020c5a667bfc2f2f.png
+- at: 2026-11-13T22:16:49.615001+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-board-light-390.f0d16f36a0e98468a85eb9d84c89c7e0.png
+- at: 2026-11-13T22:16:49.652815+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-comments-dark-1440.bb11c61dce59715dc06abe517fb9997f.png
+- at: 2026-11-13T22:16:49.691828+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-comments-dark-1920.f933337e5346592dae289e5032be6755.png
+- at: 2026-11-13T22:16:49.727471+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-comments-dark-390.7538da1d63b5f9306253a737209d0232.png
+- at: 2026-11-13T22:16:49.768234+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-comments-light-1440.3537bff4c61eb3492b934d1abffdfb30.png
+- at: 2026-11-13T22:16:49.806962+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-comments-light-1920.3fd86bb2e236317d713122187d4cf020.png
+- at: 2026-11-13T22:16:49.846658+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-comments-light-390.71aff9afff0654113d4ca666d2901b2b.png
+- at: 2026-11-13T22:16:49.882395+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-tasks-dark-1440.129a28874d3dcec5b8de014a0d9df72f.png
+- at: 2026-11-13T22:16:49.920646+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-tasks-dark-1920.160b8ae9531b4049bc6af1f0a4f41827.png
+- at: 2026-11-13T22:16:49.961516+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-tasks-dark-390.ef80e7df16dbe43f78a4feb2d4be290d.png
+- at: 2026-11-13T22:16:49.999617+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-tasks-light-1440.a8a94eb145abd0e9da30aeda4f9f177e.png
+- at: 2026-11-13T22:16:50.037499+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-tasks-light-1920.84276299ee3ac92f8c727d5841d32928.png
+- at: 2026-11-13T22:16:50.074861+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-tasks-light-390.a1e4545107a1e8d558154ef6060be961.png
+- at: 2026-11-13T22:16:50.120005+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-answered-dark-1440.845cf80aecc7c334e54787c29d15a998.png
+- at: 2026-11-13T22:16:50.158615+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-answered-dark-1920.cfed5d64127ea47f60073304276d5ce5.png
+- at: 2026-11-13T22:16:50.194876+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-answered-dark-390.a8213aa070234f9138efc3caa0f238f8.png
+- at: 2026-11-13T22:16:50.231652+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-answered-light-1440.d335bf27489bad8adce444b72da7f02b.png
+- at: 2026-11-13T22:16:50.270728+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-answered-light-1920.bded8e84d245c216567bb7cf9742d47c.png
+- at: 2026-11-13T22:16:50.307561+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-answered-light-390.5db0527917a72559b77aee7b90e35643.png
+- at: 2026-11-13T22:16:50.345913+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-board-dark-1440.4766983ea9f76a82b21615bf53fbe836.png
+- at: 2026-11-13T22:16:50.383834+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-board-dark-1920.726451bd133637e172898cbf8b2fc475.png
+- at: 2026-11-13T22:16:50.424515+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-board-dark-390.1bd3201e8ba49ed03c49b2f023931276.png
+- at: 2026-11-13T22:16:50.462806+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-board-light-1440.0dee2a5aafd22d8cd4896177f75b8416.png
+- at: 2026-11-13T22:16:50.501643+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-board-light-1920.7fdef8816b70bef9682eae4129157c48.png
+- at: 2026-11-13T22:16:50.538931+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-board-light-390.d0381ea98d2940cb6b7974ecb68883c9.png
+- at: 2026-11-13T22:16:50.577806+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-comments-dark-1440.1c45fba16ca7ef592f2f0156a49f7359.png
+- at: 2026-11-13T22:16:50.617779+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-comments-dark-1920.9e5fc7a76bd922de2aa78dab224c8b5d.png
+- at: 2026-11-13T22:16:50.654736+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-comments-dark-390.c14bc1c65670a3a60507d1a0722e6f67.png
+- at: 2026-11-13T22:16:50.693922+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-comments-light-1440.d27e82783a263dca8c4e190a4f9fb651.png
+- at: 2026-11-13T22:16:50.732334+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-comments-light-1920.e68332a2173e4cf63ca70df817e72b69.png
+- at: 2026-11-13T22:16:50.767650+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-comments-light-390.552a0b7a4672ab4aee3875e297939793.png
+- at: 2026-11-13T22:16:50.803430+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-tasks-dark-1440.456f428ca58f9666550a2264af7429a2.png
+- at: 2026-11-13T22:16:50.839757+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-tasks-dark-1920.f88fe3979058b9c2e2a7fa724b8deedf.png
+- at: 2026-11-13T22:16:50.875897+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-tasks-dark-390.a12d24630cd70786ffd61c3dac2dead2.png
+- at: 2026-11-13T22:16:50.913592+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-tasks-light-1440.ef7702688142583ba5ce161977ddc1de.png
+- at: 2026-11-13T22:16:50.948771+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-tasks-light-1920.0bebdaecf1007ab9828704ad35a91ccc.png
+- at: 2026-11-13T22:16:50.986488+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-tasks-light-390.bc593ca94443b29919edbd3fe11ffdbf.png
+- at: 2026-11-13T22:17:08.844393+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T22:17:16.527082+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T22:17:17.868253+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acaf0b13d-f674-4f85-83a5-6706f6c01497
+- at: 2026-11-13T22:18:13.760665+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T22:18:16.330594+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: web-ui, backend, review-returned
+    new: web-ui, backend, review-returned, review-blocked
+- at: 2026-11-13T22:18:22.089092+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+  - field: tags
+    old: web-ui, backend, review-returned, review-blocked
+    new: web-ui, backend, review-returned
+- at: 2026-11-13T22:18:22.125328+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-13T22:41:10.735971+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-489","DEV-490"],"related":["DEV-466","DEV-478","DEV-483","DEV-485","DEV-491","DEV-494"]}'
+    new: '{"blocks":["DEV-489","DEV-490"],"related":["DEV-466","DEV-478","DEV-483","DEV-485","DEV-491","DEV-494","DEV-502"]}'

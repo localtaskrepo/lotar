@@ -1,0 +1,56 @@
+title: Filter the Comments and History tabs by author and type
+status: InProgress
+priority: Low
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-13T22:41:10.367004+00:00
+modified: 2026-11-13T22:49:27.838089+00:00
+relationships:
+  related:
+  - DEV-466
+  - DEV-488
+  - DEV-489
+  - DEV-490
+  - DEV-491
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0dc4db1c-afdc-4589-a3bc-1ae9580009ce
+description: |-
+  The task panel's Comments and History tabs list every entry with no way to narrow them; the only control is the reload button. On a long ticket (DEV-466, STD-82) the owner can't pick out what the agents said or what changed a field. Owner asked on 2026-11-13 whether this exists and said to file it.
+
+  ## Plan
+
+  - Comments tab: toggle chips above the list by author, at least "Hide automation" (DEV-491 already mutes it); by type once question, review and hand-off comments exist (DEV-488, DEV-489, DEV-490).
+  - History tab: chips by field (status, assignee, tags, the rest) and by author.
+  - The choice is a per-viewer setting kept across tasks, like other panel preferences; the tab says how many entries are hidden and offers "Show all".
+  - No data or API change; filtering happens on what the panel already loads.
+
+  ## Done when
+
+  - [ ] Both tabs filter as above in light and dark themes, on phone width too (smoke).
+  - [ ] lint, test and smoke pass.
+tags:
+- web-ui
+history:
+- at: 2026-11-13T22:41:10.738027+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-466","DEV-488","DEV-489","DEV-490","DEV-491"]}'
+- at: 2026-11-13T22:41:11.161754+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T22:49:27.112579+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T22:49:27.838089+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0dc4db1c-afdc-4589-a3bc-1ae9580009ce

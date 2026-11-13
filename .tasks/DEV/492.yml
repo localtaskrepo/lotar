@@ -1,11 +1,17 @@
 title: 'Design a harness tool of its own: start, follow, message and resume Claude, Codex, Kilo and other agent CLIs'
-status: HelpNeeded
+status: Merging
 priority: High
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@merge'
 created: 2026-11-13T21:27:57.663811+00:00
-modified: 2026-11-13T22:00:06.429031+00:00
+modified: 2026-11-13T22:52:38.465567+00:00
+relationships:
+  related:
+  - DEV-501
+  - DEV-503
+  - DEV-504
+  - DEV-505
 comments:
 - date: 2026-11-13T21:59:51.621605+00:00
   author: claude
@@ -13,8 +19,18 @@ comments:
 - date: 2026-11-13T21:59:51.829626+00:00
   author: claude
   text: '@mallox Approve this design (docs/developers/harness-tool-design.md): a Rust tool harnessmux on ACP in its own MIT repo next to lotar, modelled on acpx, followed from lotar''s web UI, adopted as a new runner until Claude and Codex with resume replace the t3 runner?'
+- date: 2026-11-13T22:35:14.513644+00:00
+  author: claude
+  text: 'Owner decisions 2026-11-13, in his words from the options picker: interface "Link the crate"; lotar''s own runners "Remove right away"; review of the code that stays "After the switch" (filed as DEV-501). Doc updated in place (Owner decisions section, interface, adoption, risks); commit amended to f49113c8 on agent/DEV-492. Changed from the draft: lotar links the crate, and the agent table (adapter versions, option ids) is data the crate reads at run time, so adapter bumps need no lotar build; one change adds harnessmux and removes the per-CLI runners and the t3 runner; old runner names map to harnessmux agents, t3 is removed with a hint, command stays.'
+- date: 2026-11-13T22:35:14.635680+00:00
+  author: claude
+  text: '@mallox Approve the revised design (docs/developers/harness-tool-design.md): a Rust tool harnessmux on ACP in its own MIT repo, modelled on acpx, linked into lotar as a crate in one change that removes lotar''s own harness runners and the t3 runner, followed from lotar''s web UI?'
+- date: 2026-11-13T22:45:44.716708+00:00
+  author: claude
+  text: 'Owner 2026-11-13: "Approve" for the revised design (recorded in the doc, commit c2b592f9). For the merge he chose "Start the merge agent" without a review: queued as a fresh merge job with the rule''s merge prompt (status Merging, assignee @merge). Follow-ups, his choice "Start now": DEV-504 creates the harnessmux repo and crate (fix agent queued), DEV-503 switches lotar to the crate and removes its runners (Blocked on DEV-504), DEV-501 reviews the job code that stays (Blocked on DEV-503; its premature fix job was taken out of the queue).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9cf75e47-e8d0-45e5-88ad-eb92ada61a1f
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A09ad63ea-121e-4188-bbf1-5d58b7ccde3d
 description: |-
   Design a harness tool of its own, next to lotar in the localtaskrepo group: one way for lotar, agents and other apps to start, follow, message and resume sessions of Claude, Codex, Kilo and other coding-agent CLIs. The owner, 2026-11-13: "Why not pull it out and put it in its own repo next to lotar as a tool that allows multiplexing between harnesses. Then lotar can use, we can use it, any other app that needs it could use it. And we have a separate codebase that we can update at a higher frequency (for when the apis change) and faster than rebuilding lotar each time." He chose a design ticket first (standards docs/decisions/2026-11-13-harness-tool.md). Design only: no code, no new repo yet.
 
@@ -71,3 +87,68 @@ history:
   - field: assignee
     old: '@fix'
     new: mallox
+- at: 2026-11-13T22:35:03.413422+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-501"]}'
+- at: 2026-11-13T22:35:13.889226+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-501"]}'
+    new: '{"blocks":["DEV-501"],"related":["DEV-501"]}'
+- at: 2026-11-13T22:35:14.513644+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T22:35:14.635680+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T22:44:23.579869+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Merging
+- at: 2026-11-13T22:44:23.970402+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@merge'
+- at: 2026-11-13T22:44:58.238162+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-501"],"related":["DEV-501"]}'
+    new: '{"blocks":["DEV-501"],"related":["DEV-501","DEV-503"]}'
+- at: 2026-11-13T22:45:13.017351+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-501"],"related":["DEV-501","DEV-503"]}'
+    new: '{"blocks":["DEV-501"],"related":["DEV-501","DEV-503","DEV-504"]}'
+- at: 2026-11-13T22:45:25.543708+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-501"],"related":["DEV-501","DEV-503","DEV-504"]}'
+    new: '{"related":["DEV-501","DEV-503","DEV-504"]}'
+- at: 2026-11-13T22:45:44.254019+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-501","DEV-503","DEV-504"]}'
+    new: '{"related":["DEV-501","DEV-503","DEV-504","DEV-505"]}'
+- at: 2026-11-13T22:45:44.716708+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T22:52:38.465567+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A09ad63ea-121e-4188-bbf1-5d58b7ccde3d

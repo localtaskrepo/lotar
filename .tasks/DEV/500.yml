@@ -1,0 +1,54 @@
+title: The slowest Rust tests run faster
+status: InProgress
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-13T22:21:44.054473+00:00
+modified: 2026-11-13T22:44:59.106152+00:00
+relationships:
+  related:
+  - DEV-493
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acb4bc02c-bf5b-4a46-8904-8dee7196316d
+description: |-
+  Make the slowest Rust tests faster, so the suite is cheap to run often. The owner, 2026-11-13: "The faster tests can run, the cheaper it is to run them more often."
+
+  ## Context
+
+  - Agent, automation and job tests are 52% of the Linux test time; `dev318_t3_runner_test` alone takes 57 s (DEV-493 findings).
+  - The full local Rust run (`npm run test:rust:agent`) took 79 s of test time for 2138 tests on 2026-11-13.
+
+  ## Plan
+
+  - List the 20 slowest tests from a nextest JUnit report (`target/nextest/*/junit.xml`).
+  - Remove fixed sleeps and long polling intervals, shrink fixtures, share expensive setup where it stays isolated. Never weaken what a test proves; record each change's before and after time.
+
+  ## Done when
+
+  - [ ] The slowest tests with their before and after times in a comment, and the total test time before and after.
+tags:
+- backend
+history:
+- at: 2026-11-13T22:21:44.184534+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-493"]}'
+- at: 2026-11-13T22:21:44.363835+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T22:44:58.287510+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T22:44:59.106152+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acb4bc02c-bf5b-4a46-8904-8dee7196316d

@@ -1,0 +1,60 @@
+title: 'Cargo workspace step 2: the core modules become a crate of their own'
+status: Blocked
+priority: Medium
+type: Chore
+reporter: claude
+created: 2026-11-13T22:21:43.785907+00:00
+modified: 2026-11-13T22:21:51.981150+00:00
+relationships:
+  depends_on:
+  - DEV-498
+  - DEV-497
+  - DEV-496
+  related:
+  - DEV-493
+description: |-
+  Move the core modules into a crate of their own in the cargo workspace (DEV-493; the owner, 2026-11-13: "Yes on all of those ideas"). Changes above core then don't recompile core, and core's tests build in a fraction of the time.
+
+  ## Context (DEV-493)
+
+  - Core: config, storage, utils, types, output, errors, workspace, project, scanner, api_types, api_events (about 23k of 95k lines).
+  - Measured on a scratch probe: the core library builds from scratch in 8 to 16 s (the whole crate: 29 to 49 s), its unit tests in 8 to 24 s (whole crate: 43 to 44 s).
+  - It only pays off in CI if unchanged crates are cached (the CI caching ticket).
+
+  ## Plan
+
+  - `crates/lotar-core` (name to settle in the ticket). The `lotar` library re-exports it so paths in `tests/` and the binaries keep working; `pub(crate)` items used across the border become `pub`, the narrowest that works.
+  - Later steps in tickets of their own after measuring this one: services/runner, sync, mcp.
+  - Keep the release tooling, packaging and the path filters in `ci.yml` working.
+
+  ## Done when
+
+  - [ ] Timings before and after: a change in core, a change in services or cli, and the Windows and Linux CI jobs.
+  - [ ] `npm run lint`, `npm test` and `npm run smoke` pass.
+tags:
+- backend
+history:
+- at: 2026-11-13T22:21:43.912441+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-493"]}'
+- at: 2026-11-13T22:21:51.432537+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-493"]}'
+    new: '{"depends_on":["DEV-498"],"related":["DEV-493"]}'
+- at: 2026-11-13T22:21:51.703691+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-498"],"related":["DEV-493"]}'
+    new: '{"depends_on":["DEV-498","DEV-497"],"related":["DEV-493"]}'
+- at: 2026-11-13T22:21:51.981150+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-498","DEV-497"],"related":["DEV-493"]}'
+    new: '{"depends_on":["DEV-498","DEV-497","DEV-496"],"related":["DEV-493"]}'

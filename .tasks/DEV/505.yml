@@ -1,0 +1,29 @@
+title: lotar agent queue remove and flush are missing from the help
+status: Todo
+priority: Low
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-13T22:45:44.077860+00:00
+modified: 2026-11-13T22:45:44.511982+00:00
+relationships:
+  related:
+  - DEV-492
+  - DEV-501
+description: 'Found by claude on DEV-492, 2026-11-13: lotar agent --help and docs/help/agent.md say you can remove a queued job but name no command; lotar agent cancel DEV-501 answered "Job not found". The command exists: lotar agent queue remove <TICKET> (and queue flush), src/cli/handlers/agent.rs:373-392. Check: grep -n ''queue remove'' docs/help/agent.md finds nothing. Done: docs/help/agent.md and the agent help list queue remove and queue flush with an example.'
+tags:
+- health
+custom_fields:
+  finding: docs:agent-queue-actions
+history:
+- at: 2026-11-13T22:45:44.254880+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-492","DEV-501"]}'
+- at: 2026-11-13T22:45:44.511982+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

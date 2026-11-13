@@ -1,15 +1,16 @@
 title: 'A session: fresh job continues the earlier thread when the branch can''t be freed, so a reviewer can review its own work'
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T21:05:37.278437+00:00
-modified: 2026-11-13T22:03:18.709952+00:00
+modified: 2026-11-13T22:13:41.700263+00:00
 relationships:
   related:
   - DEV-408
   - DEV-414
+  - DEV-478
 comments:
 - date: 2026-11-13T21:16:00.871468+00:00
   author: claude
@@ -23,6 +24,9 @@ comments:
 - date: 2026-11-13T22:03:10.837945+00:00
   author: codex
   text: 'Review: passed. Reviewed ec7db832 diff, ticket/comments, DEV-408/414 decisions, repo guidance and recent main history. Earlier blocking log finding is resolved and regression checks git error plus failed status in the persistent log. Fresh fails; new retains fallback. No findings or tickets filed. build:web and diff --check passed. Targeted dev318_t3_runner_test passed 28/28 with RUSTC_WRAPPER= after sandbox sccache denial; first run passed tests but temp guard found xcrun_db, repeat passed cleanly. Full lint/test/smoke not independently rerun. No files changed or commits; status and assignee unchanged. No durable guidance finding.'
+- date: 2026-11-13T22:13:36.889027+00:00
+  author: codex
+  text: 'Merged: rebased without conflicts to 677a7e32, fast-forwarded main, then included main .tasks updates as requested: caec607e. Checks on rebased code: lint:agent passed; test:agent passed (2140 Rust, 1515 frontend, release/hooks); test:smoke:agent passed (390). Tests and smoke retried with sandbox escalation after localhost bind denials; RUSTC_WRAPPER= used. No separate health check command is specified; fresh/new regression coverage passed in full suite. Main was clean after amend. Not pushed: earliest unpushed commit 5fc697e1 belongs to DEV-478, currently HelpNeeded, so no finished prefix is available to push without that unfinished work. Status and assignee unchanged; automation completes this ticket when the job ends. No guidance correction.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A000e5916-f199-4132-8570-a4e1fedd1961
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af94fce2a-f9b9-4d1c-92d6-ed98fda5ecef
@@ -37,7 +41,6 @@ description: |-
   - [ ] docs/help/agent.md says what fresh does when the branch can't be freed.
 tags:
 - health
-- review-returned
 custom_fields:
   finding: refine-pilot:fresh-fallback
 history:
@@ -142,3 +145,22 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-13T22:13:36.889027+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T22:13:37.084699+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-408","DEV-414"]}'
+    new: '{"related":["DEV-408","DEV-414","DEV-478"]}'
+- at: 2026-11-13T22:13:41.700263+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, review-returned
+    new: health

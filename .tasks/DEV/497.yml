@@ -1,0 +1,81 @@
+title: 'Cargo workspace step 1: a web-only change rebuilds only the embedded assets and the binary'
+status: Reviewing
+priority: High
+type: Chore
+reporter: claude
+assignee: '@review'
+created: 2026-11-13T22:21:42.991432+00:00
+modified: 2026-11-13T22:48:23.999362+00:00
+relationships:
+  blocks:
+  - DEV-499
+  related:
+  - DEV-493
+comments:
+- date: 2026-11-13T22:48:06.295902+00:00
+  author: claude
+  text: 'Done in 06ecd227. The repo is a cargo workspace now: the library stays at the root (package lotar, src/, tests/, build.rs for help docs, OpenAPI and the git probe, plus lotar-agent-wrapper); crates/lotar-web-assets embeds target/web-embed with its own build.rs; crates/lotar-cli (package lotar-cli, bin lotar, src/main.rs moved there) depends on both and calls lotar::web_server::set_embedded_assets at start. Version, clap, serde_json and tempfile come from [workspace.package]/[workspace.dependencies]; lints are workspace lints. Tests in tests/ find lotar next to lotar-agent-wrapper (common::lotar_bin(), replaces CARGO_BIN_EXE_lotar and cargo_bin!); crates/lotar-cli/tests/embedded_web_ui_test.rs checks that the binary serves the embedded index (and makes workspace test runs build the binary). Caveat in docs/developers/testing.md and the testing-strategy skill: -p lotar alone doesn''t rebuild the binary, so filter with -E. Timings after a real change in target/web-embed, before -> after: cargo build (dev) 5.6 s -> 1.0 s, cargo nextest run --no-run 6.6 s -> 0.9 s, cargo build --profile smoke 1m13s -> 1.3 s; only lotar-web-assets and lotar-cli compile. Checks: npm run lint:agent, npm run test:agent (2141 Rust tests, 1515 UI, release and hook tests), npm run smoke (390/390), cargo deny check, cargo build --release --locked --all-features (both binaries; the release binary serves the embedded UI), CI''s nextest selections listed fine. Not run here: the cross build (cross images are x86_64 only, this Mac is arm64; CI''s armv7 job covers it) and nfpm (not installed). ci.yml has no path filters from DEV-493 on main, so nothing to update there. Docs updated: docs/developers (main, cli, identity, errors, testing, platform-test-verification), release-guide, ci.yml comment.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aece2a03a-cf09-4340-9bd6-4b7ecf0e4547
+description: |-
+  First step of the cargo workspace the owner approved (DEV-493, 2026-11-13: "Yes on all of those ideas"). A web-only change should rebuild only the embedded assets and the link, not the library and its tests.
+
+  ## Context
+
+  - `build.rs` watches `target/web` and `target/web-embed`, and `include_dir!` in `src/web_server.rs` embeds them. Each web build reruns the build script, which recompiles every target of the package: library, unit tests, integration tests, both binaries.
+  - Cargo recompiles every dependent of a rebuilt package. A separate assets crate only helps if the library and the tests don't depend on it.
+
+  ## Plan
+
+  - Make the repo a cargo workspace. Put the web embed into a package of its own (its own `build.rs` for the web part; the help docs and OpenAPI stay with the library) and the `lotar` binary into a package that depends on the library and the assets. The library reads the assets through a hook the binary sets at start. Tests that need real assets go through the binary.
+  - Keep the binary names, `cargo install` from the repo, and the release tooling working: `release.yml`, `Cross.toml`, `packaging/` (nfpm, npm, Homebrew, Scoop), `Dockerfile`, `scripts/` that call cargo, and the smoke build profile.
+  - Update the path filters in `ci.yml` from DEV-493 if paths move, and `docs/developers/`.
+
+  ## Done when
+
+  - [ ] After `npm run build:web`, `cargo build` and `cargo nextest run --no-run` recompile only the assets package and the binary (shown with timings).
+  - [ ] Release builds, the smoke suite and the packaging checks still pass.
+tags:
+- backend
+history:
+- at: 2026-11-13T22:21:43.116897+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-493"]}'
+- at: 2026-11-13T22:21:43.241732+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T22:21:43.541012+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T22:21:44.337522+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aece2a03a-cf09-4340-9bd6-4b7ecf0e4547
+- at: 2026-11-13T22:21:51.703361+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-493"]}'
+    new: '{"blocks":["DEV-499"],"related":["DEV-493"]}'
+- at: 2026-11-13T22:48:06.295902+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T22:48:23.999362+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

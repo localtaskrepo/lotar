@@ -1,15 +1,23 @@
 title: Measure a cargo workspace and path-filtered CI before splitting lotar
-status: HelpNeeded
+status: Reviewing
 priority: Medium
 type: Chore
 reporter: claude
-assignee: mallox
+assignee: '@review'
 created: 2026-11-13T21:27:58.028716+00:00
-modified: 2026-11-13T22:08:28.492633+00:00
+modified: 2026-11-13T22:49:14.507170+00:00
 relationships:
+  blocks:
+  - DEV-496
   related:
   - DEV-471
   - DEV-481
+  - DEV-495
+  - DEV-496
+  - DEV-497
+  - DEV-498
+  - DEV-499
+  - DEV-500
 comments:
 - date: 2026-11-13T22:08:01.550984+00:00
   author: claude
@@ -49,6 +57,24 @@ comments:
 - date: 2026-11-13T22:08:14.510865+00:00
   author: claude
   text: 'Question: adopt the path filters only (they save on docs and web pushes, not on Rust pushes), adopt the path filters plus moving the 40 Windows tests out of the library''s unit tests (about 2.5 to 4 min off every Rust push), or also start the cargo workspace split (core crate first, estimated 1.5 to 2 min more on Windows, a large move)?'
+- date: 2026-11-13T22:19:27.119161+00:00
+  author: claude
+  text: 'mallox in the thread, 2026-11-13: "Yes on all of those ideas. We really need to try and optimize the build and CI time. The faster tests can run, the cheaper it is to run them more often"'
+- date: 2026-11-13T22:22:24.765992+00:00
+  author: claude
+  text: |-
+    Adopted. The path filters are ready on branch `agent/DEV-493` (commit `66879b3b`). Next step: review, then merge into main.
+
+    The other ideas are now tickets of their own:
+    - DEV-495: Windows runs its 40 tests without building the library's unit-test binary. High; agent started.
+    - DEV-497: workspace step 1, so a web change rebuilds only the embedded assets and the binary. High; agent started.
+    - DEV-498: core modules stop calling up into services and cli. Queued.
+    - DEV-500: the slowest Rust tests get faster. Queued.
+    - DEV-496: CI keeps lotar's own build output between runs. Blocked until this ticket is merged, because both change `ci.yml`.
+    - DEV-499: workspace step 2, the core crate. Blocked on DEV-496, DEV-497 and DEV-498.
+- date: 2026-11-13T22:49:07.127412+00:00
+  author: claude
+  text: 'Ready for review and merge: the owner adopted the path filters. Branch `agent/DEV-493` holds one commit, `66879b3b` (path filters in `ci.yml`, the contract test that the Rust filter covers every file a Rust test reads, `docs/developers/testing.md`). Main has 3 newer commits, none in these files, and the branch merges cleanly. Re-ran the 14 workflow contract tests: all pass. The full lint, test and smoke results from the first job still hold, since nothing changed since then. Not run: the new `ci.yml` on GitHub; the first push after the merge will show it. Its ''Changed paths'' job should run the Rust jobs, because `ci.yml` itself changed.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A33be852d-9b46-4b5c-81fe-67f9a885d51d
 description: |-
@@ -111,3 +137,84 @@ history:
   - field: assignee
     old: '@fix'
     new: mallox
+- at: 2026-11-13T22:19:27.119161+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T22:21:42.485260+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-471","DEV-481"]}'
+    new: '{"related":["DEV-471","DEV-481","DEV-495"]}'
+- at: 2026-11-13T22:21:42.840291+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-471","DEV-481","DEV-495"]}'
+    new: '{"related":["DEV-471","DEV-481","DEV-495","DEV-496"]}'
+- at: 2026-11-13T22:21:43.116474+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-471","DEV-481","DEV-495","DEV-496"]}'
+    new: '{"related":["DEV-471","DEV-481","DEV-495","DEV-496","DEV-497"]}'
+- at: 2026-11-13T22:21:43.473185+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-471","DEV-481","DEV-495","DEV-496","DEV-497"]}'
+    new: '{"related":["DEV-471","DEV-481","DEV-495","DEV-496","DEV-497","DEV-498"]}'
+- at: 2026-11-13T22:21:43.911928+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-471","DEV-481","DEV-495","DEV-496","DEV-497","DEV-498"]}'
+    new: '{"related":["DEV-471","DEV-481","DEV-495","DEV-496","DEV-497","DEV-498","DEV-499"]}'
+- at: 2026-11-13T22:21:44.183400+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-471","DEV-481","DEV-495","DEV-496","DEV-497","DEV-498","DEV-499"]}'
+    new: '{"related":["DEV-471","DEV-481","DEV-495","DEV-496","DEV-497","DEV-498","DEV-499","DEV-500"]}'
+- at: 2026-11-13T22:21:51.159984+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-471","DEV-481","DEV-495","DEV-496","DEV-497","DEV-498","DEV-499","DEV-500"]}'
+    new: '{"blocks":["DEV-496"],"related":["DEV-471","DEV-481","DEV-495","DEV-496","DEV-497","DEV-498","DEV-499","DEV-500"]}'
+- at: 2026-11-13T22:22:24.765992+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T22:22:25.071471+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Todo
+- at: 2026-11-13T22:22:25.953231+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-13T22:48:26.891044+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T22:49:07.127412+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T22:49:14.507170+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

@@ -1,0 +1,33 @@
+title: 'Create harnessmux: a Rust crate and CLI that run agent CLI sessions over ACP'
+status: Todo
+priority: High
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-13T22:45:12.815612+00:00
+modified: 2026-11-13T22:45:24.603832+00:00
+relationships:
+  blocks:
+  - DEV-503
+  related:
+  - DEV-492
+  - DEV-503
+description: 'Approved design: docs/developers/harness-tool-design.md (DEV-492; on main once DEV-492 merges, until then on branch agent/DEV-492). The owner, 2026-11-13, approved it and chose "Start now" for this ticket, including creating the public GitHub repo. Create ~/Development/@localtaskrepo/harnessmux and the public repo localtaskrepo/harnessmux (MIT, like lotar; self-contained: set up, checked and run from a clone alone, shared configs from ~/Development/standards copied in). Build on ACP with the agent-client-protocol crate at its latest stable release (look it up, 5.2.0 on 2026-11-13). What it does, from the design: session registry with names; the session owner (lotar''s process or a harnessmux process) holds the ACP connection and serves a Unix socket (named pipe on Windows) for send, cancel, answer, set, status; resume via session/resume, fallback session/load; one mapping for model, effort and permissions (read-only, workspace, full); a versioned JSONL event stream; MCP servers per session; capabilities; the agent table (command, pinned adapter version, option ids) as TOML data read at run time. CLI: run, send, attach, resume, cancel, answer, set, list, status, close, capabilities, mcp. Agents: every one lotar runs today (claude, codex, copilot, gemini, cursor, amp without ACP as a legacy adapter, droid, opencode, kilo, antigravity); live-check Claude, Codex and Copilot (installed here), the rest from their docs, marked as not run live. Lessons from the acpx trial in the design doc: pin current adapters (codex-acp 1.x failed, 2.6.0 works), adapter errors sent as text become turn.failed. Tests from recorded ACP sessions; CI on macOS, Linux and Windows. Done when: the repo exists with README, LICENSE and CI passing, a first release of the crate and CLI is out, and a comment lists what ran live and what DEV-503 (the lotar switch) needs.'
+history:
+- at: 2026-11-13T22:45:13.018040+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-492","DEV-503"]}'
+- at: 2026-11-13T22:45:13.379613+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T22:45:24.603832+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-492","DEV-503"]}'
+    new: '{"blocks":["DEV-503"],"related":["DEV-492","DEV-503"]}'

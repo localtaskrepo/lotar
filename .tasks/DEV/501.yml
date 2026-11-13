@@ -1,0 +1,57 @@
+title: Review the agent job code that stays after the harnessmux switch
+status: Blocked
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-13T22:35:03.230572+00:00
+modified: 2026-11-13T22:45:44.254498+00:00
+relationships:
+  depends_on:
+  - DEV-503
+  related:
+  - DEV-492
+  - DEV-505
+description: 'The owner, 2026-11-13, on DEV-492: the agent code "is already a little older, and may have been written by less capable models"; he chose a review "After the switch". Wait for the change that links the harnessmux crate and removes lotar''s own runners and the t3 runner (docs/developers/harness-tool-design.md). Then review what stays in src/services/agent_job_service.rs (about 3200 non-test lines): queue, worktrees, landing, prompts, instructions, rules, reviewer and merge flow. Done when: findings fixed or filed as tickets, tests and smoke pass.'
+history:
+- at: 2026-11-13T22:35:03.413810+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-492"]}'
+- at: 2026-11-13T22:35:03.540638+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T22:35:13.889634+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-492"]}'
+    new: '{"depends_on":["DEV-492"],"related":["DEV-492"]}'
+- at: 2026-11-13T22:41:57.227439+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: Blocked
+- at: 2026-11-13T22:45:25.544782+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-492"],"related":["DEV-492"]}'
+    new: '{"related":["DEV-492"]}'
+- at: 2026-11-13T22:45:26.101543+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-492"]}'
+    new: '{"depends_on":["DEV-503"],"related":["DEV-492"]}'
+- at: 2026-11-13T22:45:44.254498+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"related":["DEV-492"]}'
+    new: '{"depends_on":["DEV-503"],"related":["DEV-492","DEV-505"]}'

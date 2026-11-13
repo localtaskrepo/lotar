@@ -1,0 +1,74 @@
+title: Windows CI runs its 40 selected tests without building the library's unit-test binary
+status: Reviewing
+priority: High
+type: Chore
+reporter: claude
+assignee: '@review'
+created: 2026-11-13T22:21:42.297785+00:00
+modified: 2026-11-13T22:49:26.704061+00:00
+relationships:
+  related:
+  - DEV-493
+comments:
+- date: 2026-11-13T22:49:13.685117+00:00
+  author: claude
+  text: 'Done in c0461ccb. The Windows-selected tests (storage::safety, utils::scan, automation_service async_run_monitor + windows_async_stdio: 41 incl. lotar-agent-wrapper) moved out of inline #[cfg(test)] modules into tests/storage_safety_test.rs, tests/utils_scan_test.rs and tests/automation_async_run_test.rs, compiled as their own small test binary windows_regressions (Cargo.toml [[test]]). Not into the integration binary: built from clean it costs as much as the lib unit-test build (37 s vs 37 s locally), and sccache can''t cache the incremental workspace crate on CI. Hooks made #[doc(hidden)] pub: safety::{atomic_write_file_with_io, is_lock_contention}, scan::{lock_source, write_source_with_prepared}, operations::before_task_write (now always compiled; one thread-local check per task write), automation_service::{BoundedTail, stderr_eof_within_grace, windows_async_stdio}. Windows step: --test windows_regressions --bin lotar-agent-wrapper, no --lib, no -E filter (whole targets); the manifest-vs-JUnit gate uses the same flags. Linux still runs everything (--lib --bins --tests). Contract test, tests/README.md and docs/developers/platform-test-verification.md updated. Timing, measured locally on the Mac (not CI), cargo clean -p lotar then cargo build --profile ci, then nextest --no-run for the step''s targets: before (--lib --bin lotar-agent-wrapper) 51.6 s, after (--test windows_regressions --bin lotar-agent-wrapper) 26.1 s. Nearly all of the remaining 26 s is a second library build: dev-dependencies (predicates, assert_cmd) turn on regex/bstr default features, so test targets can''t reuse the library from the ''Build binary'' step. Possible follow-up: line up those dependency features. Checks: npm run lint, npm test (2140 Rust + 1515 UI), npm run smoke (390) passed; selection run plus check-test-coverage.py OK (41 tests). Not run: Windows itself. A cross-check for x86_64-pc-windows-msvc fails here on ring''s C build (no Windows SDK headers), so the cfg(windows) test module and the now-ungated windows_async_stdio helpers compile only on CI. CI wall time after the change still needs a CI run.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0a7952ff-8d56-49c9-ab90-fa87a5b57230
+description: |-
+  The Windows CI job is the critical path in 71 of 88 green runs (DEV-493). Its longest step builds the whole lotar library as a unit-test binary (2m44 to 4m58) to run 40 tests that take 2 to 3 s. The owner, 2026-11-13: "Yes on all of those ideas. We really need to try and optimize the build and CI time. The faster tests can run, the cheaper it is to run them more often."
+
+  ## Context
+
+  - Step "Run storage safety, scan, and process regressions (nextest)" in `.github/workflows/ci.yml` runs `--lib --bin lotar-agent-wrapper` with the selectors `test(storage::safety::)`, `test(utils::scan::)`, `binary(lotar-agent-wrapper)`, `test(services::automation_service::windows_async_stdio_tests::)` and `test(services::automation_service::async_run_monitor_tests::)`.
+  - Measured locally (DEV-493): building the library's unit-test target takes 43 to 76 s. The integration test binary (`tests/integration.rs`, 52.8k lines) links against the normal library and takes 11.5 s.
+  - `tests/ci_windows_reporting_contract_test.rs` pins the selectors and the `--lib` flags. Update it along with the step.
+
+  ## Plan
+
+  - Move the Windows-selected tests out of the inline `#[cfg(test)]` modules into integration tests (`tests/`), or into a small test-only target. Add the narrowest public hooks they need (`#[doc(hidden)] pub` or a `testing` module) instead of making internals public wholesale.
+  - The Windows step then builds only the integration binary (or that target) with `--test integration`, with the same module-level selection and the manifest-vs-JUnit gate. Drop `--lib`.
+  - Keep the Linux job running everything.
+
+  ## Done when
+
+  - [ ] The Windows step no longer builds the library's unit-test target. The selected tests and the coverage gate still run on Windows.
+  - [ ] Wall time of the Windows job before and after, from a CI run or measured locally and marked as such.
+tags:
+- backend
+history:
+- at: 2026-11-13T22:21:42.485681+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-493"]}'
+- at: 2026-11-13T22:21:42.614712+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T22:21:42.988916+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T22:21:43.951553+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0a7952ff-8d56-49c9-ab90-fa87a5b57230
+- at: 2026-11-13T22:49:13.685117+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T22:49:26.704061+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
