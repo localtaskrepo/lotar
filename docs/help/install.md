@@ -115,6 +115,8 @@ Each [GitHub release](https://github.com/localtaskrepo/lotar/releases/latest) ha
 `linux-x64`, `linux-musl-x64`, `linux-musl-arm64`, `linux-musl-armv7`, `macos-arm64`, `macos-x64`,
 `windows-x64`, and `windows-arm64` (`linux-musl-armv7` and `windows-arm64` in releases after v0.12.0),
 each with a SHA-256 checksum file and a keyless Sigstore signature (`.sig`) and certificate (`.pem`).
+In releases after v0.14.3 the macOS binary is also signed with a Developer ID and notarized by
+Apple, so macOS keeps the firewall and file-access permissions you gave `lotar` when you upgrade.
 
 ```bash
 VERSION=v0.8.0   # pick the release you want

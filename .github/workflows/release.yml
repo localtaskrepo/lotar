@@ -316,7 +316,150 @@ jobs:
           $hash = (Get-FileHash -Path "out/$name.zip" -Algorithm SHA256).Hash
           "$hash  $name.zip" | Out-File -FilePath "out/$name.sha256" -Encoding ascii
 
+      # The macOS archives go to sign-macos first; only its signed copies are
+      # named release-* (DEV-482).
       - name: Upload build output
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ matrix.target == 'macos' && 'unsigned' || 'release' }}-${{ matrix.artifact }}
+          path: out/*
+          if-no-files-found: error
+          retention-days: 3
+
+  sign-macos:
+    name: Sign and notarize macOS (${{ matrix.artifact }})
+    # Signs the macOS binaries with the Developer ID certificate, so macOS keeps
+    # firewall and file-access grants across upgrades (DEV-482). Like
+    # build-and-release it runs no build code and only sees the archives.
+    needs: build
+    runs-on: macos-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        artifact: [macos-arm64, macos-x64]
+    permissions:
+      contents: read
+    env:
+      SIGN_IDENTITY: 'Developer ID Application: Ravi Gairola (3HKD37M482)'
+      TEAM_ID: 3HKD37M482
+      # Part of the designated requirement macOS grants are tied to: never change it.
+      BUNDLE_ID: net.pyxzl.lotar
+    steps:
+      - name: Check signing secrets
+        shell: bash
+        env:
+          P12: ${{ secrets.MACOS_DEVELOPER_ID_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_P12_PASSWORD }}
+          NOTARY_KEY: ${{ secrets.APPLE_NOTARY_KEY_P8_BASE64 }}
+          NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in P12 P12_PASSWORD NOTARY_KEY NOTARY_KEY_ID NOTARY_ISSUER_ID; do
+            if [ -z "${!name}" ]; then
+              missing=1
+            fi
+          done
+          if [ "$missing" = 1 ]; then
+            echo "::error::Missing macOS signing secrets (MACOS_DEVELOPER_ID_P12_BASE64, MACOS_DEVELOPER_ID_P12_PASSWORD, APPLE_NOTARY_KEY_P8_BASE64, APPLE_NOTARY_KEY_ID, APPLE_NOTARY_ISSUER_ID); see docs/release-guide.md. The release does not ship unsigned macOS archives."
+            exit 1
+          fi
+
+      - name: Download unsigned archive
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: unsigned-${{ matrix.artifact }}
+          path: unsigned
+
+      - name: Import Developer ID certificate
+        shell: bash
+        env:
+          P12: ${{ secrets.MACOS_DEVELOPER_ID_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_P12_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          keychain_password="$(uuidgen)"
+          echo "KEYCHAIN_PATH=$keychain" >> "$GITHUB_ENV"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          printf '%s' "$P12" | base64 --decode -o "$RUNNER_TEMP/developer-id.p12"
+          security import "$RUNNER_TEMP/developer-id.p12" -k "$keychain" -P "$P12_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/developer-id.p12"
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain" >/dev/null
+          security find-identity -v -p codesigning "$keychain" | grep -F "$SIGN_IDENTITY"
+
+      - name: Sign, notarize and re-pack
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+          ARTIFACT: ${{ matrix.artifact }}
+          NOTARY_KEY: ${{ secrets.APPLE_NOTARY_KEY_P8_BASE64 }}
+          NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          NAME="lotar-$TAG-$ARTIFACT"
+          (cd unsigned && shasum -a 256 --check "$NAME.sha256")
+          mkdir -p dist out
+          tar -xzf "unsigned/$NAME.tar.gz" -C dist lotar
+
+          codesign --force --options runtime --timestamp --identifier "$BUNDLE_ID" \
+            --keychain "$KEYCHAIN_PATH" --sign "$SIGN_IDENTITY" dist/lotar
+          codesign --verify --strict --verbose=2 dist/lotar
+          details="$(codesign -dvv dist/lotar 2>&1)"
+          echo "$details"
+          grep -qx "Identifier=$BUNDLE_ID" <<<"$details"
+          grep -qx "TeamIdentifier=$TEAM_ID" <<<"$details"
+          grep -q "flags=0x10000(runtime)" <<<"$details"
+
+          # notarytool takes a zip; a bare Mach-O can't be stapled, so
+          # Gatekeeper looks the ticket up online.
+          key="$RUNNER_TEMP/notary-key.p8"
+          printf '%s' "$NOTARY_KEY" | base64 --decode -o "$key"
+          ditto -c -k dist/lotar "$RUNNER_TEMP/$NAME.zip"
+          result="$(xcrun notarytool submit "$RUNNER_TEMP/$NAME.zip" \
+            --key "$key" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" \
+            --wait --output-format json)"
+          echo "$result"
+          status="$(jq -r .status <<<"$result")"
+          if [ "$status" != Accepted ]; then
+            id="$(jq -r .id <<<"$result")"
+            xcrun notarytool log "$id" --key "$key" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" || true
+            echo "::error::Notarization of $NAME ended with status $status"
+            exit 1
+          fi
+
+          # Gatekeeper's online lookup can lag the notarization a little.
+          # --type install, not execute: execute rejects a bare command-line binary as
+          # "does not seem to be an app" even when it is notarized.
+          for attempt in 1 2 3 4 5 6; do
+            if assessment="$(spctl --assess --type install -vv dist/lotar 2>&1)"; then
+              break
+            fi
+            [ "$attempt" = 6 ] && { echo "$assessment"; exit 1; }
+            sleep 10
+          done
+          echo "$assessment"
+          grep -q "source=Notarized Developer ID" <<<"$assessment"
+
+          COPYFILE_DISABLE=1 tar -czf "out/$NAME.tar.gz" -C dist lotar
+          (cd out && shasum -a 256 "$NAME.tar.gz" > "$NAME.sha256")
+          ls -l out
+
+      - name: Remove signing keychain
+        if: always()
+        shell: bash
+        run: |
+          if [ -n "${KEYCHAIN_PATH:-}" ]; then
+            security delete-keychain "$KEYCHAIN_PATH" || true
+          fi
+          rm -f "$RUNNER_TEMP/developer-id.p12" "$RUNNER_TEMP/notary-key.p8"
+
+      - name: Upload signed archive
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-${{ matrix.artifact }}
@@ -328,7 +471,8 @@ jobs:
     name: Sign and upload release assets
     # Holds the write token and the signing identity, and runs no build code:
     # it only signs what the build job produced and attaches it (DEV-291).
-    needs: build
+    # The macOS archives come from sign-macos, already Developer ID-signed.
+    needs: [build, sign-macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write

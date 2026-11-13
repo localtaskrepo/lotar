@@ -24,7 +24,9 @@ fn release_build_job_has_no_write_token_or_signing_identity() {
     assert!(install_cross.contains("--rev "), "{install_cross}");
 
     let sign = &release["jobs"]["build-and-release"];
-    assert_eq!(sign["needs"].as_str(), Some("build"));
+    // DEV-482: the macOS archives come from sign-macos.
+    let needs: Vec<_> = sign["needs"].as_sequence().unwrap().iter().filter_map(|n| n.as_str()).collect();
+    assert_eq!(needs, ["build", "sign-macos"]);
     assert_eq!(sign["permissions"]["id-token"].as_str(), Some("write"));
     for step in sign["steps"].as_sequence().unwrap() {
         let run = step["run"].as_str().unwrap_or_default();

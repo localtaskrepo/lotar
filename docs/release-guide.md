@@ -10,6 +10,8 @@ automation and the manual checks to run after every tag.
   `v` lands on `main` (for example `v0.6.3`).
 - **Artifacts produced**:
   - Signed tarballs/zips for every supported target, attached to the GitHub Release page.
+    The macOS binaries inside are also signed with the owner's Developer ID and notarized by
+    Apple; see [macOS Signing](#macos-signing).
   - Signed `.deb` and `.rpm` packages for x64 and arm64, plus a `.deb` for armv7 (armhf), built with nfpm from the static
     musl binaries (`packaging/nfpm.yaml`), attached to the same release.
   - npm packages: `@localtaskrepo/lotar` (a small Node launcher that installs the `lotar` command) and one `@localtaskrepo/lotar-<platform>`
@@ -93,6 +95,51 @@ tickets that waited for other tickets. To start one ticket's check by hand:
 4. Push the tag only after the Quality Assurance run for that commit has succeeded: the release job checks it
    ("Ensure QA succeeded") and fails, publishing nothing, while QA is still running (v0.13.0, 2026-11-11). Then
    `git tag -s vX.Y.Z -m vX.Y.Z` and `git push origin vX.Y.Z`.
+
+## macOS Signing
+
+`sign-macos` signs the binary in each macOS archive with the Developer ID Application
+certificate `Developer ID Application: Ravi Gairola (3HKD37M482)`, under the fixed
+identifier `net.pyxzl.lotar`, with the hardened runtime and a secure timestamp. It then has
+Apple notarize it. macOS ties firewall and file-access (TCC, Dropbox) grants to the
+signature's team ID and identifier, so with this signature an upgraded `lotar` keeps the
+grants of the version before. With the linker's ad-hoc signature every release was a new
+program to macOS, which asked again (DEV-482). Never change the identifier: users would
+lose their grants once more.
+
+A bare binary can't be stapled, so the notarization ticket is not in the archive; Gatekeeper
+looks it up online the first time the binary runs.
+
+The job fails when a secret is missing, so a release never ships unsigned macOS archives.
+
+### Secrets
+
+Set in the repository's **Settings → Secrets and variables → Actions**:
+
+| Secret | Contents | Where it comes from |
+| --- | --- | --- |
+| `MACOS_DEVELOPER_ID_P12_BASE64` | The Developer ID Application certificate with its private key, as a base64-encoded `.p12` | Keychain Access → My Certificates → the Developer ID Application certificate → Export as `.p12`, then `base64 -i developer-id.p12 \| pbcopy` |
+| `MACOS_DEVELOPER_ID_P12_PASSWORD` | The password set during that export | Chosen at export |
+| `APPLE_NOTARY_KEY_P8_BASE64` | An App Store Connect API key (`AuthKey_<id>.p8`), base64-encoded | App Store Connect → Users and Access → Integrations → Team Keys → generate a key with the Developer role (the `.p8` downloads only once), then `base64 -i AuthKey_<id>.p8 \| pbcopy` |
+| `APPLE_NOTARY_KEY_ID` | That key's Key ID | The Team Keys list |
+| `APPLE_NOTARY_ISSUER_ID` | The team's Issuer ID | Shown above the Team Keys list |
+
+The job imports the certificate into a temporary keychain and deletes it when it ends, even
+after a failure.
+
+### Renewing the certificate
+
+A Developer ID Application certificate is valid for five years. Releases signed before it
+expires keep working afterwards, because the signature carries a secure timestamp. Before it
+expires:
+
+1. In the Apple Developer account, under Certificates, create a new Developer ID Application
+   certificate (it needs the Account Holder role), and install it in the login keychain.
+2. Export it with its private key as a `.p12` and replace `MACOS_DEVELOPER_ID_P12_BASE64` and
+   `MACOS_DEVELOPER_ID_P12_PASSWORD`.
+
+The team ID and identifier stay the same, so the grants users gave survive the renewal. The
+notarization API key does not expire; replace its three secrets if it is revoked.
 
 ## One-Time npm Setup
 
@@ -192,6 +239,9 @@ publisher matching this repository and `release.yml`, or its configuration expir
 2. Monitor the **Release** workflow in GitHub Actions. The important jobs are:
    - `build`: compiles and packages each platform with a read-only token and no
      signing identity, and hands the archives to the next job as workflow artifacts.
+   - `sign-macos`: signs and notarizes the macOS binaries with the Developer ID and re-packs
+     their archives ([macOS Signing](#macos-signing)). It holds the Apple secrets and runs no
+     build code.
    - `build-and-release`: signs the archives with cosign and uploads them to the release.
      It holds the write token and the signing identity and runs no build code. The
      aarch64 cross build is pinned by commit (cross) and digest (`Cross.toml` image).
@@ -210,7 +260,10 @@ publisher matching this repository and `release.yml`, or its configuration expir
      checksums (uses the same token).
 3. Once the workflow finishes, check that GitHub shows a stable release as **Latest** and a
    prerelease as **Pre-release**.
-4. On this Mac, `brew upgrade lotar` and check that `lotar --version` prints the new version.
+4. On this Mac, `brew upgrade lotar` and check that `lotar --version` prints the new version,
+   and that `codesign -dvv /opt/homebrew/opt/lotar/bin/lotar` shows
+   `Authority=Developer ID Application: Ravi Gairola (3HKD37M482)`,
+   `Identifier=net.pyxzl.lotar` and `TeamIdentifier=3HKD37M482`.
    Then close the release ticket (`lotar status DEV-R Done`): that starts the checks of the
    [tickets waiting for it](#tickets-waiting-for-a-release). Create the next release's ticket.
 
@@ -268,7 +321,9 @@ What it does:
    (Homebrew on Linux) runners.
 2. Untaps and re-taps the requested repository/branch, installs LoTaR via Homebrew, runs
    the formula's `brew test`, then runs `lotar --version` to confirm the installation.
-3. Uses `file` to ensure the binary architecture matches the runner.
+3. Uses `file` to ensure the binary architecture matches the runner, and on macOS checks that
+   the binary carries the Developer ID signature (`Identifier=net.pyxzl.lotar`,
+   `TeamIdentifier=3HKD37M482`).
 4. Uploads Homebrew logs, the tapped repo, and the installed Cellar contents for post-run
    inspection.
 
@@ -308,8 +363,13 @@ Pull requests that change the install scripts run steps 1 and 2 against the late
 - **Scoop manifest issues**: The released manifest lives in
   `https://github.com/localtaskrepo/scoop-lotar`. When adjusting the JSON structure,
   re-run the manual Scoop workflow to confirm the package can still be installed.
+- **macOS signing failures**: `sign-macos` prints the notarization log when Apple rejects a
+  binary. To check a downloaded archive's binary by hand: `spctl -a -t install -vv lotar`
+  should say `accepted` and `source=Notarized Developer ID`. Use `-t install`: `-t execute`
+  rejects any command-line binary that isn't in an app bundle, notarized or not.
 - **Release workflow failures**: Re-run the failed job from the Actions tab. Make sure the
-  required secrets (`HOMEBREW_TAP_TOKEN`, Docker Hub creds) exist in the repository
+  required secrets (`HOMEBREW_TAP_TOKEN`, Docker Hub creds, the [macOS signing
+  secrets](#secrets)) exist in the repository
   settings before retrying. `publish-npm` needs no secret once trusted publishing is set up.
 
 With the release workflow and the three manual verification jobs, you can be confident the

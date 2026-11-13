@@ -180,6 +180,24 @@ jobs:
             exit 1
           fi
 
+      # The fixed Developer ID identity keeps macOS firewall and file-access
+      # grants across upgrades (DEV-482).
+      - name: Verify Developer ID signature (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          lotar_path="$(realpath "$(command -v lotar)")"
+          codesign --verify --strict --verbose=2 "$lotar_path"
+          details="$(codesign -dvv "$lotar_path" 2>&1)"
+          echo "$details"
+          for expected in "Identifier=net.pyxzl.lotar" "TeamIdentifier=3HKD37M482"; do
+            if ! grep -qx "$expected" <<<"$details"; then
+              echo "Signature mismatch: expected ${expected}" >&2
+              exit 1
+            fi
+          done
+
       - name: Upload install artifacts
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
