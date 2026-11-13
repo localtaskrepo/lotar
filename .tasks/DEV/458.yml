@@ -5,10 +5,15 @@ type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-13T08:17:43.162028+00:00
-modified: 2026-11-13T08:20:32.263794+00:00
+modified: 2026-11-13T08:26:39.235095+00:00
 relationships:
   related:
   - DEV-388
+  - DEV-400
+comments:
+- date: 2026-11-13T08:26:38.879005+00:00
+  author: claude
+  text: 'The open step needs nothing more: DEV-388''s plan made the dependent repo''s own events optional (''where cheap''), its agent found no cheap trigger, and lotar automation run (run daily in every repo by STD-56, kept fast by DEV-400) already fires the cross-repo unblocked rules. Said so in a comment on DEV-388; no files changed, no commit. Check: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar listed [untracked:DEV-388] before; this ticket goes WontDo so the finding is not filed again, as its Done-when says.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aba544abb-f870-44d7-a74a-523c76d91e8e
 description: |-
@@ -50,3 +55,13 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aba544abb-f870-44d7-a74a-523c76d91e8e
+- at: 2026-11-13T08:26:38.879005+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T08:26:39.235095+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-388"]}'
+    new: '{"related":["DEV-388","DEV-400"]}'

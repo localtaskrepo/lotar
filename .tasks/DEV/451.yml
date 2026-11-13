@@ -1,14 +1,21 @@
 title: 'Merged branch: agent/DEV-357'
-status: InProgress
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@fix-light'
 created: 2026-11-13T08:17:37.137471+00:00
-modified: 2026-11-13T08:20:18.860468+00:00
+modified: 2026-11-13T09:19:42.903670+00:00
 relationships:
   related:
   - DEV-357
+comments:
+- date: 2026-11-13T08:26:17.905214+00:00
+  author: claude
+  text: Deleted branch agent/DEV-357 with git branch -d (was f10a63c0). It was merged into main, had no commits outside main, and no worktree used it. The repos.ts check no longer lists branch:agent/DEV-357. No files changed, so there is no commit. Other merged branches (t3/*) are listed by the same check but belong to other tickets, so I left them.
+- date: 2026-11-13T09:19:42.772366+00:00
+  author: claude
+  text: 'claude: Filed by mistake: a manual repos.ts --report run on 2026-11-13 without --fix filed this safe-removal leftover as a ticket. repos.ts --fix removed it (or the fix agent did); the check no longer reports it. Closed, nothing else to do.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adfb3e495-092f-4c10-a30c-b131135b66f7
 description: |-
@@ -51,3 +58,17 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adfb3e495-092f-4c10-a30c-b131135b66f7
+- at: 2026-11-13T08:26:17.905214+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T09:19:42.772366+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T09:19:42.903670+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

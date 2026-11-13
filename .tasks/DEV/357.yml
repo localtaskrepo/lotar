@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T04:36:53.978265+00:00
-modified: 2026-11-13T08:17:37.389733+00:00
+modified: 2026-11-13T08:25:46.245058+00:00
 relationships:
   related:
   - DEV-355
@@ -13,6 +13,7 @@ relationships:
   - DEV-349
   - DEV-358
   - DEV-451
+  - DEV-435
 comments:
 - date: 2026-11-12T04:44:39.971934+00:00
   text: 'claude: Already fixed by DEV-349 (6910cc0); no code change, no commit. Cause: lotar status skips the auto-assign preview while a job runs for the ticket. Before DEV-349, any lotar-agent-wrapper process on the machine for TEST-1 counted, for example another worktree''s agent tests. The failing DEV-355 run used 7bd5c46, which doesn''t contain 6910cc0. Repro on agent/DEV-357 (f10a63c): with a lotar-agent-wrapper --ticket-id TEST-1 running without --tasks-dir (the pre-DEV-349 form), status_dry_run_explain fails at tests/cli_whoami_and_dryrun_test.rs:362, the same assertion. With the wrapper naming another --tasks-dir (how wrappers start now), it passes. Checks: cargo nextest run --cargo-profile local status_dry_run_explain passes alone and in a full nextest run (2001/2003 passed). The full run''s other failure is worker_persists_trailing_stderr_before_exit_and_summary, already tracked as DEV-358 (in progress). Remaining exposure: only a wrapper built before 6910cc0, for example a stale build in another worktree, still running a TEST-1 job.'
@@ -86,3 +87,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-355","TEST-1","DEV-349","DEV-358"]}'
     new: '{"related":["DEV-355","TEST-1","DEV-349","DEV-358","DEV-451"]}'
+- at: 2026-11-13T08:25:46.245058+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-355","TEST-1","DEV-349","DEV-358","DEV-451"]}'
+    new: '{"related":["DEV-355","TEST-1","DEV-349","DEV-358","DEV-451","DEV-435"]}'

@@ -1,11 +1,21 @@
 title: 'Leftover worktree: /Users/mallox/.t3/worktrees/lotar/t3-4b975f92-d6965800fb374df5'
-status: InProgress
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: claude
 created: 2026-11-13T08:17:28.182269+00:00
-modified: 2026-11-13T08:17:57.685678+00:00
+modified: 2026-11-13T09:19:00.097725+00:00
+relationships:
+  related:
+  - DEV-354
+comments:
+- date: 2026-11-13T08:25:00.324321+00:00
+  author: claude
+  text: 'Removed the worktree with git worktree remove. Nothing was lost: it had no changes (only ignored node_modules), its branch t3/fix-flaky-sse-test-timeouts is merged into main, and the T3 thread that used it (DEV-354) finished on 2026-11-12 with no active run. I left the merged branch in place. No files changed, so there is no commit. Check: repos.ts localtaskrepo/lotar no longer lists the worktree finding.'
+- date: 2026-11-13T09:18:59.833101+00:00
+  author: claude
+  text: 'claude: Filed by mistake: a manual repos.ts --report run on 2026-11-13 without --fix filed this safe-removal leftover as a ticket. repos.ts --fix removed it (or the fix agent did); the check no longer reports it. Closed, nothing else to do.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8188ffe3-626f-4df3-aca0-8eecdb287aaa
 description: |-
@@ -22,6 +32,8 @@ description: |-
   The worktree is removed (git worktree remove) and nothing in it was lost: its commits are merged or on a pushed branch, its uncommitted changes committed or dropped with the owner's OK. A worktree a tool still uses stays; say so in a comment and ask the owner (HelpNeeded) whether to keep it.
 tags:
 - health
+- blocked
+- 'blocked-by:dependency graph unavailable: Validation error: Validation error: Relationship snapshot unavailable: lock /Users/mallox/Development/@localtaskrepo/lotar/.tasks/@sprints/.sprints.lock is busy or unsupported: Resource temporarily unavailable (os error 35); still busy after the 500 ms snapshot wait budget; retry after the writer finishes'
 custom_fields:
   finding: worktree:/Users/mallox/.t3/worktrees/lotar/t3-4b975f92-d6965800fb374df5
 history:
@@ -41,3 +53,50 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8188ffe3-626f-4df3-aca0-8eecdb287aaa
+- at: 2026-11-13T08:25:00.324321+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T08:25:00.801784+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-354"]}'
+- at: 2026-11-13T09:04:00.314178+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-codex'
+  - field: tags
+    old: health
+    new: health, fix-retried
+- at: 2026-11-13T09:04:04.838880+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-codex'
+    new: claude
+  - field: tags
+    old: health, fix-retried
+    new: 'health, fix-retried, blocked, blocked-by:dependency graph unavailable: Validation error: Validation error: Relationship snapshot unavailable: lock /Users/mallox/Development/@localtaskrepo/lotar/.tasks/@sprints/.sprints.lock is busy or unsupported: Resource temporarily unavailable (os error 35); still busy after the 500 ms snapshot wait budget; retry after the writer finishes'
+- at: 2026-11-13T09:18:59.833101+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T09:19:00.038660+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done
+- at: 2026-11-13T09:19:00.097725+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: 'health, fix-retried, blocked, blocked-by:dependency graph unavailable: Validation error: Validation error: Relationship snapshot unavailable: lock /Users/mallox/Development/@localtaskrepo/lotar/.tasks/@sprints/.sprints.lock is busy or unsupported: Resource temporarily unavailable (os error 35); still busy after the 500 ms snapshot wait budget; retry after the writer finishes'
+    new: 'health, blocked, blocked-by:dependency graph unavailable: Validation error: Validation error: Relationship snapshot unavailable: lock /Users/mallox/Development/@localtaskrepo/lotar/.tasks/@sprints/.sprints.lock is busy or unsupported: Resource temporarily unavailable (os error 35); still busy after the 500 ms snapshot wait budget; retry after the writer finishes'

@@ -1,11 +1,21 @@
 title: 'Merged branch: t3/dev-340-undo-deferred-assignee'
-status: InProgress
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix-light'
+assignee: '@fix-codex'
 created: 2026-11-13T08:17:39.086121+00:00
-modified: 2026-11-13T08:20:18.986007+00:00
+modified: 2026-11-13T09:19:48.158442+00:00
+comments:
+- date: 2026-11-13T08:25:56.298001+00:00
+  author: claude
+  text: 'Deleted the merged branch with git branch -d (it was at 0c549ddd, already in main, no commits ahead, not checked out in any worktree). Recreate with: git branch t3/dev-340-undo-deferred-assignee 0c549ddd. No files changed, so no commit. Did not rerun repos.ts; the merge agent reruns it against the main checkout.'
+- date: 2026-11-13T09:04:05.648941+00:00
+  author: automation
+  text: The fix agent's job job-20261113T081739.722Z-35 failed (lotar agent logs job-20261113T081739.722Z-35); @fix-codex retries it on branch agent/DEV-454.
+- date: 2026-11-13T09:19:48.000504+00:00
+  author: claude
+  text: 'claude: Filed by mistake: a manual repos.ts --report run on 2026-11-13 without --fix filed this safe-removal leftover as a ticket. repos.ts --fix removed it (or the fix agent did); the check no longer reports it. Closed, nothing else to do.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A23df678b-639b-4e05-8099-7a78ed64b3bf
 description: |-
@@ -42,3 +52,36 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A23df678b-639b-4e05-8099-7a78ed64b3bf
+- at: 2026-11-13T08:25:56.298001+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T09:03:59.086999+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix-light'
+    new: '@fix-codex'
+  - field: tags
+    old: health, light
+    new: health, light, fix-retried
+- at: 2026-11-13T09:04:05.648941+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-13T09:19:48.000504+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T09:19:48.112363+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-11-13T09:19:48.158442+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, light, fix-retried
+    new: health, light

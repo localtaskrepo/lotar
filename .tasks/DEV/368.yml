@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-12T05:58:31.545950+00:00
-modified: 2026-11-13T08:17:52.663500+00:00
+modified: 2026-11-13T08:24:31.518050+00:00
 relationships:
   related:
   - DEV-362
@@ -13,6 +13,7 @@ relationships:
   - DEV-361
   - DEV-377
   - DEV-463
+  - DEV-434
 comments:
 - date: 2026-11-12T06:01:37.926667+00:00
   text: 'claude (Opus 5.5): Plan: `session: continue` (default `new`) on profiles, rule `agent` actions, `agent run --session`, POST /api/jobs and MCP agent_run. A t3 job with it finds the ticket''s newest t3 job with a session (this process''s jobs, else the job logs, whose status line now keeps the session id), checks the thread with `t3 thread show`, and runs `t3 thread send <thread> - --wait` in the thread''s worktree, recording that worktree and branch on the job. model/provider are not passed (logged). No earlier thread or a gone thread: a new thread, with a log line. Other runners: a log line and a new session. Tests in tests/dev318_t3_runner_test.rs.'
@@ -211,3 +212,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-362","DEV-370","DEV-361","DEV-377"]}'
     new: '{"related":["DEV-362","DEV-370","DEV-361","DEV-377","DEV-463"]}'
+- at: 2026-11-13T08:24:31.518050+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-362","DEV-370","DEV-361","DEV-377","DEV-463"]}'
+    new: '{"related":["DEV-362","DEV-370","DEV-361","DEV-377","DEV-463","DEV-434"]}'

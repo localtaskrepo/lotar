@@ -1,14 +1,21 @@
 title: 'Done with an open step no ticket tracks: DEV-378'
-status: InProgress
+status: WontDo
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@fix-codex'
 created: 2026-11-13T08:17:41.702047+00:00
-modified: 2026-11-13T08:21:02.470996+00:00
+modified: 2026-11-13T08:47:28.630016+00:00
 relationships:
   related:
   - DEV-378
+comments:
+- date: 2026-11-13T08:27:15.144528+00:00
+  author: claude
+  text: 'Nothing more to do for the flagged step. DEV-378''s ''Not done: main isn''t fast-forwarded, nothing is pushed, check not rerun'' was finished in its later comments: main pushed 8195112..ae839df, check rerun on main''s content. Its other leftover (LOCA-120..122 still InProgress with no job) is filed as LOCA-312 in the local repo, and DEV-378 has a comment saying so. No files changed, no commit. Check: repos.ts localtaskrepo/lotar still lists [untracked:DEV-378], since it reads the old comment; this ticket set to WontDo so the finding isn''t filed again.'
+- date: 2026-11-13T08:46:58.100310+00:00
+  author: automation
+  text: The fix agent's job job-20261113T081743.195Z-38 failed (lotar agent logs job-20261113T081743.195Z-38); @fix-codex retries it on branch agent/DEV-457.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab797b477-6db8-4bb4-b900-53508191d0f3
 description: |-
@@ -25,6 +32,7 @@ description: |-
   The open step is a ticket of its own, linked to the Done ticket (lotar task relationships add <new> <ID> --kind related), or the Done ticket is reopened when its own work is not finished. When the step needs nothing more (done, or dropped), say so in a comment and set this ticket WontDo: the finding is then not filed again.
 tags:
 - health
+- fix-retried
 custom_fields:
   finding: untracked:DEV-378
 history:
@@ -50,3 +58,26 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab797b477-6db8-4bb4-b900-53508191d0f3
+- at: 2026-11-13T08:27:15.144528+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T08:46:35.071329+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-codex'
+  - field: tags
+    old: health
+    new: health, fix-retried
+- at: 2026-11-13T08:46:58.100310+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-13T08:47:28.630016+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: WontDo

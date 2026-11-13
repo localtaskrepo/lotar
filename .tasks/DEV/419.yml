@@ -1,11 +1,11 @@
 title: 'Phone layout for Board and Tasks: one column at a time, rows instead of a table'
-status: InProgress
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-13T08:12:00.342661+00:00
-modified: 2026-11-13T08:15:59.780833+00:00
+modified: 2026-11-13T09:18:36.523556+00:00
 relationships:
   related:
   - DEV-418
@@ -13,6 +13,15 @@ comments:
 - date: 2026-11-13T08:15:59.780833+00:00
   author: claude
   text: 'Coordinating with DEV-418 (relationship chips in `BoardCardMeta`): compact cards reuse `BoardCardMeta` unchanged; card markup moves to a new `view/components/BoardCard.vue`. Whoever lands second rebases.'
+- date: 2026-11-13T09:09:55.698417+00:00
+  author: claude
+  text: 'Built in worktree `t3-4ce6a7ad` (uncommitted): `useCompactLayout` + Preferences setting (`lotar.preferences.layout.narrow`), `BoardCard.vue` shared by classic and compact boards, compact board (tabs, swipe, arrow keys, ⋯ Move-to sheet, grouping inside the column, Group/Sort in the filter panel), Tasks rows via CSS on `TaskTable` with a sort bar. Also fixed: card meta styles in `Board.vue` never reached `BoardCardMeta` (scoped CSS), so avatars, sprint chip colours and wrapping now apply. Checks so far: vue-tsc, oxlint, eslint, prettier, all 1510 UI tests, new smoke `ui.compact-layout` plus adapted board-groups/board-other/sprints-responsive/filter-autocomplete pass (installed binary). Next: smoke build, then `npm run lint`, `npm test`, `npm run smoke`.'
+- date: 2026-11-13T09:14:57.753217+00:00
+  author: claude
+  text: 'DEV-418 landed on local main as `ae7c8edd` (not pushed); its thread checked the relationship chips on compact cards at 390 px, light and dark, and they fit. Before landing DEV-419: rebase onto it. Expected conflicts: `view/pages/Board.vue` useColumns import (keep `BUILTIN_COLUMNS` plus `useCompactLayout`), and `docs/help/serve.md` Boards paragraph (keep both sentences). Then run `smoke/tests/ui.board-relationships.smoke.spec.ts`.'
+- date: 2026-11-13T09:18:36.381697+00:00
+  author: claude
+  text: 'Outcome: compact phone layout for Board and Tasks, as planned; Preferences > Narrow screens switches to Classic. Evidence: `npm run lint` ok, `npm test` ok (2126 Rust, 1510 UI), `npm run smoke` 386 of 386 after scoping the theme option in `ui.theming` (my new ''Classic'' option matched its /Classic/ locator). New: `view/components/BoardCard.vue`, `view/composables/useCompactLayout.ts`, `view/__tests__/useCompactLayout.spec.ts`, `smoke/tests/ui.compact-layout.smoke.spec.ts` (screenshots in `target/smoke-artifacts/compact-layout/`). Adapted mobile parts of board-groups (opts into Classic), board-other, sprints-responsive, filter-autocomplete. Docs: `docs/help/preferences.md#narrow-screens`, `docs/help/serve.md`. Remaining: uncommitted in worktree `t3-4ce6a7ad`; on the owner''s go-ahead commit, rebase onto DEV-418 (`ae7c8edd`, see the comment above) and land. Guidance: no durable finding.'
 references:
 - file: view/pages/Board.vue
 - file: view/components/TaskTable.vue
@@ -43,12 +52,12 @@ description: |-
 
   ## Done when
 
-  - [ ] Preference stored and shown in Preferences; Classic restores today's layout on narrow screens
-  - [ ] Board compact: tabs, swipe, cards, grouping, Move-to sheet, add-task
-  - [ ] Tasks compact: rows, sort, bulk select, row actions
-  - [ ] No horizontal page scroll at 390 px on both pages
-  - [ ] Vitest coverage for the composable; smoke specs at 390 px for both pages
-  - [ ] `npm run lint`, `npm test`, `npm run smoke` pass
+  - [x] Preference stored and shown in Preferences; Classic restores today's layout on narrow screens
+  - [x] Board compact: tabs, swipe, cards, grouping, Move-to sheet, add-task
+  - [x] Tasks compact: rows, sort, bulk select, row actions
+  - [x] No horizontal page scroll at 390 px on both pages
+  - [x] Vitest coverage for the composable; smoke specs at 390 px for both pages
+  - [x] `npm run lint`, `npm test`, `npm run smoke` pass
 
   ## Not in scope
 
@@ -92,3 +101,95 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-13T09:09:55.698417+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T09:14:57.753217+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T09:18:36.319085+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      On a phone the Board and the Tasks list are wider than the screen: board columns are at least 260 px wide (about 1.2 fit at 390 px) and the task table is about 1,570 px wide, so status, priority and assignee sit three screens to the right. The owner asked on 2026-11-13 for a more digestible phone layout, with a preference to keep the classic one.
+
+      ## Decisions (owner, 2026-11-13)
+
+      - Board on phones: **tabs + swipe**, one column at a time.
+      - Phones get the **compact layout by default**; Preferences switches back to Classic.
+      - File this ticket and build it.
+
+      ## Research
+
+      - Swiping one column at a time is the common phone board (Jira iOS/Android, Trello, GitScrum, SwiftKanban). Trello users asked for a way to jump to a column instead of swiping through each (TRELLO-1063), hence tabs.
+      - Drag and drop is fragile on touch (Jira JSWCLOUD-20716, SmartSuite feedback); Trello and Asana offer a "Move to" menu.
+      - GitHub Projects on mobile shows tables as a list with field pills; reading one task at a time suits rows-as-cards better than a wide table.
+      - Android treats < 600 dp as compact; lotar already uses a 640 px breakpoint.
+
+      ## Plan
+
+      - `Narrow screens: Compact / Classic` in Preferences (default Compact); a composable answers "compact now?" from `(max-width: 640px)` and the preference.
+      - **Board, compact:** status tabs with counts (and WIP warning) above one full-width column; tap a tab or swipe (CSS scroll snap) to change columns. Cards: ID, priority, assignee · title (2 lines) · meta line, honouring the card-field settings. Group by becomes collapsible sections inside the column. A ⋯ button on each card opens a sheet with "Move to <status>" and Open.
+      - **Tasks, compact:** rows instead of the table: ID, status, priority, updated · title · the other visible columns as a meta line. Sort control where the headers used to be; bulk select and row actions stay.
+      - Desktop and Classic stay unchanged.
+
+      ## Done when
+
+      - [ ] Preference stored and shown in Preferences; Classic restores today's layout on narrow screens
+      - [ ] Board compact: tabs, swipe, cards, grouping, Move-to sheet, add-task
+      - [ ] Tasks compact: rows, sort, bulk select, row actions
+      - [ ] No horizontal page scroll at 390 px on both pages
+      - [ ] Vitest coverage for the composable; smoke specs at 390 px for both pages
+      - [ ] `npm run lint`, `npm test`, `npm run smoke` pass
+
+      ## Not in scope
+
+      - The 13-item top navigation that also scrolls sideways on phones (own ticket).
+    new: |-
+      On a phone the Board and the Tasks list are wider than the screen: board columns are at least 260 px wide (about 1.2 fit at 390 px) and the task table is about 1,570 px wide, so status, priority and assignee sit three screens to the right. The owner asked on 2026-11-13 for a more digestible phone layout, with a preference to keep the classic one.
+
+      ## Decisions (owner, 2026-11-13)
+
+      - Board on phones: **tabs + swipe**, one column at a time.
+      - Phones get the **compact layout by default**; Preferences switches back to Classic.
+      - File this ticket and build it.
+
+      ## Research
+
+      - Swiping one column at a time is the common phone board (Jira iOS/Android, Trello, GitScrum, SwiftKanban). Trello users asked for a way to jump to a column instead of swiping through each (TRELLO-1063), hence tabs.
+      - Drag and drop is fragile on touch (Jira JSWCLOUD-20716, SmartSuite feedback); Trello and Asana offer a "Move to" menu.
+      - GitHub Projects on mobile shows tables as a list with field pills; reading one task at a time suits rows-as-cards better than a wide table.
+      - Android treats < 600 dp as compact; lotar already uses a 640 px breakpoint.
+
+      ## Plan
+
+      - `Narrow screens: Compact / Classic` in Preferences (default Compact); a composable answers "compact now?" from `(max-width: 640px)` and the preference.
+      - **Board, compact:** status tabs with counts (and WIP warning) above one full-width column; tap a tab or swipe (CSS scroll snap) to change columns. Cards: ID, priority, assignee · title (2 lines) · meta line, honouring the card-field settings. Group by becomes collapsible sections inside the column. A ⋯ button on each card opens a sheet with "Move to <status>" and Open.
+      - **Tasks, compact:** rows instead of the table: ID, status, priority, updated · title · the other visible columns as a meta line. Sort control where the headers used to be; bulk select and row actions stay.
+      - Desktop and Classic stay unchanged.
+
+      ## Done when
+
+      - [x] Preference stored and shown in Preferences; Classic restores today's layout on narrow screens
+      - [x] Board compact: tabs, swipe, cards, grouping, Move-to sheet, add-task
+      - [x] Tasks compact: rows, sort, bulk select, row actions
+      - [x] No horizontal page scroll at 390 px on both pages
+      - [x] Vitest coverage for the composable; smoke specs at 390 px for both pages
+      - [x] `npm run lint`, `npm test`, `npm run smoke` pass
+
+      ## Not in scope
+
+      - The 13-item top navigation that also scrolls sideways on phones (own ticket).
+- at: 2026-11-13T09:18:36.381697+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T09:18:36.523556+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T19:12:53.510074+00:00
-modified: 2026-11-13T08:17:51.061398+00:00
+modified: 2026-11-13T08:31:49.828629+00:00
 relationships:
   related:
   - DEV-378
@@ -22,6 +22,9 @@ comments:
 - date: 2026-11-12T19:32:34.767156+00:00
   author: claude
   text: 'claude: Merged and pushed. Rebased agent/DEV-380 onto main three times while main moved (DEV-378, DEV-379, then DEV-378 ticket updates), with no conflicts; fast-forwarded main to e874b97 and pushed it to origin (only this commit was unpushed; hooks ran). Checks in the worktree after rebasing onto DEV-379: npm run lint passed, npm test 2065/2065, npm run smoke 381/381; with XDG_RUNTIME_DIR pointed at an empty folder, neither run wrote anything there. The last rebase only brought ticket-file changes, so I didn''t rerun them. Health check in the main checkout: ~/Library/Caches/lotar/agent-queue had 13095 entries before npm test (2065/2065) and 13095 after, same names. The finding is gone. The main checkout''s .tasks had no uncommitted changes, so there was no Ticket updates commit. The existing leftovers stay until the owner answers DEV-381.'
+- date: 2026-11-13T08:31:49.828629+00:00
+  author: claude
+  text: 'claude, 2026-11-13: The step this ticket left open (the existing cache leftovers) is done in DEV-381: the owner approved, 13072 test leftovers were moved to the Trash, ~/Library/Caches/lotar/agent-queue now holds 35 entries.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adf680bc5-ab8b-4b5c-84db-43786c2d84fd
 description: |-
@@ -106,3 +109,7 @@ history:
   - field: relationships
     old: '{"related":["DEV-378","DEV-379","DEV-381"]}'
     new: '{"related":["DEV-378","DEV-379","DEV-381","DEV-462"]}'
+- at: 2026-11-13T08:31:49.828629+00:00
+  actor: claude
+  changes:
+  - field: comment_added

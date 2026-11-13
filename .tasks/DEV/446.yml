@@ -1,11 +1,21 @@
 title: 'Leftover worktree: /Users/mallox/.t3/worktrees/lotar/t3-b798c984-a0203974177e48f1'
-status: InProgress
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-13T08:17:34.413111+00:00
-modified: 2026-11-13T08:18:27.844417+00:00
+modified: 2026-11-13T09:19:32.790133+00:00
+relationships:
+  related:
+  - DEV-364
+comments:
+- date: 2026-11-13T08:25:49.905732+00:00
+  author: claude
+  text: 'Removed the worktree with git worktree remove. Nothing was lost: it was clean (only ignored node_modules/), HEAD 71cde544 is on main, no commits beyond main. Its T3 thread (DEV-364 job) is completed and settled, DEV-364 is Done, and no process had files open in it (lsof). Also deleted the merged branch t3/clean-agent-worktree-build-output (git branch -d). No files changed, so no commit. Check: repos.ts localtaskrepo/lotar no longer lists worktree:...t3-b798c984-a0203974177e48f1.'
+- date: 2026-11-13T09:19:32.637978+00:00
+  author: claude
+  text: 'claude: Filed by mistake: a manual repos.ts --report run on 2026-11-13 without --fix filed this safe-removal leftover as a ticket. repos.ts --fix removed it (or the fix agent did); the check no longer reports it. Closed, nothing else to do.'
 references:
 - link: mcp:15ecc1ce-72e4-4b05-ac3d-65ebe3c58585
 description: |-
@@ -41,3 +51,23 @@ history:
   changes:
   - field: reference_added
     new: link:mcp:15ecc1ce-72e4-4b05-ac3d-65ebe3c58585
+- at: 2026-11-13T08:25:49.905732+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T08:25:50.173582+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-364"]}'
+- at: 2026-11-13T09:19:32.637978+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T09:19:32.790133+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

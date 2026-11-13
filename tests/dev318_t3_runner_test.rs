@@ -21,8 +21,8 @@ use std::time::{Duration, Instant};
 /// `FAKE_T3_WORKTREE` as the thread's worktree, on branch `agent/from-t3`
 /// until the run renames it to `FAKE_T3_RENAME`, with the run's status
 /// from the `status` file (default `completed`), or fails with
-/// `FAKE_T3_GONE`, on claudeAgent's claude-opus-5-5; `thread send` records its arguments, folder and stdin
-/// and replies (DEV-368). `thread start` runs while a `hold` file exists.
+/// `FAKE_T3_GONE`, on claudeAgent's claude-opus-5-5; `thread send` records its arguments, folder and stdin,
+/// runs `FAKE_T3_SEND_RUN` and replies (DEV-368). `thread start` runs while a `hold` file exists.
 fn fake_t3(dir: &Path) -> PathBuf {
     let path = dir.join("fake-t3");
     let script = format!(
@@ -40,6 +40,7 @@ if [ "$1" = "thread" ] && [ "$2" = "send" ]; then
   printf '%s\n' "$@" > "$out/send.args"
   pwd -P > "$out/send.cwd"
   cat > "$out/send.stdin"
+  if [ -n "$FAKE_T3_SEND_RUN" ]; then sh -c "$FAKE_T3_SEND_RUN"; fi
   printf 'Merged it.\n'
   exit "${{FAKE_T3_EXIT:-0}}"
 fi
@@ -331,7 +332,9 @@ fn a_merge_job_runs_as_the_next_turn_of_the_fix_thread_in_its_worktree() {
     let worktree = repo.join("wt");
     git(&repo, &["worktree", "add", "-q", "-b", "agent/from-t3", worktree.to_str().unwrap()]);
     fs::write(worktree.join("fix.txt"), "fixed\n").unwrap();
-    git(&worktree, &["add", "fix.txt"]);
+    fs::create_dir_all(worktree.join(".tasks")).unwrap();
+    fs::write(worktree.join(".tasks/notes.txt"), "fix\n").unwrap();
+    git(&worktree, &["add", "-f", "fix.txt", ".tasks/notes.txt"]);
     git(&worktree, &["commit", "-qm", "fix"]);
 
     let env = format!("    env:\n      FAKE_T3_WORKTREE: \"{}\"\n", worktree.display());
@@ -364,6 +367,94 @@ fn a_merge_job_runs_as_the_next_turn_of_the_fix_thread_in_its_worktree() {
     assert!(repo.join("fix.txt").exists());
     let task = TaskService::get(&fixtures.create_storage(), &id, None).unwrap();
     assert_eq!(task.status.as_str(), "Done");
+}
+
+/// DEV-465: a merge job whose run fails, in a repository whose fix thread
+/// committed `fix.txt` and the ticket note `.tasks/notes.txt` on
+/// `agent/from-t3`. `land` runs in the main checkout
+/// as the merge agent's work; a failed merge tags the ticket merge-retried.
+fn failed_merge(land: &str) -> (TestFixtures, String, AgentJob) {
+    let fixtures = TestFixtures::new();
+    let repo = fixtures.get_temp_path().to_path_buf();
+    let git = |dir: &Path, args: &[&str]| {
+        let output = Command::new("git")
+            .args(["-c", "user.name=T", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false"])
+            .args(args)
+            .current_dir(dir)
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "git {args:?}: {output:?}");
+    };
+    fs::write(repo.join(".gitignore"), "home/\nt3-out/\nwt/\n.tasks/\n").unwrap();
+    git(&repo, &["init", "-q", "-b", "main"]);
+    git(&repo, &["add", "."]);
+    git(&repo, &["commit", "-qm", "init"]);
+    let worktree = repo.join("wt");
+    git(&repo, &["worktree", "add", "-q", "-b", "agent/from-t3", worktree.to_str().unwrap()]);
+    fs::write(worktree.join("fix.txt"), "fixed\n").unwrap();
+    fs::create_dir_all(worktree.join(".tasks")).unwrap();
+    fs::write(worktree.join(".tasks/notes.txt"), "fix\n").unwrap();
+    git(&worktree, &["add", "-f", "fix.txt", ".tasks/notes.txt"]);
+    git(&worktree, &["commit", "-qm", "fix"]);
+
+    let fix_env = format!("    env:\n      FAKE_T3_WORKTREE: \"{}\"\n", worktree.display());
+    let land = format!("cd '{}' && GIT_CONFIG_GLOBAL=/dev/null {land}", repo.display());
+    let merge_env = format!("{fix_env}      FAKE_T3_EXIT: \"1\"\n      FAKE_T3_SEND_RUN: \"{}\"\n", land.replace('"', "\\\""));
+    let _home = home_with_follow_up(&fixtures, &fix_env, "merge", &merge_env);
+    let rules = fs::read_to_string(fixtures.tasks_root.join("automation.yml")).unwrap();
+    let retry = "    - name: Merge failed\n      when:\n        assignee: \"@merge\"\n      on:\n        job_failed:\n          add:\n            tags: [merge-retried]\n";
+    fs::write(fixtures.tasks_root.join("automation.yml"), format!("{rules}{retry}")).unwrap();
+    fixtures.create_config_in_dir(&fixtures.tasks_root, &format!("{REPO_CONFIG}agent:\n  worktree:\n    enabled: true\n"));
+
+    let id = create(&fixtures, "Merge that fails", None);
+    assert_eq!(wait_for_finished_agent_job(&id, "fix").status, "completed");
+    let merge = wait_for_finished_agent_job(&id, "merge");
+    (fixtures, id, merge)
+}
+
+#[test]
+fn a_merge_job_that_fails_after_its_branch_reached_main_completes() {
+    // Rebased onto main, as the merge agent does: a copy of the fix commit.
+    let (fixtures, id, merge) = failed_merge("git -c user.name=T -c user.email=t@example.com -c commit.gpgsign=false cherry-pick agent/from-t3");
+    assert_eq!(merge.status, "completed", "{merge:?}: {:?}", messages(&merge));
+    let note = "The t3 runner exited with code 1, but agent/from-t3 is in the main checkout's current branch already: the merge job completed";
+    assert!(messages(&merge).contains(&note.to_string()), "{:?}", messages(&merge));
+    let task = TaskService::get(&fixtures.create_storage(), &id, None).unwrap();
+    assert_eq!(task.status.as_str(), "Done");
+    assert!(task.tags.is_empty(), "no merge retry: {:?}", task.tags);
+}
+
+#[test]
+fn a_merge_job_that_fails_after_its_branch_reached_main_with_amended_tasks_completes() {
+    // QIS-180: the merge amended ticket changes into the landed commit, so
+    // `git cherry` sees no copy and the tasks directory conflicts.
+    let git = "git -c user.name=T -c user.email=t@example.com -c commit.gpgsign=false";
+    let land =
+        format!("{git} cherry-pick agent/from-t3 && echo merged > .tasks/notes.txt && {git} add -f .tasks/notes.txt && {git} commit -q --amend --no-edit");
+    let (fixtures, id, merge) = failed_merge(&land);
+    assert_eq!(merge.status, "completed", "{merge:?}: {:?}", messages(&merge));
+    let task = TaskService::get(&fixtures.create_storage(), &id, None).unwrap();
+    assert_eq!(task.status.as_str(), "Done");
+    assert!(task.tags.is_empty(), "no merge retry: {:?}", task.tags);
+}
+
+#[test]
+fn a_merge_job_that_fails_with_only_its_tasks_changes_on_main_fails() {
+    let git = "git -c user.name=T -c user.email=t@example.com -c commit.gpgsign=false";
+    let (fixtures, id, merge) = failed_merge(&format!("echo merged > .tasks/notes.txt && {git} add -f .tasks/notes.txt && {git} commit -qm notes"));
+    assert_eq!(merge.status, "failed", "{merge:?}: {:?}", messages(&merge));
+    let task = TaskService::get(&fixtures.create_storage(), &id, None).unwrap();
+    assert_eq!(task.tags, ["merge-retried"]);
+}
+
+#[test]
+fn a_merge_job_that_fails_before_its_branch_reached_main_fails() {
+    let (fixtures, id, merge) = failed_merge("true");
+    assert_eq!(merge.status, "failed", "{merge:?}: {:?}", messages(&merge));
+    let task = TaskService::get(&fixtures.create_storage(), &id, None).unwrap();
+    assert_ne!(task.status.as_str(), "Done");
+    assert_eq!(task.tags, ["merge-retried"]);
 }
 
 #[test]
@@ -465,7 +556,9 @@ fn ticket_with_unmerged_work(fixtures: &TestFixtures, profile_extra: &str) -> (H
     let worktree = repo.join("wt");
     git(&repo, &["worktree", "add", "-q", "-b", "agent/from-t3", worktree.to_str().unwrap()]);
     fs::write(worktree.join("fix.txt"), "fixed\n").unwrap();
-    git(&worktree, &["add", "fix.txt"]);
+    fs::create_dir_all(worktree.join(".tasks")).unwrap();
+    fs::write(worktree.join(".tasks/notes.txt"), "fix\n").unwrap();
+    git(&worktree, &["add", "-f", "fix.txt", ".tasks/notes.txt"]);
     git(&worktree, &["commit", "-qm", "fix"]);
 
     let profile_extra = format!("    env:\n      FAKE_T3_WORKTREE: \"{{WT}}\"\n{profile_extra}").replace("{WT}", worktree.to_str().unwrap());

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T05:21:54.615269+00:00
-modified: 2026-11-13T08:17:47.616717+00:00
+modified: 2026-11-13T08:30:37.996308+00:00
 relationships:
   depends_on:
   - DEV-372
@@ -19,6 +19,8 @@ relationships:
   - DEV-375
   - DEV-396
   - DEV-460
+  - DEV-423
+  - DEV-446
 comments:
 - date: 2026-11-12T05:24:07.203106+00:00
   text: 'claude: the owner approved the fix in Fix (2026-11-11). Build it as described; the space is already freed (see Cleanup done). Reporter thread: the pyxzl.net link reference. The lotar thread that filed this tells the reporter when it is released.'
@@ -42,6 +44,9 @@ comments:
 - date: 2026-11-12T09:45:04.710827+00:00
   author: claude
   text: 'claude: nothing to merge. This thread''s branch has no commits beyond main (git log main..HEAD is empty); the fix landed earlier as 66c7060 and shipped in v0.14.0, and the release check passed (comment above). No checks ran, nothing merged or pushed. Still open: telling the reporter thread (pyxzl.net) the version 0.14.0.'
+- date: 2026-11-13T08:30:37.996308+00:00
+  author: claude
+  text: 'Reporter thread told 2026-11-13 (from DEV-460): sent the thread ''Split Repo Binaries to Skip CI Builds'' (t3-thread b51ca0ac) the release v0.14.0, fix 66c7060, what the cleanup_paths setting does and that T3 thread worktrees are STD-41''s. The last done item is finished; nothing remains open.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa38f4398-ffb1-4376-9c12-47e5507a143c
 - link: t3-thread://v2/d834978d-9e75-43fb-ba01-45747238fc44/b51ca0ac-1980-485f-a905-ffe6a2c807e5
@@ -396,3 +401,19 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-372"],"related":["DEV-343","DEV-358","DEV-366","DEV-370","DEV-369","DEV-373","DEV-375","DEV-396"]}'
     new: '{"depends_on":["DEV-372"],"related":["DEV-343","DEV-358","DEV-366","DEV-370","DEV-369","DEV-373","DEV-375","DEV-396","DEV-460"]}'
+- at: 2026-11-13T08:25:14.022962+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-372"],"related":["DEV-343","DEV-358","DEV-366","DEV-370","DEV-369","DEV-373","DEV-375","DEV-396","DEV-460"]}'
+    new: '{"depends_on":["DEV-372"],"related":["DEV-343","DEV-358","DEV-366","DEV-370","DEV-369","DEV-373","DEV-375","DEV-396","DEV-460","DEV-423"]}'
+- at: 2026-11-13T08:25:50.171978+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-372"],"related":["DEV-343","DEV-358","DEV-366","DEV-370","DEV-369","DEV-373","DEV-375","DEV-396","DEV-460","DEV-423"]}'
+    new: '{"depends_on":["DEV-372"],"related":["DEV-343","DEV-358","DEV-366","DEV-370","DEV-369","DEV-373","DEV-375","DEV-396","DEV-460","DEV-423","DEV-446"]}'
+- at: 2026-11-13T08:30:37.996308+00:00
+  actor: claude
+  changes:
+  - field: comment_added

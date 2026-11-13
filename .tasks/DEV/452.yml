@@ -1,11 +1,21 @@
 title: 'Merged branch: t3/agent-summary-job-end-handoff'
-status: InProgress
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@fix-light'
 created: 2026-11-13T08:17:37.927298+00:00
-modified: 2026-11-13T08:20:23.089915+00:00
+modified: 2026-11-13T09:19:44.497787+00:00
+relationships:
+  related:
+  - DEV-341
+comments:
+- date: 2026-11-13T08:26:19.122578+00:00
+  author: claude
+  text: Deleted branch t3/agent-summary-job-end-handoff with git branch -d (was 22b7e26a, DEV-341). git branch --contains showed the commit is in main, and no worktree had the branch checked out. Branch refs are shared, so the delete applies to the main checkout too. The repos.ts check no longer lists it. No files changed, so there is no commit.
+- date: 2026-11-13T09:19:44.364771+00:00
+  author: claude
+  text: 'claude: Filed by mistake: a manual repos.ts --report run on 2026-11-13 without --fix filed this safe-removal leftover as a ticket. repos.ts --fix removed it (or the fix agent did); the check no longer reports it. Closed, nothing else to do.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A19ee9fbc-a063-47f5-ad43-b893e06edbb8
 description: |-
@@ -42,3 +52,23 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A19ee9fbc-a063-47f5-ad43-b893e06edbb8
+- at: 2026-11-13T08:26:19.122578+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T08:26:19.562637+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-341"]}'
+- at: 2026-11-13T09:19:44.364771+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T09:19:44.497787+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

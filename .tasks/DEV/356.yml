@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-12T04:24:49.286137+00:00
-modified: 2026-11-12T08:49:42.468181+00:00
+modified: 2026-11-13T08:27:24.682357+00:00
 relationships:
   related:
   - DEV-351
@@ -19,6 +19,7 @@ relationships:
   - DEV-359
   - DEV-361
   - DEV-342
+  - DEV-443
 comments:
 - date: 2026-11-12T04:43:07.389692+00:00
   text: 'claude: Fixed in 5fe75f2 on agent/DEV-356 (test-only change). Cause: a job''s status turns completed/failed before its job_completed rules run (finalize writes the status log, then calls AutomationService::apply_job_event). The test''s wait_for_finished_job slept a fixed 300 ms after the status change and then read the ticket; under load the rule''s Done came later. Fix: wait_for_finished_job now also waits until the job''s active-job record is gone (agent_active_jobs::find is None). That record is removed at the end of apply_job_event, after the rules ran. The fixed sleep is gone. This covers all five tests in dev318_t3_runner_test.rs. Reproduced: with a temporary 1 s sleep before apply_job_event, the old test failed exactly as reported (line 152, Todo vs Done); the new test passed all 4 dev318 tests. The delay was reverted. Check: 30 of 30 runs with --retries 0 passed while npm run test:rust ran next to them. That full run stopped early on cli_agent_check_test with ''has an active agent job (pid N)'' for TEST-1: another worktree''s older-build lotar-agent-wrapper without --tasks-dir, which DEV-349 still counts on purpose (noted in its comment), so I didn''t file it again. Later checks: npm run test:rust -- --no-fail-fast 2003/2003; npm run lint passed; test:ui 1444/1444, test:release and test:hooks passed; smoke 377/378: ui.keyboard-shortcuts failed once (already DEV-355) and passed 2/2 on rerun. Guidance: no durable finding.'
@@ -188,3 +189,9 @@ history:
   - field: assignee
     old: mallox
     new: claude
+- at: 2026-11-13T08:27:24.682357+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-351","DEV-349","DEV-355","TEST-1","DEV-360","DEV-348","DEV-352","DEV-354","DEV-359","DEV-361","DEV-342"]}'
+    new: '{"related":["DEV-351","DEV-349","DEV-355","TEST-1","DEV-360","DEV-348","DEV-352","DEV-354","DEV-359","DEV-361","DEV-342","DEV-443"]}'

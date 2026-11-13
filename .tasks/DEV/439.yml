@@ -1,11 +1,21 @@
 title: 'Leftover worktree: /Users/mallox/.t3/worktrees/lotar/t3-8733a9a1-461570560c0535d1'
-status: InProgress
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-13T08:17:32.047991+00:00
-modified: 2026-11-13T08:19:04.552952+00:00
+modified: 2026-11-13T09:19:15.213908+00:00
+relationships:
+  related:
+  - DEV-344
+comments:
+- date: 2026-11-13T08:25:07.436477+00:00
+  author: claude
+  text: 'Removed worktree /Users/mallox/.t3/worktrees/lotar/t3-8733a9a1-461570560c0535d1 (git worktree remove) and deleted its branch t3/board-column-drag-fix (git branch -d, was 8fbdc688). Nothing was lost: 8fbdc688 is an ancestor of main, there were no commits past main and no uncommitted changes (only ignored node_modules). The T3 thread that used it (DEV-344 board column drag) finished and settled on 2026-11-12, so no tool still uses it. Check: repos.ts localtaskrepo/lotar no longer lists the finding. No files changed, so no commit.'
+- date: 2026-11-13T09:19:15.097011+00:00
+  author: claude
+  text: 'claude: Filed by mistake: a manual repos.ts --report run on 2026-11-13 without --fix filed this safe-removal leftover as a ticket. repos.ts --fix removed it (or the fix agent did); the check no longer reports it. Closed, nothing else to do.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6db59174-761b-4eb6-95ba-227656756864
 description: |-
@@ -41,3 +51,23 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6db59174-761b-4eb6-95ba-227656756864
+- at: 2026-11-13T08:25:07.436477+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T08:25:07.699193+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-344"]}'
+- at: 2026-11-13T09:19:15.097011+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T09:19:15.213908+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

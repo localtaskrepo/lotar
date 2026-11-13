@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T20:50:49.799402+00:00
-modified: 2026-11-13T08:17:43.613406+00:00
+modified: 2026-11-13T08:26:38.330622+00:00
 relationships:
   depends_on:
   - DEV-385
@@ -32,6 +32,9 @@ comments:
 - date: 2026-11-12T23:08:47.724761+00:00
   author: claude
   text: 'claude: Merged and pushed. The branch was already on main (e405802), so no rebase was needed. main fast-forwarded to f16bbda (DEV-388 Unblocked hook for prerequisites in another repo), then f0b34c3 (DEV-388 Ticket updates, the pending .tasks changes); pushed e405802..f0b34c3 to origin/main, pre-push hook passed. Checks in the worktree before the merge: lint, test (2107 Rust, 1503 UI, release and hook scripts), smoke (384), all pass.'
+- date: 2026-11-13T08:26:38.330622+00:00
+  author: claude
+  text: 'Dropped, no follow-up: the ''dependent repo''s own events'' step was optional in the plan (''where cheap''), and there is no cheap trigger. The dependent repo still gets its unblocked rules through lotar automation run, which STD-56 runs daily in every repo (see DEV-400). Recorded by DEV-458.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A17cafb4c-9478-44d7-a563-ba3bd10c3bf5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A53509f36-6904-4ae5-b2e0-4c118df9483b
@@ -241,3 +244,7 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-385","DEV-386"],"related":["DEV-374","DEV-389","DEV-399","DEV-400"]}'
     new: '{"depends_on":["DEV-385","DEV-386"],"related":["DEV-374","DEV-389","DEV-399","DEV-400","DEV-458"]}'
+- at: 2026-11-13T08:26:38.330622+00:00
+  actor: claude
+  changes:
+  - field: comment_added

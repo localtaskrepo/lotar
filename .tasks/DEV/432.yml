@@ -1,11 +1,21 @@
 title: 'Leftover worktree: /Users/mallox/.t3/worktrees/lotar/t3-4fd63b88-45c31edb975c2d73'
-status: InProgress
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-13T08:17:28.761822+00:00
-modified: 2026-11-13T08:18:21.139392+00:00
+modified: 2026-11-13T09:19:02.267440+00:00
+relationships:
+  related:
+  - DEV-349
+comments:
+- date: 2026-11-13T08:25:05.893484+00:00
+  author: claude
+  text: 'Removed worktree /Users/mallox/.t3/worktrees/lotar/t3-4fd63b88-45c31edb975c2d73 (git worktree remove) and deleted its branch t3/scope-agent-wrapper-job-check with git branch -d (tip 6910cc07, DEV-349, already in main). Before removing: git status --ignored showed nothing beyond build output, no commits ahead of main, no open processes (lsof), and its T3 thread (DEV-349) was completed and settled with no active run. No files changed, so there is no commit. Check: repos.ts localtaskrepo/lotar no longer lists the finding.'
+- date: 2026-11-13T09:19:02.128461+00:00
+  author: claude
+  text: 'claude: Filed by mistake: a manual repos.ts --report run on 2026-11-13 without --fix filed this safe-removal leftover as a ticket. repos.ts --fix removed it (or the fix agent did); the check no longer reports it. Closed, nothing else to do.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aaa5a1c08-7614-455f-8ac9-d1d4f0a26de1
 description: |-
@@ -41,3 +51,23 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aaa5a1c08-7614-455f-8ac9-d1d4f0a26de1
+- at: 2026-11-13T08:25:05.893484+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T08:25:06.268966+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-349"]}'
+- at: 2026-11-13T09:19:02.128461+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T09:19:02.267440+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

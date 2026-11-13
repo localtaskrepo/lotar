@@ -1,0 +1,223 @@
+title: A failed merge job sends the ticket to fix although its work already reached main
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-13T09:15:11.355311+00:00
+modified: 2026-11-13T10:05:40.356033+00:00
+relationships:
+  related:
+  - DEV-352
+comments:
+- date: 2026-11-13T09:15:23.656362+00:00
+  author: claude
+  text: 'claude: filed from the QIS-180 review. No QIS-side relationship possible across projects; QIS-180''s comment links here.'
+- date: 2026-11-13T09:28:34.956070+00:00
+  author: claude
+  text: 'Done in ca054282. A merge job whose runner fails (crash, T3 Code unreachable) now completes when its branch is on main already (the existing branch_landed check: git cherry patch-equivalent, reworked or recorded landing) and its worktree has no uncommitted changes. So job_completed rules run (Merging -> Done) instead of ''Merge failed: retry with @fix''. The job log says why: ''The t3 runner exited with code 1, but <branch> is in the main checkout''s current branch already: the merge job completed''. Built into finalize_job (src/services/agent_job_service.rs, merged_despite_failure), so the shared automation rules need no change. Tests: tests/dev318_t3_runner_test.rs a_merge_job_that_fails_after_its_branch_reached_main_completes (merge agent cherry-picks the fix onto main, then its run exits 1: job completed, ticket Done, no merge-retried tag; failed before the fix) and a_merge_job_that_fails_before_its_branch_reached_main_fails (still fails and gets the retry tag). Docs: docs/help/agent.md merge-job paragraph. Checks: npm run lint:agent clean, npm test (Rust 2128, UI 1510, release 47, hooks 7 passed), npm run smoke (386 passed). Not covered: update_job_failure (a job that fails before its runner starts) keeps failing; it can''t have merged anything.'
+- date: 2026-11-13T09:29:52.611789+00:00
+  author: codex
+  text: 'Review: blocking. src/services/agent_job_service.rs:3206 calls branch_landed, whose whole-tree comparison at 1995-2018 includes .tasks. Reproduced in an isolated Git repo: cherry-pick a commit with code and .tasks changes, amend only .tasks on main: git cherry reports +, merge-tree conflicts, while diff excluding .tasks is empty. The original incident therefore still fails recovery. Fix by comparing landed work excluding .tasks and add that regression. tests/dev318_t3_runner_test.rs:416 tests an unchanged cherry-pick only. Read ticket/comments, relationships (none), diff, surrounding landing/finalization code, guidance and recent main history of touched files; docs/decisions absent. git diff --check passed. Focused Rust tests and lint failed to start Rust checks because sccache was denied Operation not permitted; preceding frontend lint checks passed. Full tests/smoke not rerun. No files changed or commits; status/assignee unchanged. No minor tickets.'
+- date: 2026-11-13T09:54:50.143184+00:00
+  author: claude
+  text: 'Rework of review finding (branch_landed compares .tasks too): fixed. New merged_landed (src/services/agent_job_service.rs) = branch_landed, or branch_landed_outside: merges the branch into HEAD or a candidate commit since the fork with merge-tree --write-tree (conflict exit 1 accepted) and requires no difference outside the tasks dir (path of tasks_dir relative to the repo root). A branch with no changes outside .tasks doesn''t count as landed. Used by merged_despite_failure and by ensure_branch_merged, which otherwise failed the same job afterwards (found by the new test). Tests in tests/dev318_t3_runner_test.rs: the fix commit now also changes .tasks/notes.txt; new a_merge_job_that_fails_after_its_branch_reached_main_with_amended_tasks_completes (cherry-pick, then amend .tasks/notes.txt on main: git cherry +, merge-tree conflict) fails without the change and passes with it; new a_merge_job_that_fails_with_only_its_tasks_changes_on_main_fails. docs/help/agent.md merge paragraph updated. Amended commit af60ab9c (signed). Checks: npm run lint clean, npm run test:agent (Rust 2130, UI 1510, release 47, hooks 7 passed), npm run smoke (386 passed).'
+- date: 2026-11-13T09:57:01.845862+00:00
+  author: codex
+  text: 'Review: passed. Reviewed af60ab9c diff, ticket/comments, relationships (none), guidance, recent main history, landing checks and finalization. Prior blocking finding is fixed by tasks-excluding comparison in both recovery and merge verification, with amended-task conflict regression. No findings or minor tickets. Focused Rust tests: 21 passed after elevated retry; git diff --check passed. Frontend lint passed; backend lint blocked by sccache permissions. Full tests/smoke not rerun. docs/decisions absent. No files/commits/status/assignee changed; no durable guidance finding.'
+- date: 2026-11-13T10:02:47.006549+00:00
+  author: codex
+  text: 'Merge blocked by required smoke check: tests/ui.relationships.smoke.spec.ts:421, Dependencies Preferences visibility test, locator.uncheck timed out after 30000ms clicking the Dependencies checkbox (385 passed, 1 failed). Per merge instructions no merge or push performed. Branch af60ab9c already based on main ae7c8edd; no conflicts or edits. npm run lint:agent passed; npm run test:agent passed (2130 Rust, 1510 UI, 47 release, 7 hooks). All checks finished. Should an agent investigate the failing smoke test before retrying this merge?'
+- date: 2026-11-13T10:04:23.876596+00:00
+  author: triage
+  text: 'Triage: no decision needed. Branch commit af60ab9c is already on lotar main (git branch --contains af60ab9c: main; main is 2 ahead of origin/main, not pushed yet), so the merge blocked on the smoke failure has happened anyway and nothing is left to retry or investigate for this ticket. Done criteria checked: the four a_merge_job_that_fails_* tests exist in tests/dev318_t3_runner_test.rs and pass (cargo nextest run --test integration a_merge_job_that_fails: 4 passed). The failing smoke test (smoke/tests/ui.relationships.smoke.spec.ts, Dependencies Preferences checkbox uncheck timeout) is not touched by DEV-465 and belongs to the known flaky relationships smoke family (DEV-352); if it fails again on its own, file it as a separate flaky-smoke ticket. Source: git history of lotar main and the ticket comments of 2026-11-13. The only open step is the owner''s push of main.'
+- date: 2026-11-13T10:04:44.441468+00:00
+  author: codex
+  text: 'Confirmed triage: main contains af60ab9c and is two commits ahead of its upstream. The implementation is already landed; no code change, commit, merge, push or test rerun is needed this turn. Prior full lint and unit checks passed; triage reports all four failed-merge regression tests passed. The unrelated relationships smoke timeout remains associated with DEV-352. Returning to HelpNeeded / mallox as explicitly instructed for a comment requiring no change; owner push remains outstanding.'
+- date: 2026-11-13T10:05:39.645126+00:00
+  author: triage
+  text: 'Triage: no owner action left. The work is done and on main (af60ab9c, reviewed and passed; the smoke failure is the unrelated DEV-352 family). The push of main is not his to hold: he decided on 2026-11-11 that agents push and release lotar without asking (standards docs/decisions/2026-11-11-repo-health.md, repos.json lotar push true), and on 2026-11-12 that finished commits are pushed once the main checkout holds no unfinished work (docs/decisions/2026-11-12-push-finished-work.md). Main is 2 ahead of origin (ae7c8edd, af60ab9c), both finished work: push them and close this ticket. Same answer as INBOX-22 on 2026-11-13.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A65342ba7-3138-4700-af1b-bdaafd84f224
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7bc31399-fd38-46c1-904e-b81c06b6d728
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6c6f7706-57c7-4e71-b748-c6b72c66c2e9
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad235e56b-5c16-4772-a251-4b16ae279f39
+description: |-
+  ## Found
+  QIS-180 (quarter-inch-studio, https://qis.pyxzl.net/task/QIS-180): the merge agent rebased the fix, fast-forwarded main and pushed it as 66762e5 (on origin/main). Its job then failed for an infrastructure reason (job-20261113T081737.047Z-10: "Could not reach the T3 Code server at http://127.0.0.1:3773", runner exit 1). The automation treated that as a failed merge: tag merge-retried, back to @fix. The fix retry also failed (job-20261113T084742.566Z-14: T3 server SQLite "database is locked"), then @fix-codex found nothing to do, and the ticket came back to review with agent/QIS-180 still at the pre-rebase commit 527682e, a duplicate of 66762e5. Two agent runs and a review went to work that was already on main.
+
+  ## Check
+  After a merge job fails, look whether the ticket's branch commits are already on main (the branch's diff outside .tasks is already in main: git cherry is not enough, because the merge amends .tasks changes into the commit, so here it still showed '+'). If so, the job's work is done and the ticket should take the merged outcome instead of the fix retry.
+
+  ## Done when
+  A merge job that fails after its commits reached main does not send the ticket to fix; a test covers it.
+history:
+- at: 2026-11-13T09:15:11.755365+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T09:15:12.033700+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T09:15:12.841757+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A65342ba7-3138-4700-af1b-bdaafd84f224
+- at: 2026-11-13T09:15:23.656362+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T09:28:34.956070+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T09:28:46.906986+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T09:28:48.509855+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7bc31399-fd38-46c1-904e-b81c06b6d728
+- at: 2026-11-13T09:29:52.611789+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T09:29:52.800877+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: ''
+    new: review-blocked
+- at: 2026-11-13T09:30:00.099076+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: review-blocked
+    new: review-returned
+- at: 2026-11-13T09:30:00.991230+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-13T09:30:01.742331+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6c6f7706-57c7-4e71-b748-c6b72c66c2e9
+- at: 2026-11-13T09:54:50.143184+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T09:55:00.457467+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T09:55:01.731796+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad235e56b-5c16-4772-a251-4b16ae279f39
+- at: 2026-11-13T09:57:01.845862+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T09:57:06.599793+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-13T10:02:47.006549+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T10:02:51.034064+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: review-returned
+    new: ''
+- at: 2026-11-13T10:02:51.082380+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-13T10:04:23.876596+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-13T10:04:24.047287+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-352"]}'
+- at: 2026-11-13T10:04:24.192364+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-13T10:04:24.593375+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-13T10:04:44.441468+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T10:04:51.393415+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-13T10:05:39.645126+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-13T10:05:39.896364+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-13T10:05:40.356033+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress

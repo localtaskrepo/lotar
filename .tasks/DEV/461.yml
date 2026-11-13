@@ -5,10 +5,14 @@ type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-13T08:17:48.969072+00:00
-modified: 2026-11-13T08:21:42.951572+00:00
+modified: 2026-11-13T08:27:45.182765+00:00
 relationships:
   related:
   - DEV-327
+comments:
+- date: 2026-11-13T08:27:45.182765+00:00
+  author: claude
+  text: 'The open step is already done, so no new ticket. DEV-327''s follow-up was to drop the ''start each comment with your agent name'' line from standards configs/lotar/automation.yml and skills/lotar-workflow. Standards commit c057e77 (STD-56) removed it: both files now say to set LOTAR_DEFAULT_REPORTER because lotar records it as the comment''s author. grep finds the old wording only in docs/decisions/2026-11-11-ticket-process.md, a dated decision record that stays as written. No files changed and no commit. Check: repos.ts localtaskrepo/lotar still lists untracked:DEV-327 before this change. Setting WontDo as the ticket says, so the finding is not filed again.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af127ccd7-6f8d-44c2-a6fc-4339d64e5545
 description: |-
@@ -50,3 +54,7 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af127ccd7-6f8d-44c2-a6fc-4339d64e5545
+- at: 2026-11-13T08:27:45.182765+00:00
+  actor: claude
+  changes:
+  - field: comment_added

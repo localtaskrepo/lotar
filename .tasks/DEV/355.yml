@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-12T04:17:51.251399+00:00
-modified: 2026-11-12T08:49:41.399009+00:00
+modified: 2026-11-13T08:25:12.642752+00:00
 relationships:
   related:
   - DEV-352
@@ -16,6 +16,7 @@ relationships:
   - DEV-348
   - DEV-354
   - DEV-361
+  - DEV-424
 comments:
 - date: 2026-11-12T04:37:28.916711+00:00
   text: 'claude: Fixed in bb47b58 on agent/DEV-355. Cause: an app race, not the palette. The palette''s Enter ran ''Boards'' and started the move to /boards. While the lazy Board chunk loaded, the tasks page finished its first load (projects, then sprints) and called router.replace(''/''), which cancelled the pending /boards navigation. So the path stayed ''/'', and a real user could lose a click the same way. Fix: view/pages/TasksList.vue sets a flag in onBeforeRouteLeave (cleared by the next afterEach, even when the navigation fails), and applyFilter doesn''t write the URL or reload while a navigation away is underway. Test first: a new smoke test in smoke/tests/ui.keyboard-shortcuts.smoke.spec.ts holds /api/sprints/list and the Board chunk, presses Enter on ''boards'', releases sprints, then the chunk. It failed before the fix and passed 3 of 3 runs after. TasksList unit-test router mocks gained onBeforeRouteLeave. Checks: npm run lint passed. npm run test:smoke:agent (the ticket''s check) passed, 379/379. npm run test:agent: UI, release and hooks passed. Rust failed one different test in each of 3 full runs; none touches this change, and each passes alone: dev279_cross_process_jobs_test (DEV-349, fixed on main but not in this branch''s base 7bd5c46), plus two new flakes filed as DEV-357 (status_dry_run_explain) and DEV-358 (worker_persists_trailing_stderr). The first run''s failure came from LOTAR_DEFAULT_REPORTER in this job''s environment; I reran without it.'
@@ -146,3 +147,9 @@ history:
   - field: assignee
     old: mallox
     new: claude
+- at: 2026-11-13T08:25:12.642752+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-352","DEV-357","DEV-358","DEV-349","DEV-356","DEV-348","DEV-354","DEV-361"]}'
+    new: '{"related":["DEV-352","DEV-357","DEV-358","DEV-349","DEV-356","DEV-348","DEV-354","DEV-361","DEV-424"]}'

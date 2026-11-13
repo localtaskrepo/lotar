@@ -1,11 +1,21 @@
 title: 'Leftover worktree: /Users/mallox/.t3/worktrees/lotar/t3-c253af75-3f82e2b7848caff4'
-status: InProgress
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-13T08:17:34.864883+00:00
-modified: 2026-11-13T08:19:50.408393+00:00
+modified: 2026-11-13T09:19:35.279138+00:00
+relationships:
+  related:
+  - DEV-348
+comments:
+- date: 2026-11-13T08:26:23.326353+00:00
+  author: claude
+  text: 'Removed the worktree /Users/mallox/.t3/worktrees/lotar/t3-c253af75-3f82e2b7848caff4 (git worktree remove) and deleted its branch t3/fix-flaky-hand-back-test-wait (git branch -d, head 5939e6b3 is on main). Before: no uncommitted or untracked changes (only ignored node_modules), no commits outside main, no open files; it belonged to the DEV-348 T3 thread, which completed 2026-11-12 with DEV-348 Done. No repo files changed, so no commit. Check: repos.ts localtaskrepo/lotar no longer lists the finding; git worktree list no longer shows it.'
+- date: 2026-11-13T09:19:35.118752+00:00
+  author: claude
+  text: 'claude: Filed by mistake: a manual repos.ts --report run on 2026-11-13 without --fix filed this safe-removal leftover as a ticket. repos.ts --fix removed it (or the fix agent did); the check no longer reports it. Closed, nothing else to do.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa4c09da9-cbb4-4a0f-96d7-2719d6ecc446
 description: |-
@@ -41,3 +51,23 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa4c09da9-cbb4-4a0f-96d7-2719d6ecc446
+- at: 2026-11-13T08:26:23.326353+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T08:26:24.019741+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-348"]}'
+- at: 2026-11-13T09:19:35.118752+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T09:19:35.279138+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

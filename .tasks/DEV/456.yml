@@ -3,12 +3,18 @@ status: InProgress
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@fix-codex'
 created: 2026-11-13T08:17:40.261309+00:00
-modified: 2026-11-13T08:20:37.940733+00:00
+modified: 2026-11-13T08:47:30.648194+00:00
 relationships:
   related:
   - DEV-366
+  - DEV-343
+  - DEV-411
+comments:
+- date: 2026-11-13T08:27:34.348941+00:00
+  author: claude
+  text: 'The step needs nothing more: it is done. DEV-366''s open step (''only a record of what the merge job landed could clear it'', DEV-343''s conflicting branch) became DEV-411 (Worktree cleanup keeps a branch whose work landed in a conflicting form), which is linked to DEV-366 as related. DEV-411 is Done, merged as 3d4db183 and pushed: merge jobs write refs/lotar/landed/<branch>/<commit>, and cleanup removes a branch once that record is on main. Check: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar no longer lists [untracked:DEV-366]. No files changed, so there is no commit. Setting WontDo, as this ticket''s Done-when says, so the finding isn''t filed again.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8ba56db3-7074-40a9-b235-581509991722
 description: |-
@@ -25,6 +31,7 @@ description: |-
   The open step is a ticket of its own, linked to the Done ticket (lotar task relationships add <new> <ID> --kind related), or the Done ticket is reopened when its own work is not finished. When the step needs nothing more (done, or dropped), say so in a comment and set this ticket WontDo: the finding is then not filed again.
 tags:
 - health
+- fix-retried
 custom_fields:
   finding: untracked:DEV-366
 history:
@@ -50,3 +57,22 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8ba56db3-7074-40a9-b235-581509991722
+- at: 2026-11-13T08:27:34.348941+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T08:27:34.882515+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-366"]}'
+    new: '{"related":["DEV-366","DEV-343","DEV-411"]}'
+- at: 2026-11-13T08:47:30.648194+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-codex'
+  - field: tags
+    old: health
+    new: health, fix-retried

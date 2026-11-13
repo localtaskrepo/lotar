@@ -1,0 +1,70 @@
+title: 'Releases follow-ups: Add to release in the task row menu, project filter on the Releases page, refresh on release_changed'
+status: InProgress
+priority: Low
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-13T08:26:30.517705+00:00
+modified: 2026-11-13T09:26:09.144119+00:00
+relationships:
+  related:
+  - DEV-393
+  - DEV-459
+comments:
+- date: 2026-11-13T09:26:09.144119+00:00
+  author: claude
+  text: |-
+    Done in commit 24fb128d on agent/DEV-464.
+    1. Task table row menu: Add to release… per row (disabled while there are no releases), opens the same dialog as the bulk action (TaskTable.vue, TasksList.vue).
+    2. Releases page: a project picker in the header, synced to ?project=. It narrows the tickets in each release, their open/done counts and progress, and the backlog (server-side project param). Releases themselves stay workspace-wide.
+    3. release_changed: the shared release list (useReleases) subscribes to release_changed while any page uses it and reloads, so task panel, Tasks list filters/column/row menu, Calendar, Board, Insights, Dependencies and filter bars update.
+    Tests: useReleases.spec.ts (new), ReleasesList.spec.ts project filter case; jsdom gets an inert EventSource stub in vitest.setup.ts. Smoke: two new cases in ui.releases.smoke.spec.ts (row menu enabled after a release is created over REST, then adds the ticket; project filter). The row-menu smoke case fails with the subscription disabled (checked). Docs: docs/help/releases.md Web UI section.
+    Checks: npm run lint, npm test (2126 Rust, 1512 UI), npm run smoke (388) all pass.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa5d32f85-dc57-486d-b533-db54e5599c75
+description: |-
+  Steps DEV-393 left open (merge comment, 2026-11-12: "Not done (follow-up if wanted)").
+
+  1. **Task table row menu**: an Add to release entry per row, as the bulk actions already offer for selected tickets.
+  2. **Releases page**: a project filter, like the other pages' project selector.
+  3. **release_changed**: pages that show a release list (task panel, Tasks list filters and column, Calendar, filter bars) refresh it when a release_changed event arrives, not only the Releases page.
+
+  ## Done when
+
+  - [ ] Each of the three works in the browser, with smoke coverage.
+  - [ ] npm run lint, npm test and npm run smoke pass.
+tags:
+- web-ui
+history:
+- at: 2026-11-13T08:26:30.739110+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-393"]}'
+- at: 2026-11-13T08:26:31.051042+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T08:26:31.978406+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T08:27:30.278113+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-393"]}'
+    new: '{"related":["DEV-393","DEV-459"]}'
+- at: 2026-11-13T08:27:39.788721+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa5d32f85-dc57-486d-b533-db54e5599c75
+- at: 2026-11-13T09:26:09.144119+00:00
+  actor: claude
+  changes:
+  - field: comment_added

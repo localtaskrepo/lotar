@@ -2018,6 +2018,53 @@ fn branch_landed(repo_root: &std::path::Path, branch: &str) -> LoTaRResult<bool>
     Ok(std::iter::once("HEAD").chain(candidates.lines()).any(|commit| merge_adds_nothing(repo_root, commit, &branch_ref)))
 }
 
+/// Whether the changes `branch` makes outside `excluded` (a path relative to
+/// the repository root) are in the checkout's current branch: merging the
+/// branch into HEAD, or into a commit since the fork that touched those
+/// files, changes nothing outside `excluded`. Conflicts inside it don't
+/// count; a branch that changes nothing outside it hasn't landed.
+fn branch_landed_outside(repo_root: &std::path::Path, branch: &str, excluded: &std::path::Path) -> LoTaRResult<bool> {
+    let git_output = |args: &[&str]| -> LoTaRResult<String> {
+        let output = git_command(repo_root).args(args).current_dir(repo_root).output().map_err(LoTaRError::IoError)?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(LoTaRError::ValidationError(format!("git {} failed: {}", args.join(" "), stderr.trim())));
+        }
+        Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+    };
+    let branch_ref = format!("refs/heads/{branch}");
+    let outside = format!(":(exclude){}", excluded.display());
+    let base = git_output(&["merge-base", "HEAD", &branch_ref])?;
+    let base = base.trim();
+    let changed = git_output(&["diff", "--name-only", "--no-renames", "-z", base, &branch_ref, "--", ".", &outside])?;
+    let changed: Vec<&str> = changed.split('\0').filter(|path| !path.is_empty()).collect();
+    if changed.is_empty() {
+        return Ok(false);
+    }
+    let excluded_base = format!("^{base}");
+    let mut args = vec!["rev-list", "HEAD", excluded_base.as_str(), "--"];
+    args.extend(&changed);
+    let candidates = git_output(&args)?;
+    Ok(std::iter::once("HEAD").chain(candidates.lines()).any(|commit| {
+        // `merge-tree` exits 1 on a conflict and still writes the tree, with
+        // conflict markers in the conflicted files.
+        let merged = git_command(repo_root)
+            .args(["merge-tree", "--write-tree", "--no-messages", commit, &branch_ref])
+            .current_dir(repo_root)
+            .output()
+            .ok()
+            .filter(|output| matches!(output.status.code(), Some(0 | 1)))
+            .and_then(|output| String::from_utf8_lossy(&output.stdout).lines().next().map(str::to_string));
+        merged.is_some_and(|tree| {
+            git_command(repo_root)
+                .args(["diff", "--quiet", commit, &tree, "--", ".", &outside])
+                .current_dir(repo_root)
+                .status()
+                .is_ok_and(|status| status.success())
+        })
+    }))
+}
+
 /// Whether merging `branch` into `commit` yields `commit`'s own tree. A
 /// conflict, or a git without `merge-tree --write-tree`, counts as no.
 fn merge_adds_nothing(repo_root: &std::path::Path, commit: &str, branch: &str) -> bool {
@@ -3151,7 +3198,7 @@ fn ensure_branch_merged(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Pa
     let Some(repo_root) = resolve_repo_root(tasks_dir) else {
         return Ok(None);
     };
-    match branch_landed(&repo_root, &branch) {
+    match merged_landed(&repo_root, tasks_dir, &branch) {
         Ok(true) => {
             record_landing(&repo_root, &branch);
             return Ok(None);
@@ -3183,6 +3230,47 @@ fn ensure_branch_merged(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Pa
     ))
 }
 
+/// Whether a merge job's `branch` is in the checkout's current branch:
+/// `branch_landed`, or landed apart from the tasks directory. The merge
+/// amends ticket changes into the landed commit (QIS-180), so its copy on
+/// main may differ from the branch, and conflict with it, there alone.
+fn merged_landed(repo_root: &std::path::Path, tasks_dir: &std::path::Path, branch: &str) -> LoTaRResult<bool> {
+    if branch_landed(repo_root, branch)? {
+        return Ok(true);
+    }
+    let tasks_dir = std::path::absolute(tasks_dir).map_err(LoTaRError::IoError)?;
+    match tasks_dir.strip_prefix(repo_root) {
+        Ok(tasks) => branch_landed_outside(repo_root, branch, tasks),
+        Err(_) => Ok(false),
+    }
+}
+
+/// For a merge job whose runner failed: the note that explains why it
+/// completes anyway, when its branch is on main already (`merged_landed`)
+/// and its worktree holds nothing uncommitted. `None` for other jobs, and
+/// for states git can't judge.
+fn merged_despite_failure(job_id: &str, tasks_dir: &std::path::Path, exit_code: Option<i32>, runner_failed: bool) -> Option<String> {
+    let (runner, branch, worktree) = JOB_REGISTRY.lock().ok().and_then(|registry| {
+        registry
+            .jobs
+            .get(job_id)
+            .filter(|state| state.record.is_merge_job)
+            .and_then(|state| state.record.worktree_branch.clone().map(|branch| (state.record.runner.clone(), branch, state.record.worktree_path.clone())))
+    })?;
+    let repo_root = resolve_repo_root(tasks_dir)?;
+    if let Some(worktree) = worktree.map(std::path::PathBuf::from).filter(|path| path.exists()) {
+        let status = git_command(&worktree).args(["status", "--porcelain"]).output().ok()?;
+        if !status.status.success() || !status.stdout.is_empty() {
+            return None;
+        }
+    }
+    if !merged_landed(&repo_root, tasks_dir, &branch).ok()? {
+        return None;
+    }
+    let failure = if runner_failed { "reported a failure".to_string() } else { exit_description(exit_code) };
+    Some(format!("The {runner} runner {failure}, but {branch} is in the main checkout's current branch already: the merge job completed"))
+}
+
 fn finalize_job(
     job_id: &str,
     ticket_id: &str,
@@ -3195,6 +3283,14 @@ fn finalize_job(
     // A runner that reported a failure fails the job even when it exits 0.
     let runner_failed = JOB_REGISTRY.lock().ok().and_then(|registry| registry.jobs.get(job_id).map(|state| state.runner_failed)).unwrap_or(false);
     let mut success = exit_code.unwrap_or(1) == 0 && !runner_failed;
+    // A merge job whose runner failed after its branch reached main did its
+    // work (DEV-465): it completes, so automation doesn't retry a merged fix.
+    if !success && let Some(message) = merged_despite_failure(job_id, tasks_dir, exit_code, runner_failed) {
+        update_job(job_id, |state| {
+            record_and_emit(state, "agent_job_progress", Some(message.clone()));
+        });
+        success = true;
+    }
     // Work an agent leaves uncommitted in its worktree (Codex's sandbox keeps
     // git metadata read-only, signing may be unreachable) is committed here,
     // so the next phase and the merge see it. Failing to commit fails the job.

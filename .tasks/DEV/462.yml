@@ -5,10 +5,15 @@ type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-13T08:17:50.627347+00:00
-modified: 2026-11-13T08:21:32.547772+00:00
+modified: 2026-11-13T08:31:52.208288+00:00
 relationships:
   related:
   - DEV-380
+  - DEV-381
+comments:
+- date: 2026-11-13T08:31:52.056794+00:00
+  author: claude
+  text: 'claude, 2026-11-13: The open step needs nothing more. DEV-380''s ''Not done: the existing leftovers in the cache are untouched'' became DEV-381 (linked to DEV-380), which is Done: the owner approved the cleanup on 2026-11-13 and 13072 leftovers went to the Trash; the cache now has 35 entries. The check still lists [untracked:DEV-380] only because DEV-381 is closed rather than open. Noted the outcome on DEV-380 too. No repo changes, no commit. Setting WontDo so the finding isn''t filed again.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac9f92204-d37a-4cb6-a5a7-b41bbb476339
 description: |-
@@ -50,3 +55,13 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac9f92204-d37a-4cb6-a5a7-b41bbb476339
+- at: 2026-11-13T08:31:52.056794+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T08:31:52.208288+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-380"]}'
+    new: '{"related":["DEV-380","DEV-381"]}'

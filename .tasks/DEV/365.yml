@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: claude
 created: 2026-11-12T05:23:48.738895+00:00
-modified: 2026-11-12T18:46:29.688519+00:00
+modified: 2026-11-13T08:25:05.733949+00:00
 relationships:
   related:
   - DEV-362
@@ -13,6 +13,7 @@ relationships:
   - TEST-1
   - DEV-376
   - DEV-377
+  - DEV-420
 comments:
 - date: 2026-11-12T05:41:33.078682+00:00
   text: 'claude: Fixed in ebdb85b on agent/DEV-365. Cause as described: ChangeSet records changes as tags/type, but conditions looked them up under the alias. New change_key() in src/services/automation_matching.rs maps labels→tags and task_type→type; it is used for change lookups (field conditions and changes:), in ChangeSet::only and collect_change_fields, so simulate agrees too. The branch is built on DEV-362''s commit 88d95c7 (update_match/simulate code, still being merged) by fast-forward; merge DEV-362 first, or this brings it along. Test: tests/dev365_automation_alias_conditions_test.rs (real update + simulate, field and changes: forms, both aliases); it failed before the fix. Ticket check: all four comments (labels/tags/task_type/type-fired) now added. Checks: lint:agent, test:agent (2010 Rust, 1444 UI, release, hooks), test:smoke:agent (379) all pass. The first test run failed in cli_agent_check_test from a stray lotar-agent-wrapper ''foreign'' TEST-1 process of another session (known: DEV-367); it passed after that process exited. Note: in simulate a changes: from: condition never matches, because the value before is unknown (DEV-362 design, same for tags/type).'
@@ -181,3 +182,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-362","DEV-367","TEST-1","DEV-376"]}'
     new: '{"related":["DEV-362","DEV-367","TEST-1","DEV-376","DEV-377"]}'
+- at: 2026-11-13T08:25:05.733949+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-362","DEV-367","TEST-1","DEV-376","DEV-377"]}'
+    new: '{"related":["DEV-362","DEV-367","TEST-1","DEV-376","DEV-377","DEV-420"]}'

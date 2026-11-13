@@ -1,11 +1,21 @@
 title: 'Leftover worktree: /Users/mallox/.t3/worktrees/lotar/t3-38a00136-32f7c1495da9b412'
-status: InProgress
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-13T08:17:26.790708+00:00
-modified: 2026-11-13T08:17:56.553095+00:00
+modified: 2026-11-13T09:18:51.922814+00:00
+relationships:
+  related:
+  - DEV-339
+comments:
+- date: 2026-11-13T08:24:33.504837+00:00
+  author: claude
+  text: 'Removed the worktree /Users/mallox/.t3/worktrees/lotar/t3-38a00136-32f7c1495da9b412 with git worktree remove, and deleted its branch t3/rust-lib-tests-home-config with git branch -d. Nothing was lost: the branch head b261dee7 (DEV-339) is on main and origin/main, and the worktree held only ignored node_modules. The thread that used it (DEV-339, Sonnet) finished on 2026-11-12. Check: repos.ts localtaskrepo/lotar no longer lists the finding. No files changed, so there is no commit.'
+- date: 2026-11-13T09:18:51.673049+00:00
+  author: claude
+  text: 'claude: Filed by mistake: a manual repos.ts --report run on 2026-11-13 without --fix filed this safe-removal leftover as a ticket. repos.ts --fix removed it (or the fix agent did); the check no longer reports it. Closed, nothing else to do.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A63e552c8-be5b-4466-b03f-4a2ed81b803c
 description: |-
@@ -41,3 +51,23 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A63e552c8-be5b-4466-b03f-4a2ed81b803c
+- at: 2026-11-13T08:24:33.504837+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T08:24:33.650615+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-339"]}'
+- at: 2026-11-13T09:18:51.673049+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T09:18:51.922814+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

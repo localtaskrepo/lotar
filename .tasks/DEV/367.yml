@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T05:28:33.195026+00:00
-modified: 2026-11-12T18:39:56.262947+00:00
+modified: 2026-11-13T08:24:31.221951+00:00
 relationships:
   related:
   - DEV-349
@@ -17,6 +17,7 @@ relationships:
   - DEV-342
   - DEV-366
   - DEV-376
+  - DEV-426
 comments:
 - date: 2026-11-12T05:47:04.512875+00:00
   text: 'claude: Cause: DEV-349 still counted a lotar-agent-wrapper without --tasks-dir (one started by an older build, e.g. another worktree''s test run on a branch before DEV-349) as a job of every tasks directory, so a foreign wrapper for TEST-1 blocked the test''s status change. Fix (commit f85d395 on agent/DEV-367): wrapper_runs_in no longer counts such wrappers; their jobs'' active-job records still count. Unit test wrappers_of_another_tasks_dir_are_not_counted flipped first (failed, then passes); docs/developers/agent-automation-tracker.md updated. Repro: with a wrapper for TEST-1 started without --tasks-dir, cli_configured_reviewer_can_resolve fails on the old code with the ticket''s exact error and passes with the fix. Checks: npm run lint, npm test (2006 Rust + 1444 UI passed), npm run smoke (379 passed). Not run: the 30x next-to-full-suite loop (the deterministic repro covers the cause). The first npm test run hit dev320 status_and_assignee_set_during_a_job_win once, a separate race already tracked as DEV-360 (added my report there); the rerun passed.'
@@ -162,3 +163,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-349","DEV-351","DEV-361","TEST-1","DEV-365","DEV-360","DEV-342","DEV-366"]}'
     new: '{"related":["DEV-349","DEV-351","DEV-361","TEST-1","DEV-365","DEV-360","DEV-342","DEV-366","DEV-376"]}'
+- at: 2026-11-13T08:24:31.221951+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-349","DEV-351","DEV-361","TEST-1","DEV-365","DEV-360","DEV-342","DEV-366","DEV-376"]}'
+    new: '{"related":["DEV-349","DEV-351","DEV-361","TEST-1","DEV-365","DEV-360","DEV-342","DEV-366","DEV-376","DEV-426"]}'

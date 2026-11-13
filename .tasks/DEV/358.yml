@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-12T04:36:54.876848+00:00
-modified: 2026-11-12T08:49:43.508128+00:00
+modified: 2026-11-13T08:26:22.538831+00:00
 relationships:
   related:
   - DEV-349
@@ -18,6 +18,8 @@ relationships:
   - DEV-342
   - DEV-361
   - DEV-360
+  - DEV-425
+  - DEV-442
 comments:
 - date: 2026-11-12T05:02:05.534862+00:00
   text: 'claude: Reproduced on main (f10a63c) standalone: 4 of 6 runs hit the 15 s deadline. Not DEV-349: the worker is busy, one log event (open+2 writes+close) per stderr line, ~2.5 ms each under I/O load, so 6000 lines outlast 15 s. A second failure under load: ''trailing stderr must be persisted''. read_job_output stopped 5 s after the runner exited even while reading output the runner left in the pipe, failing the job and dropping its last lines (docs/help/agent.md promised available output is drained). Fix in progress: drain the bytes in the pipe at exit (FIONREAD/PeekNamedPipe) before the 5 s descendant limit starts; one write per log event; test burst 100 lines of 1 KB (still more than a pipe holds).'
@@ -205,3 +207,15 @@ history:
   - field: assignee
     old: mallox
     new: claude
+- at: 2026-11-13T08:24:07.246653+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-349","DEV-351","DEV-355","DEV-357","DEV-363","DEV-348","DEV-364","DEV-342","DEV-361","DEV-360"]}'
+    new: '{"related":["DEV-349","DEV-351","DEV-355","DEV-357","DEV-363","DEV-348","DEV-364","DEV-342","DEV-361","DEV-360","DEV-425"]}'
+- at: 2026-11-13T08:26:22.538831+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-349","DEV-351","DEV-355","DEV-357","DEV-363","DEV-348","DEV-364","DEV-342","DEV-361","DEV-360","DEV-425"]}'
+    new: '{"related":["DEV-349","DEV-351","DEV-355","DEV-357","DEV-363","DEV-348","DEV-364","DEV-342","DEV-361","DEV-360","DEV-425","DEV-442"]}'

@@ -5,13 +5,14 @@ type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-12T05:17:25.629363+00:00
-modified: 2026-11-12T18:39:56.262374+00:00
+modified: 2026-11-13T08:25:15.930929+00:00
 relationships:
   related:
   - DEV-358
   - TEST-1
   - DEV-360
   - DEV-376
+  - DEV-440
 comments:
 - date: 2026-11-12T05:29:28.248634+00:00
   text: 'claude: Cause found. The job''s runner is spawned through lotar-agent-wrapper (argv carries --job-id/--ticket-id) before the owning process wrote the shared job record. In that window list-running finds the job via the wrapper process, and ''status'' finds no record, so it refuses with ''has an active agent job (pid N)''. Reproduced in a stress run (cargo nextest --stress-count 40: 5+ failures in a row with that error). Fix: write the record before spawn (child_pid 0), rewrite it with the runner pid after; the job slot already removes it on every exit path. New deterministic test job_record_exists_when_its_wrapper_starts (fake wrapper via LOTAR_AGENT_WRAPPER lists the records at start) fails before, passes after. Running lint/test/smoke next.'
@@ -112,3 +113,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-358","TEST-1","DEV-360"]}'
     new: '{"related":["DEV-358","TEST-1","DEV-360","DEV-376"]}'
+- at: 2026-11-13T08:25:15.930929+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-358","TEST-1","DEV-360","DEV-376"]}'
+    new: '{"related":["DEV-358","TEST-1","DEV-360","DEV-376","DEV-440"]}'

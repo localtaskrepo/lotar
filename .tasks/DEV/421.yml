@@ -1,11 +1,21 @@
 title: 'Leftover worktree: /Users/mallox/.t3/worktrees/lotar/t3-15ec7d7e-e221b74d45ba2fcc'
-status: InProgress
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-13T08:17:23.182547+00:00
-modified: 2026-11-13T08:17:38.056294+00:00
+modified: 2026-11-13T09:18:35.657675+00:00
+relationships:
+  related:
+  - DEV-347
+comments:
+- date: 2026-11-13T08:24:36.288717+00:00
+  author: claude
+  text: 'Removed worktree /Users/mallox/.t3/worktrees/lotar/t3-15ec7d7e-e221b74d45ba2fcc (git worktree remove) and deleted its merged branch t3/agent-templates-helpneeded-done (git branch -d, was fc1dfdf2). Before: worktree clean except ignored node_modules, no commits outside main; owning T3 thread (DEV-347) completed and settled 2026-11-12; no process had files open there. Check rerun: repos.ts localtaskrepo/lotar no longer lists the finding. No files changed, so no commit.'
+- date: 2026-11-13T09:18:35.516723+00:00
+  author: claude
+  text: 'claude: Filed by mistake: a manual repos.ts --report run on 2026-11-13 without --fix filed this safe-removal leftover as a ticket. repos.ts --fix removed it (or the fix agent did); the check no longer reports it. Closed, nothing else to do.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af7f0a949-ce11-419e-803b-c5583a9ac7f1
 description: |-
@@ -41,3 +51,23 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af7f0a949-ce11-419e-803b-c5583a9ac7f1
+- at: 2026-11-13T08:24:36.288717+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T08:24:36.518979+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-347"]}'
+- at: 2026-11-13T09:18:35.516723+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T09:18:35.657675+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

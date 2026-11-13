@@ -1,14 +1,21 @@
 title: 'Merged branch: agent/DEV-342'
-status: InProgress
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@fix-light'
 created: 2026-11-13T08:17:36.070360+00:00
-modified: 2026-11-13T08:20:07.106560+00:00
+modified: 2026-11-13T09:19:41.432246+00:00
 relationships:
   related:
   - DEV-342
+comments:
+- date: 2026-11-13T08:25:44.337407+00:00
+  author: claude
+  text: 'Deleted branch agent/DEV-342 with git branch -d (was c55f67cf). It had no commits outside main (git merge-base --is-ancestor passed) and no worktree. Reran repos.ts localtaskrepo/lotar: [branch:agent/DEV-342] is gone. No files changed, so no commit.'
+- date: 2026-11-13T09:19:41.311777+00:00
+  author: claude
+  text: 'claude: Filed by mistake: a manual repos.ts --report run on 2026-11-13 without --fix filed this safe-removal leftover as a ticket. repos.ts --fix removed it (or the fix agent did); the check no longer reports it. Closed, nothing else to do.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1de6469e-4820-4479-ae46-377f248631e8
 description: |-
@@ -51,3 +58,17 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1de6469e-4820-4479-ae46-377f248631e8
+- at: 2026-11-13T08:25:44.337407+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T09:19:41.311777+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T09:19:41.432246+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

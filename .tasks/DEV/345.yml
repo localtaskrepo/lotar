@@ -5,13 +5,14 @@ type: Bug
 reporter: mallox
 assignee: claude
 created: 2026-11-12T02:54:29.137527+00:00
-modified: 2026-11-12T08:49:37.049786+00:00
+modified: 2026-11-13T08:26:24.931746+00:00
 relationships:
   related:
   - DEV-343
   - DEV-344
   - DEV-346
   - DEV-361
+  - DEV-445
 comments:
 - date: 2026-11-12T03:07:54.918816+00:00
   text: 'Done in 1fc9c7f on agent/DEV-345. Without ui.name the tab title is ''<repository folder> · LoTaR'' (ui.name still wins). Without ui.icon the tab shows the repository''s own icon: the first real image named favicon.svg/.ico/.png or icon.svg/.png at the repo root or in public/, static/, assets/, app/, src/, src/app/, web/. /api/branding gains repository and detected_icon (api_types.rs, types.ts, openapi.json, help docs updated); Config > Appearance previews the found icon and names the file. Tests: branding_service unit test, dev218 endpoint test, useBranding.spec, new smoke test in ui.theming. npm run lint, npm test (2000 Rust + 1443 UI) and npm run smoke (378) all pass. Note: the lotar repo itself keeps the built-in icon, as its icon lives in view/assets/branding/ and is not in the searched places.'
@@ -97,3 +98,9 @@ history:
   - field: assignee
     old: mallox
     new: claude
+- at: 2026-11-13T08:26:24.931746+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-343","DEV-344","DEV-346","DEV-361"]}'
+    new: '{"related":["DEV-343","DEV-344","DEV-346","DEV-361","DEV-445"]}'

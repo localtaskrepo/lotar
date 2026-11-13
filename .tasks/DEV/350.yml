@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-12T03:43:14.648117+00:00
-modified: 2026-11-12T09:42:07.578539+00:00
+modified: 2026-11-13T08:25:03.845239+00:00
 relationships:
   related:
   - DEV-347
@@ -14,6 +14,7 @@ relationships:
   - DEV-366
   - DEV-298
   - DEV-372
+  - DEV-422
 comments:
 - date: 2026-11-12T03:51:04.674576+00:00
   text: 'claude: Merge not done. agent/DEV-350 has no commits beyond main (still at 0b25f02), so there is nothing to merge as committed. The fix agent''s work exists only as uncommitted changes in its worktree /Users/mallox/.t3/worktrees/lotar/agent-DEV-350-9ed4478618ebbb28 (src/services/agent_active_jobs.rs, src/services/task_service.rs, tests/dev320_job_outcome_test.rs; +104/-8), and its nextest runs were still going when I looked. I did not touch, commit or discard them. Needed: let the fix agent finish and commit on agent/DEV-350, then rerun the merge. Setting HelpNeeded so the ticket does not go to Done without the fix.'
@@ -126,3 +127,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-347","DEV-352","DEV-348","DEV-366","DEV-298"]}'
     new: '{"related":["DEV-347","DEV-352","DEV-348","DEV-366","DEV-298","DEV-372"]}'
+- at: 2026-11-13T08:25:03.845239+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-347","DEV-352","DEV-348","DEV-366","DEV-298","DEV-372"]}'
+    new: '{"related":["DEV-347","DEV-352","DEV-348","DEV-366","DEV-298","DEV-372","DEV-422"]}'

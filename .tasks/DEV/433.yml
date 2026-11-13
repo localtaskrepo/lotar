@@ -1,11 +1,18 @@
 title: 'Leftover worktree: /Users/mallox/.t3/worktrees/lotar/t3-5f3a8abc-1cc5267d3fc2ac6d'
-status: InProgress
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-13T08:17:29.337351+00:00
-modified: 2026-11-13T08:18:40.015477+00:00
+modified: 2026-11-13T09:19:04.572631+00:00
+comments:
+- date: 2026-11-13T08:25:00.874269+00:00
+  author: claude
+  text: 'Removed the worktree with git worktree remove and deleted its branch t3/fix-flaky-worker-stderr-test-1 with git branch -d (was 71cde544, an ancestor of main). Before that: git status was clean (only ignored node_modules/), main..HEAD had no commits, lsof showed no open files, and no T3 thread is bound to the path. No files changed in the repo, so there is no commit. Check: repos.ts localtaskrepo/lotar no longer lists the finding.'
+- date: 2026-11-13T09:19:04.444601+00:00
+  author: claude
+  text: 'claude: Filed by mistake: a manual repos.ts --report run on 2026-11-13 without --fix filed this safe-removal leftover as a ticket. repos.ts --fix removed it (or the fix agent did); the check no longer reports it. Closed, nothing else to do.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7e8af7f5-51be-450d-94c7-6b85069476e5
 description: |-
@@ -41,3 +48,17 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7e8af7f5-51be-450d-94c7-6b85069476e5
+- at: 2026-11-13T08:25:00.874269+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T09:19:04.444601+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T09:19:04.572631+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

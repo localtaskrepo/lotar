@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: claude
 created: 2026-11-12T05:03:17.785328+00:00
-modified: 2026-11-12T18:39:56.261999+00:00
+modified: 2026-11-13T08:25:45.814726+00:00
 relationships:
   related:
   - DEV-365
@@ -15,6 +15,7 @@ relationships:
   - DEV-342
   - DEV-368
   - DEV-376
+  - DEV-444
 comments:
 - date: 2026-11-12T05:21:43.308438+00:00
   text: 'Claude (Opus 5.5): Done in 4eaad9d on agent/DEV-362. simulate now matches change events like a real update: created uses a new-task change set; updated/sprint_changed/assigned look for an update of one field (assigned always includes assignee) that fires the rule (update_match in automation_matching.rs). A match that needs a field change carries the warning ''Matches only when status changes in the same update.''; a rule needing several fields at once no longer matches, and the no-match result names it (''Done and tagged: matches only when status and tags change in the same update; ...''). CLI prints these notes on no match, the rule editor''s Try it shows them too. Docs: automation.md (field conditions inside all, Simulating rules), warnings field in api_types.rs/types.ts/openapi.json (shape unchanged). Tests: new tests/dev362_simulate_change_events_test.rs (failed before the fix); dev118 preview test now expects the status note. Checks: npm run lint:agent, test:agent (Rust 2006 passed; UI 1444 passed on rerun, Board/SprintsList specs timed out once at 5s under load and pass alone and on full rerun; release, hooks), test:smoke:agent 379 passed; ticket scenario run with the built CLI. Finding, not fixed: field conditions written with the aliases labels/task_type never match a real update, because ChangeSet records tags/type only.'
@@ -198,3 +199,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-365","DEV-348","DEV-360","DEV-361","DEV-342","DEV-368"]}'
     new: '{"related":["DEV-365","DEV-348","DEV-360","DEV-361","DEV-342","DEV-368","DEV-376"]}'
+- at: 2026-11-13T08:25:45.814726+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-365","DEV-348","DEV-360","DEV-361","DEV-342","DEV-368","DEV-376"]}'
+    new: '{"related":["DEV-365","DEV-348","DEV-360","DEV-361","DEV-342","DEV-368","DEV-376","DEV-444"]}'

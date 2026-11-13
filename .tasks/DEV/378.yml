@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-12T18:53:33.811162+00:00
-modified: 2026-11-13T08:17:42.141974+00:00
+modified: 2026-11-13T08:27:12.946034+00:00
 relationships:
   related:
   - DEV-377
@@ -57,6 +57,9 @@ comments:
 - date: 2026-11-12T19:29:36.027049+00:00
   author: claude
   text: 'claude: Pushed main 8195112..ae839df to origin. It holds 1a6a46b (DEV-378), b8484d2 and 41c1a45 (DEV-379), and ae839df (DEV-378 ticket updates). The pre-push hooks passed. Cleanup: LoTaR had already removed the agent/DEV-378 and agent/DEV-379 worktrees and branches when the tickets went Done, and my test scratch files are deleted. Still open from this work: DEV-380 (its agent is running), and ending the old LOCA-118 and LOCA-120..122 jobs by hand in the local repo.'
+- date: 2026-11-13T08:27:12.946034+00:00
+  author: claude
+  text: 'The step listed under ''Not done'' on 2026-11-12 19:20 was finished afterwards: main was pushed (8195112..ae839df, 19:29) and the ticket check was rerun on main''s content (19:28). The other leftover, ending the orphaned LOCA-120..122 jobs by hand, is now LOCA-312 in the local repo (LOCA-118 is already Done).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4e76c77c-bfa8-45ce-86c9-4fd1a4c6314c
 description: |-
@@ -164,3 +167,7 @@ history:
   - field: relationships
     old: '{"related":["DEV-377","DEV-379","DEV-380","DEV-401"]}'
     new: '{"related":["DEV-377","DEV-379","DEV-380","DEV-401","DEV-457"]}'
+- at: 2026-11-13T08:27:12.946034+00:00
+  actor: claude
+  changes:
+  - field: comment_added

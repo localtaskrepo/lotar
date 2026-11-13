@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-13T08:06:43.253125+00:00
-modified: 2026-11-13T08:23:34.090987+00:00
+modified: 2026-11-13T09:14:54.028556+00:00
 relationships:
   related:
   - DEV-419
@@ -19,6 +19,9 @@ comments:
 - date: 2026-11-13T08:23:34.090987+00:00
   author: claude
   text: 'Merged to main 2026-11-13 in the commit titled "DEV-418 Board cards: optional field ...", which also holds this ticket. Not pushed.'
+- date: 2026-11-13T09:14:54.028556+00:00
+  author: claude
+  text: 'Checked the chips in DEV-419''s compact phone board (its uncommitted work applied to main in this ticket''s worktree, then removed again): they fit at 390 px, in light and dark, and none overflows its card. Told DEV-419 about the two easy rebase conflicts (the import line in `Board.vue`, the Boards paragraph in `serve.md`).'
 references:
 - file: view/components/BoardCardMeta.vue
 - file: view/pages/Board.vue
@@ -172,6 +175,10 @@ history:
   - field: reference_added
     new: file:smoke/tests/ui.board-relationships.smoke.spec.ts
 - at: 2026-11-13T08:23:34.090987+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T09:14:54.028556+00:00
   actor: claude
   changes:
   - field: comment_added
