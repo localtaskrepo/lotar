@@ -1,15 +1,16 @@
 title: Windows CI runs its 40 selected tests without building the library's unit-test binary
-status: Reviewing
+status: Merging
 priority: High
 type: Chore
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-13T22:21:42.297785+00:00
-modified: 2026-11-13T23:55:04.285799+00:00
+modified: 2026-11-14T00:05:26.778166+00:00
 relationships:
   related:
   - DEV-493
   - DEV-506
+  - DEV-500
 comments:
 - date: 2026-11-13T22:49:13.685117+00:00
   author: claude
@@ -29,10 +30,29 @@ comments:
 - date: 2026-11-13T23:51:43.735422+00:00
   author: codex
   text: 'Reconciled against main and squashed original implementation plus feature-unification follow-up into signed commit 0400155d. Preserved current main scan_utils_tests in tests/utils_scan_test.rs; normalized test-body comparison confirms equality after import/path changes. Removed generated pycache files from the submitted change. Checks passed on this tree: npm run build:web; npm run lint:agent (approved retry after sandbox sccache denial); npm run test:agent (2152 Rust, 1515 UI, release and hooks); npm run test:smoke:agent (390); CI-feature Windows target selection on macOS (41 tests), manifest-vs-JUnit gate (41), git diff --check. Native Windows execution not available here; prior local before/after timing evidence remains in the follow-up comment. No merge or push; status and assignee left to job automation. No durable guidance correction.'
+- date: 2026-11-13T23:57:00.031289+00:00
+  author: codex
+  text: 'Review: passed. Reviewed 0400155d diff, ticket comments and owner approval, related tickets and touched-file main history. No findings or tickets filed. Scan tests preserved; Windows run/list use matching narrow targets without --lib; Linux retains all targets. Local timing evidence is labeled. Reran 41 selected tests, manifest/JUnit gate (41), six CI reporting contract tests, 47 coverage checker self-tests and diff check: all passed. Native Windows unavailable. Full lint/test/smoke not repeated; fix comment records passes on submitted tree. No files, commits, status or assignee changed.'
+- date: 2026-11-13T23:57:45.933600+00:00
+  author: codex
+  text: 'Merge blocked: current main adds storage permission regression tests in src/storage/safety.rs (private permission preservation, normal new-file permissions, metadata lookup failure), while 0400155d relocates its inline test module into tests/storage_safety_test.rs. Rebase conflicts there; aborted to preserve both sides. Need reconciliation of these new main tests into windows_regressions and required verification before another merge attempt. Nothing merged or pushed; checks not rerun because rebase did not complete. Branch remains 0400155d.'
+- date: 2026-11-13T23:57:56.142623+00:00
+  author: automation
+  text: 'The merge agent''s job job-20261113T235705.177Z-61 failed again: lotar agent logs job-20261113T235705.177Z-61. The fix is on branch t3/windows-ci-skip-lib-test-build. Should an agent try again (lotar automation run "Health: retry with @fix" --select ''id:DEV-495'', or for an agent''s ticket lotar assignee DEV-495 @fix), or will you merge it yourself?'
+- date: 2026-11-13T23:58:32.472913+00:00
+  author: triage
+  text: 'Triage: no owner answer needed, an agent tries again. Same question as the first merge failure (answered on INBOX-62): yes, reconcile the rebase conflict and retry. This time main''s DEV-500 (7fa24fb1) added storage permission tests (private permission preservation, normal new-file permissions, metadata lookup failure) to the inline test module in src/storage/safety.rs, which 0400155d moved to tests/storage_safety_test.rs. Move those three tests along into tests/storage_safety_test.rs (windows_regressions), keep main''s other changes, rerun the required checks and the Windows selection run plus the manifest-vs-JUnit gate, then merge right after the rebase so main does not move again under it. Check git log main for other commits touching src/utils/scan.rs, src/storage/safety.rs and src/services/automation_service.rs first. Basis: the owner''s 2026-11-13 ''Yes on all of those ideas'' and ''let''s please do the follow up'' on this ticket. A rebase and a retried merge are reversible and in scope; nothing here is a choice between designs.'
+- date: 2026-11-14T00:03:28.386684+00:00
+  author: codex
+  text: 'Reconciled current main in signed commit 7e9b7e13. The three permission tests were already present in tests/storage_safety_test.rs; retained them, removed the conflicting inline copy, preserved main production changes and its DEV-500 200ms lock-wait optimization using the shared test env guard. Required test run exposed a main CI path-contract mismatch for directory reads; fixed it to check the enumerated Rust files rather than the directory itself. Checks passed: lint:agent, test:agent (2155 Rust, 1515 UI, release/hooks), test:smoke:agent (390), final CI contract selection (9), CI-feature Windows target selection on macOS (41) plus manifest-vs-JUnit gate (41), diff check. Native Windows unavailable. Clean worktree; no merge or push per this fix job instructions; status and assignee unchanged. No durable guidance finding.'
+- date: 2026-11-14T00:05:22.113+00:00
+  author: codex
+  text: 'Review: passed. Reviewed 7e9b7e13 diff, ticket comments and approvals, related tickets and main history. No findings. Permission tests and lock-timeout optimization preserved. Reran 41 selected tests plus manifest/JUnit gate, nine CI contract tests, 47 checker self-tests and diff check: passed. RUSTC_WRAPPER= used after sandbox denial. Native Windows and full lint/test/smoke not repeated; fix comment records full passes on this head. No files, commits, status or assignee changed.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0a7952ff-8d56-49c9-ab90-fa87a5b57230
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A348ac5bc-1a1b-4d65-80c0-250fd960cea7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A45776dde-086c-4b15-a00d-169148dbe874
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1d2a7356-5e4e-4bd8-a143-ef3803129158
 description: |-
   The Windows CI job is the critical path in 71 of 88 green runs (DEV-493). Its longest step builds the whole lotar library as a unit-test binary (2m44 to 4m58) to run 40 tests that take 2 to 3 s. The owner, 2026-11-13: "Yes on all of those ideas. We really need to try and optimize the build and CI time. The faster tests can run, the cheaper it is to run them more often."
 
@@ -172,3 +192,86 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A45776dde-086c-4b15-a00d-169148dbe874
+- at: 2026-11-13T23:57:00.031289+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:57:04.907283+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-13T23:57:45.933600+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:57:56.142623+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:57:56.434300+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-13T23:58:32.472913+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:58:32.566458+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-493","DEV-506"]}'
+    new: '{"related":["DEV-493","DEV-506","DEV-500"]}'
+- at: 2026-11-13T23:58:32.885843+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-13T23:58:33.469066+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T00:03:28.386684+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T00:03:32.956844+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T00:03:34.103801+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1d2a7356-5e4e-4bd8-a143-ef3803129158
+- at: 2026-11-14T00:05:22.113+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T00:05:26.778166+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

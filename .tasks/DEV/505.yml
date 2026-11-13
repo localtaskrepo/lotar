@@ -3,9 +3,9 @@ status: Done
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-13T22:45:44.077860+00:00
-modified: 2026-11-13T23:53:52.251687+00:00
+modified: 2026-11-13T23:57:14.708091+00:00
 relationships:
   related:
   - DEV-492
@@ -34,9 +34,16 @@ comments:
 - date: 2026-11-13T23:53:48.660861+00:00
   author: codex
   text: 'Pushed finished commits through 93f77341 to origin/main as triage authorized from the owner decision. Newer main commit 7fa24fb1 and all uncommitted ticket updates were excluded. Push hooks passed Rust formatting/clippy and frontend typecheck/oxlint/ESLint/Prettier. Prior merge verification: ticket check and 24 help tests passed. Work is merged and pushed; closing as requested.'
+- date: 2026-11-13T23:56:30.228423+00:00
+  author: codex
+  text: 'Review: passed. No findings. Branch commit e610e6d5 changes only docs/help/agent.md, already identical on main after 93f77341. Read ticket/comments, main file history and queue handler. Ticket grep, Prettier, diff checks and installed agent help pass. Prior Rust help tests and full lint/test/smoke not repeated for this docs-only already-landed change. No files or commits changed, no tickets filed; status and assignee unchanged.'
+- date: 2026-11-13T23:57:10.473826+00:00
+  author: codex
+  text: 'Merge complete: rebase onto main dropped e610e6d5 because its patch is already upstream as 93f77341; fast-forward reports Already up to date. Branch now ends at main b4e61f6c with no commits beyond main. Main health grep finds queue remove and queue flush with the example; Prettier and diff checks pass. Full application suites not repeated for this documentation-only change; prior help test results are recorded above. No new commit or amend: main''s current tip belongs to another ticket. No push: this ticket was already pushed through 93f77341, and main has uncommitted ticket updates plus three newer unrelated commits. Preserved all of them. Status and assignee unchanged; job automation advances the ticket on completion.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A28fec7dc-34ea-4966-bd7c-9797738d89ee
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab77286cc-0e9d-4702-aae3-ba4a9636b56e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3594f6e0-b8ed-4888-954a-4868c6e2a85c
 description: 'Found by claude on DEV-492, 2026-11-13: lotar agent --help and docs/help/agent.md say you can remove a queued job but name no command; lotar agent cancel DEV-501 answered "Job not found". The command exists: lotar agent queue remove <TICKET> (and queue flush), src/cli/handlers/agent.rs:373-392. Check: grep -n ''queue remove'' docs/help/agent.md finds nothing. Done: docs/help/agent.md and the agent help list queue remove and queue flush with an example.'
 tags:
 - health
@@ -152,4 +159,38 @@ history:
   changes:
   - field: status
     old: InProgress
+    new: Done
+- at: 2026-11-13T23:55:43.305091+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Done
+    new: Reviewing
+- at: 2026-11-13T23:55:44.474076+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3594f6e0-b8ed-4888-954a-4868c6e2a85c
+- at: 2026-11-13T23:56:30.228423+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:56:35.695385+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-13T23:57:10.473826+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:57:14.708091+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
     new: Done

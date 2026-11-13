@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-13T21:27:58.028716+00:00
-modified: 2026-11-13T23:55:02.702764+00:00
+modified: 2026-11-13T23:55:35.602858+00:00
 relationships:
   blocks:
   - DEV-496
@@ -18,6 +18,7 @@ relationships:
   - DEV-498
   - DEV-499
   - DEV-500
+  - DEV-506
 comments:
 - date: 2026-11-13T22:08:01.550984+00:00
   author: claude
@@ -318,3 +319,9 @@ history:
   - field: assignee
     old: '@merge'
     new: mallox
+- at: 2026-11-13T23:55:35.602858+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-496"],"related":["DEV-471","DEV-481","DEV-495","DEV-496","DEV-497","DEV-498","DEV-499","DEV-500"]}'
+    new: '{"blocks":["DEV-496"],"related":["DEV-471","DEV-481","DEV-495","DEV-496","DEV-497","DEV-498","DEV-499","DEV-500","DEV-506"]}'

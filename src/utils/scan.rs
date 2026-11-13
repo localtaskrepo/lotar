@@ -295,7 +295,8 @@ pub fn write_source(path: &std::path::Path, expected: &str, updated: &str) -> Re
 }
 
 #[cfg(unix)]
-fn lock_source(path: &std::path::Path) -> Result<std::fs::File, String> {
+#[doc(hidden)]
+pub fn lock_source(path: &std::path::Path) -> Result<std::fs::File, String> {
     use std::os::unix::fs::MetadataExt;
     for _ in 0..8 {
         let file = std::fs::OpenOptions::new()
@@ -316,7 +317,8 @@ fn lock_source(path: &std::path::Path) -> Result<std::fs::File, String> {
 }
 
 #[cfg(not(unix))]
-fn lock_source(path: &std::path::Path) -> Result<std::fs::File, String> {
+#[doc(hidden)]
+pub fn lock_source(path: &std::path::Path) -> Result<std::fs::File, String> {
     // Stable per-path locks avoid relying on unavailable portable inode IDs.
     // Never unlink locks because another process may already be waiting on one.
     let canonical = std::fs::canonicalize(path).map_err(|e| e.to_string())?;
@@ -328,12 +330,8 @@ fn lock_source(path: &std::path::Path) -> Result<std::fs::File, String> {
     Ok(lock)
 }
 
-pub(crate) fn write_source_with_prepared(
-    path: &std::path::Path,
-    expected: &str,
-    updated: &str,
-    prepared: impl FnOnce() -> Result<(), String>,
-) -> Result<(), String> {
+#[doc(hidden)]
+pub fn write_source_with_prepared(path: &std::path::Path, expected: &str, updated: &str, prepared: impl FnOnce() -> Result<(), String>) -> Result<(), String> {
     validate_source_write(path)?;
     let canonical = std::fs::canonicalize(path).map_err(|e| e.to_string())?;
     let permissions = std::fs::metadata(path).map_err(|e| e.to_string())?.permissions();
@@ -444,119 +442,4 @@ pub fn parse_inline_attributes(line: &str) -> InlineAttrs {
         }
     }
     out
-}
-
-#[cfg(test)]
-mod scan_utils_tests {
-    use super::{parse_inline_attributes, strip_bracket_attributes};
-
-    #[test]
-    fn refresh_relocates_stale_anchors_to_unoccupied_live_mentions_and_keeps_metadata() {
-        use crate::types::ReferenceEntry;
-        let mut references = vec![
-            ReferenceEntry { code: Some("main.rs#1".into()), ..Default::default() },
-            ReferenceEntry { code: Some("main.rs#2".into()), link: Some("https://example.invalid/a".into()), ..Default::default() },
-            ReferenceEntry { code: Some("main.rs#2".into()), github: Some("example/repo#1".into()), ..Default::default() },
-        ];
-        let live = vec!["main.rs#1".into(), "main.rs#4".into()];
-        assert!(super::refresh_code_reference(&mut references, "main.rs#1", &live, &[]));
-        assert_eq!(references.len(), 3);
-        assert_eq!(references[0].code.as_deref(), Some("main.rs#1"));
-        assert_eq!(references[1].code.as_deref(), Some("main.rs#4"));
-        assert_eq!(references[1].link.as_deref(), Some("https://example.invalid/a"));
-        assert_eq!(references[2].code.as_deref(), Some("main.rs#4"));
-        assert_eq!(references[2].github.as_deref(), Some("example/repo#1"));
-        let before = references.clone();
-        assert!(!super::refresh_code_reference(&mut references, "main.rs#4", &live, &[]));
-        assert_eq!(references, before);
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn locked_inode_rename_preserves_handles_on_unix() {
-        use std::io::Read;
-        use std::os::unix::fs::MetadataExt;
-        let temp = tempfile::tempdir().unwrap();
-        let source = temp.path().join("source.rs");
-        let replacement = temp.path().join("replacement.rs");
-        std::fs::write(&source, "original").unwrap();
-        std::fs::write(&replacement, "replacement").unwrap();
-        let mut old = super::lock_source(&source).unwrap();
-        let mut new = super::lock_source(&replacement).unwrap();
-        std::fs::rename(&replacement, &source).expect("rename while both read/write inodes are locked");
-        let published = std::fs::OpenOptions::new().read(true).write(true).open(&source).unwrap();
-        assert_eq!(published.metadata().unwrap().ino(), new.metadata().unwrap().ino());
-        assert_ne!(published.metadata().unwrap().ino(), old.metadata().unwrap().ino());
-        assert_eq!(fs2::FileExt::try_lock_exclusive(&published).unwrap_err().kind(), std::io::ErrorKind::WouldBlock);
-        let mut old_bytes = String::new();
-        let mut new_bytes = String::new();
-        old.read_to_string(&mut old_bytes).unwrap();
-        new.read_to_string(&mut new_bytes).unwrap();
-        assert_eq!(old_bytes, "original");
-        assert_eq!(new_bytes, "replacement");
-        drop(new);
-        fs2::FileExt::try_lock_exclusive(&published).unwrap();
-    }
-
-    #[test]
-    fn cooperating_source_writers_compare_after_prepare_and_rename() {
-        let temp = tempfile::tempdir().unwrap();
-        let path = temp.path().join("main.rs");
-        std::fs::write(&path, "original").unwrap();
-        let barrier = std::sync::Barrier::new(2);
-        let results = std::thread::scope(|scope| {
-            let first = scope.spawn(|| {
-                super::write_source_with_prepared(&path, "original", "first", || {
-                    barrier.wait();
-                    Ok(())
-                })
-            });
-            let second = scope.spawn(|| {
-                super::write_source_with_prepared(&path, "original", "second", || {
-                    barrier.wait();
-                    Ok(())
-                })
-            });
-            [first.join().unwrap(), second.join().unwrap()]
-        });
-        assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 1);
-        assert!(results.iter().filter_map(|result| result.as_ref().err()).all(|error| error.contains("Source changed")));
-        let winner = std::fs::read_to_string(&path).unwrap();
-        assert_eq!(winner, if results[0].is_ok() { "first" } else { "second" });
-        assert!(super::write_source(&path, "original", "stale").is_err());
-        super::write_source(&path, &winner, "next inode").unwrap();
-        assert_eq!(std::fs::read_to_string(&path).unwrap(), "next inode");
-        assert_eq!(std::fs::read_dir(temp.path()).unwrap().count(), 1);
-    }
-
-    #[test]
-    fn strip_preserves_leading_indentation() {
-        let input = "\t    // TODO: Do it [assignee=me]  [priority=high]";
-        let out = strip_bracket_attributes(input);
-        assert!(out.starts_with("\t    // TODO: Do it"));
-        // Ensure no brackets remain
-        assert!(!out.contains('[') && !out.contains(']'));
-        // Ensure indentation didn't collapse
-        assert_eq!(&out[..5], "\t    ");
-    }
-
-    #[test]
-    fn strip_does_not_collapse_spacing_or_alignments() {
-        let input = "    signal_words: Vec<String>,                     // TODO handle words [tag=scan]  [due=2025-12-31]";
-        let out = strip_bracket_attributes(input);
-        // Leading spaces preserved
-        assert!(out.starts_with("    signal_words: Vec<String>,                     // TODO handle words"));
-        // No brackets remain
-        assert!(!out.contains('[') && !out.contains(']'));
-        // The run of spaces before the comment should still be long (>= 5)
-        let after_comma = out.split("Vec<String>,").nth(1).unwrap_or("");
-        // Expect at least 5 spaces before the // comment after the comma
-        assert!(after_comma.starts_with("     "));
-    }
-
-    #[test]
-    fn parse_inline_attributes_preserves_custom_field_key() {
-        let attrs = parse_inline_attributes("// TODO tidy [product=Platform]");
-        assert_eq!(attrs.fields, vec![("product".to_string(), "Platform".to_string())]);
-    }
 }

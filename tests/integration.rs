@@ -7,7 +7,8 @@
 //! Test names start with the file name (`dev300_cli_sync_followups_test::...`);
 //! select a file with `-E 'test(/^dev300_/)'` or a plain substring.
 //!
-//! `nextest_guard_test` and `performance_test` stay separate binaries.
+//! `nextest_guard_test`, `performance_test` and `windows_regressions` stay
+//! separate binaries.
 //! New test files must be added below (Cargo.toml sets `autotests = false`).
 
 #![allow(clippy::unwrap_used, reason = "test helpers outside #[test] fns")]

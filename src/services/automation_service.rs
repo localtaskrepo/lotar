@@ -1586,18 +1586,19 @@ const ASYNC_STDERR_EOF_GRACE: std::time::Duration = std::time::Duration::from_se
 /// was dropped from the front, so logged stderr can say how much was
 /// skipped instead of growing without bound.
 #[derive(Default)]
-struct BoundedTail {
-    data: Vec<u8>,
-    dropped: usize,
+#[doc(hidden)]
+pub struct BoundedTail {
+    pub data: Vec<u8>,
+    pub dropped: usize,
     limit: usize,
 }
 
 impl BoundedTail {
-    fn new(limit: usize) -> Self {
+    pub fn new(limit: usize) -> Self {
         Self { data: Vec::new(), dropped: 0, limit }
     }
 
-    fn push(&mut self, bytes: &[u8]) {
+    pub fn push(&mut self, bytes: &[u8]) {
         if self.limit == 0 {
             self.dropped += bytes.len();
             return;
@@ -1610,7 +1611,7 @@ impl BoundedTail {
         }
     }
 
-    fn snapshot(&self) -> String {
+    pub fn snapshot(&self) -> String {
         let mut text = String::from_utf8_lossy(&self.data).into_owned();
         if self.dropped > 0 && !self.data.is_empty() {
             text.insert_str(0, &format!("[+{} earlier stderr bytes]\n", self.dropped));
@@ -1673,7 +1674,8 @@ fn spawn_async_run_monitor(mut child: std::process::Child, task_id: String) {
 
 /// EOF (or a vanished reader) counts as drained; a pipe that stays silent
 /// past `grace` is treated as held open by a descendant.
-fn stderr_eof_within_grace(eof_rx: &std::sync::mpsc::Receiver<()>, grace: std::time::Duration) -> bool {
+#[doc(hidden)]
+pub fn stderr_eof_within_grace(eof_rx: &std::sync::mpsc::Receiver<()>, grace: std::time::Duration) -> bool {
     matches!(eof_rx.recv_timeout(grace), Ok(()) | Err(std::sync::mpsc::RecvTimeoutError::Disconnected))
 }
 
@@ -1699,35 +1701,34 @@ fn stderr_eof_within_grace(eof_rx: &std::sync::mpsc::Receiver<()>, grace: std::t
 /// no system-wide state is touched, and console handles that refuse the
 /// flag change are left as-is.
 #[cfg(windows)]
-mod windows_async_stdio {
+#[doc(hidden)]
+pub mod windows_async_stdio {
     use std::sync::Once;
 
     type Handle = *mut core::ffi::c_void;
 
-    pub(super) const STD_OUTPUT_HANDLE: u32 = 0xFFFF_FFF5;
-    pub(super) const STD_ERROR_HANDLE: u32 = 0xFFFF_FFF4;
-    pub(super) const HANDLE_FLAG_INHERIT: u32 = 0x0000_0001;
+    pub const STD_OUTPUT_HANDLE: u32 = 0xFFFF_FFF5;
+    pub const STD_ERROR_HANDLE: u32 = 0xFFFF_FFF4;
+    pub const HANDLE_FLAG_INHERIT: u32 = 0x0000_0001;
 
     #[link(name = "kernel32")]
     unsafe extern "system" {
         fn GetStdHandle(nStdHandle: u32) -> Handle;
         fn SetHandleInformation(hObject: Handle, dwMask: u32, dwFlags: u32) -> i32;
-        #[cfg(test)]
         fn GetHandleInformation(hObject: Handle, lpdwFlags: *mut u32) -> i32;
-        #[cfg(test)]
         fn GetFileType(hObject: Handle) -> u32;
     }
 
     static DETACH_ONCE: Once = Once::new();
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub(super) enum SlotDetach {
+    pub enum SlotDetach {
         NoHandle,
         Cleared,
         NotClearable,
     }
 
-    pub(super) fn clear_std_slot(slot: u32) -> SlotDetach {
+    pub fn clear_std_slot(slot: u32) -> SlotDetach {
         // SAFETY: both calls take plain handle values; null and
         // INVALID_HANDLE_VALUE mean "no such stdio slot".
         unsafe {
@@ -1741,15 +1742,14 @@ mod windows_async_stdio {
 
     /// Idempotent, process-lifetime detach of this process's own stdio
     /// write ends from every future child's inherited handle set.
-    pub(super) fn detach_stdio_for_async_children() {
+    pub fn detach_stdio_for_async_children() {
         DETACH_ONCE.call_once(|| {
             let _ = clear_std_slot(STD_OUTPUT_HANDLE);
             let _ = clear_std_slot(STD_ERROR_HANDLE);
         });
     }
 
-    #[cfg(test)]
-    pub(super) fn std_slot_flags(slot: u32) -> Option<u32> {
+    pub fn std_slot_flags(slot: u32) -> Option<u32> {
         // SAFETY: GetHandleInformation writes a u32 flags value.
         unsafe {
             let handle = GetStdHandle(slot);
@@ -1765,8 +1765,7 @@ mod windows_async_stdio {
     /// captured pipe stdio (the detach must verifiably succeed there) from
     /// console/character handles (which legitimately refuse the flag
     /// change). `FILE_TYPE_UNKNOWN` (0) covers absent handles too.
-    #[cfg(test)]
-    pub(super) fn std_slot_file_type(slot: u32) -> u32 {
+    pub fn std_slot_file_type(slot: u32) -> u32 {
         // SAFETY: GetFileType returns a DWORD file-type code for the handle.
         unsafe {
             let handle = GetStdHandle(slot);
@@ -2910,109 +2909,5 @@ mod dev21_cross_root_dependency_tests {
         std::fs::write(file, yaml).unwrap();
         let storage = Storage::new(&tmp.path().join(".tasks"));
         assert_eq!(find_blocked_dependencies(&storage, &dependent_dto("PX-9", &["PX-1", "PX-2", "PX-3"])), vec!["PX-2".to_string(), "PX-3".to_string()]);
-    }
-}
-
-#[cfg(test)]
-mod async_run_monitor_tests {
-    use super::*;
-    use std::sync::mpsc;
-    use std::time::{Duration, Instant};
-
-    #[test]
-    fn bounded_tail_keeps_final_bytes_and_reports_dropped_prefix() {
-        let mut tail = BoundedTail::new(8);
-        tail.push(b"abcdefgh");
-        assert_eq!(tail.dropped, 0);
-        assert_eq!(tail.data, b"abcdefgh".to_vec());
-
-        tail.push(b"ijklmn");
-        assert_eq!(tail.data, b"ghijklmn".to_vec());
-        assert_eq!(tail.dropped, 6);
-
-        let snapshot = tail.snapshot();
-        assert!(snapshot.contains("[+6 earlier stderr bytes]\n"), "{snapshot}");
-        assert!(snapshot.ends_with("ghijklmn"), "{snapshot}");
-    }
-
-    #[test]
-    fn bounded_tail_zero_limit_drops_everything() {
-        let mut tail = BoundedTail::new(0);
-        tail.push(b"xyz");
-        assert_eq!(tail.dropped, 3);
-        assert!(tail.data.is_empty());
-        assert_eq!(tail.snapshot(), "");
-    }
-
-    #[test]
-    fn eof_grace_treats_closed_channel_as_drained_and_silence_as_held() {
-        // A live-but-silent pipe (descendant holds the write end) only
-        // waits out the grace period before being reported as held.
-        let (silent_tx, silent_rx) = mpsc::channel::<()>();
-        let start = Instant::now();
-        assert!(!stderr_eof_within_grace(&silent_rx, Duration::from_millis(50)));
-        assert!(start.elapsed() >= Duration::from_millis(45), "grace returned early: {:?}", start.elapsed());
-
-        // A reader that finished (message sent, then channel closed) is
-        // drained, including the already-disconnected case.
-        drop(silent_tx);
-        assert!(stderr_eof_within_grace(&silent_rx, Duration::from_millis(1)));
-
-        let (tx, rx) = mpsc::channel::<()>();
-        tx.send(()).unwrap();
-        assert!(stderr_eof_within_grace(&rx, Duration::from_millis(1)));
-    }
-}
-
-/// Native Windows proof of the stdio-inheritance scope. Runs wherever the
-/// lib tests run on Windows; the end-to-end coupling regression lives in
-/// the portable smoke selection (`cli.automation` /
-/// `api.automation.smoke.spec.ts`).
-#[cfg(all(test, windows))]
-mod windows_async_stdio_tests {
-    use super::windows_async_stdio::{self as sys};
-
-    const FILE_TYPE_PIPE: u32 = 0x0003;
-
-    #[test]
-    fn detach_clears_inherit_bit_on_pipe_stdio() {
-        for (name, slot) in [("stdout", sys::STD_OUTPUT_HANDLE), ("stderr", sys::STD_ERROR_HANDLE)] {
-            let file_type = sys::std_slot_file_type(slot);
-            let outcome = sys::clear_std_slot(slot);
-            let flags = sys::std_slot_flags(slot);
-            if file_type == FILE_TYPE_PIPE {
-                // Captured pipe stdio (nextest/CI): the detach must
-                // verifiably clear the bit. A refusal on a real pipe is a
-                // genuine failure and must not be silently accepted.
-                assert_eq!(outcome, sys::SlotDetach::Cleared, "{name} std slot is a pipe; detach refused (file_type={file_type:#x})");
-                assert_eq!(flags.unwrap_or(u32::MAX) & sys::HANDLE_FLAG_INHERIT, 0, "{name} pipe std slot still inheritable after detach");
-            } else {
-                // Console/character handles legitimately refuse
-                // SetHandleInformation; interactive runs take this arm and
-                // only report/query consistency is enforced there.
-                match (outcome, flags) {
-                    (sys::SlotDetach::NoHandle, None) => {}
-                    (sys::SlotDetach::NotClearable, _) => {}
-                    (sys::SlotDetach::Cleared, Some(flags)) => {
-                        assert_eq!(flags & sys::HANDLE_FLAG_INHERIT, 0, "{name} std slot still inheritable after detach");
-                    }
-                    other => panic!("{name}: inconsistent detach state {other:?} (file_type={file_type:#x})"),
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn detach_is_idempotent_across_calls() {
-        sys::detach_stdio_for_async_children();
-        let first = sys::clear_std_slot(sys::STD_OUTPUT_HANDLE);
-        let second = sys::clear_std_slot(sys::STD_OUTPUT_HANDLE);
-        assert_eq!(first, second);
-        // Clearing an already-cleared slot stays cleared (idempotent
-        // outcome, not a flip-flop of the inherit bit).
-        if let sys::SlotDetach::Cleared = second {
-            let flags = sys::std_slot_flags(sys::STD_OUTPUT_HANDLE);
-            assert_eq!(flags.unwrap_or(0) & sys::HANDLE_FLAG_INHERIT, 0, "repeat detach re-armed the inherit flag");
-        }
     }
 }

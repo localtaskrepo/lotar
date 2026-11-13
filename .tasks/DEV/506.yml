@@ -1,14 +1,15 @@
 title: Python __pycache__ files are tracked and not ignored, so job auto-commits pick up new .pyc files
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T23:16:21.313989+00:00
-modified: 2026-11-13T23:48:00.275334+00:00
+modified: 2026-11-13T23:55:41.361740+00:00
 relationships:
   related:
   - DEV-495
+  - DEV-493
 comments:
 - date: 2026-11-13T23:33:02.168637+00:00
   author: claude
@@ -16,6 +17,9 @@ comments:
 - date: 2026-11-13T23:47:53.492327+00:00
   author: codex
   text: 'Review: passed. Reviewed 9be309fb, complete diff, ticket comments, related DEV-495 merge notes, repo guidance and main history. Only change: ignore __pycache__/ and untrack two artifacts. HEAD^ tracks both; HEAD tracks no pycache or pyc files. Nested cpython-314 and cpython-315 paths match .gitignore:9. git diff --check passes; clean worktree. Main has only the same two artifacts, covered by this removal. DEV-495 separately requires dropping its generated artifact commit. No findings or tickets filed. No application or UI changes; lint, application tests and smoke not run. No files, status or assignee changed.'
+- date: 2026-11-13T23:55:35.498441+00:00
+  author: codex
+  text: 'Merged locally: rebased 9be309fb onto main as a6f373ca, fast-forwarded main, and included pending .tasks updates in signed commit b4e61f6c as instructed. Main health checks pass: no tracked __pycache__ or .pyc files; git check-ignore confirms nested caches ignored via .gitignore:9. git diff --check passed. Application lint/tests/smoke not run: only ignore configuration and generated-file removal, no runtime code. Not pushed: preceding unpushed DEV-493 commit 23484856 is still HelpNeeded; leaving the unpushed stack intact. Status and assignee unchanged; job automation advances the ticket on completion.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3666565f-d65d-4b5b-bda0-e36206a47bc1
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b0e3e88-d860-4cb2-9003-4d61f98dbd31
@@ -78,3 +82,19 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-13T23:55:35.498441+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:55:35.603461+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-495"]}'
+    new: '{"related":["DEV-495","DEV-493"]}'
+- at: 2026-11-13T23:55:41.361740+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

@@ -64,6 +64,10 @@ flate2 = { version = "1.1.10", default-features = false, features = ["rust_backe
 libc = "0.2.191"
 sysinfo = { version = "0.40.1", default-features = false, features = ["system"] }
 fs2 = "0.4.3"
+# Not used directly: enables the features assert_cmd turns on, so test targets
+# reuse the library `cargo build` made instead of compiling it again (DEV-495).
+# The extra code is never called; release LTO removes it.
+bstr = "1.13.1"
 
 # Production release profile optimized for minimal binary size
 [profile.release]
@@ -145,7 +149,8 @@ opt-level = 2
 
 [dev-dependencies]
 assert_cmd = "2.2.2"
-predicates = "3.1.4"
+# No default features: its regex feature would turn on regex defaults (DEV-495).
+predicates = { version = "3.1.4", default-features = false }
 tempfile = "3.27.0"
 ctor = "1.0.13"
 dtor = "1.0.6"
@@ -162,8 +167,8 @@ version = "1.2.3"
 optional = true
 
 # DEV-302: one binary for the integration tests (each tests/*.rs file is a
-# module of tests/integration.rs); the guard and the performance budgets keep
-# their own binaries.
+# module of tests/integration.rs); the guard, the performance budgets and the
+# tests the Windows CI job runs (DEV-495) keep their own binaries.
 [[test]]
 name = "integration"
 path = "tests/integration.rs"
@@ -175,3 +180,7 @@ path = "tests/nextest_guard_test.rs"
 [[test]]
 name = "performance_test"
 path = "tests/performance_test.rs"
+
+[[test]]
+name = "windows_regressions"
+path = "tests/windows_regressions.rs"

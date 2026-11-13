@@ -522,8 +522,8 @@ jobs:
       with:
         tool: nextest
 
-    # Preserve Windows compilation coverage for every target without linking
-    # 129 unused integration-test executables before this selected runtime gate.
+    # Preserve Windows compilation coverage for every target (the library's
+    # unit tests included) without linking them for the selected runtime gate.
     - name: Compile-check all Windows targets
       shell: pwsh
       run: |
@@ -531,17 +531,18 @@ jobs:
         cargo check --profile ci --all-targets --all-features
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-    # Module selection, not a name list: every test under the storage
-    # safety and scan modules runs here, so platform-specific cases (the
-    # Windows atomic-readonly one included) and future additions are
-    # covered without maintaining witness names.
-    # If a future runtime selector needs an integration suite, add its
-    # --test target to both run and list; all suites are compile-checked above.
+    # Target selection, not a name list: every test in the windows_regressions
+    # binary (tests/windows_regressions.rs: storage safety, scan, async-run
+    # monitoring) and in lotar-agent-wrapper runs here, so platform-specific
+    # cases (the Windows atomic-readonly one included) and future additions
+    # are covered without maintaining witness names. A small binary of its own
+    # keeps the library's unit-test build and the integration binary out of
+    # this job (DEV-495).
     - name: Run storage safety, scan, and process regressions (nextest)
       shell: pwsh
       run: |
         $ErrorActionPreference = 'Stop'
-        cargo nextest run --cargo-profile ci --all-features --retries 0 --failure-output=immediate-final --lib --bin lotar-agent-wrapper -E 'test(storage::safety::) | test(utils::scan::) | binary(lotar-agent-wrapper) | test(services::automation_service::windows_async_stdio_tests::) | test(services::automation_service::async_run_monitor_tests::)'
+        cargo nextest run --cargo-profile ci --all-features --retries 0 --failure-output=immediate-final --test windows_regressions --bin lotar-agent-wrapper
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
     - name: Enforce selection coverage (manifest vs JUnit)
@@ -551,7 +552,7 @@ jobs:
         New-Item -ItemType Directory -Force -Path target/nextest | Out-Null
         # --run-ignored all keeps ignored tests visible as selected-but-ignored
         # so the checker rejects them instead of silently filtering them out.
-        cargo nextest list --cargo-profile ci --all-features --lib --bin lotar-agent-wrapper --run-ignored all --message-format json -E 'test(storage::safety::) | test(utils::scan::) | binary(lotar-agent-wrapper) | test(services::automation_service::windows_async_stdio_tests::) | test(services::automation_service::async_run_monitor_tests::)' | Out-File -Encoding utf8 target/nextest/windows-manifest.json
+        cargo nextest list --cargo-profile ci --all-features --test windows_regressions --bin lotar-agent-wrapper --run-ignored all --message-format json | Out-File -Encoding utf8 target/nextest/windows-manifest.json
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         python scripts/check-test-coverage.py --label 'windows storage + scan + process regressions' --manifest target/nextest/windows-manifest.json --junit target/nextest/default/junit.xml
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

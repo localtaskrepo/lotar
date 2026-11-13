@@ -23,21 +23,18 @@ fn attempted_windows_smoke_runs_still_require_a_report_but_skipped_runs_do_not()
     assert!(steps.iter().position(|step| std::ptr::eq(step, compile_check)).unwrap() < steps.iter().position(|step| std::ptr::eq(step, rust_run)).unwrap());
     for step in [rust_run, rust_list] {
         let command = step["run"].as_str().unwrap();
-        assert!(command.contains("--lib --bin lotar-agent-wrapper"));
+        // Whole targets: the library's unit tests and the integration binary
+        // take minutes to build on Windows (DEV-495).
+        assert!(command.contains("--test windows_regressions --bin lotar-agent-wrapper"), "{command}");
         let flags: Vec<_> = command.split_whitespace().collect();
-        assert!(!flags.contains(&"--tests"));
-        assert!(!flags.contains(&"--bins"));
-    }
-    for selector in [
-        "test(storage::safety::)",
-        "test(utils::scan::)",
-        "binary(lotar-agent-wrapper)",
-        "test(services::automation_service::windows_async_stdio_tests::)",
-        "test(services::automation_service::async_run_monitor_tests::)",
-    ] {
-        for step in [rust_run, rust_list] {
-            assert!(step["run"].as_str().unwrap().contains(selector), "Windows run and coverage manifest must include {selector}");
+        for flag in ["--lib", "--tests", "--bins", "-E", "integration"] {
+            assert!(!flags.contains(&flag), "Windows run and coverage manifest must not use {flag}: {command}");
         }
+    }
+    let binary = include_str!("windows_regressions.rs");
+    for module in ["storage_safety_test", "utils_scan_test", "automation_async_run_test"] {
+        assert!(binary.contains(&format!("mod {module};")), "Windows regressions must include {module}");
+        assert!(!include_str!("integration.rs").contains(&format!("mod {module};")), "{module} belongs to one test binary only");
     }
     assert!(rust_run["run"].as_str().unwrap().contains("--retries 0"));
     assert!(rust_run["run"].as_str().unwrap().contains("--failure-output=immediate-final"));
@@ -300,6 +297,15 @@ fn rust_path_filter_covers_the_repository_files_rust_tests_read() {
                 _ => continue,
             };
             let Ok(target) = target.canonicalize() else { continue };
+            if target.is_dir() {
+                // A directory read depends on the Rust sources it enumerates.
+                let directory = target.strip_prefix(&root).unwrap().to_str().unwrap();
+                for source in repository_files(&[directory], &["rs"], &[]) {
+                    let relative = source.strip_prefix(&root).unwrap().to_string_lossy().replace('\\', "/");
+                    assert!(filters.jobs_for(&relative).contains(&"rust_checks"), "directory reader requires {relative}");
+                }
+                continue;
+            }
             let relative = target.strip_prefix(&root).unwrap().to_string_lossy().replace('\\', "/");
             checked += 1;
             assert!(

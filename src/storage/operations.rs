@@ -224,7 +224,6 @@ impl StorageOperations {
 
         let project_path = root_path.join(&project_folder);
 
-        #[cfg(test)]
         before_task_write::run(root_path, id);
         with_storage_lock(&project_path, "task", || {
             let file_path = match Self::get_file_path_for_id(&project_path, id) {
@@ -285,7 +284,6 @@ impl StorageOperations {
 
         let project_path = root_path.join(&project_folder);
 
-        #[cfg(test)]
         before_task_write::run(root_path, id);
         with_storage_lock(&project_path, "task", || {
             let file_path = match Self::get_file_path_for_id(&project_path, id) {
@@ -590,8 +588,9 @@ impl StorageOperations {
 }
 
 /// Simulate an editor committing after a caller's lookup, before its write lock.
-#[cfg(test)]
-pub(crate) mod before_task_write {
+/// Public only for tests/utils_scan_test.rs.
+#[doc(hidden)]
+pub mod before_task_write {
     use std::cell::RefCell;
     use std::path::{Path, PathBuf};
 
@@ -605,7 +604,7 @@ pub(crate) mod before_task_write {
         static HOOK: RefCell<Option<Hook>> = const { RefCell::new(None) };
     }
 
-    pub(crate) struct Guard;
+    pub struct Guard;
 
     impl Drop for Guard {
         fn drop(&mut self) {
@@ -613,7 +612,7 @@ pub(crate) mod before_task_write {
         }
     }
 
-    pub(crate) fn install(root: &Path, id: &str, callback: impl FnOnce() + 'static) -> Guard {
+    pub fn install(root: &Path, id: &str, callback: impl FnOnce() + 'static) -> Guard {
         HOOK.with(|slot| {
             let mut slot = slot.borrow_mut();
             assert!(slot.is_none(), "task-write hook already installed");
