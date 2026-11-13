@@ -405,6 +405,27 @@ on:
     run: "echo ${{comment.author}} wrote ${{comment.text}}"
 ```
 
+### Phone notifications
+
+A `run` action can send a push to your phone through any service that takes an HTTP request, such as [ntfy](https://ntfy.sh) or [Pushover](https://pushover.net). This rule pushes when a ticket is handed to `mallox`:
+
+```yaml
+automation:
+  rules:
+    - name: Push when a ticket needs me
+      when:
+        assignee: mallox
+      on:
+        assigned:
+          run: 'curl -fsS -H "Title: ${{ticket.id}} needs you" -d "${{ticket.title}}" "https://ntfy.sh/$(cat ~/.config/ntfy-topic)"'
+```
+
+- Keep the topic or token out of the repository: read it from a file in your home directory, as above, or from an environment variable of the process that runs LoTaR. With ntfy the topic name is the password, so pick a long random one.
+- A rule in the repository's automation file runs commands only after [`lotar trust`](trust.md). A rule in your home file needs no trust, but a project with its own `automation.yml` ignores the home file.
+- To limit pushes to one project, such as an inbox project where everything that needs you lands, put the rule in that project's `automation.yml`, or use `created` instead of `assigned` there.
+- The push is sent by whichever process makes the change (the CLI, `lotar serve`, an agent job), on that machine.
+- For one digest instead of a push per ticket, leave out the rule and send the list from cron ([Running rules on a schedule](#running-rules-on-a-schedule)): `0 9 * * * cd /path/to/repo && lotar list assignee:mallox -status:done | curl -fsS -H "Title: Waiting for you" --data-binary @- "https://ntfy.sh/$(cat ~/.config/ntfy-topic)"`.
+
 ## Execution and composition semantics
 
 - Rules run in file order. A matching rule fires its event hook(s) (`created`, `updated`, `assigned`, `sprint_changed`, `release_changed`, `commented`, `unblocked`, or the job hooks) and then the legacy `start` catch-all. Each action is committed before the next one applies.
