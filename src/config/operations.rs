@@ -434,21 +434,12 @@ pub fn save_project_config(tasks_dir: &Path, project_prefix: &str, config: &Proj
     Ok(())
 }
 
-/// Ensure the provided members exist in the project's configuration, creating the project
-/// config if necessary. Returns the updated member list when changes were applied.
-pub fn auto_populate_project_members(
-    tasks_dir: &Path,
-    project_prefix: &str,
-    base_members: &[String],
-    new_members: &[String],
-) -> Result<Option<Vec<String>>, ConfigError> {
-    match plan_auto_populated_project_config(tasks_dir, project_prefix, base_members, new_members)? {
-        Some((project_config, effective)) => {
-            save_project_config(tasks_dir, project_prefix, &project_config)?;
-            Ok(Some(effective))
-        }
-        None => Ok(None),
-    }
+/// The YAML an automatic write of `config` puts in the project's config file:
+/// the file on disk with only the changed members and name patched in, so
+/// hand-written comments survive (DEV-407).
+pub fn auto_written_project_yaml(tasks_dir: &Path, project_prefix: &str, config: &ProjectConfig) -> String {
+    let existing = fs::read_to_string(crate::utils::paths::project_config_path(tasks_dir, project_prefix)).ok();
+    crate::config::normalization::to_project_yaml_preserving(project_prefix, existing.as_deref(), config)
 }
 
 /// Compute the project config that auto-population would write, without

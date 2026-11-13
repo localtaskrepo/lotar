@@ -434,7 +434,7 @@ Branch alias maps (global- and project-level):
 - `branch.priority_aliases` - Map branch tokens to priorities. Example: `{ hotfix: Critical }`
 
 Notes:
-- When `default.strict_members` is true, reporter and assignee must be listed in `members`. With `auto.populate_members` enabled (default), LoTaR automatically appends new identities to the project member list before validation.
+- When `default.strict_members` is true, reporter and assignee must be listed in `members`. With `auto.populate_members` enabled (default), LoTaR automatically appends new identities to the project member list before validation. That write changes only the `members` list in the project's `config.yml`; comments and the other lines stay as written.
 - Keys are matched case-insensitively (normalized to lowercase during parse/merge).
 - Project-level maps override/add to global maps. On conflict, project wins.
 - Aliases must map to values present in the project's `issue.*` lists; invalid entries are ignored at use time.

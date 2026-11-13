@@ -531,13 +531,13 @@ impl TaskService {
         if let Some(original_name) = original_project_name.map(str::trim).filter(|n| !n.is_empty()) {
             // Legacy `StorageOperations::add` rule: record the human-readable
             // name whenever the config is created, or still carries the
-            // prefix (or nothing) as its name.
+            // prefix (or nothing) as its name. A name that already says the
+            // same thing in other case stays as written (DEV-407).
             let config_exists = crate::utils::paths::project_config_path(tasks_root, project).is_file();
             let current = project_config.project_name.trim();
-            if !config_exists || current.is_empty() || current.eq_ignore_ascii_case(project) {
-                if current != original_name {
-                    project_config.project_name = original_name.to_string();
-                }
+            let carries_prefix = (current.is_empty() || current.eq_ignore_ascii_case(project)) && !current.eq_ignore_ascii_case(original_name);
+            if !config_exists || carries_prefix {
+                project_config.project_name = original_name.to_string();
                 changed = true;
             }
         }
@@ -573,7 +573,7 @@ impl TaskService {
         if !changed {
             return Ok((None, planned_members));
         }
-        let yaml = crate::config::normalization::to_canonical_project_yaml(&project_config);
+        let yaml = crate::config::operations::auto_written_project_yaml(tasks_root, project, &project_config);
         Ok((Some(yaml), planned_members))
     }
 
@@ -2072,7 +2072,7 @@ impl TaskService {
 
         match plan {
             Some((project_config, effective)) => {
-                let yaml = crate::config::normalization::to_canonical_project_yaml(&project_config);
+                let yaml = crate::config::operations::auto_written_project_yaml(tasks_root, project, &project_config);
                 config.members = effective;
                 Ok((config, Some(yaml)))
             }

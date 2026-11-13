@@ -659,6 +659,113 @@ pub fn to_canonical_global_yaml_with(cfg: &GlobalConfig, options: GlobalYamlOpti
     serde_yaml_ng::to_string(&Y::Mapping(root)).unwrap_or_default()
 }
 
+/// Render `cfg` for an automatic write (auto-populated members, a detected
+/// project name) over the file the user wrote: only the `members` and
+/// `project.name` lines change, so comments, key order and spelling stay
+/// (DEV-407). Falls back to canonical YAML when there is no file, or the file
+/// can't be patched into exactly `cfg`.
+pub fn to_project_yaml_preserving(project_prefix: &str, existing: Option<&str>, cfg: &ProjectConfig) -> String {
+    let canonical = to_canonical_project_yaml(cfg);
+    let Some(existing) = existing else {
+        return canonical;
+    };
+    let Ok(current) = parse_project_from_yaml_str(project_prefix, existing) else {
+        return canonical;
+    };
+    let mut text = existing.to_string();
+    if current.members != cfg.members {
+        match &cfg.members {
+            Some(members) if !members.is_empty() => text = with_top_level_members(&text, members),
+            _ => return canonical,
+        }
+    }
+    if current.project_name != cfg.project_name {
+        match with_project_name(&text, &cfg.project_name) {
+            Some(patched) => text = patched,
+            None => return canonical,
+        }
+    }
+    match parse_project_from_yaml_str(project_prefix, &text) {
+        Ok(patched) if to_canonical_project_yaml(&patched) == canonical => text,
+        _ => canonical,
+    }
+}
+
+fn join_lines(lines: &[String], trailing_newline: bool) -> String {
+    let mut text = lines.join("\n");
+    if trailing_newline {
+        text.push('\n');
+    }
+    text
+}
+
+fn is_top_level_key(line: &str, key: &str) -> Option<String> {
+    line.strip_prefix(key).and_then(|rest| rest.strip_prefix(':')).map(str::to_string)
+}
+
+/// Replace the item lines of a top-level `members:` block (or an inline
+/// list), or append the block when the file has none.
+fn with_top_level_members(text: &str, members: &[String]) -> String {
+    let mut lines: Vec<String> = text.lines().map(str::to_string).collect();
+    let items: Vec<String> = serde_yaml_ng::to_string(members).unwrap_or_default().lines().map(str::to_string).collect();
+    let Some(key_index) = lines.iter().position(|line| is_top_level_key(line, "members").is_some()) else {
+        lines.push("members:".to_string());
+        lines.extend(items);
+        return join_lines(&lines, true);
+    };
+
+    let rest = is_top_level_key(&lines[key_index], "members").unwrap_or_default();
+    let rest = rest.trim();
+    if !rest.is_empty() && !rest.starts_with('#') {
+        // Inline value such as `members: [a, b]`.
+        lines.splice(key_index..=key_index, std::iter::once("members:".to_string()).chain(items));
+        return join_lines(&lines, text.ends_with('\n'));
+    }
+
+    let mut end = key_index + 1;
+    while end < lines.len() && (lines[end].trim().is_empty() || lines[end].starts_with([' ', '\t', '-'])) {
+        end += 1;
+    }
+    while end > key_index + 1 && lines[end - 1].trim().is_empty() {
+        end -= 1;
+    }
+    let indent: String = lines[key_index + 1..end]
+        .iter()
+        .find(|line| line.trim_start().starts_with('-'))
+        .map(|line| line.chars().take_while(|c| *c == ' ').collect())
+        .unwrap_or_default();
+    lines.splice(key_index + 1..end, items.into_iter().map(|item| format!("{indent}{item}")));
+    join_lines(&lines, text.ends_with('\n'))
+}
+
+/// Replace the value of `project.name` (nested, dotted, or the flat
+/// `project_name` spelling). `None` when the file spells it some other way.
+fn with_project_name(text: &str, name: &str) -> Option<String> {
+    let scalar = serde_yaml_ng::to_string(name).ok()?.trim_end().to_string();
+    let mut lines: Vec<String> = text.lines().map(str::to_string).collect();
+    if let Some(index) = lines.iter().position(|line| is_top_level_key(line, "project.name").is_some()) {
+        lines[index] = format!("project.name: {scalar}");
+        return Some(join_lines(&lines, text.ends_with('\n')));
+    }
+    if let Some(index) = lines.iter().position(|line| is_top_level_key(line, "project_name").is_some()) {
+        lines[index] = format!("project_name: {scalar}");
+        return Some(join_lines(&lines, text.ends_with('\n')));
+    }
+    let project_index =
+        lines.iter().position(|line| is_top_level_key(line, "project").is_some_and(|rest| rest.trim().is_empty() || rest.trim().starts_with('#')))?;
+    let mut index = project_index + 1;
+    while index < lines.len() && (lines[index].trim().is_empty() || lines[index].starts_with([' ', '\t'])) {
+        let trimmed = lines[index].trim_start();
+        if trimmed.starts_with("name:") {
+            let indent = &lines[index][..lines[index].len() - trimmed.len()];
+            lines[index] = format!("{indent}name: {scalar}");
+            return Some(join_lines(&lines, text.ends_with('\n')));
+        }
+        index += 1;
+    }
+    None
+}
+
 /// Render ProjectConfig into canonical nested YAML form
 pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
     use serde_yaml_ng::Value as Y;
