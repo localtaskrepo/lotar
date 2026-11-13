@@ -1,8 +1,11 @@
 import type { ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
+import { rmSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
 import { execa, type ResultPromise } from 'execa';
 import getPort from 'get-port';
 import { ensureBinaryExists } from './binary.js';
+import { SERVER_REGISTRY_ENV } from './server-guard.js';
 import type { SmokeWorkspace } from './workspace.js';
 
 export interface LotarServerOptions {
@@ -180,6 +183,7 @@ export async function launchAndWaitReady(
     // execa >= 10 returns a Promise, not an EventEmitter; event/state access
     // goes through the underlying Node child process.
     const node = child.nodeChildProcess;
+    registerServer(node);
 
     const describeStderr = () => (stderrChunks.length > 0 ? `\nstderr:\n${stderrChunks.join('')}` : '');
 
@@ -281,6 +285,20 @@ export async function launchAndWaitReady(
         port: marker.port,
         stop: () => stopChildProcess(child, node),
     };
+}
+
+/**
+ * Record a spawned server in the run's registry until it exits, so the
+ * reaper from `server-guard.ts` kills it if the run ends first (DEV-471).
+ */
+function registerServer(node: ChildProcess): void {
+    const registry = process.env[SERVER_REGISTRY_ENV];
+    if (!registry || node.pid === undefined) {
+        return;
+    }
+    const entry = path.join(registry, String(node.pid));
+    writeFileSync(entry, '');
+    node.once('exit', () => rmSync(entry, { force: true }));
 }
 
 /**

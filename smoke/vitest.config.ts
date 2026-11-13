@@ -21,7 +21,7 @@ export default defineConfig({
         // holds. Polls stay condition-based; they only get a realistic budget.
         // Explicit per-poll timeouts still override this.
         expect: { poll: { timeout: 15_000 } },
-        globalSetup: ['../scripts/vitest-temp-guard.mjs'],
+        globalSetup: ['helpers/server-guard.ts', '../scripts/vitest-temp-guard.mjs'],
         setupFiles: ['helpers/setup.ts'],
         env: {
             LOTAR_TEST_SILENT: '1',

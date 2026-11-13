@@ -1,12 +1,15 @@
-import type { ChildProcess } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { spawn, type ChildProcess } from 'node:child_process';
+import { once } from 'node:events';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import net from 'node:net';
+import { pathToFileURL } from 'node:url';
 import getPort from 'get-port';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveBinaryPath } from '../helpers/binary.js';
 import { launchAndWaitReady, readReadyMarker, resolveServerBind, startLotarServer } from '../helpers/server.js';
+import { SERVER_REGISTRY_ENV } from '../helpers/server-guard.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
 vi.mock('get-port', async (importOriginal) => {
@@ -373,6 +376,44 @@ describe.skipIf(!lotarBinaryAvailable)('lotar serve readiness contract (real bin
                 break;
             }
         } finally {
+            await workspace.dispose();
+        }
+    });
+
+    it('stops the servers of a run that is killed (DEV-471)', async () => {
+        const workspace = await SmokeWorkspace.create({ name: 'dev471-reaper-' });
+        const registry = mkdtempSync(path.join(tmpdir(), 'dev471-registry-'));
+        vi.stubEnv(SERVER_REGISTRY_ENV, registry);
+        // Stands in for the smoke run: it starts the reaper the way the global setup does.
+        const guard = pathToFileURL(path.resolve(import.meta.dirname, '../helpers/server-guard.ts')).href;
+        const run = spawn(
+            process.execPath,
+            [
+                '--input-type=module',
+                '-e',
+                `import { startServerReaper } from '${guard}'; startServerReaper(process.argv[1]); console.log('ready'); setInterval(() => {}, 1000);`,
+                registry,
+            ],
+            { stdio: ['ignore', 'pipe', 'inherit'] },
+        );
+        try {
+            const [ready] = (await once(run.stdout, 'data')) as [Buffer];
+            expect(ready.toString()).toContain('ready');
+            const server = await startLotarServer(workspace);
+            try {
+                const node = server.raw.nodeChildProcess;
+                expect(readdirSync(registry)).toEqual([String(node.pid)]);
+
+                run.kill('SIGKILL');
+                await expect.poll(() => exited(node), { timeout: HANG_GUARD_MS }).toBe(true);
+                expect(existsSync(registry)).toBe(false);
+            } finally {
+                await server.stop();
+            }
+        } finally {
+            run.kill('SIGKILL');
+            vi.unstubAllEnvs();
+            rmSync(registry, { recursive: true, force: true });
             await workspace.dispose();
         }
     });
