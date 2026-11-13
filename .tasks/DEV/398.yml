@@ -1,11 +1,11 @@
 title: Release v0.14.2
-status: Todo
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-12T23:59:19.550608+00:00
-modified: 2026-11-13T06:21:28.144558+00:00
+modified: 2026-11-13T06:36:06.760856+00:00
 relationships:
   depends_on:
   - DEV-407
@@ -31,6 +31,9 @@ comments:
 - date: 2026-11-13T06:21:28.077527+00:00
   author: claude
   text: 'The next release ticket exists already: DEV-415 (Release v0.14.3), opened for DEV-408, which landed after the v0.14.2 tag. Step 8 has nothing to open.'
+- date: 2026-11-13T06:36:06.661267+00:00
+  author: claude
+  text: 'Step 5: Release run 43358399271 succeeded (52 assets, published 2026-11-13T03:21Z). Step 6: brew upgrade lotar, lotar --version prints 0.14.2; the lotar servers restarted on it. Step 7: closing. Nothing depends on this release. Step 8: the next one is DEV-415 (v0.14.3), which the owner asked to release now.'
 description: 'Next release. The owner picks the bump; rename this ticket if it differs (the title must start with ''Release v''). Steps: .github/skills/release/SKILL.md and docs/release-guide.md. Done when the release is installed here. Tickets that wait for this release are Blocked and depend on it; closing this ticket hands them to @fix to run their checks. Waiting now: none.'
 history:
 - at: 2026-11-13T03:07:40.917461+00:00
@@ -77,3 +80,13 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-407"],"related":["DEV-400","DEV-407","DEV-412"]}'
     new: '{"depends_on":["DEV-407"],"related":["DEV-400","DEV-407","DEV-412","DEV-408","DEV-415"]}'
+- at: 2026-11-13T06:36:06.661267+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T06:36:06.760856+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: Done
