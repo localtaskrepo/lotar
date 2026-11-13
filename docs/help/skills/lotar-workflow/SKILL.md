@@ -43,12 +43,15 @@ Do not call both transports for each operation or repeatedly dump every schema.
 | Search | `task_list` with `project`, `search`, `limit` | `list -p "$PROJECT" "search words" --limit 10` |
 | Read | `task_get` with `id` | `--format json list "$TASK_ID"`; `comment "$TASK_ID"` |
 | Create | `task_create` | `add "Outcome" -p "$PROJECT" --description "Scope and acceptance criteria"` |
+| Create one that waits for another | `task_create` with `relationships.depends_on` | `add "Outcome" -p "$PROJECT" --status "$WAITING" --depends-on "$OTHER_ID"` |
 | Report a found problem once | `task_create` with `finding` | `add "Problem" -p "$PROJECT" --finding "<stable key>" -D "What you saw"` |
 | Progress | `task_comment_add` with `id`, `text` | `comment "$TASK_ID" -m "Outcome; evidence; next step"` |
 | State | `task_update` with `id`, `patch.status` | `status "$TASK_ID" "$STATUS"` |
 | Values/schema | `config_show`; `schema_discover` filtered by `tool` | `config show --project "$PROJECT"`; command `--help` |
 
-Set `STATUS` to a configured value before transitioning. Use LoTaR mutations rather
+Set `STATUS` (and `WAITING`, the project's waiting state such as `Blocked`) to a
+configured value before transitioning. Give a new ticket its links when you create
+it, not in a second command: rules that run when it is created already see them. Use LoTaR mutations rather
 than editing task YAML directly, preserving validation and history. Leave fields
 outside your scope untouched; on uncertain failures, inspect state before retrying
 non-idempotent creates/comments so you do not duplicate them.

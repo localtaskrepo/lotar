@@ -48,7 +48,7 @@ Statuses in rules must exist in your project. The default states are Todo, InPro
 
 Rules only evaluate on task changes. The short form `status: InProgress` means “status changed to InProgress.” Use `changes` for explicit transitions.
 
-Every field condition needs its field to change in the update that fires the rule, also inside `all`. `all: [ {status: Done}, {tags: {any: [urgent]}} ]` fires only when one update sets the status to Done and changes the tags; setting the status of a ticket that is already tagged `urgent` does not fire it. The exceptions look at the task as it is now: `sprint` and `release` conditions, the time conditions below, `before`/`within`/`older_than` on `due_date`, and `assignee: { exists: ... }`. `lotar automation simulate` tells you which fields a rule needs to change ([Simulating rules](#simulating-rules)).
+Every field condition needs its field to change in the update that fires the rule, also inside `all`. `all: [ {status: Done}, {tags: {any: [urgent]}} ]` fires only when one update sets the status to Done and changes the tags; setting the status of a ticket that is already tagged `urgent` does not fire it. The exceptions look at the task as it is now: `sprint`, `release` and [relationship](#relationship-conditions) conditions, the time conditions below, `before`/`within`/`older_than` on `due_date`, and `assignee: { exists: ... }`. `lotar automation simulate` tells you which fields a rule needs to change ([Simulating rules](#simulating-rules)).
 
 To check a field's value without requiring it to change, put the condition under `current`. It looks at the task as it is now, takes the same conditions as `when`, and works next to change conditions and inside `all`, `any` and `not`. This rule fires when a Change ticket moves to InProgress, although its type did not change:
 
@@ -100,6 +100,16 @@ when: { status: Done, release: { exists: false } }        # done, in no release
 when: { release: '@next' }                               # in the next planned release
 when: { release: { in: ['0.15', '#7'] } }                # in a 0.15.x release or in #7
 when: { release: { version: '>=0.15 <0.16' } }           # in a release in that range
+```
+
+### Relationship conditions
+
+`depends_on`, `blocks`, `related`, `children`, `fixes`, `parent` and `duplicate_of` check the ticket's [relationships](./task.md#relationships) as they are now, like `sprint:`. A value is a ticket ID as the relationship stores it (`DEV-12`, `lotar:DEV-374`). Links set when the ticket is created (`lotar add --depends-on`) are in place for the `created` rules. A declared custom field of the same name is checked instead.
+
+```yaml
+when: { status: Blocked, depends_on: { exists: true } }   # waits for another ticket
+when: { parent: DEV-12 }                                  # a child of DEV-12
+when: { related: { none: [DEV-488] } }                    # not related to DEV-488
 ```
 
 ### Time conditions

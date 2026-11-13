@@ -23,6 +23,9 @@ lotar add "Fix login crash" --type=bug -P high --due=tomorrow
 # Start in a different status
 lotar add "Review the login copy" --status=NeedsReview
 
+# A ticket that waits for another, linked when it is created
+lotar add "Ship the new login" --status=Blocked --depends-on=AUTH-12
+
 # Feature with custom fields
 lotar add "User Management System" --type=feature --field=story_points=13 --field=sprint=2
 
@@ -52,6 +55,16 @@ lotar add "Environment task" --project=myapp  # Uses environment directory
 - `--description <TEXT>`, `-D <TEXT>` - Detailed description
 
 Types and priorities are whatever your configuration defines, so there are no shortcuts such as `--bug` or `--high`: use `--type bug` or `--priority high` (matched case-insensitively against the configured values).
+
+### Relationships
+- `--depends-on <ID>` - A task this one waits for (can be used multiple times)
+- `--blocks <ID>` - A task this one blocks (can be used multiple times)
+- `--related <ID>` - A related task (can be used multiple times)
+- `--parent <ID>` - The parent task
+- `--fixes <ID>` - A task this one fixes (can be used multiple times)
+- `--duplicate-of <ID>` - The task this one duplicates
+
+IDs take the forms of [`lotar task relationships add`](./task.md#edit-categories): `AUTH-12`, `12` in the new task's project, or `lotar:DEV-374` for a task in another repo (`--depends-on` and `--related` only). The links are stored in the write that creates the task, together with the other side on the linked task (`AUTH-12` gets `blocks`, unless `auto.reciprocal_relationships` is off), so automation rules on `created` already see them, in their [conditions](./automation.md#relationship-conditions) too. A missing task or an invalid ID fails the command, also with `--dry-run`, and nothing is created. REST (`/api/tasks/add`) and MCP (`task_create`) take the same links as `relationships`.
 
 ### Planning and diagnostics
 - `--dry-run` - Preview the task that would be created without writing

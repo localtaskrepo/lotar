@@ -1,15 +1,21 @@
 title: lotar agent queue remove and flush are missing from the help
-status: Todo
+status: Reviewing
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-13T22:45:44.077860+00:00
-modified: 2026-11-13T22:45:44.511982+00:00
+modified: 2026-11-13T23:08:34.425743+00:00
 relationships:
   related:
   - DEV-492
   - DEV-501
+comments:
+- date: 2026-11-13T23:08:24.243097+00:00
+  author: claude
+  text: 'docs/help/agent.md (which lotar agent --help renders) now lists lotar agent queue, queue remove <TICKET> (example: lotar agent queue remove DEV-501) and queue flush, and says cancel is for started jobs only. Commit e610e6d5. Checks: the ticket''s grep finds queue remove; built lotar agent --help shows the lines; queue remove/flush ran in a temp workspace; prettier --check; nextest help filter (26 passed). Docs-only change, so full lint/test/smoke not run.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A28fec7dc-34ea-4966-bd7c-9797738d89ee
 description: 'Found by claude on DEV-492, 2026-11-13: lotar agent --help and docs/help/agent.md say you can remove a queued job but name no command; lotar agent cancel DEV-501 answered "Job not found". The command exists: lotar agent queue remove <TICKET> (and queue flush), src/cli/handlers/agent.rs:373-392. Check: grep -n ''queue remove'' docs/help/agent.md finds nothing. Done: docs/help/agent.md and the agent help list queue remove and queue flush with an example.'
 tags:
 - health
@@ -27,3 +33,27 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-13T23:05:48.973010+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T23:05:49.764629+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A28fec7dc-34ea-4966-bd7c-9797738d89ee
+- at: 2026-11-13T23:08:24.243097+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:08:34.425743+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

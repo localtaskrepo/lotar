@@ -60,16 +60,6 @@ impl RelationshipKind {
     }
 }
 
-// ...existing code...
-
-// Custom deserializer for fields: support {k:v}, ["k=v"], [["k","v"]]
-// ...existing code...
-
-// Custom deserializer for fields: support {k:v}, ["k=v"], [["k","v"]]
-// ...existing code...
-// ...existing code...
-
-// ...existing code...
 // Custom deserializer for fields: support {k:v}, ["k=v"], [["k","v"]]
 
 fn deserialize_kv_pairs<'de, D>(deserializer: D) -> Result<Vec<(String, String)>, D::Error>
@@ -115,6 +105,44 @@ where
         JsonValue::Null => Ok(Vec::new()),
         other => Err(DeError::custom(format!("Expected object or array for fields, got {}", other))),
     }
+}
+
+/// Relationships `add` stores in the write that creates the task, so the
+/// `created` rules see them. IDs as `lotar task relationships add` takes
+/// them: `DEV-12`, `12` in the task's project, `lotar:DEV-374` for a task
+/// in another repo (depends-on and related only).
+#[derive(Args, Deserialize, Debug, Default)]
+#[command(next_help_heading = "Relationships")]
+pub struct AddRelationshipArgs {
+    /// A task this one waits for (repeatable)
+    #[arg(long, value_name = "ID")]
+    #[serde(default)]
+    pub depends_on: Vec<String>,
+
+    /// A task this one blocks (repeatable)
+    #[arg(long, value_name = "ID")]
+    #[serde(default)]
+    pub blocks: Vec<String>,
+
+    /// A related task (repeatable)
+    #[arg(long, value_name = "ID")]
+    #[serde(default)]
+    pub related: Vec<String>,
+
+    /// The parent task
+    #[arg(long, value_name = "ID")]
+    #[serde(default)]
+    pub parent: Option<String>,
+
+    /// A task this one fixes (repeatable)
+    #[arg(long, value_name = "ID")]
+    #[serde(default)]
+    pub fixes: Vec<String>,
+
+    /// The task this one duplicates
+    #[arg(long, value_name = "ID")]
+    #[serde(default)]
+    pub duplicate_of: Option<String>,
 }
 
 #[derive(Args, Deserialize, Debug)]
@@ -172,6 +200,11 @@ pub struct AddArgs {
     #[arg(long, value_name = "KEY")]
     #[serde(default)]
     pub finding: Option<String>,
+
+    /// Links stored with the new task (DEV-494)
+    #[command(flatten)]
+    #[serde(flatten)]
+    pub relationships: AddRelationshipArgs,
 
     /// Preview without writing
     #[arg(long, short = 'n')]
@@ -519,6 +552,11 @@ pub struct TaskAddArgs {
     #[arg(long, value_name = "KEY")]
     #[serde(default)]
     pub finding: Option<String>,
+
+    /// Links stored with the new task (DEV-494)
+    #[command(flatten)]
+    #[serde(flatten)]
+    pub relationships: AddRelationshipArgs,
 }
 
 #[derive(Args, Deserialize, Debug)]

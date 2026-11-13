@@ -1,14 +1,49 @@
 title: The slowest Rust tests run faster
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-13T22:21:44.054473+00:00
-modified: 2026-11-13T22:44:59.106152+00:00
+modified: 2026-11-13T23:18:18.927014+00:00
 relationships:
   related:
   - DEV-493
+comments:
+- date: 2026-11-13T23:18:08.091158+00:00
+  author: claude
+  text: |-
+    Done in commit beb917c1 on agent/DEV-500. The slowest tests were waiting out fixed production intervals and sleeps. They now set shorter intervals through env overrides, the same way LOTAR_BINARY_WATCH_INTERVAL_MS already worked. Every assertion stays the same.
+
+    Changes:
+    - LOTAR_T3_POLL_INTERVAL_MS (default 5 s): how often a job reads its T3 Code thread. dev318_t3_runner_test sets 100 ms. Its fake t3 now sleeps 0.2 s instead of 1 s after printing the thread id. The three "still waits while running" checks wait 0.5 s (5 polls) instead of 1 s.
+    - LOTAR_STORAGE_LOCK_WAIT_MS (default 2 s): how long a change waits on a held storage lock. It is set to 200 ms only in the 8 tests that hold a lock and expect the call to fail. dev55 and dev58 keep 2 s because they check the "after 2 seconds" text. The concurrency tests keep 2 s because they rely on the wait.
+    - LOTAR_MCP_WATCH_INTERVAL_MS (default 2 s): the MCP tools watcher's poll. The deferred list_changed test sets 200 ms and waits 0.5 s and 0.8 s instead of 2.3 s and 2.6 s.
+    - agent_safety done_during_a_job and dev361 worker_restarts: the runner script waits for a release file instead of `sleep 2` or `sleep 3`. This also removes a timing race.
+    - One shared helper, utils::time::env_millis, reads all four env vars, binary_watch's included. All three new vars are documented in docs/help/environment.md.
+
+    Before and after: the changed tests run serially, old code then new code, back to back. 39 tests in total, 121.6 s before, 33.9 s after:
+    - a_job_whose_thread_is_unknown_fails_with_the_reason 10.2 -> 0.3
+    - a_continue_job_whose_worker_died_ends_from_the_continued_thread 7.3 -> 1.7
+    - a_fresh_session_starts_a_new_thread_on_the_unmerged_branch_on_the_same_model 6.6 -> 1.7
+    - a_t3_that_exits_while_its_thread_runs_waits_for_the_run 6.3 -> 1.2
+    - held_task_lock_prevents_add_edit_and_delete 6.0 -> 0.6
+    - a_job_on_another_model_whose_branch_cant_be_freed_continues_the_thread 6.0 -> 1.1
+    - deferred_list_changed_is_coalesced_and_emitted_after_ready 5.6 -> 2.0
+    - a_rework_continues_the_fix_thread_after_a_fresh_review_took_its_branch 5.2 -> 2.7
+    - a_job_whose_worker_died_ends_from_its_thread_on_the_next_start 5.1 -> 0.7
+    - a_job_on_another_model_starts_a_new_thread_on_the_unmerged_branch 4.5 -> 1.3
+    - mcp_file_and_attachment_kinds_follow_the_contract 4.1 -> 0.5
+    - worker_restarts_from_the_upgraded_binary_between_jobs 3.6 -> 1.5
+    - done_during_a_job_leaves_the_worktree_to_the_jobs_end 2.6 -> 0.7
+    - 7 lock-contention tests about 2.0 -> 0.2-0.3 each
+    - dev318_t3_runner_test as a whole: 10.8 s -> 4.8 s wall time
+
+    Full npm run test:rust:agent: 87.9 s wall and 815 s summed before; 81.6 s wall and 759 s summed after. Other sessions kept the machine busy (load 11 to 33), so the full totals are noisy: a run at load 33 took 195 s. The serial numbers above are the reliable comparison. The wall time is now set by the serialized agent-processes group and the perf tests, which measure real work.
+
+    Not changed: the perf tests, the git-heavy agent_safety and automation tests, and scan_bidir and storage::transaction. Run on their own, those take 1 to 1.5 s. They only look slow under parallel load.
+
+    Checks: npm run lint, npm run test:agent (2140 Rust, 1515 UI, 47 release, 7 hooks) and npm run test:smoke:agent (390) all pass. After the final helper refactor I ran lint and test:rust:agent again (2140 passed).
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acb4bc02c-bf5b-4a46-8904-8dee7196316d
 description: |-
@@ -52,3 +87,16 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acb4bc02c-bf5b-4a46-8904-8dee7196316d
+- at: 2026-11-13T23:18:08.091158+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:18:18.927014+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

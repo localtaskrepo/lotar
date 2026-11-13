@@ -1,17 +1,26 @@
 title: 'Create harnessmux: a Rust crate and CLI that run agent CLI sessions over ACP'
-status: Todo
+status: InProgress
 priority: High
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-13T22:45:12.815612+00:00
-modified: 2026-11-13T22:45:24.603832+00:00
+modified: 2026-11-13T23:11:50.027428+00:00
 relationships:
   blocks:
   - DEV-503
   related:
   - DEV-492
   - DEV-503
+comments:
+- date: 2026-11-13T23:03:54.677004+00:00
+  author: claude
+  text: 'Owner decision 2026-11-13 (on DEV-492), asked whether automations should still be able to start T3 Code threads after the switch: "Yes, as a harnessmux agent". Add to this ticket''s scope: a t3 agent in harnessmux, driven through T3''s CLI as a legacy adapter like amp (start a thread with provider, model and worktree; follow it; send messages; continue a thread), behind the same session interface, with what T3''s CLI can''t do (effort, child threads) reported in capabilities. lotar then keeps no T3 code; runner: t3 in a profile picks this agent. Also update the Design answers in lotar''s docs/developers/harness-tool-design.md (T3 is no longer "the tool doesn''t drive T3") once DEV-492 is merged.'
+- date: 2026-11-13T23:11:50.027428+00:00
+  author: claude
+  text: 'Owner decision 2026-11-13 (on DEV-492), on grouping chats under their projects: "harnessmux only". Add to scope: every session records its project (the repo it belongs to, from git''s common dir, also when cwd is a worktree) next to its cwd; list and attach filter by project; the t3 agent starts threads in that T3 project; the event stream carries it so lotar''s UI can group by it. Claude and Codex get no project of their own: Claude files a session by its cwd (a worktree is its own project; docs: code.claude.com/docs/en/sessions.md), and Codex''s app keeps project assignments in its own state with no public app-server request to set one (codex-cli 0.169). No upstream requests (his choice).'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1d141b3f-b2f2-448d-b3f0-5ea7a2827f40
 description: 'Approved design: docs/developers/harness-tool-design.md (DEV-492; on main once DEV-492 merges, until then on branch agent/DEV-492). The owner, 2026-11-13, approved it and chose "Start now" for this ticket, including creating the public GitHub repo. Create ~/Development/@localtaskrepo/harnessmux and the public repo localtaskrepo/harnessmux (MIT, like lotar; self-contained: set up, checked and run from a clone alone, shared configs from ~/Development/standards copied in). Build on ACP with the agent-client-protocol crate at its latest stable release (look it up, 5.2.0 on 2026-11-13). What it does, from the design: session registry with names; the session owner (lotar''s process or a harnessmux process) holds the ACP connection and serves a Unix socket (named pipe on Windows) for send, cancel, answer, set, status; resume via session/resume, fallback session/load; one mapping for model, effort and permissions (read-only, workspace, full); a versioned JSONL event stream; MCP servers per session; capabilities; the agent table (command, pinned adapter version, option ids) as TOML data read at run time. CLI: run, send, attach, resume, cancel, answer, set, list, status, close, capabilities, mcp. Agents: every one lotar runs today (claude, codex, copilot, gemini, cursor, amp without ACP as a legacy adapter, droid, opencode, kilo, antigravity); live-check Claude, Codex and Copilot (installed here), the rest from their docs, marked as not run live. Lessons from the acpx trial in the design doc: pin current adapters (codex-acp 1.x failed, 2.6.0 works), adapter errors sent as text become turn.failed. Tests from recorded ACP sessions; CI on macOS, Linux and Windows. Done when: the repo exists with README, LICENSE and CI passing, a first release of the crate and CLI is out, and a comment lists what ran live and what DEV-503 (the lotar switch) needs.'
 history:
 - at: 2026-11-13T22:45:13.018040+00:00
@@ -31,3 +40,22 @@ history:
   - field: relationships
     old: '{"related":["DEV-492","DEV-503"]}'
     new: '{"blocks":["DEV-503"],"related":["DEV-492","DEV-503"]}'
+- at: 2026-11-13T23:01:40.513632+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T23:01:41.427324+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1d141b3f-b2f2-448d-b3f0-5ea7a2827f40
+- at: 2026-11-13T23:03:54.677004+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:11:50.027428+00:00
+  actor: claude
+  changes:
+  - field: comment_added

@@ -1,20 +1,63 @@
 title: Filter the Comments and History tabs by author and type
-status: InProgress
+status: Reviewing
 priority: Low
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-13T22:41:10.367004+00:00
-modified: 2026-11-13T22:49:27.838089+00:00
+modified: 2026-11-13T23:17:18.517455+00:00
 relationships:
+  blocks:
+  - DEV-488
   related:
   - DEV-466
   - DEV-488
   - DEV-489
   - DEV-490
   - DEV-491
+comments:
+- date: 2026-11-13T23:05:36.846916+00:00
+  author: claude
+  text: |-
+    Done in 5be105ee on agent/DEV-502.
+
+    - Comments tab: once a task has comments by more than one author, an Author row of chips shows or hides each author's comments. Click **automation** to hide automation's comments. The type chips the plan mentions wait for DEV-488/489/490: none of those comment types are on main yet.
+    - History tab: chips by field (Status, Assignee, Tags, Other) and by author. An entry shows only its changes to shown fields and drops out when none are left.
+    - Both tabs say how many entries are hidden ("2 of 4 comments hidden.") and offer **Show all**. The choice is kept per browser across tasks (lotar.preferences.taskPanel.commentFilter / historyFilter). Filtering works on what the panel already loads; no API or data change. Help: docs/help/serve.md.
+    - New: view/components/task-panel/TaskPanelActivityFilter.vue, view/composables/task-panel/useActivityFilter.ts.
+
+    Tests: unit view/__tests__/TaskPanelActivityFilter.spec.ts; smoke smoke/tests/ui.activity-filter.smoke.spec.ts at 390px in light and dark (hide, count, no horizontal scroll, the choice carries over to the next task, Show all).
+    Checks: npm run lint ok; npm run test:agent ok (2140 Rust, 1518 UI, release and hooks tests); npm run smoke 392/392.
+
+    Screenshots (before = main, after = this branch, task panel activity section, 390/1440/1920px, light and dark; the 1920px after-shots are identical to the 1440px ones, because the side panel has the same width, so they were stored once):
+    before: ![](attachment:dev502-comments-before-390-light.0462ad17a0a1f4f87b71f6cdfa63403c.webp) ![](attachment:dev502-comments-before-390-dark.45443308e672c1dbf925249fd4f8855c.webp) ![](attachment:dev502-comments-before-1440-light.392706f003e41e156f4a650a070db15f.webp) ![](attachment:dev502-comments-before-1440-dark.9feca265177f273b7cc9d8bbe1cd5700.webp)
+    after: ![](attachment:dev502-comments-after-390-light.f0bd4e5d1c80819efeaa095ffe8eabc3.webp) ![](attachment:dev502-comments-after-390-dark.a1e0cbc6638b98c04990a8f2f67cdaa4.webp) ![](attachment:dev502-comments-after-1440-light.43a4c7722b6e326d9e67b377be01e3ff.webp) ![](attachment:dev502-comments-after-1440-dark.d23878379059d92bd378765d0b3fb433.webp)
+    History before: ![](attachment:dev502-history-before-390-light.72fd6a8310da81f314387429e59812fd.webp) ![](attachment:dev502-history-before-390-dark.9bb4d68679b6b3aa2c306b9ea9cdfbc0.webp) ![](attachment:dev502-history-before-1440-light.133665fefcadaf82408e3ea727215df8.webp) ![](attachment:dev502-history-before-1440-dark.4381b3246d9ebd7b5e41970399fb30e7.webp)
+    History after: ![](attachment:dev502-history-after-390-light.6f2c739f923cc129141f52902cd20e47.webp) ![](attachment:dev502-history-after-390-dark.747fc3168a9aa44b982ca1af4b296e3d.webp) ![](attachment:dev502-history-after-1440-light.b496dca1d1069b652874f4606ce783c9.webp) ![](attachment:dev502-history-after-1440-dark.3d9b35805d865c622171398be6417f31.webp)
+- date: 2026-11-13T23:17:18.517455+00:00
+  author: claude
+  text: 'Owner decision 2026-11-13, on keeping unanswered questions visible when their author or type is hidden: "actually just make that a separate filter option that you can toggle on and off." So: a separate toggle in the Comments filter (e.g. "Always show open questions"), on/off, saved with the other comment-filter choices; not a fixed rule. DEV-502 has no question data, so DEV-488 builds the toggle. Merge order (agreed 2026-11-13, coordinated by the DEV-502 agent): 1) DEV-502 merges first; it waits on nobody (review, then merge). 2) DEV-488 waits for DEV-502 only for its filter part: keep working on the rest, then rebase onto main and add the Type chips and the open-questions toggle. 3) DEV-489 and DEV-490 wait for DEV-488 (existing depends-on), then rebase and add Review / Hand-off to the Type row. 4) DEV-491 waits on nobody; whichever of it and DEV-502 merges second resolves the textual conflict on the comment <li>.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0dc4db1c-afdc-4589-a3bc-1ae9580009ce
+- attachment: dev502-comments-after-1440-dark.d23878379059d92bd378765d0b3fb433.webp
+- attachment: dev502-comments-after-1440-light.43a4c7722b6e326d9e67b377be01e3ff.webp
+- attachment: dev502-comments-after-390-dark.a1e0cbc6638b98c04990a8f2f67cdaa4.webp
+- attachment: dev502-comments-after-390-light.f0bd4e5d1c80819efeaa095ffe8eabc3.webp
+- attachment: dev502-comments-before-1440-dark.9feca265177f273b7cc9d8bbe1cd5700.webp
+- attachment: dev502-comments-before-1440-light.392706f003e41e156f4a650a070db15f.webp
+- attachment: dev502-comments-before-1920-dark.7e5a0affccb5e5acab4cf019c51d4a46.webp
+- attachment: dev502-comments-before-1920-light.040259d6c11e7eaf7ddd735714c9bf58.webp
+- attachment: dev502-comments-before-390-dark.45443308e672c1dbf925249fd4f8855c.webp
+- attachment: dev502-comments-before-390-light.0462ad17a0a1f4f87b71f6cdfa63403c.webp
+- attachment: dev502-history-after-1440-dark.3d9b35805d865c622171398be6417f31.webp
+- attachment: dev502-history-after-1440-light.b496dca1d1069b652874f4606ce783c9.webp
+- attachment: dev502-history-after-390-dark.747fc3168a9aa44b982ca1af4b296e3d.webp
+- attachment: dev502-history-after-390-light.6f2c739f923cc129141f52902cd20e47.webp
+- attachment: dev502-history-before-1440-dark.4381b3246d9ebd7b5e41970399fb30e7.webp
+- attachment: dev502-history-before-1440-light.133665fefcadaf82408e3ea727215df8.webp
+- attachment: dev502-history-before-1920-light.153adf86ef293697f0abf24f867f04a2.webp
+- attachment: dev502-history-before-390-dark.9bb4d68679b6b3aa2c306b9ea9cdfbc0.webp
+- attachment: dev502-history-before-390-light.72fd6a8310da81f314387429e59812fd.webp
 description: |-
   The task panel's Comments and History tabs list every entry with no way to narrow them; the only control is the reload button. On a long ticket (DEV-466, STD-82) the owner can't pick out what the agents said or what changed a field. Owner asked on 2026-11-13 whether this exists and said to file it.
 
@@ -31,6 +74,7 @@ description: |-
   - [ ] lint, test and smoke pass.
 tags:
 - web-ui
+- ui
 history:
 - at: 2026-11-13T22:41:10.738027+00:00
   actor: claude
@@ -54,3 +98,127 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0dc4db1c-afdc-4589-a3bc-1ae9580009ce
+- at: 2026-11-13T23:05:18.953469+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev502-comments-after-1440-dark.d23878379059d92bd378765d0b3fb433.webp
+- at: 2026-11-13T23:05:19.004957+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev502-comments-after-1440-light.43a4c7722b6e326d9e67b377be01e3ff.webp
+- at: 2026-11-13T23:05:19.086822+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev502-comments-after-390-dark.a1e0cbc6638b98c04990a8f2f67cdaa4.webp
+- at: 2026-11-13T23:05:19.121379+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev502-comments-after-390-light.f0bd4e5d1c80819efeaa095ffe8eabc3.webp
+- at: 2026-11-13T23:05:19.154680+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev502-comments-before-1440-dark.9feca265177f273b7cc9d8bbe1cd5700.webp
+- at: 2026-11-13T23:05:19.187956+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev502-comments-before-1440-light.392706f003e41e156f4a650a070db15f.webp
+- at: 2026-11-13T23:05:19.222760+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev502-comments-before-1920-dark.7e5a0affccb5e5acab4cf019c51d4a46.webp
+- at: 2026-11-13T23:05:19.256942+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev502-comments-before-1920-light.040259d6c11e7eaf7ddd735714c9bf58.webp
+- at: 2026-11-13T23:05:19.291985+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev502-comments-before-390-dark.45443308e672c1dbf925249fd4f8855c.webp
+- at: 2026-11-13T23:05:19.326023+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev502-comments-before-390-light.0462ad17a0a1f4f87b71f6cdfa63403c.webp
+- at: 2026-11-13T23:05:19.361166+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev502-history-after-1440-dark.3d9b35805d865c622171398be6417f31.webp
+- at: 2026-11-13T23:05:19.395583+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev502-history-after-1440-light.b496dca1d1069b652874f4606ce783c9.webp
+- at: 2026-11-13T23:05:19.479859+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev502-history-after-390-dark.747fc3168a9aa44b982ca1af4b296e3d.webp
+- at: 2026-11-13T23:05:19.516623+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev502-history-after-390-light.6f2c739f923cc129141f52902cd20e47.webp
+- at: 2026-11-13T23:05:19.551544+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev502-history-before-1440-dark.4381b3246d9ebd7b5e41970399fb30e7.webp
+- at: 2026-11-13T23:05:19.589349+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev502-history-before-1440-light.133665fefcadaf82408e3ea727215df8.webp
+- at: 2026-11-13T23:05:19.649209+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev502-history-before-1920-light.153adf86ef293697f0abf24f867f04a2.webp
+- at: 2026-11-13T23:05:19.683099+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev502-history-before-390-dark.9bb4d68679b6b3aa2c306b9ea9cdfbc0.webp
+- at: 2026-11-13T23:05:19.718263+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev502-history-before-390-light.72fd6a8310da81f314387429e59812fd.webp
+- at: 2026-11-13T23:05:19.748356+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: web-ui
+    new: web-ui, ui
+- at: 2026-11-13T23:05:36.846916+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:05:48.342760+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T23:17:17.946827+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-466","DEV-488","DEV-489","DEV-490","DEV-491"]}'
+    new: '{"blocks":["DEV-488"],"related":["DEV-466","DEV-488","DEV-489","DEV-490","DEV-491"]}'
+- at: 2026-11-13T23:17:18.517455+00:00
+  actor: claude
+  changes:
+  - field: comment_added

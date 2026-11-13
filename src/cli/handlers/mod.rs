@@ -269,6 +269,8 @@ impl AddHandler {
         };
         task.description = args.description;
         task.tags = validated_tags;
+        // Stored in the creating write, so `created` rules see them (DEV-494).
+        task.relationships = relationships::new_task_relationships(args.relationships, &project_for_storage, resolver)?;
 
         // Determine reporter using explicit argument first, then config defaults and identity detection
         task.reporter = if let Some(reporter) = explicit_reporter {
@@ -361,6 +363,13 @@ impl AddHandler {
 
         // Use resolved project prefix, not the raw project name
         if args.dry_run {
+            // Fails where creating the task would: missing tasks, cycles.
+            if !task.relationships.is_empty() {
+                let storage = Storage::try_open(&write_root).ok_or("Relationship tasks are missing: the tasks directory does not exist")?;
+                let next = crate::storage::operations::StorageOperations::get_current_id(&write_root.join(&project_for_storage)) + 1;
+                crate::services::relationships::check_new_task(&storage, &format!("{project_for_storage}-{next}"), &task.relationships)
+                    .map_err(TaskStorageAction::Create.map_err(&project_for_storage))?;
+            }
             // Preview without saving
             match renderer.format {
                 OutputFormat::Json => {
@@ -395,6 +404,9 @@ impl AddHandler {
                     if !task.custom_fields.is_empty() {
                         obj["custom_fields"] = serde_json::to_value(&task.custom_fields).unwrap_or(serde_json::Value::Null);
                     }
+                    if !task.relationships.is_empty() {
+                        obj["relationships"] = serde_json::to_value(&task.relationships).unwrap_or(serde_json::Value::Null);
+                    }
                     if args.explain {
                         obj["explain"] = serde_json::Value::String(format!(
                             "{project_explanation}; default status and priority via smart defaults; reporter/assignee per config/defaults"
@@ -408,6 +420,9 @@ impl AddHandler {
                         "DRY RUN: Would create task in project {} with title '{}' and priority {}",
                         project_for_storage, task.title, task.priority
                     ));
+                    for (kind, ids) in relationships::describe(&task.relationships) {
+                        renderer.emit_info(format_args!("  {kind}: {ids}"));
+                    }
                     if args.explain {
                         renderer.emit_info(format_args!(
                             "Explanation: {project_explanation}; default status and priority chosen via smart defaults; reporter/assignee per config/defaults."

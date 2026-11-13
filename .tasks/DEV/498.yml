@@ -1,11 +1,11 @@
 title: Core modules no longer call up into services and cli
-status: Reviewing
+status: Merging
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-13T22:21:43.366702+00:00
-modified: 2026-11-13T22:44:57.898009+00:00
+modified: 2026-11-13T23:01:39.999334+00:00
 relationships:
   blocks:
   - DEV-499
@@ -15,8 +15,12 @@ comments:
 - date: 2026-11-13T22:44:48.794454+00:00
   author: claude
   text: 'Done in b001cb17. Core modules (config, storage, utils, types, output, errors, workspace, project, scanner, api_types, api_events) no longer reference services, cli, automation, routes, mcp, web_server, api_server or help; tests/core_layering_test.rs enforces it, grouped imports included. Moved down: AgentRunnerKind, is_repo_name and GITHUB_PUSH_FIELDS to config::types; ui.* validators and theme lists to the new config::branding (view theme spec/comments point there); FINDING_FIELD/FINDING_SEEN_FIELD to utils::custom_fields; dedupe_code_references and is_user_attached to utils::scan. TrustService moved whole to config::trust (it needed nothing above core) except describe(), which uses automation types and moved to cli/handlers/trust.rs, the only caller. binary_watch::exit_when_replaced moved up as AgentJobService::exit_when_binary_replaced. utils::scan::reference_mutation_tests moved to services/scan_service.rs. No hooks were needed, so behaviour is unchanged. Not done: agent_job_service tests still call cli::handlers::agent (services to cli, outside the core and outside Done when). Checks: npm run lint, npm run test:agent (2143 Rust, 1515 UI, release and hooks tests passed), npm run smoke (390 passed).'
+- date: 2026-11-13T23:01:34.883301+00:00
+  author: codex
+  text: 'Review: passed. Reviewed b001cb17 against main, the full diff, ticket/comments and relationships, DEV-493 owner approval and standards decision, DEV-499 scope, repository guidance and recent main history for touched files. Moves preserve behavior; core dependency guard covers the stated core modules and grouped imports. Frontend edits only update comments and test source paths, with no rendered UI change. No blocking or minor findings; no follow-up tickets. Reran lint:agent, test:agent (2143 Rust, 1515 UI, release and hook tests), and test:smoke:agent (390 tests): passed. Initial sandbox attempts failed at sccache before Rust compilation; approved unsandboxed rerun completed. Working tree clean; no files changed or commits made. Status and assignee unchanged.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abfc8dd44-dac3-4c7d-a0a0-0e2f1436b0e8
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad52bfe06-ac2b-48ef-9606-cd8791702350
 description: |-
   Preparation for a core crate in the cargo workspace the owner approved (DEV-493, 2026-11-13: "Yes on all of those ideas"). The core modules depend on the layers above them, so they can't be a crate of their own yet.
 
@@ -81,3 +85,21 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-13T22:55:10.972420+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad52bfe06-ac2b-48ef-9606-cd8791702350
+- at: 2026-11-13T23:01:34.883301+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:01:39.999334+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

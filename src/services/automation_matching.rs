@@ -243,6 +243,7 @@ fn collect_change_fields(group: &AutomationConditionGroup, out: &mut BTreeSet<St
 fn is_top_level_custom(field: &str) -> bool {
     crate::utils::fields::is_reserved_field(field).is_none()
         && !matches!(field.to_lowercase().as_str(), "labels" | "task_type" | "sprint" | "sprints" | "release" | "releases" | "status_changed")
+        && !RELATIONSHIP_FIELDS.contains(&field.to_lowercase().as_str())
 }
 
 // ── Rule matching ───────────────────────────────────────────────────────────
@@ -429,6 +430,15 @@ fn matches_field_map(
             _ => {
                 // A declared custom field may stand at the top level too
                 // (DEV-373): `affects: { version: ">=0.13" }`.
+                // Relationships are checked as they are now, like sprints
+                // (DEV-494), unless a custom field of that name is declared.
+                let declared = config.custom_fields.values.iter().any(|value| value.eq_ignore_ascii_case(key));
+                if !declared && let Some(links) = relationship_value(field_key.as_str(), current) {
+                    if matches_value_condition(condition, links.as_ref()) {
+                        continue;
+                    }
+                    return false;
+                }
                 let custom =
                     if crate::utils::fields::is_reserved_field(key).is_none() { crate::utils::custom_fields::resolve_filter_name(key, config) } else { None };
                 match custom {
@@ -456,6 +466,26 @@ fn matches_field_map(
         }
     }
     true
+}
+
+/// The relationship kinds a condition can name.
+const RELATIONSHIP_FIELDS: [&str; 7] = ["depends_on", "blocks", "related", "children", "fixes", "parent", "duplicate_of"];
+
+/// The links of a relationship kind (`depends_on`, `parent`, ...), `None`
+/// for a name that is not one. A missing link is `Some(None)`.
+fn relationship_value(field: &str, current: &TaskDTO) -> Option<Option<AutomationValue>> {
+    let rels = &current.relationships;
+    let list = |ids: &Vec<String>| Some((!ids.is_empty()).then(|| AutomationValue::List(ids.clone())));
+    match field {
+        "depends_on" => list(&rels.depends_on),
+        "blocks" => list(&rels.blocks),
+        "related" => list(&rels.related),
+        "children" => list(&rels.children),
+        "fixes" => list(&rels.fixes),
+        "parent" => Some(rels.parent.clone().map(AutomationValue::String)),
+        "duplicate_of" => Some(rels.duplicate_of.clone().map(AutomationValue::String)),
+        _ => None,
+    }
 }
 
 fn matches_custom_fields(fields: &HashMap<String, AutomationFieldCondition>, current: &TaskDTO, changes: &ChangeSet, mode: MatchMode) -> bool {

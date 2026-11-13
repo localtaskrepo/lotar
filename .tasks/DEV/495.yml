@@ -1,20 +1,25 @@
 title: Windows CI runs its 40 selected tests without building the library's unit-test binary
-status: Reviewing
+status: Merging
 priority: High
 type: Chore
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-13T22:21:42.297785+00:00
-modified: 2026-11-13T22:49:26.704061+00:00
+modified: 2026-11-13T23:16:22.136358+00:00
 relationships:
   related:
   - DEV-493
+  - DEV-506
 comments:
 - date: 2026-11-13T22:49:13.685117+00:00
   author: claude
   text: 'Done in c0461ccb. The Windows-selected tests (storage::safety, utils::scan, automation_service async_run_monitor + windows_async_stdio: 41 incl. lotar-agent-wrapper) moved out of inline #[cfg(test)] modules into tests/storage_safety_test.rs, tests/utils_scan_test.rs and tests/automation_async_run_test.rs, compiled as their own small test binary windows_regressions (Cargo.toml [[test]]). Not into the integration binary: built from clean it costs as much as the lib unit-test build (37 s vs 37 s locally), and sccache can''t cache the incremental workspace crate on CI. Hooks made #[doc(hidden)] pub: safety::{atomic_write_file_with_io, is_lock_contention}, scan::{lock_source, write_source_with_prepared}, operations::before_task_write (now always compiled; one thread-local check per task write), automation_service::{BoundedTail, stderr_eof_within_grace, windows_async_stdio}. Windows step: --test windows_regressions --bin lotar-agent-wrapper, no --lib, no -E filter (whole targets); the manifest-vs-JUnit gate uses the same flags. Linux still runs everything (--lib --bins --tests). Contract test, tests/README.md and docs/developers/platform-test-verification.md updated. Timing, measured locally on the Mac (not CI), cargo clean -p lotar then cargo build --profile ci, then nextest --no-run for the step''s targets: before (--lib --bin lotar-agent-wrapper) 51.6 s, after (--test windows_regressions --bin lotar-agent-wrapper) 26.1 s. Nearly all of the remaining 26 s is a second library build: dev-dependencies (predicates, assert_cmd) turn on regex/bstr default features, so test targets can''t reuse the library from the ''Build binary'' step. Possible follow-up: line up those dependency features. Checks: npm run lint, npm test (2140 Rust + 1515 UI), npm run smoke (390) passed; selection run plus check-test-coverage.py OK (41 tests). Not run: Windows itself. A cross-check for x86_64-pc-windows-msvc fails here on ring''s C build (no Windows SDK headers), so the cfg(windows) test module and the now-ungated windows_async_stdio helpers compile only on CI. CI wall time after the change still needs a CI run.'
+- date: 2026-11-13T23:16:20.264631+00:00
+  author: claude
+  text: 'Follow-up done at the owner''s request (2026-11-13: ''let''s please do the follow up and switch of the features''): f4395ec1 (auto-committed from my worktree as ''uncommitted changes from the earlier thread''; please squash into the DEV-495 commit when merging). Cargo.toml: predicates default-features = false (tests use only str::contains, str::is_empty, function; its regex feature turned on regex defaults), plus bstr = "1.13.1" as a normal dependency so its default+unicode features match what assert_cmd turns on. cargo tree now shows identical features for normal and dev builds (all-features, default, and the Windows msvc target). Result, measured locally on the Mac (not CI), after cargo clean -p lotar + cargo build --profile ci --all-features: nextest --no-run --test windows_regressions --bin lotar-agent-wrapper 26.1 s -> 1.1 s, one liblotar rlib instead of two. Release binary 7,212,144 -> 7,212,160 bytes (wrapper unchanged). Linux still differs in bitflags/std (tempfile -> rustix); left alone because no Linux job builds the binary and the tests in the same profile. Checks: npm run lint, npm test (2140 Rust + 1515 UI), npm run smoke (390) passed. Merge note: review commit 952950c3 only adds scripts/__pycache__/check-test-coverage.cpython-315.pyc and scripts/tests/__pycache__/test_check_test_coverage.cpython-315.pyc. That''s build output; please drop it, don''t merge it.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0a7952ff-8d56-49c9-ab90-fa87a5b57230
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A348ac5bc-1a1b-4d65-80c0-250fd960cea7
 description: |-
   The Windows CI job is the critical path in 71 of 88 green runs (DEV-493). Its longest step builds the whole lotar library as a unit-test binary (2m44 to 4m58) to run 40 tests that take 2 to 3 s. The owner, 2026-11-13: "Yes on all of those ideas. We really need to try and optimize the build and CI time. The faster tests can run, the cheaper it is to run them more often."
 
@@ -72,3 +77,27 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-13T23:12:50.517210+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A348ac5bc-1a1b-4d65-80c0-250fd960cea7
+- at: 2026-11-13T23:13:56.594748+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-13T23:16:20.264631+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:16:22.136358+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-493"]}'
+    new: '{"related":["DEV-493","DEV-506"]}'

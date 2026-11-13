@@ -5,13 +5,15 @@ type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-13T21:14:14.411039+00:00
-modified: 2026-11-13T22:41:10.737531+00:00
+modified: 2026-11-13T23:17:19.484735+00:00
 relationships:
   related:
   - DEV-466
   - DEV-488
   - DEV-481
   - DEV-502
+  - DEV-489
+  - DEV-490
 comments:
 - date: 2026-11-13T21:26:16.645800+00:00
   author: claude
@@ -41,6 +43,12 @@ comments:
 - date: 2026-11-13T22:04:18.537805+00:00
   author: automation
   text: The review found blocking problems again after one rework (the comments above). Should an agent rework it once more (lotar assignee DEV-491 @fix), will you decide the findings, or is it WontDo?
+- date: 2026-11-13T23:10:37.705620+00:00
+  author: claude
+  text: 'DEV-502 (5be105ee on agent/DEV-502, not merged yet) adds filter chips to the Comments tab: view/components/task-panel/TaskPanelCommentsTab.vue now loops over `visibleComments` (`{ comment, index }`, index into task.comments, so edit indexes stay right) and builds chips in `filterGroups`; chips render in TaskPanelActivityFilter.vue, state in view/composables/task-panel/useActivityFilter.ts (hiddenAuthors used; hiddenFields is free for types, stored as `fields` in lotar.preferences.taskPanel.commentFilter). Whichever merges second rebases onto the other: keep the visibleComments loop and put your markup inside it. For this ticket: your task-panel__comment--automation class goes on the <li> inside the visibleComments loop; expect a textual conflict on that <li>, no design conflict. The "automation" author chip hides those comments, the muted style still applies when they are shown.'
+- date: 2026-11-13T23:17:19.484735+00:00
+  author: claude
+  text: 'Merge order (agreed 2026-11-13, coordinated by the DEV-502 agent): 1) DEV-502 merges first; it waits on nobody (review, then merge). 2) DEV-488 waits for DEV-502 only for its filter part: keep working on the rest, then rebase onto main and add the Type chips and the open-questions toggle. 3) DEV-489 and DEV-490 wait for DEV-488 (existing depends-on), then rebase and add Review / Hand-off to the Type row. 4) DEV-491 waits on nobody; whichever of it and DEV-502 merges second resolves the textual conflict on the comment <li>.'
 references:
 - file: view/components/task-panel/TaskPanelCommentsTab.vue
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae010a927-d153-4e58-a0fa-41c391832f1e
@@ -277,3 +285,23 @@ history:
   - field: relationships
     old: '{"related":["DEV-466","DEV-488","DEV-481"]}'
     new: '{"related":["DEV-466","DEV-488","DEV-481","DEV-502"]}'
+- at: 2026-11-13T23:10:37.705620+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:17:18.805630+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-466","DEV-488","DEV-481","DEV-502"]}'
+    new: '{"related":["DEV-466","DEV-488","DEV-481","DEV-502","DEV-489"]}'
+- at: 2026-11-13T23:17:19.185665+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-466","DEV-488","DEV-481","DEV-502","DEV-489"]}'
+    new: '{"related":["DEV-466","DEV-488","DEV-481","DEV-502","DEV-489","DEV-490"]}'
+- at: 2026-11-13T23:17:19.484735+00:00
+  actor: claude
+  changes:
+  - field: comment_added

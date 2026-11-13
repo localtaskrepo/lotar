@@ -1,17 +1,18 @@
 title: 'Design a harness tool of its own: start, follow, message and resume Claude, Codex, Kilo and other agent CLIs'
-status: Merging
+status: Done
 priority: High
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T21:27:57.663811+00:00
-modified: 2026-11-13T22:52:38.465567+00:00
+modified: 2026-11-13T22:55:07.445999+00:00
 relationships:
   related:
   - DEV-501
   - DEV-503
   - DEV-504
   - DEV-505
+  - DEV-478
 comments:
 - date: 2026-11-13T21:59:51.621605+00:00
   author: claude
@@ -28,6 +29,9 @@ comments:
 - date: 2026-11-13T22:45:44.716708+00:00
   author: claude
   text: 'Owner 2026-11-13: "Approve" for the revised design (recorded in the doc, commit c2b592f9). For the merge he chose "Start the merge agent" without a review: queued as a fresh merge job with the rule''s merge prompt (status Merging, assignee @merge). Follow-ups, his choice "Start now": DEV-504 creates the harnessmux repo and crate (fix agent queued), DEV-503 switches lotar to the crate and removes its runners (Blocked on DEV-504), DEV-501 reviews the job code that stays (Blocked on DEV-503; its premature fix job was taken out of the queue).'
+- date: 2026-11-13T22:54:58.090332+00:00
+  author: claude
+  text: 'Merged: rebased onto main (caec607e) as 1b889752 and fast-forwarded main; then committed the main checkout''s pending .tasks changes into that commit (owner 2026-11-12), now 2d7e13f4 on main, signed. agent/DEV-492 points at it. Checks: docs-only change, so per AGENTS.md I ran the link and consistency checks: every relative link and named src/docs path resolves (the decision record is in the standards repo), and Prettier passes on both files. Not run: npm run lint, npm test, npm run smoke (no code changed). Not pushed: the oldest unpushed commit on main is 5fc697e1 (DEV-478, HelpNeeded: its merge checks didn''t complete and it asks for a rerun with local port access), and the other 11 unpushed commits, this one included, sit on top of it. The push waits on DEV-478.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9cf75e47-e8d0-45e5-88ad-eb92ada61a1f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A09ad63ea-121e-4188-bbf1-5d58b7ccde3d
@@ -152,3 +156,19 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A09ad63ea-121e-4188-bbf1-5d58b7ccde3d
+- at: 2026-11-13T22:54:58.090332+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T22:54:58.305729+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-501","DEV-503","DEV-504","DEV-505"]}'
+    new: '{"related":["DEV-501","DEV-503","DEV-504","DEV-505","DEV-478"]}'
+- at: 2026-11-13T22:55:07.445999+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

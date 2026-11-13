@@ -1258,6 +1258,36 @@ pub(crate) fn stage_task_change(
     if previous == candidate {
         return Ok(Vec::new());
     }
+    let (inventory, old, new) = plan_task_change(storage, id, previous, candidate, external)?;
+    let mut tasks = BTreeMap::new();
+    for e in old.difference(&new) {
+        apply_edge(&inventory, &storage.root_path, &mut tasks, e, false, None)?;
+    }
+    let only_owner = (!reciprocal_links(&storage.root_path, id)).then_some(id);
+    for e in new.difference(&old) {
+        apply_edge(&inventory, &storage.root_path, &mut tasks, e, true, only_owner)?;
+    }
+    tasks.remove(id);
+    stage_tasks(txn, storage, &inventory, tasks)
+}
+
+/// Check a new task's links the way creating it does, without writing:
+/// `lotar add --dry-run` fails where `lotar add` would (DEV-494).
+pub(crate) fn check_new_task(storage: &Storage, id: &str, candidate: &TaskRelationships) -> LoTaRResult<()> {
+    plan_task_change(storage, id, &TaskRelationships::default(), candidate, None).map(|_| ())
+}
+
+/// The inventory and the old and new edges of a task's relationship
+/// change, after checking the additions.
+type EdgePlan = (Inventory, BTreeSet<Edge>, BTreeSet<Edge>);
+
+fn plan_task_change(
+    storage: &Storage,
+    id: &str,
+    previous: &TaskRelationships,
+    candidate: &TaskRelationships,
+    external: Option<&ExternalSnapshot>,
+) -> LoTaRResult<EdgePlan> {
     validate_cross_repo(&storage.root_path, previous, candidate)?;
     let mut inventory = if let Some(external) = external { external.load(storage)? } else { Inventory::load(storage)? };
     // A newly allocated task does not exist physically until the transaction
@@ -1282,16 +1312,7 @@ pub(crate) fn stage_task_change(
     }
     after.extend(new.iter().cloned());
     validate_additions(&inventory, &storage.root_path, &before, &after)?;
-    let mut tasks = BTreeMap::new();
-    for e in old.difference(&new) {
-        apply_edge(&inventory, &storage.root_path, &mut tasks, e, false, None)?;
-    }
-    let only_owner = (!reciprocal_links(&storage.root_path, id)).then_some(id);
-    for e in new.difference(&old) {
-        apply_edge(&inventory, &storage.root_path, &mut tasks, e, true, only_owner)?;
-    }
-    tasks.remove(id);
-    stage_tasks(txn, storage, &inventory, tasks)
+    Ok((inventory, old, new))
 }
 
 /// Cross-repo references (DEV-386) go only in `depends_on` and `related`,

@@ -148,6 +148,7 @@ mod dev394_cli_edit_select_test;
 mod dev3_dev13_recent_and_sum_test;
 mod dev407_auto_config_comments_test;
 mod dev470_comment_author_prefix_test;
+mod dev494_add_relationships_test;
 mod dev4_archive_test;
 mod dev54_mutation_contract_test;
 mod dev55_transactional_mutations_test;

@@ -1,0 +1,28 @@
+title: Python __pycache__ files are tracked and not ignored, so job auto-commits pick up new .pyc files
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-13T23:16:21.313989+00:00
+modified: 2026-11-13T23:16:23.058075+00:00
+relationships:
+  related:
+  - DEV-495
+description: 'Found: scripts/__pycache__/check-test-coverage.cpython-314.pyc and scripts/tests/__pycache__/test_check_test_coverage.cpython-314.pyc have been tracked since 1f0c9de7, and .gitignore has no __pycache__ entry. The DEV-495 review job''s auto-commit (952950c3) added the cpython-315 versions. Check: git ls-files | grep __pycache__ lists nothing, and .gitignore ignores __pycache__/. Done: tracked .pyc files removed, __pycache__/ ignored.'
+tags:
+- health
+custom_fields:
+  finding: gitignore:pycache
+history:
+- at: 2026-11-13T23:16:22.137157+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-495"]}'
+- at: 2026-11-13T23:16:23.058075+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

@@ -1,4 +1,4 @@
-use crate::cli::args::task::RelationshipKind;
+use crate::cli::args::task::{AddRelationshipArgs, RelationshipKind};
 use crate::cli::handlers::CommandHandler;
 use crate::cli::handlers::task::context::TaskCommandContext;
 use crate::cli::handlers::task::mutation::{LoadedTask, load_task};
@@ -74,11 +74,7 @@ pub fn execute_action(
             };
             let source = resolve_id(&id, project.as_deref(), resolver)?;
             let source_project = crate::storage::TaskId::parse(&source).map_err(|e| e.to_string())?.project;
-            // `repo:ID` names a task in another repo (DEV-386).
-            let target = match crate::services::external_tasks::canonical(&target) {
-                Some(reference) => reference,
-                None => resolve_id(&target, Some(&source_project), resolver)?,
-            };
+            let target = resolve_target(&target, &source_project, resolver)?;
             let expected_current = expected.map(|id| resolve_id(&id, Some(&source_project), resolver)).transpose()?;
             let report = relationships::mutate(
                 &storage,
@@ -96,6 +92,57 @@ pub fn execute_action(
         }
     }
     Ok(())
+}
+
+/// The links `lotar add` stores with a new task of `project`, its IDs
+/// resolved as `relationships add` resolves them (DEV-494).
+pub(crate) fn new_task_relationships(args: AddRelationshipArgs, project: &str, resolver: &TasksDirectoryResolver) -> Result<TaskRelationships, String> {
+    let one = |raw: String| resolve_target(&raw, project, resolver);
+    let list = |values: Vec<String>| -> Result<Vec<String>, String> {
+        let mut ids = Vec::new();
+        for raw in values {
+            let id = resolve_target(&raw, project, resolver)?;
+            if !ids.contains(&id) {
+                ids.push(id);
+            }
+        }
+        Ok(ids)
+    };
+    Ok(TaskRelationships {
+        depends_on: list(args.depends_on)?,
+        blocks: list(args.blocks)?,
+        related: list(args.related)?,
+        parent: args.parent.map(one).transpose()?,
+        fixes: list(args.fixes)?,
+        duplicate_of: args.duplicate_of.map(one).transpose()?,
+        ..TaskRelationships::default()
+    })
+}
+
+/// Each kind with links and its IDs, for the `add --dry-run` preview.
+pub(crate) fn describe(relationships: &TaskRelationships) -> Vec<(&'static str, String)> {
+    let single = |value: &Option<String>| value.iter().cloned().collect::<Vec<_>>();
+    [
+        ("depends-on", relationships.depends_on.clone()),
+        ("blocks", relationships.blocks.clone()),
+        ("related", relationships.related.clone()),
+        ("parent", single(&relationships.parent)),
+        ("fixes", relationships.fixes.clone()),
+        ("duplicate-of", single(&relationships.duplicate_of)),
+    ]
+    .into_iter()
+    .filter(|(_, ids)| !ids.is_empty())
+    .map(|(kind, ids)| (kind, ids.join(", ")))
+    .collect()
+}
+
+/// `repo:ID` names a task in another repo (DEV-386), anything else a task
+/// of `project`.
+fn resolve_target(raw: &str, project: &str, resolver: &TasksDirectoryResolver) -> Result<String, String> {
+    match crate::services::external_tasks::canonical(raw) {
+        Some(reference) => Ok(reference),
+        None => resolve_id(raw, Some(project), resolver),
+    }
 }
 
 fn resolve_id(raw: &str, project: Option<&str>, resolver: &TasksDirectoryResolver) -> Result<String, String> {

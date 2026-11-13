@@ -28,7 +28,7 @@ pub use sprint::{SprintAction, SprintArgs, SprintCloseArgs, SprintCreateArgs, Sp
 pub use stats::{StatsAction, StatsArgs};
 pub use sync::{SyncArgs, SyncCheckArgs, SyncCommandAction, SyncCommandArgs};
 pub use task::{
-    AddArgs, RelationshipKind, SortField, TaskAction, TaskAddArgs, TaskArchiveArgs, TaskDeleteArgs, TaskEditArgs, TaskMoveArgs, TaskReferenceAction,
-    TaskReferenceAddArgs, TaskReferenceArgs, TaskReferenceKindAdd, TaskReferenceKindRemove, TaskReferenceRemoveArgs, TaskRelationshipsArgs, TaskRenumberArgs,
-    TaskRestoreArgs, TaskSearchArgs, TaskShowArgs, TaskStatusArgs,
+    AddArgs, AddRelationshipArgs, RelationshipKind, SortField, TaskAction, TaskAddArgs, TaskArchiveArgs, TaskDeleteArgs, TaskEditArgs, TaskMoveArgs,
+    TaskReferenceAction, TaskReferenceAddArgs, TaskReferenceArgs, TaskReferenceKindAdd, TaskReferenceKindRemove, TaskReferenceRemoveArgs,
+    TaskRelationshipsArgs, TaskRenumberArgs, TaskRestoreArgs, TaskSearchArgs, TaskShowArgs, TaskStatusArgs,
 };

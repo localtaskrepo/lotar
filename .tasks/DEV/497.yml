@@ -3,9 +3,9 @@ status: Reviewing
 priority: High
 type: Chore
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-13T22:21:42.991432+00:00
-modified: 2026-11-13T22:48:23.999362+00:00
+modified: 2026-11-13T23:11:05.560963+00:00
 relationships:
   blocks:
   - DEV-499
@@ -15,8 +15,12 @@ comments:
 - date: 2026-11-13T22:48:06.295902+00:00
   author: claude
   text: 'Done in 06ecd227. The repo is a cargo workspace now: the library stays at the root (package lotar, src/, tests/, build.rs for help docs, OpenAPI and the git probe, plus lotar-agent-wrapper); crates/lotar-web-assets embeds target/web-embed with its own build.rs; crates/lotar-cli (package lotar-cli, bin lotar, src/main.rs moved there) depends on both and calls lotar::web_server::set_embedded_assets at start. Version, clap, serde_json and tempfile come from [workspace.package]/[workspace.dependencies]; lints are workspace lints. Tests in tests/ find lotar next to lotar-agent-wrapper (common::lotar_bin(), replaces CARGO_BIN_EXE_lotar and cargo_bin!); crates/lotar-cli/tests/embedded_web_ui_test.rs checks that the binary serves the embedded index (and makes workspace test runs build the binary). Caveat in docs/developers/testing.md and the testing-strategy skill: -p lotar alone doesn''t rebuild the binary, so filter with -E. Timings after a real change in target/web-embed, before -> after: cargo build (dev) 5.6 s -> 1.0 s, cargo nextest run --no-run 6.6 s -> 0.9 s, cargo build --profile smoke 1m13s -> 1.3 s; only lotar-web-assets and lotar-cli compile. Checks: npm run lint:agent, npm run test:agent (2141 Rust tests, 1515 UI, release and hook tests), npm run smoke (390/390), cargo deny check, cargo build --release --locked --all-features (both binaries; the release binary serves the embedded UI), CI''s nextest selections listed fine. Not run here: the cross build (cross images are x86_64 only, this Mac is arm64; CI''s armv7 job covers it) and nfpm (not installed). ci.yml has no path filters from DEV-493 on main, so nothing to update there. Docs updated: docs/developers (main, cli, identity, errors, testing, platform-test-verification), release-guide, ci.yml comment.'
+- date: 2026-11-13T23:10:54.911901+00:00
+  author: codex
+  text: 'Review: blocking. P1 Cargo.toml:38-42 and crates/lotar-cli/Cargo.toml:2: moving the binary breaks required repository-root installation. Reproduced RUSTC_WRAPPER= cargo install --path . --root /tmp/dev497-review-install --offline --bin lotar: no bin target named lotar in package lotar. Default root installation selects only lotar-agent-wrapper. Preserve repository installation and add an install regression check. Read diff 06ecd227 versus main, ticket comments, DEV-493 approval, DEV-499, release/Cross/Docker tooling and recent main history. Reran cargo run -- --version (passed with sandbox-blocked sccache disabled), release/npm tests 47/47 and hooks 7/7. Full lint, nextest, smoke, release cross builds, nfpm and incremental timings not independently rerun. No UI changes, source edits or commits; status and assignee unchanged. No minor tickets.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aece2a03a-cf09-4340-9bd6-4b7ecf0e4547
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aeb427d8b-11c2-4310-9c31-3447004ca1e2
 description: |-
   First step of the cargo workspace the owner approved (DEV-493, 2026-11-13: "Yes on all of those ideas"). A web-only change should rebuild only the embedded assets and the link, not the library and its tests.
 
@@ -37,6 +41,7 @@ description: |-
   - [ ] Release builds, the smoke suite and the packaging checks still pass.
 tags:
 - backend
+- review-returned
 history:
 - at: 2026-11-13T22:21:43.116897+00:00
   actor: claude
@@ -79,3 +84,27 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-13T23:08:35.712743+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aeb427d8b-11c2-4310-9c31-3447004ca1e2
+- at: 2026-11-13T23:10:54.911901+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:10:55.041268+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: backend
+    new: backend, review-blocked
+- at: 2026-11-13T23:11:05.560963+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: backend, review-blocked
+    new: backend, review-returned

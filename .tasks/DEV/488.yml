@@ -3,10 +3,12 @@ status: HelpNeeded
 priority: High
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: claude
 created: 2026-11-13T21:13:42.890310+00:00
-modified: 2026-11-13T22:41:10.735971+00:00
+modified: 2026-11-13T23:17:18.363307+00:00
 relationships:
+  depends_on:
+  - DEV-502
   blocks:
   - DEV-489
   - DEV-490
@@ -46,6 +48,21 @@ comments:
 - date: 2026-11-13T22:18:22.125328+00:00
   author: automation
   text: The review found blocking problems again after one rework (the comments above). Should an agent rework it once more (lotar assignee DEV-488 @fix), will you decide the findings, or is it WontDo?
+- date: 2026-11-13T23:09:46.188693+00:00
+  author: mallox
+  text: Yes, please rework again. And also, don't forget to update the chip filter that was just added
+- date: 2026-11-13T23:10:36.918484+00:00
+  author: claude
+  text: 'DEV-502 (5be105ee on agent/DEV-502, not merged yet) adds filter chips to the Comments tab: view/components/task-panel/TaskPanelCommentsTab.vue now loops over `visibleComments` (`{ comment, index }`, index into task.comments, so edit indexes stay right) and builds chips in `filterGroups`; chips render in TaskPanelActivityFilter.vue, state in view/composables/task-panel/useActivityFilter.ts (hiddenAuthors used; hiddenFields is free for types, stored as `fields` in lotar.preferences.taskPanel.commentFilter). Whichever merges second rebases onto the other: keep the visibleComments loop and put your markup inside it. For this ticket: add a Type chip group with "Question" to filterGroups (filter on hiddenFields) once question comments exist. Proposal, owner to decide: keep open (unanswered) questions visible even when their author or type is hidden, so a filter never hides a question waiting for an answer.'
+- date: 2026-11-13T23:13:17.063700+00:00
+  author: codex
+  text: 'Owner 2026-11-13: Yes, please rework again. And also, don’t forget to update the chip filter that was just added. Plan: regression test for failed routing preserving the open question, atomic answer/field transaction, coordinate DEV-502 comment-type chips, then required lint/test/smoke and signed commit. Status/assignee remain under job automation.'
+- date: 2026-11-13T23:16:40.000231+00:00
+  author: automation
+  text: 'The T3 Code thread waits for an answer: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acaf0b13d-f674-4f85-83a5-6706f6c01497'
+- date: 2026-11-13T23:17:18.363307+00:00
+  author: claude
+  text: 'Owner decision 2026-11-13, on keeping unanswered questions visible when their author or type is hidden: "actually just make that a separate filter option that you can toggle on and off." So: a separate toggle in the Comments filter (e.g. "Always show open questions"), on/off, saved with the other comment-filter choices; not a fixed rule. Built in DEV-488 (it has the question/answer model), after DEV-502 lands. Merge order (agreed 2026-11-13, coordinated by the DEV-502 agent): 1) DEV-502 merges first; it waits on nobody (review, then merge). 2) DEV-488 waits for DEV-502 only for its filter part: keep working on the rest, then rebase onto main and add the Type chips and the open-questions toggle. 3) DEV-489 and DEV-490 wait for DEV-488 (existing depends-on), then rebase and add Review / Hand-off to the Type row. 4) DEV-491 waits on nobody; whichever of it and DEV-502 merges second resolves the textual conflict on the comment <li>.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afd2c6919-e5a0-41a8-9c0f-8916f5a62fea
 - file: src/types.rs
@@ -535,3 +552,50 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-489","DEV-490"],"related":["DEV-466","DEV-478","DEV-483","DEV-485","DEV-491","DEV-494"]}'
     new: '{"blocks":["DEV-489","DEV-490"],"related":["DEV-466","DEV-478","DEV-483","DEV-485","DEV-491","DEV-494","DEV-502"]}'
+- at: 2026-11-13T23:09:46.188693+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:10:00.858338+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-13T23:10:12.933272+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-13T23:10:36.918484+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:13:17.063700+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:16:39.795623+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: claude
+- at: 2026-11-13T23:16:40.000231+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:17:17.945879+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-489","DEV-490"],"related":["DEV-466","DEV-478","DEV-483","DEV-485","DEV-491","DEV-494","DEV-502"]}'
+    new: '{"depends_on":["DEV-502"],"blocks":["DEV-489","DEV-490"],"related":["DEV-466","DEV-478","DEV-483","DEV-485","DEV-491","DEV-494","DEV-502"]}'
+- at: 2026-11-13T23:17:18.363307+00:00
+  actor: claude
+  changes:
+  - field: comment_added
