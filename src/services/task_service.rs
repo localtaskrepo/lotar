@@ -55,6 +55,8 @@ pub struct TaskService;
 
 #[derive(Debug, Clone)]
 pub struct TaskUpdateContext {
+    /// Answer to validate and publish with its option fields in the same transaction.
+    pub question_answer: Option<super::task_questions::AnswerInput>,
     /// Refuse the update with [`LoTaRError::Conflict`] unless the task's
     /// `modified`, as task responses show it, equals this (an optimistic
     /// precondition, DEV-301).
@@ -72,13 +74,27 @@ pub struct TaskUpdateContext {
 
 impl TaskUpdateContext {
     pub fn automation_disabled() -> Self {
-        Self { expected_modified: None, allow_agent_automation: false, bypass_active_job_lock: true, enforce_review_owner: false, emit_api_event: true }
+        Self {
+            question_answer: None,
+            expected_modified: None,
+            allow_agent_automation: false,
+            bypass_active_job_lock: true,
+            enforce_review_owner: false,
+            emit_api_event: true,
+        }
     }
 }
 
 impl Default for TaskUpdateContext {
     fn default() -> Self {
-        Self { expected_modified: None, allow_agent_automation: true, bypass_active_job_lock: false, enforce_review_owner: true, emit_api_event: false }
+        Self {
+            question_answer: None,
+            expected_modified: None,
+            allow_agent_automation: true,
+            bypass_active_job_lock: false,
+            enforce_review_owner: true,
+            emit_api_event: false,
+        }
     }
 }
 
@@ -924,11 +940,16 @@ impl TaskService {
         context: TaskUpdateContext,
         relationship_delta: Option<F>,
     ) -> LoTaRResult<TaskUpdateReceipt> {
-        let held = TaskUpdate { status: patch.status.clone(), assignee: patch.assignee.clone(), ..TaskUpdate::default() };
-        let retry_context = TaskUpdateContext { expected_modified: None, bypass_active_job_lock: true, ..context.clone() };
+        let mut held = TaskUpdate { status: patch.status.clone(), assignee: patch.assignee.clone(), ..TaskUpdate::default() };
+        let answering = context.question_answer.is_some();
+        let retry_context = TaskUpdateContext { question_answer: None, expected_modified: None, bypass_active_job_lock: true, ..context.clone() };
         let mut deferred = None;
         let mut receipt = Self::update_composed_inner(storage, id, patch, context, relationship_delta, &mut deferred)?;
         if let Some(outcome) = deferred {
+            if answering {
+                held.status.clone_from(&outcome.status);
+                held.assignee.clone_from(&outcome.assignee);
+            }
             match crate::services::agent_active_jobs::record_outcome(&storage.root_path, &outcome)? {
                 Some(recorded) => receipt.deferred = Some(recorded).filter(|recorded| !recorded.is_empty()),
                 None => {
@@ -1010,6 +1031,14 @@ impl TaskService {
 
         let config = Self::resolve_config_for_mutation(storage.root_path.as_path(), &derived)?;
 
+        let answer_comment = if let Some(input) = context.question_answer.as_ref() {
+            let (comment, answer_patch) = super::task_questions::prepare_answer(storage, &canonical, &existing, &config, input)?;
+            patch = answer_patch;
+            Some(comment)
+        } else {
+            None
+        };
+
         // Shared project-aware enum validation: raw patch strings are checked
         // against this task's project configuration and canonicalized before
         // any mutation is applied.
@@ -1083,6 +1112,15 @@ impl TaskService {
         // assignment first (DEV-287).
         let explicit_assignee = patch.assignee.is_some();
         let mut t = existing.clone();
+        if let Some(comment) = answer_comment {
+            t.history.push(TaskChangeLogEntry {
+                extra: Default::default(),
+                at: comment.date.clone(),
+                actor: comment.author.clone(),
+                changes: vec![TaskChange { field: "comment_added".into(), old: None, new: None }],
+            });
+            t.comments.push(comment);
+        }
         let mut changes: Vec<TaskChange> = Vec::new();
         let mut record_change = |field: &str, old: Option<String>, new: Option<String>| {
             if old != new {
@@ -1306,7 +1344,8 @@ impl TaskService {
         let modified = chrono::Utc::now().to_rfc3339();
         t.modified = modified.clone();
 
-        if !changes.is_empty() {
+        let fields_changed = !changes.is_empty();
+        if fields_changed {
             let history_actor = resolve_current_user_for_project(Some(&storage.root_path), Some(&derived));
             t.history.push(TaskChangeLogEntry { extra: Default::default(), at: modified, actor: history_actor, changes });
         }
@@ -1360,7 +1399,7 @@ impl TaskService {
             crate::api_events::emit_task_updated(&dto, actor.as_deref());
         }
 
-        if context.allow_agent_automation {
+        if context.allow_agent_automation && (context.question_answer.is_none() || fields_changed) {
             let _ = AutomationService::apply_task_update(storage, Some(&previous_dto), &dto, &config);
         }
 

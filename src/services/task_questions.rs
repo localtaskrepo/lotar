@@ -93,28 +93,47 @@ impl TaskService {
         Ok(Self::finish_comment(storage, pushed, true))
     }
 
-    /// Answer a question comment and apply the chosen options' `set:`.
-    /// The answer is written first, then the fields change as an update by
-    /// the answerer, then `on.commented` rules see the ticket as it is now.
+    /// Publish the answer and option fields together, then fire comment rules.
     pub fn answer_question(storage: &mut Storage, id: &str, input: &AnswerInput) -> LoTaRResult<TaskDTO> {
-        let mut chosen_set: Option<OptionSet> = None;
-        let mut pushed = Self::push_comment(storage, id, CommentContext::default(), |task, now, actor| {
-            let question = find_question(&task.comments, input.to.as_deref())?;
-            let spec = question.question.as_ref().ok_or_else(|| LoTaRError::ValidationError("that comment is not a question".to_string()))?;
-            let answer = resolve_answer(question, spec, input)?;
-            chosen_set = merged_set(spec, &answer.choice);
-            let mut comment = TaskComment::new(now, actor, answer_text(spec, &answer));
-            comment.answer = Some(answer);
-            Ok(comment)
-        })?;
-        if let Some(set) = chosen_set {
-            let patch = option_set_patch(storage, &pushed.dto, &pushed.config, &set)?;
-            let receipt = TaskService::update_with_receipt(storage, &pushed.dto.id, patch, TaskUpdateContext::default())
-                .map_err(|err| LoTaRError::ValidationError(format!("The answer is recorded, but setting the option's fields failed: {err}")))?;
-            pushed.dto = receipt.dto;
-        }
-        Ok(Self::finish_comment(storage, pushed, true))
+        let context = TaskUpdateContext { question_answer: Some(input.clone()), ..Default::default() };
+        let receipt = Self::update_with_receipt(storage, id, Default::default(), context)?;
+        let dto = receipt.dto;
+        let comment = dto
+            .comments
+            .iter()
+            .rev()
+            .find(|comment| comment.answer.is_some())
+            .cloned()
+            .ok_or_else(|| LoTaRError::ValidationError("the answer was not stored".into()))?;
+        let project = crate::storage::TaskId::parse(&dto.id).map_err(|err| LoTaRError::InvalidTaskId(err.to_string()))?.project;
+        let config = Self::resolve_config_for_project(&storage.root_path, &project);
+        Ok(Self::finish_comment(storage, super::task_service::PushedComment { dto, comment, config, project }, true))
     }
+}
+
+/// Called with the update transaction's locks held, against its current task.
+pub(crate) fn prepare_answer(
+    storage: &Storage,
+    id: &str,
+    task: &crate::Task,
+    config: &ResolvedConfig,
+    input: &AnswerInput,
+) -> LoTaRResult<(TaskComment, crate::api_types::TaskUpdate)> {
+    let question = find_question(&task.comments, input.to.as_deref())?;
+    let spec = question.question.as_ref().ok_or_else(|| LoTaRError::ValidationError("that comment is not a question".into()))?;
+    let answer = resolve_answer(question, spec, input)?;
+    let patch = if let Some(set) = merged_set(spec, &answer.choice) {
+        validate_option_set("answer", &set, config)?;
+        let current = TaskService::to_dto(id, task.clone(), None, config, chrono::Utc::now());
+        option_set_patch(storage, &current, config, &set)?
+    } else {
+        Default::default()
+    };
+    let project = crate::storage::TaskId::parse(id).map_err(|err| LoTaRError::InvalidTaskId(err.to_string()))?.project;
+    let actor = crate::utils::identity::resolve_current_user_for_project(Some(&storage.root_path), Some(&project));
+    let mut comment = TaskComment::new(chrono::Utc::now().to_rfc3339(), actor, answer_text(spec, &answer));
+    comment.answer = Some(answer);
+    Ok((comment, patch))
 }
 
 /// Check a question before it is asked and return it normalized: trimmed

@@ -242,3 +242,21 @@ fn mcp_asks_and_answers() {
     assert_eq!(answered["task"]["status"], "InProgress", "{answered}");
     assert_eq!(answered["task"]["comments"][1]["answer"]["to"], date);
 }
+
+#[test]
+fn rejected_answer_keeps_question_open_and_task_unchanged() {
+    let tf = TestFixtures::new();
+    let dir = tf.get_temp_path();
+    let created: Value = serde_json::from_str(&run(dir, "claude", &["--format", "json", "add", "Retry routing"])).unwrap();
+    let id = created["task"]["id"].as_str().unwrap();
+    run(dir, "claude", &["comment", id, "--question", "Who?", "--option", "a: Assign outsider", "--set", "a:assignee=outsider"]);
+    let project = id.split_once('-').unwrap().0;
+    let config = dir.join(".tasks").join(project).join("config.yml");
+    std::fs::write(&config, "members: [claude, mallox]\nstrict_members: true\nauto.populate_members: false\n").unwrap();
+    let path = task_file(dir, id);
+    let before = std::fs::read(&path).unwrap();
+    let out = lotar(dir, "mallox", &["comment", id, "--answer", "a"]);
+    assert!(!out.status.success(), "{}", String::from_utf8_lossy(&out.stdout));
+    assert_eq!(std::fs::read(&path).unwrap(), before, "failed routing must not close the question");
+    run(dir, "mallox", &["comment", id, "--answer", "--", "Let me decide later"]);
+}
