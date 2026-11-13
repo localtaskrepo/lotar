@@ -1,15 +1,22 @@
 title: 'Automation: a job''s outcome fires the change rules when it applies'
-status: InProgress
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T01:31:31.408867+00:00
-modified: 2026-11-13T01:41:38.068354+00:00
+modified: 2026-11-13T01:49:56.425805+00:00
+relationships:
+  related:
+  - DEV-382
+  - DEV-403
 comments:
 - date: 2026-11-13T01:41:26.950652+00:00
   author: claude
   text: 'Done in c858ddf on agent/DEV-406. apply_job_outcome (src/services/automation_service.rs) now applies the outcome without automation and then dispatches apply_task_update with previous = the ticket after the job_completed/failed/cancelled rules ran, so updated and assigned rules fire (an agent profile as assignee still starts its job, via the same path). A no-op outcome fires nothing. A rule''s own set/add/remove/comment still fires no change rules (only unblocked), as before. Docs: agent.md (Status and assignee during a job) and automation.md (job hooks, plus a new Execution semantics bullet on which changes fire rules). Test: dev320_job_outcome_test::the_outcome_fires_the_updated_and_assigned_rules covers outcome HelpNeeded + mallox, an updated rule with all/current (fires, previous.status/priority from after the end rule), an assigned rule (previous.assignee), and a rule on the end rule''s priority set (doesn''t fire). It fails without the fix. Checks: lint:agent, test:agent (Rust, UI, release, hooks), test:smoke:agent (385 passed), all green.'
+- date: 2026-11-13T01:49:48.945659+00:00
+  author: claude
+  text: 'Merged: rebased agent/DEV-406 onto main (it had moved on with DEV-403 and DEV-382; no conflicts), fast-forwarded main to 078fb78 (DEV-406 Automation: a job''s outcome fires the change rules when it applies), then committed the ticket files as c80a6ce (DEV-406 Ticket updates, including a pending .tasks/DEV/405.yml change). Pushed 8e7cb78..c80a6ce to origin/main (repos.json push: true, main checkout clean, no other unpushed work). Checks on the rebased branch: lint:agent, test:agent (2112 Rust tests, UI, release, hooks) and test:smoke:agent (385), all passed.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A27b5b1da-362c-4587-aac1-8c0387f31859
 description: |-
@@ -53,3 +60,19 @@ history:
   - field: assignee
     old: '@fix'
     new: '@merge'
+- at: 2026-11-13T01:49:48.945659+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T01:49:49.018151+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-382","DEV-403"]}'
+- at: 2026-11-13T01:49:56.425805+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

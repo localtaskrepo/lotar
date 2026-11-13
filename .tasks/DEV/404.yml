@@ -1,20 +1,28 @@
 title: Project default.reporter overrides LOTAR_DEFAULT_REPORTER as comment author
-status: HelpNeeded
+status: InProgress
 priority: High
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: claude
 created: 2026-11-13T01:25:40.718079+00:00
-modified: 2026-11-13T01:26:45.695780+00:00
+modified: 2026-11-13T01:57:43.172408+00:00
 relationships:
   related:
   - DEV-126
+  - DEV-403
+  - DEV-405
 comments:
 - date: 2026-11-13T01:26:35.870717+00:00
   author: claude
   text: |-
     Current behaviour is deliberate: docs/help/precedence.md, identity.md, whoami.md and environment.md all put the project config above env (CLI > project > env > home > global), and DEV-126 tests it (tests/cli_whoami_and_dryrun_test.rs:224-237: project reporters alice/bob beat LOTAR_DEFAULT_REPORTER=environment-user). Only comment.md's wording suggests env wins. So the fix is a precedence decision.
     Question: should the env var (LOTAR_DEFAULT_REPORTER, and --config) win over project default.reporter for identity (comment author, history actor, @me), while project default.reporter still sets the reporter of new tasks? Or keep the documented order, fix comment.md, and have quarter-inch-studio drop default.reporter from its project config (STD-57)? I'd recommend the first: the env var names who is acting, project config names a default owner.
+- date: 2026-11-13T01:55:58.761687+00:00
+  author: claude
+  text: 'Decision 2026-11-12 (mallox): "Env above project, all fields". New configuration order for every field: CLI > env > project > home > global > defaults. Fixes the comment author as a side effect; release note for LOTAR_* variables in shell profiles.'
+- date: 2026-11-13T01:57:43.095356+00:00
+  author: claude
+  text: 'Same bug as DEV-403/DEV-405, fixed on main: c5fe8aa (DEV-403) and 19dcf8f (DEV-405). LOTAR_DEFAULT_REPORTER now names a comment''s author and the history actor ahead of a project''s default.reporter. By owner decision 2026-11-12, a new ticket without --reporter still gets the configured default.reporter. Rebase agent/DEV-404 onto main and rerun the repro: it should store author claude.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac3630db6-06aa-4bb6-afd5-8ee580fca286
 description: |-
@@ -64,3 +72,29 @@ history:
   - field: assignee
     old: '@fix'
     new: mallox
+- at: 2026-11-13T01:55:58.761687+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T01:56:03.487480+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-13T01:56:03.537342+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: claude
+- at: 2026-11-13T01:57:43.095356+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T01:57:43.172408+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-126"]}'
+    new: '{"related":["DEV-126","DEV-403","DEV-405"]}'

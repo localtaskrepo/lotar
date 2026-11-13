@@ -5,7 +5,10 @@ type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-12T20:07:56.581871+00:00
-modified: 2026-11-13T01:44:12.690739+00:00
+modified: 2026-11-13T01:49:49.017686+00:00
+relationships:
+  related:
+  - DEV-406
 comments:
 - date: 2026-11-13T01:22:56.330781+00:00
   author: claude
@@ -84,3 +87,9 @@ history:
   - field: status
     old: HelpNeeded
     new: Done
+- at: 2026-11-13T01:49:49.017686+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-406"]}'

@@ -5,11 +5,13 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T01:24:37.163521+00:00
-modified: 2026-11-13T01:43:53.436510+00:00
+modified: 2026-11-13T01:57:43.172129+00:00
 relationships:
   related:
   - DEV-381
   - DEV-405
+  - DEV-406
+  - DEV-404
 comments:
 - date: 2026-11-13T01:37:41.787036+00:00
   author: claude
@@ -74,3 +76,15 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-13T01:49:49.017931+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-381","DEV-405"]}'
+    new: '{"related":["DEV-381","DEV-405","DEV-406"]}'
+- at: 2026-11-13T01:57:43.172129+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-381","DEV-405","DEV-406"]}'
+    new: '{"related":["DEV-381","DEV-405","DEV-406","DEV-404"]}'
