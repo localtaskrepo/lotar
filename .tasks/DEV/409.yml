@@ -1,11 +1,11 @@
 title: Jira sync pushes a v-named version without its v
-status: InProgress
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T03:13:31.357022+00:00
-modified: 2026-11-13T05:18:28.128397+00:00
+modified: 2026-11-13T05:19:30.265294+00:00
 relationships:
   related:
   - DEV-392
@@ -18,6 +18,9 @@ comments:
 - date: 2026-11-13T05:18:27.804635+00:00
   author: claude
   text: 'Merged: rebased onto main (c6b4cf56, DEV-408/DEV-410 commits, no conflicts) and fast-forwarded main to 793ad78a ''DEV-409 Jira sync pushes a v-named version without its v''. Checks on the rebased tree: npm run lint ok, npm run test:agent ok (Rust 2120, UI 1507, release 47, hooks 7), npm run smoke 376/385 with 9 timeouts under load average 30-120 (other sessions, Time Machine). All 9 failing files passed on rerun; the full smoke had passed 385/385 on the same change before the rebase. Pushed together with the ticket update commit.'
+- date: 2026-11-13T05:19:14.820424+00:00
+  author: claude
+  text: 'Pushed: origin/main c6b4cf56..15bf3621 (793ad78a fix, 15bf3621 ticket updates).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abe3f7cfa-473f-4cb6-b321-68a78cf7333b
 description: |-
@@ -77,3 +80,13 @@ history:
   - field: relationships
     old: '{"related":["DEV-392"]}'
     new: '{"related":["DEV-392","DEV-408","DEV-410"]}'
+- at: 2026-11-13T05:19:14.820424+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T05:19:30.265294+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

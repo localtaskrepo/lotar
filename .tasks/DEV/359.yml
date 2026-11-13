@@ -5,13 +5,14 @@ type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-12T04:47:42.443342+00:00
-modified: 2026-11-12T08:49:44.662640+00:00
+modified: 2026-11-13T05:33:41.536645+00:00
 relationships:
   related:
   - DEV-354
   - DEV-356
   - DEV-348
   - DEV-361
+  - DEV-413
 comments:
 - date: 2026-11-12T04:58:54.479545+00:00
   text: 'claude: Fixed in commit 1d69b61 on agent/DEV-359. tests/web_api_integration_test.rs: after the body is sent, the response is now read to EOF with read_until_deadline (RESPONSE_DEADLINE, 15 s) instead of read_to_string against the 500 ms net_timeout. A real hang still fails with ''no response from test server within 15s''. The early-response check (100 ms read before the body) is unchanged. Checks: the ticket''s cargo nextest command, 5 runs, 35/35 each time; npm run lint:agent passes; npm run test:agent passes (Rust, UI, release, hooks). Smoke: the first run had 1 failure of 378, which I didn''t capture (smoke doesn''t touch this Rust test file), and the 2 reruns passed 378/378.'
@@ -175,3 +176,9 @@ history:
   - field: assignee
     old: mallox
     new: claude
+- at: 2026-11-13T05:33:41.536645+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-354","DEV-356","DEV-348","DEV-361"]}'
+    new: '{"related":["DEV-354","DEV-356","DEV-348","DEV-361","DEV-413"]}'
