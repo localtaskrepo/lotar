@@ -394,3 +394,46 @@ mod effort_comments_custom {
         assert_eq!(v["action"], "stats.custom.field");
     }
 }
+
+#[test]
+fn stats_comments_by_author_groups_by_comment_author() {
+    let temp = crate::common::temp_dir();
+    let project = temp.path().join(".tasks").join("TEST");
+    std::fs::create_dir_all(&project).unwrap();
+    std::fs::write(
+        project.join("1.yml"),
+        "title: One\ncreated: '2026-01-01T00:00:00Z'\ncomments:\n  - date: '2026-01-02T00:00:00Z'\n    author: alice\n    text: a1\n  - date: '2026-01-03T00:00:00Z'\n    author: bob\n    text: b1\n  - date: '2026-01-04T00:00:00Z'\n    text: legacy\n",
+    )
+    .unwrap();
+    std::fs::write(
+        project.join("2.yml"),
+        "title: Two\ncreated: '2026-01-01T00:00:00Z'\ncomments:\n  - date: '2026-01-05T00:00:00Z'\n    author: alice\n    text: a2\n",
+    )
+    .unwrap();
+
+    let out = crate::common::lotar_cmd()
+        .unwrap()
+        .current_dir(temp.path())
+        .env("LOTAR_TEST_SILENT", "1")
+        .args(["--format", "json", "stats", "comments-by-author", "--global"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(v["action"], "stats.comments.by_author");
+    assert_eq!(
+        v["items"],
+        serde_json::json!([
+            {"author": "alice", "comments": 2},
+            {"author": null, "comments": 1},
+            {"author": "bob", "comments": 1},
+        ])
+    );
+
+    let mut c = crate::common::lotar_cmd().unwrap();
+    run(&mut c, &temp, &["stats", "comments-by-author", "--global"])
+        .success()
+        .stdout(predicate::str::contains("   2  alice"))
+        .stdout(predicate::str::contains("   1  bob"))
+        .stdout(predicate::str::contains("   1  (no author)"));
+}

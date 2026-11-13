@@ -1,11 +1,11 @@
 title: Version-fields UI smoke intermittently fails under full-suite load
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T20:12:31.295335+00:00
-modified: 2026-11-13T20:46:51.918507+00:00
+modified: 2026-11-13T20:47:08.198081+00:00
 relationships:
   related:
   - DEV-481
@@ -92,3 +92,9 @@ history:
   actor: codex
   changes:
   - field: comment_added
+- at: 2026-11-13T20:47:08.198081+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

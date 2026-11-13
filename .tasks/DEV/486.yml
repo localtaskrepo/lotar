@@ -1,0 +1,94 @@
+title: 'A session: fresh job continues the earlier thread when the branch can''t be freed, so a reviewer can review its own work'
+status: Reviewing
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-13T21:05:37.278437+00:00
+modified: 2026-11-13T21:33:09.134410+00:00
+relationships:
+  related:
+  - DEV-408
+  - DEV-414
+comments:
+- date: 2026-11-13T21:16:00.871468+00:00
+  author: claude
+  text: 'Fixed in e0f836dd on agent/DEV-486. thread_with_open_work: when release_branch fails, a session: fresh job now fails with git''s error (summary/log: ''LoTaR could not free <branch> ... The job asks for a fresh thread (session: fresh), so it doesn''t continue the earlier thread <link> and fails.'') via the new OpenWork::Fail case. session: new on another model keeps DEV-408''s fallback and continues. Tests in tests/dev318_t3_runner_test.rs: a_fresh_session_whose_branch_cant_be_freed_fails, a_job_on_another_model_whose_branch_cant_be_freed_continues_the_thread (a pre-commit hook refuses LoTaR''s commit). docs/help/agent.md says what fresh does then. Checks: npm run lint, npm run test:agent, npm run smoke all pass.'
+- date: 2026-11-13T21:32:59.584045+00:00
+  author: codex
+  text: 'Review: blocking. src/services/agent_job_service.rs:2793 fails and returns before init_log at line 2880. update_job_failure calls write_status, but src/services/agent_log_service.rs:193-195 silently skips a nonexistent log. The git error is not persisted in the job log as Done when requires. Initialize logging before this failure or explicitly persist early failures, and test the log contains the git error. Read the full e0f836dd diff, ticket/comments, DEV-408/414 decisions and recent main history. Fresh/new behavior and docs otherwise look focused. Targeted nextest was blocked by sandbox sccache; retry with wrapper cleared and integration target was stopped during dependency compilation. Tests/lint/smoke not independently verified. No files changed or commits; status and assignee unchanged. No durable guidance finding.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A000e5916-f199-4132-8570-a4e1fedd1961
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af94fce2a-f9b9-4d1c-92d6-ed98fda5ecef
+description: |-
+  Found by the refine pilot (standards STD-96, docs/evidence/refine-pilot.md), 2026-11-13. src/services/agent_job_service.rs thread_with_open_work: when release_branch fails, the Err arm returns OpenWork::Continue for every profile, also for session: fresh. DEV-414 chose this to match DEV-408. But fresh exists for the @review stage (STD-59): a reviewer that continues the author's thread reviews its own work in the author's context, the case DEV-414 was made to prevent.
+
+  ## Done when
+  - [ ] A session: fresh job whose branch can't be freed fails with the git error in the log, instead of continuing the earlier thread. session: new keeps DEV-408's fallback.
+  - [ ] Test: fresh with release_branch failing fails the job; new with the same failure still continues.
+  - [ ] docs/help/agent.md says what fresh does when the branch can't be freed.
+tags:
+- health
+- review-returned
+custom_fields:
+  finding: refine-pilot:fresh-fallback
+history:
+- at: 2026-11-13T21:05:37.403854+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-408","DEV-414"]}'
+- at: 2026-11-13T21:05:37.531211+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T21:05:37.787478+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T21:05:38.352033+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A000e5916-f199-4132-8570-a4e1fedd1961
+- at: 2026-11-13T21:16:00.871468+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T21:16:13.617680+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T21:31:25.493168+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af94fce2a-f9b9-4d1c-92d6-ed98fda5ecef
+- at: 2026-11-13T21:32:59.584045+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T21:32:59.974912+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: health
+    new: health, review-blocked
+- at: 2026-11-13T21:33:09.134410+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: health, review-blocked
+    new: health, review-returned

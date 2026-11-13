@@ -1,0 +1,124 @@
+title: Automation's comments render muted in the Comments tab
+status: Reviewing
+priority: Low
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-13T21:14:14.411039+00:00
+modified: 2026-11-13T21:34:18.744410+00:00
+relationships:
+  related:
+  - DEV-466
+  - DEV-488
+  - DEV-481
+comments:
+- date: 2026-11-13T21:26:16.645800+00:00
+  author: claude
+  text: 'Done in 6c090386. Comments by author automation get the class task-panel__comment--automation: text 12px (the size of the author/date line), muted colour, no background, tighter padding; links stay link-coloured and work. Comments without that author are unchanged. The question exception isn''t in yet: no question comment type exists (DEV-488 is in Todo), so whoever adds that type should keep automation''s questions at full weight. Tests: unit test in view/__tests__/TaskPanelCommentsTab.spec.ts; new smoke test smoke/tests/ui.comments.smoke.spec.ts at 390px in the light and dark themes. It failed on the old style and passes now. Screenshots before and after, at 390px in both themes, are in the agent''s scratchpad (before-/after-light.png, before-/after-dark.png). Checks: npm run lint ok; npm run test:agent ok (2137 Rust tests, 1516 UI tests, plus the release and hooks tests); npm run smoke 391/392: the known DEV-481 flake (harness.server:409), whose fix isn''t on main yet. That file alone passed 19/19 and a full rerun passed 392/392.'
+- date: 2026-11-13T21:26:22.453230+00:00
+  author: claude
+  text: 'Correction: DEV-488 is InProgress, not Todo.'
+- date: 2026-11-13T21:34:09.023512+00:00
+  author: codex
+  text: 'Review: blocking. Missing required ticket-attached light/dark before/after screenshots at 1920, 1440 and 390px for TaskPanelCommentsTab.vue:155-159; report only cites temporary phone images. Upload and link complete sets for re-review. Reviewed full diff, ticket/comments, related tickets and component main history. No code defect identified. Targeted unit tests 2/2 and frontend/smoke typecheck passed. Own app startup failed listen EPERM on 127.0.0.1:5191; browser preview unavailable. Full gates not rerun. No files or commits changed; status and assignee unchanged.'
+references:
+- file: view/components/task-panel/TaskPanelCommentsTab.vue
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae010a927-d153-4e58-a0fa-41c391832f1e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A21fa2849-92d7-4f93-9879-7c64d33c8264
+description: |-
+  Comments by the author `automation` (job failed, retry started, thread waits for an answer) sit between the agents' and the owner's comments at the same weight, so the conversation is hard to follow on a ticket like DEV-466 or STD-82. Owner chose to show them de-emphasized on 2026-11-13.
+
+  ## Plan
+
+  - Comments tab: comments whose author is `automation` render smaller and muted, with the text still readable and links working. A question from automation (once the question comment type exists) stays full weight: it waits for the owner.
+  - No data change.
+
+  ## Done when
+
+  - [ ] Automation comments render muted in light and dark themes, on phone width too (screenshots before and after).
+  - [ ] lint, test and smoke pass.
+tags:
+- web-ui
+- light
+- review-returned
+history:
+- at: 2026-11-13T21:14:15.153197+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-466"]}'
+- at: 2026-11-13T21:14:16.371385+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T21:14:36.606468+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-466"]}'
+    new: '{"related":["DEV-466","DEV-488"]}'
+- at: 2026-11-13T21:14:38.005290+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:view/components/task-panel/TaskPanelCommentsTab.vue
+- at: 2026-11-13T21:16:19.601115+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T21:16:20.153384+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae010a927-d153-4e58-a0fa-41c391832f1e
+- at: 2026-11-13T21:26:03.403314+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-466","DEV-488"]}'
+    new: '{"related":["DEV-466","DEV-488","DEV-481"]}'
+- at: 2026-11-13T21:26:16.645800+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T21:26:22.453230+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T21:26:33.936170+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T21:33:10.787384+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A21fa2849-92d7-4f93-9879-7c64d33c8264
+- at: 2026-11-13T21:34:09.023512+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T21:34:12.814812+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: web-ui, light
+    new: web-ui, light, review-blocked
+- at: 2026-11-13T21:34:18.744410+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: web-ui, light, review-blocked
+    new: web-ui, light, review-returned

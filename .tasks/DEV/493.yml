@@ -1,0 +1,47 @@
+title: Measure a cargo workspace and path-filtered CI before splitting lotar
+status: InProgress
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-13T21:27:58.028716+00:00
+modified: 2026-11-13T21:36:26.488928+00:00
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A33be852d-9b46-4b5c-81fe-67f9a885d51d
+description: |-
+  Measure whether a cargo workspace and path-filtered CI make lotar's CI faster, before deciding on any split. The owner, 2026-11-13: "we may want to think about what part of lotar we could split into their own projects, even if just to speed up the CI steps." He chose to measure this (standards docs/decisions/2026-11-13-harness-tool.md).
+
+  ## Found (2026-11-13)
+
+  - "Quality Assurance" takes 6 to 11 minutes per push. The Windows job is the critical path (5.5 to 10.5 min): build 189 s and a nextest step of 302 s whose tests sum to 12 s, so compiling dominates.
+  - One crate, two binaries, no workspace. `tests/`: 52.8k lines in 212 files compiled as one integration binary.
+  - The web UI (`view/`, Vue 3, 112k lines) is embedded through `build.rs` and `include_dir`, so every Rust job builds it first. It has the most churn (124 of 450 commits in 30 days).
+  - Agent, automation and job tests are 52% of the Linux test time (`dev318_t3_runner_test` 57 s).
+
+  ## Measure, on a branch
+
+  - A cargo workspace (for example core/storage, runner, sync, mcp, cli/server) with the tests per crate, and what an incremental change costs then.
+  - Path filters in .github/workflows: a web-only change skips the Rust jobs (or uses prebuilt web assets), a Rust-only change skips the UI tests.
+  - Wall time of the Windows and Linux jobs before and after, for a Rust change, a web change and a docs change. Local timings are fine where CI runs can't be triggered, marked as such.
+
+  ## Done when
+
+  - [ ] A comment with the measured minutes per case and what each change costs (moved files, release tooling, the embedded web build).
+  - [ ] The branch stays unmerged; one question to the owner (HelpNeeded, assigned to mallox): adopt, adopt part, or not.
+history:
+- at: 2026-11-13T21:27:58.147150+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T21:36:25.928097+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T21:36:26.488928+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A33be852d-9b46-4b5c-81fe-67f9a885d51d

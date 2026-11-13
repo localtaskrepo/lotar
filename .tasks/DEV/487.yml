@@ -1,0 +1,107 @@
+title: stats comments-by-author still ranks by comment count, though comments record their author (DEV-327)
+status: Merging
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@merge'
+created: 2026-11-13T21:05:37.639521+00:00
+modified: 2026-11-13T21:48:54.368784+00:00
+relationships:
+  related:
+  - DEV-327
+  - DEV-478
+comments:
+- date: 2026-11-13T21:14:47.392394+00:00
+  author: claude
+  text: 'comments-by-author now groups comments by their author field; comments without author count under author null / ''(no author)''. JSON action renamed stats.comments.by_task -> stats.comments.by_author, items {author, comments}. Stale doc comment replaced, docs/help/stats.md documents the shape. New test stats_comments_by_author_groups_by_comment_author (alice x2, bob, one legacy). Commit 3083bb33. Checks: npm run lint, npm test, npm run smoke all pass.'
+- date: 2026-11-13T21:31:19.241786+00:00
+  author: codex
+  text: 'Review: passed. Reviewed 3083bb33 full diff, ticket/comments, DEV-327, guidance, stats helpers and recent main history. No findings. Focused regression passed; lint:agent passed with RUSTC_WRAPPER disabled. Full tests and smoke attempted: sandbox denies localhost binds; Rust temp guard reports xcrun_db residue. Smoke 146 passed/244 failed, with denied server binds. Full verification remains limited by sandbox. Worktree clean; no files, status or assignee changed. No durable guidance finding.'
+- date: 2026-11-13T21:48:20.578838+00:00
+  author: codex
+  text: 'Merged rebased fix 69839c9e into main by fast-forward. Required checks rerun after rebase: lint:agent, test:agent and test:smoke:agent all passed (390 smoke tests). No separate health check command is specified. Including pending .tasks changes as instructed. Status and assignee unchanged.'
+- date: 2026-11-13T21:48:53.861977+00:00
+  author: codex
+  text: 'Final main commit is 3dd40821 after the instructed ticket-file amend; code matches verified 69839c9e. DEV-478 remains HelpNeeded, so push stops before its commit: only through 4126330d is eligible. DEV-487 stays merged locally behind that unfinished work; no status or assignee change.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac2daa539-a817-4111-b0cc-4c85abc7c275
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9d2921a5-b6c4-4060-a763-72958d8c54e3
+description: |-
+  Found by the refine pilot (standards STD-96, docs/evidence/refine-pilot.md), 2026-11-13. src/cli/handlers/stats/comments.rs run_by_author still says 'Comments carry no author, so this ranks tasks by comment count'. Since DEV-327 every new comment has an author field.
+
+  ## Done when
+  - [ ] lotar stats comments-by-author groups comments by their author; comments from before DEV-327 (no author) count in one bucket.
+  - [ ] JSON and text output and docs/help/stats.md match; the stale doc comment is gone.
+  - [ ] Test with comments from two authors and one without.
+tags:
+- health
+custom_fields:
+  finding: refine-pilot:stats-comments-by-author
+history:
+- at: 2026-11-13T21:05:37.752160+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-327"]}'
+- at: 2026-11-13T21:05:37.867701+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T21:05:38.324165+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T21:05:38.904277+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac2daa539-a817-4111-b0cc-4c85abc7c275
+- at: 2026-11-13T21:14:47.392394+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T21:14:54.644572+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T21:26:35.272917+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9d2921a5-b6c4-4060-a763-72958d8c54e3
+- at: 2026-11-13T21:31:19.241786+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T21:31:24.238291+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-13T21:48:20.578838+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T21:48:53.861977+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T21:48:54.368784+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-327"]}'
+    new: '{"related":["DEV-327","DEV-478"]}'

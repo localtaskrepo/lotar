@@ -1,0 +1,124 @@
+title: Offer custom fields the tasks use, not only declared ones (config, scanned or both)
+status: HelpNeeded
+priority: Medium
+type: Feature
+reporter: claude
+assignee: mallox
+created: 2026-11-13T20:47:42.334400+00:00
+modified: 2026-11-13T21:13:43.100390+00:00
+relationships:
+  related:
+  - standards:STD-94
+  - DEV-488
+comments:
+- date: 2026-11-13T20:49:01.902306+00:00
+  author: claude
+  text: |-
+    Findings (evaluation, no code changed):
+
+    **Today.** Every field picker reads `useConfig().customFields`, the declared `custom_fields` list: board Fields and Group by (`Board.vue` drops `*`), Tasks list columns and bulk edit (`TasksList.vue` `bulkFieldNames`), Calendar/Dependencies cards, Insights/Sprints filters, automation editor. With `["*"]` that list is empty, so nothing is offered. The *values* are already scanned: `useFilterOptions.ts` collects field values from the loaded tasks. The server matches field names case-insensitively against declared ones (`task_validation.rs`); with a wildcard it keeps whatever name the task was written with. MCP/REST hints (`mcp/server/hints.rs`) list declared names only.
+
+    **Where scanned names can come from**
+    1. Loaded tasks in the UI: no server change, but the Tasks list loads one page only (default 50), so the column list would change from page to page and depend on filters. Not usable for columns/bulk edit.
+    2. Server, per project: count field names in the same pass `/api/projects/stats` already makes (`project_service::stats`, reads every task through the parse cache, as the board load does anyway). Add e.g. `custom_fields_used: [{name, count}]`, or a field on `/api/config/show` for the project. Cost: one dictionary per pass, no new disk reads; for 500 tasks well under the current stats time. Needs `api_types.rs`, `types.ts`, `openapi.json`, docs. Recommended source.
+    3. A persistent index: not needed at this size.
+
+    **Options**
+    - A. `ui.custom_fields_from: config | scanned | both`, default `both`. Declared fields first, then used ones (by count). Wildcard projects then show their fields without any setting. `config` restores today's behaviour for a project that wants a fixed list. Cost: setting in config schema, docs, config UI; ~1 day with smoke test.
+    - B. No setting: always `both`. Smaller (no schema/docs/config-UI), same result for everyone today; add the setting later if a project asks.
+    - C. Scan only for wildcard projects (declared list stays exact when present). Smallest behaviour change, but a project with declared fields never sees fields its tasks use beyond the list (only possible via legacy data).
+
+    **Scanned-only fields elsewhere**
+    - Filters, columns, cards, group by/swimlanes: work as text fields (they already work by name when typed in the filter).
+    - Suggestions: values already come from loaded tasks; unchanged.
+    - Bulk edit: offer them in a wildcard project (the server accepts any name); in a declared project the server rejects undeclared names, so offer declared ones only there.
+    - Version types/sorting: only declared fields have types (`custom_field_properties`); scanned ones stay text.
+    - MCP/REST hints: keep declared names only (hints say what is allowed); optionally add a separate `custom_fields_used` hint. Not needed for the UI.
+
+    **Name merging.** Merge names that differ only in case (the server already treats them as the same field), showing the declared spelling, else the most used one. Don't merge separators (`source_repo` vs `Source Repo`): the server treats them as different fields, so merging in the UI would show one column that writes to one of two names.
+
+    **Recommendation:** B (always declared + used, from the server-side stats pass, case-merged), with bulk edit limited to names the server accepts. Take A instead if you want a project to be able to hide used fields.
+- date: 2026-11-13T20:49:01.923273+00:00
+  author: claude
+  text: 'Question for mallox: which option should I build: A (setting config|scanned|both, default both), B (always declared + used, no setting; recommended), C (scan only wildcard projects), or none?'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A770db508-1817-4fb4-8ba4-b9b071d46e2e
+- file: view/pages/Board.vue
+- file: view/composables/useColumns.ts
+description: |-
+  Evaluate whether the web UI should also offer custom fields that tasks actually use, not only the ones a project lists in `custom_fields`, with a config option to choose the behaviour. The owner asked for this evaluation on 2026-11-13.
+
+  ## Context
+
+  - The board's **Fields** picker and **Group by**, the Tasks list columns and the Calendar and Dependencies cards only offer custom fields declared by name in `custom_fields`. With the default wildcard (`["*"]`), any field is allowed but none is offered (`view/pages/Board.vue` drops `*` from `availableCustomFields`; `view/composables/useColumns.ts` `setCustomFieldKeys`).
+  - Seen in standards' INBOX project: every ticket has the fields `source`, `source_repo` and `finding`, but the board offered none of them, so the owner concluded custom fields "are not supported" on the board. standards then used a tag for the project instead (docs/decisions/2026-11-13-inbox-ticket-properties.md in standards).
+
+  ## Questions to answer
+
+  - Where should scanned field names come from (the server's task index, a stats endpoint, the loaded tasks), and what does that cost on a big project?
+  - Behaviour options, for example a setting such as `ui.custom_fields_from: config | scanned | both`. Which default? Should a wildcard project show scanned fields by default?
+  - How do scanned-only fields behave in filters, suggestions, bulk edit, swimlanes, version types and the MCP and REST hints?
+  - Do names that differ only in case or separators (`source_repo`, `Source Repo`) merge?
+
+  ## Done when
+
+  - [ ] A comment with the findings, the options with their cost, and a recommendation.
+  - [ ] The ticket waits for the owner (HelpNeeded, assigned to mallox) with one question: which option, if any. No implementation before his answer.
+tags:
+- web-ui
+history:
+- at: 2026-11-13T20:47:42.448590+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T20:47:42.662459+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T20:47:43.172551+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A770db508-1817-4fb4-8ba4-b9b071d46e2e
+- at: 2026-11-13T20:47:47.915219+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:view/pages/Board.vue
+- at: 2026-11-13T20:47:47.948630+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:view/composables/useColumns.ts
+- at: 2026-11-13T20:47:48.047594+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["standards:STD-94"]}'
+- at: 2026-11-13T20:49:01.902306+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T20:49:01.923273+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T20:49:11.715004+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-13T21:13:43.100390+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["standards:STD-94"]}'
+    new: '{"related":["standards:STD-94","DEV-488"]}'

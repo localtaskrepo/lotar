@@ -1,0 +1,49 @@
+title: 'Design a harness tool of its own: start, follow, message and resume Claude, Codex, Kilo and other agent CLIs'
+status: InProgress
+priority: High
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-13T21:27:57.663811+00:00
+modified: 2026-11-13T21:34:19.873665+00:00
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9cf75e47-e8d0-45e5-88ad-eb92ada61a1f
+description: |-
+  Design a harness tool of its own, next to lotar in the localtaskrepo group: one way for lotar, agents and other apps to start, follow, message and resume sessions of Claude, Codex, Kilo and other coding-agent CLIs. The owner, 2026-11-13: "Why not pull it out and put it in its own repo next to lotar as a tool that allows multiplexing between harnesses. Then lotar can use, we can use it, any other app that needs it could use it. And we have a separate codebase that we can update at a higher frequency (for when the apis change) and faster than rebuilding lotar each time." He chose a design ticket first (standards docs/decisions/2026-11-13-harness-tool.md). Design only: no code, no new repo yet.
+
+  ## Context
+
+  - Today lotar's jobs run as T3 Code threads (runner t3), and every missing piece waits for T3's CLI: child threads, effort, an existing worktree, rename (pingdotgg/t3code discussion 36281). T3 is an ACP client underneath.
+  - lotar's own runner layer: `src/services/agent_runner.rs` (1771 lines, almost all generic: 12 runner kinds, flag mapping, one stream parser per CLI) and the generic parts of `agent_job_service.rs` (process spawn and kill, pipe reading). Only t3 continues sessions; session ids of claude, codex, opencode, cursor are parsed but never resumed; only claude takes messages while running.
+  - ACP (agentclientprotocol.com): stable v1, Rust SDK 1.0 since 2026-06-25 (v5.2.0, 2026-11-10). Adapters `agentclientprotocol/claude-agent-acp` and `agentclientprotocol/codex-acp`; native in Gemini CLI (`--acp`), Kilo (`kilo acp`), OpenCode, Cursor, Droid, Copilot (`--acp`, preview). Not confirmed: Amp, Antigravity.
+  - Existing tools to evaluate before building: `openclaw/acpx` (MIT, headless ACP CLI client, v0.22.0), HarnessRouter (Apache-2.0, Python, own protocol, v0.41, three months old).
+
+  ## Design questions
+
+  - Build on ACP, use or extend acpx, or keep per-CLI parsers? Which harnesses need an adapter of their own (Amp, T3)?
+  - What the tool adds over ACP: a session registry with names, attach and send from another process (lotar, an agent, the owner), resume and cancel, one model/effort/permission/sandbox mapping, a JSONL event stream, MCP servers per session.
+  - How the owner follows and answers sessions, also from his phone (what T3 gives today): lotar's web UI, a viewer of the tool's own, or both.
+  - Interface: a Rust crate plus CLI (`<tool> run --json`, `send`, `attach`, `resume`, `cancel`, `capabilities`), maybe a small daemon. lotar keeps jobs, queue, worktrees, landing, prompts and rules; `AgentProfileDetail` moves into the crate.
+  - Repo name, license, release cadence, how lotar adopts it (a new runner next to the existing ones until Claude and Codex with resume work), what goes away from lotar afterwards.
+
+  ## Done when
+
+  - [ ] A design doc in docs/developers/ with the answers, the acpx/HarnessRouter evaluation (tried, not just read), and a recommendation.
+  - [ ] One question to the owner on the ticket (HelpNeeded, assigned to mallox) to approve the design before any repo or code.
+history:
+- at: 2026-11-13T21:27:57.910559+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T21:34:19.268838+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T21:34:19.873665+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9cf75e47-e8d0-45e5-88ad-eb92ada61a1f

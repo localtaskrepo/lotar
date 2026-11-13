@@ -39,7 +39,8 @@ pub(crate) fn run_top(
     Ok(())
 }
 
-/// Comments carry no author, so this ranks tasks by comment count.
+/// Comments in scope counted per author; comments from before DEV-327
+/// carry no author and count together as `null`.
 pub(crate) fn run_by_author(
     limit: usize,
     global: bool,
@@ -48,13 +49,21 @@ pub(crate) fn run_by_author(
     resolver: &TasksDirectoryResolver,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
-    let ranking = rank_by_comments(global, project, limit, filter, resolver)?;
+    let scope = scope_project(global, project, resolver);
+    let tasks = list_tasks(scope.as_deref(), resolver, filter)?;
+    let mut counts: HashMap<Option<String>, usize> = HashMap::new();
+    for comment in tasks.into_iter().flat_map(|(_, task)| task.comments) {
+        *counts.entry(comment.author).or_insert(0) += 1;
+    }
+    let mut rows: Vec<(Option<String>, usize)> = counts.into_iter().collect();
+    rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    rows.truncate(limit);
     emit_items(
         renderer,
-        header("stats.comments.by_task", global, ranking.scope.as_deref()),
-        &ranking.rows,
-        |(id, n)| serde_json::json!({"task": id, "comments": n}),
-        |(id, n)| format!("{:>4}  {}", n, id),
+        header("stats.comments.by_author", global, scope.as_deref()),
+        &rows,
+        |(author, n)| serde_json::json!({"author": author, "comments": n}),
+        |(author, n)| format!("{:>4}  {}", n, author.as_deref().unwrap_or("(no author)")),
         "No comments found.",
     );
     Ok(())

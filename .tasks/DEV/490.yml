@@ -1,0 +1,102 @@
+title: 'Hand-off report comments: commits, checks passed, failed and not run, next step'
+status: HelpNeeded
+priority: Medium
+type: Feature
+reporter: claude
+assignee: claude
+created: 2026-11-13T21:14:11.750735+00:00
+modified: 2026-11-13T21:36:25.638759+00:00
+relationships:
+  depends_on:
+  - DEV-488
+  related:
+  - DEV-466
+  - DEV-489
+comments:
+- date: 2026-11-13T21:36:12.760262+00:00
+  author: claude
+  text: 'Report comments are in. A comment takes an optional `report` (commits, checks marked passed, failed or not_run with a reason, the next step) from the CLI (`--commit`, `--check`, `--next`), MCP `task_comment_add` and REST `POST /api/tasks/comment`. The text stays required. `lotar comment` and `lotar show` print the report. In the Comments tab, the UI shows commits as links when the git remote is on GitHub, GitLab, Bitbucket or Codeberg (new `commit_url` on `/api/branding`), and checks with pass, fail and not-run marks. It says "No check marked not run" when a report has none. Unknown report keys and results from newer versions survive edits. Old YAML is unchanged. Docs updated: OpenAPI, TS types, help (comment, MCP tools, API reference) and the lotar-workflow skill hand-off step. Not done: the comment ships with lotar 0.14.3, which doesn''t have the flags yet, so this comment is prose only. It overlaps DEV-488/DEV-489 (same `TaskComment` and `lotar comment` files); expect merge conflicts, not design conflicts. Commit e55649e8.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A92f9648a-c12b-4124-9284-32c1807b437d
+description: |-
+  Agents end their work with long prose comments that list the commit, the checks that passed and failed and the checks that did not run (e.g. DEV-466's 19:38 comment). The owner's rule is "say which checks didn't run". A `report` comment with those parts as fields shows them as a checklist and makes a missing "not run" visible. Owner chose it on 2026-11-13 together with the question comment type.
+
+  ## Plan
+
+  - Optional `report` block on `TaskComment`: `commits` (hash and what it is), `checks` (command and `passed`, `failed` or `not_run` with a reason), `next` (the next step). `text` stays the prose summary.
+  - CLI `lotar comment <id> --commit "<sha>: <what>" --check "<cmd>=passed|failed|not_run[: reason]" --next "..."`, MCP and REST with the same fields; API types, OpenAPI and help docs agree.
+  - UI: commits as links where a remote is known, checks as a list with pass, fail and not-run marks.
+  - lotar's `lotar-workflow` skill: hand-off comments use it.
+
+  ## Done when
+
+  - [ ] Report comments round-trip through CLI, MCP and REST; old YAML unchanged.
+  - [ ] The UI shows the checklist (smoke).
+  - [ ] Docs agree; lint, test and smoke pass.
+
+  Risk: a fixed shape tends to come back half filled. Keep every field optional and the prose `text` required.
+tags:
+- web-ui
+- backend
+- blocked
+- blocked-by:DEV-488
+history:
+- at: 2026-11-13T21:14:12.167161+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-466"]}'
+- at: 2026-11-13T21:14:12.982102+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T21:14:34.491178+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-466"]}'
+    new: '{"depends_on":["DEV-488"],"related":["DEV-466"]}'
+- at: 2026-11-13T21:16:14.156830+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-13T21:16:14.714990+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A92f9648a-c12b-4124-9284-32c1807b437d
+- at: 2026-11-13T21:36:12.760262+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T21:36:12.971797+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-488"],"related":["DEV-466"]}'
+    new: '{"depends_on":["DEV-488"],"related":["DEV-466","DEV-489"]}'
+- at: 2026-11-13T21:36:25.520943+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T21:36:25.638759+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: claude
+  - field: tags
+    old: web-ui, backend
+    new: web-ui, backend, blocked, blocked-by:DEV-488

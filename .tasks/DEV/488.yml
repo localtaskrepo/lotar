@@ -1,0 +1,140 @@
+title: Question comments with options the owner answers by click, and answers that set the ticket's fields
+status: Reviewing
+priority: High
+type: Feature
+reporter: claude
+assignee: '@review'
+created: 2026-11-13T21:13:42.890310+00:00
+modified: 2026-11-13T21:43:53.971865+00:00
+relationships:
+  blocks:
+  - DEV-489
+  - DEV-490
+  related:
+  - DEV-466
+  - DEV-478
+  - DEV-483
+  - DEV-485
+  - DEV-491
+comments:
+- date: 2026-11-13T21:43:40.367443+00:00
+  author: claude
+  text: |-
+    Implemented in 0e5d1651 on agent/DEV-488.
+
+    - Model: TaskComment gets optional `question` (options with key, label, optional `set`; recommended, multiple, other) and `answer` (to = question date, choice, note). `text` keeps both in prose; old YAML round-trips unchanged.
+    - Answering applies the chosen options' `set` (status, assignee, reporter, priority, type, due_date, effort, tags) as a normal update by the answerer (history actor = answerer, update/assign rules fire), then on.commented. Unknown set fields and invalid values are refused when asking; options never run commands.
+    - CLI: `lotar comment ID --question Q --option 'k: label' --set 'k:field=value' --recommend k --multiple --no-other`; `--answer keys [--to date] [note]`; `--answer -- 'words'` answers in words. `lotar show`/`comment` mark [open question]; `has:question` filter in list, REST, MCP and the search box.
+    - REST POST /api/tasks/comment and MCP task_comment_add take `question`/`answer`; api types, view/api/types.ts, openapi.json and help docs (comment, automation, mcp-tools, list, task-model, serve) agree.
+    - Automation: `comment: { answer: ... }` condition, `${{comment.choice}}`, `${{comment.note}}`.
+    - UI: Comments tab shows options as buttons (recommended marked, Other field) and the answer under its question; board cards and Tasks list rows show the open question, answerable in place.
+    - Skill lotar-workflow says to ask with --question.
+
+    Checks: npm run lint (lint:agent) clean; npm test (test:agent): 2147 Rust, 1515 UI, release and hook tests pass; npm run smoke (test:smoke:agent): 391 pass, incl. new ui.question-comments smoke (screenshots checked). New tests: tests/dev488_question_comments_test.rs (CLI, REST, MCP, automation, old YAML), unit tests in task_questions/task_query, view/__tests__/questions.spec.ts.
+    Not done here (follow-ups in the ticket): STD inbox triage copying questions and forwarding answers.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afd2c6919-e5a0-41a8-9c0f-8916f5a62fea
+- file: src/types.rs
+- file: view/components/task-panel/TaskPanelCommentsTab.vue
+description: |-
+  Agents and automation ask the owner multiple-choice questions in prose ("Question for mallox: A, B, C or none?"); he answers in a line and an agent has to read his words back and do the routing. A `question` comment with options, and an `answer` comment that records the choice, lets the UI show buttons and lets an option set the ticket's fields itself. The owner asked for it on 2026-11-13 and chose the full scope (options that set fields, open questions on cards).
+
+  ## Context
+
+  Open owner questions on 2026-11-13, all the same shape:
+
+  - DEV-485: A / B (recommended) / C / none. DEV-483: two options. DEV-478: yes / no.
+  - DEV-466, STD-82 (automation comments): rework with @fix / you decide / WontDo; retry with @fix, @fix-fable, @fix-codex or WontDo. Each option means a different assignee or status.
+  - QIS-178: in a week / when you ask. QIS-14: accept all eight proposed choices / which change (free text).
+
+  Today the inbox triage rewrites the options into the INBOX ticket's description and the rule "Inbox: the owner's answer goes to the source" (standards `configs/lotar/inbox.yml`) forwards his comment text with "(answered in INBOX-n)".
+
+  ## Plan
+
+  - **Model** (`src/types.rs` `TaskComment`): optional `question` block: `options` (key, label, optional `set:` with the fields automation `set:` accepts, e.g. `assignee`, `status`, `tags`), optional `recommended` key, `multiple` (default false), `other` (free text allowed, default true). Optional `answer` block: `to` (the question comment's `date`; comments have no ID), `choice` (key or keys), optional note. `text` stays the full question or answer in prose, so older lotar versions, `lotar show` and agents reading YAML lose nothing; `extra` already keeps the keys in older versions.
+  - **Options that set fields**: answering applies the chosen option's `set:` like an automation `set:` (history actor: the answerer). Only `set:`, never `run:` or `agent:`: option text comes from agents. Validate the fields when the question is asked.
+  - **Open question**: a question with no answer pointing to it. `lotar show` marks it; `lotar list` gets a filter (e.g. `question:open`).
+  - **CLI**: `lotar comment <id> --question "<q>" --option "<key>: <label>" ... [--recommend <key>] [--multiple]`, and `lotar comment <id> --answer <key> [--to <date>] ["note"]` (default: the last open question).
+  - **MCP** `task_comment_add` and REST: the same fields. `src/api_types.rs`, `view/api/types.ts`, `docs/openapi.json` and the help docs agree.
+  - **UI**: the Comments tab shows a question as option buttons (recommended marked, "Other" text field) and its answer under it; board cards and the Tasks list show an open question, answerable from there.
+  - **Automation**: `${{comment.choice}}` and a `comment: { answer: ... }` condition, so rules can react to a choice.
+  - **Help and skill**: lotar's `lotar-workflow` skill and help docs say how to ask with `--question`.
+
+  ## Done when
+
+  - [ ] Question and answer comments round-trip through CLI, MCP and REST; old YAML loads and saves unchanged.
+  - [ ] An answer applies its option's `set:` and records it in history; invalid `set:` fields are refused when asking.
+  - [ ] The UI answers a question by click and by "Other" text; open questions show on board cards and the Tasks list (Playwright smoke).
+  - [ ] Docs, OpenAPI and TS types agree; lint, test and smoke pass.
+
+  ## Follow-ups
+
+  - STD ticket: inbox triage copies the question to the INBOX ticket and forwards the answer with its choice; the shared skill asks with `--question`.
+  - Related comment types: review verdict, handoff report, dimmed automation notices (own tickets).
+tags:
+- web-ui
+- backend
+history:
+- at: 2026-11-13T21:13:43.100686+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-466","DEV-478","DEV-483","DEV-485"]}'
+- at: 2026-11-13T21:13:43.306769+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T21:13:43.901375+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T21:13:45.151261+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afd2c6919-e5a0-41a8-9c0f-8916f5a62fea
+- at: 2026-11-13T21:14:32.646190+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-466","DEV-478","DEV-483","DEV-485"]}'
+    new: '{"blocks":["DEV-489"],"related":["DEV-466","DEV-478","DEV-483","DEV-485"]}'
+- at: 2026-11-13T21:14:34.490665+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-489"],"related":["DEV-466","DEV-478","DEV-483","DEV-485"]}'
+    new: '{"blocks":["DEV-489","DEV-490"],"related":["DEV-466","DEV-478","DEV-483","DEV-485"]}'
+- at: 2026-11-13T21:14:36.604682+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-489","DEV-490"],"related":["DEV-466","DEV-478","DEV-483","DEV-485"]}'
+    new: '{"blocks":["DEV-489","DEV-490"],"related":["DEV-466","DEV-478","DEV-483","DEV-485","DEV-491"]}'
+- at: 2026-11-13T21:14:37.894680+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:src/types.rs
+- at: 2026-11-13T21:14:37.951410+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:view/components/task-panel/TaskPanelCommentsTab.vue
+- at: 2026-11-13T21:43:40.367443+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T21:43:53.971865+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

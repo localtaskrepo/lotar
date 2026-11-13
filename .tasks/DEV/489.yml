@@ -1,0 +1,81 @@
+title: Review comments with a pass or block verdict and findings, shown as a badge
+status: Blocked
+priority: Medium
+type: Feature
+reporter: claude
+assignee: claude
+created: 2026-11-13T21:14:10.488871+00:00
+modified: 2026-11-13T21:36:12.971553+00:00
+relationships:
+  depends_on:
+  - DEV-488
+  related:
+  - DEV-490
+comments:
+- date: 2026-11-13T21:16:11.569283+00:00
+  author: claude
+  text: 'Blocked on DEV-488: this ticket reuses the comment-type pattern DEV-488 introduces (TaskComment block, lotar comment flags, MCP/REST fields, Comments tab, comment: automation condition), and DEV-488 has only just started (agent/DEV-488, no changes yet). Building both in parallel would make two conflicting versions of the same model. No changes made, nothing committed. Next step: once DEV-488 is Done and merged, assign this back to @fix. Side note: the job started although the ticket was Blocked with an open depends-on; agent_job_service does not check dependencies before starting a job.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A74f7ed3c-4dde-4352-9136-60c3c1d347ed
+description: |-
+  Review agents write their verdict as prose ("Review: passed. ...", "The review found blocking problems") and automation finds it through the tags `review-returned` and `review-blocked`. A `review` comment with a verdict and findings makes the result readable at a glance and lets rules key on the verdict instead of tags. Owner chose it on 2026-11-13 together with the question comment type.
+
+  ## Plan
+
+  - Optional `review` block on `TaskComment`: `verdict` (`pass` or `block`), the commit reviewed, `findings` (each: summary, optional file and line, `blocking` true or false). `text` stays the prose summary, as with the question type.
+  - CLI `lotar comment <id> --review pass|block --commit <sha> [--finding "..."]`, MCP and REST with the same fields; API types, OpenAPI and help docs agree.
+  - UI: a pass/block badge with the commit and the findings list in the Comments tab; the latest verdict on the task panel.
+  - Automation: a `comment: { review: block }` condition, so the shared rules can stop depending on the review tags.
+
+  ## Done when
+
+  - [ ] Review comments round-trip through CLI, MCP and REST; old YAML unchanged.
+  - [ ] Badge and findings show in the UI (smoke).
+  - [ ] A rule can match the verdict; docs agree; lint, test and smoke pass.
+
+  Then: standards' shared review rules and review prompt switch to it (separate STD ticket).
+tags:
+- web-ui
+- backend
+history:
+- at: 2026-11-13T21:14:10.762047+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T21:14:32.646678+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"depends_on":["DEV-488"]}'
+- at: 2026-11-13T21:14:55.265313+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-13T21:14:56.385831+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A74f7ed3c-4dde-4352-9136-60c3c1d347ed
+- at: 2026-11-13T21:16:11.569283+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T21:16:19.238354+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked
+  - field: assignee
+    old: '@fix'
+    new: claude
+- at: 2026-11-13T21:36:12.971553+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-488"]}'
+    new: '{"depends_on":["DEV-488"],"related":["DEV-490"]}'

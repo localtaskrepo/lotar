@@ -287,6 +287,10 @@ By author:
 lotar stats comments-by-author [--limit N] [--global]
 ```
 
+JSON items are `{"author": "alice", "comments": 2}`. Comments written before
+lotar recorded authors count together under `"author": null`, shown as
+`(no author)` in text output.
+
 Notes:
 - Both commands default to `--limit 20`; raise it for larger leaderboards.
 
