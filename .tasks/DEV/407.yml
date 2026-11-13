@@ -1,15 +1,23 @@
 title: Adding project members rewrites the project config and drops its YAML comments
-status: InProgress
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T02:47:52.153512+00:00
-modified: 2026-11-13T03:01:43.911791+00:00
+modified: 2026-11-13T03:07:41.165351+00:00
+relationships:
+  blocks:
+  - DEV-398
+  related:
+  - DEV-398
 comments:
 - date: 2026-11-13T03:01:08.871423+00:00
   author: claude
   text: 'Fixed in 42ad6711 on agent/DEV-407. Reproduced first with 0.14.1: lotar add as a new reporter dropped every comment line and turned project.name inbox into INBOX. Cause: automatic writes (auto-populated members, the detected project name) re-serialized the whole config as canonical YAML, and the name rule overwrote a name that matched the prefix in other case. Change: new normalization::to_project_yaml_preserving patches only the members block and project.name line of the existing file, and checks the result parses to exactly the intended config (else canonical YAML, as before); TaskService uses it for add and edit; the name rule leaves a case-only match alone. Removed the unused operations::auto_populate_project_members. Test: tests/dev407_auto_config_comments_test.rs (fails before, passes after). Ticket check in a scratch repo with the new build: add, comment, edit --assignee, add as new users -> comments and name: inbox kept, members appended. Checks: npm run lint:agent, npm run test:agent (2117 Rust + 1507 UI tests), npm run smoke (385) all pass. Note: lotar comment does not add its author to members, which matches current behavior.'
+- date: 2026-11-13T03:06:51.902576+00:00
+  author: claude
+  text: 'Merged and pushed. Rebased agent/DEV-407 onto main (de36a7e1), no conflicts; fix is e2f502be. Checks in the worktree after the rebase: npm run lint:agent, npm run test:agent (2119 Rust + 1507 UI tests), npm run smoke (385) all pass. Fast-forwarded main to e2f502be, committed ticket files as b6b90f34 (DEV-407 Ticket updates), pushed de36a7e1..b6b90f34 to origin/main; the only unpushed commits were these two. Ticket check rerun with a build of the main checkout: in a scratch repo, add and comment as new users kept both comment lines and name: inbox, and appended members.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7fa63678-6276-4844-8458-e1fe313410fc
 description: 'Found 2026-11-13 in ~/Development/standards (lotar 0.14.1): .tasks/INBOX/config.yml, committed in 5ff623f (STD-54) with three comment lines, was rewritten while the inbox was in use: members [claude, mallox] added (auto.populate_members), project.name changed from inbox to INBOX, and every comment line gone (git -C ~/Development/standards diff .tasks/INBOX/config.yml). The comments explained why the project''s tickets aren''t tracked and why triage has no worktree. Check: in a scratch repo, a project config.yml with a comment line and auto.populate_members on; lotar comment or add as a new user; the comment line is still there. Done: an automatic write to a config file keeps its comments and doesn''t change values nobody asked to change (project.name), with a test; or members live somewhere that doesn''t rewrite a hand-written file.'
@@ -44,3 +52,25 @@ history:
   - field: assignee
     old: '@fix'
     new: '@merge'
+- at: 2026-11-13T03:06:51.902576+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T03:07:03.521008+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-11-13T03:07:40.992130+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-398"]}'
+- at: 2026-11-13T03:07:41.165351+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-398"]}'
+    new: '{"blocks":["DEV-398"],"related":["DEV-398"]}'

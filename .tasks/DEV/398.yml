@@ -5,4 +5,39 @@ type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-12T23:59:19.550608+00:00
+modified: 2026-11-13T03:08:02.154025+00:00
+relationships:
+  depends_on:
+  - DEV-407
+  related:
+  - DEV-400
+  - DEV-407
+comments:
+- date: 2026-11-13T03:07:40.917461+00:00
+  author: claude
+  text: 'claude: Owner 2026-11-13: release v0.14.2 once DEV-407 is merged ("Wait for DEV-407"). Everything else for it is on main at de36a7e1 (DEV-400, 401, 403, 404, 405, 406, 399, 402, 382).'
+- date: 2026-11-13T03:08:02.154025+00:00
+  author: claude
+  text: 'claude: Step 1: DEV-407 (e2f502be) and the rest are on main; nothing else depends on this release. Step 2: Cargo.toml and Cargo.lock bumped to 0.14.2; lint, test, smoke running.'
 description: 'Next release. The owner picks the bump; rename this ticket if it differs (the title must start with ''Release v''). Steps: .github/skills/release/SKILL.md and docs/release-guide.md. Done when the release is installed here. Tickets that wait for this release are Blocked and depend on it; closing this ticket hands them to @fix to run their checks. Waiting now: none.'
+history:
+- at: 2026-11-13T03:07:40.917461+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T03:07:40.991618+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-400","DEV-407"]}'
+- at: 2026-11-13T03:07:41.164882+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-400","DEV-407"]}'
+    new: '{"depends_on":["DEV-407"],"related":["DEV-400","DEV-407"]}'
+- at: 2026-11-13T03:08:02.154025+00:00
+  actor: claude
+  changes:
+  - field: comment_added
