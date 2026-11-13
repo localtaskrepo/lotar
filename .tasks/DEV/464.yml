@@ -1,17 +1,20 @@
 title: 'Releases follow-ups: Add to release in the task row menu, project filter on the Releases page, refresh on release_changed'
-status: Merging
+status: Done
 priority: Low
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T08:26:30.517705+00:00
-modified: 2026-11-13T11:11:15.892113+00:00
+modified: 2026-11-13T18:06:30.596967+00:00
 relationships:
   related:
   - DEV-393
   - DEV-459
   - DEV-467
   - DEV-470
+  - DEV-473
+  - DEV-475
+  - DEV-476
 comments:
 - date: 2026-11-13T09:26:09.144119+00:00
   author: claude
@@ -31,6 +34,9 @@ comments:
 - date: 2026-11-13T11:11:15.556237+00:00
   author: codex
   text: 'Merged by fast-forward after clean rebase: original 24fb128d became 138d8084; main commit 3442855a includes pending .tasks updates as instructed. Required gates passed outside sandbox: lint:agent, test:agent (Rust, UI, release and hooks), test:smoke:agent (389/389). DEV-470 preceding it is Done. Preparing authorized push after final clean-main check; no status or assignee change. No durable guidance finding.'
+- date: 2026-11-13T11:11:55.583019+00:00
+  author: codex
+  text: 'Push completed: main -> origin/main at 9b5c09e8 (signed merge-result commit including pending ticket updates). Pre-push Rust formatting/clippy and frontend checks passed. Full lint, test and smoke gates passed before merge; smoke 389/389. Status and assignee left unchanged; job completion moves this ticket to Done.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa5d32f85-dc57-486d-b533-db54e5599c75
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adadb2f55-82ff-4780-b8d5-b1121e46bec1
@@ -127,3 +133,31 @@ history:
   - field: relationships
     old: '{"related":["DEV-393","DEV-459","DEV-467"]}'
     new: '{"related":["DEV-393","DEV-459","DEV-467","DEV-470"]}'
+- at: 2026-11-13T11:11:55.583019+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:12:05.625187+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-13T18:01:49.469684+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-393","DEV-459","DEV-467","DEV-470"]}'
+    new: '{"related":["DEV-393","DEV-459","DEV-467","DEV-470","DEV-473"]}'
+- at: 2026-11-13T18:02:41.362141+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-393","DEV-459","DEV-467","DEV-470","DEV-473"]}'
+    new: '{"related":["DEV-393","DEV-459","DEV-467","DEV-470","DEV-473","DEV-475"]}'
+- at: 2026-11-13T18:06:30.596967+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-393","DEV-459","DEV-467","DEV-470","DEV-473","DEV-475"]}'
+    new: '{"related":["DEV-393","DEV-459","DEV-467","DEV-470","DEV-473","DEV-475","DEV-476"]}'

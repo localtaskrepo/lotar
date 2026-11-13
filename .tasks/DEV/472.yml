@@ -1,0 +1,130 @@
+title: A rework continues the fix agent's T3 thread instead of starting a new one
+status: HelpNeeded
+priority: Medium
+type: Feature
+reporter: claude
+assignee: mallox
+created: 2026-11-13T11:19:41.648456+00:00
+modified: 2026-11-13T18:06:52.908857+00:00
+relationships:
+  related:
+  - DEV-466
+  - DEV-468
+  - DEV-470
+  - DEV-377
+  - DEV-473
+comments:
+- date: 2026-11-13T11:33:27.407315+00:00
+  author: claude
+  text: 'Done in commit 91013e15 on agent/DEV-472. session: continue and the unmerged-work continuation (session: new) now take the ticket''s newest earlier thread of the job''s own agent profile, and fall back to the newest thread when that profile has no earlier job. session: fresh still builds on the newest thread. The job log header now records agent_profile, so jobs from earlier lotar processes count too; old logs without it count as another profile. When a later thread''s worktree holds the branch (a fresh review), LoTaR commits what that worktree left uncommitted, detaches it and checks the branch out again in the continued thread''s worktree. If git can''t, the job starts a new thread and the log says why. Test: dev318 a_rework_continues_the_fix_thread_after_a_fresh_review_took_its_branch covers fix, fresh review, rework with continue in the fix worktree, a second fresh review that reads the rework commit, then a rework with session new. It fails without the change. Docs: agent.md, automation.md, config-reference.md (which also gained the missing fresh value). Checks: npm run lint, npm test (2134 Rust, 1515 UI, plus release and hook tests), npm run smoke (390) all pass. Still open: the comment naming the release that has this, for standards STD-88. The release agent adds it once this ships.'
+- date: 2026-11-13T11:35:17.228693+00:00
+  author: codex
+  text: 'Review: passed. Reviewed 91013e15 diff against main, ticket/comments, related DEV-377/466/468/470, repository guidance, recent main history for touched files, continuation/branch-release/log lookup and regression coverage. No findings or minor tickets. git diff --check passed. Wrapper-free focused dev318 suite: 22 tests passed; runner exited 1 afterward because macOS left xcrun_db in its temp directory. Initial attempt blocked by sccache sandbox denial. Full lint/test/smoke not independently rerun. Release-number comment remains a post-release follow-up; no release claimed before shipping. No files or commits changed; status/assignee unchanged. No durable guidance finding.'
+- date: 2026-11-13T11:37:36.541181+00:00
+  author: codex
+  text: 'Merge blocked by verification environment. Branch 91013e15 is already based on current main 355b380e; rebase confirmed up to date. RUSTC_WRAPPER= npm run lint:agent passed. Full test:agent failed in serve_handler port-binding tests with Operation not permitted; fail-fast skipped 2100 tests and UI/release/hooks did not run; temp guard also reported xcrun_db. Build-first test:smoke:agent finished: 146 passed, 244 failed, with server bind to 127.0.0.1:0 denied by sandbox and temporary-folder cleanup errors. Nothing merged or pushed, no code changes. May this merge job rerun verification with sandbox escalation so tests can bind local ports?'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab44c36d8-896d-47bf-99ef-71f2524691a8
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acf93d678-e4a5-4da4-94a8-5c308073cc64
+description: |-
+  A rework after a blocking review starts a new T3 Code thread instead of going back to the fix agent's thread. Together with the fresh review thread and the inbox triage this gives each ticket 3 to 9 top-level threads, which the owner can't follow or tell apart (owner 2026-11-13, standards STD-88: "every task creates 3 threads in t3 so that it becomes overwhelming to handle and read and keep correlated").
+
+  ## Found
+
+  - 2026-11-13, about 10:40Z to 11:05Z: DEV-470 got 9 threads (7 job threads, 2 inbox triage), DEV-466 and DEV-468 got 4 to 5 each.
+  - standards `configs/lotar/automation.yml`, rule "Review blocked: back to @fix": the rework runs with session `new`. The ticket's newest earlier thread is the reviewer's (Codex), which has unmerged work on the branch but another model, so the job starts a new thread on the branch (docs/help/agent.md, "Continuing the ticket's last thread"). `session: continue` doesn't help: it takes the newest thread too, so the rework would run in the reviewer's thread on the reviewer's model.
+
+  ## Fix
+
+  - When a job continues an earlier thread (`session: continue`, or `new` with unmerged work), take the ticket's newest earlier thread from a job of the same agent profile. With none, keep today's behaviour (newest thread for `continue`, a new thread on the branch for `new`). So the rework on `@fix` continues the `@fix` thread, a merge (no earlier `@merge` job) still continues the newest thread, and a retry on `@fix-codex` still gets a thread of its own.
+  - The earlier thread's worktree was detached when the fresh review took the branch. Free the branch from the later thread's worktree the same way `session: fresh` does today (commit what it left uncommitted, detach it) and check it out again in the earlier thread's worktree. Its worktree is gone: a new thread on the branch, as today, and the log says why.
+  - Works with DEV-468 (every job of a ticket uses the ticket's agent branch).
+
+  ## Check
+
+  A test: `@fix` commits, a `session: fresh` review on another provider blocks, the rework on `@fix` with `session: continue` runs `t3 thread send <the fix thread>` in the fix thread's worktree on the ticket's branch, and the next fresh review reads the rework commit.
+
+  ## Done when
+
+  - [ ] `session: continue` and the unmerged-work continuation pick the newest earlier thread of the job's own profile, with the test above.
+  - [ ] docs/help/agent.md says so.
+  - [ ] A comment here says the release that has it, so standards STD-88 sets `session: continue` on its three rework rules.
+history:
+- at: 2026-11-13T11:19:41.861543+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-466","DEV-468","DEV-470"]}'
+- at: 2026-11-13T11:19:42.001508+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T11:19:42.423909+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T11:19:43.127149+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab44c36d8-896d-47bf-99ef-71f2524691a8
+- at: 2026-11-13T11:19:56.533853+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-466","DEV-468","DEV-470"]}'
+    new: '{"related":["DEV-466","DEV-468","DEV-470","DEV-377"]}'
+- at: 2026-11-13T11:33:27.407315+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:33:36.469196+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T11:33:37.748688+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acf93d678-e4a5-4da4-94a8-5c308073cc64
+- at: 2026-11-13T11:35:17.228693+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:35:22.890020+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-13T11:37:36.541181+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:37:43.048950+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-13T18:06:52.908857+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-466","DEV-468","DEV-470","DEV-377"]}'
+    new: '{"related":["DEV-466","DEV-468","DEV-470","DEV-377","DEV-473"]}'

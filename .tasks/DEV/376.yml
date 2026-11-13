@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-12T18:36:46.696798+00:00
-modified: 2026-11-12T18:48:29.741317+00:00
+modified: 2026-11-13T18:01:47.445014+00:00
 relationships:
   related:
   - DEV-339
@@ -24,6 +24,7 @@ relationships:
   - DEV-377
   - DEV-360
   - DEV-366
+  - DEV-473
 comments:
 - date: 2026-11-12T18:39:56.180701+00:00
   author: claude
@@ -112,3 +113,9 @@ history:
   - field: status
     old: HelpNeeded
     new: Done
+- at: 2026-11-13T18:01:47.445014+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-339","DEV-340","DEV-343","DEV-344","DEV-346","DEV-348","DEV-354","DEV-361","DEV-362","DEV-363","DEV-365","DEV-367","DEV-370","DEV-377","DEV-360","DEV-366"]}'
+    new: '{"related":["DEV-339","DEV-340","DEV-343","DEV-344","DEV-346","DEV-348","DEV-354","DEV-361","DEV-362","DEV-363","DEV-365","DEV-367","DEV-370","DEV-377","DEV-360","DEV-366","DEV-473"]}'

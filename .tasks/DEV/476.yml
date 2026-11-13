@@ -1,0 +1,150 @@
+title: Cleanup at Done keeps the worktrees lotar detached and the T3 Code threads' branches
+status: Merging
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@merge'
+created: 2026-11-13T18:06:30.287428+00:00
+modified: 2026-11-13T18:38:18.345685+00:00
+relationships:
+  related:
+  - DEV-464
+  - DEV-473
+  - DEV-470
+comments:
+- date: 2026-11-13T18:23:09.001940+00:00
+  author: claude
+  text: 'Fixed in 51c24399 on agent/DEV-476. Done cleanup and lotar agent worktree list/cleanup now find a ticket''s worktrees and branches through git''s reflogs: a T3 Code thread branch belongs to the ticket when its branch reflog says ''Created from agent/<ticket>'' (directly or through an earlier thread''s branch), and a detached worktree when its HEAD reflog says ''checkout: moving from <one of those branches>''. Done removes each one that is clean with its work on main (a detached worktree is checked by its commit), and with cleanup_delete_branches deletes the ticket''s landed branches that no worktree has checked out; anything with work missing from main stays. lotar agent worktree cleanup --delete-branches does the same for every done ticket. New test done_removes_detached_worktrees_and_thread_branches_whose_work_landed in tests/agent_safety_test.rs runs both paths, fails before the fix and passes after; docs/help/agent.md updated. Checks: npm run lint, npm test (2133 Rust, 1515 UI, release and hook tests) and npm run smoke (390) all passed. Dry run on this repo: it would remove the detached worktrees of DEV-464, 469, 471 and 474 plus one of DEV-470, and delete agent/DEV-464, 465, 469, 471, 474 and t3/strip-author-name-from-comments. It keeps the DEV-470 worktrees at 4c770c59, an earlier version of the fix that main holds only reworked, so git can''t show it is on main. I did not run the real cleanup.'
+- date: 2026-11-13T18:25:39.827899+00:00
+  author: codex
+  text: 'Review: blocking. src/services/agent_job_service.rs:2478 and src/cli/handlers/agent.rs:659 delete landed parent branches and their reflogs. A surviving t3/review-1 then cannot be traced through deleted t3/review to its ticket, so later list/cleanup cannot find it even after it lands. Persist ownership or preserve required ancestry; add a two-pass regression that lands and cleans the preserved third branch. Read full diff, ticket/comments, related context and main history. Diff check passed. Targeted test passed (1), but runner failed on leftover xcrun_db; initial sccache attempt denied by sandbox. Full gates not rerun. No files/commits/status/assignee changed. No minor tickets.'
+- date: 2026-11-13T18:36:13.004641+00:00
+  author: claude
+  text: 'Rework of the review finding (deleted parent branches lose the reflogs that trace surviving thread branches to the ticket), amended as 4aa84f30. Fix: delete_landed_branch (src/services/agent_job_service.rs) now first records the ticket branch of each branch and detached worktree traced through the branch it deletes: in the branch''s config branch.<name>.lotarticket (git drops it with the branch and moves it on rename), and for a detached worktree in a lotar-ticket-branch file in its own git directory (git removes it with the worktree). Tracing (new BranchOwners) uses those records, so a later cleanup still finds them. All deletions go through it, at Done, at job end and in lotar agent worktree cleanup. Test done_removes_detached_worktrees_and_thread_branches_whose_work_landed now runs two passes: pass 1 deletes t3/review and keeps t3/review-1 and a detached review worktree with uncommitted notes; then t3/review-1 lands and the notes go, and pass 2 removes both. The second pass failed before the rework, and fails again with either record disabled. docs/help/agent.md says so. Checks: npm run lint, npm test (2133 Rust, 1515 UI, release, hooks) and npm run smoke (390) passed.'
+- date: 2026-11-13T18:38:11.922841+00:00
+  author: codex
+  text: 'Review: passed. Reviewed 4aa84f30 full diff, surrounding cleanup/ownership/landing code, ticket/comments, related DEV-464/473/470, guidance and main history. Persistent ownership and the two-pass regression address the previous blocker. No findings or follow-up tickets. Diff check passed. Targeted two-pass regression passed (1/1), but npm runner exited 1 on leftover xcrun_db. Full lint/test/smoke not independently rerun; fix agent records passing gates. No files/commits/status/assignee changed. No durable guidance finding.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A184ae472-2c4a-403f-8962-8327c6e8fe94
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7f0512fe-ca4e-4264-ba1c-1880010a7ba6
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A94f2a8c8-9a27-4852-ac4f-cb4bf50f1c00
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab36fe889-a037-47bb-bb45-2cf11b2fe27a
+description: |-
+  Found (DEV-473, 2026-11-13): when a later job starts a new T3 Code thread on the ticket branch, release_branch (src/services/agent_job_service.rs:1442) detaches the earlier thread's worktree. Every job worktree here ends up detached minutes after its job (reflog 'checkout: moving from agent/DEV-464 to HEAD'). At Done, cleanup_done_ticket_worktree (:2299) only looks for a worktree with agent/<ticket> checked out, finds none and returns, so neither the detached worktrees nor agent/<ticket> are removed, although cleanup_on_done and cleanup_delete_branches are on. lotar agent worktree list/cleanup don't see detached worktrees or T3 Code's own t3/* branches either. Result: DEV-464, 469, 470 and 471 are Done and on main, but 7 clean worktrees and 9 branches stay, and the repo-health check reports them as unpushed:branches (DEV-473).
+
+  Check: after a ticket with a fix job and a review job on another model reaches Done, git worktree list and git branch show nothing left for it whose work is on main.
+
+  Done when: the cleanup at Done (and lotar agent worktree cleanup) also removes the ticket's clean detached worktrees and its thread branches (t3/*) whose work is on main, keeps any with work missing from main, with a test for both.
+tags:
+- health
+- review-returned
+custom_fields:
+  finding: cleanup:detached-worktrees
+history:
+- at: 2026-11-13T18:06:30.598868+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-464","DEV-473"]}'
+- at: 2026-11-13T18:06:30.874306+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T18:06:31.793296+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T18:06:34.361543+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A184ae472-2c4a-403f-8962-8327c6e8fe94
+- at: 2026-11-13T18:23:09.001940+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T18:23:09.182368+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-464","DEV-473"]}'
+    new: '{"related":["DEV-464","DEV-473","DEV-470"]}'
+- at: 2026-11-13T18:23:22.212578+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T18:23:23.302774+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7f0512fe-ca4e-4264-ba1c-1880010a7ba6
+- at: 2026-11-13T18:25:39.827899+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T18:25:40.023905+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: health
+    new: health, review-blocked
+- at: 2026-11-13T18:25:45.278690+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: health, review-blocked
+    new: health, review-returned
+- at: 2026-11-13T18:25:45.745909+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-13T18:25:46.282225+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A94f2a8c8-9a27-4852-ac4f-cb4bf50f1c00
+- at: 2026-11-13T18:36:13.004641+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T18:36:22.115954+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T18:36:23.133527+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab36fe889-a037-47bb-bb45-2cf11b2fe27a
+- at: 2026-11-13T18:38:11.922841+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T18:38:18.345685+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

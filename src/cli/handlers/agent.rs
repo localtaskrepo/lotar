@@ -538,7 +538,10 @@ fn derive_default_statuses(
 #[derive(Debug, Clone, Serialize)]
 struct WorktreeInfo {
     path: String,
+    /// The branch it has checked out, or the one it was detached from.
     branch: String,
+    /// Detached when a later T3 Code thread took over its branch (DEV-476).
+    detached: bool,
     ticket_id: String,
     /// Whether the ticket is in a "done" state
     is_done: bool,
@@ -546,6 +549,8 @@ struct WorktreeInfo {
     task_known: bool,
     /// Whether there's an active job for this ticket
     has_active_job: bool,
+    #[serde(skip)]
+    worktree: crate::services::agent_job_service::AgentWorktree,
 }
 
 impl AgentHandler {
@@ -574,7 +579,8 @@ impl AgentHandler {
             } else {
                 ""
             };
-            renderer.emit_raw_stdout(format_args!("  {} -> {} [{}]{}", wt.ticket_id, wt.branch, wt.path, status));
+            let detached = if wt.detached { "detached from " } else { "" };
+            renderer.emit_raw_stdout(format_args!("  {} -> {}{} [{}]{}", wt.ticket_id, detached, wt.branch, wt.path, status));
         }
         Ok(())
     }
@@ -596,7 +602,7 @@ impl AgentHandler {
             })
             .collect();
 
-        if to_remove.is_empty() {
+        if to_remove.is_empty() && !args.delete_branches {
             if matches!(renderer.format, OutputFormat::Json) {
                 renderer.emit_json(&serde_json::json!({
                     "removed": [],
@@ -611,15 +617,18 @@ impl AgentHandler {
         let repo_root = crate::utils::git::find_repo_root(&resolver.path).ok_or_else(|| "Git repository not found".to_string())?;
 
         let mut removed = Vec::new();
+        let mut deleted_branches = Vec::new();
         let mut errors = Vec::new();
+        let may_clean = |ticket_id: &str| {
+            let done_state = crate::services::agent_job_service::ticket_done_state(&resolver.path, ticket_id);
+            done_state.is_some()
+                && (args.all || done_state == Some(true))
+                && !AgentJobService::has_active_job(ticket_id)
+                && running_job_for_ticket(&resolver.path, ticket_id).is_none()
+        };
 
         for wt in &to_remove {
-            let done_state = crate::services::agent_job_service::ticket_done_state(&resolver.path, &wt.ticket_id);
-            if done_state.is_none()
-                || (!args.all && done_state != Some(true))
-                || AgentJobService::has_active_job(&wt.ticket_id)
-                || running_job_for_ticket(&resolver.path, &wt.ticket_id).is_some()
-            {
+            if !may_clean(&wt.ticket_id) {
                 errors.push(format!("{}: ticket state changed or a job is active", wt.ticket_id));
                 continue;
             }
@@ -628,9 +637,7 @@ impl AgentHandler {
                 .rsplit_once('-')
                 .and_then(|(project, _)| crate::config::resolution::config_for_project(&resolver.path, Some(project)).ok())
                 .map_or(config.agent_worktree.cleanup_ignored_files, |c| c.agent_worktree.cleanup_ignored_files);
-            if let Err(err) =
-                crate::services::agent_job_service::check_worktree_cleanup(&repo_root, std::path::Path::new(&wt.path), Some(&wt.branch), allow_ignored)
-            {
+            if let Err(err) = crate::services::agent_job_service::check_agent_worktree_cleanup(&repo_root, &wt.worktree, allow_ignored) {
                 errors.push(format!("{}: {}", wt.ticket_id, err));
                 renderer.emit_warning(format!("Preserving worktree {}: {}", wt.ticket_id, err));
                 continue;
@@ -648,24 +655,15 @@ impl AgentHandler {
                 Ok(output) if output.status.success() => {
                     renderer.emit_success(format!("Removed worktree: {} ({})", wt.ticket_id, wt.path));
 
-                    // Optionally delete the branch: its commits are in the main
-                    // checkout, possibly rebased, which `git branch -d` refuses.
-                    if args.delete_branches {
-                        let branch_result = git_command(&repo_root).args(["branch", "-D", &wt.branch]).current_dir(&repo_root).output();
-
-                        match branch_result {
-                            Ok(out) if out.status.success() => {
-                                crate::services::agent_job_service::forget_landings(&repo_root, &wt.branch);
+                    if args.delete_branches && !wt.detached {
+                        match crate::services::agent_job_service::delete_landed_branch(&repo_root, &config.agent_worktree.branch_prefix, &wt.branch) {
+                            Ok(()) => {
                                 renderer.emit_success(format!("Deleted branch: {}", wt.branch));
+                                deleted_branches.push(wt.branch.clone());
                             }
-                            Ok(out) => {
-                                let stderr = String::from_utf8_lossy(&out.stderr);
-                                errors.push(format!("{}: {}", wt.branch, stderr.trim()));
-                                renderer.emit_warning(format!("Failed to delete branch {}: {}", wt.branch, stderr.trim()));
-                            }
-                            Err(e) => {
-                                errors.push(format!("{}: {}", wt.branch, e));
-                                renderer.emit_warning(format!("Failed to delete branch {}: {}", wt.branch, e));
+                            Err(err) => {
+                                errors.push(format!("{}: {}", wt.branch, err));
+                                renderer.emit_warning(format!("Failed to delete branch {}: {}", wt.branch, err));
                             }
                         }
                     }
@@ -683,9 +681,36 @@ impl AgentHandler {
             }
         }
 
+        // Branches without a worktree: T3 Code thread branches and ticket
+        // branches whose worktrees are gone (DEV-476).
+        if args.delete_branches {
+            let prefix = &config.agent_worktree.branch_prefix;
+            for (ticket_branch, branch) in crate::services::agent_job_service::landed_agent_branches(&repo_root, prefix, None) {
+                if !may_clean(&extract_ticket_from_branch(&ticket_branch, prefix)) {
+                    continue;
+                }
+                if args.dry_run {
+                    renderer.emit_info(format!("Would delete branch: {branch}"));
+                    deleted_branches.push(branch);
+                    continue;
+                }
+                match crate::services::agent_job_service::delete_landed_branch(&repo_root, prefix, &branch) {
+                    Ok(()) => {
+                        renderer.emit_success(format!("Deleted branch: {branch}"));
+                        deleted_branches.push(branch);
+                    }
+                    Err(err) => {
+                        renderer.emit_warning(format!("Failed to delete branch {branch}: {err}"));
+                        errors.push(format!("{branch}: {err}"));
+                    }
+                }
+            }
+        }
+
         if matches!(renderer.format, OutputFormat::Json) {
             renderer.emit_json(&serde_json::json!({
                 "removed": removed,
+                "deleted_branches": deleted_branches,
                 "errors": errors,
                 "dry_run": args.dry_run,
                 "delete_branches": args.delete_branches
@@ -698,7 +723,8 @@ impl AgentHandler {
     }
 }
 
-/// List all agent worktrees
+/// List all agent worktrees, detached ones and those of T3 Code thread
+/// branches included (DEV-476).
 fn list_agent_worktrees(resolver: &TasksDirectoryResolver, config: &crate::config::types::ResolvedConfig) -> Result<Vec<WorktreeInfo>, String> {
     let repo_root = match crate::utils::git::find_repo_root(&resolver.path) {
         Some(root) => root,
@@ -707,73 +733,28 @@ fn list_agent_worktrees(resolver: &TasksDirectoryResolver, config: &crate::confi
 
     let branch_prefix = &config.agent_worktree.branch_prefix;
     verified_common_dir(&repo_root).map_err(|e| e.to_string())?;
-
-    // Get list of worktrees from git
-    let output = git_command(&repo_root)
-        .args(["worktree", "list", "--porcelain"])
-        .current_dir(&repo_root)
-        .output()
-        .map_err(|e| format!("Failed to run git worktree list: {}", e))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("git worktree list failed: {}", stderr.trim()));
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let worktrees = parse_git_worktree_list(&stdout, branch_prefix);
+    let worktrees = crate::services::agent_job_service::agent_worktrees(&repo_root, branch_prefix).map_err(|e| e.to_string())?;
 
     // Enrich with task status information
     let mut results = Vec::new();
-    for (path, branch) in worktrees {
-        if std::path::Path::new(&path) == repo_root {
-            continue;
-        }
-        let ticket_id = extract_ticket_from_branch(&branch, branch_prefix);
+    for worktree in worktrees {
+        let ticket_id = extract_ticket_from_branch(&worktree.ticket_branch, branch_prefix);
         let done_state = crate::services::agent_job_service::ticket_done_state(&resolver.path, &ticket_id);
         let has_active_job = AgentJobService::has_active_job(&ticket_id) || running_job_for_ticket(&resolver.path, &ticket_id).is_some();
 
-        results.push(WorktreeInfo { path, branch, ticket_id, is_done: done_state == Some(true), task_known: done_state.is_some(), has_active_job });
+        results.push(WorktreeInfo {
+            path: worktree.path.to_string_lossy().into_owned(),
+            branch: worktree.branch.clone(),
+            detached: worktree.detached,
+            ticket_id,
+            is_done: done_state == Some(true),
+            task_known: done_state.is_some(),
+            has_active_job,
+            worktree,
+        });
     }
 
     Ok(results)
-}
-
-/// Parse git worktree list --porcelain output
-fn parse_git_worktree_list(output: &str, branch_prefix: &str) -> Vec<(String, String)> {
-    let mut results = Vec::new();
-    let mut current_path: Option<String> = None;
-    let mut current_branch: Option<String> = None;
-
-    for line in output.lines() {
-        if let Some(path) = line.strip_prefix("worktree ") {
-            // Flush previous worktree if any
-            if let (Some(path), Some(branch)) = (current_path.take(), current_branch.take())
-                && branch.starts_with(branch_prefix)
-            {
-                results.push((path, branch));
-            }
-            current_path = Some(path.to_string());
-        } else if let Some(branch) = line.strip_prefix("branch refs/heads/") {
-            current_branch = Some(branch.to_string());
-        } else if line.is_empty() {
-            // End of worktree block - flush
-            if let (Some(path), Some(branch)) = (current_path.take(), current_branch.take())
-                && branch.starts_with(branch_prefix)
-            {
-                results.push((path, branch));
-            }
-        }
-    }
-
-    // Flush last entry
-    if let (Some(path), Some(branch)) = (current_path, current_branch)
-        && branch.starts_with(branch_prefix)
-    {
-        results.push((path, branch));
-    }
-
-    results
 }
 
 /// Extract ticket ID from branch name
@@ -1005,7 +986,7 @@ fn parse_wrapper_metadata(cmd: &[String]) -> (Option<String>, Option<String>, Op
 
 #[cfg(test)]
 mod tests {
-    use super::{extract_ticket_from_branch, parse_git_worktree_list, parse_wrapper_metadata, wrapper_runs_in};
+    use super::{extract_ticket_from_branch, parse_wrapper_metadata, wrapper_runs_in};
     use std::path::Path;
 
     #[test]
@@ -1038,45 +1019,6 @@ mod tests {
         // job; its job's own record still counts (DEV-367).
         let legacy: Vec<String> = ["lotar-agent-wrapper", "--job-id", "job-1", "--", "codex"].map(String::from).to_vec();
         assert!(!wrapper_runs_in(&legacy, Path::new("/work/b/.tasks")));
-    }
-
-    #[test]
-    fn parses_git_worktree_list_output() {
-        let output = r#"worktree /Users/test/repo
-HEAD abc123
-branch refs/heads/main
-
-worktree /Users/test/.lotar-worktrees/repo/TEST-1
-HEAD def456
-branch refs/heads/agent/TEST-1
-
-worktree /Users/test/.lotar-worktrees/repo/TEST-2
-HEAD ghi789
-branch refs/heads/agent/TEST-2
-
-"#;
-        let results = parse_git_worktree_list(output, "agent/");
-        assert_eq!(results.len(), 2);
-        assert_eq!(results[0].0, "/Users/test/.lotar-worktrees/repo/TEST-1");
-        assert_eq!(results[0].1, "agent/TEST-1");
-        assert_eq!(results[1].0, "/Users/test/.lotar-worktrees/repo/TEST-2");
-        assert_eq!(results[1].1, "agent/TEST-2");
-    }
-
-    #[test]
-    fn parses_git_worktree_list_with_custom_prefix() {
-        let output = r#"worktree /Users/test/repo
-HEAD abc123
-branch refs/heads/main
-
-worktree /Users/test/.lotar-worktrees/repo/TEST-1
-HEAD def456
-branch refs/heads/my-agent/TEST-1
-
-"#;
-        let results = parse_git_worktree_list(output, "my-agent/");
-        assert_eq!(results.len(), 1);
-        assert_eq!(results[0].1, "my-agent/TEST-1");
     }
 
     #[test]

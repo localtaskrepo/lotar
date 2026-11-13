@@ -2016,6 +2016,40 @@ pub(crate) fn ticket_done_state(tasks_dir: &std::path::Path, ticket_id: &str) ->
 /// checkout, and hold no untracked or modified files. Git-ignored files
 /// (build output) only keep it when `allow_ignored` is false.
 pub(crate) fn check_worktree_cleanup(repo_root: &std::path::Path, path: &std::path::Path, branch: Option<&str>, allow_ignored: bool) -> LoTaRResult<()> {
+    let (root, target) = check_worktree_clean(repo_root, path, allow_ignored)?;
+    let branch = branch.ok_or_else(|| LoTaRError::ValidationError("Worktree branch is unknown".into()))?;
+    let head = git_command(&target).args(["symbolic-ref", "--quiet", "HEAD"]).current_dir(&target).output().map_err(LoTaRError::IoError)?;
+    if !head.status.success() || String::from_utf8_lossy(&head.stdout).trim() != format!("refs/heads/{branch}") {
+        return Err(LoTaRError::ValidationError("Worktree branch changed or is unknown".into()));
+    }
+    if branch_landed(&root, branch)? {
+        Ok(())
+    } else {
+        Err(LoTaRError::ValidationError(format!("{branch} has commits that are not in the main checkout's current branch")))
+    }
+}
+
+/// Whether an agent worktree can be removed safely: on its branch as
+/// `check_worktree_cleanup` says, or detached from it (DEV-476) with its
+/// commit's work in the main checkout.
+pub(crate) fn check_agent_worktree_cleanup(repo_root: &std::path::Path, worktree: &AgentWorktree, allow_ignored: bool) -> LoTaRResult<()> {
+    if !worktree.detached {
+        return check_worktree_cleanup(repo_root, &worktree.path, Some(&worktree.branch), allow_ignored);
+    }
+    let (root, target) = check_worktree_clean(repo_root, &worktree.path, allow_ignored)?;
+    let head = git_command(&target).args(["symbolic-ref", "--quiet", "HEAD"]).current_dir(&target).output().map_err(LoTaRError::IoError)?;
+    let commit = rev_parse(&target, "HEAD").filter(|_| !head.status.success());
+    let commit = commit.ok_or_else(|| LoTaRError::ValidationError("Worktree is no longer detached".into()))?;
+    if commit_landed(&root, &commit, &worktree.branch)? {
+        Ok(())
+    } else {
+        Err(LoTaRError::ValidationError(format!("its commit {commit} has work that is not in the main checkout's current branch")))
+    }
+}
+
+/// The repository root and the worktree, canonical, when the worktree is
+/// another worktree of this repository without untracked or modified files.
+fn check_worktree_clean(repo_root: &std::path::Path, path: &std::path::Path, allow_ignored: bool) -> LoTaRResult<(std::path::PathBuf, std::path::PathBuf)> {
     let root = fs::canonicalize(repo_root).map_err(LoTaRError::IoError)?;
     let target = fs::canonicalize(path).map_err(LoTaRError::IoError)?;
     if target == root {
@@ -2040,16 +2074,7 @@ pub(crate) fn check_worktree_cleanup(repo_root: &std::path::Path, path: &std::pa
             first.get(3..).unwrap_or(&first)
         )));
     }
-    let branch = branch.ok_or_else(|| LoTaRError::ValidationError("Worktree branch is unknown".into()))?;
-    let head = git_command(&target).args(["symbolic-ref", "--quiet", "HEAD"]).current_dir(&target).output().map_err(LoTaRError::IoError)?;
-    if !head.status.success() || String::from_utf8_lossy(&head.stdout).trim() != format!("refs/heads/{branch}") {
-        return Err(LoTaRError::ValidationError("Worktree branch changed or is unknown".into()));
-    }
-    if branch_landed(&root, branch)? {
-        Ok(())
-    } else {
-        Err(LoTaRError::ValidationError(format!("{branch} has commits that are not in the main checkout's current branch")))
-    }
+    Ok((root, target))
 }
 
 /// Whether the work on `branch` is in the checkout's current branch: merged,
@@ -2062,6 +2087,14 @@ pub(crate) fn check_worktree_cleanup(repo_root: &std::path::Path, path: &std::pa
 /// already holds every change the branch makes. Main may have changed those
 /// lines again since, which a merge into HEAD alone would see as a conflict.
 fn branch_landed(repo_root: &std::path::Path, branch: &str) -> LoTaRResult<bool> {
+    commit_landed(repo_root, &format!("refs/heads/{branch}"), branch)
+}
+
+/// Whether the work of `rev`, the branch or a commit a worktree detached
+/// from `branch` holds, is in the checkout's current branch, as
+/// `branch_landed` says. `branch`'s landing records count for the commit
+/// they name.
+fn commit_landed(repo_root: &std::path::Path, rev: &str, branch: &str) -> LoTaRResult<bool> {
     let git_output = |args: &[&str]| -> LoTaRResult<String> {
         let output = git_command(repo_root).args(args).current_dir(repo_root).output().map_err(LoTaRError::IoError)?;
         if !output.status.success() {
@@ -2070,21 +2103,21 @@ fn branch_landed(repo_root: &std::path::Path, branch: &str) -> LoTaRResult<bool>
         }
         Ok(String::from_utf8_lossy(&output.stdout).into_owned())
     };
-    let branch_ref = format!("refs/heads/{branch}");
-    if !git_output(&["cherry", "HEAD", &branch_ref])?.lines().any(|line| line.starts_with('+')) {
+    let branch_ref = rev;
+    if !git_output(&["cherry", "HEAD", branch_ref])?.lines().any(|line| line.starts_with('+')) {
         return Ok(true);
     }
-    if landing_recorded(repo_root, branch) {
+    if landing_recorded(repo_root, branch, rev) {
         return Ok(true);
     }
-    let base = git_output(&["merge-base", "HEAD", &branch_ref])?;
+    let base = git_output(&["merge-base", "HEAD", branch_ref])?;
     let base = base.trim();
-    let changed = git_output(&["diff", "--name-only", "--no-renames", "-z", base, &branch_ref])?;
+    let changed = git_output(&["diff", "--name-only", "--no-renames", "-z", base, branch_ref])?;
     let excluded = format!("^{base}");
     let mut args = vec!["rev-list", "HEAD", excluded.as_str(), "--"];
     args.extend(changed.split('\0').filter(|path| !path.is_empty()));
     let candidates = git_output(&args)?;
-    Ok(std::iter::once("HEAD").chain(candidates.lines()).any(|commit| merge_adds_nothing(repo_root, commit, &branch_ref)))
+    Ok(std::iter::once("HEAD").chain(candidates.lines()).any(|commit| merge_adds_nothing(repo_root, commit, branch_ref)))
 }
 
 /// Whether the changes `branch` makes outside `excluded` (a path relative to
@@ -2164,12 +2197,12 @@ fn landing_ref(branch: &str, commit: &str) -> String {
     format!("refs/lotar/landed/{branch}/{commit}")
 }
 
-/// Whether a merge job recorded the branch's current commit as landed, and
-/// the main commit it landed as is in the checkout's current branch. Work
-/// a merge job reworked so it conflicts with the branch (DEV-343's branch)
-/// counts as landed this way only.
-fn landing_recorded(repo_root: &std::path::Path, branch: &str) -> bool {
-    let Some(tip) = rev_parse(repo_root, &format!("refs/heads/{branch}")) else {
+/// Whether a merge job recorded `rev`'s commit as a landed commit of
+/// `branch`, and the main commit it landed as is in the checkout's current
+/// branch. Work a merge job reworked so it conflicts with the branch
+/// (DEV-343's branch) counts as landed this way only.
+fn landing_recorded(repo_root: &std::path::Path, branch: &str, rev: &str) -> bool {
+    let Some(tip) = rev_parse(repo_root, rev) else {
         return false;
     };
     let Some(landed) = rev_parse(repo_root, &landing_ref(branch, &tip)) else {
@@ -2246,14 +2279,13 @@ fn reworked_landing(repo_root: &std::path::Path, start: &str, branch: &str, tick
 /// Remove a worktree `check_worktree_cleanup` passed, and its branch when
 /// `delete_branch` is set. The branch's commits are in the main checkout,
 /// possibly rebased, which `git branch -d` would refuse.
-fn remove_worktree(repo_root: &std::path::Path, path: &std::path::Path, branch: Option<&str>, delete_branch: bool) {
+fn remove_worktree(repo_root: &std::path::Path, path: &std::path::Path, branch: Option<&str>, delete_branch: bool, prefix: &str) {
     let worktree_arg = path.to_string_lossy().to_string();
     if run_git_command(repo_root, &["worktree", "remove", &worktree_arg]).is_ok()
         && delete_branch
         && let Some(branch) = branch
-        && run_git_command(repo_root, &["branch", "-D", branch]).is_ok()
     {
-        forget_landings(repo_root, branch);
+        let _ = delete_landed_branch(repo_root, prefix, branch);
     }
 }
 
@@ -2275,11 +2307,197 @@ fn worktree_on_branch(repo_root: &std::path::Path, branch: &str) -> Option<std::
     None
 }
 
-/// A ticket that reached Done loses its agent worktree (DEV-343), whoever
+/// A worktree of an agent ticket branch (DEV-476): it has the ticket
+/// branch or a T3 Code thread branch created from it checked out, or was
+/// detached from one when a later thread took over the branch.
+#[derive(Debug, Clone)]
+pub(crate) struct AgentWorktree {
+    pub path: std::path::PathBuf,
+    /// The branch it has checked out, or the one it was detached from.
+    pub branch: String,
+    pub detached: bool,
+    /// The ticket branch (`agent/DEV-1`) `branch` belongs to.
+    pub ticket_branch: String,
+}
+
+/// Which ticket branch each local branch belongs to (DEV-476). T3 Code
+/// creates a thread's branch (`t3/<topic>`) from the ticket branch or from
+/// an earlier thread's branch, which the branch reflogs record (`branch:
+/// Created from agent/DEV-1`); renaming a branch keeps its reflog. Deleting
+/// a branch deletes its reflog, so before cleanup deletes one, the ticket
+/// of each branch traced through it is recorded in the branch's config
+/// (`branch.<name>.lotarticket`), which git drops with the branch.
+struct BranchOwners {
+    prefix: String,
+    /// The branch each branch was created from.
+    parents: HashMap<String, String>,
+    /// The recorded ticket branches.
+    recorded: HashMap<String, String>,
+}
+
+impl BranchOwners {
+    fn load(repo_root: &std::path::Path, prefix: &str) -> Self {
+        let git_lines = |args: &[&str]| {
+            let output = git_command(repo_root).args(args).current_dir(repo_root).output();
+            output.map(|output| String::from_utf8_lossy(&output.stdout).into_owned()).unwrap_or_default()
+        };
+        let mut parents = HashMap::new();
+        for line in git_lines(&["log", "--walk-reflogs", "--format=%gD%x09%gs", "--branches"]).lines() {
+            let Some((selector, subject)) = line.split_once('\t') else {
+                continue;
+            };
+            if let (Some((branch, _)), Some(parent)) = (selector.rsplit_once("@{"), subject.strip_prefix("branch: Created from ")) {
+                parents.insert(branch.to_string(), parent.trim().to_string());
+            }
+        }
+        let recorded = git_lines(&["config", "--get-regexp", r"^branch\..*\.lotarticket$"])
+            .lines()
+            .filter_map(|line| {
+                let (key, ticket) = line.split_once(' ')?;
+                let branch = key.strip_prefix("branch.")?.strip_suffix(".lotarticket")?;
+                Some((branch.to_string(), ticket.trim().to_string()))
+            })
+            .collect();
+        Self { prefix: build_worktree_branch(prefix, ""), parents, recorded }
+    }
+
+    /// The ticket branch `branch` belongs to: itself when it has the agent
+    /// branch prefix, the recorded one, or the first ticket branch it was
+    /// created from; with the branches traced to get there, `branch` first.
+    fn trace(&self, branch: &str) -> Option<(String, Vec<String>)> {
+        let mut current = branch;
+        let mut traced = Vec::new();
+        for _ in 0..=self.parents.len() {
+            if current.starts_with(&self.prefix) {
+                return Some((current.to_string(), traced));
+            }
+            traced.push(current.to_string());
+            if let Some(ticket) = self.recorded.get(current) {
+                return Some((ticket.clone(), traced));
+            }
+            current = self.parents.get(current)?;
+        }
+        None
+    }
+
+    fn ticket_branch_of(&self, branch: &str) -> Option<String> {
+        self.trace(branch).map(|(ticket, _)| ticket)
+    }
+}
+
+/// The branch a detached worktree was on: the newest `checkout: moving
+/// from <branch> to` entry of its HEAD reflog.
+fn detached_from(worktree: &std::path::Path) -> Option<String> {
+    let output = git_command(worktree).args(["log", "--walk-reflogs", "--format=%gs", "HEAD"]).current_dir(worktree).output().ok()?;
+    let log = String::from_utf8_lossy(&output.stdout);
+    let (branch, _) = log.lines().find_map(|line| line.strip_prefix("checkout: moving from "))?.split_once(" to ")?;
+    Some(branch.to_string())
+}
+
+/// Where the ticket branch of a detached worktree is recorded once the
+/// branch it was detached from is deleted: a file in the worktree's own
+/// git directory, which git removes with the worktree.
+fn detached_ticket_record(worktree: &std::path::Path) -> Option<std::path::PathBuf> {
+    let output = git_command(worktree).args(["rev-parse", "--absolute-git-dir"]).current_dir(worktree).output().ok()?;
+    output.status.success().then(|| std::path::PathBuf::from(String::from_utf8_lossy(&output.stdout).trim()).join("lotar-ticket-branch"))
+}
+
+/// The repository's worktrees other than the main checkout, each with the
+/// branch it has checked out, or `None` when detached.
+fn linked_worktrees(repo_root: &std::path::Path) -> LoTaRResult<Vec<(std::path::PathBuf, Option<String>)>> {
+    let output = git_command(repo_root).args(["worktree", "list", "--porcelain"]).current_dir(repo_root).output().map_err(LoTaRError::IoError)?;
+    if !output.status.success() {
+        return Err(LoTaRError::ValidationError(format!("git worktree list failed: {}", String::from_utf8_lossy(&output.stderr).trim())));
+    }
+    let mut worktrees = Vec::new();
+    for block in String::from_utf8_lossy(&output.stdout).split("\n\n").skip(1) {
+        let mut lines = block.lines();
+        let Some(path) = lines.next().and_then(|line| line.strip_prefix("worktree ")) else {
+            continue;
+        };
+        let mut branch = None;
+        let mut detached = false;
+        for line in lines {
+            branch = branch.or_else(|| line.strip_prefix("branch refs/heads/").map(str::to_string));
+            detached |= line == "detached";
+        }
+        if branch.is_some() || detached {
+            worktrees.push((std::path::PathBuf::from(path), branch));
+        }
+    }
+    Ok(worktrees)
+}
+
+/// The worktrees of agent ticket branches (`prefix` names them), detached
+/// ones included.
+pub(crate) fn agent_worktrees(repo_root: &std::path::Path, prefix: &str) -> LoTaRResult<Vec<AgentWorktree>> {
+    let owners = BranchOwners::load(repo_root, prefix);
+    Ok(linked_worktrees(repo_root)?
+        .into_iter()
+        .filter_map(|(path, branch)| {
+            let detached = branch.is_none();
+            let branch = branch.or_else(|| detached_from(&path))?;
+            let recorded = detached.then(|| detached_ticket_record(&path)).flatten().and_then(|record| fs::read_to_string(record).ok());
+            let ticket_branch = recorded.map(|ticket| ticket.trim().to_string()).or_else(|| owners.ticket_branch_of(&branch))?;
+            Some(AgentWorktree { path, branch, detached, ticket_branch })
+        })
+        .collect())
+}
+
+/// The agent branches no worktree has checked out whose work is in the
+/// main checkout, as (ticket branch, branch): ticket branches and the T3
+/// Code thread branches created from them (DEV-476). With `ticket_branch`,
+/// only that ticket's.
+pub(crate) fn landed_agent_branches(repo_root: &std::path::Path, prefix: &str, ticket_branch: Option<&str>) -> Vec<(String, String)> {
+    let Ok(worktrees) = linked_worktrees(repo_root) else {
+        return Vec::new();
+    };
+    let Ok(output) = git_command(repo_root).args(["for-each-ref", "--format=%(refname:short)", "refs/heads/"]).current_dir(repo_root).output() else {
+        return Vec::new();
+    };
+    let main = git_command(repo_root).args(["symbolic-ref", "--quiet", "--short", "HEAD"]).current_dir(repo_root).output().ok();
+    let main = main.map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string());
+    let owners = BranchOwners::load(repo_root, prefix);
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter(|branch| main.as_deref() != Some(*branch) && !worktrees.iter().any(|(_, checked_out)| checked_out.as_deref() == Some(*branch)))
+        .filter_map(|branch| Some((owners.ticket_branch_of(branch)?, branch.to_string())))
+        .filter(|(ticket, _)| ticket_branch.is_none_or(|wanted| wanted == ticket))
+        .filter(|(_, branch)| branch_landed(repo_root, branch).unwrap_or(false))
+        .collect()
+}
+
+/// Delete a branch whose work is in the main checkout, possibly rebased,
+/// which `git branch -d` would refuse, and its landing records. The
+/// branches and detached worktrees traced to their ticket through it get
+/// their ticket branch recorded first, so a later cleanup still finds them
+/// (`BranchOwners`).
+pub(crate) fn delete_landed_branch(repo_root: &std::path::Path, prefix: &str, branch: &str) -> LoTaRResult<()> {
+    let owners = BranchOwners::load(repo_root, prefix);
+    let through = |traced: &str| owners.trace(traced).filter(|(_, path)| path.iter().any(|step| step == branch)).map(|(ticket, _)| ticket);
+    for (other, ticket) in owners.parents.keys().filter(|other| *other != branch).filter_map(|other| Some((other, through(other)?))) {
+        run_git_command(repo_root, &["config", &format!("branch.{other}.lotarticket"), &ticket])?;
+    }
+    for (path, _) in linked_worktrees(repo_root)?.into_iter().filter(|(_, checked_out)| checked_out.is_none()) {
+        if let (Some(record), Some(ticket)) = (detached_ticket_record(&path), detached_from(&path).and_then(|from| through(&from)))
+            && !record.exists()
+        {
+            fs::write(record, ticket).map_err(LoTaRError::IoError)?;
+        }
+    }
+    run_git_command(repo_root, &["branch", "-D", branch])?;
+    forget_landings(repo_root, branch);
+    Ok(())
+}
+
+/// A ticket that reached Done loses its agent worktrees (DEV-343), whoever
 /// set Done: an earlier phase ends with the ticket handed on, and the
 /// merge job runs in a worktree of its own, so cleanup at the end of a job
-/// alone leaves the ticket branch's worktree behind. Waits while a job
-/// runs for the ticket; its end calls this again.
+/// alone leaves the ticket branch's worktree behind. That includes the
+/// worktrees of its T3 Code thread branches and those detached when a
+/// later thread took over the branch, and the branches themselves
+/// (DEV-476); any with work missing from main stay. Waits while a job runs
+/// for the ticket; its end calls this again.
 pub(crate) fn cleanup_done_ticket_worktree(tasks_dir: &std::path::Path, ticket_id: &str) {
     if ticket_done_state(tasks_dir, ticket_id) != Some(true) {
         return;
@@ -2296,8 +2514,9 @@ pub(crate) fn cleanup_done_ticket_worktree(tasks_dir: &std::path::Path, ticket_i
     let Some(repo_root) = resolve_repo_root(tasks_dir) else {
         return;
     };
-    let branch = build_worktree_branch(&config.agent_worktree.branch_prefix, &sanitize_worktree_token(ticket_id));
-    let Some(path) = worktree_on_branch(&repo_root, &branch) else {
+    let branch_prefix = &config.agent_worktree.branch_prefix;
+    let branch = build_worktree_branch(branch_prefix, &sanitize_worktree_token(ticket_id));
+    let Ok(worktrees) = agent_worktrees(&repo_root, branch_prefix) else {
         return;
     };
     // Holding the registry keeps a job from starting in the worktree meanwhile.
@@ -2307,8 +2526,16 @@ pub(crate) fn cleanup_done_ticket_worktree(tasks_dir: &std::path::Path, ticket_i
     if registry.active_by_ticket.contains_key(ticket_id) || crate::services::agent_active_jobs::for_ticket_elsewhere(tasks_dir, ticket_id).is_some() {
         return;
     }
-    if check_worktree_cleanup(&repo_root, &path, Some(&branch), config.agent_worktree.cleanup_ignored_files).is_ok() {
-        remove_worktree(&repo_root, &path, Some(&branch), config.agent_worktree.cleanup_delete_branches);
+    let delete_branches = config.agent_worktree.cleanup_delete_branches;
+    for worktree in worktrees.iter().filter(|worktree| worktree.ticket_branch == branch) {
+        if check_agent_worktree_cleanup(&repo_root, worktree, config.agent_worktree.cleanup_ignored_files).is_ok() {
+            remove_worktree(&repo_root, &worktree.path, (!worktree.detached).then_some(worktree.branch.as_str()), delete_branches, branch_prefix);
+        }
+    }
+    if delete_branches {
+        for (_, landed) in landed_agent_branches(&repo_root, branch_prefix, Some(&branch)) {
+            let _ = delete_landed_branch(&repo_root, branch_prefix, &landed);
+        }
     }
     drop(registry);
 }
@@ -2354,7 +2581,13 @@ fn maybe_cleanup_worktree(job_id: &str, ticket_id: &str, tasks_dir: &std::path::
             record_and_emit(state, "agent_job_progress", Some(note));
         }
     } else {
-        remove_worktree(&repo_root, &target.path, target.branch.as_deref(), config.agent_worktree.cleanup_delete_branches);
+        remove_worktree(
+            &repo_root,
+            &target.path,
+            target.branch.as_deref(),
+            config.agent_worktree.cleanup_delete_branches,
+            &config.agent_worktree.branch_prefix,
+        );
     }
     drop(registry);
     cleanup_done_ticket_worktree(tasks_dir, ticket_id);

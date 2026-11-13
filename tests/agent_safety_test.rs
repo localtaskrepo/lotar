@@ -697,6 +697,81 @@ mod git_required {
         AgentJobService::get_job(&job.id).unwrap()
     }
 
+    /// DEV-476: the fix thread commits on the ticket branch; the review
+    /// thread on another model gets T3 Code's branch `t3/review` created
+    /// from it, and LoTaR detaches the fix thread's worktree to free the
+    /// branch; a third thread's branch `t3/review-1` holds a commit main
+    /// lacks, and its worktree is detached too, as is the review worktree,
+    /// which still holds notes. Once the fix and the review landed, Done
+    /// (and `lotar agent worktree cleanup`) removes the clean detached
+    /// worktree and both landed branches, and keeps the third thread's
+    /// work, the notes and a T3 Code branch created from main. Once those
+    /// are dealt with, the next cleanup removes them too, although the
+    /// branch they were traced through is gone.
+    #[test]
+    fn done_removes_detached_worktrees_and_thread_branches_whose_work_landed() {
+        common::require_git();
+        for by_cli in [false, true] {
+            let (fixture, ticket) = setup("exit 0", true);
+            let root = fixture.get_temp_path();
+            let worktree = |name: &str| root.join("worktrees").join(name);
+            let commit = |dir: &Path, name: &str| {
+                fs::write(dir.join(name), name).unwrap();
+                git(dir, &["add", name]);
+                git(dir, &["commit", "-q", "-m", &format!("{ticket} {name}")]);
+            };
+            let branch = format!("agent/{ticket}");
+            let (fix, review, third, other) = (worktree("fix"), worktree("review"), worktree("third"), worktree("other"));
+            git(root, &["worktree", "add", "-q", "-b", &branch, fix.to_str().unwrap()]);
+            commit(&fix, "fix.txt");
+            git(&fix, &["switch", "--quiet", "--detach"]);
+            git(root, &["worktree", "add", "-q", "-b", "t3/review", review.to_str().unwrap(), &branch]);
+            commit(&review, "review.txt");
+            git(root, &["worktree", "add", "-q", "-b", "t3/review-1", third.to_str().unwrap(), "t3/review"]);
+            commit(&third, "unlanded.txt");
+            git(&third, &["switch", "--quiet", "--detach"]);
+            git(&review, &["switch", "--quiet", "--detach"]);
+            fs::write(review.join("notes.txt"), "notes").unwrap();
+            git(root, &["worktree", "add", "-q", "-b", "t3/other", other.to_str().unwrap(), "main"]);
+            fs::write(root.join("main.txt"), "main moved on").unwrap();
+            git(root, &["add", "main.txt"]);
+            git(root, &["commit", "-q", "-m", "Other work"]);
+            git(root, &["cherry-pick", &branch, "t3/review"]);
+
+            if by_cli {
+                let list = Command::new(env!("CARGO_BIN_EXE_lotar"))
+                    .args(["--tasks-dir", fixture.tasks_root.to_str().unwrap(), "agent", "worktree", "list"])
+                    .env("LOTAR_IGNORE_HOME_CONFIG", "1")
+                    .current_dir(root)
+                    .output()
+                    .unwrap();
+                let listed = String::from_utf8_lossy(&list.stdout);
+                assert!(listed.contains(&format!("detached from {branch}")) && listed.contains("t3/review"), "{listed}");
+                assert!(!listed.contains("t3/other"), "{listed}");
+                let path = fixture.tasks_root.join("SAFE/1.yml");
+                let mut task: serde_yaml_ng::Value = serde_yaml_ng::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+                task["status"] = "Done".into();
+                fs::write(path, serde_yaml_ng::to_string(&task).unwrap()).unwrap();
+                let output = cleanup(&fixture);
+                assert!(!output.status.success(), "the kept worktrees are reported");
+            } else {
+                set_status(&fixture, &ticket, "Done", TaskUpdateContext::default());
+            }
+            assert!(!fix.exists(), "by_cli={by_cli}: the landed worktree is removed");
+            assert!(!branch_exists(root, &branch) && !branch_exists(root, "t3/review"), "by_cli={by_cli}: the landed branches are deleted");
+            assert!(third.join("unlanded.txt").exists() && branch_exists(root, "t3/review-1"), "by_cli={by_cli}: work missing from main stays");
+            assert!(review.join("notes.txt").exists(), "by_cli={by_cli}: uncommitted work stays");
+            assert!(other.exists() && branch_exists(root, "t3/other"), "by_cli={by_cli}: another ticket's or no ticket's branch stays");
+
+            git(root, &["cherry-pick", "t3/review-1"]);
+            fs::remove_file(review.join("notes.txt")).unwrap();
+            let output = cleanup(&fixture);
+            assert!(output.status.success(), "by_cli={by_cli}: {}", String::from_utf8_lossy(&output.stderr));
+            assert!(!third.exists() && !review.exists() && !branch_exists(root, "t3/review-1"), "by_cli={by_cli}: the work that landed later is cleaned up");
+            assert!(other.exists() && branch_exists(root, "t3/other"), "by_cli={by_cli}: another ticket's or no ticket's branch stays");
+        }
+    }
+
     /// DEV-343: Done set while a job still runs for the ticket waits for
     /// the job's end.
     #[test]

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@review'
 created: 2026-11-13T10:33:48.379945+00:00
-modified: 2026-11-13T11:11:15.892442+00:00
+modified: 2026-11-13T18:23:09.181823+00:00
 relationships:
   related:
   - DEV-327
@@ -13,6 +13,9 @@ relationships:
   - DEV-462
   - DEV-465
   - DEV-464
+  - DEV-472
+  - DEV-473
+  - DEV-476
 comments:
 - date: 2026-11-13T10:42:36.667185+00:00
   author: claude
@@ -365,3 +368,21 @@ history:
   - field: relationships
     old: '{"related":["DEV-327","DEV-459","DEV-462","DEV-465"]}'
     new: '{"related":["DEV-327","DEV-459","DEV-462","DEV-465","DEV-464"]}'
+- at: 2026-11-13T11:19:41.860968+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-327","DEV-459","DEV-462","DEV-465","DEV-464"]}'
+    new: '{"related":["DEV-327","DEV-459","DEV-462","DEV-465","DEV-464","DEV-472"]}'
+- at: 2026-11-13T18:01:49.484269+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-327","DEV-459","DEV-462","DEV-465","DEV-464","DEV-472"]}'
+    new: '{"related":["DEV-327","DEV-459","DEV-462","DEV-465","DEV-464","DEV-472","DEV-473"]}'
+- at: 2026-11-13T18:23:09.181823+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-327","DEV-459","DEV-462","DEV-465","DEV-464","DEV-472","DEV-473"]}'
+    new: '{"related":["DEV-327","DEV-459","DEV-462","DEV-465","DEV-464","DEV-472","DEV-473","DEV-476"]}'

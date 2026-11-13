@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-12T20:54:21.522017+00:00
-modified: 2026-11-13T08:26:30.737675+00:00
+modified: 2026-11-13T18:02:40.981628+00:00
 relationships:
   related:
   - DEV-373
@@ -15,6 +15,7 @@ relationships:
   - DEV-395
   - DEV-459
   - DEV-464
+  - DEV-475
 comments:
 - date: 2026-11-12T21:38:49.796104+00:00
   author: claude
@@ -31,6 +32,9 @@ comments:
 - date: 2026-11-12T22:06:17.140883+00:00
   author: claude
   text: 'claude (merge agent): Merged as 9696a5b "DEV-393 Releases like sprints: release records, a ticket''s releases, Releases page" (fast-forward of main, pushed to origin). What it adds: @releases/<id>.yml release records and a ticket''s releases list; lotar release create/list/show/update/delete/add/move/remove/backlog/release/reopen; release: search term and releases sort in both parsers; /api/releases/* and 11 release_* MCP tools (api_types, view/api/types.ts, openapi.json agree); the Releases page (version order, counts, progress, backlog, drag and bulk add/move/remove, mark released/reopen), releases in the task panel, Tasks list column and bulk actions, Calendar dates, release options in every filter bar; automation release condition, release_changed event, add/remove release action, ticket.releases, also in the rule editor; docs/help/releases.md plus list, task-model, sse, mcp, mcp-tools, automation, api-quick-reference, serve, main, index. Rebased three times as main moved (DEV-385/386/390-392/394/396/397); conflicts were list additions on both sides (events unblocked + release_changed, test module list, bulk menu actions) and kept both. Checks on the final rebase: npm run lint (lint:agent) pass; Rust nextest 2105/2105 pass (after the DEV-394 rebase; DEV-397 only touched view/utils/taskSort.ts); vitest 1499/1499; test:release 47 and test:hooks 7 pass; smoke after build:smoke 384/384 pass. Not done (follow-up if wanted): per-row Add to release in the task table row menu, a project filter on the Releases page, other pages refreshing their release list on release_changed.'
+- date: 2026-11-13T18:02:40.981628+00:00
+  author: claude
+  text: The follow-up steps named in the merge comment (row-menu Add to release, project filter on the Releases page, release_changed refresh elsewhere) were done in DEV-464, merged as 9b5c09e8 on main. Nothing left open here.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A34b8c971-d1ce-4ec1-9f04-f191b66e3734
 - file: src/storage/sprint.rs
@@ -154,3 +158,13 @@ history:
   - field: relationships
     old: '{"related":["DEV-373","DEV-394","DEV-385","DEV-397","DEV-395","DEV-459"]}'
     new: '{"related":["DEV-373","DEV-394","DEV-385","DEV-397","DEV-395","DEV-459","DEV-464"]}'
+- at: 2026-11-13T18:01:54.661182+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-373","DEV-394","DEV-385","DEV-397","DEV-395","DEV-459","DEV-464"]}'
+    new: '{"related":["DEV-373","DEV-394","DEV-385","DEV-397","DEV-395","DEV-459","DEV-464","DEV-475"]}'
+- at: 2026-11-13T18:02:40.981628+00:00
+  actor: claude
+  changes:
+  - field: comment_added

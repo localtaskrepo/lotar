@@ -1,11 +1,11 @@
 title: Jobs that failed during the T3 Code outage left 15 tickets InProgress and lost their agents' outcome
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-13T10:33:47.286204+00:00
-modified: 2026-11-13T11:03:44.978169+00:00
+modified: 2026-11-13T18:01:49.473235+00:00
 relationships:
   related:
   - DEV-401
@@ -21,6 +21,7 @@ relationships:
   - DEV-471
   - DEV-409
   - DEV-411
+  - DEV-473
 comments:
 - date: 2026-11-13T10:37:16.946574+00:00
   author: claude
@@ -49,10 +50,57 @@ comments:
 - date: 2026-11-13T11:03:37.234482+00:00
   author: codex
   text: 'Review: blocking. automation_service.rs:574-575 deletes the durable recorded outcome before writing it. Exhausting the bounded WouldBlock retries permanently loses it; apply_end_rules only logs the failure. Preserve pending outcomes/end events until successful application and test contention exhaustion followed by recovery. Read full diff, ticket/comments, recent main history and backend/testing guidance. Targeted Rust test blocked by sccache permissions; retry without wrapper required fresh compilation and was interrupted, no pass claimed. Full lint/UI/smoke and cross-repo recovery not independently verified. No files, status or assignee changed.'
+- date: 2026-11-13T11:16:34.401703+00:00
+  author: claude
+  text: |-
+    Rework of the blocking review, amended into 6b536a5f (signed, branch t3/job-outcome-t3-outage-1, not merged).
+
+    Finding (automation_service.rs:574, outcome deleted before it was applied): fixed. end_and_take_outcome (agent_active_jobs.rs) now moves the recorded outcome into a pending file (ticket id, outcome, owner pid) instead of deleting it. apply_job_event removes it only once applied, or when the error can never resolve. If the storage lock is still busy after the retries, the outcome is marked deferred and kept; unregister leaves it alone. AutomationService::apply_pending_outcomes applies deferred outcomes and those whose process exited before applying them. It runs from recover_orphaned_jobs, so on every queue worker loop and at lotar serve start; a lock that is still busy waits for the next pass. docs/help/agent.md says so.
+
+    Tests: new pending_outcome_tests::an_outcome_the_end_could_not_write_is_applied_later holds the ticket's real task lock through every retry of a job end, then checks the outcome survives the job's unregister, isn't applied while the lock is busy, and is applied once after it's released. It fails when the busy branch deletes the outcome the old way (ticket stays Todo). agent_active_jobs::a_taken_outcome_stays_pending_until_settled covers the pending file. retry_while_busy test now also checks exhaustion. BUSY_RETRIES is 1 under cfg(test) to keep the lib test fast; 10 in builds.
+
+    Checks: npm run lint:agent clean; npm run test:agent: 2134 Rust, 1513 UI, release and hook tests pass; npm run smoke: 387/387. Not checked: a real T3 outage or real lock contention between processes. Not covered: an end rule (not the outcome) that still fails after the retries is only logged, as before; replaying a whole rule could repeat its parts that did run.
+    Guidance: no durable finding.
+- date: 2026-11-13T11:18:02.164477+00:00
+  author: codex
+  text: 'Merge blocked: second review finding remains in 6b536a5f. src/services/automation_service.rs:568-572 drops end-rule actions after WouldBlock retries exhaust; only explicit recorded outcomes are retained for replay. A job without an explicit outcome can still remain InProgress with no running job. This fails the required end-rule recovery criterion. Previous review could not save this finding because the sandbox denied ticket writes, so automation incorrectly advanced to merge. No rebase, merge, push or file changes performed. Earlier targeted test could not start because sccache was permission-blocked; no checks claimed passed. Should the fix agent implement durable recovery of failed end-rule actions before this is merged?'
+- date: 2026-11-13T11:18:11.897056+00:00
+  author: automation
+  text: The merge agent's job job-20261113T111739.435Z-33 failed (lotar agent logs job-20261113T111739.435Z-33); the fix agent retries it on branch t3/job-outcome-server-outage.
+- date: 2026-11-13T11:18:35.710508+00:00
+  author: triage
+  text: 'Answer to the merge review''s question (should the fix agent implement durable recovery of failed end-rule actions before merge): yes. The ticket''s own first Done-when item says a job that ends while T3 Code is unreachable "still applies its end rules and the outcome its agent recorded, or retries them once the server answers", with a test. Losing end-rule actions after the WouldBlock retries run out leaves a job without an explicit outcome InProgress with no job running, so that item is not met. Keep the recorded outcome pending as done now, do the same for the end-rule actions (or replay only the parts that did not run, so a rule''s earlier parts are not repeated), add a test for retries running out followed by recovery, then send it to review again. No decision of the owner is needed: this is the ticket''s stated scope. Source: DEV-467 description, Done when item 1.'
+- date: 2026-11-13T11:22:31.493478+00:00
+  author: codex
+  text: 'Implementing the triage answer: end-rule actions are checkpointed in the queue cache before execution, and completed ticket/comment/command/message/archive steps are removed from the checkpoint. Worker/server recovery resumes pending steps under a per-rule lock. New no-outcome regression failed with recovery disabled (Todo instead of Done), and passes with recovery enabled. Also checking a completed patch is not replayed after a later comment hits contention. Full lint, tests and smoke are running; no merge or push.'
+- date: 2026-11-13T11:26:49.305008+00:00
+  author: codex
+  text: 'Implemented the triage answer in amended signed commit 0e3eec26 on t3/job-outcome-server-outage; not merged or pushed. Failed end-rule actions now retain durable checkpoints in the queue cache. Worker/server recovery resumes unfinished sprint changes, ticket patches, comments, commands, agent messages and archive operations under a per-rule lock; successful steps are checkpointed before proceeding so a later busy lock does not repeat them. Original event/template inputs are retained. Recorded outcome recovery remains in place. Non-contention failures are reported rather than repeatedly executing failed external commands. Updated docs/help/agent.md. Regression an_end_rule_without_an_outcome_recovers_after_retries_run_out failed with recovery disabled (Todo instead of Done) and passes enabled: holds the real task lock beyond retry exhaustion, unregisters the job, releases the lock and checks Done plus one completion comment. It also tests a patch completing before the comment blocks: recovery preserves a subsequent status edit and posts the remaining comment once. Checks passed: npm run lint:agent (after correcting one collapsible-if lint); npm run test:agent (2135 Rust tests, UI suite, release and hook tests); final npm run test:rust:agent (2135/2135) and build-first npm run test:smoke:agent (387/387) after separating sprint checkpoints; git diff --check. Not exercised: a real T3 outage or process crash between an external side effect and its checkpoint. No durable guidance finding. Status and assignee unchanged; job-end automation should send this to another review.'
+- date: 2026-11-13T11:28:13.794975+00:00
+  author: codex
+  text: 'Merge blocked: rebase of 0e3eec26 onto current main conflicts in src/services/agent_job_service.rs and docs/help/agent.md. Main adds apply_job_end_rules and ticket transition logging; this branch adds apply_end_rules and end-rule failure logging. Both behaviors must survive in one handler. Help text must retain main question-routing and transition-log guidance alongside pending recovery documentation. Rebase aborted; original commit preserved. No merge or push, no new checks run. Please resolve the overlapping handler and documentation changes and rerun required checks before merging.'
+- date: 2026-11-13T11:28:23.829866+00:00
+  author: automation
+  text: 'The merge agent''s job job-20261113T112735.288Z-39 failed again: lotar agent logs job-20261113T112735.288Z-39. The fix is on branch t3/job-outcome-t3-outage-2. Should an agent try again (lotar automation run "Health: retry with @fix" --select ''id:DEV-467'', or for an agent''s ticket lotar assignee DEV-467 @fix), or will you merge it yourself?'
+- date: 2026-11-13T11:28:49.784571+00:00
+  author: triage
+  text: 'Answer to the 11:28 question (retry, or will the owner merge it himself): an agent retries; no decision of the owner is needed. The merge job failed on a rebase conflict, not on the work: main''s apply_job_end_rules and ticket transition logging and this branch''s apply_end_rules and end-rule failure logging both have to survive in one handler, and docs/help/agent.md has to keep main''s question-routing and transition-log text next to the pending-recovery text. That is the fix agent''s job (the merge agent''s own report asks for it): rebase t3/job-outcome-t3-outage-2 onto current main, resolve both files keeping both behaviours, rerun lint:agent, test:agent and smoke, then send it to review again. Source: the 11:28 merge report and the automation comment offering the @fix retry; the owner''s merge is not required (merge-in-fix-thread, 2026-11-11).'
+- date: 2026-11-13T11:32:40.703544+00:00
+  author: codex
+  text: 'Resolved the requested rebase conflicts in signed commit 9439eafe on t3/job-outcome-t3-outage-2, rebased onto main. The existing apply_job_end_rules handler now reports end-rule failures and retains main ticket-transition logging; docs retain question routing, transition logging and pending recovery guidance. Checks passed: npm run lint:agent; npm run test:agent (2138 Rust, 1515 UI, 47 release, 7 hook tests); npm run smoke (390 tests); git diff --check. Worktree clean. No merge or push. Status and assignee unchanged; ready for another review. No durable guidance finding.'
+- date: 2026-11-13T11:33:15.479847+00:00
+  author: codex
+  text: 'Review: blocking verification gap. Inspected commit 9439eafe against main and the durable end-action checkpoints, outcome recovery, and ticket comments. Targeted npm run test:rust -- agent_job could not start: sccache returned Operation not permitted. No test pass independently established and review remains incomplete; rerun in an environment permitting sccache before merge. No files, commits, status or assignee changed.'
+- date: 2026-11-13T11:33:21.665972+00:00
+  author: automation
+  text: The review found blocking problems again after one rework (the comments above). Should an agent rework it once more (lotar assignee DEV-467 @fix), will you decide the findings, or is it WontDo?
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8a51060f-8f0e-40eb-8309-91840a4fac93
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa70d136-71c4-42cc-8c60-e9566c5a27b6
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5beeebcd-a7cb-4464-9f6c-6499226724dc
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A751c0fab-0cb6-45d0-b80c-cef58b130bfc
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2c03ade0-0206-4164-b472-2ca467bc83a2
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8aeb63c7-93c0-49d1-9778-f136836471e6
 description: |-
   On 2026-11-13 about 265 t3 jobs started at once (a manual `repos.ts --report` without `--fix`, STD-86). The T3 Code server stopped answering, and jobs whose threads went on to finish were marked failed ("Could not reach the T3 Code server at http://127.0.0.1:3773", runner exit 1). Afterwards 15 tickets are left InProgress or Reviewing with an agent assignee and no job running (`lotar agent list-running`: none, queue empty, 10:40Z):
 
@@ -81,6 +129,8 @@ description: |-
 tags:
 - health
 - review-returned
+- merge-retried
+- review-blocked
 custom_fields:
   finding: comms:job-end-lost-in-t3-outage
 history:
@@ -170,3 +220,180 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5beeebcd-a7cb-4464-9f6c-6499226724dc
+- at: 2026-11-13T11:16:34.401703+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:16:58.559083+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T11:16:59.632896+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A751c0fab-0cb6-45d0-b80c-cef58b130bfc
+- at: 2026-11-13T11:17:39.280092+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-13T11:18:02.164477+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:18:11.867538+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, review-returned
+    new: health, review-returned, merge-retried
+- at: 2026-11-13T11:18:11.897056+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:18:11.986345+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-13T11:18:35.710508+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:18:35.804794+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-13T11:18:36.432499+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-13T11:22:31.493478+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:26:49.305008+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:26:53.780376+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T11:26:55.018569+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2c03ade0-0206-4164-b472-2ca467bc83a2
+- at: 2026-11-13T11:27:34.632530+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-13T11:28:13.794975+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:28:23.829866+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:28:24.321633+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-13T11:28:49.784571+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:28:49.882081+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-13T11:28:50.343743+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-13T11:32:40.703544+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:32:45.753202+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T11:32:46.936995+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8aeb63c7-93c0-49d1-9778-f136836471e6
+- at: 2026-11-13T11:33:15.479847+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:33:18.054573+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: health, review-returned, merge-retried
+    new: health, review-returned, merge-retried, review-blocked
+- at: 2026-11-13T11:33:21.634066+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+- at: 2026-11-13T11:33:21.665972+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-13T18:01:49.473235+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411"]}'
+    new: '{"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473"]}'

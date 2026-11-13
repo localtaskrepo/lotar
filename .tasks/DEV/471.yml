@@ -1,16 +1,41 @@
 title: Smoke runs leave lotar serve processes running after they end
-status: InProgress
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-13T11:02:08.051420+00:00
-modified: 2026-11-13T11:02:09.227752+00:00
+modified: 2026-11-13T18:06:52.908258+00:00
 relationships:
   related:
   - DEV-467
+  - DEV-473
+comments:
+- date: 2026-11-13T11:14:49.225494+00:00
+  author: claude
+  text: 'Fixed in defc3022 (branch agent/DEV-471). Cause: smoke servers are children of the vitest process; when a run was killed or a test never reached stop(), nothing stopped them and they kept running with parent pid 1. Change: smoke/helpers/server-guard.ts (new first globalSetup) starts a detached reaper (smoke/helpers/server-reaper.mjs) with a pipe on stdin; launchAndWaitReady registers every server pid in the run''s registry folder until it exits. When the pipe closes (run ended, failed, or killed, also SIGKILL) the reaper kills the servers still registered. A clean run with a leaked server now fails at teardown, naming the pids. Test: harness.server.smoke.spec.ts ''stops the servers of a run that is killed (DEV-471)'' SIGKILLs a stand-in run and checks its real lotar serve exits; it fails when the reaper does not kill. Also checked by hand: SIGKILL of a real vitest run mid ui.keyboard-shortcuts leaves 0 servers; a test that skips stop() fails the run with the pid. Stopped the 40 leftover servers from agent-DEV-409/411 (parent pid 1); the ticket''s check now lists none. Checks: npm run lint, npm run test:agent (2133 Rust, 1513 UI, release, hooks), npm run test:smoke:agent (108 files, 388 tests) all pass. Not covered: the Windows CI smoke job did not run here.'
+- date: 2026-11-13T11:16:04.479096+00:00
+  author: codex
+  text: 'Review: passed with verification limits. Reviewed defc3022 against main, ticket/comments, related DEV-467 context, smoke guidance, setup/temp guard and recent main harness history. No blocking findings or minor tickets. Targeted harness: 11 passed, 3 sandbox listen EPERM failures, 5 real-binary tests skipped (binary absent). Process inspection sandbox-denied. Frontend/smoke typechecking and git diff --check passed. Full suites and Windows not rerun. No files changed or commits; status and assignee unchanged.'
+- date: 2026-11-13T11:16:55.902531+00:00
+  author: codex
+  text: 'Merge blocked: rebased the fix onto current main successfully, but npm run lint:agent and npm run test:agent both failed at Rust startup because sccache returned Operation not permitted. No merge or push performed; smoke and the process check were not rerun. Can this merge job run with permission to execute the Rust checks? Returning to mallox in HelpNeeded per the merge instructions.'
+- date: 2026-11-13T11:17:31.880323+00:00
+  author: triage
+  text: 'Triage: the merge blocker no longer applies. The fix is already on main as 355b380e (rebased from defc3022, committed 2026-11-13 03:14 local); git log main shows it, and its smoke/ files (server-guard.ts, server-reaper.mjs, server.ts, the harness spec, vitest.config.ts, README) are in it. The leftover check ''ps -axo pid,ppid,command | grep target/smoke/lotar serve'' lists 0 processes now. Nothing is left to merge and no owner permission is needed for the sccache sandbox failure (it was only this merge attempt). Not pushed: main is 1 commit ahead of origin/main; the push stays with the owner. Close DEV-471 as done: Windows smoke was not run, as noted in the first comment.'
+- date: 2026-11-13T11:17:50.412232+00:00
+  author: codex
+  text: Confirmed main contains 355b380e with all six smoke cleanup files. Nothing remains to merge; no code changes or new commit needed. Closing as Done per triage. Prior full checks are recorded in the fix comment; Windows smoke remains unrun. The zero-leftover process result is triage verification, not a new check by this job. No tests rerun for this ticket-only closure. Push remains with the owner.
+- date: 2026-11-13T11:18:29.957992+00:00
+  author: codex
+  text: 'Review: nothing to review. Branch commit defc3022 is patch-equivalent to 355b380e already on main (git cherry main HEAD); all six fix files match main exactly. No tests rerun for an already integrated change. No files or commits changed; status and assignee unchanged.'
+- date: 2026-11-13T11:19:08.437874+00:00
+  author: codex
+  text: 'Nothing to merge: rebased this job branch onto main; Git skipped defc3022 because its equivalent 355b380e is already landed. main..HEAD is now empty, and main checkout merge --ff-only reports Already up to date. Re-ran ps -axo pid,ppid,lstart,command filtered for target/smoke/lotar serve: zero matching processes. No code changes or new commits, so application checks were not rerun; Windows smoke remains unrun as previously recorded. No push: triage explicitly leaves it with the owner. Status and assignee unchanged; job completion advances the ticket.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A68db10bd-eee1-4e4b-ae5e-7eeb2f02d38b
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad41a50c9-dba4-4cd6-8e57-eedece08eb19
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1fa97ac8-1288-4d57-9f5a-2de259918e64
 description: 'Found 2026-11-13 11:00Z while working on DEV-467: 40 ''target/smoke/lotar serve --port 0 --host 127.0.0.1'' processes from the worktrees agent-DEV-409-b5589b2cd370b848 and agent-DEV-411-b5a25146b846a18e, started 2026-11-12 20:19 to 21:43 local, still run with parent pid 1 (their smoke runs ended long ago). Check: ps -axo pid,ppid,lstart,command | grep ''target/smoke/lotar serve'' lists servers whose smoke run is gone. Done when: a smoke run that ends, fails or is killed stops the servers it started, with a test; the leftover processes are stopped.'
 tags:
 - health
@@ -39,3 +64,119 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A68db10bd-eee1-4e4b-ae5e-7eeb2f02d38b
+- at: 2026-11-13T11:14:49.225494+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:14:59.851049+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T11:15:01.020715+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad41a50c9-dba4-4cd6-8e57-eedece08eb19
+- at: 2026-11-13T11:16:04.479096+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:16:11.995852+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-13T11:16:55.902531+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:17:06.879350+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-13T11:17:31.880323+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:17:31.972765+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-13T11:17:32.538725+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-13T11:17:50.412232+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:17:58.363127+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-13T11:17:58.482053+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-11-13T11:17:59.369382+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Done
+    new: Reviewing
+- at: 2026-11-13T11:17:59.945213+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1fa97ac8-1288-4d57-9f5a-2de259918e64
+- at: 2026-11-13T11:18:29.957992+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:18:34.497952+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-13T11:19:08.437874+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T11:19:12.135652+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-13T18:06:52.908258+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-467"]}'
+    new: '{"related":["DEV-467","DEV-473"]}'

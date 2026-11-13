@@ -399,6 +399,7 @@ When enabled:
 - Multiple job phases for the same ticket reuse the same worktree
 - The worktree persists after the job completes unless cleanup is enabled
 - With `cleanup_on_done`, a ticket that reaches a done status loses the worktree on its ticket branch, whoever set the status: a job, automation, the CLI or the web UI. While a job runs for the ticket, its end does the cleanup. A successful job also removes its own worktree when the ticket is done by then.
+- A ticket's worktrees and branches include those of its T3 Code threads: a thread's branch (`t3/<topic>`) that T3 Code created from the ticket branch or from an earlier thread's branch, as git's branch reflog records (`branch: Created from agent/TEST-1`), and a worktree LoTaR detached so a new thread could take over its branch, as its HEAD reflog records (`checkout: moving from agent/TEST-1 to HEAD`). Done cleanup removes each of them that passes the checks below, a detached worktree when its commit's work is in the main checkout, and with `cleanup_delete_branches` also deletes the ticket's branches that no worktree has checked out and whose work landed. Deleting a branch deletes its reflog, so before it does, cleanup records the ticket of each branch and detached worktree traced through that branch (in the branch's `branch.<name>.lotarticket` config, and in a `lotar-ticket-branch` file in the worktree's git directory), and a later cleanup still finds them once their work lands.
 - Cleanup only removes a worktree whose ticket is done, whose branch is merged into the main checkout, and that has no untracked or modified files. A branch counts as merged when every commit on it is in the main checkout, also when it landed rebased or cherry-picked (`git cherry` lists no `+` commits), or when it landed reworked: merging the branch into the main checkout's `HEAD`, or into a commit since the branch's fork point that changed the branch's files, adds nothing (`git merge-tree --write-tree` yields that commit's own tree), or when a merge job recorded the branch's current commit as landed and that record's main commit is in the main checkout (see [Default instructions](#default-instructions)). A branch with any change main doesn't hold is kept. So is a branch whose lines the merge changed (main holds other content than the branch) without a merge job's record, or one with commits added after the record; check it and remove it by hand. Git-ignored files such as build and test output are removed with it; set `cleanup_ignored_files: false` to keep any worktree that still holds ignored files. When cleanup keeps a worktree, the job log says why.
 - With `cleanup_paths`, every job end (completed, failed, cancelled, or handed back with the ticket open) deletes those paths from the job's worktree, which stays. This also covers the worktrees T3 Code makes for `t3` jobs. Build output such as Rust's `target/` takes gigabytes in each worktree; a resumed job rebuilds it (a shared compiler cache such as sccache makes that fast). A path is deleted only when git ignores it and nothing under it is tracked; symlinks, paths outside the worktree and `.git` are never deleted. Nothing is deleted while another job runs for the ticket, as it shares the worktree. The job log lists what was deleted.
 - Merge-profile jobs require worktrees so merges happen on isolated branches
@@ -413,14 +414,15 @@ List all agent worktrees:
 lotar agent worktree list
 ```
 
-This shows each worktree with its ticket ID, branch, path, and status (active job, done, or in-progress).
+This shows each worktree with its ticket ID, branch (or `detached from <branch>`), path, and status (active job, done, or in-progress), T3 Code thread worktrees included.
 
 Clean up stale worktrees:
 ```bash
 # Remove worktrees for completed/closed tickets
 lotar agent worktree cleanup
 
-# Also delete the associated git branches
+# Also delete the associated git branches, and the tickets' landed branches
+# without a worktree (T3 Code thread branches included)
 lotar agent worktree cleanup --delete-branches
 
 # Remove ALL agent worktrees (except those with active jobs)

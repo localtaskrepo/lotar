@@ -4,13 +4,14 @@ priority: Medium
 type: Chore
 reporter: claude
 created: 2026-11-13T08:17:45.021914+00:00
-modified: 2026-11-13T11:01:24.213347+00:00
+modified: 2026-11-13T18:01:53.449763+00:00
 relationships:
   related:
   - DEV-393
   - DEV-464
   - DEV-467
   - DEV-470
+  - DEV-475
 comments:
 - date: 2026-11-13T08:27:29.452450+00:00
   author: claude
@@ -96,3 +97,9 @@ history:
   changes:
   - field: assignee
     old: '@fix'
+- at: 2026-11-13T18:01:53.449763+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-393","DEV-464","DEV-467","DEV-470"]}'
+    new: '{"related":["DEV-393","DEV-464","DEV-467","DEV-470","DEV-475"]}'

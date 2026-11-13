@@ -1,0 +1,102 @@
+title: 'Commits only on this Mac: branches'
+status: HelpNeeded
+priority: Medium
+type: Chore
+reporter: claude
+assignee: mallox
+created: 2026-11-13T18:01:46.294423+00:00
+modified: 2026-11-13T18:07:06.208460+00:00
+relationships:
+  related:
+  - DEV-376
+  - DEV-464
+  - DEV-466
+  - DEV-467
+  - DEV-468
+  - DEV-469
+  - DEV-470
+  - DEV-476
+  - DEV-465
+  - DEV-471
+  - DEV-472
+comments:
+- date: 2026-11-13T18:06:52.766720+00:00
+  author: claude
+  text: |-
+    Checked (check still lists unpushed:branches). The branches fall into two groups.
+
+    1. Done tickets whose work is on main, safe to delete. Code identical to main: agent/DEV-464 24fb128d (main 9b5c09e8), agent/DEV-469 f25eea82 (b95a5c24), agent/DEV-471 defc3022 (355b380e), t3/strip-author-name-from-comments 813370d6 (656cdd7a). Earlier versions that main contains with more on top: agent/DEV-470, t3/strip-author-name-comment-prefix, t3/strip-author-name-from-comments-1 (all 4c770c59, superseded by 656cdd7a), t3/failed-merge-already-landed and t3/failed-merge-work-on-main (ca054282, superseded by DEV-465's 9921ee06). Their 7 worktrees are clean, detached, idle since 03:03 and have no processes: agent-DEV-464/469/470/471-*, t3-563e924f, t3-a580f850, t3-fb6d26b5. This is the same cleanup you approved in DEV-376 on 2026-11-12. I tried git worktree remove plus git branch -D for these, and the auto-mode permission check refused it as an irreversible deletion. Nothing was deleted.
+
+    2. Work that isn't on main, kept: DEV-466 (agent/DEV-466, t3/task-panel-git-timeout, -1), DEV-467 (agent/DEV-467, t3/job-outcome-*), DEV-468 (agent/DEV-468, t3/review-rework-ticket-branch, t3/rework-commits-on-ticket-branch). Those tickets are HelpNeeded with their own question to you; the branches clear when they merge. main's 2 unpushed commits (DEV-471, DEV-472) go out with the merge agent's next push.
+
+    Cause, filed as DEV-476: lotar detaches a thread's worktree when a review on another model takes the ticket branch, and the cleanup at Done only looks for a worktree with the ticket branch checked out, so it never removes these.
+
+    No files changed, no commit.
+
+    Question: may I (or the next job) delete the 9 branches and remove the 7 worktrees in group 1? If yes, allow it for the job, e.g. a Bash permission rule for git branch -D and git worktree remove in this repo.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A01b13bac-0f83-4535-bcc2-d80cb19bca62
+description: |-
+  14 commits on no remote, only on this Mac: agent/DEV-464 1, agent/DEV-466 1, agent/DEV-467 1, agent/DEV-468 1, agent/DEV-469 1, agent/DEV-470 1, main 2, t3/failed-merge-already-landed 1, t3/failed-merge-work-on-main 1, t3/job-outcome-server-outage 1, t3/job-outcome-t3-outage 1, t3/job-outcome-t3-outage-1 1, t3/job-outcome-t3-outage-2 1, t3/review-rework-ticket-branch 1, t3/rework-commits-on-ticket-branch 1, t3/strip-author-name-comment-prefix 1, t3/strip-author-name-from-comments-1 1, t3/task-panel-git-timeout 1, t3/task-panel-git-timeout-1 1 (git log <branch> --not --remotes)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `unpushed:branches`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[unpushed:branches]` while the problem is there.
+
+  ## Done when
+
+  git log <branch> --not --remotes is empty for each branch it lists: the commits are pushed, merged or on a branch with its worktree.
+tags:
+- health
+custom_fields:
+  finding: unpushed:branches
+history:
+- at: 2026-11-13T18:01:49.487983+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-376"]}'
+    new: '{"related":["DEV-376","DEV-464","DEV-466","DEV-467","DEV-468","DEV-469","DEV-470"]}'
+- at: 2026-11-13T18:01:50.822993+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-13T18:01:52.607683+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T18:01:55.954621+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A01b13bac-0f83-4535-bcc2-d80cb19bca62
+- at: 2026-11-13T18:06:30.598126+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-376","DEV-464","DEV-466","DEV-467","DEV-468","DEV-469","DEV-470"]}'
+    new: '{"related":["DEV-376","DEV-464","DEV-466","DEV-467","DEV-468","DEV-469","DEV-470","DEV-476"]}'
+- at: 2026-11-13T18:06:52.766720+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T18:06:52.909304+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-376","DEV-464","DEV-466","DEV-467","DEV-468","DEV-469","DEV-470","DEV-476"]}'
+    new: '{"related":["DEV-376","DEV-464","DEV-466","DEV-467","DEV-468","DEV-469","DEV-470","DEV-476","DEV-465","DEV-471","DEV-472"]}'
+- at: 2026-11-13T18:07:06.208460+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox

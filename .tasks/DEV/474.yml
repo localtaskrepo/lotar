@@ -1,0 +1,96 @@
+title: 'Config copy behind the standard: .tasks/DEV/automation.yml'
+status: Done
+priority: Low
+type: Chore
+reporter: claude
+assignee: '@merge'
+created: 2026-11-13T18:01:51.364994+00:00
+modified: 2026-11-13T18:07:39.759292+00:00
+comments:
+- date: 2026-11-13T18:02:52.887717+00:00
+  author: claude
+  text: 'Replaced .tasks/DEV/automation.yml with the current configs/lotar/automation.yml (the copy had no repo additions of its own, so it is now byte-identical to the source). Commit 9a19dc73 on agent/DEV-474. Checks: cmp against the source passes; lotar config show --project DEV loads the file in the worktree. The drift check reads the main checkout, so it still lists the drift until this merges; the merge agent reruns it. No Rust/UI code changed, so lint/test/smoke did not run.'
+- date: 2026-11-13T18:06:59.290430+00:00
+  author: claude
+  text: 'Review: passed. Read: ticket and fix agent''s comment, the diff main..HEAD (one commit 9a19dc73, only .tasks/DEV/automation.yml), the last 5 standards commits to configs/lotar/automation.yml and the last 5 main commits to the file. Reran: cmp against ~/Development/standards/configs/lotar/automation.yml is identical; the file parses as YAML (aliases on) and lotar config show --project DEV loads. The diff contains only standard changes (thread-rename lines, no-change-closes rule STD-87, ''Merges amend lotar files''); main''s copy had no repo additions that the replacement would drop. No stray files, nothing staged or untracked. The drift check reads the main checkout, so it clears only after the merge (merge agent reruns it). No code changed, so lint/test/smoke are not needed. No findings, no tickets filed.'
+- date: 2026-11-13T18:07:35.842181+00:00
+  author: claude
+  text: 'Merge: nothing to merge. Main moved on to 7d85722b (STD-88 rules copy), which already put the identical .tasks/DEV/automation.yml on main. After rebasing, 9a19dc73 was skipped as already applied, so the branch has no commits beyond main. Main''s file is byte-identical to the standard''s and committed. Ran: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar no longer lists drift:.tasks/DEV/automation.yml. Nothing pushed (no new commit from this ticket); no lint/test/smoke since no code changed.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A349b18c2-09ae-4825-b0f9-38d176bb5da7
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A22de988c-f721-4806-a394-5782446bb207
+description: |-
+  .tasks/DEV/automation.yml: configs/lotar/automation.yml changed since the copy (2 commits: git -C ~/Development/standards log -- configs/lotar/automation.yml)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `drift:.tasks/DEV/automation.yml`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[drift:.tasks/DEV/automation.yml]` while the problem is there.
+
+  ## Done when
+
+  The copy matches its source in ~/Development/standards/configs again (repo additions kept at its end) and the repo's checks pass.
+tags:
+- health
+- light
+custom_fields:
+  finding: drift:.tasks/DEV/automation.yml
+history:
+- at: 2026-11-13T18:01:51.672160+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix-light'
+- at: 2026-11-13T18:01:53.999072+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-13T18:01:57.816454+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A349b18c2-09ae-4825-b0f9-38d176bb5da7
+- at: 2026-11-13T18:02:52.887717+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T18:06:33.213375+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-light'
+    new: '@review-light'
+- at: 2026-11-13T18:06:36.574785+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A22de988c-f721-4806-a394-5782446bb207
+- at: 2026-11-13T18:06:59.290430+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T18:07:03.920141+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review-light'
+    new: '@merge'
+- at: 2026-11-13T18:07:35.842181+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T18:07:39.759292+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
