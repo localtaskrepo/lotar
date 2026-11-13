@@ -296,6 +296,8 @@ automation:
                  example separate hunks in a list); otherwise git rebase --abort, comment the conflicting files and
                  what each side wanted, set the status to HelpNeeded, assign the ticket to mallox and stop.
               3. Run the checks this repo's AGENTS.md names, in your worktree. One fails: hand back as in step 2.
+                 Skip a check the fix or rework comment says passed on the commit that is still HEAD (the rebase
+                 changed nothing: same hash before and after), and name it as skipped in your comment.
               4. git -C <root> merge --ff-only <your branch>. Main moved on: back to step 2. Refused
                  because of uncommitted changes in the main checkout: hand back. Then the lotar files: when
                  git -C <root> status --short .tasks lists changes (tickets and config, also other tickets'), and
@@ -396,6 +398,8 @@ automation:
           set:
             status: HelpNeeded
             assignee: mallox
+          # Only a new blocking review sets it again, so a pass after the owner's rework merges (STD-93).
+          remove: *unblocked
           comment: >-
             The review found blocking problems again after one rework (the comments above). Should an agent rework it
             once more (lotar assignee ${{ticket.id}} @fix), will you decide the findings, or is it WontDo?
