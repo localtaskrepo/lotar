@@ -3,14 +3,24 @@ status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T23:59:31.409842+00:00
-modified: 2026-11-12T23:59:38.126767+00:00
+modified: 2026-11-13T01:09:17.186716+00:00
 relationships:
   related:
   - DEV-374
   - DEV-388
   - DEV-389
+  - DEV-402
+comments:
+- date: 2026-11-13T01:09:06.635660+00:00
+  author: claude
+  text: |-
+    claude: Fixed in commit 60143c8 on agent/DEV-399.
+    Tests (smoke/): harness.server specs that wait on a child's exit/EOF/banner use a 60 s hang guard instead of 5 s. The fixtures.agent gate test waits for the started sentinel or the child's exit (60 s guard) and awaits the child in cleanup. gate-agent.mjs no longer recreates a removed gate dir, which caused the fixture-gate-* temp leftover. The api.automation descendant-stderr test now checks that the diagnostic arrives while the descendant still holds the pipe (60 s hold, poll until 30 s) instead of within 5 s.
+    Two UI bugs that load exposed in ui.board-state (with a failing unit test first for each): (1) TasksList pushed an extra history entry when a filter change (the default project filling in) came before the page's first apply, so Back stayed on Tasks. The page's first apply now takes that change and replaces the URL. (2) FilterBar showed the project chip until its project list loaded, then hid it in a single-project workspace. The 33 px row moving shifted a restored scroll position to 368 instead of 400 (the ticket's failure). The chip now waits for the project list.
+    Checks: npm run lint ok. npm test ok (2108 Rust, 1507 UI). npm run smoke 385/385 twice with 20 niced busy loops added (1-min load 16-52 and 32-72), no temp leftovers. ui.board-state 6/6 after the fix vs 1/4 before at load ~13.
+    Filed DEV-402: view unit tests hit Vitest's 5 s timeout at load ~20 (seen while checking, passed on rerun).
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa7b76f2-f98f-41b4-839c-9462ebd77970
 description: 'Found while releasing v0.14.1 (DEV-374): npm run smoke on 8d0dedb failed 8 of 385 at load average 34 on 14 cores, all timeouts: harness.server.smoke.spec.ts (5 tests, ''server did not advertise readiness within 5000ms'' where the test expects a specific failure), fixtures.agent.smoke.spec.ts (gate agent: started-probe.sentinel not seen in 10 s), api.automation.smoke.spec.ts (descendant-held stderr within the bounded grace), ui.board-state.smoke.spec.ts (expected 400, got 368: scroll position). The four files passed 36/36 on a re-run right after, and the full suite passed for the DEV-388 and DEV-389 agents the same evening. Check: npm run smoke while other agents build (load over 20). Done: those tests wait on the event they need instead of a fixed deadline that load breaks, or their deadlines scale, and smoke passes under that load; also the ''Tests left 1 entries in the temp folder: fixture-gate-*'' teardown error after the gate test fails.'
@@ -41,3 +51,19 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa7b76f2-f98f-41b4-839c-9462ebd77970
+- at: 2026-11-13T01:08:50.595671+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-374","DEV-388","DEV-389"]}'
+    new: '{"related":["DEV-374","DEV-388","DEV-389","DEV-402"]}'
+- at: 2026-11-13T01:09:06.635660+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T01:09:17.186716+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'

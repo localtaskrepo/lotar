@@ -1,11 +1,11 @@
 title: t3 job marked failed while its thread still runs, so a retry works the same branch
-status: InProgress
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T00:31:54.569411+00:00
-modified: 2026-11-13T01:07:27.223074+00:00
+modified: 2026-11-13T01:07:36.603849+00:00
 relationships:
   related:
   - DEV-353
@@ -80,3 +80,9 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-13T01:07:36.603849+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
