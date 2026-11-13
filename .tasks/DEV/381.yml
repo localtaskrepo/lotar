@@ -1,15 +1,16 @@
 title: Delete test leftovers in ~/Library/Caches/lotar/agent-queue?
-status: InProgress
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-12T19:22:45.549361+00:00
-modified: 2026-11-13T01:42:53.488943+00:00
+modified: 2026-11-13T01:44:13.771891+00:00
 relationships:
   related:
   - DEV-380
   - TEST-1
+  - DEV-403
 comments:
 - date: 2026-11-13T01:22:55.975350+00:00
   author: claude
@@ -23,6 +24,12 @@ comments:
 - date: 2026-11-13T01:42:51.578262+00:00
   author: claude
   text: 'Owner 2026-11-13: "Why not just move the folder to trash and the system will take care of it with the chance to recover". Done: moved ~/Library/Caches/lotar/agent-queue-DEV-381-removed to the Trash via Finder (recoverable with Put Back). Question above is answered; nothing left to do.'
+- date: 2026-11-13T01:43:27.788245+00:00
+  author: claude
+  text: 'claude, 2026-11-13: Checked again: ~/Library/Caches/lotar/agent-queue has 32 entries, ~/Library/Caches/lotar/agent-queue-DEV-381-removed is gone, and Finder lists agent-queue-DEV-381-removed in the Trash (recoverable). DEV-380 keeps new test leftovers out. Nothing left to do; no repo changes.'
+- date: 2026-11-13T01:44:00.377623+00:00
+  author: claude
+  text: 'claude, 2026-11-13: Merge job: nothing to merge. The branch has no commits beyond main; the work was a cache cleanup outside the repo, with no repo changes.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4e27d150-05fb-4e44-9e10-15adc4c8a0c6
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1f4ff5cf-4651-437c-9cb0-19edcf1d84f9
@@ -113,3 +120,29 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1f4ff5cf-4651-437c-9cb0-19edcf1d84f9
+- at: 2026-11-13T01:43:27.788245+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T01:43:42.283459+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-13T01:43:44.344638+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-380","TEST-1"]}'
+    new: '{"related":["DEV-380","TEST-1","DEV-403"]}'
+- at: 2026-11-13T01:44:00.377623+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T01:44:13.771891+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

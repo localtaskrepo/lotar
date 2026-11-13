@@ -1,15 +1,22 @@
 title: Comment author ignores LOTAR_DEFAULT_REPORTER when the project sets default.reporter
-status: InProgress
+status: Done
 priority: High
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T01:24:37.163521+00:00
-modified: 2026-11-13T01:37:59.321702+00:00
+modified: 2026-11-13T01:43:53.436510+00:00
+relationships:
+  related:
+  - DEV-381
+  - DEV-405
 comments:
 - date: 2026-11-13T01:37:41.787036+00:00
   author: claude
   text: 'Fixed in 1a7b7d9 (branch agent/DEV-403). Identity resolution now takes default_reporter from a --config override first, then LOTAR_DEFAULT_REPORTER, then the merged config (project > home > global). An agent''s env identity therefore outranks a project''s committed default.reporter for comment authors, history actors, @me and auto-set reporters on add. The add handler now uses that same identity chain instead of reading config.default_reporter directly. Without the env var, project default.reporter still applies. Tests: new dev327_comment_author_test::env_reporter_outranks_project_default_reporter (fails before the fix, passes after); cli_whoami_and_dryrun_test::project_identity_cache_is_scoped_and_precedence_is_preserved updated for the new precedence (env > project, CLI > env). Docs updated: identity.md, precedence.md, config.md, add.md, plus the whoami --explain text. Checks: npm run lint:agent, npm run test:agent (2111 Rust + 1507 UI tests), npm run test:smoke:agent (385 tests): all pass. Manual repro from the ticket (T project with default.reporter: mallox, LOTAR_DEFAULT_REPORTER=claude) now stores author: claude and actor: claude. Automation prompts that set LOTAR_DEFAULT_REPORTER now produce agent-authored comments in a repo like QIS.'
+- date: 2026-11-13T01:43:44.194373+00:00
+  author: claude
+  text: 'Merged and pushed. Rebased agent/DEV-403 onto main (clean, now c5fe8aa, signed), fast-forwarded main, committed ticket files as 912646e ''DEV-403 Ticket updates'' (includes the pending DEV-381/400/402/405/406 ticket changes), pushed e972f09..912646e to origin/main. Checks after the rebase: npm run lint:agent, npm run test:agent (2111 Rust + 1507 UI), npm run test:smoke:agent (385): all pass. Note: DEV-405 (health ticket, finding identity:comment-author-env, at @merge) reports the same bug. Its Done-when differs on one point: it wants a new ticket''s reporter to keep the documented precedence (project over env), while this fix also makes LOTAR_DEFAULT_REPORTER win for the auto-set reporter on add. DEV-405''s merge will likely conflict with c5fe8aa in src/utils/identity_detectors.rs and the docs.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A358a231a-453a-4405-8dd5-9a240fa727b1
 description: |-
@@ -51,3 +58,19 @@ history:
   - field: assignee
     old: '@fix'
     new: '@merge'
+- at: 2026-11-13T01:43:44.194373+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T01:43:44.345028+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-381","DEV-405"]}'
+- at: 2026-11-13T01:43:53.436510+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

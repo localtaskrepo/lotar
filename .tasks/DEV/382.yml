@@ -1,11 +1,11 @@
 title: 'Proposal: phone notifications for tickets that need the user'
-status: HelpNeeded
+status: Done
 priority: Low
 type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-12T20:07:56.581871+00:00
-modified: 2026-11-13T01:25:01.971804+00:00
+modified: 2026-11-13T01:44:12.690739+00:00
 comments:
 - date: 2026-11-13T01:22:56.330781+00:00
   author: claude
@@ -15,6 +15,9 @@ comments:
   text: |-
     Phone pushes already work with no new code: a rule's run action can curl ntfy (or Pushover). Commit on agent/DEV-382 adds a 'Phone notifications' section to docs/help/automation.md: a rule that pushes when a ticket is assigned to mallox, the topic read from ~/.config/ntfy-topic (outside the repo), and a cron digest using lotar list | curl. Tested end to end in a temporary workspace against a local HTTP listener: both the per-ticket push and the digest arrived, and a title containing $(...) was sent as plain text, not run. Not tested against the real ntfy.sh service.
     Question for mallox: is this recipe enough, or should lotar get a built-in notify: action (ntfy/webhook URL + token from an env var or file, no curl, works on Windows)? Recommendation: keep the recipe, and build notify: only if curl in rules turns out to be a nuisance.
+- date: 2026-11-13T01:44:12.506134+00:00
+  author: claude
+  text: 'Decision (mallox, 2026-11-12): "Yeah let''s only build it if we need it". No built-in notify: action; the run + curl recipe in docs/help/automation.md (commit 83e9a29 on agent/DEV-382) is the answer. Not yet merged to main.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5cffcdf1-16fe-4801-9331-af47e3b131ed
 description: |-
@@ -71,3 +74,13 @@ history:
   - field: assignee
     old: '@fix'
     new: mallox
+- at: 2026-11-13T01:44:12.506134+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T01:44:12.690739+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done

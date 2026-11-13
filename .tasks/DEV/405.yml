@@ -1,20 +1,30 @@
 title: A comment's author ignores LOTAR_DEFAULT_REPORTER when the project sets default.reporter
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-13T01:27:46.932016+00:00
-modified: 2026-11-13T01:39:13.934329+00:00
+modified: 2026-11-13T01:45:47.606470+00:00
+relationships:
+  related:
+  - DEV-403
 comments:
 - date: 2026-11-13T01:39:02.168885+00:00
   author: claude
   text: 'Fixed in 5bafc1f (branch agent/DEV-405). The identity detector (src/utils/identity_detectors.rs) now takes default.reporter from the running process first (--config default.reporter=, then LOTAR_DEFAULT_REPORTER), ahead of project/home/workspace config. So @me, whoami, a comment''s author and a history entry''s actor are the writing process. A new ticket''s reporter still gets the merged default.reporter in the ordinary order, project above env. Check: scratch repo with default.reporter: alice in workspace and project config; LOTAR_DEFAULT_REPORTER=bob lotar add + lotar comment X-1 hi stores reporter alice, author bob, actor bob. New test env_reporter_outranks_project_default_for_comment_author_and_history (tests/dev327_comment_author_test.rs). Updated project_identity_cache_is_scoped_and_precedence_is_preserved, which pinned the old order (project above env for identity). Docs: identity.md, precedence.md, config.md, environment.md. Checks: npm run lint, npm run test:agent (2111 Rust + 1507 UI + release + hooks), npm run smoke (385) all pass.'
+- date: 2026-11-13T01:45:34.153887+00:00
+  author: claude
+  text: 'Merge stopped, nothing merged. Main already has c5fe8aa (DEV-403, Done), which fixes the same bug in the same code: rebasing 5bafc1f onto main conflicts in src/utils/identity_detectors.rs, docs/help/identity.md, precedence.md and config.md. On main, DEV-405''s check already passes: in a scratch repo with default.reporter: alice, LOTAR_DEFAULT_REPORTER=bob lotar comment X-1 hi stores author bob, actor bob. The two branches differ on one point: on main (DEV-403) a new ticket without --reporter gets LOTAR_DEFAULT_REPORTER (bob, asserted in env_reporter_outranks_project_default_reporter, and documented that way). 5bafc1f keeps the project''s default.reporter (alice) for new tickets, as this ticket''s description suggests. Before the rebase, lint, test:agent (2111 Rust, 1507 UI) and smoke (385) passed on 5bafc1f. Question: should a new ticket created by an agent (LOTAR_DEFAULT_REPORTER=claude) in a project with default.reporter: mallox get reporter claude (main as it is now: close DEV-405 as done by DEV-403 and drop branch agent/DEV-405) or mallox (I rebase 5bafc1f''s new-ticket part onto main and change DEV-403''s test)?'
+- date: 2026-11-13T01:45:47.455461+00:00
+  author: automation
+  text: The merge agent's job job-20261113T013914.147Z-17 failed (lotar agent logs job-20261113T013914.147Z-17); the fix agent retries it on branch agent/DEV-405.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aae6d836d-243c-436c-846b-76d44e457c63
 description: 'Found 2026-11-13 in quarter-inch-studio (lotar 0.14.1): its .tasks/config.yml and .tasks/QIS/config.yml set default.reporter: mallox. lotar comment QIS-55 ... run with LOTAR_DEFAULT_REPORTER=claude stored author mallox. With standards'' rule ''Comments: the owner''s comment reaches the agent'' (comment author mallox starts the ticket''s agent, STD-56), every agent comment there started an agent: QIS-55 and QIS-170 each got a job from a closing note. The rule is switched off in QIS for now. docs/help/config.md says project configuration outranks env for merged defaults; for who wrote a comment (and the history''s actor), the explicit environment variable of the process writing it should win over a project''s default, since the default is for tickets people create without naming a reporter. Check: in a scratch repo with default.reporter: alice in the project config, LOTAR_DEFAULT_REPORTER=bob lotar comment X-1 hi stores author bob. Done: that, with a test; docs (identity.md, config.md precedence) say which identity a comment and a history entry get; the reporter of a new ticket follows the documented precedence.'
 tags:
 - health
+- merge-retried
 custom_fields:
   finding: identity:comment-author-env
 history:
@@ -44,3 +54,32 @@ history:
   - field: assignee
     old: '@fix'
     new: '@merge'
+- at: 2026-11-13T01:43:44.345474+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-403"]}'
+- at: 2026-11-13T01:45:34.153887+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T01:45:47.288193+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, merge-retried
+- at: 2026-11-13T01:45:47.455461+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-13T01:45:47.606470+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
