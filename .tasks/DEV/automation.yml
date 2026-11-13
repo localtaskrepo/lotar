@@ -112,9 +112,11 @@ automation:
     # clears the assignee (owner 2026-11-13, STD-87, docs/decisions/2026-11-13-no-change-closes.md).
     - name: "Fix done: review on Codex"
       when:
-        any:
-          - assignee: "@fix"
-          - assignee: "@fix-fable"
+        all:
+          - any:
+              - assignee: "@fix"
+              - assignee: "@fix-fable"
+          - not: { tags: { any: [review-child] } }
       on:
         job_completed:
           set:
@@ -152,7 +154,9 @@ automation:
                  "Review: passed" or "Review: blocking": what you read and reran, the findings, the tickets filed.
     - name: "Fix done: review on Claude"
       when:
-        assignee: "@fix-codex"
+        all:
+          - assignee: "@fix-codex"
+          - not: { tags: { any: [review-child] } }
       on:
         job_completed:
           set:
@@ -161,13 +165,96 @@ automation:
           agent: *review
     - name: "Fix done: light review"
       when:
-        assignee: "@fix-light"
+        all:
+          - assignee: "@fix-light"
+          - not: { tags: { any: [review-child] } }
       on:
         job_completed:
           set:
             assignee: "@review-light"
             status: Reviewing
           agent: *review
+    # Pilot (owner 2026-11-13, STD-88, docs/decisions/2026-11-13-thread-noise.md): with tag review-child, the review
+    # is a T3 child thread of the fix thread, in its worktree, instead of a top-level thread of its own. lotar runs it
+    # as the fix thread's next turn, which starts the child with the brief below: T3's CLI can't start a child
+    # (pingdotgg/t3code#33235). The reviewer profiles stay assigned, so the review, merge and rework rules apply
+    # unchanged; the merge and the rework then continue the fix thread. The brief is the review prompt above; change
+    # both together.
+    - name: "Fix done: review on Codex in a child thread"
+      when:
+        all:
+          - any:
+              - assignee: "@fix"
+              - assignee: "@fix-fable"
+          - tags: { any: [review-child] }
+      on:
+        job_completed:
+          set:
+            assignee: "@review"
+            status: Reviewing
+          agent: &review-child
+            session: continue
+            prompt: |
+              This turn starts the review of ticket ${{ticket.id}} ("${{ticket.title}}") in a child thread; you don't
+              review it yourself. Change no files and leave status and assignee as they are.
+              1. The reviewer runs on the provider and model of a lotar profile in
+                 ~/Development/standards/configs/lotar/agents.yml: review after fix and fix-fable (your model is
+                 Claude), review-claude after fix-codex (Codex), review-light after fix-light (the cheap model).
+              2. Call the T3 Code tool delegate_task: title "${{ticket.id}} review: ${{ticket.title}}", role review,
+                 isolation shared (this worktree), mode wait, timeoutMs 3600000, target providerInstanceId and model
+                 from that profile, task the brief below the line, word for word.
+              3. The wait ends before the child does: wait again (t3_thread_wait on its childThreadId). Don't end your
+                 turn while it runs: the job ends with your turn, and the rules read the child's tag review-blocked.
+              4. The child failed or commented nothing: comment "Review: child thread failed" with its link. Otherwise
+                 reply with its outcome line ("Review: passed" or "Review: blocking") and its link.
+              ---
+              Review the work for ticket ${{ticket.id}} ("${{ticket.title}}") before it is merged. A fix agent
+              committed it on your worktree's branch; you didn't write it. Run lotar with LOTAR_DEFAULT_REPORTER set
+              to your agent name (claude, codex). Change no files, commit nothing and leave status and assignee as
+              they are: when your job ends the rules send the work on by tag review-blocked.
+              1. The work: git log <main>..HEAD and its diff, main being the main checkout's branch (git -C <root>
+                 branch --show-current, <root> the first entry of git worktree list). No commits, or only .tasks
+                 changed: comment "Review: nothing to review" and stop.
+              2. Read what it must agree with, not only the diff: the ticket and its comments (what "Done when" asks,
+                 what the fix agent claims), its related tickets, the owner decisions it touches (docs/decisions, the
+                 ticket's quotes), this repo's AGENTS.md, and the recent commits to the touched files on main
+                 (git log -5 <main> -- <file>), which may have changed what the fix relies on.
+              3. Check: it does all that "Done when" asks and nothing the ticket didn't ask; each claim that relies on
+                 something outside the change holds (another check, a config or rule that uses the code, "still
+                 covered"); it decides nothing only the owner decides; a bug fix has a test that failed before it; no
+                 stray files, no second branch or copy of the same fix. Rerun the checks the fix agent names that
+                 finish in a few minutes, and put back whatever they change.
+              4. Blocking: the merge would put a bug, a decision the owner didn't make or unfinished work on main.
+                 Comment the findings, each with file and line, what is wrong and what would fix it, then
+                 lotar task edit ${{ticket.id}} --tag review-blocked. The fix agent reworks it once; a second
+                 blocking review goes to the owner.
+              5. Minor (real, but the merge can go ahead): file each as a ticket in its repo, related to
+                 ${{ticket.id}} (skill lotar-workflow). Noise and taste: leave out.
+              6. Don't end your turn while checks still run: your reply goes to the fix thread. Comment the outcome,
+                 starting "Review: passed" or "Review: blocking": what you read and reran, the findings, the tickets
+                 filed.
+    - name: "Fix done: review on Claude in a child thread"
+      when:
+        all:
+          - assignee: "@fix-codex"
+          - tags: { any: [review-child] }
+      on:
+        job_completed:
+          set:
+            assignee: "@review-claude"
+            status: Reviewing
+          agent: *review-child
+    - name: "Fix done: light review in a child thread"
+      when:
+        all:
+          - assignee: "@fix-light"
+          - tags: { any: [review-child] }
+      on:
+        job_completed:
+          set:
+            assignee: "@review-light"
+            status: Reviewing
+          agent: *review-child
     - name: "Review lifecycle"
       when:
         any:
