@@ -1,11 +1,11 @@
 title: automation run matches later tasks against state from before its own writes
-status: InProgress
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T03:13:31.646907+00:00
-modified: 2026-11-13T03:29:01.962245+00:00
+modified: 2026-11-13T03:30:31.873216+00:00
 relationships:
   related:
   - DEV-400
@@ -13,6 +13,9 @@ comments:
 - date: 2026-11-13T03:28:52.571017+00:00
   author: claude
   text: 'Fixed in commit 522763f9 on agent/DEV-410. Reproduced first: a new test (tests/dev241_automation_test.rs, a_run_matches_tasks_an_earlier_action_changed_as_they_are_now) has ''Ship'' close AM-3, which unblocks AM-4 back to Todo; without the fix the run left AM-4 at Todo. New src/storage/write_log.rs: a thread-local log of the task IDs written while it is open, fed by StorageOperations edit/mutate/delete/move_archive and transaction publishes. run_manual opens it and re-reads (TaskService::get) only the tasks it names before matching; every other task still uses the one listing, so DEV-400''s budget holds (performance_test: 19 passed). Not covered: a second manual rule on the same task still sees that task as listed, as it did before DEV-400. Checks: npm run lint (lint:agent), npm test (2121 Rust + 1507 UI + others, exit 0), npm run smoke (385 passed).'
+- date: 2026-11-13T03:30:25.311051+00:00
+  author: claude
+  text: 'Merged: branch was already on main (451d609d), fast-forwarded main to 522763f9 (fix), then committed ticket files as 008e58c9 ''DEV-410 Ticket updates''. Pushed both to origin/main (451d609d..008e58c9); the pre-push hook (Rust formatting and clippy) passed. Checks: npm run lint, npm test, npm run smoke all passed on this same tree in the fix job (no rebase changes, so not repeated).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac0804822-c39e-481a-8820-667d111410c7
 description: |-
@@ -59,3 +62,13 @@ history:
   - field: assignee
     old: '@fix'
     new: '@merge'
+- at: 2026-11-13T03:30:25.311051+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T03:30:31.873216+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

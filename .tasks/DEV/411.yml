@@ -3,13 +3,23 @@ status: InProgress
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-13T03:13:31.986812+00:00
-modified: 2026-11-13T03:13:33.339378+00:00
+modified: 2026-11-13T04:25:59.804313+00:00
 relationships:
   related:
   - DEV-343
   - DEV-366
+comments:
+- date: 2026-11-13T04:25:01.119559+00:00
+  author: claude
+  text: |-
+    Done in b8a92f12 on agent/DEV-411 (signed).
+    - Record: a merge job that succeeds writes the git ref refs/lotar/landed/<branch>/<branch commit>, pointing at main's HEAD at the job's end. branch_landed accepts a branch when the record for its current commit exists and points at a commit on main. A branch with a commit added after the record has no matching record and is kept. Cleanup (at Done, and lotar agent worktree cleanup --delete-branches) deletes the records along with the branch.
+    - What it landed: a merge job whose branch conflicts with main (no cherry, merge-tree or fast-forward) still succeeds when main gained commits since the job started whose subject starts with the ticket ID and that together change every file the branch changes. The job log names those commits and the record. If any file is left out, the job fails as before and nothing is recorded. The merge-job note in the agent prompt now asks the agent to start such commits with the ticket ID.
+    - Docs: docs/help/agent.md (merge jobs, cleanup).
+    - Tests (tests/agent_safety_test.rs): done_removes_a_branch_the_merge_job_landed_in_a_conflicting_form (main changes the fixed lines and the merge job lands the fix reworked in the main checkout; it fails without the fix with 'can't be fast-forwarded'), and merge_job_that_lands_part_of_a_conflicting_branch_fails.
+    Checks: npm run lint passed. npm test: 2121 Rust passed, release 47 and hooks 7 passed, UI 1506 of 1507: SprintsList.backlogPagination timed out at 30 s at load average ~30, failed 1 of 3 runs alone and passed twice; I changed no frontend files. npm run smoke did NOT give a verdict: 37 of 385 failed, then 41 of 109 on a rerun of the failed files. All failures were timeouts at load average 48 to 86 from other sessions, including the pure-Node harness.mcp-client tests. Smoke needs a rerun on a quiet machine before the merge.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad54e514d-2f5a-4de7-8a11-2c664f0f31b5
 description: |-
@@ -41,3 +51,13 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad54e514d-2f5a-4de7-8a11-2c664f0f31b5
+- at: 2026-11-13T04:25:01.119559+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T04:25:59.804313+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'

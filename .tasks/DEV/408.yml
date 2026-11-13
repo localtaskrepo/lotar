@@ -3,12 +3,19 @@ status: InProgress
 priority: High
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-13T03:13:31.064415+00:00
-modified: 2026-11-13T03:13:32.167556+00:00
+modified: 2026-11-13T04:39:01.382724+00:00
 relationships:
   related:
   - DEV-377
+comments:
+- date: 2026-11-13T03:34:23.894208+00:00
+  author: claude
+  text: 'Done in be55b934 on agent/DEV-408. A new t3 job now reads the earlier thread''s provider and model from t3 thread show (providerInstanceId, model). Same provider and model, or nothing set on the profile: it continues the thread as DEV-377 made it. Another provider or model: it starts a new thread with --worktree <open branch> and the profile''s provider and model, and its prompt names the earlier thread. T3 Code runs plain git worktree add, which refuses a branch that is checked out in another worktree. So to free the branch LoTaR first commits what the earlier thread left uncommitted (''<ID>: uncommitted changes from the earlier thread''), then detaches the earlier worktree with git switch --detach, which keeps its files. If git can''t do either, the job continues the earlier thread and logs why. Docs: docs/help/agent.md. Tests: a new one, a_job_on_another_model_starts_a_new_thread_on_the_unmerged_branch, plus the DEV-377 same-profile test (now sharing a setup helper) and the thread-show parse unit test. Checks: npm run lint:agent clean; npm test passed (2120 Rust tests plus UI, release and hooks; merge_jobs_are_serialized_even_with_parallel_slots was flaky and passed on retry, and it doesn''t touch this code); npm run smoke passed (385). Not checked against a live T3 Code server: the t3 CLI is the fake from the tests. The detached earlier worktree isn''t removed by cleanup_on_done, which looks worktrees up by branch, so it stays until someone removes it by hand.'
+- date: 2026-11-13T04:39:01.382724+00:00
+  author: claude
+  text: 'Merged: rebased agent/DEV-408 onto main 008e58c9 with no conflicts and fast-forwarded main to 04966bcc (DEV-408 A continued T3 thread drops the new profile''s provider and model). Ticket files committed as ''DEV-408 Ticket updates'' and pushed to origin/main. Checks on the rebased branch: npm run lint:agent clean; npm run smoke passed (385); Rust tests 2122 passed (done_during_a_job_leaves_the_worktree_to_the_jobs_end flaky, passed on retry). The machine was heavily loaded (load average 30 to 75): one full run failed merge_job_whose_branch_was_rebased_elsewhere_passes on its 10 s wait, and it passed when run alone. Another run had 13 UI tests time out after 30 s. A rerun of test:ui (1507 passed), test:release and test:hooks passed.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Add3daf95-86e6-43a5-9271-bbf9c5227026
 description: |-
@@ -48,3 +55,17 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Add3daf95-86e6-43a5-9271-bbf9c5227026
+- at: 2026-11-13T03:34:23.894208+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T03:35:39.987689+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-13T04:39:01.382724+00:00
+  actor: claude
+  changes:
+  - field: comment_added
