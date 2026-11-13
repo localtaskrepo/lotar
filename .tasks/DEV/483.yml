@@ -1,16 +1,16 @@
 title: Soft-delete UI smoke intermittently misses the deleted task row
-status: HelpNeeded
+status: WontDo
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
 created: 2026-11-13T20:12:30.897761+00:00
-modified: 2026-11-13T21:13:43.100140+00:00
+modified: 2026-11-14T04:18:20.136363+00:00
 relationships:
   related:
   - DEV-467
   - DEV-481
   - DEV-488
+  - DEV-513
 comments:
 - date: 2026-11-13T20:29:25.139447+00:00
   author: claude
@@ -18,6 +18,18 @@ comments:
 - date: 2026-11-13T20:29:25.238897+00:00
   author: claude
   text: 'Question for mallox: should I add a failure dump to this smoke test (on a failed poll at :176 it saves the page URL, the Task visibility value, the table text, the received SSE events, the trash list API response and the browser console under target/smoke-artifacts/soft-delete/) and keep the ticket open until the flake recurs with that evidence, or close it as not reproducible?'
+- date: 2026-11-14T04:16:21.104677+00:00
+  author: mallox
+  text: 2 (answered in INBOX-50)
+- date: 2026-11-14T04:17:23.523861+00:00
+  author: triage
+  text: 'Triage (INBOX-89): mallox''s "2" (2026-11-14, INBOX-50 comment, forwarded above) answers your question with option 2: close as not reproducible. No failure dump, no code change; a repeat failure files a new ticket.'
+- date: 2026-11-14T04:17:46.774843+00:00
+  author: claude
+  text: 'Closed as not reproducible, as mallox decided in INBOX-50 (option 2, 2026-11-14): no code change, no commit; a repeat failure gets a new ticket.'
+- date: 2026-11-14T04:18:11.158240+00:00
+  author: claude
+  text: 'Triage INBOX-89 repeats mallox''s INBOX-50 answer (option 2), which this job already carries out: closed as not reproducible, no failure dump, no code change, no commit.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4250e962-63f4-4869-b0f2-953cfb334415
 description: 'Found in DEV-481 (first seen in DEV-467 verification, 2026-11-13): ui.soft-delete.smoke.spec.ts:176 timed out (15s poll budget) waiting for the deleted task row after switching Task visibility to Deleted tasks, during a full smoke run under concurrent agent load. Not reproduced: 5 sequential runs plus 6 parallel runs under full CPU load (yes on every core) all passed. Ruled out by reading the code: a repeat task_deleted SSE event (useTaskStore markDeleted is idempotent) and the Escape/taskPanel route change (the route watcher ignores taskPanel). Check: npm run test:smoke:agent under concurrent agent activity; on failure keep the Playwright trace/screenshot and the browser console. Done when the cause is found and fixed, without masking it with a longer timeout.'
@@ -71,3 +83,45 @@ history:
   - field: relationships
     old: '{"related":["DEV-467","DEV-481"]}'
     new: '{"related":["DEV-467","DEV-481","DEV-488"]}'
+- at: 2026-11-14T04:16:21.104677+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-14T04:16:21.683562+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-14T04:17:02.790147+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T04:17:23.523861+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-14T04:17:27.206050+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-467","DEV-481","DEV-488"]}'
+    new: '{"related":["DEV-467","DEV-481","DEV-488","DEV-513"]}'
+- at: 2026-11-14T04:17:46.774843+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T04:18:11.158240+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T04:18:20.136363+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: WontDo
+  - field: assignee
+    old: '@fix'

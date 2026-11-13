@@ -5,8 +5,10 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-13T10:33:22.263037+00:00
-modified: 2026-11-13T22:41:10.735123+00:00
+modified: 2026-11-14T04:17:31.755450+00:00
 relationships:
+  blocks:
+  - DEV-513
   related:
   - DEV-472
   - DEV-473
@@ -16,6 +18,7 @@ relationships:
   - DEV-490
   - DEV-491
   - DEV-502
+  - DEV-513
 comments:
 - date: 2026-11-13T10:45:55.825737+00:00
   author: claude
@@ -86,6 +89,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A498a8a45-5df8-49c7-9522-d8d6c3a6f5a9
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa299dba-86ab-42ec-a04a-87cfbe2640f7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A089483d8-08d8-4608-aec1-944e859ac6b6
+releases:
+- 6
 description: |-
   Found 2026-11-13 on all six launchd servers (0.14.3): every ticket page stayed on 'Loading task…'. /api/tasks/history and /api/activity/feed never answered; the servers had a pile of git children (git log --follow ..., git ls-files .tasks) that had been waiting for minutes. Cause of the hang: git blocks in open() of ~/.gitconfig (a symlink into Dropbox) while macOS TCC asks whether the upgraded, unsigned lotar binary may read Dropbox files (same thing as 2026-11-05 with 0.12.0). That is the Mac's problem; lotar's problem is that one hanging git call blocks the whole panel: loadTask (view/composables/task-panel/useTaskPanelPersistence.ts) awaits loadCommitHistory before it sets ready, and the server runs git with no timeout, so requests and git processes pile up.
 
@@ -430,3 +435,20 @@ history:
   - field: relationships
     old: '{"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491"]}'
     new: '{"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502"]}'
+- at: 2026-11-14T04:17:27.200608+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502"]}'
+    new: '{"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513"]}'
+- at: 2026-11-14T04:17:29.605135+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513"]}'
+    new: '{"blocks":["DEV-513"],"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513"]}'
+- at: 2026-11-14T04:17:31.755450+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

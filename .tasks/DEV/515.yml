@@ -1,0 +1,64 @@
+title: Release v0.15.1
+status: WontDo
+priority: Medium
+type: Chore
+reporter: claude
+assignee: claude
+created: 2026-11-14T04:23:19.751739+00:00
+modified: 2026-11-14T04:23:36.465946+00:00
+relationships:
+  related:
+  - DEV-417
+  duplicate_of: DEV-513
+comments:
+- date: 2026-11-14T04:23:35.404419+00:00
+  author: claude
+  text: Duplicate of DEV-513, which another session opened a few minutes earlier for the same release; created by mistake while closing v0.15.0 (DEV-417).
+description: |-
+  Next lotar release after v0.15.0. The owner picks the bump; rename this ticket if it differs (the title must start with `Release v`), and the release record with `lotar release update 0.15.1 --version <v>`.
+
+  Steps: `.github/skills/release/SKILL.md` and `docs/release-guide.md`. Tickets that wait for this release are Blocked and depend on it; closing this ticket hands them to @fix to run their checks. The release record `0.15.1` lists the tickets that ship in it (`lotar list 'release:0.15.1'`).
+
+  ## Waiting for this release
+
+  None yet.
+history:
+- at: 2026-11-14T04:23:20.180340+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'
+- at: 2026-11-14T04:23:34.262281+00:00
+  actor: claude
+  changes:
+  - field: releases
+    old: '#6'
+- at: 2026-11-14T04:23:34.731870+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"duplicate_of":"DEV-513"}'
+- at: 2026-11-14T04:23:35.404419+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T04:23:35.865780+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"duplicate_of":"DEV-513"}'
+    new: '{"related":["DEV-417"],"duplicate_of":"DEV-513"}'
+- at: 2026-11-14T04:23:36.299407+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+- at: 2026-11-14T04:23:36.465946+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: WontDo
+  - field: assignee
+    new: claude

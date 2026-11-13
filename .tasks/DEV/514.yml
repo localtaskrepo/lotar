@@ -1,0 +1,32 @@
+title: A rule's run command skipped in an untrusted repo leaves no trace on the ticket, while the rule's set still applies
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-14T04:21:14.746777+00:00
+modified: 2026-11-14T04:37:42.773294+00:00
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af7f15d28-6992-41b4-bd09-eed8961e0852
+description: 'Found 2026-11-14 (standards STD-110): standards'' .tasks changed after the last lotar trust, so the server skipped the inbox relay command for five owner answers but applied the rule''s set status Done; the only trace is one ''[lotar][warn] Skipped automation run commands'' line in the server''s stderr (printed once per process), nothing on the tickets, no automation_failed SSE event. Check: in a scratch repo with a rule that has run and set, change automation.yml after lotar trust, fire the rule: the ticket shows nothing. Done: a skipped run is reported like a failed one (Automation rule ''<name>'' skipped on <ID>, an automation_failed or automation_skipped SSE event, visible in the web UI), and docs/help/automation.md says whether the rule''s other actions apply when its run is skipped (an option to skip them would fit).'
+tags:
+- health
+custom_fields:
+  finding: automation:untrusted-run-silent
+history:
+- at: 2026-11-14T04:21:14.936283+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-14T04:37:41.863162+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-14T04:37:42.773294+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af7f15d28-6992-41b4-bd09-eed8961e0852

@@ -5,8 +5,10 @@ type: Bug
 reporter: claude
 assignee: claude
 created: 2026-11-13T10:33:47.286204+00:00
-modified: 2026-11-13T20:12:31.038872+00:00
+modified: 2026-11-14T04:17:31.801079+00:00
 relationships:
+  blocks:
+  - DEV-513
   related:
   - DEV-401
   - DEV-456
@@ -26,6 +28,7 @@ relationships:
   - DEV-479
   - DEV-481
   - DEV-483
+  - DEV-513
 comments:
 - date: 2026-11-13T10:37:16.946574+00:00
   author: claude
@@ -130,6 +133,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2c03ade0-0206-4164-b472-2ca467bc83a2
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8aeb63c7-93c0-49d1-9778-f136836471e6
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A19b85aa7-bc70-4cfa-9b1f-2c60f757c3f8
+releases:
+- 6
 description: |-
   On 2026-11-13 about 265 t3 jobs started at once (a manual `repos.ts --report` without `--fix`, STD-86). The T3 Code server stopped answering, and jobs whose threads went on to finish were marked failed ("Could not reach the T3 Code server at http://127.0.0.1:3773", runner exit 1). Afterwards 15 tickets are left InProgress or Reviewing with an agent assignee and no job running (`lotar agent list-running`: none, queue empty, 10:40Z):
 
@@ -552,3 +557,20 @@ history:
   - field: relationships
     old: '{"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481"]}'
     new: '{"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483"]}'
+- at: 2026-11-14T04:17:27.202535+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483"]}'
+    new: '{"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513"]}'
+- at: 2026-11-14T04:17:29.921584+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513"]}'
+    new: '{"blocks":["DEV-513"],"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513"]}'
+- at: 2026-11-14T04:17:31.801079+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

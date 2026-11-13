@@ -5,10 +5,13 @@ type: Bug
 reporter: claude
 assignee: claude
 created: 2026-11-13T19:02:46.329827+00:00
-modified: 2026-11-13T19:37:29.968373+00:00
+modified: 2026-11-14T04:17:31.893269+00:00
 relationships:
+  blocks:
+  - DEV-513
   related:
   - DEV-481
+  - DEV-513
 comments:
 - date: 2026-11-13T19:12:17.547351+00:00
   author: claude
@@ -26,6 +29,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6f77277c-e969-4904-93a8-17a4456d01b8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A22e7b280-3492-484a-8da6-fe203bfcbda7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8744f08c-fc67-4800-b043-9bd6a29a4f97
+releases:
+- 6
 description: |-
   `lotar automation simulate` stops at the first rule that matches, while a real event applies every matching rule ("When several rules set the same field, the last rule in file order wins", docs/help/automation.md). So a rule further down can't be checked at all when an earlier rule matches the same event.
 
@@ -140,3 +145,20 @@ history:
   - field: tags
     old: review-returned
     new: 'review-returned, blocked, blocked-by:dependency graph unavailable: Validation error: Validation error: Relationship snapshot unavailable: lock /Users/mallox/Development/@localtaskrepo/lotar/.tasks/@sprints/.sprints.lock is busy or unsupported: Resource temporarily unavailable (os error 35); still busy after the 500 ms snapshot wait budget; retry after the writer finishes'
+- at: 2026-11-14T04:17:27.205283+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-481"]}'
+    new: '{"related":["DEV-481","DEV-513"]}'
+- at: 2026-11-14T04:17:30.557839+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-481","DEV-513"]}'
+    new: '{"blocks":["DEV-513"],"related":["DEV-481","DEV-513"]}'
+- at: 2026-11-14T04:17:31.893269+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

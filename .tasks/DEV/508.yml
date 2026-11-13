@@ -1,10 +1,11 @@
 title: 'crates.io: switch lotar''s crates to trusted publishing only after the first release'
-status: Blocked
+status: HelpNeeded
 priority: Medium
 type: Chore
 reporter: claude
+assignee: mallox
 created: 2026-11-14T01:39:35.096482+00:00
-modified: 2026-11-14T01:40:12.994590+00:00
+modified: 2026-11-14T04:22:15.878302+00:00
 relationships:
   depends_on:
   - DEV-417
@@ -15,6 +16,9 @@ comments:
 - date: 2026-11-14T01:40:06.621676+00:00
   author: triage
   text: 'Not due yet: the crates don''t exist on crates.io (lotar, lotar-lib, lotar-web-assets all return 404; latest tag is v0.14.3), so the ''Before you start'' check fails. The first release that publishes them is v0.15.0 (DEV-417), which waits for DEV-497 and DEV-507. DEV-508 now depends on DEV-417 and stays blocked without an assignee until the release has shipped and the three crates exist; it needs the owner only then, for the crates.io steps.'
+- date: 2026-11-14T04:22:15.878302+00:00
+  author: claude
+  text: 'Question for mallox: v0.15.0 is out and its "Publish crates" job succeeded (Release run 43555152318), so lotar, lotar-lib and lotar-web-assets are on crates.io. Will you do the five steps in the description (trusted publisher for each crate, trusted publishing only, revoke the token, delete both CARGO_REGISTRY_TOKEN secrets) and then assign this to @fix for the workflow and guide cleanup?'
 references:
 - file: .github/workflows/release.yml
 description: |-
@@ -34,8 +38,6 @@ description: |-
   - [ ] Hand back to an agent (assign @fix) to remove the token fallback from `publish-crates` in `.github/workflows/release.yml` and the first-release step from docs/release-guide.md.
 tags:
 - owner
-- blocked
-- blocked-by:DEV-417
 history:
 - at: 2026-11-14T01:39:35.316403+00:00
   actor: claude
@@ -93,3 +95,27 @@ history:
   changes:
   - field: assignee
     old: claude
+- at: 2026-11-14T04:22:14.238223+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: owner, blocked, blocked-by:DEV-417
+    new: owner
+- at: 2026-11-14T04:22:15.327722+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: HelpNeeded
+  - field: assignee
+    new: claude
+- at: 2026-11-14T04:22:15.410131+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: claude
+    new: mallox
+- at: 2026-11-14T04:22:15.878302+00:00
+  actor: claude
+  changes:
+  - field: comment_added

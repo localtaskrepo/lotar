@@ -5,13 +5,18 @@ type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-13T22:35:03.230572+00:00
-modified: 2026-11-13T22:45:44.254498+00:00
+modified: 2026-11-14T04:17:31.711593+00:00
 relationships:
   depends_on:
   - DEV-503
+  blocks:
+  - DEV-513
   related:
   - DEV-492
   - DEV-505
+  - DEV-513
+releases:
+- 6
 description: 'The owner, 2026-11-13, on DEV-492: the agent code "is already a little older, and may have been written by less capable models"; he chose a review "After the switch". Wait for the change that links the harnessmux crate and removes lotar''s own runners and the t3 runner (docs/developers/harness-tool-design.md). Then review what stays in src/services/agent_job_service.rs (about 3200 non-test lines): queue, worktrees, landing, prompts, instructions, rules, reviewer and merge flow. Done when: findings fixed or filed as tickets, tests and smoke pass.'
 history:
 - at: 2026-11-13T22:35:03.413810+00:00
@@ -55,3 +60,20 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-503"],"related":["DEV-492"]}'
     new: '{"depends_on":["DEV-503"],"related":["DEV-492","DEV-505"]}'
+- at: 2026-11-14T04:17:27.208769+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"related":["DEV-492","DEV-505"]}'
+    new: '{"depends_on":["DEV-503"],"related":["DEV-492","DEV-505","DEV-513"]}'
+- at: 2026-11-14T04:17:29.289686+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"related":["DEV-492","DEV-505","DEV-513"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-492","DEV-505","DEV-513"]}'
+- at: 2026-11-14T04:17:31.711593+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

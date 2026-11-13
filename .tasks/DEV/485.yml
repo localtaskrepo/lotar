@@ -1,15 +1,16 @@
 title: Offer custom fields the tasks use, not only declared ones (config, scanned or both)
-status: HelpNeeded
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-13T20:47:42.334400+00:00
-modified: 2026-11-13T21:13:43.100390+00:00
+modified: 2026-11-14T04:45:07.087112+00:00
 relationships:
   related:
   - standards:STD-94
   - DEV-488
+  - DEV-513
 comments:
 - date: 2026-11-13T20:49:01.902306+00:00
   author: claude
@@ -41,10 +42,30 @@ comments:
 - date: 2026-11-13T20:49:01.923273+00:00
   author: claude
   text: 'Question for mallox: which option should I build: A (setting config|scanned|both, default both), B (always declared + used, no setting; recommended), C (scan only wildcard projects), or none?'
+- date: 2026-11-14T04:16:20.313143+00:00
+  author: mallox
+  text: A (answered in INBOX-52)
+- date: 2026-11-14T04:17:15.187067+00:00
+  author: claude
+  text: 'Decision 2026-11-14 (mallox, via INBOX-52): "A" — setting ui.custom_fields_from = config | scanned | both, default both. Implementing.'
+- date: 2026-11-14T04:37:32.681673+00:00
+  author: claude
+  text: |-
+    Built option A, commit 8e01b87f on agent/DEV-485 (signed).
+    - New setting ui.custom_fields_from: config | scanned | both (default both), global or per project; config set validates it, inherit/blank clears a project override; shown in config show/inspect with its source.
+    - config show adds custom_fields_offered: declared names first, then names the scope's tasks use (most used first; empty values don't count). Names differing only in case merge (declared spelling, else most used); separators don't merge. With 'config' no tasks are read.
+    - UI: Board Fields/Group by, Tasks list columns and filters, Calendar, Dependencies, Insights and Sprints use that list. Bulk edit offers only names the server accepts (offered list under the wildcard, else the declared ones). Card/column values match field names regardless of case. Config > Tags & fields: 'Fields offered in pickers' select (checked in light/dark, desktop and phone width).
+    - MCP/REST hints unchanged (declared names only). Docs: config-reference, config, serve, openapi.
+    - Tests: new tests/dev485_offered_custom_fields_test.rs (4), view useConfig.offeredCustomFields.spec.ts (3), smoke ui.offered-custom-fields (board offers used fields, case-merged lanes, Config page save to 'config' hides them).
+    - Checks: npm run lint (lint:agent) clean; npm test: 2141 Rust + 1518 UI + release/hooks passed; npm run smoke: 391/391 passed.
+- date: 2026-11-14T04:45:02.212994+00:00
+  author: codex
+  text: 'Review: blocking. Missing mandatory UI before/after screenshot attachments and links for changed pages, in light/dark at 1920/1440/390 px (view/components/ConfigTaxonomySection.vue:78 adds the new control). Attach required evidence before resubmitting. Focused useConfig.offeredCustomFields UI tests passed (3/3). Independent browser review and full gates remain unverified; review incomplete. No files, commits, status or assignee changed.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A770db508-1817-4fb4-8ba4-b9b071d46e2e
 - file: view/pages/Board.vue
 - file: view/composables/useColumns.ts
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2fab9511-6dc1-4565-aa06-8b5776355943
 description: |-
   Evaluate whether the web UI should also offer custom fields that tasks actually use, not only the ones a project lists in `custom_fields`, with a config option to choose the behaviour. The owner asked for this evaluation on 2026-11-13.
 
@@ -66,6 +87,7 @@ description: |-
   - [ ] The ticket waits for the owner (HelpNeeded, assigned to mallox) with one question: which option, if any. No implementation before his answer.
 tags:
 - web-ui
+- review-returned
 history:
 - at: 2026-11-13T20:47:42.448590+00:00
   actor: claude
@@ -122,3 +144,66 @@ history:
   - field: relationships
     old: '{"related":["standards:STD-94"]}'
     new: '{"related":["standards:STD-94","DEV-488"]}'
+- at: 2026-11-14T04:16:20.313143+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-14T04:16:20.974635+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-14T04:16:48.690644+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T04:17:15.187067+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T04:17:27.206603+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["standards:STD-94","DEV-488"]}'
+    new: '{"related":["standards:STD-94","DEV-488","DEV-513"]}'
+- at: 2026-11-14T04:37:32.681673+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T04:37:41.298105+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T04:44:08.526820+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2fab9511-6dc1-4565-aa06-8b5776355943
+- at: 2026-11-14T04:45:02.212994+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T04:45:02.273642+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: web-ui
+    new: web-ui, review-blocked
+- at: 2026-11-14T04:45:07.087112+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: web-ui, review-blocked
+    new: web-ui, review-returned

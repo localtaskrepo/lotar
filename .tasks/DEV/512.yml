@@ -4,12 +4,17 @@ priority: Low
 type: Feature
 reporter: claude
 created: 2026-11-14T02:19:59.564652+00:00
-modified: 2026-11-14T02:20:01.281631+00:00
+modified: 2026-11-14T04:17:31.667702+00:00
 relationships:
   depends_on:
   - DEV-503
+  blocks:
+  - DEV-513
   related:
   - DEV-503
+  - DEV-513
+releases:
+- 6
 description: 'Lost in DEV-503 (owner asked to file it, 2026-11-14). 1) A profile of an agent runner can no longer set command/args (refused with a hint to harnessmux''s agents.toml). A per-profile override needs a small harnessmux API to add or replace one agent-table entry (AgentTable has no insert), then lotar maps the profile''s command and args onto it. 2) Usage lost detail: Copilot''s premium requests and lines added/removed, Claude''s count of model round trips (turns now counts lotar''s turns). Needs more usage fields in harnessmux''s events where the agents report them. Low value; do when touching harnessmux anyway.'
 history:
 - at: 2026-11-14T02:19:59.997815+00:00
@@ -24,3 +29,20 @@ history:
   - field: relationships
     old: '{"related":["DEV-503"]}'
     new: '{"depends_on":["DEV-503"],"related":["DEV-503"]}'
+- at: 2026-11-14T04:17:27.210668+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"related":["DEV-503"]}'
+    new: '{"depends_on":["DEV-503"],"related":["DEV-503","DEV-513"]}'
+- at: 2026-11-14T04:17:28.926431+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"related":["DEV-503","DEV-513"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513"]}'
+- at: 2026-11-14T04:17:31.667702+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

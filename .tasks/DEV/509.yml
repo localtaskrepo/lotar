@@ -5,12 +5,15 @@ type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-14T02:15:26.078753+00:00
-modified: 2026-11-14T02:20:05.123035+00:00
+modified: 2026-11-14T04:17:31.579201+00:00
 relationships:
   depends_on:
   - DEV-503
+  blocks:
+  - DEV-513
   related:
   - DEV-503
+  - DEV-513
 comments:
 - date: 2026-11-14T02:16:43.837266+00:00
   author: automation
@@ -27,6 +30,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A04489e72-8f3b-4408-aa34-7819ce8de78b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa6d60779-49e6-493f-bc37-9f889203e4ec
+releases:
+- 6
 description: 'Lost in DEV-503 (owner asked to file it, 2026-11-14). Before DEV-503, permissions: workspace gave Claude --permission-mode acceptEdits plus its OS sandbox (sandbox.enabled, autoAllowBashIfSandboxed), so shell writes outside the working and extra directories were blocked; Copilot and OpenCode/Kilo at workspace denied git push. Since DEV-503 workspace is the agent''s mode only (Claude acceptEdits) and harnessmux''s default policy allow approves every permission request, so shell commands run unsandboxed. Codex keeps its workspace-write sandbox. The profile keys tools.allowed/tools.disallowed and mcp.allow are no longer passed either (the job log says so). Work, mostly in harnessmux: pass Claude''s sandbox settings with the session, and give the permission policy rules (deny patterns such as git push, allow writes only under cwd and add_dirs, tool allow/deny lists) that lotar fills from permissions, tools and mcp.allow. Done when a workspace Claude job can''t write outside its directories or push, and tools/mcp.allow work again for ACP agents.'
 tags:
 - fix-retried
@@ -121,3 +126,20 @@ history:
   - field: status
     old: HelpNeeded
     new: Blocked
+- at: 2026-11-14T04:17:27.209940+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"related":["DEV-503"]}'
+    new: '{"depends_on":["DEV-503"],"related":["DEV-503","DEV-513"]}'
+- at: 2026-11-14T04:17:28.259693+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"related":["DEV-503","DEV-513"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513"]}'
+- at: 2026-11-14T04:17:31.579201+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

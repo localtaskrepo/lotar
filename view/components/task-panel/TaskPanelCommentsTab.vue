@@ -35,6 +35,7 @@
           :key="`${comment.date}-${commentIndex}`"
           class="task-panel__comment"
           :class="{
+            'task-panel__comment--automation': comment.author === 'automation' && !comment.question,
             'task-panel__comment--question': comment.question,
             [`task-panel__comment--review-${comment.review?.verdict}`]: comment.review,
           }"
@@ -331,6 +332,14 @@ function onEditingTextareaRef(ref: Element | ComponentPublicInstance | null) {
   padding: var(--space-2, 0.5rem);
   border-radius: var(--radius-md, 0.375rem);
   background: color-mix(in oklab, var(--color-surface, var(--bg)) 94%, transparent);
+}
+
+/* Automation's notes (job failed, retry started) step back so the agents' and the owner's comments stand out. */
+.task-panel__comment--automation {
+  padding-block: var(--space-1, 0.25rem);
+  background: transparent;
+  color: var(--color-muted, var(--muted));
+  font-size: var(--text-xs, 0.75rem);
 }
 
 .task-panel__comment-header {

@@ -1,0 +1,148 @@
+title: Release v0.15.1
+status: Todo
+priority: Medium
+type: Chore
+reporter: claude
+assignee: mallox
+created: 2026-11-14T04:17:27.050501+00:00
+modified: 2026-11-14T04:19:07.317172+00:00
+relationships:
+  depends_on:
+  - DEV-503
+  - DEV-510
+  - DEV-509
+  - DEV-511
+  - DEV-512
+  - DEV-501
+  - DEV-466
+  - DEV-467
+  - DEV-468
+  - DEV-477
+  - DEV-491
+  related:
+  - DEV-466
+  - DEV-467
+  - DEV-468
+  - DEV-477
+  - DEV-483
+  - DEV-485
+  - DEV-491
+  - DEV-493
+  - DEV-501
+  - DEV-503
+  - DEV-509
+  - DEV-510
+  - DEV-511
+  - DEV-512
+  - DEV-417
+comments:
+- date: 2026-11-14T04:19:07.317172+00:00
+  author: claude
+  text: 'mallox 2026-11-14: "let''s wait until 15.1 before we update so that we migrate to full functionality". This machine stays on lotar 0.14.3 until v0.15.1 is out; v0.15.0 is not installed here.'
+releases:
+- 6
+description: |-
+  Next lotar release, a **patch** bump to v0.15.1, so lotar runs its agent jobs on harnessmux. The owner, 2026-11-14: "we need to take everything in there and create a new patch version so that we can use the harnesmux properly"; scope chosen the same day: "Everything harnessmux".
+
+  Steps: `.github/skills/release/SKILL.md` and `docs/release-guide.md`. Tickets that wait for this release are Blocked and depend on it; closing this ticket hands them to @fix to run their checks.
+
+  ## Scope
+
+  - harnessmux: DEV-503 (switch lotar's jobs to the harnessmux crate), DEV-510 (gaps of the t3 agent), DEV-509 (Claude's sandbox and rule-based permission answers), DEV-511 (budget limit, agent options, live replies), DEV-512 (agent command per profile, fuller usage), DEV-501 (review of the job code that stays). DEV-509 to 512 and DEV-501 start after DEV-503 lands.
+  - Fixes with commits that were stuck on 2026-11-14: DEV-466 (git timeouts), DEV-467 (job outcomes during a T3 outage), DEV-468 (rework commits on the ticket branch), DEV-477 (automation simulate shows all rules), DEV-491 (automation comments muted).
+
+  ## Not in it
+
+  DEV-485 (custom fields, the owner chose A on 2026-11-14) goes into the release after. DEV-483 closes as not reproducible (the owner's answer "2"). DEV-493 shipped in v0.15.0.
+
+  ## Upgrade
+
+  Upgrade lotar to this release only while no agent job runs: a job started by the old runner is not picked up by the new one (DEV-510).
+history:
+- at: 2026-11-14T04:17:27.210863+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512"]}'
+- at: 2026-11-14T04:17:27.600631+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512"]}'
+    new: '{"depends_on":["DEV-503"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512"]}'
+- at: 2026-11-14T04:17:27.918942+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512"]}'
+    new: '{"depends_on":["DEV-503","DEV-510"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512"]}'
+- at: 2026-11-14T04:17:28.260284+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503","DEV-510"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512"]}'
+    new: '{"depends_on":["DEV-503","DEV-510","DEV-509"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512"]}'
+- at: 2026-11-14T04:17:28.592373+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503","DEV-510","DEV-509"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512"]}'
+    new: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512"]}'
+- at: 2026-11-14T04:17:28.926872+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512"]}'
+    new: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512"]}'
+- at: 2026-11-14T04:17:29.290032+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512"]}'
+    new: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512"]}'
+- at: 2026-11-14T04:17:29.606009+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512"]}'
+    new: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512"]}'
+- at: 2026-11-14T04:17:29.922654+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512"]}'
+    new: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512"]}'
+- at: 2026-11-14T04:17:30.237683+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512"]}'
+    new: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512"]}'
+- at: 2026-11-14T04:17:30.558344+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512"]}'
+    new: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468","DEV-477"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512"]}'
+- at: 2026-11-14T04:17:30.870459+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468","DEV-477"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512"]}'
+    new: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468","DEV-477","DEV-491"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512"]}'
+- at: 2026-11-14T04:17:31.175334+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468","DEV-477","DEV-491"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512"]}'
+    new: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468","DEV-477","DEV-491"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512","DEV-417"]}'
+- at: 2026-11-14T04:17:31.443156+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'
+- at: 2026-11-14T04:19:07.317172+00:00
+  actor: claude
+  changes:
+  - field: comment_added

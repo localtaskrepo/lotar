@@ -1,12 +1,14 @@
 title: Automation's comments render muted in the Comments tab
-status: HelpNeeded
+status: Merging
 priority: Low
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@merge'
 created: 2026-11-13T21:14:14.411039+00:00
-modified: 2026-11-13T23:17:19.484735+00:00
+modified: 2026-11-14T04:46:42.028646+00:00
 relationships:
+  blocks:
+  - DEV-513
   related:
   - DEV-466
   - DEV-488
@@ -14,6 +16,7 @@ relationships:
   - DEV-502
   - DEV-489
   - DEV-490
+  - DEV-513
 comments:
 - date: 2026-11-13T21:26:16.645800+00:00
   author: claude
@@ -49,6 +52,27 @@ comments:
 - date: 2026-11-13T23:17:19.484735+00:00
   author: claude
   text: 'Merge order (agreed 2026-11-13, coordinated by the DEV-502 agent): 1) DEV-502 merges first; it waits on nobody (review, then merge). 2) DEV-488 waits for DEV-502 only for its filter part: keep working on the rest, then rebase onto main and add the Type chips and the open-questions toggle. 3) DEV-489 and DEV-490 wait for DEV-488 (existing depends-on), then rebase and add Review / Hand-off to the Type row. 4) DEV-491 waits on nobody; whichever of it and DEV-502 merges second resolves the textual conflict on the comment <li>.'
+- date: 2026-11-14T04:16:19.482694+00:00
+  author: mallox
+  text: Yes, the screenshots look good (answered in INBOX-56)
+- date: 2026-11-14T04:16:44.545735+00:00
+  author: codex
+  text: 'Owner decision: mallox said, "Yes, the screenshots look good (answered in INBOX-56)" in the 2026-11-14T04:16:19Z comment. This answers the visual-approval blocker; no code change requested or needed. Existing implementation remains commit 6c090386; worktree is clean, so no new commit. No checks rerun for this decision-only turn. Prior evidence: implementer recorded full lint/test/smoke passing and fresh targeted smoke 2/2; reviewer independently passed unit tests 2/2 and frontend/smoke typechecking, with its smoke/browser environment limitations recorded above. Status is already InProgress and assignee @fix following the owner answer; leaving both unchanged for the job to advance to review/merge. Merge must preserve the newer Comments-tab filters and question full-weight behavior as described in the coordination comments.'
+- date: 2026-11-14T04:19:54.739398+00:00
+  author: codex
+  text: 'Merge blocked: rebase conflicts in view/components/task-panel/TaskPanelCommentsTab.vue at the comment class binding. Main adds question and review classes; 6c090386 adds unconditional automation muting. The prior review finding remains: automation questions must retain full weight now that DEV-488 is on main. Rebase aborted; original commit and clean worktree preserved. Please route back for the question exception and regression coverage before merging. No merge or push; required gates not run this turn. Earlier focused unit tests passed 2/2.'
+- date: 2026-11-14T04:20:04.122083+00:00
+  author: automation
+  text: The merge agent's job job-20261114T041909.794Z-9 failed (lotar agent logs job-20261114T041909.794Z-9); the fix agent retries it on branch t3/mute-automation-comments-1.
+- date: 2026-11-14T04:20:31.944869+00:00
+  author: triage
+  text: 'Triage: nothing here waits for the owner. (1) Visual approval: mallox answered ''Yes, the screenshots look good'' on INBOX-56 (2026-11-14 01:24), already on this ticket at 04:16. (2) The merge block at 04:19 (rebase conflict on the comment class binding in TaskPanelCommentsTab.vue, automation questions must keep full weight now that DEV-488 is on main) is a technical rework, not an owner decision. The owner''s choice of 2026-11-13 already says it: automation comments are muted, an automation question stays full weight (see Plan). The fix agent''s retry on branch t3/mute-automation-comments-1 should rebase onto main, keep the question and review classes, mute only automation comments that are not questions, add a regression test for that, then go to review and merge. Status is HelpNeeded with assignee mallox although nothing is asked of him: the automation comment at 04:20 says the fix agent retries; if that retry does not run, set the assignee to @fix.'
+- date: 2026-11-14T04:26:22.024454+00:00
+  author: codex
+  text: 'Technical rework completed following triage and the existing owner decision. Rebased onto main, preserving comment filters and question/review classes. Automation muting now excludes question comments. Added an automation-question regression case: failed before the predicate fix, passed afterward (focused tests 3/3). Signed commit a88c2a8e, DEV-491 Automation''s comments render muted in the Comments tab. Required gates passed: lint:agent, test:agent (2186 Rust tests plus UI/release/hooks), test:smoke:agent (398/398). Initial sandbox runs failed on sccache and port-binding permissions; successful test retry used RUSTC_WRAPPER= outside sandbox; lint used RUSTC_WRAPPER=; smoke passed outside sandbox. Owner screenshot approval from INBOX-56 remains acknowledged; no new screenshots taken this turn. Worktree clean; no merge or push. No durable guidance finding. Leaving status and assignee to job automation for the next review step.'
+- date: 2026-11-14T04:46:42.028646+00:00
+  author: codex
+  text: Merged a88c2a8e into main by fast-forward. Rebase was already up to date; HEAD unchanged. Skipped full lint, test:agent and smoke because rework recorded all passing on this exact commit (2186 Rust, 1532 UI, 398 smoke). Review also reran focused UI tests 3/3 and frontend/smoke typechecking successfully; its quick smoke lacked local binary, not a behavior failure. Owner screenshot approval acknowledged. No code changes during merge.
 references:
 - file: view/components/task-panel/TaskPanelCommentsTab.vue
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae010a927-d153-4e58-a0fa-41c391832f1e
@@ -67,6 +91,10 @@ references:
 - attachment: after-dark-1440.20931c1c1dbdbaa70ff9de266f776e9b.png
 - attachment: after-dark-390.7c6fd4316b21212716e99d9ff45a02f4.png
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9559ba6f-c815-48a4-8bfa-0d77fa0f6e79
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A995930c8-0f64-4c13-8e22-5a88faf5046a
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5e8b68e0-8572-42d3-bb5d-17e940bbfdf1
+releases:
+- 6
 description: |-
   Comments by the author `automation` (job failed, retry started, thread waits for an answer) sit between the agents' and the owner's comments at the same weight, so the conversation is hard to follow on a ticket like DEV-466 or STD-82. Owner chose to show them de-emphasized on 2026-11-13.
 
@@ -83,6 +111,7 @@ tags:
 - web-ui
 - light
 - review-returned
+- merge-retried
 history:
 - at: 2026-11-13T21:14:15.153197+00:00
   actor: claude
@@ -303,5 +332,135 @@ history:
     new: '{"related":["DEV-466","DEV-488","DEV-481","DEV-502","DEV-489","DEV-490"]}'
 - at: 2026-11-13T23:17:19.484735+00:00
   actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T04:16:19.482694+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-14T04:16:20.179388+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-14T04:16:20.916843+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T04:16:44.545735+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T04:16:48.196085+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T04:17:27.207475+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-466","DEV-488","DEV-481","DEV-502","DEV-489","DEV-490"]}'
+    new: '{"related":["DEV-466","DEV-488","DEV-481","DEV-502","DEV-489","DEV-490","DEV-513"]}'
+- at: 2026-11-14T04:17:30.869763+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-466","DEV-488","DEV-481","DEV-502","DEV-489","DEV-490","DEV-513"]}'
+    new: '{"blocks":["DEV-513"],"related":["DEV-466","DEV-488","DEV-481","DEV-502","DEV-489","DEV-490","DEV-513"]}'
+- at: 2026-11-14T04:17:31.939512+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'
+- at: 2026-11-14T04:17:48.725490+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A995930c8-0f64-4c13-8e22-5a88faf5046a
+- at: 2026-11-14T04:18:35.864361+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-14T04:19:54.739398+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T04:20:04.090789+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: web-ui, light, review-returned
+    new: web-ui, light, review-returned, merge-retried
+- at: 2026-11-14T04:20:04.122083+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-14T04:20:04.240189+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-14T04:20:31.944869+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-14T04:20:32.392646+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-14T04:20:32.884690+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T04:26:22.024454+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T04:26:27.859974+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T04:43:04.694276+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5e8b68e0-8572-42d3-bb5d-17e940bbfdf1
+- at: 2026-11-14T04:44:05.357689+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-14T04:46:42.028646+00:00
+  actor: codex
   changes:
   - field: comment_added

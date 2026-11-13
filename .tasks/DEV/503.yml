@@ -1,11 +1,11 @@
 title: Switch lotar's agent jobs to the harnessmux crate and remove its own runners
-status: HelpNeeded
+status: Merging
 priority: High
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@merge'
 created: 2026-11-13T22:44:58.128976+00:00
-modified: 2026-11-14T03:49:28.848137+00:00
+modified: 2026-11-14T04:46:11.451353+00:00
 relationships:
   depends_on:
   - DEV-504
@@ -15,6 +15,7 @@ relationships:
   - DEV-510
   - DEV-511
   - DEV-512
+  - DEV-513
   related:
   - DEV-492
   - DEV-504
@@ -27,6 +28,7 @@ relationships:
   - DEV-510
   - DEV-511
   - DEV-512
+  - DEV-513
 comments:
 - date: 2026-11-13T23:03:55.195485+00:00
   author: claude
@@ -93,6 +95,30 @@ comments:
 - date: 2026-11-14T03:49:28.736770+00:00
   author: automation
   text: The merge agent's job job-20261114T034852.565Z-5 failed (lotar agent logs job-20261114T034852.565Z-5); the fix agent retries it on branch t3/switch-agent-jobs-to-harnessmux-3.
+- date: 2026-11-14T04:12:50.038668+00:00
+  author: claude
+  text: 'mallox 2026-11-14: "t3 threads do not create work trees anymore." The t3 section of docs/help/agent.md on this branch (line 153: "With agent.worktree.enabled, T3 Code makes the worktree…") and on main (line 208 and the lines on freeing and re-checking out a branch in a thread''s worktree) still say they do; correct them in this change so the docs describe the current state.'
+- date: 2026-11-14T04:16:17.927581+00:00
+  author: mallox
+  text: 1 (answered in INBOX-84)
+- date: 2026-11-14T04:17:42.610587+00:00
+  author: codex
+  text: 'Applied mallox answer 1 in INBOX-84: verified clean checkout and reset stale t3/switch-agent-jobs-to-harnessmux-3 from b141e26a to 4e448311. Also applied requested docs correction: T3 threads no longer create worktrees; cleanup text now refers to existing worktrees recorded by earlier jobs. Signed amended commit 95f34f0f contains the restored rework plus this docs-only correction. Prettier check and git diff --check pass. No runtime code changed from 4e448311; full lint/test/smoke not rerun for documentation-only edits (rework comment records all passing on 4e448311). Required review must now inspect 95f34f0f in this checkout, including repository session identity and context handoff; no merge or push performed. Status and assignee left to job automation.'
+- date: 2026-11-14T04:19:28.174630+00:00
+  author: codex
+  text: 'Review: incomplete, not approval to merge. HEAD 95f34f0f contains rework 4e448311 with only a four-line docs difference. Inspected repository-scoped sessions, continuation validation and context-handoff assertions. AgentJobs unit tests: 31 passed. Diff whitespace passed. Full code review, decision reconciliation, context-handoff test execution, screenshot inspection and independent browser verification remain outstanding. No new blocking finding; no files or commits changed; status and assignee unchanged.'
+- date: 2026-11-14T04:20:50.513245+00:00
+  author: codex
+  text: 'Merge blocked: rebasing 95f34f0f onto main produced conflicts; aborted successfully, preserving the original commit. Main migrated dependencies and tests into the Cargo workspace; this change adds harnessmux in the former root dependency table and deletes runner fixtures/tests. Conflicts: Cargo.toml, .gitleaks.toml, docs/developers/agent-automation-tracker.md, docs/developers/agent-integrations-plan.md, crates/lotar-lib/tests/dev318_t3_runner_test.rs and crates/lotar-lib/tests/fixtures/agent-streams/*. Main also modified the T3 test and integration plan that this change deletes, so preservation of newer intent needs reconciliation. Should a rework agent port this change to the current workspace and reconcile those newer edits before another merge attempt? No merge or push; required lint/test/smoke gates not run because rebase did not complete.'
+- date: 2026-11-14T04:20:55.591292+00:00
+  author: automation
+  text: 'The merge agent''s job job-20261114T042005.115Z-11 failed again: lotar agent logs job-20261114T042005.115Z-11. The fix is on branch t3/switch-agent-jobs-harnessmux-1. Should an agent try again (lotar automation run "Health: retry with @fix" --select ''id:DEV-503'', or for an agent''s ticket lotar assignee DEV-503 @fix), or will you merge it yourself?'
+- date: 2026-11-14T04:21:33.688111+00:00
+  author: triage
+  text: 'yes, a rework agent ports this change to the current workspace and merges after review. The owner already decided the content: 2026-11-13 ''Link the crate'' and ''Remove right away'' (lotar''s runners and the per-CLI fixtures go), t3 stays as a harnessmux agent, and 2026-11-14 ''Rework DEV-503'' (INBOX-80), reset to 4e448311 and review on Codex then rebase and merge (INBOX-84, answer ''1''). The conflicts are mechanical: main moved the tests and fixtures into crates/lotar-lib (DEV-497) and edited dev318_t3_runner_test.rs and .gitleaks.toml by one line to follow that move. Port rule: files this change deletes stay deleted at their new path (crates/lotar-lib/tests/fixtures/agent-streams, dev318_t3_runner_test.rs, agent-integrations-plan.md); take main''s version of anything else; add the harnessmux dependency in the workspace Cargo.toml and the crate that uses it; keep any text main added to agent-automation-tracker.md. If main''s edit to a deleted file carried behaviour that no other file keeps, name it in a comment and keep it in the nearest surviving file. Then run npm run lint, npm test and npm run smoke, review the result at its commit (git rev-parse HEAD must match the commit named in the review request) and merge. Come back to the owner only if main''s newer intent contradicts a decision above, with one question.'
+- date: 2026-11-14T04:42:51.119630+00:00
+  author: codex
+  text: 'Workspace port complete: signed commit 169afb4265758f0798a8edc365eac1705387245c, rebased onto main in the assigned t3/switch-agent-jobs-harnessmux-1 checkout. Applied triage port rules: deleted runner fixtures, dev318 test and integration plan at their moved paths; retained main Cargo workspace structure, added harnessmux/tokio workspace dependencies and library usage, moved the new harness job tests into crates/lotar-lib/tests, preserved main tracker text. Main edits to deleted files introduce no surviving behavior to port: dev318 only gained report: None in a test helper; integration plan changes update paths. Checks passed: npm run lint:agent; npm run test:agent (2141 Rust, 1532 UI, release and hook tests); npm run test:smoke:agent (397 tests, 112 files). Initial sandbox test/smoke attempts could not access sccache; authorized retries passed. HEAD signature valid, working tree clean. Review must verify git rev-parse HEAD equals 169afb4265758f0798a8edc365eac1705387245c, including repository isolation and context-handoff behavior. No merge or push in this rework job; status and assignee unchanged. No durable guidance correction.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad412edd4-9d93-4142-9e2c-0d4f417c92fc
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A81ab3ef1-0cbb-489c-b085-bf72a43fd1bf
@@ -124,6 +150,10 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4c49159f-eaba-45b9-8f5c-48420f227b8d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aec9be987-519a-4c10-a995-0335aed66d14
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A65e16ba1-e3fe-42da-be0a-c2d82d387b9e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A999d7757-852d-4ea3-95ab-a60df6de80ad
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adf100d04-deb7-47cb-9a2c-f85ea17b7108
+releases:
+- 6
 description: 'Approved design: docs/developers/harness-tool-design.md (DEV-492). The owner, 2026-11-13: interface "Link the crate", lotar''s runners "Remove right away". Waits for the harnessmux release that covers every agent lotar runs today. One change: lotar depends on the harnessmux crate and runs every agent job through it (events from the session stream, the message box and cancel call send and cancel, permission requests become questions in the job view). Profiles keep their runner key: claude, codex, copilot, gemini, cursor, amp, droid, opencode, kilo, antigravity become harnessmux agents; t3 is removed with a hint to pick the agent; command stays. session: continue uses named sessions, one per ticket. Removed in the same change: the per-CLI builders and parsers in src/services/agent_runner.rs, tests/fixtures/agent-streams/, the t3 runner and its thread handling in src/services/agent_job_service.rs, docs that describe single CLIs (agent-cli-research.md moves to harnessmux). AGENTS.md: REST shape changes keep src/api_types.rs, view/api/types.ts, docs/openapi.json and help docs in step. Done when: lotar''s own fix, review and merge jobs run on Claude and Codex through the crate with resume and messages, the removed code is gone, npm run lint, npm test and npm run smoke pass.'
 tags:
 - review-returned
@@ -581,3 +611,131 @@ history:
   - field: assignee
     old: '@merge'
     new: mallox
+- at: 2026-11-14T04:12:50.038668+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T04:16:17.927581+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-14T04:16:18.588238+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-14T04:16:19.008054+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T04:17:27.208980+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-504"],"blocks":["DEV-501","DEV-509","DEV-510","DEV-511","DEV-512"],"related":["DEV-492","DEV-504","DEV-509","DEV-417","DEV-488","DEV-489","DEV-497","DEV-507","DEV-510","DEV-511","DEV-512"]}'
+    new: '{"depends_on":["DEV-504"],"blocks":["DEV-501","DEV-509","DEV-510","DEV-511","DEV-512"],"related":["DEV-492","DEV-504","DEV-509","DEV-417","DEV-488","DEV-489","DEV-497","DEV-507","DEV-510","DEV-511","DEV-512","DEV-513"]}'
+- at: 2026-11-14T04:17:27.599504+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-504"],"blocks":["DEV-501","DEV-509","DEV-510","DEV-511","DEV-512"],"related":["DEV-492","DEV-504","DEV-509","DEV-417","DEV-488","DEV-489","DEV-497","DEV-507","DEV-510","DEV-511","DEV-512","DEV-513"]}'
+    new: '{"depends_on":["DEV-504"],"blocks":["DEV-501","DEV-509","DEV-510","DEV-511","DEV-512","DEV-513"],"related":["DEV-492","DEV-504","DEV-509","DEV-417","DEV-488","DEV-489","DEV-497","DEV-507","DEV-510","DEV-511","DEV-512","DEV-513"]}'
+- at: 2026-11-14T04:17:31.489216+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'
+- at: 2026-11-14T04:17:42.610587+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T04:17:47.447254+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T04:18:37.427973+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A999d7757-852d-4ea3-95ab-a60df6de80ad
+- at: 2026-11-14T04:19:28.174630+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T04:19:32.915507+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-14T04:20:50.513245+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T04:20:55.591292+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-14T04:20:55.878477+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-14T04:21:33.688111+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-14T04:21:34.019759+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-14T04:37:42.074262+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T04:42:51.119630+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T04:42:59.282058+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T04:45:08.538177+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adf100d04-deb7-47cb-9a2c-f85ea17b7108
+- at: 2026-11-14T04:46:11.451353+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

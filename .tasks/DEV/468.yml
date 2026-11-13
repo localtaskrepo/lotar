@@ -5,8 +5,10 @@ type: Bug
 reporter: claude
 assignee: claude
 created: 2026-11-13T10:33:47.729859+00:00
-modified: 2026-11-13T19:40:30.387965+00:00
+modified: 2026-11-14T04:17:31.847792+00:00
 relationships:
+  blocks:
+  - DEV-513
   related:
   - DEV-342
   - DEV-408
@@ -15,6 +17,7 @@ relationships:
   - DEV-472
   - DEV-473
   - DEV-466
+  - DEV-513
 comments:
 - date: 2026-11-13T10:48:16.585852+00:00
   author: claude
@@ -83,6 +86,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aedb44bfa-f5c3-49bc-92d4-425790a0c62e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0b8adae8-1b60-44f1-813b-ca071e380fad
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A155afdd3-43ca-4967-a6ae-9899afe01599
+releases:
+- 6
 description: |-
   DEV-465's own run on 2026-11-13 shows reviews reading an obsolete commit. The rework after the first blocking review committed `af60ab9c` on a branch T3 Code named for that thread (`t3/failed-merge-landed-skip-fix`), not on `agent/DEV-465`. `agent/DEV-465` stayed at the first fix `ca054282`. Later `session: fresh` review threads checked out `ca054282` and blocked twice on code that main (9921ee06) had already replaced. That sent the ticket to the owner's inbox (INBOX-22, INBOX-23, INBOX-24 within 7 minutes), and the triage agent had to explain that the work was already on main. One fix ended up on six branches: agent/DEV-465, t3/failed-merge-job-already-on-main, t3/failed-merge-already-landed, t3/failed-merge-work-on-main, t3/failed-merge-landed-skip-fix, t3/failed-merge-landed-work.
 
@@ -437,3 +442,20 @@ history:
   - field: assignee
     old: '@merge'
     new: claude
+- at: 2026-11-14T04:17:27.204280+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-342","DEV-408","DEV-414","DEV-465","DEV-472","DEV-473","DEV-466"]}'
+    new: '{"related":["DEV-342","DEV-408","DEV-414","DEV-465","DEV-472","DEV-473","DEV-466","DEV-513"]}'
+- at: 2026-11-14T04:17:30.236732+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-342","DEV-408","DEV-414","DEV-465","DEV-472","DEV-473","DEV-466","DEV-513"]}'
+    new: '{"blocks":["DEV-513"],"related":["DEV-342","DEV-408","DEV-414","DEV-465","DEV-472","DEV-473","DEV-466","DEV-513"]}'
+- at: 2026-11-14T04:17:31.847792+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

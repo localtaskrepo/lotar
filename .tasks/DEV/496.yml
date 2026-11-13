@@ -1,10 +1,11 @@
 title: CI caches lotar's own build output between runs
-status: Blocked
+status: InProgress
 priority: High
 type: Chore
 reporter: claude
+assignee: '@fix'
 created: 2026-11-13T22:21:42.733070+00:00
-modified: 2026-11-13T22:21:51.980829+00:00
+modified: 2026-11-14T04:37:42.801445+00:00
 relationships:
   depends_on:
   - DEV-493
@@ -13,6 +14,8 @@ relationships:
   related:
   - DEV-107
   - DEV-493
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2c9b49ac-88aa-4223-8194-4149b3d24d9e
 description: |-
   CI keeps no build output of lotar's own code between runs, so every Rust job compiles the lotar crate from scratch, even when a push changed nothing in it (DEV-493). The owner, 2026-11-13: "We really need to try and optimize the build and CI time."
 
@@ -52,3 +55,19 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-493"],"related":["DEV-107","DEV-493"]}'
     new: '{"depends_on":["DEV-493"],"blocks":["DEV-499"],"related":["DEV-107","DEV-493"]}'
+- at: 2026-11-14T04:21:43.909992+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-14T04:37:41.888453+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-14T04:37:42.801445+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2c9b49ac-88aa-4223-8194-4149b3d24d9e
