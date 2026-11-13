@@ -185,6 +185,8 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         startEditComment,
         cancelEditComment,
         saveCommentEdit,
+        answeringQuestion,
+        answerQuestion,
         resetComments,
         bindApplyTask: bindCommentApplyTask,
     } = useTaskPanelComments({
@@ -824,6 +826,8 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         startEditComment,
         cancelEditComment,
         saveCommentEdit,
+        answeringQuestion,
+        answerQuestion,
         reporterMode,
         assigneeMode,
         reporterCustom,

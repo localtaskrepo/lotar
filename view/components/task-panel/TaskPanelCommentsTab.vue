@@ -24,6 +24,8 @@
           v-for="{ comment, index: commentIndex } in visibleComments"
           :key="`${comment.date}-${commentIndex}`"
           class="task-panel__comment"
+          :class="{ 'task-panel__comment--question': comment.question }"
+          :data-testid="comment.question ? 'comment-question' : undefined"
         >
           <div class="task-panel__comment-header">
             <div class="task-panel__comment-meta">
@@ -60,7 +62,28 @@
               </template>
             </div>
           </div>
-          <MarkdownContent v-if="editingCommentIndex !== commentIndex" :source="comment.text" />
+          <template v-if="editingCommentIndex !== commentIndex && comment.question">
+            <MarkdownContent :source="questionPrompt(comment)" />
+            <div v-if="answerOf(comment)" class="task-panel__answer" data-testid="comment-answer">
+              <div class="task-panel__comment-meta">
+                <span v-if="answerOf(comment)?.author" class="task-panel__comment-author"
+                  >{{ answerOf(comment)?.author }} · </span
+                >answered {{ formatDate(answerOf(comment)?.date || '') }}
+              </div>
+              <ul v-if="answerChoice(comment).length" class="task-panel__answer-choice">
+                <li v-for="label in answerChoice(comment)" :key="label">{{ label }}</li>
+              </ul>
+              <MarkdownContent v-if="answerOf(comment)?.answer?.note" :source="answerOf(comment)?.answer?.note || ''" />
+            </div>
+            <QuestionPrompt
+              v-else
+              :spec="comment.question"
+              :prompt="questionPrompt(comment)"
+              :busy="answeringQuestion === comment.date"
+              @answer="$emit('answer', comment, $event)"
+            />
+          </template>
+          <MarkdownContent v-else-if="editingCommentIndex !== commentIndex" :source="comment.text" />
           <textarea
             v-else
             :ref="onEditingTextareaRef"
@@ -98,17 +121,14 @@
 <script setup lang="ts">
 import { computed, type ComponentPublicInstance } from 'vue'
 import { COMMENT_FILTER_KEY, useActivityFilter } from '../../composables/task-panel/useActivityFilter'
+import type { TaskComment } from '../../api/types'
+import { answerLabels, answerTo, questionPrompt } from '../../utils/questions'
 import IconGlyph from '../IconGlyph.vue'
 import MarkdownContent from '../MarkdownContent.vue'
+import QuestionPrompt from '../QuestionPrompt.vue'
 import ReloadButton from '../ReloadButton.vue'
 import UiButton from '../UiButton.vue'
 import TaskPanelActivityFilter, { type ActivityFilterGroup } from './TaskPanelActivityFilter.vue'
-
-interface TaskComment {
-  date: string
-  author?: string
-  text: string
-}
 
 const props = defineProps<{
   mode: 'create' | 'edit'
@@ -120,6 +140,8 @@ const props = defineProps<{
   editingCommentSubmitting: boolean
   formatDate: (input: string) => string
   setEditingTextarea: (el: HTMLTextAreaElement | null) => void
+  /** DEV-488: the `date` of the question an answer is being sent for. */
+  answeringQuestion?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -128,6 +150,7 @@ const emit = defineEmits<{
   (e: 'saveEdit', index: number): void
   (e: 'cancelEdit'): void
   (e: 'addComment'): void
+  (e: 'answer', question: TaskComment, value: { choice: string[]; note: string }): void
   (e: 'update:newComment', value: string): void
   (e: 'update:editingCommentText', value: string): void
 }>()
@@ -161,6 +184,26 @@ const hiddenText = computed(() => {
   if (!hidden) return ''
   return `${hidden} of ${comments.value.length} ${comments.value.length === 1 ? 'comment' : 'comments'} hidden.`
 })
+
+const allComments = computed(() => props.task.comments || [])
+
+/** Answers show under their question (DEV-488), so the list leaves them out. */
+const shownComments = computed(() => {
+  const list = allComments.value
+  const questionDates = new Set(list.filter((comment) => comment.question).map((comment) => comment.date))
+  return list
+    .map((comment, index) => ({ comment, index }))
+    .filter(({ comment }) => !(comment.answer && questionDates.has(comment.answer.to)))
+})
+
+function answerOf(question: TaskComment): TaskComment | null {
+  return answerTo(allComments.value, question)
+}
+
+function answerChoice(question: TaskComment): string[] {
+  const answer = answerOf(question)?.answer
+  return answer ? answerLabels(question, answer) : []
+}
 
 function onEditingTextInput(event: Event) {
   emit('update:editingCommentText', (event.target as HTMLTextAreaElement).value)
@@ -205,6 +248,30 @@ function onEditingTextareaRef(ref: Element | ComponentPublicInstance | null) {
 }
 
 .task-panel__comment-author {
+  font-weight: 600;
+}
+
+.task-panel__comment--question {
+  border-left: 3px solid var(--color-accent, var(--accent));
+}
+
+.task-panel__comment--question > :deep(.markdown-content),
+.task-panel__comment--question > .question-prompt {
+  margin-bottom: var(--space-2, 0.5rem);
+}
+
+.task-panel__answer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 0.25rem);
+  margin-top: var(--space-2, 0.5rem);
+  padding-left: var(--space-2, 0.5rem);
+  border-left: 2px solid var(--color-border, var(--border));
+}
+
+.task-panel__answer-choice {
+  margin: 0;
+  padding-left: 1.2rem;
   font-weight: 600;
 }
 

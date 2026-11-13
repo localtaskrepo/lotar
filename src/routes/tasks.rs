@@ -662,12 +662,13 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Some(s) if !s.is_empty() => s.to_string(),
             _ => return bad_request("Missing id".into()),
         };
-        // Blank comments are refused, as comment/update does (DEV-276).
-        let text = match body.get("text").and_then(|v| v.as_str()) {
-            Some(s) if !s.trim().is_empty() => s.to_string(),
-            _ => return bad_request("Missing text".into()),
+        // Blank comments are refused, as comment/update does (DEV-276);
+        // `question` asks and `answer` answers (DEV-488).
+        let request = match crate::services::task_questions::CommentRequest::from_json(&body) {
+            Ok(request) => request,
+            Err(message) => return bad_request(message),
         };
-        let dto = match TaskService::add_comment(&mut storage, &id, &text) {
+        let dto = match TaskService::add_comment_request(&mut storage, &id, request) {
             Ok(dto) => dto,
             // Typed classification (DEV-58): malformed IDs and tombstone
             // refusals stay 400s; storage/serialization faults are 500s.

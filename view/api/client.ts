@@ -1,4 +1,5 @@
 import type {
+    CommentAnswerInput,
     AutomationRunRequest,
     AutomationRunResponse,
     TaskMoveRequest,
@@ -267,6 +268,10 @@ export const api = {
     },
     addComment(id: string, text: string): Promise<TaskDTO> {
         return post('/api/tasks/comment', { id, text })
+    },
+    /** DEV-488: answer a question comment; the chosen options' `set` fields apply. */
+    answerQuestion(id: string, answer: CommentAnswerInput): Promise<TaskDTO> {
+        return post('/api/tasks/comment', { id, answer })
     },
     updateComment(id: string, index: number, text: string): Promise<TaskDTO> {
         return post('/api/tasks/comment/update', { id, index, text })

@@ -42,7 +42,7 @@ The query uses the web search-box syntax. Values come from your configuration, s
 | `due_within:3` | due today through 3 days ahead | `duewithin:` | `due_within` |
 | `recent:7d`, `recent:2w` | changed in the last N days or weeks, by the task's `modified` time; `-recent:30d` is the opposite: not changed for 30 days | | `recent` |
 | `needs:effort,due` | missing every listed field | `need:` | `needs` |
-| `has:attachment,image,link,tag` | carries every listed kind | `with:` | `has` |
+| `has:attachment,image,link,tag,question` | carries every listed kind (`question`: an unanswered [question comment](./comment.md#questions-and-answers)) | `with:` | `has` |
 | `effort_min:2h`, `effort_max:1d` | inclusive effort bounds; time and points never compare; tasks without an effort are left out | `effortmin:`, `effortmax:` | `effort_min`, `effort_max` |
 | `field:iteration=wave-2`, `iteration=wave-2` | a custom field | | any other key; MCP `custom_fields` |
 | `affects>=0.13`, `affects<0.14`, `affects=^0.13` | a [version field](#version-fields) in a range | | `affects=>=0.13 <0.14` |
@@ -110,7 +110,7 @@ Flags set the same filters as the query and combine with it: list filters add up
 | Project or workspace | `--project/-p`, `--tasks-dir` |
 | Values | `--status/-s`, `--priority/-P`, `--type/-t`, `--tag/-i`, `--sprint` (repeat a flag for several values), `--assignee/-a` (`@me`, `__none__`) |
 | Dates | `--due <bucket>`, `--due-within <days>`, `--recent 7d` (any days or weeks) |
-| Missing or present | `--needs effort,due`, `--has attachment,image,link,tag` |
+| Missing or present | `--needs effort,due`, `--has attachment,image,link,tag,question` |
 | Effort | `--effort-min 2h`, `--effort-max 1d` |
 | Deletion | Active tasks by default; `--deleted` for deleted tasks only, or `--include-deleted` for both (mutually exclusive) |
 | Sorting & size | `--sort-by due-date` (keys: priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints, releases, relevance, `field:<name>`), `--reverse`, `--page-size 100` (alias: `--limit`), plus `--offset` / `--page` |

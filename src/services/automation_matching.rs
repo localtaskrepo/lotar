@@ -24,6 +24,9 @@ pub(crate) struct ChangeSet {
 #[derive(Debug, Clone)]
 struct CommentFacts {
     author: Option<String>,
+    /// The chosen option keys of an answer comment (DEV-488); `None` when
+    /// the comment answers nothing.
+    choice: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone)]
@@ -87,9 +90,13 @@ impl ChangeSet {
         Self::new(Some(current), current)
     }
 
-    /// No field changes: a comment by `author` was added to `current`.
-    pub(crate) fn commented(current: &TaskDTO, author: Option<&str>) -> Self {
-        Self { comment: Some(CommentFacts { author: author.map(str::to_string) }), ..Self::empty(current) }
+    /// No field changes: `comment` was added to `current`.
+    pub(crate) fn commented(current: &TaskDTO, comment: Option<&crate::types::TaskComment>) -> Self {
+        let facts = CommentFacts {
+            author: comment.and_then(|comment| comment.author.clone()),
+            choice: comment.and_then(|comment| comment.answer.as_ref()).map(|answer| answer.choice.clone()),
+        };
+        Self { comment: Some(facts), ..Self::empty(current) }
     }
 
     fn changed_field(&self, field: &str) -> Option<&FieldChange> {
@@ -352,6 +359,11 @@ fn matches_comment(condition: &AutomationCommentCondition, changes: &ChangeSet, 
     let Some(comment) = changes.comment.as_ref() else {
         return false;
     };
+    if let Some(answer_condition) = condition.answer.as_ref()
+        && !matches_value_condition(answer_condition, comment.choice.clone().map(AutomationValue::List).as_ref())
+    {
+        return false;
+    }
     let Some(author_condition) = condition.author.as_ref() else {
         return true;
     };

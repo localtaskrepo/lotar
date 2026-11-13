@@ -908,8 +908,8 @@ fn make_task_list_tool(enum_hints: Option<&EnumHints>) -> Value {
         "has".into(),
         json!({
             "type": ["string", "array", "null"],
-            "items": {"type": "string", "enum": ["attachment", "image", "link", "tag"]},
-            "description": "Smart filter: keep only tasks with an attachment, an image attachment, a link, or at least one tag (all listed kinds must be present). Accepts CSV string or array. Blank explicit values are errors."
+            "items": {"type": "string", "enum": ["attachment", "image", "link", "tag", "question"]},
+            "description": "Smart filter: keep only tasks with an attachment, an image attachment, a link, at least one tag, or an unanswered question comment (all listed kinds must be present). Accepts CSV string or array. Blank explicit values are errors."
         }),
     );
     properties.insert(
@@ -993,14 +993,63 @@ fn make_whoami_tool() -> Value {
 fn make_task_comment_add_tool(_enum_hints: Option<&EnumHints>) -> Value {
     json!({
         "name": "task_comment_add",
-        "description": "Append a comment to a task and record a history entry. Returns {task}.",
+        "description": "Append a comment to a task and record a history entry. With `question`, `text` is a question the owner answers by choosing an option; with `answer`, the comment answers a question (default: the last open one) and applies the chosen options' `set`. Returns {task}.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "id": {"type": "string"},
-                "text": {"type": "string"}
+                "text": {"type": "string", "description": "The comment; with `question` the question itself, with `answer` an optional note."},
+                "question": {
+                    "type": ["object", "null"],
+                    "description": "Ask a question with options.",
+                    "properties": {
+                        "options": {
+                            "type": "array",
+                            "description": "At least one option.",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "key": {"type": "string", "description": "Short key: letters, digits, '-' or '_'."},
+                                    "label": {"type": "string"},
+                                    "set": {
+                                        "type": ["object", "null"],
+                                        "description": "Fields choosing this option sets, as an automation `set:`.",
+                                        "properties": {
+                                            "status": {"type": "string"},
+                                            "assignee": {"type": "string"},
+                                            "reporter": {"type": "string"},
+                                            "priority": {"type": "string"},
+                                            "type": {"type": "string"},
+                                            "due_date": {"type": "string"},
+                                            "effort": {"type": "string"},
+                                            "tags": {"type": "array", "items": {"type": "string"}}
+                                        },
+                                        "additionalProperties": false
+                                    }
+                                },
+                                "required": ["key", "label"],
+                                "additionalProperties": false
+                            }
+                        },
+                        "recommended": {"type": ["string", "null"], "description": "Key of the recommended option."},
+                        "multiple": {"type": ["boolean", "null"], "description": "Several options may be chosen (default false)."},
+                        "other": {"type": ["boolean", "null"], "description": "A free-text answer is allowed (default true)."}
+                    },
+                    "required": ["options"],
+                    "additionalProperties": false
+                },
+                "answer": {
+                    "type": ["object", "null"],
+                    "description": "Answer a question comment.",
+                    "properties": {
+                        "to": {"type": ["string", "null"], "description": "The question comment's date (or a unique start of it); default: the last open question."},
+                        "choice": {"type": ["string", "array", "null"], "items": {"type": "string"}, "description": "Chosen option key(s); omit for a free-text answer in `text`."},
+                        "note": {"type": ["string", "null"]}
+                    },
+                    "additionalProperties": false
+                }
             },
-            "required": ["id", "text"],
+            "required": ["id"],
             "additionalProperties": false
         }
     })

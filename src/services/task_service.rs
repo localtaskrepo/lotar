@@ -97,6 +97,14 @@ pub struct TaskUpdateReceipt {
     pub deferred: Option<crate::api_types::JobOutcome>,
 }
 
+/// A comment just written by [`TaskService::push_comment`].
+pub(crate) struct PushedComment {
+    pub dto: TaskDTO,
+    pub comment: crate::types::TaskComment,
+    pub config: ResolvedConfig,
+    pub project: String,
+}
+
 /// Extras for [`TaskService::create_with`].
 #[derive(Debug, Default)]
 pub(crate) struct CreateOptions {
@@ -708,6 +716,23 @@ impl TaskService {
     /// applied to the freshest persisted state under the project task lock,
     /// so concurrent reference (or other) writes can never be lost.
     pub fn add_comment_with_context(storage: &mut Storage, id: &str, text: &str, context: CommentContext) -> LoTaRResult<TaskDTO> {
+        let fire_commented = context.fire_commented;
+        let pushed = Self::push_comment(storage, id, context, |_, now, actor| {
+            let text = strip_author_prefix(text, actor.as_deref())?;
+            Ok(crate::types::TaskComment::new(now, actor, text.to_string()))
+        })?;
+        Ok(Self::finish_comment(storage, pushed, fire_commented))
+    }
+
+    /// Append the comment `build` makes from the freshest task, its time
+    /// and its author, with a `comment_added` history entry, under the
+    /// project task lock.
+    pub(crate) fn push_comment(
+        storage: &mut Storage,
+        id: &str,
+        context: CommentContext,
+        build: impl FnOnce(&Task, String, Option<String>) -> LoTaRResult<crate::types::TaskComment>,
+    ) -> LoTaRResult<PushedComment> {
         let (id, _) = Self::follow_moves(storage, id, None)?;
         let id = id.as_str();
         let parsed = TaskId::parse(id).map_err(|err| LoTaRError::InvalidTaskId(format!("{id}: {err}")))?;
@@ -717,13 +742,14 @@ impl TaskService {
         let root_path = storage.root_path.clone();
         let canonical_guard = canonical.clone();
         let identity_project = parsed.project.clone();
+        let actor_override = context.actor_override;
         let outcome = storage.mutate_task(&canonical, move |task| {
             // Lifecycle guard (DEV-92): no comments on a tombstone.
             Self::ensure_not_deleted(task, &canonical_guard)?;
             let now = chrono::Utc::now().to_rfc3339();
-            let actor = context.actor_override.clone().or_else(|| resolve_current_user_for_project(Some(root_path.as_path()), Some(&identity_project)));
-            let text = strip_author_prefix(text, actor.as_deref())?;
-            task.comments.push(crate::types::TaskComment { extra: Default::default(), date: now.clone(), author: actor.clone(), text: text.to_string() });
+            let actor = actor_override.or_else(|| resolve_current_user_for_project(Some(root_path.as_path()), Some(&identity_project)));
+            let comment = build(task, now.clone(), actor.clone())?;
+            task.comments.push(comment);
             // Record that a comment was added without copying the body into
             // the changelog (the comment itself is the audit trail).
             task.history.push(TaskChangeLogEntry {
@@ -736,19 +762,25 @@ impl TaskService {
             Ok(true)
         })?;
 
+        let comment = outcome.after.comments.last().cloned().ok_or_else(|| LoTaRError::ValidationError("the comment was not stored".to_string()))?;
         let config = Self::resolve_config_for_project(storage.root_path.as_path(), &parsed.project);
         let sprint_lookup = Self::load_sprint_lookup(storage);
-        let comment = outcome.after.comments.last().cloned();
-        let mut dto = Self::to_dto(&canonical, outcome.after, Some(&sprint_lookup), &config, chrono::Utc::now());
-        if Self::link_mentions(storage, &canonical, Some(text), None) {
-            dto = Self::get(storage, &canonical, Some(&parsed.project)).unwrap_or(dto);
+        let dto = Self::to_dto(&canonical, outcome.after, Some(&sprint_lookup), &config, chrono::Utc::now());
+        Ok(PushedComment { dto, comment, config, project: parsed.project })
+    }
+
+    /// Link the ticket IDs the new comment mentions and fire `on.commented`;
+    /// the task as it is after both.
+    pub(crate) fn finish_comment(storage: &mut Storage, pushed: PushedComment, fire_commented: bool) -> TaskDTO {
+        let PushedComment { mut dto, comment, config, project } = pushed;
+        if Self::link_mentions(storage, &dto.id, Some(&comment.text), None) {
+            dto = Self::get(storage, &dto.id, Some(&project)).unwrap_or(dto);
         }
-        if context.fire_commented
-            && let Some(comment) = comment
-        {
+        if fire_commented {
             let _ = AutomationService::apply_comment_event(storage, &dto, &comment, &config);
+            dto = Self::get(storage, &dto.id, Some(&project)).unwrap_or(dto);
         }
-        Ok(dto)
+        dto
     }
 
     /// Edit an existing comment (0-based index) and record a `comment#N`

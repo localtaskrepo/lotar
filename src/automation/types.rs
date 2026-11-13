@@ -147,6 +147,10 @@ pub struct AutomationCommentCondition {
     /// `@any` included).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub author: Option<AutomationFieldCondition>,
+    /// The option keys an answer comment chose (DEV-488), matched like
+    /// `tags`. Comments that answer nothing have no value (`exists: false`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub answer: Option<AutomationFieldCondition>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]

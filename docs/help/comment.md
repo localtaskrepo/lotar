@@ -14,6 +14,10 @@ lotar c <TASK_ID> [TEXT]
 
 # Alternate form
 lotar task comment <TASK_ID> [TEXT]
+
+# Ask a question with options; answer it
+lotar comment <TASK_ID> --question <TEXT> --option "<key>: <label>"... [--set "<key>:<field>=<value>"...] [--recommend <key>] [--multiple] [--no-other]
+lotar comment <TASK_ID> --answer [<keys>] [--to <DATE>] [NOTE]
 ```
 
 - `-F -` reads the comment from stdin. A file that can't be read is an error (exit 1), never a silent listing.
@@ -69,6 +73,34 @@ Example JSON list response (when no text is provided):
   "items": []
 }
 ```
+
+## Questions and answers
+
+A question comment carries options the reader answers by choosing one, in the web UI by clicking (the Comments tab, board cards and the Tasks list show open questions) or with `--answer`. Use it instead of asking "A, B or C?" in prose.
+
+```bash
+# Ask; choosing "fix" assigns the ticket to the @fix agent and reopens it
+lotar comment AUTH-1 --question "Rework or close?" \
+  --option "fix: Rework with @fix" --set "fix:assignee=@fix" --set "fix:status=Todo" \
+  --option "close: Close as WontDo" --set "close:status=WontDo" \
+  --recommend fix
+
+# Answer the last open question by its key, with a note
+lotar comment AUTH-1 --answer fix "Keep the old endpoint"
+
+# Answer in your own words instead of an option
+lotar comment AUTH-1 --answer -- "Ask me again next week"
+
+# Tasks with an open question
+lotar list --has question
+```
+
+- `--option "<key>: <label>"` adds an option; keys are letters, digits, `-` and `_`. `--recommend <key>` marks one, `--multiple` lets the reader choose several (`--answer a,b`), `--no-other` allows only the options.
+- `--set "<key>:<field>=<value>"` sets a field when that option is chosen, as an automation `set:` does: `status`, `assignee`, `reporter`, `priority`, `type`, `due_date`, `effort` or `tags` (comma-separated; replaces the tags). Options only set fields; they never run commands or start anything else. Unknown fields and values the project does not allow are refused when you ask.
+- `--answer <keys>` answers the newest open question, or the one asked at `--to <DATE>` (its comment date, or a unique start of it). Without keys, the comment text is a free-text answer. A question is answered once.
+- The answer applies the chosen options' fields as an update by the answerer, recorded in history under their name; `on.updated`/`on.assigned` rules fire as for any change, then `on.commented` rules see the answer (`comment: { answer: fix }`, `${{comment.choice}}`; see [Automation](./automation.md#comment-conditions)).
+- The comment's `text` keeps the question with its options, or the answer with its labels, in prose, so `lotar show`, older lotar versions and agents reading the YAML see everything. `lotar comment <ID>` and `lotar show` mark a question no answer points to as `[open question]`.
+- The stored comment adds `question: { options: [{key, label, set?}], recommended?, multiple?, other? }` or `answer: { to, choice?, note? }`; REST (`POST /api/tasks/comment`) and MCP (`task_comment_add`) take the same `question` and `answer` fields.
 
 ## Notes
 

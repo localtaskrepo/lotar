@@ -594,7 +594,7 @@ const helpDescriptions: Record<string, string> = {
   due: 'today, soon (the next 7 days), later, or overdue (before today and not done).',
   recent: 'Days or weeks (7d, 30d, 2w): changed within that time. -recent:30d: not changed for 30 days.',
   needs: 'effort, due or both: tasks missing every listed field.',
-  has: 'attachment, image, link or tag: tasks carrying every listed kind.',
+  has: 'attachment, image, link, tag or question (unanswered): tasks carrying every listed kind.',
   due_within: 'A number of days: due from today through that many days ahead.',
   effort_min: 'An effort such as 2h, 1d or 3pt: tasks with at least that much.',
   effort_max: 'An effort such as 4h, 1d or 5pt: tasks with at most that much.',

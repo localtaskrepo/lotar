@@ -152,6 +152,7 @@ mod dev407_auto_config_comments_test;
 mod dev470_comment_author_prefix_test;
 mod dev482_macos_signing_test;
 mod dev494_add_relationships_test;
+mod dev488_question_comments_test;
 mod dev4_archive_test;
 mod dev54_mutation_contract_test;
 mod dev55_transactional_mutations_test;

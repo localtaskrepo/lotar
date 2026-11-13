@@ -46,8 +46,15 @@ Do not call both transports for each operation or repeatedly dump every schema.
 | Create one that waits for another | `task_create` with `relationships.depends_on` | `add "Outcome" -p "$PROJECT" --status "$WAITING" --depends-on "$OTHER_ID"` |
 | Report a found problem once | `task_create` with `finding` | `add "Problem" -p "$PROJECT" --finding "<stable key>" -D "What you saw"` |
 | Progress | `task_comment_add` with `id`, `text` | `comment "$TASK_ID" -m "Outcome; evidence; next step"` |
+| Ask a choice | `task_comment_add` with `id`, `text`, `question.options` | `comment "$TASK_ID" --question "Which?" --option "a: First" --option "b: Second" --recommend a` |
 | State | `task_update` with `id`, `patch.status` | `status "$TASK_ID" "$STATUS"` |
 | Values/schema | `config_show`; `schema_discover` filtered by `tool` | `config show --project "$PROJECT"`; command `--help` |
+
+When the owner has to choose between options, ask with a question comment rather
+than listing "A, B or C?" in prose: the UI shows the options as buttons and the
+answer is recorded with its choice. An option can set fields when chosen
+(`--set "b:assignee=@fix"`), so the answer routes the ticket without another
+agent reading it. Read an answer from the comment's `answer.choice`.
 
 Set `STATUS` (and `WAITING`, the project's waiting state such as `Blocked`) to a
 configured value before transitioning. Give a new ticket its links when you create

@@ -425,7 +425,7 @@ impl AutomationService {
         let tasks_dir = storage.root_path.clone();
         let project = crate::storage::TaskId::parse(&task.id).map(|parsed| parsed.project).unwrap_or_default();
         let (automation, _) = load_effective_automation(&tasks_dir, if project.is_empty() { None } else { Some(project.as_str()) }, Some(config))?;
-        let changes = ChangeSet::commented(task, comment.author.as_deref());
+        let changes = ChangeSet::commented(task, Some(comment));
         let active_sprints = compute_active_sprint_ids(storage);
         let event = AutomationEvent::Commented;
         let mut failures: Vec<String> = Vec::new();
@@ -643,8 +643,7 @@ impl AutomationService {
                 }
                 // The latest comment stands in for the new one (DEV-383).
                 AutomationEvent::Commented => {
-                    let author = task.comments.last().and_then(|comment| comment.author.as_deref());
-                    matches_rule(rule, task, &ChangeSet::commented(task, author), MatchMode::Current, config, &active_sprints)
+                    matches_rule(rule, task, &ChangeSet::commented(task, task.comments.last()), MatchMode::Current, config, &active_sprints)
                 }
                 _ => matches_rule(rule, task, &ChangeSet::empty(task), MatchMode::Current, config, &active_sprints),
             };
@@ -1828,7 +1827,7 @@ fn apply_action(
         .any(|action| action.depends_on.is_some() || action.blocks.is_some() || action.related.is_some());
 
     if let Some(set) = action.set.as_ref() {
-        apply_set_action(set, current, config, storage, &mut patch, &mut updated_tags, &mut custom_fields, &tmpl)?;
+        apply_set_action(set, current, config, storage, &mut patch, &mut updated_tags, &mut custom_fields, |value| tmpl.expand(value))?;
     }
 
     let mut releases = base.releases.clone();
@@ -2040,10 +2039,10 @@ fn apply_set_action(
     patch: &mut TaskUpdate,
     updated_tags: &mut Vec<String>,
     custom_fields: &mut crate::types::CustomFields,
-    tmpl: &TemplateContext,
+    expand: impl FnMut(&str) -> String,
 ) -> LoTaRResult<()> {
     let tasks_dir = storage.root_path.as_path();
-    let plan = SetPlan::parse(set, config, |value| tmpl.expand(value));
+    let plan = SetPlan::parse(set, config, expand);
     if let Some(status) = plan.status {
         patch.status = Some(status.to_string());
     }
@@ -2085,6 +2084,35 @@ fn apply_set_action(
     }
 
     Ok(())
+}
+
+/// The automation `set:` an answer's option makes (DEV-488).
+pub(crate) fn option_set_as_action(set: &crate::types::OptionSet) -> AutomationActionSet {
+    AutomationActionSet {
+        status: set.status.clone(),
+        assignee: set.assignee.clone(),
+        reporter: set.reporter.clone(),
+        priority: set.priority.clone(),
+        task_type: set.task_type.clone(),
+        due_date: set.due_date.clone(),
+        effort: set.effort.clone(),
+        tags: set.tags.clone().map(StringOrVec::List),
+        ..AutomationActionSet::default()
+    }
+}
+
+/// The update that applies an answered option's `set:` to `current`, as an
+/// automation `set:` would, without template expansion: option text comes
+/// from whoever asked (DEV-488).
+pub(crate) fn option_set_patch(storage: &Storage, current: &TaskDTO, config: &ResolvedConfig, set: &crate::types::OptionSet) -> LoTaRResult<TaskUpdate> {
+    let mut patch = TaskUpdate::default();
+    let mut tags = current.tags.clone();
+    let mut custom_fields = current.custom_fields.clone();
+    apply_set_action(&option_set_as_action(set), current, config, storage, &mut patch, &mut tags, &mut custom_fields, str::to_string)?;
+    if tags != current.tags {
+        patch.tags = Some(tags);
+    }
+    Ok(patch)
 }
 
 fn apply_tag_action(action: &AutomationTagAction, add: bool, tags: &mut Vec<String>) {

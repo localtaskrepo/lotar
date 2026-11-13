@@ -335,11 +335,140 @@ pub struct TaskComment {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub author: Option<String>,
     pub text: String,
+    /// The comment asks a question with options (DEV-488). `text` holds
+    /// the question and its options in prose for readers without this.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub question: Option<CommentQuestion>,
+    /// The comment answers a question (DEV-488); `text` holds the answer in
+    /// prose.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub answer: Option<CommentAnswer>,
     /// Keys this version does not know, kept so a newer tool's or a
     /// hand-written field survives edits (DEV-268).
     #[serde(flatten, default)]
     #[cfg_attr(feature = "schema", schemars(skip))]
     pub extra: std::collections::BTreeMap<String, serde_yaml_ng::Value>,
+}
+
+impl TaskComment {
+    pub fn new(date: String, author: Option<String>, text: String) -> Self {
+        Self { date, author, text, question: None, answer: None, extra: Default::default() }
+    }
+}
+
+/// A question the reader answers by choosing an option (DEV-488).
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct CommentQuestion {
+    pub options: Vec<QuestionOption>,
+    /// The option the asker recommends.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub recommended: Option<String>,
+    /// Several options may be chosen together.
+    #[serde(skip_serializing_if = "std::ops::Not::not", default)]
+    pub multiple: bool,
+    /// A free-text answer instead of an option is allowed.
+    #[serde(skip_serializing_if = "is_true", default = "default_true")]
+    pub other: bool,
+    #[serde(flatten, default)]
+    #[cfg_attr(feature = "schema", schemars(skip))]
+    pub extra: std::collections::BTreeMap<String, serde_yaml_ng::Value>,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn is_true(value: &bool) -> bool {
+    *value
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct QuestionOption {
+    pub key: String,
+    pub label: String,
+    /// Fields that choosing this option sets on the ticket, as in an
+    /// automation `set:`.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub set: Option<OptionSet>,
+    #[serde(flatten, default)]
+    #[cfg_attr(feature = "schema", schemars(skip))]
+    pub extra: std::collections::BTreeMap<String, serde_yaml_ng::Value>,
+}
+
+/// The ticket fields an answer may set: a subset of automation `set:`.
+/// Keys this version does not know land in `extra`; asking refuses them.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct OptionSet {
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub assignee: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub reporter: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub priority: Option<String>,
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none", default)]
+    pub task_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub due_date: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub effort: Option<String>,
+    /// Replaces the ticket's tags, as `set: tags` does.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub tags: Option<Vec<String>>,
+    #[serde(flatten, default)]
+    #[cfg_attr(feature = "schema", schemars(skip))]
+    pub extra: std::collections::BTreeMap<String, serde_yaml_ng::Value>,
+}
+
+impl OptionSet {
+    /// The names of the fields this set changes, in a fixed order.
+    pub fn fields(&self) -> Vec<&'static str> {
+        [
+            ("status", self.status.is_some()),
+            ("assignee", self.assignee.is_some()),
+            ("reporter", self.reporter.is_some()),
+            ("priority", self.priority.is_some()),
+            ("type", self.task_type.is_some()),
+            ("due_date", self.due_date.is_some()),
+            ("effort", self.effort.is_some()),
+            ("tags", self.tags.is_some()),
+        ]
+        .into_iter()
+        .filter_map(|(name, set)| set.then_some(name))
+        .collect()
+    }
+}
+
+/// An answer to a question comment (DEV-488).
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct CommentAnswer {
+    /// The `date` of the question comment (comments have no ID).
+    pub to: String,
+    /// The chosen option keys; empty for a free-text ("other") answer.
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub choice: Vec<String>,
+    /// The answerer's own words, if any.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub note: Option<String>,
+    #[serde(flatten, default)]
+    #[cfg_attr(feature = "schema", schemars(skip))]
+    pub extra: std::collections::BTreeMap<String, serde_yaml_ng::Value>,
+}
+
+/// Indexes of the question comments no answer points to, oldest first.
+pub fn open_questions(comments: &[TaskComment]) -> Vec<usize> {
+    comments
+        .iter()
+        .enumerate()
+        .filter(|(_, comment)| comment.question.is_some())
+        .filter(|(_, question)| !comments.iter().any(|comment| comment.answer.as_ref().is_some_and(|answer| answer.to == question.date)))
+        .map(|(index, _)| index)
+        .collect()
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq)]

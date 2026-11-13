@@ -238,6 +238,7 @@
                         >{{ t.title }}</span
                       >
                       <AgentActivityIndicator :task-id="t.id" label class="task-table__agent" />
+                      <OpenQuestion :task="t" class="task-table__question" />
                       <span
                         v-if="t.deleted_at != null"
                         class="tag task-table__deleted-badge"
@@ -489,6 +490,7 @@
 <script setup lang="ts">
 import { tagAttrs } from '../composables/useTagColors'
 import AgentActivityIndicator from './AgentActivityIndicator.vue'
+import OpenQuestion from './OpenQuestion.vue'
 import AttachmentTile from './AttachmentTile.vue'
 import type { TaskDTO } from '../api/types'
 import { asList } from '../utils/lookup'
@@ -876,6 +878,11 @@ th.active .header-button__sort {
 
 .task-table__title-wrapper .task-table__agent {
   margin-left: 0;
+}
+
+.task-table__question {
+  width: 100%;
+  cursor: default;
 }
 
 .task-table__title-wrapper {

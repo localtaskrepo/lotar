@@ -700,7 +700,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Smart filter CSV: keep tasks carrying every listed kind (attachment, image, link, tag; plurals accepted). Blank explicit values and invalid entries return 400."
+            "description": "Smart filter CSV: keep tasks carrying every listed kind (attachment, image, link, tag, question: an unanswered question comment; plurals accepted). Blank explicit values and invalid entries return 400."
           },
           {
             "name": "query",
@@ -3673,7 +3673,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Smart filter CSV: keep tasks carrying every listed kind (attachment, image, link, tag; plurals accepted). Blank explicit values and invalid entries return 400."
+            "description": "Smart filter CSV: keep tasks carrying every listed kind (attachment, image, link, tag, question: an unanswered question comment; plurals accepted). Blank explicit values and invalid entries return 400."
           },
           {
             "name": "query",
@@ -4517,6 +4517,8 @@
     "/api/tasks/comment": {
       "post": {
         "summary": "Add a comment to a task",
+        "description": "Adds `text` as a comment. With `question`, `text` is a question answered by choosing an option. With `answer`, the comment answers a question (default: the task's last open question), `text` is an optional note, and the chosen options' `set` fields are applied as an update by the answerer before `on.commented` rules run. Invalid options, unknown `set` fields, unknown option keys and answered questions return 400.",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TaskCommentRequest" } } } },
         "responses": {
           "200": {
             "description": "OK"
@@ -5973,12 +5975,169 @@
             "type": "string"
           },
           "text": {
-            "type": "string"
+            "type": "string",
+            "description": "The comment; a question or answer comment keeps its options or choice here in prose too."
+          },
+          "question": {
+            "$ref": "#/components/schemas/CommentQuestion"
+          },
+          "answer": {
+            "$ref": "#/components/schemas/CommentAnswer"
           }
         },
         "required": [
           "date",
           "text"
+        ]
+      },
+      "CommentQuestion": {
+        "type": "object",
+        "description": "A question answered by choosing an option (DEV-488).",
+        "properties": {
+          "options": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/QuestionOption"
+            }
+          },
+          "recommended": {
+            "type": "string",
+            "description": "Key of the recommended option."
+          },
+          "multiple": {
+            "type": "boolean",
+            "default": false,
+            "description": "Several options may be chosen."
+          },
+          "other": {
+            "type": "boolean",
+            "default": true,
+            "description": "A free-text answer is allowed."
+          }
+        },
+        "required": [
+          "options"
+        ]
+      },
+      "QuestionOption": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+$"
+          },
+          "label": {
+            "type": "string"
+          },
+          "set": {
+            "$ref": "#/components/schemas/QuestionOptionSet"
+          }
+        },
+        "required": [
+          "key",
+          "label"
+        ]
+      },
+      "QuestionOptionSet": {
+        "type": "object",
+        "description": "Fields choosing the option sets, as an automation `set:`. Other fields are refused when asking.",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "assignee": {
+            "type": "string"
+          },
+          "reporter": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "due_date": {
+            "type": "string"
+          },
+          "effort": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Replaces the task's tags."
+          }
+        }
+      },
+      "CommentAnswer": {
+        "type": "object",
+        "description": "An answer to a question comment (DEV-488).",
+        "properties": {
+          "to": {
+            "type": "string",
+            "description": "The question comment's `date`."
+          },
+          "choice": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Chosen option keys; omitted for a free-text answer."
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "to"
+        ]
+      },
+      "TaskCommentRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string",
+            "description": "Required unless `answer` is given; with `question` the question itself, with `answer` an optional note."
+          },
+          "question": {
+            "$ref": "#/components/schemas/CommentQuestion"
+          },
+          "answer": {
+            "type": "object",
+            "properties": {
+              "to": {
+                "type": "string",
+                "description": "The question comment's `date` or a unique start of it; default: the last open question."
+              },
+              "choice": {
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                ],
+                "description": "Chosen option key(s); omit for a free-text answer in `text` or `note`."
+              },
+              "note": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "required": [
+          "id"
         ]
       },
       "TaskChange": {

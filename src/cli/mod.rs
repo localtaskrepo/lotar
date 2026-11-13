@@ -171,6 +171,8 @@ pub enum Commands {
         /// Explain how comments are persisted
         #[arg(long, short = 'e')]
         explain: bool,
+        #[command(flatten)]
+        ask: crate::cli::args::task::CommentAskArgs,
     },
 
     /// Full task management (existing functionality)

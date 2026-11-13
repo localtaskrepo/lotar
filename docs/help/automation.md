@@ -148,6 +148,17 @@ when:
 
 ### Comment conditions
 
+`comment: { answer: ... }` checks the option keys an answer comment chose ([Questions and answers](./comment.md#questions-and-answers)), matched like `tags` (`answer: close`, `answer: { any: [fix, retry] }`); a comment that answers nothing matches only `exists: false`. In the action, `${{comment.choice}}` is the chosen keys joined with ", " and `${{comment.note}}` the answerer's own words.
+
+```yaml
+- name: Owner chose WontDo
+  when:
+    comment: { answer: wontdo }
+  on:
+    commented:
+      comment: "Closed by ${{comment.author}}: ${{comment.note}}"
+```
+
 `comment: { author: ... }` checks who wrote the comment that fired a `commented` rule. The author takes the same conditions as `assignee`: a name, a list of names, operators such as `starts_with` or `exists`, and the placeholders `@user`, `@agent` and `@any`. Names match case-insensitively. It works inside `all`, `any`, `not` and `current`, and never matches on other events, so put it only on rules with a `commented` hook. Comments from versions before 0.14 have no author: they match only `exists: false` (or `not`).
 
 ```yaml

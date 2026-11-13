@@ -119,10 +119,12 @@ pub fn render_task_text(task: &TaskDTO, tasks_root: &std::path::Path) -> String 
 
     if !task.comments.is_empty() {
         out.push_str(&format!("\nComments ({})\n", task.comments.len()));
-        for comment in &task.comments {
+        let open = crate::types::open_questions(&task.comments);
+        for (index, comment) in task.comments.iter().enumerate() {
             let mut lines = comment.text.lines();
             let author = comment.author.as_deref().map(|author| format!("{author}: ")).unwrap_or_default();
-            out.push_str(&format!("  {}  {author}{}\n", comment.date, lines.next().unwrap_or_default()));
+            let marker = if open.contains(&index) { "[open question] " } else { "" };
+            out.push_str(&format!("  {}  {marker}{author}{}\n", comment.date, lines.next().unwrap_or_default()));
             for line in lines {
                 out.push_str(&format!("    {line}\n"));
             }

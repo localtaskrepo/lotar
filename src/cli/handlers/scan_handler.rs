@@ -512,12 +512,7 @@ mod reanchor_tests {
                 // reference, and a custom field that must all survive.
                 let mut storage = crate::storage::manager::Storage::new(&tasks_dir);
                 let mut fresh = storage.get(task_id, "SAFE").ok_or("task missing")?;
-                fresh.comments.push(crate::types::TaskComment {
-                    extra: Default::default(),
-                    author: None,
-                    date: "2026-10-13T00:00:00Z".into(),
-                    text: "concurrent note".into(),
-                });
+                fresh.comments.push(crate::types::TaskComment::new("2026-10-13T00:00:00Z".into(), None, "concurrent note".into()));
                 fresh.references.push(ReferenceEntry { code: Some("other.rs#7".into()), ..Default::default() });
                 fresh.custom_fields.insert("severity".into(), crate::types::custom_value_string("high"));
                 storage.edit(task_id, &fresh).map_err(|e| e.to_string())?;

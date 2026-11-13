@@ -46,6 +46,7 @@
       :modified-info="modifiedInfo"
       :sprint="sprint"
     />
+    <OpenQuestion :task="task" class="task-question" />
   </article>
 </template>
 
@@ -58,6 +59,7 @@ import AgentActivityIndicator from './AgentActivityIndicator.vue'
 import AttachmentTile from './AttachmentTile.vue'
 import BoardCardMeta from './BoardCardMeta.vue'
 import IconGlyph from './IconGlyph.vue'
+import OpenQuestion from './OpenQuestion.vue'
 import UiButton from './UiButton.vue'
 
 /** One board card; the board provides the card-field store (DEV-419: shared by the classic and compact boards). */
@@ -106,6 +108,9 @@ function priorityClass(value: string | undefined): string {
 </script>
 
 <style scoped>
+.task-question {
+  margin-top: 6px;
+}
 /* The meta rows come from BoardCardMeta, so their rules reach into it with :deep. */
 .task-cover {
   margin: -8px -8px 8px;

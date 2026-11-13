@@ -643,7 +643,7 @@ mod tests {
 
     #[test]
     fn searches_comments_criteria_and_references() {
-        let comments = vec![TaskComment { extra: Default::default(), author: None, date: "2026-01-01".into(), text: "Reproduced on Safari".into() }];
+        let comments = vec![TaskComment::new("2026-01-01".into(), None, "Reproduced on Safari".into())];
         let criteria = vec!["Works offline".to_string()];
         let references = vec![ReferenceEntry { code: Some("web/src/sync/queue.ts#20-33".into()), ..Default::default() }];
         let task = SearchDocument {
@@ -705,7 +705,7 @@ mod tests {
 
     #[test]
     fn field_scopes_limit_terms_to_one_field() {
-        let comments = vec![TaskComment { extra: Default::default(), author: None, date: "2026-01-01".into(), text: "Needs repro on Safari".into() }];
+        let comments = vec![TaskComment::new("2026-01-01".into(), None, "Needs repro on Safari".into())];
         let tags = vec!["frontend".to_string()];
         let task = SearchDocument {
             id: "WEB-7",

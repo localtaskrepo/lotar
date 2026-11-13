@@ -228,6 +228,12 @@ impl TemplateContext {
         if let Some(ref author) = comment.author {
             self.set("comment.author", author);
         }
+        if let Some(ref answer) = comment.answer {
+            self.set("comment.choice", &answer.choice.join(", "));
+            if let Some(ref note) = answer.note {
+                self.set("comment.note", note);
+            }
+        }
         self
     }
 

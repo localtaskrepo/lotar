@@ -217,6 +217,35 @@ pub struct AddArgs {
     pub explain: bool,
 }
 
+/// Question and answer comments (DEV-488).
+#[derive(Args, Debug, Clone, Default)]
+pub struct CommentAskArgs {
+    /// Ask this question; the owner answers by choosing an --option
+    #[arg(long, value_name = "QUESTION", conflicts_with = "answer")]
+    pub question: Option<String>,
+    /// An option of the --question as "<key>: <label>" (repeatable)
+    #[arg(long = "option", value_name = "KEY: LABEL", requires = "question")]
+    pub options: Vec<String>,
+    /// A field an option sets when chosen, as "<key>:<field>=<value>" (repeatable); fields: status, assignee, reporter, priority, type, due_date, effort, tags
+    #[arg(long = "set", value_name = "KEY:FIELD=VALUE", requires = "question")]
+    pub sets: Vec<String>,
+    /// The option key the question recommends
+    #[arg(long, value_name = "KEY", requires = "question")]
+    pub recommend: Option<String>,
+    /// Several options may be chosen
+    #[arg(long, requires = "question")]
+    pub multiple: bool,
+    /// Only the options are answers, no free text
+    #[arg(long = "no-other", requires = "question")]
+    pub no_other: bool,
+    /// Answer a question with option keys (comma-separated); without a key, the comment text is a free-text answer. The comment text is a note.
+    #[arg(long, value_name = "KEYS", num_args = 0..=1, default_missing_value = "")]
+    pub answer: Option<String>,
+    /// The question to answer: its date (or a unique start of it); default: the last open question
+    #[arg(long, value_name = "DATE", requires = "answer")]
+    pub to: Option<String>,
+}
+
 #[derive(Subcommand)]
 pub enum TaskAction {
     /// View or update effort for a task
@@ -335,6 +364,8 @@ pub enum TaskAction {
         /// Explain how comments are persisted
         #[arg(long, short = 'e')]
         explain: bool,
+        #[command(flatten)]
+        ask: CommentAskArgs,
     },
 
     /// Add or remove references for a task
@@ -729,7 +760,7 @@ pub struct TaskSearchArgs {
     #[serde(default)]
     pub needs: Vec<String>,
 
-    /// Carries every listed kind, repeatable or comma-separated: attachment, image, link, tag
+    /// Carries every listed kind, repeatable or comma-separated: attachment, image, link, tag, question (an open question)
     #[arg(long, value_name = "KINDS")]
     #[serde(default)]
     pub has: Vec<String>,

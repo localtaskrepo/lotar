@@ -43,8 +43,8 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 - **Response:** Updated `TaskDTO` serialized to JSON. While an agent job runs on the ticket, a status or assignee change is not applied: the task comes back unchanged in those fields with `deferred: {job_id, status?, assignee?}` and a `message` ("HelpNeeded will be set when job <id> ends"), and the job's end applies it ([Status and assignee during a job](agent.md#status-and-assignee-during-a-job)).
 
 ### `task_comment_add`
-- **Params:** `id` (required), `text` (required).
-- **Behavior:** appends a new comment and records a history entry.
+- **Params:** `id` (required), `text` (required unless `answer` is given), optional `question` or `answer`.
+- **Behavior:** appends a new comment and records a history entry. `question: {options: [{key, label, set?}], recommended?, multiple?, other?}` asks a question with `text` as the question; an option's `set` takes `status`, `assignee`, `reporter`, `priority`, `type`, `due_date`, `effort`, `tags`, checked when asking. `answer: {to?, choice?, note?}` answers the question asked at `to` (default: the newest open one) with option keys or, without `choice`, in words (`note` or `text`), then applies the chosen options' `set` as an update by the answerer. Invalid questions and answers return `-32602` with the reason. See [Questions and answers](comment.md#questions-and-answers).
 - **Response:** Updated `TaskDTO`.
 
 ### `task_comment_update`

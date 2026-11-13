@@ -106,6 +106,8 @@ pub enum HasFlag {
     Link,
     /// At least one tag (DEV-228).
     Tag,
+    /// A question comment no answer points to (DEV-488).
+    Question,
 }
 
 /// Extensions treated as images by the `has:image` filter and the web UI.
@@ -293,10 +295,10 @@ pub fn parse_needs(raw: &str) -> Result<BTreeSet<NeedsFlag>, String> {
     Ok(out)
 }
 
-/// Strict `has` CSV parser: attachment, image or link.
+/// Strict `has` CSV parser: attachment, image, link, tag or question.
 pub fn parse_has(raw: &str) -> Result<BTreeSet<HasFlag>, String> {
     if raw.trim().is_empty() {
-        return Err("Invalid has: must not be blank (omit the parameter or supply attachment, image, link, tag)".to_string());
+        return Err("Invalid has: must not be blank (omit the parameter or supply attachment, image, link, tag, question)".to_string());
     }
     let mut out = BTreeSet::new();
     for token in raw.split(',') {
@@ -305,11 +307,12 @@ pub fn parse_has(raw: &str) -> Result<BTreeSet<HasFlag>, String> {
             "image" | "images" => HasFlag::Image,
             "link" | "links" => HasFlag::Link,
             "tag" | "tags" => HasFlag::Tag,
+            "question" | "questions" => HasFlag::Question,
             "" => {
-                return Err("Invalid has: empty entry (expected CSV of attachment, image, link, tag)".to_string());
+                return Err("Invalid has: empty entry (expected CSV of attachment, image, link, tag, question)".to_string());
             }
             other => {
-                return Err(format!("Invalid has entry: '{other}' (expected attachment, image, link or tag)"));
+                return Err(format!("Invalid has entry: '{other}' (expected attachment, image, link, tag or question)"));
             }
         };
         out.insert(flag);
@@ -546,6 +549,7 @@ fn task_matches_has(task: &TaskDTO, has: &BTreeSet<HasFlag>) -> bool {
         HasFlag::Attachment => task.references.iter().any(|r| r.attachment.is_some()),
         HasFlag::Image => task.references.iter().any(|r| r.attachment.as_deref().is_some_and(is_image_name)),
         HasFlag::Link => task.references.iter().any(|r| r.link.is_some()),
+        HasFlag::Question => !crate::types::open_questions(&task.comments).is_empty(),
     })
 }
 
@@ -712,6 +716,7 @@ pub fn sort_by_relevance<T: TaskSortFields + Searchable>(tasks: &mut [(String, T
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::TaskComment;
 
     #[test]
     fn parse_sort_by_accepts_builtins_and_prefixes() {
@@ -1012,6 +1017,27 @@ mod tests {
         tagged.tags = vec!["ui".to_string()];
         let untagged = dto("B-1", now.to_rfc3339().as_str());
         let mut tasks = vec![("A-1".to_string(), tagged), ("B-1".to_string(), untagged)];
+        let options = TaskQueryOptions { has, ..TaskQueryOptions::default() };
+        apply_smart_filters(&mut tasks, &options, now);
+        let ids: Vec<&str> = tasks.iter().map(|(id, _)| id.as_str()).collect();
+        assert_eq!(ids, vec!["A-1"]);
+    }
+
+    #[test]
+    fn has_question_keeps_tasks_with_an_open_question() {
+        // DEV-488
+        let has = parse_has("question").unwrap();
+        let now = Utc::now();
+        let mut asked = TaskComment::new("2026-11-13T10:00:00Z".into(), None, "Which?".into());
+        asked.question =
+            Some(crate::types::CommentQuestion { options: Vec::new(), recommended: None, multiple: false, other: true, extra: Default::default() });
+        let mut open = dto("A-1", now.to_rfc3339().as_str());
+        open.comments = vec![asked.clone()];
+        let mut answered = dto("B-1", now.to_rfc3339().as_str());
+        let mut answer = TaskComment::new("2026-11-13T11:00:00Z".into(), None, "Yes".into());
+        answer.answer = Some(crate::types::CommentAnswer { to: asked.date.clone(), choice: Vec::new(), note: Some("Yes".into()), extra: Default::default() });
+        answered.comments = vec![asked, answer];
+        let mut tasks = vec![("A-1".to_string(), open), ("B-1".to_string(), answered)];
         let options = TaskQueryOptions { has, ..TaskQueryOptions::default() };
         apply_smart_filters(&mut tasks, &options, now);
         let ids: Vec<&str> = tasks.iter().map(|(id, _)| id.as_str()).collect();

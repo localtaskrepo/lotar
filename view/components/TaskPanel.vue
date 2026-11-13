@@ -677,11 +677,13 @@
                     :editing-comment-submitting="editingCommentSubmitting"
                     :format-date="formatDate"
                     :set-editing-textarea="setEditingCommentTextarea"
+                    :answering-question="answeringQuestion"
                     @reload="reloadTask"
                     @startEdit="startEditComment"
                     @saveEdit="saveCommentEdit"
                     @cancelEdit="cancelEditComment"
                     @addComment="addComment"
+                    @answer="answerQuestion"
                     @update:newComment="updateNewComment"
                     @update:editingCommentText="updateEditingCommentText"
                   />
@@ -1146,6 +1148,8 @@ const {
   startEditComment,
   cancelEditComment,
   saveCommentEdit,
+  answeringQuestion,
+  answerQuestion,
   reporterMode,
   assigneeMode,
   reporterCustom,

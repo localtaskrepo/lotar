@@ -1107,8 +1107,58 @@ export interface TaskComment {
     date: string
     /** Who wrote it (the history's actor); absent on comments written before DEV-327. */
     author?: string
+    /** The comment; question and answer comments keep their options or choice here in prose too. */
     text: string
+    /** DEV-488: the comment asks a question answered by choosing an option. */
+    question?: CommentQuestion
+    /** DEV-488: the comment answers the question asked at `answer.to`. */
+    answer?: CommentAnswer
     [key: string]: unknown
+}
+
+/** DEV-488: a question answered by choosing an option. */
+export interface CommentQuestion {
+    options: QuestionOption[]
+    /** Key of the recommended option. */
+    recommended?: string
+    /** Several options may be chosen; absent means false. */
+    multiple?: boolean
+    /** A free-text answer is allowed; absent means true. */
+    other?: boolean
+}
+
+export interface QuestionOption {
+    key: string
+    label: string
+    /** Fields choosing this option sets, as an automation `set:`. */
+    set?: QuestionOptionSet
+}
+
+export interface QuestionOptionSet {
+    status?: string
+    assignee?: string
+    reporter?: string
+    priority?: string
+    type?: string
+    due_date?: string
+    effort?: string
+    /** Replaces the task's tags. */
+    tags?: string[]
+}
+
+export interface CommentAnswer {
+    /** The question comment's `date`. */
+    to: string
+    /** Chosen option keys; absent for a free-text answer. */
+    choice?: string[]
+    note?: string
+}
+
+/** `POST /api/tasks/comment` with `answer`: `to` defaults to the last open question. */
+export interface CommentAnswerInput {
+    to?: string
+    choice?: string[]
+    note?: string
 }
 
 /** `GET /api/config/show`: the scope's configuration as stored (its shape depends on the scope) plus computed completion fields. */

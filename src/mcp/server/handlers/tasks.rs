@@ -560,17 +560,19 @@ pub(crate) fn handle_task_comment_add(req: JsonRpcRequest) -> JsonRpcResponse {
         Some(s) if !s.trim().is_empty() => s.trim().to_string(),
         _ => return err(req.id, -32602, "Missing id", None),
     };
-    let text = match req.params.get("text").and_then(|v| v.as_str()) {
-        Some(s) if !s.trim().is_empty() => s.trim().to_string(),
-        _ => return err(req.id, -32602, "Missing text", None),
+    // Plain text, or a question / answer comment (DEV-488).
+    let request = match crate::services::task_questions::CommentRequest::from_json(&req.params) {
+        Ok(request) => request,
+        Err(message) => return err(req.id, -32602, &message, None),
     };
 
     let resolver = try_rpc!(resolve_tasks_dir(&req.id));
 
     let mut storage = Storage::new(&resolver.path.clone());
 
-    let dto = match TaskService::add_comment(&mut storage, &id, &text) {
+    let dto = match TaskService::add_comment_request(&mut storage, &id, request) {
         Ok(dto) => dto,
+        Err(LoTaRError::ValidationError(message)) => return err(req.id, -32602, &message, None),
         Err(error) => {
             let msg = error.to_string();
             if msg.contains("not found") {

@@ -2,7 +2,7 @@ import { errorMessage } from '../utils/errors'
 import type { Ref } from 'vue'
 import { nextTick, ref } from 'vue'
 import { api } from '../api/client'
-import type { TaskDTO } from '../api/types'
+import type { TaskComment, TaskDTO } from '../api/types'
 import { showToast } from '../components/toast'
 import { isDeletedTask } from '../utils/text'
 
@@ -20,6 +20,8 @@ export function useTaskComments(options: UseTaskCommentsOptions) {
     const editingCommentText = ref('')
     const editingCommentSubmitting = ref(false)
     const editingCommentTextarea = ref<HTMLTextAreaElement | null>(null)
+    /** DEV-488: the `date` of the question an answer is being sent for. */
+    const answeringQuestion = ref<string | null>(null)
 
     function setEditingCommentTextarea(el: HTMLTextAreaElement | null) {
         editingCommentTextarea.value = el
@@ -119,7 +121,31 @@ export function useTaskComments(options: UseTaskCommentsOptions) {
         }
     }
 
+    async function answerQuestion(question: TaskComment, value: { choice: string[]; note: string }) {
+        if (options.mode.value !== 'edit') return
+        if (isDeletedTask(options.task)) return
+        const id = options.task.id
+        if (!id || answeringQuestion.value) return
+        answeringQuestion.value = question.date
+        try {
+            const updated = await api.answerQuestion(id, {
+                to: question.date,
+                choice: value.choice,
+                note: value.note || undefined,
+            })
+            Object.assign(options.task, updated)
+            options.applyTask(updated)
+            options.emitUpdated(updated)
+        } catch (error: unknown) {
+            showToast(errorMessage(error) || 'Failed to answer the question')
+        } finally {
+            answeringQuestion.value = null
+        }
+    }
+
     return {
+        answeringQuestion,
+        answerQuestion,
         newComment,
         editingCommentIndex,
         editingCommentText,
