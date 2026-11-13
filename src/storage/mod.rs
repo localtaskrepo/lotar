@@ -8,6 +8,7 @@
 // - filter: Task filtering utilities
 // - release: Release entity definition (DEV-393)
 // - sprint: Sprint entity definition and helpers
+// - write_log: Which tasks a thread wrote while a log is open (DEV-410)
 pub mod filter;
 pub mod identity;
 pub mod layout;
@@ -21,6 +22,7 @@ pub mod search;
 pub mod sprint;
 pub mod task;
 pub mod transaction;
+pub mod write_log;
 
 // Re-export commonly used types and operations for convenience
 pub use filter::{DeletionFilter, TaskFilter};

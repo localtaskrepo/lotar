@@ -102,6 +102,30 @@ fn manual_rules_run_from_the_command_line_on_matching_tasks() {
     assert!(out.contains("No rule named 'no such rule'"), "{out}");
 }
 
+/// DEV-410: the run matches each task against one listing, so a task an
+/// earlier action changed is read again. Closing AM-1 unblocks AM-2 back
+/// to Todo, and the same run ships it too.
+#[test]
+fn a_run_matches_tasks_an_earlier_action_changed_as_they_are_now() {
+    let ws = workspace(
+        "automation:\n  rules:\n    - name: Unblock\n      when:\n        status: Blocked\n      on:\n        unblocked:\n          set:\n            status: Todo\n    - name: Ship\n      when:\n        status: Todo\n      on:\n        manual:\n          set:\n            status: Done\n",
+    );
+    std::fs::write(ws.tasks.join("config.yml"), "default:\n  project: AM\nissue:\n  states: [Todo, Blocked, InProgress, Done]\n").unwrap();
+    std::fs::remove_file(ws.tasks.join("AM/1.yml")).unwrap();
+    std::fs::remove_file(ws.tasks.join("AM/2.yml")).unwrap();
+    std::fs::write(
+        ws.tasks.join("AM/4.yml"),
+        "title: Waiting\nstatus: Blocked\npriority: Medium\ntype: Feature\ncreated: 2026-07-01T00:00:00Z\nrelationships:\n  depends_on:\n  - AM-3\n",
+    )
+    .unwrap();
+
+    let (ok, out) = run(&ws, &["automation", "run"]);
+    assert!(ok, "{out}");
+    assert!(out.contains("Ran 'Ship' on AM-3"), "{out}");
+    assert!(out.contains("Ran 'Ship' on AM-4"), "{out}");
+    assert!(file(&ws, "AM/4.yml").contains("status: Done"), "{}", file(&ws, "AM/4.yml"));
+}
+
 #[test]
 fn switched_off_rules_skip_events_too() {
     let ws = workspace(RULES);

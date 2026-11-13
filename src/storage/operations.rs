@@ -252,6 +252,7 @@ impl StorageOperations {
             }
             let file_string = serde_yaml_ng::to_string(&merged)?;
             atomic_write_file(&file_path, &file_string)?;
+            crate::storage::write_log::record(id);
 
             // No longer need to update index - simplified architecture
 
@@ -305,6 +306,7 @@ impl StorageOperations {
             if changed {
                 let file_string = serde_yaml_ng::to_string(&after).map_err(|err| LoTaRError::SerializationError(err.to_string()))?;
                 atomic_write_file(&file_path, &file_string)?;
+                crate::storage::write_log::record(id);
             }
             Ok(TaskMutationOutcome { before, after, changed })
         })
@@ -387,6 +389,7 @@ impl StorageOperations {
 
             match fs::remove_file(file_path) {
                 Ok(_) => {
+                    crate::storage::write_log::record(id);
                     // No longer need to update index - simplified architecture
                     Ok(true)
                 }
@@ -431,6 +434,7 @@ impl StorageOperations {
                 fs::create_dir_all(parent)?;
             }
             fs::rename(&file, &target)?;
+            crate::storage::write_log::record(id);
             Ok(Some((file, target)))
         })
     }

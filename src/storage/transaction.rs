@@ -334,6 +334,7 @@ impl MultiFileTransaction {
                     return Err(LoTaRError::IoError(std::io::Error::other("injected publish failure")));
                 }
                 atomic_write_file(&write.path, &write.contents)?;
+                crate::storage::write_log::record_path(&write.relative);
                 // Persist the directory entry of every completed rename before
                 // continuing; an fsync failure here is a publish failure and
                 // triggers rollback (review L2).

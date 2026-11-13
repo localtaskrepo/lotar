@@ -740,14 +740,25 @@ impl AutomationService {
         let mut found: std::collections::HashSet<String> = std::collections::HashSet::new();
         let mut entries = Vec::new();
         let mut cache: HashMap<String, (ResolvedConfig, AutomationFile)> = HashMap::new();
+        let written = crate::storage::write_log::WriteLog::open();
 
         for (_, mut task) in tasks {
-            // As a single read would: tombstones stay out, links to moved
-            // tasks show their current IDs.
-            if task.deleted_at.is_some() {
-                continue;
+            if written.wrote(&task.id) {
+                // An earlier action in this run changed it (closing a task
+                // fires its dependents' `unblocked` rules): match what it is
+                // now, not the listing (DEV-410).
+                match TaskService::get(storage, &task.id, None) {
+                    Ok(current) => task = current,
+                    Err(_) => continue,
+                }
+            } else {
+                // As a single read would: tombstones stay out, links to moved
+                // tasks show their current IDs.
+                if task.deleted_at.is_some() {
+                    continue;
+                }
+                crate::storage::moves::current_relationships(&moves, &mut task.relationships);
             }
-            crate::storage::moves::current_relationships(&moves, &mut task.relationships);
             let mut changed = false;
             let project = crate::storage::TaskId::parse(&task.id).map(|parsed| parsed.project).unwrap_or_default();
             if !cache.contains_key(&project) {
