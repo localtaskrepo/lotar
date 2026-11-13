@@ -1,0 +1,39 @@
+title: 'QA red: DEV-408''s test needs a git identity that CI doesn''t have'
+status: Done
+priority: High
+type: Bug
+reporter: claude
+assignee: claude
+created: 2026-11-13T06:51:49.624410+00:00
+modified: 2026-11-13T07:09:58.703385+00:00
+relationships:
+  related:
+  - DEV-408
+  - DEV-415
+comments:
+- date: 2026-11-13T07:09:58.549618+00:00
+  author: claude
+  text: 'Fixed in 25cb89e4: the fixture repo sets user.name, user.email and commit.gpgsign=false in its local config, which LoTaR''s own commit of leftover changes reads. Local: the 17 dev318 tests pass and npm run lint is clean; I couldn''t reproduce CI''s missing identity on the Mac (the harness scrubs GIT_CONFIG*, and git still finds one). CI: Quality Assurance run 43381803290 passed, the first green run on main since DEV-408.'
+description: |-
+  Quality Assurance on main fails since DEV-408 (runs 43367062775 to 43380454839): dev318_t3_runner_test::a_job_on_another_model_starts_a_new_thread_on_the_unmerged_branch. The fixture sets the git identity only with -c on its own git calls; LoTaR's commit of the earlier thread's leftover changes runs without it, and the CI runner has no identity ("empty ident name"), so the job falls back to continuing the earlier thread. On the Mac git finds an identity, so it passes locally. Blocks the v0.14.3 release (DEV-415).
+
+  ## Done when
+  - [ ] The fixture repo has its own user.name, user.email and commit.gpgsign=false in its local config
+  - [ ] QA green on main
+history:
+- at: 2026-11-13T06:51:49.771137+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-408","DEV-415"]}'
+- at: 2026-11-13T07:09:58.549618+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T07:09:58.703385+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: Done
