@@ -41,11 +41,14 @@ fn worker_restarts_from_the_upgraded_binary_between_jobs() {
     let install_root = root.join("install");
     install(&install_root, "0.1.0");
     let pids = root.join("worker-pids");
+    // Each job runs until the test creates `release`.
+    let release = root.join("release");
     std::fs::write(
         fixtures.tasks_root.join("config.yml"),
         format!(
-            "default:\n  project: TEST\nagents:\n  slow:\n    runner: command\n    command: sh\n    args: ['-c', 'echo $PPID >> \"{}\"; sleep 3']\n",
-            pids.display()
+            "default:\n  project: TEST\nagents:\n  slow:\n    runner: command\n    command: sh\n    args: ['-c', 'echo $PPID >> \"{}\"; while [ ! -f \"{}\" ]; do sleep 0.05; done']\n",
+            pids.display(),
+            release.display()
         ),
     )
     .unwrap();
@@ -69,6 +72,7 @@ fn worker_restarts_from_the_upgraded_binary_between_jobs() {
     install(&install_root, "0.2.0");
     std::thread::sleep(Duration::from_millis(800));
     assert!(lotar().args(["agent", "run", "TEST-2", "go", "--agent", "slow"]).status().unwrap().success());
+    std::fs::write(&release, "").unwrap();
 
     let both = wait_for_lines(&pids, 2);
     assert_ne!(first[0], both[1], "the worker started before the upgrade also ran the next job");

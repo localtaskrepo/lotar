@@ -619,6 +619,8 @@ fn delete_event_emits_canonical_id_for_padded_alias() {
 
 #[test]
 fn mcp_single_file_reference_blocks_on_held_store_lock() {
+    // A held lock fails the call after the wait; a short wait proves the same (DEV-500).
+    let _lock_wait = EnvVarGuard::set(lotar::storage::safety::STORAGE_LOCK_WAIT_ENV, "200");
     // File references resolve against the git repo root. find_repo_root
     // accepts both a .git directory and a worktree-style .git file, so try a
     // fixture-local marker (no git tooling involved) in both styles. When the

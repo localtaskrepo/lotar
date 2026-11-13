@@ -1,11 +1,11 @@
 title: Python __pycache__ files are tracked and not ignored, so job auto-commits pick up new .pyc files
-status: Reviewing
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-13T23:16:21.313989+00:00
-modified: 2026-11-13T23:33:09.543525+00:00
+modified: 2026-11-13T23:48:00.275334+00:00
 relationships:
   related:
   - DEV-495
@@ -13,8 +13,12 @@ comments:
 - date: 2026-11-13T23:33:02.168637+00:00
   author: claude
   text: 'Removed the two tracked .pyc files (git rm --cached; local copies kept) and added __pycache__/ to .gitignore. Commit 9be309fb. Checks: git ls-files | grep __pycache__ lists nothing; git check-ignore matches scripts/__pycache__/*.pyc via .gitignore:9. The cpython-315 files from 952950c3 aren''t on this branch''s base; if main has them, the merge must drop them too (the rule now ignores them). No lint/test/smoke run: ignore-file and untracking only, no code change.'
+- date: 2026-11-13T23:47:53.492327+00:00
+  author: codex
+  text: 'Review: passed. Reviewed 9be309fb, complete diff, ticket comments, related DEV-495 merge notes, repo guidance and main history. Only change: ignore __pycache__/ and untrack two artifacts. HEAD^ tracks both; HEAD tracks no pycache or pyc files. Nested cpython-314 and cpython-315 paths match .gitignore:9. git diff --check passes; clean worktree. Main has only the same two artifacts, covered by this removal. DEV-495 separately requires dropping its generated artifact commit. No findings or tickets filed. No application or UI changes; lint, application tests and smoke not run. No files, status or assignee changed.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3666565f-d65d-4b5b-bda0-e36206a47bc1
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b0e3e88-d860-4cb2-9003-4d61f98dbd31
 description: 'Found: scripts/__pycache__/check-test-coverage.cpython-314.pyc and scripts/tests/__pycache__/test_check_test_coverage.cpython-314.pyc have been tracked since 1f0c9de7, and .gitignore has no __pycache__ entry. The DEV-495 review job''s auto-commit (952950c3) added the cpython-315 versions. Check: git ls-files | grep __pycache__ lists nothing, and .gitignore ignores __pycache__/. Done: tracked .pyc files removed, __pycache__/ ignored.'
 tags:
 - health
@@ -56,3 +60,21 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-13T23:47:06.217809+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b0e3e88-d860-4cb2-9003-4d61f98dbd31
+- at: 2026-11-13T23:47:53.492327+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:48:00.275334+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

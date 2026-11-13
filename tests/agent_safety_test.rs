@@ -777,13 +777,14 @@ mod git_required {
     #[test]
     fn done_during_a_job_leaves_the_worktree_to_the_jobs_end() {
         common::require_git();
-        let (fixture, ticket) = setup("touch \"$LOTAR_TASKS_DIR/../started\"; sleep 2", true);
+        let (fixture, ticket) = setup("touch \"$LOTAR_TASKS_DIR/../started\"; while [ ! -f \"$LOTAR_TASKS_DIR/../release\" ]; do sleep 0.05; done", true);
         let root = fixture.get_temp_path();
         let job = AgentJobService::start_job_with_tasks_dir(request(&ticket), &fixture.tasks_root).unwrap();
         wait_until(|| root.join("started").exists());
         let worktree = Path::new(AgentJobService::get_job(&job.id).unwrap().worktree_path.as_deref().unwrap()).to_path_buf();
         set_status(&fixture, &ticket, "Done", TaskUpdateContext::automation_disabled());
         assert!(worktree.exists(), "the running job keeps its worktree");
+        fs::write(root.join("release"), "").unwrap();
         wait_idle();
         assert!(!worktree.exists(), "the job's end removes it");
         assert!(!branch_exists(root, &format!("agent/{ticket}")));

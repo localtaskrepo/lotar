@@ -913,6 +913,8 @@ mod tests {
 
     #[test]
     fn recovery_waits_for_the_journal_projects_task_lock() {
+        // A short storage-lock wait proves the same as the default (DEV-500).
+        let _lock_wait = crate::test_env::EnvVarGuard::set(crate::storage::safety::STORAGE_LOCK_WAIT_ENV, "200");
         let (_tmp, root) = workspace();
         let auth_task = root.join("AUTH").join("5.yml");
         fs::create_dir_all(root.join("AUTH")).unwrap();
@@ -940,7 +942,7 @@ mod tests {
         let started = std::time::Instant::now();
         let err = MultiFileTransaction::begin(&root, &[]).unwrap_err();
         assert!(err.to_string().contains("busy") || err.to_string().contains("WouldBlock"), "expected lock timeout, got: {err}");
-        assert!(started.elapsed() >= Duration::from_secs(2), "begin must have waited on the AUTH task lock");
+        assert!(started.elapsed() >= Duration::from_millis(200), "begin must have waited on the AUTH task lock");
         // The journaled file was left untouched while its lock was unavailable.
         assert_eq!(fs::read_to_string(&auth_task).unwrap(), "auth new");
         assert!(journal_path.exists());

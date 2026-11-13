@@ -54,6 +54,10 @@ impl Drop for McpChild {
 
 impl McpChild {
     fn spawn(tasks_dir: &std::path::Path) -> Self {
+        Self::spawn_with(tasks_dir, &[])
+    }
+
+    fn spawn_with(tasks_dir: &std::path::Path, env: &[(&str, &str)]) -> Self {
         // Same child-scoped hygiene as common::lotar_cmd (isolated home
         // config, no RUST_TEST_THREADS), but as a std Command so stdin and
         // stdout pipes can be owned directly.
@@ -64,6 +68,7 @@ impl McpChild {
             .env("LOTAR_IGNORE_HOME_CONFIG", "1")
             .env("LOTAR_TASKS_DIR", tasks_dir)
             .env("LOTAR_MCP_AUTORELOAD", "0")
+            .envs(env.iter().copied())
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
@@ -567,24 +572,24 @@ fn long_multibyte_enum_rejection_is_an_error_not_a_crash() {
 #[test]
 fn deferred_list_changed_is_coalesced_and_emitted_after_ready() {
     // Timing note: the tools watcher polls on an intentional 2s cadence (the
-    // kernel watcher is best-effort under sandboxed file-watch syscalls), so
-    // this test uses generous bounds. By construction nothing can be emitted
+    // kernel watcher is best-effort under sandboxed file-watch syscalls); this
+    // child polls every 200 ms, and the waits below span several polls. By construction nothing can be emitted
     // before notifications/initialized: the dispatcher defers while the
     // session is not ready, whether or not the poll has observed the change.
     let (_tmp, tasks_dir) = workspace_with_config();
-    let mut child = McpChild::spawn(&tasks_dir);
+    let mut child = McpChild::spawn_with(&tasks_dir, &[("LOTAR_MCP_WATCH_INTERVAL_MS", "200")]);
 
     let initialize = child.request(1, "initialize", valid_initialize_params());
     assert!(initialize.get("error").is_none());
 
     // Let the watcher take its baseline snapshot (one poll period) BEFORE
     // the change, so the diff below is deterministic.
-    std::thread::sleep(Duration::from_millis(2300));
+    std::thread::sleep(Duration::from_millis(500));
 
     // Trigger a tools-hint change (tags list grows) while only initialized,
     // not ready. Give the poller ample time to observe it.
     std::fs::write(tasks_dir.join("config.yml"), "default:\n  project: MCP\nissue:\n  tags:\n    - alpha\n    - beta\n").unwrap();
-    std::thread::sleep(Duration::from_millis(2600));
+    std::thread::sleep(Duration::from_millis(800));
 
     // Nothing may be emitted pre-ready.
     child.expect_silence("pre-ready window must stay silent");

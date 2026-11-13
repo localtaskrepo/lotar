@@ -128,6 +128,8 @@ fn concurrent_failed_upload_cannot_break_a_deduping_peer() {
 /// released, the same upload succeeds.
 #[test]
 fn upload_fails_closed_while_another_instance_holds_the_store_lock() {
+    // A held lock fails the call after the wait; a short wait proves the same (DEV-500).
+    let _lock_wait = EnvVarGuard::set(crate::storage::safety::STORAGE_LOCK_WAIT_ENV, "200");
     let fixture = upload_fixture();
     let attachments = fixture.tasks_dir.join("@attachments");
     let mut seed = crate::storage::manager::Storage::new(&fixture.tasks_dir);

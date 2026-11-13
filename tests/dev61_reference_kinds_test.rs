@@ -440,6 +440,8 @@ fn managed_names_reject_path_shapes() {
 
 #[test]
 fn mcp_file_and_attachment_kinds_follow_the_contract() {
+    // A held lock fails the call after the wait; a short wait proves the same (DEV-500).
+    let _lock_wait = EnvVarGuard::set(lotar::storage::safety::STORAGE_LOCK_WAIT_ENV, "200");
     let fx = isolated_workspace();
     if !fx.repo_root_available {
         eprintln!("skipping: no repo root discoverable by ancestry from CARGO_TARGET_TMPDIR");
@@ -588,6 +590,8 @@ fn bulk_attachment_uses_each_tasks_own_configured_store() {
 
 #[test]
 fn bulk_attachment_lock_contention_is_per_store() {
+    // A held lock fails the call after the wait; a short wait proves the same (DEV-500).
+    let _lock_wait = EnvVarGuard::set(lotar::storage::safety::STORAGE_LOCK_WAIT_ENV, "200");
     let fx = isolated_workspace();
     seed_project_store_override(&fx, "TQ", "@attachments-tq");
 

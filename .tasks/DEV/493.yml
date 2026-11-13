@@ -1,11 +1,11 @@
 title: Measure a cargo workspace and path-filtered CI before splitting lotar
-status: Reviewing
+status: Merging
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-13T21:27:58.028716+00:00
-modified: 2026-11-13T23:31:24.199063+00:00
+modified: 2026-11-13T23:46:04.442412+00:00
 relationships:
   blocks:
   - DEV-496
@@ -81,10 +81,14 @@ comments:
 - date: 2026-11-13T23:31:14.008372+00:00
   author: claude
   text: 'Rework of the review finding: a smoke-only change now runs ui_tests (ci.yml), so the smoke typecheck, oxlint and Prettier checks still run. The same gap existed for packaging/npm/ (its launcher is linted and tested only in ui_tests) and for the Prettier and editorconfig files: added them to the node and web patterns. Regression coverage in tests/ci_windows_reporting_contract_test.rs: one test runs every TypeScript/JavaScript/Vue file the UI job checks through the path filters and asserts ui_tests runs, one checks which jobs run for a docs, ticket, view, smoke, scripts, Rust, ci.yml and package.json change. Both fail against the previous ci.yml (smoke and packaging/npm/lotar/bin/lotar.js), pass now. docs/developers/testing.md updated. Amended commit abff246c (signed). Checks: npm run lint passed; tests 2140 Rust, 1515 Vitest, 47 release, 7 hooks passed; smoke 390 of 390 passed; ran the classify step locally on a smoke+view commit from main. Not run: ci.yml on GitHub (nothing pushed).'
+- date: 2026-11-13T23:45:59.417637+00:00
+  author: codex
+  text: 'Review: passed. Reviewed full abff246c diff, ticket comments and owner adoption, related tickets, standards decision, recent main history, UI checks and release success gate. Previous smoke-only blocker is fixed; packaging/npm and tool config coverage also added. No findings or tickets filed. npm run build:web passed. RUSTC_WRAPPER= npm run test:rust -- ci_windows_reporting_contract_test ran 9 tests: all passed, 2131 skipped; runner exited 1 afterward due to leftover xcrun_db in its temp folder. Full lint/test/smoke and GitHub Actions not rerun in this focused review. No tracked files, commits, status or assignee changed.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A33be852d-9b46-4b5c-81fe-67f9a885d51d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0b14a557-527e-4d20-a080-74d39e17b4ff
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A04cac92e-2c04-4b10-9855-5cb94b1c9df2
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7afd040f-cdaf-451f-a8da-b79215b41cc4
 description: |-
   Measure whether a cargo workspace and path-filtered CI make lotar's CI faster, before deciding on any split. The owner, 2026-11-13: "we may want to think about what part of lotar we could split into their own projects, even if just to speed up the CI steps." He chose to measure this (standards docs/decisions/2026-11-13-harness-tool.md).
 
@@ -276,3 +280,21 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-13T23:44:19.513031+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7afd040f-cdaf-451f-a8da-b79215b41cc4
+- at: 2026-11-13T23:45:59.417637+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:46:04.442412+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

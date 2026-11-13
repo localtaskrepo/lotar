@@ -61,13 +61,18 @@ fn is_lock_contention(error: &std::io::Error, native_code: Option<i32>) -> bool 
     error.kind() == std::io::ErrorKind::WouldBlock || native_code.is_some_and(|code| error.raw_os_error() == Some(code))
 }
 
+/// Overrides how long [`acquire_storage_lock`] waits for a busy lock
+/// (milliseconds); used by tests.
+pub const STORAGE_LOCK_WAIT_ENV: &str = "LOTAR_STORAGE_LOCK_WAIT_MS";
+const DEFAULT_STORAGE_LOCK_WAIT: Duration = Duration::from_secs(2);
+
 /// Acquire an exclusive advisory directory lock, retrying contention for up
 /// to two seconds. The returned file owns the lock; dropping it releases the
 /// lock on success, error, or panic. The lock file itself must not be removed.
 /// Do not sweep atomic-write temp files here: other writers need not hold this
 /// lock, so even an exclusive lock does not prove that their temp files are orphaned.
 pub fn acquire_storage_lock(target_dir: &Path, lock_name: &str) -> std::io::Result<File> {
-    acquire_storage_lock_within(target_dir, lock_name, Duration::from_secs(2))
+    acquire_storage_lock_within(target_dir, lock_name, crate::utils::time::env_millis(STORAGE_LOCK_WAIT_ENV, DEFAULT_STORAGE_LOCK_WAIT))
 }
 
 /// [`acquire_storage_lock`] with its own wait for a busy lock.
@@ -294,6 +299,8 @@ mod tests {
 
     #[test]
     fn held_lock_times_out_without_running_callback_or_removing_temp_files() {
+        // A held lock fails the call after the wait; a short wait proves the same (DEV-500).
+        let _lock_wait = crate::test_env::EnvVarGuard::set(STORAGE_LOCK_WAIT_ENV, "200");
         let dir = tempfile::tempdir().unwrap();
         let held = File::create(dir.path().join(".task.lock")).unwrap();
         held.lock_exclusive().unwrap();

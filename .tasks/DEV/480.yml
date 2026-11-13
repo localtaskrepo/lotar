@@ -5,10 +5,11 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T19:28:50.779737+00:00
-modified: 2026-11-13T20:00:58.428828+00:00
+modified: 2026-11-13T23:44:50.828526+00:00
 relationships:
   related:
   - DEV-478
+  - DEV-505
 comments:
 - date: 2026-11-13T19:43:29.641222+00:00
   author: claude
@@ -150,3 +151,9 @@ history:
   - field: tags
     old: health, review-returned
     new: health
+- at: 2026-11-13T23:44:50.828526+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-478"]}'
+    new: '{"related":["DEV-478","DEV-505"]}'

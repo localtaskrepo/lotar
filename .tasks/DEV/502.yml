@@ -1,11 +1,11 @@
 title: Filter the Comments and History tabs by author and type
-status: InProgress
+status: Reviewing
 priority: Low
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-13T22:41:10.367004+00:00
-modified: 2026-11-13T23:38:20.166552+00:00
+modified: 2026-11-13T23:47:04.846555+00:00
 relationships:
   blocks:
   - DEV-488
@@ -40,6 +40,9 @@ comments:
 - date: 2026-11-13T23:20:24.487459+00:00
   author: codex
   text: 'Review: blocking. TaskPanelHistoryTab.vue:127-131 counts only fully removed updates. For one update with status and tags, hiding Status removes changes but leaves hiddenText empty, also hiding Show all (TaskPanelActivityFilter.vue:19). Count hidden changes and retain Show all whenever filtering is active; add mixed-field coverage. Reviewed branch diff, ticket comments/related plans and recent tab history. Focused unit tests passed (3); frontend typecheck passed. Full lint/test/smoke and independent visual review not completed. No files edited or commits made; status and assignee unchanged.'
+- date: 2026-11-13T23:46:57.922867+00:00
+  author: claude
+  text: 'Rework of the blocking review finding (TaskPanelHistoryTab.vue:127-131, a field hidden within a mixed-field update gave no count and no Show all): fixed. The History tab now counts hidden changes rather than updates that drop out entirely, e.g. "1 of 3 changes hidden.", so a partly hidden update still shows the count and Show all. The Comments tab still counts comments. Test first: the unit test in view/__tests__/TaskPanelActivityFilter.spec.ts now hides Other within the status+tags+comment_added update and expects "1 of 4 changes hidden." with Show all. It failed before the fix and passes now. The smoke test expects the new wording. docs/help/serve.md updated. Amended signed commit 13a744a9. Checks: npm run lint passed; npm run test:agent passed (2140 Rust, 1518 UI, release, hooks); npm run test:smoke:agent 392/392 passed. After screenshots of the partly hidden update (Status hidden on a status+tags update) at 390/1440/1920 px, light and dark: ![](attachment:after-history-mixed-390-light.8b0620263f475b41e8b30873d6d5870e.png) ![](attachment:after-history-mixed-390-dark.70955863276f78f977c2ab615510601f.png) ![](attachment:after-history-mixed-1440-light.cc993df282ffd01c380383e873dd86cd.png) ![](attachment:after-history-mixed-1440-dark.b3e8c95a4d9d4fd8cfd8a02870f764d0.png) ![](attachment:after-history-mixed-1920-light.d24d0f809248a977354550dbe347fdef.png) ![](attachment:after-history-mixed-1920-dark.2061cd1d1a0b94433633fe37a39251f0.png). The earlier before/after screenshots still apply to the rest of the panel.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0dc4db1c-afdc-4589-a3bc-1ae9580009ce
 - attachment: dev502-comments-after-1440-dark.d23878379059d92bd378765d0b3fb433.webp
@@ -63,6 +66,12 @@ references:
 - attachment: dev502-history-before-390-light.72fd6a8310da81f314387429e59812fd.webp
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A03750fd7-9350-48ab-b423-d773fa69d752
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ada32e006-d8b4-439a-b36c-ce0c42aa530d
+- attachment: after-history-mixed-1440-dark.b3e8c95a4d9d4fd8cfd8a02870f764d0.png
+- attachment: after-history-mixed-1440-light.cc993df282ffd01c380383e873dd86cd.png
+- attachment: after-history-mixed-1920-dark.2061cd1d1a0b94433633fe37a39251f0.png
+- attachment: after-history-mixed-1920-light.d24d0f809248a977354550dbe347fdef.png
+- attachment: after-history-mixed-390-dark.70955863276f78f977c2ab615510601f.png
+- attachment: after-history-mixed-390-light.8b0620263f475b41e8b30873d6d5870e.png
 description: |-
   The task panel's Comments and History tabs list every entry with no way to narrow them; the only control is the reload button. On a long ticket (DEV-466, STD-82) the owner can't pick out what the agents said or what changed a field. Owner asked on 2026-11-13 whether this exists and said to file it.
 
@@ -263,3 +272,46 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ada32e006-d8b4-439a-b36c-ce0c42aa530d
+- at: 2026-11-13T23:46:38.415700+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-history-mixed-1440-dark.b3e8c95a4d9d4fd8cfd8a02870f764d0.png
+- at: 2026-11-13T23:46:38.448609+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-history-mixed-1440-light.cc993df282ffd01c380383e873dd86cd.png
+- at: 2026-11-13T23:46:38.480521+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-history-mixed-1920-dark.2061cd1d1a0b94433633fe37a39251f0.png
+- at: 2026-11-13T23:46:38.511982+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-history-mixed-1920-light.d24d0f809248a977354550dbe347fdef.png
+- at: 2026-11-13T23:46:38.543635+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-history-mixed-390-dark.70955863276f78f977c2ab615510601f.png
+- at: 2026-11-13T23:46:38.575499+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-history-mixed-390-light.8b0620263f475b41e8b30873d6d5870e.png
+- at: 2026-11-13T23:46:57.922867+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:47:04.846555+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

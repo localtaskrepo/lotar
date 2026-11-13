@@ -1635,6 +1635,8 @@ fn hand_back_waiting_t3_job(job_id: &str, ticket_id: &str, tasks_dir: &std::path
     });
 }
 
+/// Overrides how often a job reads its T3 Code thread (milliseconds); used by tests.
+pub const T3_POLL_INTERVAL_ENV: &str = "LOTAR_T3_POLL_INTERVAL_MS";
 /// How often a job reads its T3 Code thread while it waits for its run.
 const ORPHAN_POLL: Duration = Duration::from_secs(5);
 /// Failed `t3 thread show` reads in a row before a job stops waiting.
@@ -1758,7 +1760,7 @@ fn wait_for_t3_run(cli: &T3Cli, job_id: &str, tasks_dir: &std::path::Path, threa
                 }
             }
         }
-        thread::sleep(ORPHAN_POLL);
+        thread::sleep(crate::utils::time::env_millis(T3_POLL_INTERVAL_ENV, ORPHAN_POLL));
     }
 }
 

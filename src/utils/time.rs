@@ -427,6 +427,12 @@ fn add_business_days(mut date: chrono::NaiveDate, mut days: i64) -> chrono::Naiv
     date
 }
 
+/// The milliseconds in environment variable `var`, or `default` when it is
+/// unset, not a number or zero. Lets tests shorten waits and poll intervals.
+pub fn env_millis(var: &str, default: std::time::Duration) -> std::time::Duration {
+    std::env::var(var).ok().and_then(|raw| raw.trim().parse::<u64>().ok()).filter(|ms| *ms > 0).map(std::time::Duration::from_millis).unwrap_or(default)
+}
+
 #[cfg(test)]
 mod sprint_duration_tests {
     use super::*;

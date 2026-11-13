@@ -1,3 +1,4 @@
+use crate::common::env_mutex::EnvVarGuard;
 use lotar::storage::operations::StorageOperations;
 use lotar::storage::safety::{is_valid_project_prefix, validate_project_prefix};
 use lotar::storage::task::Task;
@@ -131,6 +132,8 @@ fn malformed_task_edit_fails_without_overwriting_user_data() {
 
 #[test]
 fn held_task_lock_prevents_add_edit_and_delete() {
+    // A held lock fails the call after the wait; a short wait proves the same (DEV-500).
+    let _lock_wait = EnvVarGuard::set(lotar::storage::safety::STORAGE_LOCK_WAIT_ENV, "200");
     use fs2::FileExt;
 
     let tmp = tempfile::tempdir().unwrap();

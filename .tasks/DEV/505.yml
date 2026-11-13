@@ -1,15 +1,22 @@
 title: lotar agent queue remove and flush are missing from the help
-status: Merging
+status: HelpNeeded
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@merge'
+assignee: '@fix'
 created: 2026-11-13T22:45:44.077860+00:00
-modified: 2026-11-13T23:22:42.198954+00:00
+modified: 2026-11-13T23:44:52.200758+00:00
 relationships:
   related:
   - DEV-492
   - DEV-501
+  - DEV-478
+  - DEV-480
+  - DEV-484
+  - DEV-486
+  - DEV-487
+  - DEV-494
+  - DEV-498
 comments:
 - date: 2026-11-13T23:08:24.243097+00:00
   author: claude
@@ -17,6 +24,12 @@ comments:
 - date: 2026-11-13T23:22:34.511490+00:00
   author: codex
   text: 'Review: passed. Reviewed e610e6d5, ticket/comments, related tickets and quoted decisions, main history, queue CLI/handler/service and embedded-help build path. No findings. Ticket grep, built agent --help, Prettier and diff checks pass; nextest integration help selection: 24 passed with RUSTC_WRAPPER empty after sccache sandbox denial. Full lint/test/smoke not run for docs-only work. No files changed, commits or tickets filed; status and assignee unchanged.'
+- date: 2026-11-13T23:44:12.185103+00:00
+  author: codex
+  text: Merged locally as 93f77341 after clean rebase and fast-forward; included pending .tasks updates as instructed. Formatting, diff checks, ticket grep on main and 24 help tests pass. Full lint/test/smoke omitted for docs-only change. Push was rejected by automatic approval review because the amended commit includes ticket updates for active InProgress work. May the finished main commits including those ticket updates be pushed?
+- date: 2026-11-13T23:44:50.574744+00:00
+  author: triage
+  text: 'Triage, answered by a recorded decision of the owner: standards docs/decisions/2026-11-12-push-finished-work.md (2026-11-12): "Up to where the git tree is clean and we don''t have pending work on a commit anymore we can push in general". Applied: push the commits whose tickets are finished. All 15 unpushed commits on main (up to 93f77341) belong to tickets that are Done or merged (DEV-478, DEV-480, DEV-484, DEV-486, DEV-487, DEV-492, DEV-494, DEV-498, DEV-505 and the STD-rules copies); the .tasks updates inside 93f77341 are ticket records, not unfinished work. The uncommitted .tasks/DEV/493.yml and 505.yml changes stay out of the push. Push main, then close this ticket. If the push is still refused by the approval check, ask the owner with the options picker and quote this decision.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A28fec7dc-34ea-4966-bd7c-9797738d89ee
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab77286cc-0e9d-4702-aae3-ba4a9636b56e
@@ -79,3 +92,32 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-13T23:44:12.185103+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:44:17.547617+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-13T23:44:50.574744+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:44:50.830810+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-492","DEV-501"]}'
+    new: '{"related":["DEV-492","DEV-501","DEV-478","DEV-480","DEV-484","DEV-486","DEV-487","DEV-494","DEV-498"]}'
+- at: 2026-11-13T23:44:52.200758+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'

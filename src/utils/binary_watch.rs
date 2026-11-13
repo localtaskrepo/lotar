@@ -65,7 +65,7 @@ pub fn watched_path() -> Option<PathBuf> {
 }
 
 fn interval() -> Duration {
-    std::env::var(INTERVAL_ENV).ok().and_then(|raw| raw.trim().parse::<u64>().ok()).filter(|ms| *ms > 0).map(Duration::from_millis).unwrap_or(DEFAULT_INTERVAL)
+    crate::utils::time::env_millis(INTERVAL_ENV, DEFAULT_INTERVAL)
 }
 
 /// Run `on_change` once, on a background thread, after the binary at

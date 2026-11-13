@@ -629,6 +629,8 @@ fn upload_noop_attach_is_store_only_and_emits_no_task_event() {
 
 #[test]
 fn mcp_single_attachment_add_checks_blob_under_the_store_lock() {
+    // A held lock fails the call after the wait; a short wait proves the same (DEV-500).
+    let _lock_wait = EnvVarGuard::set(lotar::storage::safety::STORAGE_LOCK_WAIT_ENV, "200");
     let fx = workspace("D6C7");
     let api = server();
     let id = rest_create(&api, "D6C7", "Lock ordering add target");

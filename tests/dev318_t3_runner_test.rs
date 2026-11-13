@@ -5,7 +5,7 @@ use crate::common::TestFixtures;
 use crate::common::env_mutex::EnvVarGuard;
 use lotar::api_types::{AgentJob, TaskCreate};
 use lotar::services::agent_active_jobs;
-use lotar::services::agent_job_service::{AgentJobService, AgentOrchestratorMode};
+use lotar::services::agent_job_service::{self, AgentJobService, AgentOrchestratorMode};
 use lotar::services::finding_service::FindingService;
 use lotar::services::task_service::TaskService;
 use std::fs;
@@ -58,7 +58,7 @@ if [ -n "$FAKE_T3_WORKTREE" ]; then echo "$FAKE_T3_WORKTREE" > "$out/wt.thread-$
 if [ -n "$FAKE_T3_START_RUN" ]; then sh -c "$FAKE_T3_START_RUN"; fi
 echo '[1111/090522.026791:ERROR:electron/shell/app/node_main.cc:154] Node.js environment variables are disabled because this process is invoked by other apps.' >&2
 echo "Thread thread-$$" >&2
-sleep 1
+sleep 0.2
 while [ -f "$out/hold" ]; do sleep 0.1; done
 if [ -n "$FAKE_T3_RENAME" ]; then echo "$FAKE_T3_RENAME" > "$out/branch"; fi
 if [ "${{FAKE_T3_EXIT:-0}}" = "1" ]; then echo 'The run failed: provider quota exhausted' >&2; exit 1; fi
@@ -140,6 +140,7 @@ fn home_with_fix_profile(fixtures: &TestFixtures, profile_extra: &str) -> Home {
         EnvVarGuard::clear("LOTAR_TRUST_ALL"),
         EnvVarGuard::set("LOTAR_TRUST_FILE", fixtures.get_temp_path().join("trust.yml").to_str().unwrap()),
         EnvVarGuard::set("LOTAR_TASKS_DIR", fixtures.tasks_root.to_str().unwrap()),
+        EnvVarGuard::set(agent_job_service::T3_POLL_INTERVAL_ENV, "100"),
     ];
     AgentJobService::set_orchestrator_mode(AgentOrchestratorMode::Server);
     Home { _env: env, out }
@@ -244,7 +245,7 @@ fn a_t3_that_exits_while_its_thread_runs_waits_for_the_run() {
         assert!(start.elapsed() < Duration::from_secs(10), "{:?}", AgentJobService::list_jobs());
         sleep(Duration::from_millis(50));
     }
-    sleep(Duration::from_secs(1));
+    sleep(Duration::from_millis(500));
     let running = AgentJobService::list_jobs().into_iter().find(|job| job.ticket_id == id).unwrap();
     assert_eq!(running.status, "running", "waits while the thread runs");
     fs::write(home.out.join("status"), "completed").unwrap();
@@ -860,7 +861,7 @@ fn a_continue_job_whose_worker_died_ends_from_the_continued_thread() {
     let orphan = "job-20261113T193000.000Z-1";
     orphaned_t3_job(&fixtures, &id, orphan, record.session_id.as_deref());
     AgentJobService::recover_orphaned_jobs(&tasks_dir);
-    sleep(Duration::from_secs(1));
+    sleep(Duration::from_millis(500));
     assert_eq!(AgentJobService::get_job(orphan).unwrap().status, "running", "waits while the continued run runs");
 
     // The continued run ends otherwise than the run before: the job ends from it.
@@ -928,7 +929,7 @@ fn a_job_whose_worker_died_ends_from_its_thread_on_the_next_start() {
     let running = AgentJobService::get_job(job_id).expect("taken over");
     assert_eq!(running.status, "running");
     assert!(agent_active_jobs::find(&tasks_dir, job_id).is_some_and(|job| job.owner_pid == std::process::id()));
-    sleep(Duration::from_secs(1));
+    sleep(Duration::from_millis(500));
     assert_eq!(AgentJobService::get_job(job_id).unwrap().status, "running", "waits while the thread runs");
     fs::write(home.out.join("status"), "completed").unwrap();
 

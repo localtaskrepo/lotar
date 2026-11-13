@@ -5,13 +5,14 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T22:21:43.366702+00:00
-modified: 2026-11-13T23:23:22.394124+00:00
+modified: 2026-11-13T23:44:50.830463+00:00
 relationships:
   blocks:
   - DEV-499
   related:
   - DEV-493
   - DEV-478
+  - DEV-505
 comments:
 - date: 2026-11-13T22:44:48.794454+00:00
   author: claude
@@ -123,3 +124,9 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-13T23:44:50.830463+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-499"],"related":["DEV-493","DEV-478"]}'
+    new: '{"blocks":["DEV-499"],"related":["DEV-493","DEV-478","DEV-505"]}'

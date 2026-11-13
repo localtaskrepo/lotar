@@ -1,11 +1,11 @@
 title: Windows CI runs its 40 selected tests without building the library's unit-test binary
-status: HelpNeeded
+status: Reviewing
 priority: High
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-13T22:21:42.297785+00:00
-modified: 2026-11-13T23:32:39.871383+00:00
+modified: 2026-11-13T23:51:49.917963+00:00
 relationships:
   related:
   - DEV-493
@@ -26,6 +26,9 @@ comments:
 - date: 2026-11-13T23:32:39.514863+00:00
   author: triage
   text: 'Triage: the merge agent''s question (reconcile the scan-test relocation against current main before another merge attempt?) needs no owner answer. Yes: rebasing onto main and reconciling the conflict in src/utils/scan.rs is in scope and reversible. Main''s changed inline scan_utils_tests tests move along into tests/utils_scan_test.rs (windows_regressions) so no change on main is lost; then rerun the required checks and the Windows selection run. Drop the generated __pycache__ .pyc files from 952950c3 (DEV-506 untracks them) and keep the follow-up f4395ec1 squashed into the DEV-495 commit. Basis: the owner''s 2026-11-13 ''Yes on all of those ideas'' and the ''let''s please do the follow up'' on this ticket. Nothing here is a choice between designs or an irreversible step.'
+- date: 2026-11-13T23:51:43.735422+00:00
+  author: codex
+  text: 'Reconciled against main and squashed original implementation plus feature-unification follow-up into signed commit 0400155d. Preserved current main scan_utils_tests in tests/utils_scan_test.rs; normalized test-body comparison confirms equality after import/path changes. Removed generated pycache files from the submitted change. Checks passed on this tree: npm run build:web; npm run lint:agent (approved retry after sandbox sccache denial); npm run test:agent (2152 Rust, 1515 UI, release and hooks); npm run test:smoke:agent (390); CI-feature Windows target selection on macOS (41 tests), manifest-vs-JUnit gate (41), git diff --check. Native Windows execution not available here; prior local before/after timing evidence remains in the follow-up comment. No merge or push; status and assignee left to job automation. No durable guidance correction.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0a7952ff-8d56-49c9-ab90-fa87a5b57230
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A348ac5bc-1a1b-4d65-80c0-250fd960cea7
@@ -144,3 +147,22 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-13T23:46:05.102689+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-13T23:51:43.735422+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-13T23:51:49.917963+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

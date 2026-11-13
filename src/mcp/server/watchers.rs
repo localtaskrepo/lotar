@@ -76,7 +76,7 @@ fn spawn_tools_dir_watcher(tasks_dir: PathBuf, sender: mpsc::Sender<ServerEvent>
         drop(tx);
 
         let mut last_emit: Option<Instant> = None;
-        let poll_interval = Duration::from_secs(2);
+        let poll_interval = crate::utils::time::env_millis(TOOLS_POLL_INTERVAL_ENV, Duration::from_secs(2));
         loop {
             match rx.recv_timeout(poll_interval) {
                 Ok(result) => {
@@ -103,6 +103,9 @@ fn spawn_tools_dir_watcher(tasks_dir: PathBuf, sender: mpsc::Sender<ServerEvent>
         }
     });
 }
+
+/// Overrides how often the tools watcher polls (milliseconds); used by tests.
+const TOOLS_POLL_INTERVAL_ENV: &str = "LOTAR_MCP_WATCH_INTERVAL_MS";
 
 /// Re-gather enum hints and emit a tools-list change when they differ from
 /// the last snapshot, debounced to coalesce event bursts.
