@@ -10,7 +10,7 @@ You are running inside a LoTaR agent job on the local machine with access to the
 Use the LoTaR CLI to read and update ticket ${{ticket.id}}. Run it as `"${{lotar.bin}}"`, the build that started this job; a `lotar` on your PATH may be a different version. Write commands with literal values like the ones below: some agent tools refuse commands that contain shell variables such as `$LOTAR_TICKET_ID` or `$?`.
 
 ```sh
-"${{lotar.bin}}" --format json list ${{ticket.id}}
+"${{lotar.bin}}" --format json show ${{ticket.id}}
 "${{lotar.bin}}" task relationships ${{ticket.id}}
 # The configured statuses
 "${{lotar.bin}}" config show --project ${{ticket.project}}

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T10:33:47.729859+00:00
-modified: 2026-11-14T08:32:24.151512+00:00
+modified: 2026-11-14T08:43:55.305032+00:00
 relationships:
   blocks:
   - DEV-513
@@ -111,6 +111,16 @@ comments:
 - date: 2026-11-14T08:32:18.676457+00:00
   author: claude
   text: 'Merged: 2eaaa99a (the rebase of reviewed 57c416bb, identical per git range-diff) is already on main, under d54ebc0f (DEV-526) and 5fdae405 (DEV-525); main was fast-forwarded after the 08:06Z hand-back. Gates as triage asked, run on main d54ebc0f in this worktree: npm run build:web, then npm run lint:agent, npm run test:agent (2164 Rust, 1537 UI, release, hooks) and npm run test:smoke:agent (401): all passed. Not pushed: the main checkout has uncommitted ticket edits (.tasks), so it isn''t clean. Nothing waits on this ticket.'
+- date: 2026-11-14T08:43:43.684372+00:00
+  author: claude
+  text: |-
+    Merge after the reopen (Done to Merging, 08:39Z): nothing new to land, the fix is on main as 2eaaa99a.
+
+    - This job's worktree started from agent/DEV-468, which still points at a6682318, the first version of the fix from 2026-11-13. It predates the harnessmux port. The ported, reviewed fix 2eaaa99a was made on other t3 branches and never moved agent/DEV-468: the same split this ticket fixes. The installed lotar 0.15.0 doesn't contain the fix yet.
+    - Rebasing onto main conflicted in agent_job_service.rs, docs/help/agent.md and the deleted tests/dev318_t3_runner_test.rs. The old side adds a second follow_thread_branch that calls into the removed T3 runner. 2eaaa99a does everything a6682318 does, plus failing the job when the branch can't move. I skipped a6682318, so the branch now equals main (28485241). a6682318 stays on agent/DEV-468 and t3/review-rework-ticket-branch.
+    - Checks: the two DEV-468 regression tests (dev503_harness_jobs_test: every_t3_thread_of_a_ticket_ends_on_and_starts_from_the_tickets_branch, a_ticket_branch_that_cannot_follow_its_thread_fails_the_job) passed on 28485241. I didn't rerun the full lint, test or smoke suites: this job adds no code, and the 08:32Z job ran them on main d54ebc0f, which already had the fix.
+    - Not pushed: the main checkout has uncommitted .tasks edits (DEV-468, 496, 512, 521, 523). No .tasks amend, because I merged no commit.
+    - Leftovers, not deleted: agent/DEV-468 and six t3/* branches hold old copies of this fix (t3/fix-rework-commits-ticket-branch, t3/review-rework-ticket-branch, t3/rework-commits-on-ticket-branch, -1, -2, t3/rework-commits-to-ticket-branch). They can go in a branch cleanup.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1ab3c1d7-0ce9-4c25-a520-275cf8b42ec4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae7d11a9f-4237-40dd-a146-a91f4cc63276
@@ -120,6 +130,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A155afdd3-43ca-4967-a6ae-9899afe01599
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2d7ebdd3-9368-4b87-aba8-486c77d8f982
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acb74640a-3c54-4159-ae41-fcf3e010dedf
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adf3014fd-3295-4e1d-8b7c-3349b4e8e077
 releases:
 - 6
 description: |-
@@ -621,6 +632,27 @@ history:
     old: '{"blocks":["DEV-513"],"related":["DEV-342","DEV-408","DEV-414","DEV-465","DEV-472","DEV-473","DEV-466","DEV-513","DEV-524","DEV-503","DEV-528","DEV-525"]}'
     new: '{"blocks":["DEV-513"],"related":["DEV-342","DEV-408","DEV-414","DEV-465","DEV-472","DEV-473","DEV-466","DEV-513","DEV-524","DEV-503","DEV-528","DEV-525","DEV-526"]}'
 - at: 2026-11-14T08:32:24.151512+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-14T08:39:37.378454+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Done
+    new: Merging
+- at: 2026-11-14T08:39:37.975219+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adf3014fd-3295-4e1d-8b7c-3349b4e8e077
+- at: 2026-11-14T08:43:43.684372+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T08:43:55.305032+00:00
   actor: mallox
   changes:
   - field: status

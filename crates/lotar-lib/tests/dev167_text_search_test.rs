@@ -139,3 +139,36 @@ fn mcp_task_list_search_and_relevance_sort() {
     assert_eq!(sorted(call(serde_json::json!({"project": "SRCH", "search": "\"login redirect\""}))), ids(&["1"]));
     assert_eq!(call(serde_json::json!({"project": "SRCH", "search": "login", "sort_by": "relevance"})), ids(&["5", "3", "1", "6"]));
 }
+
+#[test]
+fn cli_list_with_a_full_id_puts_that_task_first() {
+    // DEV-529: newer tickets mention SRCH-1, so the default modified-desc
+    // order would list them before it.
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("SRCH");
+    std::fs::create_dir_all(&dir).unwrap();
+    for (number, fields) in [(1, "title: The asked-for task\n"), (2, "title: Follow-up to SRCH-1\n"), (3, "title: Other\ndescription: Blocked by SRCH-1\n")] {
+        std::fs::write(
+            dir.join(format!("{number}.yml")),
+            format!("{fields}status: Todo\npriority: Medium\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-01-0{number}T00:00:00Z\n"),
+        )
+        .unwrap();
+    }
+    let run = |args: &[&str]| -> Vec<String> {
+        let output = common::lotar_cmd()
+            .unwrap()
+            .current_dir(tmp.path())
+            .env("LOTAR_TASKS_DIR", tmp.path())
+            .args(["--format", "json", "list"])
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+        json["tasks"].as_array().unwrap().iter().map(|task| task["id"].as_str().unwrap().to_owned()).collect()
+    };
+    assert_eq!(run(&["SRCH-1"]), ids(&["1", "3", "2"]));
+    assert_eq!(run(&["srch-1", "--sort-by", "title", "--reverse"]), ids(&["1", "2", "3"]));
+    // Without an exact ID the order is unchanged.
+    assert_eq!(run(&["SRCH"]), ids(&["3", "2", "1"]));
+}

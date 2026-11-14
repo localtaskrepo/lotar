@@ -211,6 +211,11 @@ impl SearchQuery {
         self.score(doc).is_some()
     }
 
+    /// Whether the whole query is the task's ID, or one it had before a move.
+    pub fn is_exact_id(&self, doc: &SearchDocument<'_>) -> bool {
+        !self.whole.is_empty() && (fold(doc.id) == self.whole || doc.moved_from.iter().any(|old| fold(old) == self.whole))
+    }
+
     /// Relevance of a task for this query, or `None` when it does not match.
     /// An empty query matches everything with a score of 0.
     pub fn score(&self, doc: &SearchDocument<'_>) -> Option<u32> {
@@ -229,7 +234,7 @@ impl SearchQuery {
             }
         }
         if !self.whole.is_empty() {
-            if fold(doc.id) == self.whole || doc.moved_from.iter().any(|old| fold(old) == self.whole) {
+            if self.is_exact_id(doc) {
                 total += EXACT_ID_BONUS;
             }
             let title = collapse_whitespace(&fold(doc.title));

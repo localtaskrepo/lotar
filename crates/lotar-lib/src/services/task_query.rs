@@ -688,6 +688,16 @@ pub fn apply(tasks: &mut Vec<(String, TaskDTO)>, options: &TaskQueryOptions, now
         sort_by_relevance(tasks, options.search.as_ref(), options.order);
     } else {
         sort_tasks_ranked(tasks, &options.sort, options.order, &options.ranks);
+        exact_id_first(tasks, options.search.as_ref());
+    }
+}
+
+/// Put the task whose ID is the whole search first in any non-relevance
+/// order, so `lotar list DEV-5` leads with DEV-5 and not with tickets that
+/// mention it (DEV-529). The sort is stable: the others keep their order.
+fn exact_id_first<T: Searchable>(tasks: &mut [(String, T)], search: Option<&SearchQuery>) {
+    if let Some(query) = search {
+        tasks.sort_by_key(|(id, task)| !query.is_exact_id(&task.search_document(id)));
     }
 }
 

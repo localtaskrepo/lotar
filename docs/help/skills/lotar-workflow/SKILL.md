@@ -26,7 +26,7 @@ and report without task mutations. Do not turn small one-off answers into ticket
 ```bash
 lotar --tasks-dir "$TASKS_DIR" config show --project "$PROJECT"
 lotar --tasks-dir "$TASKS_DIR" list -p "$PROJECT" "search words" --limit 10
-lotar --tasks-dir "$TASKS_DIR" --format json list "$TASK_ID"
+lotar --tasks-dir "$TASKS_DIR" --format json show "$TASK_ID"
 lotar --tasks-dir "$TASKS_DIR" comment "$TASK_ID"
 lotar --tasks-dir "$TASKS_DIR" task relationships "$TASK_ID"
 ```
@@ -41,7 +41,7 @@ Do not call both transports for each operation or repeatedly dump every schema.
 | Operation | MCP tool | CLI (include `--tasks-dir "$TASKS_DIR"`) |
 | --- | --- | --- |
 | Search | `task_list` with `project`, `search`, `limit` | `list -p "$PROJECT" "search words" --limit 10` |
-| Read | `task_get` with `id` | `--format json list "$TASK_ID"`; `comment "$TASK_ID"` |
+| Read | `task_get` with `id` | `--format json show "$TASK_ID"`; `comment "$TASK_ID"` |
 | Create | `task_create` | `add "Outcome" -p "$PROJECT" --description "Scope and acceptance criteria"` |
 | Create one that waits for another | `task_create` with `relationships.depends_on` | `add "Outcome" -p "$PROJECT" --status "$WAITING" --depends-on "$OTHER_ID"` |
 | Report a found problem once | `task_create` with `finding` | `add "Problem" -p "$PROJECT" --finding "<stable key>" -D "What you saw"` |

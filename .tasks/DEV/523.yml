@@ -1,11 +1,11 @@
 title: A merge job that stops on purpose still lands its branch on main
-status: Merging
+status: HelpNeeded
 priority: High
 type: Bug
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-14T06:27:21.642026+00:00
-modified: 2026-11-14T08:38:50.475538+00:00
+modified: 2026-11-14T08:39:02.534335+00:00
 relationships:
   related:
   - DEV-518
@@ -27,6 +27,9 @@ comments:
 - date: 2026-11-14T08:38:50.475538+00:00
   author: codex
   text: 'Merge blocked: the second review could not record its blocking verdict because the sandbox denied ticket writes. HEAD remains 81c1488d with the unresolved recovery gap: adopted merge jobs initialize ticket_at_start=None, so a direct hand-back after recovery is missed and main can still be fast-forwarded. No merge or push performed. Owner decision needed: should this gap be fixed before merging?'
+- date: 2026-11-14T08:39:02.412293+00:00
+  author: automation
+  text: The merge agent's job job-20261114T083832.814Z-109 failed (lotar agent logs job-20261114T083832.814Z-109); the fix agent retries it on branch t3/merge-job-stop-keeps-main-1.
 references:
 - code: crates/lotar-lib/src/services/agent_job_service.rs#3121-3170
 - code: crates/lotar-lib/src/services/agent_job_service.rs#3243-3258
@@ -56,6 +59,7 @@ description: |-
 tags:
 - agent
 - review-returned
+- merge-retried
 history:
 - at: 2026-11-14T06:27:22.694029+00:00
   actor: claude
@@ -169,3 +173,22 @@ history:
   actor: codex
   changes:
   - field: comment_added
+- at: 2026-11-14T08:39:02.375861+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: agent, review-returned
+    new: agent, review-returned, merge-retried
+- at: 2026-11-14T08:39:02.412293+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-14T08:39:02.534335+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox

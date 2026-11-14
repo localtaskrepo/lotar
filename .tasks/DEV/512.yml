@@ -1,11 +1,11 @@
 title: Per-profile agent command and fuller usage for harnessmux jobs
-status: Merging
+status: Done
 priority: Low
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T02:19:59.564652+00:00
-modified: 2026-11-14T08:24:40.023444+00:00
+modified: 2026-11-14T08:39:25.014863+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -17,6 +17,8 @@ relationships:
   - DEV-510
   - DEV-509
   - DEV-511
+  - DEV-496
+  - DEV-521
 comments:
 - date: 2026-11-14T05:51:55.474946+00:00
   author: claude
@@ -45,6 +47,9 @@ comments:
 - date: 2026-11-14T08:24:34.204568+00:00
   author: codex
   text: 'Verified existing implementation at d5b47964 with published harnessmux 0.1.2. Fresh regression check: RUSTC_WRAPPER= npm run test:rust:agent -- a_profile_command passed both tests outside sandbox; sandbox attempt failed to bind a Unix socket. No files changed or new commit needed. Prior comment records full lint/test/smoke passing on this same commit; full gates not repeated. Existing signed commit preserved, ready for job handoff.'
+- date: 2026-11-14T08:39:21.185544+00:00
+  author: codex
+  text: 'Merged into main: rebased d5b47964 cleanly onto 3c74ec14 as 552c4cf5, fast-forwarded main, then included only pending .tasks changes as instructed; final signed main commit 28485241. All required gates rerun and passed: npm run lint:agent, npm run test:agent, npm run test:smoke:agent (401 smoke tests). No checks skipped. Main was clean after amendment. Not pushed: oldest unpushed commit ff84b766 belongs to DEV-496, still HelpNeeded, and DEV-521 is also HelpNeeded; no finished prefix exists before that unfinished work. No code conflicts or durable guidance findings.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa15afbd8-214b-4ebf-9146-4dbc45d5bd47
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7b625e47-5945-42b1-af12-9560f40efb23
@@ -221,3 +226,19 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-14T08:39:21.185544+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T08:39:21.306834+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-510","DEV-509","DEV-511"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-510","DEV-509","DEV-511","DEV-496","DEV-521"]}'
+- at: 2026-11-14T08:39:25.014863+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
