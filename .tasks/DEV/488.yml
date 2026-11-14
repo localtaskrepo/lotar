@@ -1,11 +1,11 @@
 title: Question comments with options the owner answers by click, and answers that set the ticket's fields
-status: Merging
+status: Done
 priority: High
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T21:13:42.890310+00:00
-modified: 2026-11-14T00:59:40.743199+00:00
+modified: 2026-11-14T00:59:57.050176+00:00
 relationships:
   depends_on:
   - DEV-502
@@ -198,7 +198,6 @@ description: |-
 tags:
 - web-ui
 - backend
-- review-returned
 history:
 - at: 2026-11-13T21:13:43.100686+00:00
   actor: claude
@@ -755,3 +754,12 @@ history:
   actor: codex
   changes:
   - field: comment_added
+- at: 2026-11-14T00:59:57.050176+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: web-ui, backend, review-returned
+    new: web-ui, backend

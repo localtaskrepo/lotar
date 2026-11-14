@@ -11,14 +11,18 @@ this is the order and the gates. Comment each step's result on the release ticke
    tickets waiting for it. For each, find its commit (its comments name it, or
    `git log main --grep <ID>`) and check `git branch --contains <commit>` lists `main`. A
    fix not on main: comment it on the release ticket and ask the owner whether to wait.
+   `lotar list 'release:X.Y.Z -status:Done'` lists what is still open in its
+   [release record](../../../docs/release-guide.md#release-records); add the tickets merged
+   since the last tag that are in no release.
 2. **Version bump**: a patch unless the owner asks for a minor, as the guide's
    [Pre-Release Checklist](../../../docs/release-guide.md#pre-release-checklist) says, with
    its local checks, committed on main.
-3. **QA green** for that commit: the Quality Assurance run (`gh run list --workflow
-   "Quality Assurance" --commit <sha>`) has succeeded, not just started.
+3. **QA green** for that commit: the Quality Assurance run has succeeded, not just started:
+   `gh run list --workflow "Quality Assurance" --commit <sha>`.
 4. **Signed tag, pushed, only with the owner's OK.** Pushing a tag publishes the release.
    Ask him first (a HelpNeeded question on the release ticket when you can't ask directly),
-   then `git tag -s vX.Y.Z -m vX.Y.Z` and `git push origin vX.Y.Z`.
+   then `git tag -s vX.Y.Z -m vX.Y.Z` and `git push origin vX.Y.Z`, then
+   `lotar release release X.Y.Z`.
 5. **Release workflow green**: every job of the Release run for the tag succeeded
    ([Cutting a Release](../../../docs/release-guide.md#cutting-a-release)). Re-run a failed
    job; report one that fails again.
@@ -28,7 +32,8 @@ this is the order and the gates. Comment each step's result on the release ticke
    ([Tickets waiting for a release](../../../docs/release-guide.md#tickets-waiting-for-a-release)).
    Check that they were assigned.
 8. **Open the next release ticket**, `Release vX.Y.(Z+1)`, as the guide says, so the next
-   waiting ticket has one to depend on.
+   waiting ticket has one to depend on, and its record: `lotar release create X.Y.(Z+1)`,
+   `lotar release add X.Y.(Z+1) <ticket>`.
 
 Done when the release is installed, its ticket is Done, the waiting tickets are with @fix,
-and the next release ticket exists.
+and the next release ticket and record exist.

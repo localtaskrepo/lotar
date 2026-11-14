@@ -1,11 +1,11 @@
 title: 'Hand-off report comments: commits, checks passed, failed and not run, next step'
-status: Blocked
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
-assignee: claude
+assignee: '@fix'
 created: 2026-11-13T21:14:11.750735+00:00
-modified: 2026-11-14T00:28:06.148232+00:00
+modified: 2026-11-14T01:50:58.838866+00:00
 relationships:
   depends_on:
   - DEV-488
@@ -30,8 +30,16 @@ comments:
 - date: 2026-11-14T00:28:06.148232+00:00
   author: claude
   text: 'Set to Blocked: this waits for DEV-488 (depends-on, tag blocked-by:DEV-488), not for the owner. As Blocked, the "Prerequisites done" rule continues it once DEV-488 is done; in HelpNeeded nothing would. It is in v0.15.0 (DEV-417, owner 2026-11-14).'
+- date: 2026-11-14T01:22:20.264204+00:00
+  author: claude
+  text: 'Rebased onto main after DEV-488 and DEV-502. The report now goes through DEV-488''s shared paths: `CommentRequest` (REST and MCP) and the build closure in `add_comment_with_context`. A report goes with a plain comment only; with `question` or `answer` it is refused. The CLI gets `with_report` next to `with_ask`. The Comments tab keeps DEV-488''s markup, shows the report under the text, and the Type filter has a "Hand-off" chip, as agreed in the merge order. OpenAPI `TaskCommentRequest` and the MCP schema have `report`; help docs updated. Checks: npm run lint passed; npm test passed (2176 Rust, 1528 UI, release, hooks); smoke passed after build:smoke (111 files, 395 tests, including the new report checklist test). Commit 1568c37f on agent/DEV-490, single commit, signed, not pushed.'
+- date: 2026-11-14T01:23:33.827507+00:00
+  author: codex
+  text: 'Review: blocking. Missing required before/after UI screenshot attachments in light/dark at 1920, 1440 and 390 px. smoke/tests/ui.report-comments.smoke.spec.ts:62-64 only writes a local comments.png. Attach and link the required matrix before re-review. Targeted UI tests passed (2 files, 5 tests); diff whitespace check passed. Quick smoke failed before app startup because target/smoke/lotar is absent. Independent screenshots, full lint, Rust tests, full smoke and remaining cross-ticket/history review not completed. No files or commits changed; status and assignee unchanged.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A92f9648a-c12b-4124-9284-32c1807b437d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2ba70837-175f-468d-9c07-7e1e47d39a19
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5e68378b-89bd-488b-8d38-1e7bf0ad6ff0
 releases:
 - 5
 description: |-
@@ -56,6 +64,7 @@ tags:
 - backend
 - blocked
 - blocked-by:DEV-488
+- review-returned
 history:
 - at: 2026-11-13T21:14:12.167161+00:00
   actor: claude
@@ -163,3 +172,63 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-14T00:59:57.460143+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: claude
+    new: '@fix'
+- at: 2026-11-14T01:12:23.441842+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-14T01:22:20.264204+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T01:22:27.620805+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T01:22:41.431085+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2ba70837-175f-468d-9c07-7e1e47d39a19
+- at: 2026-11-14T01:23:33.827507+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T01:23:39.284026+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: web-ui, backend, blocked, blocked-by:DEV-488
+    new: web-ui, backend, blocked, blocked-by:DEV-488, review-blocked
+- at: 2026-11-14T01:23:45.519236+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: web-ui, backend, blocked, blocked-by:DEV-488, review-blocked
+    new: web-ui, backend, blocked, blocked-by:DEV-488, review-returned
+- at: 2026-11-14T01:50:57.992704+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-14T01:50:58.838866+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5e68378b-89bd-488b-8d38-1e7bf0ad6ff0

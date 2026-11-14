@@ -1,0 +1,95 @@
+title: 'crates.io: switch lotar''s crates to trusted publishing only after the first release'
+status: Blocked
+priority: Medium
+type: Chore
+reporter: claude
+created: 2026-11-14T01:39:35.096482+00:00
+modified: 2026-11-14T01:40:12.994590+00:00
+relationships:
+  depends_on:
+  - DEV-417
+  related:
+  - DEV-507
+  - DEV-497
+comments:
+- date: 2026-11-14T01:40:06.621676+00:00
+  author: triage
+  text: 'Not due yet: the crates don''t exist on crates.io (lotar, lotar-lib, lotar-web-assets all return 404; latest tag is v0.14.3), so the ''Before you start'' check fails. The first release that publishes them is v0.15.0 (DEV-417), which waits for DEV-497 and DEV-507. DEV-508 now depends on DEV-417 and stays blocked without an assignee until the release has shipped and the three crates exist; it needs the owner only then, for the crates.io steps.'
+references:
+- file: .github/workflows/release.yml
+description: |-
+  After the first release that publishes lotar to crates.io, switch the three crates from the stored token to trusted publishing only. The owner decided this on 2026-11-14 in the thread ("Trusted, token once"; details in DEV-507). The steps need his crates.io login, so they are his.
+
+  ## Before you start
+
+  - Check that https://crates.io/crates/lotar, https://crates.io/crates/lotar-lib and https://crates.io/crates/lotar-web-assets exist. If they don't, the release shipped without DEV-507: make this ticket depend on the next release ticket instead.
+  - The GitHub environment `release` already exists in localtaskrepo/lotar, limited to `v*` tags (created 2026-11-14, same as harnessmux).
+
+  ## Steps
+
+  - [ ] On crates.io, for **each** of `lotar`, `lotar-lib` and `lotar-web-assets`: Settings → Trusted Publishing → add GitHub: owner `localtaskrepo`, repository `lotar`, workflow `release.yml`, environment `release`.
+  - [ ] For each of the three crates, turn on "trusted publishing only", so a token can't publish them any more.
+  - [ ] On crates.io, Account Settings → API Tokens: revoke the token used for the first publish.
+  - [ ] Delete the repo secrets: `gh secret delete CARGO_REGISTRY_TOKEN -R localtaskrepo/lotar` and `gh secret delete CARGO_REGISTRY_TOKEN -R localtaskrepo/harnessmux` (harnessmux doesn't use its copy).
+  - [ ] Hand back to an agent (assign @fix) to remove the token fallback from `publish-crates` in `.github/workflows/release.yml` and the first-release step from docs/release-guide.md.
+tags:
+- owner
+- blocked
+- blocked-by:DEV-417
+history:
+- at: 2026-11-14T01:39:35.316403+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-507"]}'
+- at: 2026-11-14T01:39:49.988194+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-507"]}'
+    new: '{"depends_on":["DEV-417"],"related":["DEV-507"]}'
+- at: 2026-11-14T01:39:50.403248+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:.github/workflows/release.yml
+- at: 2026-11-14T01:40:06.621676+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-14T01:40:06.765218+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-417"],"related":["DEV-507"]}'
+    new: '{"depends_on":["DEV-417"],"related":["DEV-507","DEV-497"]}'
+- at: 2026-11-14T01:40:07.245060+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-14T01:40:07.377274+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Blocked
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: claude
+  - field: tags
+    old: owner
+    new: owner, blocked, blocked-by:DEV-417
+- at: 2026-11-14T01:40:12.738287+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-14T01:40:12.994590+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: claude

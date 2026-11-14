@@ -1,28 +1,79 @@
 title: 'crates.io: the published lotar-lib and lotar-web-assets crates carry their docs and web UI'
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-14T00:50:32.865133+00:00
-modified: 2026-11-14T00:56:37.022044+00:00
+modified: 2026-11-14T01:56:48.878459+00:00
 relationships:
   related:
   - DEV-497
+  - DEV-163
+  - DEV-508
+  - DEV-417
+comments:
+- date: 2026-11-14T01:12:08.540634+00:00
+  author: claude
+  text: 'Done in 5bef3dba (signed), on top of DEV-497''s latest commit 35c91373, which is still under review and not on main: the branch carries both commits. If DEV-497 is amended again, rebase this commit onto it. Changes: crates/lotar-lib/build.rs and crates/lotar-web-assets/build.rs use the repository''s docs/ and target/web-embed inside the workspace (folder crates/<name>). A packaged crate (folder <name>-<version>) uses copies in its own docs/ and web-embed/, and its build fails with a clear message when they are missing, so an empty UI can''t be published. agent_job_service.rs reads agent-instructions.md through LOTAR_DOCS_DIR, which build.rs sets. New scripts/stage-crates.mjs makes those copies (both gitignored), with tests in scripts/tests/stage-crates.test.mjs (part of test:release). include lists on all three packages: without one, the root lotar package would have published 1241 repo files, .tasks/ included. Patterns start with / because README.md alone also matched node_modules/**/README.md. Release workflow: new job publish-crates (after build-and-release, stable tags only, because Cargo.toml has the version without the prerelease suffix) runs build:web, stage-crates and cargo publish --locked --allow-dirty -p lotar-web-assets -p lotar-lib -p lotar, and skips versions already on crates.io. It reads the secret CARGO_REGISTRY_TOKEN. Note: the repo has no secret by that name (gh secret list), so the job fails clearly at the next stable tag until the token is added under that name. docs/release-guide.md (job, artifacts, prerelease table) and docs/developers/main.md are updated. Checks: npm run build:web && node scripts/stage-crates.mjs && cargo package --allow-dirty -p lotar-web-assets -p lotar-lib -p lotar passed with all three verify builds (lotar verified against the packaged lib and assets from cargo''s temp registry). From the unpacked .crate files, cargo install lotar into a scratch root, run in an empty folder: lotar help list renders, and serve returns the embedded index.html and /api/openapi.json (303 KB). npm run lint:agent, npm run test:agent (2142 Rust, 1515 UI, 50 release, 7 hooks), smoke 390/390, cargo deny check: all pass. Not run: a real cargo publish (no token, and publishing can''t be undone). Observation for DEV-497: in 35c91373 lotar-agent-wrapper is a bin of lotar-lib, so cargo install lotar from crates.io installs only lotar (the wrapper needs cargo install lotar-lib).'
+- date: 2026-11-14T01:17:07.288986+00:00
+  author: claude
+  text: 'mallox in the thread (2026-11-14): "I added the cargo registry token to lotar and harnessmux so that both can publish with it". gh secret list shows CARGO_REGISTRY_TOKEN in localtaskrepo/lotar (2026-11-14 01:15 UTC) and localtaskrepo/harnessmux. The open point from the comment above is resolved: publish-crates can publish at the next stable tag. Nothing to change in 5bef3dba, since the job already reads that secret name.'
+- date: 2026-11-14T01:18:59.945124+00:00
+  author: claude
+  text: 'Correction to "publishing can''t be undone" in the outcome comment: a published version can''t be changed or republished (a fix is a new version), and a yank only stops new projects from resolving it while it stays downloadable. A whole crate can be deleted within 72 hours of publishing, or later if it has one owner and fewer than 500 downloads a month (crates.io usage policy, RFC 3660).'
+- date: 2026-11-14T01:22:33.756062+00:00
+  author: codex
+  text: 'Review: blocking. crates/lotar-lib/Cargo.toml:24-26 places lotar-agent-wrapper only in lotar-lib, so installing lotar no longer installs the wrapper required for agent list-running (docs/help/install.md:130). Preserve the installed binary set or obtain owner approval; add install coverage. Inherited DEV-497 is HelpNeeded with integration conflicts and missing crates/ CI coverage on current main. Read both tickets/comments, branch commits, packaging scripts/manifests, release workflow, embedded UI test and main history. Reran release tests: 50/50 pass. Packaging/install, lint, Rust/UI and smoke not independently rerun. No UI source changes, file edits or commits; status and assignee unchanged. No minor tickets.'
+- date: 2026-11-14T01:34:18.407579+00:00
+  author: claude
+  text: 'The owner, 2026-11-14, in the thread: "Trusted, token once". Asked why lotar''s crates use a stored token when harnessmux uses trusted publishing, he chose: trusted publishing in a tag-only `release` environment, the token only for the first release (0.15.0, because the crates don''t exist yet), then trusted publishers on crates.io, "trusted publishing only", the token revoked and both repos'' secrets deleted. Details are in the description under "Publishing". This changes the `publish-crates` job in 5bef3dba, alongside the review finding about lotar-agent-wrapper. Before that the job read a repo-wide, long-lived secret without an environment, so any branch''s workflow could read it.'
+- date: 2026-11-14T01:39:57.631402+00:00
+  author: claude
+  text: 'The GitHub environment `release` now exists in localtaskrepo/lotar, limited to `v*` tags like harnessmux''s, so `publish-crates` can use `environment: release`. The steps after the first release (crates.io trusted publishers, "trusted publishing only", revoking the token, deleting both secrets) are the owner''s, in DEV-508. That ticket waits on DEV-417 and comes back to an agent to remove the token fallback.'
+- date: 2026-11-14T01:50:46.773621+00:00
+  author: claude
+  text: 'Rework of codex''s blocking review, now 3f31b799 (signed), rebased onto DEV-497''s new 3ec533d6 (branch t3/cargo-workspace-web-assets-4, on main 2f9b8e97). Finding 1 (lotar-agent-wrapper only in lotar-lib, so cargo install lotar drops it): fixed in DEV-497, where the layout came from. I asked the running DEV-497 rework; it moved the wrapper [[bin]] to the root package (src/bin/lotar_agent_wrapper.rs) and ported the installed-binary-set test, so DEV-507 leaves the move out to avoid a second copy of the same fix. Checked from the packaged crates: lotar-0.14.3.crate contains src/bin/lotar_agent_wrapper.rs, and cargo install from the unpacked .crate files (lotar-lib and lotar-web-assets patched to their unpacked crates) installs executables lotar and lotar-agent-wrapper. Finding 2 (inherited DEV-497 conflicts with main, crates/ missing from CI coverage): resolved by that rebase; 3ec533d6 carries main''s bstr/predicates/windows_regressions and adds crates/ to ci.yml''s Rust filter. The only conflict in DEV-507 was the docs/developers/main.md layout table (wrapper now listed under the root package). Checks: npm run build:web, stage-crates, cargo package --allow-dirty -p lotar-web-assets -p lotar-lib -p lotar with all three verify builds; from an empty folder the installed lotar renders lotar help list, and serve returns the embedded index.html and /api/openapi.json (309 KB); npm run lint:agent; npm run test:agent (2171 Rust, 1524 UI, 50 release, 7 hooks); npm run smoke 394/394; cargo deny check. Not run: a real cargo publish. DEV-507 must land after DEV-497''s 3ec533d6; if DEV-497 changes again, rebase this commit onto it.'
+- date: 2026-11-14T01:53:34.923865+00:00
+  author: codex
+  text: 'Review: blocking. .github/workflows/release.yml:695-705 lacks environment: release and id-token: write; :748-759 uses only the stored token, without the pinned crates-io-auth-action and trusted publishing required by the recorded owner decision. Implement trusted publishing with the first-release token fallback. docs/release-guide.md:256-262 omits trusted publisher setup and post-first-release steps; document the approved setup and DEV-508 handoff. Wrapper finding resolved in inherited 3ec533d6. Read branch diff, ticket comments/relationships, build scripts/manifests/staging and main release history. Release tests passed 50/50. Packaging/install, lint, full suites and smoke not independently rerun. No files or commits changed; status and assignee unchanged. No minor tickets or durable guidance finding.'
+- date: 2026-11-14T01:53:39.802610+00:00
+  author: automation
+  text: The review found blocking problems again after one rework (the comments above). Should an agent rework it once more (lotar assignee DEV-507 @fix), will you decide the findings, or is it WontDo?
+- date: 2026-11-14T01:54:07.535202+00:00
+  author: triage
+  text: 'Triage, for the question in the last automation comment: rework once more, the owner doesn''t need to decide. Both findings of the second review (codex, 2026-11-14 01:53) only ask for what he already decided, 2026-11-14 in the thread: "Trusted, token once" (recorded in this ticket''s description under Publishing and in comment 01:34). Open work for the agent: (1) publish-crates in .github/workflows/release.yml gets environment: release and id-token: write, takes its token from rust-lang/crates-io-auth-action pinned to a commit SHA (DEV-163), and falls back to secrets.CARGO_REGISTRY_TOKEN for the first release only; (2) docs/release-guide.md describes the trusted-publishing setup and the steps after the first release, handing over to DEV-508 (his crates.io steps; it waits on DEV-417). The wrapper finding is resolved in DEV-497''s 3ec533d6. Rebase onto DEV-497 if it changes again. Not for the owner: nothing to publish before this lands; DEV-417 (v0.15.0) waits on it.'
+- date: 2026-11-14T01:56:43.861133+00:00
+  author: codex
+  text: 'Reworked both second-review findings in signed commit 21a568d4. publish-crates now uses environment release, id-token write, and rust-lang/crates-io-auth-action v1.0.5 pinned to its verified upstream SHA. Trusted token is preferred; authentication failure and stored-token fallback are permitted only for v0.15.0. Later tags require trusted publishing. Release guide documents publisher coordinates, trusted-only setup, revocation/deletion of both secrets, and DEV-508 handoff after DEV-417. Existing wrapper fix retained. Checks: release tests 50/50 passed twice, git diff --check passed, workflow formatted with existing two-space indentation. No application code changed; full lint/Rust/UI/smoke and packaging/install were not rerun for this workflow/docs-only follow-up. No real publishing performed. Status and assignee unchanged; ready for next review when job ends. No durable guidance finding.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5fd0f5af-5571-46df-be41-a26e3d5cbf4d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adddbeb69-b7da-486e-93aa-781960ead76d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad339317c-b3a3-4836-b17e-43b5578532e4
+- file: .github/workflows/release.yml
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acfc0df72-92ca-4433-97a8-8cdc0cc79f9f
 description: |-
   The owner is publishing lotar on crates.io (2026-11-13: "We're actually currently working on publishing in crates. The token has already been added"). After DEV-497 the workspace has three publishable crates (lotar = the binary, lotar-lib, lotar-web-assets), but two of them still read files outside their crate folder, which cargo package leaves out:
 
   - lotar-lib: build.rs embeds docs/help and docs/openapi.json, and src/services/agent_job_service.rs includes docs/help/agent-instructions.md. cargo package -p lotar-lib fails its verify build: read docs/openapi.json: No such file or directory.
   - lotar-web-assets: include_dir! reads target/web-embed. The packaged crate builds, but embeds an empty folder, so a lotar installed from crates.io would serve no UI.
 
+  ## Publishing: trusted publishing, the token once
+
+  The owner, 2026-11-14, in the thread: "Trusted, token once". `publish-crates` publishes through crates.io trusted publishing, as harnessmux's `publish` job and lotar's own `publish-npm` do. The `CARGO_REGISTRY_TOKEN` secret is used for the first release only, because trusted publishing can be set up only for a crate that already exists on crates.io.
+
+  - The job runs in a GitHub environment `release` in localtaskrepo/lotar, limited to `v*` tags (harnessmux has the same one), with `id-token: write`.
+  - It gets its token from `rust-lang/crates-io-auth-action` (pinned to a commit SHA, like every action here, DEV-163). For the first release it falls back to `secrets.CARGO_REGISTRY_TOKEN`, so 0.15.0 can create the three crates.
+  - After 0.15.0: the owner adds a trusted publisher on crates.io for each of the three crates (repository localtaskrepo/lotar, workflow `release.yml`, environment `release`) and turns on "trusted publishing only". He then revokes the token and deletes `CARGO_REGISTRY_TOKEN` from lotar and harnessmux. harnessmux's copy isn't used even now: its AGENTS.md says "no token is stored". Then remove the fallback from the job.
+
   ## Done when
 
   - [ ] cargo package (with its verify build) passes for lotar-web-assets, lotar-lib and lotar, in that order, and a lotar installed from the packaged crates serves the web UI and lotar help.
-  - [ ] The release workflow publishes the three crates in order, or the owner decides it stays manual.
+  - [ ] The release workflow publishes the three crates in order: trusted publishing in the `release` environment, with the token fallback only for the first release.
+  - [ ] docs/release-guide.md describes the setup and the steps after the first release.
 tags:
 - backend
+- review-returned
 history:
 - at: 2026-11-14T00:50:33.106152+00:00
   actor: claude
@@ -46,3 +97,196 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5fd0f5af-5571-46df-be41-a26e3d5cbf4d
+- at: 2026-11-14T01:12:08.540634+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T01:12:22.422517+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T01:17:07.288986+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T01:18:59.945124+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T01:21:23.016511+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adddbeb69-b7da-486e-93aa-781960ead76d
+- at: 2026-11-14T01:22:33.756062+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T01:22:33.881892+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: backend
+    new: backend, review-blocked
+- at: 2026-11-14T01:22:40.203662+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: backend, review-blocked
+    new: backend, review-returned
+- at: 2026-11-14T01:23:21.621591+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-14T01:23:22.416577+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad339317c-b3a3-4836-b17e-43b5578532e4
+- at: 2026-11-14T01:34:17.944450+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      The owner is publishing lotar on crates.io (2026-11-13: "We're actually currently working on publishing in crates. The token has already been added"). After DEV-497 the workspace has three publishable crates (lotar = the binary, lotar-lib, lotar-web-assets), but two of them still read files outside their crate folder, which cargo package leaves out:
+
+      - lotar-lib: build.rs embeds docs/help and docs/openapi.json, and src/services/agent_job_service.rs includes docs/help/agent-instructions.md. cargo package -p lotar-lib fails its verify build: read docs/openapi.json: No such file or directory.
+      - lotar-web-assets: include_dir! reads target/web-embed. The packaged crate builds, but embeds an empty folder, so a lotar installed from crates.io would serve no UI.
+
+      ## Done when
+
+      - [ ] cargo package (with its verify build) passes for lotar-web-assets, lotar-lib and lotar, in that order, and a lotar installed from the packaged crates serves the web UI and lotar help.
+      - [ ] The release workflow publishes the three crates in order, or the owner decides it stays manual.
+    new: |-
+      The owner is publishing lotar on crates.io (2026-11-13: "We're actually currently working on publishing in crates. The token has already been added"). After DEV-497 the workspace has three publishable crates (lotar = the binary, lotar-lib, lotar-web-assets), but two of them still read files outside their crate folder, which cargo package leaves out:
+
+      - lotar-lib: build.rs embeds docs/help and docs/openapi.json, and src/services/agent_job_service.rs includes docs/help/agent-instructions.md. cargo package -p lotar-lib fails its verify build: read docs/openapi.json: No such file or directory.
+      - lotar-web-assets: include_dir! reads target/web-embed. The packaged crate builds, but embeds an empty folder, so a lotar installed from crates.io would serve no UI.
+
+      ## Publishing: trusted publishing, the token once
+
+      The owner, 2026-11-14, in the thread: "Trusted, token once". `publish-crates` publishes through crates.io trusted publishing, as harnessmux's `publish` job and lotar's own `publish-npm` do. The `CARGO_REGISTRY_TOKEN` secret is used for the first release only, because trusted publishing can be set up only for a crate that already exists on crates.io.
+
+      - The job runs in a GitHub environment `release` in localtaskrepo/lotar, limited to `v*` tags (harnessmux has the same one), with `id-token: write`.
+      - It gets its token from `rust-lang/crates-io-auth-action` (pinned to a commit SHA, like every action here, DEV-163). For the first release it falls back to `secrets.CARGO_REGISTRY_TOKEN`, so 0.15.0 can create the three crates.
+      - After 0.15.0: the owner adds a trusted publisher on crates.io for each of the three crates (repository localtaskrepo/lotar, workflow `release.yml`, environment `release`) and turns on "trusted publishing only". He then revokes the token and deletes `CARGO_REGISTRY_TOKEN` from lotar and harnessmux. harnessmux's copy isn't used even now: its AGENTS.md says "no token is stored". Then remove the fallback from the job.
+
+      ## Done when
+
+      - [ ] cargo package (with its verify build) passes for lotar-web-assets, lotar-lib and lotar, in that order, and a lotar installed from the packaged crates serves the web UI and lotar help.
+      - [ ] The release workflow publishes the three crates in order: trusted publishing in the `release` environment, with the token fallback only for the first release.
+      - [ ] docs/release-guide.md describes the setup and the steps after the first release.
+- at: 2026-11-14T01:34:18.207767+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-497"]}'
+    new: '{"related":["DEV-497","DEV-163"]}'
+- at: 2026-11-14T01:34:18.407579+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T01:34:18.557033+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:.github/workflows/release.yml
+- at: 2026-11-14T01:39:35.315721+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-497","DEV-163"]}'
+    new: '{"related":["DEV-497","DEV-163","DEV-508"]}'
+- at: 2026-11-14T01:39:57.631402+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T01:39:57.724271+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-497","DEV-163","DEV-508"]}'
+    new: '{"related":["DEV-497","DEV-163","DEV-508","DEV-417"]}'
+- at: 2026-11-14T01:50:46.773621+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T01:50:57.375876+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T01:52:49.141197+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acfc0df72-92ca-4433-97a8-8cdc0cc79f9f
+- at: 2026-11-14T01:53:34.923865+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T01:53:35.048091+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: backend, review-returned
+    new: backend, review-returned, review-blocked
+- at: 2026-11-14T01:53:39.766889+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+  - field: tags
+    old: backend, review-returned, review-blocked
+    new: backend, review-returned
+- at: 2026-11-14T01:53:39.802610+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-14T01:54:07.535202+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-14T01:54:07.810049+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-14T01:55:32.671395+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T01:56:43.861133+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T01:56:48.878459+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

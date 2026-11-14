@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-13T22:44:58.128976+00:00
-modified: 2026-11-14T00:56:42.811044+00:00
+modified: 2026-11-14T01:32:36.896159+00:00
 relationships:
   depends_on:
   - DEV-504
@@ -24,6 +24,9 @@ comments:
 - date: 2026-11-14T00:56:42.811044+00:00
   author: claude
   text: 'Started (claude, branch agent/DEV-503): DEV-504 is done and harnessmux 0.1.1 is on crates.io, so this is the implementation, not a release check. Plan: depend on harnessmux 0.1.1 (needs Rust 1.99; lotar pins 1.98.1), run every runner except command through a harnessmux Session owned by lotar''s process, map events to job events, message box -> send, cancel -> cancel, cross-process messages through the session socket, session: continue -> the ticket''s named session; remove agent_runner.rs''s builders/parsers, tests/fixtures/agent-streams, the T3 thread code and the wrapper''s job role; docs and tests follow.'
+- date: 2026-11-14T01:32:36.896159+00:00
+  author: claude
+  text: 'Progress (uncommitted, worktree agent/DEV-503): harnessmux 0.1.1 linked (Rust 1.99.1; ACP crates turn on serde_json preserve_order, and Clippy 1.99''s result_large_err made MCP''s error responses boxed). Jobs run as sessions <ticket>-<profile> owned by lotar''s process (agent_runner.rs rewritten, T3 thread code and per-CLI parsers gone, inbox replaced by the session socket). New: on_permission profile key, AgentJob.question + POST /api/jobs/answer, question buttons in the job view. cargo nextest: all pass except what is listed next; new tests/dev503_harness_jobs_test.rs uses a shell ACP fake. Next: smoke suite, docs, live Claude/Codex fix-review-merge runs.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad412edd4-9d93-4142-9e2c-0d4f417c92fc
 description: 'Approved design: docs/developers/harness-tool-design.md (DEV-492). The owner, 2026-11-13: interface "Link the crate", lotar''s runners "Remove right away". Waits for the harnessmux release that covers every agent lotar runs today. One change: lotar depends on the harnessmux crate and runs every agent job through it (events from the session stream, the message box and cancel call send and cancel, permission requests become questions in the job view). Profiles keep their runner key: claude, codex, copilot, gemini, cursor, amp, droid, opencode, kilo, antigravity become harnessmux agents; t3 is removed with a hint to pick the agent; command stays. session: continue uses named sessions, one per ticket. Removed in the same change: the per-CLI builders and parsers in src/services/agent_runner.rs, tests/fixtures/agent-streams/, the t3 runner and its thread handling in src/services/agent_job_service.rs, docs that describe single CLIs (agent-cli-research.md moves to harnessmux). AGENTS.md: REST shape changes keep src/api_types.rs, view/api/types.ts, docs/openapi.json and help docs in step. Done when: lotar''s own fix, review and merge jobs run on Claude and Codex through the crate with resume and messages, the removed code is gone, npm run lint, npm test and npm run smoke pass.'
@@ -77,6 +80,10 @@ history:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad412edd4-9d93-4142-9e2c-0d4f417c92fc
 - at: 2026-11-14T00:56:42.811044+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T01:32:36.896159+00:00
   actor: claude
   changes:
   - field: comment_added

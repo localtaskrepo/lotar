@@ -76,6 +76,22 @@ ends with the ticket `Done`; a failing one comes back to mallox as `HelpNeeded`.
 tickets that waited for other tickets. To start one ticket's check by hand:
 `lotar automation run "Prerequisites done: continue the waiting ticket" --select 'id:/^DEV-N$/'`.
 
+## Release records
+
+lotar's own [releases](help/releases.md) (`.tasks/@releases/`, tracked in git since 2026-11-14, owner
+"Track and use now") list the DEV tickets each version ships; 0.14.0 is the first one recorded. The
+release ticket is in its own release.
+
+- With the next release's ticket, create its record: `lotar release create X.Y.Z`, then
+  `lotar release add X.Y.Z DEV-R`.
+- A ticket planned for it, or merged on `main` for it: `lotar release add X.Y.Z DEV-N`. Before the
+  bump, add the tickets whose commits are on `main` since the last tag and are in no release:
+  `git log --format=%s vA.B.C..main | grep -oE '^DEV-[0-9]+' | sort -u`, then
+  `lotar list 'release:none'` to cross-check.
+- `lotar list 'release:X.Y.Z -status:Done'` is what is still open. A ticket that won't make it
+  moves on: `lotar release move X.Y.(Z+1) DEV-N`.
+- After the tag is pushed: `lotar release release X.Y.Z`.
+
 ## Pre-Release Checklist
 
 1. Update the version under `[workspace.package]` in the root `Cargo.toml`, which every

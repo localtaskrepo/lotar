@@ -1,11 +1,11 @@
 title: Review comments with a pass or block verdict and findings, shown as a badge
-status: Blocked
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: claude
+assignee: '@merge'
 created: 2026-11-13T21:14:10.488871+00:00
-modified: 2026-11-14T00:20:37.853233+00:00
+modified: 2026-11-14T01:57:38.407545+00:00
 relationships:
   depends_on:
   - DEV-488
@@ -26,8 +26,49 @@ comments:
 - date: 2026-11-13T23:17:18.669655+00:00
   author: claude
   text: 'Merge order (agreed 2026-11-13, coordinated by the DEV-502 agent): 1) DEV-502 merges first; it waits on nobody (review, then merge). 2) DEV-488 waits for DEV-502 only for its filter part: keep working on the rest, then rebase onto main and add the Type chips and the open-questions toggle. 3) DEV-489 and DEV-490 wait for DEV-488 (existing depends-on), then rebase and add Review / Hand-off to the Type row. 4) DEV-491 waits on nobody; whichever of it and DEV-502 merges second resolves the textual conflict on the comment <li>.'
+- date: 2026-11-14T01:20:08.352317+00:00
+  author: claude
+  text: 'Done in f23b2d15 on agent/DEV-489 (rebased onto main with DEV-488). Comments get an optional review block: verdict pass|block, commit, findings (summary, file, line, blocking); text keeps the verdict, summary and findings in prose. CLI: lotar comment <id> --review pass|block [--commit SHA] [--finding F]... [--blocker F]... [summary], F = "[file[:line]: ]summary"; a pass with a blocker is refused. MCP task_comment_add and REST POST /api/tasks/comment take review {verdict, commit?, findings?}. Automation: comment: { review: block } plus ${{comment.review}} and ${{comment.commit}}. UI: verdict badge with short commit and findings list (blocking first) in the Comments tab, a Review type chip, and the newest verdict next to the status in the panel header. lotar show and lotar comment mark [review: pass|block]. Docs: comment.md (Reviews), automation.md, mcp-tools.md, task-model.md, serve.md, lotar-workflow skill, openapi.json, view/api/types.ts. Checks: npm run lint:agent, npm run test:agent (2175 Rust, 1527 UI, release and hook tests), npm run smoke (111 files, 395 tests incl. new ui.review-comments), all passed; screenshots checked in light and dark. Old YAML round-trips unchanged (tested). Follow-up from the ticket: an STD ticket switches the shared review rules and prompt from the review-blocked tag to this.'
+- date: 2026-11-14T01:23:14.031394+00:00
+  author: codex
+  text: 'Review: blocking. Required before/after screenshot attachments are missing: ticket references contain thread links only. smoke/tests/ui.review-comments.smoke.spec.ts:69 captures after snippets at the default viewport only. Attach before and after screenshots in light and dark at 1920, 1440 and 390 px, linked from the outcome comment, before re-review. Read ticket/comments, related summaries, branch scope and review/UI guidance. Focused review UI utility tests passed (3). Full lint, Rust tests, full smoke and independent browser verification were not run; this review is incomplete beyond the confirmed missing-evidence gate. No files or commits changed; status and assignee unchanged.'
+- date: 2026-11-14T01:51:17.126296+00:00
+  author: claude
+  text: |-
+    Rework done in 09ed8571 (amended on agent/DEV-489). Finding: before/after screenshots missing. Fixed: before (main's web UI) and after (this branch), light and dark, 1920/1440/390 px, each as the panel header (newest verdict) and the Comments tab, all 24 attached to the ticket and linked below. Taking them showed one real flaw: at 390 px a review comment's Edit button dropped to its own line under the badge. Fixed in view/components/task-panel/TaskPanelCommentsTab.vue (the comment meta shrinks, so the badge wraps inside it and Edit stays on the right); before/after visible in the 390 comments shots. Checks: npm run lint:agent, npm run test:agent (2175 Rust, 1527 UI, release and hook tests), npm run test:smoke:agent (111 files, 395 tests), all passed.
+     ![before light 1920 header](attachment:dev489-before-light-1920-header.46b607ee7e2ab2a2fa4416bd29ddf084.png) ![before light 1920 comments](attachment:dev489-before-light-1920-comments.8ac3c5e79b3fb380b9d58840240dcfe7.png) ![before light 1440 header](attachment:dev489-before-light-1440-header.1a4289faac473c094b766308cba9d188.png) ![before light 1440 comments](attachment:dev489-before-light-1440-comments.8e71f5b2aabd54c4583f8e4b0fb6e81e.png) ![before light 390 header](attachment:dev489-before-light-390-header.47fb5ad8017c9aa54fcda18e58ac7ff3.png) ![before light 390 comments](attachment:dev489-before-light-390-comments.9b83670cfa32068fcd5aa0926d194bf2.png) ![before dark 1920 header](attachment:dev489-before-dark-1920-header.e1dfdc180cf126e6d9909415626fe219.png) ![before dark 1920 comments](attachment:dev489-before-dark-1920-comments.a395888a090b58858c0d559dc72931ef.png) ![before dark 1440 header](attachment:dev489-before-dark-1440-header.ff9971ecddb4ede542ba38cdba34f3b2.png) ![before dark 1440 comments](attachment:dev489-before-dark-1440-comments.bac4e03a3f52914887faf7d8dc24739d.png) ![before dark 390 header](attachment:dev489-before-dark-390-header.c286fc386ebeeacad77e4626916a5eee.png) ![before dark 390 comments](attachment:dev489-before-dark-390-comments.bb3be456f29ec36bb9a20507f6ed1ad5.png) ![after light 1920 header](attachment:dev489-after-light-1920-header.adb0efeee1e5836417131b48ea7d2a7a.png) ![after light 1920 comments](attachment:dev489-after-light-1920-comments.afc51eb0547c9dce2be5bb69632882fc.png) ![after light 1440 header](attachment:dev489-after-light-1440-header.b82aa81adef7f005b0944c82b58c1c6b.png) ![after light 1440 comments](attachment:dev489-after-light-1440-comments.0a8ba5e892ec8238368270c204d7585f.png) ![after light 390 header](attachment:dev489-after-light-390-header.5bb8a2d9f2bd47a839e39f634c05a478.png) ![after light 390 comments](attachment:dev489-after-light-390-comments.33551b60a4dcb369cf703090a379b956.png) ![after dark 1920 header](attachment:dev489-after-dark-1920-header.8bd0b75ad29e2a77f49134c4e24bd45a.png) ![after dark 1920 comments](attachment:dev489-after-dark-1920-comments.be3a63421086ddc530c1854ac7c8739a.png) ![after dark 1440 header](attachment:dev489-after-dark-1440-header.36fb1631fe2b2ca80ece99f343649247.png) ![after dark 1440 comments](attachment:dev489-after-dark-1440-comments.5077cfde75e52b02045969dc727b2579.png) ![after dark 390 header](attachment:dev489-after-dark-390-header.a6184e48d7cf9eb1d375ef3f270d9fa0.png) ![after dark 390 comments](attachment:dev489-after-dark-390-comments.4c209b6be31c4ee30e61afdeb17c278b.png)
+- date: 2026-11-14T01:57:38.407545+00:00
+  author: codex
+  text: 'Merge blocked: rebasing 09ed8571 onto main produced a file-location conflict for src/services/task_reviews.rs, suggested destination crates/lotar-lib/src/services/task_reviews.rs. Main migrated the Rust source directory into the library crate; this feature adds the review service at the former location. I aborted the rebase, preserving the original commit and all main-checkout work. Question for mallox: should a fix agent adapt this feature to the new crate layout and rerun lint, tests and smoke before retrying merge? No merge or push; checks not rerun because rebase did not complete.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A74f7ed3c-4dde-4352-9136-60c3c1d347ed
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4c5bda98-6684-4459-bbaa-befb9145e8a3
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0e7592c6-8971-4dbc-a557-25610455ec47
+- attachment: dev489-after-dark-1440-comments.5077cfde75e52b02045969dc727b2579.png
+- attachment: dev489-after-dark-1440-header.36fb1631fe2b2ca80ece99f343649247.png
+- attachment: dev489-after-dark-1920-comments.be3a63421086ddc530c1854ac7c8739a.png
+- attachment: dev489-after-dark-1920-header.8bd0b75ad29e2a77f49134c4e24bd45a.png
+- attachment: dev489-after-dark-390-comments.4c209b6be31c4ee30e61afdeb17c278b.png
+- attachment: dev489-after-dark-390-header.a6184e48d7cf9eb1d375ef3f270d9fa0.png
+- attachment: dev489-after-light-1440-comments.0a8ba5e892ec8238368270c204d7585f.png
+- attachment: dev489-after-light-1440-header.b82aa81adef7f005b0944c82b58c1c6b.png
+- attachment: dev489-after-light-1920-comments.afc51eb0547c9dce2be5bb69632882fc.png
+- attachment: dev489-after-light-1920-header.adb0efeee1e5836417131b48ea7d2a7a.png
+- attachment: dev489-after-light-390-comments.33551b60a4dcb369cf703090a379b956.png
+- attachment: dev489-after-light-390-header.5bb8a2d9f2bd47a839e39f634c05a478.png
+- attachment: dev489-before-dark-1440-comments.bac4e03a3f52914887faf7d8dc24739d.png
+- attachment: dev489-before-dark-1440-header.ff9971ecddb4ede542ba38cdba34f3b2.png
+- attachment: dev489-before-dark-1920-comments.a395888a090b58858c0d559dc72931ef.png
+- attachment: dev489-before-dark-1920-header.e1dfdc180cf126e6d9909415626fe219.png
+- attachment: dev489-before-dark-390-comments.bb3be456f29ec36bb9a20507f6ed1ad5.png
+- attachment: dev489-before-dark-390-header.c286fc386ebeeacad77e4626916a5eee.png
+- attachment: dev489-before-light-1440-comments.8e71f5b2aabd54c4583f8e4b0fb6e81e.png
+- attachment: dev489-before-light-1440-header.1a4289faac473c094b766308cba9d188.png
+- attachment: dev489-before-light-1920-comments.8ac3c5e79b3fb380b9d58840240dcfe7.png
+- attachment: dev489-before-light-1920-header.46b607ee7e2ab2a2fa4416bd29ddf084.png
+- attachment: dev489-before-light-390-comments.9b83670cfa32068fcd5aa0926d194bf2.png
+- attachment: dev489-before-light-390-header.47fb5ad8017c9aa54fcda18e58ac7ff3.png
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afb42148a-0c14-45c0-bbc8-910efc7ce2a3
 releases:
 - 5
 description: |-
@@ -50,6 +91,7 @@ description: |-
 tags:
 - web-ui
 - backend
+- review-returned
 history:
 - at: 2026-11-13T21:14:10.762047+00:00
   actor: claude
@@ -129,3 +171,214 @@ history:
   changes:
   - field: releases
     new: '#5'
+- at: 2026-11-14T00:59:57.237606+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: claude
+    new: '@fix'
+- at: 2026-11-14T01:01:19.604016+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-14T01:20:08.352317+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T01:20:19.200184+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T01:22:28.888113+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4c5bda98-6684-4459-bbaa-befb9145e8a3
+- at: 2026-11-14T01:23:14.031394+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T01:23:16.384683+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: web-ui, backend
+    new: web-ui, backend, review-blocked
+- at: 2026-11-14T01:23:20.697927+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: web-ui, backend, review-blocked
+    new: web-ui, backend, review-returned
+- at: 2026-11-14T01:39:02.830931+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-14T01:39:03.628893+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0e7592c6-8971-4dbc-a557-25610455ec47
+- at: 2026-11-14T01:50:56.533870+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev489-after-dark-1440-comments.5077cfde75e52b02045969dc727b2579.png
+- at: 2026-11-14T01:50:56.570734+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev489-after-dark-1440-header.36fb1631fe2b2ca80ece99f343649247.png
+- at: 2026-11-14T01:50:56.605524+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev489-after-dark-1920-comments.be3a63421086ddc530c1854ac7c8739a.png
+- at: 2026-11-14T01:50:56.641468+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev489-after-dark-1920-header.8bd0b75ad29e2a77f49134c4e24bd45a.png
+- at: 2026-11-14T01:50:56.676877+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev489-after-dark-390-comments.4c209b6be31c4ee30e61afdeb17c278b.png
+- at: 2026-11-14T01:50:56.712379+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev489-after-dark-390-header.a6184e48d7cf9eb1d375ef3f270d9fa0.png
+- at: 2026-11-14T01:50:56.750280+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev489-after-light-1440-comments.0a8ba5e892ec8238368270c204d7585f.png
+- at: 2026-11-14T01:50:56.794470+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev489-after-light-1440-header.b82aa81adef7f005b0944c82b58c1c6b.png
+- at: 2026-11-14T01:50:56.830516+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev489-after-light-1920-comments.afc51eb0547c9dce2be5bb69632882fc.png
+- at: 2026-11-14T01:50:56.869354+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev489-after-light-1920-header.adb0efeee1e5836417131b48ea7d2a7a.png
+- at: 2026-11-14T01:50:56.908350+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev489-after-light-390-comments.33551b60a4dcb369cf703090a379b956.png
+- at: 2026-11-14T01:50:56.950399+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev489-after-light-390-header.5bb8a2d9f2bd47a839e39f634c05a478.png
+- at: 2026-11-14T01:50:56.996398+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev489-before-dark-1440-comments.bac4e03a3f52914887faf7d8dc24739d.png
+- at: 2026-11-14T01:50:57.034072+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev489-before-dark-1440-header.ff9971ecddb4ede542ba38cdba34f3b2.png
+- at: 2026-11-14T01:50:57.071084+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev489-before-dark-1920-comments.a395888a090b58858c0d559dc72931ef.png
+- at: 2026-11-14T01:50:57.106889+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev489-before-dark-1920-header.e1dfdc180cf126e6d9909415626fe219.png
+- at: 2026-11-14T01:50:57.142760+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev489-before-dark-390-comments.bb3be456f29ec36bb9a20507f6ed1ad5.png
+- at: 2026-11-14T01:50:57.178592+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev489-before-dark-390-header.c286fc386ebeeacad77e4626916a5eee.png
+- at: 2026-11-14T01:50:57.212912+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev489-before-light-1440-comments.8e71f5b2aabd54c4583f8e4b0fb6e81e.png
+- at: 2026-11-14T01:50:57.248954+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev489-before-light-1440-header.1a4289faac473c094b766308cba9d188.png
+- at: 2026-11-14T01:50:57.284625+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev489-before-light-1920-comments.8ac3c5e79b3fb380b9d58840240dcfe7.png
+- at: 2026-11-14T01:50:57.319810+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev489-before-light-1920-header.46b607ee7e2ab2a2fa4416bd29ddf084.png
+- at: 2026-11-14T01:50:57.354479+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev489-before-light-390-comments.9b83670cfa32068fcd5aa0926d194bf2.png
+- at: 2026-11-14T01:50:57.406212+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev489-before-light-390-header.47fb5ad8017c9aa54fcda18e58ac7ff3.png
+- at: 2026-11-14T01:51:17.126296+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T01:51:23.060216+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T01:53:41.623993+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afb42148a-0c14-45c0-bbc8-910efc7ce2a3
+- at: 2026-11-14T01:54:40.656707+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-14T01:57:38.407545+00:00
+  actor: codex
+  changes:
+  - field: comment_added

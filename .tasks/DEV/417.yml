@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-13T07:10:08.883832+00:00
-modified: 2026-11-14T00:28:17.250958+00:00
+modified: 2026-11-14T01:39:57.723879+00:00
 relationships:
   depends_on:
   - DEV-482
@@ -14,6 +14,8 @@ relationships:
   - DEV-489
   - DEV-490
   - DEV-497
+  blocks:
+  - DEV-508
   related:
   - DEV-418
   - DEV-419
@@ -29,6 +31,8 @@ relationships:
   - DEV-497
   - DEV-502
   - DEV-493
+  - DEV-504
+  - DEV-507
 comments:
 - date: 2026-11-14T00:18:44.424046+00:00
   author: claude
@@ -59,10 +63,15 @@ description: |-
   - LOCA-313 (local): the check that macOS keeps its grants after a `brew upgrade` needs a Developer ID signed release, which needs DEV-482 in it.
   - STD-100 (standards): needs the question comments of DEV-488, if DEV-488 ships in this release.
 
+  ## Before the tag: a harnessmux release
+
+  The owner, 2026-11-13: "we should do a release before lotar 0.15.0 releases (the next one), so that we can test the entire release process together". Before tagging lotar, release harnessmux 0.1.2 (localtaskrepo/harnessmux; steps in its AGENTS.md): bump Cargo.toml and CHANGELOG.md, tag `v0.1.2` signed, push the tag with the owner's OK, then check every job of its Release run, the publish job above all (the first through crates.io trusted publishing, environment `release`, set up in DEV-504), and https://crates.io/crates/harnessmux shows 0.1.2.
+
   ## Open before the release
 
   - [ ] Owner decides which in-flight tickets go in (DEV-482, DEV-502, DEV-488/489/490, DEV-497).
   - [ ] Those are merged on main.
+  - [ ] harnessmux 0.1.2 released first, its crates.io publish job green (see above).
   - [ ] Version bump, QA green, signed tag (owner OK), Release workflow green, `brew upgrade lotar` here.
 history:
 - at: 2026-11-14T00:16:07.574371+00:00
@@ -153,3 +162,68 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-482","DEV-502","DEV-488","DEV-489","DEV-490","DEV-497"],"related":["DEV-418","DEV-419","DEV-464","DEV-472","DEV-476","DEV-478","DEV-480","DEV-482","DEV-486","DEV-488","DEV-494","DEV-497","DEV-502"]}'
     new: '{"depends_on":["DEV-482","DEV-502","DEV-488","DEV-489","DEV-490","DEV-497"],"related":["DEV-418","DEV-419","DEV-464","DEV-472","DEV-476","DEV-478","DEV-480","DEV-482","DEV-486","DEV-488","DEV-494","DEV-497","DEV-502","DEV-493"]}'
+- at: 2026-11-14T01:23:55.235119+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Next lotar release, a **minor** bump to v0.15.0: the owner asked for a minor because it brings new features (2026-11-14, "This is a minor version bump as this introduces a bunch new features").
+
+      Steps: `.github/skills/release/SKILL.md` and `docs/release-guide.md`. Tickets that wait for this release are Blocked and depend on it; closing this ticket hands them to @fix to run their checks.
+
+      ## On main since v0.14.3
+
+      25 tickets, among them DEV-418 (relationships on board cards), DEV-419 (phone layout for Board and Tasks), DEV-464 (releases follow-ups), DEV-494 (`lotar add --depends-on` and the other relationship options), DEV-486, DEV-472, DEV-476, DEV-478, DEV-480 (agent job fixes).
+
+      ## Waiting for this release
+
+      - LOCA-313 (local): the check that macOS keeps its grants after a `brew upgrade` needs a Developer ID signed release, which needs DEV-482 in it.
+      - STD-100 (standards): needs the question comments of DEV-488, if DEV-488 ships in this release.
+
+      ## Open before the release
+
+      - [ ] Owner decides which in-flight tickets go in (DEV-482, DEV-502, DEV-488/489/490, DEV-497).
+      - [ ] Those are merged on main.
+      - [ ] Version bump, QA green, signed tag (owner OK), Release workflow green, `brew upgrade lotar` here.
+    new: |-
+      Next lotar release, a **minor** bump to v0.15.0: the owner asked for a minor because it brings new features (2026-11-14, "This is a minor version bump as this introduces a bunch new features").
+
+      Steps: `.github/skills/release/SKILL.md` and `docs/release-guide.md`. Tickets that wait for this release are Blocked and depend on it; closing this ticket hands them to @fix to run their checks.
+
+      ## On main since v0.14.3
+
+      25 tickets, among them DEV-418 (relationships on board cards), DEV-419 (phone layout for Board and Tasks), DEV-464 (releases follow-ups), DEV-494 (`lotar add --depends-on` and the other relationship options), DEV-486, DEV-472, DEV-476, DEV-478, DEV-480 (agent job fixes).
+
+      ## Waiting for this release
+
+      - LOCA-313 (local): the check that macOS keeps its grants after a `brew upgrade` needs a Developer ID signed release, which needs DEV-482 in it.
+      - STD-100 (standards): needs the question comments of DEV-488, if DEV-488 ships in this release.
+
+      ## Before the tag: a harnessmux release
+
+      The owner, 2026-11-13: "we should do a release before lotar 0.15.0 releases (the next one), so that we can test the entire release process together". Before tagging lotar, release harnessmux 0.1.2 (localtaskrepo/harnessmux; steps in its AGENTS.md): bump Cargo.toml and CHANGELOG.md, tag `v0.1.2` signed, push the tag with the owner's OK, then check every job of its Release run, the publish job above all (the first through crates.io trusted publishing, environment `release`, set up in DEV-504), and https://crates.io/crates/harnessmux shows 0.1.2.
+
+      ## Open before the release
+
+      - [ ] Owner decides which in-flight tickets go in (DEV-482, DEV-502, DEV-488/489/490, DEV-497).
+      - [ ] Those are merged on main.
+      - [ ] harnessmux 0.1.2 released first, its crates.io publish job green (see above).
+      - [ ] Version bump, QA green, signed tag (owner OK), Release workflow green, `brew upgrade lotar` here.
+- at: 2026-11-14T01:23:55.446703+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-482","DEV-502","DEV-488","DEV-489","DEV-490","DEV-497"],"related":["DEV-418","DEV-419","DEV-464","DEV-472","DEV-476","DEV-478","DEV-480","DEV-482","DEV-486","DEV-488","DEV-494","DEV-497","DEV-502","DEV-493"]}'
+    new: '{"depends_on":["DEV-482","DEV-502","DEV-488","DEV-489","DEV-490","DEV-497"],"related":["DEV-418","DEV-419","DEV-464","DEV-472","DEV-476","DEV-478","DEV-480","DEV-482","DEV-486","DEV-488","DEV-494","DEV-497","DEV-502","DEV-493","DEV-504"]}'
+- at: 2026-11-14T01:39:49.987673+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-482","DEV-502","DEV-488","DEV-489","DEV-490","DEV-497"],"related":["DEV-418","DEV-419","DEV-464","DEV-472","DEV-476","DEV-478","DEV-480","DEV-482","DEV-486","DEV-488","DEV-494","DEV-497","DEV-502","DEV-493","DEV-504"]}'
+    new: '{"depends_on":["DEV-482","DEV-502","DEV-488","DEV-489","DEV-490","DEV-497"],"blocks":["DEV-508"],"related":["DEV-418","DEV-419","DEV-464","DEV-472","DEV-476","DEV-478","DEV-480","DEV-482","DEV-486","DEV-488","DEV-494","DEV-497","DEV-502","DEV-493","DEV-504"]}'
+- at: 2026-11-14T01:39:57.723879+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-482","DEV-502","DEV-488","DEV-489","DEV-490","DEV-497"],"blocks":["DEV-508"],"related":["DEV-418","DEV-419","DEV-464","DEV-472","DEV-476","DEV-478","DEV-480","DEV-482","DEV-486","DEV-488","DEV-494","DEV-497","DEV-502","DEV-493","DEV-504"]}'
+    new: '{"depends_on":["DEV-482","DEV-502","DEV-488","DEV-489","DEV-490","DEV-497"],"blocks":["DEV-508"],"related":["DEV-418","DEV-419","DEV-464","DEV-472","DEV-476","DEV-478","DEV-480","DEV-482","DEV-486","DEV-488","DEV-494","DEV-497","DEV-502","DEV-493","DEV-504","DEV-507"]}'

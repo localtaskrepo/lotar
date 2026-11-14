@@ -5,13 +5,14 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T22:45:12.815612+00:00
-modified: 2026-11-14T00:55:36.502037+00:00
+modified: 2026-11-14T01:24:03.291213+00:00
 relationships:
   blocks:
   - DEV-503
   related:
   - DEV-492
   - DEV-503
+  - DEV-417
 comments:
 - date: 2026-11-13T23:03:54.677004+00:00
   author: claude
@@ -67,6 +68,12 @@ comments:
 - date: 2026-11-14T00:55:36.502037+00:00
   author: claude
   text: 'mallox 2026-11-13, on crates.io trusted publishing: "yes, let''s set it up". harnessmux 2e2428c: release.yml gets a publish job after the GitHub release (environment release, id-token write, rust-lang/crates-io-auth-action@v1, cargo publish --locked). GitHub environment release created on localtaskrepo/harnessmux, deployments only from v* tags. The crates.io side is not set yet: the API refused the publish token ("does not have the required permissions"), so mallox adds it at https://crates.io/crates/harnessmux/settings (owner localtaskrepo, repository harnessmux, workflow release.yml, environment release). Not run yet: the publish job runs first at the next v* tag.'
+- date: 2026-11-14T01:00:42.957216+00:00
+  author: claude
+  text: 'mallox 2026-11-13: "I added github to crates" (the trusted publisher for harnessmux on crates.io). Not exercised yet: the publish job in release.yml runs first at the next v* tag.'
+- date: 2026-11-14T01:24:03.291213+00:00
+  author: claude
+  text: 'mallox 2026-11-13: "we should do a release before lotar 0.15.0 releases (the next one), so that we can test the entire release process together". Added to DEV-417 (Release v0.15.0) as a step before its tag: harnessmux 0.1.2 with the first trusted-publishing run.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1d141b3f-b2f2-448d-b3f0-5ea7a2827f40
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4ac64f48-54b1-4379-bb9d-f53b4f59cb4a
@@ -175,6 +182,20 @@ history:
     old: Merging
     new: Done
 - at: 2026-11-14T00:55:36.502037+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T01:00:42.957216+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T01:23:55.447346+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-503"],"related":["DEV-492","DEV-503"]}'
+    new: '{"blocks":["DEV-503"],"related":["DEV-492","DEV-503","DEV-417"]}'
+- at: 2026-11-14T01:24:03.291213+00:00
   actor: claude
   changes:
   - field: comment_added

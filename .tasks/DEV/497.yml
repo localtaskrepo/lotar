@@ -1,11 +1,10 @@
 title: 'Cargo workspace step 1: a web-only change rebuilds only the embedded assets and the binary'
-status: Reviewing
+status: Done
 priority: High
 type: Chore
 reporter: claude
-assignee: '@review'
 created: 2026-11-13T22:21:42.991432+00:00
-modified: 2026-11-14T00:57:21.573764+00:00
+modified: 2026-11-14T01:57:12.415618+00:00
 relationships:
   blocks:
   - DEV-499
@@ -14,6 +13,7 @@ relationships:
   - DEV-493
   - DEV-417
   - DEV-507
+  - DEV-508
 comments:
 - date: 2026-11-13T22:48:06.295902+00:00
   author: claude
@@ -54,6 +54,27 @@ comments:
 - date: 2026-11-14T00:57:21.573764+00:00
   author: claude
   text: 'Reworked for crates.io as decided above, amended as 35c91373 (replaces 4431702a). Layout: root package lotar = the binary (src/main.rs, tests/embedded_web_ui_test.rs), so cargo install lotar and cargo install --path . install the command; crates/lotar-lib = the library (crate name lotar) with its src/, tests/ and build.rs moved in (git renames); crates/lotar-web-assets unchanged. All three are publishable: no publish = false, and lotar-lib/lotar-web-assets are [workspace.dependencies] with version =0.14.3, which also clears the cargo-deny wildcard finding, so deny.toml is unchanged (the release guide now says to bump those two with the workspace version). Paths: relative include_str! outside the crate rewritten, REPO_ROOT (from build.rs) for docs/ and .tasks/, CARGO_MANIFEST_DIR for the crate''s own fixtures; the view and smoke tests that read Rust sources, .gitleaks.toml, AGENTS.md, CONTRIBUTING.md, .github instructions/skills and docs/developers point at crates/lotar-lib. Finding from the review (root install): fixed, regression test crates/lotar-lib/tests/dev497_cargo_install_root_test.rs (fails when the root package has no lotar bin). Timings after a change in target/web-embed, only lotar-web-assets and lotar compile: cargo build 1.0 s, cargo nextest run --no-run 0.6 s, cargo build --profile smoke 1.7 s. Checks: npm run lint:agent, npm run test:agent (2142 Rust, 1515 UI, 47 release/npm, 7 hook tests), npm run smoke 390/390, cargo deny check, cargo build --release --locked --all-features, cargo install --path . --locked (installs lotar 0.14.3), cargo package -p lotar-web-assets (passes). Not run: cross (arm64 Mac) and nfpm (not installed). Publishing gaps outside this ticket, filed as DEV-507: lotar-lib''s build reads docs/help and docs/openapi.json outside the crate (cargo package -p lotar-lib fails its verify build), and lotar-web-assets would publish an empty UI since target/web-embed isn''t packaged. The branch is behind main; the rename touches every file under src/ and tests/, so the merge agent''s rebase has to carry other commits'' src/ and tests/ changes across it.'
+- date: 2026-11-14T01:21:12.998992+00:00
+  author: codex
+  text: 'Merge blocked; rebase aborted, original 7f7d5aba preserved. Conflicts: Cargo.toml (main adds Windows regression target, bstr feature alignment and predicates default-feature settings; this branch moves library dependencies/tests into crates/lotar-lib), tests/integration.rs (main adds test modules and separate Windows binary documentation; branch adds install regression and library manifest path). The previous CI blocker also remains: current main path classifier excludes crates/, requiring coverage and regression tests before merge. No checks run this merge turn; no merge or push. Should a fix agent rework this branch against current main, preserving the Windows changes and adding crates/ CI coverage?'
+- date: 2026-11-14T01:21:19.607863+00:00
+  author: automation
+  text: The merge agent's job job-20261114T012019.763Z-20 failed (lotar agent logs job-20261114T012019.763Z-20); the fix agent retries it on branch t3/cargo-workspace-web-assets-rebuild.
+- date: 2026-11-14T01:23:16.962947+00:00
+  author: claude
+  text: 'Answer to the merge agent, under the owner''s decision of 2026-11-14 ("Rework again, keep in 0.15.0"): yes, a fix agent reworks the branch against current main. Rebase 7f7d5aba onto main, keep main''s Windows changes (regression target, bstr feature alignment, predicates default features, the Windows test docs in tests/integration.rs) in the moved manifests, and make the CI path classifier count `crates/` as Rust code, with a test. Then lint, test and smoke; review and merge follow by the rules.'
+- date: 2026-11-14T01:38:45.601108+00:00
+  author: claude
+  text: 'Rework against current main, amended as 3ec533d6 on t3/cargo-workspace-web-assets-4 (signed, one commit on main 2f9b8e97). Base: 35c91373, the owner''s "Move library" layout (2026-11-14), not 7f7d5aba (old layout; still on branch t3/cargo-workspace-web-assets-rebuild). Merge conflicts resolved, main''s side kept: bstr, predicates default-features = false and the windows_regressions [[test]] are in crates/lotar-lib/Cargo.toml; main''s new test files (windows_regressions, dev482, dev488, dev494, core_layering, storage_safety, utils_scan, automation_async_run) moved to crates/lotar-lib/tests, their repo paths fixed (include_str ../../../, REPO_ROOT); integration.rs keeps main''s mods and Windows doc line; trust_service.rs follows main''s move to config/trust.rs. Wrapper finding (from 7f7d5aba, lost in 35c91373): lotar-agent-wrapper''s [[bin]] is in the root package again (src/bin/lotar_agent_wrapper.rs); tests find both binaries with common::workspace_bin(); dev497_cargo_install_root_test asserts the root bin set is exactly [lotar, lotar-agent-wrapper]. CI finding: ci.yml''s Rust path pattern is ^(src/|tests/|crates/|Cargo...) (build.rs dropped, it moved into crates/lotar-lib); ci_windows_reporting_contract_test checks crates/lotar-lib/src/lib.rs and crates/lotar-web-assets/build.rs start the Rust jobs, and the files-Rust-tests-read check now scans crates/ with REPO_ROOT and per-package CARGO_MANIFEST_DIR. Both tests failed with crates/ taken out of the pattern, pass now. Docs: developers/main.md, testing.md, harness-tool-design.md, architecture-decisions.md, help/config-reference.md paths. Checks: npm run lint:agent; npm run test:agent (2171 Rust, 1524 UI, release, hooks); npm run smoke 394/394; cargo deny check; cargo build --release --locked --all-features (both binaries); cargo install --path . installs lotar and lotar-agent-wrapper; Windows CI selection lists lotar::bin/lotar-agent-wrapper (10) and lotar-lib::windows_regressions (31). Web-only change, only lotar-web-assets and lotar compile: cargo build 0.51 s, cargo nextest run --no-run 0.56 s. Not run: cross (x86_64 images, arm64 Mac), nfpm (not installed). DEV-507 (5bef3dba) rebases onto this commit and leaves the wrapper move to it.'
+- date: 2026-11-14T01:55:14.150708+00:00
+  author: codex
+  text: 'Merge blocked: main remains 2f9b8e97; branch HEAD remains reviewed 3ec533d6 and is already based on main. Fast-forward refused because uncommitted docs/release-guide.md in the main checkout would be overwritten. All main checkout work preserved. Skipped lint:agent, test:agent, smoke, cargo deny, release build and install because the rework comment records passes on unchanged HEAD. No push. Can the owner save or reconcile the main checkout release-guide changes so this fast-forward can proceed?'
+- date: 2026-11-14T01:55:31.423211+00:00
+  author: automation
+  text: 'The merge agent''s job job-20261114T015441.216Z-31 failed again: lotar agent logs job-20261114T015441.216Z-31. The fix is on branch t3/cargo-workspace-web-assets-5. Should an agent try again (lotar automation run "Health: retry with @fix" --select ''id:DEV-497'', or for an agent''s ticket lotar assignee DEV-497 @fix), or will you merge it yourself?'
+- date: 2026-11-14T01:57:11.570887+00:00
+  author: claude
+  text: 'Merged by hand (claude, release prep for v0.15.0): the merge was refused only because of my uncommitted docs/release-guide.md edit in the main checkout (DEV-417). Moved it aside, fast-forwarded main to the reviewed 3ec533d6 (based on main 2f9b8e97), put the edit back; it applied cleanly. Checks: the rework ran lint, test and smoke on this exact commit (comment above); review passed. Not pushed: it goes out with v0.15.0.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aece2a03a-cf09-4340-9bd6-4b7ecf0e4547
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aeb427d8b-11c2-4310-9c31-3447004ca1e2
@@ -62,6 +83,9 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3d3574f1-27f3-4348-b62d-131acda1ef87
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3b6a47a9-70f1-44d7-bed2-52ffa6c42311
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa794c3d5-1743-4237-94fb-fd191da44e15
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afecc4791-8b08-40b0-9f90-ab4b3cf9519c
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6e255cb6-e283-456a-a4f5-8ce20231a903
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abecf0c81-48f8-4808-b180-26c8717e91ca
 releases:
 - 5
 description: |-
@@ -84,7 +108,6 @@ description: |-
   - [ ] Release builds, the smoke suite and the packaging checks still pass.
 tags:
 - backend
-- review-returned
 history:
 - at: 2026-11-13T22:21:43.116897+00:00
   actor: claude
@@ -336,3 +359,132 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-14T01:00:00.789414+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afecc4791-8b08-40b0-9f90-ab4b3cf9519c
+- at: 2026-11-14T01:01:19.066246+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-14T01:21:12.998992+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T01:21:19.566131+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: backend, review-returned
+    new: backend, review-returned, merge-retried
+- at: 2026-11-14T01:21:19.607863+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-14T01:21:19.826408+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-14T01:23:16.962947+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T01:23:17.084103+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-14T01:23:46.928022+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T01:23:47.793616+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6e255cb6-e283-456a-a4f5-8ce20231a903
+- at: 2026-11-14T01:38:45.601108+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T01:39:02.020644+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T01:40:06.764342+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-499","DEV-417"],"related":["DEV-493","DEV-417","DEV-507"]}'
+    new: '{"blocks":["DEV-499","DEV-417"],"related":["DEV-493","DEV-417","DEV-507","DEV-508"]}'
+- at: 2026-11-14T01:51:24.330964+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abecf0c81-48f8-4808-b180-26c8717e91ca
+- at: 2026-11-14T01:52:47.736381+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-14T01:55:14.150708+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T01:55:31.423211+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-14T01:55:31.816497+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-14T01:57:11.570887+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T01:57:11.759626+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done
+- at: 2026-11-14T01:57:11.799612+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: backend, review-returned, merge-retried
+    new: backend
+- at: 2026-11-14T01:57:12.415618+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox

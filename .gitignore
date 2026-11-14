@@ -8,13 +8,16 @@ node_modules/
 /.kilo/
 __pycache__/
 
-# .tasks/ is the version-controlled backlog. Only the DEV project is tracked; every other
+# .tasks/ is the version-controlled backlog. Only the DEV project and @releases (lotar's
+# own releases and their DEV tickets, owner 2026-11-14) are tracked; every other
 # project + runtime dir (LOTA, TEST, @sprints, @attachments, scenario data from
 # `npm run seed:test-tasks`, …) is local-only so coincidental/test data stays out of git.
 .tasks/*/
 !.tasks/DEV/
+!.tasks/@releases/
 .tasks/**/.task.lock
 .tasks/**/.sprints.lock
+.tasks/**/.releases.lock
 .tasks/**/.attachments-store.lock
 .tasks-demo/
 
