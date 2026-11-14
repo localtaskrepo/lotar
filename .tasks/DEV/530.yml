@@ -1,11 +1,11 @@
 title: A job the dependency check held back resumes as it was when its prerequisites are done
-status: HelpNeeded
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@review'
 created: 2026-11-14T07:27:35.331056+00:00
-modified: 2026-11-14T17:39:01.727513+00:00
+modified: 2026-11-14T18:31:42.955823+00:00
 relationships:
   related:
   - DEV-351
@@ -14,6 +14,7 @@ relationships:
   - DEV-503
   - DEV-524
   - DEV-396
+  - DEV-535
 comments:
 - date: 2026-11-14T07:47:55.099885+00:00
   author: claude
@@ -50,6 +51,19 @@ comments:
 - date: 2026-11-14T17:39:01.727513+00:00
   author: claude
   text: 'DEV-524 was reworked (amended to 8db7cb8d): the queue worker''s prerequisite check (prerequisites_allow_start in start_entry) is now in DEV-524. DEV-530 is built on the old 500370cd and has its own hold_for_prerequisites in the same place, so the merge needs git rebase --onto main 500370cd agent/DEV-530 after DEV-524 lands, keeping DEV-524''s check and adding the parking of the job on top.'
+- date: 2026-11-14T18:14:55.813734+00:00
+  author: claude
+  text: 'Nothing here needs mallox: DEV-524 landed on main (c01dfce3), and its queue check prerequisites_allow_start (automation_service.rs:2644) now fails closed: a check that errors puts the job back for another try, and the last try comments on the ticket and drops the job. That answers codex''s second blocking finding (17:02Z). Left for @fix: git rebase --onto main 500370cd agent/DEV-530. Keep DEV-524''s check and put the job parking on top, so a parking error also keeps the job queued. Add the worker-boundary test the review asked for, rerun lint, test and smoke, then ask for review. A third blocking review goes to mallox.'
+- date: 2026-11-14T18:31:29.553259+00:00
+  author: claude
+  text: |-
+    Rebased onto main after DEV-524 (c01dfce3); now one signed commit fb7de879 on main, not pushed.
+
+    - Codex 17:02Z finding (the queue started a job when the check or the parking failed): DEV-524 already made the queue check fail closed (prerequisites_allow_start). On top of it, an open prerequisite now parks the job (hold_for_prerequisites is gone). A failed park returns an error, so the queue puts the job back and never starts it: mark_task_blocked parks first and takes the job back if the status cannot be set. A comment that cannot be written is reported and does not undo the park. At assignment, a failed park leaves the job in the queue, which checks again.
+    - New unit test a_queued_job_that_cannot_be_parked_goes_back_to_the_queue (queue folder not writable): an error on the normal and the last try, ticket unchanged. With the old behaviour (a failed park lets the job start) it fails with [Ok(true), Ok(true)].
+    - DEV-524 test agent_assignment_with_an_open_prerequisite_blocks_the_ticket_until_it_is_done now expects DEV-530: the held job starts with its own prompt, not the rule message, and the ticket is back in Todo.
+    - help/automation.md: DEV-524 text merged with the parking; a job that cannot be held back is retried and never started.
+    - Checks: npm run lint:agent; test:agent (2174 Rust, 1537 web); test:smoke:agent (401). All pass.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aadaa906d-5c3e-411d-b998-4015eb47b493
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A50a42e5d-ab8c-4c4e-a7e1-23c50ebf82b5
@@ -208,3 +222,38 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-14T18:08:21.839784+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396"]}'
+    new: '{"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535"]}'
+- at: 2026-11-14T18:14:55.813734+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T18:14:56.239552+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-14T18:19:12.157423+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T18:31:29.553259+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T18:31:42.955823+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

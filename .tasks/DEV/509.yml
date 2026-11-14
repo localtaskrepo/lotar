@@ -5,13 +5,12 @@ type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-14T02:15:26.078753+00:00
-modified: 2026-11-14T08:21:56.660508+00:00
+modified: 2026-11-14T18:17:10.920869+00:00
 relationships:
   depends_on:
   - DEV-503
   blocks:
   - DEV-513
-  - DEV-510
   related:
   - DEV-503
   - DEV-513
@@ -19,6 +18,8 @@ relationships:
   - DEV-510
   - DEV-511
   - DEV-512
+  - DEV-532
+  - DEV-537
 comments:
 - date: 2026-11-14T02:16:43.837266+00:00
   author: automation
@@ -409,3 +410,21 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-14T18:05:22.043758+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513","DEV-510"],"related":["DEV-503","DEV-513","DEV-516","DEV-510","DEV-511","DEV-512"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513","DEV-510"],"related":["DEV-503","DEV-513","DEV-516","DEV-510","DEV-511","DEV-512","DEV-532"]}'
+- at: 2026-11-14T18:08:45.006752+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513","DEV-510"],"related":["DEV-503","DEV-513","DEV-516","DEV-510","DEV-511","DEV-512","DEV-532"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513","DEV-510"],"related":["DEV-503","DEV-513","DEV-516","DEV-510","DEV-511","DEV-512","DEV-532","DEV-537"]}'
+- at: 2026-11-14T18:17:10.920869+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513","DEV-510"],"related":["DEV-503","DEV-513","DEV-516","DEV-510","DEV-511","DEV-512","DEV-532","DEV-537"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-516","DEV-510","DEV-511","DEV-512","DEV-532","DEV-537"]}'

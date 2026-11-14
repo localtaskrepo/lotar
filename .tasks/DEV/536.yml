@@ -1,0 +1,74 @@
+title: 'Waiting for the owner without a question: DEV-523'
+status: Done
+priority: Medium
+type: Chore
+reporter: claude
+created: 2026-11-14T18:08:25.652729+00:00
+modified: 2026-11-14T18:15:52.333815+00:00
+relationships:
+  related:
+  - DEV-523
+comments:
+- date: 2026-11-14T18:15:18.839414+00:00
+  author: claude
+  text: DEV-523's open question was buried under an automation comment; I re-asked it as DEV-523's last comment (fix the adopted-job gap first, or merge with a follow-up). No file change. Waiting on mallox's answer there.
+- date: 2026-11-14T18:15:44.123388+00:00
+  author: claude
+  text: 'Correction: DEV-536 itself needs nothing from mallox. The check no longer lists question:DEV-523, so it is Done. The question waits on DEV-523.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4ba53398-e19a-442d-9fa9-6c9f50ee8632
+description: |-
+  DEV-523 (A merge job that stops on purpose still lands its branch on main) is HelpNeeded, but its last comment asks no question: "The merge agent's job job-20261114T083832.814Z-109 failed (lotar agent logs job-20261114T083832.814Z-109); the fix agen…" (lotar show DEV-523)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `question:DEV-523`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[question:DEV-523]` while the problem is there.
+
+  ## Done when
+
+  The ticket's last comment asks the owner one question he can answer in a line (skill lotar-workflow), or the ticket moved on: Done with a comment when its done criteria are met (he can reopen it), or back to an agent when nothing needs him (a failed job: lotar assignee <id> @fix). Ask the session or agent named on the ticket before you change it.
+tags:
+- health
+custom_fields:
+  finding: question:DEV-523
+history:
+- at: 2026-11-14T18:08:26.922002+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-523"]}'
+- at: 2026-11-14T18:08:30.427735+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-14T18:14:11.337852+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-14T18:14:12.848016+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4ba53398-e19a-442d-9fa9-6c9f50ee8632
+- at: 2026-11-14T18:15:18.839414+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T18:15:44.123388+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T18:15:52.333815+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'

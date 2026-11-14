@@ -1,0 +1,91 @@
+title: 'Done with an open step no ticket tracks: DEV-279'
+status: Merging
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@merge'
+created: 2026-11-14T18:09:18.622094+00:00
+modified: 2026-11-14T18:32:52.473305+00:00
+relationships:
+  related:
+  - DEV-279
+comments:
+- date: 2026-11-14T18:18:36.789860+00:00
+  author: claude
+  text: 'The open step needs nothing more: DEV-279 dropped shipping lotar-agent-wrapper in release archives on purpose, since active-job records made list-running, agent status, cross-process cancel and the status/assignee guards work without it (DEV-279 comment, tests/dev279_cross_process_jobs_test.rs). No follow-up ticket. While checking I fixed docs/help/install.md, which still said list-running needs the wrapper and linked agent.md#list-running-requirements, an anchor that doesn''t exist; it now points to #jobs-in-other-processes. Commit acd88ef1. Checks: prettier --check on the file, anchor confirmed in agent.md; docs-only, so no build/test/smoke. The finding untracked:DEV-279 stays listed by repos.ts until this ticket ends Done/WontDo (the reviewer may set WontDo, as Done when says for a dropped step).'
+- date: 2026-11-14T18:32:44.115773+00:00
+  author: codex
+  text: 'Review: passed. Reviewed sole commit acd88ef1, full diff, DEV-539 and DEV-279 comments, repository guidance, current agent help, release packaging, existing cross-process regression test and five recent main commits touching install.md. No findings or tickets filed. Prettier and git diff --check pass. Health check completed exit 1: untracked:DEV-279 remains until closure, alongside existing unrelated findings. Docs-only: application suites and UI screenshots not required. No files changed or commits made; status and assignee unchanged. Use WontDo at closure per the dropped-step criterion. No durable guidance finding.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A381bf7bf-62ed-432e-8bfc-d55ad9d744e7
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3e5fdc24-59c3-489d-bce6-284393f127c7
+description: |-
+  DEV-279 (Agent jobs across processes: detection, cancel/status, orphaned MCP jobs, queue drops, Windows cancel) is Done, but a comment names a step still open and no open ticket is linked: "Not done: shipping the wrapper in release archives (no longer needed for these features)." (lotar show DEV-279)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `untracked:DEV-279`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[untracked:DEV-279]` while the problem is there.
+
+  ## Done when
+
+  The open step is a ticket of its own, linked to the Done ticket (lotar task relationships add <new> <ID> --kind related), or the Done ticket is reopened when its own work is not finished. When the step needs nothing more (done, or dropped), say so in a comment and set this ticket WontDo: the finding is then not filed again.
+tags:
+- health
+custom_fields:
+  finding: untracked:DEV-279
+history:
+- at: 2026-11-14T18:09:20.310836+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-279"]}'
+- at: 2026-11-14T18:09:21.660938+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-14T18:17:22.651568+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-14T18:17:23.448719+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A381bf7bf-62ed-432e-8bfc-d55ad9d744e7
+- at: 2026-11-14T18:18:36.789860+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T18:18:43.947533+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T18:31:44.763894+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3e5fdc24-59c3-489d-bce6-284393f127c7
+- at: 2026-11-14T18:32:44.115773+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T18:32:52.473305+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

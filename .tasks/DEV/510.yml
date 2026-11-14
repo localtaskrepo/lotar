@@ -1,15 +1,14 @@
 title: 'Close the gaps of harnessmux''s t3 agent: resume waits for a running thread, worktree and link in its events, a structured wait for an answer'
-status: HelpNeeded
+status: Merging
 priority: High
 type: Feature
 reporter: claude
-assignee: claude
+assignee: '@merge'
 created: 2026-11-14T02:19:54.140386+00:00
-modified: 2026-11-14T08:04:20.356163+00:00
+modified: 2026-11-14T18:24:17.043679+00:00
 relationships:
   depends_on:
   - DEV-503
-  - DEV-509
   blocks:
   - DEV-513
   related:
@@ -20,6 +19,7 @@ relationships:
   - DEV-511
   - DEV-501
   - DEV-521
+  - DEV-537
 comments:
 - date: 2026-11-14T04:12:50.227687+00:00
   author: claude
@@ -68,16 +68,16 @@ comments:
 - date: 2026-11-14T07:56:10.368161+00:00
   author: claude
   text: 'harnessmux 0.1.2 is on crates.io (DEV-509 agent: main ae24067, signed tag v0.1.2, Release run 43571745508 green; cargo search shows 0.1.2). On lotar agent/DEV-510: cargo update -p harnessmux (0.1.1 -> 0.1.2, registry checksum), amended 88002b9a -> 9b403ee8 (dropped the ''needs 0.1.2'' line from the message). Checks against the published crate: npm run lint:agent pass; npm test pass (2149 Rust, 1536 UI, release, hooks); npm run smoke pass (400). For the merge: main has moved on (DEV-511, DEV-501, DEV-521 and others), and a rebase conflicts in crates/lotar-lib/src/services/agent_job_service.rs and crates/lotar-lib/tests/integration.rs (git merge-tree). I didn''t rebase; that''s the merge step. All three done-criteria are covered by dev510_t3_session_test; worktree and branch are left out per mallox 2026-11-14. Not run: a live T3 thread.'
+- date: 2026-11-14T18:17:24.768528+00:00
+  author: claude
+  text: 'Nothing here waits for mallox (DEV-537): the 07:56 comment finished the rework of codex''s blocking review finding (Cargo.lock now harnessmux 0.1.2, amended 9b403ee8 on agent/DEV-510; lint:agent, test, smoke pass). It only waited for the harnessmux 0.1.2 release, which is out, so I removed the depends-on DEV-509 (still related) and the stale tags blocked, blocked-by:DEV-509 and review-blocked. Next: a fresh review on Codex (Answered in the thread: review on Codex), then the merge agent rebases onto main (conflicts expected in agent_job_service.rs and tests/integration.rs).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae32d01b4-631c-4fdc-adf5-8f18371bee13
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac1722915-ee93-49bf-9853-b79066d0c7be
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A217d6eac-6771-4bc7-8126-ba19717eb724
 releases:
 - 6
 description: 'Lost in DEV-503 (owner asked to file it, 2026-11-14). 1) Restart recovery: before DEV-503 a t3 job whose lotar process died waited for the still-running T3 thread (t3 thread show) and ended with it. Now lotar resumes the session and sends ''continue'', which reaches a thread that is probably still running, so the agent may work twice. harnessmux''s t3 agent should, on resume, check whether the thread runs and follow that run instead of a new turn. 2) T3 reports the thread''s worktreePath, branch and link (thread show --json); lotar used to record the worktree on the job and add the link to the ticket. Now lotar guesses the worktree from git (record_t3_worktree in agent_job_service.rs) and links nothing. harnessmux''s t3 agent should put worktree, branch and link in its events; lotar records them and attaches the link. 3) A thread waiting for an answer (t3 exit 2) used to hand the ticket to its reporter as HelpNeeded with the link; now it is turn.failed text and the job fails. harnessmux should end the turn with a structured ''waiting for an answer'' (also usable for an unanswered on_permission: ask), and lotar hands the ticket back as before. Work in harnessmux (release, crates.io) and lotar. Done when a killed lotar during a t3 job ends the job from the thread without a second turn, t3 jobs record T3''s worktree and link the thread, and a waiting thread hands the ticket back.'
-tags:
-- blocked
-- blocked-by:DEV-509
-- review-blocked
 history:
 - at: 2026-11-14T02:19:54.844800+00:00
   actor: claude
@@ -311,3 +311,48 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-503","DEV-509"],"blocks":["DEV-513","DEV-512"],"related":["DEV-503","DEV-513","DEV-509","DEV-512","DEV-511","DEV-501","DEV-521"]}'
     new: '{"depends_on":["DEV-503","DEV-509"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-509","DEV-512","DEV-511","DEV-501","DEV-521"]}'
+- at: 2026-11-14T18:08:45.030322+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503","DEV-509"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-509","DEV-512","DEV-511","DEV-501","DEV-521"]}'
+    new: '{"depends_on":["DEV-503","DEV-509"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-509","DEV-512","DEV-511","DEV-501","DEV-521","DEV-537"]}'
+- at: 2026-11-14T18:17:10.922278+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503","DEV-509"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-509","DEV-512","DEV-511","DEV-501","DEV-521","DEV-537"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-509","DEV-512","DEV-511","DEV-501","DEV-521","DEV-537"]}'
+- at: 2026-11-14T18:17:11.173399+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: blocked, blocked-by:DEV-509, review-blocked
+    new: ''
+- at: 2026-11-14T18:17:24.768528+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T18:17:24.951088+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Reviewing
+  - field: assignee
+    old: claude
+    new: '@review'
+- at: 2026-11-14T18:23:35.264338+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A217d6eac-6771-4bc7-8126-ba19717eb724
+- at: 2026-11-14T18:24:17.043679+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

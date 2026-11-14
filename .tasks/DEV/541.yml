@@ -1,0 +1,67 @@
+title: Cleanup at Done keeps a Done ticket's superseded versions, so its branches and worktrees pile up
+status: Reviewing
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@review'
+created: 2026-11-14T18:13:44.393048+00:00
+modified: 2026-11-14T18:34:02.426992+00:00
+relationships:
+  related:
+  - DEV-532
+  - DEV-476
+  - DEV-468
+  - DEV-473
+  - DEV-524
+comments:
+- date: 2026-11-14T18:33:51.295546+00:00
+  author: claude
+  text: 'Fixed in 989f8a45 (agent/DEV-541). When a ticket reaches Done, the cleanup (and lotar agent worktree cleanup for Done tickets) now also removes branches and worktrees that main supersedes. A version counts as superseded when main gained a commit since their fork point whose subject starts with the ticket ID, committed after the version''s commit. Before removal the commit is kept as refs/archive/<ticket>/<branch>/<commit> (detached worktrees: refs/archive/<ticket>/detached/<commit>). Still kept: worktrees with uncommitted changes, worktrees a process runs in (its working directory is inside), and work committed after the landing commit. New test agent_safety_test::done_archives_and_removes_versions_main_supersedes covers both the automatic path and the CLI path, and it fails without the fix. The DEV-476 test now dates its ''unlanded'' commit after the landing. docs/help/agent.md is updated. Checks run and passing: npm run lint:agent, npm run test:agent (2171 Rust, 1537 UI), npm run test:smoke:agent (401). Not run yet: the ticket''s own check against the main checkout, which needs a merge first.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6f43a938-4eac-4d80-9fca-7c2f130f611e
+description: |-
+  Found (DEV-532, 2026-11-14): after DEV-476, Done tickets still left 95 branches and 74 clean, idle worktrees (DEV-468..DEV-524, all Done). They hold earlier fix, review and rework versions of the ticket that differ from what landed on main (the merge agent rebased or reworked them), so the cleanup at Done counts them as work missing from main and keeps them. Every ticket with a review round adds some, and the repo-health check reports them as unpushed:branches daily (DEV-473, DEV-532). DEV-532 archived them under refs/archive/DEV-532/ and removed them as the owner allowed (INBOX-38).
+
+  Check: after a ticket whose fix was reworked or rebased reaches Done, git branch and git worktree list show nothing left for it.
+
+  Done when: the cleanup at Done (and lotar agent worktree cleanup) also removes a Done ticket's clean, idle versions that main supersedes (for example by keeping a ref under refs/archive/ first), keeps any with uncommitted changes or a running process, with a test.
+tags:
+- health
+custom_fields:
+  finding: cleanup:superseded-versions
+history:
+- at: 2026-11-14T18:13:45.020234+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-532","DEV-476"]}'
+    new: '{"related":["DEV-532","DEV-476","DEV-468","DEV-473","DEV-524"]}'
+- at: 2026-11-14T18:13:45.247922+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-14T18:18:44.414929+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-14T18:18:45.213294+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6f43a938-4eac-4d80-9fca-7c2f130f611e
+- at: 2026-11-14T18:33:51.295546+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T18:34:02.426992+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

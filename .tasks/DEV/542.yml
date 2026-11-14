@@ -1,0 +1,41 @@
+title: A command runner fails to start on Linux when the prompt is over 128 KiB
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-14T18:18:37.990994+00:00
+modified: 2026-11-14T18:24:18.907295+00:00
+relationships:
+  related:
+  - DEV-533
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4cf66ebf-22d7-41d7-aac6-960ad78bd9f5
+description: 'Found: build_command (crates/lotar-lib/src/services/agent_runner.rs) puts the whole prompt in LOTAR_AGENT_PROMPT. Linux caps one environment string at 128 KiB (MAX_ARG_STRLEN), so the spawn fails with ''Argument list too long (os error 7)'' and the job fails. Seen in CI on main while fixing DEV-533 (test with a 256 KiB prompt, since removed). Check: start a command-runner job with a 200 KiB prompt on Linux. Done: such a job starts and its program can read the full prompt (e.g. also offer it in a file, LOTAR_AGENT_PROMPT_FILE), docs/help/agent.md updated.'
+tags:
+- health
+custom_fields:
+  finding: agent-prompt-env:LOTAR_AGENT_PROMPT
+history:
+- at: 2026-11-14T18:18:38.153969+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-533"]}'
+- at: 2026-11-14T18:18:38.308713+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-14T18:24:18.030122+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-14T18:24:18.907295+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4cf66ebf-22d7-41d7-aac6-960ad78bd9f5

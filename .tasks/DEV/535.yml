@@ -1,0 +1,68 @@
+title: 'Waiting for the owner without a question: DEV-530'
+status: Done
+priority: Medium
+type: Chore
+reporter: claude
+created: 2026-11-14T18:08:20.420116+00:00
+modified: 2026-11-14T18:15:39.628780+00:00
+relationships:
+  related:
+  - DEV-524
+  - DEV-530
+comments:
+- date: 2026-11-14T18:15:33.258297+00:00
+  author: claude
+  text: 'No file change: DEV-530 needed no owner decision, because DEV-524 landed with the fail-closed queue check that answers its second review. I commented the remaining rebase step and assigned DEV-530 to @fix; its job is queued. The check lists question:DEV-530 until that job starts and DEV-530 leaves HelpNeeded.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A41a13974-ebff-4247-9315-222e6f2d5471
+description: |-
+  DEV-530 (A job the dependency check held back resumes as it was when its prerequisites are done) is HelpNeeded, but its last comment asks no question: "DEV-524 was reworked (amended to 8db7cb8d): the queue worker's prerequisite check (prerequisites_allow_start in start_e…" (lotar show DEV-530)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `question:DEV-530`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[question:DEV-530]` while the problem is there.
+
+  ## Done when
+
+  The ticket's last comment asks the owner one question he can answer in a line (skill lotar-workflow), or the ticket moved on: Done with a comment when its done criteria are met (he can reopen it), or back to an agent when nothing needs him (a failed job: lotar assignee <id> @fix). Ask the session or agent named on the ticket before you change it.
+tags:
+- health
+custom_fields:
+  finding: question:DEV-530
+history:
+- at: 2026-11-14T18:08:21.844537+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-524","DEV-530"]}'
+- at: 2026-11-14T18:08:24.335316+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-14T18:13:46.693385+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-14T18:13:48.067694+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A41a13974-ebff-4247-9315-222e6f2d5471
+- at: 2026-11-14T18:15:33.258297+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T18:15:39.628780+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'

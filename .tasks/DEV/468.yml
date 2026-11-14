@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T10:33:47.729859+00:00
-modified: 2026-11-14T08:44:35.155963+00:00
+modified: 2026-11-14T18:13:45.017746+00:00
 relationships:
   blocks:
   - DEV-513
@@ -24,6 +24,8 @@ relationships:
   - DEV-525
   - DEV-526
   - DEV-529
+  - DEV-532
+  - DEV-541
 comments:
 - date: 2026-11-13T10:48:16.585852+00:00
   author: claude
@@ -665,3 +667,15 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-513"],"related":["DEV-342","DEV-408","DEV-414","DEV-465","DEV-472","DEV-473","DEV-466","DEV-513","DEV-524","DEV-503","DEV-528","DEV-525","DEV-526"]}'
     new: '{"blocks":["DEV-513"],"related":["DEV-342","DEV-408","DEV-414","DEV-465","DEV-472","DEV-473","DEV-466","DEV-513","DEV-524","DEV-503","DEV-528","DEV-525","DEV-526","DEV-529"]}'
+- at: 2026-11-14T18:05:21.660296+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-513"],"related":["DEV-342","DEV-408","DEV-414","DEV-465","DEV-472","DEV-473","DEV-466","DEV-513","DEV-524","DEV-503","DEV-528","DEV-525","DEV-526","DEV-529"]}'
+    new: '{"blocks":["DEV-513"],"related":["DEV-342","DEV-408","DEV-414","DEV-465","DEV-472","DEV-473","DEV-466","DEV-513","DEV-524","DEV-503","DEV-528","DEV-525","DEV-526","DEV-529","DEV-532"]}'
+- at: 2026-11-14T18:13:45.017746+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-513"],"related":["DEV-342","DEV-408","DEV-414","DEV-465","DEV-472","DEV-473","DEV-466","DEV-513","DEV-524","DEV-503","DEV-528","DEV-525","DEV-526","DEV-529","DEV-532"]}'
+    new: '{"blocks":["DEV-513"],"related":["DEV-342","DEV-408","DEV-414","DEV-465","DEV-472","DEV-473","DEV-466","DEV-513","DEV-524","DEV-503","DEV-528","DEV-525","DEV-526","DEV-529","DEV-532","DEV-541"]}'

@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-13T22:21:42.733070+00:00
-modified: 2026-11-14T08:49:10.908539+00:00
+modified: 2026-11-14T18:05:21.949224+00:00
 relationships:
   depends_on:
   - DEV-493
@@ -21,6 +21,8 @@ relationships:
   - DEV-512
   - DEV-529
   - DEV-531
+  - DEV-524
+  - DEV-532
 comments:
 - date: 2026-11-14T05:27:32.965362+00:00
   author: claude
@@ -261,3 +263,15 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-493"],"blocks":["DEV-499"],"related":["DEV-107","DEV-493","DEV-501","DEV-522","DEV-526","DEV-527","DEV-512","DEV-529"]}'
     new: '{"depends_on":["DEV-493"],"blocks":["DEV-499"],"related":["DEV-107","DEV-493","DEV-501","DEV-522","DEV-526","DEV-527","DEV-512","DEV-529","DEV-531"]}'
+- at: 2026-11-14T18:00:44.406718+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-493"],"blocks":["DEV-499"],"related":["DEV-107","DEV-493","DEV-501","DEV-522","DEV-526","DEV-527","DEV-512","DEV-529","DEV-531"]}'
+    new: '{"depends_on":["DEV-493"],"blocks":["DEV-499"],"related":["DEV-107","DEV-493","DEV-501","DEV-522","DEV-526","DEV-527","DEV-512","DEV-529","DEV-531","DEV-524"]}'
+- at: 2026-11-14T18:05:21.949224+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-493"],"blocks":["DEV-499"],"related":["DEV-107","DEV-493","DEV-501","DEV-522","DEV-526","DEV-527","DEV-512","DEV-529","DEV-531","DEV-524"]}'
+    new: '{"depends_on":["DEV-493"],"blocks":["DEV-499"],"related":["DEV-107","DEV-493","DEV-501","DEV-522","DEV-526","DEV-527","DEV-512","DEV-529","DEV-531","DEV-524","DEV-532"]}'

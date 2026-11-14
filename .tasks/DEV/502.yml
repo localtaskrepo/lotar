@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T22:41:10.367004+00:00
-modified: 2026-11-14T00:38:10.226086+00:00
+modified: 2026-11-14T18:05:22.009114+00:00
 relationships:
   blocks:
   - DEV-488
@@ -17,6 +17,7 @@ relationships:
   - DEV-490
   - DEV-491
   - DEV-417
+  - DEV-532
 comments:
 - date: 2026-11-13T23:05:36.846916+00:00
   author: claude
@@ -589,3 +590,9 @@ history:
   - field: tags
     old: web-ui, ui, review-returned
     new: web-ui, ui
+- at: 2026-11-14T18:05:22.009114+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-488","DEV-417"],"related":["DEV-466","DEV-488","DEV-489","DEV-490","DEV-491","DEV-417"]}'
+    new: '{"blocks":["DEV-488","DEV-417"],"related":["DEV-466","DEV-488","DEV-489","DEV-490","DEV-491","DEV-417","DEV-532"]}'

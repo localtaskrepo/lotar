@@ -4,7 +4,7 @@ priority: Medium
 type: Chore
 reporter: claude
 created: 2026-11-13T21:27:58.028716+00:00
-modified: 2026-11-14T04:21:44.174965+00:00
+modified: 2026-11-14T18:05:21.767740+00:00
 relationships:
   blocks:
   - DEV-496
@@ -21,6 +21,7 @@ relationships:
   - DEV-417
   - DEV-490
   - DEV-513
+  - DEV-532
 comments:
 - date: 2026-11-13T22:08:01.550984+00:00
   author: claude
@@ -492,3 +493,9 @@ history:
   - field: tags
     old: merge-retried
     new: ''
+- at: 2026-11-14T18:05:21.767740+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-496"],"related":["DEV-471","DEV-481","DEV-495","DEV-496","DEV-497","DEV-498","DEV-499","DEV-500","DEV-506","DEV-417","DEV-490","DEV-513"]}'
+    new: '{"blocks":["DEV-496"],"related":["DEV-471","DEV-481","DEV-495","DEV-496","DEV-497","DEV-498","DEV-499","DEV-500","DEV-506","DEV-417","DEV-490","DEV-513","DEV-532"]}'

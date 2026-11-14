@@ -1,0 +1,96 @@
+title: 'Config copy behind the standard: .tasks/DEV/automation.yml'
+status: Merging
+priority: Low
+type: Chore
+reporter: claude
+assignee: '@merge'
+created: 2026-11-14T18:08:16.659184+00:00
+modified: 2026-11-14T18:19:53.149571+00:00
+relationships:
+  related:
+  - DEV-474
+comments:
+- date: 2026-11-14T18:11:53.750094+00:00
+  author: claude
+  text: |-
+    Copied `configs/lotar/automation.yml` over `.tasks/DEV/automation.yml` (no repo additions were in the copy, so the file is now identical to the source). Commit `899ebe79`.
+    - Checks: `cmp` against the source is identical; the YAML parses. The drift check reads commit dates, so it clears after the merge.
+    - Not run: `npm run lint`/`test`/`smoke` (config-only change); `lotar automation simulate` can't see DEV-534 from the worktree.
+- date: 2026-11-14T18:19:49.968827+00:00
+  author: claude
+  text: |-
+    Review: passed
+
+    - Read: ticket, fix agent's comment, `git diff main..HEAD` (only `.tasks/DEV/automation.yml`, commit `899ebe79`), `git log -5 main -- .tasks/DEV/automation.yml`, the 3 standards commits to the source, AGENTS.md.
+    - Reran: `cmp ~/Development/standards/configs/lotar/automation.yml .tasks/DEV/automation.yml` is identical; the YAML parses (aliases on); installed lotar 0.15.0 supports the `--question`/`--option`/`--set` the new rules use; `lotar automation simulate --ticket DEV-531` loads the file and matches a rule.
+    - The main copy had no repo-only additions in the old diff (every changed line is a standards change), so nothing was lost; nothing beyond the sync was added.
+    - `repos.ts` still lists the drift because it reads the main checkout; it should clear after the merge. Not run: lint/test/smoke (a config-only change, as the fix agent said).
+    - No findings, no tickets filed.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abe933f59-3c7d-489e-9ff3-2230d2d201dd
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9c5cd48a-3a07-4b6e-b9a9-e689d510d55f
+description: |-
+  .tasks/DEV/automation.yml: configs/lotar/automation.yml changed since the copy (3 commits: git -C ~/Development/standards log -- configs/lotar/automation.yml)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `drift:.tasks/DEV/automation.yml`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[drift:.tasks/DEV/automation.yml]` while the problem is there.
+
+  ## Done when
+
+  The copy matches its source in ~/Development/standards/configs again (repo additions kept at its end) and the repo's checks pass.
+tags:
+- health
+- light
+custom_fields:
+  finding: drift:.tasks/DEV/automation.yml
+history:
+- at: 2026-11-14T18:08:19.215848+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix-light'
+- at: 2026-11-14T18:08:22.149928+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-14T18:08:45.736600+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abe933f59-3c7d-489e-9ff3-2230d2d201dd
+- at: 2026-11-14T18:11:53.750094+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T18:13:46.159108+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-light'
+    new: '@review-light'
+- at: 2026-11-14T18:18:57.815234+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9c5cd48a-3a07-4b6e-b9a9-e689d510d55f
+- at: 2026-11-14T18:19:49.968827+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T18:19:53.149571+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review-light'
+    new: '@merge'

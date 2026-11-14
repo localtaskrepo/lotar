@@ -1,0 +1,122 @@
+title: 'Commits only on this Mac: branches'
+status: Done
+priority: Medium
+type: Chore
+reporter: claude
+created: 2026-11-14T18:04:57.134027+00:00
+modified: 2026-11-14T18:14:07.496403+00:00
+relationships:
+  related:
+  - DEV-473
+  - DEV-466
+  - DEV-467
+  - DEV-468
+  - DEV-476
+  - DEV-477
+  - DEV-478
+  - DEV-479
+  - DEV-480
+  - DEV-482
+  - DEV-484
+  - DEV-485
+  - DEV-486
+  - DEV-487
+  - DEV-488
+  - DEV-489
+  - DEV-490
+  - DEV-491
+  - DEV-493
+  - DEV-494
+  - DEV-495
+  - DEV-496
+  - DEV-497
+  - DEV-498
+  - DEV-500
+  - DEV-502
+  - DEV-504
+  - DEV-505
+  - DEV-506
+  - DEV-507
+  - DEV-509
+  - DEV-516
+  - DEV-518
+  - DEV-520
+  - DEV-523
+  - DEV-541
+  - DEV-524
+comments:
+- date: 2026-11-14T18:13:54.648988+00:00
+  author: claude
+  text: |-
+    Removed the leftovers of Done tickets, as the owner allowed in INBOX-38 (2026-11-13: 'when branches and workspaces are no longer needed they can be removed'). The check went from 84 commits to 29.
+
+    - **Removed:** 95 branches and 74 worktrees whose commits all belong to Done tickets (DEV-468 to DEV-524). Every worktree was clean and had no process running in it. Each one's commit is kept under `refs/archive/DEV-532/{heads,worktrees}/<name>`, so nothing is lost. To restore one: `git branch <name> refs/archive/DEV-532/heads/<name>`.
+    - **Kept:** the branches of open tickets: DEV-466 (Reviewing); DEV-467, 496, 509, 516, 520, 523 and 530 (HelpNeeded). They clear when those tickets merge. Also kept: t3/dependency-check-blocked-busy-lock (DEV-524), because a process is still running in its worktree. main's 14 commits go out with the merge agent's next push.
+    - **Cause:** filed as DEV-541. The cleanup at Done keeps a ticket's superseded versions, because they differ from what landed on main.
+
+    No files changed, no commit. Check run: `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar`.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9a3693ac-add7-4dc6-9f29-f0b97a22f01c
+description: |-
+  84 commits on no remote, only on this Mac: agent/DEV-466 1, agent/DEV-467 1, agent/DEV-468 1, agent/DEV-476 1, agent/DEV-477 1, agent/DEV-478 1, agent/DEV-479 1, agent/DEV-480 1, agent/DEV-482 1, agent/DEV-484 1, agent/DEV-485 1, agent/DEV-486 1, agent/DEV-487 1, agent/DEV-488 1, agent/DEV-489 1, agent/DEV-490 1, agent/DEV-491 1, agent/DEV-493 1, agent/DEV-494 1, agent/DEV-495 2, agent/DEV-496 1, agent/DEV-497 1, agent/DEV-498 1, agent/DEV-500 1, agent/DEV-502 1, agent/DEV-504 1, agent/DEV-505 1, agent/DEV-506 1, agent/DEV-507 2, agent/DEV-509 1, agent/DEV-516 1, agent/DEV-518 1, agent/DEV-520 1, agent/DEV-523 1, main 14, t3/automation-simulate-all-matching-rules 1, t3/automation-simulate-all-matching-rules-1 1, t3/cargo-workspace-web-assets 1, t3/cargo-workspace-web-assets-1 1, t3/cargo-workspace-web-assets-2 1, t3/cargo-workspace-web-assets-3 1, t3/cargo-workspace-web-assets-rebuild 1, t3/cargo-workspace-web-assets-step-1 1, t3/cargo-workspace-web-only-rebuild 1, t3/cleanup-detached-worktrees-t3-branches 1, t3/cleanup-done-detached-worktrees 1, t3/crates-io-docs-web-ui 2, t3/crates-io-package-docs-web-ui 1, t3/dev-478-orphaned-t3-job-thread-state 1, t3/dev-491-mute-automation-comments 1, t3/dev-491-mute-automation-comments-1 1, t3/filter-comments-history-tabs 1, t3/filter-comments-history-tabs-1 1, t3/filter-comments-history-tabs-2 1, t3/filter-comments-history-tabs-3 1, t3/fix-rework-commits-ticket-branch 2, t3/fresh-session-branch-fallback 1, t3/fresh-session-no-thread-fallback 1, t3/hand-off-report-comments 1, t3/hand-off-report-comments-1 2, t3/hand-off-report-comments-2 3, t3/handoff-report-comments 1, t3/handoff-report-comments-1 1, t3/job-outcome-server-outage 1, t3/job-outcome-t3-outage 1, t3/job-outcome-t3-outage-1 1, t3/job-outcome-t3-outage-2 1, t3/lotar-add-relationships 1, t3/lotar-add-relationships-on-create 1, t3/measure-cargo-workspace-path-ci 1, t3/mute-automation-comments 1, t3/offer-custom-fields-from-tasks 1, t3/offer-custom-fields-used-by-tasks 1, t3/question-comment-options 1, t3/question-comments-with-options 1, t3/question-comments-with-options-1 1, t3/resume-held-jobs-when-unblocked 2, t3/review-held-job-resume 2, t3/review-rework-ticket-branch 1, t3/review-verdict-comments 1, t3/review-verdict-comments-1 1, t3/rework-commits-on-ticket-branch 1, t3/rework-commits-on-ticket-branch-1 1, t3/rework-commits-on-ticket-branch-2 2, t3/sign-notarize-macos-release 1, t3/switch-agent-jobs-harnessmux 1, t3/switch-agent-jobs-to-harnessmux 1, t3/switch-agent-jobs-to-harnessmux-1 1, t3/switch-agent-jobs-to-harnessmux-2 1, t3/switch-agent-jobs-to-harnessmux-3 1, t3/t3-outage-job-outcome-fix 1, t3/taken-over-continue-job-thread-test 1, t3/taken-over-session-thread-id 1, t3/task-panel-git-timeout 1, t3/task-panel-git-timeout-1 1, t3/task-panel-git-timeout-2 2, t3/task-panel-git-timeout-3 2, t3/task-panel-git-timeout-4 2, t3/task-panel-git-timeout-5 2, t3/windows-ci-skip-lib-test-build 1, t3/windows-ci-skip-lib-unit-build 1 (git log <branch> --not --remotes)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `unpushed:branches`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[unpushed:branches]` while the problem is there.
+
+  ## Done when
+
+  git log <branch> --not --remotes is empty for each branch it lists: the commits are pushed, merged or on a branch with its worktree.
+tags:
+- health
+custom_fields:
+  finding: unpushed:branches
+history:
+- at: 2026-11-14T18:05:22.093362+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-473"]}'
+    new: '{"related":["DEV-473","DEV-466","DEV-467","DEV-468","DEV-476","DEV-477","DEV-478","DEV-479","DEV-480","DEV-482","DEV-484","DEV-485","DEV-486","DEV-487","DEV-488","DEV-489","DEV-490","DEV-491","DEV-493","DEV-494","DEV-495","DEV-496","DEV-497","DEV-498","DEV-500","DEV-502","DEV-504","DEV-505","DEV-506","DEV-507","DEV-509","DEV-516","DEV-518","DEV-520","DEV-523"]}'
+- at: 2026-11-14T18:07:40.327095+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-14T18:07:46.444380+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-14T18:08:02.733560+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9a3693ac-add7-4dc6-9f29-f0b97a22f01c
+- at: 2026-11-14T18:13:44.627715+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-473","DEV-466","DEV-467","DEV-468","DEV-476","DEV-477","DEV-478","DEV-479","DEV-480","DEV-482","DEV-484","DEV-485","DEV-486","DEV-487","DEV-488","DEV-489","DEV-490","DEV-491","DEV-493","DEV-494","DEV-495","DEV-496","DEV-497","DEV-498","DEV-500","DEV-502","DEV-504","DEV-505","DEV-506","DEV-507","DEV-509","DEV-516","DEV-518","DEV-520","DEV-523"]}'
+    new: '{"related":["DEV-473","DEV-466","DEV-467","DEV-468","DEV-476","DEV-477","DEV-478","DEV-479","DEV-480","DEV-482","DEV-484","DEV-485","DEV-486","DEV-487","DEV-488","DEV-489","DEV-490","DEV-491","DEV-493","DEV-494","DEV-495","DEV-496","DEV-497","DEV-498","DEV-500","DEV-502","DEV-504","DEV-505","DEV-506","DEV-507","DEV-509","DEV-516","DEV-518","DEV-520","DEV-523","DEV-541"]}'
+- at: 2026-11-14T18:13:54.648988+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T18:13:54.799552+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-473","DEV-466","DEV-467","DEV-468","DEV-476","DEV-477","DEV-478","DEV-479","DEV-480","DEV-482","DEV-484","DEV-485","DEV-486","DEV-487","DEV-488","DEV-489","DEV-490","DEV-491","DEV-493","DEV-494","DEV-495","DEV-496","DEV-497","DEV-498","DEV-500","DEV-502","DEV-504","DEV-505","DEV-506","DEV-507","DEV-509","DEV-516","DEV-518","DEV-520","DEV-523","DEV-541"]}'
+    new: '{"related":["DEV-473","DEV-466","DEV-467","DEV-468","DEV-476","DEV-477","DEV-478","DEV-479","DEV-480","DEV-482","DEV-484","DEV-485","DEV-486","DEV-487","DEV-488","DEV-489","DEV-490","DEV-491","DEV-493","DEV-494","DEV-495","DEV-496","DEV-497","DEV-498","DEV-500","DEV-502","DEV-504","DEV-505","DEV-506","DEV-507","DEV-509","DEV-516","DEV-518","DEV-520","DEV-523","DEV-541","DEV-524"]}'
+- at: 2026-11-14T18:14:07.496403+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'
