@@ -16,6 +16,8 @@ use std::time::Duration;
 
 const QUEUE_VERSION: u32 = 1;
 const WORKER_POLL_MS: u64 = 300;
+/// Retries of an entry whose start failed, after the first try.
+const MAX_ATTEMPTS: u32 = 3;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct AgentQueueState {
@@ -269,6 +271,7 @@ impl AgentQueueService {
 }
 
 fn start_entry(tasks_dir: &Path, entry: AgentQueueEntry) -> LoTaRResult<()> {
+    let last_try = entry.attempts >= MAX_ATTEMPTS;
     let req = AgentJobCreateRequest {
         ticket_id: entry.ticket_id,
         prompt: entry.prompt,
@@ -279,6 +282,11 @@ fn start_entry(tasks_dir: &Path, entry: AgentQueueEntry) -> LoTaRResult<()> {
         provider: entry.provider,
         session: entry.session,
     };
+    // A prerequisite can reopen while the job waits, and a check that failed
+    // at assignment is tried again here (DEV-524).
+    if req.agent.is_some() && !crate::services::automation_service::prerequisites_allow_start(tasks_dir, &req, last_try).map_err(LoTaRError::ValidationError)? {
+        return Ok(());
+    }
     let _ = AgentJobService::start_job_with_tasks_dir_mode(req, tasks_dir, JobStartMode::Immediate)?;
     Ok(())
 }
@@ -298,7 +306,7 @@ fn requeue_entry_unchanged(tasks_dir: &Path, entry: &AgentQueueEntry) -> LoTaRRe
 
 fn requeue_entry(tasks_dir: &Path, mut entry: AgentQueueEntry) -> LoTaRResult<bool> {
     entry.attempts = entry.attempts.saturating_add(1);
-    if entry.attempts > 3 {
+    if entry.attempts > MAX_ATTEMPTS {
         return Ok(false);
     }
 

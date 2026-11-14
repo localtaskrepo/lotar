@@ -497,8 +497,16 @@ impl AutomationService {
             let Ok(dependent) = TaskService::get(storage, &id, None) else {
                 continue;
             };
-            if is_done(&dependent) || !find_blocked_dependencies(storage, &dependent).is_empty() {
+            if is_done(&dependent) {
                 continue;
+            }
+            match find_blocked_dependencies(storage, &dependent) {
+                Ok(open) if open.is_empty() => {}
+                Ok(_) => continue,
+                Err(err) => {
+                    report_automation_failure(&dependent.id, "unblocked", &format!("its prerequisites could not be checked: {err}"));
+                    continue;
+                }
             }
             let mut by: Vec<Prerequisite> =
                 prerequisites_of(storage, &dependent).into_iter().filter(|dep| !crate::storage::identity::aliases_match(&dep.id, &current.id)).collect();
@@ -902,7 +910,7 @@ impl AutomationService {
         };
         if !task.relationships.depends_on.iter().any(|dep| crate::services::external_tasks::parse(dep).is_some())
             || task.task_state.as_ref().is_some_and(|state| state.is_done)
-            || !find_blocked_dependencies(storage, task).is_empty()
+            || !find_blocked_dependencies(storage, task).is_ok_and(|open| open.is_empty())
         {
             return entries;
         }
@@ -2433,23 +2441,39 @@ fn maybe_queue_agent_on_assignment(
         }
     }
 
-    let mut storage = Storage::new(tasks_dir);
-    let blocked_by = find_blocked_dependencies(&storage, task);
-    if !blocked_by.is_empty() {
-        let _ = mark_task_blocked(&mut storage, task, config, &blocked_by);
-        return Some(format!("{} waits for {}", task.id, blocked_by.join(", ")));
-    }
-
     let req = AgentJobCreateRequest {
         ticket_id: task.id.clone(),
         prompt: run.prompt.unwrap_or_else(|| DEFAULT_AUTO_PROMPT.to_string()),
         runner: None,
-        agent: Some(agent_name),
+        agent: Some(agent_name.clone()),
         model: run.model,
         effort: run.effort,
         provider: run.provider,
         session: run.session,
     };
+
+    let mut storage = Storage::new(tasks_dir);
+    match find_blocked_dependencies(&storage, task) {
+        Ok(blocked_by) if blocked_by.is_empty() => {}
+        Ok(blocked_by) => {
+            let _ = mark_task_blocked(&mut storage, task, config, &agent_name, &blocked_by);
+            return Some(format!("{} waits for {}", task.id, blocked_by.join(", ")));
+        }
+        // A check that fails is no prerequisite (DEV-524): the ticket keeps
+        // its state, and the queue checks again before the job starts.
+        Err(err) => {
+            let message =
+                format!("The prerequisites could not be checked ({err}). The @{agent_name} job waits in the queue, which checks them again before it starts.");
+            let _ = append_automation_comment(&mut storage, &task.id, &message);
+            report_automation_failure(&task.id, "agent assignment", &message);
+            if let Err(err) = AgentQueueService::enqueue(tasks_dir, req) {
+                report_automation_failure(&task.id, "agent assignment", &format!("Could not queue the agent job: {err}"));
+                return Some(format!("Could not queue the agent job: {err}"));
+            }
+            // Queued for the worker; the comment above says why.
+            return None;
+        }
+    }
 
     let ticket = req.ticket_id.clone();
     let started = if matches!(AgentJobService::orchestrator_mode(), AgentOrchestratorMode::Server) {
@@ -2462,14 +2486,21 @@ fn maybe_queue_agent_on_assignment(
         Ok(waiting) => waiting,
         // An assignment that can't start its job must say so (DEV-278).
         Err(err) => {
-            eprintln!("[lotar][warn] Could not start an agent job for {ticket}: {err}");
-            crate::api_events::emit(&crate::api_events::ApiEvent {
-                kind: "automation_failed".into(),
-                data: serde_json::json!({"id": ticket, "rule": "agent assignment", "message": err.to_string()}),
-            });
-            Some(format!("Could not start an agent job: {err}"))
+            let message = format!("Could not start an agent job: {err}");
+            report_automation_failure(&ticket, "agent assignment", &message);
+            Some(message)
         }
     }
+}
+
+/// Print an automation failure that belongs to no rule and send it as an
+/// `automation_failed` event (DEV-278).
+fn report_automation_failure(ticket: &str, rule: &str, message: &str) {
+    eprintln!("[lotar][warn] {ticket}: {message}");
+    crate::api_events::emit(&crate::api_events::ApiEvent {
+        kind: "automation_failed".into(),
+        data: serde_json::json!({"id": ticket, "rule": rule, "message": message}),
+    });
 }
 
 /// The `tell_agent` action (DEV-384), also the start-or-queue path for
@@ -2573,43 +2604,66 @@ fn count_terminal_jobs_for_ticket(ticket_id: &str) -> usize {
         .count()
 }
 
-fn find_blocked_dependencies(storage: &Storage, task: &TaskDTO) -> Vec<String> {
-    crate::services::relationships::blocked_dependencies(storage, &task.id, &task.relationships.depends_on)
-        .unwrap_or_else(|error| vec![format!("dependency graph unavailable: {error}")])
+/// Tries of the dependency check before it counts as failed (DEV-524): the
+/// snapshot waits 500 ms for a busy lock, a writer can hold it longer.
+const DEPENDENCY_CHECK_TRIES: u32 = 3;
+const DEPENDENCY_CHECK_RETRY_WAIT: std::time::Duration = std::time::Duration::from_millis(500);
+
+/// The open prerequisites of `task`. An error is the caller's to report,
+/// never a prerequisite (DEV-524).
+fn find_blocked_dependencies(storage: &Storage, task: &TaskDTO) -> LoTaRResult<Vec<String>> {
+    let mut tries = 1;
+    loop {
+        match crate::services::relationships::blocked_dependencies(storage, &task.id, &task.relationships.depends_on) {
+            Err(_) if tries < DEPENDENCY_CHECK_TRIES => {
+                tries += 1;
+                std::thread::sleep(DEPENDENCY_CHECK_RETRY_WAIT);
+            }
+            result => return result,
+        }
+    }
 }
 
-fn mark_task_blocked(storage: &mut Storage, task: &TaskDTO, config: &ResolvedConfig, blocked_by: &[String]) -> LoTaRResult<()> {
-    let mut patch = TaskUpdate::default();
-    if let Ok(status) = TaskStatus::parse_with_config("HelpNeeded", config) {
-        patch.status = Some(status.to_string());
-    }
-    if let Some(reporter) = task.reporter.as_ref() {
-        patch.assignee = Some(reporter.clone());
-    }
-
-    let mut tags = task.tags.clone();
-    push_unique_tag(&mut tags, "blocked");
-    for dep in blocked_by {
-        push_unique_tag(&mut tags, &format!("blocked-by:{}", dep));
-    }
-    patch.tags = Some(normalize_tags(tags));
-
-    if patch_has_changes(&patch) {
+/// Park a ticket whose agent job waits for open prerequisites (DEV-524): it
+/// goes to `Blocked` where the project has it and keeps its agent, so the
+/// `unblocked` rules continue it once the last one is done.
+fn mark_task_blocked(storage: &mut Storage, task: &TaskDTO, config: &ResolvedConfig, agent: &str, blocked_by: &[String]) -> LoTaRResult<()> {
+    if let Ok(status) = TaskStatus::parse_with_config("Blocked", config)
+        && task.status != status
+    {
+        let patch = TaskUpdate { status: Some(status.to_string()), ..Default::default() };
         TaskService::update_with_context(storage, &task.id, patch, TaskUpdateContext::automation_disabled())?;
     }
-
-    Ok(())
+    append_automation_comment(storage, &task.id, &format!("The @{agent} job waits for its open prerequisites: {}.", blocked_by.join(", ")))
 }
 
-fn push_unique_tag(tags: &mut Vec<String>, tag: &str) {
-    let trimmed = tag.trim();
-    if trimmed.is_empty() {
-        return;
+/// The queue worker's check just before it starts `req` (DEV-524): `Ok(true)`
+/// starts the job, `Ok(false)` drops it (the ticket waits for an open
+/// prerequisite, or the last try failed and says so on the ticket), and
+/// `Err` puts it back for another try.
+pub(crate) fn prerequisites_allow_start(tasks_dir: &Path, req: &AgentJobCreateRequest, last_try: bool) -> Result<bool, String> {
+    let mut storage = Storage::new(tasks_dir);
+    // Starting the job reports a ticket that can't be read.
+    let Ok(task) = TaskService::get(&storage, &req.ticket_id, None) else {
+        return Ok(true);
+    };
+    let agent = req.agent.as_deref().unwrap_or_default();
+    match find_blocked_dependencies(&storage, &task) {
+        Ok(blocked_by) if blocked_by.is_empty() => Ok(true),
+        Ok(blocked_by) => {
+            let project = crate::storage::TaskId::parse(&task.id).map(|parsed| parsed.project).unwrap_or_default();
+            let config = resolve_config_for_project(tasks_dir, Some(&project)).map_err(|err| err.to_string())?;
+            mark_task_blocked(&mut storage, &task, &config, agent, &blocked_by).map_err(|err| err.to_string())?;
+            Ok(false)
+        }
+        Err(err) if last_try => {
+            let message = format!("The @{agent} job didn't start: the queue could not check its prerequisites ({err}).");
+            let _ = append_automation_comment(&mut storage, &task.id, &message);
+            report_automation_failure(&task.id, "agent queue", &message);
+            Ok(false)
+        }
+        Err(err) => Err(err.to_string()),
     }
-    if tags.iter().any(|existing| existing.eq_ignore_ascii_case(trimmed)) {
-        return;
-    }
-    tags.push(trimmed.to_string());
 }
 
 fn resolve_assignee_value(value: &str, task: &TaskDTO, config: &ResolvedConfig, storage: &Storage) -> Option<String> {
@@ -2972,6 +3026,37 @@ mod dev21_cross_root_dependency_tests {
         assert_eq!(relationships.depends_on, ["AA-1"]);
     }
 
+    /// DEV-524: a busy sprints lock is retried, and one that stays busy is
+    /// an error, never a prerequisite named after it.
+    #[test]
+    fn dependency_check_retries_a_busy_lock_and_returns_an_error_when_it_stays() {
+        use fs2::FileExt;
+        let tmp = tempfile::tempdir().unwrap();
+        write_config(tmp.path(), "Done");
+        write_task(tmp.path(), "PX", 1, "Done");
+        let storage = Storage::new(&tmp.path().join(".tasks"));
+        let lock_path = tmp.path().join(".tasks/@sprints/.sprints.lock");
+        std::fs::create_dir_all(lock_path.parent().unwrap()).unwrap();
+        let hold = || {
+            let file = std::fs::OpenOptions::new().read(true).write(true).create(true).truncate(false).open(&lock_path).unwrap();
+            file.lock_exclusive().unwrap();
+            file
+        };
+        let dependent = dependent_dto("PX-9", &["PX-1"]);
+
+        // Busy past the snapshot's own 500 ms wait.
+        let lock = hold();
+        let release = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(800));
+            drop(lock);
+        });
+        assert_eq!(find_blocked_dependencies(&storage, &dependent).unwrap(), Vec::<String>::new());
+        release.join().unwrap();
+
+        let _lock = hold();
+        assert!(find_blocked_dependencies(&storage, &dependent).is_err());
+    }
+
     fn write_task(root: &std::path::Path, prefix: &str, num: u32, status: &str) {
         let dir = root.join(".tasks").join(prefix);
         std::fs::create_dir_all(&dir).unwrap();
@@ -3041,7 +3126,7 @@ mod dev21_cross_root_dependency_tests {
         let storage = Storage::new(&root_a.join(".tasks"));
 
         for deps in [["PX-1", "PX-2"], ["PX-2", "PX-1"]] {
-            let blocked = find_blocked_dependencies(&storage, &dependent_dto("PX-9", &deps));
+            let blocked = find_blocked_dependencies(&storage, &dependent_dto("PX-9", &deps)).unwrap();
             // PX-1 (Done, non-terminal in A) blocks; PX-2 (Done, terminal
             // in its own root B) does not — regardless of input order.
             assert_eq!(blocked, vec!["PX-1".to_string()], "deps: {deps:?}");
@@ -3059,6 +3144,9 @@ mod dev21_cross_root_dependency_tests {
         yaml.push_str("deleted_at: 2026-10-01T00:00:00Z\n");
         std::fs::write(file, yaml).unwrap();
         let storage = Storage::new(&tmp.path().join(".tasks"));
-        assert_eq!(find_blocked_dependencies(&storage, &dependent_dto("PX-9", &["PX-1", "PX-2", "PX-3"])), vec!["PX-2".to_string(), "PX-3".to_string()]);
+        assert_eq!(
+            find_blocked_dependencies(&storage, &dependent_dto("PX-9", &["PX-1", "PX-2", "PX-3"])).unwrap(),
+            vec!["PX-2".to_string(), "PX-3".to_string()]
+        );
     }
 }

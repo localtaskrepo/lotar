@@ -4,6 +4,7 @@ use crate::common;
 use common::TestFixtures;
 use lotar::api_types::{AgentJobCreateRequest, TaskCreate, TaskUpdate};
 use lotar::services::agent_job_service::{AgentJobService, AgentOrchestratorMode};
+use lotar::services::agent_queue_service::AgentQueueService;
 use lotar::services::automation_service::{AutomationEvent, AutomationJobContext, AutomationService};
 use lotar::services::sprint_service::SprintService;
 use lotar::services::task_service::{TaskService, TaskUpdateContext};
@@ -2875,4 +2876,129 @@ echo '{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\"
     );
 
     assert!(wait_for_job_status(&job.id, "completed", 10_000), "the queued job runs once the slot is free");
+}
+
+/// DEV-524: an agent job that waits for an open prerequisite parks its
+/// ticket as Blocked under the same agent, so `unblocked` continues it.
+#[cfg(unix)]
+#[test]
+fn agent_assignment_with_an_open_prerequisite_blocks_the_ticket_until_it_is_done() {
+    let _guard = lock_agent_tests();
+    enable_server_mode();
+    let fixtures = TestFixtures::new();
+    let prompt_file = fixtures.get_temp_path().join("fix.prompt");
+    let script = write_stub_agent_script(
+        fixtures.get_temp_path(),
+        "stub-fix.sh",
+        &format!(
+            "#!/bin/sh\nprintf '%s' \"$LOTAR_AGENT_PROMPT\" > \"{}\"\necho '{{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"ok\"}}'\n",
+            prompt_file.display()
+        ),
+    );
+    fixtures.create_config_in_dir(
+        &fixtures.tasks_root,
+        &format!(
+            "issue:\n  states: [Todo, Blocked, InProgress, HelpNeeded, Done]\nagents:\n  fix:\n    runner: command\n    command: \"{}\"\n",
+            script.display()
+        ),
+    );
+    AutomationService::set(
+        &fixtures.tasks_root,
+        None,
+        "automation:\n  rules:\n    - name: Prerequisites done\n      when:\n        status: Blocked\n      on:\n        unblocked:\n          tell_agent:\n            message: \"${{ticket.id}} waited for ${{unblocked.by}}\"\n",
+    )
+    .expect("set automation");
+
+    let mut storage = fixtures.create_storage();
+    let create = |storage: &mut lotar::Storage, title: &str| {
+        TaskService::create(
+            storage,
+            TaskCreate { title: title.to_string(), project: Some("BL".to_string()), reporter: Some("claude".to_string()), ..Default::default() },
+        )
+        .expect("create task")
+    };
+    let prerequisite = create(&mut storage, "Prerequisite");
+    let waiting = create(&mut storage, "Waiting");
+    TaskService::update(
+        &mut storage,
+        &waiting.id,
+        TaskUpdate {
+            relationships: Some(lotar::types::TaskRelationships { depends_on: vec![prerequisite.id.clone()], ..Default::default() }),
+            ..Default::default()
+        },
+    )
+    .expect("add prerequisite");
+
+    TaskService::update(&mut storage, &waiting.id, TaskUpdate { assignee: Some("@fix".into()), ..Default::default() }).expect("assign @fix");
+    let parked = TaskService::get(&storage, &waiting.id, None).unwrap();
+    assert_eq!(parked.status.as_str(), "Blocked");
+    assert_eq!(parked.assignee.as_deref(), Some("@fix"));
+    assert!(!parked.tags.iter().any(|tag| tag.starts_with("blocked")), "{:?}", parked.tags);
+    let comment = parked.comments.last().expect("automation comment");
+    assert_eq!(comment.author.as_deref(), Some("automation"));
+    assert!(comment.text.contains(&prerequisite.id), "{}", comment.text);
+    assert!(AgentJobService::list_jobs().iter().all(|job| job.ticket_id != waiting.id), "no job while the prerequisite is open");
+
+    TaskService::update(&mut storage, &prerequisite.id, TaskUpdate { status: Some("Done".into()), ..Default::default() }).expect("close prerequisite");
+    let jobs = wait_for_completed_jobs(&waiting.id, 1, 10_000);
+    assert_eq!(jobs.len(), 1, "{jobs:?}");
+    // The ticket kept @fix, so tell_agent starts it with the rule's message.
+    let prompt = fs::read_to_string(&prompt_file).expect("prompt");
+    assert!(prompt.contains(&format!("{} waited for {} (Prerequisite)", waiting.id, prerequisite.id)), "{prompt}");
+}
+
+/// DEV-524: a dependency check that fails (here an unreadable task file
+/// makes the graph incomplete) never parks the ticket: the job waits in the
+/// queue, which checks again before it starts it, and says so on the ticket
+/// when it gives up.
+#[cfg(unix)]
+#[test]
+fn a_failed_dependency_check_queues_the_job_and_the_queue_checks_again() {
+    let _guard = lock_agent_tests();
+    enable_server_mode();
+    let fixtures = TestFixtures::new();
+    let root = fixtures.get_temp_path();
+    let _queue = common::env_mutex::EnvVarGuard::set("LOTAR_AGENT_QUEUE_DIR", root.join("queue").to_str().unwrap());
+    let _no_worker = common::env_mutex::EnvVarGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+    let script =
+        write_stub_agent_script(root, "stub-fix.sh", "#!/bin/sh\necho '{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"ok\"}'\n");
+    fixtures.create_config_in_dir(
+        &fixtures.tasks_root,
+        &format!(
+            "issue:\n  states: [Todo, Blocked, InProgress, HelpNeeded, Done]\nagents:\n  fix:\n    runner: command\n    command: \"{}\"\n",
+            script.display()
+        ),
+    );
+    let mut storage = fixtures.create_storage();
+    let create = |storage: &mut lotar::Storage, title: &str| {
+        TaskService::create(
+            storage,
+            TaskCreate { title: title.to_string(), project: Some("BL".to_string()), reporter: Some("claude".to_string()), ..Default::default() },
+        )
+        .expect("create task")
+    };
+    let gives_up = create(&mut storage, "Graph stays unreadable");
+    let repaired = create(&mut storage, "Graph repaired");
+    let unreadable = fixtures.tasks_root.join("BL/99.yml");
+    fs::write(&unreadable, "title: [unclosed\n").unwrap();
+    let assign = |storage: &mut lotar::Storage, id: &str| {
+        TaskService::update(storage, id, TaskUpdate { assignee: Some("@fix".into()), ..Default::default() }).expect("assign @fix");
+        let task = TaskService::get(storage, id, None).unwrap();
+        assert_eq!((task.status.as_str(), task.assignee.as_deref()), ("Todo", Some("@fix")));
+        assert!(!task.tags.iter().any(|tag| tag.starts_with("blocked")), "{:?}", task.tags);
+        let comment = task.comments.last().expect("automation comment");
+        assert!(comment.text.contains("waits in the queue"), "{}", comment.text);
+    };
+
+    assign(&mut storage, &gives_up.id);
+    AgentQueueService::run_worker(&fixtures.tasks_root).ok();
+    let task = TaskService::get(&storage, &gives_up.id, None).unwrap();
+    assert!(task.comments.last().is_some_and(|comment| comment.text.contains("the queue could not check")), "{:?}", task.comments.last());
+    assert_eq!(task.status.as_str(), "Todo");
+    assert!(AgentJobService::list_jobs().iter().all(|job| job.ticket_id != gives_up.id), "no job without a dependency check");
+
+    assign(&mut storage, &repaired.id);
+    fs::remove_file(&unreadable).unwrap();
+    AgentQueueService::run_worker(&fixtures.tasks_root).expect("run worker");
+    assert_eq!(wait_for_completed_jobs(&repaired.id, 1, 10_000).len(), 1, "the job starts once the graph reads");
 }

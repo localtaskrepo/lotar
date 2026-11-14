@@ -4,7 +4,7 @@ priority: Medium
 type: Bug
 reporter: claude
 created: 2026-11-14T06:27:26.992238+00:00
-modified: 2026-11-14T08:37:55.700830+00:00
+modified: 2026-11-14T17:57:14.797889+00:00
 relationships:
   related:
   - DEV-514
@@ -16,6 +16,7 @@ relationships:
   - DEV-511
   - DEV-526
   - DEV-527
+  - DEV-524
 comments:
 - date: 2026-11-14T07:14:23.462133+00:00
   author: claude
@@ -176,3 +177,9 @@ history:
     new: Done
   - field: assignee
     old: '@fix'
+- at: 2026-11-14T17:57:14.797889+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-514","DEV-522","DEV-466","DEV-508","DEV-518","DEV-468","DEV-511","DEV-526","DEV-527"]}'
+    new: '{"related":["DEV-514","DEV-522","DEV-466","DEV-508","DEV-518","DEV-468","DEV-511","DEV-526","DEV-527","DEV-524"]}'

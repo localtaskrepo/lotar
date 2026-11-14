@@ -1,11 +1,11 @@
 title: Dependency check parks tickets in HelpNeeded under their reporter, and a busy lock counts as a blocker
-status: HelpNeeded
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: claude
+assignee: '@merge'
 created: 2026-11-14T06:27:24.117114+00:00
-modified: 2026-11-14T08:07:02.721940+00:00
+modified: 2026-11-14T17:59:54.017101+00:00
 relationships:
   related:
   - DEV-501
@@ -16,6 +16,8 @@ relationships:
   - DEV-528
   - DEV-320
   - DEV-530
+  - DEV-133
+  - DEV-525
 comments:
 - date: 2026-11-14T07:09:29.330963+00:00
   author: claude
@@ -34,11 +36,90 @@ comments:
 - date: 2026-11-14T08:07:02.721940+00:00
   author: automation
   text: 'The T3 Code thread waits for an answer: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8328dfb2-d6e5-4d67-ba9c-fdf371f3634a'
+- date: 2026-11-14T17:16:13.323971+00:00
+  author: claude
+  text: 'mallox 2026-11-14 in this thread, on the blocking review (same-agent retry): "Queue retries by itself". A failed check puts the job in the queue; the worker checks the prerequisites again before it starts it, 4 tries, then a comment on the ticket. The worker''s check moves here from DEV-530; DEV-530 is rebased onto this after its review.'
+- date: 2026-11-14T17:39:01.346286+00:00
+  author: claude
+  text: |-
+    Rework done, amended commit 8db7cb8d on agent/DEV-524.
+
+    Finding (assigning the same agent again never retries): fixed as mallox decided in the thread ("Queue retries by itself"). After a failed dependency check, the job now goes into the agent queue (ticket unchanged, a comment says it waits there). The queue worker checks the prerequisites just before it starts any job: open ones block the ticket as before, and a check that still fails is retried 3 more times, then the job is dropped with a comment on the ticket. No command for anyone to run. The wrong "Assign @agent again" text is gone.
+
+    Test: a_failed_dependency_check_queues_the_job_and_the_queue_checks_again (replaces agent_assignment_reports_a_failed_dependency_check_and_never_parks_the_ticket). Unreadable graph, then the worker gives up with a comment; second ticket, graph repaired, the queued job runs. It failed on 500370cd ("Assign @fix again to retry"). Docs: help/automation.md.
+
+    Checks: npm run lint:agent passes. test:agent: 2153 Rust, 50 release and 7 hook tests pass. One UI test (Board.spec.ts, DEV-133 case) timed out in a hook under load (UI suite took 993 s); rerun alone it passes (58/58). The change touches no frontend code. test:smoke:agent: 401 pass.
+
+    DEV-530 is built on 500370cd and adds its own worker check, so it needs a rebase onto this commit (both changes touch start_entry).
+- date: 2026-11-14T17:40:24.815695+00:00
+  author: codex
+  text: 'Review: blocking. automation_service.rs:2500-2507: tell_agent on a parked ticket calls maybe_queue_agent_on_assignment with identical previous/current assignees; its guard at :2347 returns without starting a job. The documented Prerequisites done rule therefore cannot continue the ticket. Permit tell_agent to start an unchanged agent and verify the open-prerequisite integration test. Queue retries address the earlier finding. Read full branch diff and DEV-528/530 context and current rule. Targeted Rust tests and lint attempted uncached, interrupted before completion; gates unverified. No files or commits changed; status and assignee unchanged. No durable guidance finding.'
+- date: 2026-11-14T17:40:29.151649+00:00
+  author: automation
+  text: The review found blocking problems again after one rework (the comments above). Should an agent rework it once more (lotar assignee DEV-524 @fix), will you decide the findings, or is it WontDo?
+- date: 2026-11-14T17:41:28.203747+00:00
+  author: triage
+  text: |-
+    Answered already: rework once more, nothing for mallox.
+
+    - mallox 2026-11-13 on [INBOX-28](https://standards.pyxzl.net/task/INBOX-28) (DEV-468, same second-blocking-review question): "Multiple rework attempts are fine if needed, just don't let it become an endless loop." This is the second rework here.
+    - The second review's finding looks wrong. `tell_agent` (`automation_service.rs:2501`, from the base, not 8db7cb8d) passes previous `None` when the assignee is unchanged, so the `previous == new` guard at `:2347` does not return. Check this first.
+    - Do: a test that a parked (Blocked) ticket with its agent as assignee restarts through `tell_agent` when the last prerequisite is Done (the DEV rule "Prerequisites done"). If it passes, answer the finding with that test and ask for review. If it fails, fix it.
+    - Keep it small. A third blocking review goes to mallox again.
+- date: 2026-11-14T17:46:08.584062+00:00
+  author: claude
+  text: |-
+    Second rework, amended commit d1c405b3 on agent/DEV-524. No code change: the finding doesn't hold.
+
+    Finding (tell_agent on a parked ticket passes identical previous/current assignees, so the guard at :2346 returns): when the assignee is already the agent, tell_agent (automation_service.rs:2500-2501) passes previous None, not the unchanged assignee, so previous == new is false and the job starts. As triage said.
+
+    Evidence: agent_assignment_with_an_open_prerequisite_blocks_the_ticket_until_it_is_done now records the job's prompt. A Blocked ticket that kept @fix, with a "Prerequisites done" tell_agent rule, starts when its last prerequisite is Done, and the prompt carries the rule's message ("<ID> waited for <prereq> (Prerequisite)"). Mutation check: with line 2501 changed to pass the old assignee, the test fails (no job); restored, it passes.
+
+    Checks on d1c405b3: npm run lint:agent passes; Rust 2153/2153; smoke 401/401. UI, release and hook tests ran on 8db7cb8d (only this test file changed since).
+- date: 2026-11-14T17:46:30.293251+00:00
+  author: claude
+  text: 'Re triage 17:41Z: done as asked, see the 17:46Z comment. The finding doesn''t hold: tell_agent passes previous None for an unchanged assignee. agent_assignment_with_an_open_prerequisite_blocks_the_ticket_until_it_is_done shows a Blocked ticket that kept @fix restarting through tell_agent with the rule''s message, and it fails when line 2501 passes the old assignee. Commit d1c405b3; lint, 2153 Rust and 401 smoke tests pass. Ready for review.'
+- date: 2026-11-14T17:48:39.870922+00:00
+  author: codex
+  text: 'Review: passed. No blocking findings in d1c405b3. Previous finding was incorrect: tell_agent passes previous None. Both integration regressions and busy-lock regression passed under nextest; diff check passed. Read diff, ticket comments, DEV-528/530, current rule and main history. Full gates not rerun; rely on fix-agent reported results. No files changed. Status and assignee unchanged. No durable guidance finding.'
+- date: 2026-11-14T17:49:20.085918+00:00
+  author: codex
+  text: 'Merge blocked: rebase onto main conflicts in crates/lotar-lib/src/services/automation_service.rs and crates/lotar-lib/tests/agent_automation_integration_test.rs. Main changes maybe_queue_agent_on_assignment to return waiting reasons to tell_agent; DEV-524 replaces the dependency/start paths with Result-based checks and queue retries, with unit-return early exits. Both waiting diagnostics and retry behavior must survive; I could not establish a certain conflict resolution. Rebase aborted, d1c405b3 preserved, main unchanged. No merge or push; full checks not rerun because rebase did not complete. Should a fix agent reconcile these changes and rerun the gates before another merge attempt?'
+- date: 2026-11-14T17:49:35.308103+00:00
+  author: automation
+  text: The merge agent's job job-20261114T174844.368Z-3 failed (lotar agent logs job-20261114T174844.368Z-3); the fix agent retries it on branch t3/dependency-check-blocked-busy-lock-1.
+- date: 2026-11-14T17:50:06.157699+00:00
+  author: triage
+  text: |-
+    Answered already: a fix agent reconciles the rebase conflict, nothing for mallox.
+
+    - mallox 2026-11-11 (`~/Development/standards/docs/decisions/2026-11-11-worktrees.md`, STD-35): the merge agent hands back on a rebase conflict it can't resolve with certainty, and "the retry goes to @fix", whose next merge picks up the branch. Same in the repo's `.tasks/DEV/automation.yml` (merge agent lifecycle).
+    - Review of `d1c405b3` passed; only the rebase onto main fails, in `automation_service.rs` and `tests/agent_automation_integration_test.rs`.
+    - Do: rebase `agent/DEV-524` onto main and keep both sides: main's waiting reasons returned to `tell_agent`, and this branch's Result-based dependency check with queue retries. Rerun lint, tests and smoke, then ask for review and merge.
+    - DEV-530 (INBOX-136) is built on the old `500370cd` and waits for this to land.
+- date: 2026-11-14T17:57:14.582846+00:00
+  author: claude
+  text: |-
+    Rebased onto main as triage said (17:5x answer): commit 85d4c042 on agent/DEV-524 (signed; was d1c405b3, whose review passed).
+
+    Conflicts, both sides kept:
+    - automation_service.rs, maybe_queue_agent_on_assignment: main's DEV-525 returns why a job doesn't run, so tell_agent can say so on the ticket. This branch's Result-based check stays. An open prerequisite blocks the ticket and returns "<ID> waits for <IDs>". A failed check queues the job and returns None (queued for the worker; its comment already says why), or the queue error. The start error uses report_automation_failure and returns main's "Could not start an agent job: ...".
+    - agent_automation_integration_test.rs: main's tell_agent_says_on_the_ticket_when_its_job_waits_for_a_slot and this branch's three DEV-524 tests, one after the other.
+
+    Checks on 85d4c042: npm run lint:agent passes; Rust 2170/2170, UI 1537/1537, release 50, hooks 7, smoke 401/401.
+
+    DEV-530 is built on the old 500370cd and waits for this to land.
+- date: 2026-11-14T17:59:50.161568+00:00
+  author: codex
+  text: 'Review: passed. No blocking findings in 85d4c042. Read full diff, ticket/comments, DEV-528/530 context, current unblock rule, guidance and recent main history. Rebase preserves waiting diagnostics and queue retries; unchanged-agent tell_agent restart remains correct. Three focused nextest regressions passed; wrapper exited 1 afterward due to temp leftovers .lotar-test-scratch and xcrun_db. Full gates not rerun; rely on recorded passing gates on this commit. Diff check passed. No UI changes, files edited or commits; status/assignee unchanged. No durable guidance finding.'
 references:
 - code: crates/lotar-lib/src/services/automation_service.rs#2520-2545
 - code: crates/lotar-lib/src/services/automation_service.rs#480-508
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8328dfb2-d6e5-4d67-ba9c-fdf371f3634a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adc368bd2-afb9-48b9-b575-dd6660e1b5d9
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A66d3e038-0dc2-464c-b4d0-63331346dcfe
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A20caebc8-70c3-49b8-8aab-7a183aaee714
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A709affca-29be-46e3-9d35-cb78322c44a9
 description: |-
   When an agent job is about to start on a ticket with an open dependency, lotar's dependency check sets the ticket to **HelpNeeded** and gives it to its reporter (usually claude). After that, nothing moves the ticket on. The inbox files only tickets assigned to mallox. The rule "Prerequisites done: continue the waiting ticket" acts only on status Blocked. No agent is assigned. On 2026-11-14 four tickets with finished, committed work sat like this for up to 11 hours: DEV-501, DEV-477, DEV-467 and DEV-468. Found while checking the HelpNeeded tickets, and mallox asked for this ticket in the thread.
 
@@ -67,6 +148,7 @@ description: |-
 tags:
 - agent
 - review-returned
+- merge-retried
 history:
 - at: 2026-11-14T06:27:25.641757+00:00
   actor: claude
@@ -174,3 +256,190 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-14T17:16:13.323971+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T17:16:13.567797+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T17:39:01.346286+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T17:39:01.573626+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-501","DEV-477","DEV-467","DEV-468","DEV-503","DEV-528","DEV-320","DEV-530"]}'
+    new: '{"related":["DEV-501","DEV-477","DEV-467","DEV-468","DEV-503","DEV-528","DEV-320","DEV-530","DEV-133"]}'
+- at: 2026-11-14T17:39:01.875523+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: claude
+    new: '@review'
+- at: 2026-11-14T17:39:03.033681+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A66d3e038-0dc2-464c-b4d0-63331346dcfe
+- at: 2026-11-14T17:40:24.815695+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T17:40:25.082591+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: agent, review-returned
+    new: agent, review-returned, review-blocked
+- at: 2026-11-14T17:40:29.117285+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+  - field: tags
+    old: agent, review-returned, review-blocked
+    new: agent, review-returned
+- at: 2026-11-14T17:40:29.151649+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-14T17:41:19.916453+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-14T17:41:20.069083+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T17:41:28.203747+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-14T17:46:08.584062+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T17:46:30.293251+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T17:46:35.183944+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T17:46:36.434295+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A20caebc8-70c3-49b8-8aab-7a183aaee714
+- at: 2026-11-14T17:48:39.870922+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T17:48:44.017007+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-14T17:49:20.085918+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T17:49:35.279029+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: agent, review-returned
+    new: agent, review-returned, merge-retried
+- at: 2026-11-14T17:49:35.308103+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-14T17:49:35.427131+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-14T17:50:06.157699+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-14T17:50:06.451559+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-14T17:50:06.614720+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T17:57:14.582846+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T17:57:14.797247+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-501","DEV-477","DEV-467","DEV-468","DEV-503","DEV-528","DEV-320","DEV-530","DEV-133"]}'
+    new: '{"related":["DEV-501","DEV-477","DEV-467","DEV-468","DEV-503","DEV-528","DEV-320","DEV-530","DEV-133","DEV-525"]}'
+- at: 2026-11-14T17:57:25.616025+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T17:57:26.714103+00:00
+  actor: triage
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A709affca-29be-46e3-9d35-cb78322c44a9
+- at: 2026-11-14T17:59:50.161568+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T17:59:54.017101+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

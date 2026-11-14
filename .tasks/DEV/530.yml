@@ -1,11 +1,11 @@
 title: A job the dependency check held back resumes as it was when its prerequisites are done
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: claude
+assignee: mallox
 created: 2026-11-14T07:27:35.331056+00:00
-modified: 2026-11-14T07:47:55.099885+00:00
+modified: 2026-11-14T17:39:01.727513+00:00
 relationships:
   related:
   - DEV-351
@@ -13,6 +13,7 @@ relationships:
   - DEV-501
   - DEV-503
   - DEV-524
+  - DEV-396
 comments:
 - date: 2026-11-14T07:47:55.099885+00:00
   author: claude
@@ -25,6 +26,34 @@ comments:
     - Tests: a_held_back_review_job_resumes_with_its_own_prompt_and_status failed on DEV-524's code and passes now. a_queued_job_whose_prerequisite_reopened_is_held_back_again is a unit test of new code. npm run lint:agent, test:agent (2155 Rust) and test:smoke:agent (401) pass.
     - Live trial in a scratch workspace with the real queue worker: TR-4 sent to review while TR-3 was open went Blocked with @review, and the queue listed the job. After TR-3 was Done, TR-4 was back in Reviewing and the review job ran with "Review TR-4 now". The first attempt ran into the trust gate (untrusted scratch workspace): the worker dropped that job without a word on the ticket. That happens to any queued job, not just held-back ones.
     - Still open from the survey: waits on another repo still need `lotar automation run` from cron (STD-88 has waited since 11-13 19:24). The rule's job prompts are not in @agent-logs.
+- date: 2026-11-14T16:45:26.999737+00:00
+  author: claude
+  text: 'mallox 2026-11-14 in the DEV-524 thread: "Review now, merge after 524". Review started; the merge agent rebases DEV-530 onto main once DEV-524 has landed.'
+- date: 2026-11-14T16:46:36.428887+00:00
+  author: codex
+  text: 'Review: blocking. automation_service.rs:2591,2653-2661 and .tasks/DEV/automation.yml:586-597: an initially Blocked ticket resumes its parked review job still Blocked and also matches the generic tell_agent rule, allowing an unwanted continuation. Add the planned unassigned-only rule condition and regression coverage for this case; align docs. Read change, related tickets/comments and main history. All three gates failed at sandbox-denied sccache; uncached targeted retry interrupted during compilation, no tests verified. No source changes, commits or ownership/status changes. DEV-524 must land first and this branch needs rebase. No durable guidance finding.'
+- date: 2026-11-14T17:01:03.413320+00:00
+  author: claude
+  text: |-
+    Rework of the blocking review, amended into 7c998bc7 (signed; still on DEV-524 500370cd, so DEV-524 merges first).
+
+    - Finding (a ticket already Blocked when its job was held back resumes still Blocked and also matched the "Prerequisites done" tell_agent rule): fixed in the rule, not the code. The DEV rule and the docs example in help/automation.md now also check `not: { assignee: "@agent" }`. Not "without an assignee" as the ticket worded it: tickets a merge agent handed to mallox must still be continued (owner 2026-11-12, STD-56; DEV-396), and dev370_release_waiting_checks_test failed with `assignee: { exists: false }`.
+    - Test a_held_back_job_on_a_blocked_ticket_resumes_alone: a ticket filed Blocked and assigned @review gets only its review job and stays Blocked under @review; an unassigned Blocked ticket and one assigned to mallox each get @fix. Without the new condition it fails (the rule moves the held ticket to InProgress).
+    - help/automation.md says a ticket that was Blocked before stays Blocked under its agent, and why the rule leaves agent-assigned tickets out.
+    - Checks: npm run lint:agent, test:agent (2156 Rust, 1537 web, all passed), test:smoke:agent (401 passed).
+- date: 2026-11-14T17:02:46.206391+00:00
+  author: codex
+  text: 'Review: blocking. automation_service.rs:2612-2629 returns false on graph/config/parking errors, and agent_queue_service.rs:start_entry interprets that as permission to start. A queued job can start despite a reopened prerequisite if the graph is unreadable, or even a known open prerequisite if parking fails. Retain the request for retry, report the failure and add worker-boundary regression tests. Earlier duplicate continuation finding is fixed. Read branch diff, ticket comments, DEV-524/396 context, rule/docs and main automation history. Targeted uncached Rust tests interrupted during compilation; no tests completed; full gates not rerun. Checks ended. No files or commits changed. Status/assignee unchanged. DEV-524 must land first; it still has a blocking review. No durable guidance finding.'
+- date: 2026-11-14T17:02:50.357502+00:00
+  author: automation
+  text: The review found blocking problems again after one rework (the comments above). Should an agent rework it once more (lotar assignee DEV-530 @fix), will you decide the findings, or is it WontDo?
+- date: 2026-11-14T17:39:01.727513+00:00
+  author: claude
+  text: 'DEV-524 was reworked (amended to 8db7cb8d): the queue worker''s prerequisite check (prerequisites_allow_start in start_entry) is now in DEV-524. DEV-530 is built on the old 500370cd and has its own hold_for_prerequisites in the same place, so the merge needs git rebase --onto main 500370cd agent/DEV-530 after DEV-524 lands, keeping DEV-524''s check and adding the parking of the job on top.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aadaa906d-5c3e-411d-b998-4015eb47b493
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A50a42e5d-ab8c-4c4e-a7e1-23c50ebf82b5
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A848e2532-060c-432c-abb4-27647b484616
 description: |-
   Follow-up of DEV-524, from a survey of the 21 waiting episodes in lotar and standards (2026-11-14, mallox in the DEV-524 thread: "review what worked so far and what issues occurred ... then try an approach that we test and see how it goes").
 
@@ -47,6 +76,8 @@ description: |-
   - [ ] A queued job whose prerequisite reopened is parked again, not started. Test fails before.
   - [ ] Docs (help/automation.md) and the DEV rule match.
   - [ ] npm run lint, npm test, npm run smoke pass.
+tags:
+- review-returned
 history:
 - at: 2026-11-14T07:27:35.590249+00:00
   actor: claude
@@ -72,6 +103,108 @@ history:
     old: Todo
     new: InProgress
 - at: 2026-11-14T07:47:55.099885+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T16:45:26.999737+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T16:45:27.285014+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: claude
+    new: '@review'
+- at: 2026-11-14T16:45:28.166021+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aadaa906d-5c3e-411d-b998-4015eb47b493
+- at: 2026-11-14T16:46:36.428887+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T16:46:36.643556+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: ''
+    new: review-blocked
+- at: 2026-11-14T16:46:40.729794+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: review-blocked
+    new: review-returned
+- at: 2026-11-14T16:46:41.521039+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-14T16:46:42.227102+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A50a42e5d-ab8c-4c4e-a7e1-23c50ebf82b5
+- at: 2026-11-14T17:01:03.413320+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T17:01:03.637232+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524"]}'
+    new: '{"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396"]}'
+- at: 2026-11-14T17:01:15.759852+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T17:01:17.210097+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A848e2532-060c-432c-abb4-27647b484616
+- at: 2026-11-14T17:02:46.206391+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T17:02:46.339042+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: review-returned
+    new: review-returned, review-blocked
+- at: 2026-11-14T17:02:50.323664+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+  - field: tags
+    old: review-returned, review-blocked
+    new: review-returned
+- at: 2026-11-14T17:02:50.357502+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-14T17:39:01.727513+00:00
   actor: claude
   changes:
   - field: comment_added

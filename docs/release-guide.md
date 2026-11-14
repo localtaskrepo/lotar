@@ -71,8 +71,8 @@ change to how the agent worker restarts after an upgrade). The next release has 
 
 Closing it fires the `unblocked` event ([When prerequisites are done](help/automation.md#when-prerequisites-are-done))
 on every ticket whose last open prerequisite it was. The rule "Prerequisites done: continue the waiting
-ticket" in `.tasks/DEV/automation.yml` assigns each one that is still `Blocked` to `@fix`, as the next turn
-of its last T3 Code thread, with a prompt to run the check against the installed lotar. A passing check
+ticket" in `.tasks/DEV/automation.yml` tells the agent of each one that is still `Blocked` (`@fix` when no
+other agent is assigned) to continue, as the next turn of its last T3 Code thread, with a prompt to run the check against the installed lotar. A passing check
 ends with the ticket `Done`; a failing one comes back to mallox as `HelpNeeded`. The same rule continues
 tickets that waited for other tickets. To start one ticket's check by hand:
 `lotar automation run "Prerequisites done: continue the waiting ticket" --select 'id:/^DEV-N$/'`.

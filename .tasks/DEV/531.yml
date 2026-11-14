@@ -1,15 +1,17 @@
 title: Agents with the job's environment bypass the running-job guard on status and assignee
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T07:31:46.259047+00:00
-modified: 2026-11-14T08:27:31.571580+00:00
+modified: 2026-11-14T08:49:16.080389+00:00
 relationships:
   related:
   - DEV-320
   - DEV-516
+  - DEV-496
+  - DEV-521
 comments:
 - date: 2026-11-14T08:06:43.937687+00:00
   author: claude
@@ -17,6 +19,9 @@ comments:
 - date: 2026-11-14T08:27:26.712851+00:00
   author: codex
   text: 'Review: passed. Reviewed 1574c3da full diff, ticket/comments, related DEV-320/516, repository guidance, main history and automation environment paths. No findings. diff --check, lint:agent, 8 job-outcome tests and changed clarification regression passed after approved sccache retries. Full UI/release/hooks and smoke not rerun; fix agent reports passes. Before-fix failure reported by fix agent, not independently rerun. No UI changes, file edits, commits or minor tickets. Status and assignee unchanged; no durable guidance finding.'
+- date: 2026-11-14T08:49:10.697573+00:00
+  author: codex
+  text: 'Merged: reviewed fix 1574c3da rebased cleanly onto main, fast-forwarded as f03688d0, then amended ticket-only updates as requested: main b4a57133. Main advanced once during checks; rebased and reran all gates. Final checks passed: lint:agent, test:agent (2167 Rust, 1537 UI, release and hooks), test:smoke:agent (401). Post-merge main check the_job_agents_own_changes_wait_while_its_run_commands_apply passed: agent status/assignee defer while lifecycle commands apply immediately. No checks skipped. Push withheld: earliest unpushed commit ff84b766 belongs to DEV-496 (HelpNeeded), followed by DEV-521 (HelpNeeded); no finished prefix ahead of upstream can be pushed. No source edits or guidance corrections during merge. Status and assignee left for job automation.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7e46419f-858b-4095-8351-aaa31ab05631
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aef967ab6-933f-45e8-9887-13c56573a82e
@@ -79,3 +84,19 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-14T08:49:10.697573+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T08:49:10.909271+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-320","DEV-516"]}'
+    new: '{"related":["DEV-320","DEV-516","DEV-496","DEV-521"]}'
+- at: 2026-11-14T08:49:16.080389+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done

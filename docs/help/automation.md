@@ -42,6 +42,8 @@ automation:
             assignee: "@reporter"
 ```
 
+A ticket that waits for an open prerequisite (`depends_on`, or another ticket's `blocks`) gets no job yet: it goes to `Blocked` where the project has that status, keeps its agent as assignee, and gets an automation comment that names what it waits for. Its [`unblocked` rules](#when-prerequisites-are-done) continue it once the last one is done. A dependency check that can't read the graph (a busy lock is tried again first) changes nothing on the ticket: the reason goes into a comment, to stderr and into an `automation_failed` event, and the job waits in the [queue](agent.md). The queue checks the prerequisites just before it starts any job: an open one blocks the ticket as above, and a check that still fails is tried 3 more times, then the job is dropped with a comment on the ticket.
+
 Statuses in rules must exist in your project. The default states are Todo, InProgress, NeedsReview and Done. Some examples below also use `Testing` and `HelpNeeded`; the agent templates add those states (`lotar init --template agent-pipeline` or `--template agent-reviewed`). `lotar automation simulate` warns about a status that does not exist.
 
 ## Triggers (`when`)
@@ -473,9 +475,9 @@ automation:
 
 ## When prerequisites are done
 
-A ticket that waits for others (`depends_on`, or another ticket's `blocks`) gets the `unblocked` event when the last of them reaches a done state. Each prerequisite counts as done by its own project's [done states](config.md#done-states), the same way agent assignment checks dependencies. Every way of closing one fires it: the CLI, the web UI, REST, MCP, a rule's `set` (from `lotar automation run` too) and the status an agent job ends with. It fires once per close: closing a prerequisite that is already done, or one while others are still open, does nothing; a ticket that is done itself is skipped.
+A ticket that waits for others (`depends_on`, or another ticket's `blocks`) gets the `unblocked` event when the last of them reaches a done state. Each prerequisite counts as done by its own project's [done states](config.md#done-states), the same way [agent assignment](#agent-job-queueing) checks dependencies. Every way of closing one fires it: the CLI, the web UI, REST, MCP, a rule's `set` (from `lotar automation run` too) and the status an agent job ends with. It fires once per close: closing a prerequisite that is already done, or one while others are still open, does nothing; a ticket that is done itself is skipped.
 
-The rule decides what happens, usually starting the ticket's agent with a prompt that says what it waited for. `session: continue` makes the job the next turn of the ticket's session of that profile, so the agent picks up where it stopped:
+The rule decides what happens, usually telling the ticket's agent what it waited for. [`tell_agent`](#telling-the-tickets-agent) starts the agent the ticket is assigned to (`agent` when it has none) as the next turn of its last session, so the agent picks up where it stopped. A ticket that agent assignment blocked is still assigned to its agent, so a rule's `agent` action, which starts a job only when the assignee changes, would not:
 
 ```yaml
 automation:
@@ -487,10 +489,9 @@ automation:
         unblocked:
           set:
             status: InProgress
-            assignee: "@fix"
-          agent:
-            session: continue
-            prompt: |
+          tell_agent:
+            agent: fix
+            message: |
               ${{ticket.id}} waited for ${{unblocked.by}}, which are done now.
               Read the ticket and continue the work.
 ```
