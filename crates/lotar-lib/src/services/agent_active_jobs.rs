@@ -29,6 +29,10 @@ pub struct ActiveJob {
     /// died can be finished from the thread's state (DEV-378).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
+    /// The job started as a merge job, so a takeover runs it as one, also
+    /// when the ticket has moved on since (DEV-544).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub merge: bool,
 }
 
 /// What a ticket should be when its job ends, set while the job ran
@@ -307,6 +311,7 @@ mod tests {
             child_pid: std::process::id(),
             started_at: "2026-01-01T00:00:00Z".into(),
             session_id: None,
+            merge: false,
         };
         register(tasks.path(), &job);
         assert_eq!(for_ticket(tasks.path(), "T-1"), Some(job.clone()));

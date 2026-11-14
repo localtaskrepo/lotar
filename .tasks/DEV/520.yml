@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-14T05:38:48.737497+00:00
-modified: 2026-11-14T18:05:22.076235+00:00
+modified: 2026-11-15T00:02:35.253845+00:00
 relationships:
   related:
   - DEV-501
@@ -26,10 +26,51 @@ comments:
 - date: 2026-11-14T07:43:16.200371+00:00
   author: automation
   text: The review found blocking problems again after one rework (the comments above). Should an agent rework it once more (lotar assignee DEV-520 @fix), will you decide the findings, or is it WontDo?
+- date: 2026-11-14T23:25:37.664807+00:00
+  author: mallox
+  text: 'Answer: rework (Rework once more (assign @fix)) (answered in INBOX-129)'
+- date: 2026-11-14T23:44:27.682253+00:00
+  author: claude
+  text: |-
+    Second rework done: an incomplete replay from the event log now fails the job instead of being trusted. Commit `617e174c` (amended `b735c56a`).
+    - A lag that replays nothing (log missing, or harnessmux hasn't written it) fails: 'sent N events lotar missed and can't read back: its event log doesn't have them'.
+    - harnessmux numbers events one after another, so once an event has been seen, a jump in seq (a malformed line the log reader skipped, or a short log) fails the job with 'events A to B'. Live events can no longer move past a lost turn end.
+    - New cases in `missed_events_lotar_cannot_read_back_fail_the_job`: missing log, broken line at the turn's end (seq 100). The missing-log case fails without the new checks.
+    - Checks: `npm run lint`, `npm test` (2153 Rust + 1537 UI), `npm run smoke` (401), all passed.
+- date: 2026-11-15T00:02:29.007036+00:00
+  author: codex
+  text: |-
+    Review: blocking.
+    - `crates/lotar-lib/src/services/agent_job_service.rs:2978`: initial recovery bypasses continuity validation while last_seq is zero. In the existing fixture, malformed lines 1–100 lose TurnFinished at 100 but leave a nonempty replay starting at 101, which is accepted. A live session can still hang. Capture a sequence baseline before sending and validate the initial replay prefix; cover missing initial events containing the turn end.
+    - Read full diff 617e174c, ticket/comments and owner decision, related DEV-501/DEV-532, main history, relevant guidance and harnessmux source. No UI changes.
+    - Targeted nextest: 3 passed. Full lint/tests/smoke not rerun. No source edits or commits, no minor findings; status and assignee unchanged.
+- date: 2026-11-15T00:02:35.253845+00:00
+  author: automation
+  text: |-
+    The review found blocking problems again after one rework (the comments above). Rework, your decision on the findings, or WontDo?
+
+    Options:
+    - fix: An agent reworks it once more
+    - decide: I decide the findings (say how)
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: An agent reworks it once more
+      set:
+        assignee: '@fix'
+    - key: decide
+      label: I decide the findings (say how)
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7234460b-fa1f-4515-a843-598de63b5e51
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af5b504b1-62e7-4678-9cf9-f100b8ba0692
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab54d2de4-c7ce-48f7-9110-e09b4120c793
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A92c2ba4c-f7af-43f2-b7fc-ba8e72583bc3
 description: 'Found by claude on DEV-501, 2026-11-14: drive_session (crates/lotar-lib/src/services/agent_job_service.rs) reads harnessmux''s broadcast channel (capacity 1024, harnessmux 0.1.1 session.rs:127) and on RecvError::Lagged just continues. MessageDelta/ThoughtDelta events come per chunk and lotar''s loop reads the cancel file and takes the registry lock per event, so a chatty turn can lag; if the dropped events include TurnFinished/TurnFailed the loop never sees the turn end and the job runs until someone cancels it. Check: a unit test that feeds more than 1024 events before the turn''s end and expects the job to end. Done: on lag, the missed events (seq after the last one seen) are replayed from the session''s event log (Status.events) through the same handling, the job ends with the right exit code, and the test passes.'
 tags:
 - health
@@ -146,3 +187,63 @@ history:
   - field: relationships
     old: '{"related":["DEV-501"]}'
     new: '{"related":["DEV-501","DEV-532"]}'
+- at: 2026-11-14T23:25:37.664807+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-14T23:25:38.491174+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-14T23:37:49.154035+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T23:44:27.682253+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T23:44:39.999053+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T23:59:48.284220+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A92c2ba4c-f7af-43f2-b7fc-ba8e72583bc3
+- at: 2026-11-15T00:02:29.007036+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T00:02:29.288055+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: health, review-returned
+    new: health, review-returned, review-blocked
+- at: 2026-11-15T00:02:35.090497+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+  - field: tags
+    old: health, review-returned, review-blocked
+    new: health, review-returned
+- at: 2026-11-15T00:02:35.253845+00:00
+  actor: automation
+  changes:
+  - field: comment_added

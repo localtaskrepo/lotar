@@ -1,11 +1,10 @@
 title: Agent jobs hold the global job lock across file and process-list I/O
-status: HelpNeeded
+status: Done
 priority: Low
 type: Chore
 reporter: claude
-assignee: mallox
 created: 2026-11-14T05:38:49.244099+00:00
-modified: 2026-11-14T18:00:44.407130+00:00
+modified: 2026-11-14T23:22:26.253113+00:00
 relationships:
   related:
   - DEV-501
@@ -16,6 +15,7 @@ relationships:
   - DEV-529
   - DEV-531
   - DEV-524
+  - DEV-516
 comments:
 - date: 2026-11-14T06:15:29.298302+00:00
   author: claude
@@ -26,6 +26,23 @@ comments:
 - date: 2026-11-14T07:16:36.953162+00:00
   author: codex
   text: 'Merge blocked: rebased onto current main successfully; HEAD is now 89693e39, so earlier checks cannot be skipped. npm run lint:agent exited 101 at Rust clippy because sccache returned Operation not permitted in the sandbox. No merge or push attempted; tests and smoke not run after lint failed, per merge step 3. Can the merge checks be rerun with compiler-cache access enabled? Reviewed fix remains saved on this worktree branch.'
+- date: 2026-11-14T23:14:50.245367+00:00
+  author: triage
+  text: |-
+    Owner's answer: rerun the merge checks outside the sandbox, once.
+
+    - He chose `rerun-open` (full access, this once) on [INBOX-120](https://standards.pyxzl.net/task/INBOX-120), 2026-11-14 07:18.
+    - That answer never reached this ticket (STD-110: the relay closed the inbox ticket although its comment here failed). No later answer from him exists.
+    - Next: rerun `npm run lint:agent`, `test:agent` and smoke on `agent/DEV-521` (`89693e39`) with compiler-cache access, then merge if they pass.
+    - Keep the sandbox setting out of this ticket: DEV-516 owns it.
+- date: 2026-11-14T23:22:05.046497+00:00
+  author: claude
+  text: |-
+    Already merged and pushed; the reruns outside the sandbox all pass on main.
+    - `89693e39` is on `main` and `origin/main`. Rebasing `agent/DEV-521` onto `main` skipped it as already applied, so the branch now equals `main` at `028b2167`.
+    - Ticket check: `push_event` no longer calls `AgentLogService::append_event`; `cancel_job` calls `terminate_child` after `drop(registry)`.
+    - Ran once outside the sandbox (owner, [INBOX-120](https://standards.pyxzl.net/task/INBOX-120)): `npm run lint:agent` passed; `test:agent` passed (2172 Rust, 1537 UI, release 50, hooks 7); smoke passed (401).
+    - Nothing to commit; I left the sandbox setting to DEV-516.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac91cd100-e131-4687-b2ab-eeb02724277e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aab1455e4-0319-41f4-b245-492779b88480
@@ -137,3 +154,37 @@ history:
   - field: relationships
     old: '{"related":["DEV-501","DEV-522","DEV-510","DEV-526","DEV-512","DEV-529","DEV-531"]}'
     new: '{"related":["DEV-501","DEV-522","DEV-510","DEV-526","DEV-512","DEV-529","DEV-531","DEV-524"]}'
+- at: 2026-11-14T23:14:50.245367+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-14T23:14:50.358726+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-501","DEV-522","DEV-510","DEV-526","DEV-512","DEV-529","DEV-531","DEV-524"]}'
+    new: '{"related":["DEV-501","DEV-522","DEV-510","DEV-526","DEV-512","DEV-529","DEV-531","DEV-524","DEV-516"]}'
+- at: 2026-11-14T23:14:50.523098+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-14T23:14:51.838732+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T23:22:05.046497+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T23:22:26.253113+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'

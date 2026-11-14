@@ -1,11 +1,11 @@
 title: CI caches lotar's own build output between runs
-status: HelpNeeded
+status: Done
 priority: High
 type: Chore
 reporter: claude
-assignee: mallox
+assignee: '@merge'
 created: 2026-11-13T22:21:42.733070+00:00
-modified: 2026-11-14T18:05:21.949224+00:00
+modified: 2026-11-15T00:03:12.467994+00:00
 relationships:
   depends_on:
   - DEV-493
@@ -23,6 +23,7 @@ relationships:
   - DEV-531
   - DEV-524
   - DEV-532
+  - DEV-547
 comments:
 - date: 2026-11-14T05:27:32.965362+00:00
   author: claude
@@ -65,10 +66,49 @@ comments:
 - date: 2026-11-14T06:47:15.900137+00:00
   author: codex
   text: 'Merge blocked. Rebased 069748b7 onto main e64997ea as ff84b766 (signed), retaining main Rust 1.99.1 and the new CARGO_INCREMENTAL=0 in the sole conflict. No merge or push. lint:agent passed with RUSTC_WRAPPER=. test:agent failed at embedded_web_ui_test::serve_sends_the_embedded_index_page: target/web-embed/index.html.gz missing; 2129/2150 tests not run, xcrun_db cleanup failure. test:smoke:agent finished: 255 failed, 146 passed; server startup reports binding 127.0.0.1:0 denied (Operation not permitted), plus temp cleanup failures. All checks stopped. Logs /tmp/dev496-merge-lint.log, /tmp/dev496-merge-test.log, /tmp/dev496-merge-smoke.log. Can the merge job rerun with localhost binding permission and web assets built before the tests?'
+- date: 2026-11-14T23:18:43.830537+00:00
+  author: mallox
+  text: 'Answer: measure (Keep open until a CI run on a push without src changes shows the wall times) (answered in INBOX-150)'
+- date: 2026-11-14T23:30:02.020627+00:00
+  author: claude
+  text: |-
+    CI measured: on a push without Rust source changes, the Linux Rust jobs got faster. Windows didn't gain this time; follow-up in DEV-547.
+
+    - Change is on main as `ff84b766` (pushed). Branch commit `069748b7` is the same change before its rebase: nothing left to merge, no new commit.
+    - **Push without src changes**: run `43628751374` (`fcb876aa`, only `crates/lotar-lib/tests` and `.tasks`)
+      - Build Frontend "Build release binary": 132–166 s before → **57 s** (sccache 2/2 hits)
+      - Rust Quality "Run tests": 225–243 s before → **143 s** (2/2 hits)
+      - Windows "Build binary": 110–211 s before → 194 s, **0/5 hits**: it restored the cache of `e64997ea`, because the two runs between were cancelled before Windows' "Save sccache" step at the end of the job
+    - **Push with src changes**: run `43629901046` (`028b2167`): release build 155 s, tests 229 s, Windows build 176 s (lotar-lib misses as expected, web assets hit). No slowdown.
+    - Cache: each job's sccache sits at its 256 MiB cap; saves cost 2–4 s, restores 2–10 s.
+    - Filed DEV-547: save the Windows sccache right after its last compile step, so cancelled runs still leave a fresh cache.
+    - Checks: none rerun (no file changed); numbers from `gh run view` logs.
+- date: 2026-11-14T23:53:33.976927+00:00
+  author: codex
+  text: |-
+    Review: nothing to review
+
+    - Branch `069748b7` is the pre-rebase version of `ff84b766`, already on main. Both touched files are identical between `ff84b766` and current main.
+    - Read ticket and measurement comment. No additional implementation remains to merge. Checks not rerun; files, commits, status and assignee unchanged.
+- date: 2026-11-15T00:02:59.534539+00:00
+  author: codex
+  text: |-
+    nothing to merge
+
+    -  is empty; worktree HEAD  is already an ancestor of main .
+    - No rebase, merge, push or checks needed; no files changed. Trust unchanged; no rules or profiles merged this turn. Status and assignee left to job automation.
+- date: 2026-11-15T00:03:07.867826+00:00
+  author: codex
+  text: |-
+    nothing to merge
+
+    - Correction to the preceding comment: `git log main..HEAD` is empty; HEAD `ff84b766` is already an ancestor of main `8e918799`.
+    - No rebase, merge, push or checks needed; no files changed. Trust unchanged; no rules or profiles merged this turn. Status and assignee left to job automation.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2c9b49ac-88aa-4223-8194-4149b3d24d9e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5d6d56fe-4cfa-47bb-b512-f4b935826a9f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8b72bddf-43c2-4e64-b76a-a5d4910aff2e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aace6bdeb-ecaa-4d10-a341-d38e318510be
 description: |-
   CI keeps no build output of lotar's own code between runs, so every Rust job compiles the lotar crate from scratch, even when a push changed nothing in it (DEV-493). The owner, 2026-11-13: "We really need to try and optimize the build and CI time."
 
@@ -275,3 +315,70 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-493"],"blocks":["DEV-499"],"related":["DEV-107","DEV-493","DEV-501","DEV-522","DEV-526","DEV-527","DEV-512","DEV-529","DEV-531","DEV-524"]}'
     new: '{"depends_on":["DEV-493"],"blocks":["DEV-499"],"related":["DEV-107","DEV-493","DEV-501","DEV-522","DEV-526","DEV-527","DEV-512","DEV-529","DEV-531","DEV-524","DEV-532"]}'
+- at: 2026-11-14T23:18:43.830537+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-14T23:18:46.061513+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-14T23:26:55.922822+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T23:29:51.597423+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-493"],"blocks":["DEV-499"],"related":["DEV-107","DEV-493","DEV-501","DEV-522","DEV-526","DEV-527","DEV-512","DEV-529","DEV-531","DEV-524","DEV-532"]}'
+    new: '{"depends_on":["DEV-493"],"blocks":["DEV-499"],"related":["DEV-107","DEV-493","DEV-501","DEV-522","DEV-526","DEV-527","DEV-512","DEV-529","DEV-531","DEV-524","DEV-532","DEV-547"]}'
+- at: 2026-11-14T23:30:02.020627+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T23:30:11.014138+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T23:52:54.663764+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aace6bdeb-ecaa-4d10-a341-d38e318510be
+- at: 2026-11-14T23:53:33.976927+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T23:53:39.663493+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-15T00:02:59.534539+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T00:03:07.867826+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T00:03:12.467994+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done

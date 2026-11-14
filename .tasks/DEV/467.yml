@@ -1,11 +1,11 @@
 title: Jobs that failed during the T3 Code outage left 15 tickets InProgress and lost their agents' outcome
-status: HelpNeeded
+status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-13T10:33:47.286204+00:00
-modified: 2026-11-14T18:49:47.294458+00:00
+modified: 2026-11-15T00:03:54.075130+00:00
 relationships:
   blocks:
   - DEV-513
@@ -37,6 +37,7 @@ relationships:
   - DEV-543
   - DEV-497
   - DEV-503
+  - DEV-514
 comments:
 - date: 2026-11-13T10:37:16.946574+00:00
   author: claude
@@ -177,6 +178,23 @@ comments:
     - crates/lotar-lib/src/services/automation_service.rs (3 hunks) and docs/help/agent.md (4 hunks): main's rule_label and DEV-524/DEV-503 text sit next to this branch's retry_while_busy, durable end-action checkpoints and recovery text. These look mechanical, but the help text describes the t3 runner that main rewrote.
 
     What's needed: a decision on whether the T3 Code outage wait goes into harnessmux (upstream) or into lotar's adapter, or whether harnessmux already covers it. After that the fix agent ports part 1 onto main, keeps the end-rule and outcome recovery (part 2, still needed) and its tests, reruns lint, test and smoke, and sends it to review again.
+- date: 2026-11-14T23:22:31.493189+00:00
+  author: mallox
+  text: 'Answer: harnessmux (In harnessmux''s t3 agent, released as 0.1.3 (your yes needed to tag), then lotar uses it) (answered in INBOX-148)'
+- date: 2026-11-14T23:45:46.453973+00:00
+  author: claude
+  text: |-
+    Built the outage wait in harnessmux as you said. Waiting on your yes to release 0.1.3.
+
+    - **harnessmux** `3c0cc5b` on `agent/DEV-467` (worktree `~/.t3/worktrees/harnessmux/DEV-467`, not merged): when `t3` exits with an error while the thread still runs, or because the T3 Code server doesn't answer, the turn now follows the thread instead of failing. Reads that find the server down wait up to 60 min. Version is 0.1.3, CHANGELOG and README updated.
+    - Test `a_t3_turn_that_loses_the_server_waits_for_it_and_ends_from_the_thread` failed before the change (`turn failed: t3 exited with exit status: 1: Could not reach the T3 Code server`) and passes now. `cargo fmt`, `clippy -D warnings`, `nextest` (37/37) and `deny` pass.
+    - **lotar** `6fbb0ab1` on `t3/job-end-rules-t3-outage`: both commits squashed and rebased onto `main` (`8e918799`). Kept: end-rule and outcome recovery. Dropped: the old t3-runner wait (main removed that runner in DEV-503). Each saved step now carries its rule name (main's DEV-514 context). `npm run lint`, `npm test` (2177 Rust, 1537 UI) and `npm run smoke` (401) pass.
+    - Next, after the tag: bump lotar to `harnessmux = "0.1.3"`, add the outage wait to the t3 part of `docs/help/agent.md`, rerun the checks, then review.
+
+    **Question:** OK to fast-forward harnessmux `main` to `3c0cc5b`, tag `v0.1.3` (signed) and push it? That publishes 0.1.3 to crates.io.
+- date: 2026-11-14T23:59:17.622100+00:00
+  author: mallox
+  text: 'Answer: yes (Release 0.1.3 now) (answered in INBOX-160)'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8a51060f-8f0e-40eb-8309-91840a4fac93
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa70d136-71c4-42cc-8c60-e9566c5a27b6
@@ -751,3 +769,54 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-513"],"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513","DEV-524","DEV-530","DEV-532","DEV-538","DEV-543","DEV-497","DEV-503"]}'
     new: '{"blocks":["DEV-513","DEV-543"],"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513","DEV-524","DEV-530","DEV-532","DEV-538","DEV-543","DEV-497","DEV-503"]}'
+- at: 2026-11-14T23:22:31.493189+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-14T23:22:41.695054+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-14T23:30:13.342796+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T23:45:46.453973+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T23:45:46.816992+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-513","DEV-543"],"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513","DEV-524","DEV-530","DEV-532","DEV-538","DEV-543","DEV-497","DEV-503"]}'
+    new: '{"blocks":["DEV-513","DEV-543"],"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513","DEV-524","DEV-530","DEV-532","DEV-538","DEV-543","DEV-497","DEV-503","DEV-514"]}'
+- at: 2026-11-14T23:46:11.342342+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-14T23:59:17.622100+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-14T23:59:17.962592+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T00:03:54.075130+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress

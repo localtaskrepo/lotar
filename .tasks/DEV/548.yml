@@ -1,0 +1,46 @@
+title: Tag colors setting downloads up to 1000 full tickets only to suggest tags
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-14T23:59:23.228533+00:00
+modified: 2026-11-15T00:04:54.092983+00:00
+relationships:
+  related:
+  - DEV-545
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A210021d3-defe-4f5f-bacf-cfdfd0e63987
+description: |-
+  Found while fixing DEV-545: `view/components/ConfigTagColorsField.vue:157` calls `api.listTasks({ project, has: 'tag', limit: 1000 })` and keeps only the tags, so the config page downloads whole tickets (descriptions, comments, history).
+
+  Check: open the config page's tag colors and look at the `/api/tasks/list` request size.
+
+  Done: the field takes its tags from `GET /api/tasks/values` (DEV-545), with a test.
+tags:
+- health
+custom_fields:
+  finding: perf:ConfigTagColorsField
+history:
+- at: 2026-11-14T23:59:23.379113+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-545"]}'
+- at: 2026-11-14T23:59:23.533191+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-15T00:04:50.873810+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T00:04:54.092983+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A210021d3-defe-4f5f-bacf-cfdfd0e63987

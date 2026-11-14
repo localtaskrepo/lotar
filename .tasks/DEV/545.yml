@@ -1,0 +1,199 @@
+title: Task panel downloads 200 full tickets only to suggest names, tags and field values
+status: Reviewing
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@review'
+created: 2026-11-14T23:27:11.181674+00:00
+modified: 2026-11-14T23:59:39.128467+00:00
+relationships:
+  related:
+  - local:LOCA-324
+  - DEV-548
+comments:
+- date: 2026-11-14T23:59:18.602914+00:00
+  author: claude
+  text: |-
+    Fixed: the task panel gets its suggestions from the new `GET /api/tasks/values` instead of 200 whole tickets (commit `743ba91f`).
+
+    - Payload on a copy of the DEV project (546 tickets): `/api/tasks/list?project=DEV&limit=200` 1,939,534 B, ~115 ms → `/api/tasks/values?project=DEV` 6,159 B, ~25 ms (debug build, localhost)
+    - Same values plus more: new reads every active ticket, not the first 200 (tags 19 → 24, `finding` values 101 → 118), none of the old values missing
+    - Endpoint: `ProjectService::values` in `crates/lotar-lib/src/services/project_service.rs`, route in `routes/tasks.rs`; contract in `api_types.rs`, `view/api/types.ts`, `docs/openapi.json`, `docs/help/serve.md`, `docs/help/api-quick-reference.md`
+    - Request fails: panel still offers members, defaults, agent profiles and the current user
+    - Tests: `dev545_task_values_test.rs` (deleted skipped, 250+ tickets, 404, OpenAPI shape), `useTaskPanelOwnership.spec.ts`, smoke `ui.task-panel-values.smoke.spec.ts` (no `limit=200` request when opening a ticket)
+    - Checks: `npm run lint` ok, `npm test` ok (2173 Rust, 1538 UI), `npm run smoke` ok (402)
+    - No page, component or style changed, so no ui tag or screenshots
+    - Left as is: `ConfigTagColorsField.vue` still lists up to 1000 whole tickets for tag suggestions; filed separately
+- date: 2026-11-14T23:59:27.509896+00:00
+  author: claude
+  text: Filed the tag colors follow-up as DEV-548.
+references:
+- file: view/composables/useTaskPanelOwnership.ts
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A08976f6f-b085-46f4-9a5b-7ff1c6ea76a4
+description: |-
+  Opening one ticket downloads up to 200 full tickets of its project only to suggest names, tags and custom field values. On the owner's inbox (standards.pyxzl.net, 2026-11-14) that was 618 KB and 652 ms of the page load for `/api/tasks/get` returning 5 KB, and it grows with the project.
+
+  ## Cause
+
+  `preloadPeople` in `view/composables/useTaskPanelOwnership.ts` calls `api.listTasks({ project, limit: 200 })` and keeps only `assignee`, `reporter`, `tags` and `custom_fields` of each item. The list returns whole tickets: descriptions, comments, history. It also sees only the first 200, so suggestions miss values used in older tickets.
+
+  Measured in the browser (`performance.getEntriesByType('resource')`) on `/task/INBOX-131`: `/api/tasks/list?project=INBOX&limit=200&offset=0` +652 ms, 618 KB; every other API call of the page under 200 KB together.
+
+  ## Fix
+
+  Get the suggestion values without whole tickets: an existing lighter source (`/api/tasks/suggest`, project stats, config members) or a small endpoint returning the distinct people, tags and field values of a project. A REST shape change follows the api-contract skill (`api_types.rs`, `view/api/types.ts`, `docs/openapi.json`).
+
+  ## Done when
+
+  - [x] Opening a ticket (edit or new) requests `GET /api/tasks/values?project=<PREFIX>` for suggestions, not `/api/tasks/list`; the response holds only the distinct names, tags and field values, no ticket bodies
+  - [x] The endpoint reads every active ticket of the project (not deleted, not archived, no 200 cap); without `project` it reads all projects, as the panel did before; an unknown project answers 404
+  - [x] Values are trimmed, empty ones dropped, each list sorted and without duplicates: people = assignee and reporter as stored; tags; custom fields = string and number values, list fields item by item (other types skipped, as before)
+  - [x] Assignee, reporter, tag and custom field suggestions still offer the same values, plus those of tickets beyond the first 200 (Rust test of the endpoint, vitest of the panel)
+  - [x] When the request fails, the panel still offers configured members, defaults, agent profiles and the current user, as now
+  - [x] Contract agrees: `api_types.rs`, `view/api/types.ts`, `docs/openapi.json`, REST help doc
+  - [x] Payload measured before and after on a seeded project of 300+ tickets
+tags:
+- web-ui
+history:
+- at: 2026-11-14T23:27:11.502735+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-14T23:27:16.093749+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:view/composables/useTaskPanelOwnership.ts
+- at: 2026-11-14T23:27:16.278561+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["local:LOCA-324"]}'
+- at: 2026-11-14T23:43:32.324137+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-14T23:43:35.255595+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A08976f6f-b085-46f4-9a5b-7ff1c6ea76a4
+- at: 2026-11-14T23:44:56.007336+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Opening one ticket downloads up to 200 full tickets of its project only to suggest names, tags and custom field values. On the owner's inbox (standards.pyxzl.net, 2026-11-14) that was 618 KB and 652 ms of the page load for `/api/tasks/get` returning 5 KB, and it grows with the project.
+
+      ## Cause
+
+      `preloadPeople` in `view/composables/useTaskPanelOwnership.ts` calls `api.listTasks({ project, limit: 200 })` and keeps only `assignee`, `reporter`, `tags` and `custom_fields` of each item. The list returns whole tickets: descriptions, comments, history. It also sees only the first 200, so suggestions miss values used in older tickets.
+
+      Measured in the browser (`performance.getEntriesByType('resource')`) on `/task/INBOX-131`: `/api/tasks/list?project=INBOX&limit=200&offset=0` +652 ms, 618 KB; every other API call of the page under 200 KB together.
+
+      ## Fix
+
+      Get the suggestion values without whole tickets: an existing lighter source (`/api/tasks/suggest`, project stats, config members) or a small endpoint returning the distinct people, tags and field values of a project. A REST shape change follows the api-contract skill (`api_types.rs`, `view/api/types.ts`, `docs/openapi.json`).
+
+      ## Done when
+
+      - [ ] Opening a ticket no longer requests full ticket bodies for suggestions
+      - [ ] Assignee, reporter, tag and custom field suggestions still offer the same values (test)
+      - [ ] Payload measured before and after on a seeded project of 300+ tickets
+    new: |-
+      Opening one ticket downloads up to 200 full tickets of its project only to suggest names, tags and custom field values. On the owner's inbox (standards.pyxzl.net, 2026-11-14) that was 618 KB and 652 ms of the page load for `/api/tasks/get` returning 5 KB, and it grows with the project.
+
+      ## Cause
+
+      `preloadPeople` in `view/composables/useTaskPanelOwnership.ts` calls `api.listTasks({ project, limit: 200 })` and keeps only `assignee`, `reporter`, `tags` and `custom_fields` of each item. The list returns whole tickets: descriptions, comments, history. It also sees only the first 200, so suggestions miss values used in older tickets.
+
+      Measured in the browser (`performance.getEntriesByType('resource')`) on `/task/INBOX-131`: `/api/tasks/list?project=INBOX&limit=200&offset=0` +652 ms, 618 KB; every other API call of the page under 200 KB together.
+
+      ## Fix
+
+      Get the suggestion values without whole tickets: an existing lighter source (`/api/tasks/suggest`, project stats, config members) or a small endpoint returning the distinct people, tags and field values of a project. A REST shape change follows the api-contract skill (`api_types.rs`, `view/api/types.ts`, `docs/openapi.json`).
+
+      ## Done when
+
+      - [ ] Opening a ticket (edit or new) requests `GET /api/tasks/values?project=<PREFIX>` for suggestions, not `/api/tasks/list`; the response holds only the distinct names, tags and field values, no ticket bodies
+      - [ ] The endpoint reads every active ticket of the project (not deleted, not archived, no 200 cap); without `project` it reads all projects, as the panel did before; an unknown project answers 404
+      - [ ] Values are trimmed, empty ones dropped, each list sorted and without duplicates: people = assignee and reporter as stored; tags; custom fields = string and number values, list fields item by item (other types skipped, as before)
+      - [ ] Assignee, reporter, tag and custom field suggestions still offer the same values, plus those of tickets beyond the first 200 (Rust test of the endpoint, vitest of the panel)
+      - [ ] When the request fails, the panel still offers configured members, defaults, agent profiles and the current user, as now
+      - [ ] Contract agrees: `api_types.rs`, `view/api/types.ts`, `docs/openapi.json`, REST help doc
+      - [ ] Payload measured before and after on a seeded project of 300+ tickets
+- at: 2026-11-14T23:59:18.557818+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Opening one ticket downloads up to 200 full tickets of its project only to suggest names, tags and custom field values. On the owner's inbox (standards.pyxzl.net, 2026-11-14) that was 618 KB and 652 ms of the page load for `/api/tasks/get` returning 5 KB, and it grows with the project.
+
+      ## Cause
+
+      `preloadPeople` in `view/composables/useTaskPanelOwnership.ts` calls `api.listTasks({ project, limit: 200 })` and keeps only `assignee`, `reporter`, `tags` and `custom_fields` of each item. The list returns whole tickets: descriptions, comments, history. It also sees only the first 200, so suggestions miss values used in older tickets.
+
+      Measured in the browser (`performance.getEntriesByType('resource')`) on `/task/INBOX-131`: `/api/tasks/list?project=INBOX&limit=200&offset=0` +652 ms, 618 KB; every other API call of the page under 200 KB together.
+
+      ## Fix
+
+      Get the suggestion values without whole tickets: an existing lighter source (`/api/tasks/suggest`, project stats, config members) or a small endpoint returning the distinct people, tags and field values of a project. A REST shape change follows the api-contract skill (`api_types.rs`, `view/api/types.ts`, `docs/openapi.json`).
+
+      ## Done when
+
+      - [ ] Opening a ticket (edit or new) requests `GET /api/tasks/values?project=<PREFIX>` for suggestions, not `/api/tasks/list`; the response holds only the distinct names, tags and field values, no ticket bodies
+      - [ ] The endpoint reads every active ticket of the project (not deleted, not archived, no 200 cap); without `project` it reads all projects, as the panel did before; an unknown project answers 404
+      - [ ] Values are trimmed, empty ones dropped, each list sorted and without duplicates: people = assignee and reporter as stored; tags; custom fields = string and number values, list fields item by item (other types skipped, as before)
+      - [ ] Assignee, reporter, tag and custom field suggestions still offer the same values, plus those of tickets beyond the first 200 (Rust test of the endpoint, vitest of the panel)
+      - [ ] When the request fails, the panel still offers configured members, defaults, agent profiles and the current user, as now
+      - [ ] Contract agrees: `api_types.rs`, `view/api/types.ts`, `docs/openapi.json`, REST help doc
+      - [ ] Payload measured before and after on a seeded project of 300+ tickets
+    new: |-
+      Opening one ticket downloads up to 200 full tickets of its project only to suggest names, tags and custom field values. On the owner's inbox (standards.pyxzl.net, 2026-11-14) that was 618 KB and 652 ms of the page load for `/api/tasks/get` returning 5 KB, and it grows with the project.
+
+      ## Cause
+
+      `preloadPeople` in `view/composables/useTaskPanelOwnership.ts` calls `api.listTasks({ project, limit: 200 })` and keeps only `assignee`, `reporter`, `tags` and `custom_fields` of each item. The list returns whole tickets: descriptions, comments, history. It also sees only the first 200, so suggestions miss values used in older tickets.
+
+      Measured in the browser (`performance.getEntriesByType('resource')`) on `/task/INBOX-131`: `/api/tasks/list?project=INBOX&limit=200&offset=0` +652 ms, 618 KB; every other API call of the page under 200 KB together.
+
+      ## Fix
+
+      Get the suggestion values without whole tickets: an existing lighter source (`/api/tasks/suggest`, project stats, config members) or a small endpoint returning the distinct people, tags and field values of a project. A REST shape change follows the api-contract skill (`api_types.rs`, `view/api/types.ts`, `docs/openapi.json`).
+
+      ## Done when
+
+      - [x] Opening a ticket (edit or new) requests `GET /api/tasks/values?project=<PREFIX>` for suggestions, not `/api/tasks/list`; the response holds only the distinct names, tags and field values, no ticket bodies
+      - [x] The endpoint reads every active ticket of the project (not deleted, not archived, no 200 cap); without `project` it reads all projects, as the panel did before; an unknown project answers 404
+      - [x] Values are trimmed, empty ones dropped, each list sorted and without duplicates: people = assignee and reporter as stored; tags; custom fields = string and number values, list fields item by item (other types skipped, as before)
+      - [x] Assignee, reporter, tag and custom field suggestions still offer the same values, plus those of tickets beyond the first 200 (Rust test of the endpoint, vitest of the panel)
+      - [x] When the request fails, the panel still offers configured members, defaults, agent profiles and the current user, as now
+      - [x] Contract agrees: `api_types.rs`, `view/api/types.ts`, `docs/openapi.json`, REST help doc
+      - [x] Payload measured before and after on a seeded project of 300+ tickets
+- at: 2026-11-14T23:59:18.602914+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T23:59:23.378613+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["local:LOCA-324"]}'
+    new: '{"related":["local:LOCA-324","DEV-548"]}'
+- at: 2026-11-14T23:59:27.509896+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T23:59:39.128467+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

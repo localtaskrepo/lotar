@@ -209,6 +209,8 @@ A job whose process exited before the job ended (a killed or crashed worker or s
 - A session job resumes its [session](#sessions) in the new process (its agent stopped with the old one) and asks the agent to continue where it stopped; the job then ends like any other. When the session can't be resumed, the job fails and says why.
 - A `command` job fails: its result went with the process.
 - The job log notes which process took the job over. A worker that waits for its last jobs before an upgrade takes over none.
+- A taken-over job runs as the kind it started as: a review job stays a review job when the ticket is Merging by then, and only a job that started as a merge job gets the merge check, on the branch its job log names.
+- A job whose log already has its end (its process exited after that, before it dropped its record) is not taken over: only its record goes, and its log, rules and ticket stay as they are.
 
 `list-running` also lists the `lotar-agent-wrapper` processes (which run `command` jobs) of this tasks directory if that binary is available (next to `lotar`, on `PATH`, or `LOTAR_AGENT_WRAPPER`). A wrapper started for another tasks directory, such as another worktree's, is not listed and doesn't block changes to a ticket with the same ID.
 

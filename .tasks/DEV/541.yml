@@ -1,11 +1,11 @@
 title: Cleanup at Done keeps a Done ticket's superseded versions, so its branches and worktrees pile up
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T18:13:44.393048+00:00
-modified: 2026-11-14T18:58:39.077671+00:00
+modified: 2026-11-14T19:02:47.683470+00:00
 relationships:
   related:
   - DEV-532
@@ -34,6 +34,15 @@ comments:
     - Process guard covers landed and superseded worktrees; regression covers busy branch/detached worktrees and idle cleanup. Read full diff, ticket/comments, related cleanup context and main history. Diff check passed.
     - Focused Rust regression passed (1/1), using RUSTC_WRAPPER empty; runner exited 1 on leftover xcrun_db. Full gates not independently rerun; fix agent records passes.
     - No files, commits, status or assignee changed. No follow-up tickets. Main cleanup check remains for merge.
+- date: 2026-11-14T19:02:43.983396+00:00
+  author: codex
+  text: |-
+    Merged and pushed as `028b2167` on `main`.
+    - Rebased reviewed `3b5ebb72` cleanly as `6805edff`; fast-forwarded main and included pending `.tasks` updates in the signed amend.
+    - Passed `npm run lint:agent`, `npm run test:agent`, and `npm run test:smoke:agent` (401 smoke tests). Initial sandbox attempts denied compiler services/local binds; unrestricted retries with `RUSTC_WRAPPER=` passed. No checks skipped.
+    - Push succeeded with hooks; main was clean before push and no other unpushed commits remained.
+    - Reran `git worktree list` and `git branch --list "*541*"`: this running merge ticket still has its worktrees/branch, as required by the active-job guard. Final absence can only be checked after job-end Done cleanup; the automatic and CLI two-pass regression passed. No live worktrees manually removed.
+    - Status/assignee unchanged; no durable guidance finding.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6f43a938-4eac-4d80-9fca-7c2f130f611e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A235eada8-6c30-455d-93fb-22a49f1fbcf4
@@ -46,7 +55,6 @@ description: |-
   Done when: the cleanup at Done (and lotar agent worktree cleanup) also removes a Done ticket's clean, idle versions that main supersedes (for example by keeping a ref under refs/archive/ first), keeps any with uncommitted changes or a running process, with a test.
 tags:
 - health
-- review-returned
 custom_fields:
   finding: cleanup:superseded-versions
 history:
@@ -146,3 +154,16 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-14T19:02:43.983396+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T19:02:47.683470+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, review-returned
+    new: health

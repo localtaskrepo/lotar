@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-14T06:27:21.642026+00:00
-modified: 2026-11-14T18:15:18.810128+00:00
+modified: 2026-11-14T23:59:34.541277+00:00
 relationships:
   related:
   - DEV-518
@@ -35,12 +35,49 @@ comments:
 - date: 2026-11-14T18:15:18.810128+00:00
   author: claude
   text: 'The merge was stopped on purpose (codex, 08:38): review blocked 81c1488d because a merge job adopted after a crash (adopt_orphaned_job) has no ticket snapshot, so an agent''s direct hand-back there still fast-forwards main. No fix agent is running; the ''fix agent retries'' line above came from the job failing on a fast-forward it should not have tried, which is this ticket''s own bug. Should an agent close that gap before 81c1488d merges (fix), or merge it as is with the gap as a follow-up ticket (merge)?'
+- date: 2026-11-14T23:14:37.711912+00:00
+  author: mallox
+  text: 'Answer: fix-first (Close the recovery gap before merging) (answered in INBOX-135)'
+- date: 2026-11-14T23:26:42.595965+00:00
+  author: claude
+  text: |-
+    Recovery gap closed, as answered (fix-first, INBOX-135): `53f61bbd` (amended).
+
+    - The start snapshot (status, assignee) is now saved in the job's on-disk record (`ActiveJob.ticket_at_start`, `agent_active_jobs.rs`). `adopt_orphaned_job` reads it back, so a merge job taken over from a dead process still sees a direct hand-back. Records from older builds have no snapshot, so for those only a recorded outcome counts.
+    - New test `git_required::an_adopted_merge_job_still_sees_a_direct_hand_back` (`agent_job_service.rs`). It fails without the fix ('Fast-forwarded the main checkout to agent/MRG-1') and passes with it.
+    - Checks: `npm run lint` passes. `npm test` passes (2153 Rust + 1537 UI). `npm run smoke`: the first run failed once in `ui.theming.smoke.spec.ts`, a UI test this change doesn't touch. That file passed alone, and the full rerun passed 401/401.
+- date: 2026-11-14T23:59:14.004496+00:00
+  author: codex
+  text: |-
+    Merge blocked: this checkout still holds the older fix, not the recovery rework.
+    - HEAD is `81c1488d`; the reported rework is `53f61bbd`.
+    - `agent_job_service.rs:1408` still sets the adopted snapshot to `None`.
+    - No rebase, merge, push or checks run. Please restore the intended reviewed commit to the job checkout before retrying.
+- date: 2026-11-14T23:59:33.323158+00:00
+  author: automation
+  text: |-
+    The merge agent's job job-20261114T235850.711Z-19 failed again (lotar agent logs job-20261114T235850.711Z-19). The fix is on branch t3/merge-job-stop-keeps-main-1. Retry with @fix, or will you merge it yourself?
+
+    Options:
+    - fix: Retry with @fix
+    - self: I merge it myself
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: self
+      label: I merge it myself
+      set:
+        status: InProgress
 references:
 - code: crates/lotar-lib/src/services/agent_job_service.rs#3121-3170
 - code: crates/lotar-lib/src/services/agent_job_service.rs#3243-3258
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa938fca8-5d60-4c03-9f7d-179493505574
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac47782a7-867f-405e-9565-79a76add1f40
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A097eaf0c-c157-4721-9a1d-f0a1dfb5bc2b
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8093f3df-92b2-4ce7-8048-3d9c05bc5d1f
 description: |-
   When a merge job ends, lotar fast-forwards the main checkout to the ticket's branch even when the merge agent decided **not** to merge. Work a review blocked, or work on top of a main that fails its checks, lands on main without anyone noticing. Found on 2026-11-14 while checking the HelpNeeded tickets, and mallox asked for this ticket in the thread.
 
@@ -213,3 +250,63 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-14T23:14:37.711912+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-14T23:14:38.388393+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-14T23:14:41.886920+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T23:26:42.595965+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T23:26:53.452436+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T23:42:17.234884+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8093f3df-92b2-4ce7-8048-3d9c05bc5d1f
+- at: 2026-11-14T23:43:30.847649+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-14T23:59:14.004496+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T23:59:33.323158+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-14T23:59:34.541277+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox

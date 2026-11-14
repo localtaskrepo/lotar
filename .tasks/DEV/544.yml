@@ -1,0 +1,158 @@
+title: A finished review job is taken over hours later and failed as a merge job on the reviewer's thread branch
+status: Merging
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@merge'
+created: 2026-11-14T23:14:58.300535+00:00
+modified: 2026-11-15T00:08:18.234901+00:00
+relationships:
+  related:
+  - DEV-478
+  - DEV-378
+comments:
+- date: 2026-11-14T23:37:35.244615+00:00
+  author: claude
+  text: |-
+    Fixed: a takeover skips jobs that already ended, and a review job stays a review job. Commit `60f27c96`.
+
+    - Cause: QIS-196's review ended at 18:11:14 and its end rules set Merging, but pid 79011 kept the job's running-job record until it exited. The takeover then ran the job again and called it a merge job because of the ticket's *current* status.
+    - The `t3/review-…` branch came from 0.15.0, which read the branch from the T3 thread's current state. Main already uses the job log header (`agent/<id>`), so that part needed no change.
+    - `adopt_orphaned_job`: if the job log has its final status, only the leftover record is dropped. No resume, no events, no rules.
+    - `ActiveJob.merge` records the job's kind when it starts, and the takeover uses it (`takes_over_as_merge_job`). A record from an older build counts as a merge job only when its profile is `merge`.
+    - Docs: `docs/help/agent.md` (Jobs whose process died).
+    - Tests: `a_job_whose_log_ended_is_not_taken_over` and `a_taken_over_job_keeps_the_kind_it_started_as`. Both fail without the fix and pass with it.
+    - Checks: `npm run lint:agent` clean, `npm run test:agent` (2174 Rust, 1537 UI) passed, `npm run test:smoke:agent` (401) passed.
+    - Not checked: why pid 79011 kept running for 5 hours after the job ended.
+- date: 2026-11-14T23:56:33.815002+00:00
+  author: codex
+  text: |-
+    Review: passed. No blocking findings in `60f27c96`.
+
+    - Read full diff, ticket/comments, related DEV-378/DEV-478, takeover/log/record callers, help and main history. No UI changes or owner decisions introduced.
+    - Ended logs stop before events/rules; unreadable logs retain takeover. Original merge kind and log-header branch are preserved; legacy records use profile.
+    - Both regression tests passed (2172 skipped), with `RUSTC_WRAPPER=` after sccache sandbox denial. Runner exited 1 for leftover macOS `xcrun_db`; assertions passed.
+    - `git diff --check` passed; tree clean. Full lint/UI/smoke not rerun (implementation reports passes). No minor tickets, edits or commits. Status and assignee unchanged.
+- date: 2026-11-15T00:08:18.234901+00:00
+  author: codex
+  text: |-
+    Merged: rebased `60f27c96` as `d3d47e8b` and fast-forwarded main.
+
+    - Passed `npm run lint:agent`, `npm run test:agent` (2174 Rust, 1537 UI), `npm run test:smoke:agent` (401), with `RUSTC_WRAPPER=`. No skipped checks.
+    - Including pending `.tasks` updates in the merged commit as instructed. No automation/config changed in this merge, so no new trust required.
+    - Preparing push with prior finished STD-119 commit `8e918799`; final hash and push result follow.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab263a21b-694d-4c1e-afa1-1d29dda26589
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A720a061e-9705-4efe-90de-a0eaf3a1f2b1
+description: |-
+  **Found** (Claude, 2026-11-14, QIS-196 in quarter-inch-studio): review job `job-20261114T180925.237Z-5` logged `agent_job_completed` at 18:11:14. At 23:13:20 a new lotar process (pid 63439) took it over from pid 79011, repeated the review message, then logged `agent_job_failed`: "Merge job finished, but t3/review-qis-196-owner-question is not merged into the main checkout's current branch". That branch is the review thread's, not `agent/QIS-196`. The failure rule then moved QIS-196 to the fix agent (status Merging, assignee @fix).
+
+  **Check:** `lotar --tasks-dir ~/Development/quarter-inch-studio/.tasks agent logs job-20261114T180925.237Z-5`
+
+  **Cause** (Claude): the review's end rules had moved QIS-196 to Merging at 18:11:14, but pid 79011 kept the job's running-job record until it exited. The takeover then (1) ran the job again although its log already had its final status, (2) treated it as a merge job because the ticket was now Merging, and (3) in 0.15.0 read the branch from the T3 thread's current state. Point 3 is fixed on main already: the takeover reads the branch from the job log header (`agent/QIS-196`).
+
+  ## Done when
+
+  - [ ] A job whose log already has its final status (completed, failed, cancelled) is not taken over: the takeover only drops its leftover running-job record. It does not resume the session, add events, apply end rules or touch the ticket.
+  - [ ] A job whose log has no final status yet is still taken over as before (DEV-378, DEV-478).
+  - [ ] A takeover runs the job as the kind it started as: a review job stays a review job, also when the ticket is Merging by then. Only a job that started as a merge job (ticket Merging or profile `merge` at start) gets the merge check.
+  - [ ] A record written by an older build has no kind: it counts as a merge job only when its profile is `merge`, never because of the ticket's current status.
+  - [ ] The merge check of a taken-over merge job uses the branch from the job log header (`agent/<id>`), not a thread's branch.
+  - [ ] If the job log can't be read (logging off, file missing), the takeover runs as before.
+  - [ ] Tests cover the ended job and the review job on a Merging ticket.
+
+  Related: DEV-478.
+custom_fields:
+  finding: job-takeover:completed-job
+history:
+- at: 2026-11-14T23:14:58.448145+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-478"]}'
+- at: 2026-11-14T23:14:58.597203+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-14T23:23:07.063683+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-14T23:24:29.674401+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab263a21b-694d-4c1e-afa1-1d29dda26589
+- at: 2026-11-14T23:27:40.525084+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      **Found** (Claude, 2026-11-14, QIS-196 in quarter-inch-studio): review job `job-20261114T180925.237Z-5` logged `agent_job_completed` at 18:11:14. At 23:13:20 a new lotar process (pid 63439) took it over from pid 79011, repeated the review message, then logged `agent_job_failed`: "Merge job finished, but t3/review-qis-196-owner-question is not merged into the main checkout's current branch". That branch is the review thread's, not `agent/QIS-196`. The failure rule then moved QIS-196 to the fix agent (status Merging, assignee @fix).
+
+      **Check:** `lotar --tasks-dir ~/Development/quarter-inch-studio/.tasks agent logs job-20261114T180925.237Z-5`
+
+      **Done when:** an existing process doesn't take over a job that has already completed, and a takeover runs the original job's kind and branch (review, `agent/<id>`), never a merge check on the thread branch. Related: DEV-478.
+    new: |-
+      **Found** (Claude, 2026-11-14, QIS-196 in quarter-inch-studio): review job `job-20261114T180925.237Z-5` logged `agent_job_completed` at 18:11:14. At 23:13:20 a new lotar process (pid 63439) took it over from pid 79011, repeated the review message, then logged `agent_job_failed`: "Merge job finished, but t3/review-qis-196-owner-question is not merged into the main checkout's current branch". That branch is the review thread's, not `agent/QIS-196`. The failure rule then moved QIS-196 to the fix agent (status Merging, assignee @fix).
+
+      **Check:** `lotar --tasks-dir ~/Development/quarter-inch-studio/.tasks agent logs job-20261114T180925.237Z-5`
+
+      **Cause** (Claude): the review's end rules had moved QIS-196 to Merging at 18:11:14, but pid 79011 kept the job's running-job record until it exited. The takeover then (1) ran the job again although its log already had its final status, (2) treated it as a merge job because the ticket was now Merging, and (3) in 0.15.0 read the branch from the T3 thread's current state. Point 3 is fixed on main already: the takeover reads the branch from the job log header (`agent/QIS-196`).
+
+      ## Done when
+
+      - [ ] A job whose log already has its final status (completed, failed, cancelled) is not taken over: the takeover only drops its leftover running-job record. It does not resume the session, add events, apply end rules or touch the ticket.
+      - [ ] A job whose log has no final status yet is still taken over as before (DEV-378, DEV-478).
+      - [ ] A takeover runs the job as the kind it started as: a review job stays a review job, also when the ticket is Merging by then. Only a job that started as a merge job (ticket Merging or profile `merge` at start) gets the merge check.
+      - [ ] A record written by an older build has no kind: it counts as a merge job only when its profile is `merge`, never because of the ticket's current status.
+      - [ ] The merge check of a taken-over merge job uses the branch from the job log header (`agent/<id>`), not a thread's branch.
+      - [ ] If the job log can't be read (logging off, file missing), the takeover runs as before.
+      - [ ] Tests cover the ended job and the review job on a Merging ticket.
+
+      Related: DEV-478.
+- at: 2026-11-14T23:27:40.657966+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-478"]}'
+    new: '{"related":["DEV-478","DEV-378"]}'
+- at: 2026-11-14T23:37:35.244615+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T23:37:47.452446+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T23:53:45.955154+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A720a061e-9705-4efe-90de-a0eaf3a1f2b1
+- at: 2026-11-14T23:56:33.815002+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T23:56:51.843628+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-15T00:08:18.234901+00:00
+  actor: codex
+  changes:
+  - field: comment_added

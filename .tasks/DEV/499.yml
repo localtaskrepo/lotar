@@ -3,8 +3,9 @@ status: Blocked
 priority: Medium
 type: Chore
 reporter: claude
+assignee: '@fix'
 created: 2026-11-13T22:21:43.785907+00:00
-modified: 2026-11-13T22:21:51.981150+00:00
+modified: 2026-11-15T00:03:45.648039+00:00
 relationships:
   depends_on:
   - DEV-498
@@ -58,3 +59,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-498","DEV-497"],"related":["DEV-493"]}'
     new: '{"depends_on":["DEV-498","DEV-497","DEV-496"],"related":["DEV-493"]}'
+- at: 2026-11-15T00:03:45.648039+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    new: '@fix'

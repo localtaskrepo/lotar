@@ -1453,9 +1453,15 @@ fn adopt_orphaned_job(tasks_dir: &std::path::Path, orphan: &crate::services::age
     let runner_kind = job.runner.parse::<AgentRunnerKind>().unwrap_or(AgentRunnerKind::Command);
     let workspace_root = tasks_dir.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| tasks_dir.to_path_buf());
     let agent_logs_dir = crate::services::agent_log_service::effective_logs_dir(tasks_dir, config.agent_logs_dir.as_deref());
+    // A job whose log has its final status ended; its process exited after
+    // that, before it dropped the record (DEV-544).
+    let ended = agent_logs_dir.as_deref().is_some_and(|dir| AgentLogService::load_status(&workspace_root, dir, &job.job_id).ok().flatten().is_some());
+    if ended {
+        crate::services::agent_active_jobs::unregister(tasks_dir, &job.job_id);
+        return;
+    }
     let header = agent_logs_dir.as_deref().and_then(|dir| AgentLogService::load_header(&workspace_root, dir, &job.job_id).ok().flatten());
-    let task = Storage::try_open(tasks_dir).and_then(|storage| TaskService::get(&storage, &ticket_id, None).ok());
-    let is_merge_job = task.as_ref().is_some_and(|task| is_merge_job_candidate(task, job.agent.as_deref()));
+    let is_merge_job = takes_over_as_merge_job(&job);
     {
         let Ok(mut registry) = JOB_REGISTRY.lock() else {
             return;
@@ -2578,6 +2584,7 @@ fn run_job(
             child_pid: 0,
             started_at: Utc::now().to_rfc3339(),
             session_id: agent.map(|_| name.clone()),
+            merge: state.record.is_merge_job,
         })
     });
     if let Some(record) = active_record.as_ref() {
@@ -3808,7 +3815,18 @@ fn has_active_merge_job(registry: &JobRegistry) -> bool {
 }
 
 fn is_merge_job_candidate(task: &crate::api_types::TaskDTO, agent_profile: Option<&str>) -> bool {
-    task.status.as_str().eq_ignore_ascii_case("Merging") || agent_profile.is_some_and(|profile| profile.trim().eq_ignore_ascii_case("merge"))
+    task.status.as_str().eq_ignore_ascii_case("Merging") || is_merge_profile(agent_profile)
+}
+
+fn is_merge_profile(agent_profile: Option<&str>) -> bool {
+    agent_profile.is_some_and(|profile| profile.trim().eq_ignore_ascii_case("merge"))
+}
+
+/// A taken-over job is a merge job when it started as one (DEV-544): the
+/// ticket's status now may be the next phase's. A record of an older build
+/// has only its profile to tell.
+fn takes_over_as_merge_job(job: &crate::services::agent_active_jobs::ActiveJob) -> bool {
+    job.merge || is_merge_profile(job.agent.as_deref())
 }
 
 fn should_stop_job(job_id: &str) -> bool {
@@ -4292,6 +4310,75 @@ mod tests {
         flush_event_log();
         let kinds: Vec<String> = logged().into_iter().map(|entry| entry.kind).collect();
         assert_eq!(kinds, vec!["agent_job_started", "agent_job_progress"], "written in sequence order");
+    }
+
+    fn orphan_record(job_id: &str, agent: Option<&str>, merge: bool) -> crate::services::agent_active_jobs::ActiveJob {
+        crate::services::agent_active_jobs::ActiveJob {
+            job_id: job_id.to_string(),
+            ticket_id: "TEST-1".to_string(),
+            runner: "t3".to_string(),
+            agent: agent.map(str::to_string),
+            owner_pid: 0,
+            child_pid: 0,
+            started_at: Utc::now().to_rfc3339(),
+            session_id: Some("thread-1".to_string()),
+            merge,
+        }
+    }
+
+    #[test]
+    fn a_job_whose_log_ended_is_not_taken_over() {
+        let queue = tempdir().expect("queue dir");
+        // SAFETY: test-local override of the queue directory.
+        unsafe { std::env::set_var("LOTAR_AGENT_QUEUE_DIR", queue.path()) };
+        let workspace = tempdir().expect("temp dir");
+        let tasks_dir = workspace.path().join(".tasks");
+        fs::create_dir_all(&tasks_dir).expect("tasks dir");
+        let logs_dir = tasks_dir.join(crate::services::agent_log_service::DEFAULT_LOGS_DIR).to_string_lossy().to_string();
+        let job_id = "job-dev544-ended";
+        AgentLogService::init_log(
+            workspace.path(),
+            Some(&logs_dir),
+            crate::services::agent_log_service::JobLogHeader {
+                job_id: job_id.to_string(),
+                ticket_id: "TEST-1".to_string(),
+                runner: "t3".to_string(),
+                created_at: Utc::now().to_rfc3339(),
+                worktree_path: None,
+                worktree_branch: Some("agent/TEST-1".to_string()),
+                model: None,
+                effort: None,
+                agent_profile: Some("review".to_string()),
+            },
+        )
+        .expect("init log");
+        let status = crate::services::agent_log_service::JobStatusLine {
+            status: "completed".to_string(),
+            at: Utc::now().to_rfc3339(),
+            exit_code: Some(0),
+            summary: Some("Review passed".to_string()),
+            usage: None,
+            session_id: None,
+        };
+        AgentLogService::write_status_with_usage(workspace.path(), Some(&logs_dir), job_id, status).expect("status line");
+        crate::services::agent_active_jobs::register(&tasks_dir, &orphan_record(job_id, Some("review"), false));
+
+        AgentJobService::recover_orphaned_jobs(&tasks_dir);
+
+        assert!(crate::services::agent_active_jobs::orphaned(&tasks_dir).is_empty(), "the leftover record is gone");
+        assert!(!JOB_REGISTRY.lock().expect("registry").jobs.contains_key(job_id), "the job doesn't run again");
+        let events = AgentLogService::load_events(workspace.path(), &logs_dir, job_id).expect("events");
+        assert!(events.is_empty(), "nothing is added to the ended job's log: {events:?}");
+    }
+
+    #[test]
+    fn a_taken_over_job_keeps_the_kind_it_started_as() {
+        assert!(!takes_over_as_merge_job(&orphan_record("job-1", Some("review"), false)), "a review job stays one on a Merging ticket");
+        assert!(takes_over_as_merge_job(&orphan_record("job-2", Some("fix"), true)), "a job that started on a Merging ticket");
+        assert!(takes_over_as_merge_job(&orphan_record("job-3", Some("merge"), false)), "an older build's record of the merge profile");
+        assert!(!takes_over_as_merge_job(&orphan_record("job-4", None, false)));
+        let json = serde_json::to_string(&orphan_record("job-5", None, false)).expect("json");
+        assert!(!json.contains("merge"), "a record of a job that isn't a merge job stays as older builds wrote it: {json}");
     }
 
     #[test]

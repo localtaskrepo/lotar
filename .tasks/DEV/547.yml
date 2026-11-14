@@ -1,0 +1,123 @@
+title: Windows CI saves sccache only at the end, so a cancelled run leaves the next push a stale cache
+status: Merging
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@merge'
+created: 2026-11-14T23:29:51.339105+00:00
+modified: 2026-11-15T00:04:49.286768+00:00
+relationships:
+  related:
+  - DEV-496
+comments:
+- date: 2026-11-14T23:55:09.559798+00:00
+  author: claude
+  text: |-
+    Windows sccache now saves right after the last compiling step, before the smoke selection (`1af3b45c`).
+    - `.github/workflows/ci.yml`: 'sccache stats' and 'Save sccache' moved from the job's end to right after the nextest step; conditions unchanged (push to main, `!cancelled()`).
+    - Not after 'Compile-check' as first planned: `cargo check` only writes metadata, the nextest step builds the `windows_regressions` and `lotar-agent-wrapper` test binaries. Nothing after it compiles.
+    - Contract in `ci_windows_reporting_contract_test.rs`: save follows the last cargo build/nextest step, before smoke, no cargo build/check after. Failed on main's `ci.yml`, passes now.
+    - Linux jobs unchanged.
+    - Checks: `npm run lint` (lint:agent), `npm test` (2172 Rust + 1537 UI), `npm run smoke` (401) all pass.
+    - Not checked: the cache-hit box needs a real Windows run on main after a cancelled one.
+- date: 2026-11-15T00:04:37.454335+00:00
+  author: codex
+  text: |-
+    Review: passed.
+
+    - Reviewed full `1af3b45c` diff, ticket/comments, related DEV-496, CI consumers and recent main history. No findings or minor tickets; Linux unchanged.
+    - Stats/save immediately follow Windows nextest, before smoke. Main-only `!cancelled()` save condition preserved. Old main workflow violates the new ordering assertion.
+    - Focused nextest contract checks: 9/9 passed with `RUSTC_WRAPPER=` and local profile. `git diff --check` passed; checkout clean.
+    - Full lint/test/smoke not repeated; prior passes remain fix-agent reported. Windows cache-hit verification requires GitHub after merge.
+    - No files, commits, status or assignee changed. No UI work or durable guidance finding.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa64db4c9-e4f9-46e4-80c7-b1a046e9f9af
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa0f70add-61af-4232-af9e-35f5d38100a1
+description: |-
+  Found in DEV-496 (2026-11-14): run 43628751374 (fcb876aa, a push without Rust source changes) had 0 of 5 sccache hits on Windows, while both Linux jobs hit 2 of 2. Windows restored the cache saved by run 43572122922 (e64997ea), because the two runs after it (f33c78cf, 41449409) were cancelled by newer pushes before their 'Save sccache' step, which is the last step of the 8 to 9 minute job. The Linux jobs end sooner and had saved.
+
+  ## Plan
+  - Save the Windows sccache right after the last step that compiles instead of at the job's end, still only from pushes to main; keep the contract in crates/lotar-lib/tests/ci_windows_reporting_contract_test.rs in step.
+  - The last compiling step is 'Run storage safety, scan, and process regressions (nextest)', not 'Compile-check all Windows targets': `cargo check` only writes metadata, the nextest step builds the `windows_regressions` and `lotar-agent-wrapper` test binaries. The later steps (coverage manifest, smoke, node tests) don't compile.
+
+  ## Done when
+  - [ ] In `windows_checks`, 'sccache stats' and 'Save sccache' come right after the nextest step and before the portable smoke selection; no Rust compile step follows them.
+  - [ ] Save still runs only on pushes to main and when the run isn't cancelled; a failed nextest step still saves (`!cancelled()`), a cancelled run saves nothing.
+  - [ ] The contract test fails if the Windows save moves back behind the smoke step or a cargo step follows it.
+  - [ ] Linux jobs unchanged (they end soon after their compiling steps).
+  - [ ] A Windows run on main after a cancelled one restores the newest saved compile output (sccache stats show hits when lotar-lib didn't change). Checkable only on GitHub after merge.
+tags:
+- backend
+history:
+- at: 2026-11-14T23:29:51.863434+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-14T23:46:20.157530+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-14T23:46:24.267798+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa64db4c9-e4f9-46e4-80c7-b1a046e9f9af
+- at: 2026-11-14T23:47:09.343818+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in DEV-496 (2026-11-14): run 43628751374 (fcb876aa, a push without Rust source changes) had 0 of 5 sccache hits on Windows, while both Linux jobs hit 2 of 2. Windows restored the cache saved by run 43572122922 (e64997ea), because the two runs after it (f33c78cf, 41449409) were cancelled by newer pushes before their 'Save sccache' step, which is the last step of the 8 to 9 minute job. The Linux jobs end sooner and had saved.
+
+      ## Plan
+      - Save the Windows sccache right after 'Compile-check all Windows targets' (the last compiling step) instead of at the job's end, still only from pushes to main; keep the contract in crates/lotar-lib/tests/ci_windows_reporting_contract_test.rs in step.
+
+      ## Done when
+      - [ ] A Windows run on main after a cancelled one restores the newest saved compile output (sccache stats show hits when lotar-lib didn't change).
+    new: |-
+      Found in DEV-496 (2026-11-14): run 43628751374 (fcb876aa, a push without Rust source changes) had 0 of 5 sccache hits on Windows, while both Linux jobs hit 2 of 2. Windows restored the cache saved by run 43572122922 (e64997ea), because the two runs after it (f33c78cf, 41449409) were cancelled by newer pushes before their 'Save sccache' step, which is the last step of the 8 to 9 minute job. The Linux jobs end sooner and had saved.
+
+      ## Plan
+      - Save the Windows sccache right after the last step that compiles instead of at the job's end, still only from pushes to main; keep the contract in crates/lotar-lib/tests/ci_windows_reporting_contract_test.rs in step.
+      - The last compiling step is 'Run storage safety, scan, and process regressions (nextest)', not 'Compile-check all Windows targets': `cargo check` only writes metadata, the nextest step builds the `windows_regressions` and `lotar-agent-wrapper` test binaries. The later steps (coverage manifest, smoke, node tests) don't compile.
+
+      ## Done when
+      - [ ] In `windows_checks`, 'sccache stats' and 'Save sccache' come right after the nextest step and before the portable smoke selection; no Rust compile step follows them.
+      - [ ] Save still runs only on pushes to main and when the run isn't cancelled; a failed nextest step still saves (`!cancelled()`), a cancelled run saves nothing.
+      - [ ] The contract test fails if the Windows save moves back behind the smoke step or a cargo step follows it.
+      - [ ] Linux jobs unchanged (they end soon after their compiling steps).
+      - [ ] A Windows run on main after a cancelled one restores the newest saved compile output (sccache stats show hits when lotar-lib didn't change). Checkable only on GitHub after merge.
+- at: 2026-11-14T23:55:09.559798+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T23:55:39.374232+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T00:02:45.906924+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa0f70add-61af-4232-af9e-35f5d38100a1
+- at: 2026-11-15T00:04:37.454335+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T00:04:49.286768+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
