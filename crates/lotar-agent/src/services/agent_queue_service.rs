@@ -35,6 +35,10 @@ struct AgentQueueState {
     taken: Vec<AgentQueueEntry>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pause: Option<QueuePause>,
+    /// Jobs the dependency check held back (DEV-530): each starts as it was
+    /// once its ticket's prerequisites are done.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    parked: Vec<ParkedEntry>,
 }
 
 /// Why the queue holds jobs back (DEV-604).
@@ -122,6 +126,16 @@ pub struct CarriedOutcome {
     pub status_at_pause: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub assignee_at_pause: Option<String>,
+}
+
+/// A job the dependency check held back (DEV-530).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ParkedEntry {
+    #[serde(flatten)]
+    pub entry: AgentQueueEntry,
+    /// The ticket's status before it was set to Blocked.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -230,44 +244,8 @@ impl WorkerState {
 impl AgentQueueService {
     #[expect(clippy::needless_pass_by_value, reason = "the caller hands this value over and does not use it afterwards")]
     pub fn enqueue(tasks_dir: &Path, req: AgentJobCreateRequest) -> LoTaRResult<bool> {
-        let runner = req.runner.as_deref().map(str::trim).filter(|runner| !runner.is_empty()).map(str::to_string);
-        let agent = match req.agent.clone() {
-            Some(agent) => agent,
-            None if runner.is_some() => String::new(),
-            None => {
-                return Err(LoTaRError::ValidationError("Agent profile or runner required".to_string()));
-            }
-        };
-        let ticket_id = req.ticket_id.trim().to_string();
-        if ticket_id.is_empty() {
-            return Err(LoTaRError::ValidationError("Ticket id is required".to_string()));
-        }
-        // Canonicalize at the queue boundary so dequeued starts and duplicate
-        // checks share one identity with the job registry.
-        let ticket_id = crate::storage::TaskId::parse(&ticket_id)
-            .map_err(|err| LoTaRError::ValidationError(format!("Invalid ticket id '{ticket_id}': {err}")))?
-            .canonical();
-        let prompt = req.prompt.trim().to_string();
-        if prompt.is_empty() {
-            return Err(LoTaRError::ValidationError("Prompt cannot be empty".to_string()));
-        }
-
-        let entry = AgentQueueEntry {
-            ticket_id: ticket_id.clone(),
-            agent: agent.clone(),
-            runner: runner.clone(),
-            prompt,
-            queued_at: time::now_rfc3339(),
-            attempts: 0,
-            model: req.model.clone(),
-            effort: req.effort.clone(),
-            provider: req.provider.clone(),
-            session: req.session,
-            thread_name: req.thread_name.clone(),
-            held_by: None,
-            commit_retry: None,
-            carried_outcome: None,
-        };
+        let entry = queue_entry(&req)?;
+        let (ticket_id, agent, runner) = (entry.ticket_id.clone(), entry.agent.clone(), entry.runner.clone());
 
         let mut inserted = false;
         with_locked_queue(tasks_dir, |state| {
@@ -289,6 +267,77 @@ impl AgentQueueService {
         }
 
         Ok(inserted)
+    }
+
+    /// Keep a job the dependency check held back (DEV-530), replacing one
+    /// parked earlier for the ticket. The entry keeps what a retry carries
+    /// (thread name, commit retry, carried outcome). `status` is the ticket's
+    /// status before it was blocked; `None` keeps the one parked before.
+    pub fn park(tasks_dir: &Path, entry: &AgentQueueEntry, status: Option<&str>) -> LoTaRResult<()> {
+        let entry = AgentQueueEntry { queued_at: time::now_rfc3339(), attempts: 0, held_by: None, ..entry.clone() };
+        with_locked_queue(tasks_dir, |state| {
+            let earlier = state.parked.iter().position(|item| crate::storage::identity::aliases_match(&item.entry.ticket_id, &entry.ticket_id));
+            let earlier = earlier.map(|index| state.parked.remove(index));
+            let status = status.map(str::to_string).or_else(|| earlier.and_then(|item| item.status));
+            state.parked.push(ParkedEntry { entry: entry.clone(), status });
+        })
+    }
+
+    /// Move the job parked for `ticket_id` to the queue under one lock
+    /// (DEV-530), so a worker that parks it again meanwhile isn't undone.
+    /// `Ok(false)`: nothing is parked. A job the queue refuses stays parked.
+    pub fn unpark(tasks_dir: &Path, ticket_id: &str) -> LoTaRResult<bool> {
+        if !queue_file_path(tasks_dir).exists() {
+            return Ok(false);
+        }
+        let mut moved = Ok(false);
+        with_locked_queue(tasks_dir, |state| {
+            let Some(index) = state.parked.iter().position(|item| crate::storage::identity::aliases_match(&item.entry.ticket_id, ticket_id)) else {
+                return;
+            };
+            let parked = &state.parked[index].entry;
+            let (commit_retry, carried_outcome) = (parked.commit_retry.clone(), parked.carried_outcome.clone());
+            moved = queue_entry(&parked.request()).map(|entry| {
+                let entry = AgentQueueEntry { commit_retry, carried_outcome, ..entry };
+                state.parked.remove(index);
+                if !state.pending.iter().any(|item| {
+                    crate::storage::identity::aliases_match(&item.ticket_id, &entry.ticket_id) && item.agent == entry.agent && item.runner == entry.runner
+                }) {
+                    state.pending.push(entry);
+                }
+                true
+            });
+        })?;
+        if moved.as_ref().is_ok_and(|moved| *moved) {
+            Self::ensure_worker(tasks_dir)?;
+        }
+        moved
+    }
+
+    /// Take the job parked for `ticket_id` out of the parked list.
+    pub fn take_parked(tasks_dir: &Path, ticket_id: &str) -> LoTaRResult<Option<ParkedEntry>> {
+        if !queue_file_path(tasks_dir).exists() {
+            return Ok(None);
+        }
+        let mut taken = None;
+        with_locked_queue(tasks_dir, |state| {
+            if let Some(index) = state.parked.iter().position(|item| crate::storage::identity::aliases_match(&item.entry.ticket_id, ticket_id)) {
+                taken = Some(state.parked.remove(index));
+            }
+        })?;
+        Ok(taken)
+    }
+
+    /// The jobs waiting for their tickets' prerequisites.
+    pub fn list_parked(tasks_dir: &Path) -> LoTaRResult<Vec<ParkedEntry>> {
+        if !queue_file_path(tasks_dir).exists() {
+            return Ok(Vec::new());
+        }
+        let mut entries = Vec::new();
+        with_locked_queue(tasks_dir, |state| {
+            entries = state.parked.clone();
+        })?;
+        Ok(entries)
     }
 
     /// List all pending entries, also those a worker took and has not
@@ -313,9 +362,10 @@ impl AgentQueueService {
         }
         let mut count = 0;
         with_locked_queue(tasks_dir, |state| {
-            count = state.pending.len() + state.taken.len();
+            count = state.pending.len() + state.taken.len() + state.parked.len();
             state.pending.clear();
             state.taken.clear();
+            state.parked.clear();
         })?;
         Ok(count)
     }
@@ -324,10 +374,11 @@ impl AgentQueueService {
     pub fn remove(tasks_dir: &Path, ticket_id: &str) -> LoTaRResult<bool> {
         let mut removed = false;
         with_locked_queue(tasks_dir, |state| {
-            let before = state.pending.len() + state.taken.len();
+            let before = state.pending.len() + state.taken.len() + state.parked.len();
             state.pending.retain(|e| e.ticket_id != ticket_id);
             state.taken.retain(|e| e.ticket_id != ticket_id);
-            removed = state.pending.len() + state.taken.len() < before;
+            state.parked.retain(|p| p.entry.ticket_id != ticket_id);
+            removed = state.pending.len() + state.taken.len() + state.parked.len() < before;
         })?;
         Ok(removed)
     }
@@ -613,12 +664,40 @@ fn start_entry(tasks_dir: &Path, entry: AgentQueueEntry) -> LoTaRResult<()> {
         return Ok(());
     }
     // A prerequisite can reopen while the job waits, and a check that failed
-    // at assignment is tried again here (DEV-524).
-    if req.agent.is_some() && !crate::services::automation_service::prerequisites_allow_start(tasks_dir, &req, last_try).map_err(LoTaRError::ValidationError)? {
+    // at assignment is tried again here (DEV-524). An open one parks the job
+    // until it is done (DEV-530).
+    if req.agent.is_some()
+        && !crate::services::automation_service::prerequisites_allow_start(tasks_dir, &entry, last_try).map_err(LoTaRError::ValidationError)?
+    {
         return Ok(());
     }
     let _ = AgentJobService::start_queued_job(req, tasks_dir, entry.commit_retry, entry.carried_outcome)?;
     Ok(())
+}
+
+/// The queue entry for `req`, checked and with the canonical ticket id, so
+/// dequeued starts and duplicate checks share one identity with the job
+/// registry.
+fn queue_entry(req: &AgentJobCreateRequest) -> LoTaRResult<AgentQueueEntry> {
+    let runner = req.runner.as_deref().map(str::trim).filter(|runner| !runner.is_empty()).map(str::to_string);
+    let agent = match req.agent.clone() {
+        Some(agent) => agent,
+        None if runner.is_some() => String::new(),
+        None => {
+            return Err(LoTaRError::ValidationError("Agent profile or runner required".to_string()));
+        }
+    };
+    let ticket_id = req.ticket_id.trim().to_string();
+    if ticket_id.is_empty() {
+        return Err(LoTaRError::ValidationError("Ticket id is required".to_string()));
+    }
+    let ticket_id =
+        crate::storage::TaskId::parse(&ticket_id).map_err(|err| LoTaRError::ValidationError(format!("Invalid ticket id '{ticket_id}': {err}")))?.canonical();
+    let prompt = req.prompt.trim().to_string();
+    if prompt.is_empty() {
+        return Err(LoTaRError::ValidationError("Prompt cannot be empty".to_string()));
+    }
+    Ok(AgentQueueEntry { ticket_id, agent, runner, prompt, ..AgentQueueEntry::retry_of(req, None, None) })
 }
 
 fn is_ticket_busy(err: &LoTaRError) -> bool {
@@ -896,6 +975,7 @@ fn load_state(file: &mut File, tasks_dir: &Path) -> LoTaRResult<AgentQueueState>
             pending: Vec::new(),
             taken: Vec::new(),
             pause: None,
+            parked: Vec::new(),
         });
     }
     let mut state: AgentQueueState = serde_json::from_str(&buf).map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
@@ -1115,6 +1195,49 @@ mod tests {
         assert!(AgentQueueService::enqueue(&tasks_dir, req.clone()).unwrap());
         assert!(!AgentQueueService::enqueue(&tasks_dir, req).unwrap());
         assert_eq!(pending_count(&tasks_dir).unwrap(), 1);
+    }
+
+    /// DEV-530: unpark moves the parked job to the queue in one step, as a
+    /// fresh entry that keeps what a retry carries (thread name, commit
+    /// retry, carried outcome); one the queue refuses stays parked.
+    #[test]
+    fn unpark_moves_the_parked_job_to_the_queue() {
+        let dir = tempdir().unwrap();
+        let _guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DIR", dir.path().to_str().unwrap());
+        let _worker_guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+        let tasks_dir = dir.path().join("tasks");
+        std::fs::create_dir_all(&tasks_dir).unwrap();
+        let req = |ticket: &str, prompt: &str| AgentJobCreateRequest {
+            ticket_id: ticket.to_string(),
+            prompt: prompt.to_string(),
+            agent: Some("review".to_string()),
+            thread_name: Some(format!("{ticket} review")),
+            ..Default::default()
+        };
+        let commit_retry = CommitRetry { job_id: "job-1".to_string(), worktree_path: "/tmp/wt".to_string(), worktree_branch: Some("agent/TEST-1".to_string()) };
+        let carried = CarriedOutcome {
+            outcome: crate::api_types::JobOutcome { job_id: "job-1".to_string(), status: Some("Merging".to_string()), ..Default::default() },
+            status_at_pause: "Reviewing".to_string(),
+            assignee_at_pause: Some("@review".to_string()),
+        };
+        let first =
+            AgentQueueEntry { attempts: 2, ..AgentQueueEntry::retry_of(&req("TEST-1", "Review TEST-1"), Some(commit_retry.clone()), Some(carried.clone())) };
+        AgentQueueService::park(&tasks_dir, &first, Some("Reviewing")).unwrap();
+        AgentQueueService::park(&tasks_dir, &AgentQueueEntry::retry_of(&req("TEST-2", "  "), None, None), None).unwrap();
+
+        assert!(AgentQueueService::unpark(&tasks_dir, "TEST-1").unwrap());
+        assert!(!AgentQueueService::unpark(&tasks_dir, "TEST-1").unwrap(), "nothing parked any more");
+        assert!(AgentQueueService::unpark(&tasks_dir, "TEST-2").is_err());
+        let pending = AgentQueueService::list_pending(&tasks_dir).unwrap();
+        assert_eq!(
+            pending.iter().map(|entry| (entry.ticket_id.as_str(), entry.prompt.as_str(), entry.attempts)).collect::<Vec<_>>(),
+            [("TEST-1", "Review TEST-1", 0)]
+        );
+        assert_eq!(pending[0].thread_name.as_deref(), Some("TEST-1 review"));
+        assert_eq!(pending[0].commit_retry.as_ref(), Some(&commit_retry));
+        assert_eq!(pending[0].carried_outcome.as_ref(), Some(&carried));
+        let parked = AgentQueueService::list_parked(&tasks_dir).unwrap();
+        assert_eq!(parked.iter().map(|item| item.entry.ticket_id.as_str()).collect::<Vec<_>>(), ["TEST-2"]);
     }
 
     #[test]

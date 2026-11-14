@@ -54,6 +54,10 @@ impl TaskHooks for AgentHooks {
                 .unwrap_or_default()
                 .iter()
                 .any(|entry| crate::storage::identity::aliases_match(&entry.ticket_id, ticket_id))
+            || AgentQueueService::list_parked(tasks_dir)
+                .unwrap_or_default()
+                .iter()
+                .any(|item| crate::storage::identity::aliases_match(&item.entry.ticket_id, ticket_id))
     }
 
     fn option_set_patch(&self, storage: &Storage, task: &TaskDTO, config: &ResolvedConfig, set: &OptionSet) -> LoTaRResult<TaskUpdate> {

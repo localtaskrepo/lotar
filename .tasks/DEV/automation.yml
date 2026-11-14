@@ -627,9 +627,10 @@ automation:
     # (owner 2026-11-12, STD-56: "when a ticket the blocks other tickets is done, it should automatically kick of
     # agents for those tickets"). tell_agent queues the message to a running job, else starts @fix as the next turn of
     # the ticket's last T3 thread; agent: fix, because a ticket a merge agent handed back was last assigned to @merge
-    # (lotar DEV-396). Proposals and owner tickets wait for him. A prerequisite in another repo (lotar:DEV-374) can't
-    # notify this one: the daily repos.ts --fix runs this rule in every repo (lotar automation run <name>). No manual
-    # action: a manual run would start every Blocked ticket.
+    # (lotar DEV-396). Proposals and owner tickets wait for him. A ticket whose job the dependency check held back gets
+    # that job instead, as it was (DEV-530). A prerequisite in another repo (lotar:DEV-374) can't notify this one: the
+    # daily repos.ts --fix runs this rule in every repo (lotar automation run <name>). No manual action: a manual run
+    # would start every Blocked ticket.
     - name: "Prerequisites done: continue the waiting ticket"
       when:
         all:

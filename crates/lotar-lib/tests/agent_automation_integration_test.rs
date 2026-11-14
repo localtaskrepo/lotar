@@ -3302,13 +3302,17 @@ echo '{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\"
 }
 
 /// DEV-524: an agent job that waits for an open prerequisite parks its
-/// ticket as Blocked under the same agent, so `unblocked` continues it.
+/// ticket as Blocked under the same agent. DEV-530: the job starts as it
+/// was once the prerequisite is done, and the ticket gets its status back
+/// before the rule on Blocked tickets could run.
 #[cfg(unix)]
 #[test]
 fn agent_assignment_with_an_open_prerequisite_blocks_the_ticket_until_it_is_done() {
     let _guard = lock_agent_tests();
     enable_server_mode();
     let fixtures = TestFixtures::new();
+    let _queue = common::env_mutex::EnvVarGuard::set("LOTAR_AGENT_QUEUE_DIR", fixtures.get_temp_path().join("queue").to_str().unwrap());
+    let _no_worker = common::env_mutex::EnvVarGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
     let prompt_file = fixtures.get_temp_path().join("fix.prompt");
     let script = write_stub_agent_script(
         fixtures.get_temp_path(),
@@ -3363,11 +3367,14 @@ fn agent_assignment_with_an_open_prerequisite_blocks_the_ticket_until_it_is_done
     assert!(AgentJobService::list_jobs().iter().all(|job| job.ticket_id != waiting.id), "no job while the prerequisite is open");
 
     TaskService::update(&mut storage, &prerequisite.id, TaskUpdate { status: Some("Done".into()), ..Default::default() }).expect("close prerequisite");
+    // The held-back job goes to the queue, which checks the prerequisites again.
+    AgentQueueService::run_worker(&fixtures.tasks_root).expect("run worker");
     let jobs = wait_for_completed_jobs(&waiting.id, 1, 10_000);
     assert_eq!(jobs.len(), 1, "{jobs:?}");
-    // The ticket kept @fix, so tell_agent starts it with the rule's message.
     let prompt = fs::read_to_string(&prompt_file).expect("prompt");
-    assert!(prompt.contains(&format!("{} waited for {} (Prerequisite)", waiting.id, prerequisite.id)), "{prompt}");
+    assert!(prompt.contains("User request:\nWork on this ticket"), "{prompt}");
+    assert!(!prompt.contains("waited for"), "{prompt}");
+    assert_eq!(TaskService::get(&storage, &waiting.id, None).unwrap().status.as_str(), "Todo");
 }
 
 /// DEV-524: a dependency check that fails (here an unreadable task file
@@ -3526,4 +3533,157 @@ fn unblocked_replay_says_no_job_for_the_agent_the_ticket_already_has() {
     assert!(actions.iter().any(|action| action.action == "no_agent_job"), "{actions:?}");
     sleep(Duration::from_millis(300));
     assert!(AgentJobService::list_jobs().iter().all(|job| job.ticket_id != waiting.id), "no job started");
+}
+
+/// DEV-530: a review job the dependency check held back runs as it was
+/// (its agent and prompt) once the prerequisite is done, the ticket gets
+/// its status back, and the `unblocked` rule for Blocked tickets stays out.
+#[cfg(unix)]
+#[test]
+fn a_held_back_review_job_resumes_with_its_own_prompt_and_status() {
+    let _guard = lock_agent_tests();
+    enable_server_mode();
+    let fixtures = TestFixtures::new();
+    let root = fixtures.get_temp_path();
+    let _queue = common::env_mutex::EnvVarGuard::set("LOTAR_AGENT_QUEUE_DIR", root.join("queue").to_str().unwrap());
+    let _no_worker = common::env_mutex::EnvVarGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+    let prompt_file = root.join("review.prompt");
+    let fix_marker = root.join("fix.ran");
+    let review = write_stub_agent_script(
+        root,
+        "stub-review.sh",
+        &format!(
+            "#!/bin/sh\nprintf '%s' \"$LOTAR_AGENT_PROMPT\" > \"{}\"\necho '{{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"ok\"}}'\n",
+            prompt_file.display()
+        ),
+    );
+    let fix = write_stub_agent_script(
+        root,
+        "stub-fix.sh",
+        &format!(
+            "#!/bin/sh\ntouch \"{}\"\necho '{{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"ok\"}}'\n",
+            fix_marker.display()
+        ),
+    );
+    fixtures.create_config_in_dir(
+        &fixtures.tasks_root,
+        &format!(
+            "issue:\n  states: [Todo, Blocked, InProgress, Reviewing, Done]\nagents:\n  review:\n    runner: command\n    command: \"{}\"\n  fix:\n    runner: command\n    command: \"{}\"\n",
+            review.display(),
+            fix.display()
+        ),
+    );
+    AutomationService::set(
+        &fixtures.tasks_root,
+        None,
+        "automation:\n  rules:\n    - name: Send to review\n      when:\n        status: Reviewing\n      on:\n        updated:\n          set:\n            assignee: \"@review\"\n          agent:\n            session: fresh\n            prompt: \"Review ${{ticket.id}}\"\n    - name: Prerequisites done\n      when:\n        status: Blocked\n      on:\n        unblocked:\n          tell_agent:\n            agent: fix\n            message: \"fix continues\"\n",
+    )
+    .expect("set automation");
+
+    let mut storage = fixtures.create_storage();
+    let create = |storage: &mut lotar::Storage, title: &str| {
+        TaskService::create(storage, TaskCreate { title: title.to_string(), project: Some("RV".to_string()), ..Default::default() }).expect("create task")
+    };
+    let prerequisite = create(&mut storage, "Prerequisite");
+    let waiting = create(&mut storage, "Waiting");
+    TaskService::update(
+        &mut storage,
+        &waiting.id,
+        TaskUpdate {
+            relationships: Some(lotar::types::TaskRelationships { depends_on: vec![prerequisite.id.clone()], ..Default::default() }),
+            ..Default::default()
+        },
+    )
+    .expect("add prerequisite");
+
+    TaskService::update(&mut storage, &waiting.id, TaskUpdate { status: Some("Reviewing".into()), ..Default::default() }).expect("send to review");
+    let parked = TaskService::get(&storage, &waiting.id, None).unwrap();
+    assert_eq!((parked.status.as_str(), parked.assignee.as_deref()), ("Blocked", Some("@review")));
+    assert!(AgentJobService::list_jobs().iter().all(|job| job.ticket_id != waiting.id), "no job while the prerequisite is open");
+
+    TaskService::update(&mut storage, &prerequisite.id, TaskUpdate { status: Some("Done".into()), ..Default::default() }).expect("close prerequisite");
+    // The held-back job goes to the queue, which checks the prerequisites again.
+    AgentQueueService::run_worker(&fixtures.tasks_root).expect("run worker");
+    let jobs = wait_for_completed_jobs(&waiting.id, 1, 10_000);
+    assert_eq!(jobs.len(), 1, "{jobs:?}");
+    assert_eq!(jobs[0].agent.as_deref(), Some("review"));
+    let prompt = fs::read_to_string(&prompt_file).expect("review prompt");
+    assert!(prompt.contains(&format!("User request:\nReview {}\n", waiting.id)), "{prompt}");
+    assert!(!fix_marker.exists(), "the fix agent stays out");
+    assert_eq!(TaskService::get(&storage, &waiting.id, None).unwrap().status.as_str(), "Reviewing");
+}
+
+/// DEV-530: a ticket that was Blocked before its review job was held back
+/// stays Blocked when the job resumes, and the `unblocked` rule that continues
+/// waiting tickets leaves it to that job. A ticket blocked by hand, one
+/// assigned to a person, and one blocked under its agent with no job kept (as
+/// lotar did before) still get the fix agent.
+#[cfg(unix)]
+#[test]
+fn a_held_back_job_on_a_blocked_ticket_resumes_alone() {
+    let _guard = lock_agent_tests();
+    enable_server_mode();
+    let fixtures = TestFixtures::new();
+    let root = fixtures.get_temp_path();
+    let _queue = common::env_mutex::EnvVarGuard::set("LOTAR_AGENT_QUEUE_DIR", root.join("queue").to_str().unwrap());
+    let _no_worker = common::env_mutex::EnvVarGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+    let ok = "#!/bin/sh\necho '{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"ok\"}'\n";
+    let review = write_stub_agent_script(root, "stub-review.sh", ok);
+    let fix = write_stub_agent_script(root, "stub-fix.sh", ok);
+    fixtures.create_config_in_dir(
+        &fixtures.tasks_root,
+        &format!(
+            "issue:\n  states: [Todo, Blocked, InProgress, Reviewing, Done]\nagents:\n  review:\n    runner: command\n    command: \"{}\"\n  fix:\n    runner: command\n    command: \"{}\"\n",
+            review.display(),
+            fix.display()
+        ),
+    );
+    AutomationService::set(
+        &fixtures.tasks_root,
+        None,
+        "automation:\n  rules:\n    - name: Prerequisites done\n      when:\n        status: Blocked\n      on:\n        unblocked:\n          set:\n            status: InProgress\n          tell_agent:\n            agent: fix\n            message: \"fix continues\"\n",
+    )
+    .expect("set automation");
+
+    let mut storage = fixtures.create_storage();
+    let prerequisite =
+        TaskService::create(&mut storage, TaskCreate { title: "Prerequisite".to_string(), project: Some("RV".to_string()), ..Default::default() })
+            .expect("create task");
+    let blocked = |storage: &mut lotar::Storage, title: &str| {
+        TaskService::create(
+            storage,
+            TaskCreate {
+                title: title.to_string(),
+                project: Some("RV".to_string()),
+                status: Some("Blocked".into()),
+                relationships: Some(lotar::types::TaskRelationships { depends_on: vec![prerequisite.id.clone()], ..Default::default() }),
+                ..Default::default()
+            },
+        )
+        .expect("create task")
+    };
+    let held = blocked(&mut storage, "Held review");
+    let by_hand = blocked(&mut storage, "Blocked by hand");
+    let handed_back = blocked(&mut storage, "Handed to a person");
+    TaskService::update(&mut storage, &handed_back.id, TaskUpdate { assignee: Some("mallox".into()), ..Default::default() }).expect("assign mallox");
+    let no_job = blocked(&mut storage, "Blocked under its agent, no job kept");
+    TaskService::update(&mut storage, &no_job.id, TaskUpdate { assignee: Some("@fix".into()), ..Default::default() }).expect("assign @fix");
+    AgentQueueService::take_parked(&fixtures.tasks_root, &no_job.id).expect("drop the held-back job").expect("held-back job");
+
+    TaskService::update(&mut storage, &held.id, TaskUpdate { assignee: Some("@review".into()), ..Default::default() }).expect("assign @review");
+    assert!(AgentJobService::list_jobs().iter().all(|job| job.ticket_id != held.id), "no job while the prerequisite is open");
+
+    TaskService::update(&mut storage, &prerequisite.id, TaskUpdate { status: Some("Done".into()), ..Default::default() }).expect("close prerequisite");
+    // The held-back job goes to the queue, which checks the prerequisites again.
+    AgentQueueService::run_worker(&fixtures.tasks_root).expect("run worker");
+    let held_jobs = wait_for_completed_jobs(&held.id, 1, 10_000);
+    let by_hand_jobs = wait_for_completed_jobs(&by_hand.id, 1, 10_000);
+    let handed_back_jobs = wait_for_completed_jobs(&handed_back.id, 1, 10_000);
+    let no_job_jobs = wait_for_completed_jobs(&no_job.id, 1, 10_000);
+    assert_eq!(held_jobs.iter().map(|job| job.agent.as_deref()).collect::<Vec<_>>(), [Some("review")], "{held_jobs:?}");
+    assert_eq!(by_hand_jobs.iter().map(|job| job.agent.as_deref()).collect::<Vec<_>>(), [Some("fix")], "{by_hand_jobs:?}");
+    assert_eq!(handed_back_jobs.iter().map(|job| job.agent.as_deref()).collect::<Vec<_>>(), [Some("fix")], "{handed_back_jobs:?}");
+    assert_eq!(no_job_jobs.iter().map(|job| job.agent.as_deref()).collect::<Vec<_>>(), [Some("fix")], "{no_job_jobs:?}");
+    let held = TaskService::get(&storage, &held.id, None).unwrap();
+    assert_eq!((held.status.as_str(), held.assignee.as_deref()), ("Blocked", Some("@review")));
 }

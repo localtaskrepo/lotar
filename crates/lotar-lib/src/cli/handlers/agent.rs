@@ -443,6 +443,7 @@ impl AgentHandler {
             None => {
                 // Default: list pending entries + worker status
                 let pending = AgentQueueService::list_pending(tasks_dir).map_err(|e| e.to_string())?;
+                let parked = AgentQueueService::list_parked(tasks_dir).map_err(|e| e.to_string())?;
                 let mut stats = AgentJobService::queue_stats();
                 // Count jobs other processes run too (DEV-279).
                 stats.running = stats.running.max(crate::services::agent_active_jobs::list(tasks_dir).len());
@@ -464,8 +465,15 @@ impl AgentHandler {
                             })
                         })
                         .collect();
+                    let parked: Vec<_> = parked
+                        .iter()
+                        .map(
+                            |p| serde_json::json!({"ticket_id": p.entry.ticket_id, "agent": p.entry.agent, "parked_at": p.entry.queued_at, "status": p.status}),
+                        )
+                        .collect();
                     renderer.emit_json(&serde_json::json!({
                         "pending": entries,
+                        "waiting_for_prerequisites": parked,
                         "worker_running": worker_running,
                         "worker_state": state.as_str(),
                         "reason": reason,
@@ -492,6 +500,13 @@ impl AgentHandler {
                     renderer.emit_raw_stdout(format_args!("ticket\tagent\tqueued_at\tattempts"));
                     for entry in &pending {
                         renderer.emit_raw_stdout(format_args!("{}\t{}\t{}\t{}", entry.ticket_id, entry.agent, entry.queued_at, entry.attempts));
+                    }
+                }
+                if !parked.is_empty() {
+                    renderer.emit_notice("Waiting for prerequisites (they start once those are done):");
+                    renderer.emit_raw_stdout(format_args!("ticket\tagent\tparked_at"));
+                    for item in &parked {
+                        renderer.emit_raw_stdout(format_args!("{}\t{}\t{}", item.entry.ticket_id, item.entry.agent, item.entry.queued_at));
                     }
                 }
                 Ok(())

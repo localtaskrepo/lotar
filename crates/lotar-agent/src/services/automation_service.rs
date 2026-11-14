@@ -6,7 +6,7 @@ use crate::config::types::ResolvedConfig;
 use crate::config::validation::errors::ValidationResult;
 use crate::errors::{LoTaRError, LoTaRResult};
 use crate::services::agent_job_service::{AgentJobService, AgentOrchestratorMode};
-use crate::services::agent_queue_service::AgentQueueService;
+use crate::services::agent_queue_service::{AgentQueueEntry, AgentQueueService};
 use crate::services::automation_matching::{ChangeSet, MatchMode, MatchState, UpdateMatch, current_fields, has_comment_condition, matches_rule, update_match};
 use crate::services::automation_validation::{parse_cooldown, validate_rules};
 use crate::services::sprint_service::SprintService;
@@ -548,6 +548,11 @@ impl AutomationService {
             let mut by: Vec<Prerequisite> =
                 prerequisites_of(storage, &dependent).into_iter().filter(|dep| !crate::storage::identity::aliases_match(&dep.id, &current.id)).collect();
             by.push(Prerequisite::from(current));
+            // A held-back job continues the ticket itself; the rules are for
+            // tickets that wait without one.
+            if resume_parked_job(storage, &dependent.id) {
+                continue;
+            }
             // Each failed rule already reported itself (rule_failure).
             let _ = Self::apply_unblocked_event(storage, &dependent.id, &by);
         }
@@ -1017,6 +1022,12 @@ impl AutomationService {
             || task.task_state.as_ref().is_some_and(|state| state.is_done)
             || !find_blocked_dependencies(storage, task).is_ok_and(|open| open.is_empty())
         {
+            return entries;
+        }
+        // A job held back for the prerequisites continues the ticket itself
+        // (DEV-530); the rules are for tickets that wait without one.
+        let held = if dry_run { holds_parked_job(&tasks_dir, task) } else { resume_parked_job(storage, &task.id) };
+        if held {
             return entries;
         }
         let by = prerequisites_of(storage, task);
@@ -2901,8 +2912,18 @@ fn maybe_queue_agent_on_assignment(
     match find_blocked_dependencies(&storage, task) {
         Ok(blocked_by) if blocked_by.is_empty() => {}
         Ok(blocked_by) => {
-            let _ = mark_task_blocked(&mut storage, task, config, &agent_name, &blocked_by);
-            return Some(format!("{} waits for {}", task.id, blocked_by.join(", ")));
+            let waits = format!("{} waits for {}", task.id, blocked_by.join(", "));
+            // A job that can't be parked waits in the queue, which checks the
+            // prerequisites again before it starts (DEV-530).
+            let Err(err) = mark_task_blocked(&mut storage, task, config, &AgentQueueEntry::retry_of(&req, None, None), &blocked_by) else {
+                return Some(waits);
+            };
+            report_automation_failure(&task.id, "agent assignment", &format!("Could not hold the job for its prerequisites: {err}"));
+            if let Err(err) = AgentQueueService::enqueue(tasks_dir, req) {
+                report_automation_failure(&task.id, "agent assignment", &format!("Could not queue the agent job: {err}"));
+                return Some(format!("Could not queue the agent job: {err}"));
+            }
+            return Some(waits);
         }
         // A check that fails is no prerequisite (DEV-524): the ticket keeps
         // its state, and the queue checks again before the job starts.
@@ -2920,6 +2941,11 @@ fn maybe_queue_agent_on_assignment(
         }
     }
 
+    // This job replaces one still parked from an earlier assignment. Dropped
+    // first: once the job is queued, the worker may park it again.
+    if let Err(err) = AgentQueueService::take_parked(tasks_dir, &req.ticket_id) {
+        report_automation_failure(&task.id, "agent assignment", &format!("Could not drop the job that waited for the prerequisites: {err}"));
+    }
     let ticket = req.ticket_id.clone();
     let started = if matches!(AgentJobService::orchestrator_mode(), AgentOrchestratorMode::Server) {
         AgentJobService::start_job_with_tasks_dir(req, tasks_dir)
@@ -3068,16 +3094,101 @@ fn find_blocked_dependencies(storage: &Storage, task: &TaskDTO) -> LoTaRResult<V
 }
 
 /// Park a ticket whose agent job waits for open prerequisites (DEV-524): it
-/// goes to `Blocked` where the project has it and keeps its agent, so the
-/// `unblocked` rules continue it once the last one is done.
-fn mark_task_blocked(storage: &mut Storage, task: &TaskDTO, config: &ResolvedConfig, agent: &str, blocked_by: &[String]) -> LoTaRResult<()> {
-    if let Ok(status) = TaskStatus::parse_with_config("Blocked", config)
+/// goes to `Blocked` where the project has it and keeps its agent. The job
+/// waits next to the queue and starts as it was once the last one is done
+/// (DEV-530).
+fn mark_task_blocked(storage: &mut Storage, task: &TaskDTO, config: &ResolvedConfig, entry: &AgentQueueEntry, blocked_by: &[String]) -> LoTaRResult<()> {
+    let blocked = TaskStatus::parse_with_config("Blocked", config).ok();
+    let earlier = (blocked.as_ref() != Some(&task.status)).then(|| task.status.to_string());
+    // A job that isn't parked is the caller's to queue, so nothing else
+    // changes before it is, and it is taken back when the status can't be set.
+    AgentQueueService::park(&storage.root_path, entry, earlier.as_deref())?;
+    if let Some(status) = blocked
         && task.status != status
     {
         let patch = TaskUpdate { status: Some(status.to_string()), ..Default::default() };
-        TaskService::update_with_context(storage, &task.id, patch, TaskUpdateContext::automation_disabled())?;
+        if let Err(err) = TaskService::update_with_context(storage, &task.id, patch, TaskUpdateContext::automation_disabled()) {
+            let _ = AgentQueueService::take_parked(&storage.root_path, &task.id);
+            return Err(err);
+        }
     }
-    append_automation_comment(storage, &task.id, &format!("The @{agent} job waits for its open prerequisites: {}.", blocked_by.join(", ")))
+    let agent = &entry.agent;
+    let message = format!("The @{agent} job waits for its open prerequisites: {}. It starts once they are done.", blocked_by.join(", "));
+    if let Err(err) = append_automation_comment(storage, &task.id, &message) {
+        report_automation_failure(&task.id, "dependency check", &format!("{message} The comment could not be written: {err}"));
+    }
+    Ok(())
+}
+
+/// Start the job the dependency check held back for `ticket_id`, as it was,
+/// and give the ticket back the status it had (DEV-530). The job stays
+/// parked until it is handed to the queue: a ticket that can't be read, a
+/// status that can't be restored or a job that can't be queued keeps it for
+/// the next try (`lotar automation run`, or assigning the agent again).
+/// `true` when the ticket has such a job, resumed or kept for the next try,
+/// so the `unblocked` rules leave it alone; `false` when it has none (also a
+/// ticket blocked before lotar kept jobs) or was given to someone else.
+fn resume_parked_job(storage: &mut Storage, ticket_id: &str) -> bool {
+    let tasks_dir = storage.root_path.clone();
+    let parked = match AgentQueueService::list_parked(&tasks_dir) {
+        Ok(parked) => parked.into_iter().find(|item| crate::storage::identity::aliases_match(&item.entry.ticket_id, ticket_id)),
+        Err(err) => {
+            report_automation_failure(ticket_id, "unblocked", &format!("Could not read the job that waits for the prerequisites: {err}"));
+            return false;
+        }
+    };
+    let Some(parked) = parked else {
+        return false;
+    };
+    let task = match TaskService::get(storage, ticket_id, None) {
+        Ok(task) => task,
+        Err(err) => {
+            report_automation_failure(
+                ticket_id,
+                "unblocked",
+                &format!("The job that waited for the prerequisites stays parked: the ticket can't be read ({err})"),
+            );
+            return true;
+        }
+    };
+    // Given to someone else meanwhile: that decides what comes next.
+    if task.assignee.as_deref() != Some(format!("@{}", parked.entry.agent).as_str()) {
+        if let Err(err) = AgentQueueService::take_parked(&tasks_dir, ticket_id) {
+            report_automation_failure(ticket_id, "unblocked", &format!("Could not drop the job that waited for the prerequisites: {err}"));
+        }
+        return false;
+    }
+    if let Some(status) = parked.status
+        && task.status.as_str().eq_ignore_ascii_case("blocked")
+    {
+        let patch = TaskUpdate { status: Some(status), ..Default::default() };
+        if let Err(err) = TaskService::update_with_context(storage, ticket_id, patch, TaskUpdateContext::automation_disabled()) {
+            report_automation_failure(
+                ticket_id,
+                "unblocked",
+                &format!("The job that waited for the prerequisites stays parked: the status can't be restored ({err})"),
+            );
+            return true;
+        }
+    }
+    // The queue checks the prerequisites again before it starts the job, so
+    // one that reopened meanwhile parks it again. Moved in one step, so a
+    // worker that parks it again meanwhile isn't undone.
+    if let Err(err) = AgentQueueService::unpark(&tasks_dir, ticket_id) {
+        report_automation_failure(ticket_id, "unblocked", &format!("The job that waited for the prerequisites stays parked: it can't be started ({err})"));
+    }
+    true
+}
+
+/// Whether `task` has a held-back job that still belongs to its agent, for
+/// a dry run of [`resume_parked_job`].
+fn holds_parked_job(tasks_dir: &Path, task: &TaskDTO) -> bool {
+    AgentQueueService::list_parked(tasks_dir).is_ok_and(|parked| {
+        parked.iter().any(|item| {
+            crate::storage::identity::aliases_match(&item.entry.ticket_id, &task.id)
+                && task.assignee.as_deref() == Some(format!("@{}", item.entry.agent).as_str())
+        })
+    })
 }
 
 /// Whether a queued job's ticket is still in the stage it was queued for:
@@ -3116,22 +3227,23 @@ pub(crate) fn queued_stage_allows_start(tasks_dir: &Path, req: &AgentJobCreateRe
 }
 
 /// The queue worker's check just before it starts `req` (DEV-524): `Ok(true)`
-/// starts the job, `Ok(false)` drops it (the ticket waits for an open
-/// prerequisite, or the last try failed and says so on the ticket), and
-/// `Err` puts it back for another try.
-pub(crate) fn prerequisites_allow_start(tasks_dir: &Path, req: &AgentJobCreateRequest, last_try: bool) -> Result<bool, String> {
+/// starts the job, `Ok(false)` takes it out of the queue (it is parked until
+/// its open prerequisites are done, DEV-530, or the last try failed and says
+/// so on the ticket), and `Err` puts it back for another try, also when it
+/// can't be parked.
+pub(crate) fn prerequisites_allow_start(tasks_dir: &Path, entry: &AgentQueueEntry, last_try: bool) -> Result<bool, String> {
     let mut storage = Storage::new(tasks_dir);
     // Starting the job reports a ticket that can't be read.
-    let Ok(task) = TaskService::get(&storage, &req.ticket_id, None) else {
+    let Ok(task) = TaskService::get(&storage, &entry.ticket_id, None) else {
         return Ok(true);
     };
-    let agent = req.agent.as_deref().unwrap_or_default();
+    let agent = &entry.agent;
     match find_blocked_dependencies(&storage, &task) {
         Ok(blocked_by) if blocked_by.is_empty() => Ok(true),
         Ok(blocked_by) => {
             let project = crate::storage::TaskId::parse(&task.id).map(|parsed| parsed.project).unwrap_or_default();
             let config = resolve_config_for_project(tasks_dir, Some(&project)).map_err(|err| err.to_string())?;
-            mark_task_blocked(&mut storage, &task, &config, agent, &blocked_by).map_err(|err| err.to_string())?;
+            mark_task_blocked(&mut storage, &task, &config, entry, &blocked_by).map_err(|err| err.to_string())?;
             Ok(false)
         }
         Err(err) if last_try => {
@@ -3533,6 +3645,168 @@ mod dev21_cross_root_dependency_tests {
 
         let _lock = hold();
         assert!(find_blocked_dependencies(&storage, &dependent).is_err());
+    }
+
+    /// DEV-530: the queue checks the prerequisites again before a job
+    /// starts; one that reopened parks the job, which keeps the ticket's
+    /// earlier status for later.
+    #[test]
+    fn a_queued_job_whose_prerequisite_reopened_is_held_back_again() {
+        let tmp = tempfile::tempdir().unwrap();
+        let tasks = tmp.path().join(".tasks");
+        std::fs::create_dir_all(tasks.join("PX")).unwrap();
+        std::fs::write(tasks.join("config.yml"), "issue:\n  states: [Todo, Blocked, Reviewing, Done]\n").unwrap();
+        write_task(tmp.path(), "PX", 1, "Reviewing");
+        std::fs::write(
+            tasks.join("PX/2.yml"),
+            "title: t2\nstatus: Reviewing\npriority: medium\ntype: task\nassignee: '@review'\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-01-01T00:00:00Z\nrelationships:\n  depends_on: [PX-1]\n",
+        )
+        .unwrap();
+        let req = AgentJobCreateRequest { ticket_id: "PX-2".into(), prompt: "Review PX-2".into(), agent: Some("review".into()), ..Default::default() };
+
+        assert_eq!(prerequisites_allow_start(&tasks, &AgentQueueEntry::retry_of(&req, None, None), false), Ok(false));
+        let storage = Storage::new(&tasks);
+        let task = TaskService::get(&storage, "PX-2", None).unwrap();
+        assert_eq!(task.status.as_str(), "Blocked");
+        assert!(task.comments.last().is_some_and(|comment| comment.text.contains("PX-1")));
+        let parked = AgentQueueService::take_parked(&tasks, "PX-2").unwrap().expect("parked job");
+        assert_eq!((parked.entry.prompt.as_str(), parked.status.as_deref()), ("Review PX-2", Some("Reviewing")));
+
+        write_task(tmp.path(), "PX", 1, "Done");
+        assert_eq!(prerequisites_allow_start(&tasks, &AgentQueueEntry::retry_of(&req, None, None), false), Ok(true), "nothing open: the job starts");
+    }
+
+    /// DEV-530: a job the queue can't park for its reopened prerequisite
+    /// (here the queue can't be written) goes back to the queue for another
+    /// try and is never started, also on the last try; the ticket stays as
+    /// it was.
+    #[test]
+    fn a_queued_job_that_cannot_be_parked_goes_back_to_the_queue() {
+        let tmp = tempfile::tempdir().unwrap();
+        let tasks = tmp.path().join(".tasks");
+        std::fs::create_dir_all(tasks.join("PX")).unwrap();
+        std::fs::write(tasks.join("config.yml"), "issue:\n  states: [Todo, Blocked, Reviewing, Done]\n").unwrap();
+        write_task(tmp.path(), "PX", 1, "Reviewing");
+        write_task(tmp.path(), "PX", 2, "Reviewing");
+        let path = tasks.join("PX/2.yml");
+        let yaml = std::fs::read_to_string(&path).unwrap();
+        std::fs::write(&path, format!("{yaml}relationships:\n  depends_on: [PX-1]\n")).unwrap();
+        let not_a_dir = tmp.path().join("queue");
+        std::fs::write(&not_a_dir, "").unwrap();
+        // nextest runs each test in its own process.
+        unsafe { std::env::set_var("LOTAR_AGENT_QUEUE_DIR", &not_a_dir) };
+        let req = AgentJobCreateRequest { ticket_id: "PX-2".into(), prompt: "Review PX-2".into(), agent: Some("review".into()), ..Default::default() };
+
+        let results = [
+            prerequisites_allow_start(&tasks, &AgentQueueEntry::retry_of(&req, None, None), false),
+            prerequisites_allow_start(&tasks, &AgentQueueEntry::retry_of(&req, None, None), true),
+        ];
+        unsafe { std::env::remove_var("LOTAR_AGENT_QUEUE_DIR") };
+        assert!(results.iter().all(Result::is_err), "{results:?}");
+        let task = TaskService::get(&Storage::new(&tasks), "PX-2", None).unwrap();
+        assert_eq!(task.status.as_str(), "Reviewing");
+        assert!(task.comments.is_empty(), "{:?}", task.comments);
+    }
+
+    /// A ticket PX-2 that waits for PX-1 (done now) with a parked @review
+    /// job; the queue is the test's own and runs no worker.
+    fn parked_review(tmp: &std::path::Path, prompt: &str) -> std::path::PathBuf {
+        let tasks = tmp.join(".tasks");
+        std::fs::create_dir_all(tasks.join("PX")).unwrap();
+        std::fs::write(
+            tasks.join("config.yml"),
+            "issue:\n  states: [Todo, Blocked, Reviewing, Done]\nagents:\n  review:\n    runner: command\n    command: /usr/bin/true\n",
+        )
+        .unwrap();
+        write_task(tmp, "PX", 1, "Done");
+        std::fs::write(
+            tasks.join("PX/2.yml"),
+            "title: t2\nstatus: Blocked\npriority: medium\ntype: task\nassignee: '@review'\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-01-01T00:00:00Z\nrelationships:\n  depends_on: [PX-1]\n",
+        )
+        .unwrap();
+        // nextest runs each test in its own process.
+        unsafe {
+            std::env::set_var("LOTAR_AGENT_QUEUE_DIR", tmp.join("queue"));
+            std::env::set_var("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+        }
+        let req = AgentJobCreateRequest { ticket_id: "PX-2".into(), prompt: prompt.into(), agent: Some("review".into()), ..Default::default() };
+        AgentQueueService::park(&tasks, &AgentQueueEntry::retry_of(&req, None, None), Some("Reviewing")).unwrap();
+        tasks
+    }
+
+    fn parked_and_pending(tasks: &std::path::Path) -> (usize, usize) {
+        (AgentQueueService::list_parked(tasks).unwrap().len(), AgentQueueService::list_pending(tasks).unwrap().len())
+    }
+
+    /// DEV-530: the parked job goes to the queue and the ticket gets its
+    /// status back.
+    #[test]
+    fn a_parked_job_resumes_into_the_queue() {
+        let tmp = tempfile::tempdir().unwrap();
+        let tasks = parked_review(tmp.path(), "Review PX-2");
+        let mut storage = Storage::new(&tasks);
+        resume_parked_job(&mut storage, "PX-2");
+        assert_eq!(parked_and_pending(&tasks), (0, 1));
+        assert_eq!(AgentQueueService::list_pending(&tasks).unwrap()[0].prompt, "Review PX-2");
+        assert_eq!(TaskService::get(&storage, "PX-2", None).unwrap().status.as_str(), "Reviewing");
+    }
+
+    /// DEV-530: the server queues the job too, rather than start it itself,
+    /// so the queue checks the prerequisites again and nothing is left
+    /// half-started when a start fails.
+    #[test]
+    fn a_parked_job_resumes_into_the_queue_in_the_server_too() {
+        let tmp = tempfile::tempdir().unwrap();
+        let tasks = parked_review(tmp.path(), "Review PX-2");
+        AgentJobService::set_orchestrator_mode(AgentOrchestratorMode::Server);
+        resume_parked_job(&mut Storage::new(&tasks), "PX-2");
+        AgentJobService::set_orchestrator_mode(AgentOrchestratorMode::Standalone);
+        assert_eq!(parked_and_pending(&tasks), (0, 1));
+        assert!(AgentJobService::list_jobs().iter().all(|job| job.ticket_id != "PX-2"));
+    }
+
+    /// DEV-530: a ticket that can't be read keeps its job parked.
+    #[test]
+    fn a_parked_job_stays_when_its_ticket_cannot_be_read() {
+        let tmp = tempfile::tempdir().unwrap();
+        let tasks = parked_review(tmp.path(), "Review PX-2");
+        std::fs::write(tasks.join("PX/2.yml"), "title: [unclosed\n").unwrap();
+        resume_parked_job(&mut Storage::new(&tasks), "PX-2");
+        assert_eq!(parked_and_pending(&tasks), (1, 0));
+    }
+
+    /// DEV-530: a status that can't be restored keeps the job parked, never
+    /// started under Blocked.
+    #[cfg(unix)]
+    #[test]
+    fn a_parked_job_stays_when_the_status_cannot_be_restored() {
+        use std::os::unix::fs::PermissionsExt;
+        let tmp = tempfile::tempdir().unwrap();
+        let tasks = parked_review(tmp.path(), "Review PX-2");
+        let mut storage = Storage::new(&tasks);
+        // The lock exists, so only the write fails.
+        TaskService::update_with_context(
+            &mut storage,
+            "PX-2",
+            TaskUpdate { title: Some("t2".into()), ..Default::default() },
+            TaskUpdateContext::automation_disabled(),
+        )
+        .unwrap();
+        let project = tasks.join("PX");
+        std::fs::set_permissions(&project, std::fs::Permissions::from_mode(0o555)).unwrap();
+        resume_parked_job(&mut storage, "PX-2");
+        std::fs::set_permissions(&project, std::fs::Permissions::from_mode(0o755)).unwrap();
+        assert_eq!(parked_and_pending(&tasks), (1, 0));
+        assert_eq!(TaskService::get(&storage, "PX-2", None).unwrap().status.as_str(), "Blocked");
+    }
+
+    /// DEV-530: a job the queue refuses (here an empty prompt) stays parked.
+    #[test]
+    fn a_parked_job_stays_when_the_queue_refuses_it() {
+        let tmp = tempfile::tempdir().unwrap();
+        let tasks = parked_review(tmp.path(), "  ");
+        resume_parked_job(&mut Storage::new(&tasks), "PX-2");
+        assert_eq!(parked_and_pending(&tasks), (1, 0));
     }
 
     fn write_task(root: &std::path::Path, prefix: &str, num: u32, status: &str) {
