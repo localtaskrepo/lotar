@@ -563,6 +563,40 @@ impl CustomFieldType {
     }
 }
 
+/// Which custom fields the web UI offers in its pickers (DEV-485):
+/// the ones `custom_fields` names, the ones tasks use, or both.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+#[serde(rename_all = "lowercase")]
+pub enum CustomFieldsFrom {
+    Config,
+    Scanned,
+    #[default]
+    Both,
+}
+
+/// The `ui.custom_fields_from` values.
+pub const CUSTOM_FIELDS_FROM_VALUES: &[&str] = &["config", "scanned", "both"];
+
+impl CustomFieldsFrom {
+    pub fn parse(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "config" => Some(Self::Config),
+            "scanned" => Some(Self::Scanned),
+            "both" => Some(Self::Both),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Config => "config",
+            Self::Scanned => "scanned",
+            Self::Both => "both",
+        }
+    }
+}
+
 /// Named tag colours; the web UI maps each to a theme-friendly hex value.
 pub const TAG_COLOR_NAMES: &[&str] = &[
     "red", "orange", "amber", "yellow", "lime", "green", "teal", "cyan", "sky", "blue", "indigo", "violet", "purple", "pink", "rose", "brown", "gray", "grey",
@@ -644,6 +678,9 @@ pub struct ProjectConfig {
     /// Per-field properties (DEV-373), merged over the global ones per field.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub custom_field_properties: Option<BTreeMap<String, CustomFieldProperties>>,
+    /// Which custom fields the web UI offers (DEV-485).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub ui_custom_fields_from: Option<CustomFieldsFrom>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub auto_set_reporter: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -743,6 +780,7 @@ impl ProjectConfig {
             default_status: None,
             custom_fields: None,
             custom_field_properties: None,
+            ui_custom_fields_from: None,
             auto_set_reporter: None,
             auto_reciprocal_relationships: None,
             auto_link_mentions: None,
@@ -860,6 +898,9 @@ pub struct GlobalConfig {
     /// Per-field properties such as the type (DEV-373).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub custom_field_properties: BTreeMap<String, CustomFieldProperties>,
+    /// Which custom fields the web UI offers (DEV-485).
+    #[serde(default)]
+    pub ui_custom_fields_from: CustomFieldsFrom,
     #[serde(default = "default_scan_signal_words")]
     pub scan_signal_words: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -997,6 +1038,7 @@ pub struct ResolvedConfig {
     pub custom_fields: StringConfigField,
     /// Effective per-field properties: global, then project entries per field.
     pub custom_field_properties: BTreeMap<String, CustomFieldProperties>,
+    pub ui_custom_fields_from: CustomFieldsFrom,
     pub scan_signal_words: Vec<String>,
     pub scan_strip_attributes: bool,
     // Effective scanner options
@@ -1272,6 +1314,7 @@ impl Default for GlobalConfig {
             default_status: None,
             custom_fields: default_custom_fields(),
             custom_field_properties: BTreeMap::new(),
+            ui_custom_fields_from: CustomFieldsFrom::default(),
             scan_signal_words: default_scan_signal_words(),
             scan_ticket_patterns: None,
             scan_enable_ticket_words: true,

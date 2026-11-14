@@ -1285,6 +1285,9 @@ export interface TagProperties {
 }
 
 /** Properties of one custom field (DEV-373); unknown keys from newer servers are kept. */
+/** Which custom fields the web UI offers (DEV-485). */
+export type CustomFieldsFrom = 'config' | 'scanned' | 'both'
+
 export interface CustomFieldProperties {
     /** `text` (the default) or `version`. */
     type?: CustomFieldTypeName | null
@@ -1346,6 +1349,9 @@ export interface ResolvedConfigDTO {
     /** Per-tag properties such as colours (DEV-20). */
     tag_properties?: Record<string, TagProperties>
     custom_field_properties?: Record<string, CustomFieldProperties>
+    ui_custom_fields_from?: CustomFieldsFrom
+    /** `config show` only: the field names the pickers offer, per `ui_custom_fields_from`. */
+    custom_fields_offered?: string[]
     // Always sent by the server; optional so partial fixtures stay valid.
     members?: string[]
     strict_members?: boolean
@@ -1405,6 +1411,7 @@ export interface GlobalConfigRaw {
     /** Per-tag properties such as colours (DEV-20). */
     tag_properties?: Record<string, TagProperties>
     custom_field_properties?: Record<string, CustomFieldProperties>
+    ui_custom_fields_from?: CustomFieldsFrom
     /** Global-only external web bundle path; absent when unset. */
     web_ui_path?: string | null
     ui_theme?: string | null
@@ -1468,6 +1475,7 @@ export interface ProjectConfigRaw {
     branch_priority_aliases?: Record<string, string>
     tag_properties?: Record<string, TagProperties> | null
     custom_field_properties?: Record<string, CustomFieldProperties> | null
+    ui_custom_fields_from?: CustomFieldsFrom | null
     remotes?: Record<string, SyncRemoteConfig>
     auth_profiles?: Record<string, SyncAuthProfile>
 }

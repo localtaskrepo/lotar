@@ -664,7 +664,8 @@ const {
   priorities,
   types,
   refresh: refreshConfig,
-  customFields: availableCustomFields,
+  customFields: declaredCustomFields,
+  offeredCustomFields: availableCustomFields,
   scope: configScope,
   tags: configuredTags,
   members,
@@ -1346,7 +1347,12 @@ async function bulkUnassign() {
 }
 
 // -- Bulk set a custom field (DEV-394) --------------------------------------
-const bulkFieldNames = computed(() => availableCustomFields.value.filter((name) => name !== '*'))
+// Only names the server accepts: any name under the wildcard, else the declared ones.
+const bulkFieldNames = computed(() =>
+  declaredCustomFields.value.includes('*')
+    ? availableCustomFields.value
+    : declaredCustomFields.value.filter((name) => name !== '*'),
+)
 const fieldDialogOpen = ref(false)
 const fieldDialogSubmitting = ref(false)
 const fieldDialogIds = ref<string[]>([])

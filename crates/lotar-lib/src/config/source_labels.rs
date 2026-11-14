@@ -300,6 +300,7 @@ fn source_label_for_global(
         "branch_status_aliases" => scope_field!(branch_status_aliases),
         "tag_properties" => scope_field!(tag_properties),
         "custom_field_properties" => scope_field!(custom_field_properties),
+        "ui_custom_fields_from" => scope_field!(ui_custom_fields_from),
         "branch_priority_aliases" => scope_field!(branch_priority_aliases),
         _ => "default",
     }
@@ -547,6 +548,11 @@ fn source_label_for_project(key: &str, resolved_project: &ResolvedConfig, projec
             let has_override = project_cfg.and_then(|pc| pc.custom_field_properties.as_ref()).is_some();
             let diff = resolved_project.custom_field_properties != base_config.custom_field_properties;
             project_scope!("custom_field_properties", has_override, diff)
+        }
+        "ui_custom_fields_from" => {
+            let has_override = project_cfg.and_then(|pc| pc.ui_custom_fields_from).is_some();
+            let diff = resolved_project.ui_custom_fields_from != base_config.ui_custom_fields_from;
+            project_scope!("ui_custom_fields_from", has_override, diff)
         }
         "branch_status_aliases" => {
             let has_override = project_cfg.and_then(|pc| pc.branch_status_aliases.as_ref()).is_some();

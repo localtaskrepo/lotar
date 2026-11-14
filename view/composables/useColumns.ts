@@ -1,4 +1,5 @@
 import { computed, inject, provide, ref, watch, type InjectionKey, type Ref } from 'vue'
+import { findCustomValue } from '../utils/customFields'
 import { storageGetJson, storageSetJson } from '../utils/storage'
 import { displayText } from '../utils/text'
 
@@ -112,7 +113,7 @@ export function customFieldEntriesFromTask(
     for (const enabled of enabledKeys) {
         const name = isCustomKey(enabled) ? enabled.slice('custom:'.length) : enabled
         if (!name || name === '*') continue
-        const raw = custom[name]
+        const raw = findCustomValue(custom, name)
         if (raw === undefined || raw === null || raw === '') continue
         out.push({ key: name, label: name, value: displayText(raw) })
     }

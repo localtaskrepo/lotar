@@ -409,6 +409,9 @@ pub fn to_canonical_global_yaml_with(cfg: &GlobalConfig, options: GlobalYamlOpti
             ui.insert(Y::String(key.into()), Y::String(value.clone()));
         }
     }
+    if cfg.ui_custom_fields_from != defaults.ui_custom_fields_from {
+        ui.insert(Y::String("custom_fields_from".into()), Y::String(cfg.ui_custom_fields_from.as_str().into()));
+    }
     if !ui.is_empty() {
         root.insert(Y::String("ui".into()), Y::Mapping(ui));
     }
@@ -912,6 +915,11 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
     }
     if !custom.is_empty() {
         root.insert(Y::String("custom".into()), Y::Mapping(custom));
+    }
+    if let Some(from) = cfg.ui_custom_fields_from {
+        let mut ui = serde_yaml_ng::Mapping::new();
+        ui.insert(Y::String("custom_fields_from".into()), Y::String(from.as_str().into()));
+        root.insert(Y::String("ui".into()), Y::Mapping(ui));
     }
 
     // scan

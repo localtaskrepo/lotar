@@ -31,12 +31,12 @@ export interface BranchAliasEntry {
     value: string
 }
 
-/** One tag colour row on the Config page (DEV-20). */
 /** The form fields that hold text (plain strings and toggle values). */
 type FormTextField = {
     [K in keyof ConfigFormState]: ConfigFormState[K] extends string ? K : never
 }[keyof ConfigFormState]
 
+/** One tag colour row on the Config page (DEV-20). */
 export interface TagColorEntry {
     tag: string
     color: string
@@ -66,6 +66,8 @@ export interface ConfigFormState {
     tags: string[]
     customFieldsMode: ListMode
     customFields: string[]
+    /** `ui.custom_fields_from`; empty in a project inherits (DEV-485). */
+    uiCustomFieldsFrom: string
     members: string[]
     strictMembers: ToggleValue
     autoPopulateMembers: ToggleValue
@@ -245,6 +247,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         tags: [],
         customFieldsMode: 'any',
         customFields: [],
+        uiCustomFieldsFrom: 'both',
         members: [],
         strictMembers: 'false',
         autoPopulateMembers: 'true',
@@ -1297,6 +1300,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         form.issueDoneStates = null
         applyRestrictedList('tags', effective.tags)
         applyRestrictedList('customFields', effective.custom_fields)
+        form.uiCustomFieldsFrom = effective.ui_custom_fields_from ?? 'both'
         form.members = [...(effective.members ?? [])]
         form.strictMembers = toToggle(!!effective.strict_members)
         form.autoPopulateMembers = toToggle(effective.auto_populate_members !== false)
@@ -1390,6 +1394,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
                 form.customFieldsMode = 'inherit'
                 form.customFields = []
             }
+            form.uiCustomFieldsFrom = typeof raw.ui_custom_fields_from === 'string' ? raw.ui_custom_fields_from : ''
             form.members = Array.isArray(raw.members) ? [...raw.members] : []
             form.strictMembers = toTriToggle(raw.strict_members)
             form.autoPopulateMembers = toTriToggle(raw.auto_populate_members)
@@ -1524,6 +1529,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         addValue('defaultAssignee', 'default_assignee', { trim: true })
         addValue('defaultPriority', 'default_priority', { trim: true })
         addValue('defaultStatus', 'default_status', { trim: true, allowEmpty: true })
+        addValue('uiCustomFieldsFrom', 'ui_custom_fields_from', { trim: true, allowEmpty: !isGlobal.value })
 
         addArray('defaultTags', 'default_tags')
         addArray('issueStates', 'issue_states')

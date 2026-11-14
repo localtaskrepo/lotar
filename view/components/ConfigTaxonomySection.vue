@@ -75,6 +75,25 @@
         <p v-if="customFieldsError" class="field-error">{{ customFieldsError }}</p>
       </div>
 
+      <div v-if="customFieldsMode !== 'none'" class="field field--full" data-testid="config-custom-fields-from">
+        <label class="field-label" :for="`${uid}-custom-fields-from`">
+          <span>Fields offered in pickers</span>
+          <span v-if="customFieldsFromSource" :class="['provenance', provenanceClass(customFieldsFromSource)]">
+            {{ provenanceLabel(customFieldsFromSource) }}
+          </span>
+        </label>
+        <UiSelect :id="`${uid}-custom-fields-from`" v-model="uiCustomFieldsFrom" class="cfg-mode-select">
+          <option v-if="!isGlobal" value="">
+            Inherit global (currently {{ CUSTOM_FIELDS_FROM_LABELS[globalCustomFieldsFrom].toLowerCase() }})
+          </option>
+          <option v-for="(label, value) in CUSTOM_FIELDS_FROM_LABELS" :key="value" :value="value">{{ label }}</option>
+        </UiSelect>
+        <p class="field-hint">
+          Which custom fields the board, task list, calendar and dependency cards offer as columns, filters and
+          group-by. Used fields are the ones the tasks have.
+        </p>
+      </div>
+
       <div v-if="customFieldsMode !== 'none'" class="field field--full" data-testid="config-version-fields">
         <span class="field-label">
           <span>Version fields</span>
@@ -109,7 +128,7 @@
 
 <script setup lang="ts">
 import { computed, useId } from 'vue'
-import type { ConfigSource, CustomFieldProperties, TagProperties } from '../api/types'
+import type { ConfigSource, CustomFieldProperties, CustomFieldsFrom, TagProperties } from '../api/types'
 import type { ListMode } from '../composables/useConfigForm'
 import type { TagColorEntry } from '../composables/useConfigForm'
 import ChipListField from './ChipListField.vue'
@@ -123,6 +142,14 @@ const customFieldsMode = defineModel<ListMode>('customFieldsMode', { required: t
 const customFields = defineModel<string[]>('customFields', { required: true })
 const tagColors = defineModel<TagColorEntry[]>('tagColors', { required: true })
 const versionFields = defineModel<string[]>('versionFields', { required: true })
+/** `ui.custom_fields_from`; empty inherits in a project (DEV-485). */
+const uiCustomFieldsFrom = defineModel<string>('uiCustomFieldsFrom', { required: true })
+
+const CUSTOM_FIELDS_FROM_LABELS: Record<CustomFieldsFrom, string> = {
+  both: 'Listed fields, then used ones',
+  config: 'Only the listed fields',
+  scanned: 'Only the fields tasks use',
+}
 
 const {
   description,
@@ -141,6 +168,8 @@ const {
   globalFieldProperties = null,
   versionFieldsError = null,
   versionFieldsSource,
+  globalCustomFieldsFrom = 'both',
+  customFieldsFromSource,
   provenanceLabel,
   provenanceClass,
 } = defineProps<{
@@ -165,6 +194,9 @@ const {
   globalFieldProperties?: Record<string, CustomFieldProperties> | null
   versionFieldsError?: string | null
   versionFieldsSource?: ConfigSource
+  /** Project scope: the global `ui.custom_fields_from`, named in the inherit option. */
+  globalCustomFieldsFrom?: CustomFieldsFrom
+  customFieldsFromSource?: ConfigSource
   provenanceLabel: (source: ConfigSource | undefined) => string
   provenanceClass: (source: ConfigSource | undefined) => string
 }>()

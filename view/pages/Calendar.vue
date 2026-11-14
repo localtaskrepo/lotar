@@ -339,7 +339,7 @@ const {
   statuses,
   priorities,
   types,
-  customFields: availableCustomFields,
+  offeredCustomFields: availableCustomFields,
   refresh: refreshConfig,
   scope: configScope,
   tags: configuredTags,

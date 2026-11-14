@@ -493,6 +493,7 @@ import AgentActivityIndicator from './AgentActivityIndicator.vue'
 import OpenQuestion from './OpenQuestion.vue'
 import AttachmentTile from './AttachmentTile.vue'
 import type { TaskDTO } from '../api/types'
+import { findCustomValue } from '../utils/customFields'
 import { asList } from '../utils/lookup'
 import { taskAttachments } from '../utils/taskAttachments'
 import { computed, onMounted, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue'
@@ -592,7 +593,7 @@ const rowsKey = computed(() => sorted.value.map((t) => t.id).join('|'))
 /** A custom field column's value for one task, or a dash when it is empty. */
 function customFieldText(task: TaskDTO, col: string): unknown {
   const key = customFieldKey(col)
-  return (key !== null && task.custom_fields?.[key]) || '—'
+  return (key !== null && findCustomValue(task.custom_fields, key)) || '—'
 }
 
 const {

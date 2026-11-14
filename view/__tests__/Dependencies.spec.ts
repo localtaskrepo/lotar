@@ -33,6 +33,7 @@ vi.mock('../composables/useConfig', async () => {
             priorities: ref(['Low', 'High']),
             types: ref(['Feature', 'Bug']),
             customFields: ref(['team']),
+            offeredCustomFields: ref(['team']),
             tags: ref(['ui']),
             members: ref(['alex']),
             scope: ref('DEV'),

@@ -926,7 +926,7 @@ const {
   statuses,
   priorities,
   types,
-  customFields: availableCustomFields,
+  offeredCustomFields: availableCustomFields,
   versionFields,
   scope: configScope,
   tags: configuredTags,

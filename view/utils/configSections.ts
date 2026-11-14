@@ -74,8 +74,16 @@ export const CONFIG_SECTIONS: readonly ConfigSectionDefinition[] = [
     {
         id: 'fields',
         label: 'Tags & fields',
-        summary: 'Which tags and custom fields tasks may use.',
-        fields: ['tagsMode', 'tags', 'tagColors', 'customFieldsMode', 'customFields', 'versionFields'],
+        summary: 'Which tags and custom fields tasks may use, and which fields the pickers offer.',
+        fields: [
+            'tagsMode',
+            'tags',
+            'tagColors',
+            'customFieldsMode',
+            'customFields',
+            'uiCustomFieldsFrom',
+            'versionFields',
+        ],
         errorKeys: ['tags', 'tag_properties', 'custom_fields', 'custom_field_properties'],
     },
     {

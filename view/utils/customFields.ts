@@ -9,6 +9,18 @@ function keyOf(fields: Record<string, unknown>, name: string): string | undefine
     return Object.keys(fields).find((key) => key.trim().toLowerCase() === wanted)
 }
 
+/** A task's raw value for a custom field: exact name, then ignoring case; undefined when absent. */
+export function findCustomValue(fields: Record<string, unknown> | null | undefined, name: string): unknown {
+    const custom = fields ?? {}
+    const exact = Object.prototype.hasOwnProperty.call(custom, name) ? custom[name] : undefined
+    if (exact !== undefined) return exact
+    const lower = name.toLowerCase()
+    for (const [key, value] of Object.entries(custom)) {
+        if (key.toLowerCase() === lower) return value
+    }
+    return undefined
+}
+
 /**
  * The task's values of a field: a list gives each item, an empty value none.
  * Keys match regardless of case, as the server matches them.

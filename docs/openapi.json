@@ -2310,6 +2310,9 @@
                         "effective_done_states": ["Done"],
                         "done_states_mode": "inferred",
                         "task_calendar_day": "2026-10-03",
+                        "custom_fields": ["*"],
+                        "ui_custom_fields_from": "both",
+                        "custom_fields_offered": ["source", "source_repo", "finding"],
                         "auto_set_reporter": true,
                         "auto_assign_on_status": true
                       }
@@ -4690,6 +4693,16 @@
                 "type": "string",
                 "format": "date",
                 "description": "Live server-local calendar day, not writable configuration or a permanently cached policy value."
+              },
+              "ui_custom_fields_from": {
+                "type": "string",
+                "enum": ["config", "scanned", "both"],
+                "description": "Which custom fields the web UI offers (`ui.custom_fields_from`, default both)."
+              },
+              "custom_fields_offered": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "config show only: the custom field names the web UI offers, per ui_custom_fields_from. Declared names first, then the names the scope's tasks use, most used first; names that differ only in case are one field."
               }
             },
             "required": ["effective_done_states", "done_states_mode", "task_calendar_day", "review_reviewers"]

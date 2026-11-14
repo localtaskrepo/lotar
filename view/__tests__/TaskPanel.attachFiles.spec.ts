@@ -179,6 +179,7 @@ vi.mock('../composables/useConfig', () => {
             types: ref(['bug', 'feature']),
             tags: ref([]),
             customFields: ref([]),
+            offeredCustomFields: ref([]),
             members: ref([] as string[]),
             defaults: {
                 value: {

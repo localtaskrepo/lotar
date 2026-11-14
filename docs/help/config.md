@@ -328,7 +328,7 @@ The second command clears the project override rather than defining a workflow w
 
 Completion affects project and sprint metrics, cross-project dependency checks, workload counts, and worktree cleanup eligibility. Existing cleanup safeguards still apply. Overdue means a non-finished task with a due calendar date strictly before today; due-today tasks and finished tasks are not overdue. All listed states count as finished work; distinguishing canceled work from successfully delivered work is not a separate policy in this version.
 
-Resolved configuration responses expose `effective_done_states`, `done_states_mode` (`explicit` or `inferred`), and the live server-local `task_calendar_day`. These are computed metadata, not writable configuration keys. Changing completion policy reclassifies existing tasks and reports; it does not rewrite task YAML or snapshot the old policy for historical reports.
+Resolved configuration responses expose `effective_done_states`, `done_states_mode` (`explicit` or `inferred`), and the live server-local `task_calendar_day`. `config show` also lists `custom_fields_offered`, the field names the web UI offers per `ui.custom_fields_from` (it reads the scope's tasks unless the setting is `config`). These are computed metadata, not writable configuration keys. Changing completion policy reclassifies existing tasks and reports; it does not rewrite task YAML or snapshot the old policy for historical reports.
 
 ## Configuration Keys
 
@@ -352,6 +352,7 @@ Resolved configuration responses expose `effective_done_states`, `done_states_mo
 - `default.strict_members` - Enforce member list for reporter/assignee fields
 - `custom_fields` - Custom field definitions, optionally with a type ([Version fields](#version-fields))
 - `custom.field_properties` - Field types for inherited fields
+- `ui.custom_fields_from` - Which custom fields the web UI offers: `config`, `scanned` or `both` (see [config reference](./config-reference.md))
     
 For review recovery, for example when a reporter is an agent or has left the
 project:
@@ -405,6 +406,7 @@ Automation (defaults inherited from global):
 - `members` - Global allowed members list (project overrides replace/extend)
 - `default.strict_members` - Enforce member list globally (projects can override)
 - `custom_fields` - Default custom fields for all projects
+- `ui.custom_fields_from` - Which custom fields the web UI offers: `config` (named ones), `scanned` (used ones) or `both` (default)
 - `sprints.defaults.length` - Default planned sprint length (e.g., `2w`) applied when creating sprints without an explicit length.
 - `sprints.defaults.capacity_points` / `sprints.defaults.capacity_hours` - Default sprint capacity values used when not provided by the caller.
 - `sprints.defaults.overdue_after` - Default grace period (e.g., `12h`) before overdue warnings trigger.

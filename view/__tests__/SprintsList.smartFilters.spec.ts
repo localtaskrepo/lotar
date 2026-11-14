@@ -146,6 +146,7 @@ vi.mock('../composables/useConfig', () => ({
         priorities: ref<string[]>(['Low', 'Med', 'High']),
         types: ref<string[]>(['task']),
         customFields: ref<string[]>([]),
+        offeredCustomFields: ref<string[]>([]),
         versionFields: ref<string[]>([]),
         refresh: vi.fn(async () => {}),
     }),

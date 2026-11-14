@@ -647,7 +647,7 @@ const {
   statuses,
   priorities,
   types,
-  customFields: availableCustomFields,
+  offeredCustomFields: availableCustomFields,
   refresh: refreshConfig,
   loading: loadingConfig,
   scope: configScope,

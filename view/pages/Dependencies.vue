@@ -352,7 +352,7 @@ const {
   statuses,
   priorities,
   types,
-  customFields,
+  offeredCustomFields: customFields,
   refresh: refreshConfig,
   scope: configScope,
   tags: configuredTags,

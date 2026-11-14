@@ -58,6 +58,7 @@ const configStore = {
     priorities: ref<string[]>(['low', 'med', 'high']),
     types: ref<string[]>(['task']),
     customFields: ref<string[]>([]),
+    offeredCustomFields: ref<string[]>([]),
     refresh: vi.fn(async () => {}),
 }
 
@@ -154,6 +155,7 @@ vi.mock('../composables/useConfig', () => ({
         priorities: configStore.priorities,
         types: configStore.types,
         customFields: configStore.customFields,
+        offeredCustomFields: configStore.customFields,
         refresh: configStore.refresh,
     }),
 }))

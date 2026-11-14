@@ -151,6 +151,7 @@ mod dev3_dev13_recent_and_sum_test;
 mod dev407_auto_config_comments_test;
 mod dev470_comment_author_prefix_test;
 mod dev482_macos_signing_test;
+mod dev485_offered_custom_fields_test;
 mod dev488_question_comments_test;
 mod dev489_review_comments_test;
 mod dev490_report_comment_test;

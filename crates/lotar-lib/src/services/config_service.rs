@@ -3,6 +3,7 @@ use crate::config::manager::ConfigManager;
 use crate::config::source_labels::{
     build_global_source_labels_with_port, build_project_source_labels_with_port, collapse_label_to_scope, config_source_entries,
 };
+use crate::config::types::CustomFieldsFrom;
 use crate::config::validation::errors::ValidationResult;
 use crate::errors::{LoTaRError, LoTaRResult};
 use crate::workspace::TasksDirectoryResolver;
@@ -30,12 +31,14 @@ impl ConfigService {
             // live server-local calendar day.
             if let Ok(resolved) = crate::config::resolution::config_for_project(resolver.path.as_path(), Some(prefix)) {
                 insert_computed_completion_fields(&mut value, &resolved);
+                insert_offered_custom_fields(&mut value, &resolved, resolver, Some(prefix));
             }
             redact_config(&mut value);
             Ok(value)
         } else {
             let mut value = serde_json::to_value(mgr.get_resolved_config()).map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
             insert_computed_completion_fields(&mut value, mgr.get_resolved_config());
+            insert_offered_custom_fields(&mut value, mgr.get_resolved_config(), resolver, None);
             redact_config(&mut value);
             Ok(value)
         }
@@ -489,6 +492,80 @@ fn insert_computed_completion_fields(value: &mut serde_json::Value, resolved: &c
     map.insert("effective_done_states".to_string(), serde_json::json!(completion::effective_done_status_values(resolved)));
     map.insert("done_states_mode".to_string(), serde_json::json!(completion::done_states_mode(resolved).as_str()));
     map.insert("task_calendar_day".to_string(), serde_json::json!(completion::local_calendar_day(chrono::Utc::now())));
+}
+
+/// The custom fields the web UI offers in its pickers (DEV-485).
+fn insert_offered_custom_fields(
+    value: &mut serde_json::Value,
+    resolved: &crate::config::types::ResolvedConfig,
+    resolver: &TasksDirectoryResolver,
+    project: Option<&str>,
+) {
+    let Some(map) = value.as_object_mut() else {
+        return;
+    };
+    let tasks = if resolved.ui_custom_fields_from == CustomFieldsFrom::Config {
+        Vec::new()
+    } else {
+        let storage = crate::storage::manager::Storage::new(&resolver.path);
+        storage.search(&crate::storage::TaskFilter { project: project.map(str::to_string), ..Default::default() })
+    };
+    let offered = offered_custom_fields(resolved, tasks.iter().map(|(_, task)| &task.custom_fields));
+    map.insert("custom_fields_offered".to_string(), serde_json::json!(offered));
+}
+
+/// Field names per `ui.custom_fields_from`: the declared ones first, then the
+/// ones the tasks use, most used first. Names that differ only in case are one
+/// field, as the server matches them; the declared spelling wins, else the
+/// most used one.
+fn offered_custom_fields<'a>(resolved: &crate::config::types::ResolvedConfig, tasks: impl Iterator<Item = &'a crate::types::CustomFields>) -> Vec<String> {
+    let declared: Vec<String> = match resolved.ui_custom_fields_from {
+        CustomFieldsFrom::Scanned => Vec::new(),
+        CustomFieldsFrom::Config | CustomFieldsFrom::Both => resolved.custom_fields.get_suggestions(),
+    };
+    let mut offered: Vec<String> = Vec::new();
+    for name in declared {
+        let name = name.trim();
+        if !name.is_empty() && !offered.iter().any(|known| known.eq_ignore_ascii_case(name)) {
+            offered.push(name.to_string());
+        }
+    }
+    if resolved.ui_custom_fields_from == CustomFieldsFrom::Config {
+        return offered;
+    }
+    // Lower-cased name -> (count, spelling -> count).
+    let mut used: BTreeMap<String, (usize, BTreeMap<String, usize>)> = BTreeMap::new();
+    for fields in tasks {
+        for (name, value) in fields {
+            let name = name.trim();
+            if name.is_empty() || custom_field_value_is_empty(value) {
+                continue;
+            }
+            let entry = used.entry(name.to_lowercase()).or_default();
+            entry.0 += 1;
+            *entry.1.entry(name.to_string()).or_default() += 1;
+        }
+    }
+    let mut scanned: Vec<(usize, String)> = used
+        .into_values()
+        .filter_map(|(count, spellings)| {
+            let spelling = spellings.into_iter().max_by(|a, b| a.1.cmp(&b.1).then_with(|| b.0.cmp(&a.0)))?.0;
+            Some((count, spelling))
+        })
+        .filter(|(_, name)| !offered.iter().any(|known| known.eq_ignore_ascii_case(name)))
+        .collect();
+    scanned.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.cmp(&b.1)));
+    offered.extend(scanned.into_iter().map(|(_, name)| name));
+    offered
+}
+
+fn custom_field_value_is_empty(value: &crate::types::CustomFieldValue) -> bool {
+    match serde_json::to_value(value) {
+        Ok(serde_json::Value::Null) => true,
+        Ok(serde_json::Value::String(text)) => text.trim().is_empty(),
+        Ok(serde_json::Value::Array(items)) => items.is_empty(),
+        _ => false,
+    }
 }
 
 /// The resolved configuration whose completion policy the inspect

@@ -158,6 +158,11 @@ fn render_resolved_config_yaml(resolved: &ResolvedConfig, sources: &HashMap<Stri
         sections.push(format!("custom:\n{}", custom_body));
     }
 
+    let mut ui_body = String::new();
+    if write_scalar_line(&mut ui_body, 2, "custom-fields-from", resolved.ui_custom_fields_from.as_str(), sources.get("ui.custom-fields-from"), options) {
+        sections.push(format!("ui:\n{}", ui_body));
+    }
+
     let mut scan_body = String::new();
     let mut scan_written = false;
     scan_written |= write_sequence(&mut scan_body, 2, "signal-words", &resolved.scan_signal_words, sources.get("scan.signal-words"), options);

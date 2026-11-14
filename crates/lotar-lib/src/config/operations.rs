@@ -128,6 +128,12 @@ fn parse_max_parallel_jobs(value: &str, field: &str) -> Result<Option<usize>, Co
         .map_err(|_| ConfigError::ParseError(format!("{field} must be a whole number (0 pauses new jobs), or empty for no limit")))
 }
 
+fn parse_custom_fields_from(value: &str) -> Result<CustomFieldsFrom, ConfigError> {
+    CustomFieldsFrom::parse(value).ok_or_else(|| {
+        ConfigError::ParseError(format!("ui_custom_fields_from must be one of: {} (got '{}')", CUSTOM_FIELDS_FROM_VALUES.join(", "), value.trim()))
+    })
+}
+
 fn parse_optional_string(value: &str) -> Option<String> {
     let trimmed = value.trim();
     if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("inherit") { None } else { Some(trimmed.to_string()) }
@@ -735,6 +741,9 @@ pub fn apply_field_to_global_config(config: &mut GlobalConfig, field: &str, valu
         "custom_field_properties" => {
             config.custom_field_properties = parse_custom_field_properties(value)?;
         }
+        "ui_custom_fields_from" => {
+            config.ui_custom_fields_from = if value.trim().is_empty() { CustomFieldsFrom::default() } else { parse_custom_fields_from(value)? };
+        }
         "branch_priority_aliases" => {
             let map = parse_alias_map::<Priority>(value, "branch priority alias")?;
             config.branch_priority_aliases = map;
@@ -1062,6 +1071,11 @@ pub fn apply_field_to_project_config(config: &mut ProjectConfig, field: &str, va
             let properties = parse_custom_field_properties(value)?;
             config.custom_field_properties = if properties.is_empty() { None } else { Some(properties) };
         }
+        "ui_custom_fields_from" => {
+            let trimmed = value.trim();
+            config.ui_custom_fields_from =
+                if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("inherit") { None } else { Some(parse_custom_fields_from(trimmed)?) };
+        }
         "branch_status_aliases" => {
             if value.trim().is_empty() {
                 config.branch_status_aliases = None;
@@ -1384,6 +1398,10 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
         "custom_field_properties" => {
             parse_custom_field_properties(value)?;
         }
+        "ui_custom_fields_from"
+            if !value.trim().is_empty() && !value.trim().eq_ignore_ascii_case("inherit") => {
+                parse_custom_fields_from(value)?;
+            }
         "branch_status_aliases"
             if !value.trim().is_empty() => {
                 parse_alias_map::<TaskStatus>(value, "branch status alias")?;
@@ -1487,6 +1505,7 @@ pub fn clear_project_override_field(config: &mut ProjectConfig, field: &str) -> 
         "branch_status_aliases" => config.branch_status_aliases = None,
         "tag_properties" => config.tag_properties = None,
         "custom_field_properties" => config.custom_field_properties = None,
+        "ui_custom_fields_from" => config.ui_custom_fields_from = None,
         "branch_priority_aliases" => config.branch_priority_aliases = None,
         "agent_context_enabled" => config.agent_context_enabled = None,
         "agent_context_extension" => config.agent_context_extension = None,

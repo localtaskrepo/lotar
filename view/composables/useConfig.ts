@@ -67,6 +67,8 @@ export function useConfig(options: { throwOnError?: boolean } = {}) {
     const priorities = ref<string[]>([])
     const types = ref<string[]>([])
     const customFieldKeys = ref<string[]>([])
+    /** The fields the pickers offer, per `ui.custom_fields_from` (DEV-485). */
+    const offeredCustomFieldKeys = ref<string[]>([])
     /** Custom fields that hold versions (DEV-373). */
     const versionFields = ref<string[]>([])
     const tags = ref<string[]>([])
@@ -95,6 +97,7 @@ export function useConfig(options: { throwOnError?: boolean } = {}) {
         priorities.value = []
         types.value = []
         customFieldKeys.value = []
+        offeredCustomFieldKeys.value = []
         versionFields.value = []
         tags.value = []
         members.value = []
@@ -131,6 +134,10 @@ export function useConfig(options: { throwOnError?: boolean } = {}) {
         types.value = base.types
         tags.value = base.tags
         customFieldKeys.value = base.customFields
+        // A server without the offered list: the declared names.
+        offeredCustomFieldKeys.value = Array.isArray(config.custom_fields_offered)
+            ? sanitizeStringList(pickArray(config, ['custom_fields_offered']))
+            : base.customFields.filter((name) => name !== '*')
         versionFields.value = versionFieldNames(config.custom_field_properties)
         members.value = sanitizeStringList(pickArray(config, ['members'], pickArray(config, ['default', 'members'])))
 
@@ -188,6 +195,7 @@ export function useConfig(options: { throwOnError?: boolean } = {}) {
         priorities,
         types,
         customFields: customFieldKeys,
+        offeredCustomFields: offeredCustomFieldKeys,
         versionFields,
         tags,
         members,

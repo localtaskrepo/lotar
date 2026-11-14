@@ -1,5 +1,6 @@
 import type { TaskDTO } from '../api/types'
 import type { ColKey } from '../composables/useColumns'
+import { findCustomValue } from './customFields'
 import { itemAt, required } from './lookup'
 import { projectOf } from './text'
 import { compareVersions, lowestVersion } from './versions'
@@ -501,18 +502,6 @@ export function customValueToString(value: unknown): string {
     if (Array.isArray(value)) return '[array]'
     if (typeof value === 'object') return '{object}'
     return 'other'
-}
-
-/** A task's raw value for a custom field: exact name, then ignoring case; undefined when absent. */
-function findCustomValue(fields: Record<string, unknown> | null | undefined, name: string): unknown {
-    const custom = fields ?? {}
-    const exact = Object.prototype.hasOwnProperty.call(custom, name) ? custom[name] : undefined
-    if (exact !== undefined) return exact
-    const lower = name.toLowerCase()
-    for (const [key, value] of Object.entries(custom)) {
-        if (key.toLowerCase() === lower) return value
-    }
-    return undefined
 }
 
 /** Mirrors `types::custom_value_items`: a list reads item by item, nested lists flattened. */

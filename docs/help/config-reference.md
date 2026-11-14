@@ -26,6 +26,7 @@ CLI > env > project > home > global > defaults (commands without a project skip 
 - custom_fields: string[] (default wildcard ["*"]); an entry can also be an object with a type, `{ name: affects, type: version }`. See [Version fields](./config.md#version-fields)
 - custom.field_properties: map of field name to properties (`type`: `text` or `version`), for a project that types inherited fields without its own `custom.fields` list; `config set custom_field_properties` writes it
   - For both lists, `["*"]` allows any value, a named list allows only those values, and `[]` allows none (for example, it turns custom fields off). In project scope a blank `config set` value clears the override, so set an explicit empty list with `lotar config set custom_fields '[]' --project=DEMO`.
+- ui.custom_fields_from: `config`, `scanned` or `both` (default `both`), global or per project. Which custom fields the web UI offers as columns, card fields, filters, **Group by** swimlanes and bulk edit choices: `config` the ones `custom_fields` names, `scanned` the ones the project's tasks use, `both` the named ones first, then the used ones, most used first. Names that differ only in case are one field (the named spelling, else the most used one); `source_repo` and `Source Repo` stay two fields. With the default wildcard, `both` offers the fields the tasks use. Bulk edit offers only names the server accepts: under a named list, only those
 - attachments.dir: string (default "@attachments")
 - attachments.max_upload_mb: number (default 10) — `0` disables uploads; `-1` is unlimited (the server still stops at 512 MiB per upload); positive values are MiB
 - sync.reports_dir: string (default "@reports")
@@ -108,7 +109,7 @@ CLI > env > project > home > global > defaults (commands without a project skip 
 - auth_profiles.<name>.api_url: string (API address override, such as GitHub Enterprise; GitHub defaults to https://api.github.com)
 
 ## Home and Project keys
-Home/global/project schemas are not identical. Project values override inherited fields for that project; `project.name` is an optional label, not the folder identifier. `server.port`, `server.public_url`, `default.project`, sprint defaults, `web_ui_path`, `repos` and `ui.*` are global-only; sprint notifications and the listed project automation flags can be overridden. See [config scope](./config.md) before copying fields between files.
+Home/global/project schemas are not identical. Project values override inherited fields for that project; `project.name` is an optional label, not the folder identifier. `server.port`, `server.public_url`, `default.project`, sprint defaults, `web_ui_path`, `repos` and `ui.*` (except `ui.custom_fields_from`) are global-only; sprint notifications and the listed project automation flags can be overridden. See [config scope](./config.md) before copying fields between files.
 
 Auth profiles are home-only: `auth_profiles` is ignored in project configs (secrets never live in the repo). Remotes can be configured globally or per-project; project remotes override/extend global remotes.
 
