@@ -1,11 +1,11 @@
 title: A command runner fails to start on Linux when the prompt is over 128 KiB
-status: Reviewing
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-14T18:18:37.990994+00:00
-modified: 2026-11-14T18:49:13.303773+00:00
+modified: 2026-11-14T18:52:13.893812+00:00
 relationships:
   related:
   - DEV-533
@@ -13,8 +13,18 @@ comments:
 - date: 2026-11-14T18:49:02.758797+00:00
   author: claude
   text: 'Fixed in 22bce0cd (branch agent/DEV-542). A command runner''s prompt is now always in a file named by LOTAR_AGENT_PROMPT_FILE: <job>.prompt next to the job''s active record, mode 0600, removed by unregister when the job ends, so it is still there when an orphaned job outlives its lotar process. LOTAR_AGENT_PROMPT stays set only while NAME=value fits Linux''s 128 KiB MAX_ARG_STRLEN. docs/help/agent.md updated. Tests: a unit test for the cutoff, a write/remove check in agent_active_jobs, and an integration test with a 200 KiB prompt (its program reads the file, and LOTAR_AGENT_PROMPT is unset). Check on Linux (rust:1.99.1 in Docker): main''s code fails with ''Failed to spawn runner: Argument list too long (os error 7)'', and the fix passes, as does the existing 256 KiB an_agent_that_never_reads_its_prompt_still_completes. On macOS: npm run lint:agent, test:agent (2172 Rust + 1537 UI) and test:smoke:agent (401) all pass. Guidance: no durable finding.'
+- date: 2026-11-14T18:52:08.373614+00:00
+  author: codex
+  text: |-
+    Review: passed; no blocking findings in `22bce0cd`.
+
+    - Read full diff, ticket/comments, related DEV-533, repository guidance, runner/wrapper/cleanup paths and recent main history. No UI changes or owner decisions.
+    - Targeted 200 KiB integration test passed; `command_runner` filter passed all 6 tests with `RUSTC_WRAPPER=`. `git diff --check main...HEAD` passed; checkout clean.
+    - Limits: npm temp guards exited 1 (`xcrun_db`, then also `.lotar-test-scratch`) with sandbox Xcode warnings; initial sccache denied. Not clean suite passes. Linux reproduction and full lint/UI/smoke were not independently repeated; fix agent records those and fail-before/pass-after evidence.
+    - No files, commits, status or assignee changes; no new findings or durable guidance correction.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4cf66ebf-22d7-41d7-aac6-960ad78bd9f5
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A67b2ee20-7118-426e-af83-1d486e48b818
 description: 'Found: build_command (crates/lotar-lib/src/services/agent_runner.rs) puts the whole prompt in LOTAR_AGENT_PROMPT. Linux caps one environment string at 128 KiB (MAX_ARG_STRLEN), so the spawn fails with ''Argument list too long (os error 7)'' and the job fails. Seen in CI on main while fixing DEV-533 (test with a 256 KiB prompt, since removed). Check: start a command-runner job with a 200 KiB prompt on Linux. Done: such a job starts and its program can read the full prompt (e.g. also offer it in a file, LOTAR_AGENT_PROMPT_FILE), docs/help/agent.md updated.'
 tags:
 - health
@@ -56,3 +66,21 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-14T18:49:58.779939+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A67b2ee20-7118-426e-af83-1d486e48b818
+- at: 2026-11-14T18:52:08.373614+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T18:52:13.893812+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

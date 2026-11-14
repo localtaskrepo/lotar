@@ -1,11 +1,11 @@
 title: 'CI failing on the default branch: .github/workflows/ci.yml'
-status: Merging
+status: Done
 priority: High
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T18:08:15.401343+00:00
-modified: 2026-11-14T18:38:20.796749+00:00
+modified: 2026-11-14T18:50:20.625249+00:00
 relationships:
   related:
   - DEV-542
@@ -17,6 +17,16 @@ comments:
 - date: 2026-11-14T18:38:15.533713+00:00
   author: codex
   text: 'Review: passed. Reviewed sole commit b28b2aa7 against main c01dfce3, full diff, AGENTS.md, review/testing guidance, ticket comments, DEV-542 and DEV-503 owner decisions, runner implementation/help, workflow and five recent main commits touching the file. Deletion removes an obsolete stdin test: command runner delivers prompts via environment. Confirmed CI run 43572122922 fails exactly this test with Argument list too long; real oversized-prompt bug already tracked in DEV-542. No findings or new tickets. Reran lint:agent, test:rust:agent (2169 passed), test:ui:agent (1537 passed), test:release and test:hooks successfully. Disabled sccache after sandbox denial; Rust retry outside sandbox passed after sandbox serve failure. Smoke not rerun for test-only deletion. Working tree clean; no commits, status or assignee changes. Latest main CI 43627459905 in progress: green-main done criterion remains for post-landing verification. No durable guidance finding.'
+- date: 2026-11-14T18:50:16.195742+00:00
+  author: codex
+  text: |-
+    Merged and pushed to `main` as `fcb876aa`.
+
+    - Rebased `b28b2aa7` onto `41449409`; fast-forwarded main and included its `.tasks` updates as instructed.
+    - Passed `npm run lint:agent`, `npm run test:agent` (2169 Rust, 1537 UI, release and hook tests), and `npm run test:smoke:agent` (401 tests). No checks skipped.
+    - `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `ci-red:.github/workflows/ci.yml`; exits 1 for 10 unrelated existing findings.
+    - Push succeeded with hooks. CI run `43628751374` is in progress, so a green latest default-branch run is still unverified. No claim that CI has passed yet.
+    - Status and assignee left to job automation; no durable guidance finding.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acde5299b-075c-45a2-95d2-31769bec4c93
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad2f4b42b-5444-45d2-8aa2-9793ef15ad74
@@ -96,3 +106,13 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-14T18:50:16.195742+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T18:50:20.625249+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

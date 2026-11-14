@@ -2597,7 +2597,11 @@ fn run_command(
     ticket_id: &str,
     mut active_record: Option<crate::services::agent_active_jobs::ActiveJob>,
 ) -> RunEnd {
-    let mut command = match build_command(profile, prompt) {
+    let prompt_file = match crate::services::agent_active_jobs::write_prompt(tasks_dir, job_id, prompt) {
+        Ok(path) => path,
+        Err(err) => return RunEnd::Failed(format!("Failed to write the prompt file: {err}")),
+    };
+    let mut command = match build_command(profile, prompt, &prompt_file) {
         Ok(command) => wrap_runner_command(command, job_id, ticket_id, AgentRunnerKind::Command.as_str(), tasks_dir),
         Err(err) => return RunEnd::Failed(err.to_string()),
     };

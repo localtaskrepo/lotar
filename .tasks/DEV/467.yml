@@ -5,10 +5,11 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-13T10:33:47.286204+00:00
-modified: 2026-11-14T18:39:48.464638+00:00
+modified: 2026-11-14T18:49:47.294458+00:00
 relationships:
   blocks:
   - DEV-513
+  - DEV-543
   related:
   - DEV-401
   - DEV-456
@@ -744,3 +745,9 @@ history:
   - field: assignee
     old: '@merge'
     new: mallox
+- at: 2026-11-14T18:49:47.294458+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-513"],"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513","DEV-524","DEV-530","DEV-532","DEV-538","DEV-543","DEV-497","DEV-503"]}'
+    new: '{"blocks":["DEV-513","DEV-543"],"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513","DEV-524","DEV-530","DEV-532","DEV-538","DEV-543","DEV-497","DEV-503"]}'

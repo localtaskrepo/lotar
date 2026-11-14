@@ -309,16 +309,24 @@ pub fn installed_agent_clis() -> Vec<&'static str> {
         .collect()
 }
 
+/// The longest prompt `LOTAR_AGENT_PROMPT` carries: Linux refuses to start a program with an environment
+/// string (`NAME=value` and its NUL) over 128 KiB (MAX_ARG_STRLEN). Longer prompts are only in the file.
+const MAX_ENV_PROMPT: usize = 128 * 1024 - "LOTAR_AGENT_PROMPT=".len() - 1;
+
 /// A `command` runner's process: the profile's program and args, with the prompt, model and effort in the
-/// environment.
-pub fn build_command(profile: &AgentProfileDetail, prompt: &str) -> LoTaRResult<RunnerCommand> {
+/// environment. `LOTAR_AGENT_PROMPT_FILE` names `prompt_file`, which holds the prompt; `LOTAR_AGENT_PROMPT`
+/// holds it too when it fits.
+pub fn build_command(profile: &AgentProfileDetail, prompt: &str, prompt_file: &std::path::Path) -> LoTaRResult<RunnerCommand> {
     let program = profile
         .command
         .clone()
         .filter(|program| !program.trim().is_empty())
         .ok_or_else(|| LoTaRError::ValidationError("Command runner requires 'command' in agent profile".to_string()))?;
     let mut env = expand_env_map(&profile.env);
-    env.insert("LOTAR_AGENT_PROMPT".to_string(), prompt.to_string());
+    env.insert("LOTAR_AGENT_PROMPT_FILE".to_string(), prompt_file.to_string_lossy().to_string());
+    if prompt.len() <= MAX_ENV_PROMPT {
+        env.insert("LOTAR_AGENT_PROMPT".to_string(), prompt.to_string());
+    }
     if let Some(model) = profile.model.as_deref() {
         env.insert("LOTAR_AGENT_MODEL".to_string(), model.to_string());
     }
@@ -371,10 +379,26 @@ mod tests {
     fn command_runner_gets_the_prompt_in_the_environment() {
         let mut detail = profile("command");
         detail.command = Some("my-agent".into());
-        let cmd = build_command(&detail, "Do it").unwrap();
+        let file = std::path::Path::new("/tmp/prompt.txt");
+        let cmd = build_command(&detail, "Do it", file).unwrap();
         assert_eq!(cmd.env.get("LOTAR_AGENT_PROMPT").map(String::as_str), Some("Do it"));
+        assert_eq!(cmd.env.get("LOTAR_AGENT_PROMPT_FILE").map(String::as_str), Some("/tmp/prompt.txt"));
         assert!(cmd.args.is_empty());
-        assert!(build_command(&profile("command"), "Do it").is_err());
+        assert!(build_command(&profile("command"), "Do it", file).is_err());
+    }
+
+    /// DEV-542: Linux refuses an environment string over 128 KiB, so a longer prompt is only in the file.
+    #[test]
+    fn command_runner_leaves_a_prompt_too_long_for_the_environment_to_the_file() {
+        let mut detail = profile("command");
+        detail.command = Some("my-agent".into());
+        let file = std::path::Path::new("/tmp/prompt.txt");
+        let fits = "x".repeat(MAX_ENV_PROMPT);
+        let cmd = build_command(&detail, &fits, file).unwrap();
+        assert_eq!(cmd.env.get("LOTAR_AGENT_PROMPT").map(String::len), Some(MAX_ENV_PROMPT));
+        let cmd = build_command(&detail, &"x".repeat(200 * 1024), file).unwrap();
+        assert!(!cmd.env.contains_key("LOTAR_AGENT_PROMPT"));
+        assert_eq!(cmd.env.get("LOTAR_AGENT_PROMPT_FILE").map(String::as_str), Some("/tmp/prompt.txt"));
     }
 
     #[test]

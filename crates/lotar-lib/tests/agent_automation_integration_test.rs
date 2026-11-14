@@ -2712,6 +2712,46 @@ sleep 300
     }
 }
 
+/// DEV-542: Linux refuses to start a program with an environment string over
+/// 128 KiB, so a longer prompt is only in `LOTAR_AGENT_PROMPT_FILE`.
+#[cfg(unix)]
+#[test]
+fn a_command_runner_reads_a_long_prompt_from_its_file() {
+    let _guard = lock_agent_tests();
+    enable_server_mode();
+    let fixtures = TestFixtures::new();
+    let root = fixtures.get_temp_path();
+    let copy = root.join("long.prompt");
+    let script = write_stub_agent_script(
+        root,
+        "long-prompt.sh",
+        &format!(
+            "#!/bin/sh
+[ -z \"$LOTAR_AGENT_PROMPT\" ] || exit 3
+cp \"$LOTAR_AGENT_PROMPT_FILE\" \"{}\"
+\
+echo '{{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"ok\"}}'\n",
+            copy.display()
+        ),
+    );
+    fixtures.create_config_in_dir(
+        &fixtures.tasks_root,
+        &format!("default:\n  project: PIPE\nagents:\n  long:\n    runner: command\n    command: \"{}\"\n", script.display()),
+    );
+    let mut storage = fixtures.create_storage();
+    let created =
+        TaskService::create(&mut storage, TaskCreate { title: "Long prompt".to_string(), project: Some("PIPE".to_string()), ..Default::default() }).unwrap();
+    let prompt = "x".repeat(200 * 1024);
+    AgentJobService::start_job_with_tasks_dir(
+        AgentJobCreateRequest { ticket_id: created.id.clone(), prompt: prompt.clone(), agent: Some("long".to_string()), ..Default::default() },
+        fixtures.tasks_root.as_path(),
+    )
+    .unwrap();
+    let jobs = wait_for_completed_jobs(&created.id, 1, 10_000);
+    assert_eq!(jobs.len(), 1, "{jobs:?}");
+    assert_eq!(jobs[0].status, "completed", "job ended as {} ({:?})", jobs[0].status, jobs[0].last_message);
+    assert!(fs::read_to_string(&copy).expect("prompt copy").contains(&prompt));
+}
 /// DEV-385: `unblocked` fires on a ticket when its last open prerequisite
 /// is done, whether a person or a rule (`lotar automation run`) closes it.
 #[cfg(unix)]

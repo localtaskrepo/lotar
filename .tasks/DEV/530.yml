@@ -1,11 +1,11 @@
 title: A job the dependency check held back resumes as it was when its prerequisites are done
-status: Merging
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-14T07:27:35.331056+00:00
-modified: 2026-11-14T18:41:34.579104+00:00
+modified: 2026-11-14T18:49:48.958972+00:00
 relationships:
   related:
   - DEV-351
@@ -64,6 +64,18 @@ comments:
     - DEV-524 test agent_assignment_with_an_open_prerequisite_blocks_the_ticket_until_it_is_done now expects DEV-530: the held job starts with its own prompt, not the rule message, and the ticket is back in Todo.
     - help/automation.md: DEV-524 text merged with the parking; a job that cannot be held back is retried and never started.
     - Checks: npm run lint:agent; test:agent (2174 Rust, 1537 web); test:smoke:agent (401). All pass.
+- date: 2026-11-14T18:49:39.221698+00:00
+  author: codex
+  text: |-
+    Merge held: the latest blocking review finding remains in fb7de879.
+
+    - automation_service.rs:2687-2710 deletes the durable parked request before reading/restoring the ticket and submitting the job. A read or submission failure loses the request; restoration failure still starts it under Blocked.
+    - Preserve the saved request until successful handoff, retain it on read/restore/submission failure, and add regression coverage.
+    - No merge, rebase, push or source edits performed. Checks not rerun because this unchanged blocking path needs rework first.
+    - Should an agent fix this remaining job-loss path before merging?
+- date: 2026-11-14T18:49:48.833419+00:00
+  author: automation
+  text: The merge agent's job job-20261114T184913.751Z-23 failed (lotar agent logs job-20261114T184913.751Z-23); the fix agent retries it on branch t3/review-dev-530-held-job-resume-1.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aadaa906d-5c3e-411d-b998-4015eb47b493
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A50a42e5d-ab8c-4c4e-a7e1-23c50ebf82b5
@@ -93,6 +105,7 @@ description: |-
   - [ ] npm run lint, npm test, npm run smoke pass.
 tags:
 - review-returned
+- merge-retried
 history:
 - at: 2026-11-14T07:27:35.590249+00:00
   actor: claude
@@ -272,3 +285,26 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-14T18:49:39.221698+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T18:49:48.799711+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: review-returned
+    new: review-returned, merge-retried
+- at: 2026-11-14T18:49:48.833419+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-14T18:49:48.958972+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox

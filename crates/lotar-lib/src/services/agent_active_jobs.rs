@@ -80,6 +80,25 @@ pub fn register(tasks_dir: &Path, job: &ActiveJob) {
     }
 }
 
+/// Write a `command` runner's prompt to a file only this user can read
+/// (`LOTAR_AGENT_PROMPT_FILE`, DEV-542). It stays while the job's program
+/// runs, also when this process exits first, and goes with the record.
+pub fn write_prompt(tasks_dir: &Path, job_id: &str, prompt: &str) -> std::io::Result<PathBuf> {
+    let name = safe_name(job_id).ok_or_else(|| std::io::Error::other(format!("Invalid job id '{job_id}'")))?;
+    let dir = dir(tasks_dir);
+    std::fs::create_dir_all(&dir)?;
+    let path = dir.join(format!("{name}.prompt"));
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    std::io::Write::write_all(&mut options.open(&path)?, prompt.as_bytes())?;
+    Ok(path)
+}
+
 pub fn unregister(tasks_dir: &Path, job_id: &str) {
     let Some(name) = safe_name(job_id) else {
         return;
@@ -87,6 +106,7 @@ pub fn unregister(tasks_dir: &Path, job_id: &str) {
     let dir = dir(tasks_dir);
     let _ = std::fs::remove_file(dir.join(format!("{name}.json")));
     let _ = std::fs::remove_file(dir.join(format!("{name}.cancel")));
+    let _ = std::fs::remove_file(dir.join(format!("{name}.prompt")));
     let _lock = lock_outcome(&dir, name);
     mark_ended(&dir, name);
     let _ = std::fs::remove_file(dir.join(format!("{name}.outcome.json")));
@@ -292,7 +312,10 @@ mod tests {
         assert_eq!(for_ticket(tasks.path(), "T-1"), Some(job.clone()));
         assert!(request_cancel(tasks.path(), "job-1"));
         assert!(cancel_requested(tasks.path(), "job-1"));
+        let prompt = write_prompt(tasks.path(), "job-1", "Do it").unwrap();
+        assert_eq!(std::fs::read_to_string(&prompt).unwrap(), "Do it");
         unregister(tasks.path(), "job-1");
+        assert!(!prompt.exists(), "the prompt goes with the record");
         assert!(list(tasks.path()).is_empty());
         assert!(!cancel_requested(tasks.path(), "job-1"));
 

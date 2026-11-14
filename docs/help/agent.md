@@ -33,7 +33,7 @@ Each agent profile names a runner. Every runner except `command` is the [harness
 | `gemini`, `cursor`, `droid`, `opencode`, `kilo`, `antigravity` | each CLI's own ACP mode |
 | `amp` | Amp's headless stream (Amp has no ACP mode; no resume) |
 | `t3` | a [T3 Code thread](#t3-code-threads), through T3's CLI |
-| `command` | any program: runs `command` with `args`; the prompt is in `LOTAR_AGENT_PROMPT` |
+| `command` | any program: runs `command` with `args`; the prompt is in the file `LOTAR_AGENT_PROMPT_FILE` names, and in `LOTAR_AGENT_PROMPT` up to 128 KiB |
 
 harnessmux installs the pinned ACP adapters (Claude, Codex) with npm on first use and starts the other CLIs from `PATH`; each CLI keeps its own sign-in. Which agents ran live and which follow their docs, the adapter versions, and how to point an agent at another program are in harnessmux's README and its `agents.toml`; a user `agents.toml` (in `~/.config/harnessmux/`) overrides them without a new LoTaR build. A profile can also set the program for its own jobs: `command` (with `args`) replaces the agent's command, and the pinned adapter with it, as a `command` in `agents.toml` does; `args` alone go after the agent's command. The agent keeps its option ids and permission modes from the table.
 
@@ -241,7 +241,7 @@ Every job also gets the ticket's `LOTAR_*` variables (`LOTAR_TICKET_ID`, `LOTAR_
 
 ## Windows agent commands
 
-A `command` runner's program runs through `lotar-agent-wrapper`. Windows cannot pass arguments with newlines or other special characters through `cmd.exe` safely, so when `command` resolves to a `.cmd`/`.bat` file, the wrapper tries to resolve the shim to the executable it forwards to and runs that directly: npm-generated `cmd` shims are recognized and executed as `node <cli.js>` with the original arguments followed by any baked shim suffix. Batch commands the wrapper cannot recognize keep going through `cmd.exe`. The prompt itself is in `LOTAR_AGENT_PROMPT`, not an argument, so it arrives byte-exact either way.
+A `command` runner's program runs through `lotar-agent-wrapper`. Windows cannot pass arguments with newlines or other special characters through `cmd.exe` safely, so when `command` resolves to a `.cmd`/`.bat` file, the wrapper tries to resolve the shim to the executable it forwards to and runs that directly: npm-generated `cmd` shims are recognized and executed as `node <cli.js>` with the original arguments followed by any baked shim suffix. Batch commands the wrapper cannot recognize keep going through `cmd.exe`. The prompt itself is not an argument, so it arrives byte-exact either way: it is in a file only the job's user can read, which `LOTAR_AGENT_PROMPT_FILE` names and LoTaR removes when the job ends, and also in `LOTAR_AGENT_PROMPT` when it is at most 128 KiB. Linux refuses to start a program with a longer environment variable, so a program that takes long prompts reads the file.
 
 ## Default instructions
 
