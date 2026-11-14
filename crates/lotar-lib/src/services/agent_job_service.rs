@@ -37,6 +37,20 @@ static JOB_REGISTRY: LazyLock<Mutex<JobRegistry>> = LazyLock::new(|| {
         max_parallel_jobs: None,
     })
 });
+/// Event log lines queued under `JOB_REGISTRY` in sequence order and written
+/// once it is released, so file I/O never holds up other jobs (DEV-521).
+static EVENT_LOG_QUEUE: Mutex<VecDeque<QueuedLogEvent>> = Mutex::new(VecDeque::new());
+/// Held while queued lines are written, so they reach the files in order.
+static EVENT_LOG_WRITER: Mutex<()> = Mutex::new(());
+
+struct QueuedLogEvent {
+    workspace_root: std::path::PathBuf,
+    logs_dir: Option<String>,
+    job_id: String,
+    kind: String,
+    at: String,
+    message: Option<String>,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum AgentJobStatus {
@@ -481,7 +495,7 @@ impl AgentJobService {
 
     pub fn cancel_job(id: &str) -> LoTaRResult<Option<AgentJob>> {
         let mut registry = JOB_REGISTRY.lock().map_err(|_| LoTaRError::ValidationError("Job registry unavailable".to_string()))?;
-        let (job, cancelled, was_pending) = {
+        let (job, cancelled, was_pending, process) = {
             let was_pending = registry.pending_queue.iter().any(|p| p.job_id == id);
             let Some(state) = registry.jobs.get_mut(id) else {
                 return Ok(None);
@@ -490,11 +504,10 @@ impl AgentJobService {
                 return Ok(Some(state.record.to_dto()));
             }
             // A session's turn is cancelled by its job's thread, which watches the status.
-            if let Some(AgentJobRuntime::Process(child)) = state.runtime.as_ref()
-                && let Ok(mut child) = child.lock()
-            {
-                terminate_child(&mut child);
-            }
+            let process = match state.runtime.as_ref() {
+                Some(AgentJobRuntime::Process(child)) => Some(Arc::clone(child)),
+                _ => None,
+            };
             let mut cancelled = false;
             if state.record.status != AgentJobStatus::Cancelled {
                 state.record.status = AgentJobStatus::Cancelled;
@@ -503,7 +516,7 @@ impl AgentJobService {
                 cancelled = true;
             }
             let job = state.record.to_dto_with_cancelled(cancelled);
-            (job, cancelled, was_pending)
+            (job, cancelled, was_pending, process)
         };
         if cancelled {
             // Remove from pending queue if it was queued
@@ -511,6 +524,15 @@ impl AgentJobService {
             // A dispatched job owns its slot until its thread (and child) has exited.
         }
         drop(registry);
+        // Stopped outside the lock: listing the processes is slow. A runner
+        // its thread already reaped is left alone, its pid may be reused.
+        if let Some(child) = process
+            && let Ok(mut child) = child.lock()
+            && matches!(child.try_wait(), Ok(None))
+        {
+            terminate_child(&mut child);
+        }
+        flush_event_log();
 
         if cancelled && was_pending {
             finalize_cancelled_job(id);
@@ -2146,6 +2168,7 @@ fn maybe_cleanup_worktree(job_id: &str, ticket_id: &str, tasks_dir: &std::path::
         );
     }
     drop(registry);
+    flush_event_log();
     cleanup_done_ticket_worktree(tasks_dir, ticket_id);
 }
 
@@ -2216,6 +2239,7 @@ fn remove_build_output(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Pat
         record_and_emit(state, "agent_job_progress", Some(format!("Deleted build output {list} from the worktree {}.", target.path.display())));
     }
     drop(registry);
+    flush_event_log();
     for parked in moved {
         let _ = remove_path(&parked);
     }
@@ -3436,6 +3460,7 @@ where
     {
         updater(state);
     }
+    flush_event_log();
 }
 
 /// Process the pending job queue - starts the next job if a slot is available
@@ -3519,16 +3544,33 @@ fn push_event(state: &mut AgentJobState, kind: &str, message: Option<String>) ->
         state.events = state.events[start..].to_vec();
     }
 
-    // Also append to persistent log file (if logging is enabled)
-    let _ = AgentLogService::append_event(
-        &state.record.workspace_root,
-        state.record.agent_logs_dir.as_deref(),
-        &state.record.id,
-        &event.kind,
-        &event.at,
-        event.message.clone(),
-    );
+    // Also append to persistent log file (if logging is enabled), once the
+    // caller has released the registry: see `flush_event_log`.
+    if let Ok(mut queue) = EVENT_LOG_QUEUE.lock() {
+        queue.push_back(QueuedLogEvent {
+            workspace_root: state.record.workspace_root.clone(),
+            logs_dir: state.record.agent_logs_dir.clone(),
+            job_id: state.record.id.clone(),
+            kind: event.kind.clone(),
+            at: event.at.clone(),
+            message: event.message.clone(),
+        });
+    }
     event
+}
+
+/// Write the event log lines `push_event` queued. Call it after releasing
+/// `JOB_REGISTRY`; the lines are written by the time it returns.
+fn flush_event_log() {
+    let Ok(_writer) = EVENT_LOG_WRITER.lock() else {
+        return;
+    };
+    loop {
+        let Some(entry) = EVENT_LOG_QUEUE.lock().ok().and_then(|mut queue| queue.pop_front()) else {
+            return;
+        };
+        let _ = AgentLogService::append_event(&entry.workspace_root, entry.logs_dir.as_deref(), &entry.job_id, &entry.kind, &entry.at, entry.message);
+    }
 }
 
 fn emit_job_event(event: &AgentJobEvent, record: &AgentJobRecord) {
@@ -3904,6 +3946,38 @@ mod tests {
         assert_eq!(first.message, second.message);
         assert_ne!(first.sequence, second.sequence);
         assert_eq!(state.events.iter().map(|event| event.sequence).collect::<Vec<_>>(), vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn push_event_writes_the_log_only_when_flushed_after_the_lock() {
+        let workspace = tempdir().expect("temp dir");
+        let mut state = unit_job_state("job-dev521-log");
+        state.record.workspace_root = workspace.path().to_path_buf();
+        state.record.agent_logs_dir = Some("logs".to_string());
+        AgentLogService::init_log(
+            workspace.path(),
+            Some("logs"),
+            crate::services::agent_log_service::JobLogHeader {
+                job_id: state.record.id.clone(),
+                ticket_id: "TEST-1".to_string(),
+                runner: "command".to_string(),
+                created_at: Utc::now().to_rfc3339(),
+                worktree_path: None,
+                worktree_branch: None,
+                model: None,
+                effort: None,
+                agent_profile: None,
+            },
+        )
+        .expect("init log");
+        push_event(&mut state, "agent_job_started", None);
+        push_event(&mut state, "agent_job_progress", Some("second".into()));
+        let logged = || AgentLogService::load_events(workspace.path(), "logs", "job-dev521-log").expect("load events");
+        assert!(logged().is_empty(), "no file I/O while the registry may be locked");
+
+        flush_event_log();
+        let kinds: Vec<String> = logged().into_iter().map(|entry| entry.kind).collect();
+        assert_eq!(kinds, vec!["agent_job_started", "agent_job_progress"], "written in sequence order");
     }
 
     #[test]
