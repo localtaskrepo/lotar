@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-13T07:10:08.883832+00:00
-modified: 2026-11-14T03:42:31.278077+00:00
+modified: 2026-11-14T03:58:30.494578+00:00
 relationships:
   depends_on:
   - DEV-482
@@ -51,6 +51,12 @@ comments:
 - date: 2026-11-14T03:42:31.278077+00:00
   author: claude
   text: 'mallox in the thread (2026-11-14): DEV-490''s two fix jobs had failed on the Codex usage limit; he reset the Codex credits and the task is running again. Status: DEV-482, DEV-502, DEV-488, DEV-489, DEV-497 Done and on main (unpushed, with ad67e063 for the release records); DEV-490 left.'
+- date: 2026-11-14T03:54:30.118804+00:00
+  author: claude
+  text: 'Step 1 done: all six scope tickets are Done and on main (DEV-482 bd1d61c1, DEV-502 3c4e7f71, DEV-488 2f9b8e97, DEV-497 3ec533d6, DEV-489 4109a6f4, DEV-490 7dc2a9f0), 15 commits not pushed yet. DEV-504 and DEV-507 (on main, in no release) added to release 0.15.0. Waiting for this release: LOCA-313, STD-100, DEV-508 (crates.io trusted publishing; this is the first release that publishes lotar, lotar-lib and lotar-web-assets to crates.io). Step 2 in progress: version 0.15.0 in Cargo.toml (workspace and the two exact crate versions) and Cargo.lock, install.md "From v0.15.0 on" for the macOS signing; lint, test and smoke running.'
+- date: 2026-11-14T03:58:30.494578+00:00
+  author: claude
+  text: 'Step 2 done: version 0.15.0. Checks on main with the bump: npm run lint:agent passed; npm run test:agent passed (2186 Rust, 1531 UI, 50 release/package, 7 hook tests); npm run test:smoke:agent passed (396). Committing and pushing main for the Quality Assurance run.'
 releases:
 - 5
 description: |-
@@ -238,6 +244,14 @@ history:
     old: '{"depends_on":["DEV-482","DEV-502","DEV-488","DEV-489","DEV-490","DEV-497"],"blocks":["DEV-508"],"related":["DEV-418","DEV-419","DEV-464","DEV-472","DEV-476","DEV-478","DEV-480","DEV-482","DEV-486","DEV-488","DEV-494","DEV-497","DEV-502","DEV-493","DEV-504","DEV-507"]}'
     new: '{"depends_on":["DEV-482","DEV-502","DEV-488","DEV-489","DEV-490","DEV-497"],"blocks":["DEV-508"],"related":["DEV-418","DEV-419","DEV-464","DEV-472","DEV-476","DEV-478","DEV-480","DEV-482","DEV-486","DEV-488","DEV-494","DEV-497","DEV-502","DEV-493","DEV-504","DEV-507","DEV-503"]}'
 - at: 2026-11-14T03:42:31.278077+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T03:54:30.118804+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T03:58:30.494578+00:00
   actor: claude
   changes:
   - field: comment_added

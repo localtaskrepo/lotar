@@ -10,7 +10,7 @@ default-members = [".", "crates/lotar-lib", "crates/lotar-web-assets"]
 resolver = "3"
 
 [workspace.package]
-version = "0.14.3"
+version = "0.15.0"
 edition = "2024"
 authors = ["Ravi Gairola <mallox@pyxzl.net>"]
 license = "MIT"
@@ -23,8 +23,8 @@ serde_json = { version = "1.0.154", features = ["std"], default-features = false
 clap = { version = "4.6.7", features = ["derive", "std", "env", "error-context", "suggestions"], default-features = false }
 # The workspace crates, published together at the workspace version: bump
 # these with [workspace.package] (docs/release-guide.md).
-lotar-lib = { path = "crates/lotar-lib", version = "=0.14.3" }
-lotar-web-assets = { path = "crates/lotar-web-assets", version = "=0.14.3" }
+lotar-lib = { path = "crates/lotar-lib", version = "=0.15.0" }
+lotar-web-assets = { path = "crates/lotar-web-assets", version = "=0.15.0" }
 
 [package]
 name = "lotar"

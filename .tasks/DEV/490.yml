@@ -1,11 +1,11 @@
 title: 'Hand-off report comments: commits, checks passed, failed and not run, next step'
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T21:14:11.750735+00:00
-modified: 2026-11-14T03:52:19.676341+00:00
+modified: 2026-11-14T03:52:28.467627+00:00
 relationships:
   depends_on:
   - DEV-488
@@ -135,9 +135,6 @@ tags:
 - backend
 - blocked
 - blocked-by:DEV-488
-- review-returned
-- merge-retried
-- fix-retried
 - ui
 history:
 - at: 2026-11-13T21:14:12.167161+00:00
@@ -646,3 +643,12 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-488"],"blocks":["DEV-417"],"related":["DEV-466","DEV-489","DEV-494","DEV-502","DEV-491"]}'
     new: '{"depends_on":["DEV-488"],"blocks":["DEV-417"],"related":["DEV-466","DEV-489","DEV-494","DEV-502","DEV-491","DEV-493"]}'
+- at: 2026-11-14T03:52:28.467627+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: web-ui, backend, blocked, blocked-by:DEV-488, review-returned, merge-retried, fix-retried, ui
+    new: web-ui, backend, blocked, blocked-by:DEV-488, ui

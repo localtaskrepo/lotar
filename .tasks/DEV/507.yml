@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T00:50:32.865133+00:00
-modified: 2026-11-14T02:17:43.409296+00:00
+modified: 2026-11-14T03:53:46.235212+00:00
 relationships:
   related:
   - DEV-497
@@ -64,6 +64,8 @@ references:
 - file: .github/workflows/release.yml
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acfc0df72-92ca-4433-97a8-8cdc0cc79f9f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A513498d0-46e2-46a7-93e8-9cfa9800071d
+releases:
+- 5
 description: |-
   The owner is publishing lotar on crates.io (2026-11-13: "We're actually currently working on publishing in crates. The token has already been added"). After DEV-497 the workspace has three publishable crates (lotar = the binary, lotar-lib, lotar-web-assets), but two of them still read files outside their crate folder, which cargo package leaves out:
 
@@ -348,3 +350,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-497","DEV-163","DEV-508","DEV-417","DEV-489"]}'
     new: '{"related":["DEV-497","DEV-163","DEV-508","DEV-417","DEV-489","DEV-503"]}'
+- at: 2026-11-14T03:53:46.235212+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#5'

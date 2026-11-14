@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T22:45:12.815612+00:00
-modified: 2026-11-14T01:24:03.291213+00:00
+modified: 2026-11-14T03:53:46.194276+00:00
 relationships:
   blocks:
   - DEV-503
@@ -77,6 +77,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1d141b3f-b2f2-448d-b3f0-5ea7a2827f40
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4ac64f48-54b1-4379-bb9d-f53b4f59cb4a
+releases:
+- 5
 description: 'Approved design: docs/developers/harness-tool-design.md (DEV-492; on main once DEV-492 merges, until then on branch agent/DEV-492). The owner, 2026-11-13, approved it and chose "Start now" for this ticket, including creating the public GitHub repo. Create ~/Development/@localtaskrepo/harnessmux and the public repo localtaskrepo/harnessmux (MIT, like lotar; self-contained: set up, checked and run from a clone alone, shared configs from ~/Development/standards copied in). Build on ACP with the agent-client-protocol crate at its latest stable release (look it up, 5.2.0 on 2026-11-13). What it does, from the design: session registry with names; the session owner (lotar''s process or a harnessmux process) holds the ACP connection and serves a Unix socket (named pipe on Windows) for send, cancel, answer, set, status; resume via session/resume, fallback session/load; one mapping for model, effort and permissions (read-only, workspace, full); a versioned JSONL event stream; MCP servers per session; capabilities; the agent table (command, pinned adapter version, option ids) as TOML data read at run time. CLI: run, send, attach, resume, cancel, answer, set, list, status, close, capabilities, mcp. Agents: every one lotar runs today (claude, codex, copilot, gemini, cursor, amp without ACP as a legacy adapter, droid, opencode, kilo, antigravity); live-check Claude, Codex and Copilot (installed here), the rest from their docs, marked as not run live. Lessons from the acpx trial in the design doc: pin current adapters (codex-acp 1.x failed, 2.6.0 works), adapter errors sent as text become turn.failed. Tests from recorded ACP sessions; CI on macOS, Linux and Windows. Done when: the repo exists with README, LICENSE and CI passing, a first release of the crate and CLI is out, and a comment lists what ran live and what DEV-503 (the lotar switch) needs.'
 history:
 - at: 2026-11-13T22:45:13.018040+00:00
@@ -199,3 +201,8 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-14T03:53:46.194276+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#5'
