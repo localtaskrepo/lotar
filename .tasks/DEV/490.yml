@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T21:14:11.750735+00:00
-modified: 2026-11-14T03:52:28.467627+00:00
+modified: 2026-11-14T05:29:56.577667+00:00
 relationships:
   depends_on:
   - DEV-488
@@ -79,6 +79,9 @@ comments:
 - date: 2026-11-14T03:52:19.515117+00:00
   author: codex
   text: 'Merge complete on main as cd28c87b after folding task records into 22b5d7af. Main is clean. Not pushed: the earliest unpushed commit 23484856 belongs to DEV-493, currently HelpNeeded; DEV-417 is also Todo. No finished prefix before that commit is available to push. Required checks were skipped based on the recorded passing results for unchanged code commit 22b5d7af. Status and assignee left to job automation.'
+- date: 2026-11-14T05:29:56.577667+00:00
+  author: codex
+  text: 'Continued verification and saved supplemental coverage in signed commit ec314dd82605ff1e8f81fc969350d24eeb6ba6a7 (signature G): REST refuses a report with a review verdict, and the report smoke captures light/dark at 1920, 1440 and 390 px. Existing reconciliation keeps both features, routes review --commit to the review field, refuses reports with question/answer/review, and preserves both filter chips. Latest ticket history confirms the feature already landed on main as cd28c87b; do not replay the older feature commits. Next: review/cherry-pick only ec314dd8 if the extra coverage is wanted. No merge or push performed here. Checks on this checkout: RUSTC_WRAPPER= npm run lint:agent passed; npm run build:web then RUSTC_WRAPPER= npm test passed (2186 Rust, 1531 UI, release 50, hooks 7); RUSTC_WRAPPER= npm run test:smoke:agent passed (112 files, 396 tests). Earlier attempts hit sccache sandbox denials, missing generated assets and timing/cleanup failures; the complete reruns passed. Not run: checks against current main plus the supplemental commit; no checks skipped on this checkout. Inspected all six new screenshot captures and attached them: attachment:after-light-1920.0d92dde49a935d66c30375b51e8a6016.png (identical crop at 1440, deduplicated), attachment:after-light-390.73789178a2cb0d2e9490effbc1884fd4.png, attachment:after-dark-1920.5275e9664b532d330a6b8e200793dfeb.png, attachment:after-dark-1440.543bbdfc7d16a53472f6d120825407c3.png, attachment:after-dark-390.194dcebbda6afc1835aa55810eb6e0d7.png. Before/after baseline matrix remains linked in the 03:50 fix comment (rebased attachments). UI tag added. Status and assignee unchanged; job automation handles the next step. No durable guidance finding.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A92f9648a-c12b-4124-9284-32c1807b437d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2ba70837-175f-468d-9c07-7e1e47d39a19
@@ -111,6 +114,11 @@ references:
 - attachment: DEV-490-before-light-1920-rebased.013cc0ad84139b407b3bdd0768e483ac.png
 - attachment: DEV-490-before-light-390-rebased.1945a4d46d61b9abbed90461aaa23809.png
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A54ac2bf7-8329-43d0-9ee1-f7456e89ab50
+- attachment: after-light-1920.0d92dde49a935d66c30375b51e8a6016.png
+- attachment: after-light-390.73789178a2cb0d2e9490effbc1884fd4.png
+- attachment: after-dark-1920.5275e9664b532d330a6b8e200793dfeb.png
+- attachment: after-dark-1440.543bbdfc7d16a53472f6d120825407c3.png
+- attachment: after-dark-390.194dcebbda6afc1835aa55810eb6e0d7.png
 releases:
 - 5
 description: |-
@@ -652,3 +660,32 @@ history:
   - field: tags
     old: web-ui, backend, blocked, blocked-by:DEV-488, review-returned, merge-retried, fix-retried, ui
     new: web-ui, backend, blocked, blocked-by:DEV-488, ui
+- at: 2026-11-14T05:27:22.418812+00:00
+  actor: codex
+  changes:
+  - field: reference_added
+    new: attachment:after-light-1920.0d92dde49a935d66c30375b51e8a6016.png
+- at: 2026-11-14T05:27:26.483522+00:00
+  actor: codex
+  changes:
+  - field: reference_added
+    new: attachment:after-light-390.73789178a2cb0d2e9490effbc1884fd4.png
+- at: 2026-11-14T05:27:28.476527+00:00
+  actor: codex
+  changes:
+  - field: reference_added
+    new: attachment:after-dark-1920.5275e9664b532d330a6b8e200793dfeb.png
+- at: 2026-11-14T05:27:30.945812+00:00
+  actor: codex
+  changes:
+  - field: reference_added
+    new: attachment:after-dark-1440.543bbdfc7d16a53472f6d120825407c3.png
+- at: 2026-11-14T05:27:33.795344+00:00
+  actor: codex
+  changes:
+  - field: reference_added
+    new: attachment:after-dark-390.194dcebbda6afc1835aa55810eb6e0d7.png
+- at: 2026-11-14T05:29:56.577667+00:00
+  actor: codex
+  changes:
+  - field: comment_added

@@ -1,11 +1,11 @@
 title: Automation's comments render muted in the Comments tab
-status: Merging
+status: Done
 priority: Low
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T21:14:14.411039+00:00
-modified: 2026-11-14T04:46:42.028646+00:00
+modified: 2026-11-14T04:56:19.523220+00:00
 relationships:
   blocks:
   - DEV-513
@@ -17,6 +17,7 @@ relationships:
   - DEV-489
   - DEV-490
   - DEV-513
+  - DEV-503
 comments:
 - date: 2026-11-13T21:26:16.645800+00:00
   author: claude
@@ -110,8 +111,6 @@ description: |-
 tags:
 - web-ui
 - light
-- review-returned
-- merge-retried
 history:
 - at: 2026-11-13T21:14:15.153197+00:00
   actor: claude
@@ -464,3 +463,18 @@ history:
   actor: codex
   changes:
   - field: comment_added
+- at: 2026-11-14T04:47:18.491167+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: web-ui, light, review-returned, merge-retried
+    new: web-ui, light
+- at: 2026-11-14T04:56:19.523220+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-513"],"related":["DEV-466","DEV-488","DEV-481","DEV-502","DEV-489","DEV-490","DEV-513"]}'
+    new: '{"blocks":["DEV-513"],"related":["DEV-466","DEV-488","DEV-481","DEV-502","DEV-489","DEV-490","DEV-513","DEV-503"]}'

@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-13T22:21:42.733070+00:00
-modified: 2026-11-14T04:37:42.801445+00:00
+modified: 2026-11-14T05:27:32.965362+00:00
 relationships:
   depends_on:
   - DEV-493
@@ -14,6 +14,10 @@ relationships:
   related:
   - DEV-107
   - DEV-493
+comments:
+- date: 2026-11-14T05:27:32.965362+00:00
+  author: claude
+  text: 'Plan (claude, 2026-11-13): CI already builds without incremental (rust-cache sets CARGO_INCREMENTAL=0; the Windows log shows it). Windows sccache had 0 hits in the last 5 main runs: rust-cache restores the dependencies, and every one of those pushes changed lotar-lib and view/, so the 3 workspace crates missed. Its 5 entries of 1 GB fill half of the Actions cache (10.2 GB in use). rust-cache''s cache-workspace-crates (v2.9.3) doesn''t help: cargo judges local crates by mtime, a fresh checkout makes them stale, and rust-cache saves only when its key changes. So: sccache with a small cap on build_artifacts, rust_checks and windows_checks, CARGO_INCREMENTAL=0 set explicitly, saved only from main. Local numbers first, CI numbers need a push.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2c9b49ac-88aa-4223-8194-4149b3d24d9e
 description: |-
@@ -71,3 +75,7 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2c9b49ac-88aa-4223-8194-4149b3d24d9e
+- at: 2026-11-14T05:27:32.965362+00:00
+  actor: claude
+  changes:
+  - field: comment_added

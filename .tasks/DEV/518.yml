@@ -1,0 +1,54 @@
+title: 'Task timeline: changes, comments, commits and agents'' threads in one place'
+status: InProgress
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-14T05:10:07.050179+00:00
+modified: 2026-11-14T05:10:09.719826+00:00
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8ddb31cb-de74-4057-9c5b-8cde01f3cd0e
+description: |-
+  ## Why
+
+  What every agent said and did on a task is scattered: comments in one tab, field changes in History, commits in another, and agent threads only on the Agent jobs page, one job at a time and only while the server still holds the job in memory. After a restart the threads vanish from the UI although `@agent-logs/<JOB>.jsonl` still has them. A new agent picking up the task has no way to read what earlier agents said.
+
+  ## Decision (owner, 2026-11-13)
+
+  - Timeline replaces the History tab (changes, comments, commits, agent runs, filterable). Comments and Commits tabs stay.
+  - Readable by the owner in the UI and by agents through the CLI and MCP.
+
+  ## Done when
+
+  - [ ] `/api/jobs?ticket_id=` and `/api/jobs/logs` include jobs from the saved job logs, so past jobs and their threads survive a restart (moved tickets still match). The Agent jobs page shows them too.
+  - [ ] The task panel's Timeline tab lists changes, comments, commits and agent runs in time order with filter chips; an agent run shows profile, model, status, duration, cost and summary, and expands to its thread (loaded on open, live while running).
+  - [ ] `lotar task timeline <ID>` and an MCP tool return the same timeline compactly (summaries, comments, changes), with the full threads on request.
+  - [ ] `api_types.rs`, `view/api/types.ts`, `docs/openapi.json` and help docs agree; Playwright smoke covers the tab.
+
+  ## Code
+
+  - `crates/lotar-lib/src/services/agent_log_service.rs`, `agent_job_service.rs`, `routes/jobs.rs`
+  - `view/components/task-panel/TaskPanelHistoryTab.vue`, `view/components/AgentJobLog.vue`, `view/components/TaskPanel.vue`
+  - `crates/lotar-lib/src/mcp/`, `crates/lotar-lib/src/cli/`
+
+  Not covered: sessions not started by lotar (a T3 Code thread working a ticket by hand) leave only comments and history.
+tags:
+- web-ui
+- api
+history:
+- at: 2026-11-14T05:10:07.368674+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-14T05:10:07.861445+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-14T05:10:09.719826+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8ddb31cb-de74-4057-9c5b-8cde01f3cd0e

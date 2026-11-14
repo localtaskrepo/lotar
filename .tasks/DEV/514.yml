@@ -1,13 +1,29 @@
 title: A rule's run command skipped in an untrusted repo leaves no trace on the ticket, while the rule's set still applies
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-14T04:21:14.746777+00:00
-modified: 2026-11-14T04:37:42.773294+00:00
+modified: 2026-11-14T05:08:56.851333+00:00
+relationships:
+  related:
+  - DEV-517
+  - DEV-485
+  - DEV-503
+comments:
+- date: 2026-11-14T04:53:42.802247+00:00
+  author: claude
+  text: 'Fixed in 0ffe8a13 on agent/DEV-514. A repository rule''s run skipped in an untrusted (or changed) workspace is now reported every time, not once per process: stderr line "Automation rule ''<name>'' skipped on <ID>. Skipped its run command: ... run `lotar trust` ...", an automation_skipped SSE event {id, rule, message}, and an automation comment on the ticket (so it shows in the web UI). The rule''s other actions (set, add, remove, comment, tell_agent) still apply, as before; docs/help/automation.md, trust.md and sse.md say so. No option to skip them was added. Test: dev259_workspace_trust_test::a_skipped_run_command_is_reported_on_the_ticket (failed before, passes now). Checks: npm run lint:agent clean; test:agent 2187 Rust + 1531 UI + release/hook tests passed; smoke 396/396 passed.'
+- date: 2026-11-14T04:57:41.412519+00:00
+  author: codex
+  text: 'Review: passed. Reviewed 0ffe8a13, all five changed files, ticket/comments (no relationships), guidance and recent main history, trust/SSE/comment update paths. No blocking findings; no UI files changed. diff --check passed. Focused trust suite: 4/4 passed with RUSTC_WRAPPER= after sandbox denied sccache. Runner exited 1 afterward due to macOS xcrun_db temp residue. Full lint/UI/smoke not rerun; prior passes are recorded by fix agent. No files, commits, status or assignee changed.'
+- date: 2026-11-14T05:07:30.745402+00:00
+  author: codex
+  text: 'Merge blocked: rebased reviewed fix onto main c9cf3a00; saved as d08b01d8 with clean worktree. No merge or push performed. Final smoke passed 399 tests. Required lint and test gates fail on main change DEV-485: crates/lotar-lib/tests/integration.rs:154 declares a missing module; its test is instead in root tests/ and has six unwrap lint errors. Filed DEV-517 (finding merge:dev485-test-module). Earlier pre-DEV-485 rebase passed lint, full tests and 399 smoke tests after sandbox retries. May this merge resume after DEV-517 fixes main?'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af7f15d28-6992-41b4-bd09-eed8961e0852
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab57d0c5c-ceda-4f63-8153-bf88fcc57404
 description: 'Found 2026-11-14 (standards STD-110): standards'' .tasks changed after the last lotar trust, so the server skipped the inbox relay command for five owner answers but applied the rule''s set status Done; the only trace is one ''[lotar][warn] Skipped automation run commands'' line in the server''s stderr (printed once per process), nothing on the tickets, no automation_failed SSE event. Check: in a scratch repo with a rule that has run and set, change automation.yml after lotar trust, fire the rule: the ticket shows nothing. Done: a skipped run is reported like a failed one (Automation rule ''<name>'' skipped on <ID>, an automation_failed or automation_skipped SSE event, visible in the web UI), and docs/help/automation.md says whether the rule''s other actions apply when its run is skipped (an option to skip them would fit).'
 tags:
 - health
@@ -30,3 +46,65 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af7f15d28-6992-41b4-bd09-eed8961e0852
+- at: 2026-11-14T04:53:42.802247+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T04:53:51.933458+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T04:55:14.911948+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab57d0c5c-ceda-4f63-8153-bf88fcc57404
+- at: 2026-11-14T04:57:41.412519+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T04:57:48.394871+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-14T05:06:46.350556+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-517"]}'
+- at: 2026-11-14T05:07:30.745402+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T05:07:31.009132+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-517"]}'
+    new: '{"related":["DEV-517","DEV-485"]}'
+- at: 2026-11-14T05:07:39.747015+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-14T05:08:56.851333+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-517","DEV-485"]}'
+    new: '{"related":["DEV-517","DEV-485","DEV-503"]}'

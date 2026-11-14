@@ -1,0 +1,80 @@
+title: DEV-485 test is outside the integration module directory and fails lint
+status: Merging
+priority: Medium
+type: Feature
+reporter: codex
+assignee: '@merge'
+created: 2026-11-14T05:06:45.628247+00:00
+modified: 2026-11-14T05:25:36.384041+00:00
+relationships:
+  related:
+  - DEV-514
+comments:
+- date: 2026-11-14T05:19:24.180019+00:00
+  author: claude
+  text: 'Moved tests/dev485_offered_custom_fields_test.rs to crates/lotar-lib/tests/, where integration.rs already declares it (its #![allow(clippy::unwrap_used)] covers the unwraps). Commit 85996b6d. Checks: npm run lint:agent, npm run test:agent (2146 Rust + 1536 UI tests; needs npm run build:web first in a fresh worktree), npm run smoke (400 tests) all pass.'
+- date: 2026-11-14T05:25:29.676446+00:00
+  author: codex
+  text: 'Review: passed. Reviewed 85996b6d against main d08b01d8, ticket/comments, related DEV-514, repository guidance, Cargo integration target/module declaration, test lint policy and recent history. Unchanged rename fixes the declared module path; no duplicate remains. No findings, UI changes, owner decisions or follow-up tickets. diff --check, lint:agent and all four relocated nextest tests passed with RUSTC_WRAPPER= after sccache sandbox denial. Full test:agent stopped on sandbox-denied localhost binds and xcrun_db residue; later UI/release/hooks stages did not run. Build-first smoke: 146 passed, 254 failed with localhost binding denied and temp residue. Prior full passes were not independently confirmed here. No tracked files, commits, status or assignee changed; no durable guidance finding.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A879c4fa0-ab3a-41a8-9787-28f26a8107e7
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1a9e65e1-f959-47b7-9e5a-a63b75a8b2cf
+description: 'Found while verifying DEV-514 rebased onto main c9cf3a00. npm run test:agent fails E0583 at crates/lotar-lib/tests/integration.rs:154: dev485_offered_custom_fields_test is missing there; the file is under root tests/ instead. npm run lint:agent also reports six unwrap lint errors in that root test. Done: place the test at the intended integration module path and pass lint and tests.'
+tags:
+- health
+custom_fields:
+  finding: merge:dev485-test-module
+history:
+- at: 2026-11-14T05:06:46.352606+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-514"]}'
+- at: 2026-11-14T05:06:47.428067+00:00
+  actor: codex
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-14T05:09:08.738602+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-14T05:09:10.213935+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A879c4fa0-ab3a-41a8-9787-28f26a8107e7
+- at: 2026-11-14T05:19:24.180019+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T05:19:31.087558+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T05:19:55.481031+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1a9e65e1-f959-47b7-9e5a-a63b75a8b2cf
+- at: 2026-11-14T05:25:29.676446+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T05:25:36.384041+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

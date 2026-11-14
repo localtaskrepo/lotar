@@ -1,0 +1,29 @@
+title: Agent jobs recover from sandbox-blocked build checks without premature handback
+status: Blocked
+priority: High
+type: Bug
+reporter: codex
+created: 2026-11-14T04:57:22.931962+00:00
+modified: 2026-11-14T04:57:31.833013+00:00
+relationships:
+  depends_on:
+  - DEV-503
+  blocks:
+  - DEV-513
+  related:
+  - DEV-509
+releases:
+- 6
+description: 'Owner requested before v0.15.1 release, 2026-11-14. Repeated DEV-503 runs stopped because sccache was denied by the Codex sandbox; shared Git metadata and main task storage also need scoped access. Latest merge handed back immediately after lint hit sccache despite documented approved retry and RUSTC_WRAPPER fallback. Investigate harnessmux permission plumbing and job instructions together; coordinate with DEV-509. Done when: regression coverage exercises permission-blocked checks and supported retries; sandboxed Codex jobs complete Rust checks through approved cache access or wrapper fallback; shared Git metadata and main tasks use scoped approval or host-side operations; genuine check failures still stop merge; verify end-to-end fix/review/merge with mux. Preserve workspace isolation, no broad full-access default. Add to v0.15.1 and make its release ticket depend on this fix.'
+history:
+- at: 2026-11-14T04:57:31.679572+00:00
+  actor: codex
+  changes:
+  - field: releases
+    new: '#6'
+- at: 2026-11-14T04:57:31.833013+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"related":["DEV-509"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-509"]}'
