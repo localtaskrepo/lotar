@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T23:27:11.643153+00:00
-modified: 2026-11-15T01:28:23.008639+00:00
+modified: 2026-11-15T07:59:20.931783+00:00
 relationships:
   related:
   - DEV-471
@@ -48,6 +48,8 @@ references:
 - file: smoke/helpers/server.ts
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A88d330b2-bc53-4fb8-a29a-a8332054c7e2
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0d0a2402-60ac-4ea4-8374-a7220a270c7c
+releases:
+- 6
 description: |-
   A `lotar serve --port 0 --host 127.0.0.1` from a smoke run kept running for 38 hours: started Fri 2026-11-13 01:01, parent `launchd` (PID 1), working directory `$TMPDIR/lotar-vitest-temp-BBXdQh/responsive-sprints--70243-5BYd7ZQWRCcj`, binary `/opt/homebrew/bin/lotar`. The owner had it stopped on 2026-11-14 (PID 72775). Leftover servers hold a port, a file watcher and memory, and every agent's smoke run can add one.
 
@@ -146,3 +148,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-471"]}'
     new: '{"related":["DEV-471","DEV-481"]}'
+- at: 2026-11-15T07:59:20.931783+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

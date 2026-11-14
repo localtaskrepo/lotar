@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T07:09:13.519705+00:00
-modified: 2026-11-15T07:52:22.808127+00:00
+modified: 2026-11-15T07:59:19.219402+00:00
 relationships:
   related:
   - DEV-320
@@ -123,6 +123,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aca68f52e-9504-466a-ba65-fba40cb044a0
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A47bb78bc-5881-46f7-b34f-00f3f6d4c8e2
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A81f177d1-3ae2-4ce3-a687-1af428112f6a
+releases:
+- 6
 description: |-
   Found while working DEV-524. DEV-468 at 2026-11-13 19:40:30Z: merge job job-20261113T193938.781Z-34 failed. The merge agent (codex) had set HelpNeeded and assigned the reporter `claude` during the job ("Returning to reporter for integration follow-up"; its log says "HelpNeeded, assigned to claude"). At job end the rule "Merge failed: retry with @fix" ran: it added merge-retried and commented "the fix agent retries it on branch ...", but the job's recorded outcome replaced its `assignee: @fix` (DEV-320), so the ticket went to HelpNeeded under claude and no fix agent started. Nothing picks up tickets assigned to an agent's reporter name, so it sat for 11 hours.
 
@@ -400,3 +402,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-320","DEV-468","DEV-524","DEV-530","DEV-467","DEV-323","DEV-554","DEV-516","DEV-544","DEV-550","DEV-555","DEV-510"]}'
     new: '{"related":["DEV-320","DEV-468","DEV-524","DEV-530","DEV-467","DEV-323","DEV-554","DEV-516","DEV-544","DEV-550","DEV-555","DEV-510","DEV-543"]}'
+- at: 2026-11-15T07:59:19.219402+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

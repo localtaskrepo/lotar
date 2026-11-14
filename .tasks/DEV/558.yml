@@ -5,7 +5,7 @@ type: Feature
 reporter: codex
 assignee: '@merge'
 created: 2026-11-15T06:59:10.494033+00:00
-modified: 2026-11-15T07:41:34.441642+00:00
+modified: 2026-11-15T07:59:22.509629+00:00
 relationships:
   related:
   - DEV-557
@@ -47,6 +47,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A54d556e7-7ef6-4b71-8f8f-9eab806bb0bd
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3d4b2ba4-11db-4618-a6f3-5e3bf6e8fec7
+releases:
+- 6
 description: 'Found during DEV-557 merge verification on d87f98b2. Approved unsandboxed npm run test:smoke:agent: 403 passed, 1 failed. smoke/tests/ui.tag-colors.smoke.spec.ts:88 expects no /api/tasks/list request after selecting in-use tags, but received it. Check the request timing and behavior; fix the cause and verify the full smoke gate. Related: DEV-557.'
 tags:
 - health
@@ -144,3 +146,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-557","DEV-548","DEV-509","DEV-520"]}'
     new: '{"related":["DEV-557","DEV-548","DEV-509","DEV-520","DEV-467"]}'
+- at: 2026-11-15T07:59:22.509629+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

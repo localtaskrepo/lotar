@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T07:31:46.259047+00:00
-modified: 2026-11-14T08:49:16.080389+00:00
+modified: 2026-11-15T07:59:19.526119+00:00
 relationships:
   related:
   - DEV-320
@@ -25,6 +25,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7e46419f-858b-4095-8351-aaa31ab05631
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aef967ab6-933f-45e8-9887-13c56573a82e
+releases:
+- 6
 description: 'Found in DEV-516: job_env (agent_job_service.rs) passes build_lotar_env with the job context, so harnessmux sessions and command-runner agents get LOTAR_AGENT_JOB_ID and LOTAR_TICKET_ID. TaskService::is_job_lifecycle (task_service.rs:1558) then counts the agent''s own lotar status/assignee commands as job lifecycle, and they apply directly mid-job instead of being recorded as the job''s outcome (DEV-320); its doc comment says agents don''t carry these. Seen in DEV-516''s integration test: a command-runner merge agent''s ''lotar status HelpNeeded'' showed while the job still ran. Check: an ACP or command agent''s status change during a job is recorded via record_outcome and applied at the job''s end. Done: agents'' changes are recorded like T3 threads'', automation run commands stay lifecycle, with a test.'
 tags:
 - health
@@ -100,3 +102,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-15T07:59:19.526119+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

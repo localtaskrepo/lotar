@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T18:09:18.622094+00:00
-modified: 2026-11-14T18:42:48.737547+00:00
+modified: 2026-11-15T07:59:20.125388+00:00
 relationships:
   related:
   - DEV-279
@@ -22,6 +22,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A381bf7bf-62ed-432e-8bfc-d55ad9d744e7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3e5fdc24-59c3-489d-bce6-284393f127c7
+releases:
+- 6
 description: |-
   DEV-279 (Agent jobs across processes: detection, cancel/status, orphaned MCP jobs, queue drops, Windows cancel) is Done, but a comment names a step still open and no open ticket is linked: "Not done: shipping the wrapper in release archives (no longer needed for these features)." (lotar show DEV-279)
 
@@ -102,3 +104,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-15T07:59:20.125388+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

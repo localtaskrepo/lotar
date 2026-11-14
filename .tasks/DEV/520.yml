@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-14T05:38:48.737497+00:00
-modified: 2026-11-15T07:41:34.439929+00:00
+modified: 2026-11-15T08:00:22.827013+00:00
 relationships:
   related:
   - DEV-501
@@ -17,6 +17,8 @@ relationships:
   - DEV-557
   - DEV-558
   - DEV-467
+  - DEV-513
+  - DEV-530
 comments:
 - date: 2026-11-14T06:11:36.177470+00:00
   author: claude
@@ -231,6 +233,14 @@ comments:
     - Older DEV-520 worktrees and branches (`d8e52c93`, `b735c56a`, `617e174c`, `7f943de1`, `00055509`) are superseded. I left them alone.
 
     **Question:** install lotar from main (with DEV-550) and then retry the merge, or will you merge `66fb3992` from `agent/DEV-520` yourself?
+- date: 2026-11-15T08:00:22.269675+00:00
+  author: claude
+  text: |-
+    mallox by voice to the chief of staff, 2026-11-14 22:40 PST: "For the tickets stuck retrying with @fix (LOCA-316, DEV-530 and similar), escalate to Fable if the normal fix agent can't do it."
+
+    No Fable retry: the agent isn't failing, lotar is.
+    - Merge jobs `job-20261115T073146.012Z-62` and `-65` failed on `fatal: Not possible to fast-forward`: the installed lotar 0.15.0 continues the review's thread on its old checkout `7f943de1` instead of the reviewed `66fb3992` (DEV-550; on main, not installed; it ships with DEV-513, Release v0.15.1).
+    - The question above (install lotar from main, or merge `66fb3992` yourself) stays open for the owner.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7234460b-fa1f-4515-a843-598de63b5e51
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af5b504b1-62e7-4678-9cf9-f100b8ba0692
@@ -677,3 +687,13 @@ history:
   - field: relationships
     old: '{"related":["DEV-501","DEV-532","DEV-511","DEV-550","DEV-509","DEV-556","DEV-557","DEV-558"]}'
     new: '{"related":["DEV-501","DEV-532","DEV-511","DEV-550","DEV-509","DEV-556","DEV-557","DEV-558","DEV-467"]}'
+- at: 2026-11-15T08:00:22.269675+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T08:00:22.827013+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-501","DEV-532","DEV-511","DEV-550","DEV-509","DEV-556","DEV-557","DEV-558","DEV-467"]}'
+    new: '{"related":["DEV-501","DEV-532","DEV-511","DEV-550","DEV-509","DEV-556","DEV-557","DEV-558","DEV-467","DEV-513","DEV-530"]}'

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T23:27:11.181674+00:00
-modified: 2026-11-15T01:57:40.797626+00:00
+modified: 2026-11-15T07:59:20.734648+00:00
 relationships:
   related:
   - local:LOCA-324
@@ -124,6 +124,8 @@ references:
 - attachment: after-light-390.2eecde059d89a989e452cbfb31213c63.png
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A27a66d8f-b290-4ac5-90fb-4709c62159ef
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A950283e0-18be-445c-8a64-337a3ca88b70
+releases:
+- 6
 description: |-
   Opening one ticket downloads up to 200 full tickets of its project only to suggest names, tags and custom field values. On the owner's inbox (standards.pyxzl.net, 2026-11-14) that was 618 KB and 652 ms of the page load for `/api/tasks/get` returning 5 KB, and it grows with the project.
 
@@ -548,3 +550,8 @@ history:
   - field: tags
     old: web-ui, review-returned, ui
     new: web-ui, ui
+- at: 2026-11-15T07:59:20.734648+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

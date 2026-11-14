@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T05:32:15.085430+00:00
-modified: 2026-11-14T07:43:44.253243+00:00
+modified: 2026-11-15T07:59:18.196941+00:00
 relationships:
   related:
   - DEV-503
@@ -43,6 +43,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Addae2e08-0406-4b73-963c-df5b714b6d37
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6e4cc558-a513-4913-bc71-9ea23db8472c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4166f9fd-7c4b-42e2-a864-809948f3c2ec
+releases:
+- 6
 description: 'Found in the DEV-503 review: .gitleaks.toml:31-34 still allowlists ^crates/lotar-lib/tests/fixtures/agent-streams/, a folder DEV-503 (01097b94) deleted. The pre-workspace version of the change removed the entry; the workspace port kept main''s .gitleaks.toml. Check: ls crates/lotar-lib/tests/fixtures/agent-streams fails while .gitleaks.toml names it. Done: the [[allowlists]] block and its comment are gone, and the secret scan still passes.'
 history:
 - at: 2026-11-14T05:32:15.969867+00:00
@@ -196,3 +198,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-15T07:59:18.196941+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

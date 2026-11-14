@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T20:47:42.334400+00:00
-modified: 2026-11-14T18:05:21.693380+00:00
+modified: 2026-11-15T07:59:16.980366+00:00
 relationships:
   related:
   - standards:STD-94
@@ -158,6 +158,8 @@ references:
 - attachment: before-tasks-columns-light-390.aee41bfbb6c56df3f025b8316ef34404.png
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A830ea7b7-d98a-47e8-8825-9d7711f0bae7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ade139b32-20e0-46b5-b7f9-412afe427dae
+releases:
+- 6
 description: |-
   Evaluate whether the web UI should also offer custom fields that tasks actually use, not only the ones a project lists in `custom_fields`, with a config option to choose the behaviour. The owner asked for this evaluation on 2026-11-13.
 
@@ -652,3 +654,8 @@ history:
   - field: relationships
     old: '{"related":["standards:STD-94","DEV-488","DEV-513","DEV-514","DEV-503","DEV-523","DEV-508"]}'
     new: '{"related":["standards:STD-94","DEV-488","DEV-513","DEV-514","DEV-503","DEV-523","DEV-508","DEV-532"]}'
+- at: 2026-11-15T07:59:16.980366+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T18:08:15.401343+00:00
-modified: 2026-11-14T18:50:20.625249+00:00
+modified: 2026-11-15T07:59:19.726330+00:00
 relationships:
   related:
   - DEV-542
@@ -30,6 +30,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acde5299b-075c-45a2-95d2-31769bec4c93
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad2f4b42b-5444-45d2-8aa2-9793ef15ad74
+releases:
+- 6
 description: |-
   Quality Assurance failing on main (gh run list -R localtaskrepo/lotar -b main -w ci.yml)
 
@@ -116,3 +118,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-15T07:59:19.726330+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

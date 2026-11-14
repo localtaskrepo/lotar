@@ -1,11 +1,11 @@
 title: A job's recorded outcome can apply before its unfinished end-rule steps
-status: Reviewing
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-14T18:22:28.435938+00:00
-modified: 2026-11-15T07:52:32.303989+00:00
+modified: 2026-11-15T07:56:24.654540+00:00
 relationships:
   depends_on:
   - DEV-467
@@ -33,6 +33,15 @@ comments:
     - Conflicts: next to main's DEV-528 test (kept both tests) and its `docs/help/agent.md` text (kept main's, added the sentence that the outcome waits behind the checkpoint).
     - Test `pending_outcome_tests::an_outcome_waits_for_the_end_rules_it_follows` frees the lock between the end rule's busy comment and the outcome: it fails without the fix and passes with it.
     - Checks on `06c8bd7f`: `npm run lint:agent` passed; `npm run test:agent` passed (Rust 2205, UI 1547, release 50, hooks 7); `npm run smoke` passed (404).
+- date: 2026-11-15T07:56:18.836374+00:00
+  author: codex
+  text: |-
+    Review: passed — no blocking findings in `06c8bd7f`.
+
+    - Read full diff, ticket comments, DEV-467/DEV-528 context, owner option A, repo guidance and recent main history. No docs/decisions directory exists.
+    - Immediate and recovery paths wait for the end-action checkpoint; regression checks the lock frees before the outcome and end-comment precedes updated-rule comment. Hand-back precedence preserved.
+    - `RUSTC_WRAPPER= npm run test:rust:agent -- pending_outcome_tests`: 5 passed, including regression. Web build and diff whitespace check passed. Initial sccache attempt sandbox-denied. Pre-fix failure recorded by fix agent, not independently reproduced in this read-only review.
+    - Full lint/tests/smoke passed per fix agent, not independently repeated. No UI changes, stray files, findings or follow-up tickets. Working tree clean; status/assignee unchanged. No durable guidance finding.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad1bfdb1c-bef4-4433-aebb-6dac3521f908
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aad8c3793-de75-44d7-9042-f03d0b75f97c
@@ -115,3 +124,16 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aad8c3793-de75-44d7-9042-f03d0b75f97c
+- at: 2026-11-15T07:56:18.836374+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:56:24.654540+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

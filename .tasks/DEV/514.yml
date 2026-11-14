@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T04:21:14.746777+00:00
-modified: 2026-11-14T23:45:46.818498+00:00
+modified: 2026-11-15T07:59:17.587082+00:00
 relationships:
   related:
   - DEV-517
@@ -57,6 +57,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae6ebc9c7-abc0-49c6-a2e1-ec2f2e8dc175
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A171a0eb3-5724-4ea5-b58b-8bc1a3c1397b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A130dd30a-dfa1-47f3-ac93-7059c29541bc
+releases:
+- 6
 description: 'Found 2026-11-14 (standards STD-110): standards'' .tasks changed after the last lotar trust, so the server skipped the inbox relay command for five owner answers but applied the rule''s set status Done; the only trace is one ''[lotar][warn] Skipped automation run commands'' line in the server''s stderr (printed once per process), nothing on the tickets, no automation_failed SSE event. Check: in a scratch repo with a rule that has run and set, change automation.yml after lotar trust, fire the rule: the ticket shows nothing. Done: a skipped run is reported like a failed one (Automation rule ''<name>'' skipped on <ID>, an automation_failed or automation_skipped SSE event, visible in the web UI), and docs/help/automation.md says whether the rule''s other actions apply when its run is skipped (an option to skip them would fit).'
 tags:
 - health
@@ -252,3 +254,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-517","DEV-485","DEV-503","DEV-523","DEV-525","DEV-508","DEV-519"]}'
     new: '{"related":["DEV-517","DEV-485","DEV-503","DEV-523","DEV-525","DEV-508","DEV-519","DEV-467"]}'
+- at: 2026-11-15T07:59:17.587082+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

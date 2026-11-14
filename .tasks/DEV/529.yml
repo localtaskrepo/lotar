@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T07:27:23.372003+00:00
-modified: 2026-11-14T08:44:47.364282+00:00
+modified: 2026-11-15T07:59:19.368071+00:00
 relationships:
   related:
   - DEV-468
@@ -25,6 +25,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A562d7c7d-eec9-4342-90fe-a19d62a56145
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A63ab5f8c-3b49-48d0-86c5-0f9f59851f04
+releases:
+- 6
 description: |-
   Found 2026-11-14 on standards STD-96. The built-in job instructions' quick reference says to read ticket details with `lotar --format json list STD-96`. That is a text search: in standards it returns 7 tickets (STD-105, STD-97, STD-96, INBOX-125, STD-110, INBOX-123, INBOX-54), and the asked-for ticket is not first. An agent that took `tasks[0]` wrote STD-97's description into STD-96 (history 2026-11-13T21:15:12), and lotar's link detection then added a wrong STD-95 relationship.
 
@@ -100,3 +102,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-15T07:59:19.368071+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T23:14:58.300535+00:00
-modified: 2026-11-15T06:33:52.555279+00:00
+modified: 2026-11-15T07:59:20.486868+00:00
 relationships:
   related:
   - DEV-478
@@ -54,6 +54,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab263a21b-694d-4c1e-afa1-1d29dda26589
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A720a061e-9705-4efe-90de-a0eaf3a1f2b1
+releases:
+- 6
 description: |-
   **Found** (Claude, 2026-11-14, QIS-196 in quarter-inch-studio): review job `job-20261114T180925.237Z-5` logged `agent_job_completed` at 18:11:14. At 23:13:20 a new lotar process (pid 63439) took it over from pid 79011, repeated the review message, then logged `agent_job_failed`: "Merge job finished, but t3/review-qis-196-owner-question is not merged into the main checkout's current branch". That branch is the review thread's, not `agent/QIS-196`. The failure rule then moved QIS-196 to the fix agent (status Merging, assignee @fix).
 
@@ -188,3 +190,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-478","DEV-378","DEV-528"]}'
     new: '{"related":["DEV-478","DEV-378","DEV-528","DEV-510"]}'
+- at: 2026-11-15T07:59:20.486868+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

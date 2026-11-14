@@ -1,11 +1,11 @@
 title: 'output_after_exit_is_limited fails under full-suite load: the drain ends before its 50 ms limit'
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T07:34:39.795147+00:00
-modified: 2026-11-15T07:47:28.132838+00:00
+modified: 2026-11-15T07:59:22.759829+00:00
 relationships:
   related:
   - DEV-467
@@ -26,9 +26,19 @@ comments:
     - The fake pipe removes writer scheduling from the timeout assertion; the neighboring test covers buffered output at exit.
     - Checks: 50/50 nextest stress iterations passed; full `RUSTC_WRAPPER= npm run test:rust:agent` passed (2197 tests) outside the sandbox after sccache/server restrictions; diff check passed.
     - No files changed or commits. Status/assignee unchanged. UI/lint/smoke not rerun for this test-only review. No durable guidance finding.
+- date: 2026-11-15T07:59:10.038487+00:00
+  author: codex
+  text: |-
+    Merged and pushed as `4d848d99`.
+    - Rebased `9e4827db` cleanly onto main, fast-forwarded, and amended the existing `.tasks` updates as requested. No lockfile or automation/profile changes; trust refresh unnecessary.
+    - Passed `npm run lint:agent`, `npm run test:agent`, `npm run test:smoke:agent` (404 smoke tests). Repeated the full Rust health check on main: 2204/2204 passed.
+    - Push completed to `origin/main`. Correction: new concurrent changes to `.tasks/DEV/530.yml` and `.tasks/DEV/543.yml` appeared during the final check; I issued push in the same command as status instead of stopping on that output. Those uncommitted changes remain untouched and were not pushed.
+    - No durable guidance finding. Status and assignee left to job automation.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8bbebf79-02c4-4c36-b700-2c0c15cc44ff
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ade68dd7f-08ce-48be-be73-4cc718854100
+releases:
+- 6
 description: |-
   Found: in DEV-467's full `npm test` (2026-11-15, branch t3/job-end-rules-t3-outage on main f92de862), `services::agent_job_service::tests::output_after_exit_is_limited` (crates/lotar-lib/src/services/agent_job_service.rs ~4717) failed with left: Ok(()) right: Err(TimedOut). It passed 5 of 5 runs alone and in the full rerun. The test's descendant thread writes to the pipe in a loop. Under load it can be descheduled for longer than the 50 ms drain limit, the pipe runs empty, and read_job_output returns Ok before the limit is reached. The branch doesn't touch this code.
 
@@ -93,3 +103,18 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-15T07:59:10.038487+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:59:18.693564+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-15T07:59:22.759829+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

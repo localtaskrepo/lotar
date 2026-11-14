@@ -4,7 +4,7 @@ priority: Medium
 type: Chore
 reporter: claude
 created: 2026-11-14T18:04:57.134027+00:00
-modified: 2026-11-14T18:14:07.496403+00:00
+modified: 2026-11-15T07:59:42.834147+00:00
 relationships:
   related:
   - DEV-473
@@ -44,6 +44,7 @@ relationships:
   - DEV-523
   - DEV-541
   - DEV-524
+  - DEV-560
 comments:
 - date: 2026-11-14T18:13:54.648988+00:00
   author: claude
@@ -120,3 +121,9 @@ history:
     new: Done
   - field: assignee
     old: '@fix'
+- at: 2026-11-15T07:59:42.834147+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-473","DEV-466","DEV-467","DEV-468","DEV-476","DEV-477","DEV-478","DEV-479","DEV-480","DEV-482","DEV-484","DEV-485","DEV-486","DEV-487","DEV-488","DEV-489","DEV-490","DEV-491","DEV-493","DEV-494","DEV-495","DEV-496","DEV-497","DEV-498","DEV-500","DEV-502","DEV-504","DEV-505","DEV-506","DEV-507","DEV-509","DEV-516","DEV-518","DEV-520","DEV-523","DEV-541","DEV-524"]}'
+    new: '{"related":["DEV-473","DEV-466","DEV-467","DEV-468","DEV-476","DEV-477","DEV-478","DEV-479","DEV-480","DEV-482","DEV-484","DEV-485","DEV-486","DEV-487","DEV-488","DEV-489","DEV-490","DEV-491","DEV-493","DEV-494","DEV-495","DEV-496","DEV-497","DEV-498","DEV-500","DEV-502","DEV-504","DEV-505","DEV-506","DEV-507","DEV-509","DEV-516","DEV-518","DEV-520","DEV-523","DEV-541","DEV-524","DEV-560"]}'

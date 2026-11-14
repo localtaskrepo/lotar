@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T06:38:33.287147+00:00
-modified: 2026-11-14T08:37:42.409252+00:00
+modified: 2026-11-15T07:59:19.052905+00:00
 relationships:
   related:
   - DEV-519
@@ -24,6 +24,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa5efb45d-1e21-48f6-b5d5-639815731a8b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0732c92f-1a96-4896-887f-570be21fa881
+releases:
+- 6
 description: 'Found in the DEV-519 merge (2026-11-13): npm run test:agent from a worktree without a web build fails, because tests/embedded_web_ui_test.rs needs target/web-embed/index.html.gz and test:agent (and test:rust) does not run build:web first. Check: in a fresh worktree run npm run test:agent without npm run build:web. Done: test:agent passes from a clean target (it builds the web assets first, or the test gets what it needs another way).'
 tags:
 - health
@@ -105,3 +107,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-519","DEV-496"]}'
     new: '{"related":["DEV-519","DEV-496","DEV-525"]}'
+- at: 2026-11-15T07:59:19.052905+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

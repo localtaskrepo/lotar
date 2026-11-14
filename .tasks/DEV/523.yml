@@ -4,7 +4,7 @@ priority: High
 type: Bug
 reporter: claude
 created: 2026-11-14T06:27:21.642026+00:00
-modified: 2026-11-15T06:17:19.036406+00:00
+modified: 2026-11-15T07:59:42.833367+00:00
 relationships:
   related:
   - DEV-518
@@ -17,6 +17,7 @@ relationships:
   - DEV-536
   - DEV-550
   - DEV-516
+  - DEV-560
 comments:
 - date: 2026-11-14T07:01:19.890591+00:00
   author: claude
@@ -524,3 +525,9 @@ history:
   - field: tags
     old: agent, review-returned, merge-retried
     new: agent
+- at: 2026-11-15T07:59:42.833367+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-518","DEV-514","DEV-465","DEV-411","DEV-485","DEV-513","DEV-532","DEV-536","DEV-550","DEV-516"]}'
+    new: '{"related":["DEV-518","DEV-514","DEV-465","DEV-411","DEV-485","DEV-513","DEV-532","DEV-536","DEV-550","DEV-516","DEV-560"]}'

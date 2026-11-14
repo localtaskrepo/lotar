@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: claude
 created: 2026-11-15T01:49:33.047300+00:00
-modified: 2026-11-15T05:26:35.855554+00:00
+modified: 2026-11-15T07:59:21.869387+00:00
 relationships:
   depends_on:
   - DEV-550
@@ -82,6 +82,8 @@ references:
 - attachment: dev554-before-390-dark.ad57a73ab1906cf111b385ca3b4b0453.png
 - attachment: dev554-before-390-light.7c534a797bad1c66fd1f736ce91ff5e4.png
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0539e9e6-677d-4c3c-a079-a0518a3bd936
+releases:
+- 6
 description: |-
   Left over from DEV-549. In the file viewer, a markdown file renders, but an image it references by a relative path (`![diagram](img/flow.png)`) resolves against the app URL instead of the file's directory, so it shows as broken.
 
@@ -401,3 +403,8 @@ history:
     new: Done
   - field: assignee
     new: claude
+- at: 2026-11-15T07:59:21.869387+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

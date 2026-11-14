@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T06:27:24.117114+00:00
-modified: 2026-11-15T01:04:18.502713+00:00
+modified: 2026-11-15T07:59:18.560009+00:00
 relationships:
   related:
   - DEV-501
@@ -129,6 +129,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A66d3e038-0dc2-464c-b4d0-63331346dcfe
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A20caebc8-70c3-49b8-8aab-7a183aaee714
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A709affca-29be-46e3-9d35-cb78322c44a9
+releases:
+- 6
 description: |-
   When an agent job is about to start on a ticket with an open dependency, lotar's dependency check sets the ticket to **HelpNeeded** and gives it to its reporter (usually claude). After that, nothing moves the ticket on. The inbox files only tickets assigned to mallox. The rule "Prerequisites done: continue the waiting ticket" acts only on status Blocked. No agent is assigned. On 2026-11-14 four tickets with finished, committed work sat like this for up to 11 hours: DEV-501, DEV-477, DEV-467 and DEV-468. Found while checking the HelpNeeded tickets, and mallox asked for this ticket in the thread.
 
@@ -493,3 +495,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-501","DEV-477","DEV-467","DEV-468","DEV-503","DEV-528","DEV-320","DEV-530","DEV-133","DEV-525","DEV-496","DEV-521","DEV-535","DEV-541","DEV-532"]}'
     new: '{"related":["DEV-501","DEV-477","DEV-467","DEV-468","DEV-503","DEV-528","DEV-320","DEV-530","DEV-133","DEV-525","DEV-496","DEV-521","DEV-535","DEV-541","DEV-532","DEV-551"]}'
+- at: 2026-11-15T07:59:18.560009+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

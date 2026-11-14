@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T18:08:16.659184+00:00
-modified: 2026-11-14T18:36:19.389264+00:00
+modified: 2026-11-15T07:59:19.979334+00:00
 relationships:
   related:
   - DEV-474
@@ -38,6 +38,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abe933f59-3c7d-489e-9ff3-2230d2d201dd
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9c5cd48a-3a07-4b6e-b9a9-e689d510d55f
+releases:
+- 6
 description: |-
   .tasks/DEV/automation.yml: configs/lotar/automation.yml changed since the copy (3 commits: git -C ~/Development/standards log -- configs/lotar/automation.yml)
 
@@ -113,3 +115,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-15T07:59:19.979334+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

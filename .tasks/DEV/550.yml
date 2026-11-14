@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T00:44:25.587433+00:00
-modified: 2026-11-15T07:36:43.819466+00:00
+modified: 2026-11-15T07:59:21.578565+00:00
 relationships:
   blocks:
   - DEV-554
@@ -165,6 +165,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1a252f40-48b2-4e3a-b760-41dc9a4e9625
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A98489058-2748-48b0-9650-ece04598c02f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa60c4383-2f46-44be-906f-6ada2f423fb0
+releases:
+- 6
 description: |-
   ## Found
 
@@ -534,3 +536,8 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-554"],"related":["DEV-523","DEV-468","DEV-472","DEV-503","DEV-509","DEV-528","DEV-554","DEV-499","DEV-549","DEV-556","DEV-520","DEV-510","DEV-466","DEV-557","DEV-516","DEV-553","DEV-530"]}'
     new: '{"blocks":["DEV-554"],"related":["DEV-523","DEV-468","DEV-472","DEV-503","DEV-509","DEV-528","DEV-554","DEV-499","DEV-549","DEV-556","DEV-520","DEV-510","DEV-466","DEV-557","DEV-516","DEV-553","DEV-530","DEV-467"]}'
+- at: 2026-11-15T07:59:21.578565+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

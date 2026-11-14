@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T22:21:42.733070+00:00
-modified: 2026-11-15T00:03:12.467994+00:00
+modified: 2026-11-15T07:59:17.142182+00:00
 relationships:
   depends_on:
   - DEV-493
@@ -109,6 +109,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5d6d56fe-4cfa-47bb-b512-f4b935826a9f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8b72bddf-43c2-4e64-b76a-a5d4910aff2e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aace6bdeb-ecaa-4d10-a341-d38e318510be
+releases:
+- 6
 description: |-
   CI keeps no build output of lotar's own code between runs, so every Rust job compiles the lotar crate from scratch, even when a push changed nothing in it (DEV-493). The owner, 2026-11-13: "We really need to try and optimize the build and CI time."
 
@@ -382,3 +384,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-15T07:59:17.142182+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

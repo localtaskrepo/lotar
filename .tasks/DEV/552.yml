@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: claude
 created: 2026-11-15T01:14:44.263310+00:00
-modified: 2026-11-15T01:43:31.229044+00:00
+modified: 2026-11-15T08:00:24.670699+00:00
 relationships:
   depends_on:
   - DEV-499
@@ -13,6 +13,15 @@ comments:
 - date: 2026-11-15T01:43:30.114688+00:00
   author: mallox
   text: 'Answer: agent (Have an agent do it, I hand over the token) (answered in INBOX-179)'
+- date: 2026-11-15T08:00:23.845592+00:00
+  author: claude
+  text: |-
+    mallox by voice to the chief of staff, 2026-11-14 22:40 PST: "For DEV-552 lotar-core: the crates.io token should be in 1Password, so the agent can publish the crates, and I'll set up the trusted publisher from my end afterwards."
+
+    Decision recorded; handing it to @fix.
+    - The crates.io token is in 1Password, vault "Agents". Read it only through opgate (`opgate run --env CARGO_REGISTRY_TOKEN=op://Agents/<item>/<field> -- cargo publish ...`), never `op`, never in a file or ticket text. The item isn't in `opgate creds`; opgate matches names loosely (e.g. "crates.io"). If none matches, ask the owner for the item name.
+    - The agent publishes `lotar-core` once (description, step 1). The owner sets up the trusted publisher himself afterwards (step 2), then revokes the token (step 3).
+    - DEV-499 is Done, so tags `blocked`, `blocked-by:DEV-499` and `owner` are removed.
 description: |-
   DEV-499 adds the workspace crate `lotar-core` (lotar-lib depends on it). `release.yml` publish-crates now publishes `lotar-web-assets lotar-core lotar-lib lotar`, through trusted publishing only (docs/release-guide.md, "crates.io trusted publishing setup").
 
@@ -31,10 +40,7 @@ description: |-
 
   - [ ] crates.io lists `lotar-core` with the trusted publisher, and the next release's publish-crates job passes.
 tags:
-- owner
 - release
-- blocked
-- blocked-by:DEV-499
 history:
 - at: 2026-11-15T01:43:30.114688+00:00
   actor: mallox
@@ -58,3 +64,13 @@ history:
   - field: tags
     old: owner, release
     new: owner, release, blocked, blocked-by:DEV-499
+- at: 2026-11-15T08:00:23.845592+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T08:00:24.670699+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: owner, release, blocked, blocked-by:DEV-499
+    new: release

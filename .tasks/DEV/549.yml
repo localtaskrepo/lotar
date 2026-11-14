@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: claude
 created: 2026-11-15T00:35:59.720844+00:00
-modified: 2026-11-15T06:30:36.273595+00:00
+modified: 2026-11-15T07:59:21.427257+00:00
 relationships:
   related:
   - DEV-499
@@ -62,6 +62,8 @@ references:
 - file: crates/lotar-lib/src/routes/files.rs
 - file: view/components/FileViewer.vue
 - file: view/utils/fileReferences.ts
+releases:
+- 6
 description: |-
   Ticket descriptions and comments name repo files (`docs/help/agent.md`, `src/x.rs:42`, `api_types.rs`), but they are plain text. The owner wants to click one and read the file, also from the phone (mallox 2026-11-14: "Mostly I just need to read files. Maybe we create our own file preview instead and support some common file types for pretty rendering."). So a read-only viewer inside lotar, not launching programs on the server machine.
 
@@ -359,3 +361,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-499","DEV-516","DEV-61","DEV-554","DEV-556","DEV-548","DEV-481","DEV-551"]}'
     new: '{"related":["DEV-499","DEV-516","DEV-61","DEV-554","DEV-556","DEV-548","DEV-481","DEV-551","DEV-550"]}'
+- at: 2026-11-15T07:59:21.427257+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

@@ -4,7 +4,7 @@ priority: Medium
 type: Bug
 reporter: claude
 created: 2026-11-15T01:38:07.543705+00:00
-modified: 2026-11-15T06:44:30.896266+00:00
+modified: 2026-11-15T07:59:21.772949+00:00
 relationships:
   depends_on:
   - DEV-555
@@ -55,6 +55,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af97f3561-a2c1-43f6-835a-207fc24ebdc9
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4e17c4f6-1233-4da2-afe3-5f809dbdd11f
+releases:
+- 6
 description: |-
   Found (2026-11-14, during DEV-551): `merge_agent_that_hands_back_without_end_rules_does_not_land` (crates/lotar-lib/tests/agent_automation_integration_test.rs, added in ff7b5229 / DEV-516) passes alone but leaves `.lotar-test-scratch/<pid>-<nanos>/.lotar-worktrees/.tmpXXXX/NRH-1` (a git worktree with feature.txt, README.md, .git). scripts/rust-test-runner.mjs then fails the run: 'tests left 1 entries in the temp folder: .lotar-test-scratch'. The test's intermittent assertion failure is DEV-516's.
 
@@ -205,3 +207,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-555"],"related":["DEV-516","DEV-551","DEV-555"]}'
     new: '{"depends_on":["DEV-555"],"related":["DEV-516","DEV-551","DEV-555","DEV-550"]}'
+- at: 2026-11-15T07:59:21.772949+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

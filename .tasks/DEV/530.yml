@@ -1,11 +1,11 @@
 title: A job the dependency check held back resumes as it was when its prerequisites are done
-status: HelpNeeded
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
 assignee: fix
 created: 2026-11-14T07:27:35.331056+00:00
-modified: 2026-11-15T07:47:41.833568+00:00
+modified: 2026-11-15T08:00:22.827975+00:00
 relationships:
   related:
   - DEV-351
@@ -17,6 +17,8 @@ relationships:
   - DEV-535
   - DEV-528
   - DEV-550
+  - DEV-513
+  - DEV-520
 comments:
 - date: 2026-11-14T07:47:55.099885+00:00
   author: claude
@@ -265,6 +267,28 @@ comments:
 
     - Open review finding to fix first: a failed start plus a failed `release_parked` leaves `starting` set for good (codex 07:47Z). Handle it, then review and merge.
     - Merge jobs 27, 68, 75 got the obsolete branch `t3/review-dev-530-held-job-resume-1` (`fb7de879`) ([DEV-550](https://lotar.pyxzl.net/task/DEV-550)). Work to merge: `t3/resume-held-jobs-when-unblocked` at `6564ad12`.
+- date: 2026-11-15T07:57:25.129388+00:00
+  author: claude
+  text: |-
+    Fixed codex 07:47Z (failed start + failed `release_parked` left `starting` set for good); amended into `4e2f775a` (signed) on `t3/resume-held-jobs-when-unblocked`.
+
+    - The mark is now a time, `starting_since`. Clearing it is itself a write that can fail, so resume does not rely on it: it checks the ticket's jobs (`list_jobs_in`, which also reads the job logs on disk). A job of the ticket created since the mark means the start ran: the entry is dropped and the job never runs twice. No job and the mark under 60 s old: a start is under way, so resume leaves it. No job and an older mark: the start failed, so the job resumes as usual.
+    - `claim_parked` takes over a mark older than 60 s, so a mark left by a failed start never blocks the job for good.
+    - Tests: `a_parked_job_left_marked_by_a_failed_start_resumes` (fails when a failed start is treated as under way), `a_parked_job_being_started_does_not_resume_again`, `start_outcome_tells_a_start_that_ran_from_one_under_way_or_failed`.
+    - Docs: `help/agent.md` explains `(starting)`.
+    - Checks: `npm run lint:agent`, `test:agent` (2183 Rust, 1537 web), `test:smoke:agent` (401), all pass.
+    - Merge: take `t3/resume-held-jobs-when-unblocked` at `4e2f775a`. Merge jobs 27, 68 and 75 got the obsolete `t3/review-dev-530-held-job-resume-1` (`fb7de879`), 68 and 75 after [DEV-550](https://lotar.pyxzl.net/task/DEV-550) was Done, so that fix does not cover this case yet.
+- date: 2026-11-15T07:57:38.067651+00:00
+  author: claude
+  text: 'Correction to my last comment: [DEV-550](https://lotar.pyxzl.net/task/DEV-550) landed on main at 06:44Z, before merge jobs 68 and 75. But the jobs run the installed `/opt/homebrew/bin/lotar` (0.15.0), which may predate it, so it is not shown that the fix misses this case. If the next merge again gets `t3/review-dev-530-held-job-resume-1`, check whether the installed build has DEV-550.'
+- date: 2026-11-15T08:00:21.414876+00:00
+  author: claude
+  text: |-
+    mallox by voice to the chief of staff, 2026-11-14 22:40 PST: "For the tickets stuck retrying with @fix (LOCA-316, DEV-530 and similar), escalate to Fable if the normal fix agent can't do it."
+
+    No Fable retry for now: @fix is working on it (job `job-20261115T074741.940Z-77`, started 07:47Z, on `t3/resume-held-jobs-when-unblocked`).
+    - The earlier merge failures (jobs 27, 68, 75) were lotar checking out the old review branch `t3/review-dev-530-held-job-resume-1`: DEV-550, fixed on main but not in the installed lotar 0.15.0 (it comes with DEV-513, Release v0.15.1). That's infrastructure, not the agent.
+    - If this job's merge fails the same way, it waits for the installed lotar with DEV-550, not for another retry. If the fix agent itself fails at the open review finding (`starting` left set after a failed `release_parked`), retry with @fix-fable.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aadaa906d-5c3e-411d-b998-4015eb47b493
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A50a42e5d-ab8c-4c4e-a7e1-23c50ebf82b5
@@ -769,3 +793,33 @@ history:
   - field: assignee
     old: '@fix'
     new: fix
+- at: 2026-11-15T07:57:25.129388+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:57:38.067651+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:57:49.207751+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Reviewing
+- at: 2026-11-15T08:00:21.414876+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T08:00:21.751892+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550"]}'
+    new: '{"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513"]}'
+- at: 2026-11-15T08:00:22.827975+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513"]}'
+    new: '{"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513","DEV-520"]}'

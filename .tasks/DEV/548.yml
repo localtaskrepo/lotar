@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-14T23:59:23.228533+00:00
-modified: 2026-11-15T07:05:44.453202+00:00
+modified: 2026-11-15T07:59:21.266937+00:00
 relationships:
   related:
   - DEV-545
@@ -71,6 +71,8 @@ references:
 - attachment: dev548-before-light-1920.4d2f5288c94c348b54df85a702c39e39.png
 - attachment: dev548-before-light-390.8acaa4aa443e21754e6977a3c35b5200.png
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A87b1f591-b95c-4e02-ab4c-7174dbf4cb8c
+releases:
+- 6
 description: |-
   Found while fixing DEV-545: `view/components/ConfigTagColorsField.vue:157` calls `api.listTasks({ project, has: 'tag', limit: 1000 })` and keeps only the tags, so the config page downloads whole tickets (descriptions, comments, history).
 
@@ -293,3 +295,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-545","DEV-555","DEV-549","DEV-556"]}'
     new: '{"related":["DEV-545","DEV-555","DEV-549","DEV-556","DEV-558"]}'
+- at: 2026-11-15T07:59:21.266937+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

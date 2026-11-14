@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-11T19:18:53.444560+00:00
-modified: 2026-11-15T03:10:04.437219+00:00
+modified: 2026-11-15T07:59:16.707318+00:00
 relationships:
   related:
   - DEV-320
@@ -67,6 +67,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5d8a9cd5-f245-4d27-bb68-87b3c690fe00
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5aaea4b7-2c65-4e67-9d52-2990156e75e1
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b296469-2cb3-4c82-a550-2e089bc82029
+releases:
+- 6
 description: 'Found by the DEV-320 agent on 2026-11-11: docs/openapi.json describes /api/tasks/update as ignoring status, which is stale. Check: grep the route''s description in docs/openapi.json against src/routes. Done: the description matches the behaviour, including the deferred outcome during an agent job.'
 custom_fields:
   finding: docs:openapi-tasks-update-status
@@ -218,3 +220,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-15T07:59:16.707318+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

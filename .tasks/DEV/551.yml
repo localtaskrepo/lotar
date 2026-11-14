@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-15T01:04:18.106307+00:00
-modified: 2026-11-15T05:26:29.956609+00:00
+modified: 2026-11-15T07:59:21.674662+00:00
 relationships:
   related:
   - DEV-315
@@ -51,6 +51,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab71a57bb-a8c9-41b0-bea6-2058af686d22
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6b08f761-8f72-4470-acad-27ffbf3cd53d
+releases:
+- 6
 description: |-
   Found: reviews run in codex's sandbox with RUSTC_WRAPPER= (sccache is denied there, DEV-479) end with 'rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: xcrun_db', after all tests passed: DEV-467 (2026-11-15 00:30), DEV-478, DEV-487, DEV-524. xcrun (Apple's cc/ld shim that rustc links through) caches tool lookups in xcrun_db under the per-user temp folder; in a sandbox that folder isn't writable, so it writes TMPDIR, which scripts/rust-test-runner.mjs (runTestsInFreshTemp, DEV-315) points at a fresh folder and requires empty. Not reproduced outside the sandbox: the same relinking run (touch a source file, RUSTC_WRAPPER= npm run test:rust -- pending_outcome_tests) leaves nothing. The file comes from the toolchain at build time, not from a test.
 
@@ -168,3 +170,8 @@ history:
   - field: status
     old: HelpNeeded
     new: Done
+- at: 2026-11-15T07:59:21.674662+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

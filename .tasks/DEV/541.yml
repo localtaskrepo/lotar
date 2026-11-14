@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T18:13:44.393048+00:00
-modified: 2026-11-14T19:02:47.683470+00:00
+modified: 2026-11-15T07:59:20.247276+00:00
 relationships:
   related:
   - DEV-532
@@ -47,6 +47,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6f43a938-4eac-4d80-9fca-7c2f130f611e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A235eada8-6c30-455d-93fb-22a49f1fbcf4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af908845e-09f5-41ea-be53-f3547335c4ac
+releases:
+- 6
 description: |-
   Found (DEV-532, 2026-11-14): after DEV-476, Done tickets still left 95 branches and 74 clean, idle worktrees (DEV-468..DEV-524, all Done). They hold earlier fix, review and rework versions of the ticket that differ from what landed on main (the merge agent rebased or reworked them), so the cleanup at Done counts them as work missing from main and keeps them. Every ticket with a review round adds some, and the repo-health check reports them as unpushed:branches daily (DEV-473, DEV-532). DEV-532 archived them under refs/archive/DEV-532/ and removed them as the owner allowed (INBOX-38).
 
@@ -167,3 +169,8 @@ history:
   - field: tags
     old: health, review-returned
     new: health
+- at: 2026-11-15T07:59:20.247276+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

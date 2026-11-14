@@ -5,7 +5,7 @@ type: Feature
 reporter: codex
 assignee: '@merge'
 created: 2026-11-15T03:03:11.380593+00:00
-modified: 2026-11-15T03:44:27.484397+00:00
+modified: 2026-11-15T07:59:21.974551+00:00
 relationships:
   blocks:
   - DEV-553
@@ -50,6 +50,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa61bc5fe-22d7-4b4c-b5d6-5a22516685c7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0d1de6c6-3bd0-4ba5-bde5-b2743abe0fb1
+releases:
+- 6
 description: 'Found during DEV-553 merge: RUSTC_WRAPPER= npm run lint:agent fails E0063 at crates/lotar-lib/tests/dev528_agent_reporter_hand_back_test.rs:44; ActiveJob initializer lacks assignee_at_start and merge. Done when initializer agrees with current type and required lint passes.'
 tags:
 - health
@@ -143,3 +145,8 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-553"],"related":["DEV-553","DEV-528","DEV-481","DEV-548","DEV-551","DEV-554"]}'
     new: '{"blocks":["DEV-553"],"related":["DEV-553","DEV-528","DEV-481","DEV-548","DEV-551","DEV-554","DEV-509"]}'
+- at: 2026-11-15T07:59:21.974551+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

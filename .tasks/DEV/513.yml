@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-14T04:17:27.050501+00:00
-modified: 2026-11-14T06:27:50.376100+00:00
+modified: 2026-11-15T08:00:22.826467+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -38,6 +38,9 @@ relationships:
   - DEV-417
   - DEV-518
   - DEV-523
+  - DEV-560
+  - DEV-530
+  - DEV-520
 comments:
 - date: 2026-11-14T04:19:07.317172+00:00
   author: claude
@@ -174,3 +177,21 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468","DEV-477","DEV-491","DEV-516"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512","DEV-417","DEV-518"]}'
     new: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468","DEV-477","DEV-491","DEV-516"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512","DEV-417","DEV-518","DEV-523"]}'
+- at: 2026-11-15T07:59:42.832122+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468","DEV-477","DEV-491","DEV-516"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512","DEV-417","DEV-518","DEV-523"]}'
+    new: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468","DEV-477","DEV-491","DEV-516"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512","DEV-417","DEV-518","DEV-523","DEV-560"]}'
+- at: 2026-11-15T08:00:21.751428+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468","DEV-477","DEV-491","DEV-516"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512","DEV-417","DEV-518","DEV-523","DEV-560"]}'
+    new: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468","DEV-477","DEV-491","DEV-516"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512","DEV-417","DEV-518","DEV-523","DEV-560","DEV-530"]}'
+- at: 2026-11-15T08:00:22.826467+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468","DEV-477","DEV-491","DEV-516"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512","DEV-417","DEV-518","DEV-523","DEV-560","DEV-530"]}'
+    new: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468","DEV-477","DEV-491","DEV-516"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512","DEV-417","DEV-518","DEV-523","DEV-560","DEV-530","DEV-520"]}'

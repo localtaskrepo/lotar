@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T05:25:05.242533+00:00
-modified: 2026-11-15T07:41:34.440896+00:00
+modified: 2026-11-15T07:59:22.076365+00:00
 relationships:
   related:
   - DEV-481
@@ -61,6 +61,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab1f61b60-116a-4422-9498-2b0514b79400
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A827eaab2-89a4-4757-af3f-44fb43f0d7e0
+releases:
+- 6
 description: |-
   Merge jobs rebase their branch onto main and then run the gates in a worktree whose `node_modules` was installed before the rebase. When main changed `package-lock.json`, the gates fail on missing packages and the job stops to ask the owner whether it may run `npm ci`.
 
@@ -249,3 +251,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-481","DEV-549","DEV-551","DEV-548","DEV-554","DEV-499","DEV-550","DEV-520"]}'
     new: '{"related":["DEV-481","DEV-549","DEV-551","DEV-548","DEV-554","DEV-499","DEV-550","DEV-520","DEV-467"]}'
+- at: 2026-11-15T07:59:22.076365+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

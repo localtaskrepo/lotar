@@ -5,7 +5,7 @@ type: Feature
 reporter: codex
 assignee: '@merge'
 created: 2026-11-14T05:06:45.628247+00:00
-modified: 2026-11-14T06:42:37.932193+00:00
+modified: 2026-11-15T07:59:17.683003+00:00
 relationships:
   related:
   - DEV-514
@@ -24,6 +24,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A879c4fa0-ab3a-41a8-9787-28f26a8107e7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1a9e65e1-f959-47b7-9e5a-a63b75a8b2cf
+releases:
+- 6
 description: 'Found while verifying DEV-514 rebased onto main c9cf3a00. npm run test:agent fails E0583 at crates/lotar-lib/tests/integration.rs:154: dev485_offered_custom_fields_test is missing there; the file is under root tests/ instead. npm run lint:agent also reports six unwrap lint errors in that root test. Done: place the test at the intended integration module path and pass lint and tests.'
 tags:
 - health
@@ -105,3 +107,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-514","DEV-503"]}'
     new: '{"related":["DEV-514","DEV-503","DEV-508"]}'
+- at: 2026-11-15T07:59:17.683003+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

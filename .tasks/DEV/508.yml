@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T01:39:35.096482+00:00
-modified: 2026-11-14T07:15:14.712486+00:00
+modified: 2026-11-15T07:59:17.405393+00:00
 relationships:
   depends_on:
   - DEV-417
@@ -54,6 +54,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab2e2e600-97ff-4f21-9d95-c81789329916
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac725f299-2f4d-4cb8-b7c0-10716802312a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4a7825c2-fc0a-45cd-83b0-d3f5419c92cf
+releases:
+- 6
 description: |-
   After the first release that publishes lotar to crates.io, switch the three crates from the stored token to trusted publishing only. The owner decided this on 2026-11-14 in the thread ("Trusted, token once"; details in DEV-507). The steps need his crates.io login, so they are his.
 
@@ -263,3 +265,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-15T07:59:17.405393+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

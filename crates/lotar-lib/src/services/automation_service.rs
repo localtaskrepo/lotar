@@ -629,22 +629,32 @@ impl AutomationService {
             failures.push(format!("End rules for {ticket_id}: {err}"));
         }
 
+        #[cfg(test)]
+        action_read_barrier::pause();
+
         // The rules have run: end the job's guard and apply the outcome,
-        // including anything recorded while they ran.
+        // including anything recorded while they ran. While steps of the
+        // end rules wait in their checkpoint, the outcome waits behind them
+        // (DEV-543), so `previous` is the ticket after every end rule.
         if let Some(job_id) = ending_job.as_deref()
             && let Some(outcome) = crate::services::agent_active_jobs::end_and_take_outcome(tasks_dir, job_id, ticket_id, |outcome| {
                 without_agent_reporter_hand_back(outcome, &task, rule_assigns)
             })
         {
-            match retry_while_busy(|| apply_job_outcome(&mut storage, ticket_id, &config, &outcome)) {
-                Err(err) if is_busy(&err) => {
-                    crate::services::agent_active_jobs::defer_outcome(tasks_dir, job_id);
-                    failures.push(format!("Outcome recorded during job {job_id} for {ticket_id} failed: {err}; the next worker or server applies it"));
-                }
-                result => {
-                    crate::services::agent_active_jobs::settle_outcome(tasks_dir, job_id);
-                    if let Err(err) = result {
-                        failures.push(format!("Outcome recorded during job {job_id} for {ticket_id} failed: {err}"));
+            if end_action_path(tasks_dir, job_id).exists() {
+                crate::services::agent_active_jobs::defer_outcome(tasks_dir, job_id);
+                failures.push(format!("Outcome recorded during job {job_id} for {ticket_id} waits for its end rules; the next worker or server applies it"));
+            } else {
+                match retry_while_busy(|| apply_job_outcome(&mut storage, ticket_id, &config, &outcome)) {
+                    Err(err) if is_busy(&err) => {
+                        crate::services::agent_active_jobs::defer_outcome(tasks_dir, job_id);
+                        failures.push(format!("Outcome recorded during job {job_id} for {ticket_id} failed: {err}; the next worker or server applies it"));
+                    }
+                    result => {
+                        crate::services::agent_active_jobs::settle_outcome(tasks_dir, job_id);
+                        if let Err(err) = result {
+                            failures.push(format!("Outcome recorded during job {job_id} for {ticket_id} failed: {err}"));
+                        }
                     }
                 }
             }
@@ -658,6 +668,9 @@ impl AutomationService {
     pub fn apply_pending_outcomes(tasks_dir: &Path) {
         replay_end_actions(tasks_dir);
         for pending in crate::services::agent_active_jobs::pending_outcomes(tasks_dir) {
+            if end_action_path(tasks_dir, &pending.outcome.job_id).exists() {
+                continue;
+            }
             let project = crate::storage::TaskId::parse(&pending.ticket_id).map(|parsed| parsed.project).unwrap_or_default();
             let result = resolve_config_for_project(tasks_dir, Some(&project))
                 .and_then(|config| apply_job_outcome(&mut Storage::new(tasks_dir), &pending.ticket_id, &config, &pending.outcome));
@@ -1957,6 +1970,11 @@ fn end_actions_dir(tasks_dir: &Path) -> std::path::PathBuf {
     crate::services::agent_queue_service::queue_dir().join(format!("end-actions-{}", crate::services::agent_queue_service::queue_hash(&root)))
 }
 
+/// The checkpoint of a job end's unfinished rule steps, named by its job.
+fn end_action_path(tasks_dir: &Path, key: &str) -> std::path::PathBuf {
+    end_actions_dir(tasks_dir).join(format!("{}.json", crate::services::agent_queue_service::queue_hash(Path::new(key))))
+}
+
 fn save_end_action(path: &Path, pending: &PendingEndAction) -> LoTaRResult<()> {
     let json = serde_json::to_string(pending).map_err(|err| LoTaRError::ValidationError(err.to_string()))?;
     crate::storage::safety::atomic_write_file(path, &json)?;
@@ -1999,7 +2017,7 @@ fn apply_durable_end_action(
     std::fs::create_dir_all(&dir)?;
     let name = crate::services::agent_queue_service::queue_hash(Path::new(key));
     let _lock = crate::storage::safety::acquire_storage_lock(&dir, &name)?;
-    let path = dir.join(format!("{name}.json"));
+    let path = end_action_path(&storage.root_path, key);
     let mut pending = if path.exists() {
         serde_json::from_str(&std::fs::read_to_string(&path)?).map_err(|err| LoTaRError::ValidationError(err.to_string()))?
     } else {
@@ -3536,6 +3554,61 @@ mod pending_outcome_tests {
         let task = TaskService::get(&Storage::new(&tasks_dir), "PX-1", None).unwrap();
         assert_eq!((task.status.as_str(), task.assignee.as_deref()), ("Todo", Some("dev")), "the rule decides, not the dropped hand-back");
         assert!(crate::services::agent_active_jobs::pending_outcomes(&tasks_dir).is_empty());
+        unsafe { std::env::remove_var("LOTAR_AGENT_QUEUE_DIR") };
+    }
+
+    /// DEV-543: the lock frees between the end rules' busy step and the
+    /// outcome; the outcome still waits for the end rules' checkpoint.
+    #[test]
+    fn an_outcome_waits_for_the_end_rules_it_follows() {
+        let queue = tempfile::tempdir().unwrap();
+        // SAFETY: nextest runs each test in its own process.
+        unsafe { std::env::set_var("LOTAR_AGENT_QUEUE_DIR", queue.path()) };
+        let temp = tempfile::tempdir().unwrap();
+        let tasks_dir = temp.path().join(".tasks");
+        std::fs::create_dir_all(tasks_dir.join("PX")).unwrap();
+        std::fs::write(tasks_dir.join("config.yml"), "issue:\n  states: [Todo, Done]\n").unwrap();
+        std::fs::write(
+            tasks_dir.join("PX/1.yml"),
+            "title: t1\nstatus: Todo\npriority: medium\ntype: task\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-01-01T00:00:00Z\ntags: []\n",
+        )
+        .unwrap();
+        std::fs::write(
+            tasks_dir.join("automation.yml"),
+            "automation:\n  rules:\n    - name: End\n      on:\n        job_completed:\n          add:\n            tags: [ended]\n          comment: end\n    - name: Outcome\n      when:\n        status: Done\n      on:\n        updated:\n          comment: outcome\n",
+        )
+        .unwrap();
+        let outcome = crate::api_types::JobOutcome { job_id: "job-1".into(), status: Some("Done".into()), ..Default::default() };
+        crate::services::agent_active_jobs::record_outcome(&tasks_dir, &outcome).unwrap();
+        // The tag step applies, the comment step finds the lock busy on
+        // both tries, and the lock frees before the outcome.
+        let held = std::rc::Rc::new(std::cell::RefCell::new(None));
+        let hook = held.clone();
+        let project = tasks_dir.join("PX");
+        action_read_barrier::install(move || {
+            action_read_barrier::install(move || {
+                *hook.borrow_mut() = Some(crate::storage::safety::acquire_storage_lock(&project, "task").unwrap());
+                action_read_barrier::install(move || {
+                    action_read_barrier::install(move || {
+                        drop(hook.borrow_mut().take());
+                    });
+                });
+            });
+        });
+        let job = AutomationJobContext { job_id: "job-1".into(), runner: "t3".into(), agent: None, worktree_path: None, worktree_branch: None, usage: None };
+        let err = AutomationService::apply_job_event(&tasks_dir, "PX-1", AutomationEvent::JobCompleted, Some(job)).unwrap_err();
+        assert!(err.to_string().contains("waits for its end rules"), "{err}");
+        assert!(held.borrow().is_none(), "the lock is free before the outcome");
+        let task = TaskService::get(&Storage::new(&tasks_dir), "PX-1", None).unwrap();
+        assert_eq!(task.status.as_str(), "Todo");
+        assert_eq!(task.tags, vec!["ended".to_string()]);
+        assert!(task.comments.is_empty());
+
+        AutomationService::apply_pending_outcomes(&tasks_dir);
+        let task = TaskService::get(&Storage::new(&tasks_dir), "PX-1", None).unwrap();
+        assert_eq!(task.status.as_str(), "Done");
+        assert_eq!(task.comments.iter().map(|comment| comment.text.as_str()).collect::<Vec<_>>(), vec!["end", "outcome"]);
+        assert!(crate::services::agent_active_jobs::pending_outcomes(&tasks_dir).is_empty(), "applied once");
         unsafe { std::env::remove_var("LOTAR_AGENT_QUEUE_DIR") };
     }
 

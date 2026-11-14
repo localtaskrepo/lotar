@@ -4,7 +4,7 @@ priority: Medium
 type: Chore
 reporter: claude
 created: 2026-11-13T22:21:43.785907+00:00
-modified: 2026-11-15T06:31:09.489653+00:00
+modified: 2026-11-15T07:59:17.242744+00:00
 relationships:
   depends_on:
   - DEV-498
@@ -143,6 +143,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A20426196-9a60-4b49-9b4a-803caf002ef8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abd23dbde-b73c-4b0d-b5c6-6ba340e217ec
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3e13854a-0fe4-4f65-afbf-9822f174830f
+releases:
+- 6
 description: |-
   Move the core modules into a crate of their own in the cargo workspace (DEV-493; the owner, 2026-11-13: "Yes on all of those ideas"). Changes above core then don't recompile core, and core's tests build in a fraction of the time.
 
@@ -406,3 +408,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-498","DEV-497","DEV-496"],"blocks":["DEV-552"],"related":["DEV-493","DEV-549","DEV-550","DEV-510","DEV-556"]}'
     new: '{"depends_on":["DEV-498","DEV-497","DEV-496"],"blocks":["DEV-552"],"related":["DEV-493","DEV-549","DEV-550","DEV-510","DEV-556","DEV-466"]}'
+- at: 2026-11-15T07:59:17.242744+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

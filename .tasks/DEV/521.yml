@@ -4,7 +4,7 @@ priority: Low
 type: Chore
 reporter: claude
 created: 2026-11-14T05:38:49.244099+00:00
-modified: 2026-11-14T23:22:26.253113+00:00
+modified: 2026-11-15T07:59:18.295801+00:00
 relationships:
   related:
   - DEV-501
@@ -46,6 +46,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac91cd100-e131-4687-b2ab-eeb02724277e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aab1455e4-0319-41f4-b245-492779b88480
+releases:
+- 6
 description: 'Found by claude on DEV-501, 2026-11-14: in crates/lotar-lib/src/services/agent_job_service.rs, push_event appends to the job''s log file while JOB_REGISTRY is locked (every update_job/record_and_emit), and cancel_job runs terminate_child, which scans all processes with sysinfo (and taskkill on Windows), under the same lock. Every job''s events, the API''s job list and new job starts wait on that. Check: grep for AgentLogService::append_event inside push_event and terminate_child inside the cancel_job lock. Done: the log append and the process kill run after the lock is released (collect what to write or kill under the lock), behaviour and event order unchanged, tests and smoke pass.'
 tags:
 - health
@@ -188,3 +190,8 @@ history:
     new: Done
   - field: assignee
     old: '@fix'
+- at: 2026-11-15T07:59:18.295801+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

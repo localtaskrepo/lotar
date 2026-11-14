@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T05:10:07.050179+00:00
-modified: 2026-11-15T06:31:09.517571+00:00
+modified: 2026-11-15T07:59:42.832769+00:00
 relationships:
   related:
   - DEV-523
@@ -15,6 +15,7 @@ relationships:
   - DEV-508
   - DEV-532
   - DEV-466
+  - DEV-560
 comments:
 - date: 2026-11-14T05:51:41.704856+00:00
   author: claude
@@ -85,6 +86,8 @@ references:
 - attachment: DEV-518-after-light-390.900267d4cb7c609f3bfd0f06d7e9672c.png
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acade90bf-5ade-412f-970f-88075d8cd6ab
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6ca8ecac-af9c-483d-9c73-72a50b982beb
+releases:
+- 6
 description: |-
   ## Why
 
@@ -347,3 +350,14 @@ history:
   - field: relationships
     old: '{"related":["DEV-523","DEV-525","DEV-513","DEV-519","DEV-508","DEV-532"]}'
     new: '{"related":["DEV-523","DEV-525","DEV-513","DEV-519","DEV-508","DEV-532","DEV-466"]}'
+- at: 2026-11-15T07:59:18.036564+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'
+- at: 2026-11-15T07:59:42.832769+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-523","DEV-525","DEV-513","DEV-519","DEV-508","DEV-532","DEV-466"]}'
+    new: '{"related":["DEV-523","DEV-525","DEV-513","DEV-519","DEV-508","DEV-532","DEV-466","DEV-560"]}'

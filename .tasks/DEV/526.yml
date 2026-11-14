@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T06:30:17.306138+00:00
-modified: 2026-11-14T08:32:18.793897+00:00
+modified: 2026-11-15T07:59:18.889129+00:00
 relationships:
   related:
   - DEV-466
@@ -72,6 +72,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A073b1d95-21bc-4b6b-b876-04e44511b319
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aec330f2d-4050-4c17-9c97-1ee1293cba81
+releases:
+- 6
 description: |-
   Agents' ticket comments are mostly one paragraph of plain text, though the web UI renders markdown and mallox reads them on his phone. mallox, 2026-11-14 on DEV-466: "I do notice that comments are not using markdown at all and the comments are mostly unformatted. Something we could improve".
 
@@ -163,3 +165,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-466","DEV-490","DEV-477","DEV-496","DEV-511","DEV-521","DEV-525"]}'
     new: '{"related":["DEV-466","DEV-490","DEV-477","DEV-496","DEV-511","DEV-521","DEV-525","DEV-468"]}'
+- at: 2026-11-15T07:59:18.889129+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

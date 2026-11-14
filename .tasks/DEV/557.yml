@@ -4,7 +4,7 @@ priority: Medium
 type: Feature
 reporter: claude
 created: 2026-11-15T06:39:52.985441+00:00
-modified: 2026-11-15T07:41:34.441303+00:00
+modified: 2026-11-15T07:59:22.243679+00:00
 relationships:
   related:
   - DEV-509
@@ -57,6 +57,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A163846ac-5812-4882-877a-c92f6a5e8734
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad75a141b-3805-4f11-b0e3-922e4fc75315
+releases:
+- 6
 description: 'Found while running npm run lint:agent for DEV-509 on main 3bbd59b6: cargo fmt --all --check reports crates/lotar-lib/tests/agent_automation_integration_test.rs:2502, a comment line from d9c34341 (DEV-550) at column 0 instead of 8 spaces. Check: cargo fmt --all --check on main. Done when main passes it (rustfmt --edition 2024 on that one file).'
 tags:
 - health
@@ -204,3 +206,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-509","DEV-550","DEV-558","DEV-520"]}'
     new: '{"related":["DEV-509","DEV-550","DEV-558","DEV-520","DEV-467"]}'
+- at: 2026-11-15T07:59:22.243679+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'
