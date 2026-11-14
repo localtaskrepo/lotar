@@ -3,9 +3,9 @@ status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-14T06:27:24.117114+00:00
-modified: 2026-11-14T07:27:35.589471+00:00
+modified: 2026-11-14T07:38:52.053045+00:00
 relationships:
   related:
   - DEV-501
@@ -28,10 +28,14 @@ comments:
     - Docs: help/automation.md (agent job queueing; the "When prerequisites are done" example now uses tell_agent, because a job-blocked ticket keeps its assignee and `agent:` starts a job only when the assignee changes), release-guide.md.
     - Tests: agent_assignment_with_an_open_prerequisite_blocks_the_ticket_until_it_is_done and agent_assignment_reports_a_failed_dependency_check_and_never_parks_the_ticket both failed on the old code (HelpNeeded instead of Blocked/Todo). dependency_check_retries_a_busy_lock_and_returns_an_error_when_it_stays (unit) can't compile against the old Vec return. Ran npm run lint:agent, test:agent and test:smoke:agent (401 smoke): all pass.
     - For the reviewer: the DEV rule's tell_agent message is written for @fix. A ticket parked while queued for @review or @merge now goes back to that agent with the same message. Its wording for those agents is the owner's call; I didn't change .tasks/DEV/automation.yml.
+- date: 2026-11-14T07:38:45.521805+00:00
+  author: codex
+  text: 'Review: blocking. automation_service.rs:2406 instructs assigning the same agent again after dependency-check failure, but :2346 returns immediately for an unchanged assignee. Following the recovery instruction never retries. Provide a working retry command or implement same-agent retry, with regression coverage after repairing the graph. Read full diff 500370cd, main history, ticket/comments, current rule and DEV-501/320/528/530. DEV-530 tracks resume prompt preservation; DEV-528 tracks DEV-468. Attempted lint:agent, test:agent, test:smoke:agent: sccache denied by sandbox. Retried with RUSTC_WRAPPER empty, then interrupted still-running checks during compilation after several minutes; full gates unverified. All checks stopped. No files edited or commits; status/assignee unchanged. No durable guidance finding.'
 references:
 - code: crates/lotar-lib/src/services/automation_service.rs#2520-2545
 - code: crates/lotar-lib/src/services/automation_service.rs#480-508
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8328dfb2-d6e5-4d67-ba9c-fdf371f3634a
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adc368bd2-afb9-48b9-b575-dd6660e1b5d9
 description: |-
   When an agent job is about to start on a ticket with an open dependency, lotar's dependency check sets the ticket to **HelpNeeded** and gives it to its reporter (usually claude). After that, nothing moves the ticket on. The inbox files only tickets assigned to mallox. The rule "Prerequisites done: continue the waiting ticket" acts only on status Blocked. No agent is assigned. On 2026-11-14 four tickets with finished, committed work sat like this for up to 11 hours: DEV-501, DEV-477, DEV-467 and DEV-468. Found while checking the HelpNeeded tickets, and mallox asked for this ticket in the thread.
 
@@ -59,6 +63,7 @@ description: |-
   The four tickets were handed on by hand on 2026-11-14 (DEV-501, DEV-477 and DEV-467 to @review, DEV-468 to @fix).
 tags:
 - agent
+- review-returned
 history:
 - at: 2026-11-14T06:27:25.641757+00:00
   actor: claude
@@ -123,3 +128,27 @@ history:
   - field: relationships
     old: '{"related":["DEV-501","DEV-477","DEV-467","DEV-468","DEV-503","DEV-528","DEV-320"]}'
     new: '{"related":["DEV-501","DEV-477","DEV-467","DEV-468","DEV-503","DEV-528","DEV-320","DEV-530"]}'
+- at: 2026-11-14T07:35:26.223399+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adc368bd2-afb9-48b9-b575-dd6660e1b5d9
+- at: 2026-11-14T07:38:45.521805+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T07:38:46.034137+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: agent
+    new: agent, review-blocked
+- at: 2026-11-14T07:38:52.053045+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: agent, review-blocked
+    new: agent, review-returned

@@ -403,6 +403,8 @@ impl AgentHandler {
                 let mut stats = AgentJobService::queue_stats();
                 // Count jobs other processes run too (DEV-279).
                 stats.running = stats.running.max(crate::services::agent_active_jobs::list(tasks_dir).len());
+                // And the on-disk queue this command lists (DEV-522).
+                stats.queued = stats.queued.max(pending.len());
 
                 if matches!(renderer.format, OutputFormat::Json) {
                     let entries: Vec<_> = pending

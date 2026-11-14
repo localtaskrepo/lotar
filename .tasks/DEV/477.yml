@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-13T19:02:46.329827+00:00
-modified: 2026-11-14T07:23:27.378563+00:00
+modified: 2026-11-14T07:31:49.288051+00:00
 relationships:
   blocks:
   - DEV-513
@@ -13,6 +13,7 @@ relationships:
   - DEV-481
   - DEV-513
   - DEV-524
+  - DEV-501
 comments:
 - date: 2026-11-13T19:12:17.547351+00:00
   author: claude
@@ -247,3 +248,9 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-14T07:31:49.288051+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-513"],"related":["DEV-481","DEV-513","DEV-524"]}'
+    new: '{"blocks":["DEV-513"],"related":["DEV-481","DEV-513","DEV-524","DEV-501"]}'

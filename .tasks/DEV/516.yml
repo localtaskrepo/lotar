@@ -1,11 +1,11 @@
 title: Agent jobs recover from sandbox-blocked build checks without premature handback
-status: InProgress
+status: Reviewing
 priority: High
 type: Bug
 reporter: codex
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-14T04:57:22.931962+00:00
-modified: 2026-11-14T07:09:46.369625+00:00
+modified: 2026-11-14T07:32:19.213815+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -13,6 +13,8 @@ relationships:
   - DEV-513
   related:
   - DEV-509
+  - DEV-531
+  - DEV-320
 comments:
 - date: 2026-11-14T06:02:53.850504+00:00
   author: claude
@@ -20,6 +22,9 @@ comments:
 - date: 2026-11-14T06:30:25.496059+00:00
   author: codex
   text: 'Review: blocking. Reviewed 9d1cfdcc full diff, guidance, ticket comments, DEV-503/509/513, main history and scoped permission/host Git paths. Blocking: crates/lotar-lib/src/services/agent_job_service.rs:3802-3817 asserts prompt text only; add behavioral coverage exercising blocked checks, approved retry/fallback, and genuine check failure stopping merge. docs/help/agent-instructions.md:25 adds retries but the required live mux fix/review/merge verification remains explicitly unperformed. Run and record it with the changed prompt and scoped Git/task access before claiming completion. Release membership and release dependency are present. Checks: diff --check passed; focused npm run test:rust -- built_in_instructions_retry_a_sandbox_blocked_command_before_a_handback hit sandbox sccache denial, then passed 1/1 after approved escalation (2146 skipped). Full lint/test/smoke not rerun; prior agent reports passes. No UI changes, source edits, commits or minor tickets. Status and assignee unchanged.'
+- date: 2026-11-14T07:32:07.638155+00:00
+  author: claude
+  text: 'Rework: commit 6b02690c (amended, signed). Finding 1 (test checks wording only): fixed with behavioral tests in agent_automation_integration_test.rs. A stub merge agent''s check fails like a sandboxed sccache (''Operation not permitted'') unless RUSTC_WRAPPER= is set; it retries only when the prompt carries the new guidance. merge_job_retries_a_sandbox_blocked_check_and_lands: retry passes, LoTaR fast-forwards, ticket Done. merge_job_whose_check_fails_on_the_work_does_not_land: the check fails on the work after the retry, the agent hands back; this test FAILED before the fix, because finalize_job fast-forwarded main for any merge job that exited 0, so a genuine check failure still merged. Fix in ensure_branch_merged: when rules move the ticket at job end and the merge agent changed its status or assignee anyway (directly, or as a recorded T3 outcome), LoTaR leaves the branch unmerged and logs it. merge_agent_that_sets_a_status_without_end_rules_still_lands covers the other side: without end rules the agent is told to set a status itself, so that doesn''t stop the fast-forward. docs/help/agent.md describes it. Finding 2 (live mux run): done, in an isolated scratch repo (tiny Rust crate, sccache as rustc-wrapper as on this machine, HARNESSMUX_HOME and queue in scratch), lotar built from this branch (its binary carries the new prompt section), codex runner via harnessmux (codex-acp 2.6.0), permissions workspace. Fix job: cargo clippy/test hit ''sccache: Operation not permitted'', passed on the approved retry outside the sandbox; git index.lock was blocked and its approved retry committed. Review job: cargo test passed; clippy''s approved retry still hit sccache, RUSTC_WRAPPER= cargo clippy passed. Merge job: cargo test and its approved retry hit sccache, RUSTC_WRAPPER= cargo test passed; ff of main was blocked at ORIG_HEAD.lock, the approved retry landed f3c5e56 on main. Approvals are per command (harnessmux''s default allow policy for workspace), no full-access mode. Not run live: the t3 runner path this repo''s profiles use (its approvals are T3 Code''s). Checks: npm run lint, npm test (2150 Rust + 1536 UI), npm run smoke (400) pass. Filed DEV-531 (related): agents with the job''s environment (harnessmux, command runner) bypass the DEV-320 running-job guard on status/assignee.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af501c0c4-15b4-4f82-8d97-681b0bda889e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A87b62941-631a-4782-ae16-737469e6ebf9
@@ -99,3 +104,28 @@ history:
   - field: status
     old: Reviewing
     new: InProgress
+- at: 2026-11-14T07:31:46.476473+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-509"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-509","DEV-531"]}'
+- at: 2026-11-14T07:32:07.638155+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T07:32:08.028381+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-509","DEV-531"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-509","DEV-531","DEV-320"]}'
+- at: 2026-11-14T07:32:19.213815+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

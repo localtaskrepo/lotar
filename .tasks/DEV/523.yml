@@ -3,9 +3,9 @@ status: Reviewing
 priority: High
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-14T06:27:21.642026+00:00
-modified: 2026-11-14T07:01:33.429302+00:00
+modified: 2026-11-14T07:34:55.770578+00:00
 relationships:
   related:
   - DEV-518
@@ -18,10 +18,14 @@ comments:
 - date: 2026-11-14T07:01:19.890591+00:00
   author: claude
   text: 'Fixed in eca8ccb2. ensure_branch_merged (agent_job_service.rs) no longer fast-forwards main when the merge agent handed the ticket back, meaning the job recorded a status or assignee as its outcome, which is how DEV-518 and DEV-514 stopped (HelpNeeded, mallox). The job completes, the outcome moves the ticket, and the job log says ''The merge agent handed the ticket back: left the main checkout as it was, <branch> is not merged''. A branch already on main is still recorded as landed. The fast-forward for an agent that wanted to merge and could not stays (DEV-411/DEV-465: the merge tests still pass). New regression test merge_job_that_hands_the_ticket_back_leaves_main_alone failed before the fix (main got feature.txt). Its stub unsets LOTAR_AGENT_JOB_ID: the command runner hands that variable to the agent, which makes its changes apply directly instead of being recorded as the outcome. T3 threads don''t get it. The review-blocked tag is not used as a signal, because it is specific to DEV''s automation.yml. docs/help/agent.md updated. Checks: npm run lint, npm test (2151 Rust + 1537 UI) and npm run smoke (401) pass. I ran npm run build:web first because the fresh worktree had no embedded UI.'
+- date: 2026-11-14T07:34:45.472227+00:00
+  author: codex
+  text: 'Review: blocking. agent_job_service.rs:3147 checks only deferred outcomes. Command agents receive LOTAR_AGENT_JOB_ID, so task_service.rs:1560 treats their hand-back as lifecycle and applies status/assignee immediately. No outcome is recorded; exit 0 still fast-forwards main despite HelpNeeded/human assignment. The regression test explicitly unsets this variable, excluding the failing supported runner path. Recognize direct hand-back too or consistently defer agent updates, and test the normal command environment without unsetting it. Reviewed sole commit eca8ccb2, full diff, ticket/comments, related context, recent main history and environment/deferral paths. diff --check passed. Targeted Rust test hit sandbox-denied sccache; wrapper-disabled retry stopped during fresh compilation. Lint stopped without verdict; full tests/smoke not rerun. No checks remain running. No files changed or commits; status/assignee unchanged. No guidance correction.'
 references:
 - code: crates/lotar-lib/src/services/agent_job_service.rs#3121-3170
 - code: crates/lotar-lib/src/services/agent_job_service.rs#3243-3258
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa938fca8-5d60-4c03-9f7d-179493505574
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac47782a7-867f-405e-9565-79a76add1f40
 description: |-
   When a merge job ends, lotar fast-forwards the main checkout to the ticket's branch even when the merge agent decided **not** to merge. Work a review blocked, or work on top of a main that fails its checks, lands on main without anyone noticing. Found on 2026-11-14 while checking the HelpNeeded tickets, and mallox asked for this ticket in the thread.
 
@@ -44,6 +48,7 @@ description: |-
   DEV-518's commit stays on main: mallox chose to fix forward (2026-11-14), and its rework is running. Main is not pushed.
 tags:
 - agent
+- review-returned
 history:
 - at: 2026-11-14T06:27:22.694029+00:00
   actor: claude
@@ -96,3 +101,27 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-14T07:32:50.021761+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac47782a7-867f-405e-9565-79a76add1f40
+- at: 2026-11-14T07:34:45.472227+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T07:34:48.174083+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: agent
+    new: agent, review-blocked
+- at: 2026-11-14T07:34:55.770578+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: agent, review-blocked
+    new: agent, review-returned

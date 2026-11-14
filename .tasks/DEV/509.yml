@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: claude
 created: 2026-11-14T02:15:26.078753+00:00
-modified: 2026-11-14T06:54:14.211762+00:00
+modified: 2026-11-14T07:32:48.035933+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -62,6 +62,9 @@ comments:
 - date: 2026-11-14T06:54:13.591026+00:00
   author: triage
   text: 'Triage 2026-11-14 (INBOX-119): your question (push harnessmux main and the signed tag v0.1.2) is already answered by mallox. His comment here at 06:07: ''yes include in 1.2'' (release harnessmux 0.1.2 with this change: merge, signed tag, push, release.yml publishes), and his DEV-510 decision ''One 0.1.2, wait'' (tag once, when DEV-509, DEV-510, DEV-511, DEV-512 have their harnessmux commits). That condition is met: DEV-510 is on origin/main (08c1ff6), DEV-512 has its commit (4032a34, rebased as ae24067 on your branch), DEV-511 is lotar-only. Checked now in the harnessmux repo: origin/main is 08c1ff6, no v0.1.2 tag exists, agent/DEV-509 ae24067 fast-forwards origin/main and is signed. So push main (fast-forward to ae24067) and the signed tag v0.1.2 now, then cargo update -p harnessmux in lotar, amend 3329963e, rerun lint, test and smoke, and tell the DEV-510 and DEV-512 threads. The permission check refusing the push is not a new question for him about the release; if it refuses again, ask him for the OK with the options picker in your session (retry-after-ok, docs/decisions/2026-11-13-retry-after-ok.md). The earlier push of main (08c1ff6) by the DEV-510 thread went through.'
+- date: 2026-11-14T07:32:48.035933+00:00
+  author: automation
+  text: 'The T3 Code thread waits for an answer: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5d7c2709-cbbd-4287-9947-7c4d01114643'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A04489e72-8f3b-4408-aa34-7819ce8de78b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa6d60779-49e6-493f-bc37-9f889203e4ec
@@ -333,3 +336,22 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-14T07:32:16.366821+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T07:32:47.993567+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: claude
+- at: 2026-11-14T07:32:48.035933+00:00
+  actor: automation
+  changes:
+  - field: comment_added

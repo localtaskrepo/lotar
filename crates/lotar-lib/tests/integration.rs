@@ -161,6 +161,7 @@ mod dev497_cargo_install_root_test;
 
 mod dev4_archive_test;
 mod dev503_harness_jobs_test;
+mod dev522_agent_queue_count_test;
 mod dev54_mutation_contract_test;
 mod dev55_transactional_mutations_test;
 mod dev56_task_identity_test;

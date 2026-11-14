@@ -1,11 +1,11 @@
 title: Review the agent job code that stays after the harnessmux switch
-status: Merging
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T22:35:03.230572+00:00
-modified: 2026-11-14T07:30:40.593809+00:00
+modified: 2026-11-14T07:31:55.065262+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -20,6 +20,9 @@ relationships:
   - DEV-201
   - DEV-524
   - DEV-530
+  - DEV-477
+  - DEV-496
+  - DEV-519
 comments:
 - date: 2026-11-14T05:34:55.100350+00:00
   author: claude
@@ -43,6 +46,9 @@ comments:
 - date: 2026-11-14T07:30:40.593809+00:00
   author: codex
   text: 'Merged ca9529ff rebased as 047bbfe0 into main by fast-forward, no conflicts or source changes during integration. Reran all gates: lint:agent, test:agent (2154 Rust, UI, release and hooks), test:smoke:agent (401 passed). No checks skipped. Folding current .tasks changes into the landing commit per merge instructions; push eligibility checked separately.'
+- date: 2026-11-14T07:31:49.147721+00:00
+  author: codex
+  text: 'Landing complete: main b3fdb415 contains reviewed ca9529ff (rebased 047bbfe0) plus authorized .tasks snapshot. All required gates passed after rebase; 401 smoke tests. Pushed finished prefix through 0327eb8f; push hooks passed. DEV-501 remains local because earlier unpushed work is still open: DEV-519 Merging, DEV-496/DEV-521/DEV-477 HelpNeeded. No force push, no skipped checks. Job automation owns final status.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A40e4b2df-5666-4b3e-9ac3-b6613c9e2aa3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A864d6f4e-9739-4249-8fa0-626d0e6c7023
@@ -222,3 +228,19 @@ history:
   actor: codex
   changes:
   - field: comment_added
+- at: 2026-11-14T07:31:49.147721+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T07:31:49.289244+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-492","DEV-505","DEV-513","DEV-520","DEV-521","DEV-201","DEV-524","DEV-530"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-492","DEV-505","DEV-513","DEV-520","DEV-521","DEV-201","DEV-524","DEV-530","DEV-477","DEV-496","DEV-519"]}'
+- at: 2026-11-14T07:31:55.065262+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done

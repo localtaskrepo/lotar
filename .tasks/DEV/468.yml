@@ -1,11 +1,11 @@
 title: A rework commits off the ticket's branch, so the next fresh review reads the old commit
-status: Reviewing
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-13T10:33:47.729859+00:00
-modified: 2026-11-14T07:09:14.383630+00:00
+modified: 2026-11-14T07:35:24.060758+00:00
 relationships:
   blocks:
   - DEV-513
@@ -102,6 +102,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0b8adae8-1b60-44f1-813b-ca071e380fad
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A155afdd3-43ca-4967-a6ae-9899afe01599
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2d7ebdd3-9368-4b87-aba8-486c77d8f982
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acb74640a-3c54-4159-ae41-fcf3e010dedf
 releases:
 - 6
 description: |-
@@ -533,3 +534,17 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-513"],"related":["DEV-342","DEV-408","DEV-414","DEV-465","DEV-472","DEV-473","DEV-466","DEV-513","DEV-524","DEV-503"]}'
     new: '{"blocks":["DEV-513"],"related":["DEV-342","DEV-408","DEV-414","DEV-465","DEV-472","DEV-473","DEV-466","DEV-513","DEV-524","DEV-503","DEV-528"]}'
+- at: 2026-11-14T07:32:22.574544+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acb74640a-3c54-4159-ae41-fcf3e010dedf
+- at: 2026-11-14T07:35:24.060758+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

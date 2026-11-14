@@ -1,0 +1,29 @@
+title: Agents with the job's environment bypass the running-job guard on status and assignee
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-14T07:31:46.259047+00:00
+modified: 2026-11-14T07:31:46.659808+00:00
+relationships:
+  related:
+  - DEV-320
+  - DEV-516
+description: 'Found in DEV-516: job_env (agent_job_service.rs) passes build_lotar_env with the job context, so harnessmux sessions and command-runner agents get LOTAR_AGENT_JOB_ID and LOTAR_TICKET_ID. TaskService::is_job_lifecycle (task_service.rs:1558) then counts the agent''s own lotar status/assignee commands as job lifecycle, and they apply directly mid-job instead of being recorded as the job''s outcome (DEV-320); its doc comment says agents don''t carry these. Seen in DEV-516''s integration test: a command-runner merge agent''s ''lotar status HelpNeeded'' showed while the job still ran. Check: an ACP or command agent''s status change during a job is recorded via record_outcome and applied at the job''s end. Done: agents'' changes are recorded like T3 threads'', automation run commands stay lifecycle, with a test.'
+tags:
+- health
+custom_fields:
+  finding: review:job-outcome-guard
+history:
+- at: 2026-11-14T07:31:46.476772+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-320","DEV-516"]}'
+- at: 2026-11-14T07:31:46.659808+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
