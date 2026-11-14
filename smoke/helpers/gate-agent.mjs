@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Gated mock agent fixture: a Copilot CLI (`--output-format json`) mock whose run is held on a
+// Gated mock agent fixture: a `command` runner program whose run is held on a
 // test-owned gate file so tests can observe and assert mid-run state
 // deterministically instead of racing fixed sleeps.
 //
@@ -7,13 +7,13 @@
 // trailing prompt are ignored):
 //   --gate-dir <dir>   directory holding the gate and sentinel files (required)
 //   --label <name>     sentinel name suffix, unique per concurrent job
-//   --mode <kind>      copilot | hold | plain (default copilot)
+//   --mode <kind>      lines | hold | plain (default lines)
 //   --hold-ms <n>      bounded self-exit while waiting for release (default 20000)
 //   --exit <code>      exit code after the gate is released (default 0)
 //
 // Protocol:
 //   0. write boot-<label>.sentinel (earliest possible diagnostics marker:
-//      pid, platform, full argv — written before validation can fail so a
+//      pid, platform, full argv, the job prompt — written before validation can fail so a
 //      missing started marker is provably either "process never reached the
 //      script" (no boot marker anywhere) or "booted but held/failed")
 //   1. emit the pre-gate runner lines for the selected mode
@@ -48,7 +48,7 @@ function parseArgs(argv) {
 const options = parseArgs(process.argv.slice(2));
 const gateDir = options['--gate-dir'];
 const label = options['--label'] ?? 'job';
-const mode = options['--mode'] ?? 'copilot';
+const mode = options['--mode'] ?? 'lines';
 const requestedHold = Number.parseInt(options['--hold-ms'] ?? '20000', 10);
 const holdMs = Number.isInteger(requestedHold) ? requestedHold : 20000;
 const requestedExit = Number.parseInt(options['--exit'] ?? '0', 10);
@@ -68,6 +68,7 @@ writeMarker(`boot-${label}.sentinel`, {
     pid: process.pid,
     platform: process.platform,
     argv: process.argv,
+    prompt: process.env.LOTAR_AGENT_PROMPT ?? null,
     gateDir: gateDir ?? null,
     mode,
     holdMs,
@@ -77,12 +78,10 @@ if (!gateDir) {
     console.error('gate-agent: --gate-dir is required');
     process.exit(2);
 }
-if (!['copilot', 'hold', 'plain'].includes(mode)) {
+if (!['lines', 'hold', 'plain'].includes(mode)) {
     console.error(`gate-agent: unknown mode ${mode}`);
     process.exit(2);
 }
-
-const sessionId = `gate-${label}-${process.pid}`;
 
 function writeSentinel(name) {
     // The owning test creates the gate directory. Never recreate it: a child
@@ -94,15 +93,12 @@ function writeSentinel(name) {
     }
 }
 
-function emit(payload) {
-    process.stdout.write(`${JSON.stringify(payload)}\n`);
+function emit(line) {
+    process.stdout.write(`${line}\n`);
 }
 
-if (mode === 'copilot') {
-    emit({ type: 'user.message', data: { content: 'gate prompt' } });
-    emit({ type: 'tool.execution_start', data: { toolName: 'bash', arguments: { command: 'phase one' } } });
-} else if (mode === 'hold') {
-    emit({ type: 'user.message', data: { content: 'gate prompt' } });
+if (mode === 'lines') {
+    emit('bash: phase one');
 }
 writeSentinel(`started-${label}.sentinel`);
 
@@ -113,17 +109,15 @@ while (!existsSync(releasePath) && Date.now() < deadline) {
 }
 
 const tail = [];
-if (mode === 'copilot') {
-    tail.push({ type: 'tool.execution_start', data: { toolName: 'bash', arguments: { command: 'phase two' } } });
-    tail.push({ type: 'assistant.message', data: { content: 'phase one / phase two done' } });
+if (mode === 'lines') {
+    tail.push('bash: phase two', 'phase one / phase two done');
 } else if (mode === 'hold') {
-    tail.push({ type: 'assistant.message', data: { content: 'held agent released' } });
+    tail.push('held agent released');
 }
-tail.push({ type: 'result', sessionId, exitCode, usage: { premiumRequests: 0 } });
 
 // Exit from the write callback so piped stdout is flushed before exit and
 // the completion sentinel never precedes the emitted runner lines.
-process.stdout.write(`${tail.map((event) => JSON.stringify(event)).join('\n')}\n`, () => {
+process.stdout.write(tail.length > 0 ? `${tail.join('\n')}\n` : '', () => {
     writeSentinel(`completed-${label}.sentinel`);
     process.exit(exitCode);
 });

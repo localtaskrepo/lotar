@@ -90,70 +90,6 @@ pub fn unregister(tasks_dir: &Path, job_id: &str) {
     let _lock = lock_outcome(&dir, name);
     mark_ended(&dir, name);
     let _ = std::fs::remove_file(dir.join(format!("{name}.outcome.json")));
-    let _inbox = lock_inbox(&dir, name);
-    let _ = std::fs::remove_file(dir.join(format!("{name}.inbox.json")));
-    let _ = std::fs::remove_file(dir.join(format!("{name}.inbox-closed")));
-}
-
-fn lock_inbox(dir: &Path, name: &str) -> std::io::Result<std::fs::File> {
-    crate::storage::safety::acquire_storage_lock_within(dir, &format!("{name}.inbox"), std::time::Duration::from_secs(5))
-}
-
-fn read_inbox(path: &Path) -> Vec<String> {
-    std::fs::read_to_string(path).ok().and_then(|json| serde_json::from_str(&json).ok()).unwrap_or_default()
-}
-
-/// Take no more messages, and hand back any still waiting.
-pub fn close_inbox(tasks_dir: &Path, job_id: &str) -> Vec<String> {
-    let Some(name) = safe_name(job_id) else {
-        return Vec::new();
-    };
-    let dir = dir(tasks_dir);
-    let _lock = lock_inbox(&dir, name);
-    let _ = std::fs::write(dir.join(format!("{name}.inbox-closed")), b"");
-    let path = dir.join(format!("{name}.inbox.json"));
-    let messages = read_inbox(&path);
-    let _ = std::fs::remove_file(&path);
-    messages
-}
-
-/// Queue a message for a running job (DEV-384); its process hands it to
-/// the agent as the next turn. `false` when the job is gone or takes no
-/// more messages because it is ending.
-pub fn push_message(tasks_dir: &Path, job_id: &str, message: &str) -> bool {
-    let Some(name) = safe_name(job_id) else {
-        return false;
-    };
-    let dir = dir(tasks_dir);
-    let Ok(_lock) = lock_inbox(&dir, name) else {
-        return false;
-    };
-    if !dir.join(format!("{name}.json")).exists() || dir.join(format!("{name}.inbox-closed")).exists() {
-        return false;
-    }
-    let path = dir.join(format!("{name}.inbox.json"));
-    let mut messages = read_inbox(&path);
-    messages.push(message.to_string());
-    serde_json::to_string(&messages).is_ok_and(|json| crate::storage::safety::atomic_write_file(&path, &json).is_ok())
-}
-
-/// The messages queued for the job, oldest first. With none waiting the
-/// job takes no more: a later [`push_message`] is refused, so its sender
-/// starts a new job instead of losing the message.
-pub fn take_messages_or_close(tasks_dir: &Path, job_id: &str) -> Vec<String> {
-    let Some(name) = safe_name(job_id) else {
-        return Vec::new();
-    };
-    let dir = dir(tasks_dir);
-    let _lock = lock_inbox(&dir, name);
-    let path = dir.join(format!("{name}.inbox.json"));
-    let messages = read_inbox(&path);
-    if messages.is_empty() {
-        let _ = std::fs::write(dir.join(format!("{name}.inbox-closed")), b"");
-    } else {
-        let _ = std::fs::remove_file(&path);
-    }
-    messages
 }
 
 /// How long an ended job's marker stays: far longer than any update that
@@ -302,20 +238,6 @@ pub fn claim(tasks_dir: &Path, job_id: &str) -> Option<ActiveJob> {
     Some(job)
 }
 
-/// Record the job's session once the runner reports it.
-pub fn set_session(tasks_dir: &Path, job_id: &str, session_id: &str) {
-    let Some(name) = safe_name(job_id) else {
-        return;
-    };
-    let path = dir(tasks_dir).join(format!("{name}.json"));
-    if let Some(mut job) = read_record(&path) {
-        job.session_id = Some(session_id.to_string());
-        if let Ok(json) = serde_json::to_string(&job) {
-            let _ = crate::storage::safety::atomic_write_file(&path, &json);
-        }
-    }
-}
-
 pub fn for_ticket(tasks_dir: &Path, ticket_id: &str) -> Option<ActiveJob> {
     list(tasks_dir).into_iter().find(|job| crate::storage::identity::aliases_match(&job.ticket_id, ticket_id))
 }
@@ -378,41 +300,10 @@ mod tests {
         register(tasks.path(), &orphan);
         assert!(list(tasks.path()).is_empty(), "a job whose owner died is not running");
         assert_eq!(orphaned(tasks.path()), vec![orphan.clone()], "it stays until a process finishes it");
-        set_session(tasks.path(), "job-2", "thread-1");
         let claimed = claim(tasks.path(), "job-2").expect("claims the orphan");
-        assert_eq!((claimed.owner_pid, claimed.session_id.as_deref()), (std::process::id(), Some("thread-1")));
+        assert_eq!((claimed.owner_pid, claimed.session_id.as_deref()), (std::process::id(), orphan.session_id.as_deref()));
         assert!(claim(tasks.path(), "job-2").is_none(), "a live owner keeps it");
         assert!(orphaned(tasks.path()).is_empty());
-        unsafe { std::env::remove_var("LOTAR_AGENT_QUEUE_DIR") };
-    }
-
-    #[test]
-    fn messages_reach_a_running_job_until_it_closes_its_inbox() {
-        let _queue = tempfile::tempdir().unwrap();
-        // SAFETY: test-local override of the queue directory.
-        unsafe { std::env::set_var("LOTAR_AGENT_QUEUE_DIR", _queue.path()) };
-        let tasks = tempfile::tempdir().unwrap();
-        assert!(!push_message(tasks.path(), "job-1", "hello"), "no such job");
-        let job = ActiveJob {
-            job_id: "job-1".into(),
-            ticket_id: "T-1".into(),
-            runner: "t3".into(),
-            agent: None,
-            owner_pid: std::process::id(),
-            child_pid: 0,
-            started_at: "2026-01-01T00:00:00Z".into(),
-            session_id: None,
-        };
-        register(tasks.path(), &job);
-        assert!(push_message(tasks.path(), "job-1", "one"));
-        assert!(push_message(tasks.path(), "job-1", "two"));
-        assert_eq!(take_messages_or_close(tasks.path(), "job-1"), ["one", "two"]);
-        assert!(push_message(tasks.path(), "job-1", "three"), "taking messages leaves the inbox open");
-        assert_eq!(take_messages_or_close(tasks.path(), "job-1"), ["three"]);
-        assert!(take_messages_or_close(tasks.path(), "job-1").is_empty());
-        assert!(!push_message(tasks.path(), "job-1", "late"), "an empty take closes the inbox");
-        assert!(close_inbox(tasks.path(), "job-1").is_empty());
-        unregister(tasks.path(), "job-1");
         unsafe { std::env::remove_var("LOTAR_AGENT_QUEUE_DIR") };
     }
 

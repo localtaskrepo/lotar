@@ -5,12 +5,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::Duration;
 
-/// Unwrap a `Result<T, JsonRpcResponse>`, returning the error response.
+/// Unwrap a `Result<T, Box<JsonRpcResponse>>`, returning the error response.
 macro_rules! try_rpc {
     ($result:expr) => {
         match $result {
             Ok(value) => value,
-            Err(response) => return response,
+            Err(response) => return *response,
         }
     };
 }
@@ -108,8 +108,8 @@ fn internal_error(id: Option<Value>, message: impl std::fmt::Display) -> JsonRpc
 }
 
 /// Resolve the tasks directory, or the standard internal-error response.
-fn resolve_tasks_dir(id: &Option<Value>) -> Result<crate::workspace::TasksDirectoryResolver, JsonRpcResponse> {
-    crate::workspace::TasksDirectoryResolver::resolve(None, None).map_err(|e| internal_error(id.clone(), e))
+fn resolve_tasks_dir(id: &Option<Value>) -> Result<crate::workspace::TasksDirectoryResolver, Box<JsonRpcResponse>> {
+    crate::workspace::TasksDirectoryResolver::resolve(None, None).map_err(|e| Box::new(internal_error(id.clone(), e)))
 }
 
 /// Tool result whose single text content is `payload` as pretty JSON.
@@ -211,7 +211,7 @@ fn write_serialized_response(stdout: &Arc<Mutex<io::Stdout>>, response: &JsonRpc
 /// What the wire loop should do after routing one incoming message.
 enum WireOutcome {
     /// Respond to a request.
-    Respond(JsonRpcResponse),
+    Respond(Box<JsonRpcResponse>),
     /// A lifecycle transition happened; emit the coalesced deferred
     /// tools-list change if one is pending.
     FlushDeferred,
@@ -232,30 +232,30 @@ enum Incoming {
 /// - structurally invalid envelopes (non-object payload, wrong `jsonrpc`,
 ///   non-string `method`, non-string/number `id`, non-object `params` on a
 ///   request) -> -32600 Invalid Request (request id echoed when valid).
-fn parse_incoming(raw: &str) -> Result<Incoming, JsonRpcResponse> {
+fn parse_incoming(raw: &str) -> Result<Incoming, Box<JsonRpcResponse>> {
     let value: Value = match serde_json::from_str(raw) {
         Ok(value) => value,
-        Err(error) => return Err(parse_error_response(&error.to_string())),
+        Err(error) => return Err(Box::new(parse_error_response(&error.to_string()))),
     };
 
     let object = match value {
         Value::Object(object) => object,
         _ => {
-            return Err(invalid_request_response(Value::Null, "request must be a JSON object"));
+            return Err(Box::new(invalid_request_response(Value::Null, "request must be a JSON object")));
         }
     };
 
     match object.get("jsonrpc") {
         Some(Value::String(version)) if version == "2.0" => {}
         _ => {
-            return Err(invalid_request_response(Value::Null, "jsonrpc must be exactly \"2.0\""));
+            return Err(Box::new(invalid_request_response(Value::Null, "jsonrpc must be exactly \"2.0\"")));
         }
     }
 
     let method = match object.get("method") {
         Some(Value::String(method)) => method.clone(),
         _ => {
-            return Err(invalid_request_response(Value::Null, "method must be a string"));
+            return Err(Box::new(invalid_request_response(Value::Null, "method must be a string")));
         }
     };
 
@@ -263,7 +263,7 @@ fn parse_incoming(raw: &str) -> Result<Incoming, JsonRpcResponse> {
         None => None,
         Some(id) if is_valid_request_id(id) => Some(id.clone()),
         Some(_) => {
-            return Err(invalid_request_response(Value::Null, "id must be a string or a number"));
+            return Err(Box::new(invalid_request_response(Value::Null, "id must be a string or a number")));
         }
     };
 
@@ -272,7 +272,7 @@ fn parse_incoming(raw: &str) -> Result<Incoming, JsonRpcResponse> {
         Some(params @ Value::Object(_)) => params.clone(),
         Some(_) => match id {
             Some(id) => {
-                return Err(invalid_request_response(id, "params must be an object"));
+                return Err(Box::new(invalid_request_response(id, "params must be an object")));
             }
             // Malformed notifications are dropped without a response, per
             // JSON-RPC: servers never reply to a message carrying no id.
@@ -309,7 +309,7 @@ fn route_message(session: Option<&McpSession>, message: Incoming) -> WireOutcome
             }
             WireOutcome::Silent
         }
-        Incoming::Request { id, method, params } => WireOutcome::Respond(route_request(session, id, &method, params)),
+        Incoming::Request { id, method, params } => WireOutcome::Respond(Box::new(route_request(session, id, &method, params))),
     }
 }
 

@@ -41,10 +41,10 @@ config:
   # (how to use the lotar CLI, the worktree branch, and how the job ends);
   # the instructions here describe the phase.
   #
-  # runner: claude, codex, copilot, gemini, cursor, amp, droid, opencode, kilo or
-  # antigravity. model and effort are passed to
-  # that CLI, so use names it knows (for example claude: sonnet/opus/haiku and
-  # effort low…max; codex: effort minimal…high).
+  # runner: claude, codex, copilot, gemini, cursor, amp, droid, opencode, kilo,
+  # antigravity or t3, each run as the harnessmux agent of that name. model is
+  # the agent's own model id (for example claude: sonnet/opus/haiku); effort is
+  # low, medium, high, xhigh or max.
   agents:
     implement:
       runner: claude

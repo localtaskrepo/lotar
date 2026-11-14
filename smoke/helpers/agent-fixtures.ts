@@ -8,11 +8,14 @@ import { resolveBinaryPath } from './binary.js';
 
 const fixturesDir = path.dirname(fileURLToPath(import.meta.url));
 
-/** Node-based mock of a Copilot CLI json run (replaces the former mock-agent.sh). */
+/** Node-based mock agent: a `command` runner program that prints progress lines. */
 export const MOCK_AGENT_SCRIPT = path.resolve(fixturesDir, 'mock-agent.mjs');
 
 /** Node-based gated mock agent used for live mid-run assertions. */
 export const GATE_AGENT_SCRIPT = path.resolve(fixturesDir, 'gate-agent.mjs');
+
+/** Node-based fake ACP agent, run as a harnessmux agent through agents.toml. */
+export const ACP_AGENT_SCRIPT = path.resolve(fixturesDir, 'acp-agent.mjs');
 
 /** Absolute path of the Node runtime executing the smoke suite. */
 export function nodeExecutable(): string {
@@ -59,12 +62,11 @@ let launchCounter = 0;
 /**
  * Write a portable launcher for a fixture script into `dir`.
  *
- * The agent runner contract spawns `<command> -p <prompt> --output-format
- * json --no-ask-user <permission flags> <args...>` for copilot profiles: the
- * base flags precede profile args, so `command` must be an executable that
- * tolerates leading unknown flags. A shebang copy of the fixture (Unix) and
- * a cmd forwarder (Windows) both satisfy that without bash/date/sleep, and
- * neither parses the runner flags — the fixtures read their own argv.
+ * The `command` runner spawns `<command> <args...>` through the agent
+ * wrapper, so `command` must be an executable. A shebang copy of the fixture
+ * (Unix) and a cmd forwarder (Windows) both satisfy that without
+ * bash/date/sleep; the fixtures read their own argv and tolerate unknown
+ * flags.
  */
 async function writeAgentLauncher(dir: string, script: string, args: readonly string[]): Promise<string> {
     launchCounter += 1;
@@ -152,7 +154,7 @@ export async function createFixtureAgents(
         const args = spec.args ?? [];
         const launcher = await launcherFor(spec.script ?? MOCK_AGENT_SCRIPT, args);
         commands.set(name, launcher);
-        const lines = [`  ${name}:`, `    runner: "copilot"`, `    command: ${JSON.stringify(launcher)}`];
+        const lines = [`  ${name}:`, `    runner: "command"`, `    command: ${JSON.stringify(launcher)}`];
         if (args.length > 0) {
             lines.push(`    args:`);
             for (const arg of args) {
@@ -210,7 +212,7 @@ export function nodeRunActionYaml(scriptArgs: readonly string[], options: { wait
     return lines.join('\n');
 }
 
-export type GateAgentMode = 'copilot' | 'hold' | 'plain';
+export type GateAgentMode = 'lines' | 'hold' | 'plain';
 
 export interface GateAgentOptions {
     readonly mode: GateAgentMode;

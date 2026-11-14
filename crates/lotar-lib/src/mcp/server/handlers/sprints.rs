@@ -433,21 +433,21 @@ struct MembershipRequest {
     sprint_ref: Option<String>,
 }
 
-fn membership_request(req: &JsonRpcRequest) -> Result<MembershipRequest, JsonRpcResponse> {
+fn membership_request(req: &JsonRpcRequest) -> Result<MembershipRequest, Box<JsonRpcResponse>> {
     let id = || req.id.clone();
     let resolver = resolve_tasks_dir(&req.id)?;
     let mut storage = Storage::new(&resolver.path);
-    let mut records = SprintService::list(&storage).map_err(|e| internal_error(id(), format!("Failed to load sprints: {}", e)))?;
+    let mut records = SprintService::list(&storage).map_err(|e| Box::new(internal_error(id(), format!("Failed to load sprints: {}", e))))?;
     let cleanup_missing = req.params.get("cleanup_missing").and_then(|v| v.as_bool()).unwrap_or(false);
     let integrity = sprint_integrity::check_missing_sprints(&mut storage, &mut records, cleanup_missing, None)
-        .map_err(|e| internal_error(id(), format!("Failed to clean up sprint references: {}", e)))?;
+        .map_err(|e| Box::new(internal_error(id(), format!("Failed to clean up sprint references: {}", e))))?;
     // `query` selects tasks with the shared task query (DEV-236); `tasks`
     // may then be omitted.
     let search = req.params.get("query").and_then(Value::as_str).map(str::trim).filter(|q| !q.is_empty());
     let raw_tasks = match req.params.get("tasks") {
         Some(value) => value.clone(),
         None if search.is_some() => Value::Array(Vec::new()),
-        None => return Err(err(id(), -32602, "Missing required field: tasks", None)),
+        None => return Err(Box::new(err(id(), -32602, "Missing required field: tasks", None))),
     };
     let mut tasks: Vec<String> = match &raw_tasks {
         Value::String(value) => {
@@ -456,19 +456,19 @@ fn membership_request(req: &JsonRpcRequest) -> Result<MembershipRequest, JsonRpc
         }
         Value::Array(values) => values.iter().filter_map(|v| v.as_str()).map(|s| s.trim()).filter(|s| !s.is_empty()).map(|s| s.to_string()).collect(),
         _ => {
-            return Err(err(id(), -32602, "tasks must be a string or array of strings", None));
+            return Err(Box::new(err(id(), -32602, "tasks must be a string or array of strings", None)));
         }
     };
     if let Some(search) = search {
-        let base =
-            resolution::load_and_merge_configs(Some(resolver.path.as_path())).map_err(|e| internal_error(id(), format!("Failed to load config: {e}")))?;
+        let base = resolution::load_and_merge_configs(Some(resolver.path.as_path()))
+            .map_err(|e| Box::new(internal_error(id(), format!("Failed to load config: {e}"))))?;
         let selected = crate::services::task_list::select_ids(&storage, &base, resolver.path.as_path(), search)
-            .map_err(|e| super::tasks::query_error(id(), e, None, &resolver.path, &base))?;
+            .map_err(|e| Box::new(super::tasks::query_error(id(), e, None, &resolver.path, &base)))?;
         tasks.extend(selected);
         tasks.sort();
         tasks.dedup();
     }
-    let sprint_ref = parse_sprint_reference(&req.params).map_err(|msg| err(id(), -32602, msg, None))?;
+    let sprint_ref = parse_sprint_reference(&req.params).map_err(|msg| Box::new(err(id(), -32602, msg, None)))?;
     Ok(MembershipRequest { storage, records, integrity, tasks, sprint_ref })
 }
 

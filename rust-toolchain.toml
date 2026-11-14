@@ -4,6 +4,6 @@
 # broke a release with new-lint errors. Bump this file deliberately (and run
 # `rustup toolchain install` locally) when upgrading.
 [toolchain]
-channel = "1.98.1"
+channel = "1.99.1"
 profile = "minimal"
 components = ["rustfmt", "clippy"]

@@ -1682,11 +1682,27 @@ export interface AgentJob {
     model?: string | null
     /** Reasoning effort the run was asked to use, when one was set. */
     effort?: string | null
-    /** What the job used, as its CLI reports it. */
+    /** What the job used, as its agent reports it. */
     usage?: AgentJobUsage | null
+    /** The agent's permission request that waits for an answer (profile `on_permission: ask`). */
+    question?: AgentJobQuestion | null
 }
 
-/** Usage a CLI reports for a job; missing values were not reported. */
+/** A permission request of a job's agent, waiting for an answer. */
+export interface AgentJobQuestion {
+    request: string
+    title: string
+    options: AgentJobQuestionOption[]
+}
+
+export interface AgentJobQuestionOption {
+    id: string
+    name: string
+    /** allow_once, allow_always, reject_once or reject_always. */
+    kind: string
+}
+
+/** Usage an agent reports for a job; missing values were not reported. */
 export interface AgentJobUsage {
     /** All input tokens, including cached ones. */
     input_tokens?: number
@@ -1765,6 +1781,14 @@ export interface AgentJobLogsResponse {
 export interface AgentJobMessageRequest {
     id: string
     message: string
+}
+
+export interface AgentJobAnswerRequest {
+    id: string
+    /** `AgentJob.question.request`. */
+    request: string
+    /** One of `AgentJob.question.options[].id`. */
+    option: string
 }
 
 export interface AgentJobMessageResponse {

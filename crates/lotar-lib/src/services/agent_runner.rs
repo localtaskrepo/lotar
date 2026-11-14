@@ -1,1064 +1,308 @@
-use crate::config::types::{AgentPermissions, AgentProfileDetail, AgentRunnerKind};
-use crate::errors::{LoTaRError, LoTaRResult};
-use serde_json::Value as JsonValue;
-use std::collections::HashMap;
+//! How a job's agent runs (DEV-503). Every runner but `command` is the harnessmux agent of the same name, run as a
+//! harnessmux session that this process owns; harnessmux maps model, effort and permissions onto each agent and
+//! turns its output into one event stream. `command` runs a program of the profile's own.
 
+use crate::config::types::{AgentPermissionPolicy, AgentPermissions, AgentProfileDetail, AgentRunnerKind};
+use crate::errors::{LoTaRError, LoTaRResult};
+use std::collections::{BTreeMap, HashMap};
+use std::sync::{LazyLock, Mutex};
+use std::time::Duration;
+
+/// A `command` runner's process.
 #[derive(Debug, Clone)]
 pub struct RunnerCommand {
     pub program: String,
     pub args: Vec<String>,
     pub env: HashMap<String, String>,
-    /// Bytes to write to the runner's stdin right after it starts (Claude
-    /// reads its first prompt from stdin in stream-json input mode).
-    pub initial_input: Option<Vec<u8>>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RunnerEventKind {
-    Init,
-    Progress,
-    Message,
-    Result,
+/// Runs the harnessmux sessions of this process's jobs. Job threads block on it; its own threads drive the agents.
+static RUNTIME: LazyLock<tokio::runtime::Runtime> = LazyLock::new(|| {
+    tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .thread_name("lotar-agents")
+        .enable_all()
+        .build()
+        .expect("the agent session runtime needs two threads and a timer")
+});
+
+pub fn block_on<F: std::future::Future>(future: F) -> F::Output {
+    RUNTIME.block_on(future)
 }
 
-#[derive(Debug, Clone)]
-pub struct RunnerEvent {
-    pub kind: RunnerEventKind,
-    pub text: Option<String>,
-    pub session_id: Option<String>,
-    pub payload: Option<JsonValue>,
-    /// The runner reported a failure (an error result, a failed turn), even
-    /// if the process later exits 0.
-    pub failed: bool,
+/// The sessions live where the harnessmux CLI keeps its own, so `harnessmux list`, `attach` and `send` reach a job's
+/// session (`HARNESSMUX_HOME` moves them, for tests).
+pub fn registry() -> harnessmux::Registry {
+    harnessmux::Registry::default()
 }
 
-impl RunnerEvent {
-    fn new(kind: RunnerEventKind, text: Option<String>, session_id: Option<String>) -> Self {
-        Self { kind, text, session_id, payload: None, failed: false }
-    }
-
-    fn with_payload(mut self, payload: &JsonValue) -> Self {
-        self.payload = Some(payload.clone());
-        self
-    }
-
-    fn failing(mut self) -> Self {
-        self.failed = true;
-        self
-    }
+/// The harnessmux agent table: the crate's built-in one with the user's `agents.toml` over it.
+pub fn agent_table() -> LoTaRResult<harnessmux::AgentTable> {
+    harnessmux::AgentTable::load().map_err(|err| LoTaRError::ValidationError(format!("harnessmux agent table: {err}")))
 }
 
-/// Claude Code settings for the `workspace` level: shell commands run inside
-/// the OS sandbox without prompting, so writes outside the working directory
-/// (and its allowed directories) are blocked.
-const CLAUDE_SANDBOX_SETTINGS: &str = r#"{"sandbox":{"enabled":true,"autoAllowBashIfSandboxed":true}}"#;
+/// The harnessmux agent a runner runs; `None` for `command`.
+pub fn harness_agent(kind: AgentRunnerKind) -> Option<&'static str> {
+    (kind != AgentRunnerKind::Command).then(|| kind.as_str())
+}
 
-/// True when the profile's own args already choose a permission mode, so
-/// LoTaR must not add its defaults (they could conflict).
-fn args_set_permissions(kind: AgentRunnerKind, args: &[String]) -> bool {
-    let flags: &[&str] = match kind {
-        AgentRunnerKind::Claude => &["--permission-mode", "--dangerously-skip-permissions", "--allow-dangerously-skip-permissions"],
-        AgentRunnerKind::Codex => &["-s", "--sandbox", "--full-auto", "--approve-for-me", "--dangerously-bypass-approvals-and-sandbox"],
-        AgentRunnerKind::Copilot => &["--allow-all-tools", "--allow-all", "--yolo", "--allow-tool", "--deny-tool"],
-        AgentRunnerKind::Gemini => &["--approval-mode", "-y", "--yolo"],
-        AgentRunnerKind::Cursor => &["--mode", "--plan", "-f", "--force", "--yolo", "--sandbox"],
-        AgentRunnerKind::Amp => &["--dangerously-allow-all", "--settings-file"],
-        AgentRunnerKind::Droid => &["--auto", "--skip-permissions-unsafe"],
-        AgentRunnerKind::Opencode | AgentRunnerKind::Kilo => &["--auto", "--yolo", "--dangerously-skip-permissions"],
-        AgentRunnerKind::Antigravity => &["--mode", "--dangerously-skip-permissions"],
-        // T3 Code threads run in the project's own runtime mode.
-        AgentRunnerKind::T3 | AgentRunnerKind::Command => return true,
+/// The repository a job's session belongs to, as harnessmux records it: the main checkout of the tasks directory's git
+/// repository (also from a worktree), else the tasks directory's parent.
+pub fn session_project(tasks_dir: &std::path::Path) -> std::path::PathBuf {
+    let project = harnessmux::registry::project_of(tasks_dir).unwrap_or_else(|| tasks_dir.parent().unwrap_or(tasks_dir).to_path_buf());
+    std::fs::canonicalize(&project).unwrap_or(project)
+}
+
+fn clean_name(raw: &str) -> String {
+    raw.chars().map(|c| if c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-') { c } else { '-' }).collect()
+}
+
+/// What every session name of a ticket starts with: the repository's folder name and a hash of its path, so two
+/// repositories with the same ticket IDs never share a session, then the ticket (`lotar-1a2b3c-DEV-1`).
+pub fn session_prefix(project: &std::path::Path, ticket_id: &str) -> String {
+    let folder = project.file_name().map(|name| clean_name(&name.to_string_lossy())).unwrap_or_default();
+    let folder: String = folder.trim_start_matches('.').chars().take(20).collect();
+    let hash = blake3::hash(project.to_string_lossy().as_bytes()).to_hex();
+    let repo = if folder.is_empty() { hash[..6].to_string() } else { format!("{folder}-{}", &hash[..6]) };
+    format!("{repo}-{}", clean_name(ticket_id))
+}
+
+/// A ticket's session for an agent profile: `lotar-1a2b3c-DEV-1-fix`, or `lotar-1a2b3c-DEV-1` for a job without a
+/// profile. A job of the same profile with `session: continue` takes the session's next turn.
+pub fn session_name(project: &std::path::Path, ticket_id: &str, agent_profile: Option<&str>) -> String {
+    let prefix = session_prefix(project, ticket_id);
+    let name = match agent_profile.map(str::trim).filter(|profile| !profile.is_empty()) {
+        Some(profile) => format!("{prefix}-{}", clean_name(profile)),
+        None => prefix,
     };
-    args.iter().any(|arg| {
-        let name = arg.split('=').next().unwrap_or(arg);
-        flags.contains(&name)
+    name.chars().take(64).collect()
+}
+
+/// The ticket's other sessions in this repository, oldest first, for the prompt of a job: their agents' replies and
+/// tool calls are in their event logs.
+pub fn earlier_sessions(project: &std::path::Path, ticket_id: &str, current: &str) -> Vec<(harnessmux::SessionRecord, std::path::PathBuf)> {
+    let registry = registry();
+    let prefix = session_prefix(project, ticket_id);
+    let mut sessions: Vec<_> = registry
+        .list(None)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|record| record.name != current && (record.name == prefix || record.name.starts_with(&format!("{prefix}-"))))
+        .map(|record| {
+            let events = registry.events_path(&record.name);
+            (record, events)
+        })
+        .filter(|(_, events)| events.is_file())
+        .collect();
+    sessions.sort_by(|a, b| a.0.last_used.cmp(&b.0.last_used));
+    sessions
+}
+
+/// Hands `message` to a session another process owns, as its next turn. False when no process owns it.
+pub fn send_to_session(name: &str, message: &str) -> bool {
+    let registry = registry();
+    block_on(async {
+        harnessmux::ipc::owner_running(&registry, name).await
+            && harnessmux::client::request(&registry, name, &harnessmux::ipc::Request::Send { prompt: message.to_string() }).await.is_ok()
     })
 }
 
-/// Each CLI's flags for a permission level. `writable_dirs` are extra
-/// directories the `workspace` level may write besides the working directory
-/// (the tasks directory and git data of a worktree job).
-/// Usage a CLI reports in its final event (Codex: per completed turn).
-pub fn usage_from_result(kind: AgentRunnerKind, payload: &JsonValue) -> Option<crate::api_types::AgentJobUsage> {
-    let uint = |value: Option<&JsonValue>| value.and_then(|v| v.as_u64());
-    let float = |value: Option<&JsonValue>| value.and_then(|v| v.as_f64());
-    let usage = match kind {
-        AgentRunnerKind::Claude | AgentRunnerKind::Amp | AgentRunnerKind::Droid => {
-            let usage = payload.get("usage");
-            let field = |name: &str| uint(usage.and_then(|u| u.get(name)));
-            let parts = [field("input_tokens"), field("cache_creation_input_tokens"), field("cache_read_input_tokens")];
-            crate::api_types::AgentJobUsage {
-                input_tokens: parts.iter().any(Option::is_some).then(|| parts.iter().flatten().sum()),
-                cached_input_tokens: field("cache_read_input_tokens"),
-                output_tokens: field("output_tokens"),
-                cost_usd: float(payload.get("total_cost_usd")),
-                turns: uint(payload.get("num_turns")),
-                ..Default::default()
-            }
-        }
-        AgentRunnerKind::Codex => {
-            let usage = payload.get("usage")?;
-            let field = |name: &str| uint(usage.get(name));
-            let output = match (field("output_tokens"), field("reasoning_output_tokens")) {
-                (Some(out), reasoning) => Some(out + reasoning.unwrap_or(0)),
-                (None, reasoning) => reasoning,
-            };
-            crate::api_types::AgentJobUsage {
-                input_tokens: field("input_tokens"),
-                cached_input_tokens: field("cached_input_tokens"),
-                output_tokens: output,
-                turns: Some(1),
-                ..Default::default()
-            }
-        }
-        AgentRunnerKind::Copilot => {
-            let usage = payload.get("usage")?;
-            let changes = usage.get("codeChanges");
-            crate::api_types::AgentJobUsage {
-                premium_requests: float(usage.get("premiumRequests")),
-                lines_added: uint(changes.and_then(|c| c.get("linesAdded"))),
-                lines_removed: uint(changes.and_then(|c| c.get("linesRemoved"))),
-                ..Default::default()
-            }
-        }
-        AgentRunnerKind::Gemini => {
-            let stats = payload.get("stats")?;
-            crate::api_types::AgentJobUsage {
-                input_tokens: uint(stats.get("input_tokens")),
-                output_tokens: uint(stats.get("output_tokens")),
-                ..Default::default()
-            }
-        }
-        AgentRunnerKind::Opencode | AgentRunnerKind::Kilo => {
-            let part = payload.get("part")?;
-            let tokens = part.get("tokens");
-            let field = |name: &str| uint(tokens.and_then(|t| t.get(name)));
-            let cache_read = uint(tokens.and_then(|t| t.get("cache")).and_then(|c| c.get("read")));
-            let cache_write = uint(tokens.and_then(|t| t.get("cache")).and_then(|c| c.get("write")));
-            let input = [field("input"), cache_read, cache_write];
-            crate::api_types::AgentJobUsage {
-                input_tokens: input.iter().any(Option::is_some).then(|| input.iter().flatten().sum()),
-                cached_input_tokens: cache_read,
-                output_tokens: match (field("output"), field("reasoning")) {
-                    (None, None) => None,
-                    (out, reasoning) => Some(out.unwrap_or(0) + reasoning.unwrap_or(0)),
-                },
-                cost_usd: float(part.get("cost")),
-                turns: Some(1),
-                ..Default::default()
-            }
-        }
-        // Cursor reports no usage; T3 Code keeps it in the thread.
-        AgentRunnerKind::Cursor | AgentRunnerKind::T3 => return None,
-        AgentRunnerKind::Antigravity => {
-            let usage = payload.get("result")?.get("usage")?;
-            let field = |name: &str| uint(usage.get(name));
-            crate::api_types::AgentJobUsage {
-                input_tokens: field("input_tokens"),
-                cached_input_tokens: field("cache_read_tokens"),
-                output_tokens: match (field("output_tokens"), field("thinking_tokens")) {
-                    (None, None) => None,
-                    (out, thinking) => Some(out.unwrap_or(0) + thinking.unwrap_or(0)),
-                },
-                turns: uint(payload.get("result").and_then(|r| r.get("num_turns"))),
-                ..Default::default()
-            }
-        }
-        AgentRunnerKind::Command => return None,
-    };
-    // A run that failed before doing anything reports zeros; that is no usage.
-    let nothing = [usage.input_tokens, usage.output_tokens, usage.turns, usage.lines_added, usage.lines_removed].iter().all(|value| value.unwrap_or(0) == 0)
-        && usage.cost_usd.unwrap_or(0.0) == 0.0
-        && usage.premium_requests.unwrap_or(0.0) == 0.0;
-    (!nothing).then_some(usage)
+/// The sessions this process owns, by name: a job that continues one while it is still open takes it over.
+static OWNED: LazyLock<Mutex<HashMap<String, harnessmux::Session>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// The ticket's session a `session: continue` job can take its next turn in, or why it can't (for the job log).
+pub fn continuable_session(name: &str, agent: &str, tasks_dir: &std::path::Path) -> Result<harnessmux::SessionRecord, String> {
+    let record = registry().load(name).map_err(|_| format!("No earlier session {name}; this job starts a new one."))?;
+    // The repository as harnessmux records it for a session: none outside git.
+    let canonical = |path: &std::path::Path| std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let expected = harnessmux::registry::project_of(tasks_dir).map(|project| canonical(&project));
+    if record.project.as_deref().map(canonical) != expected {
+        let show = |project: Option<&std::path::Path>| project.map_or_else(|| "no repository".to_string(), |project| project.display().to_string());
+        return Err(format!(
+            "The session {name} belongs to {}, not {}; this job starts a new one.",
+            show(record.project.as_deref()),
+            show(expected.as_deref())
+        ));
+    }
+    if record.state == harnessmux::SessionState::Ended {
+        return Err(format!("The session {name} was closed; this job starts a new one."));
+    }
+    if record.agent != agent {
+        return Err(format!("The session {name} runs the {} agent, not {agent}; this job starts a new one.", record.agent));
+    }
+    if !record.cwd.is_dir() {
+        return Err(format!("The working directory {} of the session {name} is gone; this job starts a new one.", record.cwd.display()));
+    }
+    Ok(record)
 }
+
+/// Opens a job's session: the existing one for `resume` (still open in this process, else resumed), otherwise a new
+/// one under `name`, which replaces an earlier session of that name nobody runs.
+pub fn open_session(name: &str, agent: &str, cwd: &std::path::Path, profile: harnessmux::Profile, resume: bool) -> Result<harnessmux::Session, String> {
+    let registry = registry();
+    let table = agent_table().map_err(|err| err.to_string())?;
+    let owned = OWNED.lock().ok().and_then(|owned| owned.get(name).cloned());
+    let session = block_on(async {
+        if let Some(session) = owned {
+            if resume && session.status().await.is_ok() {
+                return Ok(session);
+            }
+            let _ = session.close().await;
+        }
+        if resume {
+            return harnessmux::Session::resume(registry, &table, name, Some(SESSION_IDLE_TTL)).await.map_err(|err| err.to_string());
+        }
+        if let Ok(existing) = registry.load(name)
+            && existing.state != harnessmux::SessionState::Ended
+            && let Some(pid) = existing.owner_pid.filter(|pid| *pid != std::process::id() && crate::services::agent_active_jobs::process_alive(*pid))
+        {
+            return Err(format!("the session {name} is in use by process {pid}; close it with `harnessmux close {name}`"));
+        }
+        registry.remove(name).map_err(|err| err.to_string())?;
+        let options = harnessmux::StartOptions {
+            name: Some(name.to_string()),
+            agent: agent.to_string(),
+            cwd: cwd.to_path_buf(),
+            profile,
+            idle_ttl: Some(SESSION_IDLE_TTL),
+        };
+        harnessmux::Session::start(registry, &table, options).await.map_err(|err| err.to_string())
+    })?;
+    if let Ok(mut owned) = OWNED.lock() {
+        owned.insert(name.to_string(), session.clone());
+    }
+    Ok(session)
+}
+
+/// Whether the agent takes MCP servers with its session (ACP agents; not Amp, T3 Code or a command).
+pub fn takes_mcp_servers(kind: AgentRunnerKind) -> bool {
+    !matches!(kind, AgentRunnerKind::Command | AgentRunnerKind::Amp | AgentRunnerKind::T3)
+}
+
+/// How long a session stays open after its job's last turn; then its agent stops and the session stays resumable.
+pub const SESSION_IDLE_TTL: Duration = Duration::from_secs(60);
 
 /// Tools of LoTaR's MCP server an agent job may use: reading and updating
 /// tickets, not starting agents, deleting tasks or syncing.
 pub const LOTAR_MCP_JOB_TOOLS: &[&str] =
     &["task_get", "task_list", "task_update", "task_comment_add", "task_reference_add", "relationship_graph", "config_show", "whoami"];
 
-/// Whether this runner can be given LoTaR's MCP server for a job.
-pub fn supports_lotar_mcp(kind: AgentRunnerKind) -> bool {
-    matches!(kind, AgentRunnerKind::Claude | AgentRunnerKind::Copilot | AgentRunnerKind::Codex)
+/// LoTaR's MCP server for a job, bound to its tasks directory and limited to [`LOTAR_MCP_JOB_TOOLS`].
+pub fn lotar_mcp_server(lotar_bin: &str, tasks_dir: &std::path::Path) -> harnessmux::McpServer {
+    harnessmux::McpServer::Stdio {
+        command: lotar_bin.to_string(),
+        args: vec!["mcp".to_string()],
+        env: BTreeMap::from([
+            ("LOTAR_TASKS_DIR".to_string(), tasks_dir.to_string_lossy().to_string()),
+            ("LOTAR_MCP_TOOLS".to_string(), LOTAR_MCP_JOB_TOOLS.join(",")),
+            ("LOTAR_MCP_AUTORELOAD".to_string(), "0".to_string()),
+        ]),
+    }
 }
 
-/// Attach LoTaR's MCP server (named `lotar`, which also shadows a server of
-/// that name in the CLI's own settings) to a runner command, limited to
-/// [`LOTAR_MCP_JOB_TOOLS`] and pre-approved. Returns false for runners
-/// without a supported way to add an MCP server.
-pub fn attach_lotar_mcp(command: &mut RunnerCommand, kind: AgentRunnerKind, lotar_bin: &str, tasks_dir: &std::path::Path) -> bool {
-    let tasks = tasks_dir.to_string_lossy().to_string();
-    let tools = LOTAR_MCP_JOB_TOOLS.join(",");
-    let env = serde_json::json!({
-        "LOTAR_TASKS_DIR": tasks,
-        "LOTAR_MCP_TOOLS": tools,
-        "LOTAR_MCP_AUTORELOAD": "0",
-    });
-    let flags: Vec<String> = match kind {
-        AgentRunnerKind::Claude => vec![
-            "--mcp-config".to_string(),
-            serde_json::json!({ "mcpServers": { "lotar": {
-                "type": "stdio", "command": lotar_bin, "args": ["mcp"], "env": env,
-            }}})
-            .to_string(),
-            "--allowedTools=mcp__lotar".to_string(),
-        ],
-        AgentRunnerKind::Copilot => vec![
-            "--additional-mcp-config".to_string(),
-            serde_json::json!({ "mcpServers": { "lotar": {
-                "type": "local", "command": lotar_bin, "args": ["mcp"], "env": env, "tools": ["*"],
-            }}})
-            .to_string(),
-            "--allow-tool=lotar".to_string(),
-        ],
-        AgentRunnerKind::Codex => {
-            // `-c` values are TOML; JSON strings and arrays are valid TOML.
-            let toml_string = |value: &str| serde_json::to_string(value).unwrap_or_default();
-            vec![
-                "-c".to_string(),
-                format!("mcp_servers.lotar.command={}", toml_string(lotar_bin)),
-                "-c".to_string(),
-                r#"mcp_servers.lotar.args=["mcp"]"#.to_string(),
-                // Codex exec never asks, so the server's tools must be pre-approved.
-                "-c".to_string(),
-                r#"mcp_servers.lotar.default_tools_approval_mode="approve""#.to_string(),
-                "-c".to_string(),
-                format!(
-                    "mcp_servers.lotar.env={{LOTAR_TASKS_DIR={}, LOTAR_MCP_TOOLS={}, LOTAR_MCP_AUTORELOAD=\"0\"}}",
-                    toml_string(&tasks),
-                    toml_string(&tools)
-                ),
-            ]
-        }
-        _ => return false,
+/// Refuses profile settings a harnessmux agent can't take: its program and arguments come from harnessmux's agent
+/// table (`agents.toml`), not from the profile.
+pub fn check_agent_profile(kind: AgentRunnerKind, profile: &AgentProfileDetail) -> LoTaRResult<()> {
+    let Some(agent) = harness_agent(kind) else {
+        return Ok(());
     };
-    // Codex takes the prompt as its last argument; options go before it.
-    let at = if kind == AgentRunnerKind::Codex { command.args.len().saturating_sub(1) } else { command.args.len() };
-    command.args.splice(at..at, flags);
-    true
+    if profile.command.is_some() || !profile.args.is_empty() {
+        return Err(LoTaRError::ValidationError(format!(
+            "The {agent} runner takes no command or args: lotar runs it as the harnessmux agent {agent}. Set its program in harnessmux's agents.toml, or use runner: command for a program of your own."
+        )));
+    }
+    if let Some(effort) = profile.effort.as_deref() {
+        effort.parse::<harnessmux::Effort>().map_err(|err| LoTaRError::ValidationError(format!("Invalid agent effort: {err}")))?;
+    }
+    Ok(())
 }
 
-/// The runners whose CLI is on this machine's PATH (by runner name).
+/// What a harnessmux session starts with, from a profile, plus notes on the settings it doesn't pass.
+pub fn session_profile(profile: &AgentProfileDetail, env: HashMap<String, String>) -> LoTaRResult<(harnessmux::Profile, Vec<String>)> {
+    let effort = profile
+        .effort
+        .as_deref()
+        .map(str::parse::<harnessmux::Effort>)
+        .transpose()
+        .map_err(|err| LoTaRError::ValidationError(format!("Invalid agent effort: {err}")))?;
+    let permissions = match profile.permissions.unwrap_or_default() {
+        AgentPermissions::ReadOnly => harnessmux::Permissions::ReadOnly,
+        AgentPermissions::Workspace => harnessmux::Permissions::Workspace,
+        AgentPermissions::Full => harnessmux::Permissions::Full,
+    };
+    let on_permission = profile.on_permission.map(|policy| match policy {
+        AgentPermissionPolicy::Deny => harnessmux::PermissionPolicy::Deny,
+        AgentPermissionPolicy::AllowReads => harnessmux::PermissionPolicy::AllowReads,
+        AgentPermissionPolicy::Allow => harnessmux::PermissionPolicy::Allow,
+        AgentPermissionPolicy::Ask => harnessmux::PermissionPolicy::Ask,
+    });
+    let mut notes = Vec::new();
+    if profile.max_budget_usd.is_some() {
+        notes.push("The agent profile's max_budget_usd is not passed: harnessmux has no budget limit.".to_string());
+    }
+    if profile.tools.as_ref().is_some_and(|tools| !tools.allowed.is_empty() || !tools.disallowed.is_empty()) {
+        notes.push("The agent profile's tools are not passed: ACP agents take no tool lists; permissions and on_permission limit them.".to_string());
+    }
+    if profile.mcp.as_ref().is_some_and(|mcp| !mcp.allow.is_empty()) {
+        notes.push("The agent profile's mcp.allow is not passed: the agent's own MCP servers follow its own settings.".to_string());
+    }
+    let mut session_env: BTreeMap<String, String> = expand_env_map(&profile.env).into_iter().collect();
+    session_env.extend(env);
+    let session = harnessmux::Profile {
+        model: profile.model.clone(),
+        effort,
+        permissions,
+        on_permission,
+        env: session_env,
+        provider: profile.provider.clone(),
+        ..harnessmux::Profile::default()
+    };
+    Ok((session, notes))
+}
+
+/// The agents (runner names) installed on this machine: the CLI each harnessmux agent signs in with is on PATH.
 pub fn installed_agent_clis() -> Vec<&'static str> {
-    let Some(path) = std::env::var_os("PATH") else {
+    let Ok(table) = harnessmux::AgentTable::load() else {
         return Vec::new();
     };
-    let dirs: Vec<std::path::PathBuf> = std::env::split_paths(&path).collect();
     AgentRunnerKind::ALL
         .into_iter()
-        .filter(|kind| *kind != AgentRunnerKind::Command)
-        .filter(|kind| {
-            if *kind == AgentRunnerKind::T3 && t3_home_launcher().is_some() {
-                return true;
-            }
-            let program = kind.default_program();
-            dirs.iter().any(|dir| {
-                let candidates =
-                    if cfg!(windows) { vec![dir.join(format!("{program}.exe")), dir.join(format!("{program}.cmd"))] } else { vec![dir.join(program)] };
-                candidates.iter().any(|candidate| is_executable(candidate))
+        .filter_map(harness_agent)
+        .filter(|agent| {
+            table.get(agent).is_ok_and(|spec| {
+                let program = spec.requires.clone().or_else(|| spec.command.first().cloned()).unwrap_or_default();
+                harnessmux::paths::find_program(&program, &spec.paths).is_some()
             })
         })
-        .map(|kind| kind.as_str())
         .collect()
 }
 
-fn is_executable(path: &std::path::Path) -> bool {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        path.metadata().map(|meta| meta.is_file() && meta.permissions().mode() & 0o111 != 0).unwrap_or(false)
-    }
-    #[cfg(not(unix))]
-    {
-        path.is_file()
-    }
-}
-
-fn permission_args(kind: AgentRunnerKind, level: AgentPermissions, profile_args: &[String], writable_dirs: &[std::path::PathBuf]) -> Vec<String> {
-    let mut args = level_args(kind, level, profile_args);
-    if level == AgentPermissions::Workspace {
-        let flag = match kind {
-            AgentRunnerKind::Gemini => "--include-directories",
-            AgentRunnerKind::Claude | AgentRunnerKind::Codex | AgentRunnerKind::Copilot | AgentRunnerKind::Antigravity => "--add-dir",
-            // No extra-directory flag (Cursor, Amp, Droid) or handled through
-            // the permission config (OpenCode, Kilo).
-            _ => return args,
-        };
-        for dir in writable_dirs {
-            args.extend([flag.to_string(), dir.display().to_string()]);
-        }
-    }
-    args
-}
-
-fn level_args(kind: AgentRunnerKind, level: AgentPermissions, profile_args: &[String]) -> Vec<String> {
-    let owned = |items: &[&str]| items.iter().map(|item| item.to_string()).collect::<Vec<_>>();
-    match (kind, level) {
-        (AgentRunnerKind::Command | AgentRunnerKind::T3, _) => Vec::new(),
-        (AgentRunnerKind::Claude, AgentPermissions::ReadOnly) => owned(&["--permission-mode", "plan"]),
-        (AgentRunnerKind::Claude, AgentPermissions::Workspace) => {
-            let mut args = owned(&["--permission-mode", "acceptEdits"]);
-            // A profile that brings its own settings keeps them as they are.
-            if !profile_args.iter().any(|arg| arg == "--settings" || arg.starts_with("--settings=")) {
-                args.extend(["--settings".to_string(), CLAUDE_SANDBOX_SETTINGS.to_string()]);
-            }
-            args
-        }
-        (AgentRunnerKind::Claude, AgentPermissions::Full) => owned(&["--permission-mode", "bypassPermissions"]),
-        (AgentRunnerKind::Codex, AgentPermissions::ReadOnly) => owned(&["--sandbox", "read-only"]),
-        (AgentRunnerKind::Codex, AgentPermissions::Workspace) => owned(&["--sandbox", "workspace-write"]),
-        (AgentRunnerKind::Codex, AgentPermissions::Full) => owned(&["--dangerously-bypass-approvals-and-sandbox"]),
-        (AgentRunnerKind::Copilot, AgentPermissions::ReadOnly) => owned(&["--allow-all-tools", "--deny-tool=write", "--deny-tool=shell"]),
-        // Copilot has no sandbox: its file tools stay limited to the working
-        // directory, shell commands are not. Pushing stays a human decision.
-        (AgentRunnerKind::Copilot, AgentPermissions::Workspace) => owned(&["--allow-all-tools", "--deny-tool=shell(git push)"]),
-        (AgentRunnerKind::Copilot, AgentPermissions::Full) => owned(&["--allow-all"]),
-        (AgentRunnerKind::Gemini, AgentPermissions::ReadOnly) => owned(&["--approval-mode", "plan"]),
-        (AgentRunnerKind::Gemini, AgentPermissions::Workspace) => owned(&["--approval-mode", "auto_edit"]),
-        (AgentRunnerKind::Gemini, AgentPermissions::Full) => owned(&["--approval-mode", "yolo"]),
-        // Cursor's print mode only proposes edits unless --force is given.
-        (AgentRunnerKind::Cursor, AgentPermissions::ReadOnly) => owned(&["--mode", "plan"]),
-        (AgentRunnerKind::Cursor, AgentPermissions::Workspace) => owned(&["--force", "--sandbox", "enabled"]),
-        (AgentRunnerKind::Cursor, AgentPermissions::Full) => owned(&["--force", "--sandbox", "disabled"]),
-        // Amp documents only "allow all"; read-only is refused when the
-        // command is built, and workspace keeps Amp's own defaults.
-        (AgentRunnerKind::Amp, AgentPermissions::Full) => owned(&["--dangerously-allow-all"]),
-        (AgentRunnerKind::Amp, _) => Vec::new(),
-        // Droid is read-only by default; medium adds builds, tests and commits.
-        (AgentRunnerKind::Droid, AgentPermissions::ReadOnly) => Vec::new(),
-        (AgentRunnerKind::Droid, AgentPermissions::Workspace) => owned(&["--auto", "medium"]),
-        (AgentRunnerKind::Droid, AgentPermissions::Full) => owned(&["--skip-permissions-unsafe"]),
-        // OpenCode and Kilo take permission rules through config (set in the
-        // command's environment); --auto approves what the rules allow.
-        (AgentRunnerKind::Opencode | AgentRunnerKind::Kilo, AgentPermissions::ReadOnly) => Vec::new(),
-        (AgentRunnerKind::Opencode | AgentRunnerKind::Kilo, _) => owned(&["--auto"]),
-        (AgentRunnerKind::Antigravity, AgentPermissions::ReadOnly) => owned(&["--mode", "plan"]),
-        (AgentRunnerKind::Antigravity, AgentPermissions::Workspace) => owned(&["--mode", "accept-edits"]),
-        (AgentRunnerKind::Antigravity, AgentPermissions::Full) => owned(&["--dangerously-skip-permissions"]),
-    }
-}
-
-pub fn build_runner_command(
-    kind: AgentRunnerKind,
-    profile: &AgentProfileDetail,
-    prompt: &str,
-    writable_dirs: &[std::path::PathBuf],
-) -> LoTaRResult<RunnerCommand> {
-    if kind == AgentRunnerKind::T3 {
-        return build_t3_command(profile, prompt, &T3Launch::default());
-    }
-    if kind == AgentRunnerKind::Command {
-        let program = profile.command.clone().ok_or_else(|| LoTaRError::ValidationError("Command runner requires 'command' in agent profile".to_string()))?;
-        let args = profile.args.clone();
-        // The prompt is not appended as an argument for command runners;
-        // it is available via the LOTAR_AGENT_PROMPT env var instead.
-        let mut env = expand_env_map(&profile.env);
-        env.insert("LOTAR_AGENT_PROMPT".to_string(), prompt.to_string());
-        if let Some(model) = profile.model.as_deref() {
-            env.insert("LOTAR_AGENT_MODEL".to_string(), model.to_string());
-        }
-        if let Some(effort) = profile.effort.as_deref() {
-            env.insert("LOTAR_AGENT_EFFORT".to_string(), effort.to_string());
-        }
-        return Ok(RunnerCommand { program, args, env, initial_input: None });
-    }
-
-    let program = profile.command.clone().unwrap_or_else(|| kind.default_program().to_string());
-    let owned = |items: &[&str]| items.iter().map(|item| item.to_string()).collect::<Vec<_>>();
-
-    // Base flags verified against claude 2.1.308, codex-cli 0.163, copilot
-    // 1.0.69 and the Gemini CLI headless docs (DEV-199).
-    let mut args: Vec<String> = match kind {
-        AgentRunnerKind::Codex => owned(&["exec", "--json"]),
-        // In stream-json input mode Claude ignores a positional prompt and
-        // reads user messages from stdin, so the prompt is sent there.
-        AgentRunnerKind::Claude => owned(&["-p", "--output-format", "stream-json", "--input-format", "stream-json", "--verbose"]),
-        // Copilot: `-p` takes the prompt as its value; only text/json output.
-        AgentRunnerKind::Copilot => vec!["-p".to_string(), prompt.to_string(), "--output-format".to_string(), "json".to_string(), "--no-ask-user".to_string()],
-        AgentRunnerKind::Gemini => owned(&["--output-format", "stream-json"]),
-        // The flags below follow each CLI's docs (DEV-203); none is run live.
-        AgentRunnerKind::Cursor => owned(&["-p", "--output-format", "stream-json", "--trust"]),
-        AgentRunnerKind::Amp => owned(&["--stream-json"]),
-        AgentRunnerKind::Droid => owned(&["exec", "--output-format", "json"]),
-        AgentRunnerKind::Opencode | AgentRunnerKind::Kilo => owned(&["run", "--format", "json"]),
-        AgentRunnerKind::Antigravity => owned(&["--output-format", "stream-json", "--disable-slash-commands"]),
-        AgentRunnerKind::T3 | AgentRunnerKind::Command => unreachable!("handled above"),
-    };
-    if kind == AgentRunnerKind::Amp && profile.permissions == Some(AgentPermissions::ReadOnly) && !args_set_permissions(kind, &profile.args) {
-        return Err(LoTaRError::ValidationError("The amp runner has no read-only mode; use workspace or full permissions".to_string()));
-    }
-
-    if !args_set_permissions(kind, &profile.args) {
-        args.extend(permission_args(kind, profile.permissions.unwrap_or_default(), &profile.args, writable_dirs));
-    }
-    args.extend(model_effort_args(kind, profile));
-    args.extend(tool_args(kind, profile));
-    args.extend(profile.args.iter().cloned());
-
-    let initial_input = match kind {
-        AgentRunnerKind::Claude => format_stdin_message(kind, prompt),
-        AgentRunnerKind::Codex => {
-            args.push(prompt.to_string());
-            None
-        }
-        AgentRunnerKind::Gemini | AgentRunnerKind::Antigravity => {
-            args.extend(["-p".to_string(), prompt.to_string()]);
-            None
-        }
-        AgentRunnerKind::Amp => {
-            args.extend(["-x".to_string(), prompt.to_string()]);
-            None
-        }
-        // The prompt is the last positional argument.
-        AgentRunnerKind::Cursor | AgentRunnerKind::Droid | AgentRunnerKind::Opencode | AgentRunnerKind::Kilo => {
-            args.push(prompt.to_string());
-            None
-        }
-        _ => None,
-    };
-
+/// A `command` runner's process: the profile's program and args, with the prompt, model and effort in the
+/// environment.
+pub fn build_command(profile: &AgentProfileDetail, prompt: &str) -> LoTaRResult<RunnerCommand> {
+    let program = profile
+        .command
+        .clone()
+        .filter(|program| !program.trim().is_empty())
+        .ok_or_else(|| LoTaRError::ValidationError("Command runner requires 'command' in agent profile".to_string()))?;
     let mut env = expand_env_map(&profile.env);
-    if matches!(kind, AgentRunnerKind::Opencode | AgentRunnerKind::Kilo)
-        && !args_set_permissions(kind, &profile.args)
-        && !env.contains_key("OPENCODE_CONFIG_CONTENT")
-    {
-        env.insert("OPENCODE_CONFIG_CONTENT".to_string(), opencode_permission_config(profile.permissions.unwrap_or_default(), writable_dirs));
+    env.insert("LOTAR_AGENT_PROMPT".to_string(), prompt.to_string());
+    if let Some(model) = profile.model.as_deref() {
+        env.insert("LOTAR_AGENT_MODEL".to_string(), model.to_string());
     }
-
-    Ok(RunnerCommand { program, args, env, initial_input })
-}
-
-/// What a T3 Code thread is started with besides the profile (DEV-318).
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct T3Launch {
-    /// Thread title (`<ID> <title>`); empty lets T3 Code use the prompt's
-    /// first line.
-    pub title: String,
-    /// Run in a new git worktree instead of the project folder.
-    pub worktree: Option<T3Worktree>,
-}
-
-/// `--worktree <base> [--branch <branch>]`: T3 Code makes the worktree.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct T3Worktree {
-    /// Branch, tag or commit the worktree starts from (or the existing
-    /// ticket branch it checks out, when `branch` is unset).
-    pub base: String,
-    /// New branch created at `base`.
-    pub branch: Option<String>,
-}
-
-/// Where T3 Code installs its launcher (`t3` is often not on PATH).
-fn t3_home_launcher() -> Option<std::path::PathBuf> {
-    let home = std::env::var_os("HOME")?;
-    let path = std::path::Path::new(&home).join(".t3/bin/t3");
-    is_executable(&path).then_some(path)
-}
-
-fn on_path(program: &str) -> bool {
-    std::env::var_os("PATH").is_some_and(|path| std::env::split_paths(&path).any(|dir| is_executable(&dir.join(program))))
-}
-
-/// `t3 thread start . - --title … [--provider P --model M] [--worktree B
-/// [--branch X]] --wait`, run in the job's checkout, with the prompt on
-/// stdin. It prints `Thread <id>` to stderr once the thread exists, the
-/// agent's reply to stdout, and exits 0 (finished), 1 (the run failed) or
-/// 2 (the thread waits for an answer).
-pub fn build_t3_command(profile: &AgentProfileDetail, prompt: &str, launch: &T3Launch) -> LoTaRResult<RunnerCommand> {
-    let program = t3_program(profile);
-    let own = &profile.args;
-    let mut args: Vec<String> = ["thread", "start", ".", "-"].iter().map(|arg| arg.to_string()).collect();
-    if !launch.title.trim().is_empty() && !has_flag(own, &["--title"]) {
-        args.extend(["--title".to_string(), launch.title.trim().to_string()]);
+    if let Some(effort) = profile.effort.as_deref() {
+        env.insert("LOTAR_AGENT_EFFORT".to_string(), effort.to_string());
     }
-    if !has_flag(own, &["--provider", "--model"]) {
-        match (profile.provider.as_deref(), profile.model.as_deref()) {
-            (Some(provider), Some(model)) => args.extend(["--provider".to_string(), provider.to_string(), "--model".to_string(), model.to_string()]),
-            (None, None) => {}
-            (provider, _) => {
-                let missing = if provider.is_some() { "model" } else { "provider" };
-                return Err(LoTaRError::ValidationError(format!(
-                    "The t3 runner needs a provider and a model together (T3 Code: --provider with --model); set the {missing} on the profile, the rule or the run"
-                )));
-            }
-        }
-    }
-    if let Some(worktree) = launch.worktree.as_ref()
-        && !has_flag(own, &["--worktree"])
-    {
-        args.extend(["--worktree".to_string(), worktree.base.clone()]);
-        if let Some(branch) = worktree.branch.as_ref() {
-            args.extend(["--branch".to_string(), branch.clone()]);
-        }
-    }
-    if !has_flag(own, &["--wait"]) {
-        args.push("--wait".to_string());
-    }
-    args.extend(own.iter().cloned());
-    Ok(RunnerCommand { program, args, env: expand_env_map(&profile.env), initial_input: Some(prompt.as_bytes().to_vec()) })
+    Ok(RunnerCommand { program, args: profile.args.clone(), env })
 }
 
-/// `t3 thread send <thread> - --wait`, with the prompt on stdin: the job is
-/// the thread's next turn (DEV-368). It prints the reply and exits like
-/// `thread start --wait`. The thread keeps its model and its worktree, so
-/// the profile's provider, model and `args` (made for `thread start`) are
-/// not passed.
-pub fn build_t3_send_command(profile: &AgentProfileDetail, prompt: &str, thread_id: &str) -> RunnerCommand {
-    let args = ["thread", "send", thread_id, "-", "--wait"].iter().map(|arg| arg.to_string()).collect();
-    RunnerCommand { program: t3_program(profile), args, env: expand_env_map(&profile.env), initial_input: Some(prompt.as_bytes().to_vec()) }
-}
-
-/// The profile's `command`, else `t3` on PATH, else T3 Code's own launcher.
-fn t3_program(profile: &AgentProfileDetail) -> String {
-    match profile.command.clone() {
-        Some(command) => command,
-        None if on_path("t3") => "t3".to_string(),
-        None => t3_home_launcher().map(|path| path.to_string_lossy().to_string()).unwrap_or_else(|| "t3".to_string()),
-    }
-}
-
-/// The thread id from a `t3 thread start --wait` stderr line.
-pub fn t3_thread_id(line: &str) -> Option<String> {
-    let id = line.trim().strip_prefix("Thread ")?.trim();
-    (!id.is_empty() && !id.contains(char::is_whitespace)).then(|| id.to_string())
-}
-
-/// Electron's note that the t3 launcher runs Node with app defaults; it is
-/// printed on every run and says nothing about the job.
-pub fn is_t3_noise(line: &str) -> bool {
-    line.contains(":ERROR:electron/") && line.contains("Node.js environment variables are disabled")
-}
-
-/// Model and effort values end up as CLI arguments (and, for Codex, inside a
-/// `-c key=value` override), so only plain names are accepted: letters,
-/// digits and `. _ - : / @ [ ]`, not starting with `-`.
 pub fn validate_run_setting(name: &str, value: &str) -> LoTaRResult<()> {
     let valid =
         !value.is_empty() && value.len() <= 100 && !value.starts_with('-') && value.chars().all(|c| c.is_ascii_alphanumeric() || "._-:/@[]".contains(c));
     if valid { Ok(()) } else { Err(LoTaRError::ValidationError(format!("Invalid agent {name} '{value}': use letters, digits and . _ - : / @ [ ] only"))) }
 }
 
-fn has_flag(args: &[String], names: &[&str]) -> bool {
-    args.iter().any(|arg| {
-        let name = arg.split('=').next().unwrap_or(arg);
-        names.contains(&name)
-    })
-}
-
-/// Remove the profile's own model and/or effort flags from `args` (both
-/// `--flag value` and `--flag=value`, and Codex's `-c model_reasoning_effort=…`),
-/// so a single run's override is the one the CLI sees (DEV-213).
-pub fn drop_overridden_args(kind: AgentRunnerKind, args: &[String], model: bool, effort: bool) -> Vec<String> {
-    let mut flags: Vec<&str> = Vec::new();
-    if model && !matches!(kind, AgentRunnerKind::Amp | AgentRunnerKind::Command) {
-        flags.extend(["--model", "-m"]);
-    }
-    if effort {
-        flags.extend(match kind {
-            AgentRunnerKind::Claude | AgentRunnerKind::Antigravity => &["--effort"][..],
-            AgentRunnerKind::Copilot => &["--reasoning-effort"][..],
-            AgentRunnerKind::Droid => &["-r", "--reasoning-effort"][..],
-            AgentRunnerKind::Opencode | AgentRunnerKind::Kilo => &["--variant"][..],
-            _ => &[][..],
-        });
-    }
-    let codex_effort = effort && kind == AgentRunnerKind::Codex;
-    let is_effort_override = |value: &str| value.trim_start().starts_with("model_reasoning_effort=");
-
-    let mut kept = Vec::with_capacity(args.len());
-    let mut index = 0;
-    while index < args.len() {
-        let arg = &args[index];
-        let (name, inline) = match arg.split_once('=') {
-            Some((name, value)) => (name, Some(value)),
-            None => (arg.as_str(), None),
-        };
-        let next = args.get(index + 1);
-        if flags.contains(&name) {
-            // `--flag value` also drops the value; `--flag=value` is one arg.
-            let takes_next = inline.is_none() && next.is_some_and(|value| !value.starts_with('-'));
-            index += if takes_next { 2 } else { 1 };
-            continue;
-        }
-        if codex_effort && (name == "-c" || name == "--config") {
-            match inline {
-                Some(value) if is_effort_override(value) => {
-                    index += 1;
-                    continue;
-                }
-                None if next.is_some_and(|value| is_effort_override(value)) => {
-                    index += 2;
-                    continue;
-                }
-                _ => {}
-            }
-        }
-        kept.push(arg.clone());
-        index += 1;
-    }
-    kept
-}
-
-/// The profile's (or the run's) model and effort as each CLI's own flags.
-/// A flag the profile's `args` already pass is left to the profile.
-fn model_effort_args(kind: AgentRunnerKind, profile: &AgentProfileDetail) -> Vec<String> {
-    let mut args = Vec::new();
-    let own = &profile.args;
-    if let Some(model) = profile.model.as_deref() {
-        let flag = match kind {
-            AgentRunnerKind::Claude | AgentRunnerKind::Copilot | AgentRunnerKind::Cursor | AgentRunnerKind::Antigravity => Some("--model"),
-            AgentRunnerKind::Codex | AgentRunnerKind::Gemini | AgentRunnerKind::Droid | AgentRunnerKind::Opencode | AgentRunnerKind::Kilo => Some("-m"),
-            // Amp picks models through modes; command runners read env vars;
-            // t3 pairs the model with its provider (`build_t3_command`).
-            AgentRunnerKind::Amp | AgentRunnerKind::Command | AgentRunnerKind::T3 => None,
-        };
-        if let Some(flag) = flag
-            && !has_flag(own, &["--model", "-m"])
-        {
-            args.extend([flag.to_string(), model.to_string()]);
-        }
-    }
-    if let Some(effort) = profile.effort.as_deref() {
-        match kind {
-            AgentRunnerKind::Claude if !has_flag(own, &["--effort"]) => {
-                args.extend(["--effort".to_string(), effort.to_string()]);
-            }
-            AgentRunnerKind::Copilot if !has_flag(own, &["--reasoning-effort"]) => {
-                args.extend(["--reasoning-effort".to_string(), effort.to_string()]);
-            }
-            AgentRunnerKind::Codex if !own.iter().any(|arg| arg.starts_with("model_reasoning_effort=")) => {
-                args.extend(["-c".to_string(), format!("model_reasoning_effort={effort}")]);
-            }
-            AgentRunnerKind::Droid if !has_flag(own, &["-r", "--reasoning-effort"]) => {
-                args.extend(["--reasoning-effort".to_string(), effort.to_string()]);
-            }
-            AgentRunnerKind::Antigravity if !has_flag(own, &["--effort"]) => {
-                args.extend(["--effort".to_string(), effort.to_string()]);
-            }
-            // OpenCode and Kilo call reasoning effort a provider "variant".
-            AgentRunnerKind::Opencode | AgentRunnerKind::Kilo if !has_flag(own, &["--variant"]) => {
-                args.extend(["--variant".to_string(), effort.to_string()]);
-            }
-            // Gemini has no effort flag; command runners read LOTAR_AGENT_EFFORT.
-            _ => {}
-        }
-    }
-    if let Some(budget) = profile.max_budget_usd.filter(|budget| *budget > 0.0)
-        && kind == AgentRunnerKind::Claude
-        && !has_flag(own, &["--max-budget-usd"])
-    {
-        args.extend(["--max-budget-usd".to_string(), budget.to_string()]);
-    }
-    args
-}
-
-/// `tools.allowed` / `tools.disallowed` and `mcp.allow` as each CLI's own
-/// tool flags. Entries use the CLI's own tool syntax, for example
-/// `Bash(npm test:*)` for Claude or `shell(npm test)` for Copilot. Codex and
-/// Gemini have no per-tool flags, so these settings do not apply to them.
-fn tool_args(kind: AgentRunnerKind, profile: &AgentProfileDetail) -> Vec<String> {
-    let tools = profile.tools.as_ref();
-    let allowed = tools.map(|tools| tools.allowed.as_slice()).unwrap_or_default();
-    let denied = tools.map(|tools| tools.disallowed.as_slice()).unwrap_or_default();
-    let servers = profile.mcp.as_ref().map(|mcp| mcp.allow.as_slice()).unwrap_or_default();
-    let mut args = Vec::new();
-    match kind {
-        AgentRunnerKind::Claude => {
-            args.extend(allowed.iter().map(|tool| format!("--allowedTools={tool}")));
-            args.extend(servers.iter().map(|server| format!("--allowedTools=mcp__{server}")));
-            args.extend(denied.iter().map(|tool| format!("--disallowedTools={tool}")));
-        }
-        AgentRunnerKind::Copilot => {
-            args.extend(allowed.iter().chain(servers).map(|tool| format!("--allow-tool={tool}")));
-            args.extend(denied.iter().map(|tool| format!("--deny-tool={tool}")));
-        }
-        _ => {}
-    }
-    args
-}
-
-/// Parse one line of runner output. `None` means the line is not a runner
-/// event at all (kept as raw output for debugging); an empty list means a
-/// recognised event with nothing to show (hooks, deltas, bookkeeping).
-pub fn parse_runner_line(kind: AgentRunnerKind, line: &str) -> Option<Vec<RunnerEvent>> {
-    let trimmed = line.trim();
-    if trimmed.is_empty() {
-        return Some(Vec::new());
-    }
-    if kind == AgentRunnerKind::Command {
-        return Some(vec![RunnerEvent::new(RunnerEventKind::Progress, Some(trimmed.to_string()), None)]);
-    }
-    // `t3 thread start --wait` prints the agent's reply as plain text; the
-    // job keeps it whole as its summary (see `t3_reply`).
-    if kind == AgentRunnerKind::T3 {
-        return Some(Vec::new());
-    }
-    let payload: JsonValue = serde_json::from_str(trimmed).ok()?;
-    let tag = if kind == AgentRunnerKind::Antigravity { "event" } else { "type" };
-    payload.get(tag).and_then(|v| v.as_str())?;
-    Some(match kind {
-        AgentRunnerKind::Codex => parse_codex_event(&payload),
-        // Amp's stream and Droid's final JSON object follow Claude's shapes.
-        AgentRunnerKind::Claude | AgentRunnerKind::Amp | AgentRunnerKind::Droid => parse_claude_event(&payload),
-        AgentRunnerKind::Copilot => parse_copilot_event(&payload),
-        AgentRunnerKind::Gemini => parse_gemini_event(&payload),
-        AgentRunnerKind::Cursor => parse_cursor_event(&payload),
-        AgentRunnerKind::Opencode | AgentRunnerKind::Kilo => parse_opencode_event(&payload),
-        AgentRunnerKind::Antigravity => parse_antigravity_event(&payload),
-        AgentRunnerKind::T3 | AgentRunnerKind::Command => unreachable!("handled above"),
-    })
-}
-
-/// OpenCode/Kilo permission rules for a permission level, passed through
-/// `OPENCODE_CONFIG_CONTENT`. The last matching rule wins.
-fn opencode_permission_config(level: AgentPermissions, writable_dirs: &[std::path::PathBuf]) -> String {
-    let permission = match level {
-        AgentPermissions::ReadOnly => serde_json::json!({ "edit": "deny", "bash": "deny" }),
-        AgentPermissions::Workspace => {
-            let mut outside = serde_json::Map::new();
-            for dir in writable_dirs {
-                outside.insert(format!("{}/**", dir.display()), JsonValue::String("allow".to_string()));
-            }
-            serde_json::json!({
-                "bash": { "*": "allow", "git push*": "deny" },
-                "external_directory": outside,
-            })
-        }
-        AgentPermissions::Full => JsonValue::String("allow".to_string()),
-    };
-    serde_json::json!({ "permission": permission }).to_string()
-}
-
-/// Cursor CLI `stream-json`: Claude-style `system`/`assistant`/`result`
-/// events plus `tool_call` events keyed by tool type.
-fn parse_cursor_event(payload: &JsonValue) -> Vec<RunnerEvent> {
-    if payload.get("type").and_then(|v| v.as_str()) != Some("tool_call") {
-        return parse_claude_event(payload);
-    }
-    if payload.get("subtype").and_then(|v| v.as_str()) != Some("started") {
-        return Vec::new();
-    }
-    let session_id = str_field(payload, "session_id");
-    let Some((key, call)) = payload.get("tool_call").and_then(|v| v.as_object()).and_then(|calls| calls.iter().next()) else {
-        return Vec::new();
-    };
-    let name = key.strip_suffix("ToolCall").unwrap_or(key);
-    let name = str_field(call, "name").unwrap_or_else(|| {
-        let mut chars = name.chars();
-        chars.next().map(|first| first.to_uppercase().collect::<String>() + chars.as_str()).unwrap_or_default()
-    });
-    let input = call.get("args").or_else(|| call.get("arguments"));
-    vec![RunnerEvent::new(RunnerEventKind::Progress, Some(tool_summary(&name, input)), session_id)]
-}
-
-/// OpenCode and Kilo `--format json`: `step_start`, `text`, `tool_use`,
-/// `step_finish` and `error` events, each with a `part` and `sessionID`.
-fn parse_opencode_event(payload: &JsonValue) -> Vec<RunnerEvent> {
-    let session_id = str_field(payload, "sessionID");
-    let part = payload.get("part");
-    match payload.get("type").and_then(|v| v.as_str()).unwrap_or_default() {
-        "step_start" => {
-            vec![RunnerEvent::new(RunnerEventKind::Init, None, session_id).with_payload(payload)]
-        }
-        "text" => match non_empty(part.and_then(|p| str_field(p, "text"))) {
-            Some(text) => vec![RunnerEvent::new(RunnerEventKind::Message, Some(text), session_id).with_payload(payload)],
-            None => Vec::new(),
-        },
-        "tool_use" => {
-            let name = part.and_then(|p| str_field(p, "tool")).unwrap_or_else(|| "tool".to_string());
-            let input = part.and_then(|p| p.get("state")).and_then(|s| s.get("input"));
-            vec![RunnerEvent::new(RunnerEventKind::Progress, Some(tool_summary(&name, input)), session_id)]
-        }
-        // One per step; each carries that step's tokens and cost.
-        "step_finish" => {
-            vec![RunnerEvent::new(RunnerEventKind::Result, None, session_id).with_payload(payload)]
-        }
-        "error" => {
-            let error = payload.get("error");
-            let text = error
-                .and_then(|e| e.as_str().map(str::to_string))
-                .or_else(|| error.and_then(|e| e.get("data")).and_then(|d| str_field(d, "message")))
-                .or_else(|| error.and_then(|e| str_field(e, "name")))
-                .or_else(|| str_field(payload, "message"));
-            vec![RunnerEvent::new(RunnerEventKind::Progress, text, session_id).failing()]
-        }
-        _ => Vec::new(),
-    }
-}
-
-/// Antigravity `stream-json`: `init`, `step_update` and `result` events
-/// named in an `event` field.
-fn parse_antigravity_event(payload: &JsonValue) -> Vec<RunnerEvent> {
-    match payload.get("event").and_then(|v| v.as_str()).unwrap_or_default() {
-        "init" => vec![RunnerEvent::new(RunnerEventKind::Init, None, str_field(payload, "conversation_id")).with_payload(payload)],
-        "step_update" => {
-            let Some(step) = payload.get("step_update") else {
-                return Vec::new();
-            };
-            let session_id = str_field(step, "conversation_id");
-            if str_field(step, "state").as_deref() != Some("DONE") {
-                return Vec::new();
-            }
-            match str_field(step, "step_type").as_deref() {
-                Some("agent_response") => match non_empty(str_field(step, "text_delta")) {
-                    Some(text) => vec![RunnerEvent::new(RunnerEventKind::Message, Some(text), session_id)],
-                    None => Vec::new(),
-                },
-                Some("tool") => {
-                    let info = step.get("tool_info");
-                    let name = str_field(step, "tool_name").or_else(|| info.and_then(|i| str_field(i, "name"))).unwrap_or_else(|| "tool".to_string());
-                    vec![RunnerEvent::new(RunnerEventKind::Progress, Some(tool_summary(&name, info.and_then(|i| i.get("parameters")))), session_id)]
-                }
-                _ => Vec::new(),
-            }
-        }
-        "result" => {
-            let result = payload.get("result");
-            let session_id = result.and_then(|r| str_field(r, "conversation_id"));
-            let failed = result.and_then(|r| str_field(r, "status")).is_some_and(|status| status != "SUCCESS");
-            let text = result.and_then(|r| {
-                if failed { r.get("error").map(|e| e.as_str().map(str::to_string).unwrap_or_else(|| e.to_string())) } else { str_field(r, "response") }
-            });
-            let mut event = RunnerEvent::new(RunnerEventKind::Result, text, session_id).with_payload(payload);
-            if failed {
-                event = event.failing();
-            }
-            vec![event]
-        }
-        _ => Vec::new(),
-    }
-}
-
-fn str_field(value: &JsonValue, key: &str) -> Option<String> {
-    value.get(key).and_then(|v| v.as_str()).map(|s| s.to_string())
-}
-
-fn non_empty(text: Option<String>) -> Option<String> {
-    text.filter(|text| !text.trim().is_empty())
-}
-
-/// One readable line for a tool call: its name and the most telling input.
-fn tool_summary(name: &str, input: Option<&JsonValue>) -> String {
-    const KEYS: [&str; 9] = ["command", "CommandLine", "filePath", "file_path", "path", "pattern", "url", "query", "description"];
-    let detail = input.and_then(|input| {
-        if let Some(text) = input.as_str() {
-            return Some(text.to_string());
-        }
-        KEYS.iter().find_map(|key| str_field(input, key))
-    });
-    let mut line = match detail {
-        Some(detail) => format!("{name}: {}", detail.lines().next().unwrap_or_default()),
-        None => name.to_string(),
-    };
-    if line.chars().count() > 160 {
-        line = line.chars().take(157).collect::<String>() + "...";
-    }
-    line
-}
-
-fn parse_codex_event(payload: &JsonValue) -> Vec<RunnerEvent> {
-    let event_type = payload.get("type").and_then(|v| v.as_str()).unwrap_or_default();
-    let session_id = str_field(payload, "thread_id");
-    let item = payload.get("item");
-    let item_type = item.and_then(|v| v.get("type")).and_then(|v| v.as_str());
-    match (event_type, item_type) {
-        ("thread.started", _) => {
-            vec![RunnerEvent::new(RunnerEventKind::Init, None, session_id).with_payload(payload)]
-        }
-        ("item.completed", Some("agent_message")) => {
-            let text = non_empty(item.and_then(|item| str_field(item, "text")));
-            vec![RunnerEvent::new(RunnerEventKind::Message, text, session_id).with_payload(payload)]
-        }
-        ("item.started", Some("command_execution")) => {
-            let command = item.and_then(|item| str_field(item, "command")).unwrap_or_default();
-            vec![RunnerEvent::new(RunnerEventKind::Progress, Some(tool_summary("Run", Some(&JsonValue::String(command)))), session_id)]
-        }
-        ("item.completed", Some("file_change")) => {
-            let paths: Vec<String> = item
-                .and_then(|item| item.get("changes"))
-                .and_then(|v| v.as_array())
-                .map(|changes| changes.iter().filter_map(|change| str_field(change, "path")).collect())
-                .unwrap_or_default();
-            let text = format!("Edited {}", if paths.is_empty() { "files".to_string() } else { paths.join(", ") });
-            vec![RunnerEvent::new(RunnerEventKind::Progress, Some(text), session_id)]
-        }
-        ("item.completed", Some("error")) => {
-            let text = non_empty(item.and_then(|item| str_field(item, "message")));
-            vec![RunnerEvent::new(RunnerEventKind::Progress, text, session_id)]
-        }
-        ("turn.completed", _) => {
-            vec![RunnerEvent::new(RunnerEventKind::Result, None, session_id).with_payload(payload)]
-        }
-        ("turn.failed", _) => {
-            let text = payload.get("error").and_then(|error| str_field(error, "message"));
-            vec![RunnerEvent::new(RunnerEventKind::Result, text, session_id).with_payload(payload).failing()]
-        }
-        ("error", _) => {
-            let text = str_field(payload, "message");
-            vec![RunnerEvent::new(RunnerEventKind::Progress, text, session_id).failing()]
-        }
-        _ => Vec::new(),
-    }
-}
-
-fn parse_claude_event(payload: &JsonValue) -> Vec<RunnerEvent> {
-    let event_type = payload.get("type").and_then(|v| v.as_str()).unwrap_or_default();
-    let session_id = str_field(payload, "session_id");
-    match event_type {
-        "system" => match payload.get("subtype").and_then(|v| v.as_str()) {
-            Some("init") => vec![RunnerEvent::new(RunnerEventKind::Init, None, session_id).with_payload(payload)],
-            Some("api_retry") => {
-                let attempt = payload.get("attempt").and_then(|v| v.as_u64()).unwrap_or(0);
-                let error = str_field(payload, "error").unwrap_or_else(|| "request failed".to_string());
-                vec![RunnerEvent::new(RunnerEventKind::Progress, Some(format!("API {error}; retrying (attempt {attempt})")), session_id)]
-            }
-            // Hooks, status and other bookkeeping events.
-            _ => Vec::new(),
-        },
-        // Partial-message deltas (only sent with --include-partial-messages,
-        // which LoTaR does not request): the full message follows anyway.
-        "stream_event" => Vec::new(),
-        "assistant" => {
-            let blocks = payload.get("message").and_then(|v| v.get("content")).and_then(|v| v.as_array()).cloned().unwrap_or_default();
-            let mut events = Vec::new();
-            // Every text block counts, not only the first (thinking and tool
-            // blocks often come before the text).
-            let text: Vec<String> = blocks
-                .iter()
-                .filter(|block| block.get("type").and_then(|v| v.as_str()).unwrap_or("text") == "text")
-                .filter_map(|block| str_field(block, "text"))
-                .collect();
-            if let Some(text) = non_empty(Some(text.join("\n\n"))) {
-                events.push(RunnerEvent::new(RunnerEventKind::Message, Some(text), session_id.clone()).with_payload(payload));
-            }
-            for block in &blocks {
-                if block.get("type").and_then(|v| v.as_str()) == Some("tool_use") {
-                    let name = str_field(block, "name").unwrap_or_else(|| "tool".to_string());
-                    events.push(RunnerEvent::new(RunnerEventKind::Progress, Some(tool_summary(&name, block.get("input"))), session_id.clone()));
-                }
-            }
-            events
-        }
-        "result" => {
-            let is_error = payload.get("is_error").and_then(|v| v.as_bool()).unwrap_or(false)
-                || payload.get("subtype").and_then(|v| v.as_str()).is_some_and(|s| s != "success");
-            let mut events = Vec::new();
-            let denials: Vec<String> = payload
-                .get("permission_denials")
-                .and_then(|v| v.as_array())
-                .map(|denials| {
-                    denials
-                        .iter()
-                        .map(|denial| {
-                            let name = str_field(denial, "tool_name").unwrap_or_else(|| "tool".to_string());
-                            tool_summary(&name, denial.get("tool_input"))
-                        })
-                        .collect()
-                })
-                .unwrap_or_default();
-            if !denials.is_empty() {
-                events.push(RunnerEvent::new(
-                    RunnerEventKind::Progress,
-                    Some(format!(
-                        "{} tool call(s) were denied by the permission settings; see the agent profile's permissions:\n- {}",
-                        denials.len(),
-                        denials.join("\n- ")
-                    )),
-                    session_id.clone(),
-                ));
-            }
-            let mut result = RunnerEvent::new(RunnerEventKind::Result, str_field(payload, "result"), session_id).with_payload(payload);
-            if is_error {
-                result = result.failing();
-            }
-            events.push(result);
-            events
-        }
-        _ => Vec::new(),
-    }
-}
-
-/// Copilot CLI `--output-format json`: `{type, data}` envelopes.
-fn parse_copilot_event(payload: &JsonValue) -> Vec<RunnerEvent> {
-    let event_type = payload.get("type").and_then(|v| v.as_str()).unwrap_or_default();
-    let data = payload.get("data");
-    let session_id = str_field(payload, "sessionId").or_else(|| data.and_then(|data| str_field(data, "sessionId")));
-    match event_type {
-        // A real `-p` run has no session-start line; the echoed prompt is
-        // its first event, so that marks the start.
-        "session.start" | "user.message" => {
-            vec![RunnerEvent::new(RunnerEventKind::Init, None, session_id).with_payload(payload)]
-        }
-        "assistant.message" => {
-            let text = non_empty(data.and_then(|data| str_field(data, "content")));
-            match text {
-                Some(text) => vec![RunnerEvent::new(RunnerEventKind::Message, Some(text), session_id).with_payload(payload)],
-                None => Vec::new(),
-            }
-        }
-        "tool.execution_start" => {
-            let name = data.and_then(|data| str_field(data, "toolName")).unwrap_or_else(|| "tool".to_string());
-            let summary = tool_summary(&name, data.and_then(|data| data.get("arguments")));
-            vec![RunnerEvent::new(RunnerEventKind::Progress, Some(summary), session_id)]
-        }
-        "session.error" | "error" => {
-            let text = data.and_then(|data| str_field(data, "message")).or_else(|| str_field(payload, "message"));
-            vec![RunnerEvent::new(RunnerEventKind::Progress, text, session_id).failing()]
-        }
-        "result" => {
-            let exit_code = payload.get("exitCode").and_then(|v| v.as_i64()).unwrap_or(0);
-            let mut result = RunnerEvent::new(RunnerEventKind::Result, None, session_id).with_payload(payload);
-            if exit_code != 0 {
-                result = result.failing();
-            }
-            vec![result]
-        }
-        _ => Vec::new(),
-    }
-}
-
-/// Gemini CLI `--output-format stream-json` (from the headless docs; not
-/// verified against a live run).
-fn parse_gemini_event(payload: &JsonValue) -> Vec<RunnerEvent> {
-    let event_type = payload.get("type").and_then(|v| v.as_str()).unwrap_or_default();
-    let session_id = str_field(payload, "session_id");
-    match event_type {
-        "init" => {
-            vec![RunnerEvent::new(RunnerEventKind::Init, None, session_id).with_payload(payload)]
-        }
-        "message" => {
-            if payload.get("role").and_then(|v| v.as_str()).is_some_and(|role| role != "assistant") {
-                return Vec::new();
-            }
-            let text = non_empty(str_field(payload, "content"));
-            let delta = payload.get("delta").and_then(|v| v.as_bool()).unwrap_or(false);
-            let kind = if delta { RunnerEventKind::Progress } else { RunnerEventKind::Message };
-            match text {
-                Some(text) => {
-                    vec![RunnerEvent::new(kind, Some(text), session_id).with_payload(payload)]
-                }
-                None => Vec::new(),
-            }
-        }
-        "tool_use" => {
-            let name = str_field(payload, "tool_name").unwrap_or_else(|| "tool".to_string());
-            vec![RunnerEvent::new(RunnerEventKind::Progress, Some(tool_summary(&name, payload.get("parameters"))), session_id)]
-        }
-        "error" => vec![RunnerEvent::new(RunnerEventKind::Progress, str_field(payload, "message"), session_id)],
-        "result" => {
-            let failed = str_field(payload, "status").is_some_and(|status| status != "success");
-            let mut result = RunnerEvent::new(RunnerEventKind::Result, None, session_id).with_payload(payload);
-            if failed {
-                result = result.failing();
-            }
-            vec![result]
-        }
-        _ => Vec::new(),
-    }
-}
-
-fn expand_env_map(env: &std::collections::BTreeMap<String, String>) -> HashMap<String, String> {
+fn expand_env_map(env: &BTreeMap<String, String>) -> HashMap<String, String> {
     env.iter().map(|(key, value)| (key.clone(), expand_env_value(value))).collect()
 }
 
@@ -1073,216 +317,12 @@ fn expand_env_value(raw: &str) -> String {
     raw.to_string()
 }
 
-pub fn validate_runner_command(cmd: &RunnerCommand) -> LoTaRResult<()> {
-    if cmd.program.trim().is_empty() {
-        return Err(LoTaRError::ValidationError("Runner command cannot be empty".to_string()));
-    }
-    Ok(())
-}
-
-/// Returns whether stdin should be piped for this runner kind.
-/// When true, the runner accepts user messages via stdin.
-pub fn supports_stdin(kind: AgentRunnerKind) -> bool {
-    // Copilot has no stdin message protocol (DEV-199); Claude does.
-    matches!(kind, AgentRunnerKind::Claude)
-}
-
-/// Format a user message for the runner's stdin protocol.
-/// Returns the bytes to write (including trailing newline).
-pub fn format_stdin_message(kind: AgentRunnerKind, message: &str) -> Option<Vec<u8>> {
-    match kind {
-        AgentRunnerKind::Claude => {
-            // stream-json input format:
-            // {"type":"user","message":{"role":"user","content":"<text>"}}
-            let obj = serde_json::json!({
-                "type": "user",
-                "message": {
-                    "role": "user",
-                    "content": message,
-                }
-            });
-            let mut bytes = serde_json::to_vec(&obj).ok()?;
-            bytes.push(b'\n');
-            Some(bytes)
-        }
-        _ => None,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn profile(runner: &str) -> AgentProfileDetail {
         AgentProfileDetail { runner: runner.to_string(), ..Default::default() }
-    }
-
-    #[test]
-    fn usage_comes_from_each_clis_final_event() {
-        let usage = |kind: AgentRunnerKind, fixture: &str| {
-            let mut total: Option<crate::api_types::AgentJobUsage> = None;
-            for event in replay(kind, fixture) {
-                if event.kind == RunnerEventKind::Result
-                    && let Some(usage) = event.payload.as_ref().and_then(|payload| usage_from_result(kind, payload))
-                {
-                    total.get_or_insert_with(Default::default).add(&usage);
-                }
-            }
-            total.expect("usage reported")
-        };
-
-        let claude = usage(AgentRunnerKind::Claude, "claude-edit.jsonl");
-        assert_eq!(claude.input_tokens, Some(6 + 13185 + 93837));
-        assert_eq!(claude.cached_input_tokens, Some(93837));
-        assert_eq!(claude.output_tokens, Some(588));
-        assert_eq!(claude.cost_usd, Some(0.00399887));
-        assert_eq!(claude.turns, Some(4));
-        assert_eq!(claude.describe(), "107,028 tokens in (93,837 cached), 588 out · $0.0040 · 4 turns");
-
-        let codex = usage(AgentRunnerKind::Codex, "codex-edit.jsonl");
-        assert_eq!(codex.input_tokens, Some(90723));
-        assert_eq!(codex.cached_input_tokens, Some(80768));
-        assert_eq!(codex.output_tokens, Some(253));
-        assert_eq!(codex.cost_usd, None);
-
-        let copilot = usage(AgentRunnerKind::Copilot, "copilot-edit.jsonl");
-        assert_eq!(copilot.premium_requests, Some(1.0));
-        assert_eq!(copilot.lines_added, Some(1));
-        assert_eq!(copilot.lines_removed, Some(1));
-        assert_eq!(copilot.describe(), "1 premium request · +1 −1 lines");
-    }
-
-    #[test]
-    fn all_zero_usage_counts_as_none() {
-        let payload = serde_json::json!({
-            "type": "result", "is_error": true, "total_cost_usd": 0.0, "num_turns": 0,
-            "usage": { "input_tokens": 0, "output_tokens": 0 }
-        });
-        assert_eq!(usage_from_result(AgentRunnerKind::Claude, &payload), None);
-    }
-
-    #[test]
-    fn max_budget_is_passed_to_claude_only() {
-        let mut profile = crate::config::types::AgentProfileDetail { runner: "claude".to_string(), max_budget_usd: Some(0.5), ..Default::default() };
-        let claude = model_effort_args(AgentRunnerKind::Claude, &profile);
-        assert_eq!(claude, ["--max-budget-usd", "0.5"]);
-        assert!(model_effort_args(AgentRunnerKind::Codex, &profile).is_empty());
-        profile.args = vec!["--max-budget-usd".into(), "2".into()];
-        assert!(model_effort_args(AgentRunnerKind::Claude, &profile).is_empty());
-    }
-
-    fn replay(kind: AgentRunnerKind, fixture: &str) -> Vec<RunnerEvent> {
-        let path = format!("{}/tests/fixtures/agent-streams/{fixture}", env!("CARGO_MANIFEST_DIR"));
-        let text = std::fs::read_to_string(path).expect("fixture");
-        text.lines().flat_map(|line| parse_runner_line(kind, line).expect("every captured line is a runner event")).collect()
-    }
-
-    fn texts(events: &[RunnerEvent], kind: RunnerEventKind) -> Vec<String> {
-        events.iter().filter(|event| event.kind == kind).filter_map(|event| event.text.clone()).collect()
-    }
-
-    #[test]
-    fn claude_gets_its_prompt_on_stdin_with_workspace_permissions() {
-        let cmd = build_runner_command(AgentRunnerKind::Claude, &profile("claude"), "Fix the bug", &[]).unwrap();
-        assert!(!cmd.args.iter().any(|arg| arg == "Fix the bug"), "{:?}", cmd.args);
-        assert!(cmd.args.windows(2).any(|pair| pair == ["--input-format", "stream-json"]));
-        assert!(cmd.args.windows(2).any(|pair| pair == ["--permission-mode", "acceptEdits"]));
-        assert!(cmd.args.windows(2).any(|pair| pair[0] == "--settings" && pair[1].contains("autoAllowBashIfSandboxed")));
-        let input: serde_json::Value = serde_json::from_slice(cmd.initial_input.as_ref().unwrap()).unwrap();
-        assert_eq!(input["message"]["content"], "Fix the bug");
-    }
-
-    #[test]
-    fn permission_levels_map_onto_each_cli() {
-        let level = |runner: &str, permissions: AgentPermissions| {
-            let mut detail = profile(runner);
-            detail.permissions = Some(permissions);
-            let kind: AgentRunnerKind = runner.parse().unwrap();
-            build_runner_command(kind, &detail, "p", &[]).unwrap().args.join(" ")
-        };
-        assert!(level("claude", AgentPermissions::ReadOnly).contains("--permission-mode plan"));
-        assert!(level("claude", AgentPermissions::Full).contains("--permission-mode bypassPermissions"));
-        assert!(level("codex", AgentPermissions::ReadOnly).contains("--sandbox read-only"));
-        assert!(level("codex", AgentPermissions::Workspace).contains("--sandbox workspace-write"));
-        assert!(level("codex", AgentPermissions::Full).contains("--dangerously-bypass-approvals-and-sandbox"));
-        assert!(level("copilot", AgentPermissions::ReadOnly).contains("--deny-tool=write"));
-        assert!(level("copilot", AgentPermissions::Workspace).contains("--deny-tool=shell(git push)"));
-        assert!(level("copilot", AgentPermissions::Full).contains("--allow-all"));
-        assert!(level("gemini", AgentPermissions::Workspace).contains("--approval-mode auto_edit"));
-        assert!(level("gemini", AgentPermissions::Full).contains("--approval-mode yolo"));
-    }
-
-    #[test]
-    fn profile_permission_flags_replace_the_defaults() {
-        let mut detail = profile("claude");
-        detail.args = vec!["--permission-mode".into(), "plan".into()];
-        let args = build_runner_command(AgentRunnerKind::Claude, &detail, "p", &[]).unwrap().args;
-        assert_eq!(args.iter().filter(|arg| *arg == "--permission-mode").count(), 1);
-        assert!(!args.iter().any(|arg| arg == "--settings"));
-
-        let mut detail = profile("codex");
-        detail.args = vec!["-s".into(), "danger-full-access".into()];
-        let args = build_runner_command(AgentRunnerKind::Codex, &detail, "p", &[]).unwrap().args;
-        assert!(!args.iter().any(|arg| arg == "workspace-write"));
-    }
-
-    #[test]
-    fn model_and_effort_become_each_clis_flags() {
-        let args = |runner: &str| {
-            let mut profile = profile(runner);
-            profile.model = Some("m1".to_string());
-            profile.effort = Some("high".to_string());
-            let kind: AgentRunnerKind = runner.parse().unwrap();
-            build_runner_command(kind, &profile, "p", &[]).unwrap().args.join(" ")
-        };
-        assert!(args("claude").contains("--model m1 --effort high"));
-        assert!(args("copilot").contains("--model m1 --reasoning-effort high"));
-        assert!(args("codex").contains("-m m1 -c model_reasoning_effort=high"));
-        assert!(args("codex").ends_with(" p"), "the prompt stays last");
-        let gemini = args("gemini");
-        assert!(gemini.contains("-m m1") && !gemini.contains("high"));
-
-        let mut command = profile("command");
-        command.command = Some("run-agent".to_string());
-        command.model = Some("m1".to_string());
-        command.effort = Some("low".to_string());
-        let built = build_runner_command(AgentRunnerKind::Command, &command, "p", &[]).unwrap();
-        assert!(built.args.is_empty());
-        assert_eq!(built.env.get("LOTAR_AGENT_MODEL").map(String::as_str), Some("m1"));
-        assert_eq!(built.env.get("LOTAR_AGENT_EFFORT").map(String::as_str), Some("low"));
-    }
-
-    #[test]
-    fn profile_args_keep_their_own_model_and_effort() {
-        let mut claude = profile("claude");
-        claude.model = Some("m1".to_string());
-        claude.effort = Some("high".to_string());
-        claude.args = vec!["--model=opus".to_string(), "--effort".to_string(), "max".to_string()];
-        let args = build_runner_command(AgentRunnerKind::Claude, &claude, "p", &[]).unwrap().args;
-        assert!(!args.iter().any(|arg| arg == "m1" || arg == "high"), "{args:?}");
-
-        let mut codex = profile("codex");
-        codex.effort = Some("high".to_string());
-        codex.args = vec!["-c".to_string(), "model_reasoning_effort=low".to_string()];
-        let args = build_runner_command(AgentRunnerKind::Codex, &codex, "p", &[]).unwrap().args;
-        assert!(!args.contains(&"model_reasoning_effort=high".to_string()));
-    }
-
-    #[test]
-    fn run_overrides_drop_the_profiles_own_model_and_effort_flags() {
-        let owned = |items: &[&str]| items.iter().map(|item| item.to_string()).collect::<Vec<_>>();
-        let claude = owned(&["--model", "opus", "--effort=low", "--verbose"]);
-        assert_eq!(drop_overridden_args(AgentRunnerKind::Claude, &claude, true, true), owned(&["--verbose"]));
-        assert_eq!(drop_overridden_args(AgentRunnerKind::Claude, &claude, true, false), owned(&["--effort=low", "--verbose"]));
-        let codex = owned(&["-m", "gpt-5", "-c", "model_reasoning_effort=low", "-c", "sandbox=x"]);
-        assert_eq!(drop_overridden_args(AgentRunnerKind::Codex, &codex, true, true), owned(&["-c", "sandbox=x"]));
-        let codex_inline = owned(&["--config=model_reasoning_effort=low", "--json"]);
-        assert_eq!(drop_overridden_args(AgentRunnerKind::Codex, &codex_inline, false, true), owned(&["--json"]));
-        let droid = owned(&["-r", "high", "-m", "x"]);
-        assert_eq!(drop_overridden_args(AgentRunnerKind::Droid, &droid, false, true), owned(&["-m", "x"]));
-        // Command runners take model and effort from env vars; args stay.
-        let command = owned(&["--model", "x"]);
-        assert_eq!(drop_overridden_args(AgentRunnerKind::Command, &command, true, true), command);
     }
 
     #[test]
@@ -1296,386 +336,82 @@ mod tests {
     }
 
     #[test]
-    fn tools_and_mcp_servers_become_tool_flags_for_claude_and_copilot() {
-        let with_tools = |runner: &str| {
-            let mut profile = profile(runner);
-            profile.tools =
-                Some(crate::config::types::AgentToolsConfig { allowed: vec!["WebFetch".to_string()], disallowed: vec!["Bash(git push:*)".to_string()] });
-            profile.mcp = Some(crate::config::types::AgentMcpConfig { allow: vec!["docs".to_string()], ..Default::default() });
-            let kind: AgentRunnerKind = runner.parse().unwrap();
-            build_runner_command(kind, &profile, "p", &[]).unwrap().args
-        };
-        let claude = with_tools("claude");
-        for flag in ["--allowedTools=WebFetch", "--allowedTools=mcp__docs", "--disallowedTools=Bash(git push:*)"] {
-            assert!(claude.contains(&flag.to_string()), "{claude:?}");
-        }
-        let copilot = with_tools("copilot");
-        for flag in ["--allow-tool=WebFetch", "--allow-tool=docs", "--deny-tool=Bash(git push:*)"] {
-            assert!(copilot.contains(&flag.to_string()), "{copilot:?}");
-        }
-        // The workspace defaults still apply next to the profile's tools.
-        assert!(copilot.contains(&"--allow-all-tools".to_string()));
-        assert!(!with_tools("codex").iter().any(|arg| arg.contains("WebFetch")));
-    }
-
-    #[test]
-    fn workspace_level_can_write_the_extra_directories() {
-        let dirs = vec![std::path::PathBuf::from("/repo/.tasks"), std::path::PathBuf::from("/repo/.git")];
-        let args = |runner: &str| {
-            let kind: AgentRunnerKind = runner.parse().unwrap();
-            build_runner_command(kind, &profile(runner), "p", &dirs).unwrap().args.join(" ")
-        };
-        for runner in ["claude", "codex", "copilot"] {
-            assert!(args(runner).contains("--add-dir /repo/.tasks --add-dir /repo/.git"), "{runner}");
-        }
-        assert!(args("gemini").contains("--include-directories /repo/.tasks"));
-        let mut read_only = profile("claude");
-        read_only.permissions = Some(AgentPermissions::ReadOnly);
-        let args = build_runner_command(AgentRunnerKind::Claude, &read_only, "p", &dirs).unwrap().args;
-        assert!(!args.iter().any(|arg| arg == "--add-dir"));
-    }
-
-    #[test]
-    fn codex_copilot_and_gemini_take_the_prompt_as_an_argument() {
-        let codex = build_runner_command(AgentRunnerKind::Codex, &profile("codex"), "Do it", &[]).unwrap();
-        assert_eq!(codex.args.first().map(String::as_str), Some("exec"));
-        assert_eq!(codex.args.last().map(String::as_str), Some("Do it"));
-        assert!(codex.initial_input.is_none());
-
-        let copilot = build_runner_command(AgentRunnerKind::Copilot, &profile("copilot"), "Do it", &[]).unwrap();
-        assert_eq!(&copilot.args[..2], ["-p", "Do it"]);
-        assert!(copilot.args.windows(2).any(|pair| pair == ["--output-format", "json"]));
-        assert!(copilot.args.iter().any(|arg| arg == "--no-ask-user"));
-        assert!(!copilot.args.iter().any(|arg| arg == "stream-json" || arg == "--input-format"));
-
-        let gemini = build_runner_command(AgentRunnerKind::Gemini, &profile("gemini"), "Do it", &[]).unwrap();
-        assert!(gemini.args.ends_with(&["-p".to_string(), "Do it".to_string()]));
-    }
-
-    #[test]
     fn command_runner_gets_the_prompt_in_the_environment() {
         let mut detail = profile("command");
         detail.command = Some("my-agent".into());
-        let cmd = build_runner_command(AgentRunnerKind::Command, &detail, "Do it", &[]).unwrap();
+        let cmd = build_command(&detail, "Do it").unwrap();
         assert_eq!(cmd.env.get("LOTAR_AGENT_PROMPT").map(String::as_str), Some("Do it"));
         assert!(cmd.args.is_empty());
+        assert!(build_command(&profile("command"), "Do it").is_err());
     }
 
-    /// Newer CLIs from their docs (DEV-203): each documented example run
-    /// yields a start, the tool calls, the answer, a result and usage.
     #[test]
-    fn replays_the_documented_streams_of_newer_clis() {
-        let cases = [
-            (AgentRunnerKind::Cursor, "cursor-docs.jsonl", "Read: calc.py"),
-            (AgentRunnerKind::Amp, "amp-docs.jsonl", "Read: /work/repo/calc.py"),
-            (AgentRunnerKind::Droid, "droid-docs.jsonl", ""),
-            (AgentRunnerKind::Opencode, "opencode-docs.jsonl", "read: /work/repo/calc.py"),
-            (AgentRunnerKind::Antigravity, "antigravity-docs.jsonl", "run_command: cat calc.py"),
-        ];
-        for (kind, fixture, tool) in cases {
-            let events = replay(kind, fixture);
-            if !tool.is_empty() {
-                assert!(texts(&events, RunnerEventKind::Progress).iter().any(|t| t == tool), "{fixture}: {:?}", texts(&events, RunnerEventKind::Progress));
-                assert_eq!(events.first().map(|event| event.kind), Some(RunnerEventKind::Init), "{fixture}");
-            }
-            let answer = "Fixed add() to return a + b.";
-            let messages = texts(&events, RunnerEventKind::Message);
-            let results = texts(&events, RunnerEventKind::Result);
-            assert!(messages.iter().any(|m| m == answer) || results.iter().any(|r| r == answer), "{fixture}: {messages:?} {results:?}");
-            assert!(!events.iter().any(|event| event.failed), "{fixture}");
-            let mut usage = crate::api_types::AgentJobUsage::default();
-            for event in events.iter().filter(|e| e.kind == RunnerEventKind::Result) {
-                if let Some(u) = event.payload.as_ref().and_then(|p| usage_from_result(kind, p)) {
-                    usage.add(&u);
-                }
-            }
-            match kind {
-                AgentRunnerKind::Cursor => assert_eq!(usage, Default::default()),
-                AgentRunnerKind::Amp => assert_eq!(usage.input_tokens, Some(3500)),
-                AgentRunnerKind::Droid => {
-                    assert_eq!(usage.input_tokens, Some(8500));
-                    assert_eq!(usage.turns, Some(3));
-                }
-                AgentRunnerKind::Opencode => {
-                    assert_eq!(usage.input_tokens, Some(900 + 2000 + 300 + 2900));
-                    assert_eq!(usage.output_tokens, Some(30 + 20 + 5));
-                    assert_eq!(usage.turns, Some(2));
-                    assert!((usage.cost_usd.unwrap() - 0.002).abs() < 1e-9);
-                }
-                AgentRunnerKind::Antigravity => {
-                    assert_eq!(usage.input_tokens, Some(10418));
-                    assert_eq!(usage.cached_input_tokens, Some(8113));
-                    assert_eq!(usage.output_tokens, Some(589 + 551));
-                }
-                _ => unreachable!(),
+    fn every_runner_but_command_is_the_harnessmux_agent_of_its_name() {
+        let table = harnessmux::AgentTable::parse(harnessmux::agents::BUILTIN, None).unwrap();
+        for kind in AgentRunnerKind::ALL {
+            match harness_agent(kind) {
+                Some(agent) => assert!(table.get(agent).is_ok(), "{agent} is not a harnessmux agent"),
+                None => assert_eq!(kind, AgentRunnerKind::Command),
             }
         }
-        // An unsuccessful Antigravity result fails the job.
-        let failed = parse_runner_line(AgentRunnerKind::Antigravity, r#"{"event":"result","result":{"status":"ERROR","error":"quota exceeded"}}"#).unwrap();
-        assert!(failed[0].failed);
-        assert_eq!(failed[0].text.as_deref(), Some("quota exceeded"));
-        // OpenCode errors are reported and fail the job.
-        let error = parse_runner_line(
-            AgentRunnerKind::Opencode,
-            r#"{"type":"error","sessionID":"s","error":{"name":"ProviderAuthError","data":{"message":"No API key"}}}"#,
-        )
-        .unwrap();
-        assert!(error[0].failed);
-        assert_eq!(error[0].text.as_deref(), Some("No API key"));
     }
 
     #[test]
-    fn newer_clis_get_their_documented_flags() {
-        let build = |runner: &str, permissions: AgentPermissions| {
-            let kind: AgentRunnerKind = runner.parse().unwrap();
-            let mut detail = profile(runner);
-            detail.permissions = Some(permissions);
-            detail.model = Some("m1".into());
-            detail.effort = Some("high".into());
-            build_runner_command(kind, &detail, "Do it", &[std::path::PathBuf::from("/repo/.tasks")])
+    fn agent_profiles_take_no_command_and_a_known_effort() {
+        let mut claude = profile("claude");
+        claude.command = Some("/opt/claude".into());
+        let err = check_agent_profile(AgentRunnerKind::Claude, &claude).unwrap_err().to_string();
+        assert!(err.contains("agents.toml"), "{err}");
+        let mut codex = profile("codex");
+        codex.effort = Some("ultra".into());
+        let err = check_agent_profile(AgentRunnerKind::Codex, &codex).unwrap_err().to_string();
+        assert!(err.contains("low, medium, high, xhigh, max"), "{err}");
+        let mut command = profile("command");
+        command.command = Some("sh".into());
+        command.effort = Some("whatever".into());
+        assert!(check_agent_profile(AgentRunnerKind::Command, &command).is_ok());
+    }
+
+    #[test]
+    fn a_profile_becomes_a_session_profile_with_notes_on_what_it_drops() {
+        let mut detail = profile("claude");
+        detail.model = Some("sonnet".into());
+        detail.effort = Some("high".into());
+        detail.permissions = Some(AgentPermissions::ReadOnly);
+        detail.on_permission = Some(AgentPermissionPolicy::Ask);
+        detail.max_budget_usd = Some(2.0);
+        detail.env = BTreeMap::from([("A".to_string(), "1".to_string())]);
+        let (session, notes) = session_profile(&detail, HashMap::from([("LOTAR_TICKET_ID".to_string(), "DEV-1".to_string())])).unwrap();
+        assert_eq!(session.model.as_deref(), Some("sonnet"));
+        assert_eq!(session.effort, Some(harnessmux::Effort::High));
+        assert_eq!(session.permissions, harnessmux::Permissions::ReadOnly);
+        assert_eq!(session.policy(), harnessmux::PermissionPolicy::Ask);
+        assert_eq!(session.env["A"], "1");
+        assert_eq!(session.env["LOTAR_TICKET_ID"], "DEV-1");
+        assert_eq!(notes.len(), 1, "{notes:?}");
+    }
+
+    #[test]
+    fn sessions_are_named_after_repository_ticket_and_profile() {
+        let repo = std::path::Path::new("/work/lotar");
+        let prefix = session_prefix(repo, "DEV-12");
+        assert!(prefix.starts_with("lotar-") && prefix.ends_with("-DEV-12"), "{prefix}");
+        assert_eq!(session_name(repo, "DEV-12", Some("fix")), format!("{prefix}-fix"));
+        assert_eq!(session_name(repo, "DEV-12", None), prefix);
+        assert_eq!(session_name(repo, "DEV-12", Some("a b/c")), format!("{prefix}-a-b-c"));
+        let other = session_name(std::path::Path::new("/elsewhere/lotar"), "DEV-12", Some("fix"));
+        assert_ne!(other, session_name(repo, "DEV-12", Some("fix")), "another checkout with the same name and ticket");
+        let long = session_name(std::path::Path::new(&format!("/w/{}", "r".repeat(90))), "DEV-1", Some(&"x".repeat(80)));
+        assert!(harnessmux::registry::validate_name(&long).is_ok(), "{long}");
+    }
+
+    #[test]
+    fn lotar_mcp_is_limited_to_the_job_tools() {
+        let harnessmux::McpServer::Stdio { command, args, env } = lotar_mcp_server("/bin/lotar", std::path::Path::new("/repo/.tasks")) else {
+            panic!("stdio server expected");
         };
-        let args = |runner: &str, permissions| build(runner, permissions).unwrap().args.join(" ");
-
-        let cursor = build("cursor", AgentPermissions::Workspace).unwrap();
-        assert_eq!(cursor.program, "cursor-agent");
-        assert!(cursor.args.join(" ").starts_with("-p --output-format stream-json --trust"));
-        assert!(cursor.args.join(" ").contains("--force --sandbox enabled"));
-        assert_eq!(cursor.args.last().map(String::as_str), Some("Do it"));
-        assert!(args("cursor", AgentPermissions::ReadOnly).contains("--mode plan"));
-
-        assert!(args("amp", AgentPermissions::Workspace).ends_with("-x Do it"));
-        assert!(args("amp", AgentPermissions::Full).contains("--dangerously-allow-all"));
-        assert!(build("amp", AgentPermissions::ReadOnly).is_err());
-        assert!(!args("amp", AgentPermissions::Workspace).contains("m1"));
-
-        let droid = args("droid", AgentPermissions::Workspace);
-        assert!(droid.starts_with("exec --output-format json --auto medium"), "{droid}");
-        assert!(droid.contains("-m m1 --reasoning-effort high"));
-        assert!(!args("droid", AgentPermissions::ReadOnly).contains("--auto"));
-
-        let opencode = build("opencode", AgentPermissions::Workspace).unwrap();
-        assert!(opencode.args.join(" ").starts_with("run --format json --auto"));
-        assert!(opencode.args.join(" ").contains("-m m1 --variant high"));
-        let config = opencode.env.get("OPENCODE_CONFIG_CONTENT").unwrap();
-        assert!(config.contains("/repo/.tasks/**"), "{config}");
-        let read_only = build("opencode", AgentPermissions::ReadOnly).unwrap();
-        assert!(!read_only.args.iter().any(|a| a == "--auto"));
-        assert!(read_only.env["OPENCODE_CONFIG_CONTENT"].contains(r#""edit":"deny""#));
-        assert_eq!(build("kilo", AgentPermissions::Full).unwrap().program, "kilo");
-
-        let agy = build("antigravity", AgentPermissions::Workspace).unwrap();
-        assert_eq!(agy.program, "agy");
-        let agy = agy.args.join(" ");
-        assert!(agy.contains("--mode accept-edits --add-dir /repo/.tasks"), "{agy}");
-        assert!(agy.contains("--model m1 --effort high"));
-        assert!(agy.ends_with("-p Do it"));
-    }
-
-    #[test]
-    fn lotar_mcp_is_attached_per_cli_with_a_tool_allowlist() {
-        let tasks = std::path::Path::new("/repo/.tasks");
-        let attach = |runner: &str| {
-            let kind: AgentRunnerKind = runner.parse().unwrap();
-            let mut command = build_runner_command(kind, &profile(runner), "Do it", &[]).unwrap();
-            let attached = attach_lotar_mcp(&mut command, kind, "/bin/lotar", tasks);
-            (attached, command.args)
-        };
-        let (ok, claude) = attach("claude");
-        assert!(ok);
-        let config = &claude[claude.iter().position(|a| a == "--mcp-config").unwrap() + 1];
-        let config: JsonValue = serde_json::from_str(config).unwrap();
-        let server = &config["mcpServers"]["lotar"];
-        assert_eq!(server["command"], "/bin/lotar");
-        assert_eq!(server["args"], serde_json::json!(["mcp"]));
-        assert_eq!(server["env"]["LOTAR_TASKS_DIR"], "/repo/.tasks");
-        let tools = server["env"]["LOTAR_MCP_TOOLS"].as_str().unwrap();
-        assert!(tools.contains("task_comment_add") && !tools.contains("agent_run"));
-        assert!(claude.iter().any(|a| a == "--allowedTools=mcp__lotar"));
-
-        let (ok, copilot) = attach("copilot");
-        assert!(ok);
-        assert!(copilot.iter().any(|a| a == "--additional-mcp-config"));
-        assert!(copilot.iter().any(|a| a == "--allow-tool=lotar"));
-
-        let (ok, codex) = attach("codex");
-        assert!(ok);
-        assert_eq!(codex.last().map(String::as_str), Some("Do it"), "prompt stays last");
-        let joined = codex.join(" ");
-        assert!(joined.contains(r#"mcp_servers.lotar.command="/bin/lotar""#), "{joined}");
-        assert!(joined.contains(r#"default_tools_approval_mode="approve""#));
-        assert!(joined.contains(r#"LOTAR_TASKS_DIR="/repo/.tasks""#));
-
-        assert!(!attach("gemini").0);
-        assert!(!attach("cursor").0);
-    }
-
-    #[test]
-    fn replays_a_real_claude_edit_run() {
-        let events = replay(AgentRunnerKind::Claude, "claude-edit.jsonl");
-        assert_eq!(events.first().map(|event| event.kind), Some(RunnerEventKind::Init));
-        let progress = texts(&events, RunnerEventKind::Progress);
-        assert!(progress.iter().any(|text| text.starts_with("Edit: ") && text.ends_with("calc.py")), "{progress:?}");
-        assert!(progress.iter().any(|text| text.starts_with("Bash: python3")), "{progress:?}");
-        assert!(!texts(&events, RunnerEventKind::Message).is_empty());
-        let result = events.last().unwrap();
-        assert_eq!(result.kind, RunnerEventKind::Result);
-        assert!(!events.iter().any(|event| event.failed));
-        assert!(result.session_id.is_some());
-    }
-
-    #[test]
-    fn replays_a_real_codex_edit_run() {
-        let events = replay(AgentRunnerKind::Codex, "codex-edit.jsonl");
-        assert_eq!(events.first().map(|event| event.kind), Some(RunnerEventKind::Init));
-        let progress = texts(&events, RunnerEventKind::Progress);
-        assert!(progress.iter().any(|text| text.starts_with("Run: ") && text.contains("cat calc.py")), "{progress:?}");
-        assert!(progress.iter().any(|text| text.starts_with("Edited ") && text.ends_with("calc.py")), "{progress:?}");
-        assert!(!texts(&events, RunnerEventKind::Message).is_empty());
-        assert_eq!(events.last().map(|event| event.kind), Some(RunnerEventKind::Result));
-        assert!(!events.iter().any(|event| event.failed));
-    }
-
-    #[test]
-    fn replays_a_real_copilot_edit_run() {
-        let events = replay(AgentRunnerKind::Copilot, "copilot-edit.jsonl");
-        assert_eq!(events.first().unwrap().kind, RunnerEventKind::Init);
-        let progress = texts(&events, RunnerEventKind::Progress);
-        assert!(progress.iter().any(|text| text.starts_with("apply_patch")), "{progress:?}");
-        assert!(progress.iter().any(|text| text.starts_with("bash: python3")), "{progress:?}");
-        assert!(!texts(&events, RunnerEventKind::Message).is_empty());
-        let result = events.last().unwrap();
-        assert_eq!(result.kind, RunnerEventKind::Result);
-        assert!(result.session_id.is_some());
-        assert!(!events.iter().any(|event| event.failed));
-    }
-
-    #[test]
-    fn runner_reported_failures_are_flagged() {
-        let failed = |kind: AgentRunnerKind, line: &str| parse_runner_line(kind, line).unwrap().iter().any(|event| event.failed);
-        assert!(failed(AgentRunnerKind::Claude, r#"{"type":"result","subtype":"error_max_turns","is_error":true,"session_id":"s"}"#));
-        assert!(failed(AgentRunnerKind::Codex, r#"{"type":"turn.failed","error":{"message":"quota"}}"#));
-        assert!(failed(AgentRunnerKind::Codex, r#"{"type":"error","message":"stream disconnected"}"#));
-        assert!(failed(AgentRunnerKind::Copilot, r#"{"type":"result","sessionId":"s","exitCode":1}"#));
-        assert!(failed(AgentRunnerKind::Gemini, r#"{"type":"result","status":"error"}"#));
-        assert!(!failed(AgentRunnerKind::Claude, r#"{"type":"result","subtype":"success","is_error":false}"#));
-    }
-
-    #[test]
-    fn claude_reports_denied_tools_and_joins_text_blocks() {
-        let events = parse_runner_line(
-            AgentRunnerKind::Claude,
-            r#"{"type":"result","subtype":"success","is_error":false,"permission_denials":[{"tool_name":"Bash","tool_input":{"command":"git push"}}]}"#,
-        )
-        .unwrap();
-        let note = events[0].text.as_deref().unwrap();
-        assert!(note.contains("1 tool call(s) were denied"), "{note}");
-        assert!(note.contains("- Bash: git push"), "{note}");
-
-        let events = parse_runner_line(
-            AgentRunnerKind::Claude,
-            r#"{"type":"assistant","message":{"content":[{"type":"thinking","thinking":"hmm"},{"type":"text","text":"First"},{"type":"tool_use","name":"Read","input":{"file_path":"a.rs"}},{"type":"text","text":"Second"}]}}"#,
-        )
-        .unwrap();
-        assert_eq!(events[0].text.as_deref(), Some("First\n\nSecond"));
-        assert_eq!(events[1].text.as_deref(), Some("Read: a.rs"));
-    }
-
-    #[test]
-    fn bookkeeping_lines_are_recognised_but_not_shown_and_noise_is_raw() {
-        let hook = r#"{"type":"system","subtype":"hook_started","session_id":"s"}"#;
-        assert_eq!(parse_runner_line(AgentRunnerKind::Claude, hook).map(|events| events.len()), Some(0));
-        let delta = r#"{"type":"assistant.reasoning_delta","data":{"deltaContent":"x"}}"#;
-        assert_eq!(parse_runner_line(AgentRunnerKind::Copilot, delta).map(|events| events.len()), Some(0));
-        assert!(parse_runner_line(AgentRunnerKind::Claude, "Warning: something odd").is_none());
-    }
-
-    #[test]
-    fn t3_threads_get_the_prompt_on_stdin_and_provider_with_model() {
-        let mut t3 = profile("t3");
-        t3.command = Some("/opt/t3".to_string());
-        t3.provider = Some("codex".to_string());
-        t3.model = Some("gpt-5.5".to_string());
-        let launch =
-            T3Launch { title: "DEV-1 Fix it".to_string(), worktree: Some(T3Worktree { base: "main".to_string(), branch: Some("agent/DEV-1".to_string()) }) };
-        let cmd = build_t3_command(&t3, "the prompt", &launch).unwrap();
-        assert_eq!(cmd.program, "/opt/t3");
-        assert_eq!(
-            cmd.args,
-            [
-                "thread",
-                "start",
-                ".",
-                "-",
-                "--title",
-                "DEV-1 Fix it",
-                "--provider",
-                "codex",
-                "--model",
-                "gpt-5.5",
-                "--worktree",
-                "main",
-                "--branch",
-                "agent/DEV-1",
-                "--wait",
-            ]
-        );
-        assert_eq!(cmd.initial_input.as_deref(), Some(&b"the prompt"[..]));
-
-        // Without a launch the title is T3's (the prompt's first line).
-        let plain = build_runner_command(AgentRunnerKind::T3, &t3, "p", &[]).unwrap();
-        assert!(!plain.args.contains(&"--title".to_string()), "{:?}", plain.args);
-
-        // T3 takes a provider only with a model.
-        t3.model = None;
-        let err = build_t3_command(&t3, "p", &launch).unwrap_err().to_string();
-        assert!(err.contains("set the model"), "{err}");
-        t3.provider = None;
-        t3.model = Some("gpt-5.5".to_string());
-        let err = build_t3_command(&t3, "p", &launch).unwrap_err().to_string();
-        assert!(err.contains("set the provider"), "{err}");
-
-        // The profile's own args win.
-        t3.args = vec!["--provider".into(), "claudeAgent".into(), "--model".into(), "x".into()];
-        let cmd = build_t3_command(&t3, "p", &T3Launch::default()).unwrap();
-        assert_eq!(cmd.args.iter().filter(|a| *a == "--provider").count(), 1);
-    }
-
-    #[test]
-    fn a_continued_t3_job_is_sent_to_its_thread() {
-        let mut t3 = profile("t3");
-        t3.command = Some("/opt/t3".to_string());
-        t3.provider = Some("codex".to_string());
-        t3.model = Some("gpt-5.5".to_string());
-        t3.args = vec!["--title".into(), "x".into()];
-        let cmd = build_t3_send_command(&t3, "the prompt", "thread-1");
-        assert_eq!(cmd.program, "/opt/t3");
-        assert_eq!(cmd.args, ["thread", "send", "thread-1", "-", "--wait"]);
-        assert_eq!(cmd.initial_input.as_deref(), Some("the prompt".as_bytes()));
-    }
-
-    #[test]
-    fn t3_stderr_names_the_thread() {
-        assert_eq!(t3_thread_id("Thread abc-123\n").as_deref(), Some("abc-123"));
-        assert_eq!(t3_thread_id("Thread "), None);
-        assert_eq!(t3_thread_id("Threads are busy"), None);
-        assert!(is_t3_noise(
-            "[1111/090522.026791:ERROR:electron/shell/app/node_main.cc:154] Node.js environment variables are disabled because this process is invoked by other apps."
-        ));
-        assert!(!is_t3_noise("The run failed"));
-        assert_eq!("t3".parse::<AgentRunnerKind>(), Ok(AgentRunnerKind::T3));
-    }
-
-    #[test]
-    fn only_claude_accepts_stdin_messages() {
-        assert!(supports_stdin(AgentRunnerKind::Claude));
-        assert!(!supports_stdin(AgentRunnerKind::Copilot));
-        assert!(!supports_stdin(AgentRunnerKind::Codex));
-        assert!(!supports_stdin(AgentRunnerKind::Gemini));
-        assert!(!supports_stdin(AgentRunnerKind::Command));
-        let msg = format_stdin_message(AgentRunnerKind::Claude, "hello world").unwrap();
-        let parsed: serde_json::Value = serde_json::from_slice(&msg).unwrap();
-        assert_eq!(parsed["type"], "user");
-        assert_eq!(parsed["message"]["content"], "hello world");
-        assert!(format_stdin_message(AgentRunnerKind::Copilot, "hello").is_none());
+        assert_eq!((command.as_str(), args.as_slice()), ("/bin/lotar", ["mcp".to_string()].as_slice()));
+        assert_eq!(env["LOTAR_TASKS_DIR"], "/repo/.tasks");
+        assert!(env["LOTAR_MCP_TOOLS"].contains("task_update") && !env["LOTAR_MCP_TOOLS"].contains("agent_"));
     }
 }

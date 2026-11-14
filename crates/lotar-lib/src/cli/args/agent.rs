@@ -66,7 +66,7 @@ pub struct AgentRunArgs {
     pub ticket: String,
     /// Prompt for the agent
     pub prompt: String,
-    /// Runner to use (claude, codex, copilot, gemini, cursor, amp, droid, opencode, kilo, antigravity, t3)
+    /// Runner to use (claude, codex, copilot, gemini, cursor, amp, droid, opencode, kilo, antigravity, t3, command)
     #[arg(long)]
     pub runner: Option<String>,
     /// Named agent profile to use
@@ -75,16 +75,16 @@ pub struct AgentRunArgs {
     /// Model for this run, overriding the profile's
     #[arg(long)]
     pub model: Option<String>,
-    /// Reasoning effort for this run (for example low, medium, high), overriding the profile's
+    /// Reasoning effort for this run (low, medium, high, xhigh, max), overriding the profile's
     #[arg(long)]
     pub effort: Option<String>,
     /// Provider for this run (t3 runner: a T3 Code provider instance such as
     /// claudeAgent or codex), overriding the profile's
     #[arg(long)]
     pub provider: Option<String>,
-    /// `continue` runs the job as the next turn of the ticket's last T3 Code
-    /// thread (t3 runner), `fresh` in a new thread on that thread's branch
-    /// when it has unmerged work, overriding the profile's
+    /// `continue` runs the job as the next turn of the ticket's session of
+    /// its profile, `new` and `fresh` in a new session, overriding the
+    /// profile's
     #[arg(long, value_enum)]
     pub session: Option<crate::config::types::AgentSession>,
     /// Wait for the job to finish

@@ -523,6 +523,39 @@
         }
       }
     },
+    "/api/jobs/answer": {
+      "post": {
+        "summary": "Answer the agent job's open question",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentJobAnswerRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeAgentJobMessageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/api/tasks/list": {
       "get": {
         "summary": "List tasks",
@@ -9805,7 +9838,7 @@
           "usage": {
             "type": "object",
             "nullable": true,
-            "description": "What the job used, as its CLI reports it (missing values were not reported). Claude: tokens, cost, turns; Codex: tokens; Copilot: premium requests and changed lines; Gemini: tokens.",
+            "description": "What the job used, as its agent reports it (missing values were not reported): tokens and turns, and cost where the agent reports one.",
             "properties": {
               "input_tokens": { "type": "integer", "description": "All input tokens, including cached ones" },
               "cached_input_tokens": { "type": "integer" },
@@ -9816,6 +9849,10 @@
               "lines_added": { "type": "integer" },
               "lines_removed": { "type": "integer" }
             }
+          },
+          "question": {
+            "$ref": "#/components/schemas/AgentJobQuestion",
+            "description": "The agent's permission request that waits for an answer (profile on_permission: ask)."
           }
         },
         "required": [
@@ -10018,6 +10055,34 @@
           "id",
           "message"
         ]
+      },
+      "AgentJobAnswerRequest": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "request": { "type": "string", "description": "AgentJob.question.request" },
+          "option": { "type": "string", "description": "One of AgentJob.question.options[].id" }
+        },
+        "required": ["id", "request", "option"]
+      },
+      "AgentJobQuestion": {
+        "type": "object",
+        "description": "A permission request of a job's agent, waiting for an answer.",
+        "properties": {
+          "request": { "type": "string" },
+          "title": { "type": "string" },
+          "options": { "type": "array", "items": { "$ref": "#/components/schemas/AgentJobQuestionOption" } }
+        },
+        "required": ["request", "title", "options"]
+      },
+      "AgentJobQuestionOption": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "kind": { "type": "string", "description": "allow_once, allow_always, reject_once or reject_always" }
+        },
+        "required": ["id", "name", "kind"]
       },
       "AgentJobMessageResponse": {
         "type": "object",

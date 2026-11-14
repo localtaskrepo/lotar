@@ -1,7 +1,9 @@
 # Harness tool design
 
 Design for DEV-492, 2026-11-13. Status: approved by the owner on 2026-11-13; built as
-[localtaskrepo/harnessmux](https://github.com/localtaskrepo/harnessmux) (DEV-504). lotar's switch to it is DEV-503.
+[localtaskrepo/harnessmux](https://github.com/localtaskrepo/harnessmux) (DEV-504). lotar runs its agent jobs through it since
+DEV-503 (harnessmux 0.1.1); [Agent Jobs](../help/agent.md#runners) describes how. The "What lotar has today" section below
+is the state before that switch.
 
 The owner, 2026-11-13: "Why not pull it out and put it in its own repo next to lotar as a tool that allows
 multiplexing between harnesses. Then lotar can use, we can use it, any other app that needs it could use it. And we

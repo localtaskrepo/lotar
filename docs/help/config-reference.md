@@ -44,19 +44,19 @@ CLI > env > project > home > global > defaults (commands without a project skip 
 - All `agent.worktree.*` settings can be changed with `config set` (global or per project) using their flat names: `agent_worktree_enabled`, `agent_worktree_dir`, `agent_worktree_branch_prefix`, `agent_worktree_max_parallel_jobs`, `agent_worktree_cleanup_on_done`, `agent_worktree_cleanup_on_failure`, `agent_worktree_cleanup_on_cancel`, `agent_worktree_cleanup_delete_branches`, `agent_worktree_cleanup_ignored_files` and `agent_worktree_cleanup_paths`, or on the Config page under Agents. An empty value clears a project override; an empty job limit means no limit.
 - agent.automation: retired. Old files that still have this block load fine and keep it as written, but it does nothing and `lotar config validate` warns and prints the equivalent rule. Agent job status changes and reassignment are `job_started` / `job_completed` / `job_failed` / `job_cancelled` rules in the automation file; see [Automation Rules](./automation.md#agent-job-queueing). The `agent_on_*` keys of `config set` were removed.
 - agents: map (named agent CLI profiles; values may be a runner string or a full object)
-  - agents.<name>.runner: `claude` | `codex` | `copilot` | `gemini` | `cursor` | `amp` | `droid` | `opencode` | `kilo` | `antigravity` | `t3` | `command`
+  - agents.<name>.runner: `claude` | `codex` | `copilot` | `gemini` | `cursor` | `amp` | `droid` | `opencode` | `kilo` | `antigravity` | `t3` (the [harnessmux](https://github.com/localtaskrepo/harnessmux) agent of that name) | `command`
   - agents.<name>.permissions: `read-only` | `workspace` | `full` (default `workspace`) — what the agent may do without asking; see [Agent Jobs](./agent.md#permissions)
-  - agents.<name>.model / effort: optional strings — model and reasoning effort passed to the CLI; runs and automation actions can override them. See [Agent Jobs](./agent.md#model-and-effort)
+  - agents.<name>.on_permission: `deny` | `allow-reads` | `allow` | `ask` (default `allow-reads` for `read-only`, else `allow`) — what a job does when the agent asks for permission; `ask` shows the question in the job view. See [Messages and questions](./agent.md#messages-and-questions)
+  - agents.<name>.model / effort: optional strings — the agent's model id, and effort `low` | `medium` | `high` | `xhigh` | `max` (any value for `command`); runs and automation actions can override them. See [Agent Jobs](./agent.md#model-and-effort)
   - agents.<name>.provider: optional string — `t3` runner only: the T3 Code provider instance (`claudeAgent`, `codex`, …) the model runs on; set it together with `model`. See [T3 Code threads](./agent.md#t3-code-threads)
-  - agents.<name>.session: `new` | `continue` | `fresh` (default `new`) — `t3` runner only: `continue` runs the job as the next turn of the ticket's last T3 Code thread of the same profile (else its last thread), `fresh` starts a new thread on the branch of a last thread with unmerged work; see [Continuing the ticket's last thread](./agent.md#continuing-the-tickets-last-thread)
-  - agents.<name>.tools.allowed / tools.disallowed: string[] — extra tools to allow or deny (Claude, Copilot); see [Agent Jobs](./agent.md#tools-and-mcp-servers)
-  - agents.<name>.mcp.allow: string[] — MCP servers whose tools need no approval (Claude, Copilot)
-  - agents.<name>.command: optional string — the executable to run (default: the runner name, `agy` for `antigravity`, `cursor-agent` for `cursor`, and for `t3` `t3` on PATH or else `~/.t3/bin/t3`; required for `command`)
-  - agents.<name>.args: string[] — extra CLI arguments, after LoTaR's own flags
-  - agents.<name>.env: map — extra environment variables
+  - agents.<name>.session: `new` | `continue` | `fresh` (default `new`) — `continue` runs the job as the next turn of the ticket's session of this profile; `new` and `fresh` start a new one. See [Sessions](./agent.md#sessions)
+  - agents.<name>.tools.allowed / tools.disallowed, agents.<name>.mcp.allow: not passed (ACP agents take no tool lists); a job logs a note
+  - agents.<name>.command: string — `command` runner only: the program to run. Other runners refuse it; harnessmux's `agents.toml` sets their program
+  - agents.<name>.args: string[] — `command` runner only: the program's arguments
+  - agents.<name>.env: map — extra environment variables for the agent
   - `agents` can be set as a whole with `lotar config set agents '<json or yaml map>'` (project or `--global`); names may use letters, digits, `-`, `_` and `.`, and each runner must be one of the runners in [Agent Jobs](./agent.md#runners).
-  - agents.<name>.mcp.lotar: boolean (default false) — give the job LoTaR's own MCP server, limited to ticket tools (claude, copilot and codex)
-  - agents.<name>.max_budget_usd: number — stop a Claude run once it has cost this much (`--max-budget-usd`); ignored by other runners
+  - agents.<name>.mcp.lotar: boolean (default false) — give the job LoTaR's own MCP server, limited to ticket tools (not for `amp`, `t3` or `command`)
+  - agents.<name>.max_budget_usd: number — not passed (harnessmux has no budget limit); a job logs a note
   - agents.<name>.instructions: string | { file: string } — added after `agent.instructions` (or the built-in instructions) for this profile
 - scan.signal_words: string[] (default: [TODO, FIXME, HACK, BUG, NOTE])
 - scan.ticket_patterns: string[] (regex patterns to detect ticket keys)

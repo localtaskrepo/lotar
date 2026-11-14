@@ -90,5 +90,15 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Err(err) => bad_request(err.to_string()),
         }
     });
+
+    // POST /api/jobs/answer -> answer the agent's open question
+
+    api_server.register_handler("POST", "/api/jobs/answer", |req: &HttpRequest| {
+        let payload: crate::api_types::AgentJobAnswerRequest = try_response!(parse_body(req));
+        match crate::services::agent_job_service::AgentJobService::answer_question(&payload.id, &payload.request, &payload.option) {
+            Ok(job) => ok_json(200, json!({"data": {"accepted": true, "job": job}})),
+            Err(err) => bad_request(err.to_string()),
+        }
+    });
     // POST /api/tasks/add
 }

@@ -24,7 +24,7 @@ fn setup(body: &str, worktree: bool) -> (TestFixtures, String) {
     fs::write(&script, format!("#!/bin/sh\n{body}\n")).unwrap();
     fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
     fixture.create_config_in_dir(&fixture.tasks_root, &format!(
-        "default:\n  project: SAFE\nissue:\n  states: [Todo, Done]\nagent:\n  worktree:\n    enabled: {worktree}\n    dir: '{}'\n    max_parallel_jobs: 1\n    cleanup_on_done: true\n    cleanup_delete_branches: true\nagents:\n  safety:\n    runner: claude\n    command: '{}'\n",
+        "default:\n  project: SAFE\nissue:\n  states: [Todo, Done]\nagent:\n  worktree:\n    enabled: {worktree}\n    dir: '{}'\n    max_parallel_jobs: 1\n    cleanup_on_done: true\n    cleanup_delete_branches: true\nagents:\n  safety:\n    runner: command\n    command: '{}'\n",
         root.join("worktrees").display(), script.display()
     ));
     let task = TaskService::create(
@@ -679,7 +679,7 @@ mod git_required {
         fs::set_permissions(&merge, fs::Permissions::from_mode(0o755)).unwrap();
         let config_path = fixture.tasks_root.join("config.yml");
         let mut config: serde_yaml_ng::Value = serde_yaml_ng::from_str(&fs::read_to_string(&config_path).unwrap()).unwrap();
-        config["agents"]["merge"] = serde_yaml_ng::from_str(&format!("runner: claude\ncommand: '{}'", merge.display())).unwrap();
+        config["agents"]["merge"] = serde_yaml_ng::from_str(&format!("runner: command\ncommand: '{}'", merge.display())).unwrap();
         fs::write(&config_path, serde_yaml_ng::to_string(&config).unwrap()).unwrap();
     }
 

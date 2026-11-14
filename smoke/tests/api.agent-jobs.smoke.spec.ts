@@ -199,7 +199,7 @@ describe.concurrent('Agent job smoke tests', () => {
             {
                 gated: {
                     script: gate.script,
-                    args: gate.agentArgs({ mode: 'copilot', label: 'progress' }),
+                    args: gate.agentArgs({ mode: 'lines', label: 'progress' }),
                 },
             },
             'lotar-smoke-agents-gated-',
@@ -233,7 +233,7 @@ describe.concurrent('Agent job smoke tests', () => {
                 const createPayload = (await createResponse.json()) as JobEnvelope;
                 const jobId = createPayload.data.job.id;
                 expect(jobId).toBeTruthy();
-                expect(createPayload.data.job.runner).toBe('copilot');
+                expect(createPayload.data.job.runner).toBe('command');
                 // The creation handler spawns the worker thread before it
                 // builds the response DTO, so an immediately started job may
                 // already expose `running`. `queued` and `running` are the
@@ -269,19 +269,14 @@ describe.concurrent('Agent job smoke tests', () => {
                 // Prompt-integrity regression (DEV-101): the full job prompt
                 // (always multiline via ticket context, here also carrying
                 // CR/LF, quotes, percent signs, and cmd metacharacters) must
-                // reach the agent child byte-exact through the wrapper and
-                // the platform launcher. On Windows the launcher is a .cmd
-                // forwarder, so this asserts the wrapper's shim dispatch.
+                // reach the command runner's program byte-exact in
+                // LOTAR_AGENT_PROMPT, through the wrapper and the platform
+                // launcher (a .cmd forwarder on Windows).
                 const boot = await fs.readFile(path.join(gate.dir, 'boot-progress.sentinel'), 'utf8');
-                const bootArgv = (JSON.parse(boot) as { argv: string[] }).argv;
-                expect(
-                    bootArgv.some(
-                        (element) =>
-                            element.includes('Ticket context:') &&
-                            element.includes(`- ID: ${task.id}`) &&
-                            element.includes(HOSTILE_PROMPT),
-                    ),
-                ).toBe(true);
+                const bootPrompt = (JSON.parse(boot) as { prompt: string | null }).prompt ?? '';
+                expect(bootPrompt).toContain('Ticket context:');
+                expect(bootPrompt).toContain(`- ID: ${task.id}`);
+                expect(bootPrompt).toContain(HOSTILE_PROMPT);
 
                 await gate.release();
 
@@ -307,20 +302,16 @@ describe.concurrent('Agent job smoke tests', () => {
                 const eventKinds = entries.filter((e) => e.type === 'event').map((e) => e.kind);
 
                 expect(eventKinds).toContain('agent_job_started');
-                expect(eventKinds).toContain('agent_job_init');
                 expect(eventKinds).toContain('agent_job_progress');
-                expect(eventKinds).toContain('agent_job_message');
-                expect(eventKinds).toContain('agent_job_result');
                 expect(eventKinds).toContain('agent_job_completed');
 
-                // Verify progress events contain expected text
-                const progressEvents = entries.filter((e) => e.type === 'event' && e.kind === 'agent_job_progress');
-                expect(progressEvents.length).toBeGreaterThan(0);
-
-                // Verify message event contains expected text
-                const messageEvents = entries.filter((e) => e.type === 'event' && e.kind === 'agent_job_message');
-                expect(messageEvents.length).toBe(1);
-                expect(messageEvents[0]!.message).toContain('phase one / phase two done');
+                // Each output line of the command is a progress event.
+                const progress = entries
+                    .filter((e) => e.type === 'event' && e.kind === 'agent_job_progress')
+                    .map((e) => e.message);
+                expect(progress).toEqual(
+                    expect.arrayContaining(['bash: phase one', 'bash: phase two', 'phase one / phase two done']),
+                );
 
                 // Verify header contains job metadata
                 const header = entries.find((e) => e.type === 'header');

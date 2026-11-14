@@ -74,7 +74,8 @@ All rows below are defined inside the same override table and map directly to th
 
 | Variable | Values | Effect |
 | --- | --- | --- |
-| `LOTAR_AGENT_WRAPPER` | Absolute path | Overrides the wrapper binary used to launch agent CLIs for `list-running` discovery. |
+| `LOTAR_AGENT_WRAPPER` | Absolute path | Overrides the wrapper binary that runs `command` runner programs (and that `list-running` looks for). |
+| `HARNESSMUX_HOME` | Directory | Puts harnessmux's sessions, adapters and `agents.toml` under one directory (read by the harnessmux crate that runs agent jobs; for tests and sandboxes). |
 
 ### Automation & branching behavior
 
@@ -134,7 +135,6 @@ All rows below are defined inside the same override table and map directly to th
 | `LOTAR_MCP_AUTORELOAD` | `0`/`1` (default `1`) | Controls whether the MCP stdio server restarts when the binary changes. It watches the path `lotar` was started from, so an upgrade behind the same symlink (Homebrew) counts. |
 | `LOTAR_BINARY_WATCH_INTERVAL_MS` | Integer milliseconds (default 2000) | How often `lotar mcp` and `lotar serve --exit-on-upgrade` check whether the `lotar` binary was replaced. |
 | `LOTAR_STORAGE_LOCK_WAIT_MS` | Integer milliseconds (default 2000) | How long a change waits for a task, sprint or attachment lock another process holds before it fails with "still busy". |
-| `LOTAR_T3_POLL_INTERVAL_MS` | Integer milliseconds (default 5000) | How often an agent job reads its T3 Code thread while it waits for the thread's run to end. |
 | `LOTAR_MCP_WATCH_INTERVAL_MS` | Integer milliseconds (default 2000) | How often `lotar mcp` checks the tasks folder for changes that alter its tool list, when file-system events don't arrive. |
 | `LOTAR_MCP_TOOLS` | comma-separated tool names | Limits which tools the MCP server lists and runs; unset means all. Agent jobs with `mcp.lotar` use it. |
 | `LOTAR_DOCS_BASE_URL` | URL | Overrides the base used when rendering hyperlinks inside `lotar help`. |

@@ -2393,7 +2393,7 @@ fn tell_agent(
         if std::env::var("LOTAR_AGENT_JOB_ID").is_ok_and(|own| own == job.job_id) {
             return Ok(());
         }
-        if crate::services::agent_job_service::tell_running_job(&tasks_dir, &job, message) {
+        if crate::services::agent_job_service::tell_running_job(&job, message) {
             return Ok(());
         }
         let Some(agent) = job.agent.clone() else {

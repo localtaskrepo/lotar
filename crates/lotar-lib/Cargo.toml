@@ -28,6 +28,8 @@ flate2 = { version = "1.1.10", default-features = false, features = ["rust_backe
 
 # Optimize dependencies for smaller binaries
 [dependencies]
+harnessmux.workspace = true
+tokio.workspace = true
 # Unicode-aware \w \d \s \b, case folding and general categories (\p{L}, \p{Lu}…)
 # in every script; script/boolean/age/segment property classes (\p{Greek},
 # \p{Emoji}…) are left out to save ~180 KB (DEV-221).

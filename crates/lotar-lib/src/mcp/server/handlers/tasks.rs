@@ -113,9 +113,9 @@ fn parse_strict_ids(value: Option<&Value>, key: &str) -> Result<Vec<u32>, String
     }
 }
 
-fn parse_task_update_patch(req_id: Option<Value>, patch_val: &Value) -> Result<TaskUpdate, JsonRpcResponse> {
+fn parse_task_update_patch(req_id: Option<Value>, patch_val: &Value) -> Result<TaskUpdate, Box<JsonRpcResponse>> {
     if !patch_val.is_object() {
-        return Err(err(req_id, -32602, "Invalid patch (expected object)", None));
+        return Err(Box::new(err(req_id, -32602, "Invalid patch (expected object)", None)));
     }
 
     let mut patch = TaskUpdate::default();
@@ -170,7 +170,7 @@ fn parse_task_update_patch(req_id: Option<Value>, patch_val: &Value) -> Result<T
                 patch.tags = Some(items.iter().filter_map(|x| x.as_str().map(|s| s.to_string())).collect());
             }
             _ => {
-                return Err(err(req_id, -32602, "tags must be an array of strings or null", None));
+                return Err(Box::new(err(req_id, -32602, "tags must be an array of strings or null", None)));
             }
         }
     }
@@ -182,7 +182,7 @@ fn parse_task_update_patch(req_id: Option<Value>, patch_val: &Value) -> Result<T
                 patch.acceptance_criteria = Some(items.iter().filter_map(|x| x.as_str().map(|s| s.to_string())).collect());
             }
             _ => {
-                return Err(err(req_id, -32602, "acceptance_criteria must be an array of strings or null", None));
+                return Err(Box::new(err(req_id, -32602, "acceptance_criteria must be an array of strings or null", None)));
             }
         }
     }
@@ -193,7 +193,7 @@ fn parse_task_update_patch(req_id: Option<Value>, patch_val: &Value) -> Result<T
             value => match serde_json::from_value::<TaskRelationships>(value.clone()) {
                 Ok(rel) => patch.relationships = Some(rel),
                 Err(e) => {
-                    return Err(err(req_id, -32602, &format!("Invalid relationships payload: {}", e), None));
+                    return Err(Box::new(err(req_id, -32602, &format!("Invalid relationships payload: {}", e), None)));
                 }
             },
         }
@@ -210,7 +210,7 @@ fn parse_task_update_patch(req_id: Option<Value>, patch_val: &Value) -> Result<T
                 patch.custom_fields = Some(custom_fields_map);
             }
             _ => {
-                return Err(err(req_id, -32602, "custom_fields must be an object or null", None));
+                return Err(Box::new(err(req_id, -32602, "custom_fields must be an object or null", None)));
             }
         }
     }
@@ -222,14 +222,14 @@ fn parse_task_update_patch(req_id: Option<Value>, patch_val: &Value) -> Result<T
                 let mut ids = Vec::new();
                 for item in items {
                     let Some(id) = item.as_u64().and_then(|v| u32::try_from(v).ok()).filter(|v| *v > 0) else {
-                        return Err(err(req_id, -32602, "sprints must be an array of positive integers or null", None));
+                        return Err(Box::new(err(req_id, -32602, "sprints must be an array of positive integers or null", None)));
                     };
                     ids.push(id);
                 }
                 patch.sprints = Some(ids);
             }
             _ => {
-                return Err(err(req_id, -32602, "sprints must be an array of positive integers or null", None));
+                return Err(Box::new(err(req_id, -32602, "sprints must be an array of positive integers or null", None)));
             }
         }
     }
@@ -237,7 +237,7 @@ fn parse_task_update_patch(req_id: Option<Value>, patch_val: &Value) -> Result<T
     if let Some(value) = patch_val.get("releases") {
         match parse_strict_ids(Some(value), "releases") {
             Ok(ids) => patch.releases = Some(ids),
-            Err(msg) => return Err(err(req_id, -32602, &format!("{msg} or null"), None)),
+            Err(msg) => return Err(Box::new(err(req_id, -32602, &format!("{msg} or null"), None))),
         }
     }
 
@@ -497,7 +497,7 @@ pub(crate) fn handle_task_update(req: JsonRpcRequest) -> JsonRpcResponse {
     let patch_val = req.params.get("patch").cloned().unwrap_or(json!({}));
     let patch = match parse_task_update_patch(req.id.clone(), &patch_val) {
         Ok(patch) => patch,
-        Err(resp) => return resp,
+        Err(resp) => return *resp,
     };
 
     // Pre-validate enum strings against the task's project configuration so
@@ -658,7 +658,7 @@ pub(crate) fn handle_task_bulk_update(req: JsonRpcRequest) -> JsonRpcResponse {
     // validation happens inside TaskService against each task's project.
     let patch = match parse_task_update_patch(req.id.clone(), &patch_val) {
         Ok(patch) => patch,
-        Err(resp) => return resp,
+        Err(resp) => return *resp,
     };
 
     let mut storage = Storage::new(&resolver.path.clone());

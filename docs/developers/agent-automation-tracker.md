@@ -212,7 +212,7 @@ The following test scenarios are NOT yet covered. Most require complex setup (sp
 
 | Area | Files |
 |------|-------|
-| Runner adapters | `crates/lotar-lib/src/services/agent_runner.rs` |
+| Runner adapters | `crates/lotar-lib/src/services/agent_runner.rs` (harnessmux sessions and command runner) |
 | Job lifecycle | `crates/lotar-lib/src/services/agent_job_service.rs` |
 | Job event logs | `crates/lotar-lib/src/services/agent_log_service.rs` |
 | File-backed queue | `crates/lotar-lib/src/services/agent_queue_service.rs` |

@@ -15,7 +15,7 @@ env:
   RUST_BACKTRACE: 1
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   # Kept in sync with rust-toolchain.toml by the workflow contract test.
-  RUST_TOOLCHAIN: '1.98.1'
+  RUST_TOOLCHAIN: '1.99.1'
 
 # Cancel in-progress runs when a new commit is pushed
 concurrency:

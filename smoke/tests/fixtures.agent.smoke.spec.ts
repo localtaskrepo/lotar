@@ -78,28 +78,18 @@ function startNodeScript(script: string, args: readonly string[], timeoutMs = 60
     return startExecutable(nodeExecutable(), [script, ...args], timeoutMs);
 }
 
-function parseWireLines(stdout: string): Array<Record<string, unknown>> {
-    return stdout
-        .trim()
-        .split('\n')
-        .map((line) => JSON.parse(line) as Record<string, unknown>);
+function outputLines(stdout: string): string[] {
+    return stdout.trim().split('\n');
 }
 
 describe('agent fixture behavior', () => {
-    it('mock agent emits a Copilot CLI json run and exits zero', async () => {
+    it('mock agent prints its progress lines and exits zero', async () => {
         const child = startNodeScript(MOCK_AGENT_SCRIPT, []);
         const outcome = await child.outcome;
 
         expect(outcome.code).toBe(0);
         expect(outcome.signal).toBeNull();
-
-        const events = parseWireLines(outcome.stdout);
-        expect(events).toHaveLength(5);
-        expect(events[0]).toMatchObject({ type: 'user.message' });
-        expect(events[1]).toMatchObject({ type: 'tool.execution_start', data: { toolName: 'bash' } });
-        expect(events[2]).toMatchObject({ type: 'assistant.message', data: { content: 'Hello from mock agent!' } });
-        expect(events[4]).toMatchObject({ type: 'result', exitCode: 0 });
-        expect(events[4]?.sessionId).toEqual(expect.any(String));
+        expect(outputLines(outcome.stdout)).toEqual(['bash: echo Hello', 'Hello from mock agent!']);
     });
 
     it('mock agent honors a requested non-zero exit code', async () => {
@@ -107,16 +97,14 @@ describe('agent fixture behavior', () => {
         const outcome = await child.outcome;
 
         expect(outcome.code).toBe(7);
-        const events = parseWireLines(outcome.stdout);
-        expect(events).toHaveLength(5);
-        expect(events[4]).toMatchObject({ type: 'result', exitCode: 7 });
+        expect(outputLines(outcome.stdout)).toHaveLength(2);
     });
 
     it('gate agent holds until released, then completes with both phases', async () => {
         const gate = await createGateFixture('fixture-gate-');
         let child: TrackedScript | undefined;
         try {
-            child = startNodeScript(GATE_AGENT_SCRIPT, gate.agentArgs({ mode: 'copilot', label: 'probe' }));
+            child = startNodeScript(GATE_AGENT_SCRIPT, gate.agentArgs({ mode: 'lines', label: 'probe' }));
 
             // Wait for the started sentinel or the child's exit, whichever
             // comes first; the bound only guards against a hang, since
@@ -134,13 +122,11 @@ describe('agent fixture behavior', () => {
             const outcome = await child.outcome;
 
             expect(outcome.code).toBe(0);
-            const events = parseWireLines(outcome.stdout);
-            expect(events[0]).toMatchObject({ type: 'user.message' });
-            expect(events[1]).toMatchObject({ data: { toolName: 'bash', arguments: { command: 'phase one' } } });
-            expect(events).toContainEqual(
-                expect.objectContaining({ type: 'assistant.message', data: { content: 'phase one / phase two done' } }),
-            );
-            expect(events[events.length - 1]).toMatchObject({ type: 'result', exitCode: 0 });
+            expect(outputLines(outcome.stdout)).toEqual([
+                'bash: phase one',
+                'bash: phase two',
+                'phase one / phase two done',
+            ]);
 
             await gate.waitForCompleted('probe', 5_000);
             expect(await gate.drain(1_000)).toEqual([]);
@@ -171,8 +157,7 @@ describe('agent fixture behavior', () => {
 
         try {
             const launcher = fixtureAgents.command('mock');
-            // Mirror the product's copilot spawn shape: the prompt and base
-            // flags precede any profile args. Node's CLI would reject
+            // Leading flags the fixture doesn't know: Node's CLI would reject
             // --output-format, so this proves the launcher (not the raw node
             // executable) is the configured command.
             const runnerArgs = ['-p', 'ignored prompt text', '--output-format', 'json', '--no-ask-user'];
@@ -184,10 +169,7 @@ describe('agent fixture behavior', () => {
 
             expect(outcome.code).toBe(0);
             expect(outcome.signal).toBeNull();
-            const events = parseWireLines(outcome.stdout);
-            expect(events).toHaveLength(5);
-            expect(events[0]).toMatchObject({ type: 'user.message' });
-            expect(events[4]).toMatchObject({ type: 'result', exitCode: 0 });
+            expect(outputLines(outcome.stdout)).toHaveLength(2);
         } finally {
             await fixtureAgents.dispose();
         }
@@ -207,7 +189,7 @@ describe('agent fixture behavior', () => {
                 agents: Record<string, { runner: string; command: string; args?: string[]; description?: string }>;
             };
 
-            expect(agents.agents.ok?.runner).toBe('copilot');
+            expect(agents.agents.ok?.runner).toBe('command');
             expect(agents.agents.ok?.command).toBe(fixtureAgents.command('ok'));
             expect(agents.agents.ok?.args).toBeUndefined();
             expect(agents.agents.ok?.description).toBe('completes');

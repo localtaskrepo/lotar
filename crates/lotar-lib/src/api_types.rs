@@ -746,9 +746,31 @@ pub struct AgentJob {
     /// Reasoning effort the run was asked to use, when one was set.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub effort: Option<String>,
-    /// Tokens, cost and similar as reported by the CLI, once known.
+    /// Tokens, cost and similar as reported by the agent, once known.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub usage: Option<AgentJobUsage>,
+    /// The agent's permission request that waits for an answer (profile
+    /// `on_permission: ask`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub question: Option<AgentJobQuestion>,
+}
+
+/// A permission request of a job's agent, waiting for an answer (DEV-503).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJobQuestion {
+    pub request: String,
+    pub title: String,
+    pub options: Vec<AgentJobQuestionOption>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJobQuestionOption {
+    pub id: String,
+    pub name: String,
+    /// allow_once, allow_always, reject_once or reject_always.
+    pub kind: String,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -1037,6 +1059,17 @@ pub struct AgentJobLogsResponse {
 pub struct AgentJobMessageRequest {
     pub id: String,
     pub message: String,
+}
+
+/// Answers the job's open question (`AgentJob.question`) with one of its options.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJobAnswerRequest {
+    pub id: String,
+    /// `AgentJob.question.request`.
+    pub request: String,
+    /// One of `AgentJob.question.options[].id`.
+    pub option: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

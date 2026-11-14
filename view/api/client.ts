@@ -6,6 +6,7 @@ import type {
     TaskMoveResponse,
     ActivityFeedItem,
     AgentJobCancelAllResponse,
+    AgentJobAnswerRequest,
     AgentJobCancelResponse,
     AgentJobCreateRequest,
     AgentJobCreateResponse,
@@ -485,6 +486,9 @@ export const api = {
     },
     sendAgentJobMessage(payload: AgentJobMessageRequest): Promise<AgentJobMessageResponse> {
         return post('/api/jobs/message', payload)
+    },
+    answerAgentJob(payload: AgentJobAnswerRequest): Promise<AgentJobMessageResponse> {
+        return post('/api/jobs/answer', payload)
     },
 
     // Agent profiles

@@ -150,62 +150,69 @@ pub struct AgentMcpConfig {
     pub lotar: bool,
 }
 
-/// What an agent run may do without asking (DEV-199). LoTaR maps the level
-/// onto each CLI's own permission flags, unless the profile's `args` already
-/// pass that CLI's permission flags.
+/// What an agent run may do without asking (DEV-199). harnessmux maps the
+/// level onto each agent's own mode (DEV-503).
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 #[serde(rename_all = "kebab-case")]
 pub enum AgentPermissions {
     /// Read and plan only; no edits or commands that change anything.
     ReadOnly,
-    /// Edit files and run commands in the job's working directory (sandboxed
-    /// where the CLI supports it). The default.
+    /// Edit files and run commands in the job's working directory. The
+    /// default.
     #[default]
     Workspace,
     /// Approve everything, without sandboxing. Only for isolated machines.
     Full,
 }
 
-/// Which agent session a job runs in (DEV-368).
+/// Which agent session a job runs in (DEV-368, DEV-503).
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default, clap::ValueEnum)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 #[serde(rename_all = "kebab-case")]
 pub enum AgentSession {
-    /// A new session (for `t3`, a new thread). The default.
+    /// A new session. The default.
     #[default]
     New,
-    /// The next turn of the session of the ticket's last job of the same
-    /// profile (else its last job, DEV-472), where the
-    /// runner can continue one (`t3`); otherwise a new session.
+    /// The next turn of the ticket's session of the same agent profile (the
+    /// harnessmux session `<ticket>-<profile>`), when it exists and runs the
+    /// same agent; otherwise a new session.
     Continue,
-    /// A new session, also when the ticket's last `t3` thread holds
-    /// unmerged work: a new thread on that thread's branch instead of its
-    /// next turn, whatever its provider and model (DEV-414). For a
-    /// reviewer that must not check its own work.
+    /// A new session, like `new`. For a reviewer that must not check its own
+    /// work.
     Fresh,
 }
 
-/// The CLI an agent profile runs.
+/// What a job does when its agent asks for permission (DEV-503).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+#[serde(rename_all = "kebab-case")]
+pub enum AgentPermissionPolicy {
+    Deny,
+    /// Allow reads, deny the rest. The default for `read-only`.
+    AllowReads,
+    /// The default for `workspace` and `full`, whose agent modes already limit
+    /// what the agent asks for.
+    Allow,
+    /// Show the request as a question in the job view and wait for an answer.
+    Ask,
+}
+
+/// What an agent profile runs: the harnessmux agent of the same name, or
+/// `command`, a program of the profile's own (DEV-503).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AgentRunnerKind {
     Codex,
     Claude,
     Copilot,
     Gemini,
-    /// Cursor CLI (`cursor-agent -p`); from its docs, not run live.
     Cursor,
-    /// Sourcegraph Amp (`amp -x --stream-json`); from its docs, not run live.
     Amp,
-    /// Factory Droid (`droid exec -o json`); from its docs, not run live.
     Droid,
-    /// OpenCode (`opencode run --format json`); from its docs, not run live.
     Opencode,
-    /// Kilo Code CLI, an OpenCode fork (`kilo run --format json`); not run live.
     Kilo,
-    /// Google Antigravity CLI (`agy -p --output-format stream-json`); not run live.
     Antigravity,
-    /// A T3 Code thread (`t3 thread start … --wait`), DEV-318.
+    /// T3 Code threads, through T3's CLI.
     T3,
     Command,
 }
@@ -225,15 +232,6 @@ impl AgentRunnerKind {
             Self::Antigravity => "antigravity",
             Self::T3 => "t3",
             Self::Command => "command",
-        }
-    }
-
-    /// The program LoTaR runs when a profile sets no `command`.
-    pub fn default_program(&self) -> &'static str {
-        match self {
-            Self::Cursor => "cursor-agent",
-            Self::Antigravity => "agy",
-            other => other.as_str(),
         }
     }
 
@@ -283,25 +281,31 @@ pub struct AgentProfileDetail {
     /// Defaults to `workspace` when omitted.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub permissions: Option<AgentPermissions>,
-    /// Model passed to the CLI (for example `sonnet`, `gpt-5.5`).
+    /// Model as the agent lists it (for example `sonnet`, `gpt-5.5`).
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub model: Option<String>,
-    /// Reasoning effort passed to the CLI (for example `low`, `high`).
+    /// Reasoning effort: low, medium, high, xhigh or max (any value for
+    /// `command`).
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub effort: Option<String>,
-    /// Provider the CLI runs the model on. Only the t3 runner uses it: a
-    /// T3 Code provider instance id such as `claudeAgent` or `codex`.
+    /// Provider the model runs on. Only the t3 runner uses it: a T3 Code
+    /// provider instance id such as `claudeAgent` or `codex`.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub provider: Option<String>,
-    /// `continue` runs the job in the ticket's last session (t3 runner).
+    /// `continue` runs the job in the ticket's session of this profile.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub session: Option<AgentSession>,
-    /// Stop a run once it has cost this many US dollars (Claude only:
-    /// `--max-budget-usd`).
+    /// What the job does when the agent asks for permission.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub on_permission: Option<AgentPermissionPolicy>,
+    /// Not passed since DEV-503: harnessmux has no budget limit. The job log
+    /// says so.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub max_budget_usd: Option<f64>,
+    /// The program of a `command` runner; other runners refuse it.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub command: Option<String>,
+    /// The `command` runner's arguments; other runners refuse them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub args: Vec<String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]

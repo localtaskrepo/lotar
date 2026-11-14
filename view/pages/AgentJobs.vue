@@ -179,6 +179,26 @@
                 </button>
               </div>
 
+              <div
+                v-if="job.question && job.status === 'running'"
+                class="job-question"
+                role="group"
+                :aria-label="`The agent asks: ${job.question.title}`"
+              >
+                <p class="job-question__title">The agent asks: {{ job.question.title }}</p>
+                <div class="job-question__options">
+                  <UiButton
+                    v-for="option in job.question.options"
+                    :key="option.id"
+                    type="button"
+                    :variant="option.kind.startsWith('allow') ? 'primary' : 'ghost'"
+                    @click="answerQuestion(job, option.id)"
+                  >
+                    {{ option.name }}
+                  </UiButton>
+                </div>
+              </div>
+
               <div v-if="isLogsOpen(job.id)" class="log-panel">
                 <div v-if="logsLoading[job.id]" class="muted">Loading logs…</div>
                 <div v-else-if="logsError[job.id]" class="error">{{ logsError[job.id] }}</div>
@@ -414,8 +434,8 @@ function jobTiming(job: AgentJob) {
 
 const isLongSummary = (text: string) => text.length > 280 || text.split('\n').length > 3
 
-// Messages reach a running job through its stdin, which only Claude keeps open.
-const canMessage = (job: AgentJob) => job.status === 'running' && job.runner === 'claude'
+// A message is the next turn of the job's session; a command runner has none.
+const canMessage = (job: AgentJob) => job.status === 'running' && job.runner !== 'command'
 
 function openRunDialog(prefill: { ticket?: string; agent?: string | null } = {}) {
   runDialog.ticket = prefill.ticket
@@ -507,6 +527,7 @@ function updateFromEvent(payload: AgentJobEventPayload | null, kind: string) {
     model: payload.model || null,
     effort: payload.effort || null,
     usage: payload.usage || null,
+    question: payload.question ?? null,
   }
   mergeJob(next)
   recentEventJobs.set(next.id, { job: next, seq: ++eventSeq })
@@ -692,6 +713,16 @@ async function sendMessage(id: string) {
   }
 }
 
+async function answerQuestion(job: AgentJob, option: string) {
+  if (!job.question) return
+  try {
+    const response = await api.answerAgentJob({ id: job.id, request: job.question.request, option })
+    mergeJob(response.job)
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : String(err)
+  }
+}
+
 function openTask(taskId: string) {
   openTaskPanel({ taskId })
 }
@@ -708,6 +739,7 @@ function setupSse() {
       'agent_job_progress',
       'agent_job_message',
       'agent_job_input',
+      'agent_job_question',
       'agent_job_result',
       'agent_job_completed',
       'agent_job_failed',
@@ -733,6 +765,7 @@ function setupSse() {
     'agent_job_progress',
     'agent_job_message',
     'agent_job_input',
+    'agent_job_question',
     'agent_job_result',
     'agent_job_completed',
     'agent_job_failed',
@@ -1189,6 +1222,26 @@ onBeforeUnmount(() => {
 
 .job-message {
   display: flex;
+  gap: 8px;
+}
+
+.job-question {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-warning);
+  border-radius: 6px;
+}
+
+.job-question__title {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.job-question__options {
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 

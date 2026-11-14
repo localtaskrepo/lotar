@@ -149,43 +149,6 @@ fn agent_jobs_get_the_running_lotar_binary() {
     assert_eq!(std::fs::canonicalize(parts[2]).unwrap(), expected.parent().unwrap(), "the running build's directory comes first on PATH");
 }
 
-/// The runner's final answer is the job summary even when a note (denied
-/// tools) is logged just before it. The stub runner is a shell script.
-#[cfg(unix)]
-#[test]
-fn agent_job_summary_is_the_final_answer() {
-    let fixtures = TestFixtures::new();
-    let root = fixtures.get_temp_path();
-    let _tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", fixtures.tasks_root.to_string_lossy().as_ref());
-    let _silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
-    let stub = root.join("claude-stub.sh");
-    std::fs::write(
-        &stub,
-        r#"#!/bin/sh
-cat > /dev/null &
-echo '{"type":"system","subtype":"init","session_id":"s1"}'
-echo '{"type":"assistant","message":{"content":[{"type":"text","text":"Fixed it."}]},"session_id":"s1"}'
-echo '{"type":"result","subtype":"success","is_error":false,"result":"Fixed it.","permission_denials":[{"tool_name":"Bash","tool_input":{"command":"git push"}}],"session_id":"s1"}'
-"#,
-    )
-    .unwrap();
-    use std::os::unix::fs::PermissionsExt;
-    std::fs::set_permissions(&stub, std::fs::Permissions::from_mode(0o755)).unwrap();
-    fixtures.create_config_in_dir(
-        &fixtures.tasks_root,
-        &format!("default:\n  project: TEST\nagents:\n  fixer:\n    runner: claude\n    command: \"{}\"\n", stub.display()),
-    );
-    crate::common::lotar_cmd().unwrap().current_dir(root).args(["add", "Summary"]).assert().success();
-    crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(root)
-        .args(["agent", "run", "TEST-1", "go", "--agent", "fixer", "--wait"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Fixed it."))
-        .stdout(predicate::str::contains("denied").not());
-}
-
 /// Job logs are kept by default (DEV-211), so a finished job can be looked up
 /// from another process without configuring agent.logs_dir.
 #[test]

@@ -28,9 +28,9 @@ fn domain_error(req_id: Option<Value>, error: &LoTaRError) -> JsonRpcResponse {
     domain_service_error(req_id, "Release request failed", error)
 }
 
-fn resolve(req_id: &Option<Value>, root: &std::path::Path, params: &Value) -> Result<ReleaseRecord, JsonRpcResponse> {
-    let reference = release_param(params).map_err(|message| err(req_id.clone(), -32602, message, None))?;
-    ReleaseService::resolve(root, &reference).map_err(|error| domain_error(req_id.clone(), &error))
+fn resolve(req_id: &Option<Value>, root: &std::path::Path, params: &Value) -> Result<ReleaseRecord, Box<JsonRpcResponse>> {
+    let reference = release_param(params).map_err(|message| Box::new(err(req_id.clone(), -32602, message, None)))?;
+    ReleaseService::resolve(root, &reference).map_err(|error| Box::new(domain_error(req_id.clone(), &error)))
 }
 
 fn mutation_result(req_id: Option<Value>, root: &std::path::Path, record: &ReleaseRecord, changed: bool) -> JsonRpcResponse {

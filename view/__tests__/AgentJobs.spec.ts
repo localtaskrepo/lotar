@@ -18,6 +18,7 @@ vi.mock('../api/client', () => ({
         cancelAgentJob: vi.fn(),
         cancelAllAgentJobs: vi.fn(),
         sendAgentJobMessage: vi.fn(),
+        answerAgentJob: vi.fn(),
         listAgentProfiles: vi.fn(),
         getTask: vi.fn(),
         runAgentJob: vi.fn(),
@@ -1064,9 +1065,10 @@ describe('AgentJobs page context and actions', () => {
         }
     })
 
-    it('offers the message box only for running Claude jobs', async () => {
-        const claudeJob = job('job-claude', { runner: 'claude', created_at: '2026-10-08T10:00:05.000Z' })
-        ;(api.listAgentJobs as any).mockResolvedValue({ jobs: [runningJob, claudeJob], queue_stats: null })
+    it('offers the message box for running agent sessions, not for commands', async () => {
+        const commandJob = job('job-command', { runner: 'command', created_at: '2026-10-08T10:00:05.000Z' })
+        const claudeJob = job('job-claude', { runner: 'claude', created_at: '2026-10-08T10:00:06.000Z' })
+        ;(api.listAgentJobs as any).mockResolvedValue({ jobs: [commandJob, claudeJob], queue_stats: null })
         const wrapper = await mountAgentJobs()
         try {
             for (const button of wrapper.findAll('button').filter((b) => b.text() === 'Show logs')) {
@@ -1075,6 +1077,34 @@ describe('AgentJobs page context and actions', () => {
             await flushPromises()
             const boxes = wrapper.findAll('.job-card').map((card) => card.find('.job-message').exists())
             expect(boxes).toEqual([false, true])
+        } finally {
+            wrapper.unmount()
+        }
+    })
+
+    it("shows the agent's question and answers it with the chosen option", async () => {
+        const asking = job('job-asking', {
+            runner: 'claude',
+            question: {
+                request: 'req-1',
+                title: 'Edit notes.md',
+                options: [
+                    { id: 'allow', name: 'Allow', kind: 'allow_once' },
+                    { id: 'reject', name: 'Reject', kind: 'reject_once' },
+                ],
+            },
+        })
+        ;(api.listAgentJobs as any).mockResolvedValue({ jobs: [asking], queue_stats: null })
+        ;(api.answerAgentJob as any).mockResolvedValue({ accepted: true, job: { ...asking, question: null } })
+        const wrapper = await mountAgentJobs()
+        try {
+            const question = wrapper.find('.job-question')
+            expect(question.text()).toContain('The agent asks: Edit notes.md')
+            const reject = question.findAll('button').find((button) => button.text() === 'Reject')
+            await reject!.trigger('click')
+            await flushPromises()
+            expect(api.answerAgentJob).toHaveBeenCalledWith({ id: 'job-asking', request: 'req-1', option: 'reject' })
+            expect(wrapper.find('.job-question').exists()).toBe(false)
         } finally {
             wrapper.unmount()
         }

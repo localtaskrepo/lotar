@@ -267,7 +267,7 @@ maintenance and does not itself request a status change or agent launch.
 
 ### Agent run settings
 
-When an action hands the ticket to an agent profile, `agent` sets how that job runs: `model`, `effort`, `provider` and `session` (for the [`t3` runner](agent.md#t3-code-threads)) and `prompt`. `session: continue` runs the job as the next turn of the ticket's last T3 Code thread of the same profile (else its last thread), in its worktree (see [Continuing the ticket's last thread](agent.md#continuing-the-tickets-last-thread)); `session: fresh` starts a new thread on that thread's branch when it holds unmerged work, even on the same provider and model, for a reviewer that shouldn't check its own work as a further turn of the author's thread. Each value overrides the profile's own; leave one out to keep the profile's. `prompt` replaces the default request ("work on the ticket") and accepts the same templates as comments. Settings on an action that doesn't assign an agent have no effect.
+When an action hands the ticket to an agent profile, `agent` sets how that job runs: `model`, `effort`, `provider` (for the [`t3` runner](agent.md#t3-code-threads)), `session` and `prompt`. `session: continue` runs the job as the next turn of the ticket's session of the same profile (see [Sessions](agent.md#sessions)); `session: fresh` starts a new session, for a reviewer that shouldn't check its own work. Each value overrides the profile's own; leave one out to keep the profile's. `prompt` replaces the default request ("work on the ticket") and accepts the same templates as comments. Settings on an action that doesn't assign an agent have no effect.
 
 ```yaml
 - name: Hand over to testing
@@ -317,8 +317,8 @@ A merge that runs in the fix agent's thread, with its context, instead of a thre
 
 `tell_agent` hands a message to the ticket's agent, so a comment (or any other event) reaches the agent that works on the ticket:
 
-- A job runs on the ticket: the message is queued to it. A [`t3`](agent.md#t3-code-threads) job sends it to its thread as the next turn once the current turn ends, still in the same job, so the `job_completed` rules run after the agent has dealt with it. A job that runs [in another process](agent.md#jobs-in-other-processes) gets it too. Claude jobs of the same process get it on stdin; for other runners a job with the message is queued and starts when the running one ends.
-- No job runs: the ticket goes to its agent, which starts with the message as its prompt, as the next turn of the ticket's last T3 Code thread where there is one (as `session: continue` does). The ticket's agent is its assignee when that is an agent profile, else the profile in `agent`, else the last agent profile it was assigned to. Without any of them the action fails and says so. Name `agent` when the last profile may be the wrong one: a ticket a merge agent handed back was last assigned to `@merge`.
+- A job runs on the ticket: the message is queued as its session's next turn, still in the same job, so the `job_completed` rules run after the agent has dealt with it. A job that runs [in another process](agent.md#jobs-in-other-processes) gets it too, through its session. For a `command` job, a job with the message is queued and starts when the running one ends.
+- No job runs: the ticket goes to its agent, which starts with the message as its prompt, as the next turn of the ticket's session of that profile where there is one (as `session: continue` does). The ticket's agent is its assignee when that is an agent profile, else the profile in `agent`, else the last agent profile it was assigned to. Without any of them the action fails and says so. Name `agent` when the last profile may be the wrong one: a ticket a merge agent handed back was last assigned to `@merge`.
 
 `message` takes the same templates as comments; `agent` (optional) is a profile name, with or without `@`. The `model`, `effort` and `provider` of the action's `agent` settings apply to a job it starts.
 
@@ -413,7 +413,7 @@ Available variables:
 | `ticket.*` | `id`, `title`, `status`, `priority`, `type`, `assignee`, `reporter`, `description`, `due_date`, `effort`, `tags`, `field:<name>` |
 | `previous.*` | Same as `ticket.*` but for the pre-change state (available on the update-derived hooks `updated`, `assigned`, `sprint_changed`, `release_changed`, and the legacy `start`, which also covers task creation where no prior state exists; not available on `commented` or job hooks) |
 | `comment.*` | `text`, `author` (available on `commented` events; `author` is empty for a comment without one) |
-| `agent.*` | `job_id`, `runner`, `profile`, `worktree_path`, `worktree_branch` (available on job events); after a job ends also `usage`, `cost_usd`, `input_tokens`, `output_tokens`, `turns` when the CLI reported them |
+| `agent.*` | `job_id`, `runner`, `profile`, `worktree_path`, `worktree_branch` (available on job events); after a job ends also `usage`, `cost_usd`, `input_tokens`, `output_tokens`, `turns` when the agent reported them |
 | `unblocked.*` | `by` (the prerequisites with their titles: `DEV-1 (Docs), DEV-2 (Release v1.4.0)`) and `ids` (`DEV-1,DEV-2`), on `unblocked` events |
 
 Lists take a selector in square brackets. `[*]` joins every item with ", ", a number picks one item (`[0]` is the first, `[-1]` the last), and `.field` reads a field of each item:
@@ -474,7 +474,7 @@ automation:
 
 A ticket that waits for others (`depends_on`, or another ticket's `blocks`) gets the `unblocked` event when the last of them reaches a done state. Each prerequisite counts as done by its own project's [done states](config.md#done-states), the same way agent assignment checks dependencies. Every way of closing one fires it: the CLI, the web UI, REST, MCP, a rule's `set` (from `lotar automation run` too) and the status an agent job ends with. It fires once per close: closing a prerequisite that is already done, or one while others are still open, does nothing; a ticket that is done itself is skipped.
 
-The rule decides what happens, usually starting the ticket's agent with a prompt that says what it waited for. `session: continue` makes the job the next turn of the ticket's last T3 Code thread, so the agent picks up where it stopped:
+The rule decides what happens, usually starting the ticket's agent with a prompt that says what it waited for. `session: continue` makes the job the next turn of the ticket's session of that profile, so the agent picks up where it stopped:
 
 ```yaml
 automation:

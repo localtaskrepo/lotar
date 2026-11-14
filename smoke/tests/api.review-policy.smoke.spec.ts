@@ -268,7 +268,7 @@ describe('REST reviewer active-job boundary (DEV-128)', () => {
         const gate = await createGateFixture('lotar-smoke-review-gate-');
         try {
             const agents = await createFixtureAgents({
-                gated: { script: gate.script, args: gate.agentArgs({ mode: 'copilot', label: 'review' }) },
+                gated: { script: gate.script, args: gate.agentArgs({ mode: 'lines', label: 'review' }) },
             });
             try {
                 const workspace = await SmokeWorkspace.create({

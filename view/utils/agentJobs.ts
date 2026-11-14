@@ -12,8 +12,7 @@ export interface LogEntryView {
     mono: boolean
 }
 
-// Runner tool summaries look like "Bash: npm test", "Read: src/a.rs" or
-// "Run: bash -lc '…'" (see agent_runner::tool_summary).
+// Tool calls are logged as "Tool: <title>" (agent_job_service::drive_session).
 const TOOL_LINE = /^[A-Za-z_][\w.-]*: /
 
 /** A tool-call summary rather than prose; shown as plain text, not markdown. */
@@ -31,6 +30,8 @@ export function describeLogEntry(entry: AgentJobLogEntry): LogEntryView {
             return { label: 'Agent', text, tone: 'agent', mono: false }
         case 'agent_job_input':
             return { label: 'You', text, tone: 'user', mono: false }
+        case 'agent_job_question':
+            return { label: 'Question', text, tone: 'warning', mono: false }
         case 'agent_job_result':
             return { label: 'Result', text, tone: 'neutral', mono: false }
         case 'agent_job_completed':

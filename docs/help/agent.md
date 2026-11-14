@@ -1,6 +1,6 @@
 # Agent Jobs
 
-LoTaR can orchestrate supported agent CLIs (Claude Code, Codex CLI, Copilot CLI, Gemini CLI and the others listed under [Runners](#runners)) and stream progress over SSE.
+LoTaR runs agent CLIs (Claude Code, Codex CLI, Copilot CLI, T3 Code and the others listed under [Runners](#runners)) on tickets through [harnessmux](https://github.com/localtaskrepo/harnessmux) sessions and streams their progress over SSE.
 
 ## CLI commands
 
@@ -23,30 +23,60 @@ Agent profiles defined in the repository's config files only start after you tru
 
 ## Runners
 
-Each agent profile names a runner. LoTaR starts the CLI headless, reads its JSON event stream, and shows tool calls as progress and the agent's replies as messages.
+Each agent profile names a runner. Every runner except `command` is the [harnessmux](https://github.com/localtaskrepo/harnessmux) agent of the same name: LoTaR runs the job as a harnessmux session over the Agent Client Protocol (ACP), which maps the profile's model, effort and permissions onto each agent and reports tool calls, replies, permission requests and usage the same way for all of them.
 
-| Runner | Checked against | How LoTaR starts it |
-| --- | --- | --- |
-| `claude` | Claude Code 2.1.308 | `claude -p --output-format stream-json --input-format stream-json --verbose`; the prompt goes to stdin, so you can send messages while it runs |
-| `codex` | Codex CLI 0.163 | `codex exec --json … <prompt>` |
-| `copilot` | GitHub Copilot CLI 1.0.69 | `copilot -p <prompt> --output-format json --no-ask-user …` |
-| `gemini` | Gemini CLI headless docs (not run live) | `gemini --output-format stream-json … -p <prompt>` |
-| `cursor` | Cursor CLI docs (not run live) | `cursor-agent -p --output-format stream-json --trust … <prompt>`; set `command: agent` if your install only has the newer `agent` binary |
-| `amp` | Amp execute-mode docs (not run live) | `amp --stream-json … -x <prompt>` |
-| `droid` | Factory Droid `droid exec` docs (not run live) | `droid exec --output-format json … <prompt>`; output arrives when the run ends, so there is no live progress |
-| `opencode` | OpenCode CLI docs (not run live) | `opencode run --format json … <prompt>` |
-| `kilo` | Kilo Code CLI (an OpenCode fork; not run live) | `kilo run --format json … <prompt>` |
-| `antigravity` | Antigravity CLI headless docs (not run live) | `agy --output-format stream-json --disable-slash-commands … -p <prompt>` |
-| `t3` | T3 Code 0.1.9 | `t3 thread start . - --title "<ID> <title>" … --wait`, the prompt on stdin; the job is a [T3 Code thread](#t3-code-threads) |
-| `command` | any program | runs `command` with `args`; the prompt is in `LOTAR_AGENT_PROMPT` |
+| Runner | harnessmux agent |
+| --- | --- |
+| `claude` | Claude Code through its ACP adapter (`claude-agent-acp`) |
+| `codex` | Codex CLI through its ACP adapter (`codex-acp`) |
+| `copilot` | GitHub Copilot CLI (`copilot --acp`) |
+| `gemini`, `cursor`, `droid`, `opencode`, `kilo`, `antigravity` | each CLI's own ACP mode |
+| `amp` | Amp's headless stream (Amp has no ACP mode; no resume) |
+| `t3` | a [T3 Code thread](#t3-code-threads), through T3's CLI |
+| `command` | any program: runs `command` with `args`; the prompt is in `LOTAR_AGENT_PROMPT` |
 
-The runners marked "not run live" follow each CLI's documented headless interface; their parsers are tested against the documented example events. Treat them as a starting point and report differences you see with a real install; the research behind them is in [agent CLI research notes](../developers/agent-cli-research.md).
+harnessmux installs the pinned ACP adapters (Claude, Codex) with npm on first use and starts the other CLIs from `PATH`; each CLI keeps its own sign-in. Which agents ran live and which follow their docs, the adapter versions, and how to point an agent at another program are in harnessmux's README and its `agents.toml`; a user `agents.toml` (in `~/.config/harnessmux/`) overrides them without a new LoTaR build. A profile for these runners takes no `command` or `args`: the job is refused with a hint.
 
-Profile `args` come after LoTaR's flags. A job fails when the CLI exits non-zero or reports an error in its final result, even if it exits with 0.
+A job ends when its session's last turn ends: completed for a normal end, failed when the turn fails or the agent sends a known error (a missing model, a sign-in failure) as its reply.
+
+### Sessions
+
+Each job runs in the harnessmux session `<repo>-<hash>-<ticket>-<profile>` (`lotar-1a2b3c-DEV-7-fix`), or without `-<profile>` for a job without a profile, which lives where the harnessmux CLI keeps its own (`~/.local/state/harnessmux/`). The repository's folder name and a hash of its path keep two checkouts with the same ticket IDs apart. The job log names the session, and `harnessmux attach lotar-1a2b3c-DEV-7-fix` follows it from a terminal. The LoTaR process that runs the job owns the session; a minute after the job's last turn the agent stops, and the session stays resumable.
+
+- `session: new` (the default) and `session: fresh` start a new session under that name, replacing an earlier one nobody runs.
+- `session: continue` runs the job as the next turn of the ticket's session of the same profile, so a rework after a review goes back to the `@fix` session with its context. harnessmux resumes the agent's session (`session/resume`, else `session/load`). With no such session, a closed one, one of another runner or repository, or one whose working directory is gone, the job starts a new session and logs why. The continued session keeps its model and effort.
+
+Set `session` on a profile, on a rule's [`agent` settings](automation.md#agent-run-settings), with `lotar agent run --session`, or in the `session` field of `POST /api/jobs`.
+
+#### Context between phases and agents
+
+A ticket's phases often run on different agents (fix on Claude, review on Codex), each in a session of its own. Each job's prompt hands the ticket's earlier work to its agent:
+
+- **Recent context**: the ticket's last 20 prompts and agent replies, from its `.context` file next to the ticket (`agent.context_enabled`, on by default). A job adds its own when it ends, before the rules that start the next phase run, so the next agent sees them.
+- **Earlier agent sessions on this ticket**: the ticket's other harnessmux sessions in this repository, each with its agent and the path of its event log, which holds that agent's replies, tool calls and prompts. The agent reads one when the recent context leaves out something it needs.
+
+A continued session also keeps its own history in the agent.
+
+### Messages and questions
+
+A message from the Agents page, `POST /api/jobs/message`, the MCP `agent_send_message` tool, a rule's [`tell_agent`](automation.md#telling-the-tickets-agent) action or `harnessmux send <session>` is queued as the session's next turn; the job ends after the last queued turn, at most 10 turns. Another LoTaR process hands its message to the job's session over harnessmux's socket.
+
+When the agent asks for permission, the profile's `on_permission` decides:
+
+```yaml
+agents:
+  reviewer:
+    runner: claude
+    permissions: read-only
+    on_permission: ask   # deny | allow-reads | allow | ask
+```
+
+- `allow` (the default for `workspace` and `full`) and `allow-reads` (the default for `read-only`) answer without asking; the job log shows the request and the answer.
+- `ask` shows the request as a question with the agent's options on the job's card on the Agents page, as the job's `question` over REST and SSE, and as an `agent_job_question` log entry. The turn waits until someone answers (`POST /api/jobs/answer`, or the buttons on the Agents page).
 
 ### Permissions
 
-An agent runs without anyone at the keyboard, so it can't answer permission prompts. The profile's `permissions` field picks what it may do; LoTaR turns it into each CLI's own flags.
+An agent runs without anyone at the keyboard. The profile's `permissions` field picks what it may do; harnessmux turns it into the agent's own mode.
 
 ```yaml
 agents:
@@ -55,30 +85,19 @@ agents:
     permissions: read-only   # read-only | workspace (default) | full
 ```
 
-| Level | claude | codex | copilot | gemini |
-| --- | --- | --- | --- | --- |
-| `read-only` | `--permission-mode plan` | `--sandbox read-only` | all tools except write and shell | `--approval-mode plan` |
-| `workspace` | `--permission-mode acceptEdits` plus Claude's sandbox, with sandboxed shell commands allowed | `--sandbox workspace-write` | all tools except `git push` | `--approval-mode auto_edit` |
-| `full` | `--permission-mode bypassPermissions` | `--dangerously-bypass-approvals-and-sandbox` | `--allow-all` | `--approval-mode yolo` |
+| Level | claude | codex | copilot |
+| --- | --- | --- | --- |
+| `read-only` | `plan` | `read-only` | plan mode |
+| `workspace` | `acceptEdits` | `workspace-write` | agent mode |
+| `full` | `bypassPermissions` | `agent-full-access` | autopilot mode |
 
-- `workspace` lets the agent edit the job's working directory. It can also write the tasks directory (to update its ticket) and, in a worktree, the repository's `.git` directory (to commit). A merge job (profile `merge`, or a ticket in `Merging`) gets the main checkout instead of `.git`, so it can fast-forward main. These are passed as `--add-dir` (Gemini: `--include-directories`).
+- `workspace` lets the agent edit the job's working directory. It can also write the tasks directory (to update its ticket) and, in a worktree, the repository's `.git` directory (to commit). A merge job (profile `merge`, or a ticket in `Merging`) gets the main checkout instead of `.git`, so it can fast-forward main. These go to the agent as ACP `additionalDirectories`.
 - Commits from inside a sandbox can fail: Codex keeps git metadata read-only, and a signing key agent (1Password, `gpg-agent`, `ssh-agent`) is usually out of reach. LoTaR then commits the agent's changes itself when the job ends (see [Default instructions](#default-instructions)).
-- Copilot has no sandbox. At `workspace` its file tools stay in the working directory, but shell commands are not confined.
-- The newer runners map the levels to their documented options:
-
-  | Level | cursor | amp | droid | opencode, kilo | antigravity |
-  | --- | --- | --- | --- | --- | --- |
-  | `read-only` | `--mode plan` | refused (Amp has no read-only mode) | default (Droid is read-only without `--auto`) | permission config denies edit and bash | `--mode plan` |
-  | `workspace` | `--force --sandbox enabled` | Amp's defaults | `--auto medium` | `--auto` with permission config: bash allowed except `git push`, the extra directories allowed | `--mode accept-edits` plus `--add-dir` |
-  | `full` | `--force --sandbox disabled` | `--dangerously-allow-all` | `--skip-permissions-unsafe` | `--auto` with every permission allowed | `--dangerously-skip-permissions` |
-
-  OpenCode and Kilo get their permission rules through `OPENCODE_CONFIG_CONTENT`, unless the profile's `env` sets it.
-- If the profile's `args` already set permissions (for example `--permission-mode`, `--sandbox`, `--allow-tool`/`--deny-tool`, `--approval-mode` or `--yolo`), LoTaR adds no permission flags of its own.
-- `command` and `t3` runners get no permission flags; a T3 Code thread runs in its project's own runtime mode.
+- An agent without a mode for a level follows the `on_permission` policy alone; harnessmux logs a note. `command` and `t3` runners get no permissions; a T3 Code thread runs in its project's own runtime mode.
 
 ### Model and effort
 
-A profile can pick the model and reasoning effort (and, for `t3`, the provider and [session](#continuing-the-tickets-last-thread)); a single run can override them with `lotar agent run --model/--effort/--provider`, the `model`/`effort`/`provider` fields of `POST /api/jobs` and the MCP `agent_run` tool, or an automation action's [`agent` settings](automation.md#agent-run-settings).
+A profile can pick the model and reasoning effort (and, for `t3`, the provider); a single run can override them with `lotar agent run --model/--effort/--provider`, the `model`/`effort`/`provider` fields of `POST /api/jobs` and the MCP `agent_run` tool, or an automation action's [`agent` settings](automation.md#agent-run-settings).
 
 ```yaml
 agents:
@@ -92,75 +111,21 @@ agents:
     effort: medium
 ```
 
-| Runner | `model` | `effort` |
-| --- | --- | --- |
-| `claude` | `--model` | `--effort` (low, medium, high, xhigh, max) |
-| `codex` | `-m` | `-c model_reasoning_effort=<value>` (depends on the model, for example low, medium, high, xhigh) |
-| `copilot` | `--model` | `--reasoning-effort` (none, minimal, low, medium, high, xhigh, max) |
-| `gemini` | `-m` | not supported |
-| `cursor` | `--model` | not supported |
-| `amp` | not supported (Amp chooses models through its modes) | not supported |
-| `droid` | `-m` | `--reasoning-effort` |
-| `opencode`, `kilo` | `-m provider/model` | `--variant` |
-| `antigravity` | `--model` | `--effort` |
-| `t3` | `--model`, always with `--provider` (see [T3 Code threads](#t3-code-threads)) | not supported |
-| `command` | `LOTAR_AGENT_MODEL` | `LOTAR_AGENT_EFFORT` |
+- `model` is the agent's own model id, as it lists it (`harnessmux capabilities claude`); harnessmux refuses one it doesn't list.
+- `effort` is `low`, `medium`, `high`, `xhigh` or `max`, mapped to each agent's own values; an agent without effort logs a note. Any other value is refused.
+- For `command`, both are passed as given in `LOTAR_AGENT_MODEL` and `LOTAR_AGENT_EFFORT`.
 
-Values are passed through as given, so each CLI decides which names it accepts. They may use letters, digits and `. _ - : / @ [ ]`. If the profile's `args` already set the model or effort, those win over the profile's `model`/`effort` fields; a single run's override wins over both, replacing the matching flags from the profile's `args` for that run. Jobs show their model and effort in `lotar agent status`, the job list, and on the Agents page.
+Values may use letters, digits and `. _ - : / @ [ ]`. Jobs show their model and effort in `lotar agent status`, the job list, and on the Agents page.
 
 ### Usage and cost
 
-When a job ends, LoTaR records what its CLI reports about it:
+At the end of each turn LoTaR adds what the agent reports to the job's usage: input tokens (with cached), output tokens, turns, and the cost in USD where the agent reports one (Claude). The usage appears in `lotar agent status`, at the end of `lotar agent run --wait`, on the Agents page (per job, plus a cost total per ticket), in the job's `usage` field over REST, SSE and MCP, and in the job log. Automation actions on job events can use `${{agent.usage}}`, `${{agent.cost_usd}}`, `${{agent.input_tokens}}`, `${{agent.output_tokens}}` and `${{agent.turns}}`, for example to comment the cost on the ticket.
 
-| Runner | Recorded |
-| --- | --- |
-| `claude` | input tokens (with cached), output tokens, cost in USD, turns |
-| `codex` | input tokens (with cached), output tokens (including reasoning) |
-| `copilot` | premium requests, lines added and removed |
-| `gemini` | input and output tokens |
-| `amp`, `droid` | input tokens (with cached), output tokens, turns |
-| `opencode`, `kilo` | input tokens (with cached), output tokens, cost in USD, steps as turns |
-| `antigravity` | input tokens (with cached), output tokens including thinking, turns |
-| `cursor` | nothing (its output reports no usage) |
-| `t3` | nothing (T3 Code shows the thread's usage) |
-
-The usage appears in `lotar agent status`, at the end of `lotar agent run --wait`, on the Agents page (per job, plus a cost total per ticket), in the job's `usage` field over REST, SSE and MCP, and in the job log. Automation actions on job events can use `${{agent.usage}}`, `${{agent.cost_usd}}`, `${{agent.input_tokens}}`, `${{agent.output_tokens}}` and `${{agent.turns}}`, for example to comment the cost on the ticket.
-
-A Claude profile can cap what a run may spend with `max_budget_usd` (passed as `--max-budget-usd`); other CLIs have no such limit.
-
-```yaml
-agents:
-  implement:
-    runner: claude
-    max_budget_usd: 2.5
-```
-
-### Tools and MCP servers
-
-`tools` and `mcp` fine-tune what a Claude or Copilot agent may use, in that CLI's own tool syntax. They add to the permission level rather than replace it.
-
-```yaml
-agents:
-  implement:
-    runner: claude
-    tools:
-      allowed: ["WebFetch", "Bash(npm test:*)"]
-      disallowed: ["Bash(git push:*)"]
-    mcp:
-      allow: [docs]   # tools of the MCP server named "docs" need no approval
-```
-
-| Setting | claude | copilot |
-| --- | --- | --- |
-| `tools.allowed` | `--allowedTools=<tool>` | `--allow-tool=<tool>` |
-| `tools.disallowed` | `--disallowedTools=<tool>` | `--deny-tool=<tool>` |
-| `mcp.allow` | `--allowedTools=mcp__<server>` | `--allow-tool=<server>` |
-
-Codex and Gemini have no per-tool flags, so these settings don't apply to them. The MCP servers themselves come from each CLI's own configuration.
+`max_budget_usd`, `tools` and `mcp.allow` are not passed: ACP has no budget limit or tool lists. A job whose profile sets them logs a note. Limit an agent with `permissions` and `on_permission`; its own MCP servers follow its own settings.
 
 #### LoTaR's own MCP server
 
-With `mcp.lotar: true`, a job also gets LoTaR's MCP server (`lotar mcp`, the same build that started the job, bound to the job's tasks directory) under the name `lotar`, so the agent reads and updates its ticket through tools instead of the CLI:
+With `mcp.lotar: true`, a job's session also gets LoTaR's MCP server (`lotar mcp`, the same build that started the job, bound to the job's tasks directory) under the name `lotar`, so the agent reads and updates its ticket through tools instead of the CLI:
 
 ```yaml
 agents:
@@ -170,65 +135,25 @@ agents:
       lotar: true
 ```
 
-| Runner | How the server is added | Approval |
-| --- | --- | --- |
-| `claude` | `--mcp-config` | `--allowedTools=mcp__lotar` |
-| `copilot` | `--additional-mcp-config` | `--allow-tool=lotar` |
-| `codex` | `-c mcp_servers.lotar.*` | `default_tools_approval_mode = "approve"` |
-
-The server only offers the tools a job needs: `task_get`, `task_list`, `task_update`, `task_comment_add`, `task_reference_add`, `relationship_graph`, `config_show` and `whoami` (set through `LOTAR_MCP_TOOLS`, which `lotar mcp` honours in general). An agent can't start other agents (including by assigning a ticket to an agent profile), delete tasks or sync through it. This limits the MCP tools only: the agent still has a shell and `lotar` on its PATH, so it is not a security boundary. Because the server is named `lotar`, it takes the place of a LoTaR server with that name in the CLI's own settings for the job, which would point at a different tasks directory or build. Other runners don't support the switch; their jobs log a note and use the CLI.
+The server only offers the tools a job needs: `task_get`, `task_list`, `task_update`, `task_comment_add`, `task_reference_add`, `relationship_graph`, `config_show` and `whoami` (set through `LOTAR_MCP_TOOLS`, which `lotar mcp` honours in general). An agent can't start other agents (including by assigning a ticket to an agent profile), delete tasks or sync through it. This limits the MCP tools only: the agent still has a shell and `lotar` on its PATH, so it is not a security boundary. Because the server is named `lotar`, it takes the place of a LoTaR server with that name in the CLI's own settings for the job. `amp`, `t3` and `command` jobs take no MCP servers; they log a note and use the CLI.
 
 ### T3 Code threads
 
-The `t3` runner starts each job as a thread on the T3 Code server running on the same machine, so you follow and answer it in T3 Code like any other thread. LoTaR runs:
-
-```bash
-t3 thread start . - --title "<ID> <title>" --provider <provider> --model <model> --wait
-```
-
-in the job's checkout, which must be inside a T3 Code project, with the prompt on stdin.
+The `t3` runner is harnessmux's t3 agent: each session is a T3 Code thread on the T3 Code server running on the same machine, so you follow and answer it in T3 Code like any other thread. Its first turn is `t3 thread start` in the job's T3 project with the prompt on stdin, later turns `t3 thread send`.
 
 ```yaml
 agents:
   fix:
     runner: t3
-    command: /Users/me/.t3/bin/t3   # optional: `t3` on PATH, else ~/.t3/bin/t3
-    provider: claudeAgent           # a T3 Code provider instance: claudeAgent, codex, …
+    provider: claudeAgent   # a T3 Code provider instance: claudeAgent, codex, …
     model: claude-opus-5-5
 ```
 
 - `provider` and `model` go together (T3 Code's rule). Leave both out to use the project's default model in T3 Code. A rule, a run or the ticket can pick them per job: `agent: { provider: "${{ticket.field:provider}}", model: "${{ticket.field:model}}" }` falls back to the profile's values when the ticket has no such fields.
-- As soon as the thread exists, LoTaR adds its link to the ticket as a link reference, records the thread id as the job's session, and logs `T3 Code thread: <link>`.
-- The agent's reply becomes the job's summary. Exit 0 completes the job; exit 1 (the run failed) fails it with T3 Code's error.
-- Exit 2 means the thread waits for an answer. The job fails (so `job_completed` rules don't treat the ticket as done), and LoTaR hands the ticket to its reporter, with status `HelpNeeded` when the project has it and a comment with the thread's link. Answer in T3 Code; the thread goes on there.
-- Any other exit (an interrupted `t3`, a signal, a lost connection) while `t3 thread show` reports the thread still running doesn't end the job: it logs that, waits for the run to end, and then ends from the thread's state as for a [job whose process died](#jobs-whose-process-died).
-- A failed job's `agent_job_failed` event always carries its reason, for example `The t3 runner exited with code 1.`
-- The job ends when the thread's turn ends. A Claude agent that ends its turn to wait for a background command (T3 Code's `t3_background_wait` keeps the thread Working) ends the job then, and `job_completed` rules run while the thread still works: T3 Code 0.1.9's `--wait` doesn't wait for that background work. The job's prompt tells the agent to run its checks in the foreground and finish before its final message.
-- No timeout: the job lasts as long as the thread's run, hours if need be. Cancelling the job stops LoTaR waiting, not the thread: stop that in T3 Code (the job log says so, with the link).
-- With `agent.worktree.enabled`, T3 Code makes the worktree: LoTaR passes `--worktree <current branch> --branch <prefix><ticket>`, or `--worktree <prefix><ticket>` when the ticket branch already exists from an earlier phase, and records T3 Code's worktree path and branch on the job, again when the thread ends, since T3 Code may rename the branch while it works. LoTaR's own worktree folder isn't used, because a thread can only run inside a T3 project. The cleanup settings and `lotar agent worktree cleanup` treat that worktree like LoTaR's own.
+- The thread's title is `<ID> <title>`. T3 Code threads no longer create worktrees. Do not rely on starting a thread to create an isolated checkout.
 - The thread runs on the T3 Code server, so it doesn't get the job's environment (`LOTAR_TASKS_DIR`, `LOTAR_TICKET_ID`, …). Its "This job" section tells the agent to pass `--tasks-dir "<tasks folder>"` to every lotar command, so a thread in a worktree updates the ticket in the main checkout, not the worktree's copy.
-- `effort`, `permissions`, `tools`, `mcp.allow` and `mcp.lotar` don't apply (the t3 CLI has no such options); a job with `effort` or `permissions` set logs a note. Messages can't be sent to a running t3 job from LoTaR; send them in T3 Code.
-- Profile `args` come after LoTaR's flags; a `--title`, `--provider`/`--model`, `--worktree` or `--wait` there replaces LoTaR's.
-
-#### Continuing the ticket's last thread
-
-`session: continue` runs a job as the next turn of the ticket's last T3 Code thread instead of a new thread, so a follow-up such as a merge sees the earlier agent's work and no second thread appears. Set it on a profile, on a rule's [`agent` settings](automation.md#agent-run-settings), with `lotar agent run --session continue`, or in the `session` field of `POST /api/jobs`; `new` (the default) starts a thread as above.
-
-```bash
-t3 thread send <thread> - --wait
-```
-
-- The thread is the session of the ticket's newest earlier `t3` job of the same agent profile that has one, so a rework on `@fix` after a review goes back to the `@fix` thread, not the reviewer's. With no earlier job of that profile, it's the newest earlier `t3` job's thread, so a merge job continues the last thread. LoTaR finds these jobs in the same LoTaR process, or else in the job logs, which keep each finished job's session and profile.
-- When a later thread's worktree took the branch (a `session: fresh` review, below), LoTaR frees it there as for a new thread and checks it out again in the continued thread's worktree; the log says `Checked <branch> out again in the thread's worktree <path>, freed from <path>.` When git can't, the job starts a new thread and logs why.
-- LoTaR runs the command in the thread's worktree and records that worktree and branch on the job, so the merge-job check (the branch must end up in the main checkout) and the cleanup settings work as with a new thread. Exit codes, the summary and the job's session are the same too; the log says `Continuing the T3 Code thread: <link>`.
-- The thread keeps its model: `provider`, `model` and `args` aren't passed, and a job that sets any of them logs a note.
-- With no earlier thread on the ticket, or when `t3 thread show` no longer finds it or its worktree is gone, the job starts a new thread and logs why. Other runners log that they can't continue a session and start a new one.
-
-A ticket gets one thread and one branch at a time. A job for a ticket that already has a running job is refused. A `t3` job with `session: new` (the default) also continues the ticket's last thread (of the job's own profile, as above) when its worktree still holds work the main checkout doesn't have: commits that haven't landed, or uncommitted changes. That way a retry after a failed merge builds on the earlier fix and doesn't write a second one on its own branch. The log says `The ticket's earlier T3 Code thread <link> has unmerged work on <branch>; this job continues it instead of starting a new thread.` Once the branch has landed, or when the thread or its worktree is gone, the next job starts a new thread.
-
-A continued thread keeps its provider and model. When the job's profile (or the run) sets another provider or model than the earlier thread runs on, for example a retry on another provider after a failed job, the job starts a new thread on the earlier thread's branch instead, with that provider and model, and its prompt names the earlier thread. To free the branch (git checks a branch out in one worktree only), LoTaR commits what the earlier thread left uncommitted (`<ID>: uncommitted changes from the earlier thread`) and detaches the earlier worktree, which keeps its files. The log says `The ticket's earlier T3 Code thread <link> has unmerged work on <branch> and runs <provider>/<model>, not this job's provider and model; this job starts a new thread on <branch>.` When git can't free the branch, the job continues the earlier thread and logs why.
-
-`session: fresh` starts that new thread on the branch of the ticket's newest thread, whatever its profile, provider and model, for example for a reviewer on the same model as the author, which as a further turn of the author's thread would check its own work. Set it like `continue`: on a profile, on a rule's [`agent` settings](automation.md#agent-run-settings), with `lotar agent run --session fresh`, or in the `session` field of `POST /api/jobs`. LoTaR frees the branch the same way and the prompt names the earlier thread; the log says `The ticket's earlier T3 Code thread <link> has unmerged work on <branch> and the job asks for a fresh thread (session: fresh); this job starts a new thread on <branch>.` When git can't free the branch, the job fails instead of continuing the earlier thread, which would check its own work, and its log holds git's error. Without unmerged work it starts a thread as `new` does.
+- The job ends when the thread's turn ends, also while T3 Code's `t3_background_wait` keeps the thread working; the job's prompt tells the agent to finish its checks in the foreground first. A thread that waits for an answer fails the job with its link: answer in T3 Code.
+- T3's CLI has no effort, permissions, MCP servers or interrupt: cancelling a job stops LoTaR waiting, and the thread runs on until it is stopped in T3 Code.
 
 A profile in your home config (`~/.lotar`) needs no `lotar trust`, so a repository only needs a rule that assigns tickets to it and one that closes them:
 
@@ -267,11 +192,11 @@ When an MCP session ends (or reloads after an upgrade), it cancels and finishes 
 
 A job whose process exited before the job ended (a killed or crashed worker or server) no longer counts as running, and its record stays. The queue worker for the same tasks directory (the running one, or the next to start) or the next `lotar serve` there takes it over and ends it as if it had run there: the job log gets its end, the `job_completed`, `job_failed` or `job_cancelled` rules run once, and the [outcome](#status-and-assignee-during-a-job) recorded during the job applies.
 
-- A `t3` job ends from its T3 Code thread (`t3 thread show`): while the thread's run goes on, the job keeps running in the new process and ends when the run ends. A completed run completes the job with the agent's last reply as its summary, a thread waiting for an answer hands the ticket back as [described above](#t3-code-threads), and any other status fails the job and names it. When `t3 thread show` can't read the thread, the job fails with that reason. A job whose process exited before it recorded its thread looks in the project's threads (`t3 thread list`) for one created within 2 minutes after the job started whose title starts with the ticket ID. A single such thread is the job's: the job links it on the ticket and ends from it. With none, or with several (the agent started another, or another job ran on the ticket), the job fails and says so.
-- A job of any other runner fails: its result went with the process.
+- A session job resumes its [session](#sessions) in the new process (its agent stopped with the old one) and asks the agent to continue where it stopped; the job then ends like any other. When the session can't be resumed, the job fails and says why.
+- A `command` job fails: its result went with the process.
 - The job log notes which process took the job over. A worker that waits for its last jobs before an upgrade takes over none.
 
-`list-running` also lists the `lotar-agent-wrapper` processes of this tasks directory if that binary is available (next to `lotar`, on `PATH`, or `LOTAR_AGENT_WRAPPER`). A wrapper started for another tasks directory, such as another worktree's, is not listed and doesn't block changes to a ticket with the same ID.
+`list-running` also lists the `lotar-agent-wrapper` processes (which run `command` jobs) of this tasks directory if that binary is available (next to `lotar`, on `PATH`, or `LOTAR_AGENT_WRAPPER`). A wrapper started for another tasks directory, such as another worktree's, is not listed and doesn't block changes to a ticket with the same ID.
 
 ## Status and assignee during a job
 
@@ -302,9 +227,7 @@ Every job also gets the ticket's `LOTAR_*` variables (`LOTAR_TICKET_ID`, `LOTAR_
 
 ## Windows agent commands
 
-Every job prompt is multiline (it embeds ticket context). Windows cannot pass such arguments through `cmd.exe` safely: Rust's spawn validation rejects CR/LF newlines in batch arguments outright, and `cmd.exe` argument forwarding can mangle other special characters. When an agent profile `command` resolves to a `.cmd`/`.bat` file, the wrapper therefore tries to resolve the shim to the executable it forwards to and runs that directly: npm-generated `cmd` shims (the standard `claude`, `codex`, `copilot`, and `gemini` global installs) are recognized and executed as `node <cli.js>` with the original arguments followed by any baked shim suffix, so the complete prompt arrives byte-exact. Batch commands the wrapper cannot recognize keep going through `cmd.exe` with the limitations above.
-
-For an unrecognized batch command, either point `command` at the CLI's native executable or a recognized npm shim path, or use a `command` runner profile: the `command` kind delivers the prompt through the `LOTAR_AGENT_PROMPT` environment variable instead of an argument, so any executable command line (including `command: node` with a script in `args`) works there. Setting `command: node` with the CLI entry in `args` does **not** work for the codex/claude/copilot/gemini kinds, because those prepend their own flags before profile arguments and node would parse those flags as its own.
+A `command` runner's program runs through `lotar-agent-wrapper`. Windows cannot pass arguments with newlines or other special characters through `cmd.exe` safely, so when `command` resolves to a `.cmd`/`.bat` file, the wrapper tries to resolve the shim to the executable it forwards to and runs that directly: npm-generated `cmd` shims are recognized and executed as `node <cli.js>` with the original arguments followed by any baked shim suffix. Batch commands the wrapper cannot recognize keep going through `cmd.exe`. The prompt itself is in `LOTAR_AGENT_PROMPT`, not an argument, so it arrives byte-exact either way.
 
 ## Default instructions
 
@@ -369,7 +292,7 @@ The Agents page lists jobs grouped by ticket and updates live over SSE:
 - Each job shows its agent, runner, model and effort, when it started and how long it ran, its branch (hover for the worktree path), the exit code when it failed, and the agent's last message.
 - **Show logs** opens a timeline of the job: tool calls, the agent's messages, denied tools and notes from LoTaR (worktree, commits, fast-forwards).
 - **Run agent** (or **Run again** on a ticket) starts a job on a ticket without changing its assignee; pick the agent profile and optionally a model, effort and request. Clicking a profile in the profile list opens the same dialog.
-- You can stop a running job, remove a queued one, or stop all of them. While a Claude job runs you can send it a message; other runners don't accept messages.
+- You can stop a running job, remove a queued one, or stop all of them. While a job runs you can send it a message, its session's next turn (not for `command` jobs). An agent's permission question shows on its job's card with a button per option (profile `on_permission: ask`).
 
 ## Worktrees
 
@@ -402,9 +325,9 @@ When enabled:
 - Multiple job phases for the same ticket reuse the same worktree
 - The worktree persists after the job completes unless cleanup is enabled
 - With `cleanup_on_done`, a ticket that reaches a done status loses the worktree on its ticket branch, whoever set the status: a job, automation, the CLI or the web UI. While a job runs for the ticket, its end does the cleanup. A successful job also removes its own worktree when the ticket is done by then.
-- A ticket's worktrees and branches include those of its T3 Code threads: a thread's branch (`t3/<topic>`) that T3 Code created from the ticket branch or from an earlier thread's branch, as git's branch reflog records (`branch: Created from agent/TEST-1`), and a worktree LoTaR detached so a new thread could take over its branch, as its HEAD reflog records (`checkout: moving from agent/TEST-1 to HEAD`). Done cleanup removes each of them that passes the checks below, a detached worktree when its commit's work is in the main checkout, and with `cleanup_delete_branches` also deletes the ticket's branches that no worktree has checked out and whose work landed. Deleting a branch deletes its reflog, so before it does, cleanup records the ticket of each branch and detached worktree traced through that branch (in the branch's `branch.<name>.lotarticket` config, and in a `lotar-ticket-branch` file in the worktree's git directory), and a later cleanup still finds them once their work lands.
+- A ticket's worktrees and branches include those of its T3 Code threads: a thread's branch (`t3/<topic>`) that T3 Code created from the ticket branch or from an earlier thread's branch, as git's branch reflog records (`branch: Created from agent/TEST-1`), and a worktree detached from the ticket branch (LoTaR detached them so a new thread could take over the branch, before DEV-503), as its HEAD reflog records (`checkout: moving from agent/TEST-1 to HEAD`). Done cleanup removes each of them that passes the checks below, a detached worktree when its commit's work is in the main checkout, and with `cleanup_delete_branches` also deletes the ticket's branches that no worktree has checked out and whose work landed. Deleting a branch deletes its reflog, so before it does, cleanup records the ticket of each branch and detached worktree traced through that branch (in the branch's `branch.<name>.lotarticket` config, and in a `lotar-ticket-branch` file in the worktree's git directory), and a later cleanup still finds them once their work lands.
 - Cleanup only removes a worktree whose ticket is done, whose branch is merged into the main checkout, and that has no untracked or modified files. A branch counts as merged when every commit on it is in the main checkout, also when it landed rebased or cherry-picked (`git cherry` lists no `+` commits), or when it landed reworked: merging the branch into the main checkout's `HEAD`, or into a commit since the branch's fork point that changed the branch's files, adds nothing (`git merge-tree --write-tree` yields that commit's own tree), or when a merge job recorded the branch's current commit as landed and that record's main commit is in the main checkout (see [Default instructions](#default-instructions)). A branch with any change main doesn't hold is kept. So is a branch whose lines the merge changed (main holds other content than the branch) without a merge job's record, or one with commits added after the record; check it and remove it by hand. Git-ignored files such as build and test output are removed with it; set `cleanup_ignored_files: false` to keep any worktree that still holds ignored files. When cleanup keeps a worktree, the job log says why.
-- With `cleanup_paths`, every job end (completed, failed, cancelled, or handed back with the ticket open) deletes those paths from the job's worktree, which stays. This also covers the worktrees T3 Code makes for `t3` jobs. Build output such as Rust's `target/` takes gigabytes in each worktree; a resumed job rebuilds it (a shared compiler cache such as sccache makes that fast). A path is deleted only when git ignores it and nothing under it is tracked; symlinks, paths outside the worktree and `.git` are never deleted. Nothing is deleted while another job runs for the ticket, as it shares the worktree. The job log lists what was deleted.
+- With `cleanup_paths`, every job end (completed, failed, cancelled, or handed back with the ticket open) deletes those paths from the job's worktree, which stays. This also covers existing T3 Code thread worktrees recorded on earlier jobs. Build output such as Rust's `target/` takes gigabytes in each worktree; a resumed job rebuilds it (a shared compiler cache such as sccache makes that fast). A path is deleted only when git ignores it and nothing under it is tracked; symlinks, paths outside the worktree and `.git` are never deleted. Nothing is deleted while another job runs for the ticket, as it shares the worktree. The job log lists what was deleted.
 - Merge-profile jobs require worktrees so merges happen on isolated branches
 - When worktrees are enabled, setup failure fails the job; the runner never falls back to the repository checkout.
 - Git setup, checks, cleanup, and runners discard inherited/profile repository-selection overrides (`GIT_DIR`, `GIT_WORK_TREE`, `GIT_COMMON_DIR`, `GIT_INDEX_FILE`, object/discovery overrides, and `GIT_CONFIG*`). Worktree top-level and common-directory identity are verified. SSH/askpass and author/committer identity environment variables are retained.

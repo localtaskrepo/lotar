@@ -85,6 +85,7 @@ fn install_template_workflow(fixtures: &TestFixtures, prefix: &str, template: &s
     for (agent_name, command_path) in agent_commands {
         let profile =
             config["agents"].get_mut(*agent_name).and_then(YamlValue::as_mapping_mut).unwrap_or_else(|| panic!("template defines agent {agent_name}"));
+        profile.insert(YamlValue::String("runner".to_string()), YamlValue::String("command".to_string()));
         profile.insert(YamlValue::String("command".to_string()), YamlValue::String(command_path.to_string_lossy().to_string()));
     }
     fs::write(&config_path, serde_yaml_ng::to_string(&config).expect("serialize config")).expect("write config");
@@ -103,7 +104,12 @@ fn job_for_ticket(ticket_id: &str) -> lotar::api_types::AgentJob {
 }
 
 #[cfg(unix)]
+/// The least any wait below allows. Waits end as soon as the state is reached; the floor only keeps a busy machine
+/// from failing the multi-phase pipelines (DEV-503: they needed 10 to 16 s at a load average of 12).
+const WAIT_FLOOR_MS: u64 = 30_000;
+
 fn wait_for_job_status(job_id: &str, status: &str, timeout_ms: u64) -> bool {
+    let timeout_ms = timeout_ms.max(WAIT_FLOOR_MS);
     let start = Instant::now();
     while start.elapsed() < Duration::from_millis(timeout_ms) {
         if let Some(job) = AgentJobService::get_job(job_id)
@@ -149,6 +155,7 @@ fn wait_for_file_content(path: &Path, deadline: Instant, awaited: &str, is_compl
 
 #[cfg(unix)]
 fn wait_for_completed_jobs(ticket_id: &str, expected: usize, timeout_ms: u64) -> Vec<lotar::api_types::AgentJob> {
+    let timeout_ms = timeout_ms.max(WAIT_FLOOR_MS);
     let start = Instant::now();
     let mut latest = Vec::new();
     while start.elapsed() < Duration::from_millis(timeout_ms) {
@@ -167,6 +174,7 @@ fn wait_for_ticket_jobs<F>(ticket_id: &str, timeout_ms: u64, predicate: F) -> Ve
 where
     F: Fn(&[lotar::api_types::AgentJob]) -> bool,
 {
+    let timeout_ms = timeout_ms.max(WAIT_FLOOR_MS);
     let start = Instant::now();
     let mut latest = Vec::new();
     while start.elapsed() < Duration::from_millis(timeout_ms) {
@@ -182,6 +190,7 @@ where
 
 #[cfg(unix)]
 fn wait_for_task_status(storage: &lotar::Storage, ticket_id: &str, status: &str, timeout_ms: u64) -> bool {
+    let timeout_ms = timeout_ms.max(WAIT_FLOOR_MS);
     let start = Instant::now();
     while start.elapsed() < Duration::from_millis(timeout_ms) {
         if let Ok(task) = TaskService::get(storage, ticket_id, None)
@@ -204,6 +213,7 @@ fn wait_for_task<F>(storage: &lotar::Storage, ticket_id: &str, timeout_ms: u64, 
 where
     F: Fn(&lotar::api_types::TaskDTO) -> bool,
 {
+    let timeout_ms = timeout_ms.max(WAIT_FLOOR_MS);
     let start = Instant::now();
     while start.elapsed() < Duration::from_millis(timeout_ms) {
         if let Ok(task) = TaskService::get(storage, ticket_id, None)
@@ -232,7 +242,7 @@ echo '{\"type\":\"assistant\",\"message\":{\"content\":[{\"text\":\"stubbed succ
 exit 0\n",
     );
     fixtures
-        .create_config_in_dir(&fixtures.tasks_root, &format!("agents:\n  {agent_name}:\n    runner: claude\n    command: \"{}\"\n", script.to_string_lossy()));
+        .create_config_in_dir(&fixtures.tasks_root, &format!("agents:\n  {agent_name}:\n    runner: command\n    command: \"{}\"\n", script.to_string_lossy()));
     // Automation rules define lifecycle actions - agent job is queued implicitly on assignment
     let automation_yaml = automation_yaml_for(agent_name);
     AutomationService::set(&fixtures.tasks_root, None, &automation_yaml).expect("set automation");
@@ -284,7 +294,7 @@ echo '{\"type\":\"assistant\",\"message\":{\"content\":[{\"text\":\"stubbed fail
 exit 1\n",
     );
     fixtures
-        .create_config_in_dir(&fixtures.tasks_root, &format!("agents:\n  {agent_name}:\n    runner: claude\n    command: \"{}\"\n", script.to_string_lossy()));
+        .create_config_in_dir(&fixtures.tasks_root, &format!("agents:\n  {agent_name}:\n    runner: command\n    command: \"{}\"\n", script.to_string_lossy()));
     let automation_yaml = automation_yaml_for(agent_name);
     AutomationService::set(&fixtures.tasks_root, None, &automation_yaml).expect("set automation");
 
@@ -328,7 +338,7 @@ echo '{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"stub-cancel\"}'
 sleep 5\n",
     );
     fixtures
-        .create_config_in_dir(&fixtures.tasks_root, &format!("agents:\n  {agent_name}:\n    runner: claude\n    command: \"{}\"\n", script.to_string_lossy()));
+        .create_config_in_dir(&fixtures.tasks_root, &format!("agents:\n  {agent_name}:\n    runner: command\n    command: \"{}\"\n", script.to_string_lossy()));
     let automation_yaml = automation_yaml_for(agent_name);
     AutomationService::set(&fixtures.tasks_root, None, &automation_yaml).expect("set automation");
 
@@ -406,7 +416,7 @@ printf '%s|%s' \"$LOTAR_TICKET_ID\" \"$LOTAR_AGENT_PROFILE\" > \"{}\"\n",
     fixtures.create_config_in_dir(
         &fixtures.tasks_root,
         &format!(
-            "issue:\n  states:\n    - Todo\n    - InProgress\n    - Testing\n    - Done\nagents:\n  {implement_agent}:\n    runner: claude\n    command: \"{}\"\n  {test_agent}:\n    runner: claude\n    command: \"{}\"\n",
+            "issue:\n  states:\n    - Todo\n    - InProgress\n    - Testing\n    - Done\nagents:\n  {implement_agent}:\n    runner: command\n    command: \"{}\"\n  {test_agent}:\n    runner: command\n    command: \"{}\"\n",
             implement_script.to_string_lossy(),
             test_script.to_string_lossy()
         ),
@@ -476,8 +486,8 @@ fn automation_agent_settings_reach_the_job_they_start() {
             &format!("stub-{name}.sh"),
             &format!(
                 "#!/bin/sh\n\
-printf '%s\\n' \"$@\" > \"{}\"\n\
-head -n 1 > \"{}\"\n\
+printf -- '--model\\n%s\\n--effort\\n%s\\n' \"$LOTAR_AGENT_MODEL\" \"$LOTAR_AGENT_EFFORT\" > \"{}\"\n\
+printf '%s' \"$LOTAR_AGENT_PROMPT\" > \"{}\"\n\
 echo '{{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"{name}\"}}'\n\
 echo '{{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"ok\",\"session_id\":\"{name}\"}}'\n",
                 args.display(),
@@ -491,7 +501,7 @@ echo '{{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\
     fixtures.create_config_in_dir(
         &fixtures.tasks_root,
         &format!(
-            "issue:\n  states: [Todo, InProgress, Testing, Done]\nagents:\n  implement:\n    runner: claude\n    model: sonnet\n    command: \"{}\"\n  test:\n    runner: claude\n    model: opus\n    command: \"{}\"\n",
+            "issue:\n  states: [Todo, InProgress, Testing, Done]\nagents:\n  implement:\n    runner: command\n    model: sonnet\n    command: \"{}\"\n  test:\n    runner: command\n    model: opus\n    command: \"{}\"\n",
             implement_script.display(),
             test_script.display()
         ),
@@ -544,7 +554,7 @@ fn automation_agent_settings_expand_ticket_fields_and_fall_back_to_the_profile()
         "stub-fix.sh",
         &format!(
             "#!/bin/sh\n\
-printf '%s\\n' \"$@\" >> \"{}\"\n\
+printf -- '--model\\n%s\\n--effort\\n%s\\n' \"$LOTAR_AGENT_MODEL\" \"$LOTAR_AGENT_EFFORT\" >> \"{}\"\n\
 echo '--' >> \"{}\"\n\
 head -n 1 > /dev/null\n\
 echo '{{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"ok\"}}'\n",
@@ -555,7 +565,7 @@ echo '{{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\
     fixtures.create_config_in_dir(
         &fixtures.tasks_root,
         &format!(
-            "issue:\n  states: [Todo, InProgress, Done]\nagents:\n  fix:\n    runner: claude\n    model: sonnet\n    effort: medium\n    command: \"{}\"\n",
+            "issue:\n  states: [Todo, InProgress, Done]\nagents:\n  fix:\n    runner: command\n    model: sonnet\n    effort: medium\n    command: \"{}\"\n",
             script.display()
         ),
     );
@@ -761,7 +771,7 @@ fn template_expansion_in_run_action() {
     );
 
     fixtures
-        .create_config_in_dir(&fixtures.tasks_root, &format!("agents:\n  {agent_name}:\n    runner: claude\n    command: \"{}\"\n", script.to_string_lossy()));
+        .create_config_in_dir(&fixtures.tasks_root, &format!("agents:\n  {agent_name}:\n    runner: command\n    command: \"{}\"\n", script.to_string_lossy()));
     let automation_yaml = format!(
         "automation:\n  rules:\n    - name: Template test\n      when:\n        assignee: \"@{agent_name}\"\n      on:\n        job_completed:\n          run:\n            command: \"{}\"\n            args:\n              - \"${{{{ticket.id}}}}\"\n              - \"${{{{ticket.title}}}}\"\n",
         run_script.to_string_lossy()
@@ -1039,7 +1049,7 @@ exit 0\n",
     );
 
     fixtures
-        .create_config_in_dir(&fixtures.tasks_root, &format!("agents:\n  {agent_name}:\n    runner: claude\n    command: \"{}\"\n", script.to_string_lossy()));
+        .create_config_in_dir(&fixtures.tasks_root, &format!("agents:\n  {agent_name}:\n    runner: command\n    command: \"{}\"\n", script.to_string_lossy()));
     // max_iterations: 1 — after first completed job, further assignments should be blocked
     let automation_yaml = format!(
         "automation:\n  max_iterations: 1\n  rules:\n    - name: Iter lifecycle\n      when:\n        assignee: \"@{agent_name}\"\n      on:\n        job_completed:\n          set:\n            status: NeedsReview\n"
@@ -1210,7 +1220,7 @@ fn agent_assignee_does_not_leak_into_members() {
     enable_server_mode();
     let fixtures = TestFixtures::new();
 
-    fixtures.create_config_in_dir(&fixtures.tasks_root, "auto:\n  populate_members: true\nagents:\n  implement:\n    runner: claude\n    command: echo\n");
+    fixtures.create_config_in_dir(&fixtures.tasks_root, "auto:\n  populate_members: true\nagents:\n  implement:\n    runner: command\n    command: echo\n");
 
     let mut storage = fixtures.create_storage();
     let created = TaskService::create(
@@ -2080,7 +2090,7 @@ exit 0\n",
     fixtures.create_config_in_dir(
         &fixtures.tasks_root,
         &format!(
-            "default:\n  project: MRG\nissue:\n  states: [Todo, Merging, Done]\n  priorities: [Low]\n  types: [Feature]\nagent:\n  worktree:\n    enabled: false\nagents:\n  merge:\n    runner: claude\n    command: \"{}\"\n",
+            "default:\n  project: MRG\nissue:\n  states: [Todo, Merging, Done]\n  priorities: [Low]\n  types: [Feature]\nagent:\n  worktree:\n    enabled: false\nagents:\n  merge:\n    runner: command\n    command: \"{}\"\n",
             merge_script.to_string_lossy()
         ),
     );
@@ -2516,7 +2526,7 @@ exit 0\n",
 
         fixtures.create_config_in_dir(
             &fixtures.tasks_root,
-            &format!("agents:\n  {agent_name}:\n    runner: claude\n    command: \"{}\"\n", script.to_string_lossy()),
+            &format!("agents:\n  {agent_name}:\n    runner: command\n    command: \"{}\"\n", script.to_string_lossy()),
         );
         // Use OLD YAML key names: job_start, complete (not job_started, job_completed)
         let automation_yaml = format!(
@@ -2572,7 +2582,7 @@ exit 0\n",
         fixtures.create_config_in_dir(
         &fixtures.tasks_root,
         &format!(
-            "default:\n  project: MRG\nissue:\n  states: [Todo, Merging, Done]\n  priorities: [Low]\n  types: [Feature]\nagent:\n  worktree:\n    enabled: true\n    max_parallel_jobs: 4\n    cleanup_on_done: true\nagents:\n  merge:\n    runner: claude\n    command: \"{}\"\n",
+            "default:\n  project: MRG\nissue:\n  states: [Todo, Merging, Done]\n  priorities: [Low]\n  types: [Feature]\nagent:\n  worktree:\n    enabled: true\n    max_parallel_jobs: 4\n    cleanup_on_done: true\nagents:\n  merge:\n    runner: command\n    command: \"{}\"\n",
             merge_script.to_string_lossy()
         ),
     );
@@ -2642,115 +2652,6 @@ exit 0\n",
     }
 }
 
-/// DEV-202: a runner that reports an error in its final result fails the job
-/// even though it exits 0, and job_failed automation runs.
-#[cfg(unix)]
-#[test]
-fn runner_reported_error_with_exit_zero_fails_the_job() {
-    let _guard = lock_agent_tests();
-    enable_server_mode();
-    let fixtures = TestFixtures::new();
-    let script = write_stub_agent_script(
-        fixtures.get_temp_path(),
-        "error-result.sh",
-        r#"#!/bin/sh
-cat > /dev/null &
-echo '{"type":"system","subtype":"init","session_id":"e1"}'
-echo '{"type":"result","subtype":"error_during_execution","is_error":true,"result":"API Error: overloaded","session_id":"e1"}'
-exit 0
-"#,
-    );
-    fixtures.create_config_in_dir(
-        &fixtures.tasks_root,
-        &format!(
-            "default:\n  project: ERR\nissue:\n  states: [Todo, InProgress, HelpNeeded, Done]\nagents:\n  worker:\n    runner: claude\n    command: \"{}\"\n",
-            script.display()
-        ),
-    );
-    fs::write(
-        fixtures.tasks_root.join("automation.yml"),
-        "automation:\n  rules:\n    - when:\n        assignee: \"@worker\"\n      on:\n        job_failed:\n          set:\n            status: HelpNeeded\n          comment: \"Agent failed: ${{agent.job_id}}\"\n",
-    )
-    .unwrap();
-    let mut storage = fixtures.create_storage();
-    let created =
-        TaskService::create(&mut storage, TaskCreate { title: "Error result".to_string(), project: Some("ERR".to_string()), ..Default::default() }).unwrap();
-    TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some("@worker".to_string()), ..Default::default() }).unwrap();
-
-    let job = job_for_ticket(&created.id);
-    assert!(wait_for_job_status(&job.id, "failed", 6000), "job should fail");
-    let job = AgentJobService::get_job(&job.id).unwrap();
-    assert_eq!(job.exit_code, Some(0));
-    assert_eq!(job.last_message.as_deref(), Some("API Error: overloaded"));
-    assert!(wait_for_task_status(&storage, &created.id, "HelpNeeded", 6000));
-    // The rule's comment can land just after its status change; wait for it.
-    let start = Instant::now();
-    let commented = loop {
-        let task = TaskService::get(&storage, &created.id, None).unwrap();
-        if task.comments.iter().any(|c| c.text.contains(&job.id)) {
-            break true;
-        }
-        if start.elapsed() > Duration::from_millis(6000) {
-            break false;
-        }
-        sleep(Duration::from_millis(50));
-    };
-    assert!(commented, "failure comment names the job");
-}
-
-/// DEV-202: a message sent to a running Claude job reaches the agent through
-/// stdin and its answer is recorded.
-#[cfg(unix)]
-#[test]
-fn messages_reach_a_running_claude_job() {
-    let _guard = lock_agent_tests();
-    enable_server_mode();
-    let fixtures = TestFixtures::new();
-    // Reads the prompt, then answers the next stdin message by echoing it.
-    let script = write_stub_agent_script(
-        fixtures.get_temp_path(),
-        "echo-agent.sh",
-        r#"#!/bin/sh
-read -r prompt
-echo '{"type":"system","subtype":"init","session_id":"m1"}'
-echo '{"type":"assistant","message":{"content":[{"type":"text","text":"waiting"}]},"session_id":"m1"}'
-read -r message
-word=$(printf '%s' "$message" | sed -n 's/.*"content":"\([^"]*\)".*/\1/p')
-printf '{"type":"assistant","message":{"content":[{"type":"text","text":"got %s"}]},"session_id":"m1"}\n' "$word"
-printf '{"type":"result","subtype":"success","is_error":false,"result":"got %s","session_id":"m1"}\n' "$word"
-"#,
-    );
-    fixtures.create_config_in_dir(
-        &fixtures.tasks_root,
-        &format!("default:\n  project: MSG\nagents:\n  talker:\n    runner: claude\n    command: \"{}\"\n", script.display()),
-    );
-    let mut storage = fixtures.create_storage();
-    let created =
-        TaskService::create(&mut storage, TaskCreate { title: "Messages".to_string(), project: Some("MSG".to_string()), ..Default::default() }).unwrap();
-    let job = AgentJobService::start_job_with_tasks_dir(
-        AgentJobCreateRequest {
-            ticket_id: created.id.clone(),
-            prompt: "Wait for my message".to_string(),
-            agent: Some("talker".to_string()),
-            ..Default::default()
-        },
-        fixtures.tasks_root.as_path(),
-    )
-    .unwrap();
-    assert!(wait_for_job_status(&job.id, "running", 6000));
-    let deadline = Instant::now() + Duration::from_secs(6);
-    while AgentJobService::get_job(&job.id).and_then(|j| j.last_message).as_deref() != Some("waiting") {
-        assert!(Instant::now() < deadline, "agent never started waiting");
-        sleep(Duration::from_millis(25));
-    }
-    AgentJobService::send_message(&job.id, "pineapple").expect("message accepted");
-    assert!(wait_for_job_status(&job.id, "completed", 6000));
-    let job = AgentJobService::get_job(&job.id).unwrap();
-    assert_eq!(job.last_message.as_deref(), Some("got pineapple"));
-    let events = AgentJobService::events_for(&job.id);
-    assert!(events.iter().any(|e| e.kind == "agent_job_input" && e.message.as_deref() == Some("pineapple")));
-}
-
 /// DEV-202: cancelling a job also stops commands the agent started in their
 /// own session or process group (Codex and Copilot run shell commands that
 /// way), not only the runner itself.
@@ -2776,7 +2677,7 @@ sleep 300
     );
     fixtures.create_config_in_dir(
         &fixtures.tasks_root,
-        &format!("default:\n  project: CAN\nagents:\n  worker:\n    runner: claude\n    command: \"{}\"\n", script.display()),
+        &format!("default:\n  project: CAN\nagents:\n  worker:\n    runner: command\n    command: \"{}\"\n", script.display()),
     );
     let mut storage = fixtures.create_storage();
     let created =
@@ -2830,7 +2731,7 @@ exit 0
     );
     fixtures.create_config_in_dir(
         &fixtures.tasks_root,
-        &format!("default:\n  project: PIPE\nagents:\n  deaf:\n    runner: claude\n    command: \"{}\"\n", script.display()),
+        &format!("default:\n  project: PIPE\nagents:\n  deaf:\n    runner: command\n    command: \"{}\"\n", script.display()),
     );
     let mut storage = fixtures.create_storage();
     let created =
@@ -2866,7 +2767,7 @@ fn unblocked_starts_the_waiting_ticket_agent_when_its_last_prerequisite_is_done(
         root,
         "stub-fix.sh",
         &format!(
-            "#!/bin/sh\nhead -n 1 > \"{}\"\n\
+            "#!/bin/sh\nprintf '%s' \"$LOTAR_AGENT_PROMPT\" > \"{}\"\n\
 echo '{{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"fix\"}}'\n\
 echo '{{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"ok\",\"session_id\":\"fix\"}}'\n",
             stdin.display()
@@ -2874,7 +2775,7 @@ echo '{{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\
     );
     fixtures.create_config_in_dir(
         &fixtures.tasks_root,
-        &format!("issue:\n  states: [Todo, Blocked, InProgress, Done]\nagents:\n  fix:\n    runner: claude\n    command: \"{}\"\n", script.display()),
+        &format!("issue:\n  states: [Todo, Blocked, InProgress, Done]\nagents:\n  fix:\n    runner: command\n    command: \"{}\"\n", script.display()),
     );
     AutomationService::set(
         &fixtures.tasks_root,

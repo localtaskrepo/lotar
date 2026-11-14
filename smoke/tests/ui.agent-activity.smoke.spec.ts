@@ -13,7 +13,7 @@ describe.concurrent('UI agent activity indicator', () => {
     it('shows while a job runs and disappears when it finishes', async ({ expect }) => {
         const gate = await createGateFixture('lotar-smoke-gate-activity-');
         const agents = await createFixtureAgents(
-            { worker: { script: gate.script, args: gate.agentArgs({ mode: 'copilot', label: 'activity' }) } },
+            { worker: { script: gate.script, args: gate.agentArgs({ mode: 'lines', label: 'activity' }) } },
             'lotar-smoke-agents-activity-',
         );
         const workspace = await SmokeWorkspace.create({

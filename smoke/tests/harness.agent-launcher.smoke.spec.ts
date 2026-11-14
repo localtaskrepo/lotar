@@ -116,7 +116,7 @@ describe('agent fixture launcher Windows counterfactuals', () => {
         const spacedGateDir = 'C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\lotar smoke gate api D7dk7J';
         const fixtureArgs = [
             '--mode',
-            'copilot',
+            'lines',
             '--gate-dir',
             spacedGateDir,
             '--label',
@@ -143,7 +143,7 @@ describe('agent fixture launcher Windows counterfactuals', () => {
             '--input-format',
             'stream-json',
             '--mode',
-            'copilot',
+            'lines',
             '--gate-dir',
             ...spacedGateDir.split(' '),
             '--label',
@@ -160,7 +160,7 @@ describe('agent fixture launcher Windows counterfactuals', () => {
         const parsed = parseFixtureArgs(childArgv);
         expect(parsed['--gate-dir']).toBe(spacedGateDir);
         expect(parsed['--label']).toBe('progress');
-        expect(parsed['--mode']).toBe('copilot');
+        expect(parsed['--mode']).toBe('lines');
         expect(parsed['--hold-ms']).toBe('20000');
 
         // Negative control: without the baked tail (the pre-fix launcher
@@ -186,7 +186,7 @@ describe('agent fixture launcher Windows counterfactuals', () => {
         // stay accepted; only genuinely batch-unsafe values are rejected.
         const native = windowsLauncherContent('C:\\tools\\agent.cmd', [
             '--mode',
-            'copilot',
+            'lines',
             '--gate-dir',
             'C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\lotar smoke gate api X1',
             '--label',
@@ -258,8 +258,8 @@ describe('agent fixture launcher Windows counterfactuals', () => {
 
         try {
             const launcher = agents.command('gated');
-            // Mirror the product's copilot spawn shape: base flags precede
-            // profile args and the prompt is the final argument.
+            // Unknown leading flags and a hostile final argument, as a
+            // program may get them: the launcher forwards them unchanged.
             const runnerArgs = [
                 '-p',
                 '--output-format',
@@ -365,7 +365,7 @@ describe('agent wrapper batch-shim dispatch (DEV-101)', () => {
                     '--ticket-id',
                     'TEST-1',
                     '--runner',
-                    'copilot',
+                    'lines',
                     '--',
                     shimPath,
                     '-p',
@@ -432,7 +432,7 @@ describe('agent wrapper batch-shim dispatch (DEV-101)', () => {
                     '--ticket-id',
                     'TEST-1',
                     '--runner',
-                    'copilot',
+                    'lines',
                     '--',
                     launcher,
                     '-p',
@@ -495,7 +495,7 @@ describe('agent wrapper batch-shim dispatch (DEV-101)', () => {
                     '--ticket-id',
                     'TEST-1',
                     '--runner',
-                    'copilot',
+                    'lines',
                     '--',
                     launcher,
                     '-p',
@@ -504,7 +504,7 @@ describe('agent wrapper batch-shim dispatch (DEV-101)', () => {
                     '--input-format',
                     'stream-json',
                     '--mode',
-                    'copilot',
+                    'lines',
                     '--gate-dir',
                     wrongDir,
                     '--label',
@@ -541,7 +541,7 @@ describe('agent wrapper batch-shim dispatch (DEV-101)', () => {
                     .filter((value): value is string => value !== undefined);
             expect(valuesFor('--gate-dir')).toEqual([wrongDir, gate.dir]);
             expect(valuesFor('--label')).toEqual(['wronglabel', 'conflict']);
-            expect(valuesFor('--mode')).toEqual(['copilot', 'plain']);
+            expect(valuesFor('--mode')).toEqual(['lines', 'plain']);
 
             const promptIndex = argv.indexOf(HOSTILE_PROMPT);
             const lastModeIndex = argv.lastIndexOf('--mode');

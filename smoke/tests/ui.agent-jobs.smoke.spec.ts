@@ -3,7 +3,7 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { createFixtureAgents, createGateFixture } from '../helpers/agent-fixtures.js';
+import { ACP_AGENT_SCRIPT, createFixtureAgents, createGateFixture, nodeExecutable } from '../helpers/agent-fixtures.js';
 import { gitAvailable } from '../helpers/git.js';
 import { parse, stringify } from 'yaml';
 import { startLotarServer } from '../helpers/server.js';
@@ -65,7 +65,7 @@ async function writeReviewedTemplateWorkflow(
         if (!agent) {
             continue;
         }
-        agent.runner = 'copilot';
+        agent.runner = 'command';
         agent.command = mockLauncherCommand;
         agent.args = [];
     }
@@ -415,7 +415,7 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
             {
                 slow: {
                     script: gate.script,
-                    args: gate.agentArgs({ mode: 'copilot', label: 'stream' }),
+                    args: gate.agentArgs({ mode: 'lines', label: 'stream' }),
                 },
             },
             'lotar-smoke-agents-stream-',
@@ -724,6 +724,44 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
             await gate.dispose();
             await workspace.dispose();
             await agents.dispose();
+        }
+    });
+
+    it("shows the agent's permission question in the job view and answers it", async () => {
+        // The claude runner is the harnessmux claude agent; its agents.toml
+        // under HARNESSMUX_HOME runs the fake ACP agent instead (DEV-503).
+        const harnessmuxHome = await mkdtemp(path.join(tmpdir(), 'lotar-smoke-harnessmux-'));
+        await fs.outputFile(
+            path.join(harnessmuxHome, 'config', 'agents.toml'),
+            `[agents.claude]\ncommand = [${JSON.stringify(nodeExecutable())}, ${JSON.stringify(ACP_AGENT_SCRIPT)}]\n`,
+        );
+        const workspace = await SmokeWorkspace.create({
+            seedFiles: {
+                '.tasks/config.yml': configWithAgents(
+                    'agents:\n  asker:\n    runner: claude\n    on_permission: ask\n    env:\n      FAKE_ASK: "1"',
+                ),
+            },
+        });
+        try {
+            const task = await workspace.addTask('Permission question', { args: ['-p', 'UIAG'] });
+            const server = await startLotarServer(workspace, { env: { HARNESSMUX_HOME: harnessmuxHome } });
+            try {
+                await withPage(`${server.url}/agents`, async (page) => {
+                    await startJobViaApi(server.url, task.id, 'asker', 'Edit the notes');
+                    const question = page.locator('.job-question');
+                    await question.waitFor({ timeout: 15_000 });
+                    expect(await question.textContent()).toContain('The agent asks: Edit notes.md');
+                    await question.getByRole('button', { name: 'Allow', exact: true }).click();
+                    await waitForJobStatusViaApi(server.url, task.id, 'completed');
+                    await page.locator('.job-question').waitFor({ state: 'detached', timeout: 15_000 });
+                    await waitForText(page, '.job-card', 'Permission: allow');
+                });
+            } finally {
+                await server.stop();
+            }
+        } finally {
+            await workspace.dispose();
+            await fs.remove(harnessmuxHome);
         }
     });
 });

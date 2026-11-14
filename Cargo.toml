@@ -18,6 +18,8 @@ repository = "https://github.com/localtaskrepo/lotar"
 homepage = "https://localtaskrepo.github.io/lotar/"
 
 [workspace.dependencies]
+harnessmux = "0.1.1"
+tokio = { version = "1.54.1", default-features = false, features = ["rt-multi-thread", "sync", "time"] }
 tempfile = "3.27.0"
 serde_json = { version = "1.0.154", features = ["std"], default-features = false }
 clap = { version = "4.6.7", features = ["derive", "std", "env", "error-context", "suggestions"], default-features = false }
