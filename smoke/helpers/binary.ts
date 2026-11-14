@@ -18,7 +18,8 @@ export function resolveRepositoryRoot(): string {
 }
 
 export function resolveBinaryPath(): string {
-    const explicit = process.env.LOTAR_BINARY_PATH || process.env.LOTAR_BIN;
+    // Not LOTAR_BIN: an agent job sets it to the lotar that started the job, not the build under test (DEV-546).
+    const explicit = process.env.LOTAR_BINARY_PATH;
     if (explicit) {
         return explicit;
     }

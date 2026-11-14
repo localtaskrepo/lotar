@@ -1,9 +1,20 @@
 import fs from 'fs-extra';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { parse } from 'yaml';
+import { resolveBinaryPath } from '../helpers/binary.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
 describe('smoke workspace helper contracts', () => {
+    it('runs the binary under test, not the lotar of the agent job that started the run (DEV-546)', () => {
+        vi.stubEnv('LOTAR_BINARY_PATH', '');
+        vi.stubEnv('LOTAR_BIN', '/opt/homebrew/bin/lotar');
+        try {
+            expect(resolveBinaryPath()).not.toBe('/opt/homebrew/bin/lotar');
+        } finally {
+            vi.unstubAllEnvs();
+        }
+    });
+
     it('addTask returns the ID-derived task file with the persisted title', async () => {
         const workspace = await SmokeWorkspace.create();
 

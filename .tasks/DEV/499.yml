@@ -1,11 +1,11 @@
 title: 'Cargo workspace step 2: the core modules become a crate of their own'
-status: Blocked
+status: InProgress
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-13T22:21:43.785907+00:00
-modified: 2026-11-15T00:03:45.648039+00:00
+modified: 2026-11-15T00:18:58.658241+00:00
 relationships:
   depends_on:
   - DEV-498
@@ -13,6 +13,8 @@ relationships:
   - DEV-496
   related:
   - DEV-493
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1239325d-9909-4c3c-8d61-dd70c55138f0
 description: |-
   Move the core modules into a crate of their own in the cargo workspace (DEV-493; the owner, 2026-11-13: "Yes on all of those ideas"). Changes above core then don't recompile core, and core's tests build in a fraction of the time.
 
@@ -64,3 +66,14 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-15T00:18:55.069434+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-15T00:18:58.658241+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1239325d-9909-4c3c-8d61-dd70c55138f0

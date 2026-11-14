@@ -37,7 +37,7 @@ naming, runner, and coverage-enforcement policy documented in
 Environment contract on the runner:
 
 - `LOTAR_BINARY_PATH=<workspace>/target/ci/lotar.exe` — the supported variable
-  consumed by `smoke/helpers/binary.ts` (`LOTAR_BIN` is the legacy alias).
+  consumed by `smoke/helpers/binary.ts` (not `LOTAR_BIN`: agent jobs set that to their own `lotar`).
   When it is unset and no `target/smoke`/`target/release` binary exists, the
   helper fails loudly; it never builds.
 - `LOTAR_SMOKE_REQUIRE_GIT=1` — designated-runner contract from

@@ -11,7 +11,7 @@
 //
 // The script writes a project config with a broad vocabulary, then seeds tasks with a
 // realistic spread of status/priority/type/assignee/tags/effort/due-date/custom-fields.
-// It uses the built `lotar` binary (LOTAR_BINARY_PATH/LOTAR_BIN, else target/{smoke,release}).
+// It uses the built `lotar` binary (LOTAR_BINARY_PATH, else target/{smoke,release}).
 //
 // `--demo` instead seeds the curated "Atlas" scenario from scripts/demo/workspace.mjs: a git
 // repository with backdated history, three people, a stub agent profile, sprints with burndown,
@@ -29,7 +29,7 @@ const ROOT = path.resolve(__dirname, '..');
 const BIN_NAME = process.platform === 'win32' ? 'lotar.exe' : 'lotar';
 
 function resolveBinary() {
-    const explicit = process.env.LOTAR_BINARY_PATH || process.env.LOTAR_BIN;
+    const explicit = process.env.LOTAR_BINARY_PATH;
     if (explicit) return explicit;
     for (const candidate of [
         path.join(ROOT, 'target', 'smoke', BIN_NAME),

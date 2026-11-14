@@ -1,11 +1,11 @@
 title: Jobs that failed during the T3 Code outage left 15 tickets InProgress and lost their agents' outcome
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-13T10:33:47.286204+00:00
-modified: 2026-11-15T00:03:54.075130+00:00
+modified: 2026-11-15T00:27:20.422265+00:00
 relationships:
   blocks:
   - DEV-513
@@ -195,6 +195,20 @@ comments:
 - date: 2026-11-14T23:59:17.622100+00:00
   author: mallox
   text: 'Answer: yes (Release 0.1.3 now) (answered in INBOX-160)'
+- date: 2026-11-15T00:17:30.810088+00:00
+  author: claude
+  text: |-
+    harnessmux 0.1.3 is released and lotar uses it; ready for review.
+
+    - **harnessmux** `7abf799` (the outage wait, CHANGELOG dated) fast-forwarded on `main`, signed tag `v0.1.3`, both pushed. release.yml run `43656355253`: all CI, builds, release and publish passed. crates.io shows 0.1.3.
+    - **lotar** `3b983482` on `t3/job-end-rules-t3-outage`, rebased onto `main` (`c9c74057`), signed:
+      - `harnessmux = "0.1.3"` in `Cargo.toml` and `Cargo.lock`
+      - end-rule and outcome recovery, as in `6fbb0ab1`
+      - `docs/help/agent.md`: the t3 section says how the job waits through an outage
+      - new test `a_t3_job_that_loses_the_server_completes_from_its_thread_and_runs_its_end_rules` (`crates/lotar-lib/tests/dev503_harness_jobs_test.rs`): `t3` exits 1 with 'Could not reach the T3 Code server', reads fail twice, then the thread shows completed. The job completes and its `job_completed` rule sets Done. It fails on harnessmux 0.1.2 (`Job ... ended with status failed`) and passes on 0.1.3.
+    - Checks: `npm run lint` passes; `npm test` passes (2180 Rust, 1537 UI); `npm run smoke` passes (401).
+    - Done when 2 was already met: all 15 tickets are WontDo or Done.
+    - Removed the harnessmux worktree `~/.t3/worktrees/harnessmux/DEV-467` and its merged branch.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8a51060f-8f0e-40eb-8309-91840a4fac93
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa70d136-71c4-42cc-8c60-e9566c5a27b6
@@ -204,6 +218,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8aeb63c7-93c0-49d1-9778-f136836471e6
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A19b85aa7-bc70-4cfa-9b1f-2c60f757c3f8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A25c568be-e00c-4743-98fb-231701d826f1
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4bee1141-77fb-4e65-a470-22f3123e22f3
 releases:
 - 6
 description: |-
@@ -820,3 +835,21 @@ history:
   - field: status
     old: HelpNeeded
     new: InProgress
+- at: 2026-11-15T00:17:30.810088+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T00:18:10.383589+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T00:27:20.422265+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4bee1141-77fb-4e65-a470-22f3123e22f3

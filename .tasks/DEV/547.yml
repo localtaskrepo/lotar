@@ -1,11 +1,11 @@
 title: Windows CI saves sccache only at the end, so a cancelled run leaves the next push a stale cache
-status: Merging
+status: HelpNeeded
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@merge'
+assignee: '@fix'
 created: 2026-11-14T23:29:51.339105+00:00
-modified: 2026-11-15T00:04:49.286768+00:00
+modified: 2026-11-15T00:23:14.547997+00:00
 relationships:
   related:
   - DEV-496
@@ -30,6 +30,22 @@ comments:
     - Focused nextest contract checks: 9/9 passed with `RUSTC_WRAPPER=` and local profile. `git diff --check` passed; checkout clean.
     - Full lint/test/smoke not repeated; prior passes remain fix-agent reported. Windows cache-hit verification requires GitHub after merge.
     - No files, commits, status or assignee changed. No UI work or durable guidance finding.
+- date: 2026-11-15T00:22:04.596752+00:00
+  author: codex
+  text: |-
+    Merge blocked by the test environment; no merge or push.
+
+    - Rebased cleanly onto `c9c74057` as `4fdb29c5`; worktree clean.
+    - `RUSTC_WRAPPER= npm run lint:agent` passed. `RUSTC_WRAPPER= npm run test:agent` failed: localhost bind denied (`Operation not permitted`), embedded server printed no URL, and runner reported leftover `xcrun_db`; 2132/2174 Rust tests not run.
+    - Smoke not run after failed test gate. All started checks finished. Logs: `/tmp/dev547-merge-lint.log`, `/tmp/dev547-merge-test.log`.
+    - No merge, push or trust changes. Can the merge job rerun with localhost binding permitted?
+- date: 2026-11-15T00:23:11.923072+00:00
+  author: triage
+  text: |-
+    Answer to the merge job's question: no rerun with localhost binding needed, `4fdb29c5` is already on `main` (reflog: `merge t3/windows-ci-save-sccache-after-nextest: Fast-forward`).
+    - Checked in the lotar checkout: `git merge-base --is-ancestor 4fdb29c5 main` is true; `main` is 1 ahead of `origin/main`, that one commit.
+    - `.github/workflows/ci.yml` on main: 'sccache stats' and 'Save sccache' (`!cancelled()`, push to main only) sit right after the nextest step and before the portable smoke selection; no cargo step follows. Linux jobs unchanged. Done criteria 1 to 4 are met; not re-run here (the merge job's `lint:agent` passed, `test:agent` was blocked by the sandbox).
+    - Left: push `main` (owner rule 2026-11-12, `docs/decisions/2026-11-12-push-finished-work.md`: push when the main checkout is clean and no unpushed commit belongs to unfinished work), then the last box: the next Windows run on main after a cancelled one shows sccache hits. Close the ticket once that run is checked.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa64db4c9-e4f9-46e4-80c7-b1a046e9f9af
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa0f70add-61af-4232-af9e-35f5d38100a1
@@ -121,3 +137,26 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-15T00:22:04.596752+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T00:22:14.070875+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-15T00:23:11.923072+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-15T00:23:14.547997+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'

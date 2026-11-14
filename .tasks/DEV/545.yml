@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@review'
 created: 2026-11-14T23:27:11.181674+00:00
-modified: 2026-11-14T23:59:39.128467+00:00
+modified: 2026-11-15T00:27:15.377780+00:00
 relationships:
   related:
   - local:LOCA-324
@@ -27,9 +27,43 @@ comments:
 - date: 2026-11-14T23:59:27.509896+00:00
   author: claude
   text: Filed the tag colors follow-up as DEV-548.
+- date: 2026-11-15T00:15:50.351250+00:00
+  author: codex
+  text: |-
+    Review: blocking — required before/after UI screenshots are missing.
+
+    - `view/composables/useTaskPanelOwnership.ts:237` changes panel suggestions. Ticket tag `web-ui` triggers the requested light/dark screenshots at 1920, 1440 and 390 px; implementation comment confirms none were captured. Attach these before merge.
+    - Inspected `743ba91f` against `main`, ticket criteria/comments, related summaries, contract and recent ownership/service history. No confirmed code defect found; review incomplete.
+    - Ownership unit tests: 6 passed. Targeted quick smoke cannot start because `target/smoke/lotar` is absent; no independent screenshots captured.
+    - Full lint, Rust and build-first smoke not rerun. No source edits, commits or minor tickets; status and assignee unchanged.
+- date: 2026-11-15T00:27:07.860148+00:00
+  author: claude
+  text: |-
+    Rework: before and after screenshots are now attached; no code changed, so the commit stays `743ba91f`.
+
+    - Finding (missing screenshots): fixed. 12 attachments `before-{light,dark}-{1920,1440,390}.png` (built from `main`) and `after-…` (built from `agent/DEV-545`), task panel on `/task/DEMO-1` of a scratch workspace with invented people and tags
+    - Each image has a yellow caption strip naming the build and its suggestion request: before `/api/tasks/list?project=DEMO&limit=200&offset=0` 1560 B, after `/api/tasks/values?project=DEMO` 145 B
+    - Without the strip, all six pairs are byte-identical (`cmp`); the assignee select offers the same 16 options in both builds. Expected: only the data source changed, not the layout
+    - I read the 1440 light, 1920 dark and 390 dark pairs: no visual problem
+    - Smoke binary for the reviewer: `npm run build:smoke` creates `target/smoke/lotar`, which `npm run test:smoke:quick` needs
+    - Tagged `ui`
+    - Checks: no code change since `743ba91f`, so lint, `npm test` and `npm run smoke` from the first pass still apply (all passed); not rerun
 references:
 - file: view/composables/useTaskPanelOwnership.ts
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A08976f6f-b085-46f4-9a5b-7ff1c6ea76a4
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A22957222-a1b1-47f3-80a5-5c840396c127
+- attachment: before-dark-1440.3e6fe413604843dd7ad5573085ac558e.png
+- attachment: before-dark-1920.56ce7eb2af84685ff466aab5e169f29d.png
+- attachment: before-dark-390.90926518512d9115c26251403713d61f.png
+- attachment: before-light-1440.d856aedbb61455b54d81e17864ca1a67.png
+- attachment: before-light-1920.3190fc7d3d8cccf4441d3538c37bded8.png
+- attachment: before-light-390.1a64e4ef29049a15925e3b7b0c6948a7.png
+- attachment: after-dark-1440.21c8f237e290eb971f25a3d0b39397e4.png
+- attachment: after-dark-1920.f5b32aadfed85d1f2b809d50d3df03e6.png
+- attachment: after-dark-390.272e892d39a29118720b258f081f2763.png
+- attachment: after-light-1440.86531d154ac1e80b569208211b67d6f4.png
+- attachment: after-light-1920.1c85f9d4d13da70f2ce8707adefeb7b7.png
+- attachment: after-light-390.2eecde059d89a989e452cbfb31213c63.png
 description: |-
   Opening one ticket downloads up to 200 full tickets of its project only to suggest names, tags and custom field values. On the owner's inbox (standards.pyxzl.net, 2026-11-14) that was 618 KB and 652 ms of the page load for `/api/tasks/get` returning 5 KB, and it grows with the project.
 
@@ -54,6 +88,8 @@ description: |-
   - [x] Payload measured before and after on a seeded project of 300+ tickets
 tags:
 - web-ui
+- review-returned
+- ui
 history:
 - at: 2026-11-14T23:27:11.502735+00:00
   actor: claude
@@ -189,6 +225,175 @@ history:
   changes:
   - field: comment_added
 - at: 2026-11-14T23:59:39.128467+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T00:14:06.387138+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A22957222-a1b1-47f3-80a5-5c840396c127
+- at: 2026-11-15T00:15:50.351250+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T00:15:50.385842+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: web-ui
+    new: web-ui, review-blocked
+- at: 2026-11-15T00:15:55.565295+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: web-ui, review-blocked
+    new: web-ui, review-returned
+- at: 2026-11-15T00:23:32.576031+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-15T00:26:08.877167+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-dark-1440.b71b17408dad2bf00e69a7e84a3ac5fc.png
+- at: 2026-11-15T00:26:08.941972+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-dark-1920.bb9acf84e5f3639a76f39f95bdbffcbc.png
+- at: 2026-11-15T00:26:08.997670+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-dark-390.9147328cc70e60f6489918da9d1e925e.png
+- at: 2026-11-15T00:26:09.044540+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-light-1440.6ca109af5d247c840b0f377e6602ea8e.png
+- at: 2026-11-15T00:26:09.093190+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-light-1920.9a027547f1ab836d2f8c18ba16e7b13c.png
+- at: 2026-11-15T00:26:09.146438+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-light-390.89ff6d7de65e649954998891af99e127.png
+- at: 2026-11-15T00:26:54.699503+00:00
+  actor: claude
+  changes:
+  - field: reference_removed
+    old: attachment:after-dark-1440.b71b17408dad2bf00e69a7e84a3ac5fc.png
+- at: 2026-11-15T00:26:54.864044+00:00
+  actor: claude
+  changes:
+  - field: reference_removed
+    old: attachment:after-dark-1920.bb9acf84e5f3639a76f39f95bdbffcbc.png
+- at: 2026-11-15T00:26:54.932581+00:00
+  actor: claude
+  changes:
+  - field: reference_removed
+    old: attachment:after-dark-390.9147328cc70e60f6489918da9d1e925e.png
+- at: 2026-11-15T00:26:55.017677+00:00
+  actor: claude
+  changes:
+  - field: reference_removed
+    old: attachment:after-light-1440.6ca109af5d247c840b0f377e6602ea8e.png
+- at: 2026-11-15T00:26:55.090264+00:00
+  actor: claude
+  changes:
+  - field: reference_removed
+    old: attachment:after-light-1920.9a027547f1ab836d2f8c18ba16e7b13c.png
+- at: 2026-11-15T00:26:55.162542+00:00
+  actor: claude
+  changes:
+  - field: reference_removed
+    old: attachment:after-light-390.89ff6d7de65e649954998891af99e127.png
+- at: 2026-11-15T00:26:55.252539+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-dark-1440.3e6fe413604843dd7ad5573085ac558e.png
+- at: 2026-11-15T00:26:55.373774+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-dark-1920.56ce7eb2af84685ff466aab5e169f29d.png
+- at: 2026-11-15T00:26:55.519538+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-dark-390.90926518512d9115c26251403713d61f.png
+- at: 2026-11-15T00:26:55.600647+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-light-1440.d856aedbb61455b54d81e17864ca1a67.png
+- at: 2026-11-15T00:26:55.663050+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-light-1920.3190fc7d3d8cccf4441d3538c37bded8.png
+- at: 2026-11-15T00:26:55.749182+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-light-390.1a64e4ef29049a15925e3b7b0c6948a7.png
+- at: 2026-11-15T00:26:55.826450+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-dark-1440.21c8f237e290eb971f25a3d0b39397e4.png
+- at: 2026-11-15T00:26:55.939568+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-dark-1920.f5b32aadfed85d1f2b809d50d3df03e6.png
+- at: 2026-11-15T00:26:56.107846+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-dark-390.272e892d39a29118720b258f081f2763.png
+- at: 2026-11-15T00:26:56.218190+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-light-1440.86531d154ac1e80b569208211b67d6f4.png
+- at: 2026-11-15T00:26:56.430009+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-light-1920.1c85f9d4d13da70f2ce8707adefeb7b7.png
+- at: 2026-11-15T00:26:56.547300+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-light-390.2eecde059d89a989e452cbfb31213c63.png
+- at: 2026-11-15T00:27:01.824302+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: web-ui, review-returned
+    new: web-ui, review-returned, ui
+- at: 2026-11-15T00:27:07.860148+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T00:27:15.377780+00:00
   actor: mallox
   changes:
   - field: status

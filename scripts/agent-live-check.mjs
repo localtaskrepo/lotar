@@ -10,7 +10,7 @@
 //
 // Each scenario builds a throwaway git repository with a small bug and a
 // ticket, drives LoTaR the way a user would, and checks the outcome.
-// LOTAR_BIN overrides the binary (default: target/debug/lotar).
+// LOTAR_BINARY_PATH overrides the binary (default: target/debug/lotar).
 
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { parse, stringify } from 'yaml';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const lotarBin = process.env.LOTAR_BIN || path.join(root, 'target', 'debug', 'lotar');
+const lotarBin = process.env.LOTAR_BINARY_PATH || path.join(root, 'target', 'debug', 'lotar');
 
 // Cheap settings per CLI so a full run costs cents, not dollars.
 const RUNNERS = {
@@ -544,7 +544,7 @@ function runPipeline(dir, ticket, options) {
 
 const options = parseArgs(process.argv.slice(2));
 if (!fs.existsSync(lotarBin)) {
-    console.error(`LoTaR binary not found at ${lotarBin}; build it first (cargo build) or set LOTAR_BIN.`);
+    console.error(`LoTaR binary not found at ${lotarBin}; build it first (cargo build) or set LOTAR_BINARY_PATH.`);
     process.exit(2);
 }
 const runners = (options.runners.length ? options.runners : Object.keys(RUNNERS)).filter((runner) => {

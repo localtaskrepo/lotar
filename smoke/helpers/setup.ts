@@ -8,13 +8,6 @@ if (!process.env.LOTAR_TEST_SILENT) {
     process.env.LOTAR_TEST_SILENT = '1';
 }
 
-if (!process.env.LOTAR_BINARY_PATH) {
-    // Allow overriding via LOTAR_BIN for backwards compatibility
-    if (process.env.LOTAR_BIN) {
-        process.env.LOTAR_BINARY_PATH = process.env.LOTAR_BIN;
-    }
-}
-
 // Config overrides from the caller (an agent's LOTAR_DEFAULT_REPORTER) would
 // beat the fixtures' own config (DEV-338). The list comes from
 // ENV_OVERRIDE_DEFINITIONS; `npm run smoke:ui` sets LOTAR_WEB_UI_PATH itself.

@@ -1,16 +1,38 @@
 title: Tag colors setting downloads up to 1000 full tickets only to suggest tags
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-14T23:59:23.228533+00:00
-modified: 2026-11-15T00:04:54.092983+00:00
+modified: 2026-11-15T00:23:30.533709+00:00
 relationships:
   related:
   - DEV-545
+comments:
+- date: 2026-11-15T00:13:52.937975+00:00
+  author: claude
+  text: |-
+    Fixed: the tag colors field takes its tags from `GET /api/tasks/values`, not 1000 whole tickets. Commit `1270f46f`.
+    - Built on DEV-545's unmerged commit `743ba91f` (`agent/DEV-545`, in review), which adds the endpoint. Merge DEV-545 first.
+    - `view/components/ConfigTagColorsField.vue`: one `api.taskValues(project)` call. Tags are still deduplicated ignoring case and sorted.
+    - Test: `smoke/tests/ui.tag-colors.smoke.spec.ts` now requires `/api/tasks/values` and no `/api/tasks/list` on the config page. It fails on the old code (`expected [ '/api/tasks/list' ] to include '/api/tasks/values'`).
+    - Check on a 2-ticket workspace: before `/api/tasks/list?has=tag&limit=1000` 911 B, after `/api/tasks/values` 81 B.
+    - Screenshots: the before and after images are byte-identical, so lotar stored one attachment, `dev548-before.ac255f9c….png`. The field looks the same.
+    - Checks: `npm run lint`, `npm test` (2173 Rust, 1538 UI), and `npm run smoke` (402) all passed.
+- date: 2026-11-15T00:23:13.164774+00:00
+  author: codex
+  text: |-
+    Review: blocking — required before/after UI screenshots are incomplete.
+
+    - `view/components/ConfigTagColorsField.vue:156`: supply light/dark captures at 1920, 1440 and 390 px. Read the sole attachment: it is one cropped light-mode field, not the required set.
+    - Inspected commits `1270f46f` and inherited `743ba91f`, both tickets/comments and recent main component/test history. No confirmed code defect in the focused replacement. DEV-545 remains unmerged with a blocking review.
+    - Ownership unit tests: 6 passed. Targeted tag-colors smoke stopped before startup because `target/smoke/lotar` is missing. No independent screenshots or request-size verification completed.
+    - Full lint, Rust and build-first smoke not rerun. No source edits, commits or minor tickets. Supply captures and rerun browser verification before approval.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A210021d3-defe-4f5f-bacf-cfdfd0e63987
+- attachment: dev548-before.ac255f9ce70ed73711987a652ddcef13.png
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad0b59f77-255b-4f54-acc0-af142a07e13c
 description: |-
   Found while fixing DEV-545: `view/components/ConfigTagColorsField.vue:157` calls `api.listTasks({ project, has: 'tag', limit: 1000 })` and keeps only the tags, so the config page downloads whole tickets (descriptions, comments, history).
 
@@ -19,6 +41,8 @@ description: |-
   Done: the field takes its tags from `GET /api/tasks/values` (DEV-545), with a test.
 tags:
 - health
+- ui
+- review-returned
 custom_fields:
   finding: perf:ConfigTagColorsField
 history:
@@ -44,3 +68,51 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A210021d3-defe-4f5f-bacf-cfdfd0e63987
+- at: 2026-11-15T00:13:43.688350+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, ui
+- at: 2026-11-15T00:13:43.836327+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev548-before.ac255f9ce70ed73711987a652ddcef13.png
+- at: 2026-11-15T00:13:52.937975+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T00:14:01.545204+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T00:22:19.745333+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad0b59f77-255b-4f54-acc0-af142a07e13c
+- at: 2026-11-15T00:23:13.164774+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T00:23:15.157501+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: health, ui
+    new: health, ui, review-blocked
+- at: 2026-11-15T00:23:30.533709+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: health, ui, review-blocked
+    new: health, ui, review-returned

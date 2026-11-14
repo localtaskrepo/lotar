@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T23:27:11.643153+00:00
-modified: 2026-11-15T00:03:04.011596+00:00
+modified: 2026-11-15T00:27:24.680867+00:00
 relationships:
   related:
   - DEV-471
@@ -28,6 +28,14 @@ comments:
     - Fresh build plus targeted harness suites passed: `LOTAR_BIN=/opt/homebrew/bin/lotar npm run test:smoke:agent -- smoke/tests/harness.workspace.smoke.spec.ts smoke/tests/harness.server.smoke.spec.ts` (23/23, including SIGKILL). Initial sandbox run hit listen EPERM and missing artifacts; permitted build-first retry passed.
     - `npm run lint:frontend`, `npm run lint:js`, and `git diff --check main...HEAD` passed. Full Rust/UI/full smoke and Windows suites were not rerun during review.
     - No source changes or commits; status and assignee unchanged.
+- date: 2026-11-15T00:27:24.680867+00:00
+  author: codex
+  text: |-
+    Merged: fix fast-forwarded into main; all required gates passed after rebasing.
+    - Landed `c91dd9dd` (original `3081dd70`); concurrent main advance required a second clean rebase and full gate rerun.
+    - `npm run lint:agent`, `npm run test:agent` (2174 Rust, 1537 UI, release/hooks), and `LOTAR_BIN=/opt/homebrew/bin/lotar npm run test:smoke:agent` (402 tests) passed on final rebased code.
+    - SIGKILL cleanup and binary selection regressions passed. No automation/config changes in this fix, so no trust refresh needed.
+    - Folding main ticket-store changes into the merge commit as instructed; push follows only if main is clean. No guidance corrections.
 references:
 - file: smoke/helpers/server.ts
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A88d330b2-bc53-4fb8-a29a-a8332054c7e2
@@ -110,3 +118,7 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-15T00:27:24.680867+00:00
+  actor: codex
+  changes:
+  - field: comment_added

@@ -1,11 +1,11 @@
 title: Agent jobs recover from sandbox-blocked build checks without premature handback
-status: HelpNeeded
+status: Reviewing
 priority: High
 type: Bug
 reporter: codex
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-14T04:57:22.931962+00:00
-modified: 2026-11-14T23:59:29.873325+00:00
+modified: 2026-11-15T00:18:53.933291+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -88,6 +88,16 @@ comments:
     choice:
     - fix
     note: (answered in INBOX-161)
+- date: 2026-11-15T00:18:44.482883+00:00
+  author: claude
+  text: |-
+    Rework 3: taken-over merge jobs now keep the handback guard, commit `d8498d2e` (amended, signed).
+
+    - **Finding (taken-over job skipped the guard):** `ensure_branch_merged` (`agent_job_service.rs`) now checks a recorded outcome's assignee first, without needing the starting snapshot. The merge job's starting assignee is also saved in its active-job record (`ActiveJob.assignee_at_start` in `agent_active_jobs.rs`; empty means none), and `adopt_orphaned_job` restores it, so a direct reassignment is caught after a takeover too.
+    - New unit tests: `a_taken_over_merge_job_without_a_starting_assignee_still_sees_a_recorded_handback` (failed with the previous check, passes now), `a_taken_over_merge_job_handed_back_directly_stays_unmerged`, `a_taken_over_merge_job_that_finished_is_fast_forwarded`, `a_taken_over_merge_job_keeps_its_starting_assignee` (record round trip).
+    - Old records without the field: the recorded outcome still counts; a direct change can't be seen there.
+    - `docs/help/agent.md` mentions taken-over jobs.
+    - Checks: `npm run lint`, `npm test` (2155 Rust + 1536 UI), `npm run smoke` (400) pass; `RUSTC_WRAPPER= cargo nextest run --cargo-profile local -E 'test(merge_) | test(a_taken_over_merge_job)'` 17/17 pass. Live mux run not repeated (no prompt change since).
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af501c0c4-15b4-4f82-8d97-681b0bda889e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A87b62941-631a-4782-ae16-737469e6ebf9
@@ -307,3 +317,22 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-15T00:09:17.013159+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T00:18:44.482883+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T00:18:53.933291+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

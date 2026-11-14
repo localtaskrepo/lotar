@@ -91,7 +91,7 @@ function parseArgs(argv) {
 }
 
 function resolveBinary() {
-    const explicit = process.env.LOTAR_BINARY_PATH || process.env.LOTAR_BIN;
+    const explicit = process.env.LOTAR_BINARY_PATH;
     if (explicit) return explicit;
     for (const candidate of [
         path.join(ROOT, 'target', 'smoke', BIN_NAME),

@@ -22,7 +22,7 @@ description: Use this when smoke tests fail (binary/web assets, Playwright setup
 
 - “Binary not found”
   - Smoke prefers `target/smoke/lotar`, falling back to `target/release/lotar`.
-  - Fix: run `npm run build:smoke`, or set `LOTAR_BINARY_PATH` (or `LOTAR_BIN`) to a freshly built custom binary.
+  - Fix: run `npm run build:smoke`, or set `LOTAR_BINARY_PATH` to a freshly built custom binary.
 
 - “Port already in use”
   - By default the harness passes `--port 0`: the OS assigns the port at bind time (no probe-then-bind race) and the actual port is read back from the post-bind readiness banner, so default runs do not collide.
@@ -46,7 +46,7 @@ Some agent harnesses run the shell in a sandbox that blocks certain OS operation
 
 ## Useful env vars
 
-- `LOTAR_BINARY_PATH` / `LOTAR_BIN`: override the binary used by smoke.
+- `LOTAR_BINARY_PATH`: override the binary used by smoke (`LOTAR_BIN` is ignored: agent jobs set it to their own `lotar`).
 - `LOTAR_TASKS_DIR`, `LOTAR_HOME`: smoke sets these per-test (see `smoke/helpers/workspace.ts`).
 - `LOTAR_SMOKE_CHROMIUM_ARGS`: comma-separated Chromium launch flags for restricted sandboxes (e.g. `--no-sandbox,--no-zygote,--single-process`); empty by default.
 - `RUST_LOG=debug` or `LOTAR_DEBUG=1`: can help when diagnosing server/CLI behavior (keep logs free of secrets/PII).

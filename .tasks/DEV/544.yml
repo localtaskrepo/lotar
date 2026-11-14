@@ -1,11 +1,11 @@
 title: A finished review job is taken over hours later and failed as a merge job on the reviewer's thread branch
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T23:14:58.300535+00:00
-modified: 2026-11-15T00:08:18.234901+00:00
+modified: 2026-11-15T00:08:56.273281+00:00
 relationships:
   related:
   - DEV-478
@@ -41,6 +41,14 @@ comments:
     - Passed `npm run lint:agent`, `npm run test:agent` (2174 Rust, 1537 UI), `npm run test:smoke:agent` (401), with `RUSTC_WRAPPER=`. No skipped checks.
     - Including pending `.tasks` updates in the merged commit as instructed. No automation/config changed in this merge, so no new trust required.
     - Preparing push with prior finished STD-119 commit `8e918799`; final hash and push result follow.
+- date: 2026-11-15T00:08:51.119890+00:00
+  author: codex
+  text: |-
+    Merged and pushed: `c9c74057` on main, including pending ticket updates.
+
+    - Push succeeded (`028b2167..c9c74057`), including finished STD-119. Push hook passed Rust formatting and clippy.
+    - All required lint, Rust/UI tests and smoke passed before merge. No automation/config changes in this merge; trust unchanged.
+    - No checks running. Status and assignee left to job-end automation.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab263a21b-694d-4c1e-afa1-1d29dda26589
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A720a061e-9705-4efe-90de-a0eaf3a1f2b1
@@ -156,3 +164,13 @@ history:
   actor: codex
   changes:
   - field: comment_added
+- at: 2026-11-15T00:08:51.119890+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T00:08:56.273281+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
