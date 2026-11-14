@@ -1,6 +1,7 @@
 # Harness tool design
 
-Design for DEV-492, 2026-11-13. Status: approved by the owner on 2026-11-13. No repo and no code exist yet.
+Design for DEV-492, 2026-11-13. Status: approved by the owner on 2026-11-13; built as
+[localtaskrepo/harnessmux](https://github.com/localtaskrepo/harnessmux) (DEV-504). lotar's switch to it is DEV-503.
 
 The owner, 2026-11-13: "Why not pull it out and put it in its own repo next to lotar as a tool that allows
 multiplexing between harnesses. Then lotar can use, we can use it, any other app that needs it could use it. And we
@@ -17,6 +18,13 @@ the code since it's already a little older, and may have been written by less ca
 - lotar's own runners: "Remove right away" (the draft kept them next to the new runner until it worked).
 - Review of the code that stays in lotar: "After the switch" (DEV-501).
 - Asked to approve the design with these decisions in it: "Approve".
+
+2026-11-13, after the approval:
+
+- Asked whether automations should still be able to start T3 Code threads after the switch: "Yes, as a harnessmux
+  agent". The tool gets a t3 agent driven through T3's CLI; lotar keeps no T3 code.
+- On grouping chats under their projects: "harnessmux only". Every session records its project (the repository's
+  main checkout, also for a worktree); Claude and Codex get no project setting of their own and no upstream requests.
 
 ## Recommendation
 
@@ -122,13 +130,16 @@ Harnesses that need something of their own:
 
 - Amp: no ACP server known. Keep lotar's current headless runner (`amp -x --stream-json`) as a legacy adapter in
   the tool, behind the same session interface, without resume.
-- T3: not a harness but another ACP client in front of the same adapters. The tool doesn't drive T3. The owner keeps
-  T3 for his own chats.
+- T3: not a harness but another ACP client in front of the same adapters. The tool drives it through T3's CLI as a
+  legacy adapter like Amp (`t3 thread start` with provider, model and worktree; `thread send` for later turns;
+  `thread show` to follow), so automations can still start T3 Code threads. T3's CLI has no effort, child threads,
+  interrupt or permission answers; `capabilities` says so.
 - `command`: lotar's escape hatch for any program stays in lotar, outside the tool.
 
 ### What the tool adds over ACP
 
-- Session registry: a name, the agent, the working directory, the ACP session id, the adapter version, created and
+- Session registry: a name, the agent, the working directory and its project (the repository's main checkout, from
+  git's common dir, so a worktree belongs to its repository), the ACP session id, the adapter version, created and
   last-used times, the state (idle, running, waiting for permission, ended). Stored per user under
   `~/.local/state/harnessmux/` (`%LOCALAPPDATA%` on Windows), one JSON file per session.
 - One owner process per running session holding the ACP connection, reachable over a Unix socket (named pipe on
@@ -144,7 +155,8 @@ Harnesses that need something of their own:
   - Extra writable directories through ACP `additionalDirectories`.
 - An event stream of its own, JSONL, stable across agents and adapter versions: `session.started`,
   `message.delta`, `message`, `tool.started`, `tool.finished`, `permission.requested`, `usage`, `turn.finished`
-  (stop reason, tokens, cost), `turn.failed`, `session.ended`. Each event keeps the raw ACP message under `raw`.
+  (stop reason, tokens, cost), `turn.failed`, `session.ended`. Each event carries the session's project, so lotar's
+  UI can group by it, and keeps the raw ACP message under `raw`.
   Known error texts from adapters (`model_not_found`, auth failures) become `turn.failed`.
 - MCP servers per session: the caller passes them (stdio, HTTP), the tool hands them to `session/new`. lotar passes
   its own `lotar mcp` server this way instead of writing per-CLI config flags.
@@ -178,12 +190,12 @@ new one that resumes the session.
 harnessmux run <agent> [--name N] [--cwd DIR] [--model M] [--effort E] [--permissions P]
                [--mcp FILE] [--add-dir DIR] [--json] [PROMPT | -f FILE]
 harnessmux send <name> [--wait] [PROMPT | -f FILE]     # queued when a turn runs
-harnessmux attach <name> [--from-start] [--json]       # follow; stdin lines become messages
+harnessmux attach <name> [--from-start] [--json]       # follow; stdin lines become messages; --project: all of a repo
 harnessmux resume <name>                               # reconnect after a crash or reboot
 harnessmux cancel <name>
 harnessmux answer <name> <request-id> <option>         # permission request
 harnessmux set <name> <option> <value>
-harnessmux list [--json]  |  status <name>  |  close <name>
+harnessmux list [--json] [--project [DIR]]  |  status <name>  |  close <name>
 harnessmux capabilities [<agent>] [--json]
 harnessmux mcp                                          # MCP server: start, send, wait, cancel child sessions
 ```
@@ -198,8 +210,8 @@ bump or a renamed option is a data change that reaches lotar without a lotar bui
 reaches lotar with the next lotar release.
 
 `AgentProfileDetail` moves into the crate as its profile: agent, model, effort, permissions, MCP servers, extra
-directories, env, budget. lotar keeps its config keys and converts. `provider` (a T3 setting) and `session:
-continue` stay in lotar.
+directories, env, budget, and for the t3 agent provider, worktree base and branch. lotar keeps its config keys and
+converts. `session: continue` stays in lotar.
 
 lotar keeps everything that is about tickets: jobs, queue, worktrees, landing, prompts, instructions, rules, the
 reviewer and merge flow, the web UI.
@@ -220,8 +232,8 @@ One change, no transition period:
    event stream; the message box and cancel call `send` and `cancel`; permission requests become questions in the
    job view.
 2. Profiles keep their `runner` key: `claude`, `codex`, `copilot`, `gemini`, `cursor`, `amp`, `droid`, `opencode`,
-   `kilo` and `antigravity` become the tool's agent of that name. `t3` is removed with a hint to pick the agent
-   itself (`claude`, `codex`). `command` stays in lotar as the escape hatch for any program.
+   `kilo`, `antigravity` and `t3` become the tool's agent of that name. `command` stays in lotar as the escape hatch
+   for any program.
 3. `session: continue` works through the tool's named sessions, one per ticket (named `DEV-492` and so on), for all
    agents.
 4. Removed in the same change: the per-CLI command builders and parsers in `agent_runner.rs` (about 1700 lines),

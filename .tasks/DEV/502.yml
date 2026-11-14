@@ -1,11 +1,11 @@
 title: Filter the Comments and History tabs by author and type
-status: Merging
+status: Done
 priority: Low
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T22:41:10.367004+00:00
-modified: 2026-11-14T00:37:50.162770+00:00
+modified: 2026-11-14T00:38:10.226086+00:00
 relationships:
   blocks:
   - DEV-488
@@ -135,7 +135,6 @@ description: |-
 tags:
 - web-ui
 - ui
-- review-returned
 history:
 - at: 2026-11-13T22:41:10.738027+00:00
   actor: claude
@@ -581,3 +580,12 @@ history:
   actor: codex
   changes:
   - field: comment_added
+- at: 2026-11-14T00:38:10.226086+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: web-ui, ui, review-returned
+    new: web-ui, ui

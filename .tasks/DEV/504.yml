@@ -1,11 +1,11 @@
 title: 'Create harnessmux: a Rust crate and CLI that run agent CLI sessions over ACP'
-status: HelpNeeded
+status: Merging
 priority: High
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@merge'
 created: 2026-11-13T22:45:12.815612+00:00
-modified: 2026-11-14T00:30:41.988177+00:00
+modified: 2026-11-14T00:47:44.476663+00:00
 relationships:
   blocks:
   - DEV-503
@@ -55,8 +55,15 @@ comments:
 - date: 2026-11-14T00:30:41.988177+00:00
   author: claude
   text: 'mallox 2026-11-13: "Okay I created a token under the 1password item LoTaR Crates.io publish token ... We can now publish any lotar rust package there". harnessmux 0.1.1 (044d7a9, socket fix) is tagged and on GitHub Releases (6 binaries + SHA256SUMS, CI green). `cargo publish` through opgate with that token was refused by crates.io: "A verified email address is required to publish crates to crates.io" (https://crates.io/settings/profile). Waiting for the email verification, then `cargo publish` of 0.1.1 again; nothing reached crates.io yet.'
+- date: 2026-11-14T00:41:04.481445+00:00
+  author: claude
+  text: 'mallox 2026-11-13: "email is confirmed". Published harnessmux 0.1.1 to crates.io with cargo publish through opgate (token item "LoTaR Crates.io publish token"): https://crates.io/crates/harnessmux, 0.1.1 from tag v0.1.1 (044d7a9), the same commit as the GitHub release. Done when is met: repo with README, LICENSE and CI green on Linux, macOS and Windows; crate on crates.io and CLI binaries on GitHub Releases; live runs and DEV-503 needs are in the earlier comment. Left for review and merge: lotar commit 24fea9c6 on agent/DEV-504 (design doc). Not done, a proposal: crates.io Trusted Publishing so later releases publish from release.yml without the token.'
+- date: 2026-11-14T00:47:38.528642+00:00
+  author: codex
+  text: 'Review: passed. Reviewed 24fea9c6 (the only commit beyond main), its complete design-doc diff, ticket comments and related DEV-492/DEV-503 requirements, owner decisions, and main history for the touched document. The changes accurately record the approved T3 agent and harnessmux-only project grouping; no blocking findings or minor tickets. Reran Prettier check and git diff --check: passed. No application code or UI changed in this branch, so application suites and screenshots are not applicable. External release/CI/crates.io claims are supported by the implementation comments and local Cargo.toml 0.1.1, but independent online verification was unavailable: GitHub connection failed and crates.io DNS resolution failed. This review approves the LoTaR documentation merge, not a fresh audit of the separate harnessmux implementation. No files edited, commits made, or status/assignee changes.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1d141b3f-b2f2-448d-b3f0-5ea7a2827f40
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4ac64f48-54b1-4379-bb9d-f53b4f59cb4a
 description: 'Approved design: docs/developers/harness-tool-design.md (DEV-492; on main once DEV-492 merges, until then on branch agent/DEV-492). The owner, 2026-11-13, approved it and chose "Start now" for this ticket, including creating the public GitHub repo. Create ~/Development/@localtaskrepo/harnessmux and the public repo localtaskrepo/harnessmux (MIT, like lotar; self-contained: set up, checked and run from a clone alone, shared configs from ~/Development/standards copied in). Build on ACP with the agent-client-protocol crate at its latest stable release (look it up, 5.2.0 on 2026-11-13). What it does, from the design: session registry with names; the session owner (lotar''s process or a harnessmux process) holds the ACP connection and serves a Unix socket (named pipe on Windows) for send, cancel, answer, set, status; resume via session/resume, fallback session/load; one mapping for model, effort and permissions (read-only, workspace, full); a versioned JSONL event stream; MCP servers per session; capabilities; the agent table (command, pinned adapter version, option ids) as TOML data read at run time. CLI: run, send, attach, resume, cancel, answer, set, list, status, close, capabilities, mcp. Agents: every one lotar runs today (claude, codex, copilot, gemini, cursor, amp without ACP as a legacy adapter, droid, opencode, kilo, antigravity); live-check Claude, Codex and Copilot (installed here), the rest from their docs, marked as not run live. Lessons from the acpx trial in the design doc: pin current adapters (codex-acp 1.x failed, 2.6.0 works), adapter errors sent as text become turn.failed. Tests from recorded ACP sessions; CI on macOS, Linux and Windows. Done when: the repo exists with README, LICENSE and CI passing, a first release of the crate and CLI is out, and a comment lists what ran live and what DEV-503 (the lotar switch) needs.'
 history:
 - at: 2026-11-13T22:45:13.018040+00:00
@@ -120,3 +127,34 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-14T00:41:04.481445+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T00:46:49.501849+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Reviewing
+  - field: assignee
+    old: mallox
+    new: '@review'
+- at: 2026-11-14T00:46:52.233023+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4ac64f48-54b1-4379-bb9d-f53b4f59cb4a
+- at: 2026-11-14T00:47:38.528642+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T00:47:44.476663+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

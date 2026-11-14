@@ -1,11 +1,11 @@
 title: Question comments with options the owner answers by click, and answers that set the ticket's fields
-status: Blocked
+status: InProgress
 priority: High
 type: Feature
 reporter: claude
-assignee: claude
+assignee: '@fix'
 created: 2026-11-13T21:13:42.890310+00:00
-modified: 2026-11-14T00:20:37.817014+00:00
+modified: 2026-11-14T00:47:46.072143+00:00
 relationships:
   depends_on:
   - DEV-502
@@ -68,6 +68,9 @@ comments:
 - date: 2026-11-13T23:19:49.772542+00:00
   author: codex
   text: 'Rework persistence fix committed as 5eb948ed (signed), on the assigned branch; no push or merge. Answer validation and option fields now use the same locked update transaction, so failed routing leaves the question open and the task bytes unchanged. Existing answerer history, post-commit automation and active-job outcome handling are preserved. Added CLI regression coverage (reproduced failure before fix; six focused tests pass) and documented retry behavior. Checks passed: lint:agent; test:agent (2148 Rust, 1517 UI, 47 release, 7 hook tests); test:smoke:agent (391); git diff --check. Working tree clean. No UI edits in this rework; no new visual screenshots required for the persistence fix. No durable guidance correction. Owner 2026-11-13: Hold for DEV-502, then finish chips. INCOMPLETE: filter portion waits for DEV-502 to land first; do not merge DEV-488 yet. Next: rebase onto main after DEV-502 lands, add Question/Answer Type chips via hiddenFields/toggleField and a separate saved Always show open questions toggle in lotar.preferences.taskPanel.commentFilter; add unit/smoke and visual coverage. Do not copy DEV-502 files. Requesting Blocked/claude while waiting, per this job handback instructions.'
+- date: 2026-11-14T00:43:18.721184+00:00
+  author: codex
+  text: Resumed after DEV-502 landed (main 3c4e7f71); rebased the two existing commits onto main, retaining the filter implementation and main’s moved scan tests. Implemented Question/Answer/Comment Type chips plus the owner-requested saved Always show open questions toggle (off by default). Hidden answers do not expose answer buttons on an already answered question; answers remain independently filterable and edit indexes stay original. Two new unit cases failed before implementation and now pass; full lint/test/smoke and before/after screenshot capture are running. No status/assignee changes.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afd2c6919-e5a0-41a8-9c0f-8916f5a62fea
 - file: src/types.rs
@@ -123,6 +126,14 @@ references:
 - attachment: before-tasks-light-1920.0bebdaecf1007ab9828704ad35a91ccc.png
 - attachment: before-tasks-light-390.bc593ca94443b29919edbd3fe11ffdbf.png
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acaf0b13d-f674-4f85-83a5-6706f6c01497
+- attachment: after-dark-390.efa6bde520a72e2d1516b96520a56865.png
+- attachment: before-light-1920.0dd555311984824109d502a8170c3701.png
+- attachment: before-dark-1920.67d730ea156d62ccd34ca8959b1331df.png
+- attachment: before-light-390.57a9a48f86130051ea18000c0ce28266.png
+- attachment: before-dark-390.bb9b6797ea57b88bacb9533522dc2bdf.png
+- attachment: after-light-1920.f61750c7410419bd87b1d1ae7b590047.png
+- attachment: after-dark-1920.4118dc11309355919a15211102fcbd90.png
+- attachment: after-light-390.8f8c97ce4bdb79ddcb1bb87ed38a6c80.png
 releases:
 - 5
 description: |-
@@ -633,3 +644,59 @@ history:
   changes:
   - field: releases
     new: '#5'
+- at: 2026-11-14T00:38:10.446235+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: claude
+    new: '@fix'
+- at: 2026-11-14T00:38:12.599053+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-14T00:43:18.721184+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T00:47:11.900395+00:00
+  actor: codex
+  changes:
+  - field: reference_added
+    new: attachment:after-dark-390.efa6bde520a72e2d1516b96520a56865.png
+- at: 2026-11-14T00:47:22.376487+00:00
+  actor: codex
+  changes:
+  - field: reference_added
+    new: attachment:before-light-1920.0dd555311984824109d502a8170c3701.png
+- at: 2026-11-14T00:47:24.564764+00:00
+  actor: codex
+  changes:
+  - field: reference_added
+    new: attachment:before-dark-1920.67d730ea156d62ccd34ca8959b1331df.png
+- at: 2026-11-14T00:47:31.708622+00:00
+  actor: codex
+  changes:
+  - field: reference_added
+    new: attachment:before-light-390.57a9a48f86130051ea18000c0ce28266.png
+- at: 2026-11-14T00:47:34.202419+00:00
+  actor: codex
+  changes:
+  - field: reference_added
+    new: attachment:before-dark-390.bb9b6797ea57b88bacb9533522dc2bdf.png
+- at: 2026-11-14T00:47:36.298013+00:00
+  actor: codex
+  changes:
+  - field: reference_added
+    new: attachment:after-light-1920.f61750c7410419bd87b1d1ae7b590047.png
+- at: 2026-11-14T00:47:39.080104+00:00
+  actor: codex
+  changes:
+  - field: reference_added
+    new: attachment:after-dark-1920.4118dc11309355919a15211102fcbd90.png
+- at: 2026-11-14T00:47:46.072143+00:00
+  actor: codex
+  changes:
+  - field: reference_added
+    new: attachment:after-light-390.8f8c97ce4bdb79ddcb1bb87ed38a6c80.png

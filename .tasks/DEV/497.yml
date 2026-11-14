@@ -1,11 +1,11 @@
 title: 'Cargo workspace step 1: a web-only change rebuilds only the embedded assets and the binary'
-status: HelpNeeded
+status: InProgress
 priority: High
 type: Chore
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-13T22:21:42.991432+00:00
-modified: 2026-11-14T00:34:55.230240+00:00
+modified: 2026-11-14T00:38:35.378552+00:00
 relationships:
   blocks:
   - DEV-499
@@ -44,6 +44,9 @@ comments:
 - date: 2026-11-14T00:34:55.230240+00:00
   author: automation
   text: The review found blocking problems again after one rework (the comments above). Should an agent rework it once more (lotar assignee DEV-497 @fix), will you decide the findings, or is it WontDo?
+- date: 2026-11-14T00:38:33.568045+00:00
+  author: claude
+  text: 'mallox in the thread (2026-11-14): "Rework again, keep in 0.15.0". Fix the review finding: the root package keeps installing both binaries (`cargo install --path .` gives lotar and lotar-agent-wrapper), with a test of the installed binary set. Review and merge follow by the rules; v0.15.0 (DEV-417) waits for it.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aece2a03a-cf09-4340-9bd6-4b7ecf0e4547
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aeb427d8b-11c2-4310-9c31-3447004ca1e2
@@ -51,6 +54,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A61d67abe-6798-4c17-958b-442bd90607aa
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3d3574f1-27f3-4348-b62d-131acda1ef87
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3b6a47a9-70f1-44d7-bed2-52ffa6c42311
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa794c3d5-1743-4237-94fb-fd191da44e15
 releases:
 - 5
 description: |-
@@ -281,3 +285,24 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-14T00:38:33.568045+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T00:38:33.812340+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-14T00:38:34.459569+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T00:38:35.378552+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa794c3d5-1743-4237-94fb-fd191da44e15
