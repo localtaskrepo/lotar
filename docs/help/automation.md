@@ -14,7 +14,7 @@ Rules are loaded from the first file found in this order:
 
 If a project automation file exists it fully replaces the global/home rules for that project.
 
-`run` actions from the repository files (project and global) only run after you trust the repository with [`lotar trust`](trust.md), and again after those files change outside LoTaR. Until then they are skipped with a warning; the rule's other actions still apply. Rules from the home file always run.
+`run` actions from the repository files (project and global) only run after you trust the repository with [`lotar trust`](trust.md), and again after those files change outside LoTaR. Until then each skipped `run` is reported on stderr, as an `automation_skipped` SSE event and as a comment on the ticket (`Automation rule '<name>' skipped on <ID>. ...`); the rule's other actions (`set`, `add`, `remove`, `comment`, `tell_agent`) still apply. Rules from the home file always run.
 
 ## Agent job queueing
 

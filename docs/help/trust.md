@@ -19,7 +19,7 @@ Two kinds of repository files can make LoTaR run programs:
 
 These files are committed with the repository, so they can come from a clone, a pull request or a fork. Until you trust them, LoTaR:
 
-- skips automation `run` actions from those files and prints a warning once per command (the rule's other actions still apply)
+- skips automation `run` actions from those files and reports each one on stderr, as an `automation_skipped` SSE event and as a comment on the ticket (the rule's other actions still apply; see [automation](automation.md))
 - refuses to start agent jobs that use a profile defined in those files
 
 Rules from your home automation file (`~/.lotar.automation.yml`) and agent jobs started with `--runner` and no profile are your own, so they always run.

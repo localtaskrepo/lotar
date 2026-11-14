@@ -105,3 +105,25 @@ fn repository_agent_profiles_wait_for_trust() {
     env.lotar().args(["agent", "run", "TEST-1", "go", "--agent", "stub", "--wait"]).assert().success();
     assert!(marker.exists(), "a trusted profile runs");
 }
+
+#[test]
+fn a_skipped_run_command_is_reported_on_the_ticket() {
+    let env = TrustEnv::new();
+    let marker = env.root().join("RAN");
+    std::fs::write(
+        env.fixtures.tasks_root.join("automation.yml"),
+        format!(
+            "automation:\n  rules:\n    - name: relay\n      on:\n        created:\n          set:\n            priority: High\n          run: \"touch {}\"\n",
+            marker.display()
+        ),
+    )
+    .unwrap();
+
+    env.lotar().args(["add", "untrusted", "--project=TRU"]).assert().success().stderr(predicate::str::contains("Automation rule 'relay' skipped on TRU-1"));
+    assert!(!marker.exists(), "an untrusted rule must not run");
+
+    let task = std::fs::read_to_string(env.fixtures.tasks_root.join("TRU").join("1.yml")).unwrap();
+    assert!(task.contains("priority: High"), "the rule's set still applies: {task}");
+    assert!(task.contains("relay'' skipped on TRU-1"), "the ticket says the run was skipped: {task}");
+    assert!(task.contains("lotar trust"), "the comment says how to trust: {task}");
+}

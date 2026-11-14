@@ -142,7 +142,7 @@ mod cooldown_store {
 /// Report a failed rule action (DEV-278): later rules still run, and the
 /// failure is printed to stderr and sent as an `automation_failed` event.
 fn rule_failure(rule: &AutomationRule, rule_key: &str, ticket_id: &str, err: &LoTaRError) -> String {
-    let name = rule.name.clone().unwrap_or_else(|| rule_key.to_string());
+    let name = rule_label(rule, rule_key);
     let message = format!("Automation rule '{name}' failed on {ticket_id}: {err}");
     eprintln!("[lotar][warn] {message}");
     crate::api_events::emit(&crate::api_events::ApiEvent {
@@ -150,6 +150,10 @@ fn rule_failure(rule: &AutomationRule, rule_key: &str, ticket_id: &str, err: &Lo
         data: serde_json::json!({"id": ticket_id, "rule": name, "message": err.to_string()}),
     });
     message
+}
+
+fn rule_label(rule: &AutomationRule, rule_key: &str) -> String {
+    rule.name.clone().unwrap_or_else(|| rule_key.to_string())
 }
 
 fn failures_result(failures: &[String]) -> LoTaRResult<()> {
@@ -247,6 +251,8 @@ struct AutomationActionContext {
     comment: Option<crate::types::TaskComment>,
     /// The prerequisites an `unblocked` ticket waited for, all done now.
     unblocked_by: Vec<Prerequisite>,
+    /// The rule's name, for reporting a skipped `run` (DEV-514).
+    rule: String,
 }
 
 #[derive(Debug, Clone)]
@@ -394,7 +400,14 @@ impl AutomationService {
             // Fire event-specific hooks
             for &event in &events {
                 if let Some(action) = resolve_action_for_event(&rule.on, event) {
-                    let action_context = AutomationActionContext { event, job: None, previous: previous.cloned(), comment: None, unblocked_by: Vec::new() };
+                    let action_context = AutomationActionContext {
+                        event,
+                        job: None,
+                        previous: previous.cloned(),
+                        comment: None,
+                        unblocked_by: Vec::new(),
+                        rule: rule_label(rule, &rk),
+                    };
                     if let Err(err) = apply_action(storage, current, config, action, &action_context) {
                         failures.push(rule_failure(rule, &rk, &current.id, &err));
                     }
@@ -405,8 +418,14 @@ impl AutomationService {
             // Fire legacy catch-all `start` hook (backward compat)
             if let Some(action) = rule.on.start.as_ref() {
                 let primary_event = events.first().copied().unwrap_or(AutomationEvent::Updated);
-                let action_context =
-                    AutomationActionContext { event: primary_event, job: None, previous: previous.cloned(), comment: None, unblocked_by: Vec::new() };
+                let action_context = AutomationActionContext {
+                    event: primary_event,
+                    job: None,
+                    previous: previous.cloned(),
+                    comment: None,
+                    unblocked_by: Vec::new(),
+                    rule: rule_label(rule, &rk),
+                };
                 if let Err(err) = apply_action(storage, current, config, action, &action_context) {
                     failures.push(rule_failure(rule, &rk, &current.id, &err));
                 }
@@ -439,7 +458,14 @@ impl AutomationService {
                 continue;
             }
             if let Some(action) = resolve_action_for_event(&rule.on, event) {
-                let action_context = AutomationActionContext { event, job: None, previous: None, comment: Some(comment.clone()), unblocked_by: Vec::new() };
+                let action_context = AutomationActionContext {
+                    event,
+                    job: None,
+                    previous: None,
+                    comment: Some(comment.clone()),
+                    unblocked_by: Vec::new(),
+                    rule: rule_label(rule, &rk),
+                };
                 if let Err(err) = apply_action(storage, task, config, action, &action_context) {
                     failures.push(rule_failure(rule, &rk, &task.id, &err));
                 }
@@ -505,7 +531,8 @@ impl AutomationService {
             if !cooldown_allows(rule, &rk, &task.id, &tasks_dir) {
                 continue;
             }
-            let action_context = AutomationActionContext { event, job: None, previous: None, comment: None, unblocked_by: by.to_vec() };
+            let action_context =
+                AutomationActionContext { event, job: None, previous: None, comment: None, unblocked_by: by.to_vec(), rule: rule_label(rule, &rk) };
             if let Err(err) = apply_action(storage, &task, &config, action, &action_context) {
                 failures.push(rule_failure(rule, &rk, &task.id, &err));
             }
@@ -528,7 +555,8 @@ impl AutomationService {
             .filter(|_| matches!(event, AutomationEvent::JobCompleted | AutomationEvent::JobFailed | AutomationEvent::JobCancelled))
             .map(|job| job.job_id.clone());
         let recorded = ending_job.as_deref().and_then(|job_id| crate::services::agent_active_jobs::peek_outcome(tasks_dir, job_id));
-        let action_context = AutomationActionContext { event, job: job_context, previous: None, comment: None, unblocked_by: Vec::new() };
+        let mut action_context =
+            AutomationActionContext { event, job: job_context, previous: None, comment: None, unblocked_by: Vec::new(), rule: String::new() };
         let mut failures: Vec<String> = Vec::new();
 
         for (rule_idx, rule) in automation.automation.rules().iter().enumerate() {
@@ -541,6 +569,7 @@ impl AutomationService {
             }
             if let Some(action) = resolve_action_for_event(&rule.on, event) {
                 let action = without_outcome_fields(action, recorded.as_ref());
+                action_context.rule = rule_label(rule, &rk);
                 if let Err(err) = apply_action(&mut storage, &task, &config, &action, &action_context) {
                     failures.push(rule_failure(rule, &rk, ticket_id, &err));
                 }
@@ -802,8 +831,14 @@ impl AutomationService {
                     error: None,
                 };
                 if !dry_run {
-                    let context =
-                        AutomationActionContext { event: AutomationEvent::Manual, job: None, previous: None, comment: None, unblocked_by: Vec::new() };
+                    let context = AutomationActionContext {
+                        event: AutomationEvent::Manual,
+                        job: None,
+                        previous: None,
+                        comment: None,
+                        unblocked_by: Vec::new(),
+                        rule: name.clone(),
+                    };
                     match apply_action(storage, &task, &config, action, &context) {
                         Ok(()) => {
                             changed = true;
@@ -881,14 +916,21 @@ impl AutomationService {
             preview.tmpl = std::mem::take(&mut preview.tmpl).with_unblocked(&by);
             let actions = describe_action(action, task, config, &mut preview);
             let mut entry = ManualRunEntry {
-                rule: name,
+                rule: name.clone(),
                 task: task.id.clone(),
                 actions,
                 warnings: if dry_run { preview.into_warnings() } else { Vec::new() },
                 error: None,
             };
             if !dry_run {
-                let context = AutomationActionContext { event: AutomationEvent::Unblocked, job: None, previous: None, comment: None, unblocked_by: by.clone() };
+                let context = AutomationActionContext {
+                    event: AutomationEvent::Unblocked,
+                    job: None,
+                    previous: None,
+                    comment: None,
+                    unblocked_by: by.clone(),
+                    rule: name.clone(),
+                };
                 match apply_action(storage, task, config, action, &context) {
                     Ok(()) => cooldown_record(rule, &key, &task.id, &tasks_dir),
                     Err(err) => entry.error = Some(err.to_string()),
@@ -1402,13 +1444,18 @@ fn run_allowed(tasks_dir: &Path, task: &TaskDTO) -> bool {
     crate::config::trust::TrustService::allows_commands(tasks_dir)
 }
 
-/// Say once per process that repository run commands were held back.
-fn warn_untrusted_run_once(tasks_dir: &Path) {
-    static WARNED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-    if WARNED.swap(true, std::sync::atomic::Ordering::Relaxed) {
-        return;
-    }
-    eprintln!("[lotar][warn] {}", crate::config::trust::TrustService::untrusted_message(tasks_dir, "automation run commands"));
+/// Report a `run` held back in an untrusted workspace (DEV-514) on stderr,
+/// as an `automation_skipped` event and as a comment on the ticket. The
+/// rule's other actions still apply.
+fn report_skipped_run(storage: &mut Storage, ticket_id: &str, rule: &str) -> LoTaRResult<()> {
+    let reason = crate::config::trust::TrustService::untrusted_message(&storage.root_path, "its run command");
+    let message = format!("Automation rule '{rule}' skipped on {ticket_id}. {reason} The rule's other actions applied.");
+    eprintln!("[lotar][warn] {message}");
+    crate::api_events::emit(&crate::api_events::ApiEvent {
+        kind: "automation_skipped".into(),
+        data: serde_json::json!({"id": ticket_id, "rule": rule, "message": reason}),
+    });
+    append_automation_comment(storage, ticket_id, &message)
 }
 
 /// Default time a waited-for `run` command may take.
@@ -1495,12 +1542,6 @@ fn execute_run_action(
     context: &AutomationActionContext,
     tmpl: &TemplateContext,
 ) -> LoTaRResult<()> {
-    // Repository rules run commands only in a trusted workspace (DEV-259).
-    if !run_allowed(tasks_dir, task) {
-        warn_untrusted_run_once(tasks_dir);
-        return Ok(());
-    }
-
     let (command, args, env, cwd, ignore_failure, wait, timeout) = match run {
         AutomationRunAction::Shell(raw) => {
             let expanded = tmpl.expand_for_shell(raw);
@@ -1902,7 +1943,12 @@ fn apply_action(
     }
 
     if let Some(run) = action.run.as_ref() {
-        execute_run_action(run, task_for_env, config, storage.root_path.as_path(), action_context, &tmpl)?;
+        // Repository rules run commands only in a trusted workspace (DEV-259).
+        if run_allowed(&storage.root_path, task_for_env) {
+            execute_run_action(run, task_for_env, config, storage.root_path.as_path(), action_context, &tmpl)?;
+        } else {
+            report_skipped_run(storage, &current.id, &action_context.rule)?;
+        }
     }
 
     if let Some(tell) = action.tell_agent.as_ref() {
@@ -2737,7 +2783,14 @@ mod dev21_cross_root_dependency_tests {
         .unwrap();
         let current = TaskService::get(&storage, "PX-1", None).unwrap();
         let config = TaskService::resolve_config_for_project(&storage.root_path, "PX");
-        let context = AutomationActionContext { event: AutomationEvent::Updated, job: None, previous: None, comment: None, unblocked_by: Vec::new() };
+        let context = AutomationActionContext {
+            event: AutomationEvent::Updated,
+            job: None,
+            previous: None,
+            comment: None,
+            unblocked_by: Vec::new(),
+            rule: String::new(),
+        };
         let source = storage.root_path.join("PX/1.yml");
         let target = storage.root_path.join("BB/1.yml");
         let before_source = std::fs::read(&source).unwrap();
@@ -2800,7 +2853,14 @@ mod dev21_cross_root_dependency_tests {
                     &current,
                     &config,
                     &action,
-                    &AutomationActionContext { event: AutomationEvent::Updated, job: None, previous: None, comment: None, unblocked_by: Vec::new() },
+                    &AutomationActionContext {
+                        event: AutomationEvent::Updated,
+                        job: None,
+                        previous: None,
+                        comment: None,
+                        unblocked_by: Vec::new(),
+                        rule: String::new(),
+                    },
                 )
             });
             read_rx.recv_timeout(Duration::from_secs(5)).unwrap();
@@ -2828,7 +2888,14 @@ mod dev21_cross_root_dependency_tests {
                     &updated,
                     &config,
                     &invalid,
-                    &AutomationActionContext { event: AutomationEvent::Updated, job: None, previous: None, comment: None, unblocked_by: Vec::new() }
+                    &AutomationActionContext {
+                        event: AutomationEvent::Updated,
+                        job: None,
+                        previous: None,
+                        comment: None,
+                        unblocked_by: Vec::new(),
+                        rule: String::new()
+                    }
                 )
                 .is_err()
             );
