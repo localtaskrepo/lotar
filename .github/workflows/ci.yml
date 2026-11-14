@@ -16,6 +16,9 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   # Kept in sync with rust-toolchain.toml by the workflow contract test.
   RUST_TOOLCHAIN: '1.99.1'
+  # sccache can't cache incremental builds; [profile.ci] keeps them for
+  # local runs (DEV-496).
+  CARGO_INCREMENTAL: '0'
 
 # Cancel in-progress runs when a new commit is pushed
 concurrency:
@@ -83,6 +86,14 @@ jobs:
       # Designated git-capable runner: build.rs refuses to compile git
       # behavior out (panics if creating .git is denied).
       LOTAR_REQUIRE_GIT: '1'
+      # sccache keeps lotar's own crates between runs: rust-cache restores
+      # only the dependencies (DEV-496). It holds little besides them, so
+      # it is capped small, and saved only from pushes to main: every save
+      # is a new cache entry (keys are immutable), and uncapped saves
+      # overflowed the 10 GB cache limit (DEV-107).
+      SCCACHE_DIR: ${{ github.workspace }}/.sccache
+      SCCACHE_CACHE_SIZE: 256M
+      RUSTC_WRAPPER: sccache
     steps:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -91,6 +102,20 @@ jobs:
       uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
       with:
         toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+    - name: Install sccache
+      uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 # v2
+      with:
+        tool: sccache
+
+    - name: Restore sccache
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: .sccache
+        key: sccache-${{ runner.os }}-${{ github.job }}-${{ hashFiles('Cargo.lock') }}-${{ github.run_id }}
+        restore-keys: |
+          sccache-${{ runner.os }}-${{ github.job }}-${{ hashFiles('Cargo.lock') }}-
+          sccache-${{ runner.os }}-${{ github.job }}-
 
     - name: Rust cache
       uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
@@ -148,6 +173,20 @@ jobs:
         path: ci-artifacts/
         retention-days: 3
 
+    # Hit rate for later tuning; the cache itself is capped by SCCACHE_CACHE_SIZE.
+    - name: sccache stats
+      if: ${{ !cancelled() }}
+      shell: bash
+      run: sccache --show-stats
+
+    # Pull requests and failed-to-start runs restore but never save.
+    - name: Save sccache
+      if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: .sccache
+        key: sccache-${{ runner.os }}-${{ github.job }}-${{ hashFiles('Cargo.lock') }}-${{ github.run_id }}
+
   rust_checks:
     name: Rust Quality Checks
     runs-on: ubuntu-latest
@@ -160,6 +199,10 @@ jobs:
       # than setting no_git_tests, runtime require_git() probes fail closed,
       # and the manifest gate below asserts every selected test executed.
       LOTAR_REQUIRE_GIT: '1'
+      # sccache as in build_artifacts (DEV-496).
+      SCCACHE_DIR: ${{ github.workspace }}/.sccache
+      SCCACHE_CACHE_SIZE: 256M
+      RUSTC_WRAPPER: sccache
     steps:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -170,6 +213,20 @@ jobs:
         toolchain: ${{ env.RUST_TOOLCHAIN }}
         components: rustfmt, clippy
         
+    - name: Install sccache
+      uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 # v2
+      with:
+        tool: sccache
+
+    - name: Restore sccache
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: .sccache
+        key: sccache-${{ runner.os }}-${{ github.job }}-${{ hashFiles('Cargo.lock') }}-${{ github.run_id }}
+        restore-keys: |
+          sccache-${{ runner.os }}-${{ github.job }}-${{ hashFiles('Cargo.lock') }}-
+          sccache-${{ runner.os }}-${{ github.job }}-
+
     - name: Rust Cache
       uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
       with:
@@ -249,6 +306,20 @@ jobs:
           target/nextest/manifest.json
         if-no-files-found: ignore
         retention-days: 7
+
+    # Hit rate for later tuning; the cache itself is capped by SCCACHE_CACHE_SIZE.
+    - name: sccache stats
+      if: ${{ !cancelled() }}
+      shell: bash
+      run: sccache --show-stats
+
+    # Pull requests and failed-to-start runs restore but never save.
+    - name: Save sccache
+      if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: .sccache
+        key: sccache-${{ runner.os }}-${{ github.job }}-${{ hashFiles('Cargo.lock') }}-${{ github.run_id }}
 
   ui_tests:
     name: UI Unit Tests
@@ -417,11 +488,9 @@ jobs:
       USER: mallox
       USERNAME: mallox
       LOTAR_REQUIRE_GIT: '1'
-      # sccache only here (DEV-107's Windows speedup). Capped, and saved only
-      # from pushes to main: every save is a new cache entry (keys are
-      # immutable), and uncapped saves overflowed the 10 GB cache limit.
+      # sccache as in build_artifacts (DEV-496).
       SCCACHE_DIR: ${{ github.workspace }}/.sccache
-      SCCACHE_CACHE_SIZE: 1G
+      SCCACHE_CACHE_SIZE: 256M
       RUSTC_WRAPPER: sccache
     steps:
     - name: Checkout code

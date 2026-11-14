@@ -84,20 +84,28 @@ fn ci_uses_the_pinned_toolchain_and_keeps_profile_caches_independent() {
         }
     }
 
-    // sccache only on the Windows job, capped, and saved only from pushes to
-    // main: each save is a new cache entry, and uncapped per-run saves on
-    // three jobs overflowed the 10 GB Actions cache limit.
+    // sccache keeps the workspace crates' build output, which rust-cache
+    // drops (DEV-496). It needs non-incremental builds. Capped small, as it
+    // holds only lotar's own crates, and saved only from pushes to main:
+    // each save is a new cache entry, and uncapped per-run saves on three
+    // jobs overflowed the 10 GB Actions cache limit (DEV-107).
+    assert_eq!(workflow["env"]["CARGO_INCREMENTAL"].as_str(), Some("0"));
     for (name, job) in workflow["jobs"].as_mapping().unwrap() {
         let name = name.as_str().unwrap();
         let wrapper = job["env"]["RUSTC_WRAPPER"].as_str();
-        if name == "windows_checks" {
-            assert_eq!(wrapper, Some("sccache"));
-            assert_eq!(job["env"]["SCCACHE_CACHE_SIZE"].as_str(), Some("1G"));
+        if ["build_artifacts", "rust_checks", "windows_checks"].contains(&name) {
+            assert_eq!(wrapper, Some("sccache"), "{name}");
+            assert_eq!(job["env"]["SCCACHE_CACHE_SIZE"].as_str(), Some("256M"), "{name}");
             let steps = job["steps"].as_sequence().unwrap();
-            let save = steps.iter().find(|step| step["name"].as_str() == Some("Save sccache")).expect("windows_checks saves sccache");
+            let step =
+                |wanted: &str| steps.iter().find(|step| step["name"].as_str() == Some(wanted)).unwrap_or_else(|| panic!("{name} is missing step {wanted:?}"));
+            let restore = step("Restore sccache");
+            let save = step("Save sccache");
+            assert_eq!(restore["with"]["key"], save["with"]["key"], "{name}");
             let condition = save["if"].as_str().unwrap();
             assert!(condition.contains("github.event_name == 'push'"), "{condition}");
             assert!(condition.contains("refs/heads/main"), "{condition}");
+            step("Install sccache");
             assert!(steps.iter().all(|step| step["name"].as_str() != Some("Cache sccache")), "use separate restore/save steps");
         } else {
             assert_eq!(wrapper, None, "{name} must not use sccache");
