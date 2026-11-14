@@ -1724,6 +1724,94 @@ pub(crate) fn check_agent_worktree_cleanup(repo_root: &std::path::Path, worktree
     }
 }
 
+/// Why cleanup may remove a Done ticket's agent worktree or branch: its
+/// work is in the main checkout, or main supersedes it (DEV-541).
+pub(crate) enum Removal {
+    Landed,
+    /// A version of the ticket's work that differs from what landed, kept
+    /// under `reference` before it goes.
+    Superseded {
+        reference: String,
+        commit: String,
+    },
+}
+
+impl Removal {
+    /// Keep a superseded version's commit under `refs/archive/`.
+    pub(crate) fn archive(&self, repo_root: &std::path::Path) -> LoTaRResult<()> {
+        match self {
+            Self::Landed => Ok(()),
+            Self::Superseded { reference, commit } => run_git_command(repo_root, &["update-ref", reference, commit]),
+        }
+    }
+}
+
+/// How cleanup may remove an agent worktree of the Done ticket `ticket_id`
+/// that no process runs in: as `check_agent_worktree_cleanup` allows, or as
+/// a superseded version (`superseded_removal`) when it is clean and still on
+/// its branch or detached commit.
+pub(crate) fn check_done_worktree_cleanup(repo_root: &std::path::Path, worktree: &AgentWorktree, ticket_id: &str, allow_ignored: bool) -> LoTaRResult<Removal> {
+    let removal = done_worktree_removal(repo_root, worktree, ticket_id, allow_ignored)?;
+    if fs::canonicalize(&worktree.path).map_or(true, |target| process_runs_in(&target)) {
+        return Err(LoTaRError::ValidationError("a process runs in it".into()));
+    }
+    Ok(removal)
+}
+
+fn done_worktree_removal(repo_root: &std::path::Path, worktree: &AgentWorktree, ticket_id: &str, allow_ignored: bool) -> LoTaRResult<Removal> {
+    let unlanded = match check_agent_worktree_cleanup(repo_root, worktree, allow_ignored) {
+        Ok(()) => return Ok(Removal::Landed),
+        Err(err) => err,
+    };
+    let (root, target) = check_worktree_clean(repo_root, &worktree.path, allow_ignored)?;
+    let head = git_command(&target).args(["symbolic-ref", "--quiet", "HEAD"]).current_dir(&target).output().map_err(LoTaRError::IoError)?;
+    let unchanged = if worktree.detached {
+        !head.status.success()
+    } else {
+        head.status.success() && String::from_utf8_lossy(&head.stdout).trim() == format!("refs/heads/{}", worktree.branch)
+    };
+    let commit = rev_parse(&target, "HEAD").filter(|_| unchanged);
+    let label = if worktree.detached { "detached" } else { worktree.branch.as_str() };
+    commit.and_then(|commit| superseded_removal(&root, &commit, ticket_id, label)).ok_or(unlanded)
+}
+
+/// How cleanup may delete `branch`, an agent branch no worktree has
+/// checked out, with `done_ticket` naming its ticket when that is Done;
+/// `None` keeps it.
+pub(crate) fn branch_removal(repo_root: &std::path::Path, branch: &str, done_ticket: Option<&str>) -> Option<Removal> {
+    if branch_landed(repo_root, branch).unwrap_or(false) {
+        return Some(Removal::Landed);
+    }
+    superseded_removal(repo_root, &rev_parse(repo_root, &format!("refs/heads/{branch}"))?, done_ticket?, branch)
+}
+
+/// Whether main supersedes `commit`, an earlier version of the Done
+/// ticket's work that never landed as it is (the merge agent rebased or
+/// reworked it): a commit of the checkout's current branch since they
+/// forked names the ticket first in its subject, as the merge agent's
+/// commits do, and was committed later. Work committed since stays. It is
+/// archived as `refs/archive/<ticket>/<label>/<commit>`.
+fn superseded_removal(repo_root: &std::path::Path, commit: &str, ticket_id: &str, label: &str) -> Option<Removal> {
+    let committed: u64 = git_stdout(repo_root, &["log", "-1", "--format=%ct", commit]).ok()?.trim().parse().ok()?;
+    let base = git_stdout(repo_root, &["merge-base", "HEAD", commit]).ok()?;
+    let log = git_stdout(repo_root, &["log", "--format=%ct %s", &format!("{}..HEAD", base.trim())]).ok()?;
+    let landed = log.lines().filter_map(|line| line.split_once(' ')).any(|(time, subject)| {
+        time.parse::<u64>().is_ok_and(|time| time > committed) && subject.split_whitespace().next().is_some_and(|word| word.eq_ignore_ascii_case(ticket_id))
+    });
+    landed.then(|| Removal::Superseded { reference: format!("refs/archive/{ticket_id}/{label}/{commit}"), commit: commit.to_string() })
+}
+
+/// Whether a process has its working directory in `dir` (canonical). Without
+/// a process list, one is assumed to.
+fn process_runs_in(dir: &std::path::Path) -> bool {
+    let Ok(mut system) = sysinfo::System::new() else {
+        return true;
+    };
+    let kind = sysinfo::ProcessRefreshKind::nothing().with_cwd(sysinfo::UpdateKind::Always);
+    system.refresh_processes_specifics(sysinfo::ProcessesToUpdate::All, true, kind);
+    system.processes().values().any(|process| process.cwd().is_some_and(|cwd| cwd.starts_with(dir)))
+}
+
 /// The repository root and the worktree, canonical, when the worktree is
 /// another worktree of this repository without untracked or modified files.
 fn check_worktree_clean(repo_root: &std::path::Path, path: &std::path::Path, allow_ignored: bool) -> LoTaRResult<(std::path::PathBuf, std::path::PathBuf)> {
@@ -2080,11 +2168,10 @@ pub(crate) fn agent_worktrees(repo_root: &std::path::Path, prefix: &str) -> LoTa
         .collect())
 }
 
-/// The agent branches no worktree has checked out whose work is in the
-/// main checkout, as (ticket branch, branch): ticket branches and the T3
-/// Code thread branches created from them (DEV-476). With `ticket_branch`,
-/// only that ticket's.
-pub(crate) fn landed_agent_branches(repo_root: &std::path::Path, prefix: &str, ticket_branch: Option<&str>) -> Vec<(String, String)> {
+/// The agent branches no worktree has checked out, as (ticket branch,
+/// branch): ticket branches and the T3 Code thread branches created from
+/// them (DEV-476). With `ticket_branch`, only that ticket's.
+pub(crate) fn idle_agent_branches(repo_root: &std::path::Path, prefix: &str, ticket_branch: Option<&str>) -> Vec<(String, String)> {
     let Ok(worktrees) = linked_worktrees(repo_root) else {
         return Vec::new();
     };
@@ -2099,7 +2186,6 @@ pub(crate) fn landed_agent_branches(repo_root: &std::path::Path, prefix: &str, t
         .filter(|branch| main.as_deref() != Some(*branch) && !worktrees.iter().any(|(_, checked_out)| checked_out.as_deref() == Some(*branch)))
         .filter_map(|branch| Some((owners.ticket_branch_of(branch)?, branch.to_string())))
         .filter(|(ticket, _)| ticket_branch.is_none_or(|wanted| wanted == ticket))
-        .filter(|(_, branch)| branch_landed(repo_root, branch).unwrap_or(false))
         .collect()
 }
 
@@ -2132,8 +2218,10 @@ pub(crate) fn delete_landed_branch(repo_root: &std::path::Path, prefix: &str, br
 /// alone leaves the ticket branch's worktree behind. That includes the
 /// worktrees of its T3 Code thread branches and those detached when a
 /// later thread took over the branch, and the branches themselves
-/// (DEV-476); any with work missing from main stay. Waits while a job runs
-/// for the ticket; its end calls this again.
+/// (DEV-476). Versions main supersedes go too, archived (DEV-541); any
+/// other work missing from main, uncommitted changes or a process running
+/// in a worktree keep it. Waits while a job runs for the ticket; its end
+/// calls this again.
 pub(crate) fn cleanup_done_ticket_worktree(tasks_dir: &std::path::Path, ticket_id: &str) {
     if ticket_done_state(tasks_dir, ticket_id) != Some(true) {
         return;
@@ -2164,13 +2252,20 @@ pub(crate) fn cleanup_done_ticket_worktree(tasks_dir: &std::path::Path, ticket_i
     }
     let delete_branches = config.agent_worktree.cleanup_delete_branches;
     for worktree in worktrees.iter().filter(|worktree| worktree.ticket_branch == branch) {
-        if check_agent_worktree_cleanup(&repo_root, worktree, config.agent_worktree.cleanup_ignored_files).is_ok() {
+        let Ok(removal) = check_done_worktree_cleanup(&repo_root, worktree, ticket_id, config.agent_worktree.cleanup_ignored_files) else {
+            continue;
+        };
+        // A superseded branch kept without its worktree still holds its commit.
+        let keeps_commit = !worktree.detached && !delete_branches;
+        if keeps_commit || removal.archive(&repo_root).is_ok() {
             remove_worktree(&repo_root, &worktree.path, (!worktree.detached).then_some(worktree.branch.as_str()), delete_branches, branch_prefix);
         }
     }
     if delete_branches {
-        for (_, landed) in landed_agent_branches(&repo_root, branch_prefix, Some(&branch)) {
-            let _ = delete_landed_branch(&repo_root, branch_prefix, &landed);
+        for (_, idle) in idle_agent_branches(&repo_root, branch_prefix, Some(&branch)) {
+            if branch_removal(&repo_root, &idle, Some(ticket_id)).is_some_and(|removal| removal.archive(&repo_root).is_ok()) {
+                let _ = delete_landed_branch(&repo_root, branch_prefix, &idle);
+            }
         }
     }
     drop(registry);

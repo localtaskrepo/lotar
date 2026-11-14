@@ -1,11 +1,11 @@
 title: A command runner fails to start on Linux when the prompt is over 128 KiB
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T18:18:37.990994+00:00
-modified: 2026-11-14T18:52:13.893812+00:00
+modified: 2026-11-14T19:00:21.846765+00:00
 relationships:
   related:
   - DEV-533
@@ -22,6 +22,15 @@ comments:
     - Targeted 200 KiB integration test passed; `command_runner` filter passed all 6 tests with `RUSTC_WRAPPER=`. `git diff --check main...HEAD` passed; checkout clean.
     - Limits: npm temp guards exited 1 (`xcrun_db`, then also `.lotar-test-scratch`) with sandbox Xcode warnings; initial sccache denied. Not clean suite passes. Linux reproduction and full lint/UI/smoke were not independently repeated; fix agent records those and fail-before/pass-after evidence.
     - No files, commits, status or assignee changes; no new findings or durable guidance correction.
+- date: 2026-11-14T19:00:15.989946+00:00
+  author: codex
+  text: |-
+    Merged and pushed to `main` as `3206781f`.
+
+    - Rebased `22bce0cd` onto `fcb876aa`; resolved the test conflict by retaining main’s obsolete-test removal and the new 200 KiB regression. Fast-forwarded main, then included pending `.tasks` updates as requested.
+    - Passed `npm run lint:agent`, `npm run test:agent` (2171 Rust, 1537 UI, release and hooks), and `npm run test:smoke:agent` (401). Used `RUSTC_WRAPPER=` outside sandbox; no checks skipped.
+    - Post-merge Linux check: `rust:1.99.1` Docker, `cargo nextest run --cargo-profile local -E "test(a_command_runner_reads_a_long_prompt_from_its_file)"`: 1 passed. Nextest exited 110 only while writing JUnit to the read-only source mount; the 200 KiB job started and read the full prompt.
+    - Push succeeded with hooks. A concurrent `.tasks/DEV/541.yml` edit appeared at push invocation and remains untouched; main had been clean after the ticket amend. No status or assignee changes. No durable guidance correction.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4cf66ebf-22d7-41d7-aac6-960ad78bd9f5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A67b2ee20-7118-426e-af83-1d486e48b818
@@ -84,3 +93,13 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-14T19:00:15.989946+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T19:00:21.846765+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

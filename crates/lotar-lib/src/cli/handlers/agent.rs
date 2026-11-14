@@ -5,7 +5,7 @@ use crate::cli::args::{
 };
 use crate::config::manager::ConfigManager;
 use crate::output::{OutputFormat, OutputRenderer};
-use crate::services::agent_job_service::AgentJobService;
+use crate::services::agent_job_service::{self, AgentJobService};
 use crate::services::agent_log_service::AgentLogService;
 use crate::services::agent_queue_service::AgentQueueService;
 use crate::services::automation_service::AutomationService;
@@ -639,14 +639,30 @@ impl AgentHandler {
                 .rsplit_once('-')
                 .and_then(|(project, _)| crate::config::resolution::config_for_project(&resolver.path, Some(project)).ok())
                 .map_or(config.agent_worktree.cleanup_ignored_files, |c| c.agent_worktree.cleanup_ignored_files);
-            if let Err(err) = crate::services::agent_job_service::check_agent_worktree_cleanup(&repo_root, &wt.worktree, allow_ignored) {
-                errors.push(format!("{}: {}", wt.ticket_id, err));
-                renderer.emit_warning(format!("Preserving worktree {}: {}", wt.ticket_id, err));
-                continue;
-            }
+            let removal = if wt.is_done {
+                agent_job_service::check_done_worktree_cleanup(&repo_root, &wt.worktree, &wt.ticket_id, allow_ignored)
+            } else {
+                agent_job_service::check_agent_worktree_cleanup(&repo_root, &wt.worktree, allow_ignored).map(|()| agent_job_service::Removal::Landed)
+            };
+            let removal = match removal {
+                Ok(removal) => removal,
+                Err(err) => {
+                    errors.push(format!("{}: {}", wt.ticket_id, err));
+                    renderer.emit_warning(format!("Preserving worktree {}: {}", wt.ticket_id, err));
+                    continue;
+                }
+            };
             if args.dry_run {
                 renderer.emit_info(format!("Would remove: {} ({})", wt.ticket_id, wt.path));
                 removed.push(wt.ticket_id.clone());
+                continue;
+            }
+            // A superseded branch kept without its worktree still holds its commit.
+            if (wt.detached || args.delete_branches)
+                && let Err(err) = removal.archive(&repo_root)
+            {
+                errors.push(format!("{}: {}", wt.ticket_id, err));
+                renderer.emit_warning(format!("Preserving worktree {}: {}", wt.ticket_id, err));
                 continue;
             }
 
@@ -687,16 +703,21 @@ impl AgentHandler {
         // branches whose worktrees are gone (DEV-476).
         if args.delete_branches {
             let prefix = &config.agent_worktree.branch_prefix;
-            for (ticket_branch, branch) in crate::services::agent_job_service::landed_agent_branches(&repo_root, prefix, None) {
-                if !may_clean(&extract_ticket_from_branch(&ticket_branch, prefix)) {
+            for (ticket_branch, branch) in agent_job_service::idle_agent_branches(&repo_root, prefix, None) {
+                let ticket_id = extract_ticket_from_branch(&ticket_branch, prefix);
+                if !may_clean(&ticket_id) {
                     continue;
                 }
+                let done = agent_job_service::ticket_done_state(&resolver.path, &ticket_id) == Some(true);
+                let Some(removal) = agent_job_service::branch_removal(&repo_root, &branch, done.then_some(ticket_id.as_str())) else {
+                    continue;
+                };
                 if args.dry_run {
                     renderer.emit_info(format!("Would delete branch: {branch}"));
                     deleted_branches.push(branch);
                     continue;
                 }
-                match crate::services::agent_job_service::delete_landed_branch(&repo_root, prefix, &branch) {
+                match removal.archive(&repo_root).and_then(|()| agent_job_service::delete_landed_branch(&repo_root, prefix, &branch)) {
                     Ok(()) => {
                         renderer.emit_success(format!("Deleted branch: {branch}"));
                         deleted_branches.push(branch);

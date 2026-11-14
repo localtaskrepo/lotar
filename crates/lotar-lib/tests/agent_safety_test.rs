@@ -17,6 +17,12 @@ fn git(root: &Path, args: &[&str]) {
     assert!(output.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&output.stderr));
 }
 
+/// `git` with the commits it makes dated `date`.
+fn git_at(root: &Path, date: &str, args: &[&str]) {
+    let output = Command::new("git").args(args).env("GIT_COMMITTER_DATE", date).current_dir(root).output().unwrap();
+    assert!(output.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&output.stderr));
+}
+
 fn setup(body: &str, worktree: bool) -> (TestFixtures, String) {
     let fixture = TestFixtures::new();
     let root = fixture.get_temp_path();
@@ -729,6 +735,8 @@ mod git_required {
             commit(&review, "review.txt");
             git(root, &["worktree", "add", "-q", "-b", "t3/review-1", third.to_str().unwrap(), "t3/review"]);
             commit(&third, "unlanded.txt");
+            // Committed after the fix and review landed, so main doesn't supersede it (DEV-541).
+            git_at(&third, "2095-01-01T00:00:00Z", &["commit", "--amend", "--no-edit", "-q"]);
             git(&third, &["switch", "--quiet", "--detach"]);
             git(&review, &["switch", "--quiet", "--detach"]);
             fs::write(review.join("notes.txt"), "notes").unwrap();
@@ -769,6 +777,92 @@ mod git_required {
             assert!(output.status.success(), "by_cli={by_cli}: {}", String::from_utf8_lossy(&output.stderr));
             assert!(!third.exists() && !review.exists() && !branch_exists(root, "t3/review-1"), "by_cli={by_cli}: the work that landed later is cleaned up");
             assert!(other.exists() && branch_exists(root, "t3/other"), "by_cli={by_cli}: another ticket's or no ticket's branch stays");
+        }
+    }
+
+    /// DEV-541: the merge agent landed the ticket reworked, so the fix
+    /// branch, a review thread's branch and a worktree detached from it hold
+    /// earlier versions that differ from main. Done (and `lotar agent
+    /// worktree cleanup`) archives and removes them, and keeps a worktree
+    /// with uncommitted changes, those a process runs in (whose work landed
+    /// too), and work committed after the landing.
+    #[test]
+    fn done_archives_and_removes_versions_main_supersedes() {
+        common::require_git();
+        for by_cli in [false, true] {
+            let (fixture, ticket) = setup("exit 0", true);
+            let root = fixture.get_temp_path();
+            let worktree = |name: &str| root.join("worktrees").join(name);
+            let commit = |dir: &Path, name: &str, date: &str| {
+                fs::write(dir.join(name), format!("{name} {date}")).unwrap();
+                git(dir, &["add", name]);
+                git_at(dir, date, &["commit", "-q", "-m", &format!("{ticket} {name}")]);
+            };
+            let branch = format!("agent/{ticket}");
+            let (fix, review, dirty, busy, later) = (worktree("fix"), worktree("review"), worktree("dirty"), worktree("busy"), worktree("later"));
+            git(root, &["worktree", "add", "-q", "-b", &branch, fix.to_str().unwrap()]);
+            commit(&fix, "fix.txt", "2090-01-01T00:00:00Z");
+            git(root, &["worktree", "add", "-q", "-b", "t3/review", review.to_str().unwrap(), &branch]);
+            commit(&review, "fix.txt", "2090-01-02T00:00:00Z");
+            git(&review, &["switch", "--quiet", "--detach"]);
+            for (dir, name) in [(&dirty, "t3/dirty"), (&busy, "t3/busy"), (&later, "t3/later")] {
+                git(root, &["worktree", "add", "-q", "-b", name, dir.to_str().unwrap(), &branch]);
+                commit(dir, "fix.txt", "2090-01-03T00:00:00Z");
+            }
+            fs::write(dirty.join("notes.txt"), "notes").unwrap();
+            commit(&later, "later.txt", "2095-01-01T00:00:00Z");
+            commit(root, "fix.txt", "2090-02-01T00:00:00Z");
+            // Thread worktrees whose work is in main, one detached.
+            let (landed, landed_detached) = (worktree("landed"), worktree("landed-detached"));
+            for (dir, name) in [(&landed, "t3/landed"), (&landed_detached, "t3/landed-detached")] {
+                git(root, &["worktree", "add", "-q", "-b", name, dir.to_str().unwrap(), &branch]);
+                git(dir, &["reset", "-q", "--hard", "main"]);
+            }
+            git(&landed_detached, &["switch", "--quiet", "--detach"]);
+            let mut processes: Vec<_> =
+                [&busy, &landed, &landed_detached].into_iter().map(|dir| Command::new("sleep").arg("60").current_dir(dir).spawn().unwrap()).collect();
+            let review_commit = String::from_utf8(Command::new("git").args(["rev-parse", "t3/review"]).current_dir(root).output().unwrap().stdout).unwrap();
+
+            if by_cli {
+                let path = fixture.tasks_root.join("SAFE/1.yml");
+                let mut task: serde_yaml_ng::Value = serde_yaml_ng::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+                task["status"] = "Done".into();
+                fs::write(path, serde_yaml_ng::to_string(&task).unwrap()).unwrap();
+                let output = cleanup(&fixture);
+                assert!(!output.status.success(), "the kept worktrees are reported");
+            } else {
+                set_status(&fixture, &ticket, "Done", TaskUpdateContext::default());
+            }
+            for process in &mut processes {
+                let _ = process.kill();
+                let _ = process.wait();
+            }
+            assert!(!fix.exists() && !review.exists(), "by_cli={by_cli}: superseded worktrees are removed");
+            assert!(!branch_exists(root, &branch) && !branch_exists(root, "t3/review"), "by_cli={by_cli}: superseded branches are deleted");
+            let archived =
+                Command::new("git").args(["for-each-ref", "--format=%(refname)", &format!("refs/archive/{ticket}/")]).current_dir(root).output().unwrap();
+            let archived = String::from_utf8(archived.stdout).unwrap();
+            assert!(archived.contains(&format!("refs/archive/{ticket}/{branch}/")), "by_cli={by_cli}: {archived}");
+            assert!(archived.contains(&format!("refs/archive/{ticket}/detached/{}", review_commit.trim())), "by_cli={by_cli}: {archived}");
+            assert!(dirty.join("notes.txt").exists() && branch_exists(root, "t3/dirty"), "by_cli={by_cli}: uncommitted work stays");
+            assert!(busy.exists() && branch_exists(root, "t3/busy"), "by_cli={by_cli}: a worktree a process runs in stays");
+            assert!(landed.exists() && landed_detached.exists() && branch_exists(root, "t3/landed"), "by_cli={by_cli}: also when its work landed");
+            assert!(later.exists() && branch_exists(root, "t3/later"), "by_cli={by_cli}: work after the landing stays");
+
+            fs::remove_file(dirty.join("notes.txt")).unwrap();
+            let output = cleanup(&fixture);
+            assert!(!output.status.success(), "by_cli={by_cli}: the later work is still reported");
+            assert!(
+                !dirty.exists()
+                    && !busy.exists()
+                    && !landed.exists()
+                    && !landed_detached.exists()
+                    && !branch_exists(root, "t3/dirty")
+                    && !branch_exists(root, "t3/busy")
+                    && !branch_exists(root, "t3/landed"),
+                "by_cli={by_cli}: once idle they go"
+            );
+            assert!(later.exists(), "by_cli={by_cli}: work after the landing stays");
         }
     }
 
