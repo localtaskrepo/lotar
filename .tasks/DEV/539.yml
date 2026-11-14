@@ -1,11 +1,11 @@
 title: 'Done with an open step no ticket tracks: DEV-279'
-status: Merging
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T18:09:18.622094+00:00
-modified: 2026-11-14T18:32:52.473305+00:00
+modified: 2026-11-14T18:42:48.737547+00:00
 relationships:
   related:
   - DEV-279
@@ -16,6 +16,9 @@ comments:
 - date: 2026-11-14T18:32:44.115773+00:00
   author: codex
   text: 'Review: passed. Reviewed sole commit acd88ef1, full diff, DEV-539 and DEV-279 comments, repository guidance, current agent help, release packaging, existing cross-process regression test and five recent main commits touching install.md. No findings or tickets filed. Prettier and git diff --check pass. Health check completed exit 1: untracked:DEV-279 remains until closure, alongside existing unrelated findings. Docs-only: application suites and UI screenshots not required. No files changed or commits made; status and assignee unchanged. Use WontDo at closure per the dropped-step criterion. No durable guidance finding.'
+- date: 2026-11-14T18:42:45.382144+00:00
+  author: codex
+  text: 'Merged and pushed to main: acd88ef1 rebased to 8c748f30, then amended with pending .tasks updates as instructed, producing 41449409. Prettier, diff whitespace and target-heading checks pass after rebase. Docs-only: full application lint/test/smoke not required. Health command reran against main and exits 1, still listing untracked:DEV-279 because this ticket has not yet closed; the dropped wrapper step needs nothing further as recorded in the fix and review. Other reported findings are outside this change. Main was clean before push; push succeeded. Ticket closure remains with job automation as instructed. No guidance correction.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A381bf7bf-62ed-432e-8bfc-d55ad9d744e7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3e5fdc24-59c3-489d-bce6-284393f127c7
@@ -89,3 +92,13 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-14T18:42:45.382144+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T18:42:48.737547+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
