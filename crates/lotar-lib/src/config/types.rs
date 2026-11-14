@@ -307,10 +307,12 @@ pub struct AgentProfileDetail {
     /// values outside low..max such as Codex's `reasoning_effort: ultra`.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty", deserialize_with = "scalar_map")]
     pub options: BTreeMap<String, String>,
-    /// The program of a `command` runner; other runners refuse it.
+    /// The program of a `command` runner. For the other runners it replaces
+    /// the harnessmux agent's command (DEV-512).
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub command: Option<String>,
-    /// The `command` runner's arguments; other runners refuse them.
+    /// The program's arguments; without `command`, they go after the harnessmux
+    /// agent's command.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub args: Vec<String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]

@@ -41,6 +41,31 @@ pub fn agent_table() -> LoTaRResult<harnessmux::AgentTable> {
     harnessmux::AgentTable::load().map_err(|err| LoTaRError::ValidationError(format!("harnessmux agent table: {err}")))
 }
 
+/// The agent table of a job: [`agent_table`] with the profile's `command` and `args` for its agent (DEV-512). A
+/// `command` replaces the agent's program and arguments, and with them its pinned adapter, as a `command` in
+/// `agents.toml` does; `args` alone go after the agent's command.
+pub fn job_agent_table(agent: &str, profile: &AgentProfileDetail) -> LoTaRResult<harnessmux::AgentTable> {
+    with_profile_command(agent_table()?, agent, profile)
+}
+
+fn with_profile_command(mut table: harnessmux::AgentTable, agent: &str, profile: &AgentProfileDetail) -> LoTaRResult<harnessmux::AgentTable> {
+    let program = profile.command.as_deref().map(str::trim).filter(|program| !program.is_empty());
+    if program.is_none() && profile.args.is_empty() {
+        return Ok(table);
+    }
+    let invalid = |err: harnessmux::Error| LoTaRError::ValidationError(format!("harnessmux agent table: {err}"));
+    let mut spec = table.get(agent).map_err(invalid)?.clone();
+    match program {
+        Some(program) => {
+            spec.command = std::iter::once(program.to_string()).chain(profile.args.iter().cloned()).collect();
+            spec.adapter = None;
+        }
+        None => spec.command.extend(profile.args.iter().cloned()),
+    }
+    table.insert(spec).map_err(invalid)?;
+    Ok(table)
+}
+
 /// The harnessmux agent a runner runs; `None` for `command`.
 pub fn harness_agent(kind: AgentRunnerKind) -> Option<&'static str> {
     (kind != AgentRunnerKind::Command).then(|| kind.as_str())
@@ -138,9 +163,15 @@ pub fn continuable_session(name: &str, agent: &str, tasks_dir: &std::path::Path)
 
 /// Opens a job's session: the existing one for `resume` (still open in this process, else resumed), otherwise a new
 /// one under `name`, which replaces an earlier session of that name nobody runs.
-pub fn open_session(name: &str, agent: &str, cwd: &std::path::Path, profile: harnessmux::Profile, resume: bool) -> Result<harnessmux::Session, String> {
+pub fn open_session(
+    name: &str,
+    agent: &str,
+    cwd: &std::path::Path,
+    table: &harnessmux::AgentTable,
+    profile: harnessmux::Profile,
+    resume: bool,
+) -> Result<harnessmux::Session, String> {
     let registry = registry();
-    let table = agent_table().map_err(|err| err.to_string())?;
     let owned = OWNED.lock().ok().and_then(|owned| owned.get(name).cloned());
     let session = block_on(async {
         if let Some(session) = owned {
@@ -150,7 +181,7 @@ pub fn open_session(name: &str, agent: &str, cwd: &std::path::Path, profile: har
             let _ = session.close().await;
         }
         if resume {
-            return harnessmux::Session::resume(registry, &table, name, Some(SESSION_IDLE_TTL)).await.map_err(|err| err.to_string());
+            return harnessmux::Session::resume(registry, table, name, Some(SESSION_IDLE_TTL)).await.map_err(|err| err.to_string());
         }
         if let Ok(existing) = registry.load(name)
             && existing.state != harnessmux::SessionState::Ended
@@ -166,7 +197,7 @@ pub fn open_session(name: &str, agent: &str, cwd: &std::path::Path, profile: har
             profile,
             idle_ttl: Some(SESSION_IDLE_TTL),
         };
-        harnessmux::Session::start(registry, &table, options).await.map_err(|err| err.to_string())
+        harnessmux::Session::start(registry, table, options).await.map_err(|err| err.to_string())
     })?;
     if let Ok(mut owned) = OWNED.lock() {
         owned.insert(name.to_string(), session.clone());
@@ -200,21 +231,15 @@ pub fn lotar_mcp_server(lotar_bin: &str, tasks_dir: &std::path::Path) -> harness
     }
 }
 
-/// Refuses profile settings a harnessmux agent can't take: its program and arguments come from harnessmux's agent
-/// table (`agents.toml`), not from the profile.
+/// Refuses profile settings a harnessmux agent can't take.
 pub fn check_agent_profile(kind: AgentRunnerKind, profile: &AgentProfileDetail) -> LoTaRResult<()> {
-    let Some(agent) = harness_agent(kind) else {
+    if harness_agent(kind).is_none() {
         if !profile.options.is_empty() {
             return Err(LoTaRError::ValidationError(
                 "The command runner takes no options: they are ACP config options of a harnessmux agent. Use env for a program of your own.".to_string(),
             ));
         }
         return Ok(());
-    };
-    if profile.command.is_some() || !profile.args.is_empty() {
-        return Err(LoTaRError::ValidationError(format!(
-            "The {agent} runner takes no command or args: lotar runs it as the harnessmux agent {agent}. Set its program in harnessmux's agents.toml, or use runner: command for a program of your own."
-        )));
     }
     if let Some(effort) = profile.effort.as_deref() {
         parse_effort(effort)?;
@@ -364,11 +389,10 @@ mod tests {
     }
 
     #[test]
-    fn agent_profiles_take_no_command_and_a_known_effort() {
+    fn agent_profiles_take_a_known_effort() {
         let mut claude = profile("claude");
-        claude.command = Some("/opt/claude".into());
-        let err = check_agent_profile(AgentRunnerKind::Claude, &claude).unwrap_err().to_string();
-        assert!(err.contains("agents.toml"), "{err}");
+        claude.command = Some("/opt/claude-agent-acp".into());
+        assert!(check_agent_profile(AgentRunnerKind::Claude, &claude).is_ok());
         let mut codex = profile("codex");
         codex.effort = Some("ultra".into());
         let err = check_agent_profile(AgentRunnerKind::Codex, &codex).unwrap_err().to_string();
@@ -382,6 +406,28 @@ mod tests {
         assert!(check_agent_profile(AgentRunnerKind::Command, &command).is_ok());
         command.options = BTreeMap::from([("mode".to_string(), "plan".to_string())]);
         assert!(check_agent_profile(AgentRunnerKind::Command, &command).is_err());
+    }
+
+    #[test]
+    fn a_profile_command_replaces_its_agents_command_and_adapter() {
+        let table = || harnessmux::AgentTable::parse(harnessmux::agents::BUILTIN, None).unwrap();
+        let unchanged = with_profile_command(table(), "claude", &profile("claude")).unwrap();
+        assert_eq!(unchanged.get("claude").unwrap(), table().get("claude").unwrap());
+
+        let mut own = profile("claude");
+        own.command = Some(" /opt/claude-agent-acp ".into());
+        own.args = vec!["--debug".into()];
+        let replaced = with_profile_command(table(), "claude", &own).unwrap();
+        let claude = replaced.get("claude").unwrap();
+        assert_eq!(claude.command, ["/opt/claude-agent-acp", "--debug"]);
+        assert_eq!(claude.adapter, None, "a command of the profile's own runs instead of the pinned adapter");
+        assert_eq!(claude.options, table().get("claude").unwrap().options);
+        assert_eq!(replaced.get("codex").unwrap(), table().get("codex").unwrap(), "other agents stay");
+
+        let mut args = profile("copilot");
+        args.args = vec!["--log-level".into(), "debug".into()];
+        let appended = with_profile_command(table(), "copilot", &args).unwrap();
+        assert_eq!(appended.get("copilot").unwrap().command, ["copilot", "--acp", "--stdio", "--log-level", "debug"]);
     }
 
     #[test]

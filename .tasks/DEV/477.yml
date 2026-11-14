@@ -1,11 +1,11 @@
 title: automation simulate shows only the first matching rule; a real event applies all of them
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T19:02:46.329827+00:00
-modified: 2026-11-14T08:21:38.606969+00:00
+modified: 2026-11-14T08:32:24.080455+00:00
 relationships:
   blocks:
   - DEV-513
@@ -48,6 +48,9 @@ comments:
 - date: 2026-11-14T07:49:35.939781+00:00
   author: codex
   text: 'Acted on triage answer: built ignored web assets and reran every full gate on 85dcac73681f3d2bc010a1b4b7c06170b7ae7848 with RUSTC_WRAPPER cleared and normal local process permissions. build:web, lint:agent, test:agent (2153 Rust, 1537 UI, 50 release, 7 hooks), and build-first test:smoke:agent (401 tests across 115 files) all passed. No skipped checks; no source changes or new commit needed. Verified main already contains 85dcac73 and has advanced to 6a6d98ff; the earlier no-merge statement described my direct action, but automation subsequently landed it. No merge or push performed this turn. Working tree clean. Previous missing-assets and xcrun_db blockers are cleared.'
+- date: 2026-11-14T08:32:20.390860+00:00
+  author: codex
+  text: nothing to merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6f77277c-e969-4904-93a8-17a4456d01b8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A22e7b280-3492-484a-8da6-fe203bfcbda7
@@ -305,3 +308,13 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-14T08:32:20.390860+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T08:32:24.080455+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done

@@ -1536,11 +1536,12 @@ fn finish_orphaned_job(
         return;
     };
     let budget = profile.max_budget_usd;
-    let profile = crate::services::agent_runner::session_profile(profile, HashMap::new()).map(|(profile, _)| profile);
-    let session = profile.and_then(|profile| {
+    let session = (|| {
+        let table = crate::services::agent_runner::job_agent_table(agent, profile)?;
+        let (profile, _) = crate::services::agent_runner::session_profile(profile, HashMap::new())?;
         let cwd = resolve_repo_root(tasks_dir).unwrap_or_else(|| tasks_dir.to_path_buf());
-        crate::services::agent_runner::open_session(name, agent, &cwd, profile, true).map_err(LoTaRError::ValidationError)
-    });
+        crate::services::agent_runner::open_session(name, agent, &cwd, &table, profile, true).map_err(LoTaRError::ValidationError)
+    })();
     let session = match session {
         Ok(session) => session,
         Err(err) => {
@@ -2787,7 +2788,11 @@ fn run_session(
             record_and_emit(state, "agent_job_progress", Some(note.clone()));
         });
     }
-    let session = match crate::services::agent_runner::open_session(launch.name, launch.agent, launch.cwd, session_profile, launch.resume) {
+    let table = match crate::services::agent_runner::job_agent_table(launch.agent, profile) {
+        Ok(table) => table,
+        Err(err) => return RunEnd::Failed(err.to_string()),
+    };
+    let session = match crate::services::agent_runner::open_session(launch.name, launch.agent, launch.cwd, &table, session_profile, launch.resume) {
         Ok(session) => session,
         Err(err) => return RunEnd::Failed(format!("Could not start the {} session {}: {err}", launch.agent, launch.name)),
     };
@@ -4385,18 +4390,18 @@ mod tests {
         assert_eq!(profile.runner, "codex");
     }
 
-    /// DEV-503: harnessmux agents take their program from harnessmux's
-    /// agent table, so a profile's command and args are refused.
+    /// DEV-512: a profile's command and args reach its harnessmux agent
+    /// instead of being refused (DEV-503).
     #[test]
-    fn agent_profiles_with_a_command_are_refused() {
+    fn agent_profiles_with_a_command_are_accepted() {
         let mut config = ResolvedConfig::from_global(GlobalConfig::default());
         let mut detail = AgentProfileConfig::Runner("claude".to_string()).to_detail();
         detail.args = vec!["--verbose".to_string()];
         config.agent_profiles.insert("pinned".to_string(), detail);
         let req =
             AgentJobCreateRequest { ticket_id: "TEST-1".to_string(), prompt: "hello".to_string(), agent: Some("pinned".to_string()), ..Default::default() };
-        let err = resolve_profile(&config, &req).unwrap_err().to_string();
-        assert!(err.contains("runner: command"), "{err}");
+        let profile = resolve_profile(&config, &req).unwrap();
+        assert_eq!(profile.args, ["--verbose"]);
     }
 }
 

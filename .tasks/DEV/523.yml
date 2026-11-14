@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T06:27:21.642026+00:00
-modified: 2026-11-14T08:25:36.213306+00:00
+modified: 2026-11-14T08:38:50.475538+00:00
 relationships:
   related:
   - DEV-518
@@ -24,6 +24,9 @@ comments:
 - date: 2026-11-14T08:06:36.812134+00:00
   author: claude
   text: 'Rework: fixed the review finding in 81c1488d (amended). A command-runner agent''s direct hand-back is now caught too. A merge job saves the ticket''s status and assignee right after its job_start rules (ticket_at_start, next to main_head_at_start). ensure_branch_merged leaves main alone when either is true: a recorded outcome sets a status or assignee (T3 threads), or the ticket''s status or assignee differ from that snapshot (agents with LOTAR_AGENT_JOB_ID, whose changes apply directly). Tests: merge_job_that_hands_the_ticket_back_leaves_main_alone now runs the normal command environment without unsetting anything. With the snapshot check disabled it fails (''main must not get the branch''; the job log showed ''Fast-forwarded the main checkout''), and with the check in place it passes. merge_job_whose_hand_back_is_its_outcome_leaves_main_alone covers the deferred path. All 10 merge and pipeline tests pass, DEV-411/DEV-465 included. docs/help/agent.md wording now covers both paths. Limit: a job adopted from a dead process (adopt_orphaned_job) has no snapshot, so there only the recorded outcome counts. Checks: npm run lint, npm test (2152 Rust + 1537 UI) and npm run smoke (401) pass.'
+- date: 2026-11-14T08:38:50.475538+00:00
+  author: codex
+  text: 'Merge blocked: the second review could not record its blocking verdict because the sandbox denied ticket writes. HEAD remains 81c1488d with the unresolved recovery gap: adopted merge jobs initialize ticket_at_start=None, so a direct hand-back after recovery is missed and main can still be fast-forwarded. No merge or push performed. Owner decision needed: should this gap be fixed before merging?'
 references:
 - code: crates/lotar-lib/src/services/agent_job_service.rs#3121-3170
 - code: crates/lotar-lib/src/services/agent_job_service.rs#3243-3258
@@ -162,3 +165,7 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-14T08:38:50.475538+00:00
+  actor: codex
+  changes:
+  - field: comment_added

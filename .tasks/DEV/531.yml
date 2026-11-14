@@ -1,11 +1,11 @@
 title: Agents with the job's environment bypass the running-job guard on status and assignee
-status: Reviewing
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-14T07:31:46.259047+00:00
-modified: 2026-11-14T08:24:41.575415+00:00
+modified: 2026-11-14T08:27:31.571580+00:00
 relationships:
   related:
   - DEV-320
@@ -14,6 +14,9 @@ comments:
 - date: 2026-11-14T08:06:43.937687+00:00
   author: claude
   text: 'Fixed in 1574c3da. is_job_lifecycle (task_service.rs) now also requires a non-empty LOTAR_AUTOMATION_EVENT, which only automation run commands get; job_env (agent_job_service.rs) sets it empty, so ACP/command agents (also ones started by a lotar that itself runs under an automation command) have their status/assignee recorded via the job outcome and applied at the job''s end. LOTAR_AGENT_JOB_ID stays in the agent env (tell_agent uses it so an agent''s own comment doesn''t come back to it). New test dev320_job_outcome_test::the_job_agents_own_changes_wait_while_its_run_commands_apply: a command agent''s lotar status/assignee are deferred while a job_started run command applies at once; it fails without the fix. Changed running_agent_can_hand_ticket_back_for_clarification: the agent''s handoff is now the outcome, so the failed job''s error rule still adds its agent-error tag (DEV-320 semantics). docs/help/agent.md updated. Checks: npm run lint (lint:agent), npm test (2161 Rust + 1537 UI passed), npm run smoke (401 passed).'
+- date: 2026-11-14T08:27:26.712851+00:00
+  author: codex
+  text: 'Review: passed. Reviewed 1574c3da full diff, ticket/comments, related DEV-320/516, repository guidance, main history and automation environment paths. No findings. diff --check, lint:agent, 8 job-outcome tests and changed clarification regression passed after approved sccache retries. Full UI/release/hooks and smoke not rerun; fix agent reports passes. Before-fix failure reported by fix agent, not independently rerun. No UI changes, file edits, commits or minor tickets. Status and assignee unchanged; no durable guidance finding.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7e46419f-858b-4095-8351-aaa31ab05631
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aef967ab6-933f-45e8-9887-13c56573a82e
@@ -63,3 +66,16 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aef967ab6-933f-45e8-9887-13c56573a82e
+- at: 2026-11-14T08:27:26.712851+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T08:27:31.571580+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

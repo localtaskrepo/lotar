@@ -1,11 +1,10 @@
 title: The owner's comment on DEV-514 set @fix but started no job and said nothing
-status: HelpNeeded
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
 created: 2026-11-14T06:27:26.992238+00:00
-modified: 2026-11-14T08:18:56.825734+00:00
+modified: 2026-11-14T08:37:55.700830+00:00
 relationships:
   related:
   - DEV-514
@@ -16,6 +15,7 @@ relationships:
   - DEV-468
   - DEV-511
   - DEV-526
+  - DEV-527
 comments:
 - date: 2026-11-14T07:14:23.462133+00:00
   author: claude
@@ -33,6 +33,9 @@ comments:
     - `main` fast-forwarded to `5fdae405` (the rebased `99535969`) at 2026-11-14 08:09:29Z (`git reflog`: `merge t3/owner-comment-silent-no-job: Fast-forward`), the same second this ticket went to HelpNeeded. Not pushed yet (main is ahead of origin).
     - Checks on the rebased commit: `lint:agent` passed. `test:agent` and `npm run smoke` never ran clean (sandbox: missing web build, no localhost, xcrun_db residue). The earlier full pass (lint, 2151 Rust, 1537 UI, smoke 401/401) was on `99535969`, before the rebase onto DEV-468, DEV-511 and DEV-522.
     - Next: outside the blocked sandbox, build the web embed first, then run `npm run test:agent` and `npm run smoke` on main. Green: set this ticket Done. Red: fix on main. Nobody needs the owner for this.
+- date: 2026-11-14T08:37:42.163995+00:00
+  author: claude
+  text: 'Checks on main 3c74ec14 (includes the rebased fix 5fdae405, with DEV-468, DEV-511, DEV-522, DEV-526, DEV-527), run in a clean detached checkout outside the sandbox: npm run smoke 401/401 passed (it builds the web embed first); npm run test:agent 2164 Rust, 1537 UI, 50 release and 7 hook tests passed; npm run lint clean. Done. Main is still ahead of origin: nothing was pushed in this job.'
 references:
 - file: crates/lotar-lib/src/services/automation_service.rs
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3d4e623b-a781-4d38-9f93-b8f5bb02600c
@@ -149,3 +152,27 @@ history:
   - field: relationships
     old: '{"related":["DEV-514","DEV-522","DEV-466","DEV-508","DEV-518","DEV-468","DEV-511"]}'
     new: '{"related":["DEV-514","DEV-522","DEV-466","DEV-508","DEV-518","DEV-468","DEV-511","DEV-526"]}'
+- at: 2026-11-14T08:27:32.586454+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T08:37:42.163995+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T08:37:42.408877+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-514","DEV-522","DEV-466","DEV-508","DEV-518","DEV-468","DEV-511","DEV-526"]}'
+    new: '{"related":["DEV-514","DEV-522","DEV-466","DEV-508","DEV-518","DEV-468","DEV-511","DEV-526","DEV-527"]}'
+- at: 2026-11-14T08:37:55.700830+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'

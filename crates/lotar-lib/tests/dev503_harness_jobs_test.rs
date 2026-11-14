@@ -199,10 +199,16 @@ fn an_error_the_agent_sends_as_its_reply_fails_the_job() {
     harness.run(&[]).failure();
 }
 
+/// DEV-512: a profile's `command` and `args` start its agent instead of the agent table's command.
 #[test]
-fn agent_profiles_take_no_command() {
-    let harness = harness("    command: /opt/claude\n", &[]);
-    harness.run(&[]).failure().stderr(predicate::str::contains("runner: command"));
+fn a_profile_command_starts_the_agent_with_its_args() {
+    let scratch = tempfile::tempdir().unwrap();
+    let own = scratch.path().join("own-agent.sh");
+    let harness = harness(&format!("    command: {}\n    args: [\"from the profile\"]\n", own.display()), &[]);
+    let fake = harness.root().join("fake-acp.sh");
+    std::fs::write(&own, format!("#!/bin/sh\nFAKE_REPLY=\"Own agent, $1,\" exec \"{}\"\n", fake.display())).unwrap();
+    std::fs::set_permissions(&own, std::fs::Permissions::from_mode(0o755)).unwrap();
+    harness.run(&[]).success().stdout(predicate::str::contains("Own agent, from the profile, 1"));
 }
 
 #[test]

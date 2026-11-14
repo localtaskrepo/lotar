@@ -1,14 +1,16 @@
 title: 'npm run test:agent fails from a clean target: the embedded web UI test needs target/web-embed/index.html.gz'
-status: Merging
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T06:38:33.287147+00:00
-modified: 2026-11-14T07:49:00.198513+00:00
+modified: 2026-11-14T08:37:42.409252+00:00
 relationships:
   related:
   - DEV-519
+  - DEV-496
+  - DEV-525
 comments:
 - date: 2026-11-14T07:23:38.148933+00:00
   author: claude
@@ -16,6 +18,9 @@ comments:
 - date: 2026-11-14T07:48:50.949749+00:00
   author: codex
   text: 'Review: passed. No findings in commit 38015b94 after reading full diff, ticket/comments, related DEV-519, guidance, main history, asset build/rebuild logic and CI. Both Rust test scripts build assets first; CI already does so independently. Existing regression test demonstrated the original failure. npm run lint passed. test:agent built web assets and compiled with RUSTC_WRAPPER= after sccache permission failures; embedded index assertion passed, but server startup failed (serve printed no URL) under sandbox restrictions. 2108/2151 tests were not run; temp guard reported xcrun_db. Full suite pass therefore not independently verified; UI/release/hooks and smoke not rerun. Fix agent reports all gates passed. diff --check passed; checkout clean. Files, commits, status and assignee unchanged. No follow-up tickets or durable guidance finding.'
+- date: 2026-11-14T08:30:35.025011+00:00
+  author: codex
+  text: 'Merged locally: reviewed fix 38015b94 rebased twice as main advanced; final code commit 3311e4da fast-forwarded into main, then amended only with main .tasks updates as instructed, yielding 3c74ec14. Required npm run lint, npm run test:agent and npm run smoke all passed on final rebased code (RUSTC_WRAPPER=). Health check npm run test:agent also passed from main after merge; missing embedded index finding is gone. No push: earliest unpushed commit ff84b766 belongs to DEV-496 (HelpNeeded), so there is no finished prefix before that unfinished work; other pending tickets also remain. No status or assignee changes. No durable guidance finding.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa5efb45d-1e21-48f6-b5d5-639815731a8b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0732c92f-1a96-4896-887f-570be21fa881
@@ -78,3 +83,25 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-14T08:30:35.025011+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T08:30:35.857152+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-519"]}'
+    new: '{"related":["DEV-519","DEV-496"]}'
+- at: 2026-11-14T08:30:41.418031+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-14T08:37:42.409252+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-519","DEV-496"]}'
+    new: '{"related":["DEV-519","DEV-496","DEV-525"]}'

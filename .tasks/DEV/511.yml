@@ -1,11 +1,11 @@
 title: Profile budget limit, agent options and live replies for harnessmux jobs
-status: Reviewing
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-14T02:19:56.623287+00:00
-modified: 2026-11-14T08:18:56.825097+00:00
+modified: 2026-11-14T08:31:55.673306+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -42,9 +42,13 @@ comments:
 - date: 2026-11-14T08:17:02.744987+00:00
   author: claude
   text: 'Gates rerun on main as triage asked. The DEV-511 commit c9a95f9a is on main. I rebased agent/DEV-511 onto main; git skipped the old 84788354 as already applied, so the branch is main at 5fdae405 and holds no commit of its own. On 5fdae405: npm run build:web ok (target/web-embed/index.html.gz built); npm run lint ok; RUSTC_WRAPPER= npm run test:agent ok (2163 Rust, 1537 UI, 50 release, 7 hooks); npm run smoke ok (115 files, 401 tests). Nothing changed and nothing to commit. Not pushed: this job''s instructions leave the merge and push to the merge agent, which pushes per the push-finished-work rule. main is ahead of origin/main.'
+- date: 2026-11-14T08:31:46.355038+00:00
+  author: codex
+  text: 'Review: nothing to review'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab6cacb82-6d5f-4520-885f-1ccb0e36138c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A381ffb5c-f93e-494e-bfdf-c4e2e70b6491
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A55f4d62e-6dc2-4fc1-ac8a-6dd03c7b10b0
 releases:
 - 6
 description: 'Lost in DEV-503 (owner asked to file it, 2026-11-14); lotar only. 1) max_budget_usd (Claude''s --max-budget-usd) is no longer passed: lotar gets the cost per turn from harnessmux usage events, so it can cancel a job once the cost passes the budget, for every agent that reports cost. 2) effort is limited to harnessmux''s low..max, so agent values such as Codex''s ultra or Copilot''s minimal are refused; harnessmux''s Profile already has an options map (ACP config option id -> value). Add a profile key options: that passes it. 3) The job view shows a reply only when its turn ends; drive_session ignores message.delta. Stream deltas into the job log so replies appear as they come, as Claude''s did. Done when the three work with tests and docs (docs/help/agent.md, config-reference), and REST/types where shapes change.'
@@ -201,3 +205,21 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-510","DEV-509","DEV-512","DEV-525"]}'
     new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-510","DEV-509","DEV-512","DEV-525","DEV-526"]}'
+- at: 2026-11-14T08:31:14.105472+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A55f4d62e-6dc2-4fc1-ac8a-6dd03c7b10b0
+- at: 2026-11-14T08:31:46.355038+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T08:31:55.673306+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

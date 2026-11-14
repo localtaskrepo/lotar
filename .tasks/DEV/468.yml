@@ -1,11 +1,11 @@
 title: A rework commits off the ticket's branch, so the next fresh review reads the old commit
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T10:33:47.729859+00:00
-modified: 2026-11-14T08:10:19.883003+00:00
+modified: 2026-11-14T08:32:24.151512+00:00
 relationships:
   blocks:
   - DEV-513
@@ -22,6 +22,7 @@ relationships:
   - DEV-503
   - DEV-528
   - DEV-525
+  - DEV-526
 comments:
 - date: 2026-11-13T10:48:16.585852+00:00
   author: claude
@@ -107,6 +108,9 @@ comments:
     - Next for @merge: on the rebased `2eaaa99a`, run `npm run build:web`, then `npm run lint:agent`, `npm run test:agent` and `npm run test:smoke:agent`; if all pass, fast-forward main. Only a failing test that the change caused comes back to @fix.
     - This ticket blocks DEV-513, so it is not parked on the owner.
     - Assigning @merge.
+- date: 2026-11-14T08:32:18.676457+00:00
+  author: claude
+  text: 'Merged: 2eaaa99a (the rebase of reviewed 57c416bb, identical per git range-diff) is already on main, under d54ebc0f (DEV-526) and 5fdae405 (DEV-525); main was fast-forwarded after the 08:06Z hand-back. Gates as triage asked, run on main d54ebc0f in this worktree: npm run build:web, then npm run lint:agent, npm run test:agent (2164 Rust, 1537 UI, release, hooks) and npm run test:smoke:agent (401): all passed. Not pushed: the main checkout has uncommitted ticket edits (.tasks), so it isn''t clean. Nothing waits on this ticket.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1ab3c1d7-0ce9-4c25-a520-275cf8b42ec4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae7d11a9f-4237-40dd-a146-a91f4cc63276
@@ -606,3 +610,19 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-513"],"related":["DEV-342","DEV-408","DEV-414","DEV-465","DEV-472","DEV-473","DEV-466","DEV-513","DEV-524","DEV-503","DEV-528"]}'
     new: '{"blocks":["DEV-513"],"related":["DEV-342","DEV-408","DEV-414","DEV-465","DEV-472","DEV-473","DEV-466","DEV-513","DEV-524","DEV-503","DEV-528","DEV-525"]}'
+- at: 2026-11-14T08:32:18.676457+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T08:32:18.792950+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-513"],"related":["DEV-342","DEV-408","DEV-414","DEV-465","DEV-472","DEV-473","DEV-466","DEV-513","DEV-524","DEV-503","DEV-528","DEV-525"]}'
+    new: '{"blocks":["DEV-513"],"related":["DEV-342","DEV-408","DEV-414","DEV-465","DEV-472","DEV-473","DEV-466","DEV-513","DEV-524","DEV-503","DEV-528","DEV-525","DEV-526"]}'
+- at: 2026-11-14T08:32:24.151512+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done

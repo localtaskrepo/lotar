@@ -53,8 +53,8 @@ CLI > env > project > home > global > defaults (commands without a project skip 
   - agents.<name>.provider: optional string — `t3` runner only: the T3 Code provider instance (`claudeAgent`, `codex`, …) the model runs on; set it together with `model`. See [T3 Code threads](./agent.md#t3-code-threads)
   - agents.<name>.session: `new` | `continue` | `fresh` (default `new`) — `continue` runs the job as the next turn of the ticket's session of this profile; `new` and `fresh` start a new one. See [Sessions](./agent.md#sessions)
   - agents.<name>.tools.allowed / tools.disallowed, agents.<name>.mcp.allow: not passed (ACP agents take no tool lists); a job logs a note
-  - agents.<name>.command: string — `command` runner only: the program to run. Other runners refuse it; harnessmux's `agents.toml` sets their program
-  - agents.<name>.args: string[] — `command` runner only: the program's arguments
+  - agents.<name>.command: string — the program to run. For the other runners it replaces the agent's command from harnessmux's `agents.toml` (and its pinned adapter) for this profile's jobs
+  - agents.<name>.args: string[] — the program's arguments. For the other runners without `command` they go after the agent's command
   - agents.<name>.env: map — extra environment variables for the agent
   - `agents` can be set as a whole with `lotar config set agents '<json or yaml map>'` (project or `--global`); names may use letters, digits, `-`, `_` and `.`, and each runner must be one of the runners in [Agent Jobs](./agent.md#runners).
   - agents.<name>.mcp.lotar: boolean (default false) — give the job LoTaR's own MCP server, limited to ticket tools (not for `amp`, `t3` or `command`)

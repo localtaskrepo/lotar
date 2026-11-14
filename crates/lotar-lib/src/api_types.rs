@@ -617,9 +617,10 @@ pub struct TaskMoveResponse {
     pub task: TaskDTO,
 }
 
-/// What a job used, as far as its CLI reports it. Claude reports tokens,
-/// cost and turns; Codex tokens; Copilot premium requests and changed lines;
-/// Gemini tokens. Missing values were not reported.
+/// What a job used, as far as its agent reports it over ACP: tokens, and the
+/// cost where the agent reports one (Claude). Missing values were not
+/// reported. Premium requests and changed lines are not reported over ACP;
+/// they come from jobs before DEV-503 (Copilot's CLI).
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct AgentJobUsage {
@@ -634,7 +635,7 @@ pub struct AgentJobUsage {
     /// Cost in US dollars as computed by the CLI.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cost_usd: Option<f64>,
-    /// Agent turns (model round trips).
+    /// The job's turns in its session.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub turns: Option<u64>,
     /// GitHub Copilot premium requests.
