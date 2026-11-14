@@ -106,6 +106,7 @@ import type {
     TaskListFilter,
     TaskListResponse,
     TaskUpdate,
+    TaskValuesDTO,
 } from './types'
 import { showToast } from '../components/toast'
 
@@ -386,6 +387,9 @@ export const api = {
     },
     suggestTasks(q: string, project?: string, limit = 20): Promise<Array<{ id: string; title: string }>> {
         return get('/api/tasks/suggest', { q, project, limit })
+    },
+    taskValues(project?: string): Promise<TaskValuesDTO> {
+        return get('/api/tasks/values', { project })
     },
     suggestReferenceFiles(q: string, limit = 20): Promise<string[]> {
         return get('/api/references/files', { q, limit })

@@ -6,14 +6,12 @@ import { useTaskPanelOwnership } from '../composables/useTaskPanelOwnership'
 vi.mock('../api/client', () => ({
     api: {
         whoami: vi.fn(async () => ''),
-        listTasks: vi.fn(async () => ({
-            tasks: [{ id: 'A-1', reporter: 'priya', assignee: 'marco', tags: [], custom_fields: {} }],
-        })),
+        taskValues: vi.fn(async () => ({ people: ['marco', 'priya'], tags: [], custom_fields: {} })),
         listAgentProfiles: vi.fn(async () => ({ profiles: [] })),
     },
 }))
 
-function setup() {
+function setup(mergeKnownTags: (tags: Array<string | null | undefined>) => void = () => {}) {
     const form = reactive<Record<string, any>>({ reporter: '', assignee: '' })
     const ownership = useTaskPanelOwnership({
         form,
@@ -22,7 +20,7 @@ function setup() {
         suppressWatch: ref(true),
         defaults: ref({}),
         members: ref([]),
-        mergeKnownTags: () => {},
+        mergeKnownTags,
         updateField: () => {},
         onFieldBlur: () => {},
     })
@@ -66,12 +64,11 @@ describe('task panel ownership controls', () => {
                 { name: 'review', runner: 'codex', permissions: 'read-only' },
             ],
         })
-        vi.mocked(api.listTasks).mockResolvedValueOnce({
-            tasks: [
-                { id: 'A-1', reporter: '@priya', assignee: '@fix', tags: [], custom_fields: {} },
-                { id: 'A-2', reporter: 'priya', assignee: 'marco', tags: [], custom_fields: {} },
-            ],
-        } as any)
+        vi.mocked(api.taskValues).mockResolvedValueOnce({
+            people: ['@fix', '@priya', 'marco', 'priya'],
+            tags: [],
+            custom_fields: {},
+        })
         const { form, ownership } = setup()
         await ownership.preloadPeople('A')
         expect(api.listAgentProfiles).toHaveBeenCalledWith('A')
@@ -93,15 +90,39 @@ describe('task panel ownership controls', () => {
         expect(ownership.orderedKnownUsers.value).toEqual(['marco', 'priya'])
     })
 
-    it('learns the custom field values the project tasks hold, each item of a list', async () => {
-        vi.mocked(api.listTasks).mockResolvedValueOnce({
-            tasks: [
-                { id: 'A-1', tags: [], custom_fields: { affects: ['0.15', '0.15.0'], product: 'web' } },
-                { id: 'A-2', tags: [], custom_fields: { affects: '0.15', nested: {} } },
-            ],
-        } as any)
-        const { ownership } = setup()
-        await ownership.preloadPeople('A')
+    it('offers the people, tags and field values of the project without loading its tasks', async () => {
+        vi.mocked(api.taskValues).mockResolvedValueOnce({
+            people: ['marco', 'priya'],
+            tags: ['api', 'web'],
+            custom_fields: { affects: ['0.15', '0.15.0'], product: ['web'] },
+        })
+        const mergeKnownTags = vi.fn()
+        const { ownership } = setup(mergeKnownTags)
+        await ownership.preloadPeople(' A ')
+        expect(api.taskValues).toHaveBeenLastCalledWith('A')
+        expect(ownership.orderedKnownUsers.value).toEqual(['marco', 'priya'])
+        expect(mergeKnownTags).toHaveBeenCalledWith(['api', 'web'])
         expect(ownership.knownFieldValues.value).toEqual({ affects: ['0.15', '0.15.0'], product: ['web'] })
+    })
+
+    it('still offers configured members, agent profiles and the current user when the values fail to load', async () => {
+        vi.mocked(api.taskValues).mockRejectedValueOnce(new Error('offline'))
+        vi.mocked(api.listAgentProfiles).mockResolvedValueOnce({
+            profiles: [{ name: 'fix', runner: 'claude', permissions: 'workspace' }],
+        })
+        const form = reactive<Record<string, any>>({ reporter: '', assignee: '' })
+        const ownership = useTaskPanelOwnership({
+            form,
+            mode: computed(() => 'edit' as const),
+            ready: ref(false),
+            suppressWatch: ref(true),
+            defaults: ref({ reporter: 'lead' }),
+            members: ref(['sam']),
+            mergeKnownTags: () => {},
+            updateField: () => {},
+            onFieldBlur: () => {},
+        })
+        await ownership.preloadPeople('A')
+        expect(ownership.orderedKnownUsers.value).toEqual(['@fix', 'lead', 'sam'])
     })
 })

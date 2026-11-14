@@ -1094,6 +1094,12 @@ export interface ProjectCreateRequest {
     prefix?: string
     values?: Record<string, string>
 }
+// The distinct values a project's tasks hold, for suggestions (DEV-545).
+export interface TaskValuesDTO {
+    people: string[]
+    tags: string[]
+    custom_fields: Record<string, string[]>
+}
 export interface ProjectStatsDTO {
     name: string
     open_count: number

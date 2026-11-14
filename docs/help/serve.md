@@ -119,6 +119,7 @@ Exactly one case does not fail on a busy port: when **no** source configured a p
 		- Invalid values for `status`, `priority`, or `type` return HTTP 400
 		- Any additional query key is treated as a property filter. Declared custom fields can be used directly (e.g., `?sprint=W35`). Multiple values allowed via CSV; matching is case- and separator-insensitive.
 - `GET /api/tasks/get?id=...` - Get task by id (deleted tasks are hidden; opt in with `include_deleted=true`)
+- `GET /api/tasks/values[?project=PREFIX]` - Distinct people (assignees, reporters), tags and string or number custom field values of the project's active tasks, sorted; all projects without `project`; the task panel's suggestions
 - `POST /api/tasks/update` - Update task (body: TaskUpdateRequest: flat fields with `id` + optional properties; supports `@me` for reporter/assignee; `status`/`priority`/`type` are validated against the task's project config, `null` clears clearable fields, and list/map patches replace the whole value; an optional `expected_modified`, the `modified` value you loaded, makes the update fail with 409 `CONFLICT` and write nothing if the task changed since)
 - `POST /api/tasks/delete` - Soft-delete task (body: { id, hard?: bool }); hard deletion retains attachment blobs and returns warnings listing attachments and incoming task relationships
 - `POST /api/tasks/restore` - Restore a soft-deleted task (body: { id }); delete/restore do not change `modified`

@@ -977,6 +977,41 @@
         }
       }
     },
+    "/api/tasks/values": {
+      "get": {
+        "summary": "Distinct people, tags and custom field values of a project's tasks",
+        "description": "For suggestions in the task panel without loading whole tasks. Reads every active task (not deleted, not archived) of the project, or of all projects without `project`. Values are trimmed, empty ones dropped, and each list sorted without duplicates. Custom fields hold string and number values only; list fields count item by item.",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Project prefix or name; omitted reads all projects."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeTaskValues"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/api/tasks/suggest": {
       "get": {
         "summary": "Suggest tasks by text query",
@@ -8569,6 +8604,39 @@
           "prefix"
         ]
       },
+      "TaskValuesDTO": {
+        "type": "object",
+        "properties": {
+          "people": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Assignees and reporters as stored."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "custom_fields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Values by field name."
+          }
+        },
+        "required": [
+          "people",
+          "tags",
+          "custom_fields"
+        ]
+      },
       "ProjectStatsDTO": {
         "type": "object",
         "properties": {
@@ -9970,6 +10038,17 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/ProjectListResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeTaskValues": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TaskValuesDTO"
           }
         },
         "required": [

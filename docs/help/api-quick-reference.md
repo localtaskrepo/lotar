@@ -76,6 +76,7 @@ Tasks
 - GET  /api/tasks/timeline?id=ID[&project=PREFIX][&threads=true] -> { data: TaskTimeline }; changes, comments, commits of the task file and agent jobs, oldest first, each entry with a `kind` (`change`, `comment`, `commit`, `job`); `threads=true` adds each job's whole `thread`
 - GET  /api/tasks/commit_diff?id=ID&commit=SHA -> { data }; the task file's diff at that commit
 - GET  /api/tasks/suggest?q=TEXT[&project=PREFIX][&limit=N] -> { data: suggestions }; tasks whose ID or title match, for pickers
+- GET  /api/tasks/values[?project=PREFIX] -> { data: TaskValuesDTO }; the distinct people, tags and custom field values of the project's active tasks (all projects without `project`), for suggestions without loading whole tasks
 - GET  /api/tasks/export -> the filtered task list as a file; takes the same filters as `/api/tasks/list`
 - POST /api/tasks/references/link/add | /link/remove and /code/add | /code/remove -> add or remove a link or code reference
 - GET  /api/tasks/stream -> alias of `/api/events`

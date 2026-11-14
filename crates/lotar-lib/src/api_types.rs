@@ -1955,6 +1955,18 @@ pub struct ProjectStatsDTO {
     pub tags_top: Vec<String>,
 }
 
+/// The distinct people, tags and custom field values a project's tasks hold,
+/// for the task panel's suggestions without whole tasks (DEV-545).
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct TaskValuesDTO {
+    /// Assignees and reporters as stored.
+    pub people: Vec<String>,
+    pub tags: Vec<String>,
+    /// String and number values by field name; list fields item by item.
+    pub custom_fields: std::collections::BTreeMap<String, Vec<String>>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct SyncRequest {

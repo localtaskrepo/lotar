@@ -226,44 +226,30 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
         }
     }
 
+    async function loadTaskValues(scope?: string) {
+        try {
+            return await api.taskValues(scope)
+        } catch {
+            return null
+        }
+    }
+
     async function preloadPeople(project?: string | null) {
         const scope = project && project.trim() ? project.trim() : undefined
-        const [profiles, tasks] = await Promise.allSettled([
-            loadAgentProfiles(scope),
-            api.listTasks(scope ? { project: scope, limit: 200, offset: 0 } : { limit: 200, offset: 0 }),
-        ])
-        agentProfiles.value = profiles.status === 'fulfilled' ? profiles.value : []
+        // The distinct values only, not whole tasks (DEV-545).
+        const [profiles, values] = await Promise.all([loadAgentProfiles(scope), loadTaskValues(scope)])
+        agentProfiles.value = profiles
         const baseline = seedKnownUsers()
-        if (tasks.status === 'fulfilled') {
-            const response = tasks.value
-            const list = Array.isArray(response.tasks) ? response.tasks : []
+        if (values) {
             const seen = new Set<string>()
-            const tags = new Set<string>()
-            const fieldValues = new Map<string, Set<string>>()
-            list.forEach((item) => {
-                const assignee = personName(item.assignee)
-                if (assignee) seen.add(assignee)
-                const reporter = personName(item.reporter)
-                if (reporter) seen.add(reporter)
-                item.tags.forEach((tag) => {
-                    if (!tag) return
-                    const trimmed = tag.trim()
-                    if (trimmed) tags.add(trimmed)
-                })
-                Object.entries(item.custom_fields).forEach(([field, value]) => {
-                    const values = fieldValues.get(field) ?? new Set<string>()
-                    for (const entry of Array.isArray(value) ? value : [value]) {
-                        if (typeof entry !== 'string' && typeof entry !== 'number') continue
-                        const trimmed = String(entry).trim()
-                        if (trimmed) values.add(trimmed)
-                    }
-                    if (values.size) fieldValues.set(field, values)
-                })
+            values.people.forEach((value) => {
+                const person = personName(value)
+                if (person) seen.add(person)
             })
-            knownFieldValues.value = Object.fromEntries([...fieldValues].map(([field, values]) => [field, [...values]]))
+            knownFieldValues.value = values.custom_fields
             baseline.forEach((value) => seen.add(value))
             assignKnownUsersFrom(seen)
-            options.mergeKnownTags(Array.from(tags))
+            options.mergeKnownTags(values.tags)
         } else {
             assignKnownUsersFrom(baseline)
         }

@@ -75,6 +75,25 @@ pub(super) fn register(api_server: &mut ApiServer) {
         ok_json(200, json!({"data": payload}))
     });
 
+    // GET /api/tasks/values[?project=PREFIX]
+
+    api_server.register_handler("GET", "/api/tasks/values", |req: &HttpRequest| {
+        let resolver = try_response!(resolve_tasks_dir());
+        let project = match req.query.get("project").map(|v| v.trim()).filter(|v| !v.is_empty()) {
+            Some(name) => {
+                let prefix = crate::utils::project::resolve_project_input(name, &resolver.path);
+                if !resolver.path.join(&prefix).is_dir() {
+                    return not_found(format!("Project '{name}' not found"));
+                }
+                Some(prefix)
+            }
+            None => None,
+        };
+        let storage = crate::storage::manager::Storage::new(&resolver.path);
+        let values = ProjectService::values(&storage, project.as_deref());
+        ok_json(200, json!({"data": values}))
+    });
+
     // GET /api/sprints/list
 
     api_server.register_handler("GET", "/api/tasks/export", |req: &HttpRequest| {

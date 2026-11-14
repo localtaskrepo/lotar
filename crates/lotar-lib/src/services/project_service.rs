@@ -1,8 +1,8 @@
-use crate::api_types::{ProjectDTO, ProjectStatsDTO};
+use crate::api_types::{ProjectDTO, ProjectStatsDTO, TaskValuesDTO};
 use crate::storage::manager::Storage;
 use crate::types::TaskChangeLogEntry;
 use chrono::{DateTime, Utc};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 pub struct ProjectService;
 
@@ -65,6 +65,52 @@ impl ProjectService {
         let tags_top: Vec<String> = tags_top.into_iter().take(10).map(|(tag, _)| tag).collect();
 
         ProjectStatsDTO { name: name.to_string(), open_count: open, done_count: done, recent_modified: latest.map(|dt| dt.to_rfc3339()), tags_top }
+    }
+
+    /// The distinct values of every active task of `project` (all projects
+    /// when `None`): trimmed, without empties, sorted (DEV-545).
+    pub fn values(storage: &Storage, project: Option<&str>) -> TaskValuesDTO {
+        let filter = crate::storage::TaskFilter { project: project.map(str::to_string), ..Default::default() };
+        let mut people = BTreeSet::new();
+        let mut tags = BTreeSet::new();
+        let mut fields: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+        let keep = |set: &mut BTreeSet<String>, value: &str| {
+            let trimmed = value.trim();
+            if !trimmed.is_empty() {
+                set.insert(trimmed.to_string());
+            }
+        };
+        for (_, task) in storage.search(&filter) {
+            for person in [&task.assignee, &task.reporter].into_iter().flatten() {
+                keep(&mut people, person);
+            }
+            for tag in &task.tags {
+                keep(&mut tags, tag);
+            }
+            for (name, value) in &task.custom_fields {
+                // Through JSON, so both custom field value representations
+                // read the same; only strings and numbers are offered.
+                let value = serde_json::to_value(value).unwrap_or_default();
+                let entries = match value {
+                    serde_json::Value::Array(items) => items,
+                    other => vec![other],
+                };
+                for entry in entries {
+                    let text = match entry {
+                        serde_json::Value::String(text) => text,
+                        serde_json::Value::Number(number) => number.to_string(),
+                        _ => continue,
+                    };
+                    keep(fields.entry(name.clone()).or_default(), &text);
+                }
+            }
+        }
+        fields.retain(|_, values| !values.is_empty());
+        TaskValuesDTO {
+            people: people.into_iter().collect(),
+            tags: tags.into_iter().collect(),
+            custom_fields: fields.into_iter().map(|(name, values)| (name, values.into_iter().collect())).collect(),
+        }
     }
 }
 
