@@ -15,6 +15,7 @@
         {{ item.label }}
       </button>
     </div>
+    <slot />
     <p v-if="hiddenText" class="task-panel__activity-filter-hidden" role="status">
       {{ hiddenText }}
       <button type="button" class="task-panel__activity-filter-show-all" @click="$emit('showAll')">Show all</button>

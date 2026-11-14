@@ -117,4 +117,100 @@ describe('DEV-488 question comments (actual backend/browser)', () => {
             await workspace.dispose();
         }
     });
+    it('filters question and answer types and saves the open-question override', async ({ expect }) => {
+        const workspace = await SmokeWorkspace.create({ name: 'question-filter-ui-' });
+        try {
+            const task = await workspace.addTask('Example question filter', { args: ['--project=QST'] });
+            await ask(workspace, task.id);
+            await workspace.runLotar(['comment', task.id, '--answer', 'rework'], {
+                env: { LOTAR_DEFAULT_REPORTER: 'mallox' },
+            });
+            await ask(workspace, task.id);
+            await workspace.runLotar(['comment', task.id, 'Example ordinary comment'], {
+                env: { LOTAR_DEFAULT_REPORTER: 'codex' },
+            });
+            const baseline = process.env.DEV488_BASELINE_WEB;
+            for (const version of baseline ? ['before', 'after'] : ['after']) {
+                const server = await startLotarServer(workspace, {
+                    env:
+                        version === 'before'
+                            ? {
+                                  LOTAR_WEB_UI_EMBEDDED: '0',
+                                  LOTAR_WEB_UI_PATH: baseline,
+                              }
+                            : {},
+                });
+                try {
+                    await withBrowser({}, async (context) => {
+                        const page = await context.newPage();
+                        try {
+                            await page.goto(`${server.url}/task/${task.id}`);
+                            await page.getByRole('tab', { name: 'Comments', exact: true }).click();
+                            const filter = page.getByRole('group', { name: 'Filter comments' });
+                            if (version === 'after') {
+                                await filter.getByRole('button', { name: 'Answer', exact: true }).click();
+                                await expect.poll(() => page.locator('[data-testid="comment-answer"]').count()).toBe(0);
+                                expect(await page.locator('[data-testid="question-prompt"]').count()).toBe(1);
+                                await filter.getByRole('button', { name: 'Question', exact: true }).click();
+                                await filter.getByRole('button', { name: 'claude', exact: true }).click();
+                                await expect
+                                    .poll(() => page.locator('[data-testid="comment-question"]').count())
+                                    .toBe(0);
+                                await page.getByRole('checkbox', { name: 'Always show open questions' }).check();
+                                await expect
+                                    .poll(() => page.locator('[data-testid="comment-question"]').count())
+                                    .toBe(1);
+                                await page.reload();
+                                await expect
+                                    .poll(() => page.locator('[data-testid="comment-question"]').count())
+                                    .toBe(1);
+                                expect(
+                                    await page
+                                        .getByRole('checkbox', { name: 'Always show open questions' })
+                                        .isChecked(),
+                                ).toBe(true);
+                            }
+                            for (const colorScheme of ['light', 'dark'] as const) {
+                                for (const width of [1920, 1440, 390]) {
+                                    await page.setViewportSize({ width, height: 1000 });
+                                    await page.emulateMedia({ colorScheme });
+                                    await page.locator('.task-panel__tab-panel').screenshot({
+                                        path: path.join(
+                                            process.env.DEV488_SCREENSHOTS ?? path.join(ARTIFACTS, 'filter'),
+                                            `${version}-${colorScheme}-${width}.png`,
+                                        ),
+                                        animations: 'disabled',
+                                    });
+                                    expect(
+                                        await page.evaluate(
+                                            () =>
+                                                document.documentElement.scrollWidth <=
+                                                document.documentElement.clientWidth,
+                                        ),
+                                    ).toBe(true);
+                                }
+                            }
+                            if (version === 'after') {
+                                await page.getByRole('checkbox', { name: 'Always show open questions' }).uncheck();
+                                await expect
+                                    .poll(() => page.locator('[data-testid="comment-question"]').count())
+                                    .toBe(0);
+                                await filter.getByRole('button', { name: 'Show all', exact: true }).click();
+                                await expect
+                                    .poll(() => page.locator('[data-testid="comment-question"]').count())
+                                    .toBe(2);
+                                await expect.poll(() => page.locator('[data-testid="comment-answer"]').count()).toBe(1);
+                            }
+                        } finally {
+                            await page.close();
+                        }
+                    });
+                } finally {
+                    await server.stop();
+                }
+            }
+        } finally {
+            await workspace.dispose();
+        }
+    });
 });

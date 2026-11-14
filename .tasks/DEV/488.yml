@@ -1,11 +1,11 @@
 title: Question comments with options the owner answers by click, and answers that set the ticket's fields
-status: InProgress
+status: Merging
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-13T21:13:42.890310+00:00
-modified: 2026-11-14T00:47:46.072143+00:00
+modified: 2026-11-14T00:59:40.743199+00:00
 relationships:
   depends_on:
   - DEV-502
@@ -71,6 +71,29 @@ comments:
 - date: 2026-11-14T00:43:18.721184+00:00
   author: codex
   text: Resumed after DEV-502 landed (main 3c4e7f71); rebased the two existing commits onto main, retaining the filter implementation and main’s moved scan tests. Implemented Question/Answer/Comment Type chips plus the owner-requested saved Always show open questions toggle (off by default). Hidden answers do not expose answer buttons on an already answered question; answers remain independently filterable and edit indexes stay original. Two new unit cases failed before implementation and now pass; full lint/test/smoke and before/after screenshot capture are running. No status/assignee changes.
+- date: 2026-11-14T00:48:50.123354+00:00
+  author: codex
+  text: |-
+    Completed dependency follow-up in signed commit 9f54e253 on t3/question-comment-options; no push/merge. Rebased previous feature and atomic-persistence commits onto main after DEV-502 landed (now 32aecdff and 7be37a6b). Comments now have independent Question/Answer/Comment Type chips. Always show open questions is a separate saved toggle (off by default, stored as alwaysShowOpenQuestions in lotar.preferences.taskPanel.commentFilter); when enabled it overrides author/type hiding only for unanswered questions. Hidden answers remain answered, without offering another answer; grouping and edit indexes respect filters. Docs updated.
+
+    Verification: the two new unit cases failed before implementation, then passed. lint:agent passed; test:agent passed (2169 Rust, 1524 UI, release and hook checks); full build-first test:smoke:agent passed (394). Focused question/harness browser tests: 21 passed. Final screenshot-path change verified with frontend/smoke typechecking, formatting and focused question smoke (2 passed); no product-code change after full gates. git diff --check clean; signed commit verified; worktree clean. All required checks ran.
+
+    Rebase compatibility fixes: adapted two scan tests moved on main to TaskComment::new and sorted integration modules. Incidental smoke failure found and fixed: the existing reaper test raced asynchronous registry cleanup after server exit; it now polls registry removal. First full smoke had 393 pass/1 failure at that assertion; focused and complete reruns passed.
+
+    Visual evidence: main UI before, current branch after, same isolated QST example task. Captured and inspected all 12 Comments-tab crops in light/dark at 1920, 1440 and 390 px; no overflow or unreadable controls seen. The attachment store deduplicated identical desktop-width crops, so 1440 and 1920 share links. Earlier board/list/question evidence remains attached.
+    [Before light 1920/1440](https://lotar.pyxzl.net/api/attachments/h/0dd555311984824109d502a8170c3701/before-light-1920.png?project=DEV)
+    [Before dark 1920/1440](https://lotar.pyxzl.net/api/attachments/h/67d730ea156d62ccd34ca8959b1331df/before-dark-1920.png?project=DEV)
+    [Before light 390](https://lotar.pyxzl.net/api/attachments/h/57a9a48f86130051ea18000c0ce28266/before-light-390.png?project=DEV)
+    [Before dark 390](https://lotar.pyxzl.net/api/attachments/h/bb9b6797ea57b88bacb9533522dc2bdf/before-dark-390.png?project=DEV)
+    [After light 1920/1440](https://lotar.pyxzl.net/api/attachments/h/f61750c7410419bd87b1d1ae7b590047/after-light-1920.png?project=DEV)
+    [After dark 1920/1440](https://lotar.pyxzl.net/api/attachments/h/4118dc11309355919a15211102fcbd90/after-dark-1920.png?project=DEV)
+    [After light 390](https://lotar.pyxzl.net/api/attachments/h/8f8c97ce4bdb79ddcb1bb87ed38a6c80/after-light-390.png?project=DEV)
+    [After dark 390](https://lotar.pyxzl.net/api/attachments/h/efa6bde520a72e2d1516b96520a56865/after-dark-390.png?project=DEV)
+
+    No status or assignee changes this job; automation moves the ticket to its next step when this job ends. No durable guidance finding.
+- date: 2026-11-14T00:59:40.743199+00:00
+  author: codex
+  text: 'Merged by fast-forward after conflict-free rebase: 2bf9472a, 0e315f38, d10b6883. Post-rebase lint:agent, test:agent and test:smoke:agent passed; no checks skipped. Initial sandbox sccache failures were resolved by rerunning with access. Not pushed: main contains unrelated uncommitted release edits. Status and assignee unchanged; automation advances the ticket when this job ends.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afd2c6919-e5a0-41a8-9c0f-8916f5a62fea
 - file: src/types.rs
@@ -134,6 +157,7 @@ references:
 - attachment: after-light-1920.f61750c7410419bd87b1d1ae7b590047.png
 - attachment: after-dark-1920.4118dc11309355919a15211102fcbd90.png
 - attachment: after-light-390.8f8c97ce4bdb79ddcb1bb87ed38a6c80.png
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ada31666d-cfc5-4b72-b50a-7efcc4393349
 releases:
 - 5
 description: |-
@@ -700,3 +724,34 @@ history:
   changes:
   - field: reference_added
     new: attachment:after-light-390.8f8c97ce4bdb79ddcb1bb87ed38a6c80.png
+- at: 2026-11-14T00:48:50.123354+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T00:48:56.719994+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T00:48:58.572608+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ada31666d-cfc5-4b72-b50a-7efcc4393349
+- at: 2026-11-14T00:49:53.478954+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-14T00:59:40.743199+00:00
+  actor: codex
+  changes:
+  - field: comment_added

@@ -16,12 +16,22 @@
         label="Filter comments"
         :groups="filterGroups"
         :hidden-text="hiddenText"
-        @toggle="(_group, author) => filter.toggleAuthor(author)"
+        @toggle="(group, value) => (group === 'type' ? filter.toggleField(value) : filter.toggleAuthor(value))"
         @show-all="filter.showAll"
-      />
+      >
+        <label class="task-panel__open-question-filter">
+          <input
+            type="checkbox"
+            aria-label="Always show open questions"
+            :checked="filter.alwaysShowOpenQuestions.value"
+            @change="filter.toggleOpenQuestions"
+          />
+          Always show open questions
+        </label>
+      </TaskPanelActivityFilter>
       <ul class="task-panel__comments">
         <li
-          v-for="{ comment, index: commentIndex } in visibleComments"
+          v-for="{ comment, index: commentIndex } in shownComments"
           :key="`${comment.date}-${commentIndex}`"
           class="task-panel__comment"
           :class="{ 'task-panel__comment--question': comment.question }"
@@ -64,7 +74,11 @@
           </div>
           <template v-if="editingCommentIndex !== commentIndex && comment.question">
             <MarkdownContent :source="questionPrompt(comment)" />
-            <div v-if="answerOf(comment)" class="task-panel__answer" data-testid="comment-answer">
+            <div
+              v-if="answerOf(comment) && isAnswerVisible(comment)"
+              class="task-panel__answer"
+              data-testid="comment-answer"
+            >
               <div class="task-panel__comment-meta">
                 <span v-if="answerOf(comment)?.author" class="task-panel__comment-author"
                   >{{ answerOf(comment)?.author }} · </span
@@ -75,6 +89,7 @@
               </ul>
               <MarkdownContent v-if="answerOf(comment)?.answer?.note" :source="answerOf(comment)?.answer?.note || ''" />
             </div>
+            <p v-else-if="answerOf(comment)" class="muted">Answer hidden by filter</p>
             <QuestionPrompt
               v-else
               :spec="comment.question"
@@ -158,9 +173,21 @@ const emit = defineEmits<{
 const filter = useActivityFilter(COMMENT_FILTER_KEY)
 
 const comments = computed(() => (props.task.comments || []).map((comment, index) => ({ comment, index })))
-const visibleComments = computed(() =>
-  comments.value.filter(({ comment }) => !filter.hiddenAuthors.value.has(comment.author || '')),
-)
+function commentType(comment: TaskComment): string {
+  return comment.question ? 'question' : comment.answer ? 'answer' : 'comment'
+}
+
+function isVisible(comment: TaskComment): boolean {
+  if (filter.alwaysShowOpenQuestions.value && comment.question && !answerOf(comment)) return true
+  return !filter.hiddenAuthors.value.has(comment.author || '') && !filter.hiddenFields.value.has(commentType(comment))
+}
+
+function isAnswerVisible(question: TaskComment): boolean {
+  const answer = answerOf(question)
+  return !!answer && isVisible(answer)
+}
+
+const visibleComments = computed(() => comments.value.filter(({ comment }) => isVisible(comment)))
 
 /** One chip per author on this task, even a single one, so a task with only automation's comments can hide them. */
 const filterGroups = computed<ActivityFilterGroup[]>(() => {
@@ -176,6 +203,19 @@ const filterGroups = computed<ActivityFilterGroup[]>(() => {
         hidden: filter.hiddenAuthors.value.has(author),
       })),
     },
+    ...(comments.value.some(({ comment }) => comment.question || comment.answer)
+      ? [
+          {
+            id: 'type',
+            name: 'Type',
+            items: [...new Set(comments.value.map(({ comment }) => commentType(comment)))].map((type) => ({
+              value: type,
+              label: type === 'question' ? 'Question' : type === 'answer' ? 'Answer' : 'Comment',
+              hidden: filter.hiddenFields.value.has(type),
+            })),
+          },
+        ]
+      : []),
   ]
 })
 
@@ -189,11 +229,10 @@ const allComments = computed(() => props.task.comments || [])
 
 /** Answers show under their question (DEV-488), so the list leaves them out. */
 const shownComments = computed(() => {
-  const list = allComments.value
-  const questionDates = new Set(list.filter((comment) => comment.question).map((comment) => comment.date))
-  return list
-    .map((comment, index) => ({ comment, index }))
-    .filter(({ comment }) => !(comment.answer && questionDates.has(comment.answer.to)))
+  const visibleQuestions = new Set(
+    visibleComments.value.filter(({ comment }) => comment.question).map(({ comment }) => comment.date),
+  )
+  return visibleComments.value.filter(({ comment }) => !(comment.answer && visibleQuestions.has(comment.answer.to)))
 })
 
 function answerOf(question: TaskComment): TaskComment | null {
@@ -219,6 +258,13 @@ function onEditingTextareaRef(ref: Element | ComponentPublicInstance | null) {
 </script>
 
 <style scoped>
+.task-panel__open-question-filter {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1, 0.25rem);
+  font-size: var(--text-xs, 0.75rem);
+}
+
 .task-panel__comments {
   list-style: none;
   padding: 0;

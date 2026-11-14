@@ -7,6 +7,8 @@ export const COMMENT_FILTER_KEY = 'lotar.preferences.taskPanel.commentFilter'
 export const HISTORY_FILTER_KEY = 'lotar.preferences.taskPanel.historyFilter'
 
 export interface ActivityFilter {
+    alwaysShowOpenQuestions: Ref<boolean>
+    toggleOpenQuestions: () => void
     hiddenAuthors: Ref<Set<string>>
     hiddenFields: Ref<Set<string>>
     toggleAuthor: (author: string) => void
@@ -20,12 +22,21 @@ function readStrings(value: unknown): Set<string> {
 
 /** Hidden authors and fields for one tab, read from and written to the viewer's browser. */
 export function useActivityFilter(key: string): ActivityFilter {
-    const stored = storageGetJson(key) as { authors?: unknown; fields?: unknown } | null
+    const stored = storageGetJson(key) as {
+        authors?: unknown
+        fields?: unknown
+        alwaysShowOpenQuestions?: unknown
+    } | null
+    const alwaysShowOpenQuestions = ref(stored?.alwaysShowOpenQuestions === true)
     const hiddenAuthors = ref(readStrings(stored?.authors))
     const hiddenFields = ref(readStrings(stored?.fields))
 
     const persist = () => {
-        storageSetJson(key, { authors: [...hiddenAuthors.value], fields: [...hiddenFields.value] })
+        storageSetJson(key, {
+            authors: [...hiddenAuthors.value],
+            fields: [...hiddenFields.value],
+            ...(key === COMMENT_FILTER_KEY ? { alwaysShowOpenQuestions: alwaysShowOpenQuestions.value } : {}),
+        })
     }
 
     const toggle = (set: Ref<Set<string>>, value: string) => {
@@ -37,6 +48,11 @@ export function useActivityFilter(key: string): ActivityFilter {
     }
 
     return {
+        alwaysShowOpenQuestions,
+        toggleOpenQuestions: () => {
+            alwaysShowOpenQuestions.value = !alwaysShowOpenQuestions.value
+            persist()
+        },
         hiddenAuthors,
         hiddenFields,
         toggleAuthor: (author) => toggle(hiddenAuthors, author),

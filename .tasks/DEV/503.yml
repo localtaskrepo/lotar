@@ -1,10 +1,11 @@
 title: Switch lotar's agent jobs to the harnessmux crate and remove its own runners
-status: Blocked
+status: InProgress
 priority: High
 type: Feature
 reporter: claude
+assignee: '@fix'
 created: 2026-11-13T22:44:58.128976+00:00
-modified: 2026-11-13T23:11:50.140322+00:00
+modified: 2026-11-14T00:56:42.811044+00:00
 relationships:
   depends_on:
   - DEV-504
@@ -20,6 +21,11 @@ comments:
 - date: 2026-11-13T23:11:50.140322+00:00
   author: claude
   text: 'Owner decision 2026-11-13: projects "harnessmux only" (scope in DEV-504). lotar passes each job''s repo as the session''s project and groups jobs by it where the UI lists sessions.'
+- date: 2026-11-14T00:56:42.811044+00:00
+  author: claude
+  text: 'Started (claude, branch agent/DEV-503): DEV-504 is done and harnessmux 0.1.1 is on crates.io, so this is the implementation, not a release check. Plan: depend on harnessmux 0.1.1 (needs Rust 1.99; lotar pins 1.98.1), run every runner except command through a harnessmux Session owned by lotar''s process, map events to job events, message box -> send, cancel -> cancel, cross-process messages through the session socket, session: continue -> the ticket''s named session; remove agent_runner.rs''s builders/parsers, tests/fixtures/agent-streams, the T3 thread code and the wrapper''s job role; docs and tests follow.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad412edd4-9d93-4142-9e2c-0d4f417c92fc
 description: 'Approved design: docs/developers/harness-tool-design.md (DEV-492). The owner, 2026-11-13: interface "Link the crate", lotar''s runners "Remove right away". Waits for the harnessmux release that covers every agent lotar runs today. One change: lotar depends on the harnessmux crate and runs every agent job through it (events from the session stream, the message box and cancel call send and cancel, permission requests become questions in the job view). Profiles keep their runner key: claude, codex, copilot, gemini, cursor, amp, droid, opencode, kilo, antigravity become harnessmux agents; t3 is removed with a hint to pick the agent; command stays. session: continue uses named sessions, one per ticket. Removed in the same change: the per-CLI builders and parsers in src/services/agent_runner.rs, tests/fixtures/agent-streams/, the t3 runner and its thread handling in src/services/agent_job_service.rs, docs that describe single CLIs (agent-cli-research.md moves to harnessmux). AGENTS.md: REST shape changes keep src/api_types.rs, view/api/types.ts, docs/openapi.json and help docs in step. Done when: lotar''s own fix, review and merge jobs run on Claude and Codex through the crate with resume and messages, the removed code is gone, npm run lint, npm test and npm run smoke pass.'
 history:
 - at: 2026-11-13T22:44:58.238596+00:00
@@ -51,6 +57,26 @@ history:
   changes:
   - field: comment_added
 - at: 2026-11-13T23:11:50.140322+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T00:48:36.197990+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-14T00:48:37.536348+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-14T00:48:38.324035+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad412edd4-9d93-4142-9e2c-0d4f417c92fc
+- at: 2026-11-14T00:56:42.811044+00:00
   actor: claude
   changes:
   - field: comment_added

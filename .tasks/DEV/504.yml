@@ -1,11 +1,11 @@
 title: 'Create harnessmux: a Rust crate and CLI that run agent CLI sessions over ACP'
-status: Merging
+status: Done
 priority: High
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T22:45:12.815612+00:00
-modified: 2026-11-14T00:47:44.476663+00:00
+modified: 2026-11-14T00:55:36.502037+00:00
 relationships:
   blocks:
   - DEV-503
@@ -61,6 +61,12 @@ comments:
 - date: 2026-11-14T00:47:38.528642+00:00
   author: codex
   text: 'Review: passed. Reviewed 24fea9c6 (the only commit beyond main), its complete design-doc diff, ticket comments and related DEV-492/DEV-503 requirements, owner decisions, and main history for the touched document. The changes accurately record the approved T3 agent and harnessmux-only project grouping; no blocking findings or minor tickets. Reran Prettier check and git diff --check: passed. No application code or UI changed in this branch, so application suites and screenshots are not applicable. External release/CI/crates.io claims are supported by the implementation comments and local Cargo.toml 0.1.1, but independent online verification was unavailable: GitHub connection failed and crates.io DNS resolution failed. This review approves the LoTaR documentation merge, not a fresh audit of the separate harnessmux implementation. No files edited, commits made, or status/assignee changes.'
+- date: 2026-11-14T00:48:31.711242+00:00
+  author: codex
+  text: 'Merged: rebased 24fea9c6 onto main as 8ae757ec, fast-forwarded the main checkout, then included pending .tasks metadata/attachments by the required signed amend: main is 33bbb235. Prettier and git diff --check passed after rebase. Documentation-only change: full lint/test/smoke not required under AGENTS.md. No push: main has unrelated uncommitted changes in .github/skills/release/SKILL.md, .gitignore and docs/release-guide.md; preserved them. Status and assignee left unchanged; automation completes the ticket when this job ends.'
+- date: 2026-11-14T00:55:36.502037+00:00
+  author: claude
+  text: 'mallox 2026-11-13, on crates.io trusted publishing: "yes, let''s set it up". harnessmux 2e2428c: release.yml gets a publish job after the GitHub release (environment release, id-token write, rust-lang/crates-io-auth-action@v1, cargo publish --locked). GitHub environment release created on localtaskrepo/harnessmux, deployments only from v* tags. The crates.io side is not set yet: the API refused the publish token ("does not have the required permissions"), so mallox adds it at https://crates.io/crates/harnessmux/settings (owner localtaskrepo, repository harnessmux, workflow release.yml, environment release). Not run yet: the publish job runs first at the next v* tag.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1d141b3f-b2f2-448d-b3f0-5ea7a2827f40
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4ac64f48-54b1-4379-bb9d-f53b4f59cb4a
@@ -158,3 +164,17 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-14T00:48:31.711242+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T00:48:36.005973+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-14T00:55:36.502037+00:00
+  actor: claude
+  changes:
+  - field: comment_added

@@ -1,10 +1,11 @@
+import type { TaskComment } from '../api/types'
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it } from 'vitest'
 import TaskPanelCommentsTab from '../components/task-panel/TaskPanelCommentsTab.vue'
 import TaskPanelHistoryTab from '../components/task-panel/TaskPanelHistoryTab.vue'
 import { COMMENT_FILTER_KEY, HISTORY_FILTER_KEY } from '../composables/task-panel/useActivityFilter'
 
-const commentsProps = (comments: Array<{ date: string; author?: string; text: string }>) => ({
+const commentsProps = (comments: TaskComment[]) => ({
     mode: 'edit' as const,
     task: { comments },
     newComment: '',
@@ -16,7 +17,7 @@ const commentsProps = (comments: Array<{ date: string; author?: string; text: st
     setEditingTextarea: () => {},
 })
 
-const mountComments = (comments: Array<{ date: string; author?: string; text: string }>) =>
+const mountComments = (comments: TaskComment[]) =>
     mount(TaskPanelCommentsTab, {
         props: commentsProps(comments),
         global: { stubs: { MarkdownContent: { props: ['source'], template: '<p>{{ source }}</p>' } } },
@@ -73,6 +74,60 @@ describe('Comments and History tab filters (DEV-502)', () => {
         await next.find('.task-panel__activity-filter-show-all').trigger('click')
         expect(next.findAll('.task-panel__comment')).toHaveLength(3)
         expect(next.find('.task-panel__activity-filter-hidden').exists()).toBe(false)
+    })
+
+    it('filters question and answer types independently, keeping edit indexes and nested answers correct', async () => {
+        const comments: TaskComment[] = [
+            { date: 'q', author: 'automation', text: 'Which?', question: { options: [{ key: 'yes', label: 'Yes' }] } },
+            { date: 'a', author: 'mallox', text: 'Answer: yes', answer: { to: 'q', choice: ['yes'] } },
+            { date: 'c', author: 'claude', text: 'Ordinary comment' },
+        ]
+        const wrapper = mountComments(comments)
+        expect(wrapper.findAll('.task-panel__comment')).toHaveLength(2)
+        await chip(wrapper, 'Answer').trigger('click')
+        expect(wrapper.find('[data-testid="comment-answer"]').exists()).toBe(false)
+        expect(wrapper.text()).toContain('Answer hidden by filter')
+        expect(wrapper.find('[data-testid="question-prompt"]').exists()).toBe(false)
+        await chip(wrapper, 'Question').trigger('click')
+        expect(wrapper.findAll('.task-panel__comment')).toHaveLength(1)
+        const next = mountComments(comments)
+        expect(next.findAll('.task-panel__comment')).toHaveLength(1)
+        expect(next.find('.task-panel__activity-filter-hidden').text()).toContain('2 of 3 comments hidden.')
+        await next.get('.task-panel__comment-action').trigger('click')
+        expect(next.emitted('startEdit')).toEqual([[2]])
+        await chip(next, 'Answer').trigger('click')
+        expect(next.text()).toContain('Answer: yes')
+    })
+
+    it('saves an optional override for open questions without exposing answered questions', async () => {
+        const comments: TaskComment[] = [
+            {
+                date: 'open',
+                author: 'automation',
+                text: 'Open?',
+                question: { options: [{ key: 'yes', label: 'Yes' }] },
+            },
+            {
+                date: 'closed',
+                author: 'automation',
+                text: 'Closed?',
+                question: { options: [{ key: 'yes', label: 'Yes' }] },
+            },
+            { date: 'answer', author: 'mallox', text: 'Yes', answer: { to: 'closed', choice: ['yes'] } },
+        ]
+        const wrapper = mountComments(comments)
+        await chip(wrapper, 'automation').trigger('click')
+        await chip(wrapper, 'Question').trigger('click')
+        expect(wrapper.findAll('[data-testid="comment-question"]')).toHaveLength(0)
+        await wrapper.get('input[aria-label="Always show open questions"]').setValue(true)
+        expect(wrapper.findAll('[data-testid="comment-question"]')).toHaveLength(1)
+        expect(wrapper.text()).toContain('Open?')
+        expect(wrapper.text()).not.toContain('Closed?')
+        expect(JSON.parse(localStorage.getItem(COMMENT_FILTER_KEY) ?? '{}').alwaysShowOpenQuestions).toBe(true)
+        const next = mountComments(comments)
+        expect(next.findAll('[data-testid="comment-question"]')).toHaveLength(1)
+        await next.get('input[aria-label="Always show open questions"]').setValue(false)
+        expect(next.findAll('[data-testid="comment-question"]')).toHaveLength(0)
     })
 
     it('offers Hide automation on a task whose only comments are automation’s', async () => {

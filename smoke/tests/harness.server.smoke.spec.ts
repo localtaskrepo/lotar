@@ -406,7 +406,7 @@ describe.skipIf(!lotarBinaryAvailable)('lotar serve readiness contract (real bin
 
                 run.kill('SIGKILL');
                 await expect.poll(() => exited(node), { timeout: HANG_GUARD_MS }).toBe(true);
-                expect(existsSync(registry)).toBe(false);
+                await expect.poll(() => existsSync(registry), { timeout: HANG_GUARD_MS }).toBe(false);
             } finally {
                 await server.stop();
             }

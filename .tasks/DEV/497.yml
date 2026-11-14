@@ -1,11 +1,11 @@
 title: 'Cargo workspace step 1: a web-only change rebuilds only the embedded assets and the binary'
-status: InProgress
+status: Reviewing
 priority: High
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-13T22:21:42.991432+00:00
-modified: 2026-11-14T00:38:35.378552+00:00
+modified: 2026-11-14T00:57:21.573764+00:00
 relationships:
   blocks:
   - DEV-499
@@ -13,6 +13,7 @@ relationships:
   related:
   - DEV-493
   - DEV-417
+  - DEV-507
 comments:
 - date: 2026-11-13T22:48:06.295902+00:00
   author: claude
@@ -47,6 +48,12 @@ comments:
 - date: 2026-11-14T00:38:33.568045+00:00
   author: claude
   text: 'mallox in the thread (2026-11-14): "Rework again, keep in 0.15.0". Fix the review finding: the root package keeps installing both binaries (`cargo install --path .` gives lotar and lotar-agent-wrapper), with a test of the installed binary set. Review and merge follow by the rules; v0.15.0 (DEV-417) waits for it.'
+- date: 2026-11-14T00:56:26.273015+00:00
+  author: claude
+  text: 'Rework (owner, 2026-11-14: "Rework again, keep in 0.15.0"). Finding: cargo install --path . no longer installed lotar-agent-wrapper. Fix: the wrapper''s [[bin]] moved from crates/lotar-lib to the root package (it uses only std), so cargo install --path . installs lotar and lotar-agent-wrapper again. Tests in tests/ find both binaries with common::workspace_bin() (profile dir above the test binary), since lotar-lib no longer has a CARGO_BIN_EXE. Test: dev497_cargo_install_root_test::the_root_package_installs_lotar_and_the_agent_wrapper asserts the root package''s bin set is exactly [lotar, lotar-agent-wrapper]; it fails with left ["lotar"] when the wrapper is left out. Docs: developers/main.md, developers/testing.md. Commit 7f7d5aba (amended, signed). Checks: cargo install --path . --locked into a scratch root installed both executables; cargo deny check; npm run lint:agent; npm run test:agent (2143 Rust, 1515 UI); test:release 47; test:hooks 7; npm run smoke 390/390 (target/smoke has both binaries). Web-only change: only lotar-web-assets and lotar compile, cargo build 0.99 s, cargo nextest run --no-run 0.79 s. Not run: cross (x86_64 images, arm64 Mac), nfpm (not installed).'
+- date: 2026-11-14T00:57:21.573764+00:00
+  author: claude
+  text: 'Reworked for crates.io as decided above, amended as 35c91373 (replaces 4431702a). Layout: root package lotar = the binary (src/main.rs, tests/embedded_web_ui_test.rs), so cargo install lotar and cargo install --path . install the command; crates/lotar-lib = the library (crate name lotar) with its src/, tests/ and build.rs moved in (git renames); crates/lotar-web-assets unchanged. All three are publishable: no publish = false, and lotar-lib/lotar-web-assets are [workspace.dependencies] with version =0.14.3, which also clears the cargo-deny wildcard finding, so deny.toml is unchanged (the release guide now says to bump those two with the workspace version). Paths: relative include_str! outside the crate rewritten, REPO_ROOT (from build.rs) for docs/ and .tasks/, CARGO_MANIFEST_DIR for the crate''s own fixtures; the view and smoke tests that read Rust sources, .gitleaks.toml, AGENTS.md, CONTRIBUTING.md, .github instructions/skills and docs/developers point at crates/lotar-lib. Finding from the review (root install): fixed, regression test crates/lotar-lib/tests/dev497_cargo_install_root_test.rs (fails when the root package has no lotar bin). Timings after a change in target/web-embed, only lotar-web-assets and lotar compile: cargo build 1.0 s, cargo nextest run --no-run 0.6 s, cargo build --profile smoke 1.7 s. Checks: npm run lint:agent, npm run test:agent (2142 Rust, 1515 UI, 47 release/npm, 7 hook tests), npm run smoke 390/390, cargo deny check, cargo build --release --locked --all-features, cargo install --path . --locked (installs lotar 0.14.3), cargo package -p lotar-web-assets (passes). Not run: cross (arm64 Mac) and nfpm (not installed). Publishing gaps outside this ticket, filed as DEV-507: lotar-lib''s build reads docs/help and docs/openapi.json outside the crate (cargo package -p lotar-lib fails its verify build), and lotar-web-assets would publish an empty UI since target/web-embed isn''t packaged. The branch is behind main; the rename touches every file under src/ and tests/, so the merge agent''s rebase has to carry other commits'' src/ and tests/ changes across it.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aece2a03a-cf09-4340-9bd6-4b7ecf0e4547
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aeb427d8b-11c2-4310-9c31-3447004ca1e2
@@ -306,3 +313,26 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa794c3d5-1743-4237-94fb-fd191da44e15
+- at: 2026-11-14T00:50:33.105425+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-499","DEV-417"],"related":["DEV-493","DEV-417"]}'
+    new: '{"blocks":["DEV-499","DEV-417"],"related":["DEV-493","DEV-417","DEV-507"]}'
+- at: 2026-11-14T00:56:26.273015+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T00:56:35.272228+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T00:57:21.573764+00:00
+  actor: claude
+  changes:
+  - field: comment_added

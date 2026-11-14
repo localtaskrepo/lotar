@@ -1,0 +1,48 @@
+title: 'crates.io: the published lotar-lib and lotar-web-assets crates carry their docs and web UI'
+status: InProgress
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-14T00:50:32.865133+00:00
+modified: 2026-11-14T00:56:37.022044+00:00
+relationships:
+  related:
+  - DEV-497
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5fd0f5af-5571-46df-be41-a26e3d5cbf4d
+description: |-
+  The owner is publishing lotar on crates.io (2026-11-13: "We're actually currently working on publishing in crates. The token has already been added"). After DEV-497 the workspace has three publishable crates (lotar = the binary, lotar-lib, lotar-web-assets), but two of them still read files outside their crate folder, which cargo package leaves out:
+
+  - lotar-lib: build.rs embeds docs/help and docs/openapi.json, and src/services/agent_job_service.rs includes docs/help/agent-instructions.md. cargo package -p lotar-lib fails its verify build: read docs/openapi.json: No such file or directory.
+  - lotar-web-assets: include_dir! reads target/web-embed. The packaged crate builds, but embeds an empty folder, so a lotar installed from crates.io would serve no UI.
+
+  ## Done when
+
+  - [ ] cargo package (with its verify build) passes for lotar-web-assets, lotar-lib and lotar, in that order, and a lotar installed from the packaged crates serves the web UI and lotar help.
+  - [ ] The release workflow publishes the three crates in order, or the owner decides it stays manual.
+tags:
+- backend
+history:
+- at: 2026-11-14T00:50:33.106152+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-497"]}'
+- at: 2026-11-14T00:50:33.255045+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-14T00:56:36.048948+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-14T00:56:37.022044+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5fd0f5af-5571-46df-be41-a26e3d5cbf4d

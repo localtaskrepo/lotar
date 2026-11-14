@@ -274,3 +274,5 @@ To block DNS rebinding (a web page that points its own domain at your machine), 
 - a name passed with `--allow-host` (for example a reverse proxy's public name); `--allow-host '*'` turns the check off
 
 Mutating requests must also send an `Origin` that matches `Host`, and responses carry `X-Frame-Options: SAMEORIGIN` and `Content-Security-Policy: frame-ancestors 'self'`, so other sites cannot frame the UI. `GET` requests never write files.
+
+Question and answer comments can be filtered independently using the Comments tab’s Type chips. “Always show open questions” overrides author and type filters for unanswered questions only; it is off by default and saved with your comment-filter preferences. Hidden answers do not reopen answered questions.
