@@ -993,12 +993,12 @@ fn make_whoami_tool() -> Value {
 fn make_task_comment_add_tool(_enum_hints: Option<&EnumHints>) -> Value {
     json!({
         "name": "task_comment_add",
-        "description": "Append a comment to a task and record a history entry. With `question`, `text` is a question the owner answers by choosing an option; with `answer`, the comment answers a question (default: the last open one) and applies the chosen options' `set`. Returns {task}.",
+        "description": "Append a comment to a task and record a history entry. With `question`, `text` is a question the owner answers by choosing an option; with `answer`, the comment answers a question (default: the last open one) and applies the chosen options' `set`; with `review`, the comment reports a review's verdict and findings and `text` is its summary. Returns {task}.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "id": {"type": "string"},
-                "text": {"type": "string", "description": "The comment; with `question` the question itself, with `answer` an optional note."},
+                "text": {"type": "string", "description": "The comment; with `question` the question itself, with `answer` an optional note, with `review` an optional summary."},
                 "question": {
                     "type": ["object", "null"],
                     "description": "Ask a question with options.",
@@ -1046,6 +1046,30 @@ fn make_task_comment_add_tool(_enum_hints: Option<&EnumHints>) -> Value {
                         "choice": {"type": ["string", "array", "null"], "items": {"type": "string"}, "description": "Chosen option key(s); omit for a free-text answer in `text`."},
                         "note": {"type": ["string", "null"]}
                     },
+                    "additionalProperties": false
+                },
+                "review": {
+                    "type": ["object", "null"],
+                    "description": "Report a review: `text` is the summary.",
+                    "properties": {
+                        "verdict": {"type": "string", "enum": ["pass", "block"]},
+                        "commit": {"type": ["string", "null"], "description": "The commit reviewed."},
+                        "findings": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "summary": {"type": "string"},
+                                    "file": {"type": ["string", "null"]},
+                                    "line": {"type": ["integer", "null"], "minimum": 1, "description": "Line in `file`."},
+                                    "blocking": {"type": "boolean", "description": "Must be fixed before the work goes on (default false); a `pass` review has none."}
+                                },
+                                "required": ["summary"],
+                                "additionalProperties": false
+                            }
+                        }
+                    },
+                    "required": ["verdict"],
                     "additionalProperties": false
                 }
             },

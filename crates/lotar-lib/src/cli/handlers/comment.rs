@@ -4,8 +4,9 @@ use crate::cli::handlers::task::context::TaskCommandContext;
 use crate::cli::handlers::task::mutation::{LoadedTask, load_task};
 use crate::output::{OutputFormat, OutputRenderer};
 use crate::services::task_questions::{AnswerInput, OPTION_SET_FIELDS};
+use crate::services::task_reviews::parse_finding;
 use crate::services::task_service::TaskService;
-use crate::types::{CommentQuestion, OptionSet, QuestionOption, TaskComment};
+use crate::types::{CommentQuestion, CommentReview, OptionSet, QuestionOption, TaskComment};
 use crate::workspace::TasksDirectoryResolver;
 use serde_json::{Map, Value};
 
@@ -35,11 +36,12 @@ impl CommentArgs {
     }
 }
 
-/// What `lotar comment` writes: plain text, a question or an answer.
+/// What `lotar comment` writes: plain text, a question, an answer or a review.
 enum CommentKind {
     Plain(String),
     Question { prompt: String, question: CommentQuestion },
     Answer(AnswerInput),
+    Review { summary: Option<String>, review: CommentReview },
 }
 
 impl CommentKind {
@@ -50,6 +52,11 @@ impl CommentKind {
                 return Err("--question takes the question; leave out the comment text".to_string());
             }
             return Ok(Some(Self::Question { prompt, question: question_from_args(&ask.options, &ask.sets, ask.recommend, ask.multiple, !ask.no_other)? }));
+        }
+        if let Some(verdict) = ask.review {
+            let blocking = ask.blockers.iter().map(|raw| parse_finding(raw, true));
+            let findings = ask.findings.iter().map(|raw| parse_finding(raw, false)).chain(blocking).collect();
+            return Ok(Some(Self::Review { summary: text, review: CommentReview { verdict, commit: ask.commit, findings, extra: Default::default() } }));
         }
         if let Some(keys) = ask.answer {
             let choice = keys.split(',').map(str::trim).filter(|key| !key.is_empty()).map(str::to_string).collect();
@@ -124,7 +131,9 @@ impl CommandHandler for CommentHandler {
                 let add_inputs = CommentAddInputs { project: resolved_project.clone(), task, text: body, dry_run, explain };
                 handle_add_comment(&mut ctx, renderer, &full_id, add_inputs)
             }
-            Some(CommentKind::Question { .. } | CommentKind::Answer(_)) if dry_run => Err("--dry-run does not apply to --question or --answer".to_string()),
+            Some(CommentKind::Question { .. } | CommentKind::Answer(_) | CommentKind::Review { .. }) if dry_run => {
+                Err("--dry-run does not apply to --question, --answer or --review".to_string())
+            }
             Some(CommentKind::Question { prompt, question }) => {
                 let dto = TaskService::ask_question(&mut ctx.storage, &full_id, &prompt, question).map_err(|e| e.to_string())?;
                 render_last_comment(renderer, &full_id, resolved_project.as_deref(), &dto, |comment| comment.question.is_some())
@@ -132,6 +141,10 @@ impl CommandHandler for CommentHandler {
             Some(CommentKind::Answer(answer)) => {
                 let dto = TaskService::answer_question(&mut ctx.storage, &full_id, &answer).map_err(|e| e.to_string())?;
                 render_last_comment(renderer, &full_id, resolved_project.as_deref(), &dto, |comment| comment.answer.is_some())
+            }
+            Some(CommentKind::Review { summary, review }) => {
+                let dto = TaskService::add_review(&mut ctx.storage, &full_id, summary.as_deref(), review).map_err(|e| e.to_string())?;
+                render_last_comment(renderer, &full_id, resolved_project.as_deref(), &dto, |comment| comment.review.is_some())
             }
             None => {
                 render_comment_list(renderer, &full_id, resolved_project.as_deref(), &task, explain);
@@ -233,7 +246,7 @@ fn render_comment_list(renderer: &OutputRenderer, task_id: &str, project: Option
                 let open = crate::types::open_questions(&task.comments);
                 for (index, c) in task.comments.iter().enumerate() {
                     let author = c.author.as_deref().map(|author| format!("{author}: ")).unwrap_or_default();
-                    let marker = if open.contains(&index) { "[open question] " } else { "" };
+                    let marker = comment_marker(c, open.contains(&index));
                     renderer.emit_raw_stdout(format_args!("{}  {marker}{author}{}", c.date, c.text));
                 }
             }
@@ -251,6 +264,14 @@ fn build_comment_payload(status: &str, action: &str, task_id: &str, count: usize
     payload.insert("task_id".to_string(), Value::String(task_id.to_string()));
     payload.insert("comments".to_string(), Value::from(count));
     payload
+}
+
+/// The text-mode label before a comment: an open question or a review's verdict.
+pub(crate) fn comment_marker(comment: &TaskComment, open_question: bool) -> String {
+    if open_question {
+        return "[open question] ".to_string();
+    }
+    comment.review.as_ref().map(|review| format!("[review: {}] ", review.verdict)).unwrap_or_default()
 }
 
 fn comment_to_json(comment: &TaskComment) -> Value {

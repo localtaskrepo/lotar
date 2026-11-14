@@ -123,7 +123,7 @@ pub fn render_task_text(task: &TaskDTO, tasks_root: &std::path::Path) -> String 
         for (index, comment) in task.comments.iter().enumerate() {
             let mut lines = comment.text.lines();
             let author = comment.author.as_deref().map(|author| format!("{author}: ")).unwrap_or_default();
-            let marker = if open.contains(&index) { "[open question] " } else { "" };
+            let marker = crate::cli::handlers::comment::comment_marker(comment, open.contains(&index));
             out.push_str(&format!("  {}  {marker}{author}{}\n", comment.date, lines.next().unwrap_or_default()));
             for line in lines {
                 out.push_str(&format!("    {line}\n"));

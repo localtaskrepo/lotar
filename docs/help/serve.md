@@ -275,4 +275,4 @@ To block DNS rebinding (a web page that points its own domain at your machine), 
 
 Mutating requests must also send an `Origin` that matches `Host`, and responses carry `X-Frame-Options: SAMEORIGIN` and `Content-Security-Policy: frame-ancestors 'self'`, so other sites cannot frame the UI. `GET` requests never write files.
 
-Question and answer comments can be filtered independently using the Comments tab’s Type chips. “Always show open questions” overrides author and type filters for unanswered questions only; it is off by default and saved with your comment-filter preferences. Hidden answers do not reopen answered questions.
+Question, answer and review comments can be filtered independently using the Comments tab’s Type chips. A review comment shows its verdict as a badge with the commit and lists its findings, blocking ones first; the newest verdict also shows next to the task's status. “Always show open questions” overrides author and type filters for unanswered questions only; it is off by default and saved with your comment-filter preferences. Hidden answers do not reopen answered questions.

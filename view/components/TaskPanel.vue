@@ -34,6 +34,12 @@
                 data-testid="task-panel-status-badge"
                 >{{ form.status }}</span
               >
+              <ReviewBadge
+                v-if="mode === 'edit' && latestReviewComment?.review"
+                :review="latestReviewComment.review"
+                class="task-panel__review-badge"
+                data-testid="task-panel-review-badge"
+              />
               <AgentActivityIndicator v-if="mode === 'edit'" :task-id="form.id" label />
               <span v-if="isDeleted" class="badge task-panel__deleted-badge" data-testid="task-panel-deleted-badge"
                 >Deleted</span
@@ -1009,12 +1015,14 @@ import { applyTaskSnapshot, isDeletedTask, projectPrefixOfTaskId } from '../util
 import { useTaskStore } from '../composables/useTaskStore'
 import { setTaskPanelCommands } from '../composables/useTaskPanelController'
 import { recordRecentTask } from '../utils/recentTasks'
+import { latestReview } from '../utils/reviews'
 import { readTaskViewPreference } from '../utils/preferences'
 import ChipListField from './ChipListField.vue'
 import AttachmentTile from './AttachmentTile.vue'
 import AttachmentViewer from './AttachmentViewer.vue'
 import IconGlyph from './IconGlyph.vue'
 import MarkdownContent from './MarkdownContent.vue'
+import ReviewBadge from './ReviewBadge.vue'
 import UiButton from './UiButton.vue'
 import UiCard from './UiCard.vue'
 import UiLoader from './UiLoader.vue'
@@ -1173,6 +1181,8 @@ const {
 
 // Named apart from the taskId prop, which it would otherwise shadow.
 const panelTaskId = computed(() => (task.id || '').trim())
+/** DEV-489: the newest review's verdict shows next to the status. */
+const latestReviewComment = computed(() => latestReview(task.comments))
 
 // DEV-198: offer this task's actions to the command palette and remember it
 // as a recent task, while an existing, editable task is shown.
@@ -2327,6 +2337,11 @@ async function removeSprintChip(sprintId: number) {
 .task-panel__status-badge {
   align-self: center;
   white-space: nowrap;
+}
+
+.task-panel__review-badge {
+  align-self: center;
+  margin-left: var(--space-1, 0.25rem);
 }
 
 .badge--success {

@@ -159,6 +159,18 @@ when:
       comment: "Closed by ${{comment.author}}: ${{comment.note}}"
 ```
 
+`comment: { review: ... }` checks the verdict of a review comment ([Reviews](./comment.md#reviews)): `review: block`, `review: pass`, or any field condition; a comment that reviews nothing matches only `exists: false`. In the action, `${{comment.review}}` is the verdict and `${{comment.commit}}` the commit reviewed.
+
+```yaml
+- name: "Review blocked: back to @fix"
+  when:
+    comment: { review: block }
+  on:
+    commented:
+      set: { assignee: "@fix", status: InProgress }
+      comment: "Review blocked at ${{comment.commit}}; back to @fix."
+```
+
 `comment: { author: ... }` checks who wrote the comment that fired a `commented` rule. The author takes the same conditions as `assignee`: a name, a list of names, operators such as `starts_with` or `exists`, and the placeholders `@user`, `@agent` and `@any`. Names match case-insensitively. It works inside `all`, `any`, `not` and `current`, and never matches on other events, so put it only on rules with a `commented` hook. Comments from versions before 0.14 have no author: they match only `exists: false` (or `not`).
 
 ```yaml

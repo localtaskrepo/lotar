@@ -18,6 +18,9 @@ lotar task comment <TASK_ID> [TEXT]
 # Ask a question with options; answer it
 lotar comment <TASK_ID> --question <TEXT> --option "<key>: <label>"... [--set "<key>:<field>=<value>"...] [--recommend <key>] [--multiple] [--no-other]
 lotar comment <TASK_ID> --answer [<keys>] [--to <DATE>] [NOTE]
+
+# Report a review's verdict
+lotar comment <TASK_ID> --review pass|block [--commit <SHA>] [--finding "<finding>"...] [--blocker "<finding>"...] [SUMMARY]
 ```
 
 - `-F -` reads the comment from stdin. A file that can't be read is an error (exit 1), never a silent listing.
@@ -102,6 +105,27 @@ lotar list --has question
 - The answer and its option fields are saved together. A rejected field update leaves the question open so you can retry.
 - The comment's `text` keeps the question with its options, or the answer with its labels, in prose, so `lotar show`, older lotar versions and agents reading the YAML see everything. `lotar comment <ID>` and `lotar show` mark a question no answer points to as `[open question]`.
 - The stored comment adds `question: { options: [{key, label, set?}], recommended?, multiple?, other? }` or `answer: { to, choice?, note? }`; REST (`POST /api/tasks/comment`) and MCP (`task_comment_add`) take the same `question` and `answer` fields.
+
+## Reviews
+
+A review comment records a reviewer's verdict, the commit reviewed and the findings. The web UI shows the verdict as a badge on the comment and the newest verdict next to the task's status; rules match it with `comment: { review: block }`. Use it instead of writing "Review: passed" in prose.
+
+```bash
+# The review passed
+lotar comment AUTH-1 --review pass --commit 5b7385dc "Checked the migration and its tests."
+
+# The review blocks the work, with one blocking and one other finding
+lotar comment AUTH-1 --review block --commit 5b7385dc \
+  --blocker "src/auth.rs:42: the token is logged" \
+  --finding "docs/help/auth.md: the example is out of date" \
+  "The change leaks the token."
+```
+
+- `--review pass` lets the work go on, `--review block` sends it back. The comment text is the reviewer's summary; it may be left out.
+- `--commit <SHA>` names the commit the review looked at.
+- `--finding` adds a finding, `--blocker` a finding that must be fixed before the work goes on. Both take `"[<file>[:<line>]: ]<summary>"`: the part before the first `": "` is the location when it has no spaces and contains a `/` or `.`. A `pass` review cannot have a blocker.
+- The comment's `text` starts with "Review passed." or "Review blocked." (with " at <commit>"), then the summary, then the findings in prose, blocking ones first, so `lotar show`, older lotar versions and agents reading the YAML see everything. `lotar comment <ID>` and `lotar show` mark the comment `[review: pass]` or `[review: block]`.
+- The stored comment adds `review: { verdict, commit?, findings?: [{summary, file?, line?, blocking?}] }`; REST (`POST /api/tasks/comment`) and MCP (`task_comment_add`) take the same `review` field, with `text` as the summary.
 
 ## Notes
 

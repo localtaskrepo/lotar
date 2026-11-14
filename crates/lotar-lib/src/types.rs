@@ -343,6 +343,10 @@ pub struct TaskComment {
     /// prose.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub answer: Option<CommentAnswer>,
+    /// The comment reports a review's verdict and findings (DEV-489);
+    /// `text` holds the summary and the findings in prose.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub review: Option<CommentReview>,
     /// Keys this version does not know, kept so a newer tool's or a
     /// hand-written field survives edits (DEV-268).
     #[serde(flatten, default)]
@@ -352,7 +356,7 @@ pub struct TaskComment {
 
 impl TaskComment {
     pub fn new(date: String, author: Option<String>, text: String) -> Self {
-        Self { date, author, text, question: None, answer: None, extra: Default::default() }
+        Self { date, author, text, question: None, answer: None, review: None, extra: Default::default() }
     }
 }
 
@@ -458,6 +462,48 @@ pub struct CommentAnswer {
     #[serde(flatten, default)]
     #[cfg_attr(feature = "schema", schemars(skip))]
     pub extra: std::collections::BTreeMap<String, serde_yaml_ng::Value>,
+}
+
+/// A review's verdicts: `pass` lets the work go on, `block` sends it back.
+pub const REVIEW_VERDICTS: [&str; 2] = ["pass", "block"];
+
+/// A review's result (DEV-489).
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct CommentReview {
+    /// One of [`REVIEW_VERDICTS`]. Kept as text so a verdict a newer
+    /// version adds still loads.
+    pub verdict: String,
+    /// The commit the review looked at.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub commit: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub findings: Vec<ReviewFinding>,
+    #[serde(flatten, default)]
+    #[cfg_attr(feature = "schema", schemars(skip))]
+    pub extra: std::collections::BTreeMap<String, serde_yaml_ng::Value>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct ReviewFinding {
+    pub summary: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub file: Option<String>,
+    /// The line in `file`, starting at 1.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub line: Option<u32>,
+    /// The finding must be fixed before the work goes on.
+    #[serde(skip_serializing_if = "std::ops::Not::not", default)]
+    pub blocking: bool,
+    #[serde(flatten, default)]
+    #[cfg_attr(feature = "schema", schemars(skip))]
+    pub extra: std::collections::BTreeMap<String, serde_yaml_ng::Value>,
+}
+
+/// The newest review comment, if any.
+pub fn latest_review(comments: &[TaskComment]) -> Option<&TaskComment> {
+    comments.iter().rev().find(|comment| comment.review.is_some())
 }
 
 /// Indexes of the question comments no answer points to, oldest first.

@@ -46,6 +46,7 @@ Do not call both transports for each operation or repeatedly dump every schema.
 | Create one that waits for another | `task_create` with `relationships.depends_on` | `add "Outcome" -p "$PROJECT" --status "$WAITING" --depends-on "$OTHER_ID"` |
 | Report a found problem once | `task_create` with `finding` | `add "Problem" -p "$PROJECT" --finding "<stable key>" -D "What you saw"` |
 | Progress | `task_comment_add` with `id`, `text` | `comment "$TASK_ID" -m "Outcome; evidence; next step"` |
+| Report a review | `task_comment_add` with `id`, `text`, `review.verdict`, `review.commit` | `comment "$TASK_ID" --review block --commit "$SHA" --blocker "path:12: what breaks" "Summary"` |
 | Ask a choice | `task_comment_add` with `id`, `text`, `question.options` | `comment "$TASK_ID" --question "Which?" --option "a: First" --option "b: Second" --recommend a` |
 | State | `task_update` with `id`, `patch.status` | `status "$TASK_ID" "$STATUS"` |
 | Values/schema | `config_show`; `schema_discover` filtered by `tool` | `config show --project "$PROJECT"`; command `--help` |

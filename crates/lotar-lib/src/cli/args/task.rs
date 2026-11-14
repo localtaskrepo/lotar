@@ -217,7 +217,7 @@ pub struct AddArgs {
     pub explain: bool,
 }
 
-/// Question and answer comments (DEV-488).
+/// Question and answer comments (DEV-488) and review comments (DEV-489).
 #[derive(Args, Debug, Clone, Default)]
 pub struct CommentAskArgs {
     /// Ask this question; the owner answers by choosing an --option
@@ -244,6 +244,18 @@ pub struct CommentAskArgs {
     /// The question to answer: its date (or a unique start of it); default: the last open question
     #[arg(long, value_name = "DATE", requires = "answer")]
     pub to: Option<String>,
+    /// Report a review's verdict: pass or block (DEV-489). The comment text is the summary.
+    #[arg(long, value_name = "VERDICT", value_parser = ["pass", "block"], conflicts_with_all = ["question", "answer"])]
+    pub review: Option<String>,
+    /// The commit the --review looked at
+    #[arg(long, value_name = "SHA", requires = "review")]
+    pub commit: Option<String>,
+    /// A finding of the --review as "[<file>[:<line>]: ]<summary>" (repeatable)
+    #[arg(long = "finding", value_name = "FINDING", requires = "review")]
+    pub findings: Vec<String>,
+    /// A blocking finding of the --review, written as --finding (repeatable)
+    #[arg(long = "blocker", value_name = "FINDING", requires = "review")]
+    pub blockers: Vec<String>,
 }
 
 #[derive(Subcommand)]

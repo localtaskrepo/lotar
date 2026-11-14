@@ -27,6 +27,8 @@ struct CommentFacts {
     /// The chosen option keys of an answer comment (DEV-488); `None` when
     /// the comment answers nothing.
     choice: Option<Vec<String>>,
+    /// A review comment's verdict (DEV-489).
+    verdict: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -95,6 +97,7 @@ impl ChangeSet {
         let facts = CommentFacts {
             author: comment.and_then(|comment| comment.author.clone()),
             choice: comment.and_then(|comment| comment.answer.as_ref()).map(|answer| answer.choice.clone()),
+            verdict: comment.and_then(|comment| comment.review.as_ref()).map(|review| review.verdict.clone()),
         };
         Self { comment: Some(facts), ..Self::empty(current) }
     }
@@ -361,6 +364,11 @@ fn matches_comment(condition: &AutomationCommentCondition, changes: &ChangeSet, 
     };
     if let Some(answer_condition) = condition.answer.as_ref()
         && !matches_value_condition(answer_condition, comment.choice.clone().map(AutomationValue::List).as_ref())
+    {
+        return false;
+    }
+    if let Some(review_condition) = condition.review.as_ref()
+        && !matches_value_condition(review_condition, comment.verdict.clone().map(AutomationValue::String).as_ref())
     {
         return false;
     }

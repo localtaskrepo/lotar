@@ -44,3 +44,4 @@ pub mod task_move;
 pub mod task_query;
 pub mod task_questions;
 pub mod task_renumber;
+pub mod task_reviews;

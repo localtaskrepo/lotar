@@ -234,6 +234,12 @@ impl TemplateContext {
                 self.set("comment.note", note);
             }
         }
+        if let Some(ref review) = comment.review {
+            self.set("comment.review", &review.verdict);
+            if let Some(ref commit) = review.commit {
+                self.set("comment.commit", commit);
+            }
+        }
         self
     }
 

@@ -4517,7 +4517,7 @@
     "/api/tasks/comment": {
       "post": {
         "summary": "Add a comment to a task",
-        "description": "Adds `text` as a comment. With `question`, `text` is a question answered by choosing an option. With `answer`, the comment answers a question (default: the task's last open question), `text` is an optional note, and the chosen options' `set` fields are applied as an update by the answerer before `on.commented` rules run. Invalid options, unknown `set` fields, unknown option keys and answered questions return 400.",
+        "description": "Adds `text` as a comment. With `question`, `text` is a question answered by choosing an option. With `answer`, the comment answers a question (default: the task's last open question), `text` is an optional note, and the chosen options' `set` fields are applied as an update by the answerer before `on.commented` rules run. With `review`, the comment reports a review's `verdict` (`pass` or `block`), the commit and the findings, and `text` is an optional summary. Invalid options, unknown `set` fields, unknown option keys, answered questions, unknown verdicts and a `pass` review with a blocking finding return 400.",
         "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TaskCommentRequest" } } } },
         "responses": {
           "200": {
@@ -5976,13 +5976,16 @@
           },
           "text": {
             "type": "string",
-            "description": "The comment; a question or answer comment keeps its options or choice here in prose too."
+            "description": "The comment; a question, answer or review comment keeps its options, choice or verdict and findings here in prose too."
           },
           "question": {
             "$ref": "#/components/schemas/CommentQuestion"
           },
           "answer": {
             "$ref": "#/components/schemas/CommentAnswer"
+          },
+          "review": {
+            "$ref": "#/components/schemas/CommentReview"
           }
         },
         "required": [
@@ -6096,6 +6099,56 @@
           "to"
         ]
       },
+      "CommentReview": {
+        "type": "object",
+        "description": "A review's verdict and findings (DEV-489).",
+        "properties": {
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "block"
+            ]
+          },
+          "commit": {
+            "type": "string",
+            "description": "The commit reviewed."
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewFinding"
+            }
+          }
+        },
+        "required": [
+          "verdict"
+        ]
+      },
+      "ReviewFinding": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string"
+          },
+          "file": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Line in `file`; needs `file`."
+          },
+          "blocking": {
+            "type": "boolean",
+            "default": false,
+            "description": "Must be fixed before the work goes on; a `pass` review has none."
+          }
+        },
+        "required": [
+          "summary"
+        ]
+      },
       "TaskCommentRequest": {
         "type": "object",
         "properties": {
@@ -6104,10 +6157,13 @@
           },
           "text": {
             "type": "string",
-            "description": "Required unless `answer` is given; with `question` the question itself, with `answer` an optional note."
+            "description": "Required unless `answer` or `review` is given; with `question` the question itself, with `answer` an optional note, with `review` an optional summary."
           },
           "question": {
             "$ref": "#/components/schemas/CommentQuestion"
+          },
+          "review": {
+            "$ref": "#/components/schemas/CommentReview"
           },
           "answer": {
             "type": "object",

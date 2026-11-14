@@ -151,6 +151,10 @@ pub struct AutomationCommentCondition {
     /// `tags`. Comments that answer nothing have no value (`exists: false`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub answer: Option<AutomationFieldCondition>,
+    /// The verdict of a review comment (DEV-489): `pass` or `block`.
+    /// Comments that review nothing have no value (`exists: false`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review: Option<AutomationFieldCondition>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]

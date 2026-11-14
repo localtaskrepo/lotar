@@ -34,13 +34,17 @@
           v-for="{ comment, index: commentIndex } in shownComments"
           :key="`${comment.date}-${commentIndex}`"
           class="task-panel__comment"
-          :class="{ 'task-panel__comment--question': comment.question }"
-          :data-testid="comment.question ? 'comment-question' : undefined"
+          :class="{
+            'task-panel__comment--question': comment.question,
+            [`task-panel__comment--review-${comment.review?.verdict}`]: comment.review,
+          }"
+          :data-testid="comment.question ? 'comment-question' : comment.review ? 'comment-review' : undefined"
         >
           <div class="task-panel__comment-header">
             <div class="task-panel__comment-meta">
               <span v-if="comment.author" class="task-panel__comment-author">{{ comment.author }} · </span
               >{{ formatDate(comment.date) }}
+              <ReviewBadge v-if="comment.review" :review="comment.review" class="task-panel__comment-review-badge" />
             </div>
             <div class="task-panel__comment-actions">
               <template v-if="editingCommentIndex !== commentIndex">
@@ -98,6 +102,23 @@
               @answer="$emit('answer', comment, $event)"
             />
           </template>
+          <template v-else-if="editingCommentIndex !== commentIndex && comment.review">
+            <MarkdownContent v-if="reviewSummary(comment)" :source="reviewSummary(comment)" />
+            <ul v-if="comment.review.findings?.length" class="task-panel__review-findings">
+              <li
+                v-for="(finding, findingIndex) in sortedFindings(comment.review)"
+                :key="findingIndex"
+                :class="{ 'task-panel__review-finding--blocking': finding.blocking }"
+                data-testid="review-finding"
+              >
+                <span v-if="finding.blocking" class="task-panel__review-finding-mark">Blocking</span>
+                <code v-if="finding.file" class="task-panel__review-finding-file"
+                  >{{ finding.file }}{{ finding.line ? `:${finding.line}` : '' }}</code
+                >
+                <span>{{ finding.summary }}</span>
+              </li>
+            </ul>
+          </template>
           <MarkdownContent v-else-if="editingCommentIndex !== commentIndex" :source="comment.text" />
           <textarea
             v-else
@@ -136,12 +157,14 @@
 <script setup lang="ts">
 import { computed, type ComponentPublicInstance } from 'vue'
 import { COMMENT_FILTER_KEY, useActivityFilter } from '../../composables/task-panel/useActivityFilter'
-import type { TaskComment } from '../../api/types'
+import type { CommentReview, ReviewFinding, TaskComment } from '../../api/types'
 import { answerLabels, answerTo, questionPrompt } from '../../utils/questions'
+import { reviewSummary } from '../../utils/reviews'
 import IconGlyph from '../IconGlyph.vue'
 import MarkdownContent from '../MarkdownContent.vue'
 import QuestionPrompt from '../QuestionPrompt.vue'
 import ReloadButton from '../ReloadButton.vue'
+import ReviewBadge from '../ReviewBadge.vue'
 import UiButton from '../UiButton.vue'
 import TaskPanelActivityFilter, { type ActivityFilterGroup } from './TaskPanelActivityFilter.vue'
 
@@ -174,7 +197,20 @@ const filter = useActivityFilter(COMMENT_FILTER_KEY)
 
 const comments = computed(() => (props.task.comments || []).map((comment, index) => ({ comment, index })))
 function commentType(comment: TaskComment): string {
-  return comment.question ? 'question' : comment.answer ? 'answer' : 'comment'
+  return comment.question ? 'question' : comment.answer ? 'answer' : comment.review ? 'review' : 'comment'
+}
+
+const TYPE_LABELS: Record<string, string> = {
+  question: 'Question',
+  answer: 'Answer',
+  review: 'Review',
+  comment: 'Comment',
+}
+
+/** Blocking findings first, each group in the reviewer's order. */
+function sortedFindings(review: CommentReview): ReviewFinding[] {
+  const findings = review.findings ?? []
+  return [...findings.filter((finding) => finding.blocking), ...findings.filter((finding) => !finding.blocking)]
 }
 
 function isVisible(comment: TaskComment): boolean {
@@ -203,14 +239,14 @@ const filterGroups = computed<ActivityFilterGroup[]>(() => {
         hidden: filter.hiddenAuthors.value.has(author),
       })),
     },
-    ...(comments.value.some(({ comment }) => comment.question || comment.answer)
+    ...(comments.value.some(({ comment }) => comment.question || comment.answer || comment.review)
       ? [
           {
             id: 'type',
             name: 'Type',
             items: [...new Set(comments.value.map(({ comment }) => commentType(comment)))].map((type) => ({
               value: type,
-              label: type === 'question' ? 'Question' : type === 'answer' ? 'Answer' : 'Comment',
+              label: TYPE_LABELS[type] ?? type,
               hidden: filter.hiddenFields.value.has(type),
             })),
           },
@@ -293,6 +329,12 @@ function onEditingTextareaRef(ref: Element | ComponentPublicInstance | null) {
   color: var(--color-muted, var(--muted));
 }
 
+/* A review badge wraps inside the meta line; Edit stays beside it on narrow panels. */
+.task-panel__comment-header > .task-panel__comment-meta {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
 .task-panel__comment-author {
   font-weight: 600;
 }
@@ -304,6 +346,41 @@ function onEditingTextareaRef(ref: Element | ComponentPublicInstance | null) {
 .task-panel__comment--question > :deep(.markdown-content),
 .task-panel__comment--question > .question-prompt {
   margin-bottom: var(--space-2, 0.5rem);
+}
+
+.task-panel__comment--review-pass {
+  border-left: 3px solid var(--color-success);
+}
+
+.task-panel__comment--review-block {
+  border-left: 3px solid var(--color-danger);
+}
+
+.task-panel__comment-review-badge {
+  margin-left: var(--space-2, 0.5rem);
+}
+
+.task-panel__review-findings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 0.25rem);
+  margin: var(--space-2, 0.5rem) 0 0;
+  padding-left: 1.2rem;
+}
+
+.task-panel__review-findings > li {
+  overflow-wrap: anywhere;
+}
+
+.task-panel__review-finding-mark {
+  margin-right: var(--space-1, 0.25rem);
+  font-weight: 600;
+  color: var(--color-danger-strong);
+}
+
+.task-panel__review-finding-file {
+  margin-right: var(--space-1, 0.25rem);
+  font-family: var(--font-mono);
 }
 
 .task-panel__answer {

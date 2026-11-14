@@ -30,20 +30,29 @@ pub struct AnswerInput {
     pub note: Option<String>,
 }
 
-/// A comment as REST and MCP take it: `text`, plus `question` to ask or
-/// `answer` to answer (`text` is then the note).
+/// A comment as REST and MCP take it: `text`, plus `question` to ask,
+/// `answer` to answer (`text` is then the note) or `review` to report a
+/// review (`text` is then the summary, DEV-489).
 #[derive(Debug, Clone)]
 pub enum CommentRequest {
     Plain(String),
     Question { prompt: String, question: CommentQuestion },
     Answer(AnswerInput),
+    Review { summary: Option<String>, review: crate::types::CommentReview },
 }
 
 impl CommentRequest {
-    /// Read `text`, `question` and `answer` from a request body.
+    /// Read `text`, `question`, `answer` and `review` from a request body.
     pub fn from_json(body: &serde_json::Value) -> Result<Self, String> {
         let text = body.get("text").and_then(serde_json::Value::as_str).map(str::trim).filter(|text| !text.is_empty()).map(str::to_string);
         let present = |key: &str| body.get(key).is_some_and(|value| !value.is_null());
+        if present("review") {
+            if present("question") || present("answer") {
+                return Err("a review comment cannot ask or answer".to_string());
+            }
+            let review = serde_json::from_value(body["review"].clone()).map_err(|err| format!("Invalid review: {err}"))?;
+            return Ok(Self::Review { summary: text, review });
+        }
         match (present("question"), present("answer")) {
             (true, true) => Err("a comment cannot ask and answer at once".to_string()),
             (true, false) => {
@@ -64,12 +73,13 @@ impl CommentRequest {
 }
 
 impl TaskService {
-    /// Add a plain, question or answer comment.
+    /// Add a plain, question, answer or review comment.
     pub fn add_comment_request(storage: &mut Storage, id: &str, request: CommentRequest) -> LoTaRResult<TaskDTO> {
         match request {
             CommentRequest::Plain(text) => Self::add_comment(storage, id, &text),
             CommentRequest::Question { prompt, question } => Self::ask_question(storage, id, &prompt, question),
             CommentRequest::Answer(answer) => Self::answer_question(storage, id, &answer),
+            CommentRequest::Review { summary, review } => Self::add_review(storage, id, summary.as_deref(), review),
         }
     }
 

@@ -1107,12 +1107,14 @@ export interface TaskComment {
     date: string
     /** Who wrote it (the history's actor); absent on comments written before DEV-327. */
     author?: string
-    /** The comment; question and answer comments keep their options or choice here in prose too. */
+    /** The comment; question, answer and review comments keep their options, choice or verdict and findings here in prose too. */
     text: string
     /** DEV-488: the comment asks a question answered by choosing an option. */
     question?: CommentQuestion
     /** DEV-488: the comment answers the question asked at `answer.to`. */
     answer?: CommentAnswer
+    /** DEV-489: the comment reports a review's verdict and findings. */
+    review?: CommentReview
     [key: string]: unknown
 }
 
@@ -1152,6 +1154,23 @@ export interface CommentAnswer {
     /** Chosen option keys; absent for a free-text answer. */
     choice?: string[]
     note?: string
+}
+
+/** DEV-489: a review's result; `pass` lets the work go on, `block` sends it back. */
+export interface CommentReview {
+    verdict: 'pass' | 'block'
+    /** The commit reviewed. */
+    commit?: string
+    findings?: ReviewFinding[]
+}
+
+export interface ReviewFinding {
+    summary: string
+    file?: string
+    /** Line in `file`, starting at 1. */
+    line?: number
+    /** Must be fixed before the work goes on; absent means false. */
+    blocking?: boolean
 }
 
 /** `POST /api/tasks/comment` with `answer`: `to` defaults to the last open question. */
