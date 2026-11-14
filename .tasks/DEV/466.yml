@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-13T10:33:22.263037+00:00
-modified: 2026-11-14T04:17:31.755450+00:00
+modified: 2026-11-14T06:34:46.052578+00:00
 relationships:
   blocks:
   - DEV-513
@@ -19,6 +19,8 @@ relationships:
   - DEV-491
   - DEV-502
   - DEV-513
+  - DEV-525
+  - DEV-526
 comments:
 - date: 2026-11-13T10:45:55.825737+00:00
   author: claude
@@ -81,6 +83,47 @@ comments:
 - date: 2026-11-13T19:38:53.112002+00:00
   author: claude
   text: "Fable rework done: 896309c0 (signed, hooks on), on top of 03db11a4. Review this commit, not 03db11a4.\nFix (src/utils/git.rs): output_within now holds one deadline through output collection. The pipe readers send their bytes over a channel and are never joined; after the process exits, stdout and stderr are awaited only until the deadline. When it passes (process still running, or a descendant still holding a pipe), the process group is killed and the call returns TimedOut. A failing try_wait now kills the group too.\nRegression: timeout_tests::child_holding_the_output_open_is_killed_at_the_timeout (sh -c 'sleep 3 & echo $! > pid; exit 0', 300ms timeout). Before the fix it failed after 3.1s with Ok(Output); after it passes in about 0.3s and the sleep is gone.\nChecks on the final tree, all in the foreground, sccache not in the way: npm run lint:agent exit 0; npm run test:agent exit 0 (Rust, UI, release 47, hooks 7); npm run smoke 387 passed in 108 files.\nNot run: a live lotar serve with a git shim (sleep 600 & exit 0).\nLimits: a descendant that leaves the process group (setsid) and keeps the pipe is not killed; the call still returns at the deadline. \nRef state: at 19:22Z automation committed my still-red regression test as 03db11a4 ('changes from the fix agent'), detached this checkout's HEAD and removed target/. 896309c0 therefore sits on a detached HEAD in /Users/mallox/.t3/worktrees/lotar/t3-f896dc82-1dcb0918420f7648; branch t3/task-panel-git-timeout-2 still points at 03db11a4 (fast-forwarding it was denied by the permission check). The rework is two commits (03db11a4 test, 896309c0 fix), not squashed, because -3/-4/-5 branches point at 03db11a4. Status and assignee untouched."
+- date: 2026-11-14T06:17:16.354327+00:00
+  author: mallox
+  text: I don't see a question here, but I do notice that comments are not using markdown at all and the comments are mostly unformatted. Something we could improve
+- date: 2026-11-14T06:18:26.480723+00:00
+  author: triage
+  text: 'no owner question is open, nothing is waiting on mallox. His comment of 2026-11-14 06:17 (in INBOX-45) says he sees no question here, and he is right: the last automation question (rework again, decide the findings, or WontDo) was answered by his decisions of 2026-11-13: more rework rounds are fine (INBOX-29), Fable for one round (INBOX-40), do not start another agent while one works (INBOX-44). The Fable round is finished: 896309c0 on top of 03db11a4 (worktree /Users/mallox/.t3/worktrees/lotar/t3-f896dc82-1dcb0918420f7648, detached HEAD). Next step for the @fix agent: do not rework or set WontDo. Get 896309c0 reviewed (not 03db11a4, the earlier blocking reviews read only that test commit), then merge when the review passes. If the review blocks again, that is round 3 of his rule: ask him then, with the model choice (INBOX-29). His remark that comments are unformatted and lack markdown is a separate improvement for lotar, not part of this ticket.'
+- date: 2026-11-14T06:32:53.610219+00:00
+  author: codex
+  text: |-
+    ### Review handoff
+
+    Confirmed completed Fable commit **896309c0489f7552987dc0cd0eaa5375acc30a17** exists on top of **03db11a4**. No owner question remains. No new implementation round is needed.
+
+    Review **896309c0**, preserved in /Users/mallox/.t3/worktrees/lotar/t3-f896dc82-1dcb0918420f7648 at detached HEAD. This checkout still points at intermediate 03db11a4: automation must use the completed commit for review and subsequent merge. Earlier blocking reviews do not assess the finished fix.
+
+    Fable recorded passing lint, full tests and smoke; no checks rerun or review approval claimed this turn. After passing review, hand off to merge; if blocked again, ask the owner with model choice under his round-three rule. No source changes or new commit; status and assignee unchanged.
+- date: 2026-11-14T06:34:01.842273+00:00
+  author: codex
+  text: |-
+    ### Formatting feedback acknowledged
+
+    You are right: **no owner question is open**. The ticket is now **Reviewing / @review**, so I am preserving that active handoff rather than returning it to your queue.
+
+    I will use Markdown paragraphs, lists and code formatting to make comments easier to scan. Broader comment-formatting improvements are separate from this git-timeout fix, as triage recorded.
+
+    The review target remains **896309c0**, the completed Fable fix, rather than intermediate **03db11a4**. No code changes, commit or tests were needed for this acknowledgment; status and assignee unchanged.
+- date: 2026-11-14T06:34:10.279959+00:00
+  author: automation
+  text: The review found blocking problems again after one rework (the comments above). Should an agent rework it once more (lotar assignee DEV-466 @fix), will you decide the findings, or is it WontDo?
+- date: 2026-11-14T06:34:45.217479+00:00
+  author: triage
+  text: |-
+    ## Triage: no owner question is open
+
+    The automation question at 06:34 (rework again, decide the findings, or WontDo) was triggered by the handoff comments of 06:32 and 06:34. Those are not a new blocking review, so it is already answered:
+
+    - **Owner, 2026-11-13** (docs/decisions in standards, INBOX-29, INBOX-40, INBOX-44): more rework rounds are fine; Fable took one round; do not start another agent while one works.
+    - **Owner, 2026-11-14 06:17** (INBOX-45): he sees no question here.
+    - **State:** the Fable round is finished as **896309c0** on top of 03db11a4 (worktree `/Users/mallox/.t3/worktrees/lotar/t3-f896dc82-1dcb0918420f7648`, detached HEAD). The blocking reviews of 11:01, 19:24 and the earlier ones read only 03db11a4 (the test commit).
+
+    **Next for the agents:** do not rework and do not set WontDo. Review **896309c0** (not 03db11a4), then merge when it passes. Only if that review blocks on 896309c0 is it round 3 of his rule: then ask him, with the model choice (INBOX-29). Automation: a handoff or acknowledgment comment is not a blocking review.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad8d79e8d-6688-4da4-a3a5-516b2d4c3b76
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afcbae329-3a86-478f-818f-b3877e1b72d7
@@ -100,7 +143,6 @@ description: |-
 tags:
 - health
 - review-returned
-- review-blocked
 custom_fields:
   finding: hang:task-history-git
 history:
@@ -452,3 +494,78 @@ history:
   changes:
   - field: releases
     new: '#6'
+- at: 2026-11-14T06:17:16.354327+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:17:45.639811+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-14T06:18:26.480723+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:27:29.683409+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-513"],"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513"]}'
+    new: '{"blocks":["DEV-513"],"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513","DEV-525"]}'
+- at: 2026-11-14T06:30:17.559859+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-513"],"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513","DEV-525"]}'
+    new: '{"blocks":["DEV-513"],"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513","DEV-525","DEV-526"]}'
+- at: 2026-11-14T06:32:22.235815+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T06:32:53.610219+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:33:04.191587+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T06:34:01.842273+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:34:10.173897+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+  - field: tags
+    old: health, review-returned, review-blocked
+    new: health, review-returned
+- at: 2026-11-14T06:34:10.279959+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:34:45.217479+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:34:46.052578+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'

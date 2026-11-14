@@ -1,0 +1,52 @@
+title: The owner's comment on DEV-514 set @fix but started no job and said nothing
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-14T06:27:26.992238+00:00
+modified: 2026-11-14T06:27:48.595822+00:00
+relationships:
+  related:
+  - DEV-514
+  - DEV-522
+  - DEV-466
+  - DEV-508
+  - DEV-518
+references:
+- file: crates/lotar-lib/src/services/automation_service.rs
+description: |-
+  mallox's comment on DEV-514 ("retry and fix any issues", 2026-11-14 06:14:00Z) started no agent. The rule "Comments: the owner's comment reaches the agent" set the assignee to @fix at 06:14:04Z, but no job was queued, no job log was written and no automation comment says why. An owner's comment that silently does nothing looks to him as if the agents ignore him. Found 2026-11-14 while checking the HelpNeeded tickets, and mallox asked for this ticket in the thread.
+
+  ## Found
+
+  - The same rule worked minutes before and after: DEV-518 (comment 06:08:45Z, @fix 06:09:07Z, job `job-20261114T060907.825Z-5`), DEV-508 (06:15:43Z, queued 06:16:21Z) and DEV-466 (06:17:16Z, queued 06:18:29Z).
+  - One difference from those three: DEV-514's branch `t3/report-skipped-automation-runs` had already landed on main (`d08b01d8`) and was recorded as landed. The others had not landed.
+  - `lotar agent queue` at 06:20Z listed DEV-508 and DEV-466, not DEV-514. Nothing in `~/Library/Logs/lotar-services/lotar.log`.
+  - DEV-514 is Done now (its work is on main), so the ticket itself needs nothing more.
+
+  ## Done when
+
+  - [ ] The cause is found: why `tell_agent` on DEV-514 queued no job. The code is in `tell_agent` / `maybe_queue_agent_on_assignment` in `crates/lotar-lib/src/services/automation_service.rs`. It may be related to DEV-522 (the queue count).
+  - [ ] An owner comment that starts no job leaves an automation comment on the ticket saying why, like a failed rule (DEV-514's reporting).
+  - [ ] Regression test that fails before the fix.
+  - [ ] `npm run lint`, `npm test` and `npm run smoke` pass.
+tags:
+- agent
+history:
+- at: 2026-11-14T06:27:29.693805+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-514","DEV-522"]}'
+    new: '{"related":["DEV-514","DEV-522","DEV-466","DEV-508","DEV-518"]}'
+- at: 2026-11-14T06:27:30.546023+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-14T06:27:48.595822+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:crates/lotar-lib/src/services/automation_service.rs

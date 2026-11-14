@@ -1,11 +1,11 @@
 title: CI caches lotar's own build output between runs
-status: InProgress
+status: Merging
 priority: High
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-13T22:21:42.733070+00:00
-modified: 2026-11-14T05:27:32.965362+00:00
+modified: 2026-11-14T06:26:30.045678+00:00
 relationships:
   depends_on:
   - DEV-493
@@ -18,8 +18,45 @@ comments:
 - date: 2026-11-14T05:27:32.965362+00:00
   author: claude
   text: 'Plan (claude, 2026-11-13): CI already builds without incremental (rust-cache sets CARGO_INCREMENTAL=0; the Windows log shows it). Windows sccache had 0 hits in the last 5 main runs: rust-cache restores the dependencies, and every one of those pushes changed lotar-lib and view/, so the 3 workspace crates missed. Its 5 entries of 1 GB fill half of the Actions cache (10.2 GB in use). rust-cache''s cache-workspace-crates (v2.9.3) doesn''t help: cargo judges local crates by mtime, a fresh checkout makes them stale, and rust-cache saves only when its key changes. So: sccache with a small cap on build_artifacts, rust_checks and windows_checks, CARGO_INCREMENTAL=0 set explicitly, saved only from main. Local numbers first, CI numbers need a push.'
+- date: 2026-11-14T05:34:33.169228+00:00
+  author: codex
+  text: 'Review: blocking. ci.yml:89-96 and equivalent Linux/Windows changes adopt caching without required before/after Rust job timings for Rust-changing and non-src pushes. Record the measurement matrix and adopt/drop conclusion with numbers before merging. Read full diff, ticket/comments, related DEV-493/107/499 and recent main history. git diff --check passed; focused nextest ci_windows_reporting_contract_test passed 9/9 with RUSTC_WRAPPER= after sandbox denied sccache. No runtime regression established, no UI changes, no minor tickets, no durable guidance finding. No files or commits changed; status/assignee unchanged.'
+- date: 2026-11-14T05:37:12.918953+00:00
+  author: claude
+  text: |-
+    Outcome: adopted, commit 3afb1849 on agent/DEV-496 (signed; LoTaR's job automation committed it as "DEV-496: changes from the fix agent" before my own commit, so the message differs from the one asked for; I didn't rewrite it). This also answers the review's blocking finding: the numbers are below.
+
+    ## Changed
+    - ci.yml: sccache on build_artifacts and rust_checks too (Windows already had it). All three are capped at 256M (Windows was 1G) and saved only from pushes to main. `CARGO_INCREMENTAL: '0'` is now set in the workflow env, so this no longer depends on rust-cache setting it.
+    - crates/lotar-lib/tests/ci_windows_reporting_contract_test.rs: the contract now covers the three jobs, the 256M cap, the same restore and save key, save only on main, and CARGO_INCREMENTAL=0. It failed against the old ci.yml and passes now.
+
+    ## Before (CI, the last two main runs: 43554399540 and 43531910285)
+    - Windows "Build binary (ci profile)": 211 s and 110 s. sccache: 0 hits in the last 5 main runs. Every one of those pushes changed lotar-lib, and rust-cache already restores the dependencies, so sccache never hit anything.
+    - Linux "Run tests": 243 s and 225 s. build_artifacts "Build release binary": 166 s and 132 s.
+    - Actions cache: 10.2 GB in use, over the 10 GB limit. 5 GB of that is five Windows sccache entries of 1 GB each.
+    - rust-cache's cache-workspace-crates (v2.9.3, current) doesn't help. Cargo judges local crates by file mtime, and a fresh checkout makes them all stale. rust-cache also saves only when its key (the Cargo files) changes.
+
+    ## After (measured locally: Mac, 14 cores, load 20 to 85 from other sessions, so noisy)
+    Each run first drops the workspace crates' build output, the way rust-cache does.
+    - Push that doesn't change lotar-lib (tests/, workflow or web change): binary build (Windows step) 52/101/54 s -> 7/3/12 s, with 2 of 2 hits (lotar-lib, lotar-web-assets). Test build (Linux step) 80/55/63 s -> 35/48/65 s: the library's unit-test binary links an executable, which sccache can't cache. Release build (build_artifacts) 124/295 s -> 93/84 s: the fat-LTO link dominates.
+    - Push that changes lotar-lib: binary 64/27 s vs 44/31 s, tests 118/92 s vs 69/54 s. lotar-lib misses and lotar-web-assets hits, so no loss beyond noise.
+    - Cache size: lotar-lib takes about 23 MB per profile and version. One main push now saves at most 3 x 256M, down from 1 GB for Windows alone.
+
+    ## Not measured
+    CI wall times after the change: they need a push, which this job doesn't allow. The first main runs after the merge show them in the "sccache stats" step. The first run per job is cold, because adding RUSTC_WRAPPER changes rust-cache's key.
+
+    ## Checks
+    npm run lint:agent passed. npm run test:agent passed (2186 Rust, 1531 UI, 50 release, 7 hook tests). npm run test:smoke:agent passed (396 of 396).
+- date: 2026-11-14T06:00:35.788907+00:00
+  author: claude
+  text: 'Rework of the review finding (missing before/after timings and the adopt/drop decision). My 05:37 comment, posted 3 minutes after the review, has them: CI before (runs 43554399540 and 43531910285: Windows binary build 211 and 110 s with 0 sccache hits in 5 main runs, Linux Run tests 243 and 225 s, release build 166 and 132 s, Actions cache at 10.2 GB) and local after numbers for a push that doesn''t change lotar-lib (binary build 52-101 s -> 3-12 s, test build 55-80 -> 35-65 s, release build 124-295 -> 84-93 s) and one that does (no loss beyond noise). Decision: adopted. CI after-times still need a push, which these jobs don''t allow. Per DEV-493, local timings count where CI can''t be triggered, marked as such. The first main runs after the merge show the CI numbers in the ''sccache stats'' steps. Amended the commit message (no code change, same tree): 069748b7 ''DEV-496 CI caches lotar''s own build output between runs'', signed. Checks: the tree is unchanged since lint:agent, test:agent (2186 Rust, 1531 UI, 50 release, 7 hooks) and test:smoke:agent (396/396) passed; reran the 12 workflow contract tests: passed.'
+- date: 2026-11-14T06:26:23.654279+00:00
+  author: codex
+  text: 'Review: passed. Read full 069748b7 diff, ticket/comments, related DEV-493/107/499, owner adoption and recent main history. Prior measurement finding answered by local before/after matrix and adopt decision; DEV-493 permits local measurements when CI cannot be triggered. CI after-times remain unverified. Cache caps, main-only saves, keys and incremental setting agree with contracts. git diff --check passed; RUSTC_WRAPPER= cargo nextest run --cargo-profile local filtered to ci_windows_reporting_contract_test passed 9/9 (2177 skipped). Full lint/test/smoke not repeated; prior results remain agent-reported. No findings, minor tickets, UI changes or durable guidance finding. No files/commits changed; status/assignee unchanged.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2c9b49ac-88aa-4223-8194-4149b3d24d9e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5d6d56fe-4cfa-47bb-b512-f4b935826a9f
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8b72bddf-43c2-4e64-b76a-a5d4910aff2e
 description: |-
   CI keeps no build output of lotar's own code between runs, so every Rust job compiles the lotar crate from scratch, even when a push changed nothing in it (DEV-493). The owner, 2026-11-13: "We really need to try and optimize the build and CI time."
 
@@ -40,6 +77,7 @@ description: |-
   - [ ] The change is adopted or dropped with the numbers in a comment.
 tags:
 - backend
+- review-returned
 history:
 - at: 2026-11-13T22:21:42.840566+00:00
   actor: claude
@@ -79,3 +117,77 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-14T05:32:08.611524+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T05:32:11.040392+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5d6d56fe-4cfa-47bb-b512-f4b935826a9f
+- at: 2026-11-14T05:34:33.169228+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T05:34:33.320827+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: backend
+    new: backend, review-blocked
+- at: 2026-11-14T05:34:37.815763+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: backend, review-blocked
+    new: backend, review-returned
+- at: 2026-11-14T05:37:12.918953+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T05:59:53.355845+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-14T06:00:35.788907+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:00:42.234609+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T06:23:43.188919+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8b72bddf-43c2-4e64-b76a-a5d4910aff2e
+- at: 2026-11-14T06:26:23.654279+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:26:30.045678+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

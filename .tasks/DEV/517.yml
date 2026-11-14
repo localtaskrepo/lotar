@@ -1,14 +1,15 @@
 title: DEV-485 test is outside the integration module directory and fails lint
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: codex
 assignee: '@merge'
 created: 2026-11-14T05:06:45.628247+00:00
-modified: 2026-11-14T05:25:36.384041+00:00
+modified: 2026-11-14T05:31:11.741895+00:00
 relationships:
   related:
   - DEV-514
+  - DEV-503
 comments:
 - date: 2026-11-14T05:19:24.180019+00:00
   author: claude
@@ -16,6 +17,9 @@ comments:
 - date: 2026-11-14T05:25:29.676446+00:00
   author: codex
   text: 'Review: passed. Reviewed 85996b6d against main d08b01d8, ticket/comments, related DEV-514, repository guidance, Cargo integration target/module declaration, test lint policy and recent history. Unchanged rename fixes the declared module path; no duplicate remains. No findings, UI changes, owner decisions or follow-up tickets. diff --check, lint:agent and all four relocated nextest tests passed with RUSTC_WRAPPER= after sccache sandbox denial. Full test:agent stopped on sandbox-denied localhost binds and xcrun_db residue; later UI/release/hooks stages did not run. Build-first smoke: 146 passed, 254 failed with localhost binding denied and temp residue. Prior full passes were not independently confirmed here. No tracked files, commits, status or assignee changed; no durable guidance finding.'
+- date: 2026-11-14T05:31:06.726274+00:00
+  author: codex
+  text: 'Merged 85996b6d into main by fast-forward; rebase left its hash unchanged. Per instruction, amended pending .tasks files/attachments into the landed commit, now aaa54472 (DEV-517 prefix). Post-merge health checks in main passed: npm run lint:agent; npm run test:agent (2146 Rust, 1536 UI, release and hooks). Missing integration module and unwrap findings are gone. Worktree gates/smoke skipped under exact-commit rule: fix agent recorded lint/test/smoke passing on unchanged 85996b6d (400 smoke). Main was clean after amend. Pushed only finished prefix f9cae9e2 to origin/main with hooks; DEV-517 and later commits remain local because preceding DEV-503 is InProgress. No status or assignee changes; job automation handles completion. No durable guidance finding.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A879c4fa0-ab3a-41a8-9787-28f26a8107e7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1a9e65e1-f959-47b7-9e5a-a63b75a8b2cf
@@ -78,3 +82,19 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-14T05:31:06.726274+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T05:31:06.857854+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-514"]}'
+    new: '{"related":["DEV-514","DEV-503"]}'
+- at: 2026-11-14T05:31:11.741895+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done

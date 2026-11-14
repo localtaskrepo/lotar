@@ -1,0 +1,62 @@
+title: 'lotar agent queue says Queued: 0 while it lists waiting tickets'
+status: Reviewing
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@review'
+created: 2026-11-14T05:50:59.578213+00:00
+modified: 2026-11-14T06:27:27.958431+00:00
+relationships:
+  related:
+  - DEV-279
+  - DEV-503
+  - DEV-525
+comments:
+- date: 2026-11-14T06:26:35.229625+00:00
+  author: claude
+  text: 'Fixed in a7386b79: lotar agent queue now counts Queued (and JSON queued_jobs) as at least the on-disk pending entries it lists, next to the DEV-279 Running correction (cli/handlers/agent.rs). Test tests/dev522_agent_queue_count_test.rs queues two tickets with the worker disabled and checks queued_jobs=2 and ''Queued: 2''; it failed with queued_jobs=0 before the fix. Checks: npm run lint, npm test (2151 Rust, 1537 UI, release and hooks tests), npm run smoke (401) all pass.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4c2d9e9e-8022-4c6a-8203-ab6387976f80
+description: 'Found 2026-11-14: `lotar agent queue` printed "Running: 4 | Queued: 0" above 7 waiting tickets (DEV-503''s merge among them), so a queued job looks like a stalled one. Cause: crates/lotar-lib/src/cli/handlers/agent.rs:401-432 takes Queued from AgentJobService::queue_stats(), the CLI process''s own in-memory registry (always empty in a fresh CLI), while the rows come from AgentQueueService::list_pending (the on-disk queue). Running is already corrected from agent_active_jobs (DEV-279); Queued is not. JSON output has the same queued_jobs value. Check: queue a job while 4 run, then lotar agent queue. Done when Queued (and queued_jobs) counts the pending entries the command lists, with a test.'
+history:
+- at: 2026-11-14T05:50:59.729238+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-279","DEV-503"]}'
+- at: 2026-11-14T05:50:59.924578+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-14T06:11:46.612318+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-14T06:11:47.533700+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4c2d9e9e-8022-4c6a-8203-ab6387976f80
+- at: 2026-11-14T06:26:35.229625+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:26:43.085504+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T06:27:27.958431+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-279","DEV-503"]}'
+    new: '{"related":["DEV-279","DEV-503","DEV-525"]}'

@@ -1,11 +1,11 @@
 title: Jobs that failed during the T3 Code outage left 15 tickets InProgress and lost their agents' outcome
-status: HelpNeeded
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: claude
+assignee: '@review'
 created: 2026-11-13T10:33:47.286204+00:00
-modified: 2026-11-14T04:17:31.801079+00:00
+modified: 2026-11-14T06:27:24.534574+00:00
 relationships:
   blocks:
   - DEV-513
@@ -29,6 +29,7 @@ relationships:
   - DEV-481
   - DEV-483
   - DEV-513
+  - DEV-524
 comments:
 - date: 2026-11-13T10:37:16.946574+00:00
   author: claude
@@ -125,6 +126,16 @@ comments:
 - date: 2026-11-13T19:37:09.394149+00:00
   author: codex
   text: Addressed the ordering finding in signed commit 887e36ef on t3/job-outcome-survives-t3-outage. Matching job-end rules share one durable dispatch checkpoint containing their steps in configuration order. A blocked earlier step stops the dispatch, so later rules cannot overtake it during initial execution or recovery. Help text updated. Regression end_rules_resume_in_order_without_overtaking_a_blocked_comment failed against the old dispatcher (Done instead of Reviewing while the first comment remained blocked), then passed restored; all three pending_outcome_tests pass. Final lint:agent passed; test:agent passed all 2139 Rust tests plus UI, 47 release and 7 hook tests; final build-first test:smoke:agent passed 390/390. Earlier full Rust attempt failed a merge-job startup deadline and two smoke attempts each failed a different timing assertion; recorded separately in related DEV-481, rather than claiming first-pass clean gates. git diff --check passed, worktree clean, signature verified G. No merge or push. Status and assignee unchanged; job-end automation sends the work to review. No durable guidance correction.
+- date: 2026-11-14T06:25:55.945314+00:00
+  author: claude
+  text: |-
+    Unparked: the work is committed, and it waits for a fresh review, not for mallox.
+
+    - lotar's dependency check put this ticket in HelpNeeded and gave it to its reporter when the review was queued (`mark_task_blocked` in `automation_service.rs`). Nothing picks a ticket up from there: the inbox files only tickets assigned to mallox, and "Prerequisites done" acts only on Blocked tickets.
+    - The tag `blocked-by:dependency graph unavailable: ...` is no real dependency. It is the text of a lock error: `.sprints.lock` was busy during the check. I also removed `review-blocked`, left over from the review before the rework, so the rules don't count the next result as blocked again.
+    - mallox in the thread, 2026-11-14: "Go ahead" (hand it on to @review, remove the stale tags).
+
+    Next: @review reviews `887e36ef` on `t3/job-outcome-survives-t3-outage` (ordered job-end dispatch).
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8a51060f-8f0e-40eb-8309-91840a4fac93
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa70d136-71c4-42cc-8c60-e9566c5a27b6
@@ -164,9 +175,6 @@ tags:
 - health
 - review-returned
 - merge-retried
-- review-blocked
-- blocked
-- 'blocked-by:dependency graph unavailable: Validation error: Validation error: Relationship snapshot unavailable: lock /Users/mallox/Development/@localtaskrepo/lotar/.tasks/@sprints/.sprints.lock is busy or unsupported: Resource temporarily unavailable (os error 35); still busy after the 500 ms snapshot wait budget; retry after the writer finishes'
 custom_fields:
   finding: comms:job-end-lost-in-t3-outage
 history:
@@ -574,3 +582,31 @@ history:
   changes:
   - field: releases
     new: '#6'
+- at: 2026-11-14T06:25:55.721157+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: 'health, review-returned, merge-retried, review-blocked, blocked, blocked-by:dependency graph unavailable: Validation error: Validation error: Relationship snapshot unavailable: lock /Users/mallox/Development/@localtaskrepo/lotar/.tasks/@sprints/.sprints.lock is busy or unsupported: Resource temporarily unavailable (os error 35); still busy after the 500 ms snapshot wait budget; retry after the writer finishes'
+    new: health, review-returned, merge-retried
+- at: 2026-11-14T06:25:55.945314+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:25:56.416329+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Reviewing
+- at: 2026-11-14T06:25:57.258822+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: claude
+    new: '@review'
+- at: 2026-11-14T06:27:24.534574+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-513"],"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513"]}'
+    new: '{"blocks":["DEV-513"],"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513","DEV-524"]}'

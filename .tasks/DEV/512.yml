@@ -3,19 +3,50 @@ status: Blocked
 priority: Low
 type: Feature
 reporter: claude
+assignee: claude
 created: 2026-11-14T02:19:59.564652+00:00
-modified: 2026-11-14T04:17:31.667702+00:00
+modified: 2026-11-14T06:31:19.267338+00:00
 relationships:
   depends_on:
   - DEV-503
+  - DEV-510
   blocks:
   - DEV-513
   related:
   - DEV-503
   - DEV-513
+  - DEV-510
+  - DEV-509
+comments:
+- date: 2026-11-14T05:51:55.474946+00:00
+  author: claude
+  text: |-
+    Picked up after DEV-503. Both parts need harnessmux code that lotar's dependency (harnessmux 0.1.1 from crates.io) doesn't have: AgentTable has no insert, and Usage has only token, context and cost fields (no premium requests, lines changed or model round trips). So both need a harnessmux 0.1.2 on crates.io, and publishing it is your call. Part 1 could also be done in lotar alone: read harnessmux's agents.toml (harnessmux::paths::config_dir() is public), merge the profile's command and args into that agent's entry, and build the table with AgentTable::parse(BUILTIN, ...). Part 2 also needs a check with the real agents of whether their ACP adapters report these numbers at all. No files changed.
+
+    Question: which way? A) harnessmux 0.1.2 with AgentTable::insert and the extra usage fields, published, then lotar uses it (both parts, in v0.15.1). B) Part 1 in lotar alone without a harnessmux release, part 2 stays open for later. C) Take DEV-512 out of v0.15.1 (DEV-513) and do it the next time harnessmux changes, as the ticket says (low value).
+- date: 2026-11-14T06:06:48.935524+00:00
+  author: mallox
+  text: a
+- date: 2026-11-14T06:30:39.913031+00:00
+  author: claude
+  text: |-
+    mallox 2026-11-14 chose "a": harnessmux 0.1.2 with the additions, then lotar uses it. Done in code in both repos; waits for the combined harnessmux 0.1.2 release (DEV-510 does it).
+
+    Part 1, per-profile command: harnessmux commit 4032a34 on branch agent/DEV-512 (worktree ~/.t3/worktrees/harnessmux/DEV-512, based on main) adds AgentTable::insert (add or replace one agent; refuses an empty name or command), with a test, README and CHANGELOG (Unreleased). lotar commit f106a97a on agent/DEV-512: a profile of a harnessmux runner can set command and args again. command plus args replaces the agent's command and its pinned adapter, as a command in agents.toml does. args alone go after the agent's command. Option ids and modes stay from the table. Used for new and resumed sessions, and for a taken-over job. docs/help/agent.md, config-reference.md and the doc comments are updated. Cargo.toml asks for harnessmux 0.1.2; Cargo.lock still has 0.1.1. So f106a97a builds only once 0.1.2 is on crates.io: then run cargo update -p harnessmux, amend, and rerun the checks.
+
+    Part 2, fuller usage: there is nothing to map, because the agents don't report these numbers over ACP. Claude: claude-agent-acp 0.107.0 keeps num_turns to itself (checked in its source and in a live run: the prompt result has tokens and _meta.quota per model, the usage_update has cost). Copilot: totalPremiumRequests and codeChanges (linesAdded/linesRemoved) are only in its own JSON session events (session.shutdown, in copilot-sdk docs and schemas/session-events.schema.json of 1.0.112), not in ACP. A live Copilot run failed on this machine with 'Model gpt-5.4 is not available' (~/.copilot/settings.json pins gpt-5.4; the session offers only auto), so I couldn't check a live Copilot turn. The docs now say this, and that turns counts the job's turns. The usage fields stay for jobs from before DEV-503. If lines changed are wanted for every agent, harnessmux could count them from the diffs in ACP tool calls: that would be a new ticket.
+
+    Checks, run against the local harnessmux through a temporary [patch] that is not in the commit: harnessmux fmt, clippy -D warnings, nextest 28/28 and cargo deny pass. lotar: npm run lint:agent, npm run test:agent (2147 Rust, 1536 UI, release, hooks) and npm run test:smoke:agent (400) pass. The new tests are a_profile_command_starts_the_agent_with_its_args (a real job whose profile command starts the fake ACP agent with the args; on main it was refused), with_profile_command and AgentTable::insert unit tests.
+
+    Next: DEV-510's release merges harnessmux agent/DEV-512 together with the other branches. After v0.1.2 is on crates.io, run cargo update -p harnessmux in lotar, amend f106a97a and run lint, test and smoke. Then this ticket is done.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa15afbd8-214b-4ebf-9146-4dbc45d5bd47
 releases:
 - 6
 description: 'Lost in DEV-503 (owner asked to file it, 2026-11-14). 1) A profile of an agent runner can no longer set command/args (refused with a hint to harnessmux''s agents.toml). A per-profile override needs a small harnessmux API to add or replace one agent-table entry (AgentTable has no insert), then lotar maps the profile''s command and args onto it. 2) Usage lost detail: Copilot''s premium requests and lines added/removed, Claude''s count of model round trips (turns now counts lotar''s turns). Needs more usage fields in harnessmux''s events where the agents report them. Low value; do when touching harnessmux anyway.'
+tags:
+- blocked
+- blocked-by:DEV-510
 history:
 - at: 2026-11-14T02:19:59.997815+00:00
   actor: claude
@@ -46,3 +77,94 @@ history:
   changes:
   - field: releases
     new: '#6'
+- at: 2026-11-14T05:34:13.913058+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-14T05:50:43.962348+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-14T05:50:45.240944+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa15afbd8-214b-4ebf-9146-4dbc45d5bd47
+- at: 2026-11-14T05:51:55.474946+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T05:52:09.418672+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-14T05:59:35.393221+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-510"]}'
+- at: 2026-11-14T06:06:48.935524+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:06:52.017353+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-14T06:06:55.607739+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T06:18:30.128642+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-510"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-510","DEV-509"]}'
+- at: 2026-11-14T06:30:39.913031+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:30:40.239753+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-510","DEV-509"]}'
+    new: '{"depends_on":["DEV-503","DEV-510"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-510","DEV-509"]}'
+- at: 2026-11-14T06:31:08.313326+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T06:31:13.862802+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: claude
+  - field: tags
+    old: ''
+    new: blocked, blocked-by:DEV-510
+- at: 2026-11-14T06:31:19.267338+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked

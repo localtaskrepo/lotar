@@ -405,14 +405,9 @@ release.
 
 ## crates.io trusted publishing setup
 
-Only the first release, `v0.15.0`, may fall back to `CARGO_REGISTRY_TOKEN` when
-trusted authentication fails: crates must exist before their publishers can be registered.
-Later tags require trusted authentication.
-
-After v0.15.0, follow DEV-508 (waiting on the DEV-417 release): the owner registers
-a GitHub trusted publisher for each of `lotar-web-assets`, `lotar-lib` and `lotar`,
-using owner `localtaskrepo`, repository `lotar`, workflow `release.yml`, and
-environment `release`. Enable "trusted publishing only" for all three crates,
-revoke the bootstrap API token, and delete `CARGO_REGISTRY_TOKEN` from both
-`localtaskrepo/lotar` and `localtaskrepo/harnessmux`. Then hand DEV-508 back to an
-agent to remove the first-release fallback from the workflow and this guide.
+Each of `lotar-web-assets`, `lotar-lib` and `lotar` has a GitHub trusted publisher on
+crates.io (owner `localtaskrepo`, repository `lotar`, workflow `release.yml`, environment
+`release`) and "trusted publishing only" turned on, so no API token can publish them and
+the repository stores none. A new crate must be published once with a token before its
+publisher can be registered; register it right after, revoke that token, and delete it
+from the repository secrets.

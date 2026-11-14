@@ -1,11 +1,11 @@
 title: Review the agent job code that stays after the harnessmux switch
-status: Blocked
+status: Reviewing
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-13T22:35:03.230572+00:00
-modified: 2026-11-14T04:17:31.711593+00:00
+modified: 2026-11-14T06:33:09.761805+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -15,6 +15,30 @@ relationships:
   - DEV-492
   - DEV-505
   - DEV-513
+  - DEV-520
+  - DEV-521
+  - DEV-201
+  - DEV-524
+comments:
+- date: 2026-11-14T05:34:55.100350+00:00
+  author: claude
+  text: started the review on branch agent/DEV-501 (DEV-503 landed). File is now crates/lotar-lib/src/services/agent_job_service.rs, 3498 non-test lines.
+- date: 2026-11-14T05:46:03.570733+00:00
+  author: claude
+  text: 'review done, commit ca9529ff on agent/DEV-501. Fixed: (1) a workspace-permission job now gets the repo''s git data as writable dir also when the main checkout''s .git is a file (submodule, --separate-git-dir); before, the sandboxed agent could not commit there (failing test first: a_worktree_job_may_write_the_git_dir_of_a_checkout_whose_git_is_a_file). (2) Profile name merge-retry no longer counts as a merge job: dropped in DEV-201, docs name only merge. (3) Cleanups without behaviour change: one git_stdout helper for the landing checks, unused job id param removed, finalize_job reuses job_context_for, empty prompt refused before context loads, stale/misplaced doc comment on record_and_emit fixed. Filed: DEV-520 (drive_session ignores broadcast lag; a dropped turn end hangs the job), DEV-521 (global job lock held across log writes and process scans). Reviewed with no finding: queue/slot accounting, cancel paths, worktree prep and cleanup guards, landing checks, prompt/instructions, orphan adoption. Checks: npm run lint, npm test (2147 Rust, 1536 UI, release, hooks), npm run smoke (400) all pass; npm run build:web was needed first in the fresh worktree. Guidance: no durable finding.'
+- date: 2026-11-14T06:25:48.703099+00:00
+  author: claude
+  text: |-
+    Unparked: the work is committed, and it waits for a fresh review, not for mallox.
+
+    - lotar's dependency check put this ticket in HelpNeeded and gave it to its reporter when the review was queued (`mark_task_blocked` in `automation_service.rs`). Nothing picks a ticket up from there: the inbox files only tickets assigned to mallox, and "Prerequisites done" acts only on Blocked tickets.
+    - At the time DEV-503 was Merging; it has been Done since 05:50Z.
+    - mallox in the thread, 2026-11-14: "Go ahead" (hand it on to @review, remove the stale tags).
+
+    Next: @review reviews `ca9529ff` on `agent/DEV-501`.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A40e4b2df-5666-4b3e-9ac3-b6613c9e2aa3
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A864d6f4e-9739-4249-8fa0-626d0e6c7023
 releases:
 - 6
 description: 'The owner, 2026-11-13, on DEV-492: the agent code "is already a little older, and may have been written by less capable models"; he chose a review "After the switch". Wait for the change that links the harnessmux crate and removes lotar''s own runners and the t3 runner (docs/developers/harness-tool-design.md). Then review what stays in src/services/agent_job_service.rs (about 3200 non-test lines): queue, worktrees, landing, prompts, instructions, rules, reviewer and merge flow. Done when: findings fixed or filed as tickets, tests and smoke pass.'
@@ -77,3 +101,94 @@ history:
   changes:
   - field: releases
     new: '#6'
+- at: 2026-11-14T05:34:23.993647+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-14T05:34:24.937362+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A40e4b2df-5666-4b3e-9ac3-b6613c9e2aa3
+- at: 2026-11-14T05:34:55.100350+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T05:38:48.867060+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-492","DEV-505","DEV-513"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-492","DEV-505","DEV-513","DEV-520"]}'
+- at: 2026-11-14T05:38:49.353690+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-492","DEV-505","DEV-513","DEV-520"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-492","DEV-505","DEV-513","DEV-520","DEV-521"]}'
+- at: 2026-11-14T05:46:03.570733+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T05:46:03.851750+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-492","DEV-505","DEV-513","DEV-520","DEV-521"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-492","DEV-505","DEV-513","DEV-520","DEV-521","DEV-201"]}'
+- at: 2026-11-14T05:46:15.251911+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T05:46:16.079917+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: claude
+  - field: tags
+    old: ''
+    new: blocked, blocked-by:DEV-503
+- at: 2026-11-14T06:25:48.379172+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: blocked, blocked-by:DEV-503
+    new: ''
+- at: 2026-11-14T06:25:48.703099+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:25:50.368540+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Reviewing
+- at: 2026-11-14T06:25:52.554853+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: claude
+    new: '@review'
+- at: 2026-11-14T06:27:24.537073+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-492","DEV-505","DEV-513","DEV-520","DEV-521","DEV-201"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-492","DEV-505","DEV-513","DEV-520","DEV-521","DEV-201","DEV-524"]}'
+- at: 2026-11-14T06:33:09.761805+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A864d6f4e-9739-4249-8fa0-626d0e6c7023

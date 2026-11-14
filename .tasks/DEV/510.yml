@@ -3,23 +3,77 @@ status: Blocked
 priority: High
 type: Feature
 reporter: claude
+assignee: claude
 created: 2026-11-14T02:19:54.140386+00:00
-modified: 2026-11-14T04:17:31.535648+00:00
+modified: 2026-11-14T06:31:03.637582+00:00
 relationships:
   depends_on:
   - DEV-503
+  - DEV-509
   blocks:
   - DEV-513
+  - DEV-512
   related:
   - DEV-503
   - DEV-513
+  - DEV-509
+  - DEV-512
+  - DEV-511
 comments:
 - date: 2026-11-14T04:12:50.227687+00:00
   author: claude
   text: 'mallox 2026-11-14: "t3 threads do not create work trees anymore." Item 2 no longer needs T3''s worktree path or branch in harnessmux''s events; it keeps the thread link (lotar attaches it to the ticket). Items 1 and 3 are unchanged.'
+- date: 2026-11-14T05:58:35.784716+00:00
+  author: claude
+  text: |-
+    Implemented in both repos and committed. Nothing pushed or published.
+    harnessmux 08c1ff6 (branch agent/DEV-510, worktree ~/.t3/worktrees/harnessmux/DEV-510, version 0.1.2 + CHANGELOG): session.started has the thread's link; a waiting T3 thread ends the turn with stop_reason waiting_for_answer (CLI exit 3, a notice with the link) instead of turn.failed; a session resumed after its owner died mid-turn follows the thread's run in its first turn (or takes a run that ended meanwhile) and sends no prompt. Item 2 is link only, per the 2026-11-14 comment.
+    lotar 88002b9a (agent/DEV-510): the job links the thread on the ticket (also for a resumed session, read from its log); waiting_for_answer hands the ticket to its reporter as HelpNeeded with a comment that links the thread, and the job fails (exit 2); a taken-over t3 job ends with the thread's run. docs/help/agent.md updated. Cargo.toml asks for harnessmux 0.1.2, Cargo.lock still has 0.1.1: lotar builds only once 0.1.2 is on crates.io, then cargo update -p harnessmux and amend.
+    Checks: harnessmux fmt, clippy -D warnings, nextest 30/30, deny pass; new fake-t3 tests fail without the fix. lotar with a temporary local patch to harnessmux 0.1.2 (removed): npm run lint:agent, npm test (2149 Rust, 1536 UI, release, hooks), npm run smoke (400) pass; dev510_t3_session_test (link, waiting hand-back, takeover without second turn) fails without the harnessmux fix. Not run: a live t3 thread (spends quota).
+    Question: may I push harnessmux agent/DEV-510 to main and push the signed tag v0.1.2 (release.yml publishes it to crates.io, which can't be undone), then update lotar's Cargo.lock and amend the commit?
+- date: 2026-11-14T05:59:35.034909+00:00
+  author: triage
+  text: 'Answered already, no question for the owner: he approved this release twice. INBOX-102 (2026-11-14, ''yes''): release harnessmux 0.1.2, meaning merge to harnessmux main, signed tag v0.1.2, push, release.yml publishes to crates.io, irreversible. INBOX-103 (2026-11-14, ''a, let''s include all the latest changes and improvements and wait for them if needed''): one 0.1.2 carries DEV-509, DEV-510 and the DEV-512 harnessmux part. So: merge agent/DEV-510 into harnessmux main now (push-finished-work, owner 2026-11-12: push when the work is finished). Push the signed tag v0.1.2 once, after DEV-509 and DEV-510 are both on main (DEV-512''s harnessmux part too, if its agent has it ready; wait for it rather than tag twice). Both branches set version 0.1.2 and touch CHANGELOG: merge the second onto the first and resolve those two files. Then cargo update -p harnessmux in lotar, amend your lotar commit and run lint, test and smoke. Coordinate with the DEV-509 agent''s thread (cross-project-help) so only one of you pushes the tag.'
+- date: 2026-11-14T06:01:15.313816+00:00
+  author: claude
+  text: 'mallox 2026-11-14: "yes, push and tag v0.1.2 if all current tasks are done". They weren''t (DEV-511 running; DEV-509 and DEV-512 waiting for answers, each also aiming at harnessmux 0.1.2), so nothing was pushed. mallox chose "One 0.1.2, wait": once DEV-509, DEV-511 and DEV-512 have their harnessmux commits, merge them with agent/DEV-510 (08c1ff6) and the DEV-503 notes into harnessmux main and release one 0.1.2, then cargo update -p harnessmux in lotar and amend 88002b9a. Next step: that combined release (DEV-513 scope).'
+- date: 2026-11-14T06:07:25.993386+00:00
+  author: mallox
+  text: confirmed
+- date: 2026-11-14T06:07:58.772296+00:00
+  author: claude
+  text: 'mallox 2026-11-14 "confirmed": the plan stands, one harnessmux 0.1.2 that carries DEV-509, DEV-510, DEV-511, DEV-512 and the DEV-503 notes. No change now: as of now DEV-511 and DEV-512 are InProgress, DEV-509 waits as HelpNeeded, and harnessmux origin/main is still 0.1.1 (no v0.1.2 tag). Ready and unchanged: harnessmux agent/DEV-510 08c1ff6, lotar agent/DEV-510 88002b9a. Next step, once those tickets have their harnessmux commits: merge them all into harnessmux main, signed tag v0.1.2, push (release.yml publishes to crates.io), then cargo update -p harnessmux in lotar, amend 88002b9a and run lint, test and smoke.'
+- date: 2026-11-14T06:11:27.827428+00:00
+  author: mallox
+  text: Were we waiting on DEV-503? It should be done now, and triggers don't seem to be working reliably
+- date: 2026-11-14T06:12:04.066655+00:00
+  author: triage
+  text: 'Triage 2026-11-14 (INBOX-110), answering mallox''s 06:11 question ''Were we waiting on DEV-503?'': no. DEV-503 is Done (since 05:50) and DEV-510 depends on it only for the code, which is on lotar main. What the release waits for is the plan mallox confirmed at 06:07 (one harnessmux 0.1.2 with DEV-509, DEV-510, DEV-511, DEV-512 and the DEV-503 notes). State now, checked in the harnessmux repo: branches agent/DEV-503 (55b90cc), agent/DEV-509 (5811028) and agent/DEV-510 (08c1ff6) hold their commits; DEV-509 got ''yes include in 1.2'' (06:07) and DEV-512 got ''a'' (06:06), so neither waits for him any more; DEV-511 and DEV-512 have no harnessmux branch yet and are InProgress with @fix. The trigger does not reliably wake this ticket, so don''t wait for it: check the state when you run. Release when DEV-511 and DEV-512 have their harnessmux commits (merge all four branches, resolve version and CHANGELOG, signed tag v0.1.2 once, push), then cargo update -p harnessmux in lotar, amend 88002b9a, run lint, test and smoke. Nothing new for mallox to decide.'
+- date: 2026-11-14T06:17:31.676949+00:00
+  author: claude
+  text: 'Acting on triage''s answer (INBOX-102 ''yes'', INBOX-103 ''a, let''s include all the latest changes and improvements and wait for them if needed''): fast-forwarded harnessmux origin/main 2e2428c..08c1ff6 (DEV-510, version 0.1.2 + CHANGELOG; signature verified) and pushed it. No tag. agent/DEV-509 (5811028) already sits on top of 08c1ff6. Tag hand-off: I sent the DEV-509 thread (t3-thread://v2/d834978d-9e75-43fb-ba01-45747238fc44/mcp:5d7c2709-cbbd-4287-9947-7c4d01114643) a message that it pushes the signed v0.1.2 tag once DEV-509 is on main, with DEV-512''s harnessmux part first if its agent has it ready (no harnessmux branch for it at 06:17 UTC). I won''t tag, so only one of us does. It replies to this thread once 0.1.2 is on crates.io. Left for DEV-510: cargo update -p harnessmux in lotar on agent/DEV-510, amend 88002b9a, run lint, test and smoke. Blocked on DEV-509 (depends-on added) until then. No lotar files changed in this job, no checks ran.'
+- date: 2026-11-14T06:18:22.058416+00:00
+  author: claude
+  text: 'DEV-509 agent replied: it pushes the v0.1.2 tag (I won''t). It doesn''t push DEV-509 to harnessmux main or tag until DEV-511 and DEV-512 have their harnessmux commits, per mallox''s ''One 0.1.2, wait'' on this ticket. agent/DEV-509 5811028 fast-forwards origin/main 08c1ff6, and its CHANGELOG 0.1.2 lists DEV-510 and DEV-509. It messages this thread once 0.1.2 is on crates.io. DEV-510 stays Blocked until then; the remaining step is unchanged.'
+- date: 2026-11-14T06:20:36.387281+00:00
+  author: codex
+  text: 'Review: blocking. Cargo.toml:21 requires harnessmux 0.1.2 but Cargo.lock:937 selects 0.1.1. Finish the agreed combined release, update the lockfile, and rerun lint/tests/smoke before merge. Reviewed full commit/diff, ticket owner decisions, related DEV-509/DEV-513 and main history. RUSTC_WRAPPER= cargo check --locked --offline fails dependency resolution (only 0.1.1 locally); initial attempt hit sandbox-denied sccache. Live registry availability not verified. Full checks and live T3 recovery not rerun; committed dependency state is unfinished. No source changes or commits, no minor tickets. Status and assignee unchanged. No durable guidance finding.'
+- date: 2026-11-14T06:30:40.564537+00:00
+  author: claude
+  text: 'DEV-512''s harnessmux part is ready for the combined 0.1.2: commit 4032a34 on branch agent/DEV-512 (worktree ~/.t3/worktrees/harnessmux/DEV-512, based on main, version still 0.1.1, CHANGELOG under Unreleased). It adds AgentTable::insert. lotar f106a97a on agent/DEV-512 asks for 0.1.2 and needs cargo update -p harnessmux after the release. DEV-512 now depends on DEV-510.'
+- date: 2026-11-14T06:31:03.637582+00:00
+  author: codex
+  text: 'Checked triage answer against current state: harnessmux main is 08c1ff6, no local v0.1.2 tag exists, DEV-512 now has branch agent/DEV-512, and DEV-511 remains InProgress with @fix (its scope says lotar only). The combined release is still outstanding and DEV-509 already owns tagging per the prior coordination; this job does not duplicate that release. Cargo.lock still selects 0.1.1. No files changed, no commit or checks run. Review remains blocked pending the published dependency, lockfile update and full checks. Returning to HelpNeeded and @review as requested; no merge should follow.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae32d01b4-631c-4fdc-adf5-8f18371bee13
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac1722915-ee93-49bf-9853-b79066d0c7be
 releases:
 - 6
 description: 'Lost in DEV-503 (owner asked to file it, 2026-11-14). 1) Restart recovery: before DEV-503 a t3 job whose lotar process died waited for the still-running T3 thread (t3 thread show) and ended with it. Now lotar resumes the session and sends ''continue'', which reaches a thread that is probably still running, so the agent may work twice. harnessmux''s t3 agent should, on resume, check whether the thread runs and follow that run instead of a new turn. 2) T3 reports the thread''s worktreePath, branch and link (thread show --json); lotar used to record the worktree on the job and add the link to the ticket. Now lotar guesses the worktree from git (record_t3_worktree in agent_job_service.rs) and links nothing. harnessmux''s t3 agent should put worktree, branch and link in its events; lotar records them and attaches the link. 3) A thread waiting for an answer (t3 exit 2) used to hand the ticket to its reporter as HelpNeeded with the link; now it is turn.failed text and the job fails. harnessmux should end the turn with a structured ''waiting for an answer'' (also usable for an unanswered on_permission: ask), and lotar hands the ticket back as before. Work in harnessmux (release, crates.io) and lotar. Done when a killed lotar during a t3 job ends the job from the thread without a second turn, t3 jobs record T3''s worktree and link the thread, and a waiting thread hands the ticket back.'
+tags:
+- blocked
+- blocked-by:DEV-509
+- review-blocked
 history:
 - at: 2026-11-14T02:19:54.844800+00:00
   actor: claude
@@ -54,3 +108,165 @@ history:
   changes:
   - field: releases
     new: '#6'
+- at: 2026-11-14T05:34:13.406369+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-14T05:35:14.053537+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-14T05:35:14.989567+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae32d01b4-631c-4fdc-adf5-8f18371bee13
+- at: 2026-11-14T05:58:35.784716+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T05:58:47.248810+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-14T05:59:35.034909+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-14T05:59:35.392931+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-509","DEV-512"]}'
+- at: 2026-11-14T05:59:36.039620+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-14T06:01:15.313816+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:01:15.574380+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-509","DEV-512"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-509","DEV-512","DEV-511"]}'
+- at: 2026-11-14T06:07:25.993386+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:07:30.946962+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T06:07:58.772296+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:08:10.852459+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T06:08:11.635083+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+- at: 2026-11-14T06:11:27.827428+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:12:04.066655+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:15:39.747297+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Reviewing
+- at: 2026-11-14T06:17:30.247264+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-509","DEV-512","DEV-511"]}'
+    new: '{"depends_on":["DEV-503","DEV-509"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-509","DEV-512","DEV-511"]}'
+- at: 2026-11-14T06:17:31.676949+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:17:46.560793+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-14T06:17:46.743688+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: claude
+  - field: tags
+    old: ''
+    new: blocked, blocked-by:DEV-509
+- at: 2026-11-14T06:17:46.811884+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-14T06:18:22.058416+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:19:28.976581+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac1722915-ee93-49bf-9853-b79066d0c7be
+- at: 2026-11-14T06:20:36.387281+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:20:36.810490+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: blocked, blocked-by:DEV-509
+    new: blocked, blocked-by:DEV-509, review-blocked
+- at: 2026-11-14T06:30:40.238299+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503","DEV-509"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-509","DEV-512","DEV-511"]}'
+    new: '{"depends_on":["DEV-503","DEV-509"],"blocks":["DEV-513","DEV-512"],"related":["DEV-503","DEV-513","DEV-509","DEV-512","DEV-511"]}'
+- at: 2026-11-14T06:30:40.564537+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:31:03.637582+00:00
+  actor: codex
+  changes:
+  - field: comment_added

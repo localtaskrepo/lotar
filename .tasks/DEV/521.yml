@@ -1,0 +1,74 @@
+title: Agent jobs hold the global job lock across file and process-list I/O
+status: Merging
+priority: Low
+type: Chore
+reporter: claude
+assignee: '@merge'
+created: 2026-11-14T05:38:49.244099+00:00
+modified: 2026-11-14T06:33:03.536+00:00
+relationships:
+  related:
+  - DEV-501
+comments:
+- date: 2026-11-14T06:15:29.298302+00:00
+  author: claude
+  text: 'Fixed in 2f2e83d0 (branch agent/DEV-521). push_event no longer writes to the log file: it queues the line, and flush_event_log writes the queue in order after the lock is released (in update_job, cancel_job and the two worktree cleanup paths that hold the registry). A writer lock keeps lines from different threads in sequence order. cancel_job copies the runner''s handle under the lock and calls terminate_child after releasing it, skipping a runner its thread already reaped so a reused pid is never signalled. Event order and payloads are unchanged. New test push_event_writes_the_log_only_when_flushed_after_the_lock fails on the old code. Checks: lint:agent, test:agent (2151 Rust + 1537 UI + release + hooks) and smoke (401) all pass.'
+- date: 2026-11-14T06:32:51.407527+00:00
+  author: codex
+  text: 'Review: passed. Reviewed 2f2e83d0, complete main...HEAD diff, ticket/comments, related DEV-501 context, repository guidance, main history and surrounding cancellation/log/finalization paths. No findings; no UI or owner decisions. File append and process termination occur outside JOB_REGISTRY; FIFO queue and writer mutex preserve ordering. git diff --check passed. Focused push_event tests: 3 passed after disabling sandbox-blocked sccache; runner nevertheless exited 1 because macOS left xcrun_db in its temp directory. Full lint/tests/smoke were reported passing by fix agent, not repeated here. No files changed or commits made; status and assignee unchanged. No durable guidance finding.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac91cd100-e131-4687-b2ab-eeb02724277e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aab1455e4-0319-41f4-b245-492779b88480
+description: 'Found by claude on DEV-501, 2026-11-14: in crates/lotar-lib/src/services/agent_job_service.rs, push_event appends to the job''s log file while JOB_REGISTRY is locked (every update_job/record_and_emit), and cancel_job runs terminate_child, which scans all processes with sysinfo (and taskkill on Windows), under the same lock. Every job''s events, the API''s job list and new job starts wait on that. Check: grep for AgentLogService::append_event inside push_event and terminate_child inside the cancel_job lock. Done: the log append and the process kill run after the lock is released (collect what to write or kill under the lock), behaviour and event order unchanged, tests and smoke pass.'
+tags:
+- health
+custom_fields:
+  finding: review:job-lock-io
+history:
+- at: 2026-11-14T05:38:49.587423+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-14T06:03:04.498768+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-14T06:03:05.301041+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac91cd100-e131-4687-b2ab-eeb02724277e
+- at: 2026-11-14T06:15:29.298302+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:15:38.221374+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T06:30:41.617448+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aab1455e4-0319-41f4-b245-492779b88480
+- at: 2026-11-14T06:32:51.407527+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:33:03.536+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

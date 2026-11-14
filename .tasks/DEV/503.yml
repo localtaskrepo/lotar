@@ -1,11 +1,10 @@
 title: Switch lotar's agent jobs to the harnessmux crate and remove its own runners
-status: InProgress
+status: Done
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
 created: 2026-11-13T22:44:58.128976+00:00
-modified: 2026-11-14T05:19:31.802646+00:00
+modified: 2026-11-14T06:27:25.586375+00:00
 relationships:
   depends_on:
   - DEV-504
@@ -33,6 +32,10 @@ relationships:
   - DEV-491
   - DEV-485
   - DEV-514
+  - DEV-517
+  - DEV-519
+  - DEV-522
+  - DEV-524
 comments:
 - date: 2026-11-13T23:03:55.195485+00:00
   author: claude
@@ -147,6 +150,15 @@ comments:
 - date: 2026-11-14T05:17:43.141198+00:00
   author: triage
   text: 'no owner decision, and no third rework, no WontDo. The last review (05:16) is a checkout-routing failure again, not a code finding: its checkout t3/switch-agent-jobs-to-harnessmux-5 sits at the pre-workspace commit 4e448311, while the change is already on local main as 01097b94 (workspace port; lint:agent, test:agent and test:smoke:agent passed there, codex 05:01). The owner decided the content already: 2026-11-13 ''Link the crate'' and ''Remove right away'', t3 stays a harnessmux agent, 2026-11-14 ''Rework DEV-503'' (INBOX-80) and answer ''1'' (INBOX-84). Next: (1) review 01097b94 with git show 01097b94 and git diff 01097b94^ 01097b94 in a checkout whose git merge-base --is-ancestor 01097b94 HEAD succeeds (main itself or a worktree of it, now d08b01d8); do not replay or reset to 4e448311, and treat a main..HEAD list as irrelevant. Review the code against the done criteria (repository-scoped session names, context handoff test, removed runners, docs about T3 worktrees); a finding needs a file and line at 01097b94. (2) If it passes: push main as far as the finished work goes (owner 2026-11-12 docs/decisions/2026-11-12-push-finished-work.md; modified .tasks files are ticket edits, not commits), set DEV-503 Done and comment the commits and checks. (3) If it finds a real defect: fix forward on main with a failing test first, no amend. Come back to the owner only if the finding needs reverting main.'
+- date: 2026-11-14T05:32:32.296677+00:00
+  author: claude
+  text: 'Review: passed (claude), at 01097b94 as triage asked, read in a checkout that contains it (git merge-base --is-ancestor 01097b94 HEAD). Read: git show 01097b94; agent_runner.rs (sessions <repo folder>-<path hash>-<ticket>-<profile>, continue only when harnessmux recorded the same repository, agent and live cwd); agent_job_service.rs run_job/run_session/drive_session (events from the session stream, message box and later turns, cancel, permission requests as AgentJob.question, POST /api/jobs/answer); api_types.rs, view/api/types.ts, client.ts and docs/openapi.json agree; per-CLI fixtures, agent-cli-research.md, agent-integrations-plan.md and dev318_t3_runner_test.rs are gone; docs/help/agent.md:153 and :330 carry the T3 worktree text from 95f34f0f; t3 stays a harnessmux agent (owner decision as triage quotes it). Live Claude/Codex fix, review, merge, resume and message runs: the fix agent''s 2026-11-14 comment. Reran at 01097b94 in a temporary detached worktree, removed afterwards: cargo nextest --workspace for dev503, agent_check, agent_safety, agent_automation_integration and agent_runner tests, 92/92 passed, including a_ticket_hands_its_context_from_harness_to_harness_through_its_states. Full lint, test and smoke passed at 01097b94 earlier (codex, 05:01) and were not rerun. Minor, filed: DEV-519, .gitleaks.toml:31-34 still allowlists the deleted crates/lotar-lib/tests/fixtures/agent-streams/. Also found: main''s integration tests did not compile after c9cf3a00 (DEV-485 test under tests/); DEV-517 (aaa54472) already fixes that. Pushed: git push origin 01097b94:main (hooks ran, no --no-verify); origin/main was f9cae9e2 (DEV-491, Done) and is now 01097b94. Not pushed yet: c9cf3a00 (DEV-485 Done, fails the test build until its fix), d08b01d8 (DEV-514 HelpNeeded) and aaa54472 (DEV-517 Merging); their own merges push them. No files changed or commits made. Branch t3/switch-agent-jobs-harnessmux-3 is at main d08b01d8.'
+- date: 2026-11-14T05:35:08.760359+00:00
+  author: codex
+  text: 'Review: nothing to review. This checkout contains only obsolete pre-workspace commit 4e448311 beyond main. Its replacement 01097b94 is already on main (aaa54472) and origin/main. The ticket records Claude review passed at 01097b94 at 05:32, including 92 targeted tests and earlier full gates. No new implementation is present here. No new review-blocked finding, source changes, commits, tests, status or assignee changes.'
+- date: 2026-11-14T05:50:19.899519+00:00
+  author: claude
+  text: 'Owner 2026-11-14: "Dequeue, mark Done". The merge job was still queued (since 05:35, behind 8 jobs) with nothing to merge: 01097b94 is on main and origin/main, and the review passed at 01097b94 (claude, 05:32). agent/DEV-503 holds only the obsolete pre-workspace 4e448311, which must not be rebased onto main. Removed the merge job from the queue. Checks: none rerun here. lint, test and smoke passed at 01097b94 (codex, 05:01).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad412edd4-9d93-4142-9e2c-0d4f417c92fc
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A81ab3ef1-0cbb-489c-b085-bf72a43fd1bf
@@ -183,11 +195,10 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0a43f76b-3fc0-4d9b-826f-b28a535d0038
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac37d4c5d-3f35-4f6d-8422-e62b3a90fdf7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1bf9e47b-0f58-480e-8b4d-ea7769898840
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7a0a9320-3a97-4244-8cee-50a2459be1f4
 releases:
 - 6
 description: 'Approved design: docs/developers/harness-tool-design.md (DEV-492). The owner, 2026-11-13: interface "Link the crate", lotar''s runners "Remove right away". Waits for the harnessmux release that covers every agent lotar runs today. One change: lotar depends on the harnessmux crate and runs every agent job through it (events from the session stream, the message box and cancel call send and cancel, permission requests become questions in the job view). Profiles keep their runner key: claude, codex, copilot, gemini, cursor, amp, droid, opencode, kilo, antigravity become harnessmux agents; t3 is removed with a hint to pick the agent; command stays. session: continue uses named sessions, one per ticket. Removed in the same change: the per-CLI builders and parsers in src/services/agent_runner.rs, tests/fixtures/agent-streams/, the t3 runner and its thread handling in src/services/agent_job_service.rs, docs that describe single CLIs (agent-cli-research.md moves to harnessmux). AGENTS.md: REST shape changes keep src/api_types.rs, view/api/types.ts, docs/openapi.json and help docs in step. Done when: lotar''s own fix, review and merge jobs run on Claude and Codex through the crate with resume and messages, the removed code is gone, npm run lint, npm test and npm run smoke pass.'
-tags:
-- review-returned
 history:
 - at: 2026-11-13T22:44:58.238596+00:00
   actor: claude
@@ -930,3 +941,88 @@ history:
   - field: status
     old: HelpNeeded
     new: InProgress
+- at: 2026-11-14T05:31:06.856344+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-504"],"blocks":["DEV-501","DEV-509","DEV-510","DEV-511","DEV-512","DEV-513","DEV-516"],"related":["DEV-492","DEV-504","DEV-509","DEV-417","DEV-488","DEV-489","DEV-497","DEV-507","DEV-510","DEV-511","DEV-512","DEV-513","DEV-491","DEV-485","DEV-514"]}'
+    new: '{"depends_on":["DEV-504"],"blocks":["DEV-501","DEV-509","DEV-510","DEV-511","DEV-512","DEV-513","DEV-516"],"related":["DEV-492","DEV-504","DEV-509","DEV-417","DEV-488","DEV-489","DEV-497","DEV-507","DEV-510","DEV-511","DEV-512","DEV-513","DEV-491","DEV-485","DEV-514","DEV-517"]}'
+- at: 2026-11-14T05:32:15.289807+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-504"],"blocks":["DEV-501","DEV-509","DEV-510","DEV-511","DEV-512","DEV-513","DEV-516"],"related":["DEV-492","DEV-504","DEV-509","DEV-417","DEV-488","DEV-489","DEV-497","DEV-507","DEV-510","DEV-511","DEV-512","DEV-513","DEV-491","DEV-485","DEV-514","DEV-517"]}'
+    new: '{"depends_on":["DEV-504"],"blocks":["DEV-501","DEV-509","DEV-510","DEV-511","DEV-512","DEV-513","DEV-516"],"related":["DEV-492","DEV-504","DEV-509","DEV-417","DEV-488","DEV-489","DEV-497","DEV-507","DEV-510","DEV-511","DEV-512","DEV-513","DEV-491","DEV-485","DEV-514","DEV-517","DEV-519"]}'
+- at: 2026-11-14T05:32:32.296677+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T05:32:43.113043+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T05:32:43.283605+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-11-14T05:34:14.398013+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: review-returned
+    new: ''
+- at: 2026-11-14T05:34:23.747965+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Done
+    new: Reviewing
+- at: 2026-11-14T05:34:24.494155+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7a0a9320-3a97-4244-8cee-50a2459be1f4
+- at: 2026-11-14T05:35:08.760359+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T05:35:13.377719+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-14T05:50:19.899519+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T05:50:20.196827+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-14T05:50:31.620478+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+- at: 2026-11-14T05:50:59.727560+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-504"],"blocks":["DEV-501","DEV-509","DEV-510","DEV-511","DEV-512","DEV-513","DEV-516"],"related":["DEV-492","DEV-504","DEV-509","DEV-417","DEV-488","DEV-489","DEV-497","DEV-507","DEV-510","DEV-511","DEV-512","DEV-513","DEV-491","DEV-485","DEV-514","DEV-517","DEV-519"]}'
+    new: '{"depends_on":["DEV-504"],"blocks":["DEV-501","DEV-509","DEV-510","DEV-511","DEV-512","DEV-513","DEV-516"],"related":["DEV-492","DEV-504","DEV-509","DEV-417","DEV-488","DEV-489","DEV-497","DEV-507","DEV-510","DEV-511","DEV-512","DEV-513","DEV-491","DEV-485","DEV-514","DEV-517","DEV-519","DEV-522"]}'
+- at: 2026-11-14T06:27:25.586375+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-504"],"blocks":["DEV-501","DEV-509","DEV-510","DEV-511","DEV-512","DEV-513","DEV-516"],"related":["DEV-492","DEV-504","DEV-509","DEV-417","DEV-488","DEV-489","DEV-497","DEV-507","DEV-510","DEV-511","DEV-512","DEV-513","DEV-491","DEV-485","DEV-514","DEV-517","DEV-519","DEV-522"]}'
+    new: '{"depends_on":["DEV-504"],"blocks":["DEV-501","DEV-509","DEV-510","DEV-511","DEV-512","DEV-513","DEV-516"],"related":["DEV-492","DEV-504","DEV-509","DEV-417","DEV-488","DEV-489","DEV-497","DEV-507","DEV-510","DEV-511","DEV-512","DEV-513","DEV-491","DEV-485","DEV-514","DEV-517","DEV-519","DEV-522","DEV-524"]}'

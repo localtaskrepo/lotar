@@ -1,0 +1,67 @@
+title: Dependency check parks tickets in HelpNeeded under their reporter, and a busy lock counts as a blocker
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-14T06:27:24.117114+00:00
+modified: 2026-11-14T06:27:48.519873+00:00
+relationships:
+  related:
+  - DEV-501
+  - DEV-477
+  - DEV-467
+  - DEV-468
+  - DEV-503
+references:
+- code: crates/lotar-lib/src/services/automation_service.rs#2520-2545
+- code: crates/lotar-lib/src/services/automation_service.rs#480-508
+description: |-
+  When an agent job is about to start on a ticket with an open dependency, lotar's dependency check sets the ticket to **HelpNeeded** and gives it to its reporter (usually claude). After that, nothing moves the ticket on. The inbox files only tickets assigned to mallox. The rule "Prerequisites done: continue the waiting ticket" acts only on status Blocked. No agent is assigned. On 2026-11-14 four tickets with finished, committed work sat like this for up to 11 hours: DEV-501, DEV-477, DEV-467 and DEV-468. Found while checking the HelpNeeded tickets, and mallox asked for this ticket in the thread.
+
+  ## Found
+
+  - **DEV-501**: at 05:46:16Z the review was queued while DEV-503 was still Merging. The ticket went to HelpNeeded, claude, tags `blocked, blocked-by:DEV-503`. DEV-503 was Done at 05:50Z, but DEV-501 stayed parked: `fire_unblocked_dependents` fired, and the rule needs `status: Blocked`.
+  - **DEV-477, DEV-467** (2026-11-13 19:37Z): there was no open dependency. `.tasks/@sprints/.sprints.lock` was busy, so `find_blocked_dependencies` turned the error into a blocker. The ticket got the tag `blocked-by:dependency graph unavailable: Validation error: [...] Resource temporarily unavailable (os error 35) [...]`. The same happened to STD-70, STD-72 and STD-75 in standards.
+  - **DEV-468** (19:40Z): its merge job failed and automation wrote "the fix agent retries it". In the same second the ticket went to HelpNeeded under claude, and no fix agent ever started. Whether this is the same path is still to be checked.
+
+  ## Cause
+
+  `crates/lotar-lib/src/services/automation_service.rs`:
+
+  - `mark_task_blocked` (around line 2525) sets HelpNeeded and the reporter as assignee, not Blocked. It leaves no comment.
+  - `find_blocked_dependencies` (around line 2520) maps any error from `relationships::blocked_dependencies` to a fake dependency named after the error text.
+
+  ## Done when
+
+  - [ ] A ticket whose job waits for an open dependency gets status **Blocked** (in projects that have it) and a short automation comment naming what it waits for. The tags `blocked` and `blocked-by:` follow whatever fits the "Prerequisites done" rule. Once the last dependency is Done, the `unblocked` event continues it.
+  - [ ] A dependency check that fails (busy lock, unreadable graph) is retried, or reported as an automation failure on the ticket. It never becomes a `blocked-by:` tag, and it never parks the ticket.
+  - [ ] DEV-468's 19:40Z path is understood. If it is a different bug, it is fixed here or filed separately.
+  - [ ] Regression tests for each case. Each fails before the fix.
+  - [ ] `npm run lint`, `npm test` and `npm run smoke` pass.
+
+  The four tickets were handed on by hand on 2026-11-14 (DEV-501, DEV-477 and DEV-467 to @review, DEV-468 to @fix).
+tags:
+- agent
+history:
+- at: 2026-11-14T06:27:25.641757+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-501","DEV-477","DEV-467","DEV-468"]}'
+    new: '{"related":["DEV-501","DEV-477","DEV-467","DEV-468","DEV-503"]}'
+- at: 2026-11-14T06:27:26.524775+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-14T06:27:48.417715+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: code:crates/lotar-lib/src/services/automation_service.rs#2520-2545
+- at: 2026-11-14T06:27:48.519873+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: code:crates/lotar-lib/src/services/automation_service.rs#480-508

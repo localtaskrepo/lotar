@@ -1,0 +1,81 @@
+title: An agent job hangs when its session's event stream lags and drops the turn's end
+status: Reviewing
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-14T05:38:48.737497+00:00
+modified: 2026-11-14T06:30:40.409269+00:00
+relationships:
+  related:
+  - DEV-501
+comments:
+- date: 2026-11-14T06:11:36.177470+00:00
+  author: claude
+  text: 'Fixed in d8e52c93 on agent/DEV-520. drive_session now reads events through SessionEvents: it opens the session''s event log (Status.events) at its end before the prompt goes out, and on RecvError::Lagged it reads the log''s new lines, queues the ones with seq after the last seen and drops live duplicates (seq <= last seen). Those events go through the same handling, so a dropped TurnFinished/TurnFailed still ends the job with its exit code. Test dev520_session_events_tests::a_lagging_stream_replays_the_missed_events_from_the_log: turn 1 ends at seq 100, then 1400 more events go into a 1024 channel; every event comes back once and in order, turn end included. It fails without the log (old behaviour) and passes with it. Checks: npm run lint, npm test (2151 Rust + 1537 UI passed; the worktree needed npm run build:web first), npm run smoke (401 passed). The test covers the event reader, not a full job through the fake ACP agent: lag there depends on timing.'
+- date: 2026-11-14T06:30:30.353634+00:00
+  author: codex
+  text: 'Review: blocking. At agent_job_service.rs:2923 replay I/O errors become empty batches; retained live events then advance last_seq past a lost turn end, permanently preventing recovery. Status failure at 2758 likewise silently disables recovery. Fail explicitly or retry without advancing live events; cover recovery errors. At 4217 the regression tests event delivery only, not required job termination and success/failure exit codes; add deterministic driver coverage for lost TurnFinished and TurnFailed. Read full diff d8e52c93, ticket/comments, related DEV-501 context, main history, relevant guidance and harnessmux Follower/emit source. UI 1537 passed; targeted Rust test passed but runner failed leftover xcrun_db after retry with RUSTC_WRAPPER= (sccache sandbox denial). Full lint/Rust/smoke not rerun. No source changes or commits, no durable guidance finding. Status and assignee unchanged.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7234460b-fa1f-4515-a843-598de63b5e51
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af5b504b1-62e7-4678-9cf9-f100b8ba0692
+description: 'Found by claude on DEV-501, 2026-11-14: drive_session (crates/lotar-lib/src/services/agent_job_service.rs) reads harnessmux''s broadcast channel (capacity 1024, harnessmux 0.1.1 session.rs:127) and on RecvError::Lagged just continues. MessageDelta/ThoughtDelta events come per chunk and lotar''s loop reads the cancel file and takes the registry lock per event, so a chatty turn can lag; if the dropped events include TurnFinished/TurnFailed the loop never sees the turn end and the job runs until someone cancels it. Check: a unit test that feeds more than 1024 events before the turn''s end and expects the job to end. Done: on lag, the missed events (seq after the last one seen) are replayed from the session''s event log (Status.events) through the same handling, the job ends with the right exit code, and the test passes.'
+tags:
+- health
+- review-returned
+custom_fields:
+  finding: review:drive-session-lag
+history:
+- at: 2026-11-14T05:38:49.112977+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-14T06:00:42.754813+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-14T06:00:43.528211+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7234460b-fa1f-4515-a843-598de63b5e51
+- at: 2026-11-14T06:11:36.177470+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:11:46.199988+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T06:26:44.250937+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af5b504b1-62e7-4678-9cf9-f100b8ba0692
+- at: 2026-11-14T06:30:30.353634+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:30:30.509857+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: health
+    new: health, review-blocked
+- at: 2026-11-14T06:30:40.409269+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: health, review-blocked
+    new: health, review-returned

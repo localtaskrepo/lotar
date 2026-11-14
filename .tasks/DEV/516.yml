@@ -1,10 +1,11 @@
 title: Agent jobs recover from sandbox-blocked build checks without premature handback
-status: Blocked
+status: Reviewing
 priority: High
 type: Bug
 reporter: codex
+assignee: '@fix'
 created: 2026-11-14T04:57:22.931962+00:00
-modified: 2026-11-14T04:57:31.833013+00:00
+modified: 2026-11-14T06:30:32.892631+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -12,9 +13,21 @@ relationships:
   - DEV-513
   related:
   - DEV-509
+comments:
+- date: 2026-11-14T06:02:53.850504+00:00
+  author: claude
+  text: 'Commit 9d1cfdcc on agent/DEV-516. Cause: the built-in job instructions listed ''a command you need is refused'' as a reason to hand back, so a merge job handed back at the first sandbox-blocked sccache. Changed: (1) docs/help/agent-instructions.md gets a section ''Commands the sandbox blocks'': Operation not permitted, a refused socket (sccache) or a write to shared git metadata or the main tasks directory is not a failure; rerun with the harness''s approval, else the repo''s documented fallback, report the retry, hand back only when both fail. A check that fails on the work stays a real failure and a merge job doesn''t land it. The blocker clause now points at those retries. (2) AGENTS.md names the sccache retry (approval, else RUSTC_WRAPPER=) directly, so merge agents see it without loading testing-strategy. (3) docs/help/agent.md describes it. (4) Unit test built_in_instructions_retry_a_sandbox_blocked_command_before_a_handback. Found: every profile here runs on the t3 runner, and harnessmux passes no permissions to T3 (the thread uses T3 Code''s runtime mode), so the approved retry is T3''s approval; ACP Codex jobs already get the tasks dir and .git as add_dirs, and LoTaR commits and fast-forwards host-side at job end. No broad full-access default added. Checks: npm run lint, npm test (2147 Rust + 1536 UI), npm run smoke (400) all pass. Not run: a live fix/review/merge with mux. The installed lotar is 0.15.0, which has no harnessmux and doesn''t carry this text; that check needs a build with this commit (v0.15.1) running a Codex review and merge.'
+- date: 2026-11-14T06:30:25.496059+00:00
+  author: codex
+  text: 'Review: blocking. Reviewed 9d1cfdcc full diff, guidance, ticket comments, DEV-503/509/513, main history and scoped permission/host Git paths. Blocking: crates/lotar-lib/src/services/agent_job_service.rs:3802-3817 asserts prompt text only; add behavioral coverage exercising blocked checks, approved retry/fallback, and genuine check failure stopping merge. docs/help/agent-instructions.md:25 adds retries but the required live mux fix/review/merge verification remains explicitly unperformed. Run and record it with the changed prompt and scoped Git/task access before claiming completion. Release membership and release dependency are present. Checks: diff --check passed; focused npm run test:rust -- built_in_instructions_retry_a_sandbox_blocked_command_before_a_handback hit sandbox sccache denial, then passed 1/1 after approved escalation (2146 skipped). Full lint/test/smoke not rerun; prior agent reports passes. No UI changes, source edits, commits or minor tickets. Status and assignee unchanged.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af501c0c4-15b4-4f82-8d97-681b0bda889e
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A87b62941-631a-4782-ae16-737469e6ebf9
 releases:
 - 6
 description: 'Owner requested before v0.15.1 release, 2026-11-14. Repeated DEV-503 runs stopped because sccache was denied by the Codex sandbox; shared Git metadata and main task storage also need scoped access. Latest merge handed back immediately after lint hit sccache despite documented approved retry and RUSTC_WRAPPER fallback. Investigate harnessmux permission plumbing and job instructions together; coordinate with DEV-509. Done when: regression coverage exercises permission-blocked checks and supported retries; sandboxed Codex jobs complete Rust checks through approved cache access or wrapper fallback; shared Git metadata and main tasks use scoped approval or host-side operations; genuine check failures still stop merge; verify end-to-end fix/review/merge with mux. Preserve workspace isolation, no broad full-access default. Add to v0.15.1 and make its release ticket depend on this fix.'
+tags:
+- review-returned
 history:
 - at: 2026-11-14T04:57:31.679572+00:00
   actor: codex
@@ -27,3 +40,56 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-503"],"related":["DEV-509"]}'
     new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-509"]}'
+- at: 2026-11-14T05:34:14.262948+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-14T05:52:10.785807+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-14T05:52:12.360793+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af501c0c4-15b4-4f82-8d97-681b0bda889e
+- at: 2026-11-14T06:02:53.850504+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:03:04.107223+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T06:26:31.511823+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A87b62941-631a-4782-ae16-737469e6ebf9
+- at: 2026-11-14T06:30:25.496059+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:30:25.651459+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: ''
+    new: review-blocked
+- at: 2026-11-14T06:30:32.892631+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: review-blocked
+    new: review-returned

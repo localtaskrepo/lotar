@@ -1,0 +1,69 @@
+title: A merge job that stops on purpose still lands its branch on main
+status: Todo
+priority: High
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-14T06:27:21.642026+00:00
+modified: 2026-11-14T06:27:50.376657+00:00
+relationships:
+  related:
+  - DEV-518
+  - DEV-514
+  - DEV-465
+  - DEV-411
+  - DEV-485
+  - DEV-513
+references:
+- code: crates/lotar-lib/src/services/agent_job_service.rs#3121-3170
+- code: crates/lotar-lib/src/services/agent_job_service.rs#3243-3258
+description: |-
+  When a merge job ends, lotar fast-forwards the main checkout to the ticket's branch even when the merge agent decided **not** to merge. Work a review blocked, or work on top of a main that fails its checks, lands on main without anyone noticing. Found on 2026-11-14 while checking the HelpNeeded tickets, and mallox asked for this ticket in the thread.
+
+  ## Found
+
+  - **DEV-518**: at 05:53:29Z the merge job (codex) commented "Review: blocking. Merge stopped [...] No merge or push performed." At 05:53:34Z the main checkout's reflog shows `merge t3/task-timeline-agent-threads: Fast-forward`, so `0327eb8f` is on main with the blocker still in it.
+  - **DEV-514**: at 05:07:30Z the merge job commented "Merge blocked [...] No merge or push performed" because main failed lint and tests (DEV-485). At 05:07:39Z reflog: `merge t3/report-skipped-automation-runs: Fast-forward` (`d08b01d8`).
+
+  ## Cause
+
+  `finalize_job` in `crates/lotar-lib/src/services/agent_job_service.rs` (around lines 3243-3258) calls `ensure_branch_merged` for every merge job that exits 0. `ensure_branch_merged` (around line 3121) runs `git merge --ff-only <branch>` in the main checkout, so it lands the branch whatever the agent decided. It is meant for an agent that wanted to merge and could not, because the sandbox keeps git metadata read-only. An agent that stopped on purpose ends with exit 0 too: it hands the ticket back (HelpNeeded, or the `review-blocked` tag) and comments why.
+
+  ## Done when
+
+  - [ ] A merge job whose agent handed the ticket back (it is no longer Merging, it has `review-blocked`, or whatever signal fits the job-end rules best) leaves main as it was, and the job's log says so.
+  - [ ] An agent that wanted to merge and could not still gets its fast-forward (keep the DEV-411 and DEV-465 behaviour).
+  - [ ] Regression test: a merge job that ends with the ticket handed back does not move main. It fails before the fix.
+  - [ ] `npm run lint`, `npm test` and `npm run smoke` pass.
+
+  DEV-518's commit stays on main: mallox chose to fix forward (2026-11-14), and its rework is running. Main is not pushed.
+tags:
+- agent
+history:
+- at: 2026-11-14T06:27:22.694029+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-518","DEV-514","DEV-465","DEV-411"]}'
+    new: '{"related":["DEV-518","DEV-514","DEV-465","DEV-411","DEV-485"]}'
+- at: 2026-11-14T06:27:23.523265+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-14T06:27:48.227026+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: code:crates/lotar-lib/src/services/agent_job_service.rs#3121-3170
+- at: 2026-11-14T06:27:48.346783+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: code:crates/lotar-lib/src/services/agent_job_service.rs#3243-3258
+- at: 2026-11-14T06:27:50.376657+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-518","DEV-514","DEV-465","DEV-411","DEV-485"]}'
+    new: '{"related":["DEV-518","DEV-514","DEV-465","DEV-411","DEV-485","DEV-513"]}'

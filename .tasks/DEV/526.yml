@@ -1,0 +1,39 @@
+title: 'Built-in job instructions: ask for short markdown comments'
+status: Todo
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-14T06:30:17.306138+00:00
+modified: 2026-11-14T06:30:17.726217+00:00
+relationships:
+  related:
+  - DEV-466
+  - DEV-490
+description: |-
+  Agents' ticket comments are mostly one paragraph of plain text, though the web UI renders markdown and mallox reads them on his phone. mallox, 2026-11-14 on DEV-466: "I do notice that comments are not using markdown at all and the comments are mostly unformatted. Something we could improve".
+
+  ## Found
+
+  - `docs/help/agent-instructions.md` (the built-in job instructions) shows `comment <id> "<what you did or need>"`: one inline string, and nothing about markdown. Every lotar job gets it, also jobs without a prompt of their own.
+  - standards STD-112 adds to its automation prompts: "Comments in short markdown, for the owner reading on his phone: a one-line outcome, then bullets for findings or evidence, with paths, commands and hashes in backticks."
+  - A multi-line markdown comment needs a file or a heredoc, not an inline quoted string. Check what `lotar comment` takes (`--file`, stdin) and show that form.
+  - Hand-off comments can carry the `report` fields (DEV-490): `--commit`, `--check`, `--next`. The built-in text doesn't mention them.
+
+  ## Done when
+
+  - [ ] `docs/help/agent-instructions.md` asks for the same short markdown and shows how to pass a multi-line comment.
+  - [ ] It names the report fields for the final hand-off comment.
+  - [ ] The instruction tests pass.
+history:
+- at: 2026-11-14T06:30:17.562133+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-466","DEV-490"]}'
+- at: 2026-11-14T06:30:17.726217+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

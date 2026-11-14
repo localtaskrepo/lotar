@@ -1,17 +1,18 @@
 title: automation simulate shows only the first matching rule; a real event applies all of them
-status: HelpNeeded
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: claude
+assignee: '@review'
 created: 2026-11-13T19:02:46.329827+00:00
-modified: 2026-11-14T04:17:31.893269+00:00
+modified: 2026-11-14T06:39:07.321217+00:00
 relationships:
   blocks:
   - DEV-513
   related:
   - DEV-481
   - DEV-513
+  - DEV-524
 comments:
 - date: 2026-11-13T19:12:17.547351+00:00
   author: claude
@@ -25,10 +26,21 @@ comments:
 - date: 2026-11-13T19:37:00.639539+00:00
   author: claude
   text: 'Rework: fixed the review finding. simulate_action now takes the ticket the event fired on for alias resolution (@assignee, @reporter, @assignee_or_reporter, as apply_set_action does) and builds the changes on the result of earlier rules. New test simulate_resolves_aliases_against_the_ticket_the_event_fired_on (tests/dev477_simulate_all_rules_test.rs: assignee alice, rule 1 sets bob, rule 2 sets reporter @assignee; preview and real creation both give reporter alice) failed before the fix (preview bob) and passes now. Amended commit dd5de134. Checks: lint:agent, test:agent (2135 Rust, 1515 UI) pass; test:smoke:agent 390/390 on rerun; the first run''s one failure was the known flaky harness.server.smoke.spec.ts:409, noted on DEV-481.'
+- date: 2026-11-14T06:25:53.431932+00:00
+  author: claude
+  text: |-
+    Unparked: the work is committed, and it waits for a fresh review, not for mallox.
+
+    - lotar's dependency check put this ticket in HelpNeeded and gave it to its reporter when the review was queued (`mark_task_blocked` in `automation_service.rs`). Nothing picks a ticket up from there: the inbox files only tickets assigned to mallox, and "Prerequisites done" acts only on Blocked tickets.
+    - The tag `blocked-by:dependency graph unavailable: ...` is no real dependency. It is the text of a lock error: `.sprints.lock` was busy during the check.
+    - mallox in the thread, 2026-11-14: "Go ahead" (hand it on to @review, remove the stale tags).
+
+    Next: @review reviews `dd5de134` (the rework of the alias finding).
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6f77277c-e969-4904-93a8-17a4456d01b8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A22e7b280-3492-484a-8da6-fe203bfcbda7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8744f08c-fc67-4800-b043-9bd6a29a4f97
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abf9beb98-cf86-4e69-af29-2983c009c042
 releases:
 - 6
 description: |-
@@ -43,8 +55,6 @@ description: |-
   - [ ] simulate lists every matching rule with its actions, in file order, and the preview applies them all as a real event would, with a test.
 tags:
 - review-returned
-- blocked
-- 'blocked-by:dependency graph unavailable: Validation error: Validation error: Relationship snapshot unavailable: lock /Users/mallox/Development/@localtaskrepo/lotar/.tasks/@sprints/.sprints.lock is busy or unsupported: Resource temporarily unavailable (os error 35); still busy after the 500 ms snapshot wait budget; retry after the writer finishes'
 history:
 - at: 2026-11-13T19:02:46.541295+00:00
   actor: claude
@@ -162,3 +172,36 @@ history:
   changes:
   - field: releases
     new: '#6'
+- at: 2026-11-14T06:25:53.208658+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: 'review-returned, blocked, blocked-by:dependency graph unavailable: Validation error: Validation error: Relationship snapshot unavailable: lock /Users/mallox/Development/@localtaskrepo/lotar/.tasks/@sprints/.sprints.lock is busy or unsupported: Resource temporarily unavailable (os error 35); still busy after the 500 ms snapshot wait budget; retry after the writer finishes'
+    new: review-returned
+- at: 2026-11-14T06:25:53.431932+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:25:54.377979+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Reviewing
+- at: 2026-11-14T06:25:55.374372+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: claude
+    new: '@review'
+- at: 2026-11-14T06:27:24.536665+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-513"],"related":["DEV-481","DEV-513"]}'
+    new: '{"blocks":["DEV-513"],"related":["DEV-481","DEV-513","DEV-524"]}'
+- at: 2026-11-14T06:39:07.321217+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abf9beb98-cf86-4e69-af29-2983c009c042

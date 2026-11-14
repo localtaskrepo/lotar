@@ -1,17 +1,18 @@
 title: 'crates.io: switch lotar''s crates to trusted publishing only after the first release'
-status: HelpNeeded
+status: Merging
 priority: Medium
 type: Chore
 reporter: claude
-assignee: mallox
+assignee: '@merge'
 created: 2026-11-14T01:39:35.096482+00:00
-modified: 2026-11-14T04:22:15.878302+00:00
+modified: 2026-11-14T06:33:42.182935+00:00
 relationships:
   depends_on:
   - DEV-417
   related:
   - DEV-507
   - DEV-497
+  - DEV-525
 comments:
 - date: 2026-11-14T01:40:06.621676+00:00
   author: triage
@@ -19,8 +20,28 @@ comments:
 - date: 2026-11-14T04:22:15.878302+00:00
   author: claude
   text: 'Question for mallox: v0.15.0 is out and its "Publish crates" job succeeded (Release run 43555152318), so lotar, lotar-lib and lotar-web-assets are on crates.io. Will you do the five steps in the description (trusted publisher for each crate, trusted publishing only, revoke the token, delete both CARGO_REGISTRY_TOKEN secrets) and then assign this to @fix for the workflow and guide cleanup?'
+- date: 2026-11-14T06:15:43.394856+00:00
+  author: mallox
+  text: already done
+- date: 2026-11-14T06:16:20.887332+00:00
+  author: triage
+  text: 'Answered by mallox: his comment here 2026-11-14 06:15 (''already done'') and on inbox INBOX-93 2026-11-14 04:33 (''Token are revoked on github, and trusted repos are set for all 3 packages on crates''). Checked just now: lotar, lotar-lib and lotar-web-assets exist on crates.io, and gh secret list shows no CARGO_REGISTRY_TOKEN in localtaskrepo/lotar or localtaskrepo/harnessmux. The crates.io steps are done, so only the last step is open: remove the token fallback from publish-crates in .github/workflows/release.yml (the v0.15.0 branch around lines 698-764) and the first-release step from docs/release-guide.md (section ''crates.io trusted publishing setup'', line 406). He assigned this to @fix for that.'
+- date: 2026-11-14T06:32:14.978501+00:00
+  author: claude
+  text: 'Done the last step (crates.io steps confirmed done by mallox, per triage). Commit 1acd5c48 on agent/DEV-508: publish-crates in .github/workflows/release.yml no longer falls back to CARGO_REGISTRY_TOKEN for v0.15.0 (removed continue-on-error on the auth step, the secret fallback and the empty-token check; the token comes only from crates-io-auth-action, so a failed trusted auth fails the job). docs/release-guide.md ''crates.io trusted publishing setup'' now describes the current state (trusted publishing only, no stored token) and how a new crate gets its publisher, instead of the first-release step. Checks: actionlint on release.yml (only two existing shellcheck notes at lines 380 and 935, not touched); Prettier check on the guide passes. No code changed, so lint/test/smoke didn''t run; the workflow itself is only exercised by the next v* tag.'
+- date: 2026-11-14T06:32:32.835766+00:00
+  author: triage
+  text: 'Nothing open for mallox: his steps are done (his comment here 2026-11-14 06:15 ''already done''; INBOX-93 04:33 ''Token are revoked on github, and trusted repos are set for all 3 packages on crates''). The cleanup is committed as 1acd5c48 on agent/DEV-508 and continues in the normal review and merge. The owner tag no longer applies.'
+- date: 2026-11-14T06:32:48.549402+00:00
+  author: claude
+  text: 'Nothing new to do for mallox''s ''already done'' (06:15): the cleanup it unblocked is already committed as 1acd5c48 on agent/DEV-508 (publish-crates uses only the crates-io-auth-action token; the release guide describes trusted publishing only). Checked again now: no CARGO_REGISTRY_TOKEN in the secrets of localtaskrepo/lotar or localtaskrepo/harnessmux, and no token fallback left in .github or docs. No new commit; it goes on through review and merge.'
+- date: 2026-11-14T06:33:29.466019+00:00
+  author: claude
+  text: 'Agreed, nothing open for mallox: removed the owner tag. No change to the work; 1acd5c48 on agent/DEV-508 goes on through review and merge.'
 references:
 - file: .github/workflows/release.yml
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab2e2e600-97ff-4f21-9d95-c81789329916
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac725f299-2f4d-4cb8-b7c0-10716802312a
 description: |-
   After the first release that publishes lotar to crates.io, switch the three crates from the stored token to trusted publishing only. The owner decided this on 2026-11-14 in the thread ("Trusted, token once"; details in DEV-507). The steps need his crates.io login, so they are his.
 
@@ -36,8 +57,6 @@ description: |-
   - [ ] On crates.io, Account Settings → API Tokens: revoke the token used for the first publish.
   - [ ] Delete the repo secrets: `gh secret delete CARGO_REGISTRY_TOKEN -R localtaskrepo/lotar` and `gh secret delete CARGO_REGISTRY_TOKEN -R localtaskrepo/harnessmux` (harnessmux doesn't use its copy).
   - [ ] Hand back to an agent (assign @fix) to remove the token fallback from `publish-crates` in `.github/workflows/release.yml` and the first-release step from docs/release-guide.md.
-tags:
-- owner
 history:
 - at: 2026-11-14T01:39:35.316403+00:00
   actor: claude
@@ -119,3 +138,79 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-14T06:15:43.394856+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:15:48.587691+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-14T06:16:20.887332+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:27:29.692963+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-417"],"related":["DEV-507","DEV-497"]}'
+    new: '{"depends_on":["DEV-417"],"related":["DEV-507","DEV-497","DEV-525"]}'
+- at: 2026-11-14T06:31:14.143608+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T06:31:17.662345+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab2e2e600-97ff-4f21-9d95-c81789329916
+- at: 2026-11-14T06:32:14.978501+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:32:16.302044+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac725f299-2f4d-4cb8-b7c0-10716802312a
+- at: 2026-11-14T06:32:21.366472+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T06:32:32.835766+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:32:48.549402+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:33:29.402673+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: owner
+    new: ''
+- at: 2026-11-14T06:33:29.466019+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:33:42.182935+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

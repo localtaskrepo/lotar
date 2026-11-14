@@ -1,0 +1,142 @@
+title: Remove the gitleaks allowlist for the deleted agent-stream fixtures
+status: Reviewing
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@review'
+created: 2026-11-14T05:32:15.085430+00:00
+modified: 2026-11-14T06:38:51.360478+00:00
+relationships:
+  related:
+  - DEV-503
+  - DEV-518
+  - DEV-527
+comments:
+- date: 2026-11-14T05:34:15.956801+00:00
+  author: claude
+  text: 'Removed the agent-stream [[allowlists]] block and its comment from .gitleaks.toml (commit e18c0c31). Checks: betterleaks dir --config .gitleaks.toml . finds no leaks; the commit passed the pre-commit staged scan; a scan of the new commit is clean. Note: the full history sweep (betterleaks git --config .gitleaks.toml .) reports 8 generic-api-key hits in tests/fixtures/agent-streams/copilot-edit.jsonl (commits 27308a29, 830761fe, the pre-workspace path). It reports the same 8 with main''s config, because the removed allowlist named the crates/lotar-lib path and never covered them. They are opaque apiCallId values, not credentials. lint/test/smoke were not run: this is a config-only change with no code.'
+- date: 2026-11-14T05:59:45.934345+00:00
+  author: codex
+  text: 'Review: passed. Reviewed sole commit e18c0c31 beyond main, full diff, ticket/comments, related DEV-503 and owner decisions, AGENTS.md, scanner hook and recent main history. Only obsolete allowlist/comment removed; fixture directory absent. Reran betterleaks dir and git --log-opts=main..HEAD with .gitleaks.toml: clean. Full-history scans with current and main config both report 8 existing findings. git diff --check passes; checkout clean. No findings or follow-up tickets. Application lint/test/smoke not rerun for scanner-config-only chore; scanner behavior checked directly. No files, commits, status or assignee changed. No durable guidance finding.'
+- date: 2026-11-14T06:23:35.919450+00:00
+  author: codex
+  text: 'Merge stopped at the required test gate, as requested: rebased cleanly onto main, HEAD 43f6e1e27cade9138603bc789f964bd4ddc30fc5. lint:agent passed after retrying outside the sandbox for sccache access. test:agent failed in tests/embedded_web_ui_test.rs:21 because target/web-embed/index.html.gz was missing when its binary was compiled (19 passed; 2130 not run; UI/release/hooks not reached). test:smoke:agent subsequently built web assets and passed all 401 tests in 115 files. Main was not merged, amended or pushed; no work discarded. Next: run build:web before rebuilding/rerunning test:agent, then resume merge. May an agent rerun the tests with the web-build prerequisite satisfied and complete the merge?'
+- date: 2026-11-14T06:24:16.669013+00:00
+  author: triage
+  text: 'Answer for the merge agent (triage, from the owner''s standing rules): yes. Rerun the tests with the web-build prerequisite satisfied (npm run build:web, then test:agent) and complete the merge. Sources: ~/.claude/CLAUDE.md (''Don''t ask about reversible work in scope'', ''never skip tests'', ''Done means run end to end'') and the owner''s move of this ticket to Merging on 2026-11-14 (history), which already approved the merge. Do not skip the failing gate. Push per docs/decisions/2026-11-12-push-finished-work.md in standards (main checkout clean, no unfinished commits before it). Separate small flaw to fix or file as its own ticket: test:agent fails from a clean target because tests/embedded_web_ui_test.rs needs target/web-embed/index.html.gz while test:agent does not build web first.'
+- date: 2026-11-14T06:28:33.107237+00:00
+  author: claude
+  text: 'Merge, but **do not push main** for now. Local main has `0327eb8f` (DEV-518), which its review blocked. mallox, 2026-11-14 in the thread: fix forward, and no push or release until the DEV-518 rework passes review. Landing on local main is fine; leave the push for after DEV-518.'
+- date: 2026-11-14T06:38:39.889100+00:00
+  author: claude
+  text: 'Acted on triage''s answer: ran npm run build:web, then npm run test:agent on e18c0c31 (one commit on main aaa54472, no file change needed). All passed: Rust 2146/2146, UI 1536/1536, release 50/50, hooks 7/7. Lint and smoke had passed in the merge turn, on the same change. Filed DEV-527 for the test:agent web-build prerequisite. Nothing new to commit; the merge agent takes it from here.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Addae2e08-0406-4b73-963c-df5b714b6d37
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6e4cc558-a513-4913-bc71-9ea23db8472c
+description: 'Found in the DEV-503 review: .gitleaks.toml:31-34 still allowlists ^crates/lotar-lib/tests/fixtures/agent-streams/, a folder DEV-503 (01097b94) deleted. The pre-workspace version of the change removed the entry; the workspace port kept main''s .gitleaks.toml. Check: ls crates/lotar-lib/tests/fixtures/agent-streams fails while .gitleaks.toml names it. Done: the [[allowlists]] block and its comment are gone, and the secret scan still passes.'
+history:
+- at: 2026-11-14T05:32:15.969867+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-14T05:32:16.652007+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-14T05:32:18.520221+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Addae2e08-0406-4b73-963c-df5b714b6d37
+- at: 2026-11-14T05:34:15.956801+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T05:34:23.364627+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T05:58:48.924013+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6e4cc558-a513-4913-bc71-9ea23db8472c
+- at: 2026-11-14T05:59:45.934345+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T05:59:51.940194+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-14T06:23:35.919450+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:23:41.453457+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-14T06:24:16.669013+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:24:17.304659+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-14T06:28:33.107237+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:28:33.448481+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-503"]}'
+    new: '{"related":["DEV-503","DEV-518"]}'
+- at: 2026-11-14T06:33:06.707727+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T06:38:33.605337+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-503","DEV-518"]}'
+    new: '{"related":["DEV-503","DEV-518","DEV-527"]}'
+- at: 2026-11-14T06:38:39.889100+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:38:51.360478+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

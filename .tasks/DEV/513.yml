@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-14T04:17:27.050501+00:00
-modified: 2026-11-14T04:57:31.832460+00:00
+modified: 2026-11-14T06:27:50.376100+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -36,10 +36,15 @@ relationships:
   - DEV-511
   - DEV-512
   - DEV-417
+  - DEV-518
+  - DEV-523
 comments:
 - date: 2026-11-14T04:19:07.317172+00:00
   author: claude
   text: 'mallox 2026-11-14: "let''s wait until 15.1 before we update so that we migrate to full functionality". This machine stays on lotar 0.14.3 until v0.15.1 is out; v0.15.0 is not installed here.'
+- date: 2026-11-14T06:27:49.945274+00:00
+  author: claude
+  text: 'Hold: local main has `0327eb8f` (DEV-518), which its review blocked. mallox chose to fix forward on 2026-11-14. Release v0.15.1 only after the DEV-518 rework passes review and lands. DEV-523 is the bug that let it land.'
 releases:
 - 6
 description: |-
@@ -153,3 +158,19 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468","DEV-477","DEV-491"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512","DEV-417"]}'
     new: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468","DEV-477","DEV-491","DEV-516"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512","DEV-417"]}'
+- at: 2026-11-14T06:27:49.201799+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468","DEV-477","DEV-491","DEV-516"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512","DEV-417"]}'
+    new: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468","DEV-477","DEV-491","DEV-516"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512","DEV-417","DEV-518"]}'
+- at: 2026-11-14T06:27:49.945274+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:27:50.376100+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468","DEV-477","DEV-491","DEV-516"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512","DEV-417","DEV-518"]}'
+    new: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468","DEV-477","DEV-491","DEV-516"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512","DEV-417","DEV-518","DEV-523"]}'

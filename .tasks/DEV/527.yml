@@ -1,0 +1,28 @@
+title: 'npm run test:agent fails from a clean target: the embedded web UI test needs target/web-embed/index.html.gz'
+status: Todo
+priority: Medium
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-14T06:38:33.287147+00:00
+modified: 2026-11-14T06:38:33.905124+00:00
+relationships:
+  related:
+  - DEV-519
+description: 'Found in the DEV-519 merge (2026-11-13): npm run test:agent from a worktree without a web build fails, because tests/embedded_web_ui_test.rs needs target/web-embed/index.html.gz and test:agent (and test:rust) does not run build:web first. Check: in a fresh worktree run npm run test:agent without npm run build:web. Done: test:agent passes from a clean target (it builds the web assets first, or the test gets what it needs another way).'
+tags:
+- health
+custom_fields:
+  finding: test:agent:embedded-web-ui
+history:
+- at: 2026-11-14T06:38:33.605789+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-519"]}'
+- at: 2026-11-14T06:38:33.905124+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

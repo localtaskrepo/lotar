@@ -1,10 +1,11 @@
 title: Profile budget limit, agent options and live replies for harnessmux jobs
-status: Blocked
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
+assignee: '@fix'
 created: 2026-11-14T02:19:56.623287+00:00
-modified: 2026-11-14T04:17:31.623785+00:00
+modified: 2026-11-14T06:18:29.743144+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -13,6 +14,14 @@ relationships:
   related:
   - DEV-503
   - DEV-513
+  - DEV-510
+  - DEV-509
+comments:
+- date: 2026-11-14T05:50:39.665056+00:00
+  author: claude
+  text: 'Plan: (1) drive_session meters cost from usage events (ACP reports the session''s running total, so the job''s cost is the growth since the job started; it starts over when the agent restarts) and cancels the turn and fails the job once it passes max_budget_usd; also fixes multi-turn jobs summing running totals. (2) profile key options: (ACP option id -> value, scalars accepted) passed to harnessmux Profile.options; command refuses it; the effort error points to it. (3) message.delta streams into the job log as agent_job_message parts (whole paragraphs outside code blocks, the rest when a tool or question starts or the turn ends); the final message only adds what wasn''t streamed. Tests in dev503_harness_jobs_test with the fake ACP agent; docs agent.md and config-reference. No REST shape change.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab6cacb82-6d5f-4520-885f-1ccb0e36138c
 releases:
 - 6
 description: 'Lost in DEV-503 (owner asked to file it, 2026-11-14); lotar only. 1) max_budget_usd (Claude''s --max-budget-usd) is no longer passed: lotar gets the cost per turn from harnessmux usage events, so it can cancel a job once the cost passes the budget, for every agent that reports cost. 2) effort is limited to harnessmux''s low..max, so agent values such as Codex''s ultra or Copilot''s minimal are refused; harnessmux''s Profile already has an options map (ACP config option id -> value). Add a profile key options: that passes it. 3) The job view shows a reply only when its turn ends; drive_session ignores message.delta. Stream deltas into the job log so replies appear as they come, as Claude''s did. Done when the three work with tests and docs (docs/help/agent.md, config-reference), and REST/types where shapes change.'
@@ -46,3 +55,35 @@ history:
   changes:
   - field: releases
     new: '#6'
+- at: 2026-11-14T05:34:13.659500+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-14T05:46:16.998407+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-14T05:46:18.004271+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab6cacb82-6d5f-4520-885f-1ccb0e36138c
+- at: 2026-11-14T05:50:39.665056+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:01:15.574780+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-510"]}'
+- at: 2026-11-14T06:18:29.743144+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-510"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-510","DEV-509"]}'
