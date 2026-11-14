@@ -1,0 +1,120 @@
+title: 'main fails cargo fmt --check: agent_automation_integration_test.rs comment indent from DEV-550'
+status: HelpNeeded
+priority: Medium
+type: Feature
+reporter: claude
+assignee: mallox
+created: 2026-11-15T06:39:52.985441+00:00
+modified: 2026-11-15T07:00:04.247255+00:00
+relationships:
+  related:
+  - DEV-509
+  - DEV-550
+  - DEV-558
+comments:
+- date: 2026-11-15T06:44:46.875073+00:00
+  author: claude
+  text: |-
+    Fixed: comment indent restored, `cargo fmt --all --check` passes.
+    - `rustfmt --edition 2024 crates/lotar-lib/tests/agent_automation_integration_test.rs`: one line, 8-space indent at :2502
+    - Commit `d87f98b2` on `agent/DEV-557`
+    - `npm run lint:agent` passes (clippy, fmt, oxlint, eslint, prettier)
+    - `npm test` / `npm run smoke` not run: whitespace inside a comment, no behaviour change
+- date: 2026-11-15T06:49:52.299158+00:00
+  author: codex
+  text: |-
+    Review: passed.
+    - Reviewed `d87f98b2`, full diff, ticket/comments, related tickets and main file history. Only comment indentation at `crates/lotar-lib/tests/agent_automation_integration_test.rs:2502` changes.
+    - Reproduced main file formatting failure with repository configuration. `cargo fmt --all --check`, `git diff --check`, and `RUSTC_WRAPPER= npm run lint:agent` pass. Initial lint hit sandbox-denied sccache.
+    - `agent/DEV-550` has the identical fix in `9d51a37e`; file contents agree.
+    - No findings, new tickets, file edits or commits. Behavioral tests/smoke not rerun for comment whitespace. Status/assignee unchanged; no checks running. Merge agent must verify main.
+- date: 2026-11-15T06:59:56.104150+00:00
+  author: codex
+  text: |-
+    Merge blocked: smoke gate failed; main unchanged.
+    - Rebase onto `main` left `d87f98b2` unchanged. Actual checkout branch is `t3/placeholder`; no branch switch or file edits. Lint skipped because it already passed on this same commit.
+    - Approved unsandboxed `RUSTC_WRAPPER= npm run test:agent` passes: 2196 Rust, 1547 UI, 50 release, 7 hook tests. Initial sandbox runs could not bind localhost.
+    - Approved unsandboxed `RUSTC_WRAPPER= npm run test:smoke:agent`: 403 pass, 1 fail at `smoke/tests/ui.tag-colors.smoke.spec.ts:88` (unexpected `/api/tasks/list`). Filed DEV-558, related to this ticket.
+    - No merge, amend, trust change or push. All checks stopped. No durable guidance correction.
+    - Should the merge resume after DEV-558 fixes the smoke gate?
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A163846ac-5812-4882-877a-c92f6a5e8734
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad75a141b-3805-4f11-b0e3-922e4fc75315
+description: 'Found while running npm run lint:agent for DEV-509 on main 3bbd59b6: cargo fmt --all --check reports crates/lotar-lib/tests/agent_automation_integration_test.rs:2502, a comment line from d9c34341 (DEV-550) at column 0 instead of 8 spaces. Check: cargo fmt --all --check on main. Done when main passes it (rustfmt --edition 2024 on that one file).'
+tags:
+- health
+custom_fields:
+  finding: lint:rustfmt-agent-automation-test
+history:
+- at: 2026-11-15T06:39:53.159901+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-509","DEV-550"]}'
+- at: 2026-11-15T06:39:53.345099+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-15T06:39:53.928914+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T06:39:54.665918+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A163846ac-5812-4882-877a-c92f6a5e8734
+- at: 2026-11-15T06:44:46.875073+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:44:51.586599+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T06:44:53.045129+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad75a141b-3805-4f11-b0e3-922e4fc75315
+- at: 2026-11-15T06:49:52.299158+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:49:58.837423+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-15T06:59:11.056628+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-509","DEV-550"]}'
+    new: '{"related":["DEV-509","DEV-550","DEV-558"]}'
+- at: 2026-11-15T06:59:56.104150+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:00:04.247255+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox

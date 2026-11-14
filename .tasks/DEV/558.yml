@@ -1,0 +1,104 @@
+title: Tag-colour smoke observes unexpected tasks list request
+status: Merging
+priority: Medium
+type: Feature
+reporter: codex
+assignee: '@merge'
+created: 2026-11-15T06:59:10.494033+00:00
+modified: 2026-11-15T07:12:56.449074+00:00
+relationships:
+  related:
+  - DEV-557
+  - DEV-548
+  - DEV-509
+comments:
+- date: 2026-11-15T07:05:43.803148+00:00
+  author: claude
+  text: |-
+    Fixed: the DEV-548 check now starts from a blank page, so the Tasks page's own list request can no longer leak into it.
+    - Cause: `withPage(server.url, …)` loaded `/` (Tasks page) and returned at DOMContentLoaded; its `/api/tasks/list` fetch could fire after the request listener was attached, then the test navigated to Config. Config itself only calls `/api/tasks/values`.
+    - Change: `smoke/tests/ui.tag-colors.smoke.spec.ts` uses `withPage('about:blank', …)`, like `ui.sprints-sort.smoke.spec.ts`.
+    - Commit `05ff94e2` on `agent/DEV-558`.
+    - Checks: `npm run test:smoke:agent` 404/404 passed; prettier clean. `npm run lint` fails only on the rustfmt diff in `agent_automation_integration_test.rs` already on main (DEV-557). `npm test` not run: test-only change to a smoke spec.
+- date: 2026-11-15T07:12:49.923693+00:00
+  author: codex
+  text: |-
+    Review: passed.
+    - Reviewed `05ff94e2` against main `d87f98b2`, full diff, ticket/comments, DEV-548 and DEV-557, helper/component behavior and main file history. No findings or minor tickets.
+    - `smoke/helpers/ui.ts:96` returns at DOMContentLoaded. Starting blank prevents the Tasks page fetch leaking into Config observation; both endpoint assertions and selection checks remain. No application UI changes or owner decisions.
+    - Approved unrestricted `RUSTC_WRAPPER= npm run test:smoke:agent`: 404/404 passed in 117 files. Prettier and diff whitespace checks pass. Initial sandbox build was denied sccache access. An accidental duplicate sandbox smoke from comment quoting failed localhost binding; it has finished and does not supersede the unrestricted pass.
+    - Full lint and npm test not rerun for this smoke-only change. No source edits, commits, status/assignee changes or running checks. No durable guidance finding.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A54d556e7-7ef6-4b71-8f8f-9eab806bb0bd
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3d4b2ba4-11db-4618-a6f3-5e3bf6e8fec7
+description: 'Found during DEV-557 merge verification on d87f98b2. Approved unsandboxed npm run test:smoke:agent: 403 passed, 1 failed. smoke/tests/ui.tag-colors.smoke.spec.ts:88 expects no /api/tasks/list request after selecting in-use tags, but received it. Check the request timing and behavior; fix the cause and verify the full smoke gate. Related: DEV-557.'
+tags:
+- health
+custom_fields:
+  finding: smoke:tag-colors-unexpected-task-list
+history:
+- at: 2026-11-15T06:59:11.057540+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-557"]}'
+- at: 2026-11-15T06:59:11.841097+00:00
+  actor: codex
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-15T06:59:13.103632+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T06:59:16.611164+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A54d556e7-7ef6-4b71-8f8f-9eab806bb0bd
+- at: 2026-11-15T07:05:43.803148+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:05:44.483210+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-557"]}'
+    new: '{"related":["DEV-557","DEV-548"]}'
+- at: 2026-11-15T07:05:53.457158+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T07:05:58.549280+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3d4b2ba4-11db-4618-a6f3-5e3bf6e8fec7
+- at: 2026-11-15T07:09:57.764286+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-557","DEV-548"]}'
+    new: '{"related":["DEV-557","DEV-548","DEV-509"]}'
+- at: 2026-11-15T07:12:49.923693+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:12:56.449074+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

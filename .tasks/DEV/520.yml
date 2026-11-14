@@ -1,16 +1,17 @@
 title: An agent job hangs when its session's event stream lags and drops the turn's end
-status: Merging
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-14T05:38:48.737497+00:00
-modified: 2026-11-15T06:27:47.045432+00:00
+modified: 2026-11-15T06:32:01.171204+00:00
 relationships:
   related:
   - DEV-501
   - DEV-532
   - DEV-511
+  - DEV-550
 comments:
 - date: 2026-11-14T06:11:36.177470+00:00
   author: claude
@@ -123,6 +124,31 @@ comments:
     - Reviewed `00055509`, full diff against main, ticket/comments and owner decisions, related tickets, file history, guidance and harnessmux source. No findings or UI changes; cost, budget and reply handling preserved.
     - `git diff --check main..HEAD` passed. Targeted nextest stopped during fresh dependency compilation; no tests completed. Full lint/tests/smoke not rerun; implementation reports passing.
     - No source changes, commits or tickets filed. Status and assignee unchanged. No durable guidance finding.
+- date: 2026-11-15T06:31:23.092372+00:00
+  author: codex
+  text: |-
+    Merge blocked: this continued job opened the superseded review checkout, not the reviewed ticket branch.
+    - Actual HEAD is `7f943de1` on `t3/agent-job-lagged-event-hang`; `agent/DEV-520` points to reviewed `00055509`. The old commit lacks the approved adaptation to main.
+    - Existing DEV-550 tracks this continuation problem; no duplicate bug filed. Both commits preserved, no branch switch, rebase, merge or push, and no checks started.
+    - Please rerun the merge from `agent/DEV-520` at `00055509`, or authorize moving this thread checkout to that reviewed commit.
+- date: 2026-11-15T06:31:56.020936+00:00
+  author: automation
+  text: |-
+    The merge agent's job job-20261115T063038.244Z-29 failed again (lotar agent logs job-20261115T063038.244Z-29). The fix is on branch t3/agent-job-lagged-event-hang. Retry with @fix, or will you merge it yourself?
+
+    Options:
+    - fix: Retry with @fix
+    - self: I merge it myself
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: self
+      label: I merge it myself
+      set:
+        status: InProgress
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7234460b-fa1f-4515-a843-598de63b5e51
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af5b504b1-62e7-4678-9cf9-f100b8ba0692
@@ -430,3 +456,26 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-15T06:31:23.092372+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:31:26.113078+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-501","DEV-532","DEV-511"]}'
+    new: '{"related":["DEV-501","DEV-532","DEV-511","DEV-550"]}'
+- at: 2026-11-15T06:31:56.020936+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:32:01.171204+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox

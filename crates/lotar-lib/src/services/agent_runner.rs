@@ -256,8 +256,8 @@ fn parse_effort(effort: &str) -> LoTaRResult<harnessmux::Effort> {
     })
 }
 
-/// What a harnessmux session starts with, from a profile, plus notes on the settings it doesn't pass.
-pub fn session_profile(profile: &AgentProfileDetail, env: HashMap<String, String>) -> LoTaRResult<(harnessmux::Profile, Vec<String>)> {
+/// What a harnessmux session starts with, from a profile.
+pub fn session_profile(profile: &AgentProfileDetail, env: HashMap<String, String>) -> LoTaRResult<harnessmux::Profile> {
     let effort = profile.effort.as_deref().map(parse_effort).transpose()?;
     let permissions = match profile.permissions.unwrap_or_default() {
         AgentPermissions::ReadOnly => harnessmux::Permissions::ReadOnly,
@@ -270,13 +270,6 @@ pub fn session_profile(profile: &AgentProfileDetail, env: HashMap<String, String
         AgentPermissionPolicy::Allow => harnessmux::PermissionPolicy::Allow,
         AgentPermissionPolicy::Ask => harnessmux::PermissionPolicy::Ask,
     });
-    let mut notes = Vec::new();
-    if profile.tools.as_ref().is_some_and(|tools| !tools.allowed.is_empty() || !tools.disallowed.is_empty()) {
-        notes.push("The agent profile's tools are not passed: ACP agents take no tool lists; permissions and on_permission limit them.".to_string());
-    }
-    if profile.mcp.as_ref().is_some_and(|mcp| !mcp.allow.is_empty()) {
-        notes.push("The agent profile's mcp.allow is not passed: the agent's own MCP servers follow its own settings.".to_string());
-    }
     let mut session_env: BTreeMap<String, String> = expand_env_map(&profile.env).into_iter().collect();
     session_env.extend(env);
     let session = harnessmux::Profile {
@@ -284,12 +277,32 @@ pub fn session_profile(profile: &AgentProfileDetail, env: HashMap<String, String
         effort,
         permissions,
         on_permission,
+        rules: session_rules(profile),
         env: session_env,
         options: profile.options.clone(),
         provider: profile.provider.clone(),
         ..harnessmux::Profile::default()
     };
-    Ok((session, notes))
+    Ok(session)
+}
+
+/// The permission rules a session runs with (DEV-509): at workspace no `git push` and no edits outside the session's
+/// directories, plus the profile's `tools` lists and `mcp.allow` servers (Claude's `mcp__<server>__*` names).
+fn session_rules(profile: &AgentProfileDetail) -> harnessmux::Rules {
+    let workspace = profile.permissions.unwrap_or_default() == AgentPermissions::Workspace;
+    let tools = profile.tools.as_ref();
+    let servers = profile.mcp.as_ref().map(|mcp| mcp.allow.as_slice()).unwrap_or_default();
+    harnessmux::Rules {
+        deny_commands: if workspace { vec!["git push".to_string()] } else { Vec::new() },
+        allow_tools: tools
+            .map(|tools| tools.allowed.clone())
+            .unwrap_or_default()
+            .into_iter()
+            .chain(servers.iter().map(|server| format!("mcp__{server}__*")))
+            .collect(),
+        deny_tools: tools.map(|tools| tools.disallowed.clone()).unwrap_or_default(),
+        confine_writes: workspace,
+    }
 }
 
 /// The agents (runner names) installed on this machine: the CLI each harnessmux agent signs in with is on PATH.
@@ -455,7 +468,7 @@ mod tests {
     }
 
     #[test]
-    fn a_profile_becomes_a_session_profile_with_notes_on_what_it_drops() {
+    fn a_profile_becomes_a_session_profile() {
         let mut detail = profile("claude");
         detail.model = Some("sonnet".into());
         detail.effort = Some("high".into());
@@ -465,7 +478,7 @@ mod tests {
         detail.options = BTreeMap::from([("reasoning_effort".to_string(), "ultra".to_string())]);
         detail.tools = Some(crate::config::types::AgentToolsConfig { allowed: vec!["Read".into()], ..Default::default() });
         detail.env = BTreeMap::from([("A".to_string(), "1".to_string())]);
-        let (session, notes) = session_profile(&detail, HashMap::from([("LOTAR_TICKET_ID".to_string(), "DEV-1".to_string())])).unwrap();
+        let session = session_profile(&detail, HashMap::from([("LOTAR_TICKET_ID".to_string(), "DEV-1".to_string())])).unwrap();
         assert_eq!(session.model.as_deref(), Some("sonnet"));
         assert_eq!(session.effort, Some(harnessmux::Effort::High));
         assert_eq!(session.permissions, harnessmux::Permissions::ReadOnly);
@@ -473,7 +486,35 @@ mod tests {
         assert_eq!(session.env["A"], "1");
         assert_eq!(session.env["LOTAR_TICKET_ID"], "DEV-1");
         assert_eq!(session.options["reasoning_effort"], "ultra");
-        assert_eq!(notes.len(), 1, "only the tools are dropped: {notes:?}");
+        assert_eq!(session.rules.allow_tools, ["Read"]);
+        assert!(session.rules.deny_commands.is_empty() && !session.rules.confine_writes, "read-only adds no workspace rules");
+    }
+
+    #[test]
+    fn workspace_sessions_refuse_push_and_outside_edits_and_take_the_tool_lists() {
+        let mut detail = profile("claude");
+        detail.tools = Some(crate::config::types::AgentToolsConfig { allowed: vec!["Bash(cargo:*)".into()], disallowed: vec!["WebFetch".into()] });
+        detail.mcp = Some(crate::config::types::AgentMcpConfig { allow: vec!["github".into()], ..Default::default() });
+        let session = session_profile(&detail, HashMap::new()).unwrap();
+        assert_eq!(session.rules.deny_commands, ["git push"]);
+        assert!(session.rules.confine_writes);
+        assert_eq!(session.rules.allow_tools, ["Bash(cargo:*)", "mcp__github__*"]);
+        assert_eq!(session.rules.deny_tools, ["WebFetch"]);
+        let roots = [std::path::PathBuf::from("/work/repo")];
+        for line in [
+            "git push",
+            "git -C . push origin",
+            "git -c credential.helper= push",
+            "sh -c 'git push'",
+            r#"git -C "/tmp/my repo" push"#,
+            "echo ${unset:-$(git push)}",
+        ] {
+            let request = serde_json::json!({"toolCall": {"kind": "execute", "rawInput": {"command": line}}});
+            assert_eq!(session.rules.decide(&request, &roots).map(|(allow, _)| allow), Some(false), "{line} is refused");
+        }
+        detail.permissions = Some(AgentPermissions::Full);
+        let full = session_profile(&detail, HashMap::new()).unwrap();
+        assert!(full.rules.deny_commands.is_empty() && !full.rules.confine_writes);
     }
 
     #[test]

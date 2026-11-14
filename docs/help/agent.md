@@ -90,10 +90,12 @@ agents:
 | Level | claude | codex | copilot |
 | --- | --- | --- | --- |
 | `read-only` | `plan` | `read-only` | plan mode |
-| `workspace` | `acceptEdits` | `workspace-write` | agent mode |
+| `workspace` | `acceptEdits` and Claude's OS sandbox | `workspace-write` | agent mode |
 | `full` | `bypassPermissions` | `agent-full-access` | autopilot mode |
 
 - `workspace` lets the agent edit the job's working directory. It can also write the tasks directory (to update its ticket) and, in a worktree, the repository's `.git` directory (to commit). A merge job (profile `merge`, or a ticket in `Merging`) gets the main checkout instead of `.git`, so it can fast-forward main. These go to the agent as ACP `additionalDirectories`.
+- At `workspace` the job also refuses `git push` and edits outside those directories, whatever the agent: harnessmux answers the agent's permission requests by these rules before `on_permission`. The command line is read as a shell reads it, so a push is refused also with git's options before it (`git -C "/tmp/my repo" push`, `git -c key=value push`), through `env` or `sudo`, or inside `sh -c "…"` or `$(…)`; a command the line builds while it runs (a program from a variable) isn't seen, so these rules are a best-effort layer. What stops a push for sure is Claude's OS sandbox: its shell commands can't write outside those directories, can't use SSH and can't reach github.com, gitlab.com or bitbucket.org, so a workspace Claude job can't fetch from those hosts either. The sandbox has no unsandboxed retry; each command still asks, so the rules see it, and Claude also gets `git push` as a denied tool (`Bash(git push:*)`). Codex runs in its own `workspace-write` sandbox. Other agents have only the rules.
+- The profile's `tools.allowed` and `tools.disallowed` list tools by the agent's own name for them (a trailing `*` matches a prefix), and `mcp.allow` names MCP servers whose tools are allowed (`mcp__<server>__*`). harnessmux answers permission requests for them before `on_permission`; Claude also gets them as its own `allowedTools` and `disallowedTools`, so they apply to tools it runs without asking.
 - Commits from inside a sandbox can fail: Codex keeps git metadata read-only, and a signing key agent (1Password, `gpg-agent`, `ssh-agent`) is usually out of reach. LoTaR then commits the agent's changes itself when the job ends (see [Default instructions](#default-instructions)).
 - An agent without a mode for a level follows the `on_permission` policy alone; harnessmux logs a note. `command` and `t3` runners get no permissions; a T3 Code thread runs in its project's own runtime mode.
 
@@ -133,8 +135,6 @@ Values may use letters, digits and `. _ - : / @ [ ]`. Jobs show their model and 
 At the end of each turn LoTaR adds what the agent reports to the job's usage: input tokens (with cached), output tokens, turns, and the cost in USD where the agent reports one (Claude). Agents report the session's cost so far; a job's cost is what its turns added to it. Turns are the job's turns in its session. Copilot's premium requests and changed lines and Claude's model round trips are not reported over ACP, so jobs no longer show them; jobs from before the switch to harnessmux keep theirs. The usage appears in `lotar agent status`, at the end of `lotar agent run --wait`, on the Agents page (per job, plus a cost total per ticket), in the job's `usage` field over REST, SSE and MCP, and in the job log. Automation actions on job events can use `${{agent.usage}}`, `${{agent.cost_usd}}`, `${{agent.input_tokens}}`, `${{agent.output_tokens}}` and `${{agent.turns}}`, for example to comment the cost on the ticket.
 
 With `max_budget_usd` in the profile, LoTaR cancels the agent's turn and fails the job as soon as the job's cost passes it, for every agent that reports cost. A job whose agent reports none logs that the budget was not checked.
-
-`tools` and `mcp.allow` are not passed: ACP has no tool lists. A job whose profile sets them logs a note. Limit an agent with `permissions` and `on_permission`; its own MCP servers follow its own settings.
 
 #### LoTaR's own MCP server
 

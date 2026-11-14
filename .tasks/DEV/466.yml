@@ -1,11 +1,11 @@
 title: 'Task panel stays on ''Loading task…'' while git hangs: the server''s git calls have no timeout'
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-13T10:33:22.263037+00:00
-modified: 2026-11-15T06:31:09.477757+00:00
+modified: 2026-11-15T06:40:29.159188+00:00
 relationships:
   blocks:
   - DEV-513
@@ -24,6 +24,7 @@ relationships:
   - DEV-532
   - DEV-499
   - DEV-518
+  - DEV-550
 comments:
 - date: 2026-11-13T10:45:55.825737+00:00
   author: claude
@@ -257,6 +258,140 @@ comments:
     | dark 1920 | [before](https://lotar.pyxzl.net/api/attachments/get?path=DEV-466-before-dark-1920.dbc4391ac0e3a2318aad6f92adb7edbe.png) | [after](https://lotar.pyxzl.net/api/attachments/get?path=DEV-466-rebased-after-dark-1920.083f84016f32c7924736754955531a64.png) |
     | dark 1440 | [before](https://lotar.pyxzl.net/api/attachments/get?path=DEV-466-before-dark-1440.0f8f4df66923895a109e94c8a146c927.png) | [after](https://lotar.pyxzl.net/api/attachments/get?path=DEV-466-rebased-after-dark-1440.c44e902012e1d682e222d11b53730561.png) |
     | dark 390 | [before](https://lotar.pyxzl.net/api/attachments/get?path=DEV-466-before-dark-390.b3a1afadaabb3389ef037d927f96a097.png) | [after](https://lotar.pyxzl.net/api/attachments/get?path=DEV-466-rebased-after-dark-390.d9bd32a1ce9647e06b66de030e8dba3a.png) |
+- date: 2026-11-15T06:34:25.289472+00:00
+  author: codex
+  text: |-
+    Merge blocked: this job is bound to the obsolete branch, not the rebased fix.
+
+    - Current branch: `t3/task-panel-git-timeout-review`, HEAD `896309c0`.
+    - Completed rebased fix `f10b8197` exists on `t3/review-dev-466-git-timeouts` and `t3/task-panel-git-timeout-6`.
+    - Rebase conflicts in `view/composables/task-panel/useTaskPanelActivity.ts` and `view/composables/useTaskPanelState.ts`: main removes old history state; the old patch retains it alongside the new error state. Rebase aborted; all commits preserved.
+    - Please bind the review/merge job to the branch containing `f10b8197`; retrying this old branch repeats the resolved conflict.
+    - No merge, push or checks; trust unchanged.
+- date: 2026-11-15T06:34:36.366765+00:00
+  author: automation
+  text: |-
+    The merge agent's job job-20261115T063338.574Z-33 failed again (lotar agent logs job-20261115T063338.574Z-33). The fix is on branch t3/task-panel-git-timeout-review. Retry with @fix, or will you merge it yourself?
+
+    Options:
+    - fix: Retry with @fix
+    - self: I merge it myself
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: self
+      label: I merge it myself
+      set:
+        status: InProgress
+- date: 2026-11-15T06:34:50.988039+00:00
+  author: triage
+  text: |-
+    ## Triage: no owner question is open, the 06:34 question is already answered and done
+
+    - **Owner, 2026-11-15 05:30** (answered in INBOX-181): retry with @fix. The same question at 06:34 repeats it.
+    - **Done since:** the fix agent rebased the work onto main as `f10b8197` (06:31, checks pass). The merge failed again at 06:34 because its job is bound to the obsolete branch `t3/task-panel-git-timeout-review` (HEAD `896309c0`), not because the fix is wrong.
+
+    **Next:** do not retry @fix and do not hand it to the owner. Bind review and merge to `t3/review-dev-466-git-timeouts` (or `t3/task-panel-git-timeout-6`), which contain `f10b8197`, review that commit, then merge. If a review blocks `f10b8197`, it is round 3 of his rule (INBOX-29): ask him then, with the model choice.
+- date: 2026-11-15T06:35:07.104461+00:00
+  author: claude
+  text: |-
+    Fix is ready for review as `f10b8197` on this job's branch. No new changes.
+
+    - Branch `t3/review-dev-466-git-timeouts` (also `t3/task-panel-git-timeout-6`): HEAD `f10b8197`, the only commit beyond `main`, clean worktree.
+    - Checks on `f10b8197` passed in the 06:31 comment: lint, Rust 2196/2196, UI 1548/1548, smoke 404/404, ticket check (history 500 at 20 s, no git left running), screenshots attached.
+    - `main` has moved 2 commits since. I left the branch unrebased so the review reads exactly `f10b8197`; the merge agent rebases.
+    - Next: review `f10b8197` on this branch, then merge. Not the obsolete `t3/task-panel-git-timeout-review` (`896309c0`).
+- date: 2026-11-15T06:36:53.476283+00:00
+  author: codex
+  text: |-
+    Merge cannot proceed in this job: its checkout is still bound to obsolete `t3/task-panel-git-timeout-review` at `896309c0`.
+
+    - Verified again: `f10b8197` is on `t3/review-dev-466-git-timeouts`, `t3/task-panel-git-timeout-6` and `t3/task-panel-git-timeout-7`; it is absent from this branch.
+    - The supplied prior-agent statement describes another checkout. Repeating rebase here would repeat the already-recorded conflicts.
+    - Required next action is job routing to the completed branch, not another fix or owner product decision. No new rebase, edits, tests, merge or push this turn.
+- date: 2026-11-15T06:37:06.710248+00:00
+  author: automation
+  text: |-
+    The merge agent's job job-20261115T063617.899Z-37 failed again (lotar agent logs job-20261115T063617.899Z-37). The fix is on branch t3/task-panel-git-timeout-review. Retry with @fix, or will you merge it yourself?
+
+    Options:
+    - fix: Retry with @fix
+    - self: I merge it myself
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: self
+      label: I merge it myself
+      set:
+        status: InProgress
+- date: 2026-11-15T06:37:21.697066+00:00
+  author: triage
+  text: |-
+    ## Triage: no owner question is open, same as the 06:34 one
+
+    - **Owner, 2026-11-15 05:30** (answered in INBOX-181): retry with @fix. Done: the fix is rebased as `f10b8197` (checks pass, 06:31).
+    - The 06:37 merge failure is the same cause as at 06:34: the merge job is bound to the obsolete branch `t3/task-panel-git-timeout-review` (`896309c0`).
+
+    **Next:** do not retry @fix and do not hand it to the owner. Bind review and merge to `t3/review-dev-466-git-timeouts` (holds `f10b8197`), review that commit, then merge. If that review blocks, it is round 3 of his rule (INBOX-29): ask him then, with the model choice.
+- date: 2026-11-15T06:37:51.444115+00:00
+  author: claude
+  text: |-
+    Fix still ready as `f10b8197`; review and merge need to run on its branch. No new changes.
+
+    - `t3/review-dev-466-git-timeouts` (this job's worktree), `-6` and `-7` all hold `f10b8197`, the only commit beyond `main`.
+    - Old worktrees still on obsolete commits, which the jobs keep picking: `t3/task-panel-git-timeout-review` (`896309c0`), `t3/review-dev-466-git-timeout` (`03db11a4`).
+    - Cause: the review/merge job reuses an older thread's checkout. This is [DEV-550](https://lotar.pyxzl.net/task/DEV-550) (InProgress), now linked.
+    - I left the old worktrees alone: other threads own them.
+- date: 2026-11-15T06:39:39.747038+00:00
+  author: codex
+  text: |-
+    Merge remains blocked by the known job-routing issue `DEV-550`.
+
+    - Live checkout is still `t3/task-panel-git-timeout-review` at `896309c0`, not the completed branch described in the supplied handoff.
+    - `f10b8197` is preserved on `t3/review-dev-466-git-timeouts` and `t3/task-panel-git-timeout-6`, `-7`, `-8`.
+    - No new code finding or owner decision. Run the merge on the completed branch after correcting routing; do not restart the fix.
+    - No files changed, rebase, tests, merge or push; trust unchanged.
+- date: 2026-11-15T06:39:50.580454+00:00
+  author: automation
+  text: |-
+    The merge agent's job job-20261115T063913.396Z-40 failed again (lotar agent logs job-20261115T063913.396Z-40). The fix is on branch t3/task-panel-git-timeout-review. Retry with @fix, or will you merge it yourself?
+
+    Options:
+    - fix: Retry with @fix
+    - self: I merge it myself
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: self
+      label: I merge it myself
+      set:
+        status: InProgress
+- date: 2026-11-15T06:40:04.848922+00:00
+  author: triage
+  text: |-
+    ## Triage: no owner question is open, third repeat of the same one
+
+    - **Owner, 2026-11-15 05:30** (answered in INBOX-181): retry with @fix. Done: rebased as `f10b8197` (06:31, checks pass).
+    - The 06:39 merge failure is the same cause as 06:34 and 06:37: the merge job is bound to the obsolete branch `t3/task-panel-git-timeout-review` (`896309c0`). Routing is DEV-550 (InProgress).
+
+    **Next:** do not retry @fix, do not hand to the owner. Run review and merge on `t3/review-dev-466-git-timeouts` (holds `f10b8197`). If that review blocks, ask him then (INBOX-29).
+- date: 2026-11-15T06:40:23.402043+00:00
+  author: claude
+  text: |-
+    Fix unchanged: `f10b8197` on `t3/review-dev-466-git-timeouts`. No new work.
+
+    - Worktree for review and merge: `/Users/mallox/.t3/worktrees/lotar/t3-339b5809-16d3324c541980e4` (clean, `f10b8197` is the only commit beyond `main`).
+    - Every retry that starts in `t3/task-panel-git-timeout-review` (`896309c0`) fails the same way until [DEV-550](https://lotar.pyxzl.net/task/DEV-550) lands.
+    - I didn't reset the obsolete branch to `f10b8197`: another thread's worktree has it checked out.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad8d79e8d-6688-4da4-a3a5-516b2d4c3b76
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afcbae329-3a86-478f-818f-b3877e1b72d7
@@ -286,6 +421,9 @@ references:
 - attachment: DEV-466-rebased-after-light-1440.a494c66fab413c9be83444872f3ac9c3.png
 - attachment: DEV-466-rebased-after-light-1920.90ed8d6af17e3b78afb91e81b03a17e6.png
 - attachment: DEV-466-rebased-after-light-390.f87d0993bbb19d1096a1ab982fb0b93f.png
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6f98a866-a359-4365-af58-6317280bfa55
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0d34f22c-7d6c-4367-a98f-611e4c8682c4
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7b1d90ac-8afb-4197-b28b-872afb426f2e
 releases:
 - 6
 description: |-
@@ -300,6 +438,7 @@ tags:
 - merge-retried
 - fix-retried
 - ui
+- automation-limit-reached
 custom_fields:
   finding: hang:task-history-git
 history:
@@ -989,3 +1128,204 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-513"],"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513","DEV-525","DEV-526","DEV-532"]}'
     new: '{"blocks":["DEV-513"],"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513","DEV-525","DEV-526","DEV-532","DEV-499","DEV-518"]}'
+- at: 2026-11-15T06:31:36.162877+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T06:32:49.951581+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6f98a866-a359-4365-af58-6317280bfa55
+- at: 2026-11-15T06:33:37.973799+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-15T06:34:25.289472+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:34:36.366765+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:34:36.680082+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-15T06:34:50.988039+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:34:51.309043+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T06:34:51.885835+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T06:35:07.104461+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:35:11.302847+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T06:35:12.563950+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0d34f22c-7d6c-4367-a98f-611e4c8682c4
+- at: 2026-11-15T06:36:17.318780+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-15T06:36:53.476283+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:37:06.710248+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:37:07.544448+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-15T06:37:21.697066+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:37:22.157679+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T06:37:22.994881+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T06:37:51.444115+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:37:51.609978+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-513"],"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513","DEV-525","DEV-526","DEV-532","DEV-499","DEV-518"]}'
+    new: '{"blocks":["DEV-513"],"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513","DEV-525","DEV-526","DEV-532","DEV-499","DEV-518","DEV-550"]}'
+- at: 2026-11-15T06:38:01.545321+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T06:38:04.956722+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7b1d90ac-8afb-4197-b28b-872afb426f2e
+- at: 2026-11-15T06:39:13.139819+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-15T06:39:39.747038+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:39:50.580454+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:39:51.058006+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-15T06:40:04.848922+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:40:05.561500+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T06:40:06.839872+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T06:40:23.402043+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:40:29.088631+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T06:40:29.159188+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, review-returned, merge-retried, fix-retried, ui
+    new: health, review-returned, merge-retried, fix-retried, ui, automation-limit-reached

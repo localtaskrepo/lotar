@@ -1,11 +1,11 @@
 title: Restore Claude's sandbox at workspace level and add rule-based answers to permission requests
-status: HelpNeeded
+status: Merging
 priority: High
 type: Feature
 reporter: claude
-assignee: claude
+assignee: '@merge'
 created: 2026-11-14T02:15:26.078753+00:00
-modified: 2026-11-15T06:29:51.252372+00:00
+modified: 2026-11-15T07:22:55.205093+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -23,6 +23,8 @@ relationships:
   - DEV-467
   - DEV-550
   - DEV-555
+  - DEV-557
+  - DEV-558
 comments:
 - date: 2026-11-14T02:16:43.837266+00:00
   author: automation
@@ -264,6 +266,92 @@ comments:
 - date: 2026-11-15T06:29:51.252372+00:00
   author: automation
   text: 'The T3 Code thread waits for an answer: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5d7c2709-cbbd-4287-9947-7c4d01114643'
+- date: 2026-11-15T06:49:56.826317+00:00
+  author: claude
+  text: |-
+    Done: a workspace Claude job can't push however the command is written, because its sandbox blocks the git hosts (harnessmux 0.1.8). lotar uses it in `7fed8b10`.
+
+    - **Decision applied** (mallox, 'Sandbox deny list'): `agents.toml` gives Claude at workspace `network.deniedDomains = [github.com, gitlab.com, bitbucket.org]`, on top of the SSH and filesystem blocks.
+    - **Live check** (built-in table, no command rule): `git push https://github.com/…` was refused by the sandbox (`host is on the deny list`), and so was `git ls-remote`.
+    - **Review finding** (`${unset:-$(git push)}`): fixed too. `src/rules.rs` now reads `${…}` to its matching `}` and lists the substitutions in it. New test `commands_inside_parameter_expansions_are_read` failed first, passes now. The matcher is documented as best-effort (README, `docs/help/agent.md`).
+    - **Release** (OK in the picker): harnessmux main `c12aa25` on top of DEV-510's 0.1.7, signed tag `v0.1.8`, Release run `43685757668` green, crates.io lists 0.1.8. harnessmux checks: fmt, clippy, 42/42, deny, publish dry run.
+    - **lotar**: built on Fable's `dffcbc45`, rebased onto main `3bbd59b6`, harnessmux 0.1.8, the review's two cases added to `workspace_sessions_refuse_push…`, `agent.md` names the sandbox as the sure layer.
+    - **Checks**: `npm test` 2197 Rust + 1547 UI ✓, `npm run smoke` 404 ✓. `lint:agent` passes except `cargo fmt --check` on `agent_automation_integration_test.rs:2502`, an untouched file that main fails too (from DEV-550's `d9c34341`); filed as DEV-557.
+    - **Open, not in scope**: an agent with a GitHub token could still write through the API on api.github.com, which stays reachable for gh reads.
+- date: 2026-11-15T06:50:49.382082+00:00
+  author: claude
+  text: |-
+    Already done: `agent/DEV-509` is `7fed8b10` with harnessmux 0.1.8 and the deny list. Codex's 06:19 block reviewed the branch before that commit.
+
+    - **Branch**: `7fed8b10` = Fable's `dffcbc45` rebased onto main `3bbd59b6`, plus `harnessmux = "0.1.8"` in `Cargo.toml` and `Cargo.lock`. Main hasn't moved since; it merges cleanly.
+    - **harnessmux 0.1.8** (`c12aa25`, tag `v0.1.8`, on crates.io): the parser from 0.1.6, Claude's workspace `network.deniedDomains` for github.com, gitlab.com and bitbucket.org, and `${…}` reading.
+    - **Gates on this tree**: `npm test` 2197 Rust + 1547 UI ✓, `npm run smoke` 404 ✓, `lint:agent` ✓ except `cargo fmt --check` on an untouched file that main fails too (DEV-557).
+    - **Worktree**: was detached at the same commit after the review; reattached to `agent/DEV-509`, nothing else changed.
+- date: 2026-11-15T06:56:24.167084+00:00
+  author: codex
+  text: |-
+    Review: passed — no blocking findings in `7fed8b10` against main `3bbd59b6`.
+
+    - Read diff, ticket comments/owner deny-list decision, related context, runner history and packaged harnessmux 0.1.8 settings/rules. Manifest and lockfile agree; approved git hosts are denied, unsandboxed retry disabled, matcher limits documented.
+    - `git diff --check main..HEAD` and frontend build passed. Wrapper-free focused nextest run: 10/10 agent_runner tests passed, including prior bypass regressions. Initial attempt stopped at sandbox-denied sccache.
+    - Full suites and live Claude checks not independently repeated; read fix evidence: 2197 Rust, 1547 UI, 404 smoke; existing formatting issue DEV-557. No UI changes, new tickets or guidance findings.
+    - No tracked files changed or commits; status and assignee unchanged.
+- date: 2026-11-15T06:59:50.087582+00:00
+  author: codex
+  text: |-
+    Merge blocked by the required formatting gate; no merge or push performed.
+
+    - Rebase onto main `3bbd59b6` changed nothing: HEAD remains `7fed8b10`.
+    - `RUSTC_WRAPPER= npm run lint:agent` finished: frontend checks, JS lint/format and Clippy passed; Rust formatting failed at `crates/lotar-lib/tests/agent_automation_integration_test.rs:2502`, the existing DEV-557 finding. Independent `cargo fmt --all --check` confirms it.
+    - Full test/smoke skipped because the fix comment records passes on unchanged HEAD. Previous review also passed 10 focused tests.
+    - No files changed or commits made; no trust changes. All checks stopped.
+    - May this merge resume after DEV-557 lands and the required formatting gate passes?
+- date: 2026-11-15T07:00:05.660455+00:00
+  author: automation
+  text: The merge agent's job job-20261115T065635.996Z-48 failed (lotar agent logs job-20261115T065635.996Z-48); the fix agent retries it on branch t3/restore-claude-sandbox-permission-rules-4.
+- date: 2026-11-15T07:00:33.984299+00:00
+  author: triage
+  text: |-
+    Triage 2026-11-15 (INBOX-222): the merge agent's question (resume once DEV-557 lands and the fmt gate passes?) answers itself: yes.
+    - DEV-557's fix `d87f98b2` is on lotar main now (`git merge-base --is-ancestor d87f98b2 main`), and `cargo fmt --all --check` passes there.
+    - `agent/DEV-509` (`7fed8b10`) sits on `3bbd59b6`: rebase onto main, rerun `npm run lint:agent`, then merge. The fmt failure it stopped on is gone.
+    - Codex passed the review at 06:56; mallox's 'Sandbox deny list' decision stands. No owner question.
+- date: 2026-11-15T07:09:57.481501+00:00
+  author: claude
+  text: |-
+    Ready to merge: `agent/DEV-509` is rebased onto main `d87f98b2` (with DEV-557's fmt fix) as `0364b5fc`, and the fmt gate passes now.
+
+    - **Rebase**: clean, no lockfile change, commit signed.
+    - **`npm run lint:agent`**: passes, `cargo fmt --check` included.
+    - **`npm test`**: 2197 Rust + 1547 UI pass.
+    - **`npm run smoke`**: 403/404. `ui.tag-colors.smoke.spec.ts` failed once (unexpected `/api/tasks/list`) and passed alone twice. It's the known flake in DEV-558, and this branch touches no UI.
+    - Merge and push are left to the merge agent.
+- date: 2026-11-15T07:12:13.983651+00:00
+  author: codex
+  text: |-
+    Review: passed — no blocking findings in `0364b5fc` against main `d87f98b2`.
+
+    - Read six-file diff, ticket comments/owner sandbox decision, related context, recent main history and packaged harnessmux 0.1.8 settings/rules. Dependency versions agree; sandbox settings match the decision. No UI changes.
+    - Diff check passed. Focused nextest stopped during dependency compilation; no pass claimed, nothing remains running.
+    - Recorded checks on HEAD: lint, 2197 Rust and 1547 UI passed; smoke 403/404, known DEV-558 case passed two isolated retries. Full suites/live sandbox not independently repeated.
+    - No files or commits changed, no tickets filed; status and assignee unchanged.
+- date: 2026-11-15T07:22:06.159443+00:00
+  author: codex
+  text: |-
+    Merged: main fast-forwarded to `054ddd1e` (rebased from `7fed8b10`, identical tree to reviewed `0364b5fc`).
+
+    - Gates passed: lint:agent; test:agent (2197 Rust, 1547 UI plus release/hook tests); test:smoke:agent. Initial sandbox test/smoke attempts could not bind localhost; approved host-access reruns passed.
+    - No dependency lockfile changed during rebase. No automation/profile config changed, so no trust refresh required.
+    - Pending main `.tasks` updates are being included with the merged commit as instructed. Push will stop before `d87f98b2` because DEV-557 remains HelpNeeded awaiting its merge outcome; DEV-509 stays locally merged until that preceding work is cleared.
+    - No durable guidance finding. All checks finished.
+- date: 2026-11-15T07:22:55.205093+00:00
+  author: codex
+  text: |-
+    Merge complete locally; partial push succeeded.
+
+    - Main includes the verified DEV-509 code and pending ticket updates (amended from `054ddd1e`; commit before this final ticket update: `86b0d488`).
+    - Pushed finished prefix through `3bbd59b6`; pre-push Rust/frontend checks passed. DEV-557 and DEV-509 remain unpushed because DEV-557 is still HelpNeeded. No force push.
+    - Full smoke: 404/404 passed. Lint and full tests passed as recorded above. No trust refresh needed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A04489e72-8f3b-4408-aa34-7819ce8de78b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa6d60779-49e6-493f-bc37-9f889203e4ec
@@ -274,6 +362,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3e024114-ed69-486a-a066-2dc4905c9a0f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa9d7a1b3-4121-4582-b858-b2c30763f165
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2389602b-c7a5-4f22-912c-9b7dfb265444
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A71688380-7c94-4d81-8d63-899d0aa46c2b
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad1eafe9b-f027-4aeb-91cd-723a915e4867
 releases:
 - 6
 description: 'Lost in DEV-503 (owner asked to file it, 2026-11-14). Before DEV-503, permissions: workspace gave Claude --permission-mode acceptEdits plus its OS sandbox (sandbox.enabled, autoAllowBashIfSandboxed), so shell writes outside the working and extra directories were blocked; Copilot and OpenCode/Kilo at workspace denied git push. Since DEV-503 workspace is the agent''s mode only (Claude acceptEdits) and harnessmux''s default policy allow approves every permission request, so shell commands run unsandboxed. Codex keeps its workspace-write sandbox. The profile keys tools.allowed/tools.disallowed and mcp.allow are no longer passed either (the job log says so). Work, mostly in harnessmux: pass Claude''s sandbox settings with the session, and give the permission policy rules (deny patterns such as git push, allow writes only under cwd and add_dirs, tool allow/deny lists) that lotar fills from permissions, tools and mcp.allow. Done when a workspace Claude job can''t write outside its directories or push, and tools/mcp.allow work again for ACP agents.'
@@ -282,6 +372,7 @@ tags:
 - blocked
 - blocked-by:DEV-503
 - review-returned
+- merge-retried
 history:
 - at: 2026-11-14T02:15:26.410189+00:00
   actor: claude
@@ -917,5 +1008,130 @@ history:
     new: claude
 - at: 2026-11-15T06:29:51.252372+00:00
   actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:39:53.157614+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-516","DEV-510","DEV-511","DEV-512","DEV-532","DEV-537","DEV-467","DEV-550","DEV-555"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-516","DEV-510","DEV-511","DEV-512","DEV-532","DEV-537","DEV-467","DEV-550","DEV-555","DEV-557"]}'
+- at: 2026-11-15T06:49:56.826317+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:49:57.086629+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Reviewing
+  - field: assignee
+    old: claude
+    new: '@review'
+- at: 2026-11-15T06:49:58.154750+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A71688380-7c94-4d81-8d63-899d0aa46c2b
+- at: 2026-11-15T06:50:49.382082+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:56:24.167084+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:56:34.777349+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-15T06:59:50.087582+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:00:05.605826+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: fix-retried, blocked, blocked-by:DEV-503, review-returned
+    new: fix-retried, blocked, blocked-by:DEV-503, review-returned, merge-retried
+- at: 2026-11-15T07:00:05.660455+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:00:05.978398+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-15T07:00:33.984299+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:00:34.341213+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T07:00:34.928130+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T07:09:57.481501+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:09:57.761201+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-516","DEV-510","DEV-511","DEV-512","DEV-532","DEV-537","DEV-467","DEV-550","DEV-555","DEV-557"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-516","DEV-510","DEV-511","DEV-512","DEV-532","DEV-537","DEV-467","DEV-550","DEV-555","DEV-557","DEV-558"]}'
+- at: 2026-11-15T07:10:05.313367+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T07:10:09.873272+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad1eafe9b-f027-4aeb-91cd-723a915e4867
+- at: 2026-11-15T07:12:13.983651+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:12:19.198450+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-15T07:22:06.159443+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:22:55.205093+00:00
+  actor: codex
   changes:
   - field: comment_added

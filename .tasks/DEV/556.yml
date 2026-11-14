@@ -1,11 +1,11 @@
 title: A merge job that rebases onto a new package-lock.json runs its gates with stale node_modules and stops
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T05:25:05.242533+00:00
-modified: 2026-11-15T06:30:36.307424+00:00
+modified: 2026-11-15T06:32:10.023321+00:00
 relationships:
   related:
   - DEV-481
@@ -46,6 +46,16 @@ comments:
     - `git log main..HEAD` contains only `ef4c82ed`.
     - The diff changes only `.tasks/DEV/automation.yml`; stopped at review step 1 as requested.
     - No files changed, checks run, commits made, or status/assignee changes.
+- date: 2026-11-15T06:31:50.014054+00:00
+  author: codex
+  text: |-
+    Merged into main as `3bbd59b6`; updated automation is trusted.
+
+    - Rebased `ef4c82ed` onto main, then fast-forwarded and amended pending `.tasks` updates as instructed.
+    - Standards `node --test --test-reporter=dot scripts/automation.test.ts` passed (11 tests); automation copy matches standards with `cmp`.
+    - No npm/pnpm lockfile changed during rebase, so no install needed. Full application lint/tests/smoke not run: only automation prompt configuration changed; relevant automation behavior tests passed.
+    - `lotar trust --status`: Trusted.
+    - Not pushed: concurrent ticket updates left main dirty (`.tasks/DEV/520.yml`, `.tasks/DEV/550.yml`), so the clean-checkout push condition is unmet.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab1f61b60-116a-4422-9498-2b0514b79400
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A827eaab2-89a4-4757-af3f-44fb43f0d7e0
@@ -215,3 +225,13 @@ history:
   - field: relationships
     old: '{"related":["DEV-481","DEV-549","DEV-551","DEV-548","DEV-554","DEV-499"]}'
     new: '{"related":["DEV-481","DEV-549","DEV-551","DEV-548","DEV-554","DEV-499","DEV-550"]}'
+- at: 2026-11-15T06:31:50.014054+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T06:32:10.023321+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

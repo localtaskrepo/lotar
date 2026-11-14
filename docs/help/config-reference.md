@@ -52,7 +52,7 @@ CLI > env > project > home > global > defaults (commands without a project skip 
   - agents.<name>.options: map — the agent's own ACP config options, id to value (`harnessmux capabilities <agent>` lists them), for values outside `effort`'s such as `reasoning_effort: ultra`; not for `command`
   - agents.<name>.provider: optional string — `t3` runner only: the T3 Code provider instance (`claudeAgent`, `codex`, …) the model runs on; set it together with `model`. See [T3 Code threads](./agent.md#t3-code-threads)
   - agents.<name>.session: `new` | `continue` | `fresh` (default `new`) — `continue` runs the job as the next turn of the ticket's session of this profile; `new` and `fresh` start a new one. See [Sessions](./agent.md#sessions)
-  - agents.<name>.tools.allowed / tools.disallowed, agents.<name>.mcp.allow: not passed (ACP agents take no tool lists); a job logs a note
+  - agents.<name>.tools.allowed / tools.disallowed: string[] — tools allowed or refused without `on_permission`, by the agent's name for them (trailing `*` matches a prefix); agents.<name>.mcp.allow: string[] — MCP servers whose tools are allowed. See [Agent Jobs](./agent.md#permissions)
   - agents.<name>.command: string — the program to run. For the other runners it replaces the agent's command from harnessmux's `agents.toml` (and its pinned adapter) for this profile's jobs
   - agents.<name>.args: string[] — the program's arguments. For the other runners without `command` they go after the agent's command
   - agents.<name>.env: map — extra environment variables for the agent

@@ -1628,7 +1628,7 @@ fn finish_orphaned_job(
     let budget = profile.max_budget_usd;
     let session = (|| {
         let table = crate::services::agent_runner::job_agent_table(agent, profile)?;
-        let (profile, _) = crate::services::agent_runner::session_profile(profile, HashMap::new())?;
+        let profile = crate::services::agent_runner::session_profile(profile, HashMap::new())?;
         let cwd = resolve_repo_root(tasks_dir).unwrap_or_else(|| tasks_dir.to_path_buf());
         crate::services::agent_runner::open_session(name, agent, &cwd, &table, profile, true).map_err(LoTaRError::ValidationError)
     })();
@@ -2976,11 +2976,11 @@ fn run_session(
     ticket_id: &str,
     context_messages: &mut Vec<crate::services::agent_context_service::AgentContextMessage>,
 ) -> RunEnd {
-    let (mut session_profile, notes) = match crate::services::agent_runner::session_profile(profile, env) {
+    let mut session_profile = match crate::services::agent_runner::session_profile(profile, env) {
         Ok(converted) => converted,
         Err(err) => return RunEnd::Failed(err.to_string()),
     };
-    let mut notes = notes;
+    let mut notes = Vec::new();
     if session_profile.permissions == harnessmux::Permissions::Workspace {
         session_profile.add_dirs = launch.writable_dirs.clone();
     }
