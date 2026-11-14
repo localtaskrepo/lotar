@@ -129,9 +129,9 @@ sudo mv lotar /usr/local/bin/
 lotar --version
 ```
 
-Release archives contain the `lotar` binary only. Agent jobs run without the optional
-`lotar-agent-wrapper` binary, but `lotar agent list-running` needs it; see
-[Agent jobs](agent.md#list-running-requirements).
+Release archives contain the `lotar` binary only. Agent jobs, `lotar agent list-running` and
+cancelling a job from another process work without the optional `lotar-agent-wrapper` binary; see
+[Jobs in other processes](agent.md#jobs-in-other-processes).
 
 ## Any OS: Docker
 

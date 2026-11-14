@@ -1,11 +1,11 @@
 title: 'CI failing on the default branch: .github/workflows/ci.yml'
-status: Reviewing
+status: Merging
 priority: High
 type: Chore
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-14T18:08:15.401343+00:00
-modified: 2026-11-14T18:32:55.319618+00:00
+modified: 2026-11-14T18:38:20.796749+00:00
 relationships:
   related:
   - DEV-542
@@ -14,6 +14,9 @@ comments:
 - date: 2026-11-14T18:18:43.791454+00:00
   author: claude
   text: 'Cause: the last 4 main runs fail one Linux test, an_agent_that_never_reads_its_prompt_still_completes: ''Failed to spawn runner: Argument list too long''. DEV-503 moved its stub to the command runner, which puts the 256 KiB prompt in LOTAR_AGENT_PROMPT, and Linux caps one env string at 128 KiB. lotar no longer pipes prompts to stdin (harnessmux does), so the test was obsolete; removed it in commit b28b2aa7. Checks: npm run lint ok, npm run test:rust:agent 2169/2169, UI/release/hook tests ok; smoke not run (test-only change). The real 128 KiB limit is filed as DEV-542. The Windows E0583 (dev485 module) in an earlier run is already gone on later runs.'
+- date: 2026-11-14T18:38:15.533713+00:00
+  author: codex
+  text: 'Review: passed. Reviewed sole commit b28b2aa7 against main c01dfce3, full diff, AGENTS.md, review/testing guidance, ticket comments, DEV-542 and DEV-503 owner decisions, runner implementation/help, workflow and five recent main commits touching the file. Deletion removes an obsolete stdin test: command runner delivers prompts via environment. Confirmed CI run 43572122922 fails exactly this test with Argument list too long; real oversized-prompt bug already tracked in DEV-542. No findings or new tickets. Reran lint:agent, test:rust:agent (2169 passed), test:ui:agent (1537 passed), test:release and test:hooks successfully. Disabled sccache after sandbox denial; Rust retry outside sandbox passed after sandbox serve failure. Smoke not rerun for test-only deletion. Working tree clean; no commits, status or assignee changes. Latest main CI 43627459905 in progress: green-main done criterion remains for post-landing verification. No durable guidance finding.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acde5299b-075c-45a2-95d2-31769bec4c93
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad2f4b42b-5444-45d2-8aa2-9793ef15ad74
@@ -80,3 +83,16 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad2f4b42b-5444-45d2-8aa2-9793ef15ad74
+- at: 2026-11-14T18:38:15.533713+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T18:38:20.796749+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

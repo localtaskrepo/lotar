@@ -1,11 +1,11 @@
 title: 'Config copy behind the standard: .tasks/DEV/automation.yml'
-status: Merging
+status: Done
 priority: Low
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T18:08:16.659184+00:00
-modified: 2026-11-14T18:19:53.149571+00:00
+modified: 2026-11-14T18:36:19.389264+00:00
 relationships:
   related:
   - DEV-474
@@ -26,6 +26,15 @@ comments:
     - The main copy had no repo-only additions in the old diff (every changed line is a standards change), so nothing was lost; nothing beyond the sync was added.
     - `repos.ts` still lists the drift because it reads the main checkout; it should clear after the merge. Not run: lint/test/smoke (a config-only change, as the fix agent said).
     - No findings, no tickets filed.
+- date: 2026-11-14T18:36:10.560498+00:00
+  author: claude
+  text: |-
+    Merged and pushed.
+
+    - Branch was already on main's tip; fast-forwarded main to `899ebe79`, then amended the pending `.tasks` changes into it (owner 2026-11-12): now `f33c78cf`.
+    - Pushed `main` (`e64997ea..f33c78cf`, 14 commits incl. other finished tickets); the pre-push hook passed (Rust fmt/clippy, frontend checks).
+    - Skipped lint/test/smoke: config-only change; the review (`cmp` identical to standards source, YAML parses, `lotar automation simulate` loads it) passed on the same commit.
+    - Health check `repos.ts localtaskrepo/lotar`: no `drift:.tasks/DEV/automation.yml` line any more.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abe933f59-3c7d-489e-9ff3-2230d2d201dd
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9c5cd48a-3a07-4b6e-b9a9-e689d510d55f
@@ -94,3 +103,13 @@ history:
   - field: assignee
     old: '@review-light'
     new: '@merge'
+- at: 2026-11-14T18:36:10.560498+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T18:36:19.389264+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

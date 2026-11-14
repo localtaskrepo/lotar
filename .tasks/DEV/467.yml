@@ -1,11 +1,11 @@
 title: Jobs that failed during the T3 Code outage left 15 tickets InProgress and lost their agents' outcome
-status: Merging
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-13T10:33:47.286204+00:00
-modified: 2026-11-14T18:23:33.606175+00:00
+modified: 2026-11-14T18:39:48.464638+00:00
 relationships:
   blocks:
   - DEV-513
@@ -35,6 +35,7 @@ relationships:
   - DEV-538
   - DEV-543
   - DEV-497
+  - DEV-503
 comments:
 - date: 2026-11-13T10:37:16.946574+00:00
   author: claude
@@ -164,6 +165,17 @@ comments:
     Minor, filed DEV-543: when end-rule steps are left pending and the lock frees right after, the recorded outcome can apply before those steps. Status and assignee can't clash (the outcome's fields are taken out of the rules), but previous.* and the updated rules then see the ticket before the rest of the end rules have run.
 
     For the merge: main has moved 59 commits (DEV-497 moved src/ to crates/lotar-lib and deleted tests/dev318_t3_runner_test.rs). git merge-tree reports conflicts in agent_job_service.rs, automation_service.rs, docs/help/agent.md and the moved dev318 test, so the merge has to rebase first.
+- date: 2026-11-14T18:39:29.690276+00:00
+  author: claude
+  text: |-
+    Merge blocked: rebasing onto main (59 commits ahead) conflicts in a way I can't resolve while keeping both sides. I aborted the rebase. 9439eafe and 887e36ef are unchanged on branch t3/job-end-rules-t3-outage. Nothing merged or pushed, no checks ran.
+
+    Conflicts (first commit 9439eafe):
+    - crates/lotar-lib/src/services/agent_job_service.rs (5 hunks): main's DEV-503 (01097b94, switch agent jobs to the harnessmux crate) removed lotar's own t3 runner: T3ThreadState, parse_t3_thread_state, the thread-show wait. This branch's first fix (wait up to 60 min for an unreachable T3 Code server, then end from the thread's state) lives in that removed code. Keeping it means doing the wait again in harnessmux's t3 path (harnessmux 0.1.2 is an external crate) or in lotar's new adapter. That's a re-implementation, not a conflict resolution.
+    - tests/dev318_t3_runner_test.rs: deleted on main (DEV-497/DEV-503) and changed here (the server-outage regression). Its test has to move with that wait.
+    - crates/lotar-lib/src/services/automation_service.rs (3 hunks) and docs/help/agent.md (4 hunks): main's rule_label and DEV-524/DEV-503 text sit next to this branch's retry_while_busy, durable end-action checkpoints and recovery text. These look mechanical, but the help text describes the t3 runner that main rewrote.
+
+    What's needed: a decision on whether the T3 Code outage wait goes into harnessmux (upstream) or into lotar's adapter, or whether harnessmux already covers it. After that the fix agent ports part 1 onto main, keeps the end-rule and outcome recovery (part 2, still needed) and its tests, reruns lint, test and smoke, and sends it to review again.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8a51060f-8f0e-40eb-8309-91840a4fac93
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa70d136-71c4-42cc-8c60-e9566c5a27b6
@@ -713,3 +725,22 @@ history:
   - field: assignee
     old: '@review-claude'
     new: '@merge'
+- at: 2026-11-14T18:39:29.690276+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T18:39:30.119847+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-513"],"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513","DEV-524","DEV-530","DEV-532","DEV-538","DEV-543","DEV-497"]}'
+    new: '{"blocks":["DEV-513"],"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513","DEV-524","DEV-530","DEV-532","DEV-538","DEV-543","DEV-497","DEV-503"]}'
+- at: 2026-11-14T18:39:48.464638+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox

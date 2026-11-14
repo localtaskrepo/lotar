@@ -1,14 +1,16 @@
 title: A job's recorded outcome can apply before its unfinished end-rule steps
-status: Todo
+status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-14T18:22:28.435938+00:00
-modified: 2026-11-14T18:22:28.803661+00:00
+modified: 2026-11-14T18:37:27.638192+00:00
 relationships:
   related:
   - DEV-467
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad1bfdb1c-bef4-4433-aebb-6dac3521f908
 description: 'Found in the DEV-467 review (887e36ef). In AutomationService::apply_job_event (src/services/automation_service.rs ~575-600) the recorded outcome is applied even when apply_durable_end_action returned a busy error and left steps pending. If the lock frees between the two, the outcome and its updated/assigned rules run before the remaining end-rule steps (other set fields, add/remove, comment, run, tell_agent), which replay later. Status/assignee can''t conflict (without_outcome_fields strips them), but previous.* is not ''the ticket after the job''s rules ran'' as docs/help/agent.md says, and a queued agent or updated rule can see the ticket before the end rule''s tags. Done when: the outcome waits behind the job''s pending end-action checkpoint (defer it while the checkpoint exists, replay it after), with a test that frees the lock between the two.'
 history:
 - at: 2026-11-14T18:22:28.644513+00:00
@@ -22,3 +24,14 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-14T18:37:26.995135+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-14T18:37:27.638192+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad1bfdb1c-bef4-4433-aebb-6dac3521f908
