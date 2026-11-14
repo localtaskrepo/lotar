@@ -33,9 +33,15 @@ EOF
 
 Your final hand-off comment adds a report: `--commit "<sha>: <what>"` for each commit, `--check "<command>=<passed|failed|not_run>[: reason]"` for each check, including the ones you didn't run, and `--next "<step>"` for the next step. Add them to the same command, before `-F -`.
 
+## Commands the sandbox blocks
+
+A command can stop because your sandbox or tool permissions block it, not because of the work: `Operation not permitted`, a refused network or socket connection (for example to a compiler cache such as sccache), or a write outside your working directory (shared git metadata, the main checkout's tasks directory). That is not a failure. Rerun the same command with your harness's approval to run it outside the sandbox. If that is refused, use the fallback the repository's guidance documents (for example a build with its compiler cache turned off). Report which retry ran. Hand the ticket back only when the retries are refused or fail too, with the command and its error.
+
+A check that fails on the work itself (a failing test, a lint finding, a build error) is a real failure, not a sandbox block: fix it if that is your task, otherwise report it. A merge job doesn't land a branch whose checks fail.
+
 ## Clarifications, blockers and feedback
 
-If the ticket is ambiguous, a product decision is missing, you need feedback, or you are blocked and can't finish the work (for example a command you need is refused or keeps failing), don't guess: hand the ticket back.
+If the ticket is ambiguous, a product decision is missing, you need feedback, or you are blocked and can't finish the work (for example a command you need is refused or keeps failing, also after the retries under "Commands the sandbox blocks"), don't guess: hand the ticket back.
 
 - Comment the open question or blocker and the decision or input you need.
 - Assign the ticket to the person your request below names for questions; if it names no one, to its reporter (${{ticket.reporter}}).

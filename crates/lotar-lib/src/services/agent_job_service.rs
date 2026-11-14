@@ -128,6 +128,9 @@ struct AgentJobState {
     /// The main checkout's commit when a merge job started, so its end
     /// knows which of main's commits the job landed (DEV-411).
     main_head_at_start: Option<String>,
+    /// A merge job's ticket assignee once its start rules ran, so its end
+    /// sees whether the agent handed the ticket back (DEV-516).
+    assignee_at_start: Option<Option<String>>,
 }
 
 /// Data needed to start a queued job when a slot becomes available
@@ -347,6 +350,7 @@ impl AgentJobService {
                     runner_failed: false,
                     worker_running: false,
                     main_head_at_start: None,
+                    assignee_at_start: None,
                 },
             );
 
@@ -1084,7 +1088,9 @@ leave the changes in place: LoTaR commits them when the job ends. Don't switch b
                 "- This is a merge job: it succeeds only if the branch ends up in the main checkout's current branch. \
 If git refuses to fast-forward the main checkout (for example inside a sandbox), leave it: LoTaR fast-forwards it when the job ends, \
 as long as the branch is rebased onto it. If you land the work in another form instead (for example you resolve conflicts \
-in the main checkout), start each of those commits' messages with `{ticket_id}`, so LoTaR counts the branch as landed.\n"
+in the main checkout), start each of those commits' messages with `{ticket_id}`, so LoTaR counts the branch as landed. \
+If you don't land it (for example a check fails on the work), hand the ticket back, assigning it as under \"Clarifications, blockers and feedback\": \
+LoTaR then leaves the branch unmerged.\n"
             ));
         }
     } else {
@@ -1505,6 +1511,7 @@ fn adopt_orphaned_job(tasks_dir: &std::path::Path, orphan: &crate::services::age
                 runner_failed: false,
                 worker_running: true,
                 main_head_at_start: None,
+                assignee_at_start: restored_assignee(job.assignee_at_start.clone()),
             },
         );
         registry.running_count += 1;
@@ -2564,6 +2571,9 @@ fn run_job(
     if is_merge_job && let Some(head) = resolve_repo_root(&tasks_dir).and_then(|root| rev_parse(&root, "HEAD")) {
         update_job(&job_id, |state| state.main_head_at_start = Some(head.clone()));
     }
+    if is_merge_job && let Some((_, assignee)) = ticket_state(&tasks_dir, &ticket_id) {
+        update_job(&job_id, |state| state.assignee_at_start = Some(assignee.clone()));
+    }
     if let Some(reason) = session_reason {
         update_job(&job_id, |state| {
             record_and_emit(state, "agent_job_progress", Some(reason.clone()));
@@ -2585,6 +2595,7 @@ fn run_job(
             started_at: Utc::now().to_rfc3339(),
             session_id: agent.map(|_| name.clone()),
             merge: state.record.is_merge_job,
+            assignee_at_start: recorded_assignee(state.assignee_at_start.clone()),
         })
     });
     if let Some(record) = active_record.as_ref() {
@@ -3435,15 +3446,16 @@ fn commit_leftover_work(job_id: &str) -> Result<Option<String>, String> {
 /// named after the ticket, that change every file the branch changes. A
 /// merged branch's commit is recorded as landed, so cleanup at Done can
 /// remove it (DEV-411). Jobs that are not merge jobs, and states git can't
-/// judge, pass.
+/// judge, pass. A job whose agent handed the ticket back (it reassigned the
+/// ticket) is not fast-forwarded: it passes with the branch unmerged.
 fn ensure_branch_merged(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Path) -> Result<Option<String>, String> {
-    let Some((branch, start)) = JOB_REGISTRY.lock().ok().and_then(|registry| {
-        registry
-            .jobs
-            .get(job_id)
-            .filter(|state| state.record.is_merge_job)
-            .and_then(|state| state.record.worktree_branch.clone().map(|branch| (branch, state.main_head_at_start.clone())))
-    }) else {
+    let Some((branch, start, assignee_at_start)) =
+        JOB_REGISTRY.lock().ok().and_then(|registry| {
+            registry.jobs.get(job_id).filter(|state| state.record.is_merge_job).and_then(|state| {
+                state.record.worktree_branch.clone().map(|branch| (branch, state.main_head_at_start.clone(), state.assignee_at_start.clone()))
+            })
+        })
+    else {
         return Ok(None);
     };
     let Some(repo_root) = resolve_repo_root(tasks_dir) else {
@@ -3457,6 +3469,22 @@ fn ensure_branch_merged(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Pa
         // A branch git can't judge passes, like a merged one.
         Err(_) => return Ok(None),
         Ok(false) => {}
+    }
+    // An agent that handed the ticket back (for example because a check failed
+    // on the work) left the branch unmerged on purpose (DEV-516). A handback
+    // reassigns the ticket; finishing never does, with or without end rules,
+    // though it may set a status. A T3 Code thread's change waits as the
+    // job's outcome; an agent with the job's environment changes it directly.
+    // A job taken over from an older lotar may have no starting assignee;
+    // its recorded outcome still counts.
+    let recorded = crate::services::agent_active_jobs::peek_outcome(tasks_dir, job_id).and_then(|outcome| outcome.assignee);
+    let changed = || {
+        let at_start = assignee_at_start?;
+        ticket_state(tasks_dir, ticket_id).map(|(_, assignee)| assignee).filter(|now| *now != at_start).map(Option::unwrap_or_default)
+    };
+    if let Some(assignee) = recorded.or_else(changed) {
+        let to = if assignee.is_empty() { "unassigned".to_string() } else { format!("to {assignee}") };
+        return Ok(Some(format!("The agent handed {ticket_id} back ({to}): LoTaR leaves {branch} unmerged")));
     }
     let output = git_command(&repo_root).args(["merge", "--ff-only", "--quiet", &branch]).output().map_err(|err| format!("git merge: {err}"))?;
     if output.status.success() {
@@ -3726,16 +3754,31 @@ fn update_job_failure(job_id: &str, ticket_id: &str, message: String, tasks_dir:
 /// Runs the rules for the job's end and logs where they moved the ticket,
 /// so the agent's summary needn't say it (DEV-469).
 fn apply_job_end_rules(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Path, event: AutomationEvent, job_context: Option<AutomationJobContext>) {
-    let ticket_state = || TaskService::get(&Storage::new(tasks_dir), ticket_id, None).ok().map(|task| (task.status.to_string(), task.assignee));
-    let before = ticket_state();
+    let before = ticket_state(tasks_dir, ticket_id);
     let _ = AutomationService::apply_job_event(tasks_dir, ticket_id, event, job_context);
-    if let (Some(before), Some(after)) = (before, ticket_state())
+    if let (Some(before), Some(after)) = (before, ticket_state(tasks_dir, ticket_id))
         && let Some(message) = ticket_move_note(ticket_id, &before, &after)
     {
         update_job(job_id, |state| {
             push_event(state, "agent_job_progress", Some(message.clone()));
         });
     }
+}
+
+/// A merge job's starting assignee as its active-job record keeps it: empty
+/// for none, so it survives a takeover (DEV-516).
+fn recorded_assignee(assignee_at_start: Option<Option<String>>) -> Option<String> {
+    assignee_at_start.map(Option::unwrap_or_default)
+}
+
+/// The starting assignee a taken-over job's record kept; see [`recorded_assignee`].
+fn restored_assignee(recorded: Option<String>) -> Option<Option<String>> {
+    recorded.map(|assignee| Some(assignee).filter(|assignee| !assignee.is_empty()))
+}
+
+/// The ticket's status and assignee.
+fn ticket_state(tasks_dir: &std::path::Path, ticket_id: &str) -> Option<(String, Option<String>)> {
+    TaskService::get(&Storage::new(tasks_dir), ticket_id, None).ok().map(|task| (task.status.to_string(), task.assignee))
 }
 
 /// "DEV-1 is now Review, assigned to mallox" when the job's end changed the
@@ -4235,7 +4278,96 @@ mod tests {
             runner_failed: false,
             worker_running: false,
             main_head_at_start: None,
+            assignee_at_start: None,
         }
+    }
+
+    /// A taken-over merge job whose ticket the agent handed back (DEV-516):
+    /// a repository with branch `agent/TKO-1` one commit ahead of main, the
+    /// ticket assigned to sam, and the job in the registry as `adopt_orphaned_job`
+    /// leaves it. Returns the repository and the tasks directory.
+    fn taken_over_merge_job(job_id: &str, assignee_at_start: Option<Option<String>>) -> (tempfile::TempDir, std::path::PathBuf) {
+        let dir = tempdir().unwrap();
+        let repo = dir.path();
+        // SAFETY: test-local override; outcomes and job records stay out of the user's cache.
+        unsafe { std::env::set_var("LOTAR_AGENT_QUEUE_DIR", repo.join("queue")) };
+        let git = |args: &[&str]| assert!(git_command(repo).args(args).output().unwrap().status.success(), "git {args:?}");
+        git(&["init", "-q", "-b", "main"]);
+        git(&["config", "user.name", "Agent Tests"]);
+        git(&["config", "user.email", "agent-tests@example.com"]);
+        git(&["config", "commit.gpgsign", "false"]);
+        fs::write(repo.join(".gitignore"), ".tasks/\nqueue/\n").unwrap();
+        git(&["add", "."]);
+        git(&["commit", "-qm", "init"]);
+        git(&["checkout", "-q", "-b", "agent/TKO-1"]);
+        fs::write(repo.join("feature.txt"), "feature\n").unwrap();
+        git(&["add", "feature.txt"]);
+        git(&["commit", "-qm", "TKO-1 feature"]);
+        git(&["checkout", "-q", "main"]);
+        let tasks_dir = repo.join(".tasks");
+        fs::create_dir_all(&tasks_dir).unwrap();
+        fs::write(tasks_dir.join("config.yml"), "default:\n  project: TKO\n").unwrap();
+        let mut storage = Storage::new(&tasks_dir);
+        crate::services::task_service::TaskService::create(
+            &mut storage,
+            crate::api_types::TaskCreate {
+                title: "Taken over".to_string(),
+                project: Some("TKO".to_string()),
+                assignee: Some("sam".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let mut state = unit_job_state(job_id);
+        state.record.ticket_id = "TKO-1".to_string();
+        state.record.tasks_dir = tasks_dir.clone();
+        state.record.is_merge_job = true;
+        state.record.worktree_branch = Some("agent/TKO-1".to_string());
+        state.assignee_at_start = assignee_at_start;
+        JOB_REGISTRY.lock().unwrap().jobs.insert(job_id.to_string(), state);
+        (dir, tasks_dir)
+    }
+
+    #[test]
+    fn a_taken_over_merge_job_keeps_its_starting_assignee() {
+        let started_unassigned = recorded_assignee(Some(None));
+        assert_eq!(started_unassigned.as_deref(), Some(""));
+        assert_eq!(restored_assignee(started_unassigned), Some(None));
+        assert_eq!(restored_assignee(recorded_assignee(Some(Some("@merge".to_string())))), Some(Some("@merge".to_string())));
+        assert_eq!(restored_assignee(recorded_assignee(None)), None, "a job that is no merge job, or a record from an older lotar");
+    }
+
+    #[test]
+    fn a_taken_over_merge_job_handed_back_directly_stays_unmerged() {
+        let (dir, tasks_dir) = taken_over_merge_job("job-tko-direct", restored_assignee(Some("sam".to_string())));
+        let mut storage = Storage::new(&tasks_dir);
+        crate::services::task_service::TaskService::update(
+            &mut storage,
+            "TKO-1",
+            crate::api_types::TaskUpdate { assignee: Some("reviewer".to_string()), ..Default::default() },
+        )
+        .unwrap();
+        let note = ensure_branch_merged("job-tko-direct", "TKO-1", &tasks_dir).unwrap();
+        assert_eq!(note.as_deref(), Some("The agent handed TKO-1 back (to reviewer): LoTaR leaves agent/TKO-1 unmerged"));
+        assert!(!dir.path().join("feature.txt").exists(), "main stays where it was");
+    }
+
+    #[test]
+    fn a_taken_over_merge_job_without_a_starting_assignee_still_sees_a_recorded_handback() {
+        let (dir, tasks_dir) = taken_over_merge_job("job-tko-recorded", None);
+        let outcome = crate::api_types::JobOutcome { job_id: "job-tko-recorded".to_string(), assignee: Some("reviewer".to_string()), ..Default::default() };
+        crate::services::agent_active_jobs::record_outcome(&tasks_dir, &outcome).unwrap();
+        let note = ensure_branch_merged("job-tko-recorded", "TKO-1", &tasks_dir).unwrap();
+        assert_eq!(note.as_deref(), Some("The agent handed TKO-1 back (to reviewer): LoTaR leaves agent/TKO-1 unmerged"));
+        assert!(!dir.path().join("feature.txt").exists(), "main stays where it was");
+    }
+
+    #[test]
+    fn a_taken_over_merge_job_that_finished_is_fast_forwarded() {
+        let (dir, tasks_dir) = taken_over_merge_job("job-tko-done", restored_assignee(Some("sam".to_string())));
+        let note = ensure_branch_merged("job-tko-done", "TKO-1", &tasks_dir).unwrap();
+        assert_eq!(note.as_deref(), Some("Fast-forwarded the main checkout to agent/TKO-1"));
+        assert!(dir.path().join("feature.txt").exists());
     }
 
     #[test]
@@ -4252,6 +4384,27 @@ mod tests {
     fn built_in_instructions_let_the_request_name_who_gets_a_question() {
         assert!(DEFAULT_AGENT_INSTRUCTIONS.contains("the person your request below names for questions; if it names no one, to its reporter"));
         assert!(!DEFAULT_AGENT_INSTRUCTIONS.contains("Summarize changes and tests"));
+    }
+
+    /// DEV-516: a merge job handed back as soon as lint hit a sandbox-blocked sccache, since "a command you need is
+    /// refused" read as a blocker. The instructions now retry such a command first, and only a check that fails on
+    /// the work stops a merge.
+    #[test]
+    fn built_in_instructions_retry_a_sandbox_blocked_command_before_a_handback() {
+        let text = DEFAULT_AGENT_INSTRUCTIONS;
+        let sandbox = text.find("## Commands the sandbox blocks").expect("sandbox section");
+        let blockers = text.find("## Clarifications, blockers and feedback").expect("blockers section");
+        assert!(sandbox < blockers, "the retries come before the handback");
+        for phrase in [
+            "`Operation not permitted`",
+            "Rerun the same command with your harness's approval to run it outside the sandbox.",
+            "use the fallback the repository's guidance documents",
+            "Hand the ticket back only when the retries are refused or fail too",
+            "A merge job doesn't land a branch whose checks fail.",
+            "keeps failing, also after the retries under \"Commands the sandbox blocks\"",
+        ] {
+            assert!(text.contains(phrase), "missing: {phrase}");
+        }
     }
 
     #[test]
@@ -4322,6 +4475,7 @@ mod tests {
             child_pid: 0,
             started_at: Utc::now().to_rfc3339(),
             session_id: Some("thread-1".to_string()),
+            assignee_at_start: None,
             merge,
         }
     }

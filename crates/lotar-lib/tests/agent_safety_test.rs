@@ -1095,6 +1095,7 @@ fn build_output_stays_while_another_job_runs_in_the_worktree() {
         started_at: "2026-11-11T00:00:00Z".into(),
         session_id: None,
         merge: false,
+        assignee_at_start: None,
     };
     agent_active_jobs::register(&fixture.tasks_root, &elsewhere);
     fs::write(&go, "").unwrap();

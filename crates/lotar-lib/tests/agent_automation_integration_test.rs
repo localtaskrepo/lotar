@@ -2322,6 +2322,190 @@ exit 0
         assert!(!fixtures.get_temp_path().join("feature.txt").exists());
     }
 
+    /// Runs the agent-pipeline template with a merge agent that, like a
+    /// sandboxed Codex job, finds its check blocked by the compiler cache
+    /// (sccache, `Operation not permitted`) unless `RUSTC_WRAPPER=` turns the
+    /// cache off; the stub sets the wrapper itself, so the environment the
+    /// tests run in doesn't matter. It retries as the built-in instructions say, and hands the
+    /// ticket back when the check then fails on the work (DEV-516). Returns
+    /// the ticket at `status` and the merge agent's log.
+    #[cfg(unix)]
+    fn run_merge_with_sandboxed_check(prefix: &str, feature: &str, status: &str) -> (TestFixtures, lotar::api_types::TaskDTO, String) {
+        let fixtures = TestFixtures::new();
+        init_git_repository(fixtures.get_temp_path());
+        let check_log = fixtures.get_temp_path().join("check.log");
+        let agent_script = write_stub_agent_script(
+            fixtures.get_temp_path(),
+            "sandboxed-check-agent.sh",
+            &format!(
+                r#"#!/bin/sh
+profile="${{LOTAR_AGENT_PROFILE:-unknown}}"
+sid="${{profile}}-$$"
+log="{log}"
+export RUSTC_WRAPPER=sccache
+printf '{{"type":"system","subtype":"init","session_id":"%s"}}\n' "$sid"
+check() {{
+  if [ -n "$RUSTC_WRAPPER" ]; then
+    echo "sccache: error: Operation not permitted (os error 1)" >&2
+    return 1
+  fi
+  ! grep -q broken feature.txt
+}}
+case "$profile" in
+  implement) echo "{feature}" > feature.txt ;;
+  merge)
+    if ! check 2> check.err; then
+      if grep -q "Operation not permitted" check.err && printf '%s' "$LOTAR_AGENT_PROMPT" | grep -q "use the fallback the repository's guidance documents"; then
+        echo "sandbox blocked; retry with RUSTC_WRAPPER=" >> "$log"
+        if ! RUSTC_WRAPPER= check; then
+          echo "check failed on the work" >> "$log"
+          "{lotar}" comment "$LOTAR_TICKET_ID" "The check fails on the work; not merging." >/dev/null || exit 3
+          "{lotar}" status "$LOTAR_TICKET_ID" HelpNeeded >/dev/null || exit 3
+          "{lotar}" assignee "$LOTAR_TICKET_ID" "$LOTAR_TICKET_REPORTER" >/dev/null || exit 3
+        fi
+      else
+        echo "handed back at the sandbox block" >> "$log"
+        "{lotar}" status "$LOTAR_TICKET_ID" HelpNeeded >/dev/null || exit 3
+      fi
+    fi
+    rm -f check.err ;;
+esac
+printf '{{"type":"assistant","message":{{"content":[{{"text":"%s complete"}}]}},"session_id":"%s"}}\n' "$profile" "$sid"
+exit 0
+"#,
+                log = check_log.to_string_lossy(),
+                lotar = crate::common::lotar_bin().display(),
+            ),
+        );
+        install_template_workflow(
+            &fixtures,
+            prefix,
+            "agent-pipeline",
+            &[("implement", agent_script.as_path()), ("test", agent_script.as_path()), ("merge", agent_script.as_path())],
+        );
+        lotar::utils::identity::invalidate_identity_cache(Some(fixtures.tasks_root.as_path()));
+
+        let mut storage = fixtures.create_storage();
+        let created = TaskService::create(
+            &mut storage,
+            TaskCreate {
+                title: "Sandboxed check".to_string(),
+                project: Some(prefix.to_string()),
+                reporter: Some("Agent Tests".to_string()),
+                ..Default::default()
+            },
+        )
+        .expect("create task");
+        TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some("@implement".to_string()), ..Default::default() })
+            .expect("assign implementation agent");
+
+        let task = wait_for_task_state(&storage, &created.id, status, None, 10_000)
+            .unwrap_or_else(|| panic!("{} did not reach {status}: {:?}", created.id, TaskService::get(&storage, &created.id, None)));
+        let log = fs::read_to_string(&check_log).unwrap_or_default();
+        (fixtures, task, log)
+    }
+
+    /// A check the sandbox blocks is retried with the fallback, passes, and the
+    /// merge lands (DEV-516).
+    #[cfg(unix)]
+    #[test]
+    fn merge_job_retries_a_sandbox_blocked_check_and_lands() {
+        crate::common::require_git();
+        let _guard = lock_agent_tests();
+        enable_server_mode();
+        let (fixtures, task, log) = run_merge_with_sandboxed_check("SBX", "feature", "Done");
+        assert_eq!(log, "sandbox blocked; retry with RUSTC_WRAPPER=\n");
+        assert_eq!(task.status.as_str(), "Done");
+        assert!(fixtures.get_temp_path().join("feature.txt").exists(), "the branch should reach the main checkout");
+    }
+
+    /// A check that fails on the work, also after the sandbox retry, stops the
+    /// merge: the agent hands the ticket back and LoTaR doesn't fast-forward
+    /// the main checkout for it (DEV-516).
+    #[cfg(unix)]
+    #[test]
+    fn merge_job_whose_check_fails_on_the_work_does_not_land() {
+        crate::common::require_git();
+        let _guard = lock_agent_tests();
+        enable_server_mode();
+        let (fixtures, task, log) = run_merge_with_sandboxed_check("SBF", "broken", "HelpNeeded");
+        assert_eq!(log, "sandbox blocked; retry with RUSTC_WRAPPER=\ncheck failed on the work\n");
+        let jobs = wait_for_ticket_jobs(&task.id, 10_000, |jobs| jobs.iter().any(|job| job.agent.as_deref() == Some("merge") && job.finished_at.is_some()));
+        let merge_job = jobs.iter().find(|job| job.agent.as_deref() == Some("merge")).expect("merge job");
+        assert_eq!(merge_job.status, "completed", "handing back is the agent's result, not a failure to retry: {merge_job:?}");
+        let task = TaskService::get(&fixtures.create_storage(), &task.id, None).expect("get task");
+        assert_eq!((task.status.as_str(), task.assignee.as_deref()), ("HelpNeeded", Some("Agent Tests")), "the handback sticks");
+        assert!(!fixtures.get_temp_path().join("feature.txt").exists(), "a branch whose check fails must not reach the main checkout");
+    }
+
+    /// Runs a merge job without rules for the job's end: the stub agent commits
+    /// on its branch, runs `ticket_commands` (lotar subcommands for the ticket)
+    /// and leaves the fast-forward to LoTaR, as a sandboxed agent must. Returns
+    /// the ended job and the ticket (DEV-516).
+    #[cfg(unix)]
+    fn run_merge_without_end_rules(prefix: &str, ticket_commands: &[&str]) -> (TestFixtures, lotar::api_types::AgentJob, lotar::api_types::TaskDTO) {
+        let fixtures = TestFixtures::new();
+        init_git_repository(fixtures.get_temp_path());
+        let lotar = crate::common::lotar_bin();
+        let commands: String = ticket_commands.iter().map(|command| format!("\"{}\" {command} >/dev/null || exit 3\n", lotar.display())).collect();
+        let script = write_stub_agent_script(
+            fixtures.get_temp_path(),
+            "no-rules-merge-agent.sh",
+            &format!(
+                "#!/bin/sh\necho feature > feature.txt && git add feature.txt && git commit -qm \"$LOTAR_TICKET_ID feature\" || exit 4\n{commands}exit 0\n"
+            ),
+        );
+        fixtures.create_config_in_dir(
+            &fixtures.tasks_root,
+            &format!(
+                "default:\n  project: {prefix}\n  reporter: reviewer\nissue:\n  states: [Todo, InProgress, Review, HelpNeeded, Done]\n  priorities: [Low, Medium]\n  types: [Feature]\nagent:\n  worktree:\n    enabled: true\nagents:\n  merge:\n    runner: command\n    command: \"{}\"\n",
+                script.to_string_lossy()
+            ),
+        );
+        let mut storage = fixtures.create_storage();
+        let created = TaskService::create(
+            &mut storage,
+            TaskCreate { title: "Merge without end rules".to_string(), project: Some(prefix.to_string()), ..Default::default() },
+        )
+        .expect("create task");
+        TaskService::update(&mut storage, &created.id, TaskUpdate { assignee: Some("@merge".to_string()), ..Default::default() }).expect("assign merge agent");
+
+        let jobs = wait_for_ticket_jobs(&created.id, 10_000, |jobs| jobs.iter().any(|job| job.finished_at.is_some()));
+        let job = jobs.first().cloned().expect("merge job");
+        let task = TaskService::get(&storage, &created.id, None).expect("get task");
+        (fixtures, job, task)
+    }
+
+    /// Without rules for the job's end, a merge agent sets a status when it
+    /// finishes, as its instructions say: that is no handback, so LoTaR still
+    /// fast-forwards the branch it couldn't (DEV-516).
+    #[cfg(unix)]
+    #[test]
+    fn merge_agent_that_sets_a_status_without_end_rules_still_lands() {
+        crate::common::require_git();
+        let _guard = lock_agent_tests();
+        enable_server_mode();
+        let (fixtures, job, task) = run_merge_without_end_rules("NOR", &["status \"$LOTAR_TICKET_ID\" Review"]);
+        assert_eq!(job.status, "completed", "{job:?}");
+        assert!(fixtures.get_temp_path().join("feature.txt").exists(), "LoTaR fast-forwards the main checkout: {job:?}");
+        assert_eq!(task.status.as_str(), "Review");
+    }
+
+    /// Without rules for the job's end, a merge agent that hands the ticket
+    /// back (a check failed on the work) reassigns it: LoTaR leaves the branch
+    /// unmerged (DEV-516).
+    #[cfg(unix)]
+    #[test]
+    fn merge_agent_that_hands_back_without_end_rules_does_not_land() {
+        crate::common::require_git();
+        let _guard = lock_agent_tests();
+        enable_server_mode();
+        let (fixtures, job, task) = run_merge_without_end_rules("NRH", &["status \"$LOTAR_TICKET_ID\" HelpNeeded", "assignee \"$LOTAR_TICKET_ID\" reviewer"]);
+        assert_eq!(job.status, "completed", "{job:?}");
+        assert!(!fixtures.get_temp_path().join("feature.txt").exists(), "a handed-back branch must not reach the main checkout: {job:?}");
+        assert_eq!((task.status.as_str(), task.assignee.as_deref()), ("HelpNeeded", Some("reviewer")));
+    }
+
     /// A merge job whose branch was rebased onto main elsewhere (T3 Code
     /// rebases a renamed copy of the branch) passes: main has every commit's
     /// change, though not the branch's own commits (DEV-342).

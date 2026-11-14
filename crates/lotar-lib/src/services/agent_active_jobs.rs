@@ -33,6 +33,11 @@ pub struct ActiveJob {
     /// when the ticket has moved on since (DEV-544).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub merge: bool,
+    /// A merge job's ticket assignee when it started (empty: none), so a
+    /// process that takes the job over sees whether the agent handed the
+    /// ticket back (DEV-516).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assignee_at_start: Option<String>,
 }
 
 /// What a ticket should be when its job ends, set while the job ran
@@ -312,6 +317,7 @@ mod tests {
             started_at: "2026-01-01T00:00:00Z".into(),
             session_id: None,
             merge: false,
+            assignee_at_start: None,
         };
         register(tasks.path(), &job);
         assert_eq!(for_ticket(tasks.path(), "T-1"), Some(job.clone()));
