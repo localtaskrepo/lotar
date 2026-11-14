@@ -1,11 +1,11 @@
 title: 'harnessmux: sign local installs with the owner''s Developer ID'
-status: HelpNeeded
+status: InProgress
 priority: High
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-15T17:40:29.239703+00:00
-modified: 2026-11-15T19:02:41.804926+00:00
+modified: 2026-11-15T20:43:14.426354+00:00
 relationships:
   blocks:
   - DEV-563
@@ -76,6 +76,9 @@ comments:
       result: not_run
       reason: nothing to merge in lotar
     next: 'Owner: say whether harnessmux 3a3cfca needs a review first or can merge as is'
+- date: 2026-11-15T20:30:33.489496+00:00
+  author: mallox
+  text: 'Answer: review (Review on Codex in the harnessmux worktree first, then merge) (answered in INBOX-283)'
 description: |-
   Child of standards STD-138 (https://standards.pyxzl.net/task/STD-138). Owner by voice, 2026-11-15: "sign every local install of lotar, opgate and harnessmux, including builds from source, with my Developer ID, so keychain and firewall approvals survive new builds. Land it in the next version."
 
@@ -220,3 +223,19 @@ history:
   - field: assignee
     old: '@merge'
     new: mallox
+- at: 2026-11-15T20:30:33.489496+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-15T20:30:36.079526+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T20:43:14.426354+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress

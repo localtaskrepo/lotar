@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T22:21:43.366702+00:00
-modified: 2026-11-15T18:42:18.430488+00:00
+modified: 2026-11-15T19:56:14.817790+00:00
 relationships:
   blocks:
   - DEV-499
@@ -25,6 +25,13 @@ comments:
 - date: 2026-11-13T23:23:17.067726+00:00
   author: codex
   text: 'Merged into main: rebased b001cb17 without conflicts to 9b2b31bd, fast-forwarded main, then amended pending .tasks changes as instructed; final main commit 68b7ca14. All gates reran on the rebased code: lint:agent passed; test:agent passed (2146 Rust, 1515 UI, release and hook tests); test:smoke:agent passed (390). No checks skipped. Main was clean after amend. Push withheld: oldest unpushed commit 5fc697e1 belongs to DEV-478, currently HelpNeeded, so no finished prefix can be pushed before it. Status and assignee unchanged; automation completes this ticket when the job ends.'
+- date: 2026-11-15T19:56:14.817790+00:00
+  author: claude
+  text: |-
+    The step this ticket left open is done now: DEV-572 moved the services test into the cli module (`683e8626` on main).
+
+    - `running_job_matches_accepts_padded_spellings` now lives in `cli/handlers/agent.rs`, next to the function it tests.
+    - `services/agent_job_service.rs` tests no longer call `cli::handlers::agent`.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abfc8dd44-dac3-4c7d-a0a0-0e2f1436b0e8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad52bfe06-ac2b-48ef-9606-cd8791702350
@@ -151,3 +158,7 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-499"],"related":["DEV-493","DEV-478","DEV-505","DEV-532"]}'
     new: '{"blocks":["DEV-499"],"related":["DEV-493","DEV-478","DEV-505","DEV-532","DEV-572"]}'
+- at: 2026-11-15T19:56:14.817790+00:00
+  actor: claude
+  changes:
+  - field: comment_added

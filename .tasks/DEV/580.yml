@@ -1,0 +1,75 @@
+title: automation_agent_settings_reach_the_job_they_start leaves its fixture in the temp folder now and then
+status: Reviewing
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@review'
+created: 2026-11-15T20:04:35.425934+00:00
+modified: 2026-11-15T20:21:36.987021+00:00
+relationships:
+  related:
+  - DEV-576
+comments:
+- date: 2026-11-15T20:21:31.567832+00:00
+  author: claude
+  text: |-
+    Fixed: the test now waits until both jobs' workers are done before it drops the fixture.
+
+    - Reproduced: run 6 of 8 left `.lotar-test-scratch` (`tests left 1 entries`)
+    - `crates/lotar-lib/tests/agent_automation_integration_test.rs`: `wait_for_completed_jobs` replaced by `wait_for_ticket_jobs` with `AgentJobService::job_settled` on both jobs, as DEV-576's test does
+    - After: 12 runs in a row exit 0; `npm run lint`, `npm test`, `npm run smoke` pass
+    - Commit `c0c6ad79`
+  report:
+    commits:
+    - hash: c0c6ad79
+      what: the test waits until both jobs are settled
+    checks:
+    - command: for i in 1..8 rust-test-runner automation_agent_settings_reach_the_job_they_start
+      result: passed
+      reason: '12 runs in a row exit 0 (before: run 6 of 8 left .lotar-test-scratch)'
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+    - command: npm run smoke
+      result: passed
+    next: Review on another model, then merge
+description: |-
+  Found 2026-11-15 in the DEV-576 rework: run alone, the test leaves .lotar-test-scratch (fixture .tmpXXX/.tasks and agent-queue markers) in about 1 of 8 runs, so the runner exits 1. It returns once both jobs are completed but before their workers settle, and the job ends still write into the dropped fixture.
+  Check: for i in 1 2 3 4 5 6 7 8; do node scripts/rust-test-runner.mjs --agent -- automation_agent_settings_reach_the_job_they_start; done (any exit 1 with 'tests left 1 entries').
+  Done when: the test waits for AgentJobService::job_settled on its jobs (as DEV-576's test does) and 10 runs in a row exit 0.
+tags:
+- health
+custom_fields:
+  finding: test:temp-leftover-dev200
+history:
+- at: 2026-11-15T20:04:35.667137+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-576"]}'
+- at: 2026-11-15T20:04:35.905964+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-15T20:11:19.837995+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T20:21:31.567832+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T20:21:36.987021+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

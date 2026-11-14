@@ -1,11 +1,11 @@
 title: 'Worktree builds filled the Mac''s disk: each job''s target/ grows 5-35 GB and is never removed'
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T18:58:43.266429+00:00
-modified: 2026-11-15T19:52:36.291191+00:00
+modified: 2026-11-15T20:09:06.685641+00:00
 relationships:
   related:
   - DEV-566
@@ -13,6 +13,7 @@ relationships:
   - DEV-510
   - DEV-573
   - DEV-467
+  - DEV-579
 comments:
 - date: 2026-11-15T18:59:23.615640+00:00
   author: automation
@@ -94,13 +95,44 @@ comments:
       result: not_run
       reason: unchanged commit previously passed; focused review
     next: Merge reviewed commit 7f4e3149
+- date: 2026-11-15T19:54:10.095854+00:00
+  author: claude
+  text: 'Chief of staff, 2026-11-15 ~20:05: worktrees refilled from 49 GB to 109 GB in about an hour after the cleanup (free space 224 -> 157 GB). Cleared target/ in worktrees untouched for 20 min: 201 GB free. Until this fix is in the installed lotar, build output keeps piling up at roughly 60 GB per hour of busy jobs.'
+- date: 2026-11-15T20:08:54.309703+00:00
+  author: claude
+  text: |-
+    Merged: `137101ac` is on lotar `main`. Not pushed yet: the ticket files can't be committed.
+
+    - Rebased onto `e0f88162`. No lockfile changes. Lint, tests and smoke ran again, since the rebase changed the hash
+    - Fast-forwarded the main checkout to `137101ac`. No rule or config files changed, so `lotar trust` wasn't needed
+    - The `.tasks` amend was refused by the pre-commit secret scan. It flags a 1Password error quoted in backticks in `.tasks/DEV/510.yml`, a false positive. That's already tracked as [STD-140](https://standards.pyxzl.net/task/STD-140) (Reviewing); its lotar copy is `95e5762e` on `agent/STD-140`. The `.tasks` changes stay staged in the main checkout, so I didn't push
+    - Ticket check: 181 GB free. The only `target/` folders left belong to running jobs. The retry runs at job end once a lotar build with `137101ac` is installed; `/opt/homebrew/bin/lotar` is still the release
+  report:
+    commits:
+    - hash: 137101ac
+      what: DEV-574 rebased onto main e0f88162, fast-forwarded into the main checkout
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2213 Rust, UI, release and hook tests
+    - command: npm run smoke
+      result: passed
+      reason: 117 files, 404 tests
+    - command: ticket check du/df
+      result: passed
+      reason: 181 GB free; the only target/ folders left belong to running jobs (largest 5.7 GB, agent-DEV-576)
+    - command: git push
+      result: not_run
+      reason: the main checkout still has staged .tasks changes
+    next: Merge STD-140 and its lotar copy 95e5762e (agent/STD-140), then amend the staged .tasks into main and push
 description: |-
   Found 2026-11-15 by the chief of staff: the Data volume was 100% full (2.3 GB free of 926 GB) and many jobs failed. ~/.t3/worktrees used 280 GB, 243 GB of it lotar worktrees; each worktree's Rust target/ was 5-35 GB (agent-DEV-510 35 GB, t3-38403d38 17 GB, agent-DEV-528 13 GB, ...). Deleting all worktree target/ folders freed ~222 GB (224 GB free now, worktrees 49 GB).
   Check: du -sh ~/.t3/worktrees/*/*/target; df -h /System/Volumes/Data.
   Done when: a job's build output doesn't outlive the job (remove target/ at job end or worktree cleanup), or worktrees share one build cache (sccache, already used; or a shared CARGO_TARGET_DIR per repo) so a new worktree doesn't rebuild 5+ GB; and a disk check warns before the volume fills (e.g. under 50 GB free). Applies to harnessmux worktrees too (15 GB).
 tags:
 - health
-- review-returned
 custom_fields:
   finding: disk:worktree-targets
 history:
@@ -213,3 +245,26 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-15T19:54:10.095854+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T19:57:40.535484+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-566","DEV-572","DEV-510","DEV-573","DEV-467"]}'
+    new: '{"related":["DEV-566","DEV-572","DEV-510","DEV-573","DEV-467","DEV-579"]}'
+- at: 2026-11-15T20:08:54.309703+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T20:09:06.685641+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, review-returned
+    new: health

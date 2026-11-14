@@ -934,9 +934,9 @@ dependencies = [
 
 [[package]]
 name = "harnessmux"
-version = "0.1.8"
+version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "48ab2fbe39dd815b272ce4e813718923c9cdb5602160e5e6b48f1e0178ae6dec"
+checksum = "d03cc667502c0def2983732602a4979a8042894b59165e36601128e83915f605"
 dependencies = [
  "agent-client-protocol",
  "clap",

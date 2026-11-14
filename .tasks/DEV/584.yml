@@ -1,0 +1,22 @@
+title: A job that fails on a provider's usage limit pauses until the reset instead of failing into retries and owner questions
+status: Blocked
+priority: High
+type: Feature
+reporter: claude
+created: 2026-11-15T20:32:09.848672+00:00
+relationships:
+  depends_on:
+  - standards:STD-133
+description: |-
+  Step 2 of standards STD-133 (owner 2026-11-15: "Detect usage-limit and quota failures as their own state and pause cleanly instead of looping @fix retries or blaming code bugs; stop asking me the same question repeatedly."). Waits for step 1 (STD-133: no merge without a passed review), in the owner's order.
+
+  ## Found
+  - 2026-11-15 05:32Z: Codex's usage limit failed every review and merge in its thread ("You've hit your usage limit. Upgrade to Pro or try again at ..."); each failed merge asked the owner "retry with @fix?" and the retry failed the same way (standards STD-130).
+  - lotar's rules see only job_failed, not why: the shared rules (standards configs/lotar/automation.yml) can't tell a usage limit from a crash, so after STD-133 a review that fails on a limit asks the owner once per ticket.
+
+  ## Done when
+  - [ ] A job whose agent output or error matches a provider limit (usage limit, quota, rate limit, "try again at <time>") ends as its own outcome (for example `paused` with reason quota, the provider and the reset time when the message names one), not job_failed: no failure rule fires, no fix attempt or retry tag is counted, nobody is asked.
+  - [ ] lotar requeues the job on the same profile after the reset time (no time named: a configurable default, for example 1 hour), and the ticket keeps its status and assignee meanwhile; `lotar agent list-jobs` shows it paused with the time.
+  - [ ] Which wins: a limit message and a real failure in the same job: the limit (the job didn't get to run). A requeued job that hits the limit again pauses again, with no cap on owner questions because none is asked.
+  - [ ] Rules can match the new event (for example `job_paused`), so standards' rules can comment once instead of asking.
+  - [ ] Tests with a fake t3 that prints Codex's message, as in standards `scripts/automation.test.ts` (STD-130).

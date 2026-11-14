@@ -160,6 +160,7 @@ mod dev497_cargo_install_root_test;
 
 mod dev4_archive_test;
 mod dev503_harness_jobs_test;
+mod dev510_t3_session_test;
 mod dev522_agent_queue_count_test;
 mod dev528_agent_reporter_hand_back_test;
 mod dev545_task_values_test;

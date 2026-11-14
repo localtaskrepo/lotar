@@ -1,15 +1,17 @@
 title: 'Done with an open step no ticket tracks: DEV-498'
-status: Merging
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T18:42:15.622926+00:00
-modified: 2026-11-15T19:35:23.157720+00:00
+modified: 2026-11-15T19:56:24.117879+00:00
 relationships:
   related:
   - DEV-498
   - DEV-574
+  - DEV-573
+  - DEV-578
 comments:
 - date: 2026-11-15T19:10:59.635559+00:00
   author: claude
@@ -46,6 +48,38 @@ comments:
     - Passed: `npm run build:web`, `RUSTC_WRAPPER= npm run test:rust:agent -- running_job_matches_accepts_padded_spellings` (1 passed), `RUSTC_WRAPPER= npm run lint:agent`. Ordinary and approved lint attempts hit sccache permission denial; documented fallback passed.
     - Full `npm test` and `npm run smoke` not repeated for this test-only move; fix handoff reports passed. No screenshots applicable. Working tree clean; no files or commits changed. No follow-up tickets or durable guidance finding.
     - Status/assignee unchanged as requested; automation owns disposition, including description WontDo instruction. Next: merge reviewed commit.
+- date: 2026-11-15T19:56:15.100011+00:00
+  author: claude
+  text: |-
+    Merged: `683e8626` is on `main`. Not pushed. The health check still lists `untracked:DEV-498`.
+
+    - Rebased onto `main` (`8425fc6e`): no conflicts, no lockfile changes. The hash changed (`002f7e5a` to `6a3a703d`), so I reran all three checks. All passed.
+    - `git merge --ff-only`, then amended the ticket files into the merge commit: DEV-573 to DEV-578.
+    - Left out `.tasks/DEV/510.yml`: the pre-commit secret scan flags its `1Password: `Couldn't…`` error message (a false positive, tracked in STD-140 and STD-144). It is still uncommitted in the main checkout.
+    - Push: not run. The main checkout isn't clean because of `510.yml`, and DEV-578 is InProgress.
+    - Trust: not needed. No rule or config files changed.
+    - Health check: still lists `untracked:DEV-498`. The check reads DEV-498's last 3 comments, and its "Not done" comment is still one of them. I added a comment to DEV-498 saying the step is done. Per `repos.ts`, a Done finding ticket gets filed again and a WontDo one never does. This ticket's Done when says WontDo for a finished step, but the job ends it as Done.
+  report:
+    commits:
+    - hash: 683e8626
+      what: DEV-572 merged to main (rebased from 002f7e5a; ticket files amended in)
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent on 6a3a703d
+    - command: npm test
+      result: passed
+      reason: test:agent, 2211 Rust + 1547 UI + release + hooks
+    - command: npm run smoke
+      result: passed
+      reason: test:smoke:agent, 404 tests
+    - command: git push
+      result: not_run
+      reason: main checkout not clean (.tasks/DEV/510.yml)
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: failed
+      reason: still lists untracked:DEV-498
+    next: 'Owner: set this ticket WontDo (its Done when) so repos.ts does not file DEV-498 again; push main once DEV-510''s ticket file is committed'
 description: |-
   DEV-498 (Core modules no longer call up into services and cli) is Done, but a comment names a step still open and no open ticket is linked: "Not done: agent_job_service tests still call cli::handlers::agent (services to cli, outside the core and outside Done w…" (lotar show DEV-498)
 
@@ -116,3 +150,19 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-15T19:56:15.100011+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T19:56:15.242080+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-498","DEV-574"]}'
+    new: '{"related":["DEV-498","DEV-574","DEV-573","DEV-578"]}'
+- at: 2026-11-15T19:56:24.117879+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

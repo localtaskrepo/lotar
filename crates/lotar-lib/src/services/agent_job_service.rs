@@ -1679,8 +1679,14 @@ fn finish_orphaned_job(
         return;
     }
     let prompt = "The process that ran this job stopped before your turn ended. Continue the work from where you stopped, and finish it.";
+    // harnessmux's t3 agent follows the thread's run instead of sending the prompt, as that run may still go on (DEV-510).
+    let note = if runner_kind == AgentRunnerKind::T3 {
+        format!("Resumed the session {name}; the job ends with its T3 Code thread's run.")
+    } else {
+        format!("Resumed the session {name}; asked the agent to continue.")
+    };
     update_job(job_id, |state| {
-        record_and_emit(state, "agent_job_progress", Some(format!("Resumed the session {name}; asked the agent to continue.")));
+        record_and_emit(state, "agent_job_progress", Some(note.clone()));
     });
     let mut context_messages = Vec::new();
     let end = drive_session(job_id, tasks_dir, &session, prompt, &[], budget, &mut context_messages);
@@ -2794,6 +2800,8 @@ enum RunEnd {
     Stopped,
     /// The runner couldn't run or its output broke.
     Failed(String),
+    /// The agent waits for an answer in its own app; the message names where.
+    WaitingForAnswer(String),
 }
 
 fn end_job(
@@ -2810,10 +2818,58 @@ fn end_job(
             let _ = AgentContextService::append_messages(tasks_dir, config, ticket_id, context_messages.to_vec(), None);
             update_job_failure(job_id, ticket_id, message, tasks_dir);
         }
+        RunEnd::WaitingForAnswer(message) if !should_stop_job(job_id) => {
+            hand_back_waiting_job(job_id, ticket_id, &message, tasks_dir, config);
+            finalize_job(job_id, ticket_id, Some(WAITS_FOR_ANSWER), context_messages, tasks_dir, config);
+        }
         _ => {
             let _ = AgentContextService::append_messages(tasks_dir, config, ticket_id, context_messages.to_vec(), None);
         }
     }
+}
+
+/// A job's exit code when its agent waits for an answer.
+const WAITS_FOR_ANSWER: i32 = 2;
+
+/// The agent waits for an answer (a T3 Code thread's question): hand the
+/// ticket back to its reporter (status HelpNeeded where the project has it)
+/// with where to answer, and let the job fail, so `job_completed` rules
+/// don't treat it as done.
+fn hand_back_waiting_job(job_id: &str, ticket_id: &str, message: &str, tasks_dir: &std::path::Path, config: &ResolvedConfig) {
+    let mut storage = Storage::new(tasks_dir);
+    if let Ok(task) = TaskService::get(&storage, ticket_id, None) {
+        let mut patch = crate::api_types::TaskUpdate::default();
+        if let Ok(status) = crate::types::TaskStatus::parse_with_config("HelpNeeded", config) {
+            patch.status = Some(status.to_string());
+        }
+        patch.assignee = task.reporter.clone();
+        let _ = TaskService::update_with_context(&mut storage, ticket_id, patch, crate::services::task_service::TaskUpdateContext::automation_disabled());
+        let _ = TaskService::add_comment_with_context(&mut storage, ticket_id, message, crate::services::task_service::CommentContext::automation());
+    }
+    update_job(job_id, |state| {
+        state.record.last_message = Some(message.to_string());
+        record_and_emit(state, "agent_job_progress", Some(message.to_string()));
+    });
+}
+
+/// Link the agent's session (a T3 Code thread) on the ticket, so the owner
+/// and other agents find it.
+fn link_session(job_id: &str, tasks_dir: &std::path::Path, ticket_id: &str, link: &str) {
+    let mut storage = Storage::new(tasks_dir);
+    if let Err(err) = crate::services::reference_service::ReferenceService::attach_link_reference(&mut storage, ticket_id, link) {
+        update_job(job_id, |state| {
+            record_and_emit(state, "agent_job_progress", Some(format!("Could not link the session {link} on {ticket_id}: {err}")));
+        });
+    }
+}
+
+/// The link of the latest `session.started` in a session's event log.
+fn last_session_link(events: &std::path::Path) -> Option<String> {
+    let log = fs::read_to_string(events).ok()?;
+    log.lines().rev().filter_map(|line| serde_json::from_str::<harnessmux::Event>(line).ok()).find_map(|event| match event.body {
+        harnessmux::EventBody::SessionStarted { link, .. } => Some(link),
+        _ => None,
+    })?
 }
 
 /// The job's place in `dir`: a continued session's working directory, the
@@ -3251,6 +3307,17 @@ fn drive_session(
     let mut turns = 0;
     let mut exit_code = 0;
     let mut reported_cost = false;
+    let ticket_id = JOB_REGISTRY.lock().ok().and_then(|registry| registry.jobs.get(job_id).map(|state| state.record.ticket_id.clone())).unwrap_or_default();
+    let ticket_id = ticket_id.as_str();
+    // A resumed session starts before the job listens: its start is only in the log.
+    let (mut agent_name, mut link) = match block_on(session.status()) {
+        Ok(status) => (status.agent, last_session_link(&status.events)),
+        Err(_) => (String::new(), None),
+    };
+    if let Some(link) = link.as_deref() {
+        link_session(job_id, tasks_dir, ticket_id, link);
+    }
+    let mut waiting = false;
     loop {
         if crate::services::agent_active_jobs::cancel_requested(tasks_dir, job_id) {
             let _ = AgentJobService::cancel_job(job_id);
@@ -3276,12 +3343,18 @@ fn drive_session(
             reply_part(part);
         }
         match event.body {
-            EventBody::SessionStarted { agent, how, agent_session, .. } => {
+            EventBody::SessionStarted { agent, how, agent_session, link: session_link, .. } => {
                 meter.total = 0.0;
                 let id = agent_session.map(|id| format!(", {id}")).unwrap_or_default();
+                let at = session_link.as_deref().map(|link| format!(": {link}")).unwrap_or_default();
                 update_job(job_id, |state| {
-                    record_and_emit(state, "agent_job_init", Some(format!("{agent} session {how}{id}")));
+                    record_and_emit(state, "agent_job_init", Some(format!("{agent} session {how}{id}{at}")));
                 });
+                if let Some(new) = session_link.filter(|new| link.as_ref() != Some(new)) {
+                    link_session(job_id, tasks_dir, ticket_id, &new);
+                    link = Some(new);
+                }
+                agent_name = agent;
             }
             EventBody::TurnStarted { prompt } if event.turn != Some(first) => {
                 context_messages.push(build_user_message(&prompt));
@@ -3365,8 +3438,10 @@ fn drive_session(
                     ..Default::default()
                 };
                 update_job(job_id, |state| state.record.usage.get_or_insert_with(Default::default).add(&usage));
+                waiting = stop_reason == harnessmux::StopReason::WaitingForAnswer;
                 exit_code = match stop_reason {
                     harnessmux::StopReason::EndTurn => 0,
+                    harnessmux::StopReason::WaitingForAnswer => WAITS_FOR_ANSWER,
                     harnessmux::StopReason::Cancelled => {
                         progress("The turn was cancelled outside LoTaR.".to_string());
                         1
@@ -3398,6 +3473,10 @@ fn drive_session(
         reply = ReplyStream::default();
         turns += 1;
         update_job(job_id, |state| state.record.question = None);
+        if waiting {
+            let at = link.as_deref().map(|link| format!(": {link}")).unwrap_or_default();
+            return RunEnd::WaitingForAnswer(format!("The {agent_name} session waits for an answer{at}"));
+        }
         let idle = block_on(session.status()).is_ok_and(|status| status.turn.is_none() && status.queued == 0);
         if idle {
             return finish(exit_code, reported_cost);

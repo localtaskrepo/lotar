@@ -5,7 +5,10 @@ type: Feature
 reporter: mallox
 assignee: mallox
 created: 2026-10-26T17:02:37.267165+00:00
-modified: 2026-10-26T18:16:17.675904+00:00
+modified: 2026-11-15T20:09:25.133404+00:00
+relationships:
+  related:
+  - DEV-576
 comments:
 - date: 2026-10-26T17:40:28.441271+00:00
   text: 'Plan: (1) profile model/effort mapped per runner (claude --model/--effort; codex -m/-c model_reasoning_effort=; copilot --model/--reasoning-effort; gemini -m; command env LOTAR_AGENT_MODEL/EFFORT), skipped when profile args set them; (2) per-run overrides on AgentJobCreateRequest (REST, MCP tool, lotar agent run --model/--effort), persisted in queue entries, shown on job records/cards; (3) automation action ''agent: {model, effort, prompt}'' applied to the job its assignment queues; (4) tools.allowed/disallowed and mcp.allow mapped for claude (--allowedTools/--disallowedTools, mcp__<server>) and copilot (--allow-tool/--deny-tool); (5) docs + openapi + TS types; unit, queue, automation and CLI tests plus a live check. LoTaR MCP injection and usage/cost recording evaluated after, possibly as follow-ups.'
@@ -59,3 +62,9 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-15T20:09:25.133404+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-576"]}'

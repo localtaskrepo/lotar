@@ -1,11 +1,11 @@
 title: 'Task panel stays on ''Loading task…'' while git hangs: the server''s git calls have no timeout'
-status: HelpNeeded
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@review'
 created: 2026-11-13T10:33:22.263037+00:00
-modified: 2026-11-15T18:44:53.642605+00:00
+modified: 2026-11-15T20:22:25.759345+00:00
 relationships:
   blocks:
   - DEV-513
@@ -489,6 +489,38 @@ comments:
       result: not_run
       reason: unchanged patch, review job does ui-review
     next: Review 23e9cd75 on agent/DEV-466, then merge
+- date: 2026-11-15T20:11:09.278314+00:00
+  author: claude
+  text: |-
+    Answer: fix (Retry with @fix)
+
+    Chief of staff for the owner, 2026-11-15 ("If they're just try again request can you just tell the waiting threads to try again. Maybe using fable if the problem is difficult"). Earlier failures were the stale-branch bug, fixed in the installed lotar 0.15.1.
+  answer:
+    to: 2026-11-15T18:07:05.498706+00:00
+    choice:
+    - fix
+    note: Chief of staff for the owner, 2026-11-15 ("If they're just try again request can you just tell the waiting threads to try again. Maybe using fable if the problem is difficult"). Earlier failures were the stale-branch bug, fixed in the installed lotar 0.15.1.
+- date: 2026-11-15T20:22:18.087414+00:00
+  author: claude
+  text: |-
+    No new work: `agent/DEV-466` now holds the finished fix, so review and merge can run on it.
+
+    - `agent/DEV-466` = `23e9cd75`, the only commit beyond main; `git range-diff` shows it identical to `f10b8197` (same patch-id `4135716d`).
+    - The 17:40 blocking review read `e40e7eef`, the old first attempt, still checked out detached in `.t3/worktrees/lotar/agent-DEV-466-706d89b5c828fb3d`; its two findings are fixed in this commit.
+    - Based on `e20a1ff7`; main is now `137101ac` (3 commits ahead), the merge rebases.
+    - Status and assignee left as they are, so the rules send it to review.
+  report:
+    checks:
+    - command: npm run lint
+      result: not_run
+      reason: no code change; passed on f10b8197 (06:31)
+    - command: npm test
+      result: not_run
+      reason: no code change; passed on f10b8197 (06:31)
+    - command: npm run smoke
+      result: not_run
+      reason: no code change; passed on f10b8197 (06:31)
+    next: 'Review 23e9cd75 on agent/DEV-466, then merge (rebase onto main first: main is 3 commits ahead)'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad8d79e8d-6688-4da4-a3a5-516b2d4c3b76
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afcbae329-3a86-478f-818f-b3877e1b72d7
@@ -1513,3 +1545,32 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-513"],"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513","DEV-525","DEV-526","DEV-532","DEV-499","DEV-518","DEV-550","DEV-560","DEV-520","DEV-567"]}'
     new: '{"blocks":["DEV-513"],"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513","DEV-525","DEV-526","DEV-532","DEV-499","DEV-518","DEV-550","DEV-560","DEV-520","DEV-567","DEV-569"]}'
+- at: 2026-11-15T20:11:09.278314+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T20:11:09.279927+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T20:21:37.799511+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T20:22:18.087414+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T20:22:25.759345+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

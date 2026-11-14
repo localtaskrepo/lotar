@@ -1,0 +1,26 @@
+title: Retried fix job on FND-12 still opened its T3 thread on a t3/* branch, not agent/FND-12
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-15T20:14:32.206471+00:00
+modified: 2026-11-15T20:14:33.092349+00:00
+relationships:
+  related:
+  - DEV-573
+description: 'Found 2026-11-15: the retry of FND-12 (job-20261115T201131.885Z-1), sent after DEV-573 was marked fixed, ran in worktree t3-e572702e-d8af3fdf9ec6a05a on branch t3/sync-automation-yml-config-copy, while agent/FND-12 sat in its own worktree agent-FND-12-846d11fb298b8cd0. The agent worked around it by committing in the agent/FND-12 worktree. Check: git -C <thread cwd> branch --show-current equals agent/<ticket> for a retried fix job. Done: a retry continues in the ticket''s agent/* worktree.'
+tags:
+- health
+history:
+- at: 2026-11-15T20:14:32.554895+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-573"]}'
+- at: 2026-11-15T20:14:33.092349+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

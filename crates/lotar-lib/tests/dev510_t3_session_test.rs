@@ -1,0 +1,208 @@
+//! DEV-510: harnessmux's t3 agent gives a job its thread's link, ends a turn that waits for an answer as such, and a
+//! taken-over t3 job ends with the thread's run instead of a second turn. A shell script stands in for T3's CLI.
+#![cfg(unix)]
+
+use crate::common::TestFixtures;
+use crate::common::env_mutex::EnvVarGuard;
+use lotar::api_types::TaskCreate;
+use lotar::services::agent_job_service::AgentJobService;
+use lotar::services::task_service::TaskService;
+use std::os::unix::fs::PermissionsExt;
+use std::path::PathBuf;
+use std::time::{Duration, Instant};
+
+/// `t3 thread start` names thread t1, prints "Started." and exits with `start-exit` after `start-sleep` seconds;
+/// `thread send` prints "Sent."; `thread show` prints `show.json`; `thread list` prints `list.json` (or fails while
+/// `list-fail` exists). Every call goes to `calls`.
+const FAKE_T3: &str = r#"#!/bin/sh
+dir=$(dirname "$0")
+echo "$1 $2" >> "$dir/calls"
+case "$1 $2" in
+  "thread start") cat > /dev/null; echo "Thread t1" >&2; sleep "$(cat "$dir/start-sleep")"; echo "Started."; exit "$(cat "$dir/start-exit")" ;;
+  "thread send") cat > /dev/null; echo "Sent." ;;
+  "thread show") cat "$dir/show.json" ;;
+  "thread list") if [ -f "$dir/list-fail" ]; then echo "Could not reach the T3 Code server" >&2; exit 1; fi; cat "$dir/list.json" ;;
+esac
+"#;
+
+const LINK: &str = "https://app.t3.codes/threads/env/t1";
+
+struct Harness {
+    fixtures: TestFixtures,
+    dir: PathBuf,
+    _env: Vec<EnvVarGuard>,
+}
+
+fn harness(start_exit: u8, start_sleep: u32) -> Harness {
+    let fixtures = TestFixtures::new();
+    let root = fixtures.get_temp_path().to_path_buf();
+    let dir = root.join("t3");
+    std::fs::create_dir_all(&dir).unwrap();
+    let script = dir.join("t3");
+    std::fs::write(&script, FAKE_T3).unwrap();
+    std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+    std::fs::write(dir.join("start-exit"), start_exit.to_string()).unwrap();
+    std::fs::write(dir.join("start-sleep"), start_sleep.to_string()).unwrap();
+    let home = root.join("harnessmux");
+    std::fs::create_dir_all(home.join("config")).unwrap();
+    std::fs::write(home.join("config/agents.toml"), format!("[agents.t3]\nkind = \"t3\"\ncommand = [\"{}\"]\n", script.display())).unwrap();
+    fixtures.create_config_in_dir(
+        &fixtures.tasks_root,
+        "default:\n  project: TEST\nissue:\n  states: [Todo, InProgress, HelpNeeded, Done]\nagents:\n  fixer:\n    runner: t3\n    provider: claudeAgent\n    model: m\n",
+    );
+    let guards = vec![
+        EnvVarGuard::set("HARNESSMUX_HOME", home.to_string_lossy().as_ref()),
+        EnvVarGuard::set("LOTAR_TASKS_DIR", fixtures.tasks_root.to_string_lossy().as_ref()),
+        EnvVarGuard::set("LOTAR_TEST_SILENT", "1"),
+    ];
+    let create = TaskCreate { title: "Thread job".into(), project: Some("TEST".into()), reporter: Some("owner".into()), ..Default::default() };
+    TaskService::create(&mut fixtures.create_storage(), create).unwrap();
+    Harness { fixtures, dir, _env: guards }
+}
+
+impl Harness {
+    fn show(&self, status: &str, active: &str, pending: u64, reply: &str) {
+        let json = format!(
+            r#"{{"thread":{{"threadId":"t1","link":"{LINK}","status":"{status}","activeRunId":{active},"latestRunId":"r1","pendingRequestCount":{pending}}},"messages":[{{"role":"assistant","runId":"r1","text":"{reply}"}}]}}"#
+        );
+        std::fs::write(self.dir.join("show.json"), json).unwrap();
+    }
+
+    /// Whether harnessmux saved thread t1 as the session's agent session. Its t3 agent calls `thread show` before
+    /// the session's owner saves the thread id, so a process killed at that call resumes without the thread.
+    fn thread_saved(&self) -> bool {
+        let sessions = self.fixtures.get_temp_path().join("harnessmux/state/sessions");
+        std::fs::read_dir(sessions).into_iter().flatten().flatten().any(|entry| {
+            let record = std::fs::read_to_string(entry.path()).unwrap_or_default();
+            entry.path().extension().is_some_and(|ext| ext == "json")
+                && serde_json::from_str::<serde_json::Value>(&record).is_ok_and(|record| record["agent_session"] == "t1")
+        })
+    }
+
+    /// Remove the saved thread id from the session's record, as if lotar died after T3 made the thread and before
+    /// harnessmux saved its id (the record then notes when the thread was asked for), and list the thread in T3 as made
+    /// then.
+    fn forget_thread(&self) {
+        let sessions = self.fixtures.get_temp_path().join("harnessmux/state/sessions");
+        for entry in std::fs::read_dir(sessions).unwrap().flatten().filter(|entry| entry.path().extension().is_some_and(|ext| ext == "json")) {
+            let mut record: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(entry.path()).unwrap()).unwrap();
+            if record["agent_session"] != "t1" {
+                continue;
+            }
+            record.as_object_mut().unwrap().remove("agent_session");
+            record["agent_session_asked"] = record["last_used"].clone();
+            std::fs::write(entry.path(), record.to_string()).unwrap();
+            let list = serde_json::json!([{"threadId": "t1", "title": "TEST-1 Thread job", "createdAt": record["last_used"]}]);
+            std::fs::write(self.dir.join("list.json"), list.to_string()).unwrap();
+        }
+    }
+
+    fn calls(&self) -> String {
+        std::fs::read_to_string(self.dir.join("calls")).unwrap_or_default()
+    }
+
+    fn command(&self) -> assert_cmd::Command {
+        let mut cmd = crate::common::lotar_cmd().unwrap();
+        cmd.current_dir(self.fixtures.get_temp_path()).args(["agent", "run", "TEST-1", "Fix it", "--agent", "fixer", "--wait"]);
+        cmd
+    }
+
+    fn task(&self) -> lotar::api_types::TaskDTO {
+        TaskService::get(&self.fixtures.create_storage(), "TEST-1", None).unwrap()
+    }
+
+    fn linked(&self) -> bool {
+        self.task().references.iter().any(|reference| reference.link.as_deref() == Some(LINK))
+    }
+}
+
+fn wait_for(what: &str, mut done: impl FnMut() -> bool) {
+    let deadline = Instant::now() + Duration::from_secs(60);
+    while !done() {
+        assert!(Instant::now() < deadline, "timed out waiting for {what}");
+        std::thread::sleep(Duration::from_millis(25));
+    }
+}
+
+#[test]
+fn a_t3_job_links_its_thread_on_the_ticket() {
+    let harness = harness(0, 0);
+    harness.show("completed", "null", 0, "Started.");
+    harness.command().assert().success();
+    assert!(harness.linked(), "{:?}", harness.task().references);
+}
+
+#[test]
+fn a_thread_that_waits_for_an_answer_hands_the_ticket_back_with_its_link() {
+    let harness = harness(2, 0);
+    harness.show("running", "\"r1\"", 1, "Which one?");
+    harness.command().assert().failure();
+    let task = harness.task();
+    assert_eq!(task.status.as_str(), "HelpNeeded");
+    assert_eq!(task.assignee.as_deref(), Some("owner"));
+    let message = format!("The t3 session waits for an answer: {LINK}");
+    assert!(task.comments.iter().any(|comment| comment.text == message), "{:?}", task.comments);
+    assert!(harness.linked());
+}
+
+#[test]
+fn a_taken_over_t3_job_ends_with_the_threads_run_without_a_second_turn() {
+    let (harness, job) = take_over(false, false);
+    assert_eq!(job.status, "completed", "{job:?}");
+    assert_eq!(job.summary.as_deref(), Some("Finished."));
+    assert!(harness.linked());
+}
+
+#[test]
+fn a_t3_job_taken_over_before_its_thread_id_was_saved_ends_with_that_thread() {
+    let (harness, job) = take_over(true, false);
+    assert_eq!(job.status, "completed", "{job:?}");
+    assert_eq!(job.summary.as_deref(), Some("Finished."));
+    assert!(harness.linked());
+}
+
+#[test]
+fn a_t3_job_taken_over_before_its_thread_id_was_saved_fails_when_t3_cant_list_its_threads() {
+    let (_harness, job) = take_over(true, true);
+    assert_eq!(job.status, "failed", "{job:?}");
+    let reason = job.summary.or(job.last_message).unwrap_or_default();
+    assert!(reason.contains("can't tell whether that turn made a thread"), "{reason}");
+}
+
+/// Kill lotar during a t3 job's turn, finish the thread's run and take the job over; the job as it ended. No second
+/// thread or turn either way. `forget_thread`: lotar died before harnessmux saved the thread's id; `list_fails`: T3
+/// can't list its threads then.
+fn take_over(forget_thread: bool, list_fails: bool) -> (Harness, lotar::api_types::AgentJob) {
+    let harness = harness(0, 30);
+    harness.show("running", "\"r1\"", 0, "Working.");
+    let mut lotar = std::process::Command::new(crate::common::lotar_bin());
+    lotar
+        .env_remove("RUST_TEST_THREADS")
+        .env("LOTAR_IGNORE_HOME_CONFIG", "1")
+        .current_dir(harness.fixtures.get_temp_path())
+        .args(["agent", "run", "TEST-1", "Fix it", "--agent", "fixer", "--wait"])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+    let mut lotar = lotar.spawn().unwrap();
+    let tasks_dir = harness.fixtures.tasks_root.clone();
+    let session_known = || lotar::services::agent_active_jobs::for_ticket(&tasks_dir, "TEST-1").is_some_and(|job| job.session_id.is_some());
+    wait_for("the thread to start", || harness.thread_saved() && session_known());
+    lotar.kill().unwrap();
+    lotar.wait().unwrap();
+    if forget_thread {
+        harness.forget_thread();
+    }
+    if list_fails {
+        std::fs::write(harness.dir.join("list-fail"), "").unwrap();
+    }
+
+    harness.show("completed", "null", 0, "Finished.");
+    AgentJobService::recover_orphaned_jobs(&tasks_dir);
+    let job_id = lotar::services::agent_active_jobs::list(&tasks_dir).first().map(|job| job.job_id.clone());
+    let job_id = job_id.unwrap_or_default();
+    wait_for("the job to end", || AgentJobService::get_job(&job_id).is_some_and(|job| job.status != "running"));
+    let job = AgentJobService::get_job(&job_id).unwrap();
+    assert!(!harness.calls().contains("thread send"), "{}", harness.calls());
+    assert_eq!(harness.calls().matches("thread start").count(), 1, "{}", harness.calls());
+    (harness, job)
+}

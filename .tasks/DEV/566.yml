@@ -1,11 +1,11 @@
 title: 'A blocking review is ignored: the fix job''s end rule moves Reviewing on to Merging while the review still runs'
-status: HelpNeeded
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@review'
 created: 2026-11-15T17:44:03.850220+00:00
-modified: 2026-11-15T19:12:03.577270+00:00
+modified: 2026-11-15T20:42:50.059626+00:00
 relationships:
   related:
   - DEV-524
@@ -144,6 +144,44 @@ comments:
       set:
         status: WontDo
         assignee: ''
+- date: 2026-11-15T20:11:10.033422+00:00
+  author: claude
+  text: |-
+    Answer: fix (An agent reworks it once more)
+
+    Chief of staff for the owner, 2026-11-15 ("If they're just try again request can you just tell the waiting threads to try again. Maybe using fable if the problem is difficult"). One more rework.
+  answer:
+    to: 2026-11-15T19:12:03.577270+00:00
+    choice:
+    - fix
+    note: Chief of staff for the owner, 2026-11-15 ("If they're just try again request can you just tell the waiting threads to try again. Maybe using fable if the problem is difficult"). One more rework.
+- date: 2026-11-15T20:42:36.196822+00:00
+  author: claude
+  text: |-
+    Rework 2: a merge job no longer starts while `review-blocked` is set, whether queued or started directly.
+
+    - **Finding 1 (merge allowed with @merge + review-blocked):** fixed. `review_blocks_merge` in `crates/lotar-lib/src/services/agent_job_service.rs` refuses a job of profile `merge` while the ticket has tag `review-blocked`. It runs in `start_job` (every start path) and in `queued_stage_allows_start` (`automation_service.rs`), which drops the queue entry and comments `The @merge job didn't start: <ID> carries tag review-blocked, and no rework has removed it.` The rework rules remove the tag, so a reworked ticket merges as before.
+    - The tag name is now known to lotar, next to the `merge` profile and the `Merging` status it already treats specially. `docs/help/agent.md` documents it.
+    - **Finding 2 (`Review failed: merge without it` ignores the tag):** covered by finding 1: that rule's merge job now refuses to start. Upstream rule fix still tracked in STD-139.
+    - **STD-45 order (comment 18:41):** the unit test now covers an @fix entry while the ticket is at @review. It doesn't start.
+    - **Tests:** `a_queued_job_does_not_start_after_its_ticket_moved_on` (unit, replaces the test that allowed the blocked merge) and `merge_job_does_not_start_while_review_blocked` (integration, direct start). Both fail with the check turned off and pass with it on.
+  report:
+    commits:
+    - hash: 9b70f43d
+      what: a @merge job never starts while the ticket carries review-blocked; queue-start check covers the STD-45 order
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2211 Rust, 1547 UI
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 403/404 in the full run; ui.backlog-order dragTo timed out under load, passed on its own rerun
+    - command: live LOCA-333/STD-45 replay
+      result: not_run
+      reason: needs real fix, review and merge jobs
+    next: Second review, then merge
 description: 'Found 2026-11-15 on LOCA-333 (local repo). The fix agent set Reviewing at 17:39:36 (assignee @review); 8 s later, at 17:39:44, the fix job''s end rule moved it again to Merging/@merge. The review job (job-20261115T174010.077Z-13) then ran with the review prompt but was counted as a merge job: it tagged review-blocked, and its end was logged as a failed merge (cannot fast-forward), tagged merge-retried and sent to @fix. The next job (job-20261115T174245.273Z-26) got the merge prompt for the still-blocked commit. Check: lotar show LOCA-333 history in ~/Development/local. Done when: a job''s end rule doesn''t advance a ticket that the agent already moved during the job, and a merge job never starts while the ticket carries review-blocked without a rework.'
 tags:
 - health
@@ -259,3 +297,32 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-15T20:11:10.033422+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T20:11:10.034949+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T20:22:26.637127+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T20:42:36.196822+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T20:42:50.059626+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

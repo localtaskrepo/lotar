@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: Medium
 type: Chore
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-15T18:38:30.477073+00:00
-modified: 2026-11-15T18:41:27.753880+00:00
+modified: 2026-11-15T20:31:08.787131+00:00
 relationships:
   related:
   - DEV-532
@@ -45,6 +45,9 @@ comments:
       result: not_run
       reason: no code changes
     next: Owner decides whether to authorize preservation pushes
+- date: 2026-11-15T20:31:04.359093+00:00
+  author: mallox
+  text: 'Answer: main (Push main only, branches stay local (recommended)) (answered in INBOX-281)'
 description: |-
   23 commits on no remote, only on this Mac: agent/DEV-466 1, agent/DEV-467 1, agent/DEV-481 1, agent/DEV-496 1, agent/DEV-516 1, agent/DEV-528 1, agent/DEV-542 1, backup/DEV-466-896309c0 3, main 3, t3/job-outcome-server-outage 1, t3/job-outcome-survives-t3-outage 2, t3/job-outcome-t3-outage 1, t3/job-outcome-t3-outage-1 1, t3/job-outcome-t3-outage-2 1, t3/restore-claude-sandbox-permission-rules-3 1, t3/review-dev-510-t3-agent-gaps 1, t3/review-held-job-resume 2, t3/t3-agent-resume-link-wait 1, t3/t3-outage-job-outcome-fix 1, t3/task-panel-git-timeout 1, t3/task-panel-git-timeout-1 1, t3/task-panel-git-timeout-2 2, t3/task-panel-git-timeout-3 2, t3/task-panel-git-timeout-4 2, t3/task-panel-git-timeout-5 2 (git log <branch> --not --remotes)
 
@@ -106,3 +109,13 @@ history:
   - field: assignee
     old: '@fix-codex'
     new: mallox
+- at: 2026-11-15T20:31:04.359093+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-15T20:31:08.787131+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'

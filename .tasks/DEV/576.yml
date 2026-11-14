@@ -1,11 +1,16 @@
 title: Assigning a review or merge profile by hand starts its agent with the generic prompt, and a reviewer merged and pushed
-status: Reviewing
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-15T19:15:01.666242+00:00
-modified: 2026-11-15T19:49:07.977373+00:00
+modified: 2026-11-15T20:19:18.780619+00:00
+relationships:
+  related:
+  - DEV-580
+  - DEV-200
+  - DEV-553
 comments:
 - date: 2026-11-15T19:39:24.656316+00:00
   author: claude
@@ -54,6 +59,61 @@ comments:
       result: not_run
       reason: focused regression gate failed
     next: Fix regression test cleanup and rerun the required gates
+- date: 2026-11-15T20:09:24.982832+00:00
+  author: claude
+  text: |-
+    Rework done: the review's finding (the test leaves `.lotar-test-scratch`) is fixed. Only the test changed.
+
+    - Cause, two parts, both in the test: the generic `@work` job matched the test's own "Done: review" rule, which started a second `@review` job. That job either made the job count 2 (failed about 2 in 6 runs) or was still running when the test ended
+    - The test also returned once a job was `completed` but before its worker had settled, so the job end still wrote into the dropped fixture (`.tmpXXX/.tasks`, `agent-queue/*.ended`)
+    - Fix in `crates/lotar-lib/tests/agent_automation_integration_test.rs`: the rules wait for a tag no test ticket has, so no hand-started job hands on; each run waits for `AgentJobService::job_settled` (as DEV-553's merge test does) and asserts `completed`
+    - Before: 3 of 10 focused runs exited 1. After: 12 of 12 exit 0
+    - The older DEV-200 test `automation_agent_settings_reach_the_job_they_start` has the same settle race (1 in 8 runs): filed DEV-580
+  report:
+    commits:
+    - hash: 3b7330ef
+      what: 'hand assignment uses the matching rule''s agent settings (amended: test no longer leaks or flakes)'
+    checks:
+    - command: node scripts/rust-test-runner.mjs --agent -- assignment_by_hand
+      result: passed
+      reason: 12 runs in a row, exit 0
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2212 Rust, 1547 JS
+    - command: npm run smoke
+      result: passed
+    - command: G-21 agent log check
+      result: not_run
+      reason: that job is history in the gairola repo; the test reproduces it
+    next: Review again, then merge
+- date: 2026-11-15T20:19:14.811069+00:00
+  author: codex
+  text: |-
+    Review: passed
+
+    - Reviewed `3b7330ef`, full diff against `main`, ticket/comments, related tickets, effective automation rules, guidance and recent main history. No UI changes or additional findings.
+    - Previous blocker resolved: regression rules cannot launch follow-on jobs, and jobs wait for `job_settled` before fixture cleanup. Focused runner exits 0 without leftovers.
+    - Review and merge-style prompts plus generic fallback are covered. Effective review and merge rules supply the intended prompts.
+    - Lint, full tests and smoke passed. Initial sandbox runs could not start servers; approved retries passed using `RUSTC_WRAPPER=`.
+    - Checkout clean; files, commits, status and assignee unchanged. No tickets filed or durable guidance finding.
+  report:
+    checks:
+    - command: focused regression
+      result: passed
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: approved retry, RUSTC_WRAPPER empty; 2212 Rust, 1547 UI
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: approved retry; 404 tests
+    - command: G-21 historical job log
+      result: not_run
+      reason: cannot verify current fix
+    next: Merge agent may proceed
 description: |-
   Found 2026-11-15 by the chief of staff's retry agent: setting G-21's assignee to @review-claude started a review job by itself with lotar's generic 'make concrete changes' prompt; that job merged and pushed 497dd58 to gairola main before the queued review steps ran. (Here the pushed tree equals the reviewed f88bfff, so nothing unchecked landed, but the owner's rule is no merge without a passed review.)
   Check: the job's prompt in lotar agent logs for G-21's @review-claude job.
@@ -107,3 +167,47 @@ history:
   - field: tags
     old: health, review-blocked
     new: health, review-returned
+- at: 2026-11-15T19:57:17.531571+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-15T20:04:35.666586+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-580"]}'
+- at: 2026-11-15T20:09:24.982832+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T20:09:25.134047+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-580"]}'
+    new: '{"related":["DEV-580","DEV-200","DEV-553"]}'
+- at: 2026-11-15T20:09:33.334141+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T20:19:14.811069+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T20:19:18.780619+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

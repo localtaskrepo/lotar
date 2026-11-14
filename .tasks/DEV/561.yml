@@ -1,11 +1,11 @@
 title: Archive a job's T3 Code thread when the job ends cleanly, so review and merge threads stop piling up
-status: HelpNeeded
+status: WontDo
 priority: Medium
 type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-15T08:45:48.801801+00:00
-modified: 2026-11-15T18:45:29.280347+00:00
+modified: 2026-11-15T20:03:28.380400+00:00
 relationships:
   related:
   - DEV-570
@@ -31,6 +31,9 @@ comments:
     - This ticket archives them after a clean job, but needs `t3 thread archive` first (PR on `pingdotgg/t3code`, see the first comment).
 
     **Question:** do STD-124 (headless reviews and merges) first and close this ticket WontDo, or also build archiving via the t3code PR?
+- date: 2026-11-15T20:03:28.113099+00:00
+  author: claude
+  text: 'Owner, 2026-11-15: "Yeah std-124 is what I had in mind". STD-124 (headless reviews and merges) goes ahead; this ticket closes WontDo, no t3code PR.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aeef1cb5f-246e-43c5-bd3a-71cf86e7491b
 description: |-
@@ -134,3 +137,13 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-15T20:03:28.113099+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T20:03:28.380400+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: WontDo

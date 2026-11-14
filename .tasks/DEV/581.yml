@@ -1,0 +1,98 @@
+title: 'A headless job after a T3 job on the same ticket fails: agent/<ID> is checked out in the T3 thread''s worktree'
+status: Reviewing
+priority: High
+type: Bug
+reporter: claude
+assignee: '@review'
+created: 2026-11-15T20:09:34.810817+00:00
+modified: 2026-11-15T20:43:13.353058+00:00
+relationships:
+  related:
+  - DEV-583
+  - DEV-579
+  - DEV-510
+comments:
+- date: 2026-11-15T20:42:59.653437+00:00
+  author: claude
+  text: |-
+    Fixed: a headless job runs in the worktree that already has `agent/<ID>` checked out (a T3 thread's).
+
+    - `prepare_worktree` (`crates/lotar-lib/src/services/agent_job_service.rs`): after its own `<dir>/<ticket>`, it looks for a linked worktree on the ticket branch and runs there; the job log says "agent/<ID> is checked out in the worktree <path>, so this job runs there."
+    - The branch stays checked out in the thread's worktree, so a `session: continue` rework continues the thread there; a branch checked out in the main checkout still fails as before.
+    - New test `headless_jobs_run_in_the_t3_threads_worktree_that_has_the_tickets_branch` (`dev503_harness_jobs_test.rs`): T3 fix -> command review -> T3 rework (continues thread-0) -> command merge fast-forwards main -> Done removes the worktree. Without the fix it fails with the ticket's `already used by worktree` error.
+    - `docs/help/agent.md` (Worktrees) describes it.
+    - Told the DEV-510 merge and DEV-579 threads about the change.
+  report:
+    commits:
+    - hash: 879ca4ef
+      what: headless jobs reuse the worktree that has agent/<ID> checked out
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2214 Rust, 1547 UI
+    - command: npm run smoke
+      result: passed
+      reason: 404 tests
+    next: Review on another model, then merge
+description: |-
+  Found in standards STD-124 (2026-11-15): reviews and merges are to run headless (claude, codex runners) after a fix on the t3 runner. The t3 fix thread works in T3 Code's worktree (~/.t3/worktrees/<repo>/agent-<ID>-…) with the ticket branch agent/<ID> checked out. A later claude, codex or command job calls prepare_worktree (crates/lotar-lib/src/services/agent_job_service.rs), which runs `git worktree add <dir>/<ticket> agent/<ID>`; git refuses, and the job fails before the agent starts:
+
+  ```
+  Worktree setup failed: Validation error: git worktree add …/.lotar-worktrees/repo/STD-1 agent/STD-1 failed: Preparing worktree (checking out 'agent/STD-1')
+  fatal: 'agent/STD-1' is already used by worktree at '…/t3tree'
+  ```
+
+  So no headless phase can follow a T3 phase on one ticket. Detaching the T3 worktree instead would break the other direction: a rework that continues the fix thread (session: continue) then finds its worktree off the ticket branch and T3 can't start a new thread on agent/<ID> while lotar's worktree holds it.
+
+  Check (lotar 0.15.1 and main e0f88162): a repo with agent.worktree.enabled, profile review `runner: command`, `command: /bin/sh`, `args: ["-c", "pwd"]`; `git worktree add -b agent/STD-1 ../t3tree`; then `lotar agent run STD-1 "x" --agent review --wait` fails as above.
+
+  ## Done when
+  - [ ] A non-t3 job on a ticket whose branch is checked out in another linked worktree of the same repository (not the main checkout) runs in that worktree, the way prepare_worktree reuses its own <dir>/<ticket>; the job log names it. The owner on one worktree per ticket: "Ideally, it raises the one the rest of the task is running on" (standards docs/decisions/2026-11-13-thread-noise.md).
+  - [ ] A later t3 job with session: continue still continues the fix thread in its worktree (the branch stays checked out there), and a merge job in that worktree still fast-forwards main.
+  - [ ] Done cleanup still removes that worktree.
+  - [ ] A test covers t3 fix -> headless review -> t3 rework on one ticket; docs/help/agent.md (Worktrees) says so.
+history:
+- at: 2026-11-15T20:09:35.013739+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-15T20:15:02.305360+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-583"]}'
+- at: 2026-11-15T20:19:19.941240+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T20:41:50.401384+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-583"]}'
+    new: '{"related":["DEV-583","DEV-579"]}'
+- at: 2026-11-15T20:42:59.653437+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T20:42:59.907848+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-583","DEV-579"]}'
+    new: '{"related":["DEV-583","DEV-579","DEV-510"]}'
+- at: 2026-11-15T20:43:13.353058+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

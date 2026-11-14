@@ -1,15 +1,18 @@
 title: T3 agent jobs on one ticket each get their own t3/* branch, so the review and merge miss the fix commit
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T18:46:06.748265+00:00
-modified: 2026-11-15T19:43:33.780434+00:00
+modified: 2026-11-15T20:14:32.554219+00:00
 relationships:
   related:
   - DEV-510
   - DEV-574
+  - DEV-572
+  - DEV-577
+  - DEV-582
 comments:
 - date: 2026-11-15T19:11:00.407630+00:00
   author: claude
@@ -58,6 +61,38 @@ comments:
       result: not_run
       reason: fix agent reports passed; focused review rerun only
     next: Merge reviewed commit 43c72eec
+- date: 2026-11-15T20:00:34.425755+00:00
+  author: claude
+  text: |-
+    Merged: `e0f88162` is on main. Not pushed.
+
+    - Rebased `43c72eec` onto main: no conflicts, no lockfile changed. Main was then amended (`6a3a703d` became `683e8626`, ticket files only), so I rebased again onto `683e8626` and fast-forwarded.
+    - Checks on the rebased code: `npm run lint:agent`, `npm run test:agent` and `npm run test:smoke:agent` (404/404) passed. The first test run failed when `target/local/deps` disappeared mid-build (environment, not code). The rerun passed.
+    - The `.tasks` amend was refused: the pre-commit secret scan (betterleaks generic-password, low confidence) flagged a DEV-510 comment that quotes a 1Password error: `Couldn't find key in agent?`. It's a false positive. The allowlist only matches `1Password: "…"` in double quotes. Filed [STD-148](https://standards.pyxzl.net/task/STD-148) for the shared `configs/gitleaks/base.toml`. The `.tasks` changes are left staged in the main checkout, and nothing was bypassed with `--no-verify`.
+    - Not pushed: the main checkout isn't clean (staged `.tasks` files), so step 6 doesn't apply.
+    - Trust: no automation or config files changed, so `lotar trust` wasn't needed.
+    - Health check: the regression test `the_tickets_branch_follows_its_thread_past_a_parallel_and_a_stale_worktree` passed in the full test run. This job still ran on the old binary, on branch `t3/agent-job-branch-per-ticket` rather than `agent/DEV-573`, which still points at the pre-rebase `43c72eec`.
+  report:
+    commits:
+    - hash: e0f88162
+      what: DEV-573 fix (was 43c72eec), rebased onto main 683e8626 and fast-forwarded
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent
+    - command: npm test
+      result: passed
+      reason: test:agent
+    - command: npm run smoke
+      result: passed
+      reason: test:smoke:agent, 404 tests
+    - command: lotar trust
+      result: not_run
+      reason: no rules or config changed
+    - command: git push
+      result: not_run
+      reason: main checkout not clean (.tasks amend blocked by the secret scan)
+    next: Push main once the staged .tasks files are committed (STD-148 fixes the scan)
 description: 'Found reviewing G-21 (gairola), 2026-11-15: the fix retry ran on T3 worktree branch t3/sync-lotar-automation-config-copy and committed f88bfff there; its prompt said branch agent/G-21, which stays at main. The review thread got another fresh branch, t3/sync-automation-yml-config-copy, also at main. The merge runs in the reviewer''s thread and checks git log main..HEAD, so it would report nothing to merge and the ticket would close with the drift still there. DEV-510''s merge failed the same way on 2026-11-14. Check: after a fix job on T3, the review and merge worktrees'' HEAD contains the fix commit. Done: every T3 job for a ticket works on agent/<ID> (or lotar hands the next job the branch the previous one committed to).'
 tags:
 - health
@@ -117,3 +152,31 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-15T19:56:15.242422+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-510","DEV-574"]}'
+    new: '{"related":["DEV-510","DEV-574","DEV-572"]}'
+- at: 2026-11-15T20:00:34.425755+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T20:00:42.667856+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-15T20:11:00.003294+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-510","DEV-574","DEV-572"]}'
+    new: '{"related":["DEV-510","DEV-574","DEV-572","DEV-577"]}'
+- at: 2026-11-15T20:14:32.554219+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-510","DEV-574","DEV-572","DEV-577"]}'
+    new: '{"related":["DEV-510","DEV-574","DEV-572","DEV-577","DEV-582"]}'

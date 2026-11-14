@@ -1,14 +1,76 @@
 title: harnessmux send --wait waits forever when the session's owner dies mid-turn
-status: InProgress
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-15T19:45:09.734691+00:00
-modified: 2026-11-15T19:52:37.255137+00:00
+modified: 2026-11-15T20:11:54.023433+00:00
 relationships:
   related:
   - DEV-510
+  - DEV-572
+comments:
+- date: 2026-11-15T19:57:05.207219+00:00
+  author: claude
+  text: |-
+    Fixed in harnessmux `1d8fd5d` on branch `agent/DEV-578` (worktree `~/.t3/worktrees/harnessmux/DEV-578`). Nothing changed in lotar.
+
+    - **Cause:** `client::wait_turn` followed the event log until the turn's end or `session.ended`. A killed owner writes neither.
+    - **Fix:** after 2 s without new events the wait asks the owner for its status over the socket. If no one answers, it reads the log once more (the end may have come just before the owner stopped), then fails: "the owner of <name> stopped during turn N without ending it; `harnessmux send <name>` resumes the session". Covers `send --wait`, `run` and the MCP `wait` tool.
+    - **Test (the ticket's check):** `tests/cli.rs` `a_wait_whose_owner_dies_mid_turn_ends_with_an_error` kills the owner during `send --wait`. Before the fix it hung until the 40 s limit; now it ends in about 2.4 s (passed 3 runs in a row).
+    - CHANGELOG `Unreleased` entry and a README line added. DEV-510's unmerged branch also edits `CHANGELOG.md` and `tests/cli.rs`, so the merge may need a small conflict fix there.
+  report:
+    commits:
+    - hash: 1d8fd5d
+      what: harnessmux wait_turn checks that the owner still answers
+    checks:
+    - command: cargo nextest run (harnessmux, 43 tests)
+      result: passed
+    - command: cargo clippy --all-targets --all-features -- -D warnings
+      result: passed
+    - command: cargo fmt --all --check
+      result: passed
+    - command: cargo deny check
+      result: passed
+    - command: npm run lint / npm test / npm run smoke (lotar)
+      result: not_run
+      reason: no lotar file changed
+    next: Review harnessmux branch agent/DEV-578 (worktree ~/.t3/worktrees/harnessmux/DEV-578), merge it into harnessmux main; lotar picks it up with the next harnessmux release
+- date: 2026-11-15T20:02:49.574639+00:00
+  author: codex
+  text: |-
+    Review: passed — no blocking findings in harnessmux `1d8fd5d`.
+
+    - Reviewed the complete fix, README/CHANGELOG, owner socket and follower behavior, repository guidance, related DEV-510/DEV-572 context and recent main history. The regression kills the owner after acceptance and now exits with the expected error; prior failing evidence is recorded by the fix agent.
+    - Independently reran `cargo nextest run`: 43/43 passed; `cargo fmt --all --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo deny check` and `git diff --check` passed. Deny reports a duplicate `syn` warning. Checks ran with approved execution in the harnessmux worktree.
+    - Merge target is harnessmux branch `agent/DEV-578`, commit `1d8fd5d`, at `/Users/mallox/.t3/worktrees/harnessmux/DEV-578`. The assigned LoTaR checkout instead contains unrelated DEV-572 commit `6a3a703d`; do not treat it as this fix. LoTaR receives the fix through a subsequent harnessmux release.
+    - No UI changes. LoTaR lint/test/smoke not run because this fix changes no LoTaR code. No files changed, commits or minor tickets created; status and assignee left unchanged.
+- date: 2026-11-15T20:11:47.156789+00:00
+  author: claude
+  text: |-
+    Merged: harnessmux `main` fast-forwarded to `1d8fd5d`. Not pushed.
+
+    - Branch `agent/DEV-578` already sat on harnessmux `main` (`c12aa25`), so no rebase and no conflict. DEV-510 was already on main.
+    - Ticket check passes in the main checkout `~/Development/@localtaskrepo/harnessmux`: `cargo nextest run a_wait_whose_owner_dies_mid_turn_ends_with_an_error`, 1 passed, 2.4 s.
+    - Skipped: fmt, clippy, the full nextest run and deny. Fix and review both passed them on `1d8fd5d`, which is still HEAD.
+    - Not pushed: harnessmux isn't listed in `~/Development/standards/repos.json`, so agents may not push it.
+    - No rules or `.tasks` changed, so no `lotar trust`. Nothing to merge in lotar: its branch only holds DEV-572's `6a3a703d`, which is already on main as `683e8626`.
+  report:
+    commits:
+    - hash: 1d8fd5d
+      what: harnessmux main fast-forwarded, send --wait ends when the owner dies
+    checks:
+    - command: harnessmux cargo nextest run a_wait_whose_owner_dies_mid_turn_ends_with_an_error
+      result: passed
+      reason: main checkout, 2.4 s
+    - command: harnessmux fmt/clippy/nextest/deny
+      result: not_run
+      reason: skipped, passed on 1d8fd5d in fix and review, no rebase
+    - command: lotar npm run lint/test/smoke
+      result: not_run
+      reason: no lotar file changed
+    next: Push harnessmux main and release it; lotar gets the fix with the next harnessmux release
 description: 'Found in DEV-510 rework 5: in harnessmux tests/cli.rs a send accepted by an owner that then died (kill -9) left `harnessmux send --wait` following the event log until the test''s 40 s limit. `client::wait_turn` (src/client.rs) ends only on the turn''s end or session.ended, which a killed owner never writes. Check: kill an owner after it accepts a prompt, then see whether `send --wait` returns. Done when the wait notices the owner is gone (socket no longer answers) and ends with an error or resumes the session.'
 tags:
 - health
@@ -32,3 +94,45 @@ history:
   - field: status
     old: Todo
     new: InProgress
+- at: 2026-11-15T19:56:15.242698+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-510"]}'
+    new: '{"related":["DEV-510","DEV-572"]}'
+- at: 2026-11-15T19:57:05.207219+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T19:57:16.657647+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T20:02:49.574639+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T20:02:57.753890+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-15T20:11:47.156789+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T20:11:54.023433+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

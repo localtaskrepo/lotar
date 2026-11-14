@@ -1,0 +1,193 @@
+title: 'Lotar build and development use too much disk and time per job: optimize, with measurements'
+status: HelpNeeded
+priority: High
+type: Feature
+reporter: claude
+assignee: mallox
+created: 2026-11-15T19:57:40.271694+00:00
+modified: 2026-11-15T20:41:50.400340+00:00
+relationships:
+  related:
+  - DEV-499
+  - DEV-574
+  - DEV-581
+comments:
+- date: 2026-11-15T20:40:48.024583+00:00
+  author: claude
+  text: |-
+    Quick win done: one local build profile; a worktree's tests + lint + smoke now take 2.3 GB instead of 3.3 to 6.1 GB, and the smoke build step takes 2.5 s instead of 29 to 92 s.
+
+    **Before** (cold with sccache warm, load 25 to 50, so times are rough)
+    - `npm test` (`local`): 46 s, 1.9 GB; one rebuild after a change adds 0.6 GB (incremental)
+    - `npm run build:smoke` (`smoke`, opt-level 2): 92 s cold, 29 s after a change, 0.74 GB
+    - clippy (`dev`): 20 s, 0.62 GB
+    - raw `cargo nextest run` (`dev` with debug info, as agents run it): 31 s, +2.9 GB
+    - One worktree: 3.3 GB for the gates, 6.1 GB with a raw run. Seen today: `agent-DEV-576` had `debug` 2.6 GB + `local` 2.0 GB
+
+    **After** (`e2f4698d`)
+    - `dev` takes `local`'s settings (no debug info, dependencies at opt-level 2); `local` and `smoke` are gone
+    - `npm test` passes `--cargo-profile dev`: 46 to 58 s (load 50 to 79), 1.9 GB. Without it cargo uses its `test` profile, which rebuilt dependencies (26 s instead of 4 s)
+    - `build:smoke` is `cargo build --bins --tests`, the same build: 0.2 s with nothing changed, 2.5 s after `npm test`, +0 GB. Plain `cargo build` would have built about 0.6 GB again, because `tempfile` (a dev dependency) turns on `rustix` and `fastrand` default features
+    - Smoke runs the unoptimized `target/debug/lotar` at the same speed (A/B: 6.1 s vs 5.5 s)
+    - Lint + tests + smoke in one worktree: 2.3 GB in `target/debug`, about 1 GB (30%) less per job; −2.9 GB more where an agent ran raw dev builds
+
+    **Changed**: `Cargo.toml`, `package.json`, `scripts/rust-test-runner.mjs` and its test, `smoke/helpers/binary.ts`, `scripts/screenshots.mjs`, `scripts/generate-test-tasks.mjs`, docs and skills (`testing-strategy`, `smoke-suite-debugging`, `smoke.instructions.md`). Callers searched in lotar, `~/Development` and open DEV tickets: none left. CI keeps `ci` and `release`.
+
+    **Not changed**: the owner's decision of 2026-11-13 (STD-95: build output stays until Done). Every job still gets a new T3 worktree, so a ticket with fix, review and merge holds about 3 × 2.3 GB until Done.
+  report:
+    commits:
+    - hash: e2f4698d
+      what: one local build profile (dev); local and smoke profiles removed; npm test, clippy and smoke share target/debug
+    checks:
+    - command: npm run lint (lint:agent)
+      result: passed
+    - command: npm test (test:agent)
+      result: passed
+      reason: 2212 Rust, 1547 UI, release and hook tests; the first run failed mcp_wire_lifecycle_test::deferred_list_changed_is_coalesced_and_emitted_after_ready 4 times in a row, passed 6 of 6 after .lotar-test-scratch leftovers were removed
+    - command: npm run smoke (test:smoke:agent)
+      result: passed
+      reason: 404 of 404, 103 s
+    - command: node --test scripts/tests/rust-test-runner.test.mjs
+      result: passed
+      reason: '46'
+    - command: smoke A/B, same 6 specs (46 tests), old smoke binary vs new dev binary
+      result: passed
+      reason: 6.1 s vs 5.5 s
+    - command: CI (ci and release profiles)
+      result: not_run
+      reason: unchanged, CI never used local or smoke
+    - command: raw cargo nextest run without --cargo-profile, after
+      result: not_run
+      reason: the skill now says to pass --cargo-profile dev
+    next: 'Owner: answer the split question in the next comment; review and merge of e2f4698d can go ahead independently'
+- date: 2026-11-15T20:41:01.370006+00:00
+  author: claude
+  text: |-
+    Question for mallox: which part of lotar should become its own crate first: (A) agent jobs and automation, (B) MCP, (C) sync, or (D) move agent jobs out into a project of their own? I recommend A.
+
+    **Why the split** (lines of Rust today)
+    - `lotar-lib` src ~72k: services 37k (agent jobs, runner, queue, automation 13.4k; sync 5.4k; sprints 3.1k), cli 19k, mcp 9.1k, routes and web server 5.3k. `lotar-core` 24k (DEV-499). Tests 59k, one integration binary.
+    - Most of this month's tickets change agent jobs, yet every change rebuilds all 72k lines and links all 59k lines of tests.
+    - (A) crate `lotar-agent`: `agent_*`, `automation*`, the runner; with its own tests a change there builds and tests about a fifth of lotar-lib. Then MCP and sync the same way.
+    - (D) goes further: agent job orchestration beside harnessmux, with lotar as one user. That's the "small and focused" rule from STD-131, but it's the most work.
+
+    **More proposals, for you to decide later**
+    - Reuse builds between a ticket's jobs: review and merge start in a new T3 worktree with a cold build (1 to 2 min, 2.3 GB each). lotar could copy the earlier worktree's `target/` as an APFS clone (`cp -c`, no extra disk until something rebuilds). That needs a change to the job start, and T3 Code creates the worktree.
+    - Once a later job of the ticket has its own build, remove the earlier worktree's `target/`. That changes STD-95 (keep builds until Done), so it's your call.
+    - One shared `CARGO_TARGET_DIR`: not proposed. DEV-574 found that cargo's lock would serialize parallel jobs.
+    - harnessmux: one profile already, 0.9 to 1.6 GB per worktree (`DEV-510`, `DEV-578`), 5.7 GB in the main checkout, 2.5 GB of worktrees now. The same fix applies: `[profile.dev] debug = false` (or `"line-tables-only"`), plus `--cargo-profile dev` for nextest in its AGENTS.md. Not measured there yet; a small ticket in harnessmux once you agree.
+- date: 2026-11-15T20:41:49.151211+00:00
+  author: claude
+  text: |-
+    Note: DEV-581 covers part of the build-reuse proposal above.
+
+    - It changes `prepare_worktree` in `agent_job_service.rs` so that a headless job reuses the T3 thread's worktree that already has `agent/<ID>` checked out, which leaves one worktree and one `target/` per ticket in that case.
+    - `e2f4698d` doesn't touch that file, so the two don't conflict.
+description: |-
+  Owner, 2026-11-15, in his words: "we need to find a solution for the space being used up. Tasks need to clean up after them properly. At least on lotar we need to do something to optimize the build and development process." Related standing rule (owner 2026-11-15, STD-131): keep projects small and focused; lotar is the example of one that got so big it's hard to change, with long build times.
+
+  ## Found today
+  - Disk filled (2.3 GB free of 926 GB): ~230 GB of target/ folders in ~/.t3/worktrees, 5-35 GB per lotar worktree. After a cleanup they regrew ~60 GB in an hour of busy jobs (DEV-574 comment).
+  - One worktree builds several profiles side by side (target/debug, target/local, target/smoke, target/release, coverage), each a full build; every new worktree starts cold. sccache exists but fails in sandboxed jobs (Operation not permitted, STD-125).
+  - DEV-574 removes build output when a job's worktree is cleaned up, but builds are kept until the ticket is Done (standards owner decision), so active tickets still pile up.
+
+  ## What
+  1. Measure first: size and build time per profile, per job type (fix, review, merge), cold vs warm; what each job actually needs to build (a review often needs only the tests the diff touches; a merge only the gate).
+  2. Quick wins, each with its measured effect: fewer profiles per worktree (e.g. smoke and local reuse one profile, or dev profile with debug = 0/line-tables-only), one shared build cache that works inside the sandbox (sccache fix or a shared CARGO_TARGET_DIR per repo with cargo's lock), review/merge jobs reuse the fix job's worktree and build instead of a new one, build output removed when a job ends unless the next step of the same ticket reuses it.
+  3. Larger: which parts of lotar should become smaller crates or separate projects so a change builds and tests only its part (continues DEV-499's workspace split), as a proposal for the owner.
+
+  ## Done when
+  - [ ] Measurements in a comment: disk and build time per profile, cold and warm, and per job step (lint, tests, smoke), before and after.
+  - [ ] Quick wins done in lotar, each with its measured effect: one local build profile instead of `dev` + `local` + `smoke`; `npm test`, clippy and `npm run smoke` share `target/debug`; `npm run build:smoke` builds nothing after `npm test`.
+  - [ ] Nothing slower: smoke runs on the unoptimized binary in the same time (A/B on the same specs), and `npm run lint`, `npm test`, `npm run smoke` pass.
+  - [ ] No caller left on the removed `local`/`smoke` profiles: scripts, smoke helpers, CI, docs, skills; open tickets and other repos checked. CI keeps `ci` and `release`.
+  - [ ] The owner's decision of 2026-11-13 (STD-95: build output stays until Done) stays as written; changing it, a shared target dir, and job worktree reuse are proposals, not done here.
+  - [ ] The larger split (smaller crates or projects) as a proposal, with one HelpNeeded question to the owner (mallox).
+  - [ ] The same treatment proposed for harnessmux.
+history:
+- at: 2026-11-15T19:57:40.536361+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-499","DEV-574"]}'
+- at: 2026-11-15T19:57:40.768708+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-15T20:02:58.695414+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T20:39:53.800821+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Owner, 2026-11-15, in his words: "we need to find a solution for the space being used up. Tasks need to clean up after them properly. At least on lotar we need to do something to optimize the build and development process." Related standing rule (owner 2026-11-15, STD-131): keep projects small and focused; lotar is the example of one that got so big it's hard to change, with long build times.
+
+      ## Found today
+      - Disk filled (2.3 GB free of 926 GB): ~230 GB of target/ folders in ~/.t3/worktrees, 5-35 GB per lotar worktree. After a cleanup they regrew ~60 GB in an hour of busy jobs (DEV-574 comment).
+      - One worktree builds several profiles side by side (target/debug, target/local, target/smoke, target/release, coverage), each a full build; every new worktree starts cold. sccache exists but fails in sandboxed jobs (Operation not permitted, STD-125).
+      - DEV-574 removes build output when a job's worktree is cleaned up, but builds are kept until the ticket is Done (standards owner decision), so active tickets still pile up.
+
+      ## What
+      1. Measure first: size and build time per profile, per job type (fix, review, merge), cold vs warm; what each job actually needs to build (a review often needs only the tests the diff touches; a merge only the gate).
+      2. Quick wins, each with its measured effect: fewer profiles per worktree (e.g. smoke and local reuse one profile, or dev profile with debug = 0/line-tables-only), one shared build cache that works inside the sandbox (sccache fix or a shared CARGO_TARGET_DIR per repo with cargo's lock), review/merge jobs reuse the fix job's worktree and build instead of a new one, build output removed when a job ends unless the next step of the same ticket reuses it.
+      3. Larger: which parts of lotar should become smaller crates or separate projects so a change builds and tests only its part (continues DEV-499's workspace split), as a proposal for the owner.
+
+      ## Done when
+      - A comment with the measurements and the quick wins done, with before/after disk and time per job.
+      - The larger split as a proposal with a HelpNeeded question to the owner.
+      - Same treatment proposed for harnessmux (15 GB of worktrees today).
+    new: |-
+      Owner, 2026-11-15, in his words: "we need to find a solution for the space being used up. Tasks need to clean up after them properly. At least on lotar we need to do something to optimize the build and development process." Related standing rule (owner 2026-11-15, STD-131): keep projects small and focused; lotar is the example of one that got so big it's hard to change, with long build times.
+
+      ## Found today
+      - Disk filled (2.3 GB free of 926 GB): ~230 GB of target/ folders in ~/.t3/worktrees, 5-35 GB per lotar worktree. After a cleanup they regrew ~60 GB in an hour of busy jobs (DEV-574 comment).
+      - One worktree builds several profiles side by side (target/debug, target/local, target/smoke, target/release, coverage), each a full build; every new worktree starts cold. sccache exists but fails in sandboxed jobs (Operation not permitted, STD-125).
+      - DEV-574 removes build output when a job's worktree is cleaned up, but builds are kept until the ticket is Done (standards owner decision), so active tickets still pile up.
+
+      ## What
+      1. Measure first: size and build time per profile, per job type (fix, review, merge), cold vs warm; what each job actually needs to build (a review often needs only the tests the diff touches; a merge only the gate).
+      2. Quick wins, each with its measured effect: fewer profiles per worktree (e.g. smoke and local reuse one profile, or dev profile with debug = 0/line-tables-only), one shared build cache that works inside the sandbox (sccache fix or a shared CARGO_TARGET_DIR per repo with cargo's lock), review/merge jobs reuse the fix job's worktree and build instead of a new one, build output removed when a job ends unless the next step of the same ticket reuses it.
+      3. Larger: which parts of lotar should become smaller crates or separate projects so a change builds and tests only its part (continues DEV-499's workspace split), as a proposal for the owner.
+
+      ## Done when
+      - [ ] Measurements in a comment: disk and build time per profile, cold and warm, and per job step (lint, tests, smoke), before and after.
+      - [ ] Quick wins done in lotar, each with its measured effect: one local build profile instead of `dev` + `local` + `smoke`; `npm test`, clippy and `npm run smoke` share `target/debug`; `npm run build:smoke` builds nothing after `npm test`.
+      - [ ] Nothing slower: smoke runs on the unoptimized binary in the same time (A/B on the same specs), and `npm run lint`, `npm test`, `npm run smoke` pass.
+      - [ ] No caller left on the removed `local`/`smoke` profiles: scripts, smoke helpers, CI, docs, skills; open tickets and other repos checked. CI keeps `ci` and `release`.
+      - [ ] The owner's decision of 2026-11-13 (STD-95: build output stays until Done) stays as written; changing it, a shared target dir, and job worktree reuse are proposals, not done here.
+      - [ ] The larger split (smaller crates or projects) as a proposal, with one HelpNeeded question to the owner (mallox).
+      - [ ] The same treatment proposed for harnessmux.
+- at: 2026-11-15T20:40:48.024583+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T20:41:01.370006+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T20:41:39.354441+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-15T20:41:49.151211+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T20:41:50.400340+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-499","DEV-574"]}'
+    new: '{"related":["DEV-499","DEV-574","DEV-581"]}'
