@@ -270,7 +270,8 @@ publisher matching this repository and `release.yml`, or its configuration expir
      Versions that are already on npm are skipped, so the job can be re-run. Prerelease
      tags (`v1.0.0-rc.1`) publish under the `next` dist-tag instead of `latest`.
    - `publish-crates`: publishes `lotar-web-assets`, `lotar-lib` and `lotar` to crates.io
-     (uses `CARGO_REGISTRY_TOKEN`). Both library crates read files outside their folder, which
+     through trusted publishing in the GitHub `release` environment (restricted to `v*` tags),
+     with `id-token: write` and the pinned `rust-lang/crates-io-auth-action`. Both library crates read files outside their folder, which
      `cargo package` leaves out, so `node scripts/stage-crates.mjs` first copies `docs/help`,
      `docs/openapi.json` and `target/web-embed` (after `npm run build:web`) into them. Versions
      already on crates.io are skipped. To check the packages locally:
@@ -401,3 +402,17 @@ Pull requests that change the install scripts run steps 1 and 2 against the late
 With the release workflow and the three manual verification jobs, you can be confident the
 published artifacts install correctly on macOS, Linux, and Windows before announcing the
 release.
+
+## crates.io trusted publishing setup
+
+Only the first release, `v0.15.0`, may fall back to `CARGO_REGISTRY_TOKEN` when
+trusted authentication fails: crates must exist before their publishers can be registered.
+Later tags require trusted authentication.
+
+After v0.15.0, follow DEV-508 (waiting on the DEV-417 release): the owner registers
+a GitHub trusted publisher for each of `lotar-web-assets`, `lotar-lib` and `lotar`,
+using owner `localtaskrepo`, repository `lotar`, workflow `release.yml`, and
+environment `release`. Enable "trusted publishing only" for all three crates,
+revoke the bootstrap API token, and delete `CARGO_REGISTRY_TOKEN` from both
+`localtaskrepo/lotar` and `localtaskrepo/harnessmux`. Then hand DEV-508 back to an
+agent to remove the first-release fallback from the workflow and this guide.

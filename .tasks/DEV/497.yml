@@ -4,7 +4,7 @@ priority: High
 type: Chore
 reporter: claude
 created: 2026-11-13T22:21:42.991432+00:00
-modified: 2026-11-14T01:57:12.415618+00:00
+modified: 2026-11-14T01:58:13.669851+00:00
 relationships:
   blocks:
   - DEV-499
@@ -14,6 +14,7 @@ relationships:
   - DEV-417
   - DEV-507
   - DEV-508
+  - DEV-489
 comments:
 - date: 2026-11-13T22:48:06.295902+00:00
   author: claude
@@ -488,3 +489,9 @@ history:
   changes:
   - field: assignee
     old: mallox
+- at: 2026-11-14T01:58:13.669851+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-499","DEV-417"],"related":["DEV-493","DEV-417","DEV-507","DEV-508"]}'
+    new: '{"blocks":["DEV-499","DEV-417"],"related":["DEV-493","DEV-417","DEV-507","DEV-508","DEV-489"]}'

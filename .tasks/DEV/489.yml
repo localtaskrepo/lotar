@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T21:14:10.488871+00:00
-modified: 2026-11-14T01:57:38.407545+00:00
+modified: 2026-11-14T02:07:38.271213+00:00
 relationships:
   depends_on:
   - DEV-488
@@ -16,6 +16,7 @@ relationships:
   - DEV-494
   - DEV-502
   - DEV-491
+  - DEV-497
 comments:
 - date: 2026-11-13T21:16:11.569283+00:00
   author: claude
@@ -40,6 +41,15 @@ comments:
 - date: 2026-11-14T01:57:38.407545+00:00
   author: codex
   text: 'Merge blocked: rebasing 09ed8571 onto main produced a file-location conflict for src/services/task_reviews.rs, suggested destination crates/lotar-lib/src/services/task_reviews.rs. Main migrated the Rust source directory into the library crate; this feature adds the review service at the former location. I aborted the rebase, preserving the original commit and all main-checkout work. Question for mallox: should a fix agent adapt this feature to the new crate layout and rerun lint, tests and smoke before retrying merge? No merge or push; checks not rerun because rebase did not complete.'
+- date: 2026-11-14T01:57:50.812509+00:00
+  author: automation
+  text: The merge agent's job job-20261114T015649.120Z-33 failed (lotar agent logs job-20261114T015649.120Z-33); the fix agent retries it on branch t3/review-verdict-comments-2.
+- date: 2026-11-14T01:58:13.565109+00:00
+  author: triage
+  text: 'Answer to the merge agent''s question (triaged, no need for mallox): yes. Moving the review service to crates/lotar-lib/src/services/task_reviews.rs and adapting the feature to the new crate layout is routine, reversible work within this ticket; the owner chose the feature on 2026-11-13 (see the description) and DEV-497 (Cargo workspace step 1, already merged on main as 3ec533d6) made the layout change. The fix agent already retries on t3/review-verdict-comments-2 (automation comment 2026-11-14T01:57). Rebase onto main, move the new files to the crate paths, rerun lint:agent, test:agent and test:smoke:agent, then retry the merge. Only ask the owner if a check fails for a reason you cannot fix.'
+- date: 2026-11-14T02:05:09.489422+00:00
+  author: codex
+  text: 'Adapted to the merged DEV-497 workspace layout: rebased onto main, resolved the review service location at crates/lotar-lib/src/services/task_reviews.rs, and moved the new integration test into crates/lotar-lib/tests so integration.rs includes it from the correct directory. Feature logic unchanged. Signed commit ad4f3ada (DEV-489 Review comments with a pass or block verdict and findings, shown as a badge); clean worktree. Checks: lint:agent passed; test:smoke:agent passed (111 files, 395 tests); npm test passed (2177 Rust, 1527 UI, 47 release, 7 hook tests). Initial sandbox runs were denied sccache access and retried with approved access. Initial test:agent compiled embedded assets before the concurrent web build finished, then the next run hit the existing dev318 agent-job log timing assertion (missing final status record); full npm test rerun passed with no failures. git diff main --check passed. No checks remain running. No merge or push in this fix follow-up, per its explicit handoff instruction; merge agent should retry integration. Status and assignee left unchanged; automation handles the next step when this job ends.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A74f7ed3c-4dde-4352-9136-60c3c1d347ed
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4c5bda98-6684-4459-bbaa-befb9145e8a3
@@ -69,6 +79,7 @@ references:
 - attachment: dev489-before-light-390-comments.9b83670cfa32068fcd5aa0926d194bf2.png
 - attachment: dev489-before-light-390-header.47fb5ad8017c9aa54fcda18e58ac7ff3.png
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afb42148a-0c14-45c0-bbc8-910efc7ce2a3
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A93a4900e-7f89-4dc5-8c54-025bfb8e2281
 releases:
 - 5
 description: |-
@@ -92,6 +103,7 @@ tags:
 - web-ui
 - backend
 - review-returned
+- merge-retried
 history:
 - at: 2026-11-13T21:14:10.762047+00:00
   actor: claude
@@ -382,3 +394,71 @@ history:
   actor: codex
   changes:
   - field: comment_added
+- at: 2026-11-14T01:57:50.782108+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: web-ui, backend, review-returned
+    new: web-ui, backend, review-returned, merge-retried
+- at: 2026-11-14T01:57:50.812509+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-14T01:57:50.988450+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-14T01:58:13.565109+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-14T01:58:13.669199+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-488"],"blocks":["DEV-417"],"related":["DEV-490","DEV-494","DEV-502","DEV-491"]}'
+    new: '{"depends_on":["DEV-488"],"blocks":["DEV-417"],"related":["DEV-490","DEV-494","DEV-502","DEV-491","DEV-497"]}'
+- at: 2026-11-14T01:58:14.005650+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-14T01:58:52.847480+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T02:05:09.489422+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T02:05:15.807333+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T02:06:55.435815+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A93a4900e-7f89-4dc5-8c54-025bfb8e2281
+- at: 2026-11-14T02:07:38.271213+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

@@ -1,11 +1,11 @@
 title: 'crates.io: the published lotar-lib and lotar-web-assets crates carry their docs and web UI'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-14T00:50:32.865133+00:00
-modified: 2026-11-14T01:56:48.878459+00:00
+modified: 2026-11-14T02:08:49.281571+00:00
 relationships:
   related:
   - DEV-497
@@ -46,12 +46,19 @@ comments:
 - date: 2026-11-14T01:56:43.861133+00:00
   author: codex
   text: 'Reworked both second-review findings in signed commit 21a568d4. publish-crates now uses environment release, id-token write, and rust-lang/crates-io-auth-action v1.0.5 pinned to its verified upstream SHA. Trusted token is preferred; authentication failure and stored-token fallback are permitted only for v0.15.0. Later tags require trusted publishing. Release guide documents publisher coordinates, trusted-only setup, revocation/deletion of both secrets, and DEV-508 handoff after DEV-417. Existing wrapper fix retained. Checks: release tests 50/50 passed twice, git diff --check passed, workflow formatted with existing two-space indentation. No application code changed; full lint/Rust/UI/smoke and packaging/install were not rerun for this workflow/docs-only follow-up. No real publishing performed. Status and assignee unchanged; ready for next review when job ends. No durable guidance finding.'
+- date: 2026-11-14T01:58:47.213302+00:00
+  author: codex
+  text: 'Review: passed. Inspected branch diff, comments, relationships, owner decision and main history. Prior trusted-publishing and documentation findings resolved. Wrapper fix is on main. Release tests 50/50 and diff checks passed. Packaging/install and full suites not independently rerun. No findings or minor tickets. Files, commits, status and assignee unchanged.'
+- date: 2026-11-14T02:08:49.281571+00:00
+  author: codex
+  text: 'Merged into main by fast-forward after clean rebase: 385b207d and 8a732432. Checks passed: npm run lint:agent, npm run test:agent (2171 Rust, 1524 UI, 50 release, 7 hook), npm run smoke (394/394). Initial sandbox sccache denial retried with required access; initial Rust run lacked generated web assets, resolved by npm run build:web before full passing rerun. Packaging/install and real publishing not rerun. Pending .tasks changes will be included by the requested amend. Push limited to 3ec533d6, before unfinished owner release DEV-417 commit ad67e063; this ticket remains local behind it. Status and assignee unchanged; automation advances to Done when this job ends.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5fd0f5af-5571-46df-be41-a26e3d5cbf4d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adddbeb69-b7da-486e-93aa-781960ead76d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad339317c-b3a3-4836-b17e-43b5578532e4
 - file: .github/workflows/release.yml
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acfc0df72-92ca-4433-97a8-8cdc0cc79f9f
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A513498d0-46e2-46a7-93e8-9cfa9800071d
 description: |-
   The owner is publishing lotar on crates.io (2026-11-13: "We're actually currently working on publishing in crates. The token has already been added"). After DEV-497 the workspace has three publishable crates (lotar = the binary, lotar-lib, lotar-web-assets), but two of them still read files outside their crate folder, which cargo package leaves out:
 
@@ -290,3 +297,25 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-14T01:57:52.592475+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A513498d0-46e2-46a7-93e8-9cfa9800071d
+- at: 2026-11-14T01:58:47.213302+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T01:58:52.077229+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-14T02:08:49.281571+00:00
+  actor: codex
+  changes:
+  - field: comment_added

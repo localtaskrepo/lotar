@@ -1,11 +1,11 @@
 title: 'Hand-off report comments: commits, checks passed, failed and not run, next step'
-status: InProgress
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-13T21:14:11.750735+00:00
-modified: 2026-11-14T01:50:58.838866+00:00
+modified: 2026-11-14T02:06:53.514674+00:00
 relationships:
   depends_on:
   - DEV-488
@@ -36,10 +36,26 @@ comments:
 - date: 2026-11-14T01:23:33.827507+00:00
   author: codex
   text: 'Review: blocking. Missing required before/after UI screenshot attachments in light/dark at 1920, 1440 and 390 px. smoke/tests/ui.report-comments.smoke.spec.ts:62-64 only writes a local comments.png. Attach and link the required matrix before re-review. Targeted UI tests passed (2 files, 5 tests); diff whitespace check passed. Quick smoke failed before app startup because target/smoke/lotar is absent. Independent screenshots, full lint, Rust tests, full smoke and remaining cross-ticket/history review not completed. No files or commits changed; status and assignee unchanged.'
+- date: 2026-11-14T02:00:49.749897+00:00
+  author: claude
+  text: 'Rework: the one blocking finding (missing before/after screenshots) is fixed; no code change was needed, so the commit stays 1568c37f (nothing to amend). Attached 12 screenshots of the task panel''s Comments tab with two report comments: before = main 2f9b8e97, after = this branch, light and dark at 1920, 1440 and 390 px: attachment:DEV-490-before-light-1920.75b491aa3253db953d25c0525c47ce06.png, attachment:DEV-490-before-light-1440.f823f04b5504961a9896b07c1c1c134b.png, attachment:DEV-490-before-light-390.934178fc6f8ab673823102ffd97ae3f4.png, attachment:DEV-490-before-dark-1920.6646091033c3f0a179ef90600de3eeda.png, attachment:DEV-490-before-dark-1440.e506c25725ec0e13a5a5b8e5dbfc5ac2.png, attachment:DEV-490-before-dark-390.fc7681cae8b7d6c562d286ff2e45779b.png, attachment:DEV-490-after-light-1920.97ce1b51cd495a9f0e4533470729c5de.png, attachment:DEV-490-after-light-1440.ddf85e8e58e0d22263290fa75b3e0db9.png, attachment:DEV-490-after-light-390.41fd6d88605e6b0c3ddb48e5f1ed4731.png, attachment:DEV-490-after-dark-1920.77a3fcd996eec5cfbd2dd3468747ff0d.png, attachment:DEV-490-after-dark-1440.8f309434502e221cd766413406507243.png, attachment:DEV-490-after-dark-390.18fe67f53049f794651247855e73ad04.png. I read them: before shows the comment text only; after shows the commit hash link, the checklist with check, cross and dash marks plus text, the Next line, ''No check marked not run'' on the second comment, and the Hand-off chip in the Type filter; nothing clips or overflows at 390 px, and dark mode has no white boxes. The reviewer''s quick smoke failed only because target/smoke/lotar wasn''t built in that checkout: built it with npm run build:smoke, and smoke/tests/ui.report-comments.smoke.spec.ts passes (1 test). Not rerun: lint, npm test and the full smoke suite, because no file changed since they passed on 1568c37f.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A92f9648a-c12b-4124-9284-32c1807b437d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2ba70837-175f-468d-9c07-7e1e47d39a19
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5e68378b-89bd-488b-8d38-1e7bf0ad6ff0
+- attachment: DEV-490-after-dark-1440.8f309434502e221cd766413406507243.png
+- attachment: DEV-490-after-dark-1920.77a3fcd996eec5cfbd2dd3468747ff0d.png
+- attachment: DEV-490-after-dark-390.18fe67f53049f794651247855e73ad04.png
+- attachment: DEV-490-after-light-1440.ddf85e8e58e0d22263290fa75b3e0db9.png
+- attachment: DEV-490-after-light-1920.97ce1b51cd495a9f0e4533470729c5de.png
+- attachment: DEV-490-after-light-390.41fd6d88605e6b0c3ddb48e5f1ed4731.png
+- attachment: DEV-490-before-dark-1440.e506c25725ec0e13a5a5b8e5dbfc5ac2.png
+- attachment: DEV-490-before-dark-1920.6646091033c3f0a179ef90600de3eeda.png
+- attachment: DEV-490-before-dark-390.fc7681cae8b7d6c562d286ff2e45779b.png
+- attachment: DEV-490-before-light-1440.f823f04b5504961a9896b07c1c1c134b.png
+- attachment: DEV-490-before-light-1920.75b491aa3253db953d25c0525c47ce06.png
+- attachment: DEV-490-before-light-390.934178fc6f8ab673823102ffd97ae3f4.png
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acda8e56b-d78f-4e06-8ded-692722a53ae6
 releases:
 - 5
 description: |-
@@ -232,3 +248,90 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5e68378b-89bd-488b-8d38-1e7bf0ad6ff0
+- at: 2026-11-14T02:00:17.916525+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-490-after-dark-1440.8f309434502e221cd766413406507243.png
+- at: 2026-11-14T02:00:17.995158+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-490-after-dark-1920.77a3fcd996eec5cfbd2dd3468747ff0d.png
+- at: 2026-11-14T02:00:18.066844+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-490-after-dark-390.18fe67f53049f794651247855e73ad04.png
+- at: 2026-11-14T02:00:18.123778+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-490-after-light-1440.ddf85e8e58e0d22263290fa75b3e0db9.png
+- at: 2026-11-14T02:00:18.190533+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-490-after-light-1920.97ce1b51cd495a9f0e4533470729c5de.png
+- at: 2026-11-14T02:00:18.283573+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-490-after-light-390.41fd6d88605e6b0c3ddb48e5f1ed4731.png
+- at: 2026-11-14T02:00:18.416546+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-490-before-dark-1440.e506c25725ec0e13a5a5b8e5dbfc5ac2.png
+- at: 2026-11-14T02:00:18.497802+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-490-before-dark-1920.6646091033c3f0a179ef90600de3eeda.png
+- at: 2026-11-14T02:00:18.549631+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-490-before-dark-390.fc7681cae8b7d6c562d286ff2e45779b.png
+- at: 2026-11-14T02:00:18.625095+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-490-before-light-1440.f823f04b5504961a9896b07c1c1c134b.png
+- at: 2026-11-14T02:00:18.691518+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-490-before-light-1920.75b491aa3253db953d25c0525c47ce06.png
+- at: 2026-11-14T02:00:18.751850+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-490-before-light-390.934178fc6f8ab673823102ffd97ae3f4.png
+- at: 2026-11-14T02:00:49.749897+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T02:01:00.209205+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T02:05:18.906915+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acda8e56b-d78f-4e06-8ded-692722a53ae6
+- at: 2026-11-14T02:06:53.514674+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
