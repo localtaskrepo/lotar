@@ -111,6 +111,17 @@ fn ci_uses_the_pinned_toolchain_and_keeps_profile_caches_independent() {
             assert_eq!(wrapper, None, "{name} must not use sccache");
         }
     }
+    // Newer pushes cancel the long Windows job, so it saves right after its
+    // last compiling step instead of at the end (DEV-547).
+    let windows = workflow["jobs"]["windows_checks"]["steps"].as_sequence().unwrap();
+    let position = |wanted: &str| windows.iter().position(|step| step["name"].as_str() == Some(wanted)).unwrap();
+    let save = position("Save sccache");
+    let last_compile =
+        windows.iter().rposition(|step| step["run"].as_str().is_some_and(|run| run.contains("cargo build") || run.contains("cargo nextest run"))).unwrap();
+    assert_eq!(save, last_compile + 2, "sccache stats and save follow the last compiling step");
+    assert_eq!(position("sccache stats"), last_compile + 1);
+    assert!(save < position("Run portable agent + automation smoke selection (browser-free)"));
+    assert!(windows[save..].iter().all(|step| step["run"].as_str().is_none_or(|run| !run.contains("cargo build") && !run.contains("cargo check"))));
     let linux = workflow["jobs"]["rust_checks"]["steps"].as_sequence().unwrap();
     let full = linux.iter().find(|step| step["run"].as_str().is_some_and(|run| run.contains("cargo nextest run"))).unwrap();
     assert!(full["run"].as_str().unwrap().contains("--lib --bins --tests"));

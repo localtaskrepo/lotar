@@ -614,6 +614,23 @@ jobs:
         cargo nextest run --cargo-profile ci --all-features --retries 0 --failure-output=immediate-final --test windows_regressions --bin lotar-agent-wrapper
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+    # Hit rate for later tuning; the cache itself is capped by SCCACHE_CACHE_SIZE.
+    - name: sccache stats
+      if: ${{ !cancelled() }}
+      shell: bash
+      run: sccache --show-stats
+
+    # Pull requests and failed-to-start runs restore but never save. Saved
+    # right after the last step that compiles, not at the job's end: newer
+    # pushes cancel this long job, and a run cancelled before its save left
+    # the next push an old cache (DEV-547).
+    - name: Save sccache
+      if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: .sccache
+        key: sccache-${{ runner.os }}-${{ github.job }}-${{ hashFiles('Cargo.lock') }}-${{ github.run_id }}
+
     - name: Enforce selection coverage (manifest vs JUnit)
       shell: pwsh
       run: |
@@ -694,20 +711,6 @@ jobs:
 
     - name: Verify release ticket links and page rendering
       run: npm run test:release
-
-    # Hit rate for later tuning; the cache itself is capped by SCCACHE_CACHE_SIZE.
-    - name: sccache stats
-      if: ${{ !cancelled() }}
-      shell: bash
-      run: sccache --show-stats
-
-    # Pull requests and failed-to-start runs restore but never save.
-    - name: Save sccache
-      if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-      with:
-        path: .sccache
-        key: sccache-${{ runner.os }}-${{ github.job }}-${{ hashFiles('Cargo.lock') }}-${{ github.run_id }}
 
   # DEV-309: build the release targets that have no native runner elsewhere in
   # QA, so a broken ARM build stops before a release is tagged. Windows arm64
