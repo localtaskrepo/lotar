@@ -1991,7 +1991,20 @@ fn apply_action(
                 provider: expand_run_setting(agent.provider.as_deref(), |raw| tmpl.expand(raw)),
                 ..AgentRunSettings::default()
             });
-            tell_agent(storage, &current.id, config, &message, tell.agent.as_deref(), run.unwrap_or_default())?;
+            // A message that reaches no agent says why on the ticket (DEV-525).
+            let rule = &action_context.rule;
+            match tell_agent(storage, &current.id, config, &message, tell.agent.as_deref(), run.unwrap_or_default()) {
+                Ok(None) => {}
+                Ok(Some(why)) => append_automation_comment(
+                    storage,
+                    &current.id,
+                    &format!("Automation rule '{rule}' told no agent on {} yet. {}.", current.id, why.trim_end_matches('.')),
+                )?,
+                Err(err) => {
+                    append_automation_comment(storage, &current.id, &format!("Automation rule '{rule}' told no agent on {}: {err}", current.id))?;
+                    return Err(err);
+                }
+            }
         }
     }
 
@@ -2357,6 +2370,9 @@ struct AgentRunSettings {
 
 /// Automatically queue an agent job when the assignee changes to an agent profile.
 /// This is the implicit behavior: assigning a ticket to an agent starts a job.
+/// Returns why the agent's job doesn't run now, for [`tell_agent`] to say on
+/// the ticket (DEV-525); `None` when it runs, is queued for the worker, or
+/// the assignee is no agent.
 fn maybe_queue_agent_on_assignment(
     tasks_dir: &Path,
     previous_assignee: Option<&str>,
@@ -2364,10 +2380,10 @@ fn maybe_queue_agent_on_assignment(
     task: &TaskDTO,
     config: &ResolvedConfig,
     run: AgentRunSettings,
-) {
+) -> Option<String> {
     // No change in assignee
     if previous_assignee == new_assignee {
-        return;
+        return None;
     }
 
     // Check if new assignee is an agent profile
@@ -2377,15 +2393,15 @@ fn maybe_queue_agent_on_assignment(
             if config.agent_profiles.contains_key(name) {
                 name.to_string()
             } else {
-                return;
+                return None;
             }
         }
-        _ => return,
+        _ => return None,
     };
 
     // Don't queue if there's already an active job for this ticket
     if AgentJobService::has_active_job(&task.id) {
-        return;
+        return Some(format!("{} already has a job; it reads the ticket when it starts", task.id));
     }
 
     // Check max_iterations safety net
@@ -2410,7 +2426,10 @@ fn maybe_queue_agent_on_assignment(
                 },
                 TaskUpdateContext::automation_disabled(),
             );
-            return;
+            return Some(format!(
+                "{terminal_count} agent jobs ended on {} in the last 24 hours, the limit (max_iterations) is {limit}; tagged automation-limit-reached",
+                task.id
+            ));
         }
     }
 
@@ -2418,7 +2437,7 @@ fn maybe_queue_agent_on_assignment(
     let blocked_by = find_blocked_dependencies(&storage, task);
     if !blocked_by.is_empty() {
         let _ = mark_task_blocked(&mut storage, task, config, &blocked_by);
-        return;
+        return Some(format!("{} waits for {}", task.id, blocked_by.join(", ")));
     }
 
     let req = AgentJobCreateRequest {
@@ -2434,17 +2453,22 @@ fn maybe_queue_agent_on_assignment(
 
     let ticket = req.ticket_id.clone();
     let started = if matches!(AgentJobService::orchestrator_mode(), AgentOrchestratorMode::Server) {
-        AgentJobService::start_job_with_tasks_dir(req, tasks_dir).map(|_| ())
+        AgentJobService::start_job_with_tasks_dir(req, tasks_dir)
+            .map(|job| AgentJobService::waiting_reason(&job.id).map(|reason| format!("Agent job {} is queued: {reason}", job.id)))
     } else {
-        AgentQueueService::enqueue(tasks_dir, req).map(|_| ())
+        AgentQueueService::enqueue(tasks_dir, req).map(|_| None)
     };
-    // An assignment that can't start its job must say so (DEV-278).
-    if let Err(err) = started {
-        eprintln!("[lotar][warn] Could not start an agent job for {ticket}: {err}");
-        crate::api_events::emit(&crate::api_events::ApiEvent {
-            kind: "automation_failed".into(),
-            data: serde_json::json!({"id": ticket, "rule": "agent assignment", "message": err.to_string()}),
-        });
+    match started {
+        Ok(waiting) => waiting,
+        // An assignment that can't start its job must say so (DEV-278).
+        Err(err) => {
+            eprintln!("[lotar][warn] Could not start an agent job for {ticket}: {err}");
+            crate::api_events::emit(&crate::api_events::ApiEvent {
+                kind: "automation_failed".into(),
+                data: serde_json::json!({"id": ticket, "rule": "agent assignment", "message": err.to_string()}),
+            });
+            Some(format!("Could not start an agent job: {err}"))
+        }
     }
 }
 
@@ -2454,6 +2478,7 @@ fn maybe_queue_agent_on_assignment(
 /// Otherwise the ticket goes to its agent, which starts with the message as
 /// the next turn of the ticket's last session where there is one. A job
 /// never tells itself: an agent's own comment doesn't come back to it.
+/// Returns why the agent doesn't get the message now (DEV-525).
 fn tell_agent(
     storage: &mut Storage,
     ticket_id: &str,
@@ -2461,17 +2486,17 @@ fn tell_agent(
     message: &str,
     fallback: Option<&str>,
     mut run: AgentRunSettings,
-) -> LoTaRResult<()> {
+) -> LoTaRResult<Option<String>> {
     let tasks_dir = storage.root_path.clone();
     let task = TaskService::get(storage, ticket_id, None)?;
     run.session = Some(crate::config::types::AgentSession::Continue);
     run.prompt = Some(message.to_string());
     if let Some(job) = crate::services::agent_active_jobs::for_ticket(&tasks_dir, &task.id) {
         if std::env::var("LOTAR_AGENT_JOB_ID").is_ok_and(|own| own == job.job_id) {
-            return Ok(());
+            return Ok(None);
         }
         if crate::services::agent_job_service::tell_running_job(&job, message) {
-            return Ok(());
+            return Ok(None);
         }
         let Some(agent) = job.agent.clone() else {
             return Err(LoTaRError::ValidationError(format!("The job running on {} has no agent profile to tell", task.id)));
@@ -2487,11 +2512,12 @@ fn tell_agent(
             session: run.session,
         };
         AgentQueueService::enqueue(&tasks_dir, req)?;
-        return AgentQueueService::ensure_worker(&tasks_dir);
+        return AgentQueueService::ensure_worker(&tasks_dir).map(|()| None);
     }
-    if AgentJobService::has_active_job(&task.id) {
+    if let Some(job_id) = AgentJobService::active_job_id(&task.id) {
         // Queued in this process: the job reads the ticket when it starts.
-        return Ok(());
+        let reason = AgentJobService::waiting_reason(&job_id).unwrap_or_else(|| "it is starting".to_string());
+        return Ok(Some(format!("Agent job {job_id} is queued: {reason}. It reads the ticket when it starts")));
     }
     let Some(agent) = ticket_agent(&task, config, fallback) else {
         return Err(LoTaRError::ValidationError(format!("{} has no agent to tell: set tell_agent.agent", task.id)));
@@ -2507,8 +2533,7 @@ fn tell_agent(
         let updated = TaskService::update_with_context(storage, &task.id, patch, TaskUpdateContext::automation_disabled())?;
         (task.assignee.clone(), updated)
     };
-    maybe_queue_agent_on_assignment(&tasks_dir, previous.as_deref(), updated.assignee.as_deref(), &updated, config, run);
-    Ok(())
+    Ok(maybe_queue_agent_on_assignment(&tasks_dir, previous.as_deref(), updated.assignee.as_deref(), &updated, config, run))
 }
 
 /// The ticket's agent profile: its assignee when that is one, else the

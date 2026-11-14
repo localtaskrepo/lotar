@@ -2823,3 +2823,54 @@ echo '{{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\
     let prompt = fs::read_to_string(&stdin).expect("prompt");
     assert!(prompt.contains(&format!("{} waited for {} (Docs), {} (Release)", waiting.id, docs.id, release.id)), "{prompt}");
 }
+
+/// DEV-525: a comment whose `tell_agent` job has to wait for a free slot
+/// says so on the ticket. The waiting job has no log yet and `lotar agent
+/// queue` doesn't list it, so the comment looked ignored.
+#[cfg(unix)]
+#[test]
+fn tell_agent_says_on_the_ticket_when_its_job_waits_for_a_slot() {
+    let _guard = lock_agent_tests();
+    enable_server_mode();
+    let fixtures = TestFixtures::new();
+    let script = write_stub_agent_script(
+        fixtures.get_temp_path(),
+        "stub-slow.sh",
+        "#!/bin/sh\n\
+sleep 1\n\
+echo '{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"ok\",\"session_id\":\"slow\"}'\n",
+    );
+    fixtures.create_config_in_dir(
+        &fixtures.tasks_root,
+        &format!("agent:\n  worktree:\n    max_parallel_jobs: 1\nagents:\n  fix:\n    runner: command\n    command: \"{}\"\n", script.display()),
+    );
+    AutomationService::set(
+        &fixtures.tasks_root,
+        None,
+        "automation:\n  rules:\n    - name: Comment reaches the agent\n      on:\n        commented:\n          tell_agent:\n            agent: fix\n            message: \"${{comment.text}}\"\n",
+    )
+    .expect("set automation");
+
+    let mut storage = fixtures.create_storage();
+    let create = |storage: &mut lotar::Storage, title: &str| {
+        TaskService::create(storage, TaskCreate { title: title.to_string(), project: Some("TELL".to_string()), ..Default::default() }).expect("create task")
+    };
+    let busy = create(&mut storage, "Busy");
+    let waiting = create(&mut storage, "Waiting");
+    TaskService::update(&mut storage, &busy.id, TaskUpdate { assignee: Some("@fix".to_string()), ..Default::default() }).expect("assign busy");
+    assert!(wait_for_job_status(&job_for_ticket(&busy.id).id, "running", 5_000), "the first job runs");
+
+    TaskService::add_comment(&mut storage, &waiting.id, "retry and fix any issues").expect("comment");
+    let task = TaskService::get(&storage, &waiting.id, None).expect("get task");
+    assert_eq!(task.assignee.as_deref(), Some("@fix"));
+    let job = job_for_ticket(&waiting.id);
+    let said = task.comments.iter().map(|comment| comment.text.as_str()).collect::<Vec<_>>();
+    assert!(
+        said.iter().any(|text| text.contains("told no agent")
+            && text.contains(&format!("Agent job {} is queued", job.id))
+            && text.contains("agent.worktree.max_parallel_jobs is 1")),
+        "{said:?}"
+    );
+
+    assert!(wait_for_job_status(&job.id, "completed", 10_000), "the queued job runs once the slot is free");
+}

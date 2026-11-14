@@ -464,6 +464,25 @@ impl AgentJobService {
         }
     }
 
+    /// Why the job waits in this process's queue instead of running, or
+    /// `None` once it runs (DEV-525). A waiting job has no log yet and
+    /// `lotar agent queue` doesn't list it, so its ticket has to say so.
+    pub fn waiting_reason(job_id: &str) -> Option<String> {
+        let registry = JOB_REGISTRY.lock().ok()?;
+        let pending = registry.pending_queue.iter().find(|pending| pending.job_id == job_id)?;
+        let merge_busy = registry
+            .jobs
+            .iter()
+            .any(|(id, state)| id != job_id && state.record.is_merge_job && matches!(state.record.status, AgentJobStatus::Queued | AgentJobStatus::Running));
+        Some(match registry.max_parallel_jobs {
+            Some(max) if registry.running_count >= max => {
+                format!("it waits for a free slot: {} jobs run, agent.worktree.max_parallel_jobs is {max}", registry.running_count)
+            }
+            _ if pending.is_merge_job && merge_busy => "it waits for the other merge job to end".to_string(),
+            _ => "it waits in the job queue".to_string(),
+        })
+    }
+
     /// The job this process runs (or queues) for the ticket.
     pub fn active_job_id(ticket_id: &str) -> Option<String> {
         JOB_REGISTRY.lock().ok().and_then(|registry| registry.active_by_ticket.get(ticket_id).cloned())
