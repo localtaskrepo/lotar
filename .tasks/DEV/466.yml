@@ -1,11 +1,11 @@
 title: 'Task panel stays on ''Loading task…'' while git hangs: the server''s git calls have no timeout'
-status: HelpNeeded
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-13T10:33:22.263037+00:00
-modified: 2026-11-14T08:06:55.655002+00:00
+modified: 2026-11-14T08:20:54.424209+00:00
 relationships:
   blocks:
   - DEV-513
@@ -151,6 +151,34 @@ comments:
 - date: 2026-11-14T07:43:11.562410+00:00
   author: automation
   text: The fix agent's job job-20261114T074228.393Z-80 failed (lotar agent logs job-20261114T074228.393Z-80); @fix-codex retries it on branch t3/task-panel-git-timeout-review.
+- date: 2026-11-14T08:20:31.650540+00:00
+  author: claude
+  text: |-
+    ## Fix: finished on this branch, checks pass
+
+    **What changed.** The branch `t3/review-dev-466-git-timeouts` held only the intermediate commit `03db11a4`. I fast-forwarded it to the finished Fable round **`896309c0`** (signed, a child of `03db11a4`). No new code: that commit already does everything *Done* asks:
+    - `src/utils/git.rs`: `output_within` / `GIT_TIMEOUT` (20 s). It runs git in its own process group and kills the group at the deadline, also when git exits but a child keeps the pipes open (the earlier review finding). It answers with a `TimedOut` error.
+    - `src/services/audit_service.rs`: history, activity feed, `show` and `ls-files` calls go through it. `git cat-file --batch` reads time out too.
+    - UI: `loadTask` no longer waits for commit history. The Commits tab has its own loading state and an error line.
+
+    **Checks (all on `896309c0`)**
+    - Ticket check, end to end: a `git` shim that runs `sleep 600` on PATH, then `lotar serve`. `/api/tasks/get` answers in 33 ms. `/api/tasks/history` answers **500 "git did not finish within 20s" after 20.0 s**. No `sleep` children are left.
+    - Fails before the fix: the panel test (`TaskPanel.integration.spec.ts`, DEV-466) fails with the `main` version of `useTaskPanelPersistence.ts` and passes with the fix. The Rust timeout tests pass (6/6).
+    - `npm run lint:agent` passed. `npm run test:agent` passed: Rust 2134/2134, UI 1514/1514, release and hooks tests. `npm run test:smoke:agent` passed: 387/387.
+    - Not in scope: agent-job git calls (merge, worktree, branch) still have no timeout. They write, and killing them partway through is not what this ticket asks.
+
+    **Screenshots** (hanging git, 22 s after opening TST-1, Commits tab). *Before* is lotar 0.15.0: the panel stays on *Loading task…*. *After* is this branch: the task shows, and the Commits tab says *Couldn't load commits: … git did not finish within 20s*. The refresh button retries.
+
+    | Mode and width | Before | After |
+    | --- | --- | --- |
+    | light 1920 | [before](https://lotar.pyxzl.net/api/attachments/get?path=DEV-466-before-light-1920.81742d69834fc63e1a1e4be69db731d4.png) | [after](https://lotar.pyxzl.net/api/attachments/get?path=DEV-466-after-light-1920.366b95159be81ba25edb73859fabef3e.png) |
+    | light 1440 | [before](https://lotar.pyxzl.net/api/attachments/get?path=DEV-466-before-light-1440.500883141d4ff3d51decdd20dd7c76a2.png) | [after](https://lotar.pyxzl.net/api/attachments/get?path=DEV-466-after-light-1440.e00d172c7b6045e868d4ecc5bff914f0.png) |
+    | light 390 | [before](https://lotar.pyxzl.net/api/attachments/get?path=DEV-466-before-light-390.737133926ccf6d9ca0c29beef5d96f28.png) | [after](https://lotar.pyxzl.net/api/attachments/get?path=DEV-466-after-light-390.d5636552f72073bef93f9888f32544f7.png) |
+    | dark 1920 | [before](https://lotar.pyxzl.net/api/attachments/get?path=DEV-466-before-dark-1920.dbc4391ac0e3a2318aad6f92adb7edbe.png) | [after](https://lotar.pyxzl.net/api/attachments/get?path=DEV-466-after-dark-1920.e78d695864d2ee7030589d00cdab9c7e.png) |
+    | dark 1440 | [before](https://lotar.pyxzl.net/api/attachments/get?path=DEV-466-before-dark-1440.0f8f4df66923895a109e94c8a146c927.png) | [after](https://lotar.pyxzl.net/api/attachments/get?path=DEV-466-after-dark-1440.14870798ff614cf08237cf81da96ef92.png) |
+    | dark 390 | [before](https://lotar.pyxzl.net/api/attachments/get?path=DEV-466-before-dark-390.b3a1afadaabb3389ef037d927f96a097.png) | [after](https://lotar.pyxzl.net/api/attachments/get?path=DEV-466-after-dark-390.42bbd24bc3e9f3d84ed44b8f190371f4.png) |
+
+    Tagged `ui`. Next: review on another model, then merge.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad8d79e8d-6688-4da4-a3a5-516b2d4c3b76
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afcbae329-3a86-478f-818f-b3877e1b72d7
@@ -162,6 +190,18 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aac522e67-2e35-4b84-84de-ec60aeed2746
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A60a527cf-ce89-46a4-bc73-69d319930972
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A188f347f-efb3-4a7f-8d1d-05dcb917bae5
+- attachment: DEV-466-after-dark-1440.14870798ff614cf08237cf81da96ef92.png
+- attachment: DEV-466-after-dark-1920.e78d695864d2ee7030589d00cdab9c7e.png
+- attachment: DEV-466-after-dark-390.42bbd24bc3e9f3d84ed44b8f190371f4.png
+- attachment: DEV-466-after-light-1440.e00d172c7b6045e868d4ecc5bff914f0.png
+- attachment: DEV-466-after-light-1920.366b95159be81ba25edb73859fabef3e.png
+- attachment: DEV-466-after-light-390.d5636552f72073bef93f9888f32544f7.png
+- attachment: DEV-466-before-dark-1440.0f8f4df66923895a109e94c8a146c927.png
+- attachment: DEV-466-before-dark-1920.dbc4391ac0e3a2318aad6f92adb7edbe.png
+- attachment: DEV-466-before-dark-390.b3a1afadaabb3389ef037d927f96a097.png
+- attachment: DEV-466-before-light-1440.500883141d4ff3d51decdd20dd7c76a2.png
+- attachment: DEV-466-before-light-1920.81742d69834fc63e1a1e4be69db731d4.png
+- attachment: DEV-466-before-light-390.737133926ccf6d9ca0c29beef5d96f28.png
 releases:
 - 6
 description: |-
@@ -175,6 +215,7 @@ tags:
 - review-returned
 - merge-retried
 - fix-retried
+- ui
 custom_fields:
   finding: hang:task-history-git
 history:
@@ -686,3 +727,79 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A188f347f-efb3-4a7f-8d1d-05dcb917bae5
+- at: 2026-11-14T08:20:05.832191+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, review-returned, merge-retried, fix-retried
+    new: health, review-returned, merge-retried, fix-retried, ui
+- at: 2026-11-14T08:20:05.922345+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-466-after-dark-1440.14870798ff614cf08237cf81da96ef92.png
+- at: 2026-11-14T08:20:05.985836+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-466-after-dark-1920.e78d695864d2ee7030589d00cdab9c7e.png
+- at: 2026-11-14T08:20:06.035281+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-466-after-dark-390.42bbd24bc3e9f3d84ed44b8f190371f4.png
+- at: 2026-11-14T08:20:06.082442+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-466-after-light-1440.e00d172c7b6045e868d4ecc5bff914f0.png
+- at: 2026-11-14T08:20:06.133233+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-466-after-light-1920.366b95159be81ba25edb73859fabef3e.png
+- at: 2026-11-14T08:20:06.182947+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-466-after-light-390.d5636552f72073bef93f9888f32544f7.png
+- at: 2026-11-14T08:20:06.239537+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-466-before-dark-1440.0f8f4df66923895a109e94c8a146c927.png
+- at: 2026-11-14T08:20:06.290662+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-466-before-dark-1920.dbc4391ac0e3a2318aad6f92adb7edbe.png
+- at: 2026-11-14T08:20:06.340623+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-466-before-dark-390.b3a1afadaabb3389ef037d927f96a097.png
+- at: 2026-11-14T08:20:06.403097+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-466-before-light-1440.500883141d4ff3d51decdd20dd7c76a2.png
+- at: 2026-11-14T08:20:06.462913+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-466-before-light-1920.81742d69834fc63e1a1e4be69db731d4.png
+- at: 2026-11-14T08:20:06.520998+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-466-before-light-390.737133926ccf6d9ca0c29beef5d96f28.png
+- at: 2026-11-14T08:20:31.650540+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T08:20:54.424209+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Reviewing

@@ -1,17 +1,21 @@
 title: Job instructions read a ticket with lotar list <ID>, which also returns every ticket that mentions the ID
-status: Reviewing
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-14T07:27:23.372003+00:00
-modified: 2026-11-14T08:03:41.273257+00:00
+modified: 2026-11-14T08:24:31.532033+00:00
 comments:
 - date: 2026-11-14T08:03:30.242278+00:00
   author: claude
   text: 'Fixed in 9976ba1f (agent/DEV-529). Job instructions (docs/help/agent-instructions.md) and the lotar-workflow and lotar-dev-tracking skills now read the ticket with `--format json show <ID>`. `lotar list <ID>` with a full ID (also REST/MCP/web UI, via task_query::apply) puts that task first in every non-relevance order; the others keep their order. docs/help/list.md says so and points to show. New test dev167_text_search_test::cli_list_with_a_full_id_puts_that_task_first (fails without the fix); agent_job_service test updated. Checks: npm run lint, npm run test:agent (2161 Rust + 1537 UI passed), npm run smoke (401 passed).'
+- date: 2026-11-14T08:24:24.942264+00:00
+  author: codex
+  text: 'Review: passed. Reviewed full commit diff, acceptance criteria/comments, shared query before pagination and recent main history. No findings or UI changes. Web build and diff check passed. All 5 focused search tests passed; runner exited 1 because macOS xcrun left xcrun_db in its temp folder. Used RUSTC_WRAPPER= after sandbox denied sccache. Full lint/test/smoke were not independently rerun. No files, commits, status or assignee changed; no durable guidance finding.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A562d7c7d-eec9-4342-90fe-a19d62a56145
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A63ab5f8c-3b49-48d0-86c5-0f9f59851f04
 description: |-
   Found 2026-11-14 on standards STD-96. The built-in job instructions' quick reference says to read ticket details with `lotar --format json list STD-96`. That is a text search: in standards it returns 7 tickets (STD-105, STD-97, STD-96, INBOX-125, STD-110, INBOX-123, INBOX-54), and the asked-for ticket is not first. An agent that took `tasks[0]` wrote STD-97's description into STD-96 (history 2026-11-13T21:15:12), and lotar's link detection then added a wrong STD-95 relationship.
 
@@ -53,3 +57,21 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-14T08:21:42.248299+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A63ab5f8c-3b49-48d0-86c5-0f9f59851f04
+- at: 2026-11-14T08:24:24.942264+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T08:24:31.532033+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

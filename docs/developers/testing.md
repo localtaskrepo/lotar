@@ -31,10 +31,10 @@ Git hooks are opt-in (`npm run hooks:install`) and take seconds; see [.githooks/
 
 ## Targeted runs
 
-- `npm run test:rust` – Rust-only suite via `cargo nextest`, useful while iterating on CLI/service changes.
+- `npm run test:rust` – Rust-only suite via `cargo nextest`, after `npm run build:web`; useful while iterating on CLI/service changes.
 - `npm run test:ui` – Vitest unit tests for `view/` components.
 - `npm run test:smoke:quick` – Executes smoke specs without rebuilding. Use only with fresh artifacts from `npm run build:smoke`; the harness prefers the smoke binary over a release binary.
-- `npm run build:web` – Rebuilds the SPA into `target/web` and compressed embedding assets into `target/web-embed`. A fresh worktree needs these before Rust compilation; rebuild Rust after asset changes to refresh the embedded UI. A web-only change recompiles only `crates/lotar-web-assets` and the `lotar` binary (the root package), not the library and its tests.
+- `npm run build:web` – Rebuilds the SPA into `target/web` and compressed embedding assets into `target/web-embed`. A fresh worktree needs these before Rust compilation (`test:rust` and `test:rust:agent` build them first); rebuild Rust after asset changes to refresh the embedded UI. A web-only change recompiles only `crates/lotar-web-assets` and the `lotar` binary (the root package), not the library and its tests.
 - The tests in `crates/lotar-lib/tests/` run the `lotar` binary of the root package and `lotar-agent-wrapper` through `common::lotar_bin()` and `common::workspace_bin()`, which find them in the build folder above the test binary. Cargo builds them when the tests run for the whole workspace (the default); with `-p lotar-lib` alone they may be stale or missing. The test that needs the embedded UI, `tests/embedded_web_ui_test.rs`, belongs to the root package. Tests reach files outside the crate (`docs/`, `.tasks/`) through `env!("REPO_ROOT")`.
 
 ## Troubleshooting tips
