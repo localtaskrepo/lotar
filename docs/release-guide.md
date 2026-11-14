@@ -1,6 +1,6 @@
 # Release & Verification Guide
 
-LoTaR ships signed binaries, `.deb` and `.rpm` packages, npm packages, a Docker image, a
+LoTaR ships signed binaries, `.deb` and `.rpm` packages, npm packages, crates on crates.io, a Docker image, a
 Homebrew tap (macOS and Linux), a Scoop bucket, and install scripts. This guide summarizes the release
 automation and the manual checks to run after every tag.
 
@@ -16,6 +16,7 @@ automation and the manual checks to run after every tag.
     musl binaries (`packaging/nfpm.yaml`), attached to the same release.
   - npm packages: `@localtaskrepo/lotar` (a small Node launcher that installs the `lotar` command) and one `@localtaskrepo/lotar-<platform>`
     package per binary, assembled by `scripts/npm-packages.mjs` from the release archives.
+  - Crates on crates.io: `lotar` (the binary, `cargo install lotar`), `lotar-lib` and `lotar-web-assets`.
   - Docker image `mallox/lotar:<version>` built via Buildx, also tagged `latest` (or `next`
     for a prerelease).
   - Homebrew tap update pushed to `localtaskrepo/homebrew-lotar`. The formula installs the
@@ -268,6 +269,12 @@ publisher matching this repository and `release.yml`, or its configuration expir
    - `publish-npm`: publishes the platform packages, then `@localtaskrepo/lotar`, with npm provenance.
      Versions that are already on npm are skipped, so the job can be re-run. Prerelease
      tags (`v1.0.0-rc.1`) publish under the `next` dist-tag instead of `latest`.
+   - `publish-crates`: publishes `lotar-web-assets`, `lotar-lib` and `lotar` to crates.io
+     (uses `CARGO_REGISTRY_TOKEN`). Both library crates read files outside their folder, which
+     `cargo package` leaves out, so `node scripts/stage-crates.mjs` first copies `docs/help`,
+     `docs/openapi.json` and `target/web-embed` (after `npm run build:web`) into them. Versions
+     already on crates.io are skipped. To check the packages locally:
+     `npm run build:web && node scripts/stage-crates.mjs && cargo package --allow-dirty -p lotar-web-assets -p lotar-lib -p lotar`.
    - `update-release-page`: injects quick download links and snapshot-linked
      ticket references in the custom commit list.
    - `publish-docker-image`: builds/pushes the Docker image to Docker Hub as
@@ -298,6 +305,7 @@ rule everywhere (a `-` in the tag), so prerelease users opt in and nobody else g
 | npm | `latest` dist-tag | `next` dist-tag |
 | Docker | `1.0.0` and `latest` | `1.0.0-rc.1` and `next` |
 | Homebrew tap, Scoop bucket | Updated | Not updated (`update-homebrew-tap` and `update-scoop-bucket` are skipped) |
+| crates.io | Published | Not published (`publish-crates` is skipped: `Cargo.toml` has the version without the suffix) |
 | `.deb`/`.rpm` packages | Attached to the release | Attached to the release |
 
 ## Post-Release Verification

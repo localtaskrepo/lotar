@@ -23,3 +23,7 @@ __pycache__/
 
 # npm first-publish workspace (docs/release-guide.md, DEV-250)
 /npm-bootstrap/
+
+# Copies scripts/stage-crates.mjs makes for cargo package (DEV-507)
+/crates/lotar-lib/docs/
+/crates/lotar-web-assets/web-embed/

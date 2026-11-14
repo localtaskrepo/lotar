@@ -7,8 +7,8 @@ LoTaR is a Rust workspace with a Vue front-end bundle. The CLI, REST server, MCP
 | Path | Role |
 | --- | --- |
 | `Cargo.toml`, `src/main.rs`, `src/bin/` (root package `lotar`) | The `lotar` binary: parses the command line, dispatches to `cli::handlers`, and hands the library the embedded web UI. Also `lotar-agent-wrapper`, which uses only std. The package named `lotar` holds both binaries, so `cargo install lotar` and `cargo install --path .` install them. |
-| `crates/lotar-lib` | The library (crate `lotar`) and the Rust tests in `crates/lotar-lib/tests/`. `env!("REPO_ROOT")` gives it the repository root for files outside the crate (`docs/`, `.tasks/`). |
-| `crates/lotar-web-assets` | Embeds `target/web-embed`. Only the binary depends on it, so a web build recompiles this crate and the binary, not the library and its tests. |
+| `crates/lotar-lib` | The library (crate `lotar`) and the Rust tests in `crates/lotar-lib/tests/`. `env!("REPO_ROOT")` gives it the repository root for files outside the crate (`docs/`, `.tasks/`). Its build script embeds `docs/help` and `docs/openapi.json`; a packaged crate (`cargo package`) carries them in its own `docs/`, copied by `scripts/stage-crates.mjs`. |
+| `crates/lotar-web-assets` | Embeds `target/web-embed` (a packaged crate: its own `web-embed/`, copied by `scripts/stage-crates.mjs`). Only the binary depends on it, so a web build recompiles this crate and the binary, not the library and its tests. |
 | `crates/lotar-lib/src/cli` | Clap command graph, argument structs, preprocessors, and per-command handlers. |
 | `crates/lotar-lib/src/services` | Business logic (task CRUD, sprint ops, analytics, code reference management, audit helpers). |
 | `crates/lotar-lib/src/storage` | YAML persistence plus higher-level managers. `storage/manager::Storage` handles reads/writes under `.tasks`. |

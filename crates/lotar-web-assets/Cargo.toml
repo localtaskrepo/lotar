@@ -1,12 +1,15 @@
 [package]
 name = "lotar-web-assets"
-description = "The LoTaR web UI, embedded from target/web-embed"
+description = "The LoTaR web UI, embedded for the lotar binary"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
+# web-embed/ is the copy of target/web-embed that scripts/stage-crates.mjs
+# makes for cargo package (DEV-507).
+include = ["/src/**", "/build.rs", "/web-embed/**"]
 
 [lints]
 workspace = true

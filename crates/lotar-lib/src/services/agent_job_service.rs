@@ -28,7 +28,7 @@ use std::time::{Duration, Instant};
 const EVENT_LOG_LIMIT: usize = 200;
 /// How long a runner's descendants may keep its output streams busy after it exits.
 const OUTPUT_DRAIN_LIMIT: Duration = Duration::from_secs(5);
-const DEFAULT_AGENT_INSTRUCTIONS: &str = include_str!("../../../../docs/help/agent-instructions.md");
+const DEFAULT_AGENT_INSTRUCTIONS: &str = include_str!(concat!(env!("LOTAR_DOCS_DIR"), "/help/agent-instructions.md"));
 
 static JOB_COUNTER: AtomicU64 = AtomicU64::new(1);
 static ORCHESTRATOR_MODE: LazyLock<Mutex<AgentOrchestratorMode>> = LazyLock::new(|| Mutex::new(AgentOrchestratorMode::Standalone));

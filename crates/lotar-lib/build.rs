@@ -15,9 +15,23 @@ fn main() {
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR must be set"));
     let repo_root = manifest_dir.parent().and_then(Path::parent).expect("crates/lotar-lib is two levels below the root").to_path_buf();
     println!("cargo::rustc-env=REPO_ROOT={}", repo_root.display());
+    // Inside the workspace the docs come from the repository's docs/. A
+    // packaged crate (cargo package, crates.io) sits in a folder named
+    // lotar-lib-<version> with no repository around it, so it carries a copy
+    // in its own docs/, which scripts/stage-crates.mjs makes (DEV-507).
+    let docs_dir = if manifest_dir.ends_with("crates/lotar-lib") {
+        println!("cargo:rerun-if-changed=../../docs/help");
+        println!("cargo:rerun-if-changed=../../docs/openapi.json");
+        repo_root.join("docs")
+    } else {
+        println!("cargo:rerun-if-changed=docs");
+        manifest_dir.join("docs")
+    };
+    assert!(docs_dir.join("openapi.json").is_file(), "{} has no openapi.json: run `node scripts/stage-crates.mjs` before `cargo package`", docs_dir.display());
+    println!("cargo::rustc-env=LOTAR_DOCS_DIR={}", docs_dir.display());
     // The web UI is embedded by crates/lotar-web-assets, so a web build
     // doesn't rerun this script or recompile the library.
-    embed_compressed_docs(&repo_root);
+    embed_compressed_docs(&docs_dir);
 
     // Some sandboxed runtimes (e.g. certain agent harnesses) forbid creating
     // anything named `.git`, which makes every integration test that runs
@@ -71,7 +85,7 @@ fn main() {
 /// (about a third of their size) and decompressed when used. Writes
 /// `help-gz/<path>.gz` and `openapi.json.gz` to OUT_DIR, plus `help_docs.rs`
 /// listing the help files for `src/help/mod.rs`.
-fn embed_compressed_docs(repo_root: &Path) {
+fn embed_compressed_docs(docs_dir: &Path) {
     use std::io::Write;
     let out_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR must be set"));
     let gzip = |bytes: &[u8]| -> Vec<u8> {
@@ -80,8 +94,7 @@ fn embed_compressed_docs(repo_root: &Path) {
         encoder.finish().expect("gzip in memory")
     };
 
-    let help_root = repo_root.join("docs").join("help");
-    println!("cargo:rerun-if-changed=../../docs/help");
+    let help_root = docs_dir.join("help");
     let mut help_files = walk_files(&help_root).expect("read docs/help");
     help_files.sort();
     let mut index = String::from(
@@ -99,8 +112,7 @@ fn embed_compressed_docs(repo_root: &Path) {
     index.push_str("];\n");
     fs::write(out_dir.join("help_docs.rs"), index).expect("write help_docs.rs");
 
-    let spec = repo_root.join("docs").join("openapi.json");
-    println!("cargo:rerun-if-changed=../../docs/openapi.json");
+    let spec = docs_dir.join("openapi.json");
     fs::write(out_dir.join("openapi.json.gz"), gzip(&fs::read(&spec).expect("read docs/openapi.json"))).expect("write openapi.json.gz");
 }
 

@@ -692,6 +692,87 @@ jobs:
               (cd "$dir" && npm publish --access public --provenance --tag "$dist_tag")
             done
 
+  publish-crates:
+    name: Publish crates
+    # lotar-web-assets, lotar-lib, then lotar on crates.io (DEV-507), with the
+    # CARGO_REGISTRY_TOKEN secret. Cargo.toml holds the version without the
+    # tag's suffix, so prereleases publish nothing here.
+    needs: build-and-release
+    if: ${{ !contains(github.ref_name, '-') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+
+      - name: Write Node version file
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            const version = pkg.engines?.node;
+            if (!version) {
+              core.setFailed('package.json is missing engines.node');
+            } else {
+              fs.writeFileSync('.node-version', `${version}\n`);
+            }
+
+      - name: Setup Node (for web build)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.node-version'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            **/package-lock.json
+
+      # The packaged crates carry docs/ and the web UI as copies inside their
+      # folders (scripts/stage-crates.mjs); those copies are gitignored, hence
+      # --allow-dirty.
+      - name: Stage the docs and the web UI into the crates
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build:web
+          node scripts/stage-crates.mjs
+
+      - name: Publish crates
+        shell: bash
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "$CARGO_REGISTRY_TOKEN" ]; then
+            echo "::error::The CARGO_REGISTRY_TOKEN secret is not set"
+            exit 1
+          fi
+          version="${GITHUB_REF_NAME#v}"
+          # Versions already on crates.io are skipped, so the job can be re-run.
+          packages=()
+          for crate in lotar-web-assets lotar-lib lotar; do
+            status="$(curl -s -o /dev/null -w '%{http_code}' -A 'lotar release (github.com/localtaskrepo/lotar)' \
+              "https://crates.io/api/v1/crates/${crate}/${version}")"
+            if [ "$status" = 200 ]; then
+              echo "${crate}@${version} is already published; skipping"
+            else
+              packages+=(-p "$crate")
+            fi
+          done
+          if [ "${#packages[@]}" -gt 0 ]; then
+            # Cargo publishes them in dependency order and verifies each one.
+            cargo publish --locked --allow-dirty "${packages[@]}"
+          fi
+
   update-release-page:
     name: Update Release Page
     needs: build-and-release

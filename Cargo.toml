@@ -39,6 +39,8 @@ documentation = "https://github.com/localtaskrepo/lotar/tree/main/docs"
 readme = "README.md"
 keywords = ["cli", "task-management", "git", "yaml", "issue-tracker"]
 categories = ["command-line-utilities", "development-tools"]
+# Without a list the root package would publish the whole repository.
+include = ["/src/**", "/tests/**", "/README.md", "/LICENSE"]
 default-run = "lotar"
 
 # `cargo install --path .` installs both: `lotar agent list-running` needs the

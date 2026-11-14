@@ -4,7 +4,9 @@
 
 use include_dir::{Dir, include_dir};
 
-static FILES: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../target/web-embed");
+// target/web-embed in the workspace, the crate's own web-embed/ when packaged
+// (build.rs sets the variable).
+static FILES: Dir<'_> = include_dir!("$LOTAR_WEB_EMBED_DIR");
 
 /// The bytes of an embedded file, by its path inside `target/web-embed`
 /// (text assets carry a `.gz` suffix).

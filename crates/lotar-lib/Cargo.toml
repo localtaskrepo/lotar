@@ -9,6 +9,9 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
+# docs/ is the copy scripts/stage-crates.mjs makes for cargo package
+# (DEV-507); the tests stay in the repository.
+include = ["/src/**", "/build.rs", "/docs/**"]
 # Integration tests are modules of one binary (tests/integration.rs, DEV-302).
 autotests = false
 autobins = false
