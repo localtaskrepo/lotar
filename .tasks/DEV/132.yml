@@ -5,7 +5,10 @@ type: Bug
 reporter: mallox
 assignee: mallox
 created: 2026-10-22T02:17:45.894551+00:00
-modified: 2026-10-22T20:13:30.317276+00:00
+modified: 2026-11-15T21:29:21.453303+00:00
+relationships:
+  related:
+  - DEV-586
 comments:
 - date: 2026-10-22T18:59:14.984891+00:00
   text: |-
@@ -41,3 +44,9 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-11-15T21:29:21.453303+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-586"]}'

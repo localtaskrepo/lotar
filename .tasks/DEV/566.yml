@@ -1,15 +1,17 @@
 title: 'A blocking review is ignored: the fix job''s end rule moves Reviewing on to Merging while the review still runs'
-status: HelpNeeded
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@review'
 created: 2026-11-15T17:44:03.850220+00:00
-modified: 2026-11-15T20:53:41.380946+00:00
+modified: 2026-11-15T21:34:12.482187+00:00
 relationships:
   related:
   - DEV-524
   - DEV-574
+  - DEV-582
+  - DEV-583
 comments:
 - date: 2026-11-15T18:13:42.492529+00:00
   author: claude
@@ -224,6 +226,37 @@ comments:
       set:
         status: WontDo
         assignee: ''
+- date: 2026-11-15T21:28:20.770994+00:00
+  author: triage
+  text: |-
+    Answer: fix, no new decision needed. The last blocking review judged the wrong commit; it isn't a verdict on `9b70f43d`.
+
+    - Owner 2026-11-15 (quoted in the 20:11 comment): "If they're just try again request can you just tell the waiting threads to try again." This is a try-again.
+    - `9b70f43d` sits only on branch `t3/fix-blocking-review-end-rule-2`; `agent/DEV-566` still points at `b3168b0f`, so the review (20:53) read the old code (same mismatch as DEV-583/DEV-582).
+    - To do: put `9b70f43d` on `agent/DEV-566` (worktree `~/.t3/worktrees/lotar/agent-DEV-566-7288458cdef30afb`), then hand to Reviewing again. Fix the real review result if it blocks.
+- date: 2026-11-15T21:33:02.222112+00:00
+  author: claude
+  text: |-
+    `agent/DEV-566` now holds the rework `9b70f43d`; review restarts on it.
+
+    - Moved the branch in `~/.t3/worktrees/lotar/agent-DEV-566-7288458cdef30afb` with `git reset --keep 9b70f43d` (worktree was clean). `b3168b0f` stays on `t3/fix-blocking-review-end-rule-1` and two other branches.
+    - Verified: `review_blocks_merge` is in that worktree's `agent_job_service.rs`.
+    - No code change: `9b70f43d` passed `npm run lint:agent`, `npm run test:agent` and `npm run test:smoke:agent` (see the 20:4x hand-off comment).
+- date: 2026-11-15T21:33:15.349140+00:00
+  author: claude
+  text: 'No new commit: the review on Codex follows when this @fix job ends (rule `Fix done: review on Codex`); `automation run` matched nothing while the job runs.'
+  report:
+    checks:
+    - command: npm run lint:agent
+      result: passed
+      reason: on 9b70f43d, earlier this thread
+    - command: npm run test:agent
+      result: passed
+      reason: on 9b70f43d, earlier this thread
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: on 9b70f43d, ui.backlog-order passed on rerun
+    next: Codex review of agent/DEV-566 at 9b70f43d
 description: 'Found 2026-11-15 on LOCA-333 (local repo). The fix agent set Reviewing at 17:39:36 (assignee @review); 8 s later, at 17:39:44, the fix job''s end rule moved it again to Merging/@merge. The review job (job-20261115T174010.077Z-13) then ran with the review prompt but was counted as a merge job: it tagged review-blocked, and its end was logged as a failed merge (cannot fast-forward), tagged merge-retried and sent to @fix. The next job (job-20261115T174245.273Z-26) got the merge prompt for the still-blocked commit. Check: lotar show LOCA-333 history in ~/Development/local. Done when: a job''s end rule doesn''t advance a ticket that the agent already moved during the job, and a merge job never starts while the ticket carries review-blocked without a rework.'
 tags:
 - health
@@ -394,3 +427,42 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-15T21:28:20.770994+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-15T21:28:21.350615+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-524","DEV-574"]}'
+    new: '{"related":["DEV-524","DEV-574","DEV-582","DEV-583"]}'
+- at: 2026-11-15T21:28:23.255509+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T21:32:00.622482+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T21:33:02.222112+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T21:33:15.349140+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T21:34:12.482187+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

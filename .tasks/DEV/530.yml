@@ -1,11 +1,11 @@
 title: A job the dependency check held back resumes as it was when its prerequisites are done
-status: HelpNeeded
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: mallox
+assignee: '@review'
 created: 2026-11-14T07:27:35.331056+00:00
-modified: 2026-11-15T21:00:53.190304+00:00
+modified: 2026-11-15T21:55:55.482117+00:00
 relationships:
   related:
   - DEV-351
@@ -20,6 +20,7 @@ relationships:
   - DEV-513
   - DEV-520
   - DEV-583
+  - DEV-586
 comments:
 - date: 2026-11-14T07:47:55.099885+00:00
   author: claude
@@ -429,6 +430,46 @@ comments:
       result: not_run
       reason: implementation incomplete
     next: Implement scheduled recovery of expired starting claims, with a test that does not manually invoke resume.
+- date: 2026-11-15T21:28:58.466305+00:00
+  author: triage
+  text: |-
+    Continue with the rework (fix): mallox already answered this, nothing here needs him.
+
+    - Owner's answer: "fix (An agent reworks it once more)" on 2026-11-15 20:32Z (INBOX-268); the chief of staff gave the same go-ahead at 20:11Z.
+    - Open work, from codex 21:00Z: expired `starting` claims on parked jobs have no scheduled recovery (`resume_parked_job` only reconciles when called again; the queue worker exits when idle). Add periodic recovery, a regression test that does not call `resume_parked_job` a second time, then `npm run lint:agent`, `test:agent`, `test:smoke:agent`.
+    - Branch: `agent/DEV-530` at `4e2f775a`.
+- date: 2026-11-15T21:55:13.215218+00:00
+  author: claude
+  text: |-
+    Rework done: the review finding is gone because the path it was in is removed. Commit `fb666856` (signed), on `agent/DEV-530` and `t3/dependency-check-resume-held-jobs`.
+
+    - **Why the reviews kept finding cases:** the claim/`starting_since` path ran only in `AgentOrchestratorMode::Server`, and nothing outside the tests sets that mode (`grep set_orchestrator_mode`). `lotar serve` runs Standalone, so every real resume already took the one-step `unpark`.
+    - **Fix:** `resume_parked_job` now always moves the job into the queue with `AgentQueueService::unpark`, as the ticket's approach says ("queued as it was"; the queue checks the prerequisites again). Removed: `claim_parked`, `release_parked`, `starting_since`, `STARTING_GRACE`, `StartOutcome`, the `(starting)` line in `lotar agent queue` and in `docs/help/agent.md`.
+    - **Test:** `a_parked_job_resumes_into_the_queue_in_the_server_too` failed on `4e2f775a` (`left: (1, 0)`, right `(0, 1)`) and passes now. The 3 integration tests that ran in server mode now run the queue worker after the prerequisite closes.
+    - **Smoke:** 400/401. `ui.backlog-order` timed out on a drag under full load (that's DEV-586, in progress); the spec alone passes 2/2. Nothing in the UI changed.
+    - `agent/DEV-530` moved from `4e2f775a` to `fb666856` (its worktree was clean); `4e2f775a` stays on `t3/resume-held-jobs-when-unblocked`.
+  report:
+    commits:
+    - hash: fb666856
+      what: held jobs always resume through the queue; starting mark, claim and release removed
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2180 Rust, 1537 web
+    - command: npm run test:smoke:agent
+      result: failed
+      reason: 400/401, ui.backlog-order drag timeout under full load (DEV-586); the spec passes alone (2/2)
+    next: Review and merge agent/DEV-530 at fb666856
+- date: 2026-11-15T21:55:39.856454+00:00
+  author: claude
+  text: |-
+    Triage's 21:28Z rework is already done in `fb666856`, so nothing changed in this turn. Ready for review.
+
+    - `agent/DEV-530` is at `fb666856`, not `4e2f775a` (triage read the branch before my 21:55Z comment).
+    - The `starting` claims the periodic recovery was meant to clean up no longer exist. A held job now always resumes through the queue (`AgentQueueService::unpark`, in one locked step), so a failed start leaves no claim behind and there's nothing to recover.
+    - Checks on `fb666856`: `lint:agent` and `test:agent` passed. `test:smoke:agent` was 400/401: the `ui.backlog-order` drag timed out under load (DEV-586) and passes 2/2 when run on its own.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aadaa906d-5c3e-411d-b998-4015eb47b493
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A50a42e5d-ab8c-4c4e-a7e1-23c50ebf82b5
@@ -1096,3 +1137,42 @@ history:
   - field: assignee
     old: '@fix-codex'
     new: mallox
+- at: 2026-11-15T21:28:58.466305+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-15T21:29:01.743154+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T21:34:19.164239+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T21:55:13.215218+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T21:55:13.597442+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513","DEV-520","DEV-583"]}'
+    new: '{"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524","DEV-396","DEV-535","DEV-528","DEV-550","DEV-513","DEV-520","DEV-583","DEV-586"]}'
+- at: 2026-11-15T21:55:39.856454+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T21:55:55.482117+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

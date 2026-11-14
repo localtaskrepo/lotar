@@ -1,12 +1,14 @@
 title: A merge job that landed its work fails when the ticket branch is checked out in another worktree
-status: HelpNeeded
+status: Blocked
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-15T19:24:33.178444+00:00
-modified: 2026-11-15T21:01:59.418026+00:00
+modified: 2026-11-15T21:55:57.349362+00:00
 relationships:
+  depends_on:
+  - DEV-583
   related:
   - DEV-573
   - DEV-583
@@ -73,6 +75,40 @@ comments:
 - date: 2026-11-15T21:01:52.193343+00:00
   author: codex
   text: 'Blocked: actual checkout branch is t3/merge-worktree-branch; required agent/DEV-577 is checked out in another worktree. Instructions prohibit switching branches. Please relaunch in the existing agent/DEV-577 worktree. No edits or checks performed; finished-only decision remains to implement.'
+- date: 2026-11-15T21:30:35.755368+00:00
+  author: triage
+  text: |-
+    Waiting for DEV-583: the owner's decision is made (finished-only, INBOX-291, 2026-11-15 20:28); the retry is blocked by the branch problem DEV-583 covers.
+
+    - The fix job can't start on `agent/DEV-577`: it opens in `t3/merge-worktree-branch`, `agent/DEV-577` is checked out in another worktree (last codex comment).
+    - That is DEV-583 (a retried T3 job opens on `t3/<name>`, not the ticket branch), which waits for the owner (INBOX-307).
+    - Continue with the finished-only rework once DEV-583 is done.
+- date: 2026-11-15T21:54:32.386539+00:00
+  author: claude
+  text: |-
+    Reworked as answered (finished-only, INBOX-291): rebased onto main, DEV-573's detach now applies only to finished jobs' worktrees.
+
+    - `move_ticket_branch` in `crates/lotar-lib/src/services/agent_job_service.rs` detaches a worktree on the ticket branch only when an ended job's log recorded it and no running job continues that job's session (`finished_job_worktrees`)
+    - Any other worktree (a running agent's, one no job recorded) stays on the branch; the move is skipped when the thread's work is on main, else the job fails as before
+    - Tests in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs`: DEV-573's stale worktree is now a finished job's (still detached); DEV-577's test asserts the unrecorded worktree stays on `agent/TEST-1`
+    - Commit `55b78b15` replaces `f1480c15` (amended in the rebase); `npm ci` ran after the rebase
+  report:
+    commits:
+    - hash: 55b78b15
+      what: rebased on main; detach only finished jobs' worktrees, skip the move when the work is on main
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2224 Rust + 1548 UI tests
+    - command: npm run smoke
+      result: passed
+      reason: 404 tests
+    next: Merge agent rebases and fast-forwards main
+- date: 2026-11-15T21:55:57.349362+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: DEV-583.'
 description: |-
   Found: job job-20261115T191640.133Z-8 (standards STD-136) rebased, fast-forwarded main to d0deac4 and pushed, then failed: `git branch --force agent/STD-136 18b8e9c` refused, 'cannot force update the branch used by worktree at .../agent-STD-136-...'. The ticket went back to Merging, assigned to @fix, and a fix agent was started for work already on main.
   Check: run a merge job in a T3 thread whose ticket branch is checked out in a lotar worktree; the job ends failed after the merge.
@@ -191,3 +227,33 @@ history:
   - field: assignee
     old: '@fix-codex'
     new: mallox
+- at: 2026-11-15T21:30:35.755368+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-15T21:30:37.424934+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T21:30:38.601011+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-573","DEV-583"]}'
+    new: '{"depends_on":["DEV-583"],"related":["DEV-573","DEV-583"]}'
+- at: 2026-11-15T21:30:40.220080+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-15T21:54:32.386539+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T21:55:57.349362+00:00
+  actor: automation
+  changes:
+  - field: comment_added

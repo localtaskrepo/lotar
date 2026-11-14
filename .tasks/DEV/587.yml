@@ -1,0 +1,28 @@
+title: 'Flaky smoke: global task actions on desktop fail under full-suite load'
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-15T21:35:33.389545+00:00
+modified: 2026-11-15T21:35:35.452500+00:00
+relationships:
+  related:
+  - DEV-581
+description: 'Found 2026-11-15 in the DEV-581 rework: `npm run smoke` failed 1 of 404, `tests/ui.global-actions.smoke.spec.ts` > ''keeps actions usable and creates in the known project on desktop'' (AssertionError: expected false to be true; Matcher did not succeed in time). The file alone passes (`npx vitest run --config smoke/vitest.config.ts tests/ui.global-actions.smoke.spec.ts`). Check: run the full smoke suite a few times. Done: the test passes under full-suite load.'
+tags:
+- health
+custom_fields:
+  finding: smoke:ui.global-actions
+history:
+- at: 2026-11-15T21:35:34.253152+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-581"]}'
+- at: 2026-11-15T21:35:35.452500+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

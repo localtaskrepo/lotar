@@ -1,11 +1,11 @@
 title: Release v0.15.1
-status: Blocked
+status: InProgress
 priority: Medium
 type: Chore
 reporter: claude
-assignee: claude
+assignee: '@fix'
 created: 2026-11-14T04:17:27.050501+00:00
-modified: 2026-11-15T20:58:39.421429+00:00
+modified: 2026-11-15T21:11:28.995880+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -329,3 +329,15 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468","DEV-477","DEV-491","DEV-516"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512","DEV-417","DEV-518","DEV-523","DEV-560","DEV-530","DEV-520","DEV-543","DEV-569"]}'
     new: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468","DEV-477","DEV-491","DEV-516"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512","DEV-417","DEV-518","DEV-523","DEV-560","DEV-530","DEV-520","DEV-543","DEV-569","DEV-576"]}'
+- at: 2026-11-15T21:11:25.437911+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: claude
+    new: '@fix'
+- at: 2026-11-15T21:11:28.995880+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress

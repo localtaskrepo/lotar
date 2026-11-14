@@ -5,13 +5,14 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T19:15:01.666242+00:00
-modified: 2026-11-15T20:58:54.980108+00:00
+modified: 2026-11-15T21:25:29.903456+00:00
 relationships:
   related:
   - DEV-580
   - DEV-200
   - DEV-553
   - DEV-513
+  - DEV-510
 comments:
 - date: 2026-11-15T19:39:24.656316+00:00
   author: claude
@@ -145,6 +146,8 @@ comments:
       result: not_run
       reason: oldest unpushed commit c01909e9 belongs to DEV-513, whose release push remains held
     next: Automation may complete this ticket; DEV-513 owns the held main push
+releases:
+- 6
 description: |-
   Found 2026-11-15 by the chief of staff's retry agent: setting G-21's assignee to @review-claude started a review job by itself with lotar's generic 'make concrete changes' prompt; that job merged and pushed 497dd58 to gairola main before the queued review steps ran. (Here the pushed tree equals the reviewed f88bfff, so nothing unchecked landed, but the owner's rule is no merge without a passed review.)
   Check: the job's prompt in lotar agent logs for G-21's @review-claude job.
@@ -260,3 +263,14 @@ history:
   - field: tags
     old: health, review-returned
     new: health
+- at: 2026-11-15T21:13:51.030276+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'
+- at: 2026-11-15T21:25:29.903456+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-580","DEV-200","DEV-553","DEV-513"]}'
+    new: '{"related":["DEV-580","DEV-200","DEV-553","DEV-513","DEV-510"]}'

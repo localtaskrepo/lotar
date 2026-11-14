@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T14:04:06.211844+00:00
-modified: 2026-11-15T19:08:45.715580+00:00
+modified: 2026-11-15T21:13:49.200871+00:00
 relationships:
   related:
   - DEV-575
@@ -220,6 +220,8 @@ comments:
     next: Push main once .tasks/DEV/510.yml commits (STD-144)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A66037259-7163-419e-97e8-988c801c6ee5
+releases:
+- 6
 description: |-
   ## Found
   Daily communication review (STD-17), 2026-11-15. The same problem was filed twice, and two fix agents each staged a separate fix:
@@ -474,3 +476,8 @@ history:
   - field: tags
     old: health, fix-retried, review-returned
     new: health
+- at: 2026-11-15T21:13:49.200871+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

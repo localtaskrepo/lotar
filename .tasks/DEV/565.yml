@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T17:43:24.223842+00:00
-modified: 2026-11-15T18:24:22.229588+00:00
+modified: 2026-11-15T21:13:49.599189+00:00
 relationships:
   related:
   - DEV-368
@@ -141,6 +141,8 @@ comments:
     - command: node --test --test-name-pattern=STD-130 scripts/automation.test.ts (standards, build of e20a1ff7)
       result: passed
     next: 'Owner: commit lotar''s .tasks changes and push main once STD-140 lets the secret scan through'
+releases:
+- 6
 description: |-
   Found: since lotar 0.15.1 (DEV-503, harnessmux) a `session: continue` job resumes only `<repo>-<hash>-<ticket>-<profile>`, so the standards rule "Review passed: merge" (profile merge, session: continue) logs "No earlier session repo-…-STD-1-merge; this job starts a new one." and starts a new thread instead of the reviewer's. The same holds for the review-child pilot (STD-88: merge and rework continue the fix thread). DEV-503's approved design said "session: continue uses named sessions, one per ticket"; the owner decided 2026-11-11 that the merge runs in the reviewer's thread (standards docs/decisions/2026-11-11-merge-in-fix-thread.md, DEV-368). DEV-503's hand-off lists the per-profile session but not that it drops this.
   Check: in ~/Development/standards, `node --test --test-name-pattern=STD-130 scripts/automation.test.ts` fails on 0.15.1 (`start merge thread-1` instead of `send merge thread-0`) and passes on 0.15.0 (`/opt/homebrew/Cellar/lotar/0.15.0/bin/lotar`). It fails standards' commit gate, so no standards commit lands (STD-136).
@@ -256,3 +258,8 @@ history:
   - field: tags
     old: health, review-returned
     new: health
+- at: 2026-11-15T21:13:49.599189+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

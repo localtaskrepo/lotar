@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T18:42:15.622926+00:00
-modified: 2026-11-15T19:56:24.117879+00:00
+modified: 2026-11-15T21:13:50.157796+00:00
 relationships:
   related:
   - DEV-498
@@ -80,6 +80,8 @@ comments:
       result: failed
       reason: still lists untracked:DEV-498
     next: 'Owner: set this ticket WontDo (its Done when) so repos.ts does not file DEV-498 again; push main once DEV-510''s ticket file is committed'
+releases:
+- 6
 description: |-
   DEV-498 (Core modules no longer call up into services and cli) is Done, but a comment names a step still open and no open ticket is linked: "Not done: agent_job_service tests still call cli::handlers::agent (services to cli, outside the core and outside Done w…" (lotar show DEV-498)
 
@@ -166,3 +168,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-15T21:13:50.157796+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

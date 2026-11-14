@@ -5,7 +5,10 @@ type: Bug
 reporter: mallox
 assignee: mallox
 created: 2026-10-24T23:52:53.970680+00:00
-modified: 2026-10-27T23:37:51.094567+00:00
+modified: 2026-11-15T21:29:21.455462+00:00
+relationships:
+  related:
+  - DEV-586
 comments:
 - date: 2026-10-25T00:07:23.315288+00:00
   text: 'Another occurrence 2026-10-24 (full smoke after applying Dependabot #44/#45/#47 locally): ui.insights-isolation ''drawer open and feed refresh cannot alter the Insights activity chart (mocked feed, isolated scopes)'' failed once in a full parallel run, then passed 3/3 in isolation and the next full run passed 343/343. Same load-timing pattern.'
@@ -71,3 +74,9 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-15T21:29:21.455462+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-586"]}'

@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T18:41:21.086962+00:00
-modified: 2026-11-15T19:01:10.620654+00:00
+modified: 2026-11-15T21:13:49.999253+00:00
 relationships:
   related:
   - DEV-534
@@ -87,6 +87,8 @@ comments:
       result: not_run
       reason: same reason
     next: Push main after the .tasks ticket files are committed (STD-140 blocks that commit)
+releases:
+- 6
 description: |-
   .tasks/DEV/automation.yml: configs/lotar/automation.yml changed since the copy (1 commits: git -C ~/Development/standards log -- configs/lotar/automation.yml)
 
@@ -158,3 +160,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-15T21:13:49.999253+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

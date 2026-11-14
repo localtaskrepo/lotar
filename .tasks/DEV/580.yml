@@ -1,14 +1,16 @@
 title: automation_agent_settings_reach_the_job_they_start leaves its fixture in the temp folder now and then
-status: Merging
+status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-15T20:04:35.425934+00:00
-modified: 2026-11-15T20:59:27.230491+00:00
+modified: 2026-11-15T21:30:31.069372+00:00
 relationships:
   related:
   - DEV-576
+  - DEV-586
+  - DEV-466
 comments:
 - date: 2026-11-15T20:21:31.567832+00:00
   author: claude
@@ -55,6 +57,55 @@ comments:
     - command: npm run test:smoke:agent
       result: passed
     next: Merge agent may proceed
+- date: 2026-11-15T21:29:55.558221+00:00
+  author: codex
+  text: |-
+    Merge stopped: required smoke check failed; the fix is preserved and unmerged.
+
+    - Reviewed fix `c0c6ad79` rebased cleanly as `175e36d0` onto `f37cbaa0`; no npm lockfile changed. Checkout remains clean on its assigned `t3/wait-for-agent-job-settlement` branch; no source edits or new implementation commits.
+    - Lint and full tests passed after the approved retry for sandbox-denied sccache. Focused regression passed 10 consecutive runs without leftovers.
+    - Smoke built successfully, then failed 12/404 browser tests and left `playwright-artifacts-UnVrAb`, `playwright_chromiumdev_profile-6u87EE`, `ui-task-order--44156-IQPO9mo696xz`. Exact assertions and cleanup evidence filed in DEV-586, related here; no diagnostics deleted.
+    - Coordinated with DEV-466 merge agent: its separate run passed 404/404. Main advanced to `50cfad9a` while these checks ran; no second rebase or merge attempted after the failure. Load is unproven.
+    - Nothing merged or pushed. No automation/config change in this fix, so trust refresh was not applicable. No durable guidance finding.
+  report:
+    commits:
+    - hash: 175e36d0
+      what: reviewed fix rebased onto f37cbaa0, preserved unmerged
+    checks:
+    - command: npm run lint:agent
+      result: passed
+      reason: approved retry after sandbox sccache denial
+    - command: npm run test:agent
+      result: passed
+      reason: 2219 Rust tests plus UI, release and hook suites
+    - command: npm run test:smoke:agent
+      result: failed
+      reason: 12 browser failures, 392 passed; three temp leftovers, tracked in DEV-586
+    - command: focused rust-test-runner regression x10
+      result: passed
+      reason: ten consecutive exit-zero runs, no leftovers
+    - command: gates after rebase onto 50cfad9a
+      result: not_run
+      reason: stopped on required smoke failure before second rebase
+    - command: post-merge health check
+      result: not_run
+      reason: no merge performed
+    next: Owner chooses retry after DEV-586; then rebase onto current main, rerun gates, fast-forward and repeat health check
+- date: 2026-11-15T21:30:17.683196+00:00
+  author: codex
+  text: |-
+    Should DEV-580 wait for DEV-586 before another merge attempt, or retry the full gates now?
+
+    Options:
+    - wait: Wait for DEV-586 to resolve the smoke failures (recommended)
+    - retry: Retry full gates on current main before merging
+  question:
+    options:
+    - key: wait
+      label: Wait for DEV-586 to resolve the smoke failures
+    - key: retry
+      label: Retry full gates on current main before merging
+    recommended: wait
 description: |-
   Found 2026-11-15 in the DEV-576 rework: run alone, the test leaves .lotar-test-scratch (fixture .tmpXXX/.tasks and agent-queue markers) in about 1 of 8 runs, so the runner exits 1. It returns once both jobs are completed but before their workers settle, and the job ends still write into the dropped fixture.
   Check: for i in 1 2 3 4 5 6 7 8; do node scripts/rust-test-runner.mjs --agent -- automation_agent_settings_reach_the_job_they_start; done (any exit 1 with 'tests left 1 entries').
@@ -107,3 +158,32 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-15T21:29:21.465525+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-576"]}'
+    new: '{"related":["DEV-576","DEV-586"]}'
+- at: 2026-11-15T21:29:55.558221+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T21:29:57.623318+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-576","DEV-586"]}'
+    new: '{"related":["DEV-576","DEV-586","DEV-466"]}'
+- at: 2026-11-15T21:30:17.683196+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T21:30:31.069372+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox

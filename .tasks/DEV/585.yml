@@ -1,11 +1,11 @@
 title: 'Flaky Rust tests: file watcher and MCP list_changed events missing under full-suite load'
-status: HelpNeeded
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-15T20:46:20.952204+00:00
-modified: 2026-11-15T21:05:53.816585+00:00
+modified: 2026-11-15T21:55:58.686969+00:00
 relationships:
   related:
   - DEV-510
@@ -30,6 +30,14 @@ comments:
       result: failed
       reason: serve_sends_the_embedded_index_page printed no URL; 2151 tests not run
     next: Retry server test outside sandbox, then reproduce the three event tests
+- date: 2026-11-15T21:30:59.573933+00:00
+  author: triage
+  text: |-
+    Answered by the owner's earlier decision: Codex jobs stay in their sandbox, so this ticket needs a Claude fix job, not Codex.
+
+    - `standards/docs/decisions/2026-11-14-codex-sandbox-network.md` (owner, STD-125): Codex jobs keep the sandbox, build with `RUSTC_WRAPPER=`, and tests that bind local ports (`serve_sends_the_embedded_index_page`, the watcher and MCP wire tests) can't pass there.
+    - So the `serve printed no URL` failure is the sandbox, not the bug. Don't retry it under Codex.
+    - Next: run `npm run -s test:agent` under a Claude job (network allowed) under load, reproduce the three event tests, and replace the fixed sleeps with waiting for readiness.
 description: |-
   Found during the DEV-510 merge (2026-11-15): the first `npm run -s test:agent` in the DEV-510 worktree failed 3 tests; the second full run passed 2218/2218 on the same commit.
 
@@ -87,3 +95,19 @@ history:
   actor: codex
   changes:
   - field: comment_added
+- at: 2026-11-15T21:30:59.573933+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-15T21:31:02.379978+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T21:55:58.686969+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress

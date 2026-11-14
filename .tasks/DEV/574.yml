@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T18:58:43.266429+00:00
-modified: 2026-11-15T20:09:06.685641+00:00
+modified: 2026-11-15T21:13:50.580731+00:00
 relationships:
   related:
   - DEV-566
@@ -127,6 +127,8 @@ comments:
       result: not_run
       reason: the main checkout still has staged .tasks changes
     next: Merge STD-140 and its lotar copy 95e5762e (agent/STD-140), then amend the staged .tasks into main and push
+releases:
+- 6
 description: |-
   Found 2026-11-15 by the chief of staff: the Data volume was 100% full (2.3 GB free of 926 GB) and many jobs failed. ~/.t3/worktrees used 280 GB, 243 GB of it lotar worktrees; each worktree's Rust target/ was 5-35 GB (agent-DEV-510 35 GB, t3-38403d38 17 GB, agent-DEV-528 13 GB, ...). Deleting all worktree target/ folders freed ~222 GB (224 GB free now, worktrees 49 GB).
   Check: du -sh ~/.t3/worktrees/*/*/target; df -h /System/Volumes/Data.
@@ -268,3 +270,8 @@ history:
   - field: tags
     old: health, review-returned
     new: health
+- at: 2026-11-15T21:13:50.580731+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'

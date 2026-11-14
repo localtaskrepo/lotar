@@ -3274,18 +3274,76 @@ fn drive_session(
     budget: Option<f64>,
     context_messages: &mut Vec<crate::services::agent_context_service::AgentContextMessage>,
 ) -> RunEnd {
-    use harnessmux::EventBody;
-    let mut events = session.events();
-    let earlier =
-        harnessmux::follow::Follower::from_start(&crate::services::agent_runner::registry().events_path(session.name())).read_new().unwrap_or_default();
+    let status = block_on(session.status()).map_err(|err| err.to_string());
+    // A resumed session starts before the job listens: its start is only in the log.
+    let link = status.as_ref().ok().and_then(|status| last_session_link(&status.events));
+    let agent = status.as_ref().map(|status| status.agent.clone()).unwrap_or_default();
+    let (mut events, earlier) = SessionEvents::open(status.map(|status| status.events), || session.events());
     let mut meter = CostMeter::after(&earlier);
     // A job taken over from a stopped process has cost something already.
     meter.job = AgentJobService::get_job(job_id).and_then(|job| job.usage).and_then(|usage| usage.cost_usd).unwrap_or(0.0);
-    let mut reply = ReplyStream::default();
     let first = match block_on(session.send(prompt.to_string())) {
         Ok(turn) => turn,
         Err(err) => return RunEnd::Failed(format!("Could not send the prompt to the session {}: {err}", session.name())),
     };
+    drive_turns(
+        job_id,
+        tasks_dir,
+        session,
+        &mut events,
+        TurnSettings { first, prefixes, budget, agent: &agent, link: link.as_deref() },
+        meter,
+        context_messages,
+    )
+}
+
+/// What a job's turns run with.
+#[derive(Clone, Copy)]
+struct TurnSettings<'a> {
+    /// The job's first turn.
+    first: u64,
+    prefixes: &'a [String],
+    budget: Option<f64>,
+    /// The session's agent and link (a T3 Code thread), as far as known when the job starts.
+    agent: &'a str,
+    link: Option<&'a str>,
+}
+
+/// What the job loop asks of a session besides its events.
+trait TurnControl {
+    fn name(&self) -> &str;
+    fn cancel(&self);
+    /// No turn runs and none is queued.
+    fn idle(&self) -> bool;
+}
+
+impl TurnControl for harnessmux::Session {
+    fn name(&self) -> &str {
+        harnessmux::Session::name(self)
+    }
+
+    fn cancel(&self) {
+        let _ = block_on(harnessmux::Session::cancel(self));
+    }
+
+    fn idle(&self) -> bool {
+        block_on(self.status()).is_ok_and(|status| status.turn.is_none() && status.queued == 0)
+    }
+}
+
+/// Record the events of turn `first` and the turns after it until the session is idle.
+fn drive_turns(
+    job_id: &str,
+    tasks_dir: &std::path::Path,
+    session: &impl TurnControl,
+    events: &mut SessionEvents,
+    settings: TurnSettings<'_>,
+    mut meter: CostMeter,
+    context_messages: &mut Vec<crate::services::agent_context_service::AgentContextMessage>,
+) -> RunEnd {
+    use harnessmux::EventBody;
+    let TurnSettings { first, prefixes, budget, agent, link } = settings;
+    let mut reply = ReplyStream::default();
     let progress = |message: String| {
         update_job(job_id, |state| {
             state.record.last_message = Some(message.clone());
@@ -3309,11 +3367,7 @@ fn drive_session(
     let mut reported_cost = false;
     let ticket_id = JOB_REGISTRY.lock().ok().and_then(|registry| registry.jobs.get(job_id).map(|state| state.record.ticket_id.clone())).unwrap_or_default();
     let ticket_id = ticket_id.as_str();
-    // A resumed session starts before the job listens: its start is only in the log.
-    let (mut agent_name, mut link) = match block_on(session.status()) {
-        Ok(status) => (status.agent, last_session_link(&status.events)),
-        Err(_) => (String::new(), None),
-    };
+    let (mut agent_name, mut link) = (agent.to_string(), link.map(str::to_string));
     if let Some(link) = link.as_deref() {
         link_session(job_id, tasks_dir, ticket_id, link);
     }
@@ -3323,15 +3377,13 @@ fn drive_session(
             let _ = AgentJobService::cancel_job(job_id);
         }
         if should_stop_job(job_id) {
-            let _ = block_on(session.cancel());
+            session.cancel();
             return RunEnd::Stopped;
         }
-        let event = match block_on(async { tokio::time::timeout(Duration::from_millis(200), events.recv()).await }) {
-            Err(_) | Ok(Err(tokio::sync::broadcast::error::RecvError::Lagged(_))) => continue,
-            Ok(Err(tokio::sync::broadcast::error::RecvError::Closed)) => {
-                return RunEnd::Failed(format!("The session {} ended before the job's turn did.", session.name()));
-            }
-            Ok(Ok(event)) => event,
+        let event = match events.next(Duration::from_millis(200)) {
+            Ok(None) => continue,
+            Err(why) => return RunEnd::Failed(format!("The session {} {why}", session.name())),
+            Ok(Some(event)) => event,
         };
         if event.turn.is_some_and(|turn| turn < first) {
             continue;
@@ -3415,7 +3467,7 @@ fn drive_session(
                     meter.report(total);
                 }
                 if let Some(budget) = budget.filter(|budget| meter.job > *budget) {
-                    let _ = block_on(session.cancel());
+                    session.cancel();
                     let usage = crate::api_types::AgentJobUsage { cost_usd: meter.turn.take(), ..Default::default() };
                     update_job(job_id, |state| state.record.usage.get_or_insert_with(Default::default).add(&usage));
                     return RunEnd::Failed(format!(
@@ -3477,15 +3529,98 @@ fn drive_session(
             let at = link.as_deref().map(|link| format!(": {link}")).unwrap_or_default();
             return RunEnd::WaitingForAnswer(format!("The {agent_name} session waits for an answer{at}"));
         }
-        let idle = block_on(session.status()).is_ok_and(|status| status.turn.is_none() && status.queued == 0);
-        if idle {
+        if session.idle() {
             return finish(exit_code, reported_cost);
         }
         if turns >= MAX_TURNS {
-            let _ = block_on(session.cancel());
+            session.cancel();
             progress(format!("The job ran {MAX_TURNS} turns; the messages still queued stay on the ticket."));
             return finish(exit_code, reported_cost);
         }
+    }
+}
+
+/// A session's events in order. When the broadcast channel lags (a chatty turn
+/// sends more than it holds), the missed ones come from the session's event log
+/// (DEV-520), so the turn's end is never lost. harnessmux numbers events one
+/// after another; a gap the log can't fill (missing, unreadable or malformed)
+/// fails the job.
+struct SessionEvents {
+    live: tokio::sync::broadcast::Receiver<harnessmux::Event>,
+    /// The log, or why lotar doesn't know where it is.
+    log: Result<harnessmux::follow::Follower, String>,
+    /// Events read but not handed out yet, by seq.
+    pending: std::collections::BTreeMap<u64, harnessmux::Event>,
+    /// The last event handed out, or the log's last when it opened; none while the log is unknown.
+    last_seq: Option<u64>,
+}
+
+impl SessionEvents {
+    /// Reads the log to its end for the last seq, then subscribes: every later
+    /// event is in the log, the channel or both.
+    /// Also returns the log's events so far.
+    fn open(
+        log: Result<std::path::PathBuf, String>,
+        subscribe: impl FnOnce() -> tokio::sync::broadcast::Receiver<harnessmux::Event>,
+    ) -> (Self, Vec<harnessmux::Event>) {
+        let mut earlier = Vec::new();
+        let log = log.and_then(|path| {
+            let mut log = harnessmux::follow::Follower::from_start(&path);
+            earlier = log.read_new().map_err(|err| err.to_string())?;
+            Ok(log)
+        });
+        let last_seq = log.is_ok().then(|| earlier.last().map_or(0, |event| event.seq));
+        (Self { live: subscribe(), log, pending: Default::default(), last_seq }, earlier)
+    }
+
+    /// The next event, none when nothing came within `wait`. The error ends
+    /// "The session <name> …": it ended, or lotar missed events it can't read back.
+    fn next(&mut self, wait: Duration) -> Result<Option<harnessmux::Event>, String> {
+        use tokio::sync::broadcast::error::RecvError;
+        let mut read_log = false;
+        loop {
+            if let Some(entry) = self.pending.first_entry() {
+                let seq = *entry.key();
+                match self.last_seq {
+                    Some(last) if seq <= last => {
+                        entry.remove();
+                        continue;
+                    }
+                    Some(last) if seq > last + 1 => {
+                        if read_log {
+                            return Err(format!("sent events {} to {} lotar missed and can't read back: its event log doesn't have them", last + 1, seq - 1));
+                        }
+                        self.read_log(seq - last - 1)?;
+                        read_log = true;
+                        continue;
+                    }
+                    _ => {
+                        self.last_seq = Some(seq);
+                        return Ok(Some(entry.remove()));
+                    }
+                }
+            }
+            match block_on(async { tokio::time::timeout(wait, self.live.recv()).await }) {
+                Err(_) => return Ok(None),
+                Ok(Err(RecvError::Closed)) => return Err("ended before the job's turn did.".to_string()),
+                // The owner appends each event to the log before it sends it.
+                Ok(Err(RecvError::Lagged(missed))) => self.read_log(missed)?,
+                Ok(Ok(event)) => {
+                    self.pending.insert(event.seq, event);
+                }
+            }
+        }
+    }
+
+    /// Adds the log's new events to the pending ones.
+    fn read_log(&mut self, missed: u64) -> Result<(), String> {
+        let read = match &mut self.log {
+            Ok(log) => log.read_new().map_err(|err| err.to_string()),
+            Err(why) => Err(format!("its event log is unknown: {why}")),
+        };
+        let read = read.map_err(|why| format!("sent {missed} events lotar missed and can't read back: {why}"))?;
+        self.pending.extend(read.into_iter().map(|event| (event.seq, event)));
+        Ok(())
     }
 }
 
@@ -5161,5 +5296,164 @@ mod dev21_ticket_done_state_tests {
 
         // Unknown identity stays indeterminate (conservatively no cleanup).
         assert_eq!(ticket_done_state(&tasks_a, "PX-99"), None);
+    }
+}
+
+#[cfg(test)]
+mod dev520_session_events_tests {
+    use super::{CostMeter, RunEnd, SessionEvents, TurnControl, TurnSettings, drive_turns};
+    use harnessmux::{Event, EventBody, StopReason, Usage};
+    use std::io::Write as _;
+    use std::path::{Path, PathBuf};
+    use std::time::Duration;
+
+    struct Idle;
+
+    impl TurnControl for Idle {
+        fn name(&self) -> &str {
+            "s"
+        }
+
+        fn cancel(&self) {}
+
+        fn idle(&self) -> bool {
+            true
+        }
+    }
+
+    fn delta(seq: u64, turn: u64) -> Event {
+        event(seq, turn, EventBody::MessageDelta { text: format!("chunk {seq}") })
+    }
+
+    fn event(seq: u64, turn: u64, body: EventBody) -> Event {
+        Event { v: harnessmux::event::EVENT_VERSION, ts: String::new(), session: "s".into(), project: None, seq, turn: Some(turn), body, raw: None }
+    }
+
+    /// Opens `log`, then turn 1 ends with `end` at seq 100 and turn 2 sends 1400 more events (each
+    /// written to `written` first) into harnessmux's 1024-event channel before the job reads one, and the session
+    /// ends: the channel has dropped turn 1's end, the log has it.
+    fn lagged(end: EventBody, log: Result<PathBuf, String>, written: &Path) -> SessionEvents {
+        lagged_with(end, log, written, |_| true)
+    }
+
+    /// [`lagged`], with only the events `logged` accepts written whole to the log; the others as a broken line.
+    fn lagged_with(end: EventBody, log: Result<PathBuf, String>, written: &Path, logged: impl Fn(u64) -> bool) -> SessionEvents {
+        let (tx, rx) = tokio::sync::broadcast::channel(1024);
+        let (events, _) = SessionEvents::open(log, || rx);
+        let mut file = std::fs::OpenOptions::new().create(true).append(true).open(written).unwrap();
+        let mut end = Some(end);
+        for seq in 1..=1500 {
+            let event = match seq {
+                ..100 => delta(seq, 1),
+                100 => event(seq, 1, end.take().unwrap()),
+                _ => delta(seq, 2),
+            };
+            if logged(seq) {
+                writeln!(file, "{}", serde_json::to_string(&event).unwrap()).unwrap();
+            } else {
+                writeln!(file, "{{\"seq\":{seq},").unwrap();
+            }
+            tx.send(event).unwrap();
+        }
+        events
+    }
+
+    fn finished() -> EventBody {
+        EventBody::TurnFinished { stop_reason: StopReason::EndTurn, usage: Usage::default() }
+    }
+
+    fn drive(events: &mut SessionEvents, tasks_dir: &Path) -> RunEnd {
+        let settings = TurnSettings { first: 1, prefixes: &[], budget: None, agent: "", link: None };
+        drive_turns("dev520-test", tasks_dir, &Idle, events, settings, CostMeter::default(), &mut Vec::new())
+    }
+
+    #[test]
+    fn a_lagging_stream_replays_the_missed_events_from_the_log() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("events.jsonl");
+        let mut events = lagged(finished(), Ok(path.clone()), &path);
+        let mut seen = Vec::new();
+        while let Ok(Some(event)) = events.next(Duration::from_millis(50)) {
+            assert_eq!(event.body.ends_turn(), event.seq == 100);
+            seen.push(event.seq);
+        }
+        assert_eq!(seen, (1..=1500).collect::<Vec<_>>(), "every event once, in order, the turn's end included");
+    }
+
+    #[test]
+    fn a_job_whose_turn_end_the_stream_dropped_ends_with_the_turns_exit_code() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("finished.jsonl");
+        let mut events = lagged(finished(), Ok(path.clone()), &path);
+        assert!(matches!(drive(&mut events, dir.path()), RunEnd::Exited(Some(0))));
+
+        let path = dir.path().join("failed.jsonl");
+        let mut events = lagged(EventBody::TurnFailed { error: "boom".into() }, Ok(path.clone()), &path);
+        assert!(matches!(drive(&mut events, dir.path()), RunEnd::Exited(Some(1))));
+    }
+
+    #[test]
+    fn missed_events_lotar_cannot_read_back_fail_the_job() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("events.jsonl");
+        let mut events = lagged(finished(), Err("no status".into()), &path);
+        let RunEnd::Failed(why) = drive(&mut events, dir.path()) else { panic!("an unknown log fails the job") };
+        assert!(why.contains("can't read back") && why.contains("no status"), "{why}");
+
+        // A directory where the log should be: reading it fails.
+        let unreadable = dir.path().join("unreadable");
+        std::fs::create_dir(&unreadable).unwrap();
+        let mut events = lagged(finished(), Ok(unreadable), &path);
+        let RunEnd::Failed(why) = drive(&mut events, dir.path()) else { panic!("an unreadable log fails the job") };
+        assert!(why.contains("can't read back"), "{why}");
+
+        // harnessmux hasn't created the log, or another one is written.
+        let mut events = lagged(finished(), Ok(dir.path().join("missing.jsonl")), &path);
+        let RunEnd::Failed(why) = drive(&mut events, dir.path()) else { panic!("a missing log fails the job") };
+        assert!(why.contains("doesn't have them"), "{why}");
+
+        // A broken line where turn 1's end should be: the gap shows.
+        let broken = dir.path().join("broken.jsonl");
+        let mut events = lagged_with(finished(), Ok(broken.clone()), &broken, |seq| seq != 100);
+        let RunEnd::Failed(why) = drive(&mut events, dir.path()) else { panic!("a log with a gap fails the job") };
+        assert!(why.contains("events 100 to 100"), "{why}");
+
+        // Broken lines from the first event through turn 1's end: the gap before the first event lotar sees shows too.
+        let broken = dir.path().join("broken-start.jsonl");
+        let mut events = lagged_with(finished(), Ok(broken.clone()), &broken, |seq| seq > 100);
+        let RunEnd::Failed(why) = drive(&mut events, dir.path()) else { panic!("a log missing its first events fails the job") };
+        assert!(why.contains("events 1 to 100"), "{why}");
+    }
+
+    /// The log holds earlier turns when the job opens it, and events come while it subscribes (in the log only).
+    #[test]
+    fn events_start_after_the_logs_last_one() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("events.jsonl");
+        let write = |seqs: std::ops::RangeInclusive<u64>| {
+            let mut file = std::fs::OpenOptions::new().create(true).append(true).open(&path).unwrap();
+            for seq in seqs {
+                writeln!(file, "{}", serde_json::to_string(&delta(seq, 1)).unwrap()).unwrap();
+            }
+        };
+        write(1..=10);
+        let (tx, rx) = tokio::sync::broadcast::channel(1024);
+        let (mut events, earlier) = SessionEvents::open(Ok(path.clone()), || {
+            write(11..=15);
+            rx
+        });
+        assert_eq!(earlier.iter().map(|event| event.seq).collect::<Vec<_>>(), (1..=10).collect::<Vec<_>>(), "what the session logged before");
+        let mut file = std::fs::OpenOptions::new().append(true).open(&path).unwrap();
+        for seq in 16..=1515 {
+            let event = delta(seq, 2);
+            writeln!(file, "{}", serde_json::to_string(&event).unwrap()).unwrap();
+            tx.send(event).unwrap();
+        }
+        drop(tx);
+        let mut seen = Vec::new();
+        while let Ok(Some(event)) = events.next(Duration::from_millis(50)) {
+            seen.push(event.seq);
+        }
+        assert_eq!(seen, (11..=1515).collect::<Vec<_>>());
     }
 }

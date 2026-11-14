@@ -1,14 +1,17 @@
 title: Retried fix job on FND-12 still opened its T3 thread on a t3/* branch, not agent/FND-12
-status: HelpNeeded
+status: Blocked
 priority: Medium
 type: Bug
 reporter: claude
-assignee: mallox
 created: 2026-11-15T20:14:32.206471+00:00
-modified: 2026-11-15T21:01:01.861114+00:00
+modified: 2026-11-15T21:55:56.630948+00:00
 relationships:
+  depends_on:
+  - DEV-583
   related:
   - DEV-573
+  - DEV-583
+  - DEV-566
 comments:
 - date: 2026-11-15T20:49:17.809654+00:00
   author: automation
@@ -27,6 +30,42 @@ comments:
       label: Use current checkout
     - key: restart
       label: Restart in agent/DEV-582
+- date: 2026-11-15T21:14:27.902006+00:00
+  author: claude
+  text: |-
+    Not fixed: this is the same problem as [DEV-583](https://lotar.pyxzl.net/task/DEV-583), which is waiting on your decision. No commits.
+
+    - Cause: on a retry `agent/FND-12` already exists, so `plan_t3_worktree` (`agent_job_service.rs:1366`) passes only `--worktree agent/FND-12`. T3 Code can't check that branch out a second time, so it creates a new `t3/<topic>` branch.
+    - `t3 thread start` (T3 Code v0.1.9) can only create a new worktree, not use an existing one. So the "Done" line (the retry continues in the `agent/*` worktree) needs a change in harnessmux/T3. Codex reached the same conclusion on DEV-583 and asked you whether to make that change.
+    - FND-12 job `job-20261115T201131.885Z-1` failed: the agent committed on `agent/FND-12` in the old worktree, and lotar then refused to move the branch. I added this to DEV-583.
+    - Linked DEV-582 to DEV-583.
+
+    Question: may I close DEV-582 as a duplicate of DEV-583, so the fix lands there?
+  report:
+    checks:
+    - command: git branch --show-current
+      result: failed
+      reason: retry thread on t3/sync-automation-yml-config-copy, not agent/FND-12
+    - command: npm run lint
+      result: not_run
+      reason: no changes
+    - command: npm test
+      result: not_run
+      reason: no changes
+    - command: npm run smoke
+      result: not_run
+      reason: no changes
+    next: 'Owner: close as duplicate of DEV-583, or keep it open'
+- date: 2026-11-15T21:29:37.312875+00:00
+  author: triage
+  text: |-
+    Waits for the owner's answer on [DEV-583](https://lotar.pyxzl.net/task/DEV-583) (inbox INBOX-307): the same question, whether to extend T3/harnessmux to bind an existing `agent/<ID>` checkout.
+
+    - Your question here (close as duplicate of DEV-583?) is covered by that decision; the fix lands there.
+    - DEV-582 continues when DEV-583 is done.
+- date: 2026-11-15T21:55:56.630948+00:00
+  author: automation
+  text: 'The @fix job waits for its open prerequisites: DEV-583.'
 description: 'Found 2026-11-15: the retry of FND-12 (job-20261115T201131.885Z-1), sent after DEV-573 was marked fixed, ran in worktree t3-e572702e-d8af3fdf9ec6a05a on branch t3/sync-automation-yml-config-copy, while agent/FND-12 sat in its own worktree agent-FND-12-846d11fb298b8cd0. The agent worked around it by committing in the agent/FND-12 worktree. Check: git -C <thread cwd> branch --show-current equals agent/<ticket> for a retried fix job. Done: a retry continues in the ticket''s agent/* worktree.'
 tags:
 - health
@@ -75,3 +114,50 @@ history:
   - field: assignee
     old: '@fix-codex'
     new: mallox
+- at: 2026-11-15T21:14:12.745861+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-573"]}'
+    new: '{"related":["DEV-573","DEV-583"]}'
+- at: 2026-11-15T21:14:27.902006+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T21:28:21.351933+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-573","DEV-583"]}'
+    new: '{"related":["DEV-573","DEV-583","DEV-566"]}'
+- at: 2026-11-15T21:29:37.312875+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-15T21:29:39.682678+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T21:29:42.011503+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-573","DEV-583","DEV-566"]}'
+    new: '{"depends_on":["DEV-583"],"related":["DEV-573","DEV-583","DEV-566"]}'
+- at: 2026-11-15T21:29:44.188780+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-15T21:29:57.746987+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-15T21:55:56.630948+00:00
+  actor: automation
+  changes:
+  - field: comment_added

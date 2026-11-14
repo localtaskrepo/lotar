@@ -5,13 +5,18 @@ type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-15T20:15:01.954526+00:00
-modified: 2026-11-15T21:01:42.524452+00:00
+modified: 2026-11-15T21:30:38.601633+00:00
 relationships:
+  blocks:
+  - DEV-582
+  - DEV-577
   related:
   - DEV-530
   - DEV-577
   - DEV-581
   - DEV-510
+  - DEV-582
+  - DEV-566
 comments:
 - date: 2026-11-15T20:48:30.575159+00:00
   author: automation
@@ -42,6 +47,14 @@ comments:
       result: not_run
       reason: no changes
     next: Decide existing-checkout launch interface scope
+- date: 2026-11-15T21:14:15.027731+00:00
+  author: claude
+  text: |-
+    More evidence from DEV-582 (FND-12): the retry also *fails* when the agent works around the wrong branch.
+
+    - Job `job-20261115T201131.885Z-1` ran in `t3-e572702e-…` on `t3/sync-automation-yml-config-copy`; the agent committed in the old `agent-FND-12-846d…` worktree on `agent/FND-12` instead.
+    - `follow_thread_branch` then failed the job: "agent/FND-12 stays where it is … it has commits that t3/… lacks", although the work was safe on `agent/FND-12`.
+    - Whichever fix you pick here should also cover that case (the thread made no commits and the ticket branch moved ahead: not a failure).
 description: 'Found 2026-11-15 in standards: a fix job that is retried on another agent or resumed after its prerequisite ("Prerequisites done", "Retry with @fix-codex", "Retry with @fix-fable") starts a new T3 thread in a fresh worktree on a generated branch (`t3/gitleaks-allow-1password-backticks`, `t3/fix-gitleaks-1password-backtick-allowlist`), while its prompt says "You are working in a git worktree on branch `agent/STD-144` ... Don''t switch branches". The first job''s uncommitted work stays in `~/.t3/worktrees/standards/agent-STD-144-…`, out of reach. Seen on STD-144 (jobs `job-20261115T192529.587Z-12` and the 20:12Z retry), STD-140 (`job-20261115T192519.646Z-11`) and STD-149 (the review ran on `t3/std-149-dedupe-finding-tickets` at the rejected commit while the rework was on `agent/STD-149`). Two codex jobs handed back for this alone, and standards has about 30 leftover `t3/` worktrees. Related: DEV-581, DEV-577, DEV-530. Check: retry a failed T3 fix job with another agent; `git branch --show-current` in the new thread prints `agent/<ID>` and `git status` shows the first job''s changes. Done: a retried or resumed T3 job runs in the ticket''s existing `agent/<ID>` worktree (or the prompt names the branch the thread really has and where the earlier work is).'
 tags:
 - health
@@ -98,3 +111,31 @@ history:
   - field: assignee
     old: '@fix-codex'
     new: mallox
+- at: 2026-11-15T21:14:12.748162+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-530","DEV-577","DEV-581","DEV-510"]}'
+    new: '{"related":["DEV-530","DEV-577","DEV-581","DEV-510","DEV-582"]}'
+- at: 2026-11-15T21:14:15.027731+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T21:28:21.352361+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-530","DEV-577","DEV-581","DEV-510","DEV-582"]}'
+    new: '{"related":["DEV-530","DEV-577","DEV-581","DEV-510","DEV-582","DEV-566"]}'
+- at: 2026-11-15T21:29:42.012226+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-530","DEV-577","DEV-581","DEV-510","DEV-582","DEV-566"]}'
+    new: '{"blocks":["DEV-582"],"related":["DEV-530","DEV-577","DEV-581","DEV-510","DEV-582","DEV-566"]}'
+- at: 2026-11-15T21:30:38.601633+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-582"],"related":["DEV-530","DEV-577","DEV-581","DEV-510","DEV-582","DEV-566"]}'
+    new: '{"blocks":["DEV-582","DEV-577"],"related":["DEV-530","DEV-577","DEV-581","DEV-510","DEV-582","DEV-566"]}'

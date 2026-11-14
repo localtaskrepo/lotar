@@ -1,11 +1,10 @@
 title: 'Commits only on this Mac: branches'
-status: HelpNeeded
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
-assignee: mallox
 created: 2026-11-15T18:38:30.477073+00:00
-modified: 2026-11-15T20:52:18.532380+00:00
+modified: 2026-11-15T21:17:00.518366+00:00
 relationships:
   related:
   - DEV-532
@@ -77,6 +76,23 @@ comments:
       set:
         status: WontDo
         assignee: ''
+- date: 2026-11-15T21:16:43.922882+00:00
+  author: claude
+  text: |-
+    Pushed main as you decided (INBOX-281: "Push main only, branches stay local"). The branches are still local only.
+
+    - `git push origin main`: fast-forward `63aa6193..50cfad9a` (12 commits). The pre-push hook passed.
+    - `git log main --not --remotes` is now empty.
+    - `repos.ts` still lists `[unpushed:branches]` with 18 commits on `agent/*`, `t3/*` and `backup/*` branches. You accepted that, so nothing was deleted or pushed for them.
+    - No files changed and nothing to commit.
+  report:
+    checks:
+    - command: 'git push origin main (pre-push: Rust fmt+clippy, frontend typecheck/oxlint/ESLint/Prettier)'
+      result: passed
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
+      reason: main no longer listed; branches still listed, by decision
+    next: 'None: the local branches stay local per the owner''s answer'
 description: |-
   23 commits on no remote, only on this Mac: agent/DEV-466 1, agent/DEV-467 1, agent/DEV-481 1, agent/DEV-496 1, agent/DEV-516 1, agent/DEV-528 1, agent/DEV-542 1, backup/DEV-466-896309c0 3, main 3, t3/job-outcome-server-outage 1, t3/job-outcome-survives-t3-outage 2, t3/job-outcome-t3-outage 1, t3/job-outcome-t3-outage-1 1, t3/job-outcome-t3-outage-2 1, t3/restore-claude-sandbox-permission-rules-3 1, t3/review-dev-510-t3-agent-gaps 1, t3/review-held-job-resume 2, t3/t3-agent-resume-link-wait 1, t3/t3-outage-job-outcome-fix 1, t3/task-panel-git-timeout 1, t3/task-panel-git-timeout-1 1, t3/task-panel-git-timeout-2 2, t3/task-panel-git-timeout-3 2, t3/task-panel-git-timeout-4 2, t3/task-panel-git-timeout-5 2 (git log <branch> --not --remotes)
 
@@ -91,7 +107,6 @@ description: |-
   git log <branch> --not --remotes is empty for each branch it lists: the commits are pushed, merged or on a branch with its worktree.
 tags:
 - health
-- fix-retried
 custom_fields:
   finding: unpushed:branches
 history:
@@ -167,3 +182,24 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-15T21:16:43.922882+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T21:16:45.994084+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done
+- at: 2026-11-15T21:16:46.084023+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, fix-retried
+    new: health
+- at: 2026-11-15T21:17:00.518366+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox

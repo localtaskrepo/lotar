@@ -5,10 +5,11 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T19:05:32.144426+00:00
-modified: 2026-11-15T19:36:03.926459+00:00
+modified: 2026-11-15T21:29:21.464494+00:00
 relationships:
   related:
   - DEV-562
+  - DEV-586
 comments:
 - date: 2026-11-15T19:11:25.640871+00:00
   author: claude
@@ -85,6 +86,8 @@ comments:
       result: not_run
       reason: main checkout not clean, .tasks/DEV/510.yml blocked by secret scan
     next: Push main once STD-140/STD-144 settle the 510.yml false positive
+releases:
+- 6
 description: 'Found: the DEV-562 merge''s full smoke run (2026-11-15) failed smoke/tests/ui.description-preview.smoke.spec.ts:158 ''scrolls on a touch drag and opens the editor on a tap'': expected 0 to be greater than 0 (scrollTop stayed 0). Check: npm run test:smoke:agent; the file alone passed 3/3 and the full suite rerun passed 404/404. Done: the test passes reliably under full-suite load.'
 tags:
 - health
@@ -144,3 +147,14 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-15T21:13:50.763660+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#6'
+- at: 2026-11-15T21:29:21.464494+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-562"]}'
+    new: '{"related":["DEV-562","DEV-586"]}'

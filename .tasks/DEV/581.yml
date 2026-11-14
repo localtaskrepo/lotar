@@ -1,16 +1,17 @@
 title: 'A headless job after a T3 job on the same ticket fails: agent/<ID> is checked out in the T3 thread''s worktree'
-status: InProgress
+status: Reviewing
 priority: High
 type: Bug
 reporter: claude
-assignee: '@fix-codex'
+assignee: '@review-claude'
 created: 2026-11-15T20:09:34.810817+00:00
-modified: 2026-11-15T21:02:03.800403+00:00
+modified: 2026-11-15T21:36:32.098928+00:00
 relationships:
   related:
   - DEV-583
   - DEV-579
   - DEV-510
+  - DEV-587
 comments:
 - date: 2026-11-15T20:42:59.653437+00:00
   author: claude
@@ -48,6 +49,60 @@ comments:
 - date: 2026-11-15T21:02:03.800403+00:00
   author: automation
   text: The fix agent's job job-20261115T210200.620Z-65 failed (lotar agent logs job-20261115T210200.620Z-65); @fix-codex retries it on branch agent/DEV-581.
+- date: 2026-11-15T21:35:47.665868+00:00
+  author: claude
+  text: |-
+    Rework: fixed the review's temp-folder finding.
+
+    - Cause: `prepare_worktree` created `agent.worktree.dir` (`.lotar-worktrees` next to the repo, here in `.lotar-test-scratch`, outside the fixture) before it reused the T3 thread's worktree.
+    - Fix: `create_dir_all` now runs only right before `git worktree add` (`crates/lotar-lib/src/services/agent_job_service.rs:1344`), so a reused worktree creates nothing.
+    - Before: the single test reported `tests left 1 entries in the temp folder: .lotar-test-scratch` and exited 1; now it exits 0.
+    - Smoke: `tests/ui.global-actions.smoke.spec.ts` (desktop actions) failed once under full-suite load and passed alone; it doesn't touch this change. Filed [DEV-587](https://lotar.pyxzl.net/task/DEV-587).
+  report:
+    commits:
+    - hash: 53a4723b
+      what: amended; reusing a worktree no longer creates the lotar worktree folder
+    checks:
+    - command: npm run test:rust:agent -- headless_jobs_run_in_the_t3_threads_worktree_that_has_the_tickets_branch
+      result: passed
+      reason: exit 0, no temp leftover
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2214 Rust, 1547 UI
+    - command: npm run smoke
+      result: failed
+      reason: 1 of 404, ui.global-actions desktop flaky under load; the file alone passes; filed DEV-587
+    next: 'Review again, then merge (main moved: rebase first)'
+- date: 2026-11-15T21:36:24.044689+00:00
+  author: codex
+  text: |-
+    Fixed the review blocker: the regression fixture now owns its worktree directory and leaves no scratch files.
+
+    - Reproduced the passing-test/exit-1 cleanup failure; retained scratch showed an empty sibling `.lotar-worktrees/<fixture>` created before linked-worktree reuse.
+    - Configured an absolute worktree directory inside the fixture. The focused regression and full Rust temp cleanup gate pass.
+    - Signed amended commit `2fc25a95`; no push or merge. T3 supplied branch `t3/reuse-linked-ticket-worktree-1`, which I left unchanged.
+    - Lint and full tests pass. Initial full-test retry was needed after concurrent compilation replaced its binary. Sandbox socket denial was retried with approval and `RUSTC_WRAPPER=`.
+    - Full smoke had browser timeouts; all seven affected files pass on serial retry. A broad serial retry was stopped before narrowing to those files. No checks remain running.
+    - No durable instruction finding. Status and assignee left to job automation.
+  report:
+    commits:
+    - hash: 2fc25a95
+      what: amend fixture cleanup fix
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: RUSTC_WRAPPER= npm run test:agent
+      result: passed
+      reason: 2214 Rust and 1547 UI tests; clean temp gate
+    - command: npm run test:smoke:agent
+      result: failed
+      reason: 396 passed, 8 browser timeout failures
+    - command: npm run test:smoke:quick:agent -- affected files --maxWorkers=1 --maxConcurrency=1 --no-file-parallelism
+      result: passed
+      reason: all seven failing files recovered serially
+    next: Review amended commit; merge agent integrates
 description: |-
   Found in standards STD-124 (2026-11-15): reviews and merges are to run headless (claude, codex runners) after a fix on the t3 runner. The t3 fix thread works in T3 Code's worktree (~/.t3/worktrees/<repo>/agent-<ID>-…) with the ticket branch agent/<ID> checked out. A later claude, codex or command job calls prepare_worktree (crates/lotar-lib/src/services/agent_job_service.rs), which runs `git worktree add <dir>/<ticket> agent/<ID>`; git refuses, and the job fails before the agent starts:
 
@@ -149,3 +204,26 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-15T21:35:34.252616+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-583","DEV-579","DEV-510"]}'
+    new: '{"related":["DEV-583","DEV-579","DEV-510","DEV-587"]}'
+- at: 2026-11-15T21:35:47.665868+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T21:36:24.044689+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T21:36:32.098928+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix-codex'
+    new: '@review-claude'

@@ -1,0 +1,66 @@
+title: Full smoke run fails 12 browser tests and leaves three temporary entries
+status: InProgress
+priority: Medium
+type: Bug
+reporter: codex
+assignee: '@fix'
+created: 2026-11-15T21:29:20.908261+00:00
+modified: 2026-11-15T21:55:13.599130+00:00
+relationships:
+  related:
+  - DEV-132
+  - DEV-170
+  - DEV-223
+  - DEV-352
+  - DEV-399
+  - DEV-466
+  - DEV-575
+  - DEV-580
+  - DEV-530
+description: |-
+  Found 2026-11-15 during DEV-580 merge verification on 175e36d0 (main base f37cbaa0). Approved unsandboxed npm run test:smoke:agent built successfully, then failed 12/404 tests (392 passed, 191.04s). No merge performed. The DEV-466 agent independently passed 404/404 on its different source tree; load is a hypothesis, not a proven cause.
+
+  ## Failure evidence
+  - ui.backlog-order: 390px drag, line 79, test timed out at 120000ms.
+  - ui.board-state: line 103, .show-more-btn click timed out at 30000ms waiting for stability.
+  - ui.filter-autocomplete: line 244, help toggle colour poll timed out.
+  - ui.question-comments: line 108, expected zero question controls, received one.
+  - ui.reference-kinds: line 182, task row click timed out at 30000ms.
+  - ui.relationships: lines 113 (1440px fixes draft fill), 70 (390px Relationships tab click), 280 (wrapped suggestions tab click), 901 (dependency-lists summary click), all 30000ms timeouts.
+  - ui.sprints-responsive: lines 55 (1440px task row wait), 168 (844px Create sprint click), 30000ms timeouts.
+  - ui.theming: line 152, Repository skin option click timed out at 30000ms.
+  - Teardown: Tests left 3 entries: playwright-artifacts-UnVrAb, playwright_chromiumdev_profile-6u87EE, ui-task-order--44156-IQPO9mo696xz. Preserve diagnostic files; do not delete files another process may use.
+
+  ## Check
+  Run npm run test:smoke:agent. Compare focused spec runs and full-suite results; capture load and browser/server diagnostics before attributing failures to load. Earlier distinct precedents DEV-399, DEV-170, DEV-132, DEV-223 and DEV-352 are Done; DEV-575 only covers description preview dragging.
+
+  ## Done when
+  Explain and fix the failing assertions with appropriate regression coverage, ensure failed browser tests clean their owned temporary entries, and pass repeated full smoke runs. Split confirmed independent causes into linked tickets if needed.
+tags:
+- health
+custom_fields:
+  finding: smoke:browser-timeouts-dev580
+history:
+- at: 2026-11-15T21:29:21.467426+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-132","DEV-170","DEV-223","DEV-352","DEV-399","DEV-466","DEV-575","DEV-580"]}'
+- at: 2026-11-15T21:29:22.813757+00:00
+  actor: codex
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-15T21:36:34.565629+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T21:55:13.599130+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-132","DEV-170","DEV-223","DEV-352","DEV-399","DEV-466","DEV-575","DEV-580"]}'
+    new: '{"related":["DEV-132","DEV-170","DEV-223","DEV-352","DEV-399","DEV-466","DEV-575","DEV-580","DEV-530"]}'

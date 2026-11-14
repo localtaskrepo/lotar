@@ -5,7 +5,10 @@ type: Bug
 reporter: mallox
 assignee: mallox
 created: 2026-10-27T22:32:35.678773+00:00
-modified: 2026-10-27T23:37:51.146576+00:00
+modified: 2026-11-15T21:29:21.457051+00:00
+relationships:
+  related:
+  - DEV-586
 comments:
 - date: 2026-10-27T23:37:50.961046+00:00
   text: 'Fixed: the board-state test now waits for the filtered query to land before scrolling, and checks Back-navigation scroll restore against the router''s 1.5 s restore budget (view/utils/routerScroll.ts): a round where the board rendered tall enough within the budget must restore exactly; slower rounds retry up to three times and the test fails if none is fast enough. Verified in the loaded run (48/48) and full smoke 359/359.'
@@ -29,3 +32,9 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-11-15T21:29:21.457051+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-586"]}'

@@ -4,7 +4,7 @@ priority: High
 type: Feature
 reporter: claude
 created: 2026-11-14T02:19:54.140386+00:00
-modified: 2026-11-15T21:01:36.504226+00:00
+modified: 2026-11-15T21:25:29.876818+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -36,6 +36,8 @@ relationships:
   - DEV-581
   - DEV-585
   - DEV-583
+  - DEV-466
+  - DEV-576
 comments:
 - date: 2026-11-14T04:12:50.227687+00:00
   author: claude
@@ -584,6 +586,16 @@ comments:
       result: not_run
       reason: held behind unpushed release commit c01909e9 (DEV-513 waits for the owner's publish yes)
     next: 'DEV-513: re-run the release checks and ask the owner for the publish yes; that push carries 85565157'
+- date: 2026-11-15T21:10:56.149698+00:00
+  author: claude
+  text: 'Nothing left: harnessmux `v0.1.9` is on crates.io (Release run `43757297625` passed) and lotar main has DEV-510 as `85565157` (merged 20:46).'
+- date: 2026-11-15T21:25:28.336467+00:00
+  author: claude
+  text: |-
+    Pushed: `85565157` is on `origin/main`. Another session's push at 13:13 PST, which also took DEV-576 and DEV-466 (`50cfad9a`), carried it.
+
+    - The owner said to push now, and by then nothing was left unpushed (`git log @{u}..` is empty).
+    - Tag `v0.15.1` isn't pushed: the release still waits in DEV-513.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae32d01b4-631c-4fdc-adf5-8f18371bee13
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac1722915-ee93-49bf-9853-b79066d0c7be
@@ -1512,3 +1524,17 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-509","DEV-512","DEV-511","DEV-501","DEV-521","DEV-537","DEV-467","DEV-499","DEV-516","DEV-528","DEV-544","DEV-550","DEV-560","DEV-520","DEV-564","DEV-569","DEV-573","DEV-562","DEV-574","DEV-578","DEV-581","DEV-585"]}'
     new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-509","DEV-512","DEV-511","DEV-501","DEV-521","DEV-537","DEV-467","DEV-499","DEV-516","DEV-528","DEV-544","DEV-550","DEV-560","DEV-520","DEV-564","DEV-569","DEV-573","DEV-562","DEV-574","DEV-578","DEV-581","DEV-585","DEV-583"]}'
+- at: 2026-11-15T21:10:56.149698+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T21:25:28.336467+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T21:25:29.876818+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-509","DEV-512","DEV-511","DEV-501","DEV-521","DEV-537","DEV-467","DEV-499","DEV-516","DEV-528","DEV-544","DEV-550","DEV-560","DEV-520","DEV-564","DEV-569","DEV-573","DEV-562","DEV-574","DEV-578","DEV-581","DEV-585","DEV-583"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-509","DEV-512","DEV-511","DEV-501","DEV-521","DEV-537","DEV-467","DEV-499","DEV-516","DEV-528","DEV-544","DEV-550","DEV-560","DEV-520","DEV-564","DEV-569","DEV-573","DEV-562","DEV-574","DEV-578","DEV-581","DEV-585","DEV-583","DEV-466","DEV-576"]}'

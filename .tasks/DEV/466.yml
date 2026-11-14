@@ -1,11 +1,11 @@
 title: 'Task panel stays on ''Loading task…'' while git hangs: the server''s git calls have no timeout'
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T10:33:22.263037+00:00
-modified: 2026-11-15T21:08:30.236143+00:00
+modified: 2026-11-15T21:29:57.619375+00:00
 relationships:
   blocks:
   - DEV-513
@@ -29,6 +29,9 @@ relationships:
   - DEV-520
   - DEV-567
   - DEV-569
+  - DEV-510
+  - DEV-586
+  - DEV-580
 comments:
 - date: 2026-11-13T10:45:55.825737+00:00
   author: claude
@@ -606,9 +609,6 @@ description: |-
   Done: the task panel shows the task as soon as /api/tasks/get answers; commit history loads on its own and shows its own loading and error state. The server's git calls have a timeout, kill the child when it runs out and answer with an error, so git processes don't pile up. A test covers both with a git that hangs.
 tags:
 - health
-- review-returned
-- merge-retried
-- fix-retried
 - ui
 - automation-limit-reached
 custom_fields:
@@ -1638,3 +1638,30 @@ history:
   actor: codex
   changes:
   - field: comment_added
+- at: 2026-11-15T21:09:30.006414+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, review-returned, merge-retried, fix-retried, ui, automation-limit-reached
+    new: health, ui, automation-limit-reached
+- at: 2026-11-15T21:25:29.874392+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-513"],"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513","DEV-525","DEV-526","DEV-532","DEV-499","DEV-518","DEV-550","DEV-560","DEV-520","DEV-567","DEV-569"]}'
+    new: '{"blocks":["DEV-513"],"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513","DEV-525","DEV-526","DEV-532","DEV-499","DEV-518","DEV-550","DEV-560","DEV-520","DEV-567","DEV-569","DEV-510"]}'
+- at: 2026-11-15T21:29:21.459205+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-513"],"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513","DEV-525","DEV-526","DEV-532","DEV-499","DEV-518","DEV-550","DEV-560","DEV-520","DEV-567","DEV-569","DEV-510"]}'
+    new: '{"blocks":["DEV-513"],"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513","DEV-525","DEV-526","DEV-532","DEV-499","DEV-518","DEV-550","DEV-560","DEV-520","DEV-567","DEV-569","DEV-510","DEV-586"]}'
+- at: 2026-11-15T21:29:57.619375+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-513"],"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513","DEV-525","DEV-526","DEV-532","DEV-499","DEV-518","DEV-550","DEV-560","DEV-520","DEV-567","DEV-569","DEV-510","DEV-586"]}'
+    new: '{"blocks":["DEV-513"],"related":["DEV-472","DEV-473","DEV-468","DEV-482","DEV-488","DEV-490","DEV-491","DEV-502","DEV-513","DEV-525","DEV-526","DEV-532","DEV-499","DEV-518","DEV-550","DEV-560","DEV-520","DEV-567","DEV-569","DEV-510","DEV-586","DEV-580"]}'
