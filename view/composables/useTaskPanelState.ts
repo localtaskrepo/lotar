@@ -50,7 +50,7 @@ export interface TaskPanelEmit {
     (event: 'redirected', id: string): void
 }
 
-type ActivityTab = 'comments' | 'relationships' | 'history' | 'commits' | 'references'
+type ActivityTab = 'comments' | 'relationships' | 'timeline' | 'commits' | 'references'
 
 /** How the user asked to close the panel (DEV-263). */
 export type TaskPanelCloseSource = 'escape' | 'dismiss'
@@ -296,10 +296,8 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
     })
 
     const {
-        changeLog,
         commitHistory,
         commitsLoading,
-        syncFromTaskHistory,
         resetActivity,
         loadCommitHistory: loadCommitHistoryFromActivity,
         refreshCommits: refreshCommitsFromActivity,
@@ -319,7 +317,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
     const activityTabs: Array<{ id: ActivityTab; label: string }> = [
         { id: 'comments', label: 'Comments' },
         { id: 'relationships', label: 'Relationships' },
-        { id: 'history', label: 'History' },
+        { id: 'timeline', label: 'Timeline' },
         { id: 'commits', label: 'Commits' },
         { id: 'references', label: 'References' },
     ]
@@ -466,7 +464,6 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         applyRelationshipsFromTask,
         applyTaskCustomFields,
         applyTaskSprints,
-        syncFromTaskHistory,
         resetActivity,
         resetComments,
         cancelEditComment,
@@ -669,7 +666,6 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         afterApply: (source) => {
             mergeKnownTags(source.tags)
             syncOwnershipControls()
-            syncFromTaskHistory(source)
         },
         save: async (field) => {
             if (field === 'status') return updateStatus(form.status)
@@ -760,7 +756,6 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         knownFieldValues,
         activityTabs,
         activityTab,
-        changeLog,
         commitHistory,
         commitsLoading,
         sprintsLoading,

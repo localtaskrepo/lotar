@@ -2,7 +2,6 @@ import type { Ref } from 'vue'
 import { formatDateTime } from '../../utils/date'
 import { onScopeDispose, ref } from 'vue'
 import { api } from '../../api/client'
-import type { TaskDTO, TaskHistoryEntry } from '../../api/types'
 import { titleCase } from '../../utils/text'
 
 export interface CommitEntry {
@@ -14,10 +13,8 @@ export interface CommitEntry {
 }
 
 export interface TaskPanelActivityApi {
-    changeLog: Ref<TaskHistoryEntry[]>
     commitHistory: Ref<CommitEntry[]>
     commitsLoading: Ref<boolean>
-    syncFromTaskHistory: (task: TaskDTO) => void
     resetActivity: () => void
     loadCommitHistory: (taskId: string, limit?: number) => Promise<void>
     refreshCommits: (taskId: string | undefined, limit?: number) => Promise<void>
@@ -30,7 +27,6 @@ export interface TaskPanelActivityApi {
 const DEFAULT_HISTORY_LIMIT = 8
 
 export function useTaskPanelActivity(): TaskPanelActivityApi {
-    const changeLog = ref<TaskHistoryEntry[]>([])
     const commitHistory = ref<CommitEntry[]>([])
     const commitsLoading = ref(false)
     let generation = 0
@@ -38,21 +34,9 @@ export function useTaskPanelActivity(): TaskPanelActivityApi {
     const resetActivity = () => {
         generation += 1
         commitsLoading.value = false
-        changeLog.value = []
         commitHistory.value = []
     }
     onScopeDispose(resetActivity)
-
-    const syncFromTaskHistory = (task: TaskDTO) => {
-        const history = Array.isArray(task.history) ? task.history : []
-        changeLog.value = history
-            .slice()
-            .reverse()
-            .map((entry) => ({
-                ...entry,
-                changes: Array.isArray(entry.changes) ? entry.changes.map((change) => ({ ...change })) : [],
-            }))
-    }
 
     const loadCommitHistory = async (taskId: string, limit = DEFAULT_HISTORY_LIMIT) => {
         const request = ++generation
@@ -98,10 +82,8 @@ export function useTaskPanelActivity(): TaskPanelActivityApi {
     }
 
     return {
-        changeLog,
         commitHistory,
         commitsLoading,
-        syncFromTaskHistory,
         resetActivity,
         loadCommitHistory,
         refreshCommits,

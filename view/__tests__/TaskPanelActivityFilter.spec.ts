@@ -1,9 +1,28 @@
-import type { TaskComment } from '../api/types'
-import { mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it } from 'vitest'
+import type { TaskComment, TaskTimelineEntry } from '../api/types'
+import { flushPromises, mount } from '@vue/test-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import TaskPanelCommentsTab from '../components/task-panel/TaskPanelCommentsTab.vue'
-import TaskPanelHistoryTab from '../components/task-panel/TaskPanelHistoryTab.vue'
-import { COMMENT_FILTER_KEY, HISTORY_FILTER_KEY } from '../composables/task-panel/useActivityFilter'
+import TaskPanelTimelineTab from '../components/task-panel/TaskPanelTimelineTab.vue'
+import { COMMENT_FILTER_KEY, TIMELINE_FILTER_KEY } from '../composables/task-panel/useActivityFilter'
+
+const timeline = vi.hoisted(() => ({ entries: [] as unknown[] }))
+const sseHandlers = vi.hoisted(() => new Map<string, (event: MessageEvent) => void>())
+const getAgentJobLogs = vi.hoisted(() => vi.fn())
+
+vi.mock('../api/client', () => ({
+    api: {
+        taskTimeline: vi.fn(async (id: string) => ({ task_id: id, entries: timeline.entries })),
+        getAgentJobLogs,
+    },
+}))
+
+vi.mock('../composables/useSse', () => ({
+    useSse: () => ({
+        on: (kind: string, handler: (event: MessageEvent) => void) => sseHandlers.set(kind, handler),
+        off: vi.fn(),
+        close: vi.fn(),
+    }),
+}))
 
 const commentsProps = (comments: TaskComment[]) => ({
     mode: 'edit' as const,
@@ -17,35 +36,66 @@ const commentsProps = (comments: TaskComment[]) => ({
     setEditingTextarea: () => {},
 })
 
+const markdownStub = { MarkdownContent: { props: ['source'], template: '<p>{{ source }}</p>' } }
+
 const mountComments = (comments: TaskComment[]) =>
     mount(TaskPanelCommentsTab, {
         props: commentsProps(comments),
-        global: { stubs: { MarkdownContent: { props: ['source'], template: '<p>{{ source }}</p>' } } },
+        global: { stubs: markdownStub },
     })
 
-const historyLog = [
-    { at: '3', actor: 'automation', changes: [{ field: 'status', old: 'Todo', new: 'InProgress' }] },
+const job = {
+    id: 'job-1',
+    ticket_id: 'DEV-1',
+    runner: 'claude',
+    agent: 'fix',
+    status: 'running',
+    created_at: '2026-01-01T00:04:00Z',
+    started_at: '2026-01-01T00:04:00Z',
+    model: 'sonnet',
+    summary: 'Working on it',
+    usage: { cost_usd: 0.5 },
+}
+
+const timelineEntries: TaskTimelineEntry[] = [
+    { kind: 'change', at: '2026-01-01T00:01:00Z', actor: 'mallox', changes: [{ field: 'assignee', new: 'claude' }] },
     {
-        at: '2',
+        kind: 'change',
+        at: '2026-01-01T00:02:00Z',
         actor: 'claude',
         changes: [
             { field: 'tags', old: '', new: 'ui' },
-            { field: 'comment_added', old: null, new: null },
+            { field: 'priority', old: 'Low', new: 'High' },
         ],
     },
-    { at: '1', actor: 'mallox', changes: [{ field: 'assignee', old: '', new: 'claude' }] },
+    { kind: 'comment', at: '2026-01-01T00:03:00Z', index: 0, comment: { date: '', author: 'claude', text: 'Plan' } },
+    { kind: 'job', at: '2026-01-01T00:04:00Z', job },
+    {
+        kind: 'commit',
+        at: '2026-01-01T00:05:00Z',
+        commit: 'abcdef123456',
+        author: 'Ravi',
+        email: 'r@example.com',
+        message: 'DEV-1 Fix',
+    },
 ]
 
-const mountHistory = () =>
-    mount(TaskPanelHistoryTab, {
+const mountTimeline = async (entries: TaskTimelineEntry[] = timelineEntries) => {
+    timeline.entries = entries
+    const wrapper = mount(TaskPanelTimelineTab, {
         props: {
             mode: 'edit',
-            changeLog: historyLog,
+            taskId: 'DEV-1',
             formatDate: (input: string) => input,
             formatFieldName: (field: string) => field,
             formatChangeValue: (value?: string | null) => value ?? '',
+            formatCommit: (value: string) => value.slice(0, 7),
         },
+        global: { stubs: markdownStub },
     })
+    await flushPromises()
+    return wrapper
+}
 
 const chip = (wrapper: ReturnType<typeof mount>, label: string) => {
     const found = wrapper.findAll('.task-panel__activity-filter-chip').find((item) => item.text() === label)
@@ -53,7 +103,7 @@ const chip = (wrapper: ReturnType<typeof mount>, label: string) => {
     return found
 }
 
-describe('Comments and History tab filters (DEV-502)', () => {
+describe('Comments and Timeline tab filters (DEV-502, DEV-518)', () => {
     beforeEach(() => localStorage.clear())
 
     it('hides an author’s comments, says how many are hidden, and keeps the choice for the next task', async () => {
@@ -137,19 +187,11 @@ describe('Comments and History tab filters (DEV-502)', () => {
         expect(wrapper.find('.task-panel__activity-filter-hidden').text()).toContain('1 of 1 comment hidden.')
     })
 
-    it('offers the field and author chips on a history with one field and one author', async () => {
-        const wrapper = mount(TaskPanelHistoryTab, {
-            props: {
-                mode: 'edit',
-                changeLog: historyLog.slice(0, 1),
-                formatDate: (input: string) => input,
-                formatFieldName: (field: string) => field,
-                formatChangeValue: (value?: string | null) => value ?? '',
-            },
-        })
-        expect(chip(wrapper, 'Status').exists()).toBe(true)
-        await chip(wrapper, 'automation').trigger('click')
-        expect(wrapper.find('.task-panel__activity-filter-hidden').text()).toContain('1 of 1 change hidden.')
+    it('offers the kind and author chips on a timeline with one entry', async () => {
+        const wrapper = await mountTimeline(timelineEntries.slice(0, 1))
+        expect(chip(wrapper, 'Changes').exists()).toBe(true)
+        await chip(wrapper, 'mallox').trigger('click')
+        expect(wrapper.find('.task-panel__activity-filter-hidden').text()).toContain('1 of 1 entry hidden.')
     })
 
     it('shows no filter on a task without comments', () => {
@@ -157,29 +199,56 @@ describe('Comments and History tab filters (DEV-502)', () => {
         expect(wrapper.find('.task-panel__activity-filter').exists()).toBe(false)
     })
 
-    it('filters history by field group and by author', async () => {
-        const wrapper = mountHistory()
-        const fieldsShown = () => wrapper.findAll('.task-panel__history-change strong').map((item) => item.text())
-        expect(fieldsShown()).toEqual(['status', 'tags', 'comment_added', 'assignee'])
+    it('lists the timeline newest first and filters it by kind, field and author', async () => {
+        const wrapper = await mountTimeline()
+        const kinds = () => wrapper.findAll('.timeline__item').map((item) => item.attributes('data-kind'))
+        expect(kinds()).toEqual(['commit', 'job', 'comment', 'change', 'change'])
+        expect(wrapper.get('[data-testid="timeline-job"]').text()).toContain('claude · sonnet')
+        expect(wrapper.get('[data-testid="timeline-job"]').text()).toContain('$0.50')
 
+        await chip(wrapper, 'Commits').trigger('click')
+        expect(kinds()).toEqual(['job', 'comment', 'change', 'change'])
         await chip(wrapper, 'Other').trigger('click')
-        expect(fieldsShown()).toEqual(['status', 'tags', 'assignee'])
-        // A change hidden within an update that stays shown still counts.
-        expect(wrapper.find('.task-panel__activity-filter-hidden').text()).toContain('1 of 4 changes hidden.')
-        expect(wrapper.find('.task-panel__activity-filter-show-all').exists()).toBe(true)
-
-        await chip(wrapper, 'automation').trigger('click')
-        expect(fieldsShown()).toEqual(['tags', 'assignee'])
-        expect(wrapper.find('.task-panel__activity-filter-hidden').text()).toContain('2 of 4 changes hidden.')
-        expect(JSON.parse(localStorage.getItem(HISTORY_FILTER_KEY) ?? '{}')).toEqual({
-            authors: ['automation'],
-            fields: ['other'],
+        expect(wrapper.findAll('.task-panel__history-change strong').map((item) => item.text())).toEqual([
+            'tags',
+            'assignee',
+        ])
+        await chip(wrapper, 'claude').trigger('click')
+        expect(kinds()).toEqual(['job', 'change'])
+        expect(wrapper.find('.task-panel__activity-filter-hidden').text()).toContain('3 of 5 entries hidden.')
+        expect(JSON.parse(localStorage.getItem(TIMELINE_FILTER_KEY) ?? '{}')).toEqual({
+            authors: ['claude'],
+            fields: ['kind:commit', 'other'],
         })
 
-        await chip(wrapper, 'Tags').trigger('click')
-        await chip(wrapper, 'Assignee').trigger('click')
-        expect(wrapper.text()).toContain('All updates are hidden by the filter')
         await wrapper.find('.task-panel__activity-filter-show-all').trigger('click')
-        expect(fieldsShown()).toHaveLength(4)
+        expect(kinds()).toHaveLength(5)
+    })
+
+    it('loads an agent run’s thread when opened and follows it live', async () => {
+        getAgentJobLogs.mockResolvedValue({
+            job,
+            events: [{ kind: 'agent_job_message', sequence: 1, at: '2026-01-01T00:04:01Z', message: 'Reading' }],
+        })
+        const wrapper = await mountTimeline()
+        expect(wrapper.find('.log-list').exists()).toBe(false)
+        await wrapper.get('.timeline__toggle').trigger('click')
+        await flushPromises()
+        expect(getAgentJobLogs).toHaveBeenCalledWith('job-1')
+        expect(wrapper.get('.log-list').text()).toContain('Reading')
+
+        const event = {
+            id: 'job-1',
+            ticket_id: 'DEV-1',
+            sequence: 2,
+            at: '2026-01-01T00:04:02Z',
+            message: 'Done reading',
+        }
+        sseHandlers.get('agent_job_message')?.({ data: JSON.stringify(event) } as MessageEvent)
+        sseHandlers.get('agent_job_message')?.({
+            data: JSON.stringify({ ...event, ticket_id: 'DEV-2', id: 'job-9' }),
+        } as MessageEvent)
+        await flushPromises()
+        expect(wrapper.get('.log-list').text()).toContain('Done reading')
     })
 })

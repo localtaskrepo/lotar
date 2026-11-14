@@ -144,6 +144,7 @@ These commands only read the repository.
 
 ```bash
 lotar task history PROJ-123                 # commits that touched the task
+lotar task timeline PROJ-123                # changes, comments, commits and agent jobs
 lotar task diff PROJ-123                    # diff of the latest such commit
 lotar task diff PROJ-123 --commit abcdef1
 lotar task at PROJ-123 abcdef1              # the task file at a commit

@@ -146,6 +146,7 @@ fn all_tool_definitions(enum_hints: Option<&EnumHints>) -> Vec<Value> {
         make_whoami_tool(),
         make_task_create_tool(enum_hints),
         make_task_get_tool(enum_hints),
+        make_task_timeline_tool(enum_hints),
         make_task_update_tool(enum_hints),
         make_task_comment_add_tool(enum_hints),
         make_task_comment_update_tool(enum_hints),
@@ -563,6 +564,32 @@ fn make_task_get_tool(enum_hints: Option<&EnumHints>) -> Value {
                 "include_deleted": {
                     "type": ["boolean", "null"],
                     "description": "Also resolve soft-deleted tasks. Defaults to false."
+                }
+            },
+            "required": ["id"],
+            "additionalProperties": false
+        }
+    });
+
+    attach_field_hints(&mut tool, enum_field_hints(enum_hints, &[("project", Hint::Projects, false)]));
+
+    describe_enum_hints(&mut tool, enum_hints, &[Hint::Projects]);
+
+    tool
+}
+
+fn make_task_timeline_tool(enum_hints: Option<&EnumHints>) -> Value {
+    let mut tool = json!({
+        "name": "task_timeline",
+        "description": "What happened on a task, oldest first: field changes, comments, commits of the task file and agent jobs (profile, model, status, times, usage and summary), including jobs of earlier server runs from the saved job logs. Read it to learn what earlier agents said and did. With threads=true each job also carries its whole thread (agent replies, tool calls, prompts). Returns {task_id, entries}; each entry has a kind: change, comment, commit or job.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "string"},
+                "project": {"type": ["string", "null"]},
+                "threads": {
+                    "type": ["boolean", "null"],
+                    "description": "Include each agent job's whole thread. Defaults to false."
                 }
             },
             "required": ["id"],

@@ -863,6 +863,26 @@ pub(super) fn register(api_server: &mut ApiServer) {
     // Activity endpoints
     // GET /api/activity/feed[?since=ISO][&until=ISO][&project=PREFIX][&limit=N]
 
+    // GET /api/tasks/timeline?id=ID[&threads=true] -> changes, comments, commits and agent jobs (DEV-518)
+
+    api_server.register_handler("GET", "/api/tasks/timeline", |req: &HttpRequest| {
+        let id = match req.query.get("id") {
+            Some(v) if !v.is_empty() => v.clone(),
+            _ => return bad_request("Missing id".into()),
+        };
+        let threads = match req.query.get("threads").map(|s| s.as_str()) {
+            None | Some("false") => false,
+            Some("true") => true,
+            Some(other) => return bad_request(format!("Invalid threads value: '{other}' (expected true or false)")),
+        };
+        let resolver = try_response!(resolve_tasks_dir());
+        let project = req.query.get("project").map(|s| s.as_str());
+        match crate::services::task_timeline::TaskTimelineService::build(&resolver.path, &id, project, threads) {
+            Ok(timeline) => ok_json(200, json!({"data": timeline})),
+            Err(e) => map_lotar_error(e),
+        }
+    });
+
     api_server.register_handler("GET", "/api/tasks/commit_diff", |req: &HttpRequest| {
         let id = match req.query.get("id") {
             Some(v) if !v.is_empty() => v.clone(),

@@ -489,6 +489,20 @@ pub(crate) fn handle_task_get(req: JsonRpcRequest) -> JsonRpcResponse {
     }
 }
 
+/// The task's changes, comments, commits and agent jobs, oldest first (DEV-518); `threads` adds each job's thread.
+pub(crate) fn handle_task_timeline(req: JsonRpcRequest) -> JsonRpcResponse {
+    let Some(id) = req.params.get("id").and_then(|v| v.as_str()) else {
+        return err(req.id, -32602, "Missing id", None);
+    };
+    let project = req.params.get("project").and_then(|v| v.as_str());
+    let threads = req.params.get("threads").and_then(|v| v.as_bool()).unwrap_or(false);
+    let resolver = try_rpc!(resolve_tasks_dir(&req.id));
+    match crate::services::task_timeline::TaskTimelineService::build(&resolver.path, id, project, threads) {
+        Ok(timeline) => text_result(req.id, &timeline),
+        Err(e) => err(req.id, -32004, "Task not found", Some(json!({"message": e.to_string()}))),
+    }
+}
+
 pub(crate) fn handle_task_update(req: JsonRpcRequest) -> JsonRpcResponse {
     let Some(id) = req.params.get("id").and_then(|v| v.as_str()) else {
         return err(req.id, -32602, "Missing id", None);

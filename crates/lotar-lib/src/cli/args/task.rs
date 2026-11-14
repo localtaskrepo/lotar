@@ -325,6 +325,15 @@ pub enum TaskAction {
         limit: usize,
     },
 
+    /// Show what happened on a task: changes, comments, commits and agent jobs, oldest first
+    Timeline {
+        /// Task ID (with or without project prefix)
+        id: String,
+        /// Include each agent job's whole thread
+        #[arg(long)]
+        threads: bool,
+    },
+
     /// Show per-field change history derived from git snapshots
     #[command(alias = "history-field")]
     HistoryByField {

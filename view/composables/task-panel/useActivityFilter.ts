@@ -3,8 +3,8 @@ import { storageGetJson, storageSetJson } from '../../utils/storage'
 
 /** Which authors' comments the Comments tab hides, kept across tasks (DEV-502). */
 export const COMMENT_FILTER_KEY = 'lotar.preferences.taskPanel.commentFilter'
-/** Which authors and field groups the History tab hides, kept across tasks (DEV-502). */
-export const HISTORY_FILTER_KEY = 'lotar.preferences.taskPanel.historyFilter'
+/** Which kinds, authors and field groups the Timeline tab hides, kept across tasks (DEV-502, DEV-518). */
+export const TIMELINE_FILTER_KEY = 'lotar.preferences.taskPanel.timelineFilter'
 
 export interface ActivityFilter {
     alwaysShowOpenQuestions: Ref<boolean>

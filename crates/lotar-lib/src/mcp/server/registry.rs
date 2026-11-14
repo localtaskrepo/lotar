@@ -34,7 +34,7 @@ use super::handlers::{
     handle_sprint_summary, handle_sprint_update, handle_sprint_velocity, handle_sync_pull, handle_sync_push, handle_task_archive, handle_task_bulk_comment_add,
     handle_task_bulk_reference_add, handle_task_bulk_reference_remove, handle_task_bulk_update, handle_task_comment_add, handle_task_comment_update,
     handle_task_create, handle_task_delete, handle_task_get, handle_task_list, handle_task_move, handle_task_reference_add, handle_task_reference_remove,
-    handle_task_restore, handle_task_unarchive, handle_task_update, handle_whoami,
+    handle_task_restore, handle_task_timeline, handle_task_unarchive, handle_task_update, handle_whoami,
 };
 use super::schema::{unsupported_keywords, validate_instance};
 use super::tools::build_tool_definitions;
@@ -78,6 +78,7 @@ pub(crate) fn tool_specs() -> &'static [ToolSpec] {
         ToolSpec { name: "relationship_mutate", method: "relationship/mutate", handler: handle_relationship_mutate },
         ToolSpec { name: "relationship_repair", method: "relationship/repair", handler: handle_relationship_repair },
         ToolSpec { name: "task_get", method: "task/get", handler: handle_task_get },
+        ToolSpec { name: "task_timeline", method: "task/timeline", handler: handle_task_timeline },
         ToolSpec { name: "task_update", method: "task/update", handler: handle_task_update },
         ToolSpec { name: "task_comment_add", method: "task/comment_add", handler: handle_task_comment_add },
         ToolSpec { name: "task_comment_update", method: "task/comment_update", handler: handle_task_comment_update },
@@ -313,7 +314,7 @@ mod tests {
         let definitions = build_tool_definitions(None);
         let mut advertised: Vec<String> = definitions.iter().map(|tool| tool.get("name").and_then(|v| v.as_str()).unwrap().to_string()).collect();
         advertised.sort();
-        assert_eq!(advertised.len(), 57, "advertised tool count changed");
+        assert_eq!(advertised.len(), 58, "advertised tool count changed");
         assert!(advertised.iter().any(|name| name == "sprint_reorder"));
         for name in ["relationship_graph", "relationship_check", "relationship_mutate", "relationship_repair"] {
             assert!(advertised.iter().any(|advertised| advertised == name));

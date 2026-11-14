@@ -1781,6 +1781,18 @@ export interface AgentJobLogEntry {
     message?: string | null
 }
 
+/** Everything that happened on a task, oldest first (DEV-518). */
+export interface TaskTimeline {
+    task_id: string
+    entries: TaskTimelineEntry[]
+}
+
+export type TaskTimelineEntry =
+    | { kind: 'change'; at: string; actor?: string | null; changes: TaskHistoryChange[] }
+    | { kind: 'comment'; at: string; index: number; comment: TaskComment }
+    | { kind: 'commit'; at: string; commit: string; author: string; email: string; message: string }
+    | { kind: 'job'; at: string; job: AgentJob; thread?: AgentJobLogEntry[] | null }
+
 export interface AgentJobLogsResponse {
     job: AgentJob
     events: AgentJobLogEntry[]

@@ -53,6 +53,7 @@ watch(
 <style scoped>
 .log-list {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 2px;
   max-height: 420px;
   overflow-y: auto;
@@ -131,7 +132,8 @@ watch(
     grid-template-columns: max-content minmax(0, 1fr);
   }
 
-  .log-message {
+  /* :deep reaches MarkdownContent's root, which has no scope attribute of this component. */
+  .log-row :deep(.log-message) {
     grid-column: 1 / -1;
   }
 }

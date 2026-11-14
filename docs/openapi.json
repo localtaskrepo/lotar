@@ -338,6 +338,7 @@
       },
       "get": {
         "summary": "List agent jobs",
+        "description": "Newest first. Includes jobs only the saved job logs hold (earlier server runs, other processes); a logged job without an end is running while a live process holds it, else failed. `ticket_id` also matches a moved task's old ID.",
         "parameters": [
           {
             "name": "ticket_id",
@@ -407,6 +408,7 @@
     "/api/jobs/logs": {
       "get": {
         "summary": "Get agent job logs",
+        "description": "From this server while it holds the job, else from the job's saved log, whose events are numbered by their place in it.",
         "parameters": [
           {
             "name": "id",
@@ -3501,6 +3503,65 @@
             "description": "Page offset"
           }
         ]
+      }
+    },
+    "/api/tasks/timeline": {
+      "get": {
+        "summary": "Get a task's timeline",
+        "description": "Everything that happened on the task, oldest first: history entries (without `comment_added`, which its comment entry stands for), comments, git commits that changed the task file, and agent jobs, including jobs only the saved job logs hold. With `threads=true` every job entry carries its whole thread.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Task identifier; an old ID of a moved task shows the task it became."
+          },
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "threads",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            },
+            "description": "Include each job's whole thread (default false)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeTaskTimeline"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
       }
     },
     "/api/tasks/commit_diff": {
@@ -9233,6 +9294,153 @@
         "required": [
           "data"
         ]
+      },
+      "EnvelopeTaskTimeline": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TaskTimeline"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "TaskTimeline": {
+        "type": "object",
+        "description": "Everything that happened on a task, oldest first (DEV-518).",
+        "properties": {
+          "task_id": {
+            "type": "string"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskTimelineEntry"
+            }
+          }
+        },
+        "required": [
+          "task_id",
+          "entries"
+        ]
+      },
+      "TaskTimelineEntry": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "One history entry: what an actor changed at once.",
+            "properties": {
+              "kind": {
+                "const": "change"
+              },
+              "at": {
+                "type": "string"
+              },
+              "actor": {
+                "type": "string"
+              },
+              "changes": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/TaskChange"
+                }
+              }
+            },
+            "required": [
+              "kind",
+              "at",
+              "changes"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "comment"
+              },
+              "at": {
+                "type": "string"
+              },
+              "index": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The comment's 0-based index on the task."
+              },
+              "comment": {
+                "$ref": "#/components/schemas/TaskComment"
+              }
+            },
+            "required": [
+              "kind",
+              "at",
+              "index",
+              "comment"
+            ]
+          },
+          {
+            "type": "object",
+            "description": "A commit that changed the task's file.",
+            "properties": {
+              "kind": {
+                "const": "commit"
+              },
+              "at": {
+                "type": "string"
+              },
+              "commit": {
+                "type": "string"
+              },
+              "author": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "at",
+              "commit",
+              "author",
+              "email",
+              "message"
+            ]
+          },
+          {
+            "type": "object",
+            "description": "An agent job on the task, at the time it was asked for.",
+            "properties": {
+              "kind": {
+                "const": "job"
+              },
+              "at": {
+                "type": "string"
+              },
+              "job": {
+                "$ref": "#/components/schemas/AgentJob"
+              },
+              "thread": {
+                "type": "array",
+                "description": "The job's whole thread; only with threads=true.",
+                "items": {
+                  "$ref": "#/components/schemas/AgentJobLogEntry"
+                }
+              }
+            },
+            "required": [
+              "kind",
+              "at",
+              "job"
+            ]
+          }
+        ],
+        "discriminator": {
+          "propertyName": "kind"
+        }
       },
       "EnvelopeTaskHistory": {
         "type": "object",

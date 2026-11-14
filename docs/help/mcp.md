@@ -82,6 +82,7 @@ The registry binds every advertised tool to its handler; `tools/list` returns ex
 | `relationship_mutate` | Add, remove or change the kind of one relationship, updating both sides together. |
 | `relationship_repair` | Preview, then apply, conservative relationship repairs. |
 | `task_get` | Fetch a task by id (project inferred or provided). |
+| `task_timeline` | A task's changes, comments, commits and agent jobs, oldest first; `threads: true` adds each job's thread. |
 | `task_update` | Patch mutable fields, relationships, and custom fields. |
 | `task_comment_add` | Append a comment to a task. |
 | `task_comment_update` | Update an existing comment on a task. |

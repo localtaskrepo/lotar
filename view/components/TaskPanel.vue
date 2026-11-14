@@ -704,14 +704,15 @@
                     :mutate="mutateRelationship"
                   />
 
-                  <TaskPanelHistoryTab
-                    v-else-if="activityTab === 'history'"
+                  <TaskPanelTimelineTab
+                    v-else-if="activityTab === 'timeline'"
                     :mode="mode"
-                    :change-log="changeLog"
+                    :task-id="task.id"
+                    :revision="`${task.history?.length ?? 0}-${task.comments?.length ?? 0}`"
                     :format-date="formatDate"
                     :format-field-name="formatFieldName"
                     :format-change-value="formatChangeValue"
-                    @reload="reloadTask"
+                    :format-commit="formatCommit"
                   />
 
                   <TaskPanelCommitsTab
@@ -1030,7 +1031,7 @@ import UiModal from './UiModal.vue'
 import TaskPanelCommentsTab from './task-panel/TaskPanelCommentsTab.vue'
 import TaskPanelCommitsTab from './task-panel/TaskPanelCommitsTab.vue'
 import TaskPanelCustomFieldsSection from './task-panel/TaskPanelCustomFieldsSection.vue'
-import TaskPanelHistoryTab from './task-panel/TaskPanelHistoryTab.vue'
+import TaskPanelTimelineTab from './task-panel/TaskPanelTimelineTab.vue'
 import TaskPanelOwnershipSection from './task-panel/TaskPanelOwnershipSection.vue'
 import TaskPanelReferencesTab from './task-panel/TaskPanelReferencesTab.vue'
 import TaskPanelRelationshipsTab from './task-panel/TaskPanelRelationshipsTab.vue'
@@ -1102,7 +1103,6 @@ const {
   knownFieldValues,
   activityTabs,
   activityTab,
-  changeLog,
   commitHistory,
   commitsLoading,
   sprintsLoading,

@@ -1,6 +1,6 @@
 # lotar task
 
-The full task command group. Every task operation lives here. The most common ones also have top-level shortcuts (`lotar add`, `lotar list`, `lotar show`, `lotar edit`, `lotar status`, ...). Some operations exist only under `lotar task`: `relationships`, `delete`, `restore`, `archive`, `unarchive`, `move`, `history`, `history-by-field`, `diff`, `at` and `reference`.
+The full task command group. Every task operation lives here. The most common ones also have top-level shortcuts (`lotar add`, `lotar list`, `lotar show`, `lotar edit`, `lotar status`, ...). Some operations exist only under `lotar task`: `relationships`, `delete`, `restore`, `archive`, `unarchive`, `move`, `timeline`, `history`, `history-by-field`, `diff`, `at` and `reference`.
 
 
 ## Invocation
@@ -33,6 +33,7 @@ lotar tasks <ACTION> [OPTIONS]   # alias
 | `archive` / `unarchive` | Move tasks into the project's `@archive` folder (read-only) or back. | Archive helper. |
 | `move` | Move tasks to another project; old IDs keep working. | Move helper. |
 | `renumber` | Give one copy of a number stored twice the next free number. | Move helper. |
+| `timeline` | Changes, comments, commits and agent jobs of a task, oldest first. | See [timeline](#timeline). |
 | `history` / `history-field` | Git history utilities. | See `docs/help/history.md`. |
 | `diff` | Show the latest (or specific) git diff for a task. | History/diff helper. |
 | `at` | Print the file at a specific commit. | History helper. |
@@ -416,6 +417,19 @@ lotar task renumber <TASK_ID> --file <PATH> [--dry-run|-n]
 - No redirect is left, since the old ID still belongs to the other copy. Links, sprint entries and commits that meant the renumbered copy still say the old ID; the command reminds you to update them.
 - Refused for an ID stored in one file (use [`task move`](#move) to change project) and for a move stub.
 - Two branches that each create `DEV/12.yml` give a merge conflict rather than a duplicate: keep one side as `DEV/12.yml`, save the other side in a subfolder such as `DEV/merged/12.yml`, and run `lotar task renumber DEV-12 --file .tasks/DEV/merged/12.yml`.
+
+### timeline
+
+```bash
+lotar task timeline <TASK_ID> [--threads]
+lotar --format json task timeline <TASK_ID> [--threads]
+```
+
+- Lists what happened on the task, oldest first: field changes (with who made them), comments, commits that changed the task file, and agent jobs (profile, runner, model, status, how long it ran, cost and summary). A comment stands for its own `comment_added` change.
+- Agent jobs come from the running server's memory and from the saved job logs (`<tasks dir>/@agent-logs`, see [agent logs](agent.md#notes)), so jobs of earlier runs and other processes are listed too; jobs from before a [move](#move) count.
+- `--threads` adds each job's whole thread below it: agent replies, tool calls and the prompts it got. Use it to read what earlier agents on the task said and did.
+- JSON output is the `TaskTimeline` of `GET /api/tasks/timeline`: `{task_id, entries}` with a `kind` per entry (`change`, `comment`, `commit`, `job`). The MCP tool `task_timeline` returns the same.
+- Outside a git repository the timeline has no commits.
 
 ### Git history helpers (`history`, `history-field`, `diff`, `at`)
 

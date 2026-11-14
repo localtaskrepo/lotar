@@ -36,6 +36,7 @@ pub mod sync_report_service;
 pub mod sync_service;
 pub mod task_order;
 pub mod task_service;
+pub mod task_timeline;
 pub mod task_validation;
 pub mod theme_file;
 

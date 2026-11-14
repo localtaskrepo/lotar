@@ -23,6 +23,7 @@ pub(crate) mod render;
 mod restore;
 mod search;
 mod show;
+mod timeline;
 
 use delete::DeleteHandler;
 use edit::EditHandler;
@@ -83,6 +84,7 @@ impl CommandHandler for TaskHandler {
             TaskAction::Show(show_args) => show::handle_show(&show_args.id, project, resolver, renderer),
             TaskAction::Edit(edit_args) => EditHandler::execute(edit_args, project, resolver, renderer),
             TaskAction::History { id, limit } => handle_history(&id, limit, project, resolver, renderer),
+            TaskAction::Timeline { id, threads } => timeline::handle_timeline(&id, threads, project, resolver, renderer),
             TaskAction::HistoryByField { field, id, limit } => handle_history_by_field(&field, &id, limit, project, resolver, renderer),
             TaskAction::Diff { id, commit, fields } => handle_diff(&id, commit, fields, project, resolver, renderer),
             TaskAction::At { id, commit } => handle_at(&id, &commit, project, resolver, renderer),

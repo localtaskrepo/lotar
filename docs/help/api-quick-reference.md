@@ -43,11 +43,11 @@ Endpoints with quick examples. For full schema see [OpenAPI](../openapi.json).
 - GET  /api/agents/profiles[?project=PREFIX] -> { data: { profiles: AgentProfileInfo[], installed_runners: string[], project } } (name, runner, model?, effort?, permissions), sorted by name; without `project` the default project is used
 - POST /api/agents/profiles (AgentProfileCreateRequest: name, runner, project?, global?, model?, effort?, permissions?) -> { data: ConfigSetResponse }; refuses a name that already exists for that scope
 - POST /api/jobs (AgentJobCreateRequest; optional `model`/`effort`/`provider`/`session` override the profile for this run) -> { data: AgentJobCreateResponse }
-- GET  /api/jobs?ticket_id=ID&status=STATUS -> { data: AgentJobListResponse }
+- GET  /api/jobs?ticket_id=ID&status=STATUS -> { data: AgentJobListResponse }; newest first, including jobs only the saved job logs hold (earlier server runs, other processes); `ticket_id` also matches a moved task's old ID
 - GET  /api/jobs/get?id=JOB_ID -> { data: AgentJobStatusResponse }
 - POST /api/jobs/cancel ({ id }) -> { data: AgentJobCancelResponse }
 - POST /api/jobs/cancel-all -> { data: AgentJobCancelAllResponse }
-- GET  /api/jobs/logs?id=JOB_ID -> { data: AgentJobLogsResponse }
+- GET  /api/jobs/logs?id=JOB_ID -> { data: AgentJobLogsResponse }; from the job's log when this server does not hold the job
 - GET  /api/automation/show[?project=PREFIX] -> { data: AutomationInspectResponse }
 - POST /api/automation/set (AutomationSetRequest) -> { data: AutomationSetResponse }
 - POST /api/sprints/create (SprintCreateRequest) -> { data: SprintCreateResponse }; configured sprint defaults apply unless `skip_defaults: true` (see `applied_defaults`)
@@ -73,6 +73,7 @@ Tasks
 - POST /api/tasks/comment ({ id, text, report? }) -> { data: TaskDTO }; `report` is a hand-off report (`commits`, `checks`, `next`; see [lotar comment](./comment.md#hand-off-reports)), refused with 400 when a commit is not a hash or a check result is not `passed`, `failed` or `not_run`
 - POST /api/tasks/comment/update ({ id, index, text }) -> { data: TaskDTO }; `index` is the comment's position, starting at 0
 - GET  /api/tasks/history?id=ID[&limit=N] -> { data: commits }; recent git commits that changed the task file
+- GET  /api/tasks/timeline?id=ID[&project=PREFIX][&threads=true] -> { data: TaskTimeline }; changes, comments, commits of the task file and agent jobs, oldest first, each entry with a `kind` (`change`, `comment`, `commit`, `job`); `threads=true` adds each job's whole `thread`
 - GET  /api/tasks/commit_diff?id=ID&commit=SHA -> { data }; the task file's diff at that commit
 - GET  /api/tasks/suggest?q=TEXT[&project=PREFIX][&limit=N] -> { data: suggestions }; tasks whose ID or title match, for pickers
 - GET  /api/tasks/export -> the filtered task list as a file; takes the same filters as `/api/tasks/list`

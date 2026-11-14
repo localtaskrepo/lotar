@@ -37,6 +37,10 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 - **Params:** `id` (required), optional `project` override to disambiguate numeric IDs, and `include_deleted` (bool, default false).
 - **Response:** Pretty-printed `TaskDTO` for the requested record. Every `TaskDTO` has `url`, the ticket's web link, while the workspace sets [`server.public_url`](./config-reference.md).
 
+### `task_timeline`
+- **Params:** `id` (required), optional `project`, and `threads` (bool, default false).
+- **Response:** `{task_id, entries}`, oldest first. Each entry has `at` and a `kind`: `change` (`actor`, `changes`), `comment` (`index`, `comment`), `commit` (`commit`, `author`, `email`, `message`) or `job` (`job`: profile, runner, model, status, times, `usage`, `summary`). Jobs of earlier server runs come from the saved job logs. With `threads: true` each job also has `thread`, its whole log: agent replies, tool calls and prompts. Read it to learn what earlier agents on the task said and did. See [timeline](task.md#timeline).
+
 ### `task_update`
 - **Params:** `id` (required) and `patch` object. Patch keys mirror `task_create` fields (including the `task_type` alias for `type`) plus `acceptance_criteria` and `sprints`.
 - **Behavior:** tri-state semantics per key: omitted = no-op, `null` = clear, value = set. Empty string clears reporter/assignee/due_date/effort/description; empty array/object clears tags/acceptance_criteria/relationships/custom_fields/sprints. `title`/`status`/`priority`/`type` treat `null` as omitted and blank titles are rejected. Enum strings are validated against the task's project configuration (failures return `-32602` with `error.data.suggestions`); list and map patches replace the whole value; `sprints` must be an array of positive integers (invalid entries are rejected, not dropped); membership failures keep the `Task update failed` envelope with `data.message` (a tool-execution `isError` result).

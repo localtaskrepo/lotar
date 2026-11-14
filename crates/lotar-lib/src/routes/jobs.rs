@@ -11,23 +11,28 @@ pub(super) fn register(api_server: &mut ApiServer) {
         }
     });
 
-    // GET /api/jobs -> list agent jobs
+    // GET /api/jobs -> list agent jobs, with the ones only the job logs hold (DEV-518)
 
     api_server.register_handler("GET", "/api/jobs", |req: &HttpRequest| {
-        let mut jobs = crate::services::agent_job_service::AgentJobService::list_jobs();
+        let resolver = resolve_tasks_dir().ok();
+        let mut jobs = match &resolver {
+            Some(resolver) => crate::services::agent_job_service::AgentJobService::list_jobs_in(&resolver.path),
+            None => crate::services::agent_job_service::AgentJobService::list_jobs(),
+        };
         if let Some(ticket_id) = req.query.get("ticket_id") {
             // Jobs from before a move name the task's old ID (DEV-183).
-            match resolve_tasks_dir() {
-                Ok(resolver) => {
+            match &resolver {
+                Some(resolver) => {
                     let moves = crate::storage::moves::MoveResolver::new(&resolver.path);
                     jobs.retain(|job| job.ticket_id == *ticket_id || moves.same(&job.ticket_id, ticket_id));
                 }
-                Err(_) => jobs.retain(|job| job.ticket_id == *ticket_id),
+                None => jobs.retain(|job| job.ticket_id == *ticket_id),
             }
         }
         if let Some(status) = req.query.get("status") {
             jobs.retain(|job| job.status.eq_ignore_ascii_case(status));
         }
+        jobs.sort_by(|a, b| b.created_at.cmp(&a.created_at));
         let queue_stats = crate::services::agent_job_service::AgentJobService::queue_stats();
         ok_json(200, json!({"data": {"jobs": jobs, "queue_stats": queue_stats}}))
     });
@@ -39,8 +44,8 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Some(v) if !v.trim().is_empty() => v.clone(),
             _ => return bad_request("Missing job id".into()),
         };
-        match crate::services::agent_job_service::AgentJobService::get_job(&id) {
-            Some(job) => ok_json(200, json!({"data": {"job": job}})),
+        match job_with_events(&id) {
+            Some((job, _)) => ok_json(200, json!({"data": {"job": job}})),
             None => not_found(format!("Job '{}' not found", id)),
         }
     });
@@ -52,11 +57,10 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Some(v) if !v.trim().is_empty() => v.clone(),
             _ => return bad_request("Missing job id".into()),
         };
-        let Some(job) = crate::services::agent_job_service::AgentJobService::get_job(&id) else {
-            return not_found(format!("Job '{}' not found", id));
-        };
-        let events = crate::services::agent_job_service::AgentJobService::events_for(&id);
-        ok_json(200, json!({"data": {"job": job, "events": events}}))
+        match job_with_events(&id) {
+            Some((job, events)) => ok_json(200, json!({"data": {"job": job, "events": events}})),
+            None => not_found(format!("Job '{}' not found", id)),
+        }
     });
 
     // POST /api/jobs/cancel -> cancel agent job
@@ -100,5 +104,13 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Err(err) => bad_request(err.to_string()),
         }
     });
-    // POST /api/tasks/add
+}
+
+/// The job from this process, else from its log (DEV-518).
+fn job_with_events(id: &str) -> Option<(crate::api_types::AgentJob, Vec<crate::services::agent_job_service::AgentJobEvent>)> {
+    match resolve_tasks_dir() {
+        Ok(resolver) => crate::services::agent_job_service::AgentJobService::job_with_events_in(&resolver.path, id),
+        Err(_) => crate::services::agent_job_service::AgentJobService::get_job(id)
+            .map(|job| (job, crate::services::agent_job_service::AgentJobService::events_for(id))),
+    }
 }

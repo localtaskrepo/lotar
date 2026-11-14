@@ -101,6 +101,7 @@ import type {
     JobOutcome,
     TaskOrderRequest,
     TaskOrderResponse,
+    TaskTimeline,
     TaskDeleteResponse,
     TaskListFilter,
     TaskListResponse,
@@ -373,6 +374,9 @@ export const api = {
     },
     removeTaskReference(payload: GenericReferenceRemoveRequest): Promise<GenericReferenceRemoveResponse> {
         return post('/api/tasks/references/remove', payload)
+    },
+    taskTimeline(id: string, threads = false): Promise<TaskTimeline> {
+        return get('/api/tasks/timeline', threads ? { id, threads: 'true' } : { id })
     },
     taskHistory(
         id: string,

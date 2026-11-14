@@ -5,7 +5,7 @@ import { toDateInputValue } from '../../utils/date'
 import { parseTaskId, removeKey } from '../../utils/text'
 import type { TaskPanelFormState } from './useTaskPanelPersistence'
 
-type ActivityTab = 'comments' | 'relationships' | 'history' | 'commits' | 'references'
+type ActivityTab = 'comments' | 'relationships' | 'timeline' | 'commits' | 'references'
 
 interface ProjectInfo {
     prefix: string
@@ -55,7 +55,6 @@ interface UseTaskPanelFormLifecycleOptions {
     applyRelationshipsFromTask: (task: TaskDTO | null | undefined) => void
     applyTaskCustomFields: (values: Record<string, unknown>) => void
     applyTaskSprints: (task: TaskDTO) => void
-    syncFromTaskHistory: (task: TaskDTO) => void
     resetActivity: () => void
     resetComments: () => void
     cancelEditComment: () => void
@@ -204,7 +203,6 @@ export function useTaskPanelFormLifecycle(options: UseTaskPanelFormLifecycleOpti
               }))
             : []
 
-        options.syncFromTaskHistory(data)
         options.syncOwnershipControls()
         void options.preloadPeople(options.form.project)
         options.applyTaskCustomFields(data.custom_fields)

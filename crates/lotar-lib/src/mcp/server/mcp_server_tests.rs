@@ -1618,3 +1618,59 @@ fn version_fields_are_checked_and_queryable() {
 
     clear_tasks_dir_env();
 }
+
+#[test]
+fn task_timeline_lists_comments_and_saved_jobs_with_threads_on_request() {
+    let _lock = lock_var("LOTAR_TASKS_DIR");
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    unsafe {
+        std::env::set_var("LOTAR_TASKS_DIR", &tasks_dir);
+    }
+    let call = |id: i64, name: &str, arguments: Value| {
+        dispatch(JsonRpcRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(id)),
+            method: "tools/call".into(),
+            params: json!({"name": name, "arguments": arguments}),
+        })
+    };
+    let created = parse_tool_payload(&call(1, "task_create", json!({"title": "Timeline", "project": "MCP"})));
+    let id = created["task"]["id"].as_str().unwrap().to_string();
+    assert!(call(2, "task_comment_add", json!({"id": id, "text": "Started"})).error.is_none());
+    // A job of an earlier server run: only its log is left (DEV-518).
+    let logs = tasks_dir.join("@agent-logs");
+    std::fs::create_dir_all(&logs).unwrap();
+    let log = [
+        json!({"type": "header", "job_id": "job-20990101T000000.000Z-1", "ticket_id": id, "runner": "claude", "created_at": "2099-01-01T00:00:00Z", "agent_profile": "fix", "model": "sonnet"}),
+        json!({"type": "event", "kind": "agent_job_started", "at": "2099-01-01T00:00:01Z"}),
+        json!({"type": "event", "kind": "agent_job_message", "at": "2099-01-01T00:00:02Z", "message": "I fixed it"}),
+        json!({"type": "status", "status": "completed", "at": "2099-01-01T00:01:00Z", "exit_code": 0, "summary": "Fixed", "usage": {"cost_usd": 0.25}}),
+    ]
+    .map(|line| line.to_string())
+    .join("\n");
+    std::fs::write(logs.join("job-20990101T000000.000Z-1.jsonl"), log).unwrap();
+
+    let compact = parse_tool_payload(&call(3, "task_timeline", json!({"id": id})));
+    let entries = compact["entries"].as_array().unwrap();
+    let kinds: Vec<&str> = entries.iter().map(|entry| entry["kind"].as_str().unwrap()).collect();
+    assert!(kinds.contains(&"comment"), "{kinds:?}");
+    assert!(!entries.iter().any(|entry| entry["changes"].as_array().is_some_and(|c| c.iter().any(|c| c["field"] == "comment_added"))));
+    let job = entries.last().unwrap();
+    assert_eq!(job["kind"], "job", "the job is the newest entry");
+    assert_eq!(job["job"]["status"], "completed");
+    assert_eq!(job["job"]["summary"], "Fixed");
+    assert_eq!(job["job"]["agent"], "fix");
+    assert_eq!(job["job"]["started_at"], "2099-01-01T00:00:01Z");
+    assert!(job.get("thread").is_none(), "threads only on request");
+
+    let full = parse_tool_payload(&call(4, "task_timeline", json!({"id": id, "threads": true})));
+    let thread = full["entries"].as_array().unwrap().last().unwrap()["thread"].as_array().unwrap().clone();
+    assert_eq!(thread.len(), 2);
+    assert_eq!(thread[1]["message"], "I fixed it");
+    assert_eq!(thread[1]["sequence"], 2);
+
+    let missing = call(5, "task_timeline", json!({"id": "MCP-999"}));
+    assert_eq!(tool_response_payload(&missing).get("isError"), Some(&json!(true)));
+}

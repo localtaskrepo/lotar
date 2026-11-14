@@ -11,7 +11,6 @@ use crate::storage::manager::Storage;
 use crate::utils::git::{clear_repository_env, git_command, verified_common_dir};
 use crate::workspace::TasksDirectoryResolver;
 use chrono::Utc;
-use serde::Serialize;
 use serde_json::json;
 use std::collections::{HashMap, VecDeque};
 use std::fs;
@@ -88,13 +87,7 @@ struct AgentJobRecord {
     is_merge_job: bool,
 }
 
-#[derive(Debug, Clone, Serialize)]
-pub struct AgentJobEvent {
-    pub kind: String,
-    pub sequence: u64,
-    pub at: String,
-    pub message: Option<String>,
-}
+pub use crate::api_types::AgentJobEvent;
 
 /// What a running job's agent runs as.
 enum AgentJobRuntime {
@@ -410,6 +403,40 @@ impl AgentJobService {
         Vec::new()
     }
 
+    /// [`Self::list_jobs`], plus the jobs only the job logs hold (DEV-518): jobs of an earlier server run or of
+    /// another process. A job this process holds wins over its log.
+    pub fn list_jobs_in(tasks_dir: &std::path::Path) -> Vec<AgentJob> {
+        let mut jobs = Self::list_jobs();
+        let mut seen: std::collections::HashSet<String> = jobs.iter().map(|job| job.id.clone()).collect();
+        let running: std::collections::HashSet<String> = crate::services::agent_active_jobs::list(tasks_dir).into_iter().map(|job| job.job_id).collect();
+        for saved in saved_jobs(tasks_dir) {
+            if seen.insert(saved.header.job_id.clone()) {
+                jobs.push(saved_job_dto(&saved, running.contains(&saved.header.job_id)));
+            }
+        }
+        jobs
+    }
+
+    /// The job and its events: from this process while it holds the job, else from the job's log (DEV-518).
+    /// Logged events are numbered by their place in the log.
+    pub fn job_with_events_in(tasks_dir: &std::path::Path, id: &str) -> Option<(AgentJob, Vec<AgentJobEvent>)> {
+        if let Some(job) = get_job_dto(id) {
+            return Some((job, Self::events_for(id)));
+        }
+        let saved = saved_job(tasks_dir, id)?;
+        let running = crate::services::agent_active_jobs::find(tasks_dir, id).is_some();
+        Some((saved_job_dto(&saved, running), saved_events(&saved)))
+    }
+
+    /// The job's whole thread for readers (DEV-518): its log holds every event, while this process keeps only
+    /// the last [`EVENT_LOG_LIMIT`].
+    pub fn full_thread_in(tasks_dir: &std::path::Path, id: &str) -> Vec<AgentJobEvent> {
+        match saved_job(tasks_dir, id) {
+            Some(saved) => saved_events(&saved),
+            None => Self::events_for(id),
+        }
+    }
+
     /// Get queue statistics
     pub fn queue_stats() -> crate::api_types::AgentQueueStats {
         if let Ok(registry) = JOB_REGISTRY.lock() {
@@ -638,6 +665,73 @@ impl AgentJobRecord {
 fn get_job_dto(id: &str) -> Option<AgentJob> {
     let registry = JOB_REGISTRY.lock().ok()?;
     registry.jobs.get(id).map(|state| state.record.to_dto())
+}
+
+/// The log folders the tasks directory's projects write to (`agent_logs_dir` can differ per project).
+fn job_log_dirs(tasks_dir: &std::path::Path) -> Vec<String> {
+    let mut projects = vec![None];
+    projects.extend(crate::utils::filesystem::list_visible_subdirs(tasks_dir).into_iter().map(|(prefix, _)| Some(prefix)));
+    let mut dirs: Vec<String> = Vec::new();
+    for project in projects {
+        let configured = crate::config::resolution::config_for_project(tasks_dir, project.as_deref()).ok().and_then(|config| config.agent_logs_dir);
+        if let Some(dir) = crate::services::agent_log_service::effective_logs_dir(tasks_dir, configured.as_deref())
+            && !dirs.contains(&dir)
+        {
+            dirs.push(dir);
+        }
+    }
+    dirs
+}
+
+fn workspace_root_of(tasks_dir: &std::path::Path) -> std::path::PathBuf {
+    tasks_dir.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| tasks_dir.to_path_buf())
+}
+
+fn saved_jobs(tasks_dir: &std::path::Path) -> Vec<crate::services::agent_log_service::SavedJob> {
+    let root = workspace_root_of(tasks_dir);
+    job_log_dirs(tasks_dir).iter().flat_map(|dir| AgentLogService::load_jobs(&root, dir)).collect()
+}
+
+fn saved_job(tasks_dir: &std::path::Path, id: &str) -> Option<crate::services::agent_log_service::SavedJob> {
+    let root = workspace_root_of(tasks_dir);
+    job_log_dirs(tasks_dir).iter().find_map(|dir| AgentLogService::load_job(&root, dir, id).ok().flatten())
+}
+
+fn saved_events(saved: &crate::services::agent_log_service::SavedJob) -> Vec<AgentJobEvent> {
+    saved
+        .events
+        .iter()
+        .zip(1u64..)
+        .map(|(entry, sequence)| AgentJobEvent { kind: entry.kind.clone(), sequence, at: entry.at.clone(), message: entry.message.clone() })
+        .collect()
+}
+
+/// A logged job. One without an end in its log is running when a live process holds it, else it ended with
+/// the process that ran it.
+fn saved_job_dto(saved: &crate::services::agent_log_service::SavedJob, running: bool) -> AgentJob {
+    let header = &saved.header;
+    let status = saved.status.as_ref();
+    let fallback = if running { AgentJobStatus::Running } else { AgentJobStatus::Failed };
+    AgentJob {
+        id: header.job_id.clone(),
+        ticket_id: header.ticket_id.clone(),
+        runner: header.runner.clone(),
+        agent: header.agent_profile.clone(),
+        status: status.map_or_else(|| fallback.as_str().to_string(), |status| status.status.clone()),
+        created_at: header.created_at.clone(),
+        started_at: saved.events.iter().find(|entry| entry.kind == "agent_job_started").map(|entry| entry.at.clone()),
+        finished_at: status.map(|status| status.at.clone()),
+        exit_code: status.and_then(|status| status.exit_code),
+        last_message: saved.events.iter().rev().find_map(|entry| entry.message.clone()),
+        summary: status.and_then(|status| status.summary.clone()),
+        session_id: status.and_then(|status| status.session_id.clone()),
+        worktree_path: header.worktree_path.clone(),
+        worktree_branch: header.worktree_branch.clone(),
+        model: header.model.clone(),
+        effort: header.effort.clone(),
+        usage: status.and_then(|status| status.usage.clone()),
+        question: None,
+    }
 }
 
 fn job_context_for(id: &str) -> Option<AutomationJobContext> {

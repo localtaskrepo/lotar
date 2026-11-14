@@ -275,6 +275,28 @@ impl AgentLogService {
         Ok(last_status)
     }
 
+    /// A whole job log: header, events and the last status line (DEV-518).
+    /// `None` when the log is missing or has no header.
+    pub fn load_job(workspace_root: &Path, logs_dir: &str, job_id: &str) -> LoTaRResult<Option<SavedJob>> {
+        let path = resolve_log_path(workspace_root, logs_dir, job_id)?;
+        if !path.exists() {
+            return Ok(None);
+        }
+        Ok(read_saved_job(&path))
+    }
+
+    /// Every job log in the folder, newest first; logs without a header are skipped.
+    pub fn load_jobs(workspace_root: &Path, logs_dir: &str) -> Vec<SavedJob> {
+        let dir = resolve_logs_dir(workspace_root, logs_dir);
+        let Ok(entries) = fs::read_dir(&dir) else {
+            return Vec::new();
+        };
+        let mut jobs: Vec<SavedJob> =
+            entries.filter_map(Result::ok).map(|entry| entry.path()).filter(|path| is_job_log(path)).filter_map(|path| read_saved_job(&path)).collect();
+        jobs.sort_by(|a, b| b.header.created_at.cmp(&a.header.created_at));
+        jobs
+    }
+
     /// List all job log files in the logs directory.
     pub fn list_logs(workspace_root: &Path, logs_dir: &str) -> LoTaRResult<Vec<String>> {
         let resolved_dir = resolve_logs_dir(workspace_root, logs_dir);
@@ -297,6 +319,31 @@ impl AgentLogService {
         job_ids.reverse(); // Newest first
         Ok(job_ids)
     }
+}
+
+/// A job as its log saved it.
+#[derive(Debug, Clone)]
+pub struct SavedJob {
+    pub header: JobLogHeader,
+    pub events: Vec<JobLogEntry>,
+    /// The last status line: a job writes one as it ends.
+    pub status: Option<JobStatusLine>,
+}
+
+fn read_saved_job(path: &Path) -> Option<SavedJob> {
+    let reader = BufReader::new(File::open(path).ok()?);
+    let mut header = None;
+    let mut events = Vec::new();
+    let mut status = None;
+    for line in reader.lines().map_while(Result::ok) {
+        match serde_json::from_str::<JobLogLine>(&line) {
+            Ok(JobLogLine::Header(found)) if header.is_none() => header = Some(found),
+            Ok(JobLogLine::Event(entry)) => events.push(entry),
+            Ok(JobLogLine::Status(found)) => status = Some(found),
+            _ => {}
+        }
+    }
+    Some(SavedJob { header: header?, events, status })
 }
 
 /// Resolve the logs directory path. Supports both relative and absolute paths.
@@ -448,6 +495,38 @@ mod tests {
         // List logs
         let logs = AgentLogService::list_logs(workspace_root, logs_dir).unwrap();
         assert_eq!(logs, vec!["job-test-1".to_string()]);
+    }
+
+    #[test]
+    fn saved_jobs_are_read_back_newest_first() {
+        let dir = tempdir().unwrap();
+        let root = dir.path();
+        for (id, created) in [("job-a", "2026-01-01T00:00:00Z"), ("job-b", "2026-02-01T00:00:00Z")] {
+            let header = JobLogHeader {
+                job_id: id.to_string(),
+                ticket_id: "T-1".to_string(),
+                runner: "claude".to_string(),
+                created_at: created.to_string(),
+                worktree_path: None,
+                worktree_branch: None,
+                model: Some("sonnet".to_string()),
+                effort: None,
+                agent_profile: Some("fix".to_string()),
+            };
+            AgentLogService::init_log(root, Some("logs"), header).unwrap();
+            AgentLogService::append_event(root, Some("logs"), id, "agent_job_message", created, Some("Hello".to_string())).unwrap();
+        }
+        AgentLogService::write_status(root, Some("logs"), "job-a", "completed", "2026-01-01T00:05:00Z", Some(0), Some("Done".to_string())).unwrap();
+        AgentLogService::append_event(root, Some("logs"), "job-a", "agent_job_progress", "2026-01-01T00:05:01Z", Some("Moved".to_string())).unwrap();
+        fs::write(root.join("logs").join("job-broken.jsonl"), "not json\n").unwrap();
+
+        let jobs = AgentLogService::load_jobs(root, "logs");
+        assert_eq!(jobs.iter().map(|job| job.header.job_id.as_str()).collect::<Vec<_>>(), ["job-b", "job-a"]);
+        let job_a = AgentLogService::load_job(root, "logs", "job-a").unwrap().unwrap();
+        assert_eq!(job_a.events.len(), 2, "events after the status line count too");
+        assert_eq!(job_a.status.unwrap().summary.as_deref(), Some("Done"));
+        assert!(jobs[0].status.is_none());
+        assert!(AgentLogService::load_job(root, "logs", "job-missing").unwrap().is_none());
     }
 
     #[test]

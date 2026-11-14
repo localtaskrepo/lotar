@@ -755,6 +755,62 @@ pub struct AgentJob {
     pub question: Option<AgentJobQuestion>,
 }
 
+/// One entry of a job's log; `sequence` numbers a job's events from 1.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJobEvent {
+    pub kind: String,
+    pub sequence: u64,
+    pub at: String,
+    pub message: Option<String>,
+}
+
+/// Everything that happened on a task, oldest first (DEV-518): field changes, comments, commits of the task
+/// file and agent jobs.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct TaskTimeline {
+    pub task_id: String,
+    pub entries: Vec<TaskTimelineEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum TaskTimelineEntry {
+    /// One history entry: what an actor changed at once.
+    Change {
+        at: String,
+        #[serde(skip_serializing_if = "Option::is_none", default)]
+        actor: Option<String>,
+        changes: Vec<crate::types::TaskChange>,
+    },
+    Comment {
+        at: String,
+        /// The comment's 0-based index on the task.
+        index: usize,
+        comment: crate::types::TaskComment,
+    },
+    /// A commit that changed the task's file.
+    Commit { at: String, commit: String, author: String, email: String, message: String },
+    /// An agent job on the task, at the time it was asked for.
+    Job {
+        at: String,
+        job: AgentJob,
+        /// The job's whole thread, only when asked for.
+        #[serde(skip_serializing_if = "Option::is_none", default)]
+        thread: Option<Vec<AgentJobEvent>>,
+    },
+}
+
+impl TaskTimelineEntry {
+    pub fn at(&self) -> &str {
+        match self {
+            Self::Change { at, .. } | Self::Comment { at, .. } | Self::Commit { at, .. } | Self::Job { at, .. } => at,
+        }
+    }
+}
+
 /// A permission request of a job's agent, waiting for an answer (DEV-503).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]

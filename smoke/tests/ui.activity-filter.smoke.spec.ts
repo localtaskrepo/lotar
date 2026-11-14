@@ -17,7 +17,7 @@ const history = [
     { at: '2026-11-13T12:00:00Z', actor: 'mallox', changes: [{ field: 'assignee', old: 'claude', new: '' }] },
 ];
 
-describe.concurrent('Comments and History tab filters (DEV-502)', () => {
+describe.concurrent('Comments and Timeline tab filters (DEV-502, DEV-518)', () => {
     for (const colorScheme of ['light', 'dark'] as const) {
         it(`hides an author's comments and a field's updates at 390px in the ${colorScheme} theme`, async ({
             expect,
@@ -55,15 +55,16 @@ describe.concurrent('Comments and History tab filters (DEV-502)', () => {
                             .evaluateAll((chips) => chips.map((chip) => getComputedStyle(chip).textDecorationLine));
                         expect(styles).toEqual(['line-through', 'none', 'none']);
 
-                        await page.getByRole('tab', { name: 'History', exact: true }).click();
-                        const historyFilter = page.getByRole('group', { name: 'Filter history' });
-                        await historyFilter.getByRole('button', { name: 'Status', exact: true }).click();
-                        await historyFilter.getByRole('button', { name: 'mallox', exact: true }).click();
+                        await page.getByRole('tab', { name: 'Timeline', exact: true }).click();
+                        const timelineFilter = page.getByRole('group', { name: 'Filter timeline' });
+                        await timelineFilter.getByRole('button', { name: 'Status', exact: true }).click();
+                        await timelineFilter.getByRole('button', { name: 'mallox', exact: true }).click();
                         await expect
                             .poll(() => page.locator('.task-panel__history-change strong').allTextContents())
                             .toEqual(['Tags']);
-                        expect(await historyFilter.getByRole('status').textContent()).toContain(
-                            '2 of 3 changes hidden.',
+                        // Status's change empties its entry; mallox's change and comment go too.
+                        expect(await timelineFilter.getByRole('status').textContent()).toContain(
+                            '3 of 6 entries hidden.',
                         );
 
                         // The choice is the viewer's and carries over to the next task.
@@ -72,7 +73,7 @@ describe.concurrent('Comments and History tab filters (DEV-502)', () => {
                         await expect.poll(() => page.locator('.task-panel__comment').count()).toBe(2);
                         await page.getByRole('button', { name: 'Show all', exact: true }).click();
                         await expect.poll(() => page.locator('.task-panel__comment').count()).toBe(3);
-                        await page.getByRole('tab', { name: 'History', exact: true }).click();
+                        await page.getByRole('tab', { name: 'Timeline', exact: true }).click();
                         await expect
                             .poll(() => page.locator('.task-panel__history-change strong').allTextContents())
                             .toEqual(['Tags']);
