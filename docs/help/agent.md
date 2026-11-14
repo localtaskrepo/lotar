@@ -37,7 +37,9 @@ Each agent profile names a runner. Every runner except `command` is the [harness
 
 harnessmux installs the pinned ACP adapters (Claude, Codex) with npm on first use and starts the other CLIs from `PATH`; each CLI keeps its own sign-in. Which agents ran live and which follow their docs, the adapter versions, and how to point an agent at another program are in harnessmux's README and its `agents.toml`; a user `agents.toml` (in `~/.config/harnessmux/`) overrides them without a new LoTaR build. A profile for these runners takes no `command` or `args`: the job is refused with a hint.
 
-A job ends when its session's last turn ends: completed for a normal end, failed when the turn fails or the agent sends a known error (a missing model, a sign-in failure) as its reply.
+The agent's reply shows in the job log while it writes it: each finished paragraph (outside a code block) as it arrives, the rest when a tool starts, the agent asks for permission or the turn ends.
+
+A job ends when its session's last turn ends: completed for a normal end, failed when the turn fails, the agent sends a known error (a missing model, a sign-in failure) as its reply, or the job's cost passes the profile's [`max_budget_usd`](#usage-and-cost).
 
 ### Sessions
 
@@ -112,16 +114,27 @@ agents:
 ```
 
 - `model` is the agent's own model id, as it lists it (`harnessmux capabilities claude`); harnessmux refuses one it doesn't list.
-- `effort` is `low`, `medium`, `high`, `xhigh` or `max`, mapped to each agent's own values; an agent without effort logs a note. Any other value is refused.
+- `effort` is `low`, `medium`, `high`, `xhigh` or `max`, mapped to each agent's own values; an agent without effort logs a note. Any other value is refused: set an agent's own value (Codex's `ultra`, Copilot's `minimal`) in `options`.
+- `options` sets the agent's own ACP config options, id to value, after `model` and `effort`. `harnessmux capabilities <agent>` lists the ids and values; an id or value the agent doesn't offer fails the job. The `command` runner refuses `options`.
+
+```yaml
+agents:
+  deep:
+    runner: codex
+    options:
+      reasoning_effort: ultra
+```
 - For `command`, both are passed as given in `LOTAR_AGENT_MODEL` and `LOTAR_AGENT_EFFORT`.
 
 Values may use letters, digits and `. _ - : / @ [ ]`. Jobs show their model and effort in `lotar agent status`, the job list, and on the Agents page.
 
 ### Usage and cost
 
-At the end of each turn LoTaR adds what the agent reports to the job's usage: input tokens (with cached), output tokens, turns, and the cost in USD where the agent reports one (Claude). The usage appears in `lotar agent status`, at the end of `lotar agent run --wait`, on the Agents page (per job, plus a cost total per ticket), in the job's `usage` field over REST, SSE and MCP, and in the job log. Automation actions on job events can use `${{agent.usage}}`, `${{agent.cost_usd}}`, `${{agent.input_tokens}}`, `${{agent.output_tokens}}` and `${{agent.turns}}`, for example to comment the cost on the ticket.
+At the end of each turn LoTaR adds what the agent reports to the job's usage: input tokens (with cached), output tokens, turns, and the cost in USD where the agent reports one (Claude). Agents report the session's cost so far; a job's cost is what its turns added to it. The usage appears in `lotar agent status`, at the end of `lotar agent run --wait`, on the Agents page (per job, plus a cost total per ticket), in the job's `usage` field over REST, SSE and MCP, and in the job log. Automation actions on job events can use `${{agent.usage}}`, `${{agent.cost_usd}}`, `${{agent.input_tokens}}`, `${{agent.output_tokens}}` and `${{agent.turns}}`, for example to comment the cost on the ticket.
 
-`max_budget_usd`, `tools` and `mcp.allow` are not passed: ACP has no budget limit or tool lists. A job whose profile sets them logs a note. Limit an agent with `permissions` and `on_permission`; its own MCP servers follow its own settings.
+With `max_budget_usd` in the profile, LoTaR cancels the agent's turn and fails the job as soon as the job's cost passes it, for every agent that reports cost. A job whose agent reports none logs that the budget was not checked.
+
+`tools` and `mcp.allow` are not passed: ACP has no tool lists. A job whose profile sets them logs a note. Limit an agent with `permissions` and `on_permission`; its own MCP servers follow its own settings.
 
 #### LoTaR's own MCP server
 

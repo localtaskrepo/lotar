@@ -1459,6 +1459,7 @@ fn finish_orphaned_job(
         update_job_failure(job_id, ticket_id, message, tasks_dir);
         return;
     };
+    let budget = profile.max_budget_usd;
     let profile = crate::services::agent_runner::session_profile(profile, HashMap::new()).map(|(profile, _)| profile);
     let session = profile.and_then(|profile| {
         let cwd = resolve_repo_root(tasks_dir).unwrap_or_else(|| tasks_dir.to_path_buf());
@@ -1480,7 +1481,7 @@ fn finish_orphaned_job(
         record_and_emit(state, "agent_job_progress", Some(format!("Resumed the session {name}; asked the agent to continue.")));
     });
     let mut context_messages = Vec::new();
-    let end = drive_session(job_id, tasks_dir, &session, prompt, &[], &mut context_messages);
+    let end = drive_session(job_id, tasks_dir, &session, prompt, &[], budget, &mut context_messages);
     end_job(job_id, ticket_id, end, &context_messages, tasks_dir, config);
 }
 
@@ -2723,7 +2724,7 @@ fn run_session(
         let note = format!("{how} {} (`harnessmux attach {}` follows it).", launch.name, launch.name);
         record_and_emit(state, "agent_job_progress", Some(note));
     });
-    let end = drive_session(job_id, tasks_dir, &session, prompt, &working_dir_prefixes(launch.cwd), context_messages);
+    let end = drive_session(job_id, tasks_dir, &session, prompt, &working_dir_prefixes(launch.cwd), profile.max_budget_usd, context_messages);
     if let (Some(root), Some(before)) = (repo_root.as_deref(), worktrees_before.as_deref()) {
         record_t3_worktree(job_id, root, before);
     }
@@ -2747,19 +2748,95 @@ fn publish_session(job_id: &str, session: &harnessmux::Session) -> bool {
 /// comments would otherwise keep it going.
 const MAX_TURNS: u64 = 10;
 
+/// The agent's reply in the running turn as it streams in (DEV-511): whole
+/// paragraphs outside code blocks go to the job log as they arrive, the rest
+/// when a tool starts, the agent asks or the turn ends.
+#[derive(Default)]
+struct ReplyStream {
+    pending: String,
+    /// Part of this turn's reply is in the job log already.
+    streamed: bool,
+}
+
+impl ReplyStream {
+    fn push(&mut self, delta: &str) -> Option<String> {
+        self.pending.push_str(delta);
+        let pending = &self.pending;
+        let cut = pending.match_indices("\n\n").map(|(at, _)| at + 2).filter(|&end| pending[..end].matches("```").count().is_multiple_of(2)).last()?;
+        let part: String = self.pending.drain(..cut).collect();
+        self.part(&part)
+    }
+
+    fn flush(&mut self) -> Option<String> {
+        let part = std::mem::take(&mut self.pending);
+        self.part(&part)
+    }
+
+    fn part(&mut self, part: &str) -> Option<String> {
+        let part = part.trim();
+        if part.is_empty() {
+            return None;
+        }
+        self.streamed = true;
+        Some(part.to_string())
+    }
+}
+
+/// What a job's agent costs (DEV-511). Agents report the session's total so
+/// far (ACP `usage_update`), which starts over when the agent process starts
+/// again (`session.started`).
+#[derive(Default)]
+struct CostMeter {
+    /// The session's total the agent reported last.
+    total: f64,
+    job: f64,
+    turn: Option<f64>,
+}
+
+impl CostMeter {
+    /// Starts after what the session cost before the job: the last total in its event log since its agent started.
+    fn after(earlier: &[harnessmux::Event]) -> Self {
+        let mut meter = Self::default();
+        for event in earlier {
+            match &event.body {
+                harnessmux::EventBody::SessionStarted { .. } => meter.total = 0.0,
+                harnessmux::EventBody::Usage(usage) => meter.total = usage.cost_usd.unwrap_or(meter.total),
+                _ => {}
+            }
+        }
+        meter
+    }
+
+    fn report(&mut self, total: f64) {
+        // A total below the last one is a new agent process whose start the job didn't see.
+        let spent = if total >= self.total { total - self.total } else { total };
+        self.total = total;
+        self.job += spent;
+        *self.turn.get_or_insert(0.0) += spent;
+    }
+}
+
 /// Run `prompt` as the next turn of `session`, then the turns that messages
 /// queue meanwhile (the message box, `harnessmux send`, DEV-384), and record
-/// their events on the job. The job ends with the last of them.
+/// their events on the job. The job ends with the last of them, or when its
+/// cost passes `budget`.
 fn drive_session(
     job_id: &str,
     tasks_dir: &std::path::Path,
     session: &harnessmux::Session,
     prompt: &str,
     prefixes: &[String],
+    budget: Option<f64>,
     context_messages: &mut Vec<crate::services::agent_context_service::AgentContextMessage>,
 ) -> RunEnd {
     use harnessmux::EventBody;
     let mut events = session.events();
+    let earlier =
+        harnessmux::follow::Follower::from_start(&crate::services::agent_runner::registry().events_path(session.name())).read_new().unwrap_or_default();
+    let mut meter = CostMeter::after(&earlier);
+    // A job taken over from a stopped process has cost something already.
+    meter.job = AgentJobService::get_job(job_id).and_then(|job| job.usage).and_then(|usage| usage.cost_usd).unwrap_or(0.0);
+    let mut reply = ReplyStream::default();
     let first = match block_on(session.send(prompt.to_string())) {
         Ok(turn) => turn,
         Err(err) => return RunEnd::Failed(format!("Could not send the prompt to the session {}: {err}", session.name())),
@@ -2770,9 +2847,21 @@ fn drive_session(
             record_and_emit(state, "agent_job_progress", Some(message.clone()));
         });
     };
+    let reply_part = |part: String| {
+        update_job(job_id, |state| {
+            state.record.last_message = Some(part.clone());
+            record_and_emit(state, "agent_job_message", Some(part.clone()));
+        });
+    };
+    let finish = |exit_code: i32, reported_cost: bool| {
+        if budget.is_some() && !reported_cost {
+            progress("The agent reported no cost, so the profile's max_budget_usd was not checked.".to_string());
+        }
+        RunEnd::Exited(Some(exit_code))
+    };
     let mut turns = 0;
     let mut exit_code = 0;
-    let mut cost = None;
+    let mut reported_cost = false;
     loop {
         if crate::services::agent_active_jobs::cancel_requested(tasks_dir, job_id) {
             let _ = AgentJobService::cancel_job(job_id);
@@ -2792,8 +2881,14 @@ fn drive_session(
             continue;
         }
         let ended = event.body.ends_turn();
+        if matches!(event.body, EventBody::ToolStarted { .. } | EventBody::PermissionRequested { .. })
+            && let Some(part) = reply.flush()
+        {
+            reply_part(part);
+        }
         match event.body {
             EventBody::SessionStarted { agent, how, agent_session, .. } => {
+                meter.total = 0.0;
                 let id = agent_session.map(|id| format!(", {id}")).unwrap_or_default();
                 update_job(job_id, |state| {
                     record_and_emit(state, "agent_job_init", Some(format!("{agent} session {how}{id}")));
@@ -2805,12 +2900,22 @@ fn drive_session(
                     record_and_emit(state, "agent_job_input", Some(prompt.clone()));
                 });
             }
+            EventBody::MessageDelta { text } => {
+                if let Some(part) = reply.push(&text) {
+                    reply_part(part);
+                }
+            }
             EventBody::Message { text } if !text.trim().is_empty() => {
                 let text = text.trim().to_string();
                 context_messages.push(build_assistant_message(&text));
+                // What streamed is in the log already; the whole reply is the job's last message.
+                let rest = if reply.streamed { reply.flush() } else { Some(text.clone()) };
+                reply = ReplyStream::default();
                 update_job(job_id, |state| {
+                    if let Some(rest) = rest.clone() {
+                        record_and_emit(state, "agent_job_message", Some(rest));
+                    }
                     state.record.last_message = Some(text.clone());
-                    record_and_emit(state, "agent_job_message", Some(text.clone()));
                 });
             }
             EventBody::ToolStarted { title, .. } => progress(format!("Tool: {}", strip_prefixes(&title, prefixes))),
@@ -2842,7 +2947,21 @@ fn drive_session(
                 let message = format!("{}: {answer} ({by})", title.unwrap_or_else(|| format!("Permission request {request}")));
                 record_and_emit(state, "agent_job_progress", Some(message));
             }),
-            EventBody::Usage(usage) => cost = usage.cost_usd.or(cost),
+            EventBody::Usage(usage) => {
+                if let Some(total) = usage.cost_usd {
+                    reported_cost = true;
+                    meter.report(total);
+                }
+                if let Some(budget) = budget.filter(|budget| meter.job > *budget) {
+                    let _ = block_on(session.cancel());
+                    let usage = crate::api_types::AgentJobUsage { cost_usd: meter.turn.take(), ..Default::default() };
+                    update_job(job_id, |state| state.record.usage.get_or_insert_with(Default::default).add(&usage));
+                    return RunEnd::Failed(format!(
+                        "The job cost ${:.2}, more than the profile's max_budget_usd of ${budget:.2}; LoTaR cancelled the agent's turn.",
+                        meter.job
+                    ));
+                }
+            }
             EventBody::Notice { text } => progress(text),
             EventBody::TurnFinished { stop_reason, usage } => {
                 let usage = crate::api_types::AgentJobUsage {
@@ -2852,7 +2971,7 @@ fn drive_session(
                     },
                     cached_input_tokens: usage.cached_input_tokens,
                     output_tokens: usage.output_tokens,
-                    cost_usd: usage.cost_usd.or(cost.take()),
+                    cost_usd: usage.cost_usd.or(meter.turn.take()),
                     turns: Some(1),
                     ..Default::default()
                 };
@@ -2884,16 +3003,20 @@ fn drive_session(
         if !ended {
             continue;
         }
+        if let Some(part) = reply.flush() {
+            reply_part(part);
+        }
+        reply = ReplyStream::default();
         turns += 1;
         update_job(job_id, |state| state.record.question = None);
         let idle = block_on(session.status()).is_ok_and(|status| status.turn.is_none() && status.queued == 0);
         if idle {
-            return RunEnd::Exited(Some(exit_code));
+            return finish(exit_code, reported_cost);
         }
         if turns >= MAX_TURNS {
             let _ = block_on(session.cancel());
             progress(format!("The job ran {MAX_TURNS} turns; the messages still queued stay on the ticket."));
-            return RunEnd::Exited(Some(exit_code));
+            return finish(exit_code, reported_cost);
         }
     }
 }
@@ -4018,6 +4141,36 @@ mod tests {
         let result = read_job_output(reader, &exited, Duration::from_millis(50), |_| thread::sleep(Duration::from_millis(1)));
         assert_eq!(result.map_err(|error| error.kind()), Err(std::io::ErrorKind::TimedOut));
         descendant.join().unwrap();
+    }
+
+    #[test]
+    fn a_streamed_reply_splits_at_paragraphs_outside_code_blocks() {
+        let mut reply = ReplyStream::default();
+        assert_eq!(reply.push("First "), None);
+        assert_eq!(reply.push("part.\n\n```sh\nls\n\n"), Some("First part.".to_string()));
+        assert_eq!(reply.push("pwd\n```\n\nLast"), Some("```sh\nls\n\npwd\n```".to_string()));
+        assert_eq!(reply.flush(), Some("Last".to_string()));
+        assert!(reply.streamed);
+    }
+
+    #[test]
+    fn a_job_costs_what_the_session_total_grew_by() {
+        let usage = |cost: f64| harnessmux::Event {
+            v: 1,
+            ts: String::new(),
+            session: "s".to_string(),
+            project: None,
+            seq: 1,
+            turn: None,
+            body: harnessmux::EventBody::Usage(harnessmux::Usage { cost_usd: Some(cost), ..Default::default() }),
+            raw: None,
+        };
+        let mut meter = CostMeter::after(&[usage(1.0)]);
+        meter.report(1.5);
+        assert_eq!((meter.job, meter.turn), (0.5, Some(0.5)));
+        // The agent process started again: its total starts over.
+        meter.report(0.25);
+        assert_eq!(meter.job, 0.75);
     }
 
     #[test]

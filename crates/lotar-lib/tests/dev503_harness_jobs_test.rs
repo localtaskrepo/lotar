@@ -16,13 +16,18 @@ use std::time::{Duration, Instant};
 /// `$FAKE_REPLY` and a turn number, after a tool call with `$FAKE_TOOL`. It logs every line it reads to `$FAKE_LOG`. `$FAKE_ASK` asks for permission first
 /// and says which option it got; `$FAKE_HOLD` (a file it creates) keeps the first prompt running until a cancel;
 /// `$FAKE_SLOW` sleeps that many seconds before it answers; `$FAKE_RUN` is a shell command it runs in the session's
-/// working directory before it answers.
+/// working directory before it answers. `$FAKE_PREFACE` is a reply chunk it sends as soon as a prompt arrives;
+/// `$FAKE_COST` the cost of each turn, reported as the session's total so far. It offers one config option,
+/// `reasoning_effort` (`high` or `ultra`).
 const FAKE_ACP_AGENT: &str = r#"#!/bin/sh
 turn=0
 pending=""
 respond() { printf '{"jsonrpc":"2.0","id":%s,"result":%s}\n' "$1" "$2"; }
 reply() {
   turn=$((turn + 1))
+  if [ -n "$FAKE_COST" ]; then
+    printf '{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"fake-1","update":{"sessionUpdate":"usage_update","used":10,"size":100,"cost":{"amount":%s,"currency":"USD"}}}}\n' "$(awk "BEGIN { print $turn * $FAKE_COST }")"
+  fi
   if [ -n "$FAKE_TOOL" ]; then
     printf '{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"fake-1","update":{"sessionUpdate":"tool_call","toolCallId":"t%s","title":"Read %s/notes.md","kind":"read","status":"pending"}}}\n' "$turn" "$cwd"
   fi
@@ -37,13 +42,18 @@ while IFS= read -r line; do
       respond "$id" '{"protocolVersion":1,"agentCapabilities":{"loadSession":true,"sessionCapabilities":{"resume":{}}},"agentInfo":{"name":"fake-acp","version":"1.0.0"},"authMethods":[]}' ;;
     *'"method":"session/new"'*)
       cwd=$(printf '%s' "$line" | sed -nE 's/.*"cwd":"([^"]*)".*/\1/p')
-      respond "$id" '{"sessionId":"fake-1"}' ;;
+      respond "$id" '{"sessionId":"fake-1","configOptions":[{"id":"reasoning_effort","name":"Reasoning","type":"select","currentValue":"high","options":[{"value":"high","name":"High"},{"value":"ultra","name":"Ultra"}]}]}' ;;
     *'"method":"session/resume"'*|*'"method":"session/load"'*)
       cwd=$(printf '%s' "$line" | sed -nE 's/.*"cwd":"([^"]*)".*/\1/p')
       respond "$id" '{}' ;;
+    *'"method":"session/set_config_option"'*)
+      respond "$id" '{"configOptions":[{"id":"reasoning_effort","name":"Reasoning","type":"select","currentValue":"high","options":[{"value":"high","name":"High"},{"value":"ultra","name":"Ultra"}]}]}' ;;
     *'"method":"session/cancel"'*)
       if [ -n "$pending" ]; then respond "$pending" '{"stopReason":"cancelled"}'; pending=""; fi ;;
     *'"method":"session/prompt"'*)
+      if [ -n "$FAKE_PREFACE" ]; then
+        printf '{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"fake-1","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"%s"}}}}\n' "$FAKE_PREFACE"
+      fi
       if [ -n "$FAKE_HOLD" ] && [ ! -f "$FAKE_HOLD" ]; then
         pending=$id
         touch "$FAKE_HOLD"
@@ -242,6 +252,63 @@ fn cancelling_a_job_cancels_its_sessions_turn() {
     assert_eq!(status(&job), "cancelled");
     wait_for("the job's end", || AgentJobService::job_settled(&job));
     let _ = std::fs::remove_file(&hold);
+}
+
+/// DEV-511: a reply shows in the job log while the agent writes it, not only when its turn ends.
+#[test]
+fn a_reply_streams_into_the_job_log_as_the_agent_writes_it() {
+    let hold = std::env::temp_dir().join(format!("lotar-dev511-hold-{}", std::process::id()));
+    let _ = std::fs::remove_file(&hold);
+    let held = harness("", &[("FAKE_PREFACE", "Looking at it.\\\\n\\\\n".into()), ("FAKE_HOLD", hold.to_string_lossy().to_string())]);
+    let job = held.start();
+    let messages =
+        |job: &str| AgentJobService::events_for(job).into_iter().filter(|e| e.kind == "agent_job_message").filter_map(|e| e.message).collect::<Vec<_>>();
+    wait_for("the first paragraph", || messages(&job) == ["Looking at it."]);
+    assert_eq!(status(&job), "running", "the turn is still running");
+    AgentJobService::cancel_job(&job).unwrap();
+    wait_for("the job's end", || AgentJobService::job_settled(&job));
+    let _ = std::fs::remove_file(&hold);
+    drop(held);
+
+    // A whole turn: the part before a tool streams, the rest comes with the end of the turn, nothing twice.
+    let harness = harness("", &[("FAKE_PREFACE", "Looking at it.".into()), ("FAKE_TOOL", "1".into())]);
+    let job = harness.start();
+    wait_for("the job's end", || status(&job) == "completed");
+    assert_eq!(messages(&job), ["Looking at it.", "Done 1"]);
+    assert_eq!(AgentJobService::get_job(&job).unwrap().last_message.as_deref(), Some("Looking at it.Done 1"), "the whole reply");
+}
+
+/// DEV-511: agents report the session's cost so far; the job's cost is what it added, and a job that passes the
+/// profile's max_budget_usd is cancelled.
+#[test]
+fn a_job_records_what_it_cost_and_stops_at_the_profiles_budget() {
+    let two_turns = harness("", &[("FAKE_COST", "0.25".into()), ("FAKE_SLOW", "1".into())]);
+    let job = two_turns.start();
+    wait_for("the first prompt", || two_turns.log().contains("\"method\":\"session/prompt\""));
+    AgentJobService::send_message(&job, "and the tests").expect("message accepted");
+    wait_for("the job's end", || status(&job) == "completed");
+    let usage = AgentJobService::get_job(&job).unwrap().usage.unwrap();
+    assert_eq!((usage.turns, usage.cost_usd), (Some(2), Some(0.5)), "two turns of 0.25, not the totals 0.25 + 0.5");
+    drop(two_turns);
+
+    let harness = harness("    max_budget_usd: 0.4\n", &[("FAKE_COST", "0.5".into())]);
+    let job = harness.start();
+    wait_for("the job's failure", || status(&job) == "failed");
+    let events = AgentJobService::events_for(&job);
+    assert!(events.iter().any(|e| e.message.as_deref().is_some_and(|m| m.contains("$0.50, more than the profile's max_budget_usd of $0.40"))), "{events:?}");
+}
+
+/// DEV-511: `options` sets the agent's own config options, such as an effort outside low..max.
+#[test]
+fn profile_options_set_the_agents_own_config_options() {
+    let ultra = harness("    options:\n      reasoning_effort: ultra\n", &[]);
+    ultra.run(&[]).success();
+    let log = ultra.log();
+    let set = log.lines().find(|line| line.contains("\"method\":\"session/set_config_option\"")).unwrap_or_else(|| panic!("{log}"));
+    assert!(set.contains("\"configId\":\"reasoning_effort\"") && set.contains("\"value\":\"ultra\""), "{set}");
+    drop(ultra);
+    let refused = harness("    options:\n      reasoning_effort: bogus\n", &[]);
+    refused.run(&[]).failure().stdout(predicate::str::contains("bogus is not a value"));
 }
 
 fn git(dir: &Path, args: &[&str]) {

@@ -49,6 +49,7 @@ CLI > env > project > home > global > defaults (commands without a project skip 
   - agents.<name>.permissions: `read-only` | `workspace` | `full` (default `workspace`) — what the agent may do without asking; see [Agent Jobs](./agent.md#permissions)
   - agents.<name>.on_permission: `deny` | `allow-reads` | `allow` | `ask` (default `allow-reads` for `read-only`, else `allow`) — what a job does when the agent asks for permission; `ask` shows the question in the job view. See [Messages and questions](./agent.md#messages-and-questions)
   - agents.<name>.model / effort: optional strings — the agent's model id, and effort `low` | `medium` | `high` | `xhigh` | `max` (any value for `command`); runs and automation actions can override them. See [Agent Jobs](./agent.md#model-and-effort)
+  - agents.<name>.options: map — the agent's own ACP config options, id to value (`harnessmux capabilities <agent>` lists them), for values outside `effort`'s such as `reasoning_effort: ultra`; not for `command`
   - agents.<name>.provider: optional string — `t3` runner only: the T3 Code provider instance (`claudeAgent`, `codex`, …) the model runs on; set it together with `model`. See [T3 Code threads](./agent.md#t3-code-threads)
   - agents.<name>.session: `new` | `continue` | `fresh` (default `new`) — `continue` runs the job as the next turn of the ticket's session of this profile; `new` and `fresh` start a new one. See [Sessions](./agent.md#sessions)
   - agents.<name>.tools.allowed / tools.disallowed, agents.<name>.mcp.allow: not passed (ACP agents take no tool lists); a job logs a note
@@ -57,7 +58,7 @@ CLI > env > project > home > global > defaults (commands without a project skip 
   - agents.<name>.env: map — extra environment variables for the agent
   - `agents` can be set as a whole with `lotar config set agents '<json or yaml map>'` (project or `--global`); names may use letters, digits, `-`, `_` and `.`, and each runner must be one of the runners in [Agent Jobs](./agent.md#runners).
   - agents.<name>.mcp.lotar: boolean (default false) — give the job LoTaR's own MCP server, limited to ticket tools (not for `amp`, `t3` or `command`)
-  - agents.<name>.max_budget_usd: number — not passed (harnessmux has no budget limit); a job logs a note
+  - agents.<name>.max_budget_usd: number — the job's turn is cancelled and the job fails once the cost the agent reports passes it. See [Usage and cost](./agent.md#usage-and-cost)
   - agents.<name>.instructions: string | { file: string } — added after `agent.instructions` (or the built-in instructions) for this profile
 - scan.signal_words: string[] (default: [TODO, FIXME, HACK, BUG, NOTE])
 - scan.ticket_patterns: string[] (regex patterns to detect ticket keys)

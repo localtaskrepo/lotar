@@ -204,6 +204,11 @@ pub fn lotar_mcp_server(lotar_bin: &str, tasks_dir: &std::path::Path) -> harness
 /// table (`agents.toml`), not from the profile.
 pub fn check_agent_profile(kind: AgentRunnerKind, profile: &AgentProfileDetail) -> LoTaRResult<()> {
     let Some(agent) = harness_agent(kind) else {
+        if !profile.options.is_empty() {
+            return Err(LoTaRError::ValidationError(
+                "The command runner takes no options: they are ACP config options of a harnessmux agent. Use env for a program of your own.".to_string(),
+            ));
+        }
         return Ok(());
     };
     if profile.command.is_some() || !profile.args.is_empty() {
@@ -212,19 +217,23 @@ pub fn check_agent_profile(kind: AgentRunnerKind, profile: &AgentProfileDetail) 
         )));
     }
     if let Some(effort) = profile.effort.as_deref() {
-        effort.parse::<harnessmux::Effort>().map_err(|err| LoTaRError::ValidationError(format!("Invalid agent effort: {err}")))?;
+        parse_effort(effort)?;
     }
     Ok(())
 }
 
+/// An agent's own effort values (Codex's `ultra`, Copilot's `minimal`) go in `options` under its effort option's id.
+fn parse_effort(effort: &str) -> LoTaRResult<harnessmux::Effort> {
+    effort.parse::<harnessmux::Effort>().map_err(|err| {
+        LoTaRError::ValidationError(format!(
+            "Invalid agent effort: {err}. Set a value of the agent's own in the profile's options, under the id `harnessmux capabilities <agent>` lists (for example reasoning_effort: ultra)."
+        ))
+    })
+}
+
 /// What a harnessmux session starts with, from a profile, plus notes on the settings it doesn't pass.
 pub fn session_profile(profile: &AgentProfileDetail, env: HashMap<String, String>) -> LoTaRResult<(harnessmux::Profile, Vec<String>)> {
-    let effort = profile
-        .effort
-        .as_deref()
-        .map(str::parse::<harnessmux::Effort>)
-        .transpose()
-        .map_err(|err| LoTaRError::ValidationError(format!("Invalid agent effort: {err}")))?;
+    let effort = profile.effort.as_deref().map(parse_effort).transpose()?;
     let permissions = match profile.permissions.unwrap_or_default() {
         AgentPermissions::ReadOnly => harnessmux::Permissions::ReadOnly,
         AgentPermissions::Workspace => harnessmux::Permissions::Workspace,
@@ -237,9 +246,6 @@ pub fn session_profile(profile: &AgentProfileDetail, env: HashMap<String, String
         AgentPermissionPolicy::Ask => harnessmux::PermissionPolicy::Ask,
     });
     let mut notes = Vec::new();
-    if profile.max_budget_usd.is_some() {
-        notes.push("The agent profile's max_budget_usd is not passed: harnessmux has no budget limit.".to_string());
-    }
     if profile.tools.as_ref().is_some_and(|tools| !tools.allowed.is_empty() || !tools.disallowed.is_empty()) {
         notes.push("The agent profile's tools are not passed: ACP agents take no tool lists; permissions and on_permission limit them.".to_string());
     }
@@ -254,6 +260,7 @@ pub fn session_profile(profile: &AgentProfileDetail, env: HashMap<String, String
         permissions,
         on_permission,
         env: session_env,
+        options: profile.options.clone(),
         provider: profile.provider.clone(),
         ..harnessmux::Profile::default()
     };
@@ -365,11 +372,16 @@ mod tests {
         let mut codex = profile("codex");
         codex.effort = Some("ultra".into());
         let err = check_agent_profile(AgentRunnerKind::Codex, &codex).unwrap_err().to_string();
-        assert!(err.contains("low, medium, high, xhigh, max"), "{err}");
+        assert!(err.contains("low, medium, high, xhigh, max") && err.contains("options"), "{err}");
+        codex.effort = None;
+        codex.options = BTreeMap::from([("reasoning_effort".to_string(), "ultra".to_string())]);
+        assert!(check_agent_profile(AgentRunnerKind::Codex, &codex).is_ok());
         let mut command = profile("command");
         command.command = Some("sh".into());
         command.effort = Some("whatever".into());
         assert!(check_agent_profile(AgentRunnerKind::Command, &command).is_ok());
+        command.options = BTreeMap::from([("mode".to_string(), "plan".to_string())]);
+        assert!(check_agent_profile(AgentRunnerKind::Command, &command).is_err());
     }
 
     #[test]
@@ -380,6 +392,8 @@ mod tests {
         detail.permissions = Some(AgentPermissions::ReadOnly);
         detail.on_permission = Some(AgentPermissionPolicy::Ask);
         detail.max_budget_usd = Some(2.0);
+        detail.options = BTreeMap::from([("reasoning_effort".to_string(), "ultra".to_string())]);
+        detail.tools = Some(crate::config::types::AgentToolsConfig { allowed: vec!["Read".into()], ..Default::default() });
         detail.env = BTreeMap::from([("A".to_string(), "1".to_string())]);
         let (session, notes) = session_profile(&detail, HashMap::from([("LOTAR_TICKET_ID".to_string(), "DEV-1".to_string())])).unwrap();
         assert_eq!(session.model.as_deref(), Some("sonnet"));
@@ -388,7 +402,8 @@ mod tests {
         assert_eq!(session.policy(), harnessmux::PermissionPolicy::Ask);
         assert_eq!(session.env["A"], "1");
         assert_eq!(session.env["LOTAR_TICKET_ID"], "DEV-1");
-        assert_eq!(notes.len(), 1, "{notes:?}");
+        assert_eq!(session.options["reasoning_effort"], "ultra");
+        assert_eq!(notes.len(), 1, "only the tools are dropped: {notes:?}");
     }
 
     #[test]

@@ -298,10 +298,15 @@ pub struct AgentProfileDetail {
     /// What the job does when the agent asks for permission.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub on_permission: Option<AgentPermissionPolicy>,
-    /// Not passed since DEV-503: harnessmux has no budget limit. The job log
-    /// says so.
+    /// The job's turn is cancelled and the job fails once the cost the agent
+    /// reports passes this (DEV-511).
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub max_budget_usd: Option<f64>,
+    /// The agent's own ACP config options, id to value (`harnessmux
+    /// capabilities <agent>` lists them), set after `model` and `effort`: for
+    /// values outside low..max such as Codex's `reasoning_effort: ultra`.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty", deserialize_with = "scalar_map")]
+    pub options: BTreeMap<String, String>,
     /// The program of a `command` runner; other runners refuse it.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub command: Option<String>,
@@ -316,6 +321,30 @@ pub struct AgentProfileDetail {
     pub mcp: Option<AgentMcpConfig>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub instructions: Option<AgentInstructionsConfig>,
+}
+
+/// A map whose values may be written as YAML scalars (`fast: true`, `level: 2`);
+/// they are kept as the strings ACP options take.
+fn scalar_map<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<BTreeMap<String, String>, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Scalar {
+        Text(String),
+        Flag(bool),
+        Number(serde_json::Number),
+    }
+    let map = BTreeMap::<String, Scalar>::deserialize(deserializer)?;
+    Ok(map
+        .into_iter()
+        .map(|(key, value)| {
+            let value = match value {
+                Scalar::Text(text) => text,
+                Scalar::Flag(flag) => flag.to_string(),
+                Scalar::Number(number) => number.to_string(),
+            };
+            (key, value)
+        })
+        .collect())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
