@@ -1359,6 +1359,63 @@ fn record_t3_worktree(job_id: &str, repo_root: &std::path::Path, before: &[std::
     }
 }
 
+/// Point the ticket's agent branch at the commit its thread ended on
+/// (DEV-468): T3 Code runs a thread on a branch of its own (`t3/<topic>`),
+/// and a later job that starts from the ticket's branch must read that
+/// thread's work, not an earlier job's.
+fn follow_thread_branch(job_id: &str, tasks_dir: &std::path::Path, ticket_id: &str, config: &ResolvedConfig) -> Result<(), String> {
+    if !config.agent_worktree.enabled {
+        return Ok(());
+    }
+    let thread_branch = JOB_REGISTRY.lock().ok().and_then(|registry| {
+        let record = &registry.jobs.get(job_id)?.record;
+        record.worktree_branch.clone().filter(|_| record.runner == AgentRunnerKind::T3.as_str() && record.worktree_path.is_some())
+    });
+    let (Some(thread_branch), Some(repo_root)) = (thread_branch, resolve_repo_root(tasks_dir)) else {
+        return Ok(());
+    };
+    let ticket_branch = build_worktree_branch(&config.agent_worktree.branch_prefix, &sanitize_worktree_token(ticket_id));
+    if thread_branch == ticket_branch {
+        return Ok(());
+    }
+    let moved = move_ticket_branch(&repo_root, &ticket_branch, &thread_branch)
+        .map_err(|err| format!("{ticket_branch} stays where it is, not at {thread_branch} of the T3 Code thread: {err}"))?;
+    if moved {
+        let note = format!("Pointed {ticket_branch} at {thread_branch}, where the T3 Code thread worked, so the ticket's next job starts from its work.");
+        update_job(job_id, |state| {
+            record_and_emit(state, "agent_job_progress", Some(note.clone()));
+        });
+    }
+    Ok(())
+}
+
+/// Move `ticket_branch` to the tip of `thread_branch`, or create it there.
+/// `Ok(false)` when it is there already; an error when it holds a commit
+/// the thread's branch lacks and the main checkout doesn't have, which
+/// moving it would drop.
+fn move_ticket_branch(repo_root: &std::path::Path, ticket_branch: &str, thread_branch: &str) -> Result<bool, String> {
+    let git_output = |args: &[&str]| -> Result<String, String> {
+        let output = git_command(repo_root).args(args).output().map_err(|err| format!("git {}: {err}", args.join(" ")))?;
+        if !output.status.success() {
+            return Err(format!("git {} failed: {}", args.join(" "), String::from_utf8_lossy(&output.stderr).trim()));
+        }
+        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    };
+    let tip = git_output(&["rev-parse", "--verify", &format!("refs/heads/{thread_branch}^{{commit}}")])?;
+    if branch_exists(repo_root, ticket_branch) {
+        let ticket_ref = format!("refs/heads/{ticket_branch}");
+        if git_output(&["rev-parse", &ticket_ref])? == tip {
+            return Ok(false);
+        }
+        let lacks = git_output(&["cherry", &tip, &ticket_ref])?.lines().any(|line| line.starts_with('+'));
+        if lacks && !branch_landed(repo_root, ticket_branch).unwrap_or(false) {
+            return Err(format!("it has commits that {thread_branch} lacks"));
+        }
+    }
+    git_output(&["branch", "--force", ticket_branch, &tip])?;
+    Ok(true)
+}
+
 /// Take over a job whose process exited before it ended (DEV-378): it runs
 /// in this process from now on, so its record, status and end rules work
 /// as if it had started here.
@@ -3366,6 +3423,19 @@ fn finalize_job(
     }
     if commit_failure.is_some() {
         success = false;
+    }
+    // After that commit, so the ticket's branch gets LoTaR's commit too. A
+    // branch that can't follow fails the job: automation must not hand the
+    // ticket on to a job that would read the stale branch.
+    if let Err(note) = follow_thread_branch(job_id, tasks_dir, ticket_id, config) {
+        if success {
+            commit_failure = Some(note);
+            success = false;
+        } else {
+            update_job(job_id, |state| {
+                record_and_emit(state, "agent_job_progress", Some(note.clone()));
+            });
+        }
     }
     // A merge job must end with its branch in the main checkout; LoTaR
     // fast-forwards when the agent couldn't, and fails the job otherwise so

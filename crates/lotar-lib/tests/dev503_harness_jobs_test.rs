@@ -424,3 +424,113 @@ fn a_ticket_hands_its_context_from_harness_to_harness_through_its_states() {
     assert!(merge[0].contains("-PIPE-1-review (codex agent"), "and the review session: {}", merge[0]);
     assert!(root.join("fix.txt").is_file(), "the fix reached main");
 }
+
+/// `t3` as T3 Code's CLI: `thread start` runs each thread in a new worktree on a branch of its own (`t3/topic-<n>`),
+/// made from the `--worktree` base, runs `$FAKE_RUN` there and logs `<base> <branch> <commit it started from>` to
+/// `$FAKE_LOG`. `thread show` answers with an empty thread.
+const FAKE_T3: &str = r#"#!/bin/sh
+[ "$1 $2" = "thread start" ] || { echo '{}'; exit 0; }
+base=""
+while [ $# -gt 0 ]; do
+  if [ "$1" = "--worktree" ]; then base=$2; shift; fi
+  shift
+done
+cat > /dev/null
+mkdir -p "$FAKE_TREES"
+n=$(ls "$FAKE_TREES" | wc -l | tr -d ' ')
+tree="$FAKE_TREES/$n"
+git worktree add -q -b "t3/topic-$n" "$tree" "$base" || exit 1
+printf '%s t3/topic-%s %s\n' "$base" "$n" "$(git -C "$tree" rev-parse HEAD)" >> "$FAKE_LOG"
+(cd "$tree" && sh -c "$FAKE_RUN") >/dev/null 2>&1
+echo "Thread thread-$n" >&2
+echo "Done in thread $n"
+"#;
+
+/// A repository whose TEST project runs the profiles `fix`, `rework` and `review` as fake T3 Code threads in worktrees.
+fn t3_harness(rework_run: &str) -> (TestFixtures, Vec<EnvVarGuard>) {
+    crate::common::require_git();
+    let fixtures = TestFixtures::new();
+    let root = fixtures.get_temp_path().to_path_buf();
+    let t3 = root.join("fake-t3.sh");
+    std::fs::write(&t3, FAKE_T3).unwrap();
+    std::fs::set_permissions(&t3, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let home = root.join("harnessmux");
+    std::fs::create_dir_all(home.join("config")).unwrap();
+    std::fs::write(home.join("config/agents.toml"), format!("[agents.t3]\ncommand = [\"{}\"]\n", t3.display())).unwrap();
+    let profile = |name: &str, run: &str| {
+        format!(
+            "  {name}:\n    runner: t3\n    env:\n      FAKE_LOG: \"{}\"\n      FAKE_TREES: \"{}\"\n      FAKE_RUN: \"{run}\"\n",
+            root.join("t3.log").display(),
+            root.join("t3-trees").display()
+        )
+    };
+    fixtures.create_config_in_dir(
+        &fixtures.tasks_root,
+        &format!(
+            "default:\n  project: TEST\nagent:\n  worktree:\n    enabled: true\nagents:\n{}{}{}",
+            profile("fix", "echo fix > fix.txt && git add fix.txt && git commit -qm TEST-1-fix"),
+            profile("rework", rework_run),
+            profile("review", ""),
+        ),
+    );
+    TaskService::create(&mut fixtures.create_storage(), TaskCreate { title: "Rework".into(), project: Some("TEST".into()), ..Default::default() }).unwrap();
+    git(&root, &["init", "-q", "-b", "main"]);
+    git(&root, &["config", "user.name", "Rework"]);
+    git(&root, &["config", "user.email", "rework@example.invalid"]);
+    git(&root, &["config", "commit.gpgsign", "false"]);
+    git(&root, &["add", "."]);
+    git(&root, &["commit", "-qm", "init"]);
+    let guards = vec![
+        EnvVarGuard::set("HARNESSMUX_HOME", home.to_string_lossy().as_ref()),
+        EnvVarGuard::set("LOTAR_TASKS_DIR", fixtures.tasks_root.to_string_lossy().as_ref()),
+        EnvVarGuard::set("LOTAR_TEST_SILENT", "1"),
+    ];
+    (fixtures, guards)
+}
+
+fn run_t3(fixtures: &TestFixtures, profile: &str) -> assert_cmd::assert::Assert {
+    let mut cmd = crate::common::lotar_cmd().unwrap();
+    cmd.current_dir(fixtures.get_temp_path()).args(["agent", "run", "TEST-1", "Work on it", "--agent", profile, "--wait"]);
+    cmd.assert()
+}
+
+fn rev(dir: &Path, rev: &str) -> String {
+    let output = std::process::Command::new("git").args(["rev-parse", rev]).current_dir(dir).output().unwrap();
+    String::from_utf8_lossy(&output.stdout).trim().to_string()
+}
+
+/// DEV-468: T3 Code runs each thread on a branch of its own, so a rework thread's commits (here LoTaR's commit of
+/// what the rework left uncommitted) missed `agent/TEST-1`, and the next `session: fresh` review read the first fix.
+/// Each thread's branch now becomes the ticket's branch when its job ends.
+#[test]
+fn every_t3_thread_of_a_ticket_ends_on_and_starts_from_the_tickets_branch() {
+    let (fixtures, _env) = t3_harness("echo rework > rework.txt");
+    let root = fixtures.get_temp_path();
+    run_t3(&fixtures, "fix").success();
+    assert_eq!(rev(root, "agent/TEST-1"), rev(root, "t3/topic-0"), "the fix thread's commit is on the ticket's branch");
+    run_t3(&fixtures, "rework").success();
+    let rework = rev(root, "t3/topic-1");
+    assert_eq!(rev(root, "agent/TEST-1"), rework, "so is LoTaR's commit of the rework");
+    let tree = root.join("t3-trees/1");
+    assert!(tree.join("rework.txt").is_file() && rev(&tree, "HEAD~1") == rev(root, "t3/topic-0"), "the rework was committed on the fix");
+    run_t3(&fixtures, "review").success();
+    let log = std::fs::read_to_string(root.join("t3.log")).unwrap();
+    let review = log.lines().nth(2).unwrap_or_default();
+    assert_eq!(review, format!("agent/TEST-1 t3/topic-2 {rework}"), "the fresh review starts from the rework: {log}");
+}
+
+/// A ticket branch that can't follow its thread (here it is checked out in the main checkout) fails the job and stays
+/// where it was, so automation doesn't hand the ticket to a job that would read it.
+#[test]
+fn a_ticket_branch_that_cannot_follow_its_thread_fails_the_job() {
+    let (fixtures, _env) = t3_harness("echo rework > rework.txt && git add rework.txt && git commit -qm TEST-1-rework");
+    let root = fixtures.get_temp_path();
+    run_t3(&fixtures, "fix").success();
+    let fix = rev(root, "agent/TEST-1");
+    git(root, &["checkout", "-q", "agent/TEST-1"]);
+    run_t3(&fixtures, "rework")
+        .failure()
+        .stdout(predicate::str::contains("agent/TEST-1 stays where it is, not at t3/topic-1 of the T3 Code thread: git branch --force"));
+    assert_eq!(rev(root, "agent/TEST-1"), fix, "the ticket's branch is unchanged");
+    assert_ne!(rev(root, "t3/topic-1"), fix, "the rework stays on its thread's branch");
+}
