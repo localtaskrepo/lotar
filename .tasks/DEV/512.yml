@@ -1,15 +1,14 @@
 title: Per-profile agent command and fuller usage for harnessmux jobs
-status: Blocked
+status: Reviewing
 priority: Low
 type: Feature
 reporter: claude
-assignee: claude
+assignee: '@review'
 created: 2026-11-14T02:19:59.564652+00:00
-modified: 2026-11-14T06:31:19.267338+00:00
+modified: 2026-11-14T08:04:20.975976+00:00
 relationships:
   depends_on:
   - DEV-503
-  - DEV-510
   blocks:
   - DEV-513
   related:
@@ -17,6 +16,7 @@ relationships:
   - DEV-513
   - DEV-510
   - DEV-509
+  - DEV-511
 comments:
 - date: 2026-11-14T05:51:55.474946+00:00
   author: claude
@@ -39,6 +39,9 @@ comments:
     Checks, run against the local harnessmux through a temporary [patch] that is not in the commit: harnessmux fmt, clippy -D warnings, nextest 28/28 and cargo deny pass. lotar: npm run lint:agent, npm run test:agent (2147 Rust, 1536 UI, release, hooks) and npm run test:smoke:agent (400) pass. The new tests are a_profile_command_starts_the_agent_with_its_args (a real job whose profile command starts the fake ACP agent with the args; on main it was refused), with_profile_command and AgentTable::insert unit tests.
 
     Next: DEV-510's release merges harnessmux agent/DEV-512 together with the other branches. After v0.1.2 is on crates.io, run cargo update -p harnessmux in lotar, amend f106a97a and run lint, test and smoke. Then this ticket is done.
+- date: 2026-11-14T08:04:20.624138+00:00
+  author: claude
+  text: 'harnessmux 0.1.2 is on crates.io (the DEV-509 agent released it with the owner''s OK; my commit 4032a34 is in it as ae24067). lotar: ran cargo update -p harnessmux (Cargo.lock 0.1.1 -> 0.1.2) and amended the commit. Main had moved on (DEV-511 c9a95f9a and others), and four files conflicted: config/types.rs, agent_job_service.rs, agent_runner.rs and docs/help/agent.md. I rebased agent/DEV-512 onto main and resolved them, keeping both: DEV-511''s budget for a taken-over job and the options refusal for the command runner, plus the profile command, and in agent.md DEV-511''s cost text together with the usage note. The commit is now d5b47964 on agent/DEV-512, signed, one commit on top of main. Checks with the published 0.1.2 and no local patch, on the rebased branch: npm run lint:agent, npm run test:agent (2161 Rust, 1537 UI, release 50, hooks 7) and npm run test:smoke:agent (401) all pass. Removed the dependency on DEV-510, which I had added only for the release. Ready for review and merge.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa15afbd8-214b-4ebf-9146-4dbc45d5bd47
 releases:
@@ -168,3 +171,31 @@ history:
   - field: status
     old: HelpNeeded
     new: Blocked
+- at: 2026-11-14T08:04:20.357535+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503","DEV-510"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-510","DEV-509"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-510","DEV-509"]}'
+- at: 2026-11-14T08:04:20.624138+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T08:04:20.737521+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-510","DEV-509"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-510","DEV-509","DEV-511"]}'
+- at: 2026-11-14T08:04:20.922502+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: Reviewing
+- at: 2026-11-14T08:04:20.975976+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: claude
+    new: '@review'

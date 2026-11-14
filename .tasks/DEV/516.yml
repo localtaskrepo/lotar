@@ -1,11 +1,11 @@
 title: Agent jobs recover from sandbox-blocked build checks without premature handback
-status: Reviewing
+status: HelpNeeded
 priority: High
 type: Bug
 reporter: codex
-assignee: '@review'
+assignee: mallox
 created: 2026-11-14T04:57:22.931962+00:00
-modified: 2026-11-14T07:32:19.213815+00:00
+modified: 2026-11-14T07:53:00.403984+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -25,9 +25,16 @@ comments:
 - date: 2026-11-14T07:32:07.638155+00:00
   author: claude
   text: 'Rework: commit 6b02690c (amended, signed). Finding 1 (test checks wording only): fixed with behavioral tests in agent_automation_integration_test.rs. A stub merge agent''s check fails like a sandboxed sccache (''Operation not permitted'') unless RUSTC_WRAPPER= is set; it retries only when the prompt carries the new guidance. merge_job_retries_a_sandbox_blocked_check_and_lands: retry passes, LoTaR fast-forwards, ticket Done. merge_job_whose_check_fails_on_the_work_does_not_land: the check fails on the work after the retry, the agent hands back; this test FAILED before the fix, because finalize_job fast-forwarded main for any merge job that exited 0, so a genuine check failure still merged. Fix in ensure_branch_merged: when rules move the ticket at job end and the merge agent changed its status or assignee anyway (directly, or as a recorded T3 outcome), LoTaR leaves the branch unmerged and logs it. merge_agent_that_sets_a_status_without_end_rules_still_lands covers the other side: without end rules the agent is told to set a status itself, so that doesn''t stop the fast-forward. docs/help/agent.md describes it. Finding 2 (live mux run): done, in an isolated scratch repo (tiny Rust crate, sccache as rustc-wrapper as on this machine, HARNESSMUX_HOME and queue in scratch), lotar built from this branch (its binary carries the new prompt section), codex runner via harnessmux (codex-acp 2.6.0), permissions workspace. Fix job: cargo clippy/test hit ''sccache: Operation not permitted'', passed on the approved retry outside the sandbox; git index.lock was blocked and its approved retry committed. Review job: cargo test passed; clippy''s approved retry still hit sccache, RUSTC_WRAPPER= cargo clippy passed. Merge job: cargo test and its approved retry hit sccache, RUSTC_WRAPPER= cargo test passed; ff of main was blocked at ORIG_HEAD.lock, the approved retry landed f3c5e56 on main. Approvals are per command (harnessmux''s default allow policy for workspace), no full-access mode. Not run live: the t3 runner path this repo''s profiles use (its approvals are T3 Code''s). Checks: npm run lint, npm test (2150 Rust + 1536 UI), npm run smoke (400) pass. Filed DEV-531 (related): agents with the job''s environment (harnessmux, command runner) bypass the DEV-320 running-job guard on status/assignee.'
+- date: 2026-11-14T07:52:52.202436+00:00
+  author: codex
+  text: 'Review: blocking. agent_job_service.rs:2297-2301,3068-3077 skips handback protection without end rules: genuine failed-check HelpNeeded handbacks can still fast-forward. Distinguish failed handback from successful status-setting independently of end rules and add regression coverage. agent_automation_integration_test.rs:2341,2412 inherits RUSTC_WRAPPER: RUSTC_WRAPPER= npm run test:rust -- merge_job_ compiled but retry-and-lands test failed all 3 attempts (empty log versus expected retry); initialize simulated wrapper explicitly. Five tests cancelled. Read full diff, ticket/comments, related 503/509/531/320/513, guidance and main history; diff --check passed. Full lint/UI/smoke and live mux not repeated. No files or commits changed. Second blocking review requires owner attention; status/assignee unchanged.'
+- date: 2026-11-14T07:53:00.403984+00:00
+  author: automation
+  text: The review found blocking problems again after one rework (the comments above). Should an agent rework it once more (lotar assignee DEV-516 @fix), will you decide the findings, or is it WontDo?
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af501c0c4-15b4-4f82-8d97-681b0bda889e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A87b62941-631a-4782-ae16-737469e6ebf9
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adae38dd0-cb48-4704-a861-5ec090a7d16f
 releases:
 - 6
 description: 'Owner requested before v0.15.1 release, 2026-11-14. Repeated DEV-503 runs stopped because sccache was denied by the Codex sandbox; shared Git metadata and main task storage also need scoped access. Latest merge handed back immediately after lint hit sccache despite documented approved retry and RUSTC_WRAPPER fallback. Investigate harnessmux permission plumbing and job instructions together; coordinate with DEV-509. Done when: regression coverage exercises permission-blocked checks and supported retries; sandboxed Codex jobs complete Rust checks through approved cache access or wrapper fallback; shared Git metadata and main tasks use scoped approval or host-side operations; genuine check failures still stop merge; verify end-to-end fix/review/merge with mux. Preserve workspace isolation, no broad full-access default. Add to v0.15.1 and make its release ticket depend on this fix.'
@@ -129,3 +136,34 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-14T07:49:42.203008+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adae38dd0-cb48-4704-a861-5ec090a7d16f
+- at: 2026-11-14T07:52:52.202436+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T07:52:54.469218+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: review-returned
+    new: review-returned, review-blocked
+- at: 2026-11-14T07:53:00.364211+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+  - field: tags
+    old: review-returned, review-blocked
+    new: review-returned
+- at: 2026-11-14T07:53:00.403984+00:00
+  actor: automation
+  changes:
+  - field: comment_added

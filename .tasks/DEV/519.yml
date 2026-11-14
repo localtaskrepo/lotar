@@ -1,11 +1,11 @@
 title: Remove the gitleaks allowlist for the deleted agent-stream fixtures
-status: Merging
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T05:32:15.085430+00:00
-modified: 2026-11-14T07:31:49.289751+00:00
+modified: 2026-11-14T07:43:44.253243+00:00
 relationships:
   related:
   - DEV-503
@@ -36,6 +36,9 @@ comments:
 - date: 2026-11-14T07:19:24.132488+00:00
   author: codex
   text: 'Review: passed. Reviewed commit e18c0c31 and full diff, ticket context, related tickets, scanner hook and main history. Only obsolete allowlist/comment removed; fixtures absent. Current-file secret scan passes; main..HEAD scan passes (zero bytes); git diff --check passes. Main already contains identical change as 43f6e1e. No findings or new tickets. Application lint/tests/smoke not rerun for scanner-only chore. Files, commits, status and assignee unchanged. No durable guidance finding.'
+- date: 2026-11-14T07:43:37.790906+00:00
+  author: codex
+  text: 'nothing to merge: git log main..HEAD is empty. This checkout HEAD 43f6e1e27cade9138603bc789f964bd4ddc30fc5 is already contained in main (now 6a6d98ff). No files changed, checks rerun, commits made or push attempted; stopped at merge step 1 as instructed.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Addae2e08-0406-4b73-963c-df5b714b6d37
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6e4cc558-a513-4913-bc71-9ea23db8472c
@@ -183,3 +186,13 @@ history:
   - field: relationships
     old: '{"related":["DEV-503","DEV-518","DEV-527","DEV-508","DEV-514"]}'
     new: '{"related":["DEV-503","DEV-518","DEV-527","DEV-508","DEV-514","DEV-501"]}'
+- at: 2026-11-14T07:43:37.790906+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T07:43:44.253243+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done

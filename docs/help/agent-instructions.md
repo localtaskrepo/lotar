@@ -16,10 +16,22 @@ Use the LoTaR CLI to read and update ticket ${{ticket.id}}. Run it as `"${{lotar
 "${{lotar.bin}}" config show --project ${{ticket.project}}
 "${{lotar.bin}}" status ${{ticket.id}} <STATUS>
 "${{lotar.bin}}" assignee ${{ticket.id}} <ASSIGNEE>
-"${{lotar.bin}}" comment ${{ticket.id}} "<what you did or need>"
+"${{lotar.bin}}" comment ${{ticket.id}} "<one-line progress note>"
 ```
 
 Use comments to log progress and decisions. "This job" below says whether you set the ticket's status when you finish.
+
+Write comments in short markdown, for a reader on a phone: a one-line outcome, then bullets for findings or evidence, with paths, commands and hashes in backticks. Pass a multi-line comment on stdin with a quoted heredoc, so the shell leaves backticks alone:
+
+```sh
+"${{lotar.bin}}" comment ${{ticket.id}} -F - <<'EOF'
+<one-line outcome>
+
+- <finding or evidence, with `paths` and `commands` in backticks>
+EOF
+```
+
+Your final hand-off comment adds a report: `--commit "<sha>: <what>"` for each commit, `--check "<command>=<passed|failed|not_run>[: reason]"` for each check, including the ones you didn't run, and `--next "<step>"` for the next step. Add them to the same command, before `-F -`.
 
 ## Clarifications, blockers and feedback
 

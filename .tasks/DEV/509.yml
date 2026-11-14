@@ -1,11 +1,11 @@
 title: Restore Claude's sandbox at workspace level and add rule-based answers to permission requests
-status: HelpNeeded
+status: Reviewing
 priority: High
 type: Feature
 reporter: claude
-assignee: claude
+assignee: '@review'
 created: 2026-11-14T02:15:26.078753+00:00
-modified: 2026-11-14T07:32:48.035933+00:00
+modified: 2026-11-14T07:49:19.466256+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -65,6 +65,9 @@ comments:
 - date: 2026-11-14T07:32:48.035933+00:00
   author: automation
   text: 'The T3 Code thread waits for an answer: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5d7c2709-cbbd-4287-9947-7c4d01114643'
+- date: 2026-11-14T07:48:58.156750+00:00
+  author: claude
+  text: 'Acted on triage (INBOX-119) after mallox''s OK in my session via the options picker, 2026-11-14: ''Yes, push and tag''. harnessmux: main fast-forwarded 08c1ff6..ae24067 (DEV-510, DEV-509 5811028, DEV-503 notes ebb191f, DEV-512 ae24067) and pushed. Signed tag v0.1.2 pushed. Every job of Release run 43571745508 succeeded (ci, 6 builds, release, publish); crates.io lists 0.1.2. Review finding fixed: cargo update -p harnessmux moves Cargo.lock to 0.1.2, so it matches Cargo.toml. Amended lotar commit: 1e1cbced on agent/DEV-509 (was 3329963e). Checks without any local patch: npm run lint:agent, npm test (2147 Rust, 1536 UI, release, hooks) and npm run smoke (400) pass. Told the DEV-510 and DEV-512 threads to update their lockfiles.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A04489e72-8f3b-4408-aa34-7819ce8de78b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa6d60779-49e6-493f-bc37-9f889203e4ec
@@ -355,3 +358,16 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-14T07:48:58.156750+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T07:49:19.466256+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Reviewing
+  - field: assignee
+    old: claude
+    new: '@review'

@@ -1,11 +1,11 @@
 title: 'Task panel stays on ''Loading task…'' while git hangs: the server''s git calls have no timeout'
-status: Merging
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-13T10:33:22.263037+00:00
-modified: 2026-11-14T07:18:27.013941+00:00
+modified: 2026-11-14T08:06:55.655002+00:00
 relationships:
   blocks:
   - DEV-513
@@ -137,6 +137,20 @@ comments:
     - This is a focused code inspection, **not full review approval**. UI screenshot verification, full gates and live shim reproduction remain unverified by me.
 
     No new blocking code finding, no replacement fix agent, no owner question, and no status or assignee change. Keep the completed commit as the review target. Do not interpret this coordination/verification-limit comment as a failed review or trigger another implementation round. The active reviewer needs writable build access to finish verification before the merge agent proceeds.
+- date: 2026-11-14T07:41:10.067980+00:00
+  author: automation
+  text: The merge agent's job job-20261114T074017.590Z-78 failed (lotar agent logs job-20261114T074017.590Z-78); the fix agent retries it on branch t3/task-panel-git-timeout-review.
+- date: 2026-11-14T07:42:53.496472+00:00
+  author: codex
+  text: |-
+    ## Merge blocked: completed fix absent from assigned branch
+
+    The assigned branch t3/task-panel-git-timeout-review is clean at 03db11a4. Its commits beyond main are 35883139 and 03db11a4; completed rework 896309c0 is not an ancestor of HEAD. Merging this branch would land the intermediate implementation with the known inherited-pipe hang.
+
+    Please restore completed commit 896309c0 to the job branch and obtain its pending review before retrying the merge. No rebase, merge, push, source edits or checks performed. This is a checkout/handoff blocker, not a new blocking review of 896309c0.
+- date: 2026-11-14T07:43:11.562410+00:00
+  author: automation
+  text: The fix agent's job job-20261114T074228.393Z-80 failed (lotar agent logs job-20261114T074228.393Z-80); @fix-codex retries it on branch t3/task-panel-git-timeout-review.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad8d79e8d-6688-4da4-a3a5-516b2d4c3b76
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afcbae329-3a86-478f-818f-b3877e1b72d7
@@ -146,6 +160,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa299dba-86ab-42ec-a04a-87cfbe2640f7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A089483d8-08d8-4608-aec1-944e859ac6b6
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aac522e67-2e35-4b84-84de-ec60aeed2746
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A60a527cf-ce89-46a4-bc73-69d319930972
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A188f347f-efb3-4a7f-8d1d-05dcb917bae5
 releases:
 - 6
 description: |-
@@ -157,6 +173,8 @@ description: |-
 tags:
 - health
 - review-returned
+- merge-retried
+- fix-retried
 custom_fields:
   finding: hang:task-history-git
 history:
@@ -616,3 +634,55 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-14T07:40:22.339169+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A60a527cf-ce89-46a4-bc73-69d319930972
+- at: 2026-11-14T07:41:09.782685+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@merge'
+    new: '@fix'
+  - field: tags
+    old: health, review-returned
+    new: health, review-returned, merge-retried
+- at: 2026-11-14T07:41:10.067980+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-14T07:42:29.639646+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: InProgress
+- at: 2026-11-14T07:42:53.496472+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T07:43:11.476283+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: health, review-returned, merge-retried
+    new: health, review-returned, merge-retried, fix-retried
+- at: 2026-11-14T07:43:11.562410+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-14T07:43:11.814212+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-14T08:06:55.655002+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A188f347f-efb3-4a7f-8d1d-05dcb917bae5

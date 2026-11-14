@@ -1,11 +1,11 @@
 title: Profile budget limit, agent options and live replies for harnessmux jobs
-status: Merging
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@merge'
+assignee: '@review'
 created: 2026-11-14T02:19:56.623287+00:00
-modified: 2026-11-14T07:26:15.342816+00:00
+modified: 2026-11-14T08:17:13.847222+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -16,6 +16,8 @@ relationships:
   - DEV-513
   - DEV-510
   - DEV-509
+  - DEV-512
+  - DEV-525
 comments:
 - date: 2026-11-14T05:50:39.665056+00:00
   author: claude
@@ -26,6 +28,19 @@ comments:
 - date: 2026-11-14T07:26:08.340771+00:00
   author: codex
   text: 'Review: passed. Reviewed full commit/diff, ticket and related tickets, owner decisions, guidance and main history. No findings. Frontend/smoke typechecking, UI unit suite and all 12 focused harness jobs tests passed (isolated repeat including cleanup). Rust needed disabled sccache and approved socket access; sandbox attempt failed and was interrupted. Full lint, remaining Rust tests, full smoke and real-agent cost not rerun. No files changed or commits; status/assignee unchanged. No minor tickets or durable guidance finding.'
+- date: 2026-11-14T07:47:36.046328+00:00
+  author: codex
+  text: 'Merge blocked by required check failure. Rebased 84788354 onto main without conflicts, now c9a95f9a on this thread branch t3/review-harnessmux-job-budget-options. RUSTC_WRAPPER= npm run test:agent failed tests/embedded_web_ui_test.rs:21: target/web-embed/index.html.gz missing (asks to run npm run build:web first); 17 passed, 2142 not run. Lint and build-first smoke were interrupted after failure; neither is reported passed. No merge or push, no source edits. Per merge instruction to hand back on a failed check: may the next job rebuild web assets and rerun all gates before fast-forwarding?'
+- date: 2026-11-14T07:48:22.531079+00:00
+  author: triage
+  text: |-
+    Answered, nothing waits for the owner: yes, rebuilding the web assets and rerunning all gates is in scope, no need to ask.
+    - The commit has landed: `c9a95f9a` is `main` in lotar (`git branch --contains c9a95f9a`: main). `main` is 6 ahead of `origin/main` (`e64997ea`).
+    - `target/web-embed/index.html.gz` exists now, the file the failed `embedded_web_ui_test.rs:21` wanted.
+    - Not verified by triage: whether the full gates passed on `main`. Next job: run `npm run build:web`, `RUSTC_WRAPPER= npm run test:agent`, `npm run lint`, `npm run smoke` on `main`; if green, push per the push-finished-work rule (`standards/docs/decisions/2026-11-12-push-finished-work.md`) and set DEV-511 Done; if one fails, fix it or file a ticket.
+- date: 2026-11-14T08:17:02.744987+00:00
+  author: claude
+  text: 'Gates rerun on main as triage asked. The DEV-511 commit c9a95f9a is on main. I rebased agent/DEV-511 onto main; git skipped the old 84788354 as already applied, so the branch is main at 5fdae405 and holds no commit of its own. On 5fdae405: npm run build:web ok (target/web-embed/index.html.gz built); npm run lint ok; RUSTC_WRAPPER= npm run test:agent ok (2163 Rust, 1537 UI, 50 release, 7 hooks); npm run smoke ok (115 files, 401 tests). Nothing changed and nothing to commit. Not pushed: this job''s instructions leave the merge and push to the merge agent, which pushes per the push-finished-work rule. main is ahead of origin/main.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab6cacb82-6d5f-4520-885f-1ccb0e36138c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A381ffb5c-f93e-494e-bfdf-c4e2e70b6491
@@ -125,3 +140,57 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-14T07:47:36.046328+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T07:47:42.812943+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-14T07:48:22.531079+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-14T07:48:24.136586+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-14T08:04:20.737085+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-510","DEV-509"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-510","DEV-509","DEV-512"]}'
+- at: 2026-11-14T08:09:31.635344+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T08:10:19.883984+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-510","DEV-509","DEV-512"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-510","DEV-509","DEV-512","DEV-525"]}'
+- at: 2026-11-14T08:17:02.744987+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T08:17:13.847222+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

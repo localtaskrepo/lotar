@@ -1,11 +1,11 @@
 title: The owner's comment on DEV-514 set @fix but started no job and said nothing
-status: Reviewing
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-14T06:27:26.992238+00:00
-modified: 2026-11-14T07:39:00.444513+00:00
+modified: 2026-11-14T08:10:20.230028+00:00
 relationships:
   related:
   - DEV-514
@@ -13,10 +13,25 @@ relationships:
   - DEV-466
   - DEV-508
   - DEV-518
+  - DEV-468
+  - DEV-511
 comments:
 - date: 2026-11-14T07:14:23.462133+00:00
   author: claude
   text: 'Fixed in 99535969 on agent/DEV-525. Cause: the comment''s job was not lost. The server created job-20261114T061406.149Z-6 at 06:14:06 and kept it in its in-memory queue behind agent.worktree.max_parallel_jobs (2 in DEV). That job has no log until it starts (its header says 06:32:11, when it ran) and lotar agent queue doesn''t list it (it lists only the queue file of lotar processes outside the server). DEV-508 and DEV-466 came through the CLI''s file queue, which is why they showed up there. The branch having landed was not the cause. Fix: tell_agent now comments on the ticket when the agent doesn''t get the message now: ''Automation rule <name> told no agent on <ID> yet. Agent job <id> is queued: it waits for a free slot: N jobs run, agent.worktree.max_parallel_jobs is M.'' The same comment covers waiting for the other merge job, another job on the ticket still waiting to start, prerequisites, max_iterations, and a start error (the rule still fails as before). New AgentJobService::waiting_reason; docs/help/automation.md (Telling the ticket''s agent) explains it. Test: agent_automation_integration_test::tell_agent_says_on_the_ticket_when_its_job_waits_for_a_slot, which failed before the fix and passes now. Checks: npm run lint clean; npm run test:agent (the npm test suites) 2151 Rust, 1537 UI, 50 release and 7 hooks tests passed; npm run smoke 401/401 passed. Not covered: a plain assignment to an agent that has to wait (not through tell_agent) still says nothing on the ticket.'
+- date: 2026-11-14T07:42:21.412282+00:00
+  author: codex
+  text: 'Review: passed. Reviewed sole commit 99535969 and all four files, ticket/comments, five related tickets, repository guidance, recent main history and queue/comment paths. No findings; no UI changes; docs/decisions absent. diff --check passed. Focused tell_agent tests passed 2/2 with RUSTC_WRAPPER= after sccache sandbox denial; runner exited 1 afterward for macOS xcrun_db temp residue. Full lint/test/smoke not rerun; prior passes and pre-fix regression failure recorded by implementer. No files, commits, status or assignee changed. No durable guidance finding.'
+- date: 2026-11-14T08:09:11.193113+00:00
+  author: codex
+  text: 'Merge blocked: rebased 99535969 onto main as 5fdae405; worktree clean, no merge or push. lint:agent passed. test:agent failed because target/web-embed/index.html.gz was missing (I started tests alongside the smoke build); Rust runner also reported xcrun_db residue, later suites not reached. Smoke finished with failures and temp leftovers under this sandbox. Logs: /tmp/dev525-merge-lint.log, /tmp/dev525-merge-test.log, /tmp/dev525-merge-smoke.log. May verification and merge resume with the web build completed and localhost binding permitted?'
+- date: 2026-11-14T08:10:19.750438+00:00
+  author: triage
+  text: |-
+    Already landed: the merge question is moot, finish the checks.
+    - `main` fast-forwarded to `5fdae405` (the rebased `99535969`) at 2026-11-14 08:09:29Z (`git reflog`: `merge t3/owner-comment-silent-no-job: Fast-forward`), the same second this ticket went to HelpNeeded. Not pushed yet (main is ahead of origin).
+    - Checks on the rebased commit: `lint:agent` passed. `test:agent` and `npm run smoke` never ran clean (sandbox: missing web build, no localhost, xcrun_db residue). The earlier full pass (lint, 2151 Rust, 1537 UI, smoke 401/401) was on `99535969`, before the rebase onto DEV-468, DEV-511 and DEV-522.
+    - Next: outside the blocked sandbox, build the web embed first, then run `npm run test:agent` and `npm run smoke` on main. Green: set this ticket Done. Red: fix on main. Nobody needs the owner for this.
 references:
 - file: crates/lotar-lib/src/services/automation_service.rs
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3d4e623b-a781-4d38-9f93-b8f5bb02600c
@@ -85,3 +100,45 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8be8daf2-f7bc-4278-ac03-9a237f08ead3
+- at: 2026-11-14T07:42:21.412282+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T07:42:27.779596+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-14T08:09:11.193113+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T08:09:29.439745+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-14T08:10:19.750438+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-14T08:10:19.884358+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-514","DEV-522","DEV-466","DEV-508","DEV-518"]}'
+    new: '{"related":["DEV-514","DEV-522","DEV-466","DEV-508","DEV-518","DEV-468","DEV-511"]}'
+- at: 2026-11-14T08:10:20.230028+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'

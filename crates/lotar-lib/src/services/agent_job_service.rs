@@ -4129,6 +4129,15 @@ mod tests {
     }
 
     #[test]
+    fn built_in_instructions_ask_for_short_markdown_comments_with_a_report() {
+        assert!(DEFAULT_AGENT_INSTRUCTIONS.contains("short markdown"));
+        assert!(DEFAULT_AGENT_INSTRUCTIONS.contains("-F - <<'EOF'"), "shows how to pass a multi-line comment");
+        for field in ["--commit", "--check", "--next"] {
+            assert!(DEFAULT_AGENT_INSTRUCTIONS.contains(field), "names the report field {field}");
+        }
+    }
+
+    #[test]
     fn push_event_sequences_start_positive_and_stay_strictly_monotonic() {
         let mut state = unit_job_state("job-dev108-mono");
         let started = push_event(&mut state, "agent_job_started", None);

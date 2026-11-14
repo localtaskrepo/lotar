@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: claude
 created: 2026-11-14T07:27:35.331056+00:00
-modified: 2026-11-14T07:27:52.335164+00:00
+modified: 2026-11-14T07:47:55.099885+00:00
 relationships:
   related:
   - DEV-351
@@ -13,6 +13,18 @@ relationships:
   - DEV-501
   - DEV-503
   - DEV-524
+comments:
+- date: 2026-11-14T07:47:55.099885+00:00
+  author: claude
+  text: |-
+    Implemented in commit 388d708f on agent/DEV-530 (worktree ~/.t3/worktrees/lotar/DEV-530). It sits on DEV-524's 500370cd, so DEV-524 merges first.
+
+    - When the dependency check holds a job back, the job request (agent, prompt, session, model, effort, provider) and the ticket's earlier status are kept next to the agent queue. `lotar agent queue` lists them under "Waiting for prerequisites"; `queue remove` and `flush` cover them too, and a task with one can't be moved.
+    - When the last prerequisite is done (the unblocked event, also the cross-repo `automation run`), the job is queued as it was and the ticket gets its status back, before the unblocked rules run. So the DEV rule on status Blocked leaves those tickets alone and needs no change. A ticket given to someone else meanwhile drops the job.
+    - The queue worker checks the prerequisites again just before it starts a job, and holds it back again if one reopened (the DEV-503 brief-Done case).
+    - Tests: a_held_back_review_job_resumes_with_its_own_prompt_and_status failed on DEV-524's code and passes now. a_queued_job_whose_prerequisite_reopened_is_held_back_again is a unit test of new code. npm run lint:agent, test:agent (2155 Rust) and test:smoke:agent (401) pass.
+    - Live trial in a scratch workspace with the real queue worker: TR-4 sent to review while TR-3 was open went Blocked with @review, and the queue listed the job. After TR-3 was Done, TR-4 was back in Reviewing and the review job ran with "Review TR-4 now". The first attempt ran into the trust gate (untrusted scratch workspace): the worker dropped that job without a word on the ticket. That happens to any queued job, not just held-back ones.
+    - Still open from the survey: waits on another repo still need `lotar automation run` from cron (STD-88 has waited since 11-13 19:24). The rule's job prompts are not in @agent-logs.
 description: |-
   Follow-up of DEV-524, from a survey of the 21 waiting episodes in lotar and standards (2026-11-14, mallox in the DEV-524 thread: "review what worked so far and what issues occurred ... then try an approach that we test and see how it goes").
 
@@ -59,3 +71,7 @@ history:
   - field: status
     old: Todo
     new: InProgress
+- at: 2026-11-14T07:47:55.099885+00:00
+  actor: claude
+  changes:
+  - field: comment_added

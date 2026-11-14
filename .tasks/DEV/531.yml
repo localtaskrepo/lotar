@@ -1,15 +1,21 @@
 title: Agents with the job's environment bypass the running-job guard on status and assignee
-status: Todo
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-14T07:31:46.259047+00:00
-modified: 2026-11-14T07:31:46.659808+00:00
+modified: 2026-11-14T08:06:54.230694+00:00
 relationships:
   related:
   - DEV-320
   - DEV-516
+comments:
+- date: 2026-11-14T08:06:43.937687+00:00
+  author: claude
+  text: 'Fixed in 1574c3da. is_job_lifecycle (task_service.rs) now also requires a non-empty LOTAR_AUTOMATION_EVENT, which only automation run commands get; job_env (agent_job_service.rs) sets it empty, so ACP/command agents (also ones started by a lotar that itself runs under an automation command) have their status/assignee recorded via the job outcome and applied at the job''s end. LOTAR_AGENT_JOB_ID stays in the agent env (tell_agent uses it so an agent''s own comment doesn''t come back to it). New test dev320_job_outcome_test::the_job_agents_own_changes_wait_while_its_run_commands_apply: a command agent''s lotar status/assignee are deferred while a job_started run command applies at once; it fails without the fix. Changed running_agent_can_hand_ticket_back_for_clarification: the agent''s handoff is now the outcome, so the failed job''s error rule still adds its agent-error tag (DEV-320 semantics). docs/help/agent.md updated. Checks: npm run lint (lint:agent), npm test (2161 Rust + 1537 UI passed), npm run smoke (401 passed).'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7e46419f-858b-4095-8351-aaa31ab05631
 description: 'Found in DEV-516: job_env (agent_job_service.rs) passes build_lotar_env with the job context, so harnessmux sessions and command-runner agents get LOTAR_AGENT_JOB_ID and LOTAR_TICKET_ID. TaskService::is_job_lifecycle (task_service.rs:1558) then counts the agent''s own lotar status/assignee commands as job lifecycle, and they apply directly mid-job instead of being recorded as the job''s outcome (DEV-320); its doc comment says agents don''t carry these. Seen in DEV-516''s integration test: a command-runner merge agent''s ''lotar status HelpNeeded'' showed while the job still ran. Check: an ACP or command agent''s status change during a job is recorded via record_outcome and applied at the job''s end. Done: agents'' changes are recorded like T3 threads'', automation run commands stay lifecycle, with a test.'
 tags:
 - health
@@ -27,3 +33,27 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-14T07:49:01.236371+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-14T07:49:04.156330+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7e46419f-858b-4095-8351-aaa31ab05631
+- at: 2026-11-14T08:06:43.937687+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T08:06:54.230694+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

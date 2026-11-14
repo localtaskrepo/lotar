@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-13T22:21:42.733070+00:00
-modified: 2026-11-14T07:31:49.288702+00:00
+modified: 2026-11-14T07:39:48.894607+00:00
 relationships:
   depends_on:
   - DEV-493
@@ -15,6 +15,7 @@ relationships:
   - DEV-107
   - DEV-493
   - DEV-501
+  - DEV-522
 comments:
 - date: 2026-11-14T05:27:32.965362+00:00
   author: claude
@@ -219,3 +220,9 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-493"],"blocks":["DEV-499"],"related":["DEV-107","DEV-493"]}'
     new: '{"depends_on":["DEV-493"],"blocks":["DEV-499"],"related":["DEV-107","DEV-493","DEV-501"]}'
+- at: 2026-11-14T07:39:48.894607+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-493"],"blocks":["DEV-499"],"related":["DEV-107","DEV-493","DEV-501"]}'
+    new: '{"depends_on":["DEV-493"],"blocks":["DEV-499"],"related":["DEV-107","DEV-493","DEV-501","DEV-522"]}'

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T10:33:47.729859+00:00
-modified: 2026-11-14T07:35:24.060758+00:00
+modified: 2026-11-14T08:10:19.883003+00:00
 relationships:
   blocks:
   - DEV-513
@@ -21,6 +21,7 @@ relationships:
   - DEV-524
   - DEV-503
   - DEV-528
+  - DEV-525
 comments:
 - date: 2026-11-13T10:48:16.585852+00:00
   author: claude
@@ -94,6 +95,18 @@ comments:
 - date: 2026-11-14T06:57:31.262764+00:00
   author: claude
   text: 'Rebased by porting: main replaced lotar''s own T3 runner with the harnessmux crate (DEV-503) and deleted tests/dev318_t3_runner_test.rs, so ccc96841/9d77abc6 could not be rebased. The bug is still there on main: plan_t3_worktree starts each thread from agent/<ticket>, while record_t3_worktree records T3 Code''s t3/<topic> branch. New commit 57c416bb (signed) on branch t3/rework-commits-on-ticket-branch-3, on top of main e64997ea: finalize_job, after commit_leftover_work, moves the ticket branch to the T3 thread''s branch (follow_thread_branch / move_ticket_branch in crates/lotar-lib/src/services/agent_job_service.rs). A refused move (unlanded commits the thread lacks, or the branch checked out elsewhere) fails the job and leaves the branch. Compared with 9d77abc6: plain-string reasons (no doubled ''Validation error:''), only t3 jobs, and a ticket branch whose extra commits already landed may move (a merge thread that rewrote commits). Tests in crates/lotar-lib/tests/dev503_harness_jobs_test.rs with a fake t3 CLI through harnessmux: every_t3_thread_of_a_ticket_ends_on_and_starts_from_the_tickets_branch (fix, then rework left uncommitted, then a fresh review starts from LoTaR''s rework commit) and a_ticket_branch_that_cannot_follow_its_thread_fails_the_job. Both fail on main''s code and pass with the fix. docs/help/agent.md T3 section updated. Checks: npm run lint:agent, npm run test:agent (2152 Rust, 1537 UI, release, hooks) and npm run test:smoke:agent (401) passed; build:web had to run first in this fresh worktree. The old commits stay on t3/fix-rework-commits-ticket-branch. Note: docs say T3 threads no longer create worktrees (owner, DEV-503), but this thread itself runs in a T3 worktree on t3/rework-commits-on-ticket-branch-3, so the fix is a no-op when no worktree appears and acts when one does.'
+- date: 2026-11-14T08:06:50.767601+00:00
+  author: codex
+  text: 'Merge blocked at the required test gate. Rebased 57c416bb cleanly onto current main as 2eaaa99a; npm run lint:agent passed. npm run test:agent failed in serve_sends_the_embedded_index_page because target/web-embed/index.html.gz is missing (requires npm run build:web); 20 tests passed, 2141 not run. UI/release/hooks and smoke did not run after that failure. Following the merge instruction to hand back on a failed check: main was not fast-forwarded, amended or pushed. Next: build web assets, rerun required test and smoke gates on the rebased commit, then retry fast-forward. No source edits; reviewed work preserved.'
+- date: 2026-11-14T08:07:31.888331+00:00
+  author: triage
+  text: |-
+    nothing waits for mallox; the merge only needs a rerun.
+
+    - The 08:06Z merge hand-back is a build step, not a question: `npm run test:agent` failed in `serve_sends_the_embedded_index_page` because `target/web-embed/index.html.gz` was missing (`npm run build:web` was not run in the fresh worktree). The review passed (19:37Z) and mallox said Go ahead (2026-11-14, hand-off to merge).
+    - Next for @merge: on the rebased `2eaaa99a`, run `npm run build:web`, then `npm run lint:agent`, `npm run test:agent` and `npm run test:smoke:agent`; if all pass, fast-forward main. Only a failing test that the change caused comes back to @fix.
+    - This ticket blocks DEV-513, so it is not parked on the owner.
+    - Assigning @merge.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1ab3c1d7-0ce9-4c25-a520-275cf8b42ec4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae7d11a9f-4237-40dd-a146-a91f4cc63276
@@ -123,8 +136,6 @@ description: |-
   - [ ] Every job of a ticket, in any thread, commits to and reads from one branch (the ticket's agent branch), with a test.
 tags:
 - health
-- review-returned
-- merge-retried
 custom_fields:
   finding: comms:rework-off-ticket-branch
 history:
@@ -548,3 +559,50 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-14T08:06:50.767601+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T08:06:55.800397+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: health, review-returned, merge-retried
+    new: health
+- at: 2026-11-14T08:06:55.854345+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-14T08:07:31.888331+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-14T08:07:33.202144+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-14T08:07:33.564225+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@merge'
+- at: 2026-11-14T08:07:47.935123+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Merging
+- at: 2026-11-14T08:10:19.883003+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-513"],"related":["DEV-342","DEV-408","DEV-414","DEV-465","DEV-472","DEV-473","DEV-466","DEV-513","DEV-524","DEV-503","DEV-528"]}'
+    new: '{"blocks":["DEV-513"],"related":["DEV-342","DEV-408","DEV-414","DEV-465","DEV-472","DEV-473","DEV-466","DEV-513","DEV-524","DEV-503","DEV-528","DEV-525"]}'
