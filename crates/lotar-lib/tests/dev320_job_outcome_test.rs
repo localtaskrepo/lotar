@@ -495,3 +495,82 @@ fn the_outcome_fires_the_updated_and_assigned_rules() {
     let comments: Vec<&str> = task.comments.iter().map(|comment| comment.text.as_str()).collect();
     assert_eq!(comments, ["From Todo (High) to HelpNeeded", "Was fixer"]);
 }
+
+/// DEV-531: the job's own agent carries the job's id and ticket, yet its
+/// status and assignee changes wait for the job's end like a T3 thread's.
+/// An automation `run` command of the job's events still applies at once.
+#[test]
+fn the_job_agents_own_changes_wait_while_its_run_commands_apply() {
+    let fixtures = TestFixtures::new();
+    let root = fixtures.get_temp_path().to_path_buf();
+    let queue = root.join("queue");
+    let go = root.join("GO");
+    let said = root.join("said");
+    let lotar = crate::common::lotar_bin();
+    std::fs::write(
+        fixtures.tasks_root.join("config.yml"),
+        format!(
+            "default:\n  project: OUTA\nissue:\n  states: [Todo, InProgress, HelpNeeded, Done]\nagents:\n  fix:\n    runner: command\n    command: sh\n    args: ['-c', '\"$LOTAR_BIN\" status OUTA-1 HelpNeeded > \"{said}\"; \"$LOTAR_BIN\" assignee OUTA-1 owner >> \"{said}\"; touch \"{said}.done\"; while [ ! -f \"{go}\" ]; do sleep 0.1; done']\n",
+            said = said.display(),
+            go = go.display()
+        ),
+    )
+    .unwrap();
+    std::fs::write(
+        fixtures.tasks_root.join("automation.yml"),
+        format!(
+            "automation:\n  rules:\n    - name: Start\n      on:\n        job_started:\n          run: '\"{}\" status OUTA-1 InProgress'\n",
+            lotar.display()
+        ),
+    )
+    .unwrap();
+    let cmd = || {
+        let mut cmd = std::process::Command::new(&lotar);
+        cmd.current_dir(&root)
+            .env_remove("RUST_TEST_THREADS")
+            .env_remove("LOTAR_AGENT_JOB_ID")
+            .env_remove("LOTAR_TICKET_ID")
+            .env_remove("LOTAR_AUTOMATION_EVENT")
+            .env("LOTAR_IGNORE_HOME_CONFIG", "1")
+            .env("LOTAR_TRUST_ALL", "1")
+            .env("LOTAR_AGENT_QUEUE_DIR", &queue)
+            .env("LOTAR_TEST_SILENT", "1");
+        cmd
+    };
+    assert!(cmd().args(["add", "needs a decision", "--assignee", "mallox"]).status().unwrap().success());
+
+    let runner = cmd()
+        .args(["agent", "run", "OUTA-1", "go", "--agent", "fix", "--wait"])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
+    let mut job = Finish { go: go.clone(), runner };
+
+    let done = root.join("said.done");
+    let deadline = Instant::now() + Duration::from_secs(15);
+    while !done.exists() {
+        assert!(Instant::now() < deadline, "the agent never ran");
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    let said = std::fs::read_to_string(&said).unwrap();
+    assert!(said.contains("HelpNeeded will be set when job"), "{said}");
+    assert!(said.contains("owner will be assigned when job"), "{said}");
+    let show = |field: &str| {
+        let out = cmd().args(["--format", "json", "list", "OUTA-1"]).output().unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+        json["tasks"][0][field].clone()
+    };
+    // The job_started rule's command applied at once; the agent's change waits.
+    assert_eq!(show("status"), "InProgress");
+    assert_eq!(show("assignee"), "mallox");
+
+    std::fs::write(&go, b"").unwrap();
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while job.runner.try_wait().unwrap().is_none() {
+        assert!(Instant::now() < deadline, "job never finished");
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    assert_eq!(show("status"), "HelpNeeded");
+    assert_eq!(show("assignee"), "owner");
+}

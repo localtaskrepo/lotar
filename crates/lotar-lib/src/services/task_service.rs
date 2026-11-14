@@ -1553,13 +1553,17 @@ impl TaskService {
 
     /// Whether this process is part of the job's lifecycle: an automation
     /// `run` command started for that job carries its id and ticket in
-    /// `LOTAR_AGENT_JOB_ID` and `LOTAR_TICKET_ID`. Agents themselves (T3
-    /// threads among them) don't, so their changes become the job's outcome.
+    /// `LOTAR_AGENT_JOB_ID` and `LOTAR_TICKET_ID`, and its event in
+    /// `LOTAR_AUTOMATION_EVENT`. The job's agent carries the first two but
+    /// no event (DEV-531), and T3 threads none, so their changes become the
+    /// job's outcome.
     pub(crate) fn is_job_lifecycle(job_id: &str, id: &str) -> bool {
-        let env = |name: &str| std::env::var(name).ok().map(|v| v.trim().to_string());
+        let env = |name: &str| std::env::var(name).ok().map(|v| v.trim().to_string()).filter(|v| !v.is_empty());
         // Canonical alias comparison: padded aliases of the ticket match;
         // unparseable values never do.
-        env("LOTAR_AGENT_JOB_ID").is_some_and(|env_job| env_job == job_id) && env("LOTAR_TICKET_ID").is_some_and(|ticket| ticket_alias_matches(&ticket, id))
+        env("LOTAR_AUTOMATION_EVENT").is_some()
+            && env("LOTAR_AGENT_JOB_ID").is_some_and(|env_job| env_job == job_id)
+            && env("LOTAR_TICKET_ID").is_some_and(|ticket| ticket_alias_matches(&ticket, id))
     }
 
     fn enforce_review_owner_transition(

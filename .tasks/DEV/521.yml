@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-14T05:38:49.244099+00:00
-modified: 2026-11-14T08:39:21.307249+00:00
+modified: 2026-11-14T08:44:35.159095+00:00
 relationships:
   related:
   - DEV-501
@@ -13,6 +13,7 @@ relationships:
   - DEV-510
   - DEV-526
   - DEV-512
+  - DEV-529
 comments:
 - date: 2026-11-14T06:15:29.298302+00:00
   author: claude
@@ -116,3 +117,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-501","DEV-522","DEV-510","DEV-526"]}'
     new: '{"related":["DEV-501","DEV-522","DEV-510","DEV-526","DEV-512"]}'
+- at: 2026-11-14T08:44:35.159095+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-501","DEV-522","DEV-510","DEV-526","DEV-512"]}'
+    new: '{"related":["DEV-501","DEV-522","DEV-510","DEV-526","DEV-512","DEV-529"]}'

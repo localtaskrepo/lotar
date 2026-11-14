@@ -2069,7 +2069,9 @@ exit 1\n",
         "expected clarification comment, got {:?}",
         refreshed.comments
     );
-    assert!(!refreshed.tags.iter().any(|tag| tag == "agent-error"), "self-handoff should avoid fallback error automation: {:?}", refreshed.tags);
+    // The handoff is the job's outcome (DEV-531): it replaces the error
+    // rule's `set`, and the rest of that rule still runs.
+    assert!(refreshed.tags.iter().any(|tag| tag == "agent-error"), "the failed job's rule still adds its tags: {:?}", refreshed.tags);
 }
 
 #[cfg(unix)]

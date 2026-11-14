@@ -1,11 +1,11 @@
 title: Profile budget limit, agent options and live replies for harnessmux jobs
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T02:19:56.623287+00:00
-modified: 2026-11-14T08:31:55.673306+00:00
+modified: 2026-11-14T08:45:11.762304+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -19,6 +19,7 @@ relationships:
   - DEV-512
   - DEV-525
   - DEV-526
+  - DEV-529
 comments:
 - date: 2026-11-14T05:50:39.665056+00:00
   author: claude
@@ -45,6 +46,9 @@ comments:
 - date: 2026-11-14T08:31:46.355038+00:00
   author: codex
   text: 'Review: nothing to review'
+- date: 2026-11-14T08:45:05.612484+00:00
+  author: codex
+  text: nothing to merge. git log main..HEAD is empty; HEAD c9a95f9a is already an ancestor of the main checkout's current branch main (c0511cb0). No files changed, commits, rebase, checks or push in this job; stopped at step 1 as instructed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab6cacb82-6d5f-4520-885f-1ccb0e36138c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A381ffb5c-f93e-494e-bfdf-c4e2e70b6491
@@ -223,3 +227,19 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-14T08:44:35.158085+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-510","DEV-509","DEV-512","DEV-525","DEV-526"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-510","DEV-509","DEV-512","DEV-525","DEV-526","DEV-529"]}'
+- at: 2026-11-14T08:45:05.612484+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T08:45:11.762304+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done

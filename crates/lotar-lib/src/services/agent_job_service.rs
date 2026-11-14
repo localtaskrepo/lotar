@@ -2562,6 +2562,10 @@ fn job_env(job_id: &str, tasks_dir: &std::path::Path, ticket_id: &str, config: &
     {
         env.extend(build_lotar_env(&task, config, tasks_dir, None, job_context_for(job_id).as_ref()));
     }
+    // Not an automation `run` command, also when this lotar was started by
+    // one: the agent's status and assignee changes are the job's outcome
+    // (DEV-531).
+    env.insert("LOTAR_AUTOMATION_EVENT".to_string(), String::new());
     // The agent calls the CLI itself; point it at this build, not whatever
     // `lotar` is first on its PATH (login shells and some CLIs reorder PATH).
     // The prompt names this binary by its absolute path (Claude Code refuses

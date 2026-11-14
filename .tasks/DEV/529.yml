@@ -1,11 +1,17 @@
 title: Job instructions read a ticket with lotar list <ID>, which also returns every ticket that mentions the ID
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T07:27:23.372003+00:00
-modified: 2026-11-14T08:24:31.532033+00:00
+modified: 2026-11-14T08:44:47.364282+00:00
+relationships:
+  related:
+  - DEV-468
+  - DEV-496
+  - DEV-511
+  - DEV-521
 comments:
 - date: 2026-11-14T08:03:30.242278+00:00
   author: claude
@@ -13,6 +19,9 @@ comments:
 - date: 2026-11-14T08:24:24.942264+00:00
   author: codex
   text: 'Review: passed. Reviewed full commit diff, acceptance criteria/comments, shared query before pagination and recent main history. No findings or UI changes. Web build and diff check passed. All 5 focused search tests passed; runner exited 1 because macOS xcrun left xcrun_db in its temp folder. Used RUSTC_WRAPPER= after sandbox denied sccache. Full lint/test/smoke were not independently rerun. No files, commits, status or assignee changed; no durable guidance finding.'
+- date: 2026-11-14T08:44:34.797881+00:00
+  author: codex
+  text: 'Merged into main: reviewed fix 9976ba1f rebased to 61147463, fast-forwarded, then amended only pending .tasks files as instructed; final main commit c0511cb0. Checks on final rebase: lint:agent passed, test:agent passed (2166 Rust, 1537 UI, release and hooks), test:smoke:agent passed (401). Initial sandbox bind failures resolved by running checks outside sandbox with RUSTC_WRAPPER=. Main instructions verified to use --format json show; full-ID regression passes with mentioning tickets. Main was clean after amend. Not pushed: oldest unpushed commit ff84b766 belongs to DEV-496, currently HelpNeeded; DEV-521 also HelpNeeded, DEV-468/DEV-511 Merging. No finished prefix exists before the first unfinished commit. Status and assignee left for job automation.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A562d7c7d-eec9-4342-90fe-a19d62a56145
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A63ab5f8c-3b49-48d0-86c5-0f9f59851f04
@@ -75,3 +84,19 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-14T08:44:34.797881+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T08:44:35.159645+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-468","DEV-496","DEV-511","DEV-521"]}'
+- at: 2026-11-14T08:44:47.364282+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
