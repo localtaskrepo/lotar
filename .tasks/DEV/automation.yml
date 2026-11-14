@@ -98,6 +98,8 @@ automation:
                  reviewer can check. Where the owner's words settle a point, quote them and follow them as written.
                  Say which value wins when two can apply, and what happens when a step fails. Find the callers in
                  every repo that may use what you change, and read the whole search output.
+                 Before your first edit, list the project's running and waiting T3 threads (t3_thread_list) and tell
+                 each one whose ticket is about the same files what you will change (skill cross-project-help).
               2. Never delete or discard work that isn't saved elsewhere, and never decide what only the owner decides.
                  Ask the running agents (T3 threads) first; when it still needs him, comment one question, set the
                  status to HelpNeeded, assign the ticket to mallox and stop.
@@ -353,15 +355,19 @@ automation:
                  git -C <root> log -1 is still the last commit you merged, git -C <root> add .tasks and
                  git -C <root> commit --amend --no-edit -- .tasks: they belong to no ticket (owner 2026-11-12).
                  Nothing else: never stash, reset, commit other files or check out anything in the main checkout.
-              5. Push only if ~/Development/standards/repos.json lists this repo with "push": true, and only
+              5. The merged commits change rules or agent profiles (git -C <root> diff --name-only <main before
+                 step 4>..<main> -- .tasks/automation.yml '.tasks/*/automation.yml' .tasks/config.yml
+                 '.tasks/*/config.yml' lists a file): run lotar trust in <root> (the owner lets agents trust,
+                 2026-11-11), else lotar skips the rules' run commands; lotar trust --status there must say Trusted.
+              6. Push only if ~/Development/standards/repos.json lists this repo with "push": true, and only
                  finished work (owner 2026-11-12): the main checkout is clean (git -C <root> status --short lists
                  nothing), and no unpushed commit (git -C <root> log @{u}..) belongs to work still in progress (another
                  ticket InProgress, a session still working in the main checkout). Then git -C <root> push, also
                  others' finished commits. One unfinished: push the commits before it, git -C <root> push origin
                  <sha>:<main>, and comment what waits. Never with --no-verify. Refused: hand back.
-              6. A health ticket names a check command: run it again; it must no longer list the finding.
-              7. Comment the outcome: the commits merged, pushed or why not, the checks that ran. The ticket goes
-                 to Done when your job ends.
+              7. A health ticket names a check command: run it again; it must no longer list the finding.
+              8. Comment the outcome: the commits merged, pushed or why not, trusted or not, the checks that ran. The
+                 ticket goes to Done when your job ends.
     - name: "Review failed: merge without it"
       when:
         any:
@@ -375,8 +381,8 @@ automation:
             The review job ${{agent.job_id}} failed (lotar agent logs ${{agent.job_id}}); the merge goes ahead without
             a review.
           agent: *merge
-    # Blocking findings go back to the author's profile once, which builds on its branch in a new thread (the
-    # reviewer's runs another model, lotar DEV-408); tag review-returned sends a second blocking review to mallox.
+    # Blocking findings go back to the author's profile once, as the next turn of its own thread, not the reviewer's
+    # (lotar 0.15.0, DEV-472; owner 2026-11-13, STD-88); tag review-returned sends a second blocking review to mallox.
     - name: "Review blocked: back to @fix"
       when:
         all:
@@ -392,6 +398,8 @@ automation:
           remove: &unblocked
             tags: [review-blocked]
           agent: &rework
+            # The continued thread keeps its model; these pick the model of a new one when that thread is gone.
+            session: continue
             model: "${{ticket.field:model}}"
             provider: "${{ticket.field:provider}}"
             prompt: |
