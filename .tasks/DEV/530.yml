@@ -1,0 +1,61 @@
+title: A job the dependency check held back resumes as it was when its prerequisites are done
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: claude
+created: 2026-11-14T07:27:35.331056+00:00
+modified: 2026-11-14T07:27:52.335164+00:00
+relationships:
+  related:
+  - DEV-351
+  - DEV-467
+  - DEV-501
+  - DEV-503
+  - DEV-524
+description: |-
+  Follow-up of DEV-524, from a survey of the 21 waiting episodes in lotar and standards (2026-11-14, mallox in the DEV-524 thread: "review what worked so far and what issues occurred ... then try an approach that we test and see how it goes").
+
+  ## Found
+
+  - The "Prerequisites done" rule always continues with tell_agent @fix, whatever step was pending. DEV-501: the fix agent did the review. DEV-467: the review reopened the thread that wrote the fix and refused to review its own commit. tell_agent always continues the last session with the rule's message, but a review needs a fresh thread with the review prompt, and a merge needs the merge prompt.
+  - The check runs at every hand-off, so finished work was parked on its way to review or merge (DEV-351, 490, 501, 510, 512).
+  - A prerequisite that was Done for only two minutes (DEV-503, 05:32–05:34Z) started DEV-501, 509 and 510 early.
+
+  ## Approach
+
+  - When the check holds a job back, lotar keeps the job request (agent, prompt, session, model, effort, provider) and the ticket's status, next to the agent queue.
+  - When the last prerequisite is done (`unblocked`, also the cross-repo `automation run`), that job is queued as it was, and the ticket gets its status back.
+  - The queue checks the prerequisites again before it starts a job, and parks it again if one is open by then.
+  - DEV's "Prerequisites done" rule acts only on tickets without an assignee (blocked by hand or by triage). Tickets that keep their agent resume on their own.
+
+  ## Done when
+
+  - [ ] A review or merge job held back by an open prerequisite runs with its own prompt and session once the prerequisite is done, and the ticket returns to its earlier status. Test fails before.
+  - [ ] A queued job whose prerequisite reopened is parked again, not started. Test fails before.
+  - [ ] Docs (help/automation.md) and the DEV rule match.
+  - [ ] npm run lint, npm test, npm run smoke pass.
+history:
+- at: 2026-11-14T07:27:35.590249+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-351","DEV-467","DEV-501","DEV-503","DEV-524"]}'
+- at: 2026-11-14T07:27:36.046357+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-14T07:27:52.266797+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: claude
+- at: 2026-11-14T07:27:52.335164+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress

@@ -1,11 +1,11 @@
 title: 'Task panel stays on ''Loading task…'' while git hangs: the server''s git calls have no timeout'
-status: HelpNeeded
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-13T10:33:22.263037+00:00
-modified: 2026-11-14T06:34:46.052578+00:00
+modified: 2026-11-14T07:18:27.013941+00:00
 relationships:
   blocks:
   - DEV-513
@@ -124,6 +124,19 @@ comments:
     - **State:** the Fable round is finished as **896309c0** on top of 03db11a4 (worktree `/Users/mallox/.t3/worktrees/lotar/t3-f896dc82-1dcb0918420f7648`, detached HEAD). The blocking reviews of 11:01, 19:24 and the earlier ones read only 03db11a4 (the test commit).
 
     **Next for the agents:** do not rework and do not set WontDo. Review **896309c0** (not 03db11a4), then merge when it passes. Only if that review blocks on 896309c0 is it round 3 of his rule: then ask him, with the model choice (INBOX-29). Automation: a handoff or acknowledgment comment is not a blocking review.
+- date: 2026-11-14T07:18:21.764902+00:00
+  author: codex
+  text: |-
+    ### Completed fix inspected: 896309c0
+
+    I reviewed the actual Fable change **896309c0489f7552987dc0cd0eaa5375acc30a17**, rather than the intermediate test commit. **The earlier inherited-pipe finding is addressed in this code:** stdout and stderr now use timed channel receives sharing the process deadline; timeout or process-wait failure kills the process group. There is no unbounded reader join.
+
+    - Confirmed the preserved checkout HEAD is exactly 896309c0.
+    - Diff whitespace check passed.
+    - Attempted the inherited-pipe Rust regression with sccache disabled and an external target directory. The runner still tried to create target/nextest/default in that checkout and was denied permission; the test did not run.
+    - This is a focused code inspection, **not full review approval**. UI screenshot verification, full gates and live shim reproduction remain unverified by me.
+
+    No new blocking code finding, no replacement fix agent, no owner question, and no status or assignee change. Keep the completed commit as the review target. Do not interpret this coordination/verification-limit comment as a failed review or trigger another implementation round. The active reviewer needs writable build access to finish verification before the merge agent proceeds.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad8d79e8d-6688-4da4-a3a5-516b2d4c3b76
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afcbae329-3a86-478f-818f-b3877e1b72d7
@@ -132,6 +145,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A498a8a45-5df8-49c7-9522-d8d6c3a6f5a9
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa299dba-86ab-42ec-a04a-87cfbe2640f7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A089483d8-08d8-4608-aec1-944e859ac6b6
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aac522e67-2e35-4b84-84de-ec60aeed2746
 releases:
 - 6
 description: |-
@@ -569,3 +583,36 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-14T07:16:49.181763+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T07:16:50.621058+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aac522e67-2e35-4b84-84de-ec60aeed2746
+- at: 2026-11-14T07:17:41.516393+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T07:18:21.764902+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T07:18:27.013941+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

@@ -1,11 +1,11 @@
 title: The owner's comment on DEV-514 set @fix but started no job and said nothing
-status: Todo
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-14T06:27:26.992238+00:00
-modified: 2026-11-14T06:27:48.595822+00:00
+modified: 2026-11-14T07:14:33.922816+00:00
 relationships:
   related:
   - DEV-514
@@ -13,8 +13,13 @@ relationships:
   - DEV-466
   - DEV-508
   - DEV-518
+comments:
+- date: 2026-11-14T07:14:23.462133+00:00
+  author: claude
+  text: 'Fixed in 99535969 on agent/DEV-525. Cause: the comment''s job was not lost. The server created job-20261114T061406.149Z-6 at 06:14:06 and kept it in its in-memory queue behind agent.worktree.max_parallel_jobs (2 in DEV). That job has no log until it starts (its header says 06:32:11, when it ran) and lotar agent queue doesn''t list it (it lists only the queue file of lotar processes outside the server). DEV-508 and DEV-466 came through the CLI''s file queue, which is why they showed up there. The branch having landed was not the cause. Fix: tell_agent now comments on the ticket when the agent doesn''t get the message now: ''Automation rule <name> told no agent on <ID> yet. Agent job <id> is queued: it waits for a free slot: N jobs run, agent.worktree.max_parallel_jobs is M.'' The same comment covers waiting for the other merge job, another job on the ticket still waiting to start, prerequisites, max_iterations, and a start error (the rule still fails as before). New AgentJobService::waiting_reason; docs/help/automation.md (Telling the ticket''s agent) explains it. Test: agent_automation_integration_test::tell_agent_says_on_the_ticket_when_its_job_waits_for_a_slot, which failed before the fix and passes now. Checks: npm run lint clean; npm run test:agent (the npm test suites) 2151 Rust, 1537 UI, 50 release and 7 hooks tests passed; npm run smoke 401/401 passed. Not covered: a plain assignment to an agent that has to wait (not through tell_agent) still says nothing on the ticket.'
 references:
 - file: crates/lotar-lib/src/services/automation_service.rs
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3d4e623b-a781-4d38-9f93-b8f5bb02600c
 description: |-
   mallox's comment on DEV-514 ("retry and fix any issues", 2026-11-14 06:14:00Z) started no agent. The rule "Comments: the owner's comment reaches the agent" set the assignee to @fix at 06:14:04Z, but no job was queued, no job log was written and no automation comment says why. An owner's comment that silently does nothing looks to him as if the agents ignore him. Found 2026-11-14 while checking the HelpNeeded tickets, and mallox asked for this ticket in the thread.
 
@@ -50,3 +55,27 @@ history:
   changes:
   - field: reference_added
     new: file:crates/lotar-lib/src/services/automation_service.rs
+- at: 2026-11-14T06:57:45.858357+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-14T06:57:46.728223+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3d4e623b-a781-4d38-9f93-b8f5bb02600c
+- at: 2026-11-14T07:14:23.462133+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T07:14:33.922816+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

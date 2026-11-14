@@ -1,15 +1,38 @@
 title: 'Built-in job instructions: ask for short markdown comments'
-status: Todo
+status: Reviewing
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-14T06:30:17.306138+00:00
-modified: 2026-11-14T06:30:17.726217+00:00
+modified: 2026-11-14T07:10:10.760632+00:00
 relationships:
   related:
   - DEV-466
   - DEV-490
+comments:
+- date: 2026-11-14T07:10:01.584512+00:00
+  author: claude
+  text: |-
+    Built-in job instructions now ask for short markdown comments and name the hand-off report fields.
+
+    - `docs/help/agent-instructions.md`: the STD-112 wording (one-line outcome, bullets, paths/commands/hashes in backticks), a `comment <id> -F - <<'EOF'` heredoc example, and `--commit`, `--check` (incl. `not_run`), `--next` for the final comment.
+    - Checked by hand that `lotar comment -F -` takes the report flags together with a heredoc body; this comment was written that way.
+    - New test `built_in_instructions_ask_for_short_markdown_comments_with_a_report` in `agent_job_service.rs` (failed before the doc change).
+  report:
+    commits:
+    - hash: c4c917d8
+      what: 'DEV-526 Built-in job instructions: ask for short markdown comments'
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+    - command: npm run smoke
+      result: passed
+    next: review on another model, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A073b1d95-21bc-4b6b-b876-04e44511b319
 description: |-
   Agents' ticket comments are mostly one paragraph of plain text, though the web UI renders markdown and mallox reads them on his phone. mallox, 2026-11-14 on DEV-466: "I do notice that comments are not using markdown at all and the comments are mostly unformatted. Something we could improve".
 
@@ -37,3 +60,27 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-14T07:01:34.041436+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-14T07:01:34.808508+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A073b1d95-21bc-4b6b-b876-04e44511b319
+- at: 2026-11-14T07:10:01.584512+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T07:10:10.760632+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

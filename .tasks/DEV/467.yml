@@ -1,11 +1,11 @@
 title: Jobs that failed during the T3 Code outage left 15 tickets InProgress and lost their agents' outcome
-status: Reviewing
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: claude
 created: 2026-11-13T10:33:47.286204+00:00
-modified: 2026-11-14T06:27:24.534574+00:00
+modified: 2026-11-14T07:27:35.585462+00:00
 relationships:
   blocks:
   - DEV-513
@@ -30,6 +30,7 @@ relationships:
   - DEV-483
   - DEV-513
   - DEV-524
+  - DEV-530
 comments:
 - date: 2026-11-13T10:37:16.946574+00:00
   author: claude
@@ -136,6 +137,9 @@ comments:
     - mallox in the thread, 2026-11-14: "Go ahead" (hand it on to @review, remove the stale tags).
 
     Next: @review reviews `887e36ef` on `t3/job-outcome-survives-t3-outage` (ordered job-end dispatch).
+- date: 2026-11-14T06:43:51.603013+00:00
+  author: codex
+  text: 'Routing blocker: the latest 2026-11-14 comment requests a fresh review of 887e36ef, but this job resumed the same thread that authored that commit. The implementation and ordering regression are already committed here (9439eafe and 887e36ef); checkout is clean and no subsequent implementation finding is recorded. Please route the fresh review to another agent context that did not author the fix. I have not approved my own work, changed code, or rerun previously completed checks. Related DEV-524 owns the dependency-check parking bug; it is not additional scope for this ticket. Handing back to reporter claude in configured HelpNeeded for reviewer routing.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8a51060f-8f0e-40eb-8309-91840a4fac93
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa70d136-71c4-42cc-8c60-e9566c5a27b6
@@ -610,3 +614,22 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-513"],"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513"]}'
     new: '{"blocks":["DEV-513"],"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513","DEV-524"]}'
+- at: 2026-11-14T06:43:51.603013+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:43:56.508088+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: claude
+- at: 2026-11-14T07:27:35.585462+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-513"],"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513","DEV-524"]}'
+    new: '{"blocks":["DEV-513"],"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513","DEV-524","DEV-530"]}'

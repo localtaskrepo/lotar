@@ -1,0 +1,43 @@
+title: A failed job's hand-back to an agent reporter overrides the retry rule, whose comment still promises the retry
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-14T07:09:13.519705+00:00
+modified: 2026-11-14T07:09:15.505132+00:00
+relationships:
+  related:
+  - DEV-320
+  - DEV-468
+  - DEV-524
+description: |-
+  Found while working DEV-524. DEV-468 at 2026-11-13 19:40:30Z: merge job job-20261113T193938.781Z-34 failed. The merge agent (codex) had set HelpNeeded and assigned the reporter `claude` during the job ("Returning to reporter for integration follow-up"; its log says "HelpNeeded, assigned to claude"). At job end the rule "Merge failed: retry with @fix" ran: it added merge-retried and commented "the fix agent retries it on branch ...", but the job's recorded outcome replaced its `assignee: @fix` (DEV-320), so the ticket went to HelpNeeded under claude and no fix agent started. Nothing picks up tickets assigned to an agent's reporter name, so it sat for 11 hours.
+
+  This is not the dependency check (no `blocked` tag was added, DEV-524).
+
+  ## Check
+
+  `.tasks/DEV/468.yml` history at 19:40:30Z: tags + automation comment, then status Merging -> HelpNeeded and assignee @merge -> claude in one entry.
+
+  ## Done when
+
+  - [ ] A rule's comment never promises a retry that the job's recorded outcome cancelled, or the outcome doesn't override a retry rule's assignee when it only hands the ticket to an agent-named reporter (owner decides which).
+  - [ ] A job's hand-back to a reporter that is an agent (claude, codex) reaches someone who acts on it.
+  - [ ] Regression test that fails before the fix.
+tags:
+- health
+custom_fields:
+  finding: automation:job-outcome-overrides-retry
+history:
+- at: 2026-11-14T07:09:14.386981+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-320","DEV-468","DEV-524"]}'
+- at: 2026-11-14T07:09:15.505132+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

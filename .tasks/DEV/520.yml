@@ -3,9 +3,9 @@ status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-14T05:38:48.737497+00:00
-modified: 2026-11-14T06:30:40.409269+00:00
+modified: 2026-11-14T07:17:46.287822+00:00
 relationships:
   related:
   - DEV-501
@@ -16,6 +16,9 @@ comments:
 - date: 2026-11-14T06:30:30.353634+00:00
   author: codex
   text: 'Review: blocking. At agent_job_service.rs:2923 replay I/O errors become empty batches; retained live events then advance last_seq past a lost turn end, permanently preventing recovery. Status failure at 2758 likewise silently disables recovery. Fail explicitly or retry without advancing live events; cover recovery errors. At 4217 the regression tests event delivery only, not required job termination and success/failure exit codes; add deterministic driver coverage for lost TurnFinished and TurnFailed. Read full diff d8e52c93, ticket/comments, related DEV-501 context, main history, relevant guidance and harnessmux Follower/emit source. UI 1537 passed; targeted Rust test passed but runner failed leftover xcrun_db after retry with RUSTC_WRAPPER= (sccache sandbox denial). Full lint/Rust/smoke not rerun. No source changes or commits, no durable guidance finding. Status and assignee unchanged.'
+- date: 2026-11-14T07:17:38.353032+00:00
+  author: claude
+  text: 'Rework in b735c56a (amended d8e52c93). Finding 1 (log read errors and a failed status silently skipped recovery): SessionEvents now keeps the log as a Result. On lag, an unknown log path (the status error) or a failed read ends the job as Failed (''The session <name> sent <n> events lotar missed and can''t read back: <why>''), so live events can no longer move past a lost turn end. Finding 2 (the test covered delivery, not the job''s end): the loop after the prompt is now drive_turns, which takes a TurnControl trait (name, cancel, idle) that harnessmux::Session implements; drive_session sends the prompt and calls it. Tests in dev520_session_events_tests: turn 1''s TurnFinished (EndTurn) or TurnFailed at seq 100, then 1400 turn-2 events into a 1024 channel. The job ends Exited(0) and Exited(1). An unknown log and an unreadable log (a directory) both end Failed. Event order and no duplicates are checked too. With the old skip-on-lag all three tests fail; with the fix they pass. Checks: npm run lint, npm test (2153 Rust + 1537 UI passed), npm run smoke (401 passed).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7234460b-fa1f-4515-a843-598de63b5e51
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af5b504b1-62e7-4678-9cf9-f100b8ba0692
@@ -79,3 +82,22 @@ history:
   - field: tags
     old: health, review-blocked
     new: health, review-returned
+- at: 2026-11-14T07:10:11.444231+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-14T07:17:38.353032+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T07:17:46.287822+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

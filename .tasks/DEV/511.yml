@@ -1,11 +1,11 @@
 title: Profile budget limit, agent options and live replies for harnessmux jobs
-status: InProgress
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-14T02:19:56.623287+00:00
-modified: 2026-11-14T06:18:29.743144+00:00
+modified: 2026-11-14T07:26:15.342816+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -20,8 +20,15 @@ comments:
 - date: 2026-11-14T05:50:39.665056+00:00
   author: claude
   text: 'Plan: (1) drive_session meters cost from usage events (ACP reports the session''s running total, so the job''s cost is the growth since the job started; it starts over when the agent restarts) and cancels the turn and fails the job once it passes max_budget_usd; also fixes multi-turn jobs summing running totals. (2) profile key options: (ACP option id -> value, scalars accepted) passed to harnessmux Profile.options; command refuses it; the effort error points to it. (3) message.delta streams into the job log as agent_job_message parts (whole paragraphs outside code blocks, the rest when a tool or question starts or the turn ends); the final message only adds what wasn''t streamed. Tests in dev503_harness_jobs_test with the fake ACP agent; docs agent.md and config-reference. No REST shape change.'
+- date: 2026-11-14T06:43:49.320715+00:00
+  author: claude
+  text: 'Done in 84788354 on agent/DEV-511. (1) max_budget_usd works again: drive_session meters the cost from harnessmux usage events and, once the job''s cost passes the budget, cancels the agent''s turn and fails the job (''The job cost $0.50, more than the profile''s max_budget_usd of $0.40''). Agents report the session''s running total (claude-agent-acp sends total_cost_usd), so a job''s cost is now the growth over its turns. Before, a multi-turn job added up the running totals, e.g. 0.25 + 0.5 instead of 0.5. A total that drops, or a session.started event, means the agent restarted. A job taken over from a stopped process starts from the cost it already recorded. A job whose agent reports no cost logs that the budget wasn''t checked. (2) New profile key options: (ACP config option id -> value; YAML true/2 are accepted as strings) goes to harnessmux Profile.options. command refuses it. An invalid effort error now points to options (reasoning_effort: ultra). (3) message.delta streams into the job log as agent_job_message parts: each paragraph outside a code block as it arrives, the rest when a tool starts, a question comes or the turn ends. The final message adds only what wasn''t streamed, and last_message stays the whole reply. No REST shape change. Docs: agent.md (model and effort, usage and cost, live replies), config-reference.md. Tests: dev503_harness_jobs_test (streaming while the turn runs and nothing logged twice, cost of two turns, budget failure, options reach session/set_config_option, a bad value fails), unit tests for ReplyStream and CostMeter. Checks: npm run lint ok; npm run test:agent ok (2151 Rust, 1536 UI, 50 release, 7 hooks); npm run smoke ok (114 files, 400 tests). Not run: a live job against a real agent''s cost. Guidance: no lasting finding.'
+- date: 2026-11-14T07:26:08.340771+00:00
+  author: codex
+  text: 'Review: passed. Reviewed full commit/diff, ticket and related tickets, owner decisions, guidance and main history. No findings. Frontend/smoke typechecking, UI unit suite and all 12 focused harness jobs tests passed (isolated repeat including cleanup). Rust needed disabled sccache and approved socket access; sandbox attempt failed and was interrupted. Full lint, remaining Rust tests, full smoke and real-agent cost not rerun. No files changed or commits; status/assignee unchanged. No minor tickets or durable guidance finding.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab6cacb82-6d5f-4520-885f-1ccb0e36138c
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A381ffb5c-f93e-494e-bfdf-c4e2e70b6491
 releases:
 - 6
 description: 'Lost in DEV-503 (owner asked to file it, 2026-11-14); lotar only. 1) max_budget_usd (Claude''s --max-budget-usd) is no longer passed: lotar gets the cost per turn from harnessmux usage events, so it can cancel a job once the cost passes the budget, for every agent that reports cost. 2) effort is limited to harnessmux''s low..max, so agent values such as Codex''s ultra or Copilot''s minimal are refused; harnessmux''s Profile already has an options map (ACP config option id -> value). Add a profile key options: that passes it. 3) The job view shows a reply only when its turn ends; drive_session ignores message.delta. Stream deltas into the job log so replies appear as they come, as Claude''s did. Done when the three work with tests and docs (docs/help/agent.md, config-reference), and REST/types where shapes change.'
@@ -87,3 +94,34 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-510"]}'
     new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-510","DEV-509"]}'
+- at: 2026-11-14T06:43:49.320715+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:43:57.345803+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T07:22:47.737276+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A381ffb5c-f93e-494e-bfdf-c4e2e70b6491
+- at: 2026-11-14T07:26:08.340771+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T07:26:15.342816+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

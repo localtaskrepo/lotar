@@ -1,11 +1,11 @@
 title: Review the agent job code that stays after the harnessmux switch
-status: Reviewing
+status: Merging
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-13T22:35:03.230572+00:00
-modified: 2026-11-14T06:33:09.761805+00:00
+modified: 2026-11-14T07:30:40.593809+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -19,6 +19,7 @@ relationships:
   - DEV-521
   - DEV-201
   - DEV-524
+  - DEV-530
 comments:
 - date: 2026-11-14T05:34:55.100350+00:00
   author: claude
@@ -36,6 +37,12 @@ comments:
     - mallox in the thread, 2026-11-14: "Go ahead" (hand it on to @review, remove the stale tags).
 
     Next: @review reviews `ca9529ff` on `agent/DEV-501`.
+- date: 2026-11-14T06:46:01.786718+00:00
+  author: codex
+  text: 'Fresh review of ca9529ff completed: full diff and relevant helpers inspected; no new findings. No additional changes or commit needed; existing commit preserved, working tree clean. Passed npm run lint:agent, npm run test:agent (2147 Rust, 1536 UI, release and hooks), npm run test:smoke:agent (400 tests). Built web assets; disabled sccache after sandbox denial; final tests and smoke passed with approved unsandboxed execution for local port binding. No durable guidance finding. Status and assignee left to job automation.'
+- date: 2026-11-14T07:30:40.593809+00:00
+  author: codex
+  text: 'Merged ca9529ff rebased as 047bbfe0 into main by fast-forward, no conflicts or source changes during integration. Reran all gates: lint:agent, test:agent (2154 Rust, UI, release and hooks), test:smoke:agent (401 passed). No checks skipped. Folding current .tasks changes into the landing commit per merge instructions; push eligibility checked separately.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A40e4b2df-5666-4b3e-9ac3-b6613c9e2aa3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A864d6f4e-9739-4249-8fa0-626d0e6c7023
@@ -192,3 +199,26 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A864d6f4e-9739-4249-8fa0-626d0e6c7023
+- at: 2026-11-14T06:46:01.786718+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:46:08.621656+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-14T07:27:35.586532+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-492","DEV-505","DEV-513","DEV-520","DEV-521","DEV-201","DEV-524"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-492","DEV-505","DEV-513","DEV-520","DEV-521","DEV-201","DEV-524","DEV-530"]}'
+- at: 2026-11-14T07:30:40.593809+00:00
+  actor: codex
+  changes:
+  - field: comment_added

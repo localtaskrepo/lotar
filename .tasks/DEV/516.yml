@@ -1,11 +1,11 @@
 title: Agent jobs recover from sandbox-blocked build checks without premature handback
-status: Reviewing
+status: InProgress
 priority: High
 type: Bug
 reporter: codex
 assignee: '@fix'
 created: 2026-11-14T04:57:22.931962+00:00
-modified: 2026-11-14T06:30:32.892631+00:00
+modified: 2026-11-14T07:09:46.369625+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -93,3 +93,9 @@ history:
   - field: tags
     old: review-blocked
     new: review-returned
+- at: 2026-11-14T07:09:46.369625+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress

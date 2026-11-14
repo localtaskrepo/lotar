@@ -1,14 +1,20 @@
 title: 'npm run test:agent fails from a clean target: the embedded web UI test needs target/web-embed/index.html.gz'
-status: Todo
+status: Reviewing
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-14T06:38:33.287147+00:00
-modified: 2026-11-14T06:38:33.905124+00:00
+modified: 2026-11-14T07:23:46.343580+00:00
 relationships:
   related:
   - DEV-519
+comments:
+- date: 2026-11-14T07:23:38.148933+00:00
+  author: claude
+  text: 'Fixed in 38015b94 on agent/DEV-527: npm scripts test:rust and test:rust:agent now run npm run build:web first (like build and build:smoke), so test:agent and npm test build target/web-embed themselves. CI is unaffected: it calls cargo nextest directly after its own build:web step. Updated the fresh-worktree notes in .github/skills/testing-strategy/SKILL.md and docs/developers/testing.md. Checks: reproduced the failure (embedded_web_ui_test panics without target/web-embed); after the fix, from a target with no web/web-embed, npm run test:agent passes (2151 Rust, 1537 UI, release and hooks tests); npm run lint and npm run smoke (401 tests) pass.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa5efb45d-1e21-48f6-b5d5-639815731a8b
 description: 'Found in the DEV-519 merge (2026-11-13): npm run test:agent from a worktree without a web build fails, because tests/embedded_web_ui_test.rs needs target/web-embed/index.html.gz and test:agent (and test:rust) does not run build:web first. Check: in a fresh worktree run npm run test:agent without npm run build:web. Done: test:agent passes from a clean target (it builds the web assets first, or the test gets what it needs another way).'
 tags:
 - health
@@ -26,3 +32,27 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-14T07:17:46.598031+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-14T07:17:47.297483+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa5efb45d-1e21-48f6-b5d5-639815731a8b
+- at: 2026-11-14T07:23:38.148933+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T07:23:46.343580+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

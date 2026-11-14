@@ -1,17 +1,18 @@
 title: 'Task timeline: changes, comments, commits and agents'' threads in one place'
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T05:10:07.050179+00:00
-modified: 2026-11-14T06:37:18.401526+00:00
+modified: 2026-11-14T06:52:43.317874+00:00
 relationships:
   related:
   - DEV-523
   - DEV-525
   - DEV-513
   - DEV-519
+  - DEV-508
 comments:
 - date: 2026-11-14T05:51:41.704856+00:00
   author: claude
@@ -63,6 +64,9 @@ comments:
     **Checks:** `npm run lint` passes. Tests pass: Rust 2151, UI 1537, release 50, hooks 7. `npm run smoke` passes 401.
 
     No page, component or style changed in this rework, so the screenshots in the earlier comment still show the current UI.
+- date: 2026-11-14T06:52:38.447612+00:00
+  author: codex
+  text: 'nothing to merge: this assigned checkout is at 0327eb8f, already contained in the main checkout branch main (ff84b766); git log main..HEAD is empty. No rebase, merge, checks or push performed. The rework comment names 6818cb78, which is not this checkout HEAD. The owner decision recorded at 06:27 also prohibits pushing until the rework review passes.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8ddb31cb-de74-4057-9c5b-8cde01f3cd0e
 - attachment: DEV-518-before-dark-1440.7d671b310bb0b52c66922587e9199bf2.png
@@ -313,3 +317,19 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-14T06:42:37.932475+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-523","DEV-525","DEV-513","DEV-519"]}'
+    new: '{"related":["DEV-523","DEV-525","DEV-513","DEV-519","DEV-508"]}'
+- at: 2026-11-14T06:52:38.447612+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:52:43.317874+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done

@@ -269,14 +269,14 @@ impl AgentJobService {
             return Err(LoTaRError::ValidationError("Merge agent jobs require agent.worktree.enabled=true so merges run on isolated branches.".to_string()));
         }
 
-        let job_id = make_job_id();
-        let context = AgentContextService::load(tasks_dir, &config, &ticket_id)?;
-        let template = instruction_template(tasks_dir, &config, &task, &job_id, runner_kind, req.agent.as_deref());
-        let instructions = resolve_agent_instructions(tasks_dir, &config, &profile)?.map(|text| template.expand(&text));
         let user_prompt = req.prompt.trim().to_string();
         if user_prompt.is_empty() {
             return Err(LoTaRError::ValidationError("Prompt cannot be empty".to_string()));
         }
+        let job_id = make_job_id();
+        let context = AgentContextService::load(tasks_dir, &config, &ticket_id)?;
+        let template = instruction_template(tasks_dir, &config, &task, &job_id, runner_kind, req.agent.as_deref());
+        let instructions = resolve_agent_instructions(tasks_dir, &config, &profile)?.map(|text| template.expand(&text));
         // A T3 Code thread runs in its project's runtime mode, whatever the
         // profile's permissions say.
         let read_only = runner_kind != AgentRunnerKind::T3 && profile.permissions == Some(crate::config::types::AgentPermissions::ReadOnly);
@@ -1218,17 +1218,17 @@ fn current_lotar_binary() -> Option<std::path::PathBuf> {
 }
 
 /// Directories outside the working directory that a workspace-permission
-/// job may write: the tasks directory and the repository's git data. A merge
-/// job also gets the main checkout, since merging updates it.
+/// job may write: the tasks directory and the repository's git data (also
+/// when `.git` is a file, as in a submodule). A merge job gets the main
+/// checkout instead, since merging updates it.
 fn extra_writable_dirs(working_dir: &std::path::Path, tasks_dir: &std::path::Path, is_merge_job: bool) -> Vec<std::path::PathBuf> {
     let canonical = |path: &std::path::Path| path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
     let work = canonical(working_dir);
     let mut dirs = vec![canonical(tasks_dir)];
     if let Some(repo_root) = resolve_repo_root(tasks_dir) {
-        let git_dir = repo_root.join(".git");
         if is_merge_job {
             dirs.push(canonical(&repo_root));
-        } else if git_dir.is_dir() {
+        } else if let Ok(git_dir) = verified_common_dir(&repo_root) {
             dirs.push(canonical(&git_dir));
         }
     }
@@ -1243,7 +1243,7 @@ struct WorktreeContext {
     worktree_branch: Option<String>,
 }
 
-fn prepare_worktree(_job_id: &str, tasks_dir: &std::path::Path, ticket_id: &str, config: &ResolvedConfig) -> LoTaRResult<WorktreeContext> {
+fn prepare_worktree(tasks_dir: &std::path::Path, ticket_id: &str, config: &ResolvedConfig) -> LoTaRResult<WorktreeContext> {
     let repo_root = resolve_repo_root(tasks_dir).ok_or_else(|| LoTaRError::ValidationError("Git repository not found".to_string()))?;
 
     let mut context = WorktreeContext { working_dir: repo_root.clone(), worktree_path: None, worktree_branch: None };
@@ -1555,14 +1555,17 @@ fn branch_exists(repo_root: &std::path::Path, branch: &str) -> bool {
 }
 
 fn run_git_command(repo_root: &std::path::Path, args: &[&str]) -> LoTaRResult<()> {
+    git_stdout(repo_root, args).map(drop)
+}
+
+/// What a git command prints, or why it failed.
+fn git_stdout(repo_root: &std::path::Path, args: &[&str]) -> LoTaRResult<String> {
     let output = git_command(repo_root).args(args).current_dir(repo_root).output().map_err(LoTaRError::IoError)?;
-
-    if output.status.success() {
-        return Ok(());
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(LoTaRError::ValidationError(format!("git {} failed: {}", args.join(" "), stderr.trim())));
     }
-
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    Err(LoTaRError::ValidationError(format!("git {} failed: {}", args.join(" "), stderr.trim())))
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
 #[derive(Debug, Clone)]
@@ -1691,29 +1694,21 @@ fn branch_landed(repo_root: &std::path::Path, branch: &str) -> LoTaRResult<bool>
 /// `branch_landed` says. `branch`'s landing records count for the commit
 /// they name.
 fn commit_landed(repo_root: &std::path::Path, rev: &str, branch: &str) -> LoTaRResult<bool> {
-    let git_output = |args: &[&str]| -> LoTaRResult<String> {
-        let output = git_command(repo_root).args(args).current_dir(repo_root).output().map_err(LoTaRError::IoError)?;
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(LoTaRError::ValidationError(format!("git {} failed: {}", args.join(" "), stderr.trim())));
-        }
-        Ok(String::from_utf8_lossy(&output.stdout).into_owned())
-    };
-    let branch_ref = rev;
-    if !git_output(&["cherry", "HEAD", branch_ref])?.lines().any(|line| line.starts_with('+')) {
+    let git_output = |args: &[&str]| git_stdout(repo_root, args);
+    if !git_output(&["cherry", "HEAD", rev])?.lines().any(|line| line.starts_with('+')) {
         return Ok(true);
     }
     if landing_recorded(repo_root, branch, rev) {
         return Ok(true);
     }
-    let base = git_output(&["merge-base", "HEAD", branch_ref])?;
+    let base = git_output(&["merge-base", "HEAD", rev])?;
     let base = base.trim();
-    let changed = git_output(&["diff", "--name-only", "--no-renames", "-z", base, branch_ref])?;
+    let changed = git_output(&["diff", "--name-only", "--no-renames", "-z", base, rev])?;
     let excluded = format!("^{base}");
     let mut args = vec!["rev-list", "HEAD", excluded.as_str(), "--"];
     args.extend(changed.split('\0').filter(|path| !path.is_empty()));
     let candidates = git_output(&args)?;
-    Ok(std::iter::once("HEAD").chain(candidates.lines()).any(|commit| merge_adds_nothing(repo_root, commit, branch_ref)))
+    Ok(std::iter::once("HEAD").chain(candidates.lines()).any(|commit| merge_adds_nothing(repo_root, commit, rev)))
 }
 
 /// Whether the changes `branch` makes outside `excluded` (a path relative to
@@ -1722,14 +1717,7 @@ fn commit_landed(repo_root: &std::path::Path, rev: &str, branch: &str) -> LoTaRR
 /// files, changes nothing outside `excluded`. Conflicts inside it don't
 /// count; a branch that changes nothing outside it hasn't landed.
 fn branch_landed_outside(repo_root: &std::path::Path, branch: &str, excluded: &std::path::Path) -> LoTaRResult<bool> {
-    let git_output = |args: &[&str]| -> LoTaRResult<String> {
-        let output = git_command(repo_root).args(args).current_dir(repo_root).output().map_err(LoTaRError::IoError)?;
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(LoTaRError::ValidationError(format!("git {} failed: {}", args.join(" "), stderr.trim())));
-        }
-        Ok(String::from_utf8_lossy(&output.stdout).into_owned())
-    };
+    let git_output = |args: &[&str]| git_stdout(repo_root, args);
     let branch_ref = format!("refs/heads/{branch}");
     let outside = format!(":(exclude){}", excluded.display());
     let base = git_output(&["merge-base", "HEAD", &branch_ref])?;
@@ -1832,15 +1820,7 @@ pub(crate) fn forget_landings(repo_root: &std::path::Path, branch: &str) {
 /// together they change every file the branch changes. Empty when any
 /// file is left out, or when git can't tell.
 fn reworked_landing(repo_root: &std::path::Path, start: &str, branch: &str, ticket_id: &str) -> Vec<String> {
-    let git_output = |args: &[&str]| {
-        git_command(repo_root)
-            .args(args)
-            .current_dir(repo_root)
-            .output()
-            .ok()
-            .filter(|output| output.status.success())
-            .map(|output| String::from_utf8_lossy(&output.stdout).into_owned())
-    };
+    let git_output = |args: &[&str]| git_stdout(repo_root, args).ok();
     let branch_ref = format!("refs/heads/{branch}");
     let Some(base) = git_output(&["merge-base", "HEAD", &branch_ref]) else {
         return Vec::new();
@@ -2340,7 +2320,7 @@ fn run_job(
             context
         })
     } else {
-        prepare_worktree(&job_id, &tasks_dir, &ticket_id, &config)
+        prepare_worktree(&tasks_dir, &ticket_id, &config)
     };
     let worktree_context = match prepared {
         Ok(context) => {
@@ -3344,19 +3324,9 @@ fn finalize_job(
         },
     );
 
-    let mut job_context = None;
+    let job_context = job_context_for(job_id);
     let mut registry = JOB_REGISTRY.lock().ok();
     if let Some(ref mut registry) = registry {
-        if let Some(state) = registry.jobs.get(job_id) {
-            job_context = Some(AutomationJobContext {
-                job_id: state.record.id.clone(),
-                runner: state.record.runner.clone(),
-                agent: state.record.agent_profile.clone(),
-                worktree_path: state.record.worktree_path.clone(),
-                worktree_branch: state.record.worktree_branch.clone(),
-                usage: state.record.usage.clone(),
-            });
-        }
         if registry.active_by_ticket.get(ticket_id).is_some_and(|id| id == job_id) {
             registry.active_by_ticket.remove(ticket_id);
         }
@@ -3518,11 +3488,7 @@ fn has_active_merge_job(registry: &JobRegistry) -> bool {
 }
 
 fn is_merge_job_candidate(task: &crate::api_types::TaskDTO, agent_profile: Option<&str>) -> bool {
-    task.status.as_str().eq_ignore_ascii_case("Merging")
-        || agent_profile.is_some_and(|profile| {
-            let normalized = profile.trim().to_ascii_lowercase();
-            normalized == "merge" || normalized == "merge-retry"
-        })
+    task.status.as_str().eq_ignore_ascii_case("Merging") || agent_profile.is_some_and(|profile| profile.trim().eq_ignore_ascii_case("merge"))
 }
 
 fn should_stop_job(job_id: &str) -> bool {
@@ -3597,8 +3563,6 @@ fn emit_job_event(event: &AgentJobEvent, record: &AgentJobRecord) {
     crate::api_events::emit(&crate::api_events::ApiEvent { kind: event.kind.clone(), data: payload });
 }
 
-/// Record-then-stream pair for SSE-visible job events. Log-only kinds
-/// (agent_job_raw/init/result) stay on bare `push_event`.
 /// Finished jobs stay in memory for a day (status, events for the UI) and
 /// at most `MAX_FINISHED_JOBS` of them, so a long-running server doesn't
 /// grow without bound (DEV-279). Their logs stay on disk.
@@ -3626,6 +3590,8 @@ fn prune_finished_jobs(registry: &mut JobRegistry) {
     }
 }
 
+/// Record an event and stream it to the UI (SSE). Notes only the job log
+/// needs use bare `push_event`.
 fn record_and_emit(state: &mut AgentJobState, kind: &str, message: Option<String>) -> AgentJobEvent {
     let event = push_event(state, kind, message);
     emit_job_event(&event, &state.record);
@@ -3832,6 +3798,25 @@ mod tests {
         let resolved = resolve_worktree_root(&repo_root, None).unwrap();
         let display = resolved.to_string_lossy();
         assert!(display.contains(".lotar-worktrees"));
+    }
+
+    #[test]
+    fn a_worktree_job_may_write_the_git_dir_of_a_checkout_whose_git_is_a_file() {
+        let tmp = tempdir().unwrap();
+        let main = tmp.path().join("main");
+        let git_dir = tmp.path().join("git-data");
+        let init = crate::utils::git::git_command(tmp.path())
+            .args(["init", "--quiet", "--separate-git-dir", &git_dir.to_string_lossy(), &main.to_string_lossy()])
+            .output()
+            .unwrap();
+        assert!(init.status.success(), "{}", String::from_utf8_lossy(&init.stderr));
+        let tasks_dir = main.join(".tasks");
+        std::fs::create_dir_all(&tasks_dir).unwrap();
+        let worktree = tmp.path().join("worktree");
+        std::fs::create_dir_all(&worktree).unwrap();
+
+        let dirs = extra_writable_dirs(&worktree, &tasks_dir, false);
+        assert!(dirs.contains(&git_dir.canonicalize().unwrap()), "{dirs:?}");
     }
 
     #[test]

@@ -1,11 +1,11 @@
 title: A merge job that stops on purpose still lands its branch on main
-status: Todo
+status: Reviewing
 priority: High
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-14T06:27:21.642026+00:00
-modified: 2026-11-14T06:27:50.376657+00:00
+modified: 2026-11-14T07:01:33.429302+00:00
 relationships:
   related:
   - DEV-518
@@ -14,9 +14,14 @@ relationships:
   - DEV-411
   - DEV-485
   - DEV-513
+comments:
+- date: 2026-11-14T07:01:19.890591+00:00
+  author: claude
+  text: 'Fixed in eca8ccb2. ensure_branch_merged (agent_job_service.rs) no longer fast-forwards main when the merge agent handed the ticket back, meaning the job recorded a status or assignee as its outcome, which is how DEV-518 and DEV-514 stopped (HelpNeeded, mallox). The job completes, the outcome moves the ticket, and the job log says ''The merge agent handed the ticket back: left the main checkout as it was, <branch> is not merged''. A branch already on main is still recorded as landed. The fast-forward for an agent that wanted to merge and could not stays (DEV-411/DEV-465: the merge tests still pass). New regression test merge_job_that_hands_the_ticket_back_leaves_main_alone failed before the fix (main got feature.txt). Its stub unsets LOTAR_AGENT_JOB_ID: the command runner hands that variable to the agent, which makes its changes apply directly instead of being recorded as the outcome. T3 threads don''t get it. The review-blocked tag is not used as a signal, because it is specific to DEV''s automation.yml. docs/help/agent.md updated. Checks: npm run lint, npm test (2151 Rust + 1537 UI) and npm run smoke (401) pass. I ran npm run build:web first because the fresh worktree had no embedded UI.'
 references:
 - code: crates/lotar-lib/src/services/agent_job_service.rs#3121-3170
 - code: crates/lotar-lib/src/services/agent_job_service.rs#3243-3258
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa938fca8-5d60-4c03-9f7d-179493505574
 description: |-
   When a merge job ends, lotar fast-forwards the main checkout to the ticket's branch even when the merge agent decided **not** to merge. Work a review blocked, or work on top of a main that fails its checks, lands on main without anyone noticing. Found on 2026-11-14 while checking the HelpNeeded tickets, and mallox asked for this ticket in the thread.
 
@@ -67,3 +72,27 @@ history:
   - field: relationships
     old: '{"related":["DEV-518","DEV-514","DEV-465","DEV-411","DEV-485"]}'
     new: '{"related":["DEV-518","DEV-514","DEV-465","DEV-411","DEV-485","DEV-513"]}'
+- at: 2026-11-14T06:47:33.031240+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-14T06:47:33.847686+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa938fca8-5d60-4c03-9f7d-179493505574
+- at: 2026-11-14T07:01:19.890591+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T07:01:33.429302+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

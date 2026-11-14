@@ -1,11 +1,11 @@
 title: Dependency check parks tickets in HelpNeeded under their reporter, and a busy lock counts as a blocker
-status: Todo
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-14T06:27:24.117114+00:00
-modified: 2026-11-14T06:27:48.519873+00:00
+modified: 2026-11-14T07:27:35.589471+00:00
 relationships:
   related:
   - DEV-501
@@ -13,9 +13,25 @@ relationships:
   - DEV-467
   - DEV-468
   - DEV-503
+  - DEV-528
+  - DEV-320
+  - DEV-530
+comments:
+- date: 2026-11-14T07:09:29.330963+00:00
+  author: claude
+  text: |-
+    Done in commit 500370cd on agent/DEV-524.
+
+    - An agent job that waits for an open prerequisite now sets the ticket to Blocked (where the project has it), keeps its agent as assignee and comments "The @<agent> job waits for its open prerequisites: <IDs>." No reporter, no HelpNeeded, no blocked/blocked-by: tags (nothing read them, and nothing removed them). The "Prerequisites done" rule matches on status Blocked, and its tell_agent starts the ticket's own agent (assignee first).
+    - The dependency check returns an error instead of a fake "dependency graph unavailable" prerequisite. It is tried 3 times, 500 ms apart, on top of the snapshot's own 500 ms lock wait. A check that still fails starts no job and parks nothing: it comments the reason on the ticket ("Assign @<agent> again to retry"), prints it and sends automation_failed. A failed check during `unblocked` is reported the same way, and the cross-repo run skips the ticket.
+    - DEV-468 at 19:40Z took a different path: the merge agent itself set HelpNeeded/claude during its job, and that recorded outcome replaced the failure rule's @fix (DEV-320). No blocked tag was added. Filed as DEV-528.
+    - Docs: help/automation.md (agent job queueing; the "When prerequisites are done" example now uses tell_agent, because a job-blocked ticket keeps its assignee and `agent:` starts a job only when the assignee changes), release-guide.md.
+    - Tests: agent_assignment_with_an_open_prerequisite_blocks_the_ticket_until_it_is_done and agent_assignment_reports_a_failed_dependency_check_and_never_parks_the_ticket both failed on the old code (HelpNeeded instead of Blocked/Todo). dependency_check_retries_a_busy_lock_and_returns_an_error_when_it_stays (unit) can't compile against the old Vec return. Ran npm run lint:agent, test:agent and test:smoke:agent (401 smoke): all pass.
+    - For the reviewer: the DEV rule's tell_agent message is written for @fix. A ticket parked while queued for @review or @merge now goes back to that agent with the same message. Its wording for those agents is the owner's call; I didn't change .tasks/DEV/automation.yml.
 references:
 - code: crates/lotar-lib/src/services/automation_service.rs#2520-2545
 - code: crates/lotar-lib/src/services/automation_service.rs#480-508
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8328dfb2-d6e5-4d67-ba9c-fdf371f3634a
 description: |-
   When an agent job is about to start on a ticket with an open dependency, lotar's dependency check sets the ticket to **HelpNeeded** and gives it to its reporter (usually claude). After that, nothing moves the ticket on. The inbox files only tickets assigned to mallox. The rule "Prerequisites done: continue the waiting ticket" acts only on status Blocked. No agent is assigned. On 2026-11-14 four tickets with finished, committed work sat like this for up to 11 hours: DEV-501, DEV-477, DEV-467 and DEV-468. Found while checking the HelpNeeded tickets, and mallox asked for this ticket in the thread.
 
@@ -65,3 +81,45 @@ history:
   changes:
   - field: reference_added
     new: code:crates/lotar-lib/src/services/automation_service.rs#480-508
+- at: 2026-11-14T06:50:47.051376+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-14T06:50:47.822504+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8328dfb2-d6e5-4d67-ba9c-fdf371f3634a
+- at: 2026-11-14T07:09:14.384988+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-501","DEV-477","DEV-467","DEV-468","DEV-503"]}'
+    new: '{"related":["DEV-501","DEV-477","DEV-467","DEV-468","DEV-503","DEV-528"]}'
+- at: 2026-11-14T07:09:29.330963+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T07:09:29.580079+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-501","DEV-477","DEV-467","DEV-468","DEV-503","DEV-528"]}'
+    new: '{"related":["DEV-501","DEV-477","DEV-467","DEV-468","DEV-503","DEV-528","DEV-320"]}'
+- at: 2026-11-14T07:09:45.233224+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T07:27:35.589471+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-501","DEV-477","DEV-467","DEV-468","DEV-503","DEV-528","DEV-320"]}'
+    new: '{"related":["DEV-501","DEV-477","DEV-467","DEV-468","DEV-503","DEV-528","DEV-320","DEV-530"]}'

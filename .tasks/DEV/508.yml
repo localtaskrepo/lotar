@@ -1,11 +1,11 @@
 title: 'crates.io: switch lotar''s crates to trusted publishing only after the first release'
-status: Merging
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T01:39:35.096482+00:00
-modified: 2026-11-14T06:33:42.182935+00:00
+modified: 2026-11-14T07:15:14.712486+00:00
 relationships:
   depends_on:
   - DEV-417
@@ -13,6 +13,11 @@ relationships:
   - DEV-507
   - DEV-497
   - DEV-525
+  - DEV-485
+  - DEV-514
+  - DEV-517
+  - DEV-518
+  - DEV-519
 comments:
 - date: 2026-11-14T01:40:06.621676+00:00
   author: triage
@@ -38,10 +43,17 @@ comments:
 - date: 2026-11-14T06:33:29.466019+00:00
   author: claude
   text: 'Agreed, nothing open for mallox: removed the owner tag. No change to the work; 1acd5c48 on agent/DEV-508 goes on through review and merge.'
+- date: 2026-11-14T06:42:37.670771+00:00
+  author: claude
+  text: 'Merged: rebase onto main was a no-op (1acd5c48 already on 43f6e1e2), fast-forwarded main, then amended the main checkout''s .tasks changes into it: main is now e64997ea. Checks: npm run lint:agent passes, npm run test:release passes (50/50), actionlint on release.yml (only the two existing shellcheck notes at lines 380/935). Skipped test:rust, test:ui and smoke: the commit changes only the release workflow and docs/release-guide.md, which those suites don''t exercise. Pushed only up to c9cf3a00 (DEV-485): the next unpushed commit, d08b01d8, belongs to DEV-514, which mallox reopened to InProgress at 06:32, so it and everything after it (DEV-517, DEV-518, DEV-519, this DEV-508 commit e64997ea) wait for DEV-514 to finish.'
+- date: 2026-11-14T07:15:07.093212+00:00
+  author: codex
+  text: 'Review: nothing to review. agent/DEV-508 and main both point to ff84b766123b82d20c9151e666f82eba7aca7aad; git log main..HEAD and the diff are empty. No files changed, no checks rerun, status and assignee unchanged.'
 references:
 - file: .github/workflows/release.yml
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab2e2e600-97ff-4f21-9d95-c81789329916
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac725f299-2f4d-4cb8-b7c0-10716802312a
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4a7825c2-fc0a-45cd-83b0-d3f5419c92cf
 description: |-
   After the first release that publishes lotar to crates.io, switch the three crates from the stored token to trusted publishing only. The owner decided this on 2026-11-14 in the thread ("Trusted, token once"; details in DEV-507). The steps need his crates.io login, so they are his.
 
@@ -214,3 +226,40 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-14T06:42:37.670771+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:42:37.931358+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-417"],"related":["DEV-507","DEV-497","DEV-525"]}'
+    new: '{"depends_on":["DEV-417"],"related":["DEV-507","DEV-497","DEV-525","DEV-485","DEV-514","DEV-517","DEV-518","DEV-519"]}'
+- at: 2026-11-14T06:51:10.527341+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-14T07:14:34.961809+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Done
+    new: Merging
+- at: 2026-11-14T07:14:35.740535+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4a7825c2-fc0a-45cd-83b0-d3f5419c92cf
+- at: 2026-11-14T07:15:07.093212+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T07:15:14.712486+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done

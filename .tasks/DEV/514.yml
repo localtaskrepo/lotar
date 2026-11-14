@@ -1,11 +1,11 @@
 title: A rule's run command skipped in an untrusted repo leaves no trace on the ticket, while the rule's set still applies
-status: InProgress
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-14T04:21:14.746777+00:00
-modified: 2026-11-14T06:32:14.570527+00:00
+modified: 2026-11-14T06:54:55.877854+00:00
 relationships:
   related:
   - DEV-517
@@ -13,6 +13,8 @@ relationships:
   - DEV-503
   - DEV-523
   - DEV-525
+  - DEV-508
+  - DEV-519
 comments:
 - date: 2026-11-14T04:53:42.802247+00:00
   author: claude
@@ -36,10 +38,24 @@ comments:
     - mallox in the thread, 2026-11-14, asked whether this has a resolution already: "Go ahead" (close it).
 
     Your comment at 06:14 set @fix but queued no job. That is filed as a lotar bug of its own (see Related).
+- date: 2026-11-14T06:42:40.615875+00:00
+  author: claude
+  text: 'Retry: nothing left to fix or merge. The fix d08b01d8 is already on main: the merge job''s ensure_branch_merged fast-forwarded it although that job stopped (the bug in DEV-519''s sibling ticket filed 2026-11-14). DEV-517 (aaa54472) has since fixed the lint/test failure that blocked the merge. Checked on main''s HEAD 43f6e1e2 (this branch equals main, no commits beyond it): npm run lint:agent clean; smoke 401/401 passed; npm test: 2150 Rust (incl. dev259_workspace_trust_test::a_skipped_run_command_is_reported_on_the_ticket, the ticket''s check), 1537 UI, release 50, hooks 7, all passed. Note: the first test run failed only because a fresh worktree has no target/web-embed until the web build runs; after smoke built it everything passed. No commit, nothing to merge or push.'
+- date: 2026-11-14T06:42:52.469492+00:00
+  author: claude
+  text: 'Correction to the comment above: the ticket for the merge job that fast-forwards a branch it decided not to merge is DEV-523.'
+- date: 2026-11-14T06:53:40.413296+00:00
+  author: codex
+  text: 'Review: nothing to review'
+- date: 2026-11-14T06:54:41.869520+00:00
+  author: claude
+  text: 'nothing to merge: this branch has no commits beyond main (ff84b766); the fix d08b01d8 is already on main.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af7f15d28-6992-41b4-bd09-eed8961e0852
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab57d0c5c-ceda-4f63-8153-bf88fcc57404
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae6ebc9c7-abc0-49c6-a2e1-ec2f2e8dc175
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A171a0eb3-5724-4ea5-b58b-8bc1a3c1397b
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A130dd30a-dfa1-47f3-ac93-7059c29541bc
 description: 'Found 2026-11-14 (standards STD-110): standards'' .tasks changed after the last lotar trust, so the server skipped the inbox relay command for five owner answers but applied the rule''s set status Done; the only trace is one ''[lotar][warn] Skipped automation run commands'' line in the server''s stderr (printed once per process), nothing on the tickets, no automation_failed SSE event. Check: in a scratch repo with a rule that has run and set, change automation.yml after lotar trust, fire the rule: the ticket shows nothing. Done: a skipped run is reported like a failed one (Automation rule ''<name>'' skipped on <ID>, an automation_failed or automation_skipped SSE event, visible in the web UI), and docs/help/automation.md says whether the rule''s other actions apply when its run is skipped (an option to skip them would fit).'
 tags:
 - health
@@ -167,3 +183,65 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae6ebc9c7-abc0-49c6-a2e1-ec2f2e8dc175
+- at: 2026-11-14T06:42:37.931821+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-517","DEV-485","DEV-503","DEV-523","DEV-525"]}'
+    new: '{"related":["DEV-517","DEV-485","DEV-503","DEV-523","DEV-525","DEV-508"]}'
+- at: 2026-11-14T06:42:40.615875+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:42:40.740501+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-517","DEV-485","DEV-503","DEV-523","DEV-525","DEV-508"]}'
+    new: '{"related":["DEV-517","DEV-485","DEV-503","DEV-523","DEV-525","DEV-508","DEV-519"]}'
+- at: 2026-11-14T06:42:52.469492+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:51:08.538850+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T06:53:13.972461+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A171a0eb3-5724-4ea5-b58b-8bc1a3c1397b
+- at: 2026-11-14T06:53:40.413296+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:53:47.221550+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-14T06:53:51.431339+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A130dd30a-dfa1-47f3-ac93-7059c29541bc
+- at: 2026-11-14T06:54:41.869520+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:54:55.877854+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done

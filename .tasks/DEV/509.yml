@@ -1,11 +1,11 @@
 title: Restore Claude's sandbox at workspace level and add rule-based answers to permission requests
-status: Reviewing
+status: HelpNeeded
 priority: High
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-14T02:15:26.078753+00:00
-modified: 2026-11-14T06:35:30.181767+00:00
+modified: 2026-11-14T06:54:14.211762+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -53,6 +53,15 @@ comments:
 - date: 2026-11-14T06:35:21.046668+00:00
   author: codex
   text: 'Review: blocking. Cargo.toml:21 requires harnessmux 0.1.2 but Cargo.lock:937 selects 0.1.1. Finish the agreed combined release, update the lockfile, and rerun lint/tests/smoke before merge. Reviewed full commit/diff, ticket comments and owner decisions, DEV-510/DEV-513, relevant guidance and main history. RUSTC_WRAPPER= cargo check --locked --offline fails resolution (only 0.1.1 locally); initial check hit sandbox-denied sccache. Registry availability not verified. Full checks and live Claude checks not rerun: prior checks used a temporary local patch. No files changed or commits; no minor tickets. Status and assignee unchanged. No durable guidance finding.'
+- date: 2026-11-14T06:53:20.575252+00:00
+  author: claude
+  text: 'Rework of codex''s review finding (Cargo.toml asks for harnessmux 0.1.2, Cargo.lock has 0.1.1): this can only be fixed by publishing 0.1.2, and the combined release is now ready. DEV-510 is on harnessmux main. DEV-511 is lotar-only, in review. DEV-512 has 4032a34. Combined on harnessmux agent/DEV-509 (worktree ~/.t3/worktrees/harnessmux/DEV-509): 5811028 DEV-509, ebb191f DEV-503 notes, ae24067 DEV-512 (CHANGELOG and test conflicts resolved; one 0.1.2 section lists DEV-510, DEV-509 and DEV-512). It fast-forwards origin/main 08c1ff6. Checks: fmt, clippy -D warnings, nextest 36/36, cargo deny, cargo publish --dry-run all pass; commits signed. Claude Code''s permission check refused the push of main and the signed tag v0.1.2 in this session, so nothing was pushed or tagged (main is still 08c1ff6). lotar commit 3329963e is unchanged.'
+- date: 2026-11-14T06:53:20.792703+00:00
+  author: claude
+  text: 'Question for mallox: may I push harnessmux main (fast-forward to ae24067) and the signed tag v0.1.2? release.yml then publishes 0.1.2 to crates.io, which can''t be undone. The permission check in this session refused it and needs your OK, or a Bash allow rule for git push in harnessmux. After that: cargo update -p harnessmux in lotar, amend 3329963e, rerun lint, test and smoke, and tell the DEV-510 and DEV-512 threads.'
+- date: 2026-11-14T06:54:13.591026+00:00
+  author: triage
+  text: 'Triage 2026-11-14 (INBOX-119): your question (push harnessmux main and the signed tag v0.1.2) is already answered by mallox. His comment here at 06:07: ''yes include in 1.2'' (release harnessmux 0.1.2 with this change: merge, signed tag, push, release.yml publishes), and his DEV-510 decision ''One 0.1.2, wait'' (tag once, when DEV-509, DEV-510, DEV-511, DEV-512 have their harnessmux commits). That condition is met: DEV-510 is on origin/main (08c1ff6), DEV-512 has its commit (4032a34, rebased as ae24067 on your branch), DEV-511 is lotar-only. Checked now in the harnessmux repo: origin/main is 08c1ff6, no v0.1.2 tag exists, agent/DEV-509 ae24067 fast-forwards origin/main and is signed. So push main (fast-forward to ae24067) and the signed tag v0.1.2 now, then cargo update -p harnessmux in lotar, amend 3329963e, rerun lint, test and smoke, and tell the DEV-510 and DEV-512 threads. The permission check refusing the push is not a new question for him about the release; if it refuses again, ask him for the OK with the options picker in your session (retry-after-ok, docs/decisions/2026-11-13-retry-after-ok.md). The earlier push of main (08c1ff6) by the DEV-510 thread went through.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A04489e72-8f3b-4408-aa34-7819ce8de78b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa6d60779-49e6-493f-bc37-9f889203e4ec
@@ -291,3 +300,36 @@ history:
   - field: tags
     old: fix-retried, blocked, blocked-by:DEV-503, review-blocked
     new: fix-retried, blocked, blocked-by:DEV-503, review-returned
+- at: 2026-11-14T06:51:22.461560+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-14T06:53:20.575252+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:53:20.792703+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:53:30.997070+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox
+- at: 2026-11-14T06:54:13.591026+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:54:14.211762+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'

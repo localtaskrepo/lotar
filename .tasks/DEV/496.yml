@@ -1,11 +1,11 @@
 title: CI caches lotar's own build output between runs
-status: Merging
+status: HelpNeeded
 priority: High
 type: Chore
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-13T22:21:42.733070+00:00
-modified: 2026-11-14T06:26:30.045678+00:00
+modified: 2026-11-14T06:47:32.125335+00:00
 relationships:
   depends_on:
   - DEV-493
@@ -53,6 +53,9 @@ comments:
 - date: 2026-11-14T06:26:23.654279+00:00
   author: codex
   text: 'Review: passed. Read full 069748b7 diff, ticket/comments, related DEV-493/107/499, owner adoption and recent main history. Prior measurement finding answered by local before/after matrix and adopt decision; DEV-493 permits local measurements when CI cannot be triggered. CI after-times remain unverified. Cache caps, main-only saves, keys and incremental setting agree with contracts. git diff --check passed; RUSTC_WRAPPER= cargo nextest run --cargo-profile local filtered to ci_windows_reporting_contract_test passed 9/9 (2177 skipped). Full lint/test/smoke not repeated; prior results remain agent-reported. No findings, minor tickets, UI changes or durable guidance finding. No files/commits changed; status/assignee unchanged.'
+- date: 2026-11-14T06:47:15.900137+00:00
+  author: codex
+  text: 'Merge blocked. Rebased 069748b7 onto main e64997ea as ff84b766 (signed), retaining main Rust 1.99.1 and the new CARGO_INCREMENTAL=0 in the sole conflict. No merge or push. lint:agent passed with RUSTC_WRAPPER=. test:agent failed at embedded_web_ui_test::serve_sends_the_embedded_index_page: target/web-embed/index.html.gz missing; 2129/2150 tests not run, xcrun_db cleanup failure. test:smoke:agent finished: 255 failed, 146 passed; server startup reports binding 127.0.0.1:0 denied (Operation not permitted), plus temp cleanup failures. All checks stopped. Logs /tmp/dev496-merge-lint.log, /tmp/dev496-merge-test.log, /tmp/dev496-merge-smoke.log. Can the merge job rerun with localhost binding permission and web assets built before the tests?'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2c9b49ac-88aa-4223-8194-4149b3d24d9e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5d6d56fe-4cfa-47bb-b512-f4b935826a9f
@@ -77,7 +80,6 @@ description: |-
   - [ ] The change is adopted or dropped with the numbers in a comment.
 tags:
 - backend
-- review-returned
 history:
 - at: 2026-11-13T22:21:42.840566+00:00
   actor: claude
@@ -191,3 +193,22 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-14T06:47:15.900137+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T06:47:32.077558+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: backend, review-returned
+    new: backend
+- at: 2026-11-14T06:47:32.125335+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
