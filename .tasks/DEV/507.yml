@@ -1,17 +1,19 @@
 title: 'crates.io: the published lotar-lib and lotar-web-assets crates carry their docs and web UI'
-status: Merging
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T00:50:32.865133+00:00
-modified: 2026-11-14T02:08:49.281571+00:00
+modified: 2026-11-14T02:17:43.409296+00:00
 relationships:
   related:
   - DEV-497
   - DEV-163
   - DEV-508
   - DEV-417
+  - DEV-489
+  - DEV-503
 comments:
 - date: 2026-11-14T01:12:08.540634+00:00
   author: claude
@@ -52,6 +54,9 @@ comments:
 - date: 2026-11-14T02:08:49.281571+00:00
   author: codex
   text: 'Merged into main by fast-forward after clean rebase: 385b207d and 8a732432. Checks passed: npm run lint:agent, npm run test:agent (2171 Rust, 1524 UI, 50 release, 7 hook), npm run smoke (394/394). Initial sandbox sccache denial retried with required access; initial Rust run lacked generated web assets, resolved by npm run build:web before full passing rerun. Packaging/install and real publishing not rerun. Pending .tasks changes will be included by the requested amend. Push limited to 3ec533d6, before unfinished owner release DEV-417 commit ad67e063; this ticket remains local behind it. Status and assignee unchanged; automation advances to Done when this job ends.'
+- date: 2026-11-14T02:09:10.201933+00:00
+  author: codex
+  text: 'Final merge commit is e442f204 after including pending .tasks changes. Push was not attempted: another session changed .tasks/DEV/503.yml immediately after the amend, so main is no longer clean and the requested push gate is not met. The unfinished DEV-417 ancestor also prevents pushing this ticket. All required checks completed; no background checks remain.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5fd0f5af-5571-46df-be41-a26e3d5cbf4d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adddbeb69-b7da-486e-93aa-781960ead76d
@@ -80,7 +85,6 @@ description: |-
   - [ ] docs/release-guide.md describes the setup and the steps after the first release.
 tags:
 - backend
-- review-returned
 history:
 - at: 2026-11-14T00:50:33.106152+00:00
   actor: claude
@@ -319,3 +323,28 @@ history:
   actor: codex
   changes:
   - field: comment_added
+- at: 2026-11-14T02:09:10.201933+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T02:09:14.906914+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: backend, review-returned
+    new: backend
+- at: 2026-11-14T02:11:01.662439+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-497","DEV-163","DEV-508","DEV-417"]}'
+    new: '{"related":["DEV-497","DEV-163","DEV-508","DEV-417","DEV-489"]}'
+- at: 2026-11-14T02:17:43.409296+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-497","DEV-163","DEV-508","DEV-417","DEV-489"]}'
+    new: '{"related":["DEV-497","DEV-163","DEV-508","DEV-417","DEV-489","DEV-503"]}'

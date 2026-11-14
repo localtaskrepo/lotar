@@ -120,8 +120,13 @@
             </ul>
           </template>
           <MarkdownContent v-else-if="editingCommentIndex !== commentIndex" :source="comment.text" />
+          <CommentReport
+            v-if="comment.report && editingCommentIndex !== commentIndex"
+            :report="comment.report"
+            :commit-url="branding.commitUrl"
+          />
           <textarea
-            v-else
+            v-if="editingCommentIndex === commentIndex"
             :ref="onEditingTextareaRef"
             :value="editingCommentText"
             class="task-panel__comment-edit"
@@ -158,6 +163,7 @@
 import { computed, type ComponentPublicInstance } from 'vue'
 import { COMMENT_FILTER_KEY, useActivityFilter } from '../../composables/task-panel/useActivityFilter'
 import type { CommentReview, ReviewFinding, TaskComment } from '../../api/types'
+import { useBranding } from '../../composables/useBranding'
 import { answerLabels, answerTo, questionPrompt } from '../../utils/questions'
 import { reviewSummary } from '../../utils/reviews'
 import IconGlyph from '../IconGlyph.vue'
@@ -166,6 +172,7 @@ import QuestionPrompt from '../QuestionPrompt.vue'
 import ReloadButton from '../ReloadButton.vue'
 import ReviewBadge from '../ReviewBadge.vue'
 import UiButton from '../UiButton.vue'
+import CommentReport from './CommentReport.vue'
 import TaskPanelActivityFilter, { type ActivityFilterGroup } from './TaskPanelActivityFilter.vue'
 
 const props = defineProps<{
@@ -194,16 +201,26 @@ const emit = defineEmits<{
 }>()
 
 const filter = useActivityFilter(COMMENT_FILTER_KEY)
+const branding = useBranding()
 
 const comments = computed(() => (props.task.comments || []).map((comment, index) => ({ comment, index })))
 function commentType(comment: TaskComment): string {
-  return comment.question ? 'question' : comment.answer ? 'answer' : comment.review ? 'review' : 'comment'
+  return comment.question
+    ? 'question'
+    : comment.answer
+      ? 'answer'
+      : comment.review
+        ? 'review'
+        : comment.report
+          ? 'handoff'
+          : 'comment'
 }
 
 const TYPE_LABELS: Record<string, string> = {
   question: 'Question',
   answer: 'Answer',
   review: 'Review',
+  handoff: 'Hand-off',
   comment: 'Comment',
 }
 
@@ -239,7 +256,7 @@ const filterGroups = computed<ActivityFilterGroup[]>(() => {
         hidden: filter.hiddenAuthors.value.has(author),
       })),
     },
-    ...(comments.value.some(({ comment }) => comment.question || comment.answer || comment.review)
+    ...(comments.value.some(({ comment }) => comment.question || comment.answer || comment.review || comment.report)
       ? [
           {
             id: 'type',

@@ -128,6 +128,11 @@ pub fn render_task_text(task: &TaskDTO, tasks_root: &std::path::Path) -> String 
             for line in lines {
                 out.push_str(&format!("    {line}\n"));
             }
+            if let Some(report) = &comment.report {
+                for line in crate::cli::handlers::comment::report_lines(report) {
+                    out.push_str(&format!("    {line}\n"));
+                }
+            }
         }
     }
     out.trim_end().to_string()

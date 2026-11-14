@@ -347,6 +347,9 @@ pub struct TaskComment {
     /// `text` holds the summary and the findings in prose.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub review: Option<CommentReview>,
+    /// A hand-off report with a plain comment.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub report: Option<CommentReport>,
     /// Keys this version does not know, kept so a newer tool's or a
     /// hand-written field survives edits (DEV-268).
     #[serde(flatten, default)]
@@ -356,7 +359,7 @@ pub struct TaskComment {
 
 impl TaskComment {
     pub fn new(date: String, author: Option<String>, text: String) -> Self {
-        Self { date, author, text, question: None, answer: None, review: None, extra: Default::default() }
+        Self { date, author, text, question: None, answer: None, review: None, report: None, extra: Default::default() }
     }
 }
 
@@ -515,6 +518,60 @@ pub fn open_questions(comments: &[TaskComment]) -> Vec<usize> {
         .filter(|(_, question)| !comments.iter().any(|comment| comment.answer.as_ref().is_some_and(|answer| answer.to == question.date)))
         .map(|(index, _)| index)
         .collect()
+}
+
+/// The parts of a hand-off comment (DEV-490). Every part is optional, so a
+/// half-filled report still loads; the UI shows what is missing.
+#[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct CommentReport {
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub commits: Vec<ReportCommit>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub checks: Vec<ReportCheck>,
+    /// The next step, e.g. who acts and what they do.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub next: Option<String>,
+    #[serde(flatten, default)]
+    #[cfg_attr(feature = "schema", schemars(skip))]
+    pub extra: std::collections::BTreeMap<String, serde_yaml_ng::Value>,
+}
+
+impl CommentReport {
+    pub fn is_empty(&self) -> bool {
+        self.commits.is_empty() && self.checks.is_empty() && self.next.is_none() && self.extra.is_empty()
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct ReportCommit {
+    pub hash: String,
+    /// What the commit is, e.g. its subject.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub what: Option<String>,
+    #[serde(flatten, default)]
+    #[cfg_attr(feature = "schema", schemars(skip))]
+    pub extra: std::collections::BTreeMap<String, serde_yaml_ng::Value>,
+}
+
+/// A check's result: `passed`, `failed` or `not_run`. Kept as text so a
+/// result a newer version adds still loads.
+pub const REPORT_CHECK_RESULTS: [&str; 3] = ["passed", "failed", "not_run"];
+
+#[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct ReportCheck {
+    /// The command or check, e.g. `npm test`.
+    pub command: String,
+    /// One of [`REPORT_CHECK_RESULTS`].
+    pub result: String,
+    /// Why it failed or did not run.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub reason: Option<String>,
+    #[serde(flatten, default)]
+    #[cfg_attr(feature = "schema", schemars(skip))]
+    pub extra: std::collections::BTreeMap<String, serde_yaml_ng::Value>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq)]

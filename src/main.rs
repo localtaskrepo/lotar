@@ -345,7 +345,7 @@ fn main() {
                 }
             }
         }
-        Commands::Comment { id, text, message, file, dry_run, explain, ask } => {
+        Commands::Comment { id, text, message, file, dry_run, explain, ask, report } => {
             renderer.log_info("BEGIN COMMENT");
             // Resolve comment content from args: file > message > text > stdin
             let resolved_text = match lotar::cli::handlers::comment::resolve_comment_text(file, message, text) {
@@ -356,7 +356,7 @@ fn main() {
                 }
             };
             let text_value = if resolved_text.trim().is_empty() { None } else { Some(resolved_text) };
-            let args = CommentArgs::new(id, text_value, None, dry_run, explain).with_ask(ask);
+            let args = CommentArgs::new(id, text_value, None, dry_run, explain).with_ask(ask).with_report(report.into_report());
             match CommentHandler::execute(args, cli.project.as_deref(), &resolver, &renderer) {
                 Ok(()) => {
                     renderer.log_info("END COMMENT status=ok");

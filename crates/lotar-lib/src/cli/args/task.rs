@@ -248,7 +248,7 @@ pub struct CommentAskArgs {
     #[arg(long, value_name = "VERDICT", value_parser = ["pass", "block"], conflicts_with_all = ["question", "answer"])]
     pub review: Option<String>,
     /// The commit the --review looked at
-    #[arg(long, value_name = "SHA", requires = "review")]
+    #[arg(skip)]
     pub commit: Option<String>,
     /// A finding of the --review as "[<file>[:<line>]: ]<summary>" (repeatable)
     #[arg(long = "finding", value_name = "FINDING", requires = "review")]
@@ -378,11 +378,64 @@ pub enum TaskAction {
         explain: bool,
         #[command(flatten)]
         ask: CommentAskArgs,
+        #[command(flatten)]
+        report: CommentReportArgs,
     },
 
     /// Add or remove references for a task
     #[command(alias = "references")]
     Reference(TaskReferenceArgs),
+}
+
+/// A hand-off report on a new comment (DEV-490); the text stays the summary.
+#[derive(Args, Deserialize, Debug, Default)]
+pub struct CommentReportArgs {
+    /// A commit of the hand-off: "<sha>: <what it is>" (repeatable)
+    #[arg(long = "commit", value_name = "SHA[: WHAT]", value_parser = parse_report_commit)]
+    pub commits: Vec<crate::types::ReportCommit>,
+    /// A check and its result: "<command>=passed|failed|not_run[: reason]" (repeatable)
+    #[arg(long = "check", value_name = "CMD=RESULT[: REASON]", value_parser = parse_report_check)]
+    pub checks: Vec<crate::types::ReportCheck>,
+    /// The next step
+    #[arg(long = "next", allow_hyphen_values = true)]
+    pub next: Option<String>,
+}
+
+impl CommentReportArgs {
+    pub fn into_report(self) -> Option<crate::types::CommentReport> {
+        let report = crate::types::CommentReport { commits: self.commits, checks: self.checks, next: self.next, extra: Default::default() };
+        if report.is_empty() { None } else { Some(report) }
+    }
+}
+
+fn parse_report_commit(s: &str) -> Result<crate::types::ReportCommit, String> {
+    let (hash, what) = match s.split_once(':') {
+        Some((hash, what)) => (hash, Some(what.trim().to_string()).filter(|w| !w.is_empty())),
+        None => (s, None),
+    };
+    let hash = hash.trim();
+    if hash.len() < 4 || !hash.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err(format!("'{hash}' is not a commit hash; use \"<sha>: <what>\""));
+    }
+    Ok(crate::types::ReportCommit { hash: hash.to_string(), what, extra: Default::default() })
+}
+
+/// The command may hold `=` itself (`FOO=1 npm test=passed`), so the
+/// result is the last `=` followed by a known result.
+fn parse_report_check(s: &str) -> Result<crate::types::ReportCheck, String> {
+    for (index, _) in s.rmatch_indices('=') {
+        let rest = &s[index + 1..];
+        let (result, reason) = match rest.split_once(':') {
+            Some((result, reason)) => (result, Some(reason.trim().to_string()).filter(|r| !r.is_empty())),
+            None => (rest, None),
+        };
+        let result = result.trim().to_ascii_lowercase().replace('-', "_");
+        let command = s[..index].trim();
+        if crate::types::REPORT_CHECK_RESULTS.contains(&result.as_str()) && !command.is_empty() {
+            return Ok(crate::types::ReportCheck { command: command.to_string(), result, reason, extra: Default::default() });
+        }
+    }
+    Err(format!("'{s}' needs \"<command>=passed|failed|not_run[: reason]\""))
 }
 
 #[derive(Args, Deserialize, Debug)]

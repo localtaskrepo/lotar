@@ -1111,6 +1111,10 @@ pub struct BrandingResponse {
     /// Why configured images are not shown (missing file, not an image…).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub problems: Vec<String>,
+    /// A commit's web page without the hash, from the first git remote on
+    /// a known host; report comments link their commits with it (DEV-490).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub commit_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

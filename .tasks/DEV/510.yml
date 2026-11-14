@@ -1,0 +1,26 @@
+title: 'Close the gaps of harnessmux''s t3 agent: resume waits for a running thread, worktree and link in its events, a structured wait for an answer'
+status: Blocked
+priority: High
+type: Feature
+reporter: claude
+created: 2026-11-14T02:19:54.140386+00:00
+modified: 2026-11-14T02:19:55.842357+00:00
+relationships:
+  depends_on:
+  - DEV-503
+  related:
+  - DEV-503
+description: 'Lost in DEV-503 (owner asked to file it, 2026-11-14). 1) Restart recovery: before DEV-503 a t3 job whose lotar process died waited for the still-running T3 thread (t3 thread show) and ended with it. Now lotar resumes the session and sends ''continue'', which reaches a thread that is probably still running, so the agent may work twice. harnessmux''s t3 agent should, on resume, check whether the thread runs and follow that run instead of a new turn. 2) T3 reports the thread''s worktreePath, branch and link (thread show --json); lotar used to record the worktree on the job and add the link to the ticket. Now lotar guesses the worktree from git (record_t3_worktree in agent_job_service.rs) and links nothing. harnessmux''s t3 agent should put worktree, branch and link in its events; lotar records them and attaches the link. 3) A thread waiting for an answer (t3 exit 2) used to hand the ticket to its reporter as HelpNeeded with the link; now it is turn.failed text and the job fails. harnessmux should end the turn with a structured ''waiting for an answer'' (also usable for an unanswered on_permission: ask), and lotar hands the ticket back as before. Work in harnessmux (release, crates.io) and lotar. Done when a killed lotar during a t3 job ends the job from the thread without a second turn, t3 jobs record T3''s worktree and link the thread, and a waiting thread hands the ticket back.'
+history:
+- at: 2026-11-14T02:19:54.844800+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-503"]}'
+- at: 2026-11-14T02:19:55.842357+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-503"]}'
+    new: '{"depends_on":["DEV-503"],"related":["DEV-503"]}'

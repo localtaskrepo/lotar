@@ -13,7 +13,7 @@ use crate::services::automation_service::option_set_patch;
 use crate::services::task_service::{CommentContext, TaskService, TaskUpdateContext};
 use crate::services::task_validation as validation;
 use crate::storage::manager::Storage;
-use crate::types::{CommentAnswer, CommentQuestion, OptionSet, TaskComment};
+use crate::types::{CommentAnswer, CommentQuestion, CommentReport, OptionSet, TaskComment};
 use serde::Deserialize;
 
 /// The fields an option's `set:` accepts.
@@ -35,7 +35,7 @@ pub struct AnswerInput {
 /// review (`text` is then the summary, DEV-489).
 #[derive(Debug, Clone)]
 pub enum CommentRequest {
-    Plain(String),
+    Plain { text: String, report: Option<CommentReport> },
     Question { prompt: String, question: CommentQuestion },
     Answer(AnswerInput),
     Review { summary: Option<String>, review: crate::types::CommentReview },
@@ -46,8 +46,16 @@ impl CommentRequest {
     pub fn from_json(body: &serde_json::Value) -> Result<Self, String> {
         let text = body.get("text").and_then(serde_json::Value::as_str).map(str::trim).filter(|text| !text.is_empty()).map(str::to_string);
         let present = |key: &str| body.get(key).is_some_and(|value| !value.is_null());
+        if present("report") {
+            if present("question") || present("answer") || present("review") {
+                return Err("a report goes with a plain comment, not with a question, answer or review".to_string());
+            }
+            let report: CommentReport = serde_json::from_value(body["report"].clone()).map_err(|err| format!("Invalid report: {err}"))?;
+            let text = text.ok_or("Missing text: the report's prose summary")?;
+            return Ok(Self::Plain { text, report: Some(report) });
+        }
         if present("review") {
-            if present("question") || present("answer") {
+            if present("question") || present("answer") || present("report") {
                 return Err("a review comment cannot ask or answer".to_string());
             }
             let review = serde_json::from_value(body["review"].clone()).map_err(|err| format!("Invalid review: {err}"))?;
@@ -67,7 +75,7 @@ impl CommentRequest {
                 }
                 Ok(Self::Answer(answer))
             }
-            (false, false) => text.map(Self::Plain).ok_or_else(|| "Missing text".to_string()),
+            (false, false) => text.map(|text| Self::Plain { text, report: None }).ok_or_else(|| "Missing text".to_string()),
         }
     }
 }
@@ -76,7 +84,9 @@ impl TaskService {
     /// Add a plain, question, answer or review comment.
     pub fn add_comment_request(storage: &mut Storage, id: &str, request: CommentRequest) -> LoTaRResult<TaskDTO> {
         match request {
-            CommentRequest::Plain(text) => Self::add_comment(storage, id, &text),
+            CommentRequest::Plain { text, report } => {
+                Self::add_comment_with_context(storage, id, &text, CommentContext { report, ..CommentContext::default() })
+            }
             CommentRequest::Question { prompt, question } => Self::ask_question(storage, id, &prompt, question),
             CommentRequest::Answer(answer) => Self::answer_question(storage, id, &answer),
             CommentRequest::Review { summary, review } => Self::add_review(storage, id, summary.as_deref(), review),

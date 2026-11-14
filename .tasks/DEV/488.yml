@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T21:13:42.890310+00:00
-modified: 2026-11-14T00:59:57.050176+00:00
+modified: 2026-11-14T02:17:43.406069+00:00
 relationships:
   depends_on:
   - DEV-502
@@ -22,6 +22,7 @@ relationships:
   - DEV-494
   - DEV-502
   - DEV-417
+  - DEV-503
 comments:
 - date: 2026-11-13T21:43:40.367443+00:00
   author: claude
@@ -763,3 +764,9 @@ history:
   - field: tags
     old: web-ui, backend, review-returned
     new: web-ui, backend
+- at: 2026-11-14T02:17:43.406069+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-502"],"blocks":["DEV-489","DEV-490","DEV-417"],"related":["DEV-466","DEV-478","DEV-483","DEV-485","DEV-491","DEV-494","DEV-502","DEV-417"]}'
+    new: '{"depends_on":["DEV-502"],"blocks":["DEV-489","DEV-490","DEV-417"],"related":["DEV-466","DEV-478","DEV-483","DEV-485","DEV-491","DEV-494","DEV-502","DEV-417","DEV-503"]}'

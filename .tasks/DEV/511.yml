@@ -1,0 +1,26 @@
+title: Profile budget limit, agent options and live replies for harnessmux jobs
+status: Blocked
+priority: Medium
+type: Feature
+reporter: claude
+created: 2026-11-14T02:19:56.623287+00:00
+modified: 2026-11-14T02:19:58.793102+00:00
+relationships:
+  depends_on:
+  - DEV-503
+  related:
+  - DEV-503
+description: 'Lost in DEV-503 (owner asked to file it, 2026-11-14); lotar only. 1) max_budget_usd (Claude''s --max-budget-usd) is no longer passed: lotar gets the cost per turn from harnessmux usage events, so it can cancel a job once the cost passes the budget, for every agent that reports cost. 2) effort is limited to harnessmux''s low..max, so agent values such as Codex''s ultra or Copilot''s minimal are refused; harnessmux''s Profile already has an options map (ACP config option id -> value). Add a profile key options: that passes it. 3) The job view shows a reply only when its turn ends; drive_session ignores message.delta. Stream deltas into the job log so replies appear as they come, as Claude''s did. Done when the three work with tests and docs (docs/help/agent.md, config-reference), and REST/types where shapes change.'
+history:
+- at: 2026-11-14T02:19:57.383575+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-503"]}'
+- at: 2026-11-14T02:19:58.793102+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-503"]}'
+    new: '{"depends_on":["DEV-503"],"related":["DEV-503"]}'

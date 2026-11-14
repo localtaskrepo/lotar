@@ -48,6 +48,7 @@ Do not call both transports for each operation or repeatedly dump every schema.
 | Progress | `task_comment_add` with `id`, `text` | `comment "$TASK_ID" -m "Outcome; evidence; next step"` |
 | Report a review | `task_comment_add` with `id`, `text`, `review.verdict`, `review.commit` | `comment "$TASK_ID" --review block --commit "$SHA" --blocker "path:12: what breaks" "Summary"` |
 | Ask a choice | `task_comment_add` with `id`, `text`, `question.options` | `comment "$TASK_ID" --question "Which?" --option "a: First" --option "b: Second" --recommend a` |
+| Hand off | `task_comment_add` with `report` | `comment "$TASK_ID" -m "Outcome" --commit "<sha>: <what>" --check "<cmd>=passed\|failed\|not_run: <why>" --next "<step>"` |
 | State | `task_update` with `id`, `patch.status` | `status "$TASK_ID" "$STATUS"` |
 | Values/schema | `config_show`; `schema_discover` filtered by `tool` | `config show --project "$PROJECT"`; command `--help` |
 
@@ -103,7 +104,9 @@ who scans, often on a small screen:
    return evidence. Delegation requires the user's/harness's authorization.
 3. Before a session ends or another agent takes over, record the outcome, key
    decisions, verification commands/results, remaining work, and next exact action.
-   Include any temporary tool/provider limitation needed by the next session.
+   Write it as a report comment: the outcome as text, each commit, every check with
+   `passed`, `failed` or `not_run` and why, and the next step. List the checks that
+   did not run too. Include any temporary tool/provider limitation needed by the next session.
 4. Follow the project's review/completion policy. If awaiting review or integration,
    do not mark the work shipped. Use a configured waiting state or leave the current
    state and explain the blocker. Do not reassign people or invent workflow values

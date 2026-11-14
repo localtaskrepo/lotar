@@ -70,7 +70,7 @@ More endpoints (request and response shapes are in [OpenAPI](../openapi.json)):
 
 Tasks
 - POST /api/tasks/status ({ id, status }) -> { data: TaskDTO, deferred?: JobOutcome }; same validation and agent-job handling as `lotar status`
-- POST /api/tasks/comment ({ id, text }) -> { data: TaskDTO }
+- POST /api/tasks/comment ({ id, text, report? }) -> { data: TaskDTO }; `report` is a hand-off report (`commits`, `checks`, `next`; see [lotar comment](./comment.md#hand-off-reports)), refused with 400 when a commit is not a hash or a check result is not `passed`, `failed` or `not_run`
 - POST /api/tasks/comment/update ({ id, index, text }) -> { data: TaskDTO }; `index` is the comment's position, starting at 0
 - GET  /api/tasks/history?id=ID[&limit=N] -> { data: commits }; recent git commits that changed the task file
 - GET  /api/tasks/commit_diff?id=ID&commit=SHA -> { data }; the task file's diff at that commit

@@ -153,6 +153,33 @@ fn read_remotes_at(git_entry: &Path) -> Vec<String> {
     remotes
 }
 
+/// The web page of a commit for a remote on a known host, without the hash
+/// (e.g. `https://github.com/o/r/commit/`); `None` for other hosts (DEV-490).
+pub fn commit_url_prefix(remote: &str) -> Option<String> {
+    let remote = remote.trim();
+    // https://host/o/r(.git), ssh://git@host/o/r.git or git@host:o/r.git
+    let rest = match remote.split_once("://") {
+        Some((_, rest)) => rest,
+        None => remote,
+    };
+    let rest = rest.rsplit_once('@').map_or(rest, |(_, rest)| rest);
+    let (host, path) = match rest.split_once('/') {
+        Some((host, path)) if !host.contains(':') || remote.contains("://") => (host.split(':').next()?, path),
+        _ => rest.split_once(':')?,
+    };
+    let path = path.trim_matches('/').trim_end_matches(".git");
+    if path.is_empty() || path.split('/').count() < 2 {
+        return None;
+    }
+    let commit = match host.to_ascii_lowercase().as_str() {
+        "github.com" | "codeberg.org" => "commit",
+        "gitlab.com" => "-/commit",
+        "bitbucket.org" => "commits",
+        _ => return None,
+    };
+    Some(format!("https://{host}/{path}/{commit}/"))
+}
+
 /// Read-only metadata location, not the ownership verification used for Git writes.
 pub(crate) fn metadata_dirs(git_entry: &Path) -> Option<(PathBuf, PathBuf)> {
     let git_dir = if git_entry.is_dir() {
@@ -195,6 +222,30 @@ fn metadata_directory(value: &str, base: &Path) -> Option<PathBuf> {
 #[cfg(test)]
 #[path = "../../tests/common/dev73_git_metadata_cases.rs"]
 mod metadata_tests;
+
+#[cfg(test)]
+mod commit_url_tests {
+    use super::commit_url_prefix;
+
+    #[test]
+    fn known_hosts_give_a_commit_page() {
+        let github = Some("https://github.com/localtaskrepo/lotar/commit/".to_string());
+        assert_eq!(commit_url_prefix("git@github.com:localtaskrepo/lotar.git"), github);
+        assert_eq!(commit_url_prefix("https://github.com/localtaskrepo/lotar.git"), github);
+        assert_eq!(commit_url_prefix("https://token@github.com/localtaskrepo/lotar"), github);
+        assert_eq!(commit_url_prefix("ssh://git@github.com:22/localtaskrepo/lotar.git"), github);
+        assert_eq!(commit_url_prefix("git@gitlab.com:group/sub/app.git"), Some("https://gitlab.com/group/sub/app/-/commit/".to_string()));
+        assert_eq!(commit_url_prefix("https://bitbucket.org/team/app"), Some("https://bitbucket.org/team/app/commits/".to_string()));
+    }
+
+    #[test]
+    fn other_remotes_give_none() {
+        assert_eq!(commit_url_prefix("nyx:repos/app.git"), None);
+        assert_eq!(commit_url_prefix("/srv/git/app.git"), None);
+        assert_eq!(commit_url_prefix("https://git.example.com/o/r.git"), None);
+        assert_eq!(commit_url_prefix("git@github.com:lotar"), None);
+    }
+}
 
 #[cfg(test)]
 mod routing_tests {

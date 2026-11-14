@@ -45,6 +45,7 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 ### `task_comment_add`
 - **Params:** `id` (required), `text` (required unless `answer` or `review` is given), optional `question`, `answer` or `review`.
 - **Behavior:** appends a new comment and records a history entry. `question: {options: [{key, label, set?}], recommended?, multiple?, other?}` asks a question with `text` as the question; an option's `set` takes `status`, `assignee`, `reporter`, `priority`, `type`, `due_date`, `effort`, `tags`, checked when asking. `answer: {to?, choice?, note?}` answers the question asked at `to` (default: the newest open one) with option keys or, without `choice`, in words (`note` or `text`), then applies the chosen options' `set` as an update by the answerer. `review: {verdict, commit?, findings?: [{summary, file?, line?, blocking?}]}` reports a review with `text` as its summary; `verdict` is `pass` or `block`, and a `pass` review has no blocking finding. Invalid questions, answers and reviews return `-32602` with the reason. See [Questions and answers](comment.md#questions-and-answers) and [Reviews](comment.md#reviews).
+Reports add optional `report: {commits?, checks?, next?}` to plain comments only; they cannot accompany a question, answer or review. See [Hand-off reports](comment.md#hand-off-reports).
 - **Response:** Updated `TaskDTO`.
 
 ### `task_comment_update`

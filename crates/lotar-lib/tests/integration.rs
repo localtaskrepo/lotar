@@ -154,6 +154,7 @@ mod dev470_comment_author_prefix_test;
 mod dev482_macos_signing_test;
 mod dev488_question_comments_test;
 mod dev489_review_comments_test;
+mod dev490_report_comment_test;
 mod dev494_add_relationships_test;
 mod dev497_cargo_install_root_test;
 mod dev4_archive_test;

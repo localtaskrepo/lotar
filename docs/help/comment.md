@@ -8,6 +8,7 @@ Add or list comments for a task. Supports positional text, message flag, file in
 lotar comment <TASK_ID> [TEXT]
 lotar comment <TASK_ID> -m|--message <TEXT>
 lotar comment <TASK_ID> -F|--file <PATH>
+lotar comment <TASK_ID> <TEXT> [--commit "<SHA>[: WHAT]"]... [--check "<CMD>=<RESULT>[: REASON]"]... [--next <STEP>]
 
 # Alias
 lotar c <TASK_ID> [TEXT]
@@ -44,6 +45,13 @@ printf "Line 1\nLine 2\n" | lotar comment 1
 
 # JSON output
 lotar --format json comment 1 -m "First note"
+
+# Hand-off report: the text is the summary
+lotar comment DEV-12 "Report comments work in CLI, MCP and REST" \
+  --commit "5b7385dc: DEV-12 Report comments" \
+  --check "npm test=passed" \
+  --check "npm run smoke=not_run: no browser in the sandbox" \
+  --next "review agent checks the UI"
 
 # List existing comments (no text provided)
 lotar comment 1
@@ -105,6 +113,36 @@ lotar list --has question
 - The answer and its option fields are saved together. A rejected field update leaves the question open so you can retry.
 - The comment's `text` keeps the question with its options, or the answer with its labels, in prose, so `lotar show`, older lotar versions and agents reading the YAML see everything. `lotar comment <ID>` and `lotar show` mark a question no answer points to as `[open question]`.
 - The stored comment adds `question: { options: [{key, label, set?}], recommended?, multiple?, other? }` or `answer: { to, choice?, note? }`; REST (`POST /api/tasks/comment`) and MCP (`task_comment_add`) take the same `question` and `answer` fields.
+## Hand-off reports
+
+A report belongs to a plain comment only. Combining it with a question, answer or review verdict is refused. With `--review`, `--commit <sha>` identifies the reviewed commit; without `--review`, repeat `--commit "<sha>: <what>"` to list report commits.
+
+An agent ending its work adds the parts of its hand-off as a `report` on the comment, so they show as a checklist and a missing "not run" stands out:
+
+- `--commit "<sha>: <what>"`: a commit and what it is (repeatable). The hash is 4 to 64 hex digits.
+- `--check "<command>=<result>[: reason]"`: a check and its result, `passed`, `failed` or `not_run` (`not-run` works too), with why it failed or did not run (repeatable). The command may contain `=` itself (`FOO=1 npm test=passed`).
+- `--next "<step>"`: the next step.
+
+Every part is optional; the text stays required and is the prose summary, so tools that don't know reports lose nothing. The comment stores the report under its text:
+
+```yaml
+- date: 2026-11-13T21:20:32Z
+  author: claude
+  text: Report comments work in CLI, MCP and REST
+  report:
+    commits:
+    - hash: 5b7385dc
+      what: DEV-12 Report comments
+    checks:
+    - command: npm test
+      result: passed
+    - command: npm run smoke
+      result: not_run
+      reason: no browser in the sandbox
+    next: review agent checks the UI
+```
+
+`lotar comment <ID>` and `lotar show` print the report under the text (`check npm run smoke: not run (no browser in the sandbox)`); JSON output includes it as `report`. The web UI shows the commits, linked to their page when the git remote is on GitHub, GitLab, Bitbucket or Codeberg, and the checks with pass, fail and not-run marks. It says "No check marked not run" when a report lists none. The Comments tab's Type filter has a "Hand-off" chip to show or hide report comments. MCP `task_comment_add` and `POST /api/tasks/comment` take the same `report` object.
 
 ## Reviews
 

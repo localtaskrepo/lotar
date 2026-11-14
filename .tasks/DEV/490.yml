@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-13T21:14:11.750735+00:00
-modified: 2026-11-14T02:06:53.514674+00:00
+modified: 2026-11-14T03:52:19.676341+00:00
 relationships:
   depends_on:
   - DEV-488
@@ -17,6 +17,7 @@ relationships:
   - DEV-494
   - DEV-502
   - DEV-491
+  - DEV-493
 comments:
 - date: 2026-11-13T21:36:12.760262+00:00
   author: claude
@@ -39,6 +40,45 @@ comments:
 - date: 2026-11-14T02:00:49.749897+00:00
   author: claude
   text: 'Rework: the one blocking finding (missing before/after screenshots) is fixed; no code change was needed, so the commit stays 1568c37f (nothing to amend). Attached 12 screenshots of the task panel''s Comments tab with two report comments: before = main 2f9b8e97, after = this branch, light and dark at 1920, 1440 and 390 px: attachment:DEV-490-before-light-1920.75b491aa3253db953d25c0525c47ce06.png, attachment:DEV-490-before-light-1440.f823f04b5504961a9896b07c1c1c134b.png, attachment:DEV-490-before-light-390.934178fc6f8ab673823102ffd97ae3f4.png, attachment:DEV-490-before-dark-1920.6646091033c3f0a179ef90600de3eeda.png, attachment:DEV-490-before-dark-1440.e506c25725ec0e13a5a5b8e5dbfc5ac2.png, attachment:DEV-490-before-dark-390.fc7681cae8b7d6c562d286ff2e45779b.png, attachment:DEV-490-after-light-1920.97ce1b51cd495a9f0e4533470729c5de.png, attachment:DEV-490-after-light-1440.ddf85e8e58e0d22263290fa75b3e0db9.png, attachment:DEV-490-after-light-390.41fd6d88605e6b0c3ddb48e5f1ed4731.png, attachment:DEV-490-after-dark-1920.77a3fcd996eec5cfbd2dd3468747ff0d.png, attachment:DEV-490-after-dark-1440.8f309434502e221cd766413406507243.png, attachment:DEV-490-after-dark-390.18fe67f53049f794651247855e73ad04.png. I read them: before shows the comment text only; after shows the commit hash link, the checklist with check, cross and dash marks plus text, the Next line, ''No check marked not run'' on the second comment, and the Hand-off chip in the Type filter; nothing clips or overflows at 390 px, and dark mode has no white boxes. The reviewer''s quick smoke failed only because target/smoke/lotar wasn''t built in that checkout: built it with npm run build:smoke, and smoke/tests/ui.report-comments.smoke.spec.ts passes (1 test). Not rerun: lint, npm test and the full smoke suite, because no file changed since they passed on 1568c37f.'
+- date: 2026-11-14T02:09:51.431784+00:00
+  author: codex
+  text: 'Merge blocked: rebased 1568c37f onto main as 63e86303; resolved docs/developers/cli.md by preserving main''s crates/lotar-lib paths and the report description. Required npm run lint:agent failed after retry outside sandbox (initial sccache permission denial): tests/dev490_report_comment_test.rs:9 unresolved crate::common; crates/lotar-lib/tests/integration.rs:156 module file missing. Main moved tests into crates/lotar-lib/tests, but this new test remains in root tests. Need owner decision on returning this for rework; no fast-forward or push performed. npm test and smoke not run because the required lint gate failed. Rebased work preserved on t3/hand-off-report-comments-1 at 63e86303.'
+- date: 2026-11-14T02:10:00.236013+00:00
+  author: automation
+  text: The merge agent's job job-20261114T020737.565Z-39 failed (lotar agent logs job-20261114T020737.565Z-39); the fix agent retries it on branch t3/hand-off-report-comments-1.
+- date: 2026-11-14T02:10:29.558526+00:00
+  author: triage
+  text: 'Triage answer: yes, return it for rework; no owner decision is needed. Move tests/dev490_report_comment_test.rs into crates/lotar-lib/tests (register it in integration.rs as the other tests there are), use that crate''s common module, then rerun npm run lint:agent, npm test and the smoke, and retry the merge. This is in-scope, reversible work on a feature the owner already chose on 2026-11-13 (see the description), and the same layout fix was answered the same way on DEV-489 (INBOX-76, 2026-11-14). The automation has already started a fix agent on t3/hand-off-report-comments-1 (comment of 2026-11-14 02:10); it carries on from there.'
+- date: 2026-11-14T02:17:47.876647+00:00
+  author: codex
+  text: 'Rework completed per triage: moved tests/dev490_report_comment_test.rs unchanged into crates/lotar-lib/tests; integration.rs already registers the module, and crate::common now resolves to the library integration helpers. Signed commit 0ed25410 (signature verified G), clean worktree; no merge or push. Checks: npm run lint:agent passed; npm test passed (2178 Rust, 1528 UI, release and hooks). Initial npm test stopped for missing generated target/web-embed/index.html.gz; npm run build:web then full rerun passed. npm run smoke built and ran all 395 tests: 392 passed, three timeout failures in api.automation, cli.automation and harness.agent-launcher. Retried those three files with test:smoke:quick: all 34 tests passed. Report checklist smoke passed in full run. Not run: another full smoke rerun after the targeted timeout recovery. No application behavior or UI changed in this rework. Status and assignee unchanged; job automation takes the next step.'
+- date: 2026-11-14T02:20:18.841368+00:00
+  author: codex
+  text: 'Merge blocked: rebase onto main conflicts with the newly landed DEV-489 review comments in cli/handlers/comment.rs, mcp/server/tools.rs, services/task_questions.rs, types.rs, tests/integration.rs (under crates/lotar-lib), docs/help/mcp-tools.md, docs/openapi.json, view/api/types.ts and view/components/task-panel/TaskPanelCommentsTab.vue. Main adds review verdicts and review --commit handling; this branch adds report commits/checks and changes the same plain-comment request path. Combining report and review input needs explicit handling, so I could not confidently preserve both intents mechanically. Rebase aborted; both feature commits remain intact at HEAD 0ed25410. No merge or push. Required lint, full tests and smoke not run because rebase did not complete. Return this to rework to reconcile DEV-489 and DEV-490 together?'
+- date: 2026-11-14T02:20:34.886278+00:00
+  author: automation
+  text: 'The merge agent''s job job-20261114T021901.413Z-50 failed again: lotar agent logs job-20261114T021901.413Z-50. The fix is on branch t3/hand-off-report-comments-2. Should an agent try again (lotar automation run "Health: retry with @fix" --select ''id:DEV-490'', or for an agent''s ticket lotar assignee DEV-490 @fix), or will you merge it yourself?'
+- date: 2026-11-14T02:21:18.435806+00:00
+  author: triage
+  text: 'Triage answer: yes, return it for rework; no owner decision is needed. Reconcile with DEV-489 (merged to main as 4109a6f4) yourself: rebase agent/DEV-490 (or t3/hand-off-report-comments-2) onto main and resolve the conflicts in cli/handlers/comment.rs, mcp/server/tools.rs, services/task_questions.rs, types.rs, tests/integration.rs, docs/help/mcp-tools.md, docs/openapi.json, view/api/types.ts and TaskPanelCommentsTab.vue. Keep both features. How they combine follows this ticket''s own rule (comment of 2026-11-14 01:22): a report goes with a plain comment only and is refused together with question, answer or a review verdict, so a review keeps its own commit field and the Hand-off chip stays next to the Review chip. Say so in the docs and add a test for the refusal. Then run lint:agent, npm test and the smoke (build:web / build:smoke first if target/ is missing) and retry the merge. This is in-scope, reversible work on a feature the owner chose on 2026-11-13, answered the same way for the test move on 2026-11-14 (INBOX-77, INBOX-76). If a design point stays open after that, ask the one question then.'
+- date: 2026-11-14T02:54:00.165659+00:00
+  author: automation
+  text: The fix agent's job job-20261114T022120.517Z-1 failed (lotar agent logs job-20261114T022120.517Z-1); @fix-codex retries it on branch t3/hand-off-report-comments-2.
+- date: 2026-11-14T02:55:18.145027+00:00
+  author: automation
+  text: 'The fix agent''s job job-20261114T025400.159Z-2 failed again: lotar agent logs job-20261114T025400.159Z-2. Should an agent try again (lotar automation run "Health: retry with @fix" --select ''id:DEV-490'', or @fix-fable, @fix-codex; for an agent''s ticket lotar assignee DEV-490 @fix), or is it WontDo?'
+- date: 2026-11-14T03:42:50.038793+00:00
+  author: claude
+  text: 'mallox in the thread (2026-11-14): "I just reset the codex token credits so the task is now running". No job was running, so restarted with @fix; it continues the Codex thread on t3/hand-off-report-comments-2 with the rework the triage answer above describes. In v0.15.0 (DEV-417), the last open ticket.'
+- date: 2026-11-14T03:50:31.456+00:00
+  author: claude
+  text: 'Fix after triage: rebased onto main with DEV-489 (4109a6f4) and kept both features. A report goes with a plain comment only; with a question, answer or review it is refused (CLI, REST 400, MCP invalid params). A review keeps its own --commit hash, and the Hand-off chip sits next to the Review chip in the Type filter. docs/help/comment.md, the MCP tool description and docs/openapi.json say so. New tests: reports_refuse_other_comment_types and cli_review_keeps_its_commit_and_refuses_report_checks in crates/lotar-lib/tests/dev490_report_comment_test.rs. One signed commit 22b5d7af (the three branch commits squashed, same tree). Checks on 22b5d7af: npm run lint:agent passed; npm test passed (2186 Rust, 1531 UI, release 50, hooks 7) after npm run build:web; smoke passed (build:smoke, then 112 files, 396 tests). Screenshots of the Comments tab, before = main 4109a6f4 UI, after = this branch, light and dark at 1920, 1440 and 390 px, with a plain comment, two reports and a review: attachment:DEV-490-after-dark-1440-rebased.e335f30d62067d4beee9e821663e4b06.png attachment:DEV-490-after-dark-1920-rebased.862fad73f64a4adf30e5e84ddb144b69.png attachment:DEV-490-after-dark-390-rebased.6788141349546ec51f1bb72cb6789324.png attachment:DEV-490-after-light-1440-rebased.e44907ffd9c0c6bce6ad2cb7e3f2e7e2.png attachment:DEV-490-after-light-1920-rebased.9ba2ae915729422ec708dcc5cbdd4f92.png attachment:DEV-490-after-light-390-rebased.c7524ed0344d4c87878cb68c3f52d0e2.png attachment:DEV-490-before-dark-1440-rebased.1ce7c2b6d785675a531b9a73ef60c264.png attachment:DEV-490-before-dark-1920-rebased.7504a59e35990d2f7ec4db50ea84002d.png attachment:DEV-490-before-dark-390-rebased.1bf709b5f0ce455bce72abb62e62fe7e.png attachment:DEV-490-before-light-1440-rebased.359894ca859e97d2477022a371322dea.png attachment:DEV-490-before-light-1920-rebased.013cc0ad84139b407b3bdd0768e483ac.png attachment:DEV-490-before-light-390-rebased.1945a4d46d61b9abbed90461aaa23809.png. I read them: before shows the report comments as text only and Type chips Comment and Review; after shows the commit link, check, cross and dash marks, Next, ''No check marked not run'', the review badge unchanged and a Hand-off chip between Comment and Review; nothing clips at 390 px, and dark mode has no light boxes. Not run: nothing skipped.'
+- date: 2026-11-14T03:51:53.526102+00:00
+  author: codex
+  text: Merged 22b5d7af into main by fast-forward. Rebase reported already up to date; HEAD unchanged. Skipped lint:agent, npm test and full smoke using the fix comment recording all passed on this exact commit, as merge instructions permit. Earlier review targeted UI tests passed (5); its quick smoke could not start without local artifacts and was not a product failure. No status or assignee change. Task records will be folded into the merged commit as instructed; push follows only if main is clean and its unpushed work is finished.
+- date: 2026-11-14T03:52:19.515117+00:00
+  author: codex
+  text: 'Merge complete on main as cd28c87b after folding task records into 22b5d7af. Main is clean. Not pushed: the earliest unpushed commit 23484856 belongs to DEV-493, currently HelpNeeded; DEV-417 is also Todo. No finished prefix before that commit is available to push. Required checks were skipped based on the recorded passing results for unchanged code commit 22b5d7af. Status and assignee left to job automation.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A92f9648a-c12b-4124-9284-32c1807b437d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2ba70837-175f-468d-9c07-7e1e47d39a19
@@ -56,6 +96,21 @@ references:
 - attachment: DEV-490-before-light-1920.75b491aa3253db953d25c0525c47ce06.png
 - attachment: DEV-490-before-light-390.934178fc6f8ab673823102ffd97ae3f4.png
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acda8e56b-d78f-4e06-8ded-692722a53ae6
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4afa32d0-4a3c-482c-9b9b-2502af4727f3
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A08e23193-c3f1-49e9-a76b-ac787fd040cb
+- attachment: DEV-490-after-dark-1440-rebased.e335f30d62067d4beee9e821663e4b06.png
+- attachment: DEV-490-after-dark-1920-rebased.862fad73f64a4adf30e5e84ddb144b69.png
+- attachment: DEV-490-after-dark-390-rebased.6788141349546ec51f1bb72cb6789324.png
+- attachment: DEV-490-after-light-1440-rebased.e44907ffd9c0c6bce6ad2cb7e3f2e7e2.png
+- attachment: DEV-490-after-light-1920-rebased.9ba2ae915729422ec708dcc5cbdd4f92.png
+- attachment: DEV-490-after-light-390-rebased.c7524ed0344d4c87878cb68c3f52d0e2.png
+- attachment: DEV-490-before-dark-1440-rebased.1ce7c2b6d785675a531b9a73ef60c264.png
+- attachment: DEV-490-before-dark-1920-rebased.7504a59e35990d2f7ec4db50ea84002d.png
+- attachment: DEV-490-before-dark-390-rebased.1bf709b5f0ce455bce72abb62e62fe7e.png
+- attachment: DEV-490-before-light-1440-rebased.359894ca859e97d2477022a371322dea.png
+- attachment: DEV-490-before-light-1920-rebased.013cc0ad84139b407b3bdd0768e483ac.png
+- attachment: DEV-490-before-light-390-rebased.1945a4d46d61b9abbed90461aaa23809.png
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A54ac2bf7-8329-43d0-9ee1-f7456e89ab50
 releases:
 - 5
 description: |-
@@ -81,6 +136,9 @@ tags:
 - blocked
 - blocked-by:DEV-488
 - review-returned
+- merge-retried
+- fix-retried
+- ui
 history:
 - at: 2026-11-13T21:14:12.167161+00:00
   actor: claude
@@ -335,3 +393,256 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-14T02:09:51.431784+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T02:10:00.199505+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: web-ui, backend, blocked, blocked-by:DEV-488, review-returned
+    new: web-ui, backend, blocked, blocked-by:DEV-488, review-returned, merge-retried
+- at: 2026-11-14T02:10:00.236013+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-14T02:10:00.346750+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-14T02:10:29.558526+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-14T02:10:29.867847+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-14T02:10:30.509029+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T02:17:47.876647+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T02:17:55.512282+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T02:17:56.958952+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4afa32d0-4a3c-482c-9b9b-2502af4727f3
+- at: 2026-11-14T02:19:00.358495+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-14T02:20:18.841368+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T02:20:34.886278+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-14T02:20:35.942958+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-14T02:21:18.435806+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-14T02:21:19.963128+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-14T02:21:22.328068+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T02:53:58.021825+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-codex'
+  - field: tags
+    old: web-ui, backend, blocked, blocked-by:DEV-488, review-returned, merge-retried
+    new: web-ui, backend, blocked, blocked-by:DEV-488, review-returned, merge-retried, fix-retried
+- at: 2026-11-14T02:54:00.165659+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-14T02:55:17.461712+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-codex'
+    new: mallox
+- at: 2026-11-14T02:55:18.145027+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-14T03:42:50.038793+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T03:42:50.642846+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-14T03:43:06.401449+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-14T03:43:09.768671+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A08e23193-c3f1-49e9-a76b-ac787fd040cb
+- at: 2026-11-14T03:50:20.979654+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-490-after-dark-1440-rebased.e335f30d62067d4beee9e821663e4b06.png
+- at: 2026-11-14T03:50:21.031713+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-490-after-dark-1920-rebased.862fad73f64a4adf30e5e84ddb144b69.png
+- at: 2026-11-14T03:50:21.070663+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-490-after-dark-390-rebased.6788141349546ec51f1bb72cb6789324.png
+- at: 2026-11-14T03:50:21.109437+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-490-after-light-1440-rebased.e44907ffd9c0c6bce6ad2cb7e3f2e7e2.png
+- at: 2026-11-14T03:50:21.148593+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-490-after-light-1920-rebased.9ba2ae915729422ec708dcc5cbdd4f92.png
+- at: 2026-11-14T03:50:21.186525+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-490-after-light-390-rebased.c7524ed0344d4c87878cb68c3f52d0e2.png
+- at: 2026-11-14T03:50:21.225591+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-490-before-dark-1440-rebased.1ce7c2b6d785675a531b9a73ef60c264.png
+- at: 2026-11-14T03:50:21.263667+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-490-before-dark-1920-rebased.7504a59e35990d2f7ec4db50ea84002d.png
+- at: 2026-11-14T03:50:21.300569+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-490-before-dark-390-rebased.1bf709b5f0ce455bce72abb62e62fe7e.png
+- at: 2026-11-14T03:50:21.337459+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-490-before-light-1440-rebased.359894ca859e97d2477022a371322dea.png
+- at: 2026-11-14T03:50:21.377652+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-490-before-light-1920-rebased.013cc0ad84139b407b3bdd0768e483ac.png
+- at: 2026-11-14T03:50:21.417602+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-490-before-light-390-rebased.1945a4d46d61b9abbed90461aaa23809.png
+- at: 2026-11-14T03:50:21.448444+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: web-ui, backend, blocked, blocked-by:DEV-488, review-returned, merge-retried, fix-retried
+    new: web-ui, backend, blocked, blocked-by:DEV-488, review-returned, merge-retried, fix-retried, ui
+- at: 2026-11-14T03:50:31.456+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-14T03:50:40.986401+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-14T03:50:42.341433+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A54ac2bf7-8329-43d0-9ee1-f7456e89ab50
+- at: 2026-11-14T03:51:23.505751+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-14T03:51:53.526102+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T03:52:19.515117+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-14T03:52:19.676341+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-488"],"blocks":["DEV-417"],"related":["DEV-466","DEV-489","DEV-494","DEV-502","DEV-491"]}'
+    new: '{"depends_on":["DEV-488"],"blocks":["DEV-417"],"related":["DEV-466","DEV-489","DEV-494","DEV-502","DEV-491","DEV-493"]}'

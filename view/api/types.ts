@@ -229,6 +229,8 @@ export interface BrandingResponse {
     /** Without ui.icon: the repository's own icon file that `icon` shows. */
     detected_icon?: string
     problems?: string[]
+    /** A commit's web page without the hash, from the git remote (DEV-490). */
+    commit_url?: string
 }
 
 export interface BrandingUploadResponse {
@@ -1115,6 +1117,8 @@ export interface TaskComment {
     answer?: CommentAnswer
     /** DEV-489: the comment reports a review's verdict and findings. */
     review?: CommentReview
+    /** A hand-off report (DEV-490); `text` stays the prose summary. */
+    report?: CommentReport
     [key: string]: unknown
 }
 
@@ -1178,6 +1182,29 @@ export interface CommentAnswerInput {
     to?: string
     choice?: string[]
     note?: string
+}
+
+/** A hand-off report: every part is optional. */
+export interface CommentReport {
+    commits?: ReportCommit[]
+    checks?: ReportCheck[]
+    /** The next step. */
+    next?: string
+}
+
+export interface ReportCommit {
+    hash: string
+    /** What the commit is. */
+    what?: string
+}
+
+export type ReportCheckResult = 'passed' | 'failed' | 'not_run'
+
+export interface ReportCheck {
+    command: string
+    result: ReportCheckResult
+    /** Why it failed or did not run. */
+    reason?: string
 }
 
 /** `GET /api/config/show`: the scope's configuration as stored (its shape depends on the scope) plus computed completion fields. */

@@ -1051,7 +1051,7 @@ const TELL_RULE: &str = "    - name: The owner's comments reach the agent\n     
 
 fn comment_as(fixtures: &TestFixtures, id: &str, author: &str, text: &str) {
     let mut storage = fixtures.create_storage();
-    let context = lotar::services::task_service::CommentContext { actor_override: Some(author.to_string()), fire_commented: true };
+    let context = lotar::services::task_service::CommentContext { actor_override: Some(author.to_string()), fire_commented: true, report: None };
     TaskService::add_comment_with_context(&mut storage, id, text, context).unwrap();
 }
 

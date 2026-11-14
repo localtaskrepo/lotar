@@ -274,5 +274,6 @@ fn branding_response(resolver: &crate::workspace::TasksDirectoryResolver, config
         icon,
         detected_icon,
         problems,
+        commit_url: crate::utils::git::read_remotes(&root).iter().find_map(|remote| crate::utils::git::commit_url_prefix(remote)),
     }
 }

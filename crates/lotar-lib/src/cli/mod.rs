@@ -173,6 +173,8 @@ pub enum Commands {
         explain: bool,
         #[command(flatten)]
         ask: crate::cli::args::task::CommentAskArgs,
+        #[command(flatten)]
+        report: args::CommentReportArgs,
     },
 
     /// Full task management (existing functionality)

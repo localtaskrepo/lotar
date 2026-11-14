@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-13T07:10:08.883832+00:00
-modified: 2026-11-14T01:39:57.723879+00:00
+modified: 2026-11-14T03:42:31.278077+00:00
 relationships:
   depends_on:
   - DEV-482
@@ -33,6 +33,7 @@ relationships:
   - DEV-493
   - DEV-504
   - DEV-507
+  - DEV-503
 comments:
 - date: 2026-11-14T00:18:44.424046+00:00
   author: claude
@@ -47,6 +48,9 @@ comments:
     - Uncommitted in the main checkout: those files; they go into the version bump commit.
     - Also in 0.15.0 but HelpNeeded on mallox: DEV-478 and DEV-493 (code on main; their merge jobs asked to rerun checks with localhost access).
     Next: when the six are Done, the release steps (bump to 0.15.0, QA, tag with the owner OK).
+- date: 2026-11-14T03:42:31.278077+00:00
+  author: claude
+  text: 'mallox in the thread (2026-11-14): DEV-490''s two fix jobs had failed on the Codex usage limit; he reset the Codex credits and the task is running again. Status: DEV-482, DEV-502, DEV-488, DEV-489, DEV-497 Done and on main (unpushed, with ad67e063 for the release records); DEV-490 left.'
 releases:
 - 5
 description: |-
@@ -227,3 +231,13 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-482","DEV-502","DEV-488","DEV-489","DEV-490","DEV-497"],"blocks":["DEV-508"],"related":["DEV-418","DEV-419","DEV-464","DEV-472","DEV-476","DEV-478","DEV-480","DEV-482","DEV-486","DEV-488","DEV-494","DEV-497","DEV-502","DEV-493","DEV-504"]}'
     new: '{"depends_on":["DEV-482","DEV-502","DEV-488","DEV-489","DEV-490","DEV-497"],"blocks":["DEV-508"],"related":["DEV-418","DEV-419","DEV-464","DEV-472","DEV-476","DEV-478","DEV-480","DEV-482","DEV-486","DEV-488","DEV-494","DEV-497","DEV-502","DEV-493","DEV-504","DEV-507"]}'
+- at: 2026-11-14T02:17:43.405626+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-482","DEV-502","DEV-488","DEV-489","DEV-490","DEV-497"],"blocks":["DEV-508"],"related":["DEV-418","DEV-419","DEV-464","DEV-472","DEV-476","DEV-478","DEV-480","DEV-482","DEV-486","DEV-488","DEV-494","DEV-497","DEV-502","DEV-493","DEV-504","DEV-507"]}'
+    new: '{"depends_on":["DEV-482","DEV-502","DEV-488","DEV-489","DEV-490","DEV-497"],"blocks":["DEV-508"],"related":["DEV-418","DEV-419","DEV-464","DEV-472","DEV-476","DEV-478","DEV-480","DEV-482","DEV-486","DEV-488","DEV-494","DEV-497","DEV-502","DEV-493","DEV-504","DEV-507","DEV-503"]}'
+- at: 2026-11-14T03:42:31.278077+00:00
+  actor: claude
+  changes:
+  - field: comment_added

@@ -123,11 +123,11 @@ impl CommandHandler for TaskHandler {
             TaskAction::Unarchive(args) => archive::execute(&args, false, project, resolver, renderer),
             TaskAction::Move(args) => move_task::execute(&args, project, resolver, renderer),
             TaskAction::Renumber(args) => move_task::renumber(&args, project, resolver, renderer),
-            TaskAction::Comment { id, text, message, file, dry_run, explain, ask } => {
+            TaskAction::Comment { id, text, message, file, dry_run, explain, ask, report } => {
                 // Resolve comment content from args: file > message > text > stdin
                 let resolved_text = crate::cli::handlers::comment::resolve_comment_text(file, message, text)?;
                 let text_value = if resolved_text.trim().is_empty() { None } else { Some(resolved_text) };
-                let args = CommentArgs::new(id, text_value, project.map(|s| s.to_string()), dry_run, explain).with_ask(ask);
+                let args = CommentArgs::new(id, text_value, project.map(|s| s.to_string()), dry_run, explain).with_ask(ask).with_report(report.into_report());
                 CommentHandler::execute(args, project, resolver, renderer)
             }
 

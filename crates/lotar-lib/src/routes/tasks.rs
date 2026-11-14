@@ -649,7 +649,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
         }
     });
 
-    // POST /api/tasks/comment { id, text }
+    // POST /api/tasks/comment { id, text, report? }
 
     api_server.register_handler("POST", "/api/tasks/comment", |req: &HttpRequest| {
         let resolver = try_response!(resolve_tasks_dir());

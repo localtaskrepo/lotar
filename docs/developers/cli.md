@@ -77,8 +77,8 @@ Each section links to relevant source files and tests. Additions should follow t
 
 - **User help:** [../help/comment.md](../help/comment.md)
 - **Implementation:** `CommentArgs` + `CommentHandler` (`crates/lotar-lib/src/cli/handlers/comment.rs`). Supports stdin, `-m`, or `--file` content sources and powers the `lotar task comment` alias.
-- **Services:** Comments append to `TaskComment` in storage; no author metadata yet.
-- **Tests:** `crates/lotar-lib/tests/comment_command_test.rs`, `crates/lotar-lib/tests/comment_shortcut_test.rs`, `crates/lotar-lib/tests/comment_task_parity_test.rs`.
+- **Services:** `TaskService::add_comment_with_context` appends a `TaskComment` with its author and an optional hand-off `report` (`CommentReportArgs` parses `--commit`/`--check`/`--next`; `normalize_report` checks it for every surface).
+- **Tests:** `crates/lotar-lib/tests/comment_command_test.rs`, `crates/lotar-lib/tests/comment_shortcut_test.rs`, `crates/lotar-lib/tests/comment_task_parity_test.rs`, `crates/lotar-lib/tests/dev490_report_comment_test.rs`.
 
 ### lotar task history
 

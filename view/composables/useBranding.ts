@@ -21,6 +21,8 @@ export interface BrandingState {
     /** The repository's own icon file `icon` shows when ui.icon is unset. */
     detectedIcon: string | null
     problems: string[]
+    /** A commit's web page without the hash, from the git remote. */
+    commitUrl: string | null
 }
 
 export const DEFAULT_APP_NAME = 'LoTaR'
@@ -38,6 +40,7 @@ const state = reactive<BrandingState>({
     icon: null,
     detectedIcon: null,
     problems: [],
+    commitUrl: null,
 })
 
 let watching = false
@@ -60,6 +63,7 @@ export function applyBranding(response: BrandingResponse) {
     state.icon = response.icon ?? null
     state.detectedIcon = response.detected_icon ?? null
     state.problems = response.problems ?? []
+    state.commitUrl = response.commit_url ?? null
     setRepositoryTheme(state.theme)
     if (typeof document === 'undefined') return
     document.title = tabTitle(state)

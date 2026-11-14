@@ -4517,7 +4517,7 @@
     "/api/tasks/comment": {
       "post": {
         "summary": "Add a comment to a task",
-        "description": "Adds `text` as a comment. With `question`, `text` is a question answered by choosing an option. With `answer`, the comment answers a question (default: the task's last open question), `text` is an optional note, and the chosen options' `set` fields are applied as an update by the answerer before `on.commented` rules run. With `review`, the comment reports a review's `verdict` (`pass` or `block`), the commit and the findings, and `text` is an optional summary. Invalid options, unknown `set` fields, unknown option keys, answered questions, unknown verdicts and a `pass` review with a blocking finding return 400.",
+        "description": "Adds `text` as a comment. With `question`, `text` is a question answered by choosing an option. With `answer`, the comment answers a question (default: the task's last open question), `text` is an optional note, and the chosen options' `set` fields are applied as an update by the answerer before `on.commented` rules run. With `review`, the comment reports a review's `verdict` (`pass` or `block`), the commit and the findings, and `text` is an optional summary. A report carries commits, checks and the next step with required prose text; combining report with question, answer or review returns 400. Invalid options, unknown `set` fields, unknown option keys, answered questions, unknown verdicts and a `pass` review with a blocking finding return 400.",
         "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TaskCommentRequest" } } } },
         "responses": {
           "200": {
@@ -5694,6 +5694,10 @@
               "type": "string"
             },
             "description": "Why configured images are not shown."
+          },
+          "commit_url": {
+            "type": "string",
+            "description": "A commit's web page without the hash, from the first git remote on a known host (GitHub, GitLab, Bitbucket, Codeberg); report comments link their commits with it."
           }
         }
       },
@@ -5986,6 +5990,10 @@
           },
           "review": {
             "$ref": "#/components/schemas/CommentReview"
+
+          },
+          "report": {
+            "$ref": "#/components/schemas/CommentReport"
           }
         },
         "required": [
@@ -6164,6 +6172,10 @@
           },
           "review": {
             "$ref": "#/components/schemas/CommentReview"
+
+          },
+          "report": {
+            "$ref": "#/components/schemas/CommentReport"
           },
           "answer": {
             "type": "object",
@@ -6195,6 +6207,33 @@
         "required": [
           "id"
         ]
+      },
+      "CommentReport": {
+        "type": "object",
+        "description": "A hand-off report (DEV-490): commits, checks with their result and the next step. Every part is optional; the comment's text stays the prose summary.",
+        "properties": {
+          "commits": { "type": "array", "items": { "$ref": "#/components/schemas/ReportCommit" } },
+          "checks": { "type": "array", "items": { "$ref": "#/components/schemas/ReportCheck" } },
+          "next": { "type": "string", "description": "The next step." }
+        },
+        "required": []
+      },
+      "ReportCommit": {
+        "type": "object",
+        "properties": {
+          "hash": { "type": "string", "description": "A commit hash (4 to 64 hex digits)." },
+          "what": { "type": "string", "description": "What the commit is." }
+        },
+        "required": ["hash"]
+      },
+      "ReportCheck": {
+        "type": "object",
+        "properties": {
+          "command": { "type": "string", "description": "The command or check, e.g. `npm test`." },
+          "result": { "type": "string", "enum": ["passed", "failed", "not_run"] },
+          "reason": { "type": "string", "description": "Why it failed or did not run." }
+        },
+        "required": ["command", "result"]
       },
       "TaskChange": {
         "type": "object",

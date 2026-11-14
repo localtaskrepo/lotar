@@ -993,7 +993,7 @@ fn make_whoami_tool() -> Value {
 fn make_task_comment_add_tool(_enum_hints: Option<&EnumHints>) -> Value {
     json!({
         "name": "task_comment_add",
-        "description": "Append a comment to a task and record a history entry. With `question`, `text` is a question the owner answers by choosing an option; with `answer`, the comment answers a question (default: the last open one) and applies the chosen options' `set`; with `review`, the comment reports a review's verdict and findings and `text` is its summary. Returns {task}.",
+        "description": "Append a comment to a task and record a history entry. With `question`, `text` is a question the owner answers by choosing an option; with `answer`, the comment answers a question (default: the last open one) and applies the chosen options' `set`; with `review`, the comment reports a review's verdict and findings and `text` is its summary. With `report`, a plain comment carries commits, checks and its next step; reports cannot accompany question, answer or review. Returns {task}.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -1070,6 +1070,16 @@ fn make_task_comment_add_tool(_enum_hints: Option<&EnumHints>) -> Value {
                         }
                     },
                     "required": ["verdict"],
+                    "additionalProperties": false
+                },
+                "report": {
+                    "type": ["object", "null"],
+                    "description": "A hand-off report with a plain comment; `text` stays the prose summary.",
+                    "properties": {
+                        "commits": {"type": "array", "items": {"type": "object", "properties": {"hash": {"type": "string"}, "what": {"type": "string"}}, "required": ["hash"], "additionalProperties": false}},
+                        "checks": {"type": "array", "items": {"type": "object", "properties": {"command": {"type": "string"}, "result": {"type": "string", "enum": ["passed", "failed", "not_run"]}, "reason": {"type": "string", "description": "Why it failed or did not run."}}, "required": ["command", "result"], "additionalProperties": false}},
+                        "next": {"type": "string", "description": "The next step."}
+                    },
                     "additionalProperties": false
                 }
             },

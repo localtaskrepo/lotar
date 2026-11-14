@@ -6,7 +6,7 @@ use crate::output::{OutputFormat, OutputRenderer};
 use crate::services::task_questions::{AnswerInput, OPTION_SET_FIELDS};
 use crate::services::task_reviews::parse_finding;
 use crate::services::task_service::TaskService;
-use crate::types::{CommentQuestion, CommentReview, OptionSet, QuestionOption, TaskComment};
+use crate::types::{CommentQuestion, CommentReport, CommentReview, OptionSet, QuestionOption, TaskComment};
 use crate::workspace::TasksDirectoryResolver;
 use serde_json::{Map, Value};
 
@@ -23,15 +23,22 @@ pub struct CommentArgs {
     pub dry_run: bool,
     pub explain: bool,
     pub ask: CommentAskArgs,
+    /// A hand-off report stored with the new comment (DEV-490).
+    pub report: Option<CommentReport>,
 }
 
 impl CommentArgs {
     pub fn new(task_id: String, text: Option<String>, explicit_project: Option<String>, dry_run: bool, explain: bool) -> Self {
-        Self { task_id, text, explicit_project, dry_run, explain, ask: CommentAskArgs::default() }
+        Self { task_id, text, explicit_project, dry_run, explain, ask: CommentAskArgs::default(), report: None }
     }
 
     pub fn with_ask(mut self, ask: CommentAskArgs) -> Self {
         self.ask = ask;
+        self
+    }
+
+    pub fn with_report(mut self, report: Option<CommentReport>) -> Self {
+        self.report = report;
         self
     }
 }
@@ -100,12 +107,27 @@ impl CommandHandler for CommentHandler {
     type Result = Result<(), String>;
 
     fn execute(args: Self::Args, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Self::Result {
-        let CommentArgs { task_id, text, explicit_project, dry_run, explain, ask } = args;
+        let CommentArgs { task_id, text, explicit_project, dry_run, explain, mut ask, mut report } = args;
 
         let project_hint = explicit_project.as_deref().or(project);
         renderer.log_info(format_args!("comment: begin task_id={} explicit_project={:?}", task_id, project_hint));
 
+        if ask.review.is_some()
+            && let Some(value) = &mut report
+        {
+            if value.commits.len() > 1 || value.commits.iter().any(|commit| commit.what.is_some()) {
+                return Err("A review takes one --commit hash without a description".to_string());
+            }
+            ask.commit = value.commits.pop().map(|commit| commit.hash);
+            if value.is_empty() {
+                report = None;
+            }
+        }
         let comment = CommentKind::from_args(text.filter(|candidate| !candidate.trim().is_empty()), ask)?;
+        // A report goes with a plain comment, whose text is the prose summary.
+        if report.is_some() && !matches!(comment, Some(CommentKind::Plain(_))) {
+            return Err("A report comment needs its text, the prose summary, and goes without --question, --answer or --review".to_string());
+        }
 
         let mut ctx = if comment.is_some() {
             TaskCommandContext::new(resolver, project_hint, Some(task_id.as_str()))?
@@ -128,7 +150,7 @@ impl CommandHandler for CommentHandler {
 
         match comment {
             Some(CommentKind::Plain(body)) => {
-                let add_inputs = CommentAddInputs { project: resolved_project.clone(), task, text: body, dry_run, explain };
+                let add_inputs = CommentAddInputs { project: resolved_project.clone(), task, text: body, report, dry_run, explain };
                 handle_add_comment(&mut ctx, renderer, &full_id, add_inputs)
             }
             Some(CommentKind::Question { .. } | CommentKind::Answer(_) | CommentKind::Review { .. }) if dry_run => {
@@ -158,11 +180,11 @@ struct CommentAddInputs {
     project: Option<String>,
     task: crate::storage::task::Task,
     text: String,
+    report: Option<CommentReport>,
     dry_run: bool,
     explain: bool,
 }
 
-#[expect(clippy::needless_pass_by_value, reason = "the caller hands this value over and does not use it afterwards")]
 fn handle_add_comment(ctx: &mut TaskCommandContext, renderer: &OutputRenderer, full_id: &str, inputs: CommentAddInputs) -> Result<(), String> {
     renderer.log_debug("comment: preparing new comment entry");
     if inputs.dry_run {
@@ -170,12 +192,14 @@ fn handle_add_comment(ctx: &mut TaskCommandContext, renderer: &OutputRenderer, f
         let prefix = crate::storage::TaskId::parse(full_id).ok().map(|parsed| parsed.project);
         let author = crate::utils::identity::resolve_current_user_for_project(Some(ctx.storage.root_path.as_path()), prefix.as_deref());
         let text = crate::services::task_service::strip_author_prefix(&inputs.text, author.as_deref()).map_err(|e| e.to_string())?.to_string();
-        let entry = TaskComment::new(timestamp, author, text);
+        let report = inputs.report.map(crate::services::task_service::normalize_report).transpose().map_err(|e| e.to_string())?.flatten();
+        let entry = TaskComment { report, ..TaskComment::new(timestamp, author, text) };
         render_comment_preview(renderer, full_id, inputs.project.as_deref(), &entry, inputs.task.comments.len() + 1, inputs.explain);
         return Ok(());
     }
 
-    let dto = crate::services::task_service::TaskService::add_comment(&mut ctx.storage, full_id, &inputs.text).map_err(|e| e.to_string())?;
+    let context = crate::services::task_service::CommentContext { report: inputs.report, ..Default::default() };
+    let dto = TaskService::add_comment_with_context(&mut ctx.storage, full_id, &inputs.text, context).map_err(|e| e.to_string())?;
     renderer.log_info("comment: comment persisted");
 
     let entry = dto.comments.last().ok_or("comment was not stored")?;
@@ -248,6 +272,11 @@ fn render_comment_list(renderer: &OutputRenderer, task_id: &str, project: Option
                     let author = c.author.as_deref().map(|author| format!("{author}: ")).unwrap_or_default();
                     let marker = comment_marker(c, open.contains(&index));
                     renderer.emit_raw_stdout(format_args!("{}  {marker}{author}{}", c.date, c.text));
+                    if let Some(report) = &c.report {
+                        for line in report_lines(report) {
+                            renderer.emit_raw_stdout(format_args!("    {line}"));
+                        }
+                    }
                 }
             }
             if explain {
@@ -276,6 +305,29 @@ pub(crate) fn comment_marker(comment: &TaskComment, open_question: bool) -> Stri
 
 fn comment_to_json(comment: &TaskComment) -> Value {
     serde_json::to_value(comment).unwrap_or_else(|_| serde_json::json!({ "date": comment.date, "text": comment.text }))
+}
+
+/// A report as text lines, e.g. "check npm test: not run (no browser)", so a
+/// missing "not run" shows next to the checks that ran.
+pub fn report_lines(report: &CommentReport) -> Vec<String> {
+    let mut lines = Vec::new();
+    for commit in &report.commits {
+        lines.push(match &commit.what {
+            Some(what) => format!("commit {}: {what}", commit.hash),
+            None => format!("commit {}", commit.hash),
+        });
+    }
+    for check in &report.checks {
+        let result = check.result.replace('_', " ");
+        lines.push(match &check.reason {
+            Some(reason) => format!("check {}: {result} ({reason})", check.command),
+            None => format!("check {}: {result}", check.command),
+        });
+    }
+    if let Some(next) = &report.next {
+        lines.push(format!("next: {next}"));
+    }
+    lines
 }
 
 fn insert_project(payload: &mut Map<String, Value>, project: Option<&str>) {

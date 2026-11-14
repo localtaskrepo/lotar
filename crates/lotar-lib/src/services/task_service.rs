@@ -143,11 +143,13 @@ pub struct CommentContext {
     /// Comments written by automation itself disable this so comment
     /// actions can never recurse.
     pub fire_commented: bool,
+    /// The hand-off report stored with the comment (DEV-490).
+    pub report: Option<crate::types::CommentReport>,
 }
 
 impl Default for CommentContext {
     fn default() -> Self {
-        Self { actor_override: None, fire_commented: true }
+        Self { actor_override: None, fire_commented: true, report: None }
     }
 }
 
@@ -155,8 +157,42 @@ impl CommentContext {
     /// Context for comments written by automation: recorded under the
     /// `automation` actor, never re-dispatching `on.commented` rules.
     pub fn automation() -> Self {
-        Self { actor_override: Some("automation".to_string()), fire_commented: false }
+        Self { actor_override: Some("automation".to_string()), fire_commented: false, report: None }
     }
+}
+
+/// A report with trimmed text, or `None` when nothing is left. Refuses a
+/// commit that is not a hash and a check without a command or with an
+/// unknown result, so every surface stores the same shape (DEV-490).
+pub fn normalize_report(report: crate::types::CommentReport) -> LoTaRResult<Option<crate::types::CommentReport>> {
+    let text = |value: Option<String>| value.map(|v| v.trim().to_string()).filter(|v| !v.is_empty());
+    let mut out = crate::types::CommentReport { next: text(report.next), extra: report.extra, ..Default::default() };
+    for mut commit in report.commits {
+        commit.hash = commit.hash.trim().to_ascii_lowercase();
+        if commit.hash.len() < 4 || commit.hash.len() > 64 || !commit.hash.chars().all(|c| c.is_ascii_hexdigit()) {
+            return Err(LoTaRError::ValidationError(format!("Report commit '{}' is not a commit hash", commit.hash)));
+        }
+        commit.what = text(commit.what);
+        out.commits.push(commit);
+    }
+    for mut check in report.checks {
+        check.command = check.command.trim().to_string();
+        if check.command.is_empty() {
+            return Err(LoTaRError::ValidationError("Report check needs a command".into()));
+        }
+        check.result = check.result.trim().to_ascii_lowercase().replace('-', "_");
+        if !crate::types::REPORT_CHECK_RESULTS.contains(&check.result.as_str()) {
+            return Err(LoTaRError::ValidationError(format!(
+                "Report check '{}': result '{}' is not one of {}",
+                check.command,
+                check.result,
+                crate::types::REPORT_CHECK_RESULTS.join(", ")
+            )));
+        }
+        check.reason = text(check.reason);
+        out.checks.push(check);
+    }
+    Ok(if out.is_empty() { None } else { Some(out) })
 }
 
 /// The comment text without a leading "<author>:", "<author>,",
@@ -733,9 +769,10 @@ impl TaskService {
     /// so concurrent reference (or other) writes can never be lost.
     pub fn add_comment_with_context(storage: &mut Storage, id: &str, text: &str, context: CommentContext) -> LoTaRResult<TaskDTO> {
         let fire_commented = context.fire_commented;
+        let report = context.report.clone().map(normalize_report).transpose()?.flatten();
         let pushed = Self::push_comment(storage, id, context, |_, now, actor| {
             let text = strip_author_prefix(text, actor.as_deref())?;
-            Ok(crate::types::TaskComment::new(now, actor, text.to_string()))
+            Ok(crate::types::TaskComment { report, ..crate::types::TaskComment::new(now, actor, text.to_string()) })
         })?;
         Ok(Self::finish_comment(storage, pushed, fire_commented))
     }
