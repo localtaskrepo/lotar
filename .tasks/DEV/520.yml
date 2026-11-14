@@ -1,17 +1,21 @@
 title: An agent job hangs when its session's event stream lags and drops the turn's end
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-14T05:38:48.737497+00:00
-modified: 2026-11-15T07:25:02.785770+00:00
+modified: 2026-11-15T07:36:02.612090+00:00
 relationships:
   related:
   - DEV-501
   - DEV-532
   - DEV-511
   - DEV-550
+  - DEV-509
+  - DEV-556
+  - DEV-557
+  - DEV-558
 comments:
 - date: 2026-11-14T06:11:36.177470+00:00
   author: claude
@@ -160,6 +164,72 @@ comments:
     choice:
     - fix
     note: (answered in INBOX-215)
+- date: 2026-11-15T07:30:18.223594+00:00
+  author: claude
+  text: |-
+    Retry: rebased the reviewed fix onto main, ready for the merge. Commit `66fb3992` on `agent/DEV-520` (was `00055509`).
+    - Main moved on by 4 commits (DEV-550, DEV-556, DEV-557, DEV-509); the rebase applied with no conflicts and the code is unchanged.
+    - Checks after `npm ci`: `npm run lint`, `npm test` (2201 Rust + 1547 UI), `npm run smoke` (404), all passed.
+    - The merge should run from `agent/DEV-520`, not the old `t3/agent-job-lagged-event-hang` checkout at `7f943de1` (DEV-550).
+- date: 2026-11-15T07:30:46.426858+00:00
+  author: claude
+  text: |-
+    Retry already done for this answer (INBOX-215): no new change.
+    - Fix is `66fb3992` on `agent/DEV-520`, signed, rebased on main. Lint, tests and smoke passed (comment 07:30).
+    - Main has one newer commit since (`f92de862` DEV-558, a smoke-test fix), which the merge agent's rebase picks up.
+    - Ticket is in review (`@review`); status and assignee left as they are.
+- date: 2026-11-15T07:33:39.188266+00:00
+  author: codex
+  text: |-
+    Review: passed.
+    - Reviewed `66fb3992`, full diff against main, ticket/comments, related context, main history and harnessmux 0.1.8. No findings or UI changes; cost/budget/reply handling preserved.
+    - Targeted nextest with `RUSTC_WRAPPER=`: all 4 DEV-520 tests passed. Diff check passed. Full lint/tests/smoke not rerun; fix reports passing on this commit.
+    - No source changes, commits or tickets filed. Status/assignee unchanged. No durable guidance finding.
+- date: 2026-11-15T07:33:44.576788+00:00
+  author: automation
+  text: |-
+    The merge agent's job job-20261115T073146.012Z-62 failed again (lotar agent logs job-20261115T073146.012Z-62). The fix is on branch t3/agent-job-lagged-event-stream-hang. Retry with @fix, or will you merge it yourself?
+
+    Options:
+    - fix: Retry with @fix
+    - self: I merge it myself
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: self
+      label: I merge it myself
+      set:
+        status: InProgress
+- date: 2026-11-15T07:34:13.649174+00:00
+  author: codex
+  text: |-
+    Merge blocked: continuation still opened the superseded checkout.
+    - This checkout is clean at `7f943de1` on `t3/agent-job-lagged-event-hang`; reviewed `agent/DEV-520` is `66fb3992`. Main is `f92de862`.
+    - Instructions prohibit switching branches or operating in another checkout. No source changes, rebase, checks, merge or push performed; all work preserved. Existing DEV-550 covers this problem.
+    - May this thread switch to `agent/DEV-520` so it can rebase and merge the reviewed commit instead of retrying the old checkout?
+- date: 2026-11-15T07:34:44.226300+00:00
+  author: mallox
+  text: |-
+    Answer: fix (Retry with @fix)
+
+    (answered in INBOX-226)
+  answer:
+    to: 2026-11-15T07:33:44.576788+00:00
+    choice:
+    - fix
+    note: (answered in INBOX-226)
+- date: 2026-11-15T07:35:54.596860+00:00
+  author: claude
+  text: |-
+    Blocked: another retry by @fix can't help, because the installed lotar has no DEV-550 fix.
+    - `/opt/homebrew/bin/lotar` is 0.15.0, installed 2026-11-13 20:21. The DEV-550 fix (`d9c34341`, merge opens the rework's commit, not the review's old checkout) came 2026-11-14 22:29, so each merge job still opens `t3/agent-job-lagged-event-hang` at the old `7f943de1`.
+    - The reviewed fix is `66fb3992` (signed; on `agent/DEV-520` and `t3/agent-job-lagged-event-stream-hang`), one commit behind main (`f92de862` DEV-558, no conflict expected). Lint, tests and smoke passed on it, review passed.
+    - Older DEV-520 worktrees and branches (`d8e52c93`, `b735c56a`, `617e174c`, `7f943de1`, `00055509`) are superseded. I left them alone.
+
+    **Question:** install lotar from main (with DEV-550) and then retry the merge, or will you merge `66fb3992` from `agent/DEV-520` yourself?
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7234460b-fa1f-4515-a843-598de63b5e51
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af5b504b1-62e7-4678-9cf9-f100b8ba0692
@@ -167,6 +237,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A92c2ba4c-f7af-43f2-b7fc-ba8e72583bc3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A659f95d0-2e62-4885-a0d2-10c981c23c81
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Add19d5e6-d084-4938-b07f-64e12bedc3df
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aaa3dde28-c4a6-48d9-a0d4-6848aac33a6a
 description: 'Found by claude on DEV-501, 2026-11-14: drive_session (crates/lotar-lib/src/services/agent_job_service.rs) reads harnessmux''s broadcast channel (capacity 1024, harnessmux 0.1.1 session.rs:127) and on RecvError::Lagged just continues. MessageDelta/ThoughtDelta events come per chunk and lotar''s loop reads the cancel file and takes the registry lock per event, so a chatty turn can lag; if the dropped events include TurnFinished/TurnFailed the loop never sees the turn end and the job runs until someone cancels it. Check: a unit test that feeds more than 1024 events before the turn''s end and expects the job to end. Done: on lag, the missed events (seq after the last one seen) are replayed from the session''s event log (Status.events) through the same handling, the job ends with the right exit code, and the test passes.'
 tags:
 - health
@@ -506,3 +577,96 @@ history:
   - field: status
     old: HelpNeeded
     new: InProgress
+- at: 2026-11-15T07:30:18.223594+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:30:18.448225+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-501","DEV-532","DEV-511","DEV-550"]}'
+    new: '{"related":["DEV-501","DEV-532","DEV-511","DEV-550","DEV-509","DEV-556","DEV-557"]}'
+- at: 2026-11-15T07:30:26.535764+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T07:30:46.426858+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:30:46.553817+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-501","DEV-532","DEV-511","DEV-550","DEV-509","DEV-556","DEV-557"]}'
+    new: '{"related":["DEV-501","DEV-532","DEV-511","DEV-550","DEV-509","DEV-556","DEV-557","DEV-558"]}'
+- at: 2026-11-15T07:30:53.786457+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-15T07:31:50.182032+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aaa3dde28-c4a6-48d9-a0d4-6848aac33a6a
+- at: 2026-11-15T07:33:39.188266+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:33:44.523208+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-15T07:33:44.576788+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:34:13.649174+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:34:44.226300+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:34:44.227967+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T07:34:53.762521+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T07:35:54.596860+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:36:02.612090+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox

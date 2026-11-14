@@ -1,11 +1,11 @@
 title: Jobs that failed during the T3 Code outage left 15 tickets InProgress and lost their agents' outcome
-status: HelpNeeded
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-13T10:33:47.286204+00:00
-modified: 2026-11-15T07:25:13.844696+00:00
+modified: 2026-11-15T07:40:12.196081+00:00
 relationships:
   blocks:
   - DEV-513
@@ -44,6 +44,8 @@ relationships:
   - DEV-315
   - DEV-487
   - DEV-528
+  - DEV-559
+  - DEV-550
 comments:
 - date: 2026-11-13T10:37:16.946574+00:00
   author: claude
@@ -358,6 +360,29 @@ comments:
     choice:
     - fix
     note: (answered in INBOX-212)
+- date: 2026-11-15T07:36:43.682720+00:00
+  author: claude
+  text: |-
+    Rebased onto `main` (`f92de862`) and reverified. Signed commit `f2f7c19f` on `t3/job-end-rules-t3-outage`, ready for review. The 06:27 review found no code defect: its tests didn't finish a cold compile.
+
+    - Rebase conflicts were mechanical:
+      - `Cargo.toml` and `Cargo.lock`: took main's `harnessmux = "0.1.8"`. It contains 0.1.3's outage wait (`git merge-base --is-ancestor v0.1.3 v0.1.8`).
+      - `crates/lotar-lib/tests/dev503_harness_jobs_test.rs`: main's DEV-550 tests and this branch's outage test were both added at the end of the file. Kept both.
+    - No logic change since `f5ff32cc`.
+    - Checks on `f2f7c19f`: `npm run lint` passes; `npm test` passes (2204 Rust, 1547 UI); `npm run smoke` passes (404).
+      - The first `npm test` run failed only `output_after_exit_is_limited`, a timing test this branch doesn't touch. It passed 5 of 5 runs alone and in the full rerun. Filed as DEV-559 (health).
+    - For the reviewer: in this worktree, `RUSTC_WRAPPER= npm run test:rust -- pending_outcome_tests retry_while_busy_tests agent_active_jobs dev320 dev528 a_t3_job_that_loses_the_server` takes about 17 s (19 passed, runner exit 0), with the build already warm. In a fresh checkout, build first or allow time for the compile.
+- date: 2026-11-15T07:39:51.921305+00:00
+  author: codex
+  text: |-
+    Review: passed — no blocking findings in .
+    - Read the diff, ticket/rework evidence, DEV-528 decision and current outcome handling, recovery checkpoints, outage integration and recent main history. No UI changes or stray files.
+    - Independently passed  and all 5 targeted recovery/outage tests with  outside the sandbox. Initial sandbox run passed 4 recovery tests but denied the harnessmux Unix socket; approved rerun passed all 5.
+    - Full lint, UI and smoke not independently rerun; rely on fix-agent results on this commit. Historical 15-ticket cleanup relies on recorded evidence.
+    - No new findings or tickets. Files, commits, status and assignee unchanged. No durable guidance finding.
+- date: 2026-11-15T07:40:03.920157+00:00
+  author: codex
+  text: 'Review evidence correction: reviewed commit f2f7c19f. Shell quoting stripped inline command text from my previous comment and reran the same five tests; that run also passed. The independent checks were git diff --check and targeted nextest recovery/outage tests using the local cargo profile with RUSTC_WRAPPER empty. No tracked files changed.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8a51060f-8f0e-40eb-8309-91840a4fac93
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa70d136-71c4-42cc-8c60-e9566c5a27b6
@@ -370,6 +395,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4bee1141-77fb-4e65-a470-22f3123e22f3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A25c730c7-2cff-42ab-be74-0fe43df13f6e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae85dcff3-69b4-40f4-a334-cba368e5f4ac
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aacee4248-9ce7-48c2-98b8-9830256a31f2
 releases:
 - 6
 description: |-
@@ -1194,3 +1220,56 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-15T07:27:43.624646+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T07:34:39.962568+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-513","DEV-543"],"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513","DEV-524","DEV-530","DEV-532","DEV-538","DEV-543","DEV-497","DEV-503","DEV-514","DEV-509","DEV-510","DEV-551","DEV-315","DEV-487","DEV-528"]}'
+    new: '{"blocks":["DEV-513","DEV-543"],"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513","DEV-524","DEV-530","DEV-532","DEV-538","DEV-543","DEV-497","DEV-503","DEV-514","DEV-509","DEV-510","DEV-551","DEV-315","DEV-487","DEV-528","DEV-559"]}'
+- at: 2026-11-15T07:36:43.682720+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:36:43.817777+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-513","DEV-543"],"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513","DEV-524","DEV-530","DEV-532","DEV-538","DEV-543","DEV-497","DEV-503","DEV-514","DEV-509","DEV-510","DEV-551","DEV-315","DEV-487","DEV-528","DEV-559"]}'
+    new: '{"blocks":["DEV-513","DEV-543"],"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513","DEV-524","DEV-530","DEV-532","DEV-538","DEV-543","DEV-497","DEV-503","DEV-514","DEV-509","DEV-510","DEV-551","DEV-315","DEV-487","DEV-528","DEV-559","DEV-550"]}'
+- at: 2026-11-15T07:36:51.770709+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T07:36:53.039732+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aacee4248-9ce7-48c2-98b8-9830256a31f2
+- at: 2026-11-15T07:39:51.921305+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:40:03.920157+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:40:12.196081+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

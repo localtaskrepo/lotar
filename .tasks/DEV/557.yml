@@ -1,16 +1,16 @@
 title: 'main fails cargo fmt --check: agent_automation_integration_test.rs comment indent from DEV-550'
-status: HelpNeeded
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
 created: 2026-11-15T06:39:52.985441+00:00
-modified: 2026-11-15T07:25:39.360084+00:00
+modified: 2026-11-15T07:31:14.261199+00:00
 relationships:
   related:
   - DEV-509
   - DEV-550
   - DEV-558
+  - DEV-520
 comments:
 - date: 2026-11-15T06:44:46.875073+00:00
   author: claude
@@ -50,6 +50,9 @@ comments:
 - date: 2026-11-15T07:25:38.960787+00:00
   author: triage
   text: 'Already answered by the owner on INBOX-221 (comment 2026-11-15 07:24): wait, resume the merge after DEV-558 is fixed. DEV-558 is still Merging (@merge). Nothing to do until it is Done.'
+- date: 2026-11-15T07:31:09.581833+00:00
+  author: claude
+  text: 'Done: the fix is on main and `cargo fmt --all --check` passes in the main checkout (`d87f98b2` is an ancestor of main `f92de862`; DEV-558 is Done).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A163846ac-5812-4882-877a-c92f6a5e8734
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad75a141b-3805-4f11-b0e3-922e4fc75315
@@ -170,3 +173,27 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-15T07:30:18.449318+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-509","DEV-550","DEV-558"]}'
+    new: '{"related":["DEV-509","DEV-550","DEV-558","DEV-520"]}'
+- at: 2026-11-15T07:30:54.293314+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T07:31:09.581833+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T07:31:14.261199+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'

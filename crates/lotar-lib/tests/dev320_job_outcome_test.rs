@@ -404,7 +404,7 @@ fn an_assignment_recorded_after_the_job_ended_applies_directly() {
         assignee_at_start: None,
     };
     agent_active_jobs::register(&tasks_dir, &job);
-    assert!(agent_active_jobs::end_and_take_outcome(&tasks_dir, "job-ending").is_none());
+    assert!(agent_active_jobs::end_and_take_outcome(&tasks_dir, "job-ending", "OUTE-1", Some).is_none());
     // The update still sees the job, as one that checked just before its end.
     agent_active_jobs::register(&tasks_dir, &job);
 

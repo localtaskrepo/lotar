@@ -1,16 +1,17 @@
 title: Tag-colour smoke observes unexpected tasks list request
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: codex
 assignee: '@merge'
 created: 2026-11-15T06:59:10.494033+00:00
-modified: 2026-11-15T07:26:42.521460+00:00
+modified: 2026-11-15T07:30:46.554568+00:00
 relationships:
   related:
   - DEV-557
   - DEV-548
   - DEV-509
+  - DEV-520
 comments:
 - date: 2026-11-15T07:05:43.803148+00:00
   author: claude
@@ -124,3 +125,15 @@ history:
   actor: codex
   changes:
   - field: comment_added
+- at: 2026-11-15T07:27:00.968516+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-15T07:30:46.554568+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-557","DEV-548","DEV-509"]}'
+    new: '{"related":["DEV-557","DEV-548","DEV-509","DEV-520"]}'

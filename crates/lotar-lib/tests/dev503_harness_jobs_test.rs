@@ -671,3 +671,54 @@ fn a_continued_thread_never_takes_the_worktree_of_the_thread_it_replaced() {
     assert_eq!(ticket, rev(root, "t3/topic-2"), "a new thread did the work, and the ticket's branch follows it: {log}");
     assert_eq!(rev(root, "t3/topic-2~1"), rev(root, "t3/topic-1"), "it started from the replacement thread's work: {log}");
 }
+
+/// `t3` whose server stops answering: `thread start` names thread-1 and exits 1 with T3's error, and `thread show`
+/// fails the same way while `$FAKE_DOWN` holds a number above 0, then shows the thread completed.
+const FAKE_T3_OUTAGE: &str = r#"#!/bin/sh
+case "$1 $2" in
+  "thread start") cat > /dev/null; echo "Thread thread-1" >&2; echo "Could not reach the T3 Code server at http://127.0.0.1:3773" >&2; exit 1 ;;
+  "thread show")
+    down=$(cat "$FAKE_DOWN" 2>/dev/null || echo 0)
+    if [ "$down" -gt 0 ]; then
+      echo $((down - 1)) > "$FAKE_DOWN"
+      echo "Could not reach the T3 Code server at http://127.0.0.1:3773" >&2
+      exit 1
+    fi
+    echo '{"thread":{"threadId":"thread-1","status":"completed","activeRunId":null,"latestRunId":"r1","pendingRequestCount":0},"messages":[{"role":"assistant","runId":"r1","text":"Fixed while the server was down"}]}' ;;
+esac
+"#;
+
+/// DEV-467: jobs whose thread finished while the T3 Code server didn't answer failed, so their end rules never ran.
+/// The job now follows the thread until the server answers and ends from it.
+#[test]
+fn a_t3_job_that_loses_the_server_completes_from_its_thread_and_runs_its_end_rules() {
+    let fixtures = TestFixtures::new();
+    let root = fixtures.get_temp_path().to_path_buf();
+    let t3 = root.join("fake-t3.sh");
+    std::fs::write(&t3, FAKE_T3_OUTAGE).unwrap();
+    std::fs::set_permissions(&t3, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let home = root.join("harnessmux");
+    std::fs::create_dir_all(home.join("config")).unwrap();
+    std::fs::write(home.join("config/agents.toml"), format!("[agents.t3]\ncommand = [\"{}\"]\n", t3.display())).unwrap();
+    let down = root.join("down");
+    std::fs::write(&down, "2").unwrap();
+    fixtures.create_config_in_dir(
+        &fixtures.tasks_root,
+        &format!("default:\n  project: TEST\nagents:\n  fix:\n    runner: t3\n    env:\n      FAKE_DOWN: \"{}\"\n", down.display()),
+    );
+    std::fs::write(
+        fixtures.tasks_root.join("automation.yml"),
+        "automation:\n  rules:\n    - name: Finish\n      on:\n        job_completed:\n          set:\n            status: Done\n",
+    )
+    .unwrap();
+    TaskService::create(&mut fixtures.create_storage(), TaskCreate { title: "Outage".into(), project: Some("TEST".into()), ..Default::default() }).unwrap();
+    let _env = [
+        EnvVarGuard::set("HARNESSMUX_HOME", home.to_string_lossy().as_ref()),
+        EnvVarGuard::set("LOTAR_TASKS_DIR", fixtures.tasks_root.to_string_lossy().as_ref()),
+        EnvVarGuard::set("LOTAR_TEST_SILENT", "1"),
+    ];
+    run_t3(&fixtures, "fix").success().stdout(predicate::str::contains("Fixed while the server was down"));
+    assert_eq!(std::fs::read_to_string(&down).unwrap().trim(), "0", "the job read the thread through the outage");
+    let task = TaskService::get(&fixtures.create_storage(), "TEST-1", None).unwrap();
+    assert_eq!(task.status.as_str(), "Done", "the job_completed rule ran");
+}

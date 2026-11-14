@@ -411,11 +411,12 @@ impl AgentJobService {
 
     /// Finish the jobs whose process exited before they ended, as a worker
     /// or server starts (DEV-378). Each one runs here from now on; see
-    /// [`adopt_orphaned_job`].
+    /// [`adopt_orphaned_job`]. Outcomes their ends left pending apply too (DEV-467).
     pub fn recover_orphaned_jobs(tasks_dir: &std::path::Path) {
         for orphan in crate::services::agent_active_jobs::orphaned(tasks_dir) {
             adopt_orphaned_job(tasks_dir, &orphan);
         }
+        AutomationService::apply_pending_outcomes(tasks_dir);
     }
 
     pub fn list_jobs() -> Vec<AgentJob> {
@@ -3880,7 +3881,11 @@ fn update_job_failure(job_id: &str, ticket_id: &str, message: String, tasks_dir:
 /// so the agent's summary needn't say it (DEV-469).
 fn apply_job_end_rules(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Path, event: AutomationEvent, job_context: Option<AutomationJobContext>) {
     let before = ticket_state(tasks_dir, ticket_id);
-    let _ = AutomationService::apply_job_event(tasks_dir, ticket_id, event, job_context);
+    if let Err(err) = AutomationService::apply_job_event(tasks_dir, ticket_id, event, job_context) {
+        update_job(job_id, |state| {
+            record_and_emit(state, "agent_job_progress", Some(format!("The end rules for {ticket_id} failed: {err}")));
+        });
+    }
     if let (Some(before), Some(after)) = (before, ticket_state(tasks_dir, ticket_id))
         && let Some(message) = ticket_move_note(ticket_id, &before, &after)
     {

@@ -1,0 +1,46 @@
+title: 'output_after_exit_is_limited fails under full-suite load: the drain ends before its 50 ms limit'
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-15T07:34:39.795147+00:00
+modified: 2026-11-15T07:34:41.686234+00:00
+relationships:
+  related:
+  - DEV-467
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8bbebf79-02c4-4c36-b700-2c0c15cc44ff
+description: |-
+  Found: in DEV-467's full `npm test` (2026-11-15, branch t3/job-end-rules-t3-outage on main f92de862), `services::agent_job_service::tests::output_after_exit_is_limited` (crates/lotar-lib/src/services/agent_job_service.rs ~4717) failed with left: Ok(()) right: Err(TimedOut). It passed 5 of 5 runs alone and in the full rerun. The test's descendant thread writes to the pipe in a loop. Under load it can be descheduled for longer than the 50 ms drain limit, the pipe runs empty, and read_job_output returns Ok before the limit is reached. The branch doesn't touch this code.
+
+  Check: npm run test:rust under full-suite load (or with a loaded CPU) fails it now and then.
+
+  Done when: the test proves the drain limit without depending on the writer outpacing the reader, for example by holding the pipe full or with a writer that never yields, and it passes repeated full runs.
+tags:
+- health
+custom_fields:
+  finding: tests:flaky:output_after_exit_is_limited
+history:
+- at: 2026-11-15T07:34:39.964386+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-467"]}'
+- at: 2026-11-15T07:34:40.130446+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-15T07:34:40.610806+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T07:34:41.686234+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8bbebf79-02c4-4c36-b700-2c0c15cc44ff

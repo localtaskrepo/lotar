@@ -192,16 +192,82 @@ pub fn peek_outcome(tasks_dir: &Path, job_id: &str) -> Option<JobOutcome> {
 /// recorded for a job that no longer reads it. A change that checked for
 /// the job before that and records its outcome after the read below is
 /// refused by [`record_outcome`] and applied directly by its caller.
-pub fn end_and_take_outcome(tasks_dir: &Path, job_id: &str) -> Option<JobOutcome> {
+///
+/// The outcome stays on disk as pending until [`settle_outcome`] (DEV-467):
+/// if its end can't apply it, or its process dies first, a later worker or
+/// server applies it ([`pending_outcomes`]). `keep` decides what of it
+/// still applies before it is kept (DEV-528's agent-reporter hand-back), so a
+/// later worker or server applies only that; `None` drops it.
+pub fn end_and_take_outcome(tasks_dir: &Path, job_id: &str, ticket_id: &str, keep: impl FnOnce(JobOutcome) -> Option<JobOutcome>) -> Option<JobOutcome> {
     let name = safe_name(job_id)?;
     let dir = dir(tasks_dir);
     let _ = std::fs::remove_file(dir.join(format!("{name}.json")));
     let _lock = lock_outcome(&dir, name);
     mark_ended(&dir, name);
     let path = dir.join(format!("{name}.outcome.json"));
-    let outcome = read_outcome(&path);
-    let _ = std::fs::remove_file(&path);
-    outcome
+    let Some(outcome) = read_outcome(&path).and_then(keep) else {
+        let _ = std::fs::remove_file(&path);
+        return None;
+    };
+    let pending = PendingOutcome { ticket_id: ticket_id.to_string(), outcome: outcome.clone(), owner_pid: std::process::id(), deferred: false };
+    if write_pending(&dir, name, &pending).is_ok() {
+        let _ = std::fs::remove_file(&path);
+    }
+    Some(outcome)
+}
+
+/// An outcome its job's end took but hasn't applied yet (DEV-467).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PendingOutcome {
+    pub ticket_id: String,
+    pub outcome: JobOutcome,
+    /// The process that ended the job and applies the outcome.
+    pub owner_pid: u32,
+    /// The owner couldn't apply it and left it to a later worker or server.
+    #[serde(default)]
+    pub deferred: bool,
+}
+
+fn pending_path(dir: &Path, name: &str) -> PathBuf {
+    dir.join(format!("{name}.pending.json"))
+}
+
+fn write_pending(dir: &Path, name: &str, pending: &PendingOutcome) -> std::io::Result<()> {
+    let json = serde_json::to_string(pending).map_err(std::io::Error::other)?;
+    crate::storage::safety::atomic_write_file(&pending_path(dir, name), &json)
+}
+
+/// The outcome was applied, or can never be: forget it.
+pub fn settle_outcome(tasks_dir: &Path, job_id: &str) {
+    if let Some(name) = safe_name(job_id) {
+        let _ = std::fs::remove_file(pending_path(&dir(tasks_dir), name));
+    }
+}
+
+/// The outcome couldn't be applied yet: leave it to the next worker or server.
+pub fn defer_outcome(tasks_dir: &Path, job_id: &str) {
+    let Some(name) = safe_name(job_id) else {
+        return;
+    };
+    let dir = dir(tasks_dir);
+    let path = pending_path(&dir, name);
+    if let Some(mut pending) = std::fs::read_to_string(&path).ok().and_then(|json| serde_json::from_str::<PendingOutcome>(&json).ok()) {
+        pending.deferred = true;
+        let _ = write_pending(&dir, name, &pending);
+    }
+}
+
+/// Outcomes left to this process: deferred, or their owner exited first.
+pub fn pending_outcomes(tasks_dir: &Path) -> Vec<PendingOutcome> {
+    let Ok(entries) = std::fs::read_dir(dir(tasks_dir)) else {
+        return Vec::new();
+    };
+    entries
+        .flatten()
+        .filter(|entry| entry.file_name().to_str().is_some_and(|name| name.ends_with(".pending.json")))
+        .filter_map(|entry| std::fs::read_to_string(entry.path()).ok().and_then(|json| serde_json::from_str::<PendingOutcome>(&json).ok()))
+        .filter(|pending| pending.deferred || !process_alive(pending.owner_pid))
+        .collect()
 }
 
 fn read_outcome(path: &Path) -> Option<JobOutcome> {
@@ -233,7 +299,8 @@ fn records(tasks_dir: &Path) -> Vec<ActiveJob> {
 }
 
 fn read_record(path: &Path) -> Option<ActiveJob> {
-    let is_record = path.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.ends_with(".json") && !n.ends_with(".outcome.json"));
+    let is_record =
+        path.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.ends_with(".json") && !n.ends_with(".outcome.json") && !n.ends_with(".pending.json"));
     if !is_record {
         return None;
     }
@@ -350,13 +417,38 @@ mod tests {
         let outcome = |job_id: &str| JobOutcome { job_id: job_id.into(), assignee: Some("owner".into()), ..JobOutcome::default() };
 
         assert_eq!(record_outcome(tasks.path(), &outcome("job-1")).unwrap(), Some(outcome("job-1")));
-        assert_eq!(end_and_take_outcome(tasks.path(), "job-1"), Some(outcome("job-1")));
+        assert_eq!(end_and_take_outcome(tasks.path(), "job-1", "T-1", Some), Some(outcome("job-1")));
         assert_eq!(record_outcome(tasks.path(), &outcome("job-1")).unwrap(), None, "after the end took the outcome");
         assert!(peek_outcome(tasks.path(), "job-1").is_none());
+        settle_outcome(tasks.path(), "job-1");
 
         unregister(tasks.path(), "job-2");
         assert_eq!(record_outcome(tasks.path(), &outcome("job-2")).unwrap(), None, "after the job was unregistered");
         assert!(peek_outcome(tasks.path(), "job-2").is_none());
+        unsafe { std::env::remove_var("LOTAR_AGENT_QUEUE_DIR") };
+    }
+
+    #[test]
+    fn a_taken_outcome_stays_pending_until_settled() {
+        let _queue = tempfile::tempdir().unwrap();
+        // SAFETY: test-local override of the queue directory.
+        unsafe { std::env::set_var("LOTAR_AGENT_QUEUE_DIR", _queue.path()) };
+        let tasks = tempfile::tempdir().unwrap();
+        let outcome = JobOutcome { job_id: "job-1".into(), status: Some("Done".into()), ..JobOutcome::default() };
+        record_outcome(tasks.path(), &outcome).unwrap();
+        assert_eq!(end_and_take_outcome(tasks.path(), "job-1", "T-1", Some), Some(outcome.clone()));
+        unregister(tasks.path(), "job-1");
+        assert!(pending_outcomes(tasks.path()).is_empty(), "its live owner still applies it");
+
+        defer_outcome(tasks.path(), "job-1");
+        let pending = PendingOutcome { ticket_id: "T-1".into(), outcome, owner_pid: std::process::id(), deferred: true };
+        assert_eq!(pending_outcomes(tasks.path()), vec![pending.clone()], "kept past the job's end");
+        assert!(list(tasks.path()).is_empty() && orphaned(tasks.path()).is_empty(), "not a job record");
+
+        write_pending(&dir(tasks.path()), "job-1", &PendingOutcome { owner_pid: 0, deferred: false, ..pending }).unwrap();
+        assert_eq!(pending_outcomes(tasks.path()).len(), 1, "its owner exited before applying it");
+        settle_outcome(tasks.path(), "job-1");
+        assert!(pending_outcomes(tasks.path()).is_empty());
         unsafe { std::env::remove_var("LOTAR_AGENT_QUEUE_DIR") };
     }
 }
