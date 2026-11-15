@@ -215,7 +215,7 @@ Actions define what happens at different points in the automation lifecycle:
 
 Older files may use `job_start`, `complete`/`success`, `error`/`failure` and `cancel` for the job hooks; they still work.
 
-A status or assignee someone sets while the job runs (an agent handing the ticket back, for example) is the job's outcome: it replaces the `set.status`/`set.assignee` of the `job_completed`, `job_failed` and `job_cancelled` rules, whose other actions still run. Applied when the job ends, the outcome fires the `updated` and `assigned` rules like any other change. See [Status and assignee during a job](agent.md#status-and-assignee-during-a-job).
+A status or assignee someone sets while the job runs (an agent handing the ticket back, for example) is the job's outcome: it replaces the `set.status`/`set.assignee` of the `job_completed`, `job_failed` and `job_cancelled` rules, whose other actions still run. A hand-back to an agent-named reporter (`claude`, `codex`) is dropped when one of these rules sets an assignee. Applied when the job ends, the outcome fires the `updated` and `assigned` rules like any other change. See [Status and assignee during a job](agent.md#status-and-assignee-during-a-job).
 
 Actions support `set`, `add`, `remove`, `comment`, `run`, `agent`, `tell_agent`, and `archive`.
 

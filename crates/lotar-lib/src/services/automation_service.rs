@@ -562,13 +562,14 @@ impl AutomationService {
             .as_ref()
             .filter(|_| matches!(event, AutomationEvent::JobCompleted | AutomationEvent::JobFailed | AutomationEvent::JobCancelled))
             .map(|job| job.job_id.clone());
-        let recorded = ending_job.as_deref().and_then(|job_id| crate::services::agent_active_jobs::peek_outcome(tasks_dir, job_id));
         let mut action_context =
             AutomationActionContext { event, job: job_context, previous: None, comment: None, unblocked_by: Vec::new(), rule: String::new() };
         let mut failures: Vec<String> = Vec::new();
 
+        let active_sprints = compute_active_sprint_ids(&storage);
+        let mut actions = Vec::new();
         for (rule_idx, rule) in automation.automation.rules().iter().enumerate() {
-            if !matches_rule(rule, &task, &ChangeSet::empty(&task), MatchMode::Current, &config, &compute_active_sprint_ids(&storage)) {
+            if !matches_rule(rule, &task, &ChangeSet::empty(&task), MatchMode::Current, &config, &active_sprints) {
                 continue;
             }
             let rk = rule_identity(rule, rule_idx);
@@ -576,19 +577,29 @@ impl AutomationService {
                 continue;
             }
             if let Some(action) = resolve_action_for_event(&rule.on, event) {
-                let action = without_outcome_fields(action, recorded.as_ref());
-                action_context.rule = rule_label(rule, &rk);
-                if let Err(err) = apply_action(&mut storage, &task, &config, &action, &action_context) {
-                    failures.push(rule_failure(rule, &rk, ticket_id, &err));
-                }
-                cooldown_record(rule, &rk, ticket_id, tasks_dir);
+                actions.push((rule, rk, action));
             }
+        }
+        let rule_assigns = actions.iter().any(|(_, _, action)| action.set.as_ref().is_some_and(|set| set.assignee.is_some()));
+        let recorded = ending_job
+            .as_deref()
+            .and_then(|job_id| crate::services::agent_active_jobs::peek_outcome(tasks_dir, job_id))
+            .and_then(|outcome| without_agent_reporter_hand_back(outcome, &task, rule_assigns));
+
+        for (rule, rk, action) in actions {
+            let action = without_outcome_fields(action, recorded.as_ref());
+            action_context.rule = rule_label(rule, &rk);
+            if let Err(err) = apply_action(&mut storage, &task, &config, &action, &action_context) {
+                failures.push(rule_failure(rule, &rk, ticket_id, &err));
+            }
+            cooldown_record(rule, &rk, ticket_id, tasks_dir);
         }
 
         // The rules have run: end the job's guard and apply the outcome,
         // including anything recorded while they ran.
         if let Some(job_id) = ending_job.as_deref()
             && let Some(outcome) = crate::services::agent_active_jobs::end_and_take_outcome(tasks_dir, job_id)
+            && let Some(outcome) = without_agent_reporter_hand_back(outcome, &task, rule_assigns)
             && let Err(err) = apply_job_outcome(&mut storage, ticket_id, &config, &outcome)
         {
             failures.push(format!("Outcome recorded during job {job_id} for {ticket_id} failed: {err}"));
@@ -2021,6 +2032,19 @@ fn apply_action(
     }
 
     Ok(())
+}
+
+/// A job's hand-back to the ticket's reporter reaches no one when that
+/// reporter is an agent name (claude, codex): nothing picks up a ticket
+/// assigned to it. When an end rule assigns the ticket, that hand-back
+/// (its status and assignee) is dropped and the rule decides (owner
+/// 2026-11-14, DEV-528). `None` when nothing is left to apply.
+fn without_agent_reporter_hand_back(outcome: crate::api_types::JobOutcome, task: &TaskDTO, rule_assigns: bool) -> Option<crate::api_types::JobOutcome> {
+    let to_agent_reporter = outcome.assignee.as_deref().is_some_and(|assignee| {
+        task.reporter.as_deref().is_some_and(|reporter| reporter.eq_ignore_ascii_case(assignee))
+            && crate::config::operations::AGENT_RUNNERS.iter().any(|runner| runner.eq_ignore_ascii_case(assignee))
+    });
+    if rule_assigns && to_agent_reporter { None } else { Some(outcome) }
 }
 
 /// The action without the `set` fields a job outcome decides (DEV-320).
