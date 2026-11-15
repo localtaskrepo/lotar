@@ -93,7 +93,7 @@ pub fn session_prefix(project: &std::path::Path, ticket_id: &str) -> String {
 }
 
 /// A ticket's session for an agent profile: `lotar-1a2b3c-DEV-1-fix`, or `lotar-1a2b3c-DEV-1` for a job without a
-/// profile. A job of the same profile with `session: continue` takes the session's next turn.
+/// profile.
 pub fn session_name(project: &std::path::Path, ticket_id: &str, agent_profile: Option<&str>) -> String {
     let prefix = session_prefix(project, ticket_id);
     let name = match agent_profile.map(str::trim).filter(|profile| !profile.is_empty()) {
@@ -101,6 +101,16 @@ pub fn session_name(project: &std::path::Path, ticket_id: &str, agent_profile: O
         None => prefix,
     };
     name.chars().take(64).collect()
+}
+
+/// The session a `session: continue` job takes its next turn in: the newest of its own profile, else the ticket's
+/// newest of any profile (a merge continues the review's T3 Code thread, DEV-368, DEV-565), else its own name.
+pub fn session_to_continue(project: &std::path::Path, ticket_id: &str, agent_profile: Option<&str>) -> String {
+    let own = session_name(project, ticket_id, agent_profile);
+    if registry().load(&own).is_ok() {
+        return own;
+    }
+    earlier_sessions(project, ticket_id, &own).pop().map_or(own, |(record, _)| record.name)
 }
 
 /// The ticket's other sessions in this repository, oldest first, for the prompt of a job: their agents' replies and
@@ -175,12 +185,35 @@ pub fn open_session(
     let owned = OWNED.lock().ok().and_then(|owned| owned.get(name).cloned());
     let session = block_on(async {
         if let Some(session) = owned {
-            if resume && session.status().await.is_ok() {
+            let open = session.status().await.is_ok();
+            let same_env = registry.load(name).is_ok_and(|record| record.profile.env == profile.env);
+            if resume && open && same_env {
                 return Ok(session);
             }
             let _ = session.close().await;
+            // An open session whose agent runs with another job's environment (a merge after the review in this
+            // process) stops as at its idle TTL, the same backend close, and stays resumable: it resumes below.
+            if resume
+                && open
+                && let Ok(mut record) = registry.load(name)
+            {
+                record.state = harnessmux::SessionState::Idle;
+                registry.save(&record).map_err(|err| err.to_string())?;
+            }
         }
         if resume {
+            // The process of the session's last job (an `agent run` whose end rule started this job) owns it until it
+            // exits, at the latest until its idle TTL.
+            let until = tokio::time::Instant::now() + SESSION_IDLE_TTL + Duration::from_secs(5);
+            while harnessmux::ipc::owner_running(&registry, name).await && tokio::time::Instant::now() < until {
+                tokio::time::sleep(Duration::from_millis(200)).await;
+            }
+            // Its agent runs with this job's environment (its profile's env and the ticket's LOTAR_ variables), not the
+            // one of the job that started it: a merge that continues the review's session runs as the merge profile.
+            if let Ok(mut record) = registry.load(name) {
+                record.profile.env = profile.env;
+                registry.save(&record).map_err(|err| err.to_string())?;
+            }
             return harnessmux::Session::resume(registry, table, name, Some(SESSION_IDLE_TTL)).await.map_err(|err| err.to_string());
         }
         if let Ok(existing) = registry.load(name)

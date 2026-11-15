@@ -421,9 +421,10 @@ fn a_ticket_hands_its_context_from_harness_to_harness_through_its_states() {
     assert!(review[0].contains("Fixed: fix.txt holds the fix 1"), "the reviewer gets the fix agent's reply: {}", review[0]);
     assert!(review[0].contains("Earlier agent sessions on this ticket") && review[0].contains("-PIPE-1-fix (claude agent"), "and its session: {}", review[0]);
     assert_eq!(read("fix").matches("\"method\":\"session/new\"").count(), 1, "the rework is the next turn of the fix session");
+    assert!(read("fix").contains("\"method\":\"session/resume\""), "resumed with the rework's environment (DEV-565)");
     assert!(fix[1].contains("Review: keep fix.txt but say why 1"), "the rework gets the review: {}", fix[1]);
     assert!(
-        merge[0].contains("Review: keep fix.txt but say why 1") && merge[0].contains("Fixed: fix.txt holds the fix 2"),
+        merge[0].contains("Review: keep fix.txt but say why 1") && merge[0].matches("Fixed: fix.txt holds the fix 1").count() >= 2,
         "the merge agent gets both: {}",
         merge[0]
     );
@@ -503,8 +504,12 @@ fn t3_harness_with(profiles: &[(&str, &str, &str)]) -> (TestFixtures, Vec<EnvVar
 }
 
 fn run_t3(fixtures: &TestFixtures, profile: &str) -> assert_cmd::assert::Assert {
+    run_t3_with(fixtures, profile, &[])
+}
+
+fn run_t3_with(fixtures: &TestFixtures, profile: &str, extra: &[&str]) -> assert_cmd::assert::Assert {
     let mut cmd = crate::common::lotar_cmd().unwrap();
-    cmd.current_dir(fixtures.get_temp_path()).args(["agent", "run", "TEST-1", "Work on it", "--agent", profile, "--wait"]);
+    cmd.current_dir(fixtures.get_temp_path()).args(["agent", "run", "TEST-1", "Work on it", "--agent", profile, "--wait"]).args(extra);
     cmd.assert()
 }
 
@@ -550,7 +555,7 @@ fn a_ticket_branch_that_cannot_follow_its_thread_fails_the_job() {
 }
 
 /// A `fix` thread that commits, then amends, and a `merge` thread that hands the ticket back; both continue their
-/// threads.
+/// threads. The first merge starts its own (`--session new`), else it would continue the fix's.
 fn amending_fix_and_merge() -> (TestFixtures, Vec<EnvVarGuard>) {
     t3_harness_with(&[
         (
@@ -572,7 +577,7 @@ fn a_continued_merge_thread_starts_from_the_rework_that_amended_the_ticket_branc
     let root = fixtures.get_temp_path();
     run_t3(&fixtures, "fix").success();
     let fix = rev(root, "agent/TEST-1");
-    run_t3(&fixtures, "merge").success();
+    run_t3_with(&fixtures, "merge", &["--session", "new"]).success();
     assert_ne!(rev(root, "main"), fix, "the merge handed the ticket back and left main alone");
     run_t3(&fixtures, "fix").success();
     let rework = rev(root, "t3/topic-0");
@@ -584,6 +589,47 @@ fn a_continued_merge_thread_starts_from_the_rework_that_amended_the_ticket_branc
     assert_eq!(merge, format!("send thread-1 t3/topic-1 {rework}"), "the continued merge thread starts from the rework: {log}");
 }
 
+/// DEV-565: the owner decided 2026-11-11 that the merge runs in the reviewer's thread (DEV-368). A `session: continue`
+/// job without a session of its own profile takes the next turn of the ticket's newest session, whatever profile ran
+/// it, as before harnessmux (DEV-503). The review's end rule starts the merge, and its turn runs with the merge
+/// profile's env (its `FAKE_RUN`).
+#[test]
+fn a_continued_merge_without_a_session_of_its_own_takes_the_reviews_thread() {
+    let (fixtures, _env) = t3_harness_with(&[("review", "", ""), ("merge", "touch merged", "    session: continue\n")]);
+    let root = fixtures.get_temp_path();
+    lotar::services::automation_service::AutomationService::set(
+        &fixtures.tasks_root,
+        None,
+        "automation:\n  rules:\n    - name: Reviewed\n      when:\n        not: { assignee: \"@merge\" }\n      on:\n        job_completed:\n          set: { assignee: \"@merge\" }\n          agent: { session: continue, prompt: Merge it }\n",
+    )
+    .expect("automation rules");
+    run_t3(&fixtures, "review").success();
+    wait_for("the merge", || root.join("t3.log").is_file() && std::fs::read_to_string(root.join("t3.log")).unwrap().lines().count() == 2);
+    let log = std::fs::read_to_string(root.join("t3.log")).unwrap();
+    assert!(log.lines().last().unwrap_or_default().starts_with("send thread-0 "), "the merge continues the review's thread: {log}");
+    wait_for("the merge's turn", || root.join("t3-trees/0/merged").is_file());
+}
+
+/// DEV-565, in one process (`lotar serve`): the merge takes over the review's session while it is still open there, and
+/// its turn runs with the merge profile's env, not the review's.
+#[test]
+fn a_continued_merge_in_the_reviews_process_runs_with_the_merge_profiles_env() {
+    let (fixtures, _env) = t3_harness_with(&[("review", "", ""), ("merge", "touch merged", "    session: continue\n")]);
+    let root = fixtures.get_temp_path();
+    lotar::services::automation_service::AutomationService::set(
+        &fixtures.tasks_root,
+        None,
+        "automation:\n  rules:\n    - name: Reviewed\n      when:\n        assignee: \"@review\"\n      on:\n        job_completed:\n          set: { assignee: \"@merge\" }\n",
+    )
+    .expect("automation rules");
+    AgentJobService::set_orchestrator_mode(AgentOrchestratorMode::Server);
+    let mut storage = fixtures.create_storage();
+    TaskService::update(&mut storage, "TEST-1", lotar::api_types::TaskUpdate { assignee: Some("@review".into()), ..Default::default() }).unwrap();
+    wait_for("the merge's turn", || root.join("t3-trees/0/merged").is_file());
+    let log = std::fs::read_to_string(root.join("t3.log")).unwrap();
+    assert!(log.lines().last().unwrap_or_default().starts_with("send thread-0 "), "the merge continues the review's thread: {log}");
+}
+
 /// A continued thread whose branch holds a commit the ticket's branch lacks keeps it: the job starts a new thread on
 /// the ticket's branch instead and says why.
 #[test]
@@ -591,7 +637,7 @@ fn a_continued_thread_with_work_of_its_own_leaves_it_and_starts_a_new_thread() {
     let (fixtures, _env) = amending_fix_and_merge();
     let root = fixtures.get_temp_path();
     run_t3(&fixtures, "fix").success();
-    run_t3(&fixtures, "merge").success();
+    run_t3_with(&fixtures, "merge", &["--session", "new"]).success();
     let tree = root.join("t3-trees/1");
     std::fs::write(tree.join("own.txt"), "own").unwrap();
     git(&tree, &["add", "own.txt"]);

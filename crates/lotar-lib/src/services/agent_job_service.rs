@@ -1645,7 +1645,9 @@ fn finish_orphaned_job(
     let budget = profile.max_budget_usd;
     let session = (|| {
         let table = crate::services::agent_runner::job_agent_table(agent, profile)?;
-        let profile = crate::services::agent_runner::session_profile(profile, HashMap::new())?;
+        // The turn it finishes keeps the environment the job gave it.
+        let env = crate::services::agent_runner::registry().load(name).map(|record| record.profile.env.into_iter().collect()).unwrap_or_default();
+        let profile = crate::services::agent_runner::session_profile(profile, env)?;
         let cwd = resolve_repo_root(tasks_dir).unwrap_or_else(|| tasks_dir.to_path_buf());
         crate::services::agent_runner::open_session(name, agent, &cwd, &table, profile, true).map_err(LoTaRError::ValidationError)
     })();
@@ -2578,13 +2580,17 @@ fn run_job(
     let agent = harness_agent(runner_kind);
     let agent_profile = JOB_REGISTRY.lock().ok().and_then(|registry| registry.jobs.get(&job_id).and_then(|state| state.record.agent_profile.clone()));
     let project = crate::services::agent_runner::session_project(&tasks_dir);
-    let name = session_name(&project, &ticket_id, agent_profile.as_deref());
+    let own_name = session_name(&project, &ticket_id, agent_profile.as_deref());
     // The session a `session: continue` job takes its next turn in, or why
     // it starts a new one (for the job log).
     let (mut continued, mut session_reason) = match (profile.session == Some(AgentSession::Continue), agent) {
         (false, _) => (None, None),
         (true, None) => (None, Some("The command runner has no session to continue; this job starts the command as usual.".to_string())),
-        (true, Some(agent)) => match crate::services::agent_runner::continuable_session(&name, agent, &tasks_dir) {
+        (true, Some(agent)) => match crate::services::agent_runner::continuable_session(
+            &crate::services::agent_runner::session_to_continue(&project, &ticket_id, agent_profile.as_deref()),
+            agent,
+            &tasks_dir,
+        ) {
             Ok(record) => (Some(record), None),
             Err(reason) => (None, Some(reason)),
         },
@@ -2592,8 +2598,8 @@ fn run_job(
     let t3_worktrees = runner_kind == AgentRunnerKind::T3 && config.agent_worktree.enabled;
     let mut thread_worktree = None;
     if t3_worktrees && continued.is_some() {
-        let thread = continued.as_ref().and_then(|record| record.agent_session.clone());
-        match continued_thread_worktree(&tasks_dir, &ticket_id, &config, &name, thread.as_deref()) {
+        let (session, thread) = continued.as_ref().map(|record| (record.name.clone(), record.agent_session.clone())).unwrap_or_default();
+        match continued_thread_worktree(&tasks_dir, &ticket_id, &config, &session, thread.as_deref()) {
             Ok(found) => thread_worktree = Some(found),
             Err(reason) => {
                 continued = None;
@@ -2601,6 +2607,9 @@ fn run_job(
             }
         }
     }
+    // A job that starts a new session starts its profile's own, never
+    // replacing another profile's.
+    let name = continued.as_ref().map_or(own_name, |record| record.name.clone());
     // A t3 job asks T3 Code for the worktree (DEV-318); a continued session
     // stays where it ran, a continued T3 Code thread in its own worktree.
     let mut t3_plan = None;

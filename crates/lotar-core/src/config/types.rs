@@ -175,8 +175,9 @@ pub enum AgentSession {
     #[default]
     New,
     /// The next turn of the ticket's session of the same agent profile (the
-    /// harnessmux session `<ticket>-<profile>`), when it exists and runs the
-    /// same agent; otherwise a new session.
+    /// harnessmux session `<ticket>-<profile>`), else of the ticket's newest
+    /// session, when it exists and runs the same agent; otherwise a new
+    /// session.
     Continue,
     /// A new session, like `new`. For a reviewer that must not check its own
     /// work.
