@@ -2396,6 +2396,27 @@ pub(crate) fn cleanup_done_ticket_worktree(tasks_dir: &std::path::Path, ticket_i
     drop(registry);
 }
 
+/// A job ended: retry `cleanup_done_ticket_worktree` for every Done ticket
+/// that still has an agent worktree (DEV-574). A T3 Code thread's process
+/// often still runs in a worktree when its ticket goes Done, which keeps
+/// the worktree and its build output; nothing else would retry it.
+fn cleanup_done_worktrees(tasks_dir: &std::path::Path, config: &ResolvedConfig) {
+    let Some(repo_root) = resolve_repo_root(tasks_dir) else {
+        return;
+    };
+    let prefix = &config.agent_worktree.branch_prefix;
+    let Ok(worktrees) = agent_worktrees(&repo_root, prefix) else {
+        return;
+    };
+    let tickets: std::collections::BTreeSet<_> = worktrees
+        .iter()
+        .map(|worktree| worktree.ticket_branch.strip_prefix(prefix.as_str()).unwrap_or(&worktree.ticket_branch).trim_start_matches('/').to_string())
+        .collect();
+    for ticket_id in tickets {
+        cleanup_done_ticket_worktree(tasks_dir, &ticket_id);
+    }
+}
+
 enum JobOutcome {
     Success,
     Failure,
@@ -3562,6 +3583,7 @@ fn finalize_cancelled_job(job_id: &str) {
     if let Ok(config) = crate::config::resolution::config_for_project(&record.tasks_dir, prefix.as_deref()) {
         maybe_cleanup_worktree(job_id, &record.ticket_id, &record.tasks_dir, &config, JobOutcome::Cancelled);
         remove_build_output(job_id, &record.ticket_id, &record.tasks_dir, &config);
+        cleanup_done_worktrees(&record.tasks_dir, &config);
     }
 }
 
@@ -3887,6 +3909,7 @@ fn finalize_job(
 
     maybe_cleanup_worktree(job_id, ticket_id, tasks_dir, config, if success { JobOutcome::Success } else { JobOutcome::Failure });
     remove_build_output(job_id, ticket_id, tasks_dir, config);
+    cleanup_done_worktrees(tasks_dir, config);
 }
 
 /// How a runner process ended, for a failure's reason.

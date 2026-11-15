@@ -866,6 +866,35 @@ mod git_required {
         }
     }
 
+    /// DEV-574: a T3 Code thread's process still ran in the worktree when
+    /// the ticket went Done, so it stayed with its build output. The next
+    /// job end, for any ticket, removes it once the process is gone.
+    #[test]
+    fn a_later_job_end_removes_a_done_worktree_a_process_kept() {
+        common::require_git();
+        let (fixture, ticket) = setup("exit 0", true);
+        let root = fixture.get_temp_path();
+        let other = TaskService::create(
+            &mut fixture.create_storage(),
+            TaskCreate { title: "Another ticket".into(), project: Some("SAFE".into()), ..Default::default() },
+        )
+        .unwrap();
+        let branch = format!("agent/{ticket}");
+        let worktree = root.join("worktrees").join("thread");
+        git(root, &["worktree", "add", "-q", "-b", &branch, worktree.to_str().unwrap()]);
+        let mut process = Command::new("sleep").arg("60").current_dir(&worktree).spawn().unwrap();
+        set_status(&fixture, &ticket, "Done", TaskUpdateContext::default());
+        assert!(worktree.exists(), "a worktree a process runs in stays");
+        process.kill().unwrap();
+        process.wait().unwrap();
+
+        AgentJobService::start_job_with_tasks_dir(request(&other.id), &fixture.tasks_root).unwrap();
+        wait_idle();
+        assert!(!worktree.exists(), "another ticket's job end removes it");
+        assert!(!branch_exists(root, &branch));
+        assert!(root.join("worktrees").join(&other.id).exists(), "the open ticket's worktree stays");
+    }
+
     /// DEV-343: Done set while a job still runs for the ticket waits for
     /// the job's end.
     #[test]
