@@ -85,7 +85,11 @@ const html = computed(() =>
     resolveAttachment: props.attachmentTaskId ? (stored) => attachmentUrl(stored, props.attachmentTaskId) : undefined,
     taskReferences: props.taskReferences ? { isProject, href: taskHref } : undefined,
     fileReferences: props.fileReferences
-      ? { resolve: (reference) => lookupFile(reference, props.fileBase), href: fileHref }
+      ? {
+          resolve: (reference) => lookupFile(reference, props.fileBase),
+          href: fileHref,
+          src: (path) => api.fileContentUrl(path),
+        }
       : undefined,
   }),
 )

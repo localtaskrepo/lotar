@@ -9,6 +9,7 @@ const repository = new Map([
     ['api_types.rs', 'crates/lotar-lib/src/api_types.rs'],
     ['view/api/types.ts', 'view/api/types.ts'],
     ['src/x-12.rs', 'src/x-12.rs'],
+    ['img/flow.png', 'docs/img/flow.png'],
 ])
 const asked: string[] = []
 const fileReferences = {
@@ -17,6 +18,7 @@ const fileReferences = {
         return repository.get(reference) ?? null
     },
     href: (location: { path: string; line?: number; endLine?: number }) => `?file=${formatFileLocation(location)}`,
+    src: (path: string) => `/api/files/content?path=${path}`,
 }
 
 function render(source: string) {
@@ -98,6 +100,24 @@ describe('file references in markdown', () => {
         )
         expect(links(host)).toEqual([])
         expect(asked).toEqual([])
+    })
+
+    it('loads relative images from the repository', () => {
+        const host = render('![flow](img/flow.png) ![gone](img/missing.png) ![web](https://example.com/a.png)')
+        expect([...host.querySelectorAll('img')].map((image) => image.getAttribute('src'))).toEqual([
+            '/api/files/content?path=docs/img/flow.png',
+            'img/missing.png',
+            'https://example.com/a.png',
+        ])
+    })
+
+    it('gives a relative image no source while its lookup is pending', () => {
+        const host = document.createElement('div')
+        host.innerHTML = renderMarkdownToHtml('![flow](img/flow.png)', {
+            fileReferences: { ...fileReferences, resolve: () => undefined },
+        })
+        expect(host.querySelector('img')?.hasAttribute('src')).toBe(false)
+        expect(host.querySelector('img')?.getAttribute('alt')).toBe('flow')
     })
 
     it('links a path before a task ID inside it can claim it', () => {

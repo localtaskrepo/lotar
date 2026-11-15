@@ -24,12 +24,15 @@ export interface RenderMarkdownOptions {
      * Turn names of repository files into links: markdown links to relative
      * paths, inline code holding a path, and file names in prose. Only names
      * `resolve` maps to a repository path are linked, so a file that does not
-     * exist stays text. Text inside code blocks is left alone.
+     * exist stays text. Text inside code blocks is left alone. Images with a
+     * relative source load the repository file through `src`.
      */
     fileReferences?: {
         /** Repository path of the file a name refers to; null or undefined when unknown. */
         resolve: (reference: string) => string | null | undefined
         href: (location: FileLocation) => string
+        /** URL of a repository file's bytes, for images. */
+        src: (path: string) => string
     }
 }
 
@@ -84,6 +87,14 @@ export function renderMarkdownToHtml(source: string, options: RenderMarkdownOpti
 // host, or the API (resolved attachments).
 const NON_FILE_HREF = /^(?:[a-z][a-z0-9+.-]*:|#|\?|\/\/|\/api\/)/i
 
+function safeDecodeURI(uri: string) {
+    try {
+        return decodeURI(uri)
+    } catch {
+        return uri
+    }
+}
+
 function fileLink(
     location: FileLocation,
     path: string,
@@ -108,16 +119,22 @@ function linkFileReferences(
 ): boolean {
     let changed = false
 
+    for (const image of root.querySelectorAll<HTMLImageElement>('img[src]')) {
+        const src = image.getAttribute('src') ?? ''
+        if (!src || NON_FILE_HREF.test(src)) continue
+        const path = refs.resolve(safeDecodeURI(src))
+        // A name that names no file keeps its source; while the lookup is
+        // pending, no source, so the browser does not ask the app URL for it.
+        if (path === null) continue
+        if (path) image.src = refs.src(path)
+        else image.removeAttribute('src')
+        changed = true
+    }
+
     for (const anchor of root.querySelectorAll<HTMLAnchorElement>('a[href]')) {
         const href = anchor.getAttribute('href') ?? ''
         if (!href || NON_FILE_HREF.test(href)) continue
-        let decoded = href
-        try {
-            decoded = decodeURI(href)
-        } catch {
-            // Keep the raw href.
-        }
-        const location = parseFileLocation(decoded)
+        const location = parseFileLocation(safeDecodeURI(href))
         const path = refs.resolve(location.path)
         if (!path) continue
         fileLink(location, path, refs, anchor)
