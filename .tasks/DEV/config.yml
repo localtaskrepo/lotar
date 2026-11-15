@@ -24,4 +24,6 @@ attachments:
   dir: DEV/@attachments
 agent:
   worktree:
+    # At most 2 jobs at a time in lotar, the rest queue: each runs Rust builds and the smoke suites. Only lotar has a
+    # limit (owner 2026-11-15, STD-170, standards docs/decisions/2026-11-15-job-limit.md).
     max_parallel_jobs: 2
