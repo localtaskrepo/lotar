@@ -67,6 +67,21 @@ pub struct JobStatusLine {
     /// continues it (DEV-368).
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub session_id: Option<String>,
+    /// The worktree and branch the job's T3 Code thread ended in: T3 Code
+    /// makes them after the header is written (DEV-550).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub worktree_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub worktree_branch: Option<String>,
+    /// The commit the job's thread ended on, when the ticket's branch
+    /// pointed at it then: a later job that continues the thread may move
+    /// the thread's branch on from it to the ticket's branch (DEV-550).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub ticket_commit: Option<String>,
+    /// The agent's own session the job ended in (a T3 Code thread id): a
+    /// session name outlives it when a job starts a new one (DEV-550).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub agent_session: Option<String>,
 }
 
 pub struct AgentLogService;
@@ -179,7 +194,18 @@ impl AgentLogService {
             workspace_root,
             logs_dir,
             job_id,
-            JobStatusLine { status: status.to_string(), at: at.to_string(), exit_code, summary, usage: None, session_id: None },
+            JobStatusLine {
+                status: status.to_string(),
+                at: at.to_string(),
+                exit_code,
+                summary,
+                usage: None,
+                session_id: None,
+                worktree_path: None,
+                worktree_branch: None,
+                ticket_commit: None,
+                agent_session: None,
+            },
         )
     }
 

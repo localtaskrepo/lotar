@@ -131,6 +131,10 @@ struct AgentJobState {
     /// A merge job's ticket assignee once its start rules ran, so its end
     /// sees whether the agent handed the ticket back (DEV-516).
     assignee_at_start: Option<Option<String>>,
+    /// The ticket branch's commit when a T3 Code job's thread started from
+    /// it: a thread that rewrote that commit (an amend) moves the ticket's
+    /// branch when nothing else moved it meanwhile (DEV-550).
+    ticket_commit_at_start: Option<String>,
 }
 
 /// Data needed to start a queued job when a slot becomes available
@@ -351,6 +355,7 @@ impl AgentJobService {
                     worker_running: false,
                     main_head_at_start: None,
                     assignee_at_start: None,
+                    ticket_commit_at_start: None,
                 },
             );
 
@@ -770,8 +775,8 @@ fn saved_job_dto(saved: &crate::services::agent_log_service::SavedJob, running: 
         last_message: saved.events.iter().rev().find_map(|entry| entry.message.clone()),
         summary: status.and_then(|status| status.summary.clone()),
         session_id: status.and_then(|status| status.session_id.clone()),
-        worktree_path: header.worktree_path.clone(),
-        worktree_branch: header.worktree_branch.clone(),
+        worktree_path: status.and_then(|status| status.worktree_path.clone()).or_else(|| header.worktree_path.clone()),
+        worktree_branch: status.and_then(|status| status.worktree_branch.clone()).or_else(|| header.worktree_branch.clone()),
         model: header.model.clone(),
         effort: header.effort.clone(),
         usage: status.and_then(|status| status.usage.clone()),
@@ -1362,6 +1367,73 @@ fn plan_t3_worktree(tasks_dir: &std::path::Path, ticket_id: &str, config: &Resol
     Ok((context, plan))
 }
 
+/// The worktree of the T3 Code thread a `session: continue` job sends its
+/// turn to, moved to the ticket branch's commit (DEV-550): T3 Code keeps a
+/// thread on a branch of its own, which a later job's work on the ticket's
+/// branch (an amended rework) leaves behind. The branch moves when it is
+/// behind the ticket's branch, or still at the commit the ticket's branch
+/// pointed at when the thread's last job ended. The worktree is the one
+/// the session's latest job logged, and only when that job ended in
+/// `thread`: a job that started a new thread replaced the session's
+/// earlier one under the same name. `Ok` gives the worktree, its branch
+/// and a note when the branch moved; `Err` says why the thread can't
+/// continue, and LoTaR changes nothing then.
+fn continued_thread_worktree(
+    tasks_dir: &std::path::Path,
+    ticket_id: &str,
+    config: &ResolvedConfig,
+    session: &str,
+    thread: Option<&str>,
+) -> Result<(std::path::PathBuf, String, Option<String>), String> {
+    let ticket_branch = build_worktree_branch(&config.agent_worktree.branch_prefix, &sanitize_worktree_token(ticket_id));
+    let refuse = |why: String| format!("{why}; this job starts a new T3 Code thread on {ticket_branch}.");
+    let repo_root = resolve_repo_root(tasks_dir).ok_or_else(|| refuse("Git repository not found".to_string()))?;
+    let latest = saved_jobs(tasks_dir)
+        .into_iter()
+        .filter_map(|job| job.status)
+        .filter(|status| status.session_id.as_deref() == Some(session))
+        .max_by(|a, b| a.at.cmp(&b.at))
+        .filter(|status| thread.is_some() && status.agent_session.as_deref() == thread);
+    let (path, branch, ticket_commit) = latest
+        .and_then(|status| Some((std::path::PathBuf::from(status.worktree_path?), status.worktree_branch?, status.ticket_commit)))
+        .ok_or_else(|| refuse(format!("The latest job of the session {session} recorded no worktree of its T3 Code thread")))?;
+    let shown = path.display();
+    if !path.is_dir() {
+        return Err(refuse(format!("The T3 Code thread's worktree {shown} is gone")));
+    }
+    let git = |args: &[&str]| -> Result<std::process::Output, String> {
+        git_command(&path).args(args).output().map_err(|err| refuse(format!("git {} in {shown}: {err}", args.join(" "))))
+    };
+    let on = git(&["symbolic-ref", "--quiet", "--short", "HEAD"])?;
+    if !on.status.success() || String::from_utf8_lossy(&on.stdout).trim() != branch {
+        return Err(refuse(format!("The T3 Code thread's worktree {shown} is no longer on {branch}")));
+    }
+    let changes = git(&["status", "--porcelain"])?;
+    if !changes.status.success() || !changes.stdout.is_empty() {
+        return Err(refuse(format!("The T3 Code thread's worktree {shown} has uncommitted changes, which LoTaR leaves alone")));
+    }
+    let target = rev_parse(&repo_root, &format!("refs/heads/{ticket_branch}")).ok_or_else(|| refuse(format!("{ticket_branch} doesn't exist")))?;
+    let head = rev_parse(&path, "HEAD").ok_or_else(|| refuse(format!("{shown} has no commit")))?;
+    if head == target {
+        return Ok((path, branch, None));
+    }
+    let behind = git(&["merge-base", "--is-ancestor", &head, &target])?.status.success();
+    if !behind && ticket_commit.as_deref() != Some(head.as_str()) {
+        return Err(refuse(format!("{branch} in the T3 Code thread's worktree {shown} has commits {ticket_branch} lacks, which LoTaR leaves alone")));
+    }
+    let reset = git(&["reset", "--quiet", "--keep", &target])?;
+    if !reset.status.success() {
+        return Err(refuse(format!("git reset --keep {target} in {shown} failed: {}", String::from_utf8_lossy(&reset.stderr).trim())));
+    }
+    let short = |commit: &str| commit.get(..12).unwrap_or(commit).to_string();
+    let note = format!(
+        "Moved {branch} of the continued T3 Code thread from {} to {} ({ticket_branch}), so the thread works on the ticket's current commit.",
+        short(&head),
+        short(&target)
+    );
+    Ok((path, branch, Some(note)))
+}
+
 /// Record the worktree T3 Code made for a t3 job's thread: the one that
 /// appeared while it ran, else the one on the job's branch. T3 Code may
 /// rename the branch it was given (`agent/DEV-1` becomes `t3/<topic>`), so
@@ -1392,18 +1464,20 @@ fn follow_thread_branch(job_id: &str, tasks_dir: &std::path::Path, ticket_id: &s
     if !config.agent_worktree.enabled {
         return Ok(());
     }
-    let thread_branch = JOB_REGISTRY.lock().ok().and_then(|registry| {
-        let record = &registry.jobs.get(job_id)?.record;
-        record.worktree_branch.clone().filter(|_| record.runner == AgentRunnerKind::T3.as_str() && record.worktree_path.is_some())
+    let thread = JOB_REGISTRY.lock().ok().and_then(|registry| {
+        let state = registry.jobs.get(job_id)?;
+        let record = &state.record;
+        let branch = record.worktree_branch.clone().filter(|_| record.runner == AgentRunnerKind::T3.as_str() && record.worktree_path.is_some())?;
+        Some((branch, state.ticket_commit_at_start.clone()))
     });
-    let (Some(thread_branch), Some(repo_root)) = (thread_branch, resolve_repo_root(tasks_dir)) else {
+    let (Some((thread_branch, started_from)), Some(repo_root)) = (thread, resolve_repo_root(tasks_dir)) else {
         return Ok(());
     };
     let ticket_branch = build_worktree_branch(&config.agent_worktree.branch_prefix, &sanitize_worktree_token(ticket_id));
     if thread_branch == ticket_branch {
         return Ok(());
     }
-    let moved = move_ticket_branch(&repo_root, &ticket_branch, &thread_branch)
+    let moved = move_ticket_branch(&repo_root, &ticket_branch, &thread_branch, started_from.as_deref())
         .map_err(|err| format!("{ticket_branch} stays where it is, not at {thread_branch} of the T3 Code thread: {err}"))?;
     if moved {
         let note = format!("Pointed {ticket_branch} at {thread_branch}, where the T3 Code thread worked, so the ticket's next job starts from its work.");
@@ -1417,8 +1491,9 @@ fn follow_thread_branch(job_id: &str, tasks_dir: &std::path::Path, ticket_id: &s
 /// Move `ticket_branch` to the tip of `thread_branch`, or create it there.
 /// `Ok(false)` when it is there already; an error when it holds a commit
 /// the thread's branch lacks and the main checkout doesn't have, which
-/// moving it would drop.
-fn move_ticket_branch(repo_root: &std::path::Path, ticket_branch: &str, thread_branch: &str) -> Result<bool, String> {
+/// moving it would drop. Unless it is still at `started_from`, the commit
+/// the thread started from: then the thread rewrote that commit (an amend).
+fn move_ticket_branch(repo_root: &std::path::Path, ticket_branch: &str, thread_branch: &str, started_from: Option<&str>) -> Result<bool, String> {
     let git_output = |args: &[&str]| -> Result<String, String> {
         let output = git_command(repo_root).args(args).output().map_err(|err| format!("git {}: {err}", args.join(" ")))?;
         if !output.status.success() {
@@ -1429,10 +1504,11 @@ fn move_ticket_branch(repo_root: &std::path::Path, ticket_branch: &str, thread_b
     let tip = git_output(&["rev-parse", "--verify", &format!("refs/heads/{thread_branch}^{{commit}}")])?;
     if branch_exists(repo_root, ticket_branch) {
         let ticket_ref = format!("refs/heads/{ticket_branch}");
-        if git_output(&["rev-parse", &ticket_ref])? == tip {
+        let ticket_tip = git_output(&["rev-parse", &ticket_ref])?;
+        if ticket_tip == tip {
             return Ok(false);
         }
-        let lacks = git_output(&["cherry", &tip, &ticket_ref])?.lines().any(|line| line.starts_with('+'));
+        let lacks = started_from != Some(ticket_tip.as_str()) && git_output(&["cherry", &tip, &ticket_ref])?.lines().any(|line| line.starts_with('+'));
         if lacks && !branch_landed(repo_root, ticket_branch).unwrap_or(false) {
             return Err(format!("it has commits that {thread_branch} lacks"));
         }
@@ -1512,6 +1588,7 @@ fn adopt_orphaned_job(tasks_dir: &std::path::Path, orphan: &crate::services::age
                 worker_running: true,
                 main_head_at_start: None,
                 assignee_at_start: restored_assignee(job.assignee_at_start.clone()),
+                ticket_commit_at_start: None,
             },
         );
         registry.running_count += 1;
@@ -2487,7 +2564,7 @@ fn run_job(
     let name = session_name(&project, &ticket_id, agent_profile.as_deref());
     // The session a `session: continue` job takes its next turn in, or why
     // it starts a new one (for the job log).
-    let (continued, session_reason) = match (profile.session == Some(AgentSession::Continue), agent) {
+    let (mut continued, mut session_reason) = match (profile.session == Some(AgentSession::Continue), agent) {
         (false, _) => (None, None),
         (true, None) => (None, Some("The command runner has no session to continue; this job starts the command as usual.".to_string())),
         (true, Some(agent)) => match crate::services::agent_runner::continuable_session(&name, agent, &tasks_dir) {
@@ -2495,12 +2572,31 @@ fn run_job(
             Err(reason) => (None, Some(reason)),
         },
     };
+    let t3_worktrees = runner_kind == AgentRunnerKind::T3 && config.agent_worktree.enabled;
+    let mut thread_worktree = None;
+    if t3_worktrees && continued.is_some() {
+        let thread = continued.as_ref().and_then(|record| record.agent_session.clone());
+        match continued_thread_worktree(&tasks_dir, &ticket_id, &config, &name, thread.as_deref()) {
+            Ok(found) => thread_worktree = Some(found),
+            Err(reason) => {
+                continued = None;
+                session_reason = Some(reason);
+            }
+        }
+    }
     // A t3 job asks T3 Code for the worktree (DEV-318); a continued session
-    // stays where it ran.
+    // stays where it ran, a continued T3 Code thread in its own worktree.
     let mut t3_plan = None;
+    let mut moved_note = None;
     let prepared = if let Some(record) = continued.as_ref() {
-        Ok(worktree_context_at(&tasks_dir, &record.cwd))
-    } else if runner_kind == AgentRunnerKind::T3 && config.agent_worktree.enabled {
+        let mut context = worktree_context_at(&tasks_dir, &record.cwd);
+        if let Some((path, branch, note)) = thread_worktree {
+            context.worktree_path = Some(path);
+            context.worktree_branch = Some(branch);
+            moved_note = note;
+        }
+        Ok(context)
+    } else if t3_worktrees {
         plan_t3_worktree(&tasks_dir, &ticket_id, &config).map(|(context, plan)| {
             t3_plan = Some(plan);
             context
@@ -2574,10 +2670,14 @@ fn run_job(
     if is_merge_job && let Some((_, assignee)) = ticket_state(&tasks_dir, &ticket_id) {
         update_job(&job_id, |state| state.assignee_at_start = Some(assignee.clone()));
     }
-    if let Some(reason) = session_reason {
+    for note in session_reason.into_iter().chain(moved_note) {
         update_job(&job_id, |state| {
-            record_and_emit(state, "agent_job_progress", Some(reason.clone()));
+            record_and_emit(state, "agent_job_progress", Some(note.clone()));
         });
+    }
+    let ticket_ref = format!("refs/heads/{}", build_worktree_branch(&config.agent_worktree.branch_prefix, &sanitize_worktree_token(&ticket_id)));
+    if t3_worktrees && let Some(commit) = resolve_repo_root(&tasks_dir).and_then(|root| rev_parse(&root, &ticket_ref)) {
+        update_job(&job_id, |state| state.ticket_commit_at_start = Some(commit.clone()));
     }
 
     // Other processes see the job, and can ask to cancel it or send it a
@@ -2902,7 +3002,12 @@ fn run_session(
             session_profile.worktree_base = Some(plan.base.clone());
             session_profile.branch = plan.branch.clone();
         }
-        worktrees_before = repo_root.as_deref().map(|root| linked_worktrees(root).unwrap_or_default().into_iter().map(|(path, _)| path).collect::<Vec<_>>());
+        // A continued thread makes no worktree: it keeps the one run_job
+        // checked for it, not one another job's thread made meanwhile.
+        if !launch.resume {
+            worktrees_before =
+                repo_root.as_deref().map(|root| linked_worktrees(root).unwrap_or_default().into_iter().map(|(path, _)| path).collect::<Vec<_>>());
+        }
     }
     for note in notes {
         update_job(job_id, |state| {
@@ -3550,6 +3655,15 @@ fn merged_despite_failure(job_id: &str, tasks_dir: &std::path::Path, exit_code: 
     Some(format!("The {runner} runner {failure}, but {branch} is in the main checkout's current branch already: the merge job completed"))
 }
 
+/// The commit a job's worktree `branch` ended on, when the ticket's branch
+/// points at it too (for [`continued_thread_worktree`]).
+fn ended_on_ticket_branch(tasks_dir: &std::path::Path, ticket_id: &str, config: &ResolvedConfig, branch: Option<&str>) -> Option<String> {
+    let repo_root = resolve_repo_root(tasks_dir)?;
+    let tip = rev_parse(&repo_root, &format!("refs/heads/{}", branch?))?;
+    let ticket_branch = build_worktree_branch(&config.agent_worktree.branch_prefix, &sanitize_worktree_token(ticket_id));
+    (rev_parse(&repo_root, &format!("refs/heads/{ticket_branch}")).as_deref() == Some(tip.as_str())).then_some(tip)
+}
+
 fn finalize_job(
     job_id: &str,
     ticket_id: &str,
@@ -3627,6 +3741,11 @@ fn finalize_job(
             if runner_failed { format!("The {runner} runner reported a failure.") } else { format!("The {runner} runner {}.", exit_description(exit_code)) }
         })
     });
+    // Before the job ends: whoever waits for its end reads the ticket then.
+    let worktree_branch = JOB_REGISTRY.lock().ok().and_then(|registry| registry.jobs.get(job_id).and_then(|state| state.record.worktree_branch.clone()));
+    let ticket_commit = ended_on_ticket_branch(tasks_dir, ticket_id, config, worktree_branch.as_deref());
+    let session_name = JOB_REGISTRY.lock().ok().and_then(|registry| registry.jobs.get(job_id).and_then(|state| state.record.session_id.clone()));
+    let agent_session = session_name.and_then(|name| crate::services::agent_runner::registry().load(&name).ok()).and_then(|record| record.agent_session);
     let mut finalized = false;
     update_job(job_id, |state| {
         if state.record.status == AgentJobStatus::Cancelled {
@@ -3650,7 +3769,7 @@ fn finalize_job(
 
     // Write final status to persistent log (if logging is enabled)
     let status_str = if success { "completed" } else { "failed" };
-    let (summary, workspace_root, logs_dir, usage, session_id) = if let Ok(registry) = JOB_REGISTRY.lock() {
+    let (summary, workspace_root, logs_dir, usage, session_id, worktree_path, worktree_branch) = if let Ok(registry) = JOB_REGISTRY.lock() {
         if let Some(state) = registry.jobs.get(job_id) {
             (
                 state.record.summary.clone(),
@@ -3658,12 +3777,14 @@ fn finalize_job(
                 state.record.agent_logs_dir.clone(),
                 state.record.usage.clone(),
                 state.record.session_id.clone(),
+                state.record.worktree_path.clone(),
+                state.record.worktree_branch.clone(),
             )
         } else {
-            (None, tasks_dir.to_path_buf(), None, None, None)
+            (None, tasks_dir.to_path_buf(), None, None, None, None, None)
         }
     } else {
-        (None, tasks_dir.to_path_buf(), None, None, None)
+        (None, tasks_dir.to_path_buf(), None, None, None, None, None)
     };
     let _ = AgentLogService::write_status_with_usage(
         &workspace_root,
@@ -3676,6 +3797,10 @@ fn finalize_job(
             summary,
             usage,
             session_id,
+            worktree_path,
+            worktree_branch,
+            ticket_commit,
+            agent_session,
         },
     );
 
@@ -4279,6 +4404,7 @@ mod tests {
             worker_running: false,
             main_head_at_start: None,
             assignee_at_start: None,
+            ticket_commit_at_start: None,
         }
     }
 
@@ -4513,6 +4639,10 @@ mod tests {
             summary: Some("Review passed".to_string()),
             usage: None,
             session_id: None,
+            worktree_path: None,
+            worktree_branch: None,
+            ticket_commit: None,
+            agent_session: None,
         };
         AgentLogService::write_status_with_usage(workspace.path(), Some(&logs_dir), job_id, status).expect("status line");
         crate::services::agent_active_jobs::register(&tasks_dir, &orphan_record(job_id, Some("review"), false));
