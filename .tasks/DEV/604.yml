@@ -1,16 +1,18 @@
 title: Commit-signing and full-disk failures pause the queue instead of failing every job; a signing failure retries only the commit
-status: Todo
+status: InProgress
 priority: High
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-16T02:33:15.288469+00:00
-modified: 2026-11-16T02:33:17.878277+00:00
+modified: 2026-11-16T03:20:08.618296+00:00
 relationships:
   related:
   - DEV-584
   - DEV-574
   - DEV-579
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ace8ed2ae-c500-4fb4-b0a3-aa01766ee626
 description: |-
   Source: the chief of staff's token-use analysis, 2026-11-14 00:00 to 2026-11-15 16:15 PST (notes: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/notes.md, per-job costs: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/jobs_cost3.json). Owner 2026-11-15 picked this recommendation from the options picker.
 
@@ -18,10 +20,26 @@ description: |-
   - 41 jobs failed on commit signing ("Couldn't find key in agent", the opgate outage 2026-11-15 00:30-09:32) after doing their work, so the work was redone ($37). Disk-full failures (DEV-574, DEV-579) failed jobs the same way. Usage limits: 65 jobs ($31), which DEV-584 covers.
 
   ## Done when
-  - [ ] A job whose output shows a commit-signing failure or a full disk (ENOSPC, "No space left on device") ends as paused with that reason, like DEV-584's usage-limit pause: no failure rule, no retry tag, no owner question.
+  - [ ] A job whose output shows a commit-signing failure or a full disk (ENOSPC, "No space left on device") ends as paused with that reason, like DEV-584's usage-limit pause: no failure rule, no retry tag, no owner question. DEV-584 isn't built yet, so this ticket builds the pause and DEV-584 adds the usage-limit reason to it.
+    - Output read: LoTaR's own failure note (its end-of-job commit, worktree setup, runner error), the agent's last message and its last 10 events. Not the whole log: an agent that only talks about a full disk mustn't pause.
+    - Signing: `gpg failed to sign`, `Couldn't find key in agent`, `failed to sign the data`, `signing failed`, `cannot run gpg`, `agent refused operation`. Disk: `No space left on device`, `ENOSPC`, `os error 28`.
+    - Both in one job: disk wins (it holds every job). A job that succeeded never pauses.
+    - The paused job reads `paused` (job status, log status line, event `agent_job_paused` with the reason); the ticket keeps its status and assignee.
   - [ ] While such a pause is open, lotar starts no new job that would hit it (signing: any job that commits; disk: any job) and tries one job again on a schedule (default 10 minutes); the first success resumes the queue. list-jobs shows the pause and its reason.
+    - "Commits": the job runs in an agent worktree (`agent.worktree.enabled`) with a profile that isn't `permissions: read-only`. Read-only jobs still start during a signing pause.
+    - The pause is kept in the agent queue's state file, so the server, the queue worker and later processes all see it, also after a restart.
+    - Held jobs wait: queue entries stay queued, jobs started in `lotar serve` wait as queued with the reason. The paused job's own retry goes first in the queue.
+    - Schedule: one held job (the paused job's retry first) starts every 10 minutes; `LOTAR_AGENT_PAUSE_RETRY_SECONDS` overrides that (tests). That job failing the same way pauses again for another 10 minutes; failing another way runs the usual failure rules and the pause stays.
+    - Any job in the pause's scope that completes ends the pause; the held jobs then start as slots allow.
+    - `lotar agent list-jobs` (text and `--format json`, key `pause`) and `lotar agent queue` show the reason, since when, the next try and the job that paused it.
   - [ ] A signing failure keeps the worktree as it is: the resumed job first retries the commit (the staged work stays) instead of starting the agent's task again.
+    - Paused at LoTaR's end-of-job commit (signing or disk): the worktree is neither cleaned up nor reset; the retry is a commit-only job on the same profile and worktree that runs no agent, commits, then ends like the original (branch follow, merge check, `job_completed` rules).
+    - Worktree gone by then: the retry runs the agent's task again.
+    - A disk pause still removes the job's build output (`agent.worktree.cleanup_paths`), which frees space.
   - [ ] Tests with a fake signer that fails and a fake disk-full error.
+    - A repo whose `gpg.program` is a script that fails, then succeeds: the job pauses, a held job waits, the retry commits the staged work without running the agent, the queue resumes.
+    - A runner whose output says `No space left on device`: the job pauses, every job is held.
+    - Docs: `docs/help/agent.md`.
 history:
 - at: 2026-11-16T02:33:17.084663+00:00
   actor: claude
@@ -34,3 +52,56 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-16T03:15:35.735696+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-16T03:15:37.919878+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ace8ed2ae-c500-4fb4-b0a3-aa01766ee626
+- at: 2026-11-16T03:20:08.618296+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Source: the chief of staff's token-use analysis, 2026-11-14 00:00 to 2026-11-15 16:15 PST (notes: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/notes.md, per-job costs: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/jobs_cost3.json). Owner 2026-11-15 picked this recommendation from the options picker.
+
+      ## Found
+      - 41 jobs failed on commit signing ("Couldn't find key in agent", the opgate outage 2026-11-15 00:30-09:32) after doing their work, so the work was redone ($37). Disk-full failures (DEV-574, DEV-579) failed jobs the same way. Usage limits: 65 jobs ($31), which DEV-584 covers.
+
+      ## Done when
+      - [ ] A job whose output shows a commit-signing failure or a full disk (ENOSPC, "No space left on device") ends as paused with that reason, like DEV-584's usage-limit pause: no failure rule, no retry tag, no owner question.
+      - [ ] While such a pause is open, lotar starts no new job that would hit it (signing: any job that commits; disk: any job) and tries one job again on a schedule (default 10 minutes); the first success resumes the queue. list-jobs shows the pause and its reason.
+      - [ ] A signing failure keeps the worktree as it is: the resumed job first retries the commit (the staged work stays) instead of starting the agent's task again.
+      - [ ] Tests with a fake signer that fails and a fake disk-full error.
+    new: |-
+      Source: the chief of staff's token-use analysis, 2026-11-14 00:00 to 2026-11-15 16:15 PST (notes: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/notes.md, per-job costs: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/jobs_cost3.json). Owner 2026-11-15 picked this recommendation from the options picker.
+
+      ## Found
+      - 41 jobs failed on commit signing ("Couldn't find key in agent", the opgate outage 2026-11-15 00:30-09:32) after doing their work, so the work was redone ($37). Disk-full failures (DEV-574, DEV-579) failed jobs the same way. Usage limits: 65 jobs ($31), which DEV-584 covers.
+
+      ## Done when
+      - [ ] A job whose output shows a commit-signing failure or a full disk (ENOSPC, "No space left on device") ends as paused with that reason, like DEV-584's usage-limit pause: no failure rule, no retry tag, no owner question. DEV-584 isn't built yet, so this ticket builds the pause and DEV-584 adds the usage-limit reason to it.
+        - Output read: LoTaR's own failure note (its end-of-job commit, worktree setup, runner error), the agent's last message and its last 10 events. Not the whole log: an agent that only talks about a full disk mustn't pause.
+        - Signing: `gpg failed to sign`, `Couldn't find key in agent`, `failed to sign the data`, `signing failed`, `cannot run gpg`, `agent refused operation`. Disk: `No space left on device`, `ENOSPC`, `os error 28`.
+        - Both in one job: disk wins (it holds every job). A job that succeeded never pauses.
+        - The paused job reads `paused` (job status, log status line, event `agent_job_paused` with the reason); the ticket keeps its status and assignee.
+      - [ ] While such a pause is open, lotar starts no new job that would hit it (signing: any job that commits; disk: any job) and tries one job again on a schedule (default 10 minutes); the first success resumes the queue. list-jobs shows the pause and its reason.
+        - "Commits": the job runs in an agent worktree (`agent.worktree.enabled`) with a profile that isn't `permissions: read-only`. Read-only jobs still start during a signing pause.
+        - The pause is kept in the agent queue's state file, so the server, the queue worker and later processes all see it, also after a restart.
+        - Held jobs wait: queue entries stay queued, jobs started in `lotar serve` wait as queued with the reason. The paused job's own retry goes first in the queue.
+        - Schedule: one held job (the paused job's retry first) starts every 10 minutes; `LOTAR_AGENT_PAUSE_RETRY_SECONDS` overrides that (tests). That job failing the same way pauses again for another 10 minutes; failing another way runs the usual failure rules and the pause stays.
+        - Any job in the pause's scope that completes ends the pause; the held jobs then start as slots allow.
+        - `lotar agent list-jobs` (text and `--format json`, key `pause`) and `lotar agent queue` show the reason, since when, the next try and the job that paused it.
+      - [ ] A signing failure keeps the worktree as it is: the resumed job first retries the commit (the staged work stays) instead of starting the agent's task again.
+        - Paused at LoTaR's end-of-job commit (signing or disk): the worktree is neither cleaned up nor reset; the retry is a commit-only job on the same profile and worktree that runs no agent, commits, then ends like the original (branch follow, merge check, `job_completed` rules).
+        - Worktree gone by then: the retry runs the agent's task again.
+        - A disk pause still removes the job's build output (`agent.worktree.cleanup_paths`), which frees space.
+      - [ ] Tests with a fake signer that fails and a fake disk-full error.
+        - A repo whose `gpg.program` is a script that fails, then succeeds: the job pauses, a held job waits, the retry commits the staged work without running the agent, the queue resumes.
+        - A runner whose output says `No space left on device`: the job pauses, every job is held.
+        - Docs: `docs/help/agent.md`.

@@ -1,14 +1,46 @@
 title: 'A job killed during its worktree setup leaves no log or record: its ticket keeps the agent assignee and no job'
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-16T02:27:02.391806+00:00
-modified: 2026-11-16T02:32:46.305458+00:00
+modified: 2026-11-16T03:14:01.792822+00:00
 relationships:
   related:
   - DEV-593
+comments:
+- date: 2026-11-16T03:13:34.213619+00:00
+  author: claude
+  text: |-
+    Fixed: a job killed during its worktree setup is now taken over and failed, with its `job_failed` rules run once.
+
+    - Cause: `run_job` saved no record and no log until the worktree setup was done, so the next worker had nothing to take over.
+    - Fix (`agent_job_service.rs`): `run_job` saves the record before `prepare_worktree` / `continued_thread_worktree`, with a new field `in_setup` (`agent_active_jobs.rs`, serde default, so old records still load). `mark_started` replaces it as before.
+    - Takeover: an `in_setup` record fails for any runner, with no session started: "The lotar process running the job exited while it set up the job's worktree, before the job started." It writes the missing job log first, so `agent status` and `list-jobs` show the failure.
+    - Also fixed: a worktree setup that fails without a kill now writes a job log (before, `agent status` didn't know that job either).
+    - Tests (`dev510_t3_session_test.rs`): `a_t3_job_killed_during_its_worktree_setup_fails_once_taken_over` (a fake `git` on PATH holds the setup, then the test kills `lotar agent run`) and `a_job_whose_worktree_setup_fails_logs_the_failure`.
+    - Docs: `docs/help/agent.md`, "Jobs whose process died".
+    - Built on DEV-593's `d7d4c99a` (not on main yet). I told the DEV-593 merge thread.
+    - Not covered: a half-made worktree a killed setup leaves stays where it is. The next job reuses it or reports it, as before.
+  report:
+    commits:
+    - hash: 5103be6e
+      what: job record saved before the worktree setup; takeover fails such a job with a setup reason and writes its log
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent
+    - command: npm test
+      result: passed
+      reason: test:agent, Rust 2235/2235, UI, release, hooks
+    - command: npm run smoke
+      result: passed
+      reason: test:smoke:agent 405/405
+    - command: cargo nextest -E test(during_its_worktree_setup)
+      result: passed
+      reason: fails without the fix (no record left)
+    next: Review, then merge; DEV-593 (d7d4c99a) has to land first or together
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2505bb09-8e58-4b77-8936-77e599e8c58a
 description: |-
@@ -70,3 +102,16 @@ history:
       - [ ] A worktree setup that fails without a kill (agent worktrees on) is logged too: its job log shows the failure.
       - [ ] A cancel during the setup still ends the job as cancelled; its record is dropped as before.
       - [ ] Builds on DEV-593 (`d7d4c99a`), which isn't on main yet.
+- at: 2026-11-16T03:13:34.213619+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T03:14:01.792822+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

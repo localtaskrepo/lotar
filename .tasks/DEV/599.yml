@@ -1,16 +1,48 @@
 title: The busy-ticket check calls t3 for every earlier thread on each queue retry
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-16T02:29:49.963817+00:00
-modified: 2026-11-16T02:33:41.244313+00:00
+modified: 2026-11-16T03:15:17.242145+00:00
 relationships:
   related:
   - DEV-594
   - DEV-279
   - DEV-600
+comments:
+- date: 2026-11-16T03:15:04.430118+00:00
+  author: claude
+  text: |-
+    Fixed: a busy ticket's start asks T3 Code nothing, and an idle answer is cached for 30 s.
+
+    - `start_job_with_tasks_dir_mode` checks the registry and the active-jobs file first. `running_t3_thread` runs only when the ticket has no active job. The check inside the registry lock stays, for races.
+    - `RUNNING_T3_THREADS` is now `T3_THREAD_ANSWERS`: ticket → `(Instant, threads asked, Option<(thread, job)>)`. Running and idle answers are both cached for `T3_THREAD_RECHECK`, but only while the ticket's earlier threads stay the same. A job that ended since then means T3 Code is asked again at once.
+    - The lock is held only to read and write the cache, not while `t3` runs. The return type is unchanged. I told the [DEV-600](https://lotar.pyxzl.net/task/DEV-600) thread, which rebases onto this.
+    - New test `a_start_on_a_busy_ticket_or_after_an_idle_answer_asks_t3_code_nothing` (`dev503_harness_jobs_test.rs`): after a fix job, three starts (queued, busy, after cancel) together run `t3 thread show` once.
+    - `docs/help/agent.md` says what is cached.
+  report:
+    commits:
+    - hash: 5550d54d
+      what: DEV-594 043e01bd cherry-picked (the code this fixes, not on main yet; drops out on rebase once DEV-594 lands)
+    - hash: dcfbccef
+      what: registry check before t3; idle answer cached; no lock held during t3
+    checks:
+    - command: cargo nextest run --workspace -E test(/no_job_starts_while|a_start_on_a_busy_ticket/)
+      result: passed
+      reason: new test fails without the fix (4 shows vs 3)
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405/405
+    - command: ui-review
+      result: not_run
+      reason: no pages, components or styles changed
+    next: Review, then merge after DEV-594 (or together with it)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afb8bc697-69d5-449f-896d-839c94b42ef2
 description: |-
@@ -75,3 +107,16 @@ history:
       - [ ] A `t3` call that fails counts as "not running", as before (no change).
       - [ ] Test: in-process, after a T3 fix job on the ticket, a queued start, a start refused as busy, and a start after cancelling run `t3 thread show` once in all.
       - [ ] DEV-594's test `no_job_starts_while_t3_code_still_runs_an_earlier_jobs_thread` still passes; `docs/help/agent.md` says what is cached.
+- at: 2026-11-16T03:15:04.430118+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T03:15:17.242145+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

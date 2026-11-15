@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-15T17:40:28.569324+00:00
-modified: 2026-11-16T02:57:02.588516+00:00
+modified: 2026-11-16T03:08:17.284707+00:00
 relationships:
   depends_on:
   - DEV-564
@@ -17,6 +17,7 @@ relationships:
   - DEV-588
   - DEV-593
   - DEV-606
+  - DEV-595
 comments:
 - date: 2026-11-15T18:01:34.472793+00:00
   author: claude
@@ -273,6 +274,27 @@ comments:
       result: not_run
       reason: scheduled for the next version
     next: 'Merge agent: rebase if main moved, rerun gates, fast-forward'
+- date: 2026-11-16T03:08:16.756720+00:00
+  author: claude
+  text: |-
+    Retry job: nothing to do. The work is already rebased and checked on `t3/e64a8987`.
+
+    - The Codex retry stopped at its usage limit before doing anything. I picked it up on `t3/db6dfa77`.
+    - `t3/db6dfa77` holds `53e25f3c`, the old rebase onto `ee916064`. Its patch is identical to `adffe220` on `t3/e64a8987`, which is newer and on top of DEV-520. Merge `adffe220`, not this branch.
+    - Main has since gained `d4750e91` (DEV-595). The merge agent's rebase handles that.
+    - No files changed, no commit. Status and assignee left as they were.
+  report:
+    checks:
+    - command: npm run lint
+      result: not_run
+      reason: done on t3/e64a8987 at 02:57
+    - command: npm test
+      result: not_run
+      reason: done on t3/e64a8987 at 02:57
+    - command: npm run smoke
+      result: not_run
+      reason: done on t3/e64a8987 at 02:57
+    next: 'Merge agent: merge t3/e64a8987 (adffe220), not t3/db6dfa77'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A48978e68-4aef-478b-9e73-5de28287861d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3690749e-953c-4cfe-a099-7df1148176ba
@@ -601,3 +623,13 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-16T03:08:16.756720+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T03:08:17.284707+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-564","DEV-520"],"related":["standards:STD-138","DEV-482","DEV-564","DEV-588","DEV-593","DEV-606"]}'
+    new: '{"depends_on":["DEV-564","DEV-520"],"related":["standards:STD-138","DEV-482","DEV-564","DEV-588","DEV-593","DEV-606","DEV-595"]}'

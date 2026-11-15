@@ -1,11 +1,11 @@
 title: Two T3 fix jobs on DEV-585 ran in parallel on different branches; the reviewer saw a commit the handoff didn't report
-status: HelpNeeded
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: mallox
 created: 2026-11-15T23:19:28.800463+00:00
-modified: 2026-11-16T02:33:11.318636+00:00
+modified: 2026-11-16T03:26:42.801124+00:00
 relationships:
   related:
   - DEV-573
@@ -18,6 +18,8 @@ relationships:
   - DEV-520
   - DEV-596
   - DEV-602
+  - DEV-592
+  - DEV-595
 comments:
 - date: 2026-11-16T00:14:57.744466+00:00
   author: claude
@@ -150,6 +152,51 @@ comments:
       result: not_run
       reason: no pages, components or styles changed
     next: 'Merge: rebase 043e01bd onto main (agent/DEV-594''s 6d352640 is the same patch on a stale DEV-520 commit 3643595f)'
+- date: 2026-11-16T03:21:18.800605+00:00
+  author: claude
+  text: |-
+    Merged: `bab2586f` is on main; the retry question is moot.
+
+    - Rebased onto `7a19ab6d`. One conflict in `dev503_harness_jobs_test.rs`: DEV-595 and DEV-594 had each added a test at the same spot. I kept both.
+    - Lint, the full test suite and smoke passed on the rebased commit. Afterwards main only got `.tasks` changes (DEV-592 amended).
+    - Main checkout fast-forwarded. Not pushed.
+  report:
+    commits:
+    - hash: bab2586f
+      what: no job on a ticket starts while T3 Code still runs an earlier job's thread on it
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2239 Rust, 1548 UI (RUSTC_WRAPPER=)
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405/405
+    next: None; follow-ups DEV-599, DEV-600, DEV-584
+- date: 2026-11-16T03:26:42.801124+00:00
+  author: claude
+  text: |-
+    Rebased the fix onto current main and all checks pass: `ef730b1e` on `t3/5879d431`.
+
+    - Dropped the stale DEV-520 commit `3643595f` (main has it as `40670683`, which only adds `.tasks` changes).
+    - Conflict in `dev503_harness_jobs_test.rs`: DEV-595 (`d4750e91`) added a test in the same spot. I kept both tests, and no other code changed.
+    - Lint, the full test suite and smoke all passed on `ef730b1e`.
+  report:
+    commits:
+    - hash: ef730b1e
+      what: 043e01bd rebased onto main 7a19ab6d; kept DEV-595's new test beside this one
+    checks:
+    - command: npm run lint:agent
+      result: passed
+      reason: RUSTC_WRAPPER= (sccache blocked)
+    - command: npm run test:agent
+      result: passed
+      reason: 2239 Rust, 1548 UI
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405/405
+    next: Review, then merge ef730b1e
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac7b10056-3c44-41c2-8994-c511e6ecbf64
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Add03900f-234f-44e1-ad34-1daae32380ea
@@ -159,8 +206,6 @@ references:
 description: 'Found 2026-11-15 on DEV-585: thread worktree t3-feedd691 ran on t3/fix-flaky-watcher-mcp-event-tests (d6dbec07) while its prompt said agent/DEV-585; a second fix job committed 1011487e on agent/DEV-585 (worktree agent-DEV-585-3db9...). The review blocked on the mismatch. Check: one fix job per ticket at a time, and a T3 job''s worktree is on agent/<ID> as its prompt says (see DEV-573, DEV-581). Done when a second fix job can''t start while one runs and the job''s branch matches its prompt.'
 tags:
 - health
-- merge-retried
-- fix-retried
 custom_fields:
   finding: agent-jobs:parallel-fix-branches
 history:
@@ -319,3 +364,29 @@ history:
   - field: relationships
     old: '{"related":["DEV-573","DEV-581","DEV-585","DEV-584","DEV-599","DEV-600","DEV-503","DEV-520","DEV-596"]}'
     new: '{"related":["DEV-573","DEV-581","DEV-585","DEV-584","DEV-599","DEV-600","DEV-503","DEV-520","DEV-596","DEV-602"]}'
+- at: 2026-11-16T03:21:18.800605+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T03:21:19.187918+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-573","DEV-581","DEV-585","DEV-584","DEV-599","DEV-600","DEV-503","DEV-520","DEV-596","DEV-602"]}'
+    new: '{"related":["DEV-573","DEV-581","DEV-585","DEV-584","DEV-599","DEV-600","DEV-503","DEV-520","DEV-596","DEV-602","DEV-592","DEV-595"]}'
+- at: 2026-11-16T03:21:20.113542+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done
+- at: 2026-11-16T03:21:20.180865+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, merge-retried, fix-retried
+    new: health
+- at: 2026-11-16T03:26:42.801124+00:00
+  actor: claude
+  changes:
+  - field: comment_added

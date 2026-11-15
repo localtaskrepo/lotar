@@ -1,22 +1,24 @@
 title: A rework, review or merge round after more than 55 idle minutes starts a fresh session with a handoff
-status: Todo
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-16T02:33:13.636+00:00
-modified: 2026-11-16T02:33:14.644238+00:00
+modified: 2026-11-16T03:18:39.551875+00:00
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abdbbb661-1e5b-4a66-ac04-a25e682f8972
 description: |-
   Source: the chief of staff's token-use analysis, 2026-11-14 00:00 to 2026-11-15 16:15 PST (notes: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/notes.md, per-job costs: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/jobs_cost3.json). Owner 2026-11-15 picked this recommendation from the options picker.
 
   ## Found
   - 51 job calls rewrote the whole cache of a thread of 80k+ tokens because the thread resumed after its 1-hour prompt cache expired ($73 in 40 hours). Cache writes are 46% of Claude spend; a 1-hour cache write costs twice the input price.
-  - 1,006 job calls ran with over 200k tokens of context ($127).
-
-  ## Done when
-  - [ ] A rule's agent with session: continue (rework after a blocking review, a review or merge in the fix thread) starts a fresh session instead when the thread's last job ended more than a configurable time ago (default 55 minutes), and its prompt carries a short handoff: the ticket, the branch and newest commit, the last fix and review comments.
-  - [ ] list-jobs or the job log says which happened and why.
-  - [ ] Tests for both cases (resumed within the time, fresh after it).
+  - 1,006 job calls ran with over 200k tokens of context ($127).## Done when
+  - [ ] A job with `session: continue` (profile or rule, e.g. rework after a blocking review, review or merge in the fix thread) resumes the session it picked only when that session's `last_used` (harnessmux sets it when the last turn ended) is at most the job's profile setting `continue_within_minutes` ago (default 55; `0` never resumes). The job's own profile wins (a merge continuing the review's thread uses the merge profile's value); rules don't set it.
+  - [ ] Older: the job starts a new session of its own profile, as for the other "can't continue" cases, and the old T3 thread stays as it is. Its prompt ends with a handoff: the session it didn't continue (name, agent, last used), the ticket branch and its newest commit (hash and subject; left out when there is no branch or git fails), and the ticket's newest 3 comments (author, date, text cut at 1,500 characters).
+  - [ ] The job log (`lotar agent logs`, job progress events) says which happened and why: "Continuing ..., last used N minutes ago (within M)" or "... last used N minutes ago, more than continue_within_minutes (M); this job starts a new one with a handoff". A `last_used` that doesn't parse: the job resumes as before.
+  - [ ] Other reasons not to continue (no session, closed, other agent, worktree gone) are unchanged and get no handoff.
+  - [ ] Tests for both cases (resumed within the time, fresh after it with the handoff in the prompt); `docs/help/agent.md` and `config-reference.md` describe the setting.
   - Related: standards' ticket for auto-compacting threads at 200k (same analysis).
 history:
 - at: 2026-11-16T02:33:14.644238+00:00
@@ -24,3 +26,42 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-16T03:14:34.718826+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-16T03:14:37.643009+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abdbbb661-1e5b-4a66-ac04-a25e682f8972
+- at: 2026-11-16T03:18:39.551875+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Source: the chief of staff's token-use analysis, 2026-11-14 00:00 to 2026-11-15 16:15 PST (notes: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/notes.md, per-job costs: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/jobs_cost3.json). Owner 2026-11-15 picked this recommendation from the options picker.
+
+      ## Found
+      - 51 job calls rewrote the whole cache of a thread of 80k+ tokens because the thread resumed after its 1-hour prompt cache expired ($73 in 40 hours). Cache writes are 46% of Claude spend; a 1-hour cache write costs twice the input price.
+      - 1,006 job calls ran with over 200k tokens of context ($127).
+
+      ## Done when
+      - [ ] A rule's agent with session: continue (rework after a blocking review, a review or merge in the fix thread) starts a fresh session instead when the thread's last job ended more than a configurable time ago (default 55 minutes), and its prompt carries a short handoff: the ticket, the branch and newest commit, the last fix and review comments.
+      - [ ] list-jobs or the job log says which happened and why.
+      - [ ] Tests for both cases (resumed within the time, fresh after it).
+      - Related: standards' ticket for auto-compacting threads at 200k (same analysis).
+    new: |-
+      Source: the chief of staff's token-use analysis, 2026-11-14 00:00 to 2026-11-15 16:15 PST (notes: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/notes.md, per-job costs: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/jobs_cost3.json). Owner 2026-11-15 picked this recommendation from the options picker.
+
+      ## Found
+      - 51 job calls rewrote the whole cache of a thread of 80k+ tokens because the thread resumed after its 1-hour prompt cache expired ($73 in 40 hours). Cache writes are 46% of Claude spend; a 1-hour cache write costs twice the input price.
+      - 1,006 job calls ran with over 200k tokens of context ($127).## Done when
+      - [ ] A job with `session: continue` (profile or rule, e.g. rework after a blocking review, review or merge in the fix thread) resumes the session it picked only when that session's `last_used` (harnessmux sets it when the last turn ended) is at most the job's profile setting `continue_within_minutes` ago (default 55; `0` never resumes). The job's own profile wins (a merge continuing the review's thread uses the merge profile's value); rules don't set it.
+      - [ ] Older: the job starts a new session of its own profile, as for the other "can't continue" cases, and the old T3 thread stays as it is. Its prompt ends with a handoff: the session it didn't continue (name, agent, last used), the ticket branch and its newest commit (hash and subject; left out when there is no branch or git fails), and the ticket's newest 3 comments (author, date, text cut at 1,500 characters).
+      - [ ] The job log (`lotar agent logs`, job progress events) says which happened and why: "Continuing ..., last used N minutes ago (within M)" or "... last used N minutes ago, more than continue_within_minutes (M); this job starts a new one with a handoff". A `last_used` that doesn't parse: the job resumes as before.
+      - [ ] Other reasons not to continue (no session, closed, other agent, worktree gone) are unchanged and get no handoff.
+      - [ ] Tests for both cases (resumed within the time, fresh after it with the handoff in the prompt); `docs/help/agent.md` and `config-reference.md` describe the setting.
+      - Related: standards' ticket for auto-compacting threads at 200k (same analysis).

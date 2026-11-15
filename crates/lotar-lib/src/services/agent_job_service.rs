@@ -1724,8 +1724,14 @@ fn finish_orphaned_job(
 ) {
     let job_id = job.job_id.as_str();
     let _slot = RunningJobSlot { job_id, ticket_id, tasks_dir };
-    let (Some(agent), Some(name)) = (harness_agent(runner_kind), job.session_id.as_deref()) else {
+    let Some(agent) = harness_agent(runner_kind) else {
         let message = format!("The lotar process running the job exited before the {} runner finished, so its result is unknown.", job.runner);
+        update_job_failure(job_id, ticket_id, message, tasks_dir);
+        return;
+    };
+    // Its process exited before it started the session (DEV-593).
+    let Some(name) = job.session_id.as_deref() else {
+        let message = format!("The lotar process running the job exited before the job ended, before it started the {} session.", job.runner);
         update_job_failure(job_id, ticket_id, message, tasks_dir);
         return;
     };
@@ -2797,9 +2803,7 @@ fn run_job(
             cancelled = true;
             return;
         }
-        state.record.status = AgentJobStatus::Running;
-        state.record.started_at = Some(started_at.clone());
-        record_and_emit(state, "agent_job_started", None);
+        mark_started(state, &tasks_dir, &ticket_id, &started_at);
     });
 
     if cancelled {
@@ -2826,23 +2830,13 @@ fn run_job(
     }
 
     // Other processes see the job, and can ask to cancel it or send it a
-    // message (DEV-279). The record comes before the runner: they see it
-    // from the start, and a wrapper without a record refuses ticket changes
+    // message (DEV-279). The record names the session before the runner
+    // starts it, and a wrapper without a record refuses ticket changes
     // (DEV-360).
-    let active_record = JOB_REGISTRY.lock().ok().and_then(|registry| {
-        registry.jobs.get(&job_id).map(|state| crate::services::agent_active_jobs::ActiveJob {
-            job_id: job_id.clone(),
-            ticket_id: ticket_id.clone(),
-            runner: state.record.runner.clone(),
-            agent: state.record.agent_profile.clone(),
-            owner_pid: std::process::id(),
-            child_pid: 0,
-            started_at: Utc::now().to_rfc3339(),
-            session_id: agent.map(|_| name.clone()),
-            merge: state.record.is_merge_job,
-            assignee_at_start: recorded_assignee(state.assignee_at_start.clone()),
-        })
-    });
+    let active_record = JOB_REGISTRY
+        .lock()
+        .ok()
+        .and_then(|registry| registry.jobs.get(&job_id).map(|state| active_record_of(state, &ticket_id, &started_at, agent.map(|_| name.clone()))));
     if let Some(record) = active_record.as_ref() {
         crate::services::agent_active_jobs::register(&tasks_dir, record);
     }
@@ -4336,6 +4330,33 @@ fn recorded_assignee(assignee_at_start: Option<Option<String>>) -> Option<String
     assignee_at_start.map(Option::unwrap_or_default)
 }
 
+/// The job runs from now on. Its record is saved before the start is
+/// logged, so a process killed from then on leaves the job to the next
+/// worker or server, which ends it (DEV-593). The record names no session
+/// yet: a takeover must not resume a continued session this job never reached.
+fn mark_started(state: &mut AgentJobState, tasks_dir: &std::path::Path, ticket_id: &str, started_at: &str) {
+    state.record.status = AgentJobStatus::Running;
+    state.record.started_at = Some(started_at.to_string());
+    crate::services::agent_active_jobs::register(tasks_dir, &active_record_of(state, ticket_id, started_at, None));
+    record_and_emit(state, "agent_job_started", None);
+}
+
+/// The record other processes see of a job this process runs (DEV-279).
+fn active_record_of(state: &AgentJobState, ticket_id: &str, started_at: &str, session_id: Option<String>) -> crate::services::agent_active_jobs::ActiveJob {
+    crate::services::agent_active_jobs::ActiveJob {
+        job_id: state.record.id.clone(),
+        ticket_id: ticket_id.to_string(),
+        runner: state.record.runner.clone(),
+        agent: state.record.agent_profile.clone(),
+        owner_pid: std::process::id(),
+        child_pid: 0,
+        started_at: started_at.to_string(),
+        session_id,
+        merge: state.record.is_merge_job,
+        assignee_at_start: recorded_assignee(state.assignee_at_start.clone()),
+    }
+}
+
 /// The starting assignee a taken-over job's record kept; see [`recorded_assignee`].
 fn restored_assignee(recorded: Option<String>) -> Option<Option<String>> {
     recorded.map(|assignee| Some(assignee).filter(|assignee| !assignee.is_empty()))
@@ -5096,6 +5117,67 @@ mod tests {
         assert!(!JOB_REGISTRY.lock().expect("registry").jobs.contains_key(job_id), "the job doesn't run again");
         let events = AgentLogService::load_events(workspace.path(), &logs_dir, job_id).expect("events");
         assert!(events.is_empty(), "nothing is added to the ended job's log: {events:?}");
+    }
+
+    #[test]
+    fn a_job_saves_its_record_before_its_start_is_logged() {
+        let queue = tempdir().expect("queue dir");
+        // SAFETY: test-local override of the queue directory.
+        unsafe { std::env::set_var("LOTAR_AGENT_QUEUE_DIR", queue.path()) };
+        let tasks = tempdir().expect("tasks dir");
+        let mut state = unit_job_state("job-dev593-start");
+        state.record.status = AgentJobStatus::Queued;
+
+        mark_started(&mut state, tasks.path(), "TEST-1", "2026-11-15T22:00:00Z");
+
+        assert_eq!(state.events.last().map(|event| event.kind.as_str()), Some("agent_job_started"));
+        let record = crate::services::agent_active_jobs::find(tasks.path(), "job-dev593-start").expect("the record goes with the start");
+        assert_eq!((record.ticket_id.as_str(), record.session_id), ("TEST-1", None), "no session before the runner starts one");
+    }
+
+    /// Killed after it saved its record, before the start reached the log
+    /// (or during its `job_started` rules): the takeover fails the job and
+    /// starts no session (DEV-593).
+    #[test]
+    fn a_job_killed_before_its_session_started_fails_when_taken_over() {
+        let queue = tempdir().expect("queue dir");
+        // SAFETY: test-local override of the queue directory.
+        unsafe { std::env::set_var("LOTAR_AGENT_QUEUE_DIR", queue.path()) };
+        let workspace = tempdir().expect("temp dir");
+        let tasks_dir = workspace.path().join(".tasks");
+        fs::create_dir_all(&tasks_dir).expect("tasks dir");
+        let logs_dir = tasks_dir.join(crate::services::agent_log_service::DEFAULT_LOGS_DIR).to_string_lossy().to_string();
+        let job_id = "job-dev593-unstarted";
+        AgentLogService::init_log(
+            workspace.path(),
+            Some(&logs_dir),
+            crate::services::agent_log_service::JobLogHeader {
+                job_id: job_id.to_string(),
+                ticket_id: "TEST-1".to_string(),
+                runner: "t3".to_string(),
+                created_at: Utc::now().to_rfc3339(),
+                worktree_path: None,
+                worktree_branch: None,
+                model: None,
+                effort: None,
+                agent_profile: Some("fix".to_string()),
+            },
+        )
+        .expect("init log");
+        let record = crate::services::agent_active_jobs::ActiveJob { session_id: None, ..orphan_record(job_id, Some("fix"), false) };
+        crate::services::agent_active_jobs::register(&tasks_dir, &record);
+
+        AgentJobService::recover_orphaned_jobs(&tasks_dir);
+
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+        while AgentJobService::get_job(job_id).is_none_or(|job| job.status == "running") {
+            assert!(std::time::Instant::now() < deadline, "the taken-over job ends");
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        let job = AgentJobService::get_job(job_id).expect("job");
+        assert_eq!(job.status, "failed", "{job:?}");
+        let reason = job.summary.or(job.last_message).unwrap_or_default();
+        assert!(reason.contains("exited before the job ended, before it started the t3 session"), "{reason}");
     }
 
     #[test]

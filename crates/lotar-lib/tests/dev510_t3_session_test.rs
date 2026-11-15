@@ -206,3 +206,59 @@ fn take_over(forget_thread: bool, list_fails: bool) -> (Harness, lotar::api_type
     assert_eq!(harness.calls().matches("thread start").count(), 1, "{}", harness.calls());
     (harness, job)
 }
+
+/// DEV-593: lotar killed after `agent_job_started`, while a `job_started` rule runs and before the session starts,
+/// leaves the job to the next worker or server, which fails it with that reason and runs its `job_failed` rules
+/// once; `agent status` and `list-jobs` show it failed.
+#[test]
+fn a_t3_job_killed_before_its_session_started_fails_once_taken_over() {
+    let harness = harness(0, 0);
+    let _trust = EnvVarGuard::set("LOTAR_TRUST_ALL", "1");
+    let (started, failed) = (harness.dir.join("rule-started"), harness.dir.join("rule-failed"));
+    std::fs::write(
+        harness.fixtures.tasks_root.join("automation.yml"),
+        format!(
+            "automation:\n  rules:\n    - name: Hold\n      on:\n        job_started:\n          run: \"sh -c 'touch {}; sleep 30'\"\n        job_failed:\n          run: \"sh -c 'echo x >> {}'\"\n",
+            started.display(),
+            failed.display()
+        ),
+    )
+    .unwrap();
+    let mut lotar = std::process::Command::new(crate::common::lotar_bin());
+    lotar
+        .env_remove("RUST_TEST_THREADS")
+        .env("LOTAR_IGNORE_HOME_CONFIG", "1")
+        .current_dir(harness.fixtures.get_temp_path())
+        .args(["agent", "run", "TEST-1", "Fix it", "--agent", "fixer", "--wait"])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+    let mut lotar = lotar.spawn().unwrap();
+    wait_for("the job_started rule", || started.exists());
+    lotar.kill().unwrap();
+    lotar.wait().unwrap();
+
+    let tasks_dir = harness.fixtures.tasks_root.clone();
+    let orphans = lotar::services::agent_active_jobs::orphaned(&tasks_dir);
+    assert_eq!(orphans.len(), 1, "the killed job leaves its record");
+    assert_eq!(orphans[0].session_id, None, "it names no session it never started");
+    let job_id = orphans[0].job_id.clone();
+    AgentJobService::recover_orphaned_jobs(&tasks_dir);
+    wait_for("the job to end", || AgentJobService::get_job(&job_id).is_some_and(|job| job.status != "running"));
+    let job = AgentJobService::get_job(&job_id).unwrap();
+    assert_eq!(job.status, "failed", "{job:?}");
+    let reason = job.summary.or(job.last_message).unwrap_or_default();
+    assert!(reason.contains("exited before the job ended"), "{reason}");
+    wait_for("the job_failed rule", || failed.exists());
+    AgentJobService::recover_orphaned_jobs(&tasks_dir);
+    assert_eq!(std::fs::read_to_string(&failed).unwrap_or_default(), "x\n", "the job_failed rule ran once");
+    assert!(!harness.calls().contains("thread"), "no session was started or resumed: {}", harness.calls());
+
+    let cli = |args: &[&str]| {
+        let output = crate::common::lotar_cmd().unwrap().current_dir(harness.fixtures.get_temp_path()).args(args).output().unwrap();
+        String::from_utf8_lossy(&output.stdout).to_string()
+    };
+    let status = cli(&["--format", "json", "agent", "status", &job_id]);
+    assert!(status.contains("\"status\":\"failed\"") && status.contains("exited before the job ended"), "{status}");
+    let jobs = cli(&["--format", "json", "agent", "list-jobs"]);
+    assert!(jobs.contains("\"status\":\"failed\"") && jobs.contains("exited before the job ended"), "{jobs}");
+}

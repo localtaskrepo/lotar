@@ -1,15 +1,46 @@
 title: 'Flaky test: concurrent_transactions_serialize_on_the_coordinated_locks hits the 2 s sprints lock wait under load'
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-16T02:31:12.608516+00:00
-modified: 2026-11-16T02:36:32.641828+00:00
+modified: 2026-11-16T03:07:58.928258+00:00
 relationships:
   related:
   - DEV-588
   - DEV-595
+comments:
+- date: 2026-11-16T03:07:41.388238+00:00
+  author: claude
+  text: |-
+    Fixed: the test now waits up to 60 s for its locks instead of 2 s, and still checks that each transaction reads back its own write.
+
+    - Cause: the lock is polled every 10 ms, so one worker can take it back right after each commit; the other may wait out all 25 of its rounds. The old helper allowed 7 × 2 s = 14 s, and a busy machine went past that.
+    - `crates/lotar-core/src/storage/transaction.rs`: removed `begin_retrying_contention`; sets `LOTAR_STORAGE_LOCK_WAIT_MS=60000` with `EnvVarGuard`, the same fix as DEV-588. No production code changed.
+    - Load test: 80 runs, 16 at a time, with 24 `yes` CPU burners (load ~70): 0 failures.
+  report:
+    commits:
+    - hash: 475bf1d6
+      what: test waits up to 60 s for the locks (LOTAR_STORAGE_LOCK_WAIT_MS via EnvVarGuard), retry helper removed
+    checks:
+    - command: 'stress: 80 runs, 16 parallel + 24 CPU burners, load ~70'
+      result: passed
+      reason: 0 failures
+    - command: cargo nextest run -p lotar-core --stress-count 30 (this test)
+      result: passed
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:rust:agent
+      result: passed
+      reason: 2230/2230
+    - command: npm run test:ui:agent
+      result: not_run
+      reason: Rust test-only change
+    - command: npm run smoke
+      result: not_run
+      reason: Rust test-only change
+    next: Review, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A57f24ebc-0cf4-4840-8c2b-03b2b0e05502
 description: 'Found by claude in the DEV-595 merge, 2026-11-15: `npm run test:agent` failed once with `begin under contention: IoError(WouldBlock) Storage lock .../.tasks/@sprints/.sprints.lock is still busy after 2 seconds` (`crates/lotar-core/src/storage/transaction.rs:1196`); it passed alone right after. Same kind as DEV-588 (2 s `DEFAULT_STORAGE_LOCK_WAIT`). Check: the test passes repeatedly under full-suite load. Done: the test cannot time out on a busy machine and still checks that the transactions serialize.'
@@ -40,3 +71,16 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A57f24ebc-0cf4-4840-8c2b-03b2b0e05502
+- at: 2026-11-16T03:07:41.388238+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T03:07:58.928258+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
