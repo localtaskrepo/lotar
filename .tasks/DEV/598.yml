@@ -5,10 +5,14 @@ type: Bug
 reporter: claude
 assignee: '@review'
 created: 2026-11-16T02:27:02.391806+00:00
-modified: 2026-11-16T03:14:01.792822+00:00
+modified: 2026-11-16T03:51:44.018426+00:00
 relationships:
   related:
   - DEV-593
+  - DEV-592
+  - DEV-594
+  - DEV-595
+  - DEV-605
 comments:
 - date: 2026-11-16T03:13:34.213619+00:00
   author: claude
@@ -41,6 +45,29 @@ comments:
       result: passed
       reason: fails without the fix (no record left)
     next: Review, then merge; DEV-593 (d7d4c99a) has to land first or together
+- date: 2026-11-16T03:51:43.583450+00:00
+  author: claude
+  text: |-
+    Rebased onto main: DEV-593 landed as `e1904446`, so the branch now holds only the DEV-598 commit `3629b79a` (was `5103be6e`).
+
+    - `git rebase --onto main d7d4c99a agent/DEV-598` applied cleanly over DEV-592, DEV-594 and DEV-595. No conflicts, and the code is unchanged.
+    - The 14 takeover/orphan tests pass, the new DEV-598 tests included.
+    - DEV-605 (lotar's own merge) will add a block at the top of `run_job`. Whoever rebases second gets a small conflict next to the new setup record.
+  report:
+    commits:
+    - hash: 3629b79a
+      what: job record saved before the worktree setup; takeover fails such a job with a setup reason and writes its log
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent, after the rebase
+    - command: npm test
+      result: passed
+      reason: test:agent, Rust 2244/2244, after the rebase
+    - command: npm run smoke
+      result: passed
+      reason: '402/405 in the full run, 3 UI files timed out (30 s Playwright clicks, load); those 3 files rerun alone: 29/29 passed'
+    next: Review, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2505bb09-8e58-4b77-8936-77e599e8c58a
 description: |-
@@ -115,3 +142,13 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-16T03:51:43.583450+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T03:51:44.018426+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-593"]}'
+    new: '{"related":["DEV-593","DEV-592","DEV-594","DEV-595","DEV-605"]}'

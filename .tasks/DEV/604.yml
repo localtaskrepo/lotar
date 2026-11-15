@@ -1,16 +1,45 @@
 title: Commit-signing and full-disk failures pause the queue instead of failing every job; a signing failure retries only the commit
-status: InProgress
+status: Reviewing
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-16T02:33:15.288469+00:00
-modified: 2026-11-16T03:20:08.618296+00:00
+modified: 2026-11-16T03:52:06.387223+00:00
 relationships:
   related:
   - DEV-584
   - DEV-574
   - DEV-579
+  - DEV-602
+  - DEV-605
+comments:
+- date: 2026-11-16T03:51:54.680927+00:00
+  author: claude
+  text: |-
+    Done: signing and full-disk failures now pause the queue instead of failing jobs. A signing failure at LoTaR's commit is retried as a commit-only job.
+
+    - Detection (`pause_cause_in` in `agent_job_service.rs`): reads LoTaR's failure note, the agent's last message and the last 10 events. If both a disk and a signing line show up, disk wins. The job ends `paused` (`agent_job_paused`): no end rules run, the ticket keeps its status and assignee, and the worktree is not cleaned up.
+    - Pause state is kept in the queue file (`agent_queue_service.rs`: `QueuePause`, `admit`, `end_pause`, `pause`). The worker's dequeue and the server's in-memory queue hold jobs in scope: disk holds every job, signing holds worktree jobs that aren't read-only. One held job (the paused job's retry first) starts every 10 min (`LOTAR_AGENT_PAUSE_RETRY_SECONDS`). The first in-scope job that completes ends the pause.
+    - Commit retry: the queue entry carries `commit_retry` (worktree path and branch). `run_job` skips the agent and `finalize_job` commits. If the worktree is gone, the agent runs again.
+    - `lotar agent list-jobs` and `lotar agent queue` show the pause (`pause` in JSON). Docs: `docs/help/agent.md` § Paused queue.
+    - Tests: `dev604_queue_pauses_test.rs` uses a fake `gpg.program` that fails and then signs: the retry commits, the agent ran once, and the held job runs after the pause ends. A fake `No space left on device` runner holds every job. Unit tests cover admission and matching.
+    - Not done: no `job_paused` rule event (DEV-584 adds the usage-limit reason and that event). The retry interval is an env var, not a config key.
+    - Told DEV-602/603/594 which functions I touch; told DEV-605 how its own merge commit can pause.
+  report:
+    commits:
+    - hash: 6fc5011a
+      what: signing/disk failures pause the queue; commit-only retry; list-jobs and queue show the pause
+    checks:
+    - command: npm run lint (lint:agent)
+      result: passed
+    - command: npm test (test:agent)
+      result: passed
+      reason: 2242 Rust, 1548 UI; an earlier run hit a storage-lock timeout in storage_path_safety_test at load 92-137, passed alone and in the rerun
+    - command: npm run smoke (test:smoke:agent)
+      result: passed
+      reason: 405 tests
+    next: Review on another model, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ace8ed2ae-c500-4fb4-b0a3-aa01766ee626
 description: |-
@@ -105,3 +134,22 @@ history:
         - A repo whose `gpg.program` is a script that fails, then succeeds: the job pauses, a held job waits, the retry commits the staged work without running the agent, the queue resumes.
         - A runner whose output says `No space left on device`: the job pauses, every job is held.
         - Docs: `docs/help/agent.md`.
+- at: 2026-11-16T03:51:54.680927+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T03:51:54.993441+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-584","DEV-574","DEV-579"]}'
+    new: '{"related":["DEV-584","DEV-574","DEV-579","DEV-602","DEV-605"]}'
+- at: 2026-11-16T03:52:06.387223+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

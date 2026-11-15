@@ -1,11 +1,42 @@
 title: A rework, review or merge round after more than 55 idle minutes starts a fresh session with a handoff
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-16T02:33:13.636+00:00
-modified: 2026-11-16T03:18:39.551875+00:00
+modified: 2026-11-16T03:40:52.142971+00:00
+relationships:
+  related:
+  - DEV-602
+comments:
+- date: 2026-11-16T03:40:37.686895+00:00
+  author: claude
+  text: |-
+    Done: a `session: continue` job resumes only within `continue_within_minutes` (profile, default 55) of the session's last turn; older, it starts a new session with a handoff.
+
+    - `run_job` (`agent_job_service.rs`): checks the session's `last_used` before touching its worktree; the job log says `Continuing the session …, last used N minutes ago (within …, M)` or `… not within continue_within_minutes (M); this job starts a new one with a handoff`
+    - Handoff appended to the prompt: the skipped session, ticket branch + newest commit (`git log -1`), the newest 3 comments (cut at 1,500 chars); left out parts when git or the ticket can't be read
+    - The job's own profile sets the time (a merge continuing the reviewer's thread uses the merge profile's); `0` never resumes; an unparseable `last_used` resumes as before
+    - Tests: `session_continue_resumes_a_session_used_within_the_time`, `session_continue_starts_a_new_session_with_a_handoff_after_the_time` (`dev503_harness_jobs_test.rs`)
+    - Docs: `docs/help/agent.md#sessions`, `config-reference.md`
+    - No config change needed in standards' `configs/lotar` (the default applies); its README could mention it once released
+    - Told the DEV-602 thread (same `run_job` code) what changes
+  report:
+    commits:
+    - hash: d9e58bcb
+      what: 'continue_within_minutes (default 55): idle sessions start fresh with a handoff'
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent
+    - command: npm test
+      result: passed
+      reason: test:agent, 2240 Rust + 1548 UI
+    - command: npm run smoke
+      result: passed
+      reason: 404/405 in the full run; ui.sprints-responsive '1024px' timed out on a click, passed 7/7 rerun alone (unrelated)
+    next: Review, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abdbbb661-1e5b-4a66-ac04-a25e682f8972
 description: |-
@@ -65,3 +96,22 @@ history:
       - [ ] Other reasons not to continue (no session, closed, other agent, worktree gone) are unchanged and get no handoff.
       - [ ] Tests for both cases (resumed within the time, fresh after it with the handoff in the prompt); `docs/help/agent.md` and `config-reference.md` describe the setting.
       - Related: standards' ticket for auto-compacting threads at 200k (same analysis).
+- at: 2026-11-16T03:40:37.686895+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T03:40:38.441695+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-602"]}'
+- at: 2026-11-16T03:40:52.142971+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

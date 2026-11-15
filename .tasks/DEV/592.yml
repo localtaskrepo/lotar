@@ -1,16 +1,18 @@
 title: After a server restart, a non-empty agent queue stays idle until a new job is enqueued
-status: HelpNeeded
+status: Done
 priority: High
 type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-15T22:38:44.315409+00:00
-modified: 2026-11-16T03:21:19.187069+00:00
+modified: 2026-11-16T03:53:34.853251+00:00
 relationships:
   related:
   - DEV-524
   - DEV-595
   - DEV-594
+  - DEV-593
+  - DEV-598
 comments:
 - date: 2026-11-15T22:58:47.097053+00:00
   author: claude
@@ -218,6 +220,30 @@ comments:
       result: not_run
       reason: no rules or config changed
     next: 'None: the ticket goes to Done when this job ends'
+- date: 2026-11-16T03:53:05.207599+00:00
+  author: claude
+  text: |-
+    Merge: nothing to merge, the fix is already on main and pushed.
+
+    - `git rebase main` dropped `ed1eb876`: "patch contents already upstream" as `7a19ab6d` (same code, only the `.tasks` amend differs)
+    - `origin/main` contains `7a19ab6d`; `git log @{u}..` in the main checkout is empty, so there's nothing to push
+    - The commit changes no rules or config; `lotar trust --status` says Trusted
+    - Main checkout left as it was: its uncommitted `.tasks` changes don't sit on a commit of mine, so no amend
+  report:
+    commits:
+    - hash: 7a19ab6d
+      what: DEV-592 fix, already on main and origin/main
+    checks:
+    - command: npm run lint
+      result: not_run
+      reason: nothing to merge, the fix landed earlier
+    - command: npm test
+      result: not_run
+      reason: nothing to merge
+    - command: npm run smoke
+      result: not_run
+      reason: nothing to merge
+    next: none
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A64ee8131-7181-4973-9f22-9b8e73b9e1aa
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab7c500a9-f749-4c5f-9f0c-08ccea2aa0f6
@@ -225,6 +251,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A107f2550-a229-4816-b920-d814b2851f3d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A140b7670-fbae-43e1-b402-26593e485856
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A29000f68-1ede-4764-b872-7846b217c776
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3b2c8ec3-be3e-4315-b91e-3843b9a329a9
 description: |-
   After the lotar server restarts, a queue that still holds tickets stays idle: the queue worker starts only when a new job is enqueued. Found by the chief of staff on 2026-11-15 in local; nothing moved 13 queued tickets until someone queued another job.
 
@@ -249,10 +276,6 @@ description: |-
     - Entries waiting for prerequisites leave the queue (DEV-524: the ticket is marked blocked), so they are not a queue state.
   - [ ] `lotar agent queue resume` starts the worker for the tasks directory without queueing a job (standards STD-113 proposal): with entries and no worker it starts one and says so; with a worker running or an empty queue it changes nothing and says why; exit 0 in these cases, non-zero only when the queue can't be read. JSON: `{"pending": N, "worker_state": ...}`.
   - [ ] `docs/help/agent.md` describes the states and `resume`.
-tags:
-- review-returned
-- merge-retried
-- fix-retried
 history:
 - at: 2026-11-15T22:38:44.990878+00:00
   actor: claude
@@ -481,3 +504,36 @@ history:
   - field: relationships
     old: '{"related":["DEV-524","DEV-595"]}'
     new: '{"related":["DEV-524","DEV-595","DEV-594"]}'
+- at: 2026-11-16T03:37:46.215910+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-524","DEV-595","DEV-594"]}'
+    new: '{"related":["DEV-524","DEV-595","DEV-594","DEV-593"]}'
+- at: 2026-11-16T03:51:44.016037+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-524","DEV-595","DEV-594","DEV-593"]}'
+    new: '{"related":["DEV-524","DEV-595","DEV-594","DEV-593","DEV-598"]}'
+- at: 2026-11-16T03:52:19.232227+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3b2c8ec3-be3e-4315-b91e-3843b9a329a9
+- at: 2026-11-16T03:53:05.207599+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T03:53:12.143440+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done
+- at: 2026-11-16T03:53:34.853251+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: review-returned, merge-retried, fix-retried
+    new: ''

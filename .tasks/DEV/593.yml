@@ -1,11 +1,11 @@
 title: 'Jobs left in status unknown by a killed process are never taken over: their tickets stall with an agent assignee'
-status: HelpNeeded
+status: Done
 priority: High
 type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-15T22:38:45.433554+00:00
-modified: 2026-11-16T03:07:20.175682+00:00
+modified: 2026-11-16T03:54:47.085679+00:00
 relationships:
   related:
   - DEV-520
@@ -13,6 +13,11 @@ relationships:
   - DEV-563
   - DEV-598
   - DEV-595
+  - DEV-607
+  - DEV-592
+  - DEV-594
+  - DEV-597
+  - DEV-602
 comments:
 - date: 2026-11-15T23:05:51.463565+00:00
   author: claude
@@ -170,6 +175,57 @@ comments:
     - The fix is `13d0d902` on `t3/81a4c186` (the rebase of `89b0ebff`), and the review of 02:27 passed it.
     - Main has moved again since (`d4750e91` DEV-595), so the merge has to rebase once more.
     - Status and assignee unchanged (HelpNeeded, mallox): whether to merge or retry is the owner's call.
+- date: 2026-11-16T03:37:45.796540+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `e1904446` on `main` (`7a19ab6d..e1904446`).
+
+    - Main moved three times during the merge (DEV-595 `d4750e91`, DEV-592 `7a19ab6d`, DEV-594 `bab2586f`), and each one touched `agent_job_service.rs` and/or `docs/help/agent.md`. Every rebase applied cleanly, with no lockfile change.
+    - Lint, tests and smoke ran after each rebase. The last run, on `ba5af023`, passed all three. On `01894368`, one smoke test (`ui.global-actions`, closing the Create task panel: "element is not stable") timed out, then passed 2/2 alone. It's a recurrence of DEV-597, filed as DEV-607.
+    - Pending `.tasks` changes in the main checkout were amended into the merged commit (`ba5af023` → `e1904446`).
+    - No rule or agent profile changed, so `lotar trust` wasn't run.
+    - Pushed: the main checkout was clean, and the other unpushed commit (DEV-594) is Done.
+    - `13d0d902` on `t3/81a4c186` (another thread's rebase) has the same change as this merge. That branch and `agent/DEV-593` are obsolete now.
+    - Status was HelpNeeded/mallox, from the 00:43 retry question. I left it as it was, as the job says: it goes to Done when the job ends.
+  report:
+    commits:
+    - hash: e1904446
+      what: DEV-593 fix merged into main and pushed (rebase of 89b0ebff, .tasks amended in)
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent on ba5af023
+    - command: npm test
+      result: passed
+      reason: test:agent on ba5af023, Rust 2242/2242, UI 1548, release 50, hooks 7
+    - command: npm run smoke
+      result: passed
+      reason: test:smoke:agent on ba5af023, 405/405
+    - command: lotar trust
+      result: not_run
+      reason: no rule or config file changed
+    next: 'None: Done when the job ends. Branches agent/DEV-593 and t3/81a4c186 hold older copies of the same change and can go.'
+- date: 2026-11-16T03:54:29.460109+00:00
+  author: claude
+  text: |-
+    Merge: nothing to merge, the fix is already on main and pushed as `e1904446`.
+
+    - `git rebase main` dropped `89b0ebff`: "patch contents already upstream" (same code diff, `e1904446` also carries the amended `.tasks`)
+    - `origin/main` = `e1904446`, nothing unpushed in the main checkout
+    - No rule or profile files changed, so no `lotar trust`
+    - Left the main checkout's uncommitted `.tasks` changes alone: amending would rewrite the pushed `e1904446`
+  report:
+    checks:
+    - command: npm run lint
+      result: not_run
+      reason: nothing to merge
+    - command: npm test
+      result: not_run
+      reason: nothing to merge
+    - command: npm run smoke
+      result: not_run
+      reason: nothing to merge
+    next: 'none: landed and pushed'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af7a13f60-c8a7-480f-9a43-18b65593cff9
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A099de4f8-9b37-463b-906a-cd98e6116716
@@ -177,6 +233,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A411fe491-6294-4ea9-a830-6190b0ea29c4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3d8303cb-7c3a-400a-b103-d506cbf72b4a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A121e8ec4-974c-49f8-902d-8760d5c70955
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adda55600-2046-4125-9910-c27bb82afb58
 description: |-
   Jobs whose process died right after `agent_job_started` stay in status `unknown` and are never taken over, so their tickets sit InProgress with an agent assignee and no job. docs/help/agent.md says the queue worker for the same tasks directory, or the next `lotar serve`, takes such a job over and ends it. Found 2026-11-15 in local.
 
@@ -192,10 +249,6 @@ description: |-
   ## Done when
   - [ ] A job record left in `unknown` by a killed process is ended by the next worker or server in that tasks directory; its `job_failed` rules run once. Test: kill the job's process between `agent_job_started` and the session start.
   - [ ] `lotar agent status` and `list-jobs` show such a job as failed with that reason, not `unknown`.
-tags:
-- review-returned
-- merge-retried
-- fix-retried
 history:
 - at: 2026-11-15T22:38:45.899280+00:00
   actor: claude
@@ -383,3 +436,46 @@ history:
   - field: relationships
     old: '{"related":["DEV-520","DEV-590","DEV-563","DEV-598"]}'
     new: '{"related":["DEV-520","DEV-590","DEV-563","DEV-598","DEV-595"]}'
+- at: 2026-11-16T03:37:27.338758+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-520","DEV-590","DEV-563","DEV-598","DEV-595"]}'
+    new: '{"related":["DEV-520","DEV-590","DEV-563","DEV-598","DEV-595","DEV-607"]}'
+- at: 2026-11-16T03:37:45.796540+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T03:37:46.216759+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-520","DEV-590","DEV-563","DEV-598","DEV-595","DEV-607"]}'
+    new: '{"related":["DEV-520","DEV-590","DEV-563","DEV-598","DEV-595","DEV-607","DEV-592","DEV-594","DEV-597"]}'
+- at: 2026-11-16T03:42:31.956313+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-520","DEV-590","DEV-563","DEV-598","DEV-595","DEV-607","DEV-592","DEV-594","DEV-597"]}'
+    new: '{"related":["DEV-520","DEV-590","DEV-563","DEV-598","DEV-595","DEV-607","DEV-592","DEV-594","DEV-597","DEV-602"]}'
+- at: 2026-11-16T03:53:50.517760+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adda55600-2046-4125-9910-c27bb82afb58
+- at: 2026-11-16T03:54:29.460109+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T03:54:35.469683+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done
+- at: 2026-11-16T03:54:47.085679+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: review-returned, merge-retried, fix-retried
+    new: ''

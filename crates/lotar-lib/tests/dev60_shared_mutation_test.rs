@@ -408,6 +408,9 @@ fn reference_update_automation_bare_updated_fires_conditioned_stays_silent() {
 
 #[test]
 fn concurrent_comments_and_references_preserve_all_writes() {
+    // Six writers queue on one task lock; on a loaded machine the default 2 s
+    // wait times out before the last one gets its turn (DEV-588).
+    let _lock_wait = EnvVarGuard::set(lotar::storage::safety::STORAGE_LOCK_WAIT_ENV, "60000");
     let (tmp, tasks_dir) = gitless_workspace("D6C1");
     let mut storage = Storage::new(&tasks_dir);
     let task = create_task(&mut storage, "D6C1", "Concurrency target");

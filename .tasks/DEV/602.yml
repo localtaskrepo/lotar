@@ -1,17 +1,53 @@
 title: Review and merge jobs work on the branch that holds the fix's commits, not on a new t3/* branch
-status: InProgress
+status: Reviewing
 priority: High
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-16T02:33:11.139637+00:00
-modified: 2026-11-16T03:14:42.727207+00:00
+modified: 2026-11-16T03:51:54.992713+00:00
 relationships:
   related:
   - DEV-583
   - DEV-594
   - DEV-577
   - DEV-595
+  - DEV-603
+  - DEV-593
+  - DEV-604
+comments:
+- date: 2026-11-16T03:48:30.481925+00:00
+  author: claude
+  text: |-
+    Fixed: every job now starts from the ticket's branch with the newest work main lacks, and a merge that brings nothing can't end Done while the fix is on another branch.
+
+    - Cause in STD-133: the fix thread committed `f9f71b7` on an earlier thread's `t3/harden-agent-plumbing`, while LoTaR logged the job's worktree on `agent/STD-133`. So `agent/STD-133` stayed at main, the review (`-1`) and merge (`-2`) threads started from it, and the merge counted a branch with nothing in it as landed.
+    - Job start (`follow_ticket_work` in `agent_job_service.rs`): before setting up the worktree, LoTaR points `agent/<ID>` at the newest of the ticket's branches with unlanded commits. It looks at reflog-traced branches and the branches earlier jobs logged. It doesn't move when `agent/<ID>` has diverged work of its own. When git refuses the move, the job fails before it starts.
+    - Merge end (`ensure_branch_merged`): a branch with nothing beyond main at the start fails the job while another ticket branch holds unlanded work, and the message names that branch.
+    - From the DEV-593 merge thread: leftover copies of a fix that main holds rebased and amended (`t3/81a4c186`, `agent/DEV-593`) don't count. The check reuses cleanup's `superseded_removal`: a later main commit whose subject starts with the ticket ID.
+    - Tests in `dev503_harness_jobs_test.rs`: `review_and_merge_start_from_the_branch_that_holds_the_fix` (STD-133), `a_merge_that_brings_nothing_while_the_ticket_has_unlanded_work_fails`, `a_leftover_copy_of_a_fix_that_main_supersedes_is_not_unlanded_work`. Each one fails without its part of the change.
+    - Docs: `docs/help/agent.md` (Worktrees, merge job paragraph). "Done when" is sharpened in the description.
+    - Guidance: no durable finding.
+  report:
+    commits:
+    - hash: '67499e12'
+      what: jobs start from the ticket branch with the newest unlanded work; a merge that brings nothing fails while the fix is elsewhere
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2241 Rust, 1548 UI
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405/405, before the superseded-copy change (Rust-only, covered by the rerun test suite)
+    - command: new tests fail before the change
+      result: passed
+      reason: all 3
+    - command: live STD-133-style run with real T3
+      result: not_run
+      reason: covered by the fake-t3 tests
+    next: Review on another model, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0fdff5f2-dc5b-42f4-94e7-32cec663f3c7
 description: |-
@@ -24,10 +60,11 @@ description: |-
 
   ## Done when
   - [ ] Every job of a ticket (fix, review, merge; T3 and headless) starts from the branch that holds the ticket's newest fix commit, whatever T3 Code named it: before the job plans its worktree, LoTaR points `agent/<ID>` at the ticket's branch (`agent/<ID>` or a branch traced to it through its reflog, `BranchOwners`) whose tip is newest among those with commits not in the main checkout's branch. The job log says so.
-  - [ ] Which wins: `agent/<ID>` stays where it is when it has commits of its own beyond main that the newer branch doesn't build on (diverged work isn't LoTaR's to pick); otherwise the newest branch wins. A branch whose work landed (also rebased) doesn't count.
+  - [ ] Which wins: `agent/<ID>` stays where it is when it has commits of its own beyond main that the newer branch doesn't build on (diverged work isn't LoTaR's to pick); otherwise the newest branch wins. A branch whose work landed (also rebased) doesn't count, nor one main supersedes (a later main commit whose subject starts with the ticket ID: the DEV-593 merge left `t3/81a4c186` and `agent/DEV-593` as older copies of a fix it rebased and amended).
   - [ ] A step fails: when `agent/<ID>` can't move there (git refuses), the job fails at the start with both branch names, before any thread starts.
   - [ ] A merge job whose branch held nothing beyond main when it started fails, naming the ticket's branch that has unlanded commits, instead of completing, so the ticket can't go Done through the merge step with none of its fix commits on main. A merge with no unlanded ticket work anywhere passes as before.
   - [ ] A test with the fake t3 reproduces the STD-133 case (fix commits on an earlier thread's `t3/x`, review and merge threads on new `t3/*` branches): the review starts from the fix and the merge lands it on main. Fails before the change. A second test: a merge whose thread branch ends with nothing beyond main fails, naming the branch.
+  - [ ] A third test: a leftover `t3/old` copy of a fix that main holds rebased and amended leaves the ticket branch on main, and the merge passes.
   - [ ] `docs/help/agent.md` describes it.
 history:
 - at: 2026-11-16T02:33:12.803472+00:00
@@ -77,3 +114,69 @@ history:
       - [ ] A merge job whose branch held nothing beyond main when it started fails, naming the ticket's branch that has unlanded commits, instead of completing, so the ticket can't go Done through the merge step with none of its fix commits on main. A merge with no unlanded ticket work anywhere passes as before.
       - [ ] A test with the fake t3 reproduces the STD-133 case (fix commits on an earlier thread's `t3/x`, review and merge threads on new `t3/*` branches): the review starts from the fix and the merge lands it on main. Fails before the change. A second test: a merge whose thread branch ends with nothing beyond main fails, naming the branch.
       - [ ] `docs/help/agent.md` describes it.
+- at: 2026-11-16T03:40:38.441276+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-583","DEV-594","DEV-577","DEV-595"]}'
+    new: '{"related":["DEV-583","DEV-594","DEV-577","DEV-595","DEV-603"]}'
+- at: 2026-11-16T03:42:31.544017+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Source: the chief of staff's token-use analysis, 2026-11-14 00:00 to 2026-11-15 16:15 PST (notes: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/notes.md, per-job costs: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/jobs_cost3.json). Owner 2026-11-15 picked this recommendation from the options picker.
+
+      ## Found
+      - 48 merges or reviews failed on branch mismatches in 40 hours (about $40-60 of the jobs, with the retries they caused). Merges fail with "t3/... is not merged into the main checkout's current branch"; reviews check stale branches.
+      - standards STD-133: the fix committed f9f71b7 on t3/harden-agent-plumbing; the review ran on t3/harden-agent-plumbing-1 and the merge on t3/harden-agent-plumbing-2, both behind main. Each found nothing, and the ticket went to Done with nothing on main (reopened 2026-11-15).
+      - DEV-583 makes the T3 prompt name the thread's real branch; it doesn't make the review and the merge start where the fix's commits are.- Cause in STD-133 (job logs in standards `.tasks/@agent-logs`): the fix thread committed `f9f71b7` on `t3/harden-agent-plumbing`, an earlier thread's branch created from `agent/STD-133`, while LoTaR recorded the job's worktree on `agent/STD-133`. So `agent/STD-133` stayed at main, the review and merge threads started from it, and the merge counted a branch with nothing beyond main as merged.
+
+      ## Done when
+      - [ ] Every job of a ticket (fix, review, merge; T3 and headless) starts from the branch that holds the ticket's newest fix commit, whatever T3 Code named it: before the job plans its worktree, LoTaR points `agent/<ID>` at the ticket's branch (`agent/<ID>` or a branch traced to it through its reflog, `BranchOwners`) whose tip is newest among those with commits not in the main checkout's branch. The job log says so.
+      - [ ] Which wins: `agent/<ID>` stays where it is when it has commits of its own beyond main that the newer branch doesn't build on (diverged work isn't LoTaR's to pick); otherwise the newest branch wins. A branch whose work landed (also rebased) doesn't count.
+      - [ ] A step fails: when `agent/<ID>` can't move there (git refuses), the job fails at the start with both branch names, before any thread starts.
+      - [ ] A merge job whose branch held nothing beyond main when it started fails, naming the ticket's branch that has unlanded commits, instead of completing, so the ticket can't go Done through the merge step with none of its fix commits on main. A merge with no unlanded ticket work anywhere passes as before.
+      - [ ] A test with the fake t3 reproduces the STD-133 case (fix commits on an earlier thread's `t3/x`, review and merge threads on new `t3/*` branches): the review starts from the fix and the merge lands it on main. Fails before the change. A second test: a merge whose thread branch ends with nothing beyond main fails, naming the branch.
+      - [ ] `docs/help/agent.md` describes it.
+    new: |-
+      Source: the chief of staff's token-use analysis, 2026-11-14 00:00 to 2026-11-15 16:15 PST (notes: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/notes.md, per-job costs: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/jobs_cost3.json). Owner 2026-11-15 picked this recommendation from the options picker.
+
+      ## Found
+      - 48 merges or reviews failed on branch mismatches in 40 hours (about $40-60 of the jobs, with the retries they caused). Merges fail with "t3/... is not merged into the main checkout's current branch"; reviews check stale branches.
+      - standards STD-133: the fix committed f9f71b7 on t3/harden-agent-plumbing; the review ran on t3/harden-agent-plumbing-1 and the merge on t3/harden-agent-plumbing-2, both behind main. Each found nothing, and the ticket went to Done with nothing on main (reopened 2026-11-15).
+      - DEV-583 makes the T3 prompt name the thread's real branch; it doesn't make the review and the merge start where the fix's commits are.- Cause in STD-133 (job logs in standards `.tasks/@agent-logs`): the fix thread committed `f9f71b7` on `t3/harden-agent-plumbing`, an earlier thread's branch created from `agent/STD-133`, while LoTaR recorded the job's worktree on `agent/STD-133`. So `agent/STD-133` stayed at main, the review and merge threads started from it, and the merge counted a branch with nothing beyond main as merged.
+
+      ## Done when
+      - [ ] Every job of a ticket (fix, review, merge; T3 and headless) starts from the branch that holds the ticket's newest fix commit, whatever T3 Code named it: before the job plans its worktree, LoTaR points `agent/<ID>` at the ticket's branch (`agent/<ID>` or a branch traced to it through its reflog, `BranchOwners`) whose tip is newest among those with commits not in the main checkout's branch. The job log says so.
+      - [ ] Which wins: `agent/<ID>` stays where it is when it has commits of its own beyond main that the newer branch doesn't build on (diverged work isn't LoTaR's to pick); otherwise the newest branch wins. A branch whose work landed (also rebased) doesn't count, nor one main supersedes (a later main commit whose subject starts with the ticket ID: the DEV-593 merge left `t3/81a4c186` and `agent/DEV-593` as older copies of a fix it rebased and amended).
+      - [ ] A step fails: when `agent/<ID>` can't move there (git refuses), the job fails at the start with both branch names, before any thread starts.
+      - [ ] A merge job whose branch held nothing beyond main when it started fails, naming the ticket's branch that has unlanded commits, instead of completing, so the ticket can't go Done through the merge step with none of its fix commits on main. A merge with no unlanded ticket work anywhere passes as before.
+      - [ ] A test with the fake t3 reproduces the STD-133 case (fix commits on an earlier thread's `t3/x`, review and merge threads on new `t3/*` branches): the review starts from the fix and the merge lands it on main. Fails before the change. A second test: a merge whose thread branch ends with nothing beyond main fails, naming the branch.
+      - [ ] A third test: a leftover `t3/old` copy of a fix that main holds rebased and amended leaves the ticket branch on main, and the merge passes.
+      - [ ] `docs/help/agent.md` describes it.
+- at: 2026-11-16T03:42:31.957064+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-583","DEV-594","DEV-577","DEV-595","DEV-603"]}'
+    new: '{"related":["DEV-583","DEV-594","DEV-577","DEV-595","DEV-603","DEV-593"]}'
+- at: 2026-11-16T03:48:30.481925+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T03:48:43.896845+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-16T03:51:54.992713+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-583","DEV-594","DEV-577","DEV-595","DEV-603","DEV-593"]}'
+    new: '{"related":["DEV-583","DEV-594","DEV-577","DEV-595","DEV-603","DEV-593","DEV-604"]}'

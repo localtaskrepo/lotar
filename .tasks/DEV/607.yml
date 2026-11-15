@@ -1,0 +1,47 @@
+title: 'Flaky smoke: global task actions on desktop still time out closing the Create task panel after DEV-597'
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-16T03:37:27.096061+00:00
+modified: 2026-11-16T04:08:26.886634+00:00
+relationships:
+  related:
+  - DEV-597
+  - DEV-593
+  - DEV-588
+comments:
+- date: 2026-11-16T04:08:26.235549+00:00
+  author: claude
+  text: |-
+    Seen again in the DEV-588 merge (2026-11-16, load ~120): same `Close panel` click "element is not stable" timeout at `smoke/tests/ui.global-actions.smoke.spec.ts:120`.
+
+    - Rerun of the spec alone at the same load: 3/3 passed.
+description: |-
+  `smoke/tests/ui.global-actions.smoke.spec.ts` > "keeps actions usable and creates in the known project on desktop" timed out again in a full `npm run test:smoke:agent` run, after DEV-597 was marked Done.
+
+  ## Found
+  - 2026-11-15, DEV-593 merge, worktree `t3-9345ff07`, commit `01894368` (Rust-only change, no UI).
+  - `locator.click: Timeout 30000ms exceeded` on the Create task dialog's "Close panel" button, line 120; Playwright log: "element is not stable", retried until the timeout.
+  - 1 failed / 404 passed. The same file alone (`npm run test:smoke:quick:agent -- smoke/tests/ui.global-actions.smoke.spec.ts`) passed 2/2, and three other full runs that day passed 405/405.
+
+  ## Done when
+  - [ ] The test waits for the panel to finish its open transition (or closes it in a way that doesn't need a stable box) so a slow full-suite run can't time out here.
+  - [ ] Several full smoke runs under load pass this test.
+history:
+- at: 2026-11-16T03:37:27.767129+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-16T04:08:26.235549+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T04:08:26.886634+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-597","DEV-593"]}'
+    new: '{"related":["DEV-597","DEV-593","DEV-588"]}'

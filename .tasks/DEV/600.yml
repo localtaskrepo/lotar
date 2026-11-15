@@ -1,11 +1,11 @@
 title: A T3 thread that waits for an answer holds every later job on its ticket without saying so
-status: HelpNeeded
+status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-16T02:29:53.068923+00:00
-modified: 2026-11-16T02:48:33.619077+00:00
+modified: 2026-11-16T03:49:10.934896+00:00
 relationships:
   related:
   - DEV-594
@@ -124,3 +124,9 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-16T03:49:10.934896+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
