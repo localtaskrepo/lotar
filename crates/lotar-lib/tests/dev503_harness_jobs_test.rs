@@ -435,8 +435,12 @@ fn a_ticket_hands_its_context_from_harness_to_harness_through_its_states() {
 /// `t3` as T3 Code's CLI: `thread start` runs each thread in a new worktree on a branch of its own (`t3/topic-<n>`),
 /// made from the `--worktree` base, runs `$FAKE_RUN` there and logs `<base> <branch> <commit it started from>` to
 /// `$FAKE_LOG`. `thread send thread-<n>` runs `$FAKE_RUN` in that thread's worktree and logs
-/// `send thread-<n> <branch> <commit it started from>`. `thread show` answers with an empty thread.
+/// `send thread-<n> <branch> <commit it started from>`. `thread show thread-<n>` answers with that thread's worktree.
 const FAKE_T3: &str = r#"#!/bin/sh
+if [ "$1 $2" = "thread show" ]; then
+  printf '{"thread":{"threadId":"%s","worktreePath":"%s"}}\n' "$3" "$FAKE_TREES/${3#thread-}"
+  exit 0
+fi
 if [ "$1 $2" = "thread send" ]; then
   cat > /dev/null
   tree="$FAKE_TREES/${3#thread-}"
@@ -536,6 +540,31 @@ fn every_t3_thread_of_a_ticket_ends_on_and_starts_from_the_tickets_branch() {
     let log = std::fs::read_to_string(root.join("t3.log")).unwrap();
     let review = log.lines().nth(2).unwrap_or_default();
     assert_eq!(review, format!("agent/TEST-1 t3/topic-2 {rework}"), "the fresh review starts from the rework: {log}");
+}
+
+/// DEV-573: a fix thread whose job ran while another worktree appeared (a parallel job's), after a failed job's
+/// worktree kept `agent/TEST-1` checked out. LoTaR took that old worktree for the thread's, so the ticket's branch
+/// stayed behind and the review and merge missed the fix. T3 Code now names the thread's worktree, and the old one is
+/// detached so the ticket's branch can follow.
+#[test]
+fn the_tickets_branch_follows_its_thread_past_a_parallel_and_a_stale_worktree() {
+    // Outside the fixture: lotar doesn't find TEST-1 with a worktree nested in the repository.
+    let elsewhere = tempfile::tempdir().unwrap();
+    let parallel = format!("git worktree add -q -b t3/other {}", elsewhere.path().join("parallel").display());
+    let fix = format!("{parallel} && echo fix > fix.txt && git add fix.txt && git commit -qm TEST-1-fix");
+    let (fixtures, _env) = t3_harness_with(&[("fix", &fix, ""), ("review", "", "")]);
+    let root = fixtures.get_temp_path();
+    let stale = elsewhere.path().join("stale");
+    git(root, &["worktree", "add", "-q", "-b", "agent/TEST-1", stale.to_str().unwrap()]);
+    let start = rev(root, "HEAD");
+    run_t3(&fixtures, "fix").success();
+    let fix = rev(root, "t3/topic-0");
+    assert_ne!(fix, start, "the fix thread committed");
+    assert_eq!(rev(root, "agent/TEST-1"), fix, "the fix thread's commit is on the ticket's branch");
+    assert_eq!(rev(&stale, "HEAD"), start, "the failed job's worktree stays, detached at its commit");
+    run_t3(&fixtures, "review").success();
+    let log = std::fs::read_to_string(root.join("t3.log")).unwrap();
+    assert_eq!(log.lines().nth(1).unwrap_or_default(), format!("agent/TEST-1 t3/topic-1 {fix}"), "the review starts from the fix: {log}");
 }
 
 /// A ticket branch that can't follow its thread (here it is checked out in the main checkout) fails the job and stays

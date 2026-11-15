@@ -1445,19 +1445,22 @@ fn continued_thread_worktree(
     Ok((path, branch, Some(note)))
 }
 
-/// Record the worktree T3 Code made for a t3 job's thread: the one that
-/// appeared while it ran, else the one on the job's branch. T3 Code may
-/// rename the branch it was given (`agent/DEV-1` becomes `t3/<topic>`), so
-/// the branch is read from the worktree.
-fn record_t3_worktree(job_id: &str, repo_root: &std::path::Path, before: &[std::path::PathBuf]) {
+/// Record the worktree T3 Code made for a t3 job's thread: the one T3 Code
+/// names for the thread, else the one that appeared while it ran, else of
+/// those the one on the job's branch. Other jobs' threads make worktrees
+/// meanwhile, and an earlier job's may hold the job's branch (DEV-573).
+/// T3 Code may rename the branch it was given (`agent/DEV-1` becomes
+/// `t3/<topic>`), so the branch is read from the worktree.
+fn record_t3_worktree(job_id: &str, repo_root: &std::path::Path, before: &[std::path::PathBuf], named: Option<std::path::PathBuf>) {
     let Ok(now) = linked_worktrees(repo_root) else {
         return;
     };
     let branch = JOB_REGISTRY.lock().ok().and_then(|registry| registry.jobs.get(job_id).and_then(|state| state.record.worktree_branch.clone()));
     let new: Vec<_> = now.iter().filter(|(path, _)| !before.contains(path)).collect();
-    let found = match new.as_slice() {
-        [one] => Some((*one).clone()),
-        _ => branch.as_deref().and_then(|branch| now.iter().find(|(_, on)| on.as_deref() == Some(branch)).cloned()),
+    let named = named.and_then(|named| fs::canonicalize(named).ok());
+    let found = match (named.and_then(|named| new.iter().find(|(path, _)| fs::canonicalize(path).ok().as_ref() == Some(&named))), new.as_slice()) {
+        (Some(thread), _) | (None, [thread]) => Some((*thread).clone()),
+        _ => branch.as_deref().and_then(|branch| new.iter().find(|(_, on)| on.as_deref() == Some(branch)).map(|found| (*found).clone())),
     };
     if let Some((path, branch)) = found {
         update_job(job_id, |state| {
@@ -1504,6 +1507,9 @@ fn follow_thread_branch(job_id: &str, tasks_dir: &std::path::Path, ticket_id: &s
 /// the thread's branch lacks and the main checkout doesn't have, which
 /// moving it would drop. Unless it is still at `started_from`, the commit
 /// the thread started from: then the thread rewrote that commit (an amend).
+/// A worktree of an earlier thread (one whose job failed) that still has
+/// `ticket_branch` checked out is detached at its commit first, as T3 Code
+/// leaves one when a later thread takes over the branch (DEV-573).
 fn move_ticket_branch(repo_root: &std::path::Path, ticket_branch: &str, thread_branch: &str, started_from: Option<&str>) -> Result<bool, String> {
     let git_output = |args: &[&str]| -> Result<String, String> {
         let output = git_command(repo_root).args(args).output().map_err(|err| format!("git {}: {err}", args.join(" ")))?;
@@ -1522,6 +1528,16 @@ fn move_ticket_branch(repo_root: &std::path::Path, ticket_branch: &str, thread_b
         let lacks = started_from != Some(ticket_tip.as_str()) && git_output(&["cherry", &tip, &ticket_ref])?.lines().any(|line| line.starts_with('+'));
         if lacks && !branch_landed(repo_root, ticket_branch).unwrap_or(false) {
             return Err(format!("it has commits that {thread_branch} lacks"));
+        }
+        let worktrees = linked_worktrees(repo_root).map_err(|err| err.to_string())?;
+        for (path, _) in worktrees.iter().filter(|(_, on)| on.as_deref() == Some(ticket_branch)) {
+            let detach = git_command(path)
+                .args(["checkout", "--quiet", "--detach"])
+                .output()
+                .map_err(|err| format!("git checkout --detach in {}: {err}", path.display()))?;
+            if !detach.status.success() {
+                return Err(format!("git checkout --detach in {} failed: {}", path.display(), String::from_utf8_lossy(&detach.stderr).trim()));
+            }
         }
     }
     git_output(&["branch", "--force", ticket_branch, &tip])?;
@@ -3044,6 +3060,8 @@ fn run_session(
         Ok(table) => table,
         Err(err) => return RunEnd::Failed(err.to_string()),
     };
+    let t3_env: Vec<(String, String)> =
+        table.get(launch.agent).map(|spec| spec.env.clone()).unwrap_or_default().into_iter().chain(session_profile.env.clone()).collect();
     let session = match crate::services::agent_runner::open_session(launch.name, launch.agent, launch.cwd, &table, session_profile, launch.resume) {
         Ok(session) => session,
         Err(err) => return RunEnd::Failed(format!("Could not start the {} session {}: {err}", launch.agent, launch.name)),
@@ -3059,9 +3077,26 @@ fn run_session(
     });
     let end = drive_session(job_id, tasks_dir, &session, prompt, &working_dir_prefixes(launch.cwd), profile.max_budget_usd, context_messages);
     if let (Some(root), Some(before)) = (repo_root.as_deref(), worktrees_before.as_deref()) {
-        record_t3_worktree(job_id, root, before);
+        let thread = crate::services::agent_runner::registry().load(launch.name).ok().and_then(|record| record.agent_session);
+        let program = table.get(launch.agent).ok().and_then(|spec| block_on(spec.launch_command()).ok()).map(|(program, _)| program);
+        let named = thread.zip(program).and_then(|(thread, program)| t3_thread_worktree(&program, &t3_env, root, &thread));
+        record_t3_worktree(job_id, root, before, named);
     }
     end
+}
+
+/// The worktree T3 Code runs `thread` in, from `t3 thread show <thread> --json`.
+fn t3_thread_worktree(program: &std::path::Path, env: &[(String, String)], cwd: &std::path::Path, thread: &str) -> Option<std::path::PathBuf> {
+    let output = Command::new(program)
+        .args(["thread", "show", thread, "--json", "--messages", "0"])
+        .envs(env.iter().map(|(key, value)| (key, value)))
+        .current_dir(cwd)
+        .stdin(Stdio::null())
+        .output()
+        .ok()
+        .filter(|output| output.status.success())?;
+    let shown: serde_json::Value = serde_json::from_slice(&output.stdout).ok()?;
+    shown.get("thread")?.get("worktreePath")?.as_str().filter(|path| !path.is_empty()).map(std::path::PathBuf::from)
 }
 
 /// Make the session the job's runtime, unless the job was cancelled meanwhile.
