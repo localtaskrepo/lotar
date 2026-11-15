@@ -49,7 +49,7 @@ of its own after the switch.
 - `crates/lotar-lib/src/services/agent_job_service.rs` (4629 lines): mostly lotar's own job logic (queue, prompts, worktrees,
   landing, rules), plus generic process handling: spawn through the wrapper, kill the process tree, read pipes,
   write stdin messages.
-- `AgentProfileDetail` (`crates/lotar-lib/src/config/types.rs`): runner, permissions, model, effort, provider, session, budget,
+- `AgentProfileDetail` (`crates/lotar-core/src/config/types.rs`): runner, permissions, model, effort, provider, session, budget,
   command, args, env, tools.
 - Only the t3 runner continues sessions. Claude, Codex, OpenCode and Cursor session ids are parsed but never resumed.
   Only Claude takes messages while it runs (stream-json on stdin).

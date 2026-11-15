@@ -181,7 +181,7 @@ pub fn commit_url_prefix(remote: &str) -> Option<String> {
 }
 
 /// Read-only metadata location, not the ownership verification used for Git writes.
-pub(crate) fn metadata_dirs(git_entry: &Path) -> Option<(PathBuf, PathBuf)> {
+pub fn metadata_dirs(git_entry: &Path) -> Option<(PathBuf, PathBuf)> {
     let git_dir = if git_entry.is_dir() {
         fs::canonicalize(git_entry).ok()?
     } else {

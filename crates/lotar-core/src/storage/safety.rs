@@ -162,7 +162,7 @@ fn refuse_under_pending_transaction(target_dir: &Path) -> std::io::Result<()> {
 /// matching on message text. Display is exactly the refusal message, so
 /// existing diagnostics are unchanged.
 #[derive(Debug)]
-pub(crate) struct PendingJournalRefusal(pub(crate) String);
+pub struct PendingJournalRefusal(pub String);
 
 impl std::fmt::Display for PendingJournalRefusal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -188,7 +188,7 @@ pub fn atomic_write_file(path: &Path, contents: &str) -> std::io::Result<()> {
 
 /// Byte-oriented variant of [`atomic_write_file`] for rollback payloads that
 /// must reproduce exact original bytes (including non-UTF-8 content).
-pub(crate) fn atomic_write_bytes(path: &Path, contents: &[u8]) -> std::io::Result<()> {
+pub fn atomic_write_bytes(path: &Path, contents: &[u8]) -> std::io::Result<()> {
     atomic_write_file_with_io(
         path,
         |file| {

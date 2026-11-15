@@ -350,14 +350,14 @@ impl OutputRenderer {
 
 /// Wrap `text` in ANSI bold (unconditional wrapper for call sites that have
 /// already decided styling is appropriate).
-pub(crate) fn ansi_bold(text: &str) -> String {
+pub fn ansi_bold(text: &str) -> String {
     format!("\x1b[1m{}\x1b[0m", text)
 }
 
 /// Wrap `text` in ANSI bold plus a yellow foreground highlight. Used for the
 /// serve fallback port: bold AND highlighted, so the moved port stands out
 /// from the rest of the banner (which stays plain or plain-bold).
-pub(crate) fn ansi_bold_highlight(text: &str) -> String {
+pub fn ansi_bold_highlight(text: &str) -> String {
     format!("\x1b[1;33m{}\x1b[0m", text)
 }
 
@@ -377,7 +377,7 @@ pub(crate) fn styling_allowed(format_is_text: bool, no_color_set: bool, stdout_i
 
 /// Whether stdout styling is appropriate for this renderer right now.
 /// Machine formats (JSON) and piped/plain streams never receive ANSI.
-pub(crate) fn stdout_styling_enabled(format: &OutputFormat) -> bool {
+pub fn stdout_styling_enabled(format: &OutputFormat) -> bool {
     styling_allowed(matches!(format, OutputFormat::Text), no_color_disables(std::env::var_os("NO_COLOR").as_deref()), std::io::stdout().is_terminal())
 }
 

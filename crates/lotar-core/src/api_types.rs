@@ -516,6 +516,19 @@ pub struct FindingReport {
     pub commented: bool,
 }
 
+impl FindingReport {
+    /// One line naming the ticket, for text output.
+    pub fn describe(&self, key: &str) -> String {
+        match self.state {
+            FindingState::New => format!("Created {} for finding {key}", self.id),
+            FindingState::Recurred => format!("Created {} for finding {key}; it was fixed before and came back", self.id),
+            FindingState::Open if self.commented => format!("{} already reports finding {key}; added this report as a comment", self.id),
+            FindingState::Open => format!("{} already reports finding {key}; seen again with nothing new, no comment added", self.id),
+            FindingState::Suppressed => format!("{} reported finding {key} and was closed as won't do; nothing created", self.id),
+        }
+    }
+}
+
 /// Patch payload shared by REST, MCP, and UI clients.
 ///
 /// Field presence is tri-state on the wire: omitted = no-op, `null` = clear,
@@ -1430,7 +1443,7 @@ pub struct TaskListFilter {
     pub archived: crate::storage::layout::ArchiveFilter,
 }
 
-pub(crate) fn deserialize_string_or_vec<'de, D>(d: D) -> Result<Vec<String>, D::Error>
+pub fn deserialize_string_or_vec<'de, D>(d: D) -> Result<Vec<String>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {

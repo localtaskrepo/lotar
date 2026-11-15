@@ -13,11 +13,11 @@ Make API changes once, but keep all consumers consistent (CLI/server, UI, docs).
 - Routing/handlers: `crates/lotar-lib/src/routes/`, `crates/lotar-lib/src/api_server.rs`, `crates/lotar-lib/src/web_server.rs`
 
 2. Update Rust contract types
-- DTOs: `crates/lotar-lib/src/api_types.rs`
-- If you adjust validation/errors, keep behavior consistent with existing API error shapes (`crates/lotar-lib/src/errors.rs`).
+- DTOs: `crates/lotar-core/src/api_types.rs`
+- If you adjust validation/errors, keep behavior consistent with existing API error shapes (`crates/lotar-core/src/errors.rs`).
 
 3. Update UI types + API client
-- DTOs: `view/api/types.ts` (explicit note at top: aligned with `crates/lotar-lib/src/api_types.rs`)
+- DTOs: `view/api/types.ts` (explicit note at top: aligned with `crates/lotar-core/src/api_types.rs`)
 - Calls: `view/api/client.ts`
 
 4. Update OpenAPI + help docs

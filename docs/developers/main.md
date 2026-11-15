@@ -1,18 +1,19 @@
 # Architecture Overview
 
-LoTaR is a Rust workspace with a Vue front-end bundle. The CLI, REST server, MCP process, and scanners all share the same storage + configuration primitives under `crates/lotar-lib/src/`. This document sketches the moving parts so you know where to look when changing behavior.
+LoTaR is a Rust workspace with a Vue front-end bundle. The CLI, REST server, MCP process, and scanners all share the same storage + configuration primitives in `crates/lotar-core`. This document sketches the moving parts so you know where to look when changing behavior.
 
 ## Repository layout (high level)
 
 | Path | Role |
 | --- | --- |
 | `Cargo.toml`, `src/main.rs`, `src/bin/` (root package `lotar`) | The `lotar` binary: parses the command line, dispatches to `cli::handlers`, and hands the library the embedded web UI. Also `lotar-agent-wrapper`, which uses only std. The package named `lotar` holds both binaries, so `cargo install lotar` and `cargo install --path .` install them. |
-| `crates/lotar-lib` | The library (crate `lotar`) and the Rust tests in `crates/lotar-lib/tests/`. `env!("REPO_ROOT")` gives it the repository root for files outside the crate (`docs/`, `.tasks/`). Its build script embeds `docs/help` and `docs/openapi.json`; a packaged crate (`cargo package`) carries them in its own `docs/`, copied by `scripts/stage-crates.mjs`. |
+| `crates/lotar-core` | The core modules (DEV-499): config, storage, tasks and types, output, errors, workspace and project resolution, the scanner, and the REST types (`api_types`, `api_events`). It depends on no other workspace crate, so a change above it doesn't recompile it. `crates/lotar-lib` re-exports its modules, so `lotar::config` and `crate::config` keep working. Its unit tests stay in its modules; test-only items it shares with lotar-lib's unit tests (the transaction fault hooks) are compiled always and `#[doc(hidden)]`, because `cfg(test)` doesn't reach across crates. |
+| `crates/lotar-lib` | The library (crate `lotar`): services, automation, the CLI handlers, MCP and the servers, built on `lotar-core`, and the Rust tests in `crates/lotar-lib/tests/`. `env!("REPO_ROOT")` gives it the repository root for files outside the crate (`docs/`, `.tasks/`). Its build script embeds `docs/help` and `docs/openapi.json`; a packaged crate (`cargo package`) carries them in its own `docs/`, copied by `scripts/stage-crates.mjs`. |
 | `crates/lotar-web-assets` | Embeds `target/web-embed` (a packaged crate: its own `web-embed/`, copied by `scripts/stage-crates.mjs`). Only the binary depends on it, so a web build recompiles this crate and the binary, not the library and its tests. |
 | `crates/lotar-lib/src/cli` | Clap command graph, argument structs, preprocessors, and per-command handlers. |
 | `crates/lotar-lib/src/services` | Business logic (task CRUD, sprint ops, analytics, code reference management, audit helpers). |
-| `crates/lotar-lib/src/storage` | YAML persistence plus higher-level managers. `storage/manager::Storage` handles reads/writes under `.tasks`. |
-| `crates/lotar-lib/src/workspace.rs` | Tasks directory resolution, search heuristics, and config loading. |
+| `crates/lotar-core/src/storage` | YAML persistence plus higher-level managers. `storage/manager::Storage` handles reads/writes under `.tasks`. |
+| `crates/lotar-core/src/workspace.rs` | Tasks directory resolution, search heuristics, and config loading. |
 | `crates/lotar-lib/src/web_server.rs`, `crates/lotar-lib/src/api_server.rs`, `crates/lotar-lib/src/routes/` | HTTP transport, request routing, REST handlers, SSE, and static asset serving. |
 | `crates/lotar-lib/src/mcp` | JSON-RPC server shared with IDEs or agents. |
 | `view/` | SPA source consumed by Vite. Built assets land in `target/web/` via `npm run build:web`. |
@@ -52,7 +53,7 @@ LoTaR is a Rust workspace with a Vue front-end bundle. The CLI, REST server, MCP
 
 - **Adding a command** – define args in `crates/lotar-lib/src/cli/args`, add handler logic under `crates/lotar-lib/src/cli/handlers`, hook it up in `cli::Commands`, then document the internals in `cli.md`.
 - **Changing workspace discovery** – update `workspace.rs` and `cli::project`, plus refresh `environment.md` and `precedence.md`.
-- **Modifying REST/MCP behavior** – adjust `crates/lotar-lib/src/routes/` or `crates/lotar-lib/src/mcp/server/` and check `crates/lotar-lib/src/api_types.rs`. REST shape changes also require `view/api/types.ts`, `docs/openapi.json`, and the relevant help pages.
+- **Modifying REST/MCP behavior** – adjust `crates/lotar-lib/src/routes/` or `crates/lotar-lib/src/mcp/server/` and check `crates/lotar-core/src/api_types.rs`. REST shape changes also require `view/api/types.ts`, `docs/openapi.json`, and the relevant help pages.
 - **Tweaking automation** – look at `services/task_service.rs`, `utils/identity.rs`, and `config::*`. Tests usually live under `crates/lotar-lib/tests/auto_*` or `crates/lotar-lib/tests/cli_*`.
 
 For command-specific details, jump to [CLI Internals](./cli.md). For schemas and precedence, see the references listed in `index.md`.

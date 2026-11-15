@@ -103,7 +103,7 @@ pub(crate) fn config_content_server_port(content: &str) -> Result<Option<u16>, S
 /// file sets the server port, `Ok(None)` when the file is absent or sets no
 /// port, and `Err` when the file exists but cannot be parsed (its intended
 /// port is unknowable, so callers must not guess).
-pub(crate) fn config_file_server_port(path: &Path, what: &str) -> Result<Option<u16>, String> {
+pub fn config_file_server_port(path: &Path, what: &str) -> Result<Option<u16>, String> {
     let content = match fs::read_to_string(path) {
         Ok(content) => content,
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(None),
@@ -117,14 +117,14 @@ pub(crate) fn config_file_server_port(path: &Path, what: &str) -> Result<Option<
 /// Whether the global config FILE under a tasks root explicitly sets the
 /// server port (any accepted spelling). Presence-only: false for missing or
 /// unparseable files.
-pub(crate) fn global_config_sets_server_port(tasks_root: &Path) -> bool {
+pub fn global_config_sets_server_port(tasks_root: &Path) -> bool {
     config_file_server_port(&crate::utils::paths::global_config_path(tasks_root), "global config").ok().flatten().is_some()
 }
 
 /// The home config layer's explicit server port, honoring the shared ignore
 /// gates: an ignored or missing home layer contributes nothing; a present
 /// but unparseable one is an error so no caller silently guesses.
-pub(crate) fn home_config_server_port() -> Result<Option<u16>, String> {
+pub fn home_config_server_port() -> Result<Option<u16>, String> {
     if !home_config_honored() {
         return Ok(None);
     }
