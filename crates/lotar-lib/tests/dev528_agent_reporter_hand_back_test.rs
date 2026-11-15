@@ -50,6 +50,8 @@ fn fail_job_after_hand_back(reporter: &str, hand_back_to: &str) -> (String, Opti
             child_pid: 1,
             started_at: "2026-11-13T19:39:38Z".into(),
             session_id: None,
+            merge: false,
+            assignee_at_start: None,
         },
     );
     let outcome = JobOutcome { job_id: "job-merge".into(), status: Some("HelpNeeded".into()), assignee: Some(hand_back_to.into()), cleared: Vec::new() };

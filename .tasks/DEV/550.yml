@@ -1,19 +1,89 @@
 title: A merge that continues the review's thread checks out the review's old commit, not the rework
-status: InProgress
+status: HelpNeeded
 priority: High
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-15T00:44:25.587433+00:00
-modified: 2026-11-15T01:22:12.721025+00:00
+modified: 2026-11-15T03:18:33.805646+00:00
 relationships:
+  blocks:
+  - DEV-554
   related:
   - DEV-523
   - DEV-468
   - DEV-472
   - DEV-503
+  - DEV-509
+  - DEV-528
+  - DEV-554
+comments:
+- date: 2026-11-15T01:49:44.291431+00:00
+  author: claude
+  text: |-
+    Fixed in `3aa4daa5` on `agent/DEV-550`: a continued T3 thread now starts from the ticket branch's current commit.
+
+    - Cause on main: since harnessmux (DEV-503), a `session: continue` T3 job ran with the main checkout as its directory and recorded no worktree. So it sent its turn to the thread's own stale branch, skipped the leftover-work commit and never moved `agent/<ID>`. An amended rework was also refused by the ticket-branch move (the pre-amend commit counted as "commits the thread lacks").
+    - Before the turn, `continued_thread_worktree` (`agent_job_service.rs`) finds the thread's worktree from the session's last job log. It moves the thread's branch to the ticket branch (`git reset --keep`) when that branch is behind the ticket branch, or still at the commit the ticket branch had when that job ended. Otherwise (worktree gone, uncommitted changes, commits of its own, older logs) it changes nothing: the job starts a new thread on the ticket branch and the log says why.
+    - Job status lines now record `worktree_path`, `worktree_branch` and `ticket_commit`. A continued job uses the thread's worktree, so commit and follow work as for a new thread.
+    - `move_ticket_branch` accepts a rewrite (amend) when the ticket branch is still at the commit the thread started from.
+    - Tests (`tests/dev503_harness_jobs_test.rs`, fake `t3` now handles `thread send`): `a_continued_merge_thread_starts_from_the_rework_that_amended_the_ticket_branch` failed before the fix (ticket branch stayed at the pre-amend fix) and passes now. Also added `a_continued_thread_with_work_of_its_own_leaves_it_and_starts_a_new_thread`.
+    - Side fix: `merge_agent_that_hands_back_without_end_rules_does_not_land` was flaky on main too (it read the ticket before the job's outcome was applied). Its helper now waits for `job_settled`, and it passed 8 of 8 runs with retries off.
+    - Docs: `docs/help/agent.md` (T3 Code threads).
+    - Checks: `npm run lint:agent` passes. `npm run test:agent` passes (2185 Rust, 1537 UI, 50 release, 7 hooks). `npm run test:smoke:agent` passes (402).
+    - Told the DEV-509 thread which files this touches; it has a small overlap in `agent_job_service.rs` and `agent.md`.
+    - Not covered: jobs whose log came from lotar 0.15.0 (like DEV-523's merge thread) have no recorded worktree, so their continuation starts a new thread on the ticket branch.
+- date: 2026-11-15T02:06:47.787274+00:00
+  author: codex
+  text: |-
+    Review: blocking.
+
+    - `crates/lotar-lib/src/services/agent_job_service.rs:2587` records the continued worktree, but the post-turn call at `3024` invokes `record_t3_worktree`, whose `1440-1448` prefer any single new worktree over the known branch. Another job creating a worktree during this turn makes finalization adopt it, commit its leftovers and potentially point this ticket at unrelated work. Preserve the verified worktree for continued jobs and add an unrelated-worktree regression.
+    - Reviewed `3aa4daa5`, ticket criteria/comment, related context, full code/test/help diff and recent service history. No UI. `docs/decisions` absent. `git diff --check` passed; clean checkout, no edits or commits.
+    - Focused dev503 Rust tests compiled with `RUSTC_WRAPPER=` after sccache sandbox denial; runtime harness sockets are denied (`Operation not permitted`). Full gates not independently rerun. No minor tickets; status/assignee unchanged.
+- date: 2026-11-15T03:02:15.361707+00:00
+  author: claude
+  text: |-
+    Rework: review finding fixed in `27131660` (amended).
+
+    - Finding (a continued job adopts a worktree another thread makes during its turn): fixed. `run_session` in `agent_job_service.rs` takes the worktree snapshot for `record_t3_worktree` only for a new thread. A continued thread keeps the worktree `continued_thread_worktree` checked, so leftover commits and the ticket-branch move stay on it.
+    - New test `a_continued_thread_keeps_its_worktree_when_another_appears_during_its_turn` (`tests/dev503_harness_jobs_test.rs`): during a continued fix turn, a worktree `other` appears with an uncommitted file. Before the fix LoTaR committed it on `other` and the test failed. It passes now: `other` and `agent/TEST-1` stay unchanged.
+    - `docs/help/agent.md` now says a worktree another thread makes during the turn is not the job's.
+    - Checks: `npm run lint:agent` passes. `npm run test:agent` passes (2186 Rust, 1537 UI, 50 release, 7 hooks). `npm run test:smoke:agent` passes (402). The Mac was heavily loaded (load average 77), so smoke ran slowly.
+- date: 2026-11-15T03:06:43.893669+00:00
+  author: codex
+  text: |-
+    Review: blocking.
+
+    - `crates/lotar-lib/src/services/agent_job_service.rs:1387` selects worktree logs by reusable session name and skips newer logs without worktree metadata. `agent_runner.rs:192` replaces sessions under the same name. After a replacement thread has no recorded worktree, continuation can send work to that new thread while resetting/committing/following the old thread branch. Bind metadata to the session generation/thread identity and fail closed on missing latest metadata; add a replacement-session regression.
+    - Previous adoption finding is fixed by `!launch.resume` and has regression coverage. Reviewed amended `27131660`, full diff, ticket criteria and comments, recent service history. No UI changes. `git diff --check` passed; no files or commits changed.
+    - Focused Rust check hit sandbox sccache denial; wrapper-disabled retry was stopped during fresh compilation. No checks remain running. Full gates not independently rerun. No minor tickets; status/assignee unchanged.
+- date: 2026-11-15T03:06:53.596008+00:00
+  author: automation
+  text: |-
+    The review found blocking problems again after one rework (the comments above). Rework, your decision on the findings, or WontDo?
+
+    Options:
+    - fix: An agent reworks it once more
+    - decide: I decide the findings (say how)
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: An agent reworks it once more
+      set:
+        assignee: '@fix'
+    - key: decide
+      label: I decide the findings (say how)
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9386a119-7c48-40f0-95b1-7872e3db5945
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae864c4e5-e4ce-4c5c-a220-848be6280c22
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1a252f40-48b2-4e3a-b760-41dc9a4e9625
 description: |-
   ## Found
 
@@ -35,6 +105,8 @@ description: |-
   - [ ] Regression test: a rework amends the ticket branch, then a continued merge job sees the new commit (and fails without the fix).
   - [ ] `docs/help/agent.md` describes it.
   - [ ] npm run lint, npm test and npm run smoke pass.
+tags:
+- review-returned
 history:
 - at: 2026-11-15T00:44:26.064331+00:00
   actor: claude
@@ -95,3 +167,114 @@ history:
   - field: relationships
     old: '{"related":["DEV-523","DEV-468","DEV-472"]}'
     new: '{"related":["DEV-523","DEV-468","DEV-472","DEV-503"]}'
+- at: 2026-11-15T01:49:44.291431+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:49:44.405844+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-523","DEV-468","DEV-472","DEV-503"]}'
+    new: '{"related":["DEV-523","DEV-468","DEV-472","DEV-503","DEV-509"]}'
+- at: 2026-11-15T01:50:11.854418+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T02:03:26.404823+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae864c4e5-e4ce-4c5c-a220-848be6280c22
+- at: 2026-11-15T02:06:47.787274+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T02:06:47.928513+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: ''
+    new: review-blocked
+- at: 2026-11-15T02:06:57.470346+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: review-blocked
+    new: review-returned
+- at: 2026-11-15T02:31:35.101641+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-15T02:41:49.140211+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-523","DEV-468","DEV-472","DEV-503","DEV-509"]}'
+    new: '{"related":["DEV-523","DEV-468","DEV-472","DEV-503","DEV-509","DEV-528"]}'
+- at: 2026-11-15T03:02:15.361707+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T03:02:22.349563+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T03:02:28.311003+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-523","DEV-468","DEV-472","DEV-503","DEV-509","DEV-528"]}'
+    new: '{"related":["DEV-523","DEV-468","DEV-472","DEV-503","DEV-509","DEV-528","DEV-554"]}'
+- at: 2026-11-15T03:05:23.217336+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1a252f40-48b2-4e3a-b760-41dc9a4e9625
+- at: 2026-11-15T03:06:43.893669+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T03:06:44.021259+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: review-returned
+    new: review-returned, review-blocked
+- at: 2026-11-15T03:06:53.440301+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+  - field: tags
+    old: review-returned, review-blocked
+    new: review-returned
+- at: 2026-11-15T03:06:53.596008+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-15T03:18:33.805646+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-523","DEV-468","DEV-472","DEV-503","DEV-509","DEV-528","DEV-554"]}'
+    new: '{"blocks":["DEV-554"],"related":["DEV-523","DEV-468","DEV-472","DEV-503","DEV-509","DEV-528","DEV-554"]}'

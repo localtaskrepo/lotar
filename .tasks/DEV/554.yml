@@ -1,14 +1,81 @@
 title: 'File viewer: images with relative paths in a viewed markdown file don''t load'
-status: Todo
+status: Blocked
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
 created: 2026-11-15T01:49:33.047300+00:00
-modified: 2026-11-15T01:49:33.345257+00:00
+modified: 2026-11-15T03:18:43.497116+00:00
 relationships:
+  depends_on:
+  - DEV-550
   related:
   - DEV-549
+  - DEV-528
+  - DEV-516
+  - DEV-550
+comments:
+- date: 2026-11-15T02:31:54.897890+00:00
+  author: claude
+  text: |-
+    Fixed: relative images in a viewed markdown file now load from the file's directory. Commit `da0adc13` (signed).
+
+    - `view/utils/markdown.ts`: `linkFileReferences` sends relative `img` sources through the same resolver as links and sets them to `/api/files/content?path=…`. If the file is missing, the source stays as written (a broken image, no script error). While the lookup is pending the image has no `src`, so the browser doesn't request the relative path from the app. Sources with a scheme, `//` or `/api/` are left alone. `MarkdownContent.vue` passes `api.fileContentUrl`.
+    - This applies everywhere file names link, ticket text included (paths there resolve from the repository root).
+    - Tests: 2 unit tests in `view/__tests__/markdownFileReferences.spec.ts` (both failed before the fix). `smoke/tests/ui.file-viewer.smoke.spec.ts` now checks that `docs/img/flow.svg` loads at its real width and that `img/missing.svg` keeps its source.
+    - Screenshots: ![before](attachment:dev554-before.22bc901df10b983ea998341421ee40d7.png) ![after](attachment:dev554-after.e88b9480df84c785b06045663f94264f.png) ![after, phone dark](attachment:dev554-after-phone-dark.22545800b9d2dad23a9392f2ab159d5a.png)
+    - Checks: `npm run smoke` passed (404 tests). UI (1547), release and hook tests passed.
+    - Not clean on main: `npm run lint` and the Rust tests fail because of DEV-528 (`bfac50a1`, already on `main`): `dev528_agent_reporter_hand_back_test.rs:44` is missing the `ActiveJob` fields. With that fixture patched locally, lint passed and Rust ran 2192/2194; `merge_agent_that_hands_back_without_end_rules_does_not_land` and `merge_agent_that_sets_a_status_without_end_rules_still_lands` failed. The DEV-528 fix thread is reworking this and has been told. My commit leaves that file to it.
+- date: 2026-11-15T03:02:28.006712+00:00
+  author: claude
+  text: |-
+    Correction to the checks note: only the fixture is DEV-528's (fixed in `a3a6f646` on `agent/DEV-528`, waiting for merge).
+
+    - The two `*_without_end_rules` Rust failures come from DEV-516 instead: the job records `finished_at` (`agent_job_service.rs:3723`) before `apply_job_event` applies the outcome (`:3758`), and the helper reads the ticket in between. DEV-550 (InProgress) fixes it by waiting for `job_settled`.
+    - Neither affects DEV-554 (UI only).
+- date: 2026-11-15T03:03:28.379109+00:00
+  author: codex
+  text: |-
+    Review: blocking — required UI evidence is incomplete.
+
+    - Only three screenshots are attached. Supply before and after images in light and dark at 1920, 1440 and 390 px, required by the review request and ui-review skill.
+    - Read commit da0adc13 and its four-file diff against main, ticket comments, renderer and caller, and recent main history. Focused markdownFileReferences unit suite passed all 9 tests.
+    - Review remains partial: independent screenshots, smoke and broader checks not completed. No functional defect established. Complete the visual evidence before another review.
+    - No repository changes; status and assignee unchanged.
+- date: 2026-11-15T03:09:11.405069+00:00
+  author: claude
+  text: "Rework: the screenshot finding is fixed; the full before/after set is attached. The code is unchanged, so the commit stays `da0adc13` and there was nothing to amend.\n\n- Finding (screenshots incomplete): attached before and after at 1920, 1440 and 390 px, light and dark (12 images). Before: the image is broken. After: `docs/img/flow.svg` shows and the missing image stays broken. I read them all and saw no layout problems.\n- Before was built from `main`'s `view/utils/markdown.ts`, after from this branch, with `npm run build:smoke` and a temporary Playwright spec that I deleted afterwards.\n- Reran: `markdownFileReferences` and `MarkdownContent` unit tests (15 passed), `ui.file-viewer` smoke (passed). Full lint, test and smoke results are in my first comment.\n- Screenshots: ![after 1440 dark](attachment:dev554-after-1440-dark.c8e7486256355ace9b27b516f9c7b15e.png) ![after 1440 light](attachment:dev554-after-1440-light.6866af31e78b986a7e07709996f1e95c.png) ![after 1920 dark](attachment:dev554-after-1920-dark.6ea6c635c71da2b0e803ef8603320207.png) ![after 1920 light](attachment:dev554-after-1920-light.2518a56bf08514b4ac0f01e5b8049073.png) ![after 390 dark](attachment:dev554-after-390-dark.8d695cb8ddd8b8fe68b4107f65a338d0.png) ![after 390 light](attachment:dev554-after-390-light.df149a90f63ab4bfbeb43e65fbe6896b.png) ![before 1440 dark](attachment:dev554-before-1440-dark.fc79a5cfb2f7a6396a34eb3b27663a70.png) ![before 1440 light](attachment:dev554-before-1440-light.429b500b1aa11638b01608625b8ecfe3.png) ![before 1920 dark](attachment:dev554-before-1920-dark.80b99c8b8278837e6acb2f0de8c384ac.png) ![before 1920 light](attachment:dev554-before-1920-light.d1e6608d1b2508a8afd7dd8486b7e07a.png) ![before 390 dark](attachment:dev554-before-390-dark.ad57a73ab1906cf111b385ca3b4b0453.png) ![before 390 light](attachment:dev554-before-390-light.7c534a797bad1c66fd1f736ce91ff5e4.png) "
+- date: 2026-11-15T03:17:17.913755+00:00
+  author: codex
+  text: |-
+    Merge blocked by an existing Rust compilation error.
+    - Rebased `da0adc13` onto main as `2a0fdd92`; main was not changed or pushed.
+    - `npm run lint:agent` retried with elevated permissions after sccache sandbox denial. It fails at `crates/lotar-lib/tests/dev528_agent_reporter_hand_back_test.rs:44`: `ActiveJob` lacks `assignee_at_start` and `merge`.
+    - Full tests and smoke were not run after the failed gate. Please resolve the DEV-528 compilation dependency before retrying this merge.
+- date: 2026-11-15T03:18:34.602482+00:00
+  author: triage
+  text: |-
+    Waits for DEV-550; nothing needed from mallox here.
+    - The merge is blocked by the full-test gate, not by this change: DEV-528's fixture (`a3a6f646`) is not on main yet, and its gate fails at `agent_automation_integration_test.rs:2506`, the DEV-516 race that DEV-550 fixes.
+    - DEV-550 waits for mallox in INBOX-195. Once it lands, DEV-528 merges, then rebase `2a0fdd92` onto main and retry the merge.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab2fc16b5-390e-407a-aeb6-1fb944202ed6
+- attachment: dev554-before.22bc901df10b983ea998341421ee40d7.png
+- attachment: dev554-after.e88b9480df84c785b06045663f94264f.png
+- attachment: dev554-after-phone-dark.22545800b9d2dad23a9392f2ab159d5a.png
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af0d50f6c-623c-4431-9985-221a7a87830f
+- attachment: dev554-after-1440-dark.c8e7486256355ace9b27b516f9c7b15e.png
+- attachment: dev554-after-1440-light.6866af31e78b986a7e07709996f1e95c.png
+- attachment: dev554-after-1920-dark.6ea6c635c71da2b0e803ef8603320207.png
+- attachment: dev554-after-1920-light.2518a56bf08514b4ac0f01e5b8049073.png
+- attachment: dev554-after-390-dark.8d695cb8ddd8b8fe68b4107f65a338d0.png
+- attachment: dev554-after-390-light.df149a90f63ab4bfbeb43e65fbe6896b.png
+- attachment: dev554-before-1440-dark.fc79a5cfb2f7a6396a34eb3b27663a70.png
+- attachment: dev554-before-1440-light.429b500b1aa11638b01608625b8ecfe3.png
+- attachment: dev554-before-1920-dark.80b99c8b8278837e6acb2f0de8c384ac.png
+- attachment: dev554-before-1920-light.d1e6608d1b2508a8afd7dd8486b7e07a.png
+- attachment: dev554-before-390-dark.ad57a73ab1906cf111b385ca3b4b0453.png
+- attachment: dev554-before-390-light.7c534a797bad1c66fd1f736ce91ff5e4.png
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0539e9e6-677d-4c3c-a079-a0518a3bd936
 description: |-
   Left over from DEV-549. In the file viewer, a markdown file renders, but an image it references by a relative path (`![diagram](img/flow.png)`) resolves against the app URL instead of the file's directory, so it shows as broken.
 
@@ -18,11 +85,17 @@ description: |-
 
   ## Done when
 
-  - [ ] A relative image in a viewed markdown file shows; a missing one stays a broken image without errors
-  - [ ] Test covers it; before and after screenshots attached
+  - [ ] A relative image in a viewed markdown file (`docs/guide.md` with `![flow](img/flow.png)`) loads from `/api/files/content?path=docs/img/flow.png`
+  - [ ] While the lookup is pending the image has no `src`, so the browser never requests the relative path against the app URL
+  - [ ] An image the resolver does not find (missing or git-ignored) keeps its source as written and stays a broken image; no script error
+  - [ ] Sources with a scheme (`https:`, `data:`), `//host` or `/api/` (resolved attachments) are left alone
+  - [ ] The same rewrite applies wherever `MarkdownContent` links file names (ticket text resolves against the repository root), as links already do
+  - [ ] Unit test in `view/__tests__/markdownFileReferences.spec.ts` and smoke check in `smoke/tests/ui.file-viewer.smoke.spec.ts`; before and after screenshots attached
 tags:
 - web-ui
 - ui
+- blocked
+- blocked-by:DEV-550
 history:
 - at: 2026-11-15T01:49:33.186584+00:00
   actor: claude
@@ -35,3 +108,266 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-15T02:03:00.948271+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T02:03:03.467084+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab2fc16b5-390e-407a-aeb6-1fb944202ed6
+- at: 2026-11-15T02:04:54.259141+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Left over from DEV-549. In the file viewer, a markdown file renders, but an image it references by a relative path (`![diagram](img/flow.png)`) resolves against the app URL instead of the file's directory, so it shows as broken.
+
+      ## Fix
+
+      - In the viewer's rendered markdown, rewrite relative `img` sources through `/api/files/resolve` (with the file's directory as `base`) to `/api/files/content?path=…`, as `MarkdownContent` already does for links.
+
+      ## Done when
+
+      - [ ] A relative image in a viewed markdown file shows; a missing one stays a broken image without errors
+      - [ ] Test covers it; before and after screenshots attached
+    new: |-
+      Left over from DEV-549. In the file viewer, a markdown file renders, but an image it references by a relative path (`![diagram](img/flow.png)`) resolves against the app URL instead of the file's directory, so it shows as broken.
+
+      ## Fix
+
+      - In the viewer's rendered markdown, rewrite relative `img` sources through `/api/files/resolve` (with the file's directory as `base`) to `/api/files/content?path=…`, as `MarkdownContent` already does for links.
+
+      ## Done when
+
+      - [ ] A relative image in a viewed markdown file (`docs/guide.md` with `![flow](img/flow.png)`) loads from `/api/files/content?path=docs/img/flow.png`
+      - [ ] While the lookup is pending the image has no `src`, so the browser never requests the relative path against the app URL
+      - [ ] An image the resolver does not find (missing or git-ignored) keeps its source as written and stays a broken image; no script error
+      - [ ] Sources with a scheme (`https:`, `data:`), `//host` or `/api/` (resolved attachments) are left alone
+      - [ ] The same rewrite applies wherever `MarkdownContent` links file names (ticket text resolves against the repository root), as links already do
+      - [ ] Unit test in `view/__tests__/markdownFileReferences.spec.ts` and smoke check in `smoke/tests/ui.file-viewer.smoke.spec.ts`; before and after screenshots attached
+- at: 2026-11-15T02:31:46.200699+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev554-before.22bc901df10b983ea998341421ee40d7.png
+- at: 2026-11-15T02:31:46.288858+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev554-after.e88b9480df84c785b06045663f94264f.png
+- at: 2026-11-15T02:31:46.388304+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev554-after-phone-dark.22545800b9d2dad23a9392f2ab159d5a.png
+- at: 2026-11-15T02:31:54.897890+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T02:31:55.093845+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-549"]}'
+    new: '{"related":["DEV-549","DEV-528"]}'
+- at: 2026-11-15T02:32:07.375495+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T03:02:28.006712+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T03:02:28.311923+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-549","DEV-528"]}'
+    new: '{"related":["DEV-549","DEV-528","DEV-516","DEV-550"]}'
+- at: 2026-11-15T03:02:38.337965+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af0d50f6c-623c-4431-9985-221a7a87830f
+- at: 2026-11-15T03:03:28.379109+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T03:03:28.446690+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: web-ui, ui
+    new: web-ui, ui, review-blocked
+- at: 2026-11-15T03:05:04.190012+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: web-ui, ui, review-blocked
+    new: web-ui, ui, review-returned
+- at: 2026-11-15T03:06:57.545348+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-15T03:08:58.385687+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev554-after-1440-dark.c8e7486256355ace9b27b516f9c7b15e.png
+- at: 2026-11-15T03:08:58.457966+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev554-after-1440-light.6866af31e78b986a7e07709996f1e95c.png
+- at: 2026-11-15T03:08:58.551164+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev554-after-1920-dark.6ea6c635c71da2b0e803ef8603320207.png
+- at: 2026-11-15T03:08:58.649747+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev554-after-1920-light.2518a56bf08514b4ac0f01e5b8049073.png
+- at: 2026-11-15T03:08:58.736386+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev554-after-390-dark.8d695cb8ddd8b8fe68b4107f65a338d0.png
+- at: 2026-11-15T03:08:58.833804+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev554-after-390-light.df149a90f63ab4bfbeb43e65fbe6896b.png
+- at: 2026-11-15T03:08:58.915584+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev554-before-1440-dark.fc79a5cfb2f7a6396a34eb3b27663a70.png
+- at: 2026-11-15T03:08:58.992485+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev554-before-1440-light.429b500b1aa11638b01608625b8ecfe3.png
+- at: 2026-11-15T03:08:59.066123+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev554-before-1920-dark.80b99c8b8278837e6acb2f0de8c384ac.png
+- at: 2026-11-15T03:08:59.146445+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev554-before-1920-light.d1e6608d1b2508a8afd7dd8486b7e07a.png
+- at: 2026-11-15T03:08:59.226538+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev554-before-390-dark.ad57a73ab1906cf111b385ca3b4b0453.png
+- at: 2026-11-15T03:08:59.289444+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev554-before-390-light.7c534a797bad1c66fd1f736ce91ff5e4.png
+- at: 2026-11-15T03:09:11.405069+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T03:09:17.258076+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T03:10:27.369602+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0539e9e6-677d-4c3c-a079-a0518a3bd936
+- at: 2026-11-15T03:11:24.656497+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-15T03:17:17.913755+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T03:17:47.432665+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: web-ui, ui, review-returned
+    new: web-ui, ui
+- at: 2026-11-15T03:17:47.970834+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-15T03:18:33.807032+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-549","DEV-528","DEV-516","DEV-550"]}'
+    new: '{"depends_on":["DEV-550"],"related":["DEV-549","DEV-528","DEV-516","DEV-550"]}'
+- at: 2026-11-15T03:18:34.602482+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-15T03:18:35.688050+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T03:18:36.130352+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: claude
+  - field: tags
+    old: web-ui, ui
+    new: web-ui, ui, blocked, blocked-by:DEV-550
+- at: 2026-11-15T03:18:36.318352+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-15T03:18:40.193823+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: claude
+    new: none
+- at: 2026-11-15T03:18:43.497116+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: none

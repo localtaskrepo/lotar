@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-14T02:19:54.140386+00:00
-modified: 2026-11-15T01:45:26.619520+00:00
+modified: 2026-11-15T02:37:04.416294+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -193,12 +193,58 @@ comments:
 - date: 2026-11-15T01:45:23.071258+00:00
   author: mallox
   text: 'Answer: yes (Release 0.1.5) (answered in INBOX-171)'
+- date: 2026-11-15T02:07:08.470687+00:00
+  author: claude
+  text: |-
+    Released harnessmux 0.1.5 (mallox: yes, INBOX-171); lotar `990fd913` uses it, all checks pass.
+
+    - harnessmux: main fast-forwarded `3c630d0..06129ef` and pushed; signed tag `v0.1.5` pushed. Release run `43665419516` passed every job, `publish` included.
+    - lotar: `cargo update -p harnessmux` (0.1.2 -> 0.1.5, crates.io checksum), amended `52cb2190` -> `990fd913` (signed), dropped the 'needs 0.1.5' line. Merges cleanly with main `bfac50a1`.
+    - Checks on `990fd913` against the published crate:
+      - `npm run lint:agent` pass
+      - `npm test` pass: 2176 Rust, 1537 UI, release, hooks
+      - `npm run smoke` pass: 401
+      - dev510 4/4, including the crash-window takeover test
+      - Not run: a live T3 thread.
+    - For the merge: lotar main still pins harnessmux 0.1.2. The open DEV-467 (0.1.3) and DEV-509 (0.1.4) lotar branches will conflict on the pin; keep 0.1.5, which contains both.
+- date: 2026-11-15T02:36:37.883210+00:00
+  author: codex
+  text: |-
+    Review: blocking — recovery can still start a duplicate after a failed thread lookup.
+
+    - `Cargo.toml:21` selects harnessmux 0.1.5. Its `src/backend/t3.rs:343-358` converts failed thread-list execution or invalid JSON to None and ignores exit status. Lines 42-55 then leave an interrupted session without a thread ID, allowing thread start. After a crash before ID persistence, a transient lookup failure thus starts a second thread. Retry or fail unresolved recovery without starting; add a regression for failed lookup with an existing thread and missing saved ID.
+    - Read branch 990fd913, service/tests/docs, published adapter, ticket comments and owner scope/release decisions, related context and main history. No UI changes; owner dropped worktree metadata.
+    - git diff --check passes. Focused Rust tests built with RUSTC_WRAPPER= after sccache denial; all four failed in sandbox (Unix-socket bind Operation not permitted; takeover timed out). Product behavior inconclusive. Full gates and live T3 not rerun.
+    - No source edits, commits or minor tickets; status and assignee unchanged.
+- date: 2026-11-15T02:37:04.416294+00:00
+  author: automation
+  text: |-
+    The review found blocking problems again after one rework (the comments above). Rework, your decision on the findings, or WontDo?
+
+    Options:
+    - fix: An agent reworks it once more
+    - decide: I decide the findings (say how)
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: An agent reworks it once more
+      set:
+        assignee: '@fix'
+    - key: decide
+      label: I decide the findings (say how)
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae32d01b4-631c-4fdc-adf5-8f18371bee13
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac1722915-ee93-49bf-9853-b79066d0c7be
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A217d6eac-6771-4bc7-8126-ba19717eb724
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ade25f0a6-8c3c-4b75-b4a0-234604553055
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A03a430a2-d48e-48e0-929c-de1fc6e95ba0
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A95ddc811-271c-44bd-8afc-835d44994831
 releases:
 - 6
 description: 'Lost in DEV-503 (owner asked to file it, 2026-11-14). 1) Restart recovery: before DEV-503 a t3 job whose lotar process died waited for the still-running T3 thread (t3 thread show) and ended with it. Now lotar resumes the session and sends ''continue'', which reaches a thread that is probably still running, so the agent may work twice. harnessmux''s t3 agent should, on resume, check whether the thread runs and follow that run instead of a new turn. 2) T3 reports the thread''s worktreePath, branch and link (thread show --json); lotar used to record the worktree on the job and add the link to the ticket. Now lotar guesses the worktree from git (record_t3_worktree in agent_job_service.rs) and links nothing. harnessmux''s t3 agent should put worktree, branch and link in its events; lotar records them and attaches the link. 3) A thread waiting for an answer (t3 exit 2) used to hand the ticket to its reporter as HelpNeeded with the link; now it is turn.failed text and the job fails. harnessmux should end the turn with a structured ''waiting for an answer'' (also usable for an unanswered on_permission: ask), and lotar hands the ticket back as before. Work in harnessmux (release, crates.io) and lotar. Done when a killed lotar during a t3 job ends the job from the thread without a second turn, t3 jobs record T3''s worktree and link the thread, and a waiting thread hands the ticket back.'
@@ -654,3 +700,53 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-15T01:56:12.765420+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T02:07:08.470687+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T02:07:15.249891+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T02:32:11.320181+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A95ddc811-271c-44bd-8afc-835d44994831
+- at: 2026-11-15T02:36:37.883210+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T02:36:48.249741+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: merge-retried, review-returned
+    new: merge-retried, review-returned, review-blocked
+- at: 2026-11-15T02:37:04.308127+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+  - field: tags
+    old: merge-retried, review-returned, review-blocked
+    new: merge-retried, review-returned
+- at: 2026-11-15T02:37:04.416294+00:00
+  actor: automation
+  changes:
+  - field: comment_added

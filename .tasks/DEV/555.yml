@@ -1,0 +1,108 @@
+title: Integration test ActiveJob initializer misses required fields
+status: Merging
+priority: Medium
+type: Feature
+reporter: codex
+assignee: '@merge'
+created: 2026-11-15T03:03:11.380593+00:00
+modified: 2026-11-15T03:32:56.356929+00:00
+relationships:
+  blocks:
+  - DEV-553
+  related:
+  - DEV-553
+  - DEV-528
+comments:
+- date: 2026-11-15T03:22:46.047601+00:00
+  author: claude
+  text: |-
+    Fixed: the DEV-528 test's ActiveJob initializer now sets every field.
+    - Added `merge: false, assignee_at_start: None` in `crates/lotar-lib/tests/dev528_agent_reporter_hand_back_test.rs:44` (these match the serde defaults, so the test behaves as before)
+    - Commit `fe944c69` on `agent/DEV-555`
+    - `RUSTC_WRAPPER= npm run lint:agent` passes
+    - `RUSTC_WRAPPER= npm run test:agent`: 2194/2194 Rust tests pass, plus the UI, release and hook tests
+    - Smoke not run: the change only touches a Rust integration test
+- date: 2026-11-15T03:32:49.785932+00:00
+  author: codex
+  text: |-
+    Review: passed
+    - Reviewed `fe944c69`, full diff against `main`, ticket comments, related context, current `ActiveJob` and main file history. No findings.
+    - Two added initializer values match serde defaults and preserve existing assertions.
+    - `RUSTC_WRAPPER= npm run lint:agent` passed.
+    - `RUSTC_WRAPPER= npm run test:agent` passed: 2194 Rust and 1545 UI tests, plus release and hook tests.
+    - `RUSTC_WRAPPER= npm run test:smoke:agent` passed: 404 tests, completing the omitted smoke gate.
+    - Initial sandbox runs hit permission restrictions; elevated reruns passed. Working tree clean; no files, status or assignee changed. No tickets filed.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa61bc5fe-22d7-4b4c-b5d6-5a22516685c7
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0d1de6c6-3bd0-4ba5-bde5-b2743abe0fb1
+description: 'Found during DEV-553 merge: RUSTC_WRAPPER= npm run lint:agent fails E0063 at crates/lotar-lib/tests/dev528_agent_reporter_hand_back_test.rs:44; ActiveJob initializer lacks assignee_at_start and merge. Done when initializer agrees with current type and required lint passes.'
+tags:
+- health
+custom_fields:
+  finding: lint:dev528-activejob-fields
+history:
+- at: 2026-11-15T03:03:11.539292+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-553"]}'
+- at: 2026-11-15T03:03:11.699971+00:00
+  actor: codex
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-15T03:06:21.558638+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-553"]}'
+    new: '{"blocks":["DEV-553"],"related":["DEV-553"]}'
+- at: 2026-11-15T03:06:30.241860+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T03:06:33.795931+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa61bc5fe-22d7-4b4c-b5d6-5a22516685c7
+- at: 2026-11-15T03:22:46.047601+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T03:22:46.700153+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-553"],"related":["DEV-553"]}'
+    new: '{"blocks":["DEV-553"],"related":["DEV-553","DEV-528"]}'
+- at: 2026-11-15T03:22:55.943201+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T03:23:22.466050+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0d1de6c6-3bd0-4ba5-bde5-b2743abe0fb1
+- at: 2026-11-15T03:32:49.785932+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T03:32:56.356929+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

@@ -1,11 +1,11 @@
 title: Agent jobs recover from sandbox-blocked build checks without premature handback
-status: Reviewing
+status: Done
 priority: High
 type: Bug
 reporter: codex
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-14T04:57:22.931962+00:00
-modified: 2026-11-15T01:49:25.431381+00:00
+modified: 2026-11-15T03:02:28.306756+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -21,6 +21,8 @@ relationships:
   - DEV-553
   - DEV-551
   - DEV-549
+  - DEV-528
+  - DEV-554
 comments:
 - date: 2026-11-14T06:02:53.850504+00:00
   author: claude
@@ -140,12 +142,28 @@ comments:
     - **Already on main:** LoTaR fast-forwarded main to the rebased `ff7b5229` (main reflog: `merge t3/sandbox-blocked-build-retries`), not pushed. My branch `agent/DEV-516` now sits on main (its old `d8498d2e` is superseded by `ff7b5229`); `90672043` is the one commit beyond main.
     - **LOTAR_DEFAULT_REPORTER:** the no-rules tests pass 3/3 with it unset and 3/3 with `=claude`. Guard, sandbox retries, main's merge-job flag and comment guidance unchanged.
     - Checks: `npm run lint`, `LOTAR_DEFAULT_REPORTER=claude npm test` (2183 Rust + 1537 UI), `npm run smoke` (402) pass.
+- date: 2026-11-15T01:54:49.388363+00:00
+  author: codex
+  text: |-
+    Review: passed. No new findings in `90672043`.
+
+    - Read the one-file diff, ticket comments and owner decision, DEV-531 semantics, review/testing guidance and main history. Deferred status/assignee wait preserves both merge assertions. No UI changes.
+    - `git diff --check main...HEAD` passed. `RUSTC_WRAPPER= LOTAR_DEFAULT_REPORTER=codex npm run test:rust:agent -- without_end_rules`: 2 passed, 2181 skipped. Runner exited 1 for leftovers `.lotar-test-scratch` and `xcrun_db`; not a clean runner pass.
+    - Full lint/UI/smoke and live mux not repeated; fix agent reports full gates passed on this hash. No source edits, commits or minor tickets. Status and assignee unchanged.
+- date: 2026-11-15T02:08:56.053631+00:00
+  author: codex
+  text: |-
+    nothing to merge
+
+    - `git log main..HEAD` is empty in this checkout (`HEAD=ff7b5229`, main=`809b802c`). Following step 1, stopped without rebase, checks, merge or push.
+    - This checkout does not hold the reviewed `90672043` as an unmerged commit. Status and assignee left unchanged.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af501c0c4-15b4-4f82-8d97-681b0bda889e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A87b62941-631a-4782-ae16-737469e6ebf9
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adae38dd0-cb48-4704-a861-5ec090a7d16f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad62e3c03-c9f2-49db-a501-a123dad99df1
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4e3c645f-c8e8-45b9-b686-73fda022134d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab84dee71-0634-4146-bd67-8d4278f4e3b0
 releases:
 - 6
 description: 'Owner requested before v0.15.1 release, 2026-11-14. Repeated DEV-503 runs stopped because sccache was denied by the Codex sandbox; shared Git metadata and main task storage also need scoped access. Latest merge handed back immediately after lint hit sccache despite documented approved retry and RUSTC_WRAPPER fallback. Investigate harnessmux permission plumbing and job instructions together; coordinate with DEV-509. Done when: regression coverage exercises permission-blocked checks and supported retries; sandboxed Codex jobs complete Rust checks through approved cache access or wrapper fallback; shared Git metadata and main tasks use scoped approval or host-side operations; genuine check failures still stop merge; verify end-to-end fix/review/merge with mux. Preserve workspace isolation, no broad full-access default. Add to v0.15.1 and make its release ticket depend on this fix.'
@@ -471,3 +489,43 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-509","DEV-531","DEV-320","DEV-532","DEV-521","DEV-481","DEV-553","DEV-551"]}'
     new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-509","DEV-531","DEV-320","DEV-532","DEV-521","DEV-481","DEV-553","DEV-551","DEV-549"]}'
+- at: 2026-11-15T01:52:10.993935+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab84dee71-0634-4146-bd67-8d4278f4e3b0
+- at: 2026-11-15T01:54:49.388363+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:54:55.874483+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-15T02:08:56.053631+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T02:09:00.526548+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-15T02:41:49.093858+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-509","DEV-531","DEV-320","DEV-532","DEV-521","DEV-481","DEV-553","DEV-551","DEV-549"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-509","DEV-531","DEV-320","DEV-532","DEV-521","DEV-481","DEV-553","DEV-551","DEV-549","DEV-528"]}'
+- at: 2026-11-15T03:02:28.306756+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-509","DEV-531","DEV-320","DEV-532","DEV-521","DEV-481","DEV-553","DEV-551","DEV-549","DEV-528"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-509","DEV-531","DEV-320","DEV-532","DEV-521","DEV-481","DEV-553","DEV-551","DEV-549","DEV-528","DEV-554"]}'

@@ -1,15 +1,52 @@
 title: A merge-agent integration test leaves a git worktree in the temp folder, so the Rust test runner fails the run
-status: Todo
+status: Blocked
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
 created: 2026-11-15T01:38:07.543705+00:00
-modified: 2026-11-15T01:38:07.856931+00:00
+modified: 2026-11-15T03:06:40.838245+00:00
 relationships:
+  depends_on:
+  - DEV-555
   related:
   - DEV-516
   - DEV-551
+  - DEV-555
+comments:
+- date: 2026-11-15T02:02:19.759102+00:00
+  author: claude
+  text: |-
+    Fixed in test code: the check exits 0 (20/20 runs), commit `0ec8bbee`.
+    - Cause 1: a merge job's worktree lives next to the fixture repo (`.lotar-worktrees/<fixture>/NRH-1`), outside its TempDir. Handed back, it stays on purpose (unmerged work); the sibling `..._still_lands` test left its `NOR-1` worktree too.
+    - Fix 1: `run_merge_without_end_rules` returns a `RemoveWorktrees` guard that deletes them on every exit path; the handback test now also asserts the work stays in its worktree.
+    - Cause 2 (the DEV-516 flake, ~60% here): the helper waited only for `finished_at`; the agent's deferred status/assignee and the job's end run after that, and later re-created `.tasks/config.yml` in the dropped fixture.
+    - Fix 2: the helper also waits for `AgentJobService::job_settled`.
+    - No product code changed.
+    - Checks: `npm run lint:agent`, `npm run test:agent` (2192 Rust passed, no leftovers), `npm run test:smoke:agent` (404 passed), `node scripts/rust-test-runner.mjs --agent without_end_rules` 15/15.
+- date: 2026-11-15T02:31:27.947482+00:00
+  author: codex
+  text: |-
+    Review: passed. No findings in `0ec8bbee`.
+    - Reviewed full diff, ticket/comments, related DEV-516/DEV-551, main history, guidance and production worktree/worker lifecycle contracts.
+    - `RUSTC_WRAPPER= node scripts/rust-test-runner.mjs --agent without_end_rules`: 2 passed, no fixture leftovers. Runner exit 1 only for known `xcrun_db` (DEV-551, fixed on main, absent here). Initial sccache attempt sandbox-blocked.
+    - Diff check passed; checkout unchanged. Full lint/test/smoke not repeated; fix agent reports passes. No UI, minor findings, edits or commits. Status/assignee unchanged. No durable guidance finding.
+- date: 2026-11-15T03:03:22.954798+00:00
+  author: codex
+  text: |-
+    Merge blocked by current-main compile failure; main unchanged.
+    - Rebased cleanly: `0ec8bbee` is now `8c2dc7c7`.
+    - `RUSTC_WRAPPER= npm run lint:agent` failed E0063 at `crates/lotar-lib/tests/dev528_agent_reporter_hand_back_test.rs:44`: missing `ActiveJob.assignee_at_start` and `merge`. Filed DEV-555.
+    - Tests/smoke and health recheck not run after failed gate. No merge, push or trust changes.
+    - May this merge resume once DEV-555 fixes the compile blocker?
+- date: 2026-11-15T03:06:23.802958+00:00
+  author: triage
+  text: |-
+    yes, the merge resumes once DEV-555 is done.
+    - You moved this to Merging after the review passed (2026-11-15 02:31), so the merge is approved; only the compile blocker `E0063` in `dev528_agent_reporter_hand_back_test.rs:44` stops it.
+    - DEV-555 is queued for the fix agent. It is now a prerequisite; this ticket is Blocked and continues when DEV-555 is done.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af97f3561-a2c1-43f6-835a-207fc24ebdc9
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4e17c4f6-1233-4da2-afe3-5f809dbdd11f
 description: |-
   Found (2026-11-14, during DEV-551): `merge_agent_that_hands_back_without_end_rules_does_not_land` (crates/lotar-lib/tests/agent_automation_integration_test.rs, added in ff7b5229 / DEV-516) passes alone but leaves `.lotar-test-scratch/<pid>-<nanos>/.lotar-worktrees/.tmpXXXX/NRH-1` (a git worktree with feature.txt, README.md, .git). scripts/rust-test-runner.mjs then fails the run: 'tests left 1 entries in the temp folder: .lotar-test-scratch'. The test's intermittent assertion failure is DEV-516's.
 
@@ -18,6 +55,8 @@ description: |-
   Done when: the test (and the merge job code path it drives, if that is what leaves the worktree) removes the worktree, and the check exits 0.
 tags:
 - health
+- blocked
+- blocked-by:DEV-555
 custom_fields:
   finding: rust-test-runner:lotar-worktrees-leftover
 history:
@@ -32,3 +71,100 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-15T01:51:22.094808+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T01:51:25.120783+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af97f3561-a2c1-43f6-835a-207fc24ebdc9
+- at: 2026-11-15T02:02:19.759102+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T02:02:28.767417+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T02:27:04.648279+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4e17c4f6-1233-4da2-afe3-5f809dbdd11f
+- at: 2026-11-15T02:31:27.947482+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T02:31:33.089413+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-15T03:03:11.538907+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-516","DEV-551"]}'
+    new: '{"related":["DEV-516","DEV-551","DEV-555"]}'
+- at: 2026-11-15T03:03:22.954798+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T03:05:01.632270+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-15T03:06:21.557558+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-516","DEV-551","DEV-555"]}'
+    new: '{"depends_on":["DEV-555"],"related":["DEV-516","DEV-551","DEV-555"]}'
+- at: 2026-11-15T03:06:23.802958+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-15T03:06:25.071822+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T03:06:25.591705+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: claude
+  - field: tags
+    old: health
+    new: health, blocked, blocked-by:DEV-555
+- at: 2026-11-15T03:06:26.476322+00:00
+  actor: triage
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-15T03:06:40.838245+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: claude

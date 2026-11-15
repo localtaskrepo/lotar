@@ -1,11 +1,11 @@
 title: A job the dependency check held back resumes as it was when its prerequisites are done
-status: Merging
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-14T07:27:35.331056+00:00
-modified: 2026-11-15T01:48:20.014500+00:00
+modified: 2026-11-15T02:03:18.880529+00:00
 relationships:
   related:
   - DEV-351
@@ -90,6 +90,33 @@ comments:
     - Tests: `a_parked_job_resumes_into_the_queue`, `a_parked_job_stays_when_its_ticket_cannot_be_read`, `…_when_the_status_cannot_be_restored`, `…_when_the_queue_refuses_it`. The three "stays" tests fail when the job is removed first, as before.
     - `help/automation.md`: such a job keeps waiting and the reason is reported.
     - Checks: `npm run lint:agent`, `test:agent` (2178 Rust, 1537 web), `test:smoke:agent` (401), all pass.
+- date: 2026-11-15T02:03:02.413932+00:00
+  author: codex
+  text: |-
+    Merge held: the supplied checkout contains the older fix, not the latest rework.
+
+    - Current branch t3/review-dev-530-held-job-resume-1 is at fb7de879; the ticket names c5fd40f2. No branch switch or history changes made.
+    - fb7de879 still removes the parked request before a successful handoff (automation_service.rs:2687-2710), the known blocking finding.
+    - No merge, push or trust changes; checks not rerun on the obsolete commit.
+    - Can the merge job be restarted on the reworked branch after the latest queue-transfer race finding is resolved?
+- date: 2026-11-15T02:03:17.829501+00:00
+  author: automation
+  text: |-
+    The merge agent's job job-20261115T020229.601Z-79 failed again (lotar agent logs job-20261115T020229.601Z-79). The fix is on branch t3/review-dev-530-held-job-resume-1. Retry with @fix, or will you merge it yourself?
+
+    Options:
+    - fix: Retry with @fix
+    - self: I merge it myself
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: self
+      label: I merge it myself
+      set:
+        status: InProgress
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aadaa906d-5c3e-411d-b998-4015eb47b493
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A50a42e5d-ab8c-4c4e-a7e1-23c50ebf82b5
@@ -372,3 +399,20 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-15T02:03:02.413932+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T02:03:17.829501+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-15T02:03:18.880529+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox

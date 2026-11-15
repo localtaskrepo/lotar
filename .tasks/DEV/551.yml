@@ -1,11 +1,11 @@
 title: The Rust test runner fails a passing run in an agent sandbox because xcrun leaves xcrun_db in its temp folder
-status: Reviewing
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: mallox
 created: 2026-11-15T01:04:18.106307+00:00
-modified: 2026-11-15T01:44:56.573187+00:00
+modified: 2026-11-15T02:26:57.365317+00:00
 relationships:
   related:
   - DEV-315
@@ -26,8 +26,25 @@ comments:
     - Not reproduced in a sandbox here (this Claude shell isn't sandboxed); the fake run covers it.
     - Checks: `lint:agent` passed; UI, release, hooks and smoke (403/403) passed. Rust: 2182/2182 passed with `-E 'not test(/without_end_rules/)'`. The full run failed only on `merge_agent_that_hands_back_without_end_rules_does_not_land`, which is already tracked in DEV-516 and is unrelated to this change.
     - New finding DEV-553: that test also leaks a git worktree under `.lotar-test-scratch/.../.lotar-worktrees` even when it passes, so the runner fails a single-test run.
+- date: 2026-11-15T01:56:56.947971+00:00
+  author: codex
+  text: |-
+    Review: passed. No findings in `5dd5d739`.
+    - Reviewed complete diff, ticket/comments, related context, cleanup decision and main history. Exact cache exception preserves real-leftover rejection.
+    - Passed: runner tests 46, release 50, hooks 7, diff check, sandboxed Rust config tests 43 with runner exit 0.
+    - Original pending_outcome_tests filter selected zero tests (exit 4); broader lib run hit sandbox socket-bind failures. Full lint/UI/smoke not repeated; fix agent reports passing gates.
+    - No source edits or commits; status and assignee unchanged. No durable guidance finding.
+- date: 2026-11-15T02:26:47.838517+00:00
+  author: codex
+  text: |-
+    Merge blocked by required checks; main was not changed.
+    - Rebased cleanly onto main: `5dd5d739` is now `5e76d9ee`.
+    - `RUSTC_WRAPPER= npm run lint:agent` failed with TS2307 for `highlight.js/lib/core` and language imports in `view/utils/highlight.ts`. `test:agent` and `test:smoke:agent` stopped in the web build on the same missing dependency. All commands have finished.
+    - No merge, push, trust changes or source edits. The previous review passed; these failures occurred after rebasing onto current main.
+    - May I refresh this worktree dependencies with `npm ci`, rerun the required gates, and continue the merge?
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab71a57bb-a8c9-41b0-bea6-2058af686d22
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6b08f761-8f72-4470-acad-27ffbf3cd53d
 description: |-
   Found: reviews run in codex's sandbox with RUSTC_WRAPPER= (sccache is denied there, DEV-479) end with 'rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: xcrun_db', after all tests passed: DEV-467 (2026-11-15 00:30), DEV-478, DEV-487, DEV-524. xcrun (Apple's cc/ld shim that rustc links through) caches tool lookups in xcrun_db under the per-user temp folder; in a sandbox that folder isn't writable, so it writes TMPDIR, which scripts/rust-test-runner.mjs (runTestsInFreshTemp, DEV-315) points at a fresh folder and requires empty. Not reproduced outside the sandbox: the same relinking run (touch a source file, RUSTC_WRAPPER= npm run test:rust -- pending_outcome_tests) leaves nothing. The file comes from the toolchain at build time, not from a test.
 
@@ -86,3 +103,34 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-15T01:55:10.128207+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A6b08f761-8f72-4470-acad-27ffbf3cd53d
+- at: 2026-11-15T01:56:56.947971+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:57:02.969456+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-15T02:26:47.838517+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T02:26:57.365317+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox

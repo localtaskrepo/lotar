@@ -1,11 +1,11 @@
 title: Restore Claude's sandbox at workspace level and add rule-based answers to permission requests
-status: Reviewing
+status: HelpNeeded
 priority: High
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: claude
 created: 2026-11-14T02:15:26.078753+00:00
-modified: 2026-11-15T01:46:47.005219+00:00
+modified: 2026-11-15T03:02:23.296759+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -21,6 +21,7 @@ relationships:
   - DEV-532
   - DEV-537
   - DEV-467
+  - DEV-550
 comments:
 - date: 2026-11-14T02:16:43.837266+00:00
   author: automation
@@ -108,6 +109,58 @@ comments:
     - **Resolution**: kept main's budget and options work and its command/args docs, plus this ticket's rules. No profile setting is dropped any more, so `session_profile` returns the Profile alone, without a notes list. Its two callers in `agent_job_service.rs` are adjusted. harnessmux stays on 0.1.4, which contains everything main used from 0.1.2.
     - **Checks**: `npm run lint:agent` ✓, UI tests 1537 ✓, `npm run smoke` 402 ✓. Rust: 2183/2184 pass.
     - **Rust failure, also on main**: `merge_agent_that_hands_back_without_end_rules_does_not_land` (`agent_automation_integration_test.rs:2506`, `(Todo, @merge)` instead of `(HelpNeeded, reviewer)`) fails under full-suite load. It passes alone. A clean worktree of main `ff7b5229` fails it too, plus `merge_agent_that_sets_a_status_without_end_rules_still_lands`. It's DEV-516's test and is already recorded on DEV-516, so no new ticket.
+- date: 2026-11-15T01:49:55.491821+00:00
+  author: codex
+  text: |-
+    Review: blocking — quoted paths bypass workspace push denial.
+
+    - `crates/lotar-lib/src/services/agent_runner.rs:296` delegates to harnessmux 0.1.4 `src/rules.rs:74`, whose `split_whitespace` misses `git -C "/tmp/my repo" push`. Default allow then approves it. Use shell-aware parsing, add quoted-path regression tests, update dependency.
+    - Reproduced using unchanged published matcher functions in a scratch Rust executable: plain `git -C . push` denied, quoted path missed. No push executed.
+    - Reviewed `47c730cd`, full diff, comments, relationships, related context, main history and published sandbox settings. Prior lockfile/simple-option findings resolved; no UI changes.
+    - `git diff --check` passed. `RUSTC_WRAPPER= npm run test:rust:agent -- agent_runner`: 10 tests passed; temp guard failed on `xcrun_db`. Initial attempt hit sandbox-denied sccache. Full lint/UI/smoke and live Claude not rerun.
+    - No files changed, commits or minor tickets; status/assignee unchanged. No durable guidance finding.
+- date: 2026-11-15T01:50:12.522170+00:00
+  author: automation
+  text: |-
+    The review found blocking problems again after one rework (the comments above). Rework, your decision on the findings, or WontDo?
+
+    Options:
+    - fix: An agent reworks it once more
+    - decide: I decide the findings (say how)
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: An agent reworks it once more
+      set:
+        assignee: '@fix'
+    - key: decide
+      label: I decide the findings (say how)
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-15T01:50:37.575455+00:00
+  author: triage
+  text: |-
+    Triage 2026-11-15 (INBOX-183): already decided by mallox, INBOX-134 comment 2026-11-14 23:16: 'rework and in general if the normal model can't cut it, then we have fable 5.2 available for really tough cases. After enough tries I think we need to escalate in general.'
+    - This is the third review block (codex 01:49: quoted paths like `git -C "/tmp/my repo" push` bypass the deny, `split_whitespace` in harnessmux `src/rules.rs`). The normal @fix has had two reworks, so this round goes to @fix-fable.
+    - Fix by shell-aware parsing, add quoted-path regression tests, release needs his OK again.
+- date: 2026-11-15T02:08:06.978118+00:00
+  author: claude
+  text: |-
+    Not started: the @fix-fable round can't run on Fable here.
+
+    - The `fix-fable` profile (`~/Development/standards/configs/lotar/agents.yml`) asks for `claude-fable-5-2`, but T3's `claudeAgent` provider only offers Opus 5.5, Sonnet 5.5 and Haiku 5.5. A Fable child task was refused with `model_unavailable`.
+    - So this @fix-fable job ran in the existing DEV-509 thread on `claude-opus-5-5`, the model that already had two reworks.
+    - The fix is known: a shell-aware tokenizer in harnessmux `src/rules.rs` instead of `split_whitespace`, quoted-path tests such as `git -C "/tmp/my repo" push`, then a 0.1.5 release (needs your OK) and the lotar bump.
+    - No files changed.
+
+    **Question for mallox:** Fable isn't available in T3. Should Opus 5.5 at max effort do this round, or do you enable `claude-fable-5-2` in T3 and reassign `@fix-fable`?
+- date: 2026-11-15T03:02:23.296759+00:00
+  author: automation
+  text: 'The T3 Code thread waits for an answer: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3e024114-ed69-486a-a066-2dc4905c9a0f'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A04489e72-8f3b-4408-aa34-7819ce8de78b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa6d60779-49e6-493f-bc37-9f889203e4ec
@@ -115,6 +168,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aaa3c0a4f-6336-4351-afb3-bb97094d46b7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A468c2341-53de-4ba3-9431-72827cb55179
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9d6a68ee-ae5b-4e72-92c3-cd2b38b9b764
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3e024114-ed69-486a-a066-2dc4905c9a0f
 releases:
 - 6
 description: 'Lost in DEV-503 (owner asked to file it, 2026-11-14). Before DEV-503, permissions: workspace gave Claude --permission-mode acceptEdits plus its OS sandbox (sandbox.enabled, autoAllowBashIfSandboxed), so shell writes outside the working and extra directories were blocked; Copilot and OpenCode/Kilo at workspace denied git push. Since DEV-503 workspace is the agent''s mode only (Claude acceptEdits) and harnessmux''s default policy allow approves every permission request, so shell commands run unsandboxed. Codex keeps its workspace-write sandbox. The profile keys tools.allowed/tools.disallowed and mcp.allow are no longer passed either (the job log says so). Work, mostly in harnessmux: pass Claude''s sandbox settings with the session, and give the permission policy rules (deny patterns such as git push, allow writes only under cwd and add_dirs, tool allow/deny lists) that lotar fills from permissions, tools and mcp.allow. Done when a workspace Claude job can''t write outside its directories or push, and tools/mcp.allow work again for ACP agents.'
@@ -539,3 +593,85 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9d6a68ee-ae5b-4e72-92c3-cd2b38b9b764
+- at: 2026-11-15T01:49:44.404990+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-516","DEV-510","DEV-511","DEV-512","DEV-532","DEV-537","DEV-467"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-516","DEV-510","DEV-511","DEV-512","DEV-532","DEV-537","DEV-467","DEV-550"]}'
+- at: 2026-11-15T01:49:55.491821+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:49:58.622020+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: fix-retried, blocked, blocked-by:DEV-503, review-returned
+    new: fix-retried, blocked, blocked-by:DEV-503, review-returned, review-blocked
+- at: 2026-11-15T01:50:12.395331+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+  - field: tags
+    old: fix-retried, blocked, blocked-by:DEV-503, review-returned, review-blocked
+    new: fix-retried, blocked, blocked-by:DEV-503, review-returned
+- at: 2026-11-15T01:50:12.522170+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:50:37.575455+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:50:38.626879+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T01:50:39.069740+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-fable'
+- at: 2026-11-15T02:06:59.171684+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T02:08:06.978118+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T02:08:15.460150+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-fable'
+    new: mallox
+- at: 2026-11-15T02:37:09.894537+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3e024114-ed69-486a-a066-2dc4905c9a0f
+- at: 2026-11-15T03:02:23.217052+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: claude
+- at: 2026-11-15T03:02:23.296759+00:00
+  actor: automation
+  changes:
+  - field: comment_added

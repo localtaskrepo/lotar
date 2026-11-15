@@ -1,11 +1,11 @@
 title: Jobs that failed during the T3 Code outage left 15 tickets InProgress and lost their agents' outcome
-status: Merging
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-13T10:33:47.286204+00:00
-modified: 2026-11-15T01:44:25.560732+00:00
+modified: 2026-11-15T01:56:06.625600+00:00
 relationships:
   blocks:
   - DEV-513
@@ -43,6 +43,7 @@ relationships:
   - DEV-551
   - DEV-315
   - DEV-487
+  - DEV-528
 comments:
 - date: 2026-11-13T10:37:16.946574+00:00
   author: claude
@@ -269,6 +270,36 @@ comments:
     - Independently reran `RUSTC_WRAPPER= npm run test:rust -- pending_outcome_tests a_t3_job_that_loses_the_server` with approved execution: all 4 passed, runner exit 0. Sandbox attempts reproduced xcrun_db leftovers and Unix socket denial; these were environment failures.
     - `git diff --check main...HEAD` passed. No files or commits changed. Full lint, unit and smoke suites were not independently repeated; their passes on this HEAD are fix-agent evidence. Pre-fix failure evidence and reconciliation of the 15 tickets are recorded in earlier comments, not independently reproduced here.
     - Existing outcome-order follow-up DEV-543 remains relevant and already has its own fix; no duplicate ticket filed. Status and assignee unchanged.
+- date: 2026-11-15T01:55:42.178232+00:00
+  author: claude
+  text: |-
+    Merge blocked: rebasing onto `main` (`bfac50a1`) conflicts with DEV-528, and resolving it needs new code. I aborted the rebase. `3b983482` is unchanged on `t3/job-end-rules-t3-outage`. Nothing merged or pushed, no checks ran.
+
+    - `crates/lotar-lib/src/services/automation_service.rs` `apply_job_event`:
+      - main (DEV-528) collects the matching rules first, works out `rule_assigns`, and filters the recorded outcome with `without_agent_reporter_hand_back` (a hand-back to an agent reporter is dropped when an end rule assigns the ticket).
+      - This branch applies end actions through `apply_durable_end_action` with `retry_while_busy`, and takes the outcome with `end_and_take_outcome(tasks_dir, job_id, ticket_id)`, deferring it or settling it.
+      - Why it's not mechanical: an outcome deferred because the lock is busy is saved before DEV-528's filter runs. `apply_pending_outcomes` then applies it later, unfiltered, so the dropped hand-back to an agent reporter comes back. Keeping both needs the saved outcome filtered (or `rule_assigns` saved with it), an outcome the filter drops settled, and a test. That's new logic, not a conflict resolution.
+    - `crates/lotar-lib/src/services/agent_job_service.rs`: mechanical. Main's `ticket_state(tasks_dir, ticket_id)` plus this branch's logging of end-rule failures.
+    - `docs/help/agent.md`: main added a DEV-528 line next to the paragraph this branch extends. Keep both.
+    - Next: the fix agent rebases, applies DEV-528's filter before the outcome is saved or deferred (with a test: a busy lock, then recovery, then the agent-reporter hand-back is still dropped), reruns `npm run lint`, `npm test` and `npm run smoke`, and sends it to review.
+- date: 2026-11-15T01:56:04.552514+00:00
+  author: automation
+  text: |-
+    The merge agent's job job-20261115T015456.767Z-74 failed again (lotar agent logs job-20261115T015456.767Z-74). The fix is on branch t3/job-end-rules-t3-outage. Retry with @fix, or will you merge it yourself?
+
+    Options:
+    - fix: Retry with @fix
+    - self: I merge it myself
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: self
+      label: I merge it myself
+      set:
+        status: InProgress
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8a51060f-8f0e-40eb-8309-91840a4fac93
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afa70d136-71c4-42cc-8c60-e9566c5a27b6
@@ -1011,3 +1042,26 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-15T01:55:42.178232+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:55:42.340179+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-513","DEV-543"],"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513","DEV-524","DEV-530","DEV-532","DEV-538","DEV-543","DEV-497","DEV-503","DEV-514","DEV-509","DEV-510","DEV-551","DEV-315","DEV-487"]}'
+    new: '{"blocks":["DEV-513","DEV-543"],"related":["DEV-401","DEV-456","DEV-458","DEV-459","DEV-460","DEV-461","DEV-462","DEV-463","DEV-464","DEV-465","DEV-471","DEV-409","DEV-411","DEV-473","DEV-478","DEV-479","DEV-481","DEV-483","DEV-513","DEV-524","DEV-530","DEV-532","DEV-538","DEV-543","DEV-497","DEV-503","DEV-514","DEV-509","DEV-510","DEV-551","DEV-315","DEV-487","DEV-528"]}'
+- at: 2026-11-15T01:56:04.552514+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:56:06.625600+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox

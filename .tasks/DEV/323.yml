@@ -1,14 +1,15 @@
 title: 'openapi: /api/tasks/update says status is ignored, but the route applies it (and defers it during a job)'
-status: Reviewing
+status: Done
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-11T19:18:53.444560+00:00
-modified: 2026-11-15T01:49:15.596553+00:00
+modified: 2026-11-15T03:10:04.437219+00:00
 relationships:
   related:
   - DEV-320
+  - DEV-528
 comments:
 - date: 2026-11-15T00:46:54.466785+00:00
   author: claude
@@ -16,9 +17,56 @@ comments:
 - date: 2026-11-15T01:25:59.981431+00:00
   author: claude
   text: 'Rewrote the /api/tasks/update description in docs/openapi.json: dropped the stale ''status is ignored, handled by CLI'' note; it now says status/priority/type are validated against the project config and a status change applies auto.assign_on_status, keeping the DEV-320 deferred-during-job sentence. Matches routes/tasks.rs (status goes through TaskService::update_with_receipt) and the dev54 mutation contract test. Checked: JSON valid, prettier clean, integration openapi tests pass (4/4). Docs-only, so full lint/test/smoke not run.'
+- date: 2026-11-15T01:51:12.221612+00:00
+  author: codex
+  text: |-
+    Review: passed
+    - Reviewed `3dec737c`, full diff against `main`, both tickets and comments, repository guidance and recent main history. Only the intended OpenAPI description changed; no duplicate fix or owner decision.
+    - `docs/openapi.json:887` matches route/service validation, configured auto-assignment and deferred outcomes. Existing dev54 tests cover REST status updates; prose checked against implementation.
+    - JSON parsing, Prettier and diff whitespace checks pass. Focused OpenAPI nextest run: 4/4 pass with `RUSTC_WRAPPER=` outside sandbox (initial cache and localhost permission denials).
+    - No findings or tickets filed. Full lint/test/smoke omitted for docs-only work. No UI changes. Files, status and assignee unchanged.
+- date: 2026-11-15T02:08:24.328781+00:00
+  author: codex
+  text: |-
+    Merge blocked: post-rebase OpenAPI checks cannot compile.
+    - Rebased cleanly onto `main`; fix is now `809b802c`. Nothing merged or pushed.
+    - JSON parsing, Prettier and diff whitespace checks pass. Focused nextest fails at `crates/lotar-lib/tests/dev528_agent_reporter_hand_back_test.rs:44`: `ActiveJob` initializer lacks `assignee_at_start` and `merge` (E0063).
+    - Main needs that test fixture repaired before retrying the merge. Full application gates omitted for this documentation-only change; no rules changed, so trust was not needed.
+- date: 2026-11-15T02:08:53.398894+00:00
+  author: triage
+  text: |-
+    Fix is already on main; no owner decision needed. Close as Done.
+    - `809b802c` is on `main` (`git branch --contains 809b802c`); it changes only the `/api/tasks/update` description in `docs/openapi.json`.
+    - Done criterion met: the 'status is ignored' text is gone from that route and the deferred-during-job outcome is kept (review passed in the Codex comment, 2026-11-15).
+    - The merge-blocking compile error (`ActiveJob` fixture in `dev528_agent_reporter_hand_back_test.rs:44` lacks `assignee_at_start`, `merge`) is a separate problem from DEV-528 on main, not part of this ticket; I did not re-run it.
+- date: 2026-11-15T02:43:35.880434+00:00
+  author: claude
+  text: |-
+    Done: the fix is already on `main`, so nothing is left to merge.
+    - `809b802c` is on `main` and changes only the `/api/tasks/update` description in `docs/openapi.json`.
+    - Checked on `main`: the text 'ignored by this REST route' no longer appears, and the sentence about the deferred outcome during a job is still there.
+    - The compile error in `dev528_agent_reporter_hand_back_test.rs:44` comes from DEV-528, not from this ticket. Not re-run here.
+    - No new commit. This worktree's `3dec737c` is the same change as `809b802c`.
+- date: 2026-11-15T03:05:57.884221+00:00
+  author: codex
+  text: |-
+    Review: nothing to review
+
+    - `main` and `HEAD` both point to `8c2dc7c7142e6b8734e746bb093621355de7c5de`.
+    - `git log main..HEAD` and `git diff --stat main...HEAD` are empty. Stopped at the requested early gate; no checks rerun.
+    - No source changes or commits; status and assignee left unchanged.
+- date: 2026-11-15T03:09:59.729555+00:00
+  author: claude
+  text: |-
+    Merge: nothing to merge
+    - `HEAD` and `main` are both `8c2dc7c7`; `git log main..HEAD` lists no commits.
+    - The fix is already on `main` as `809b802c`.
+    - Nothing rebased, merged, pushed or trusted; no checks run.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A64a037ea-00db-462b-b857-dbba46c9f927
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5d8a9cd5-f245-4d27-bb68-87b3c690fe00
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5aaea4b7-2c65-4e67-9d52-2990156e75e1
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b296469-2cb3-4c82-a550-2e089bc82029
 description: 'Found by the DEV-320 agent on 2026-11-11: docs/openapi.json describes /api/tasks/update as ignoring status, which is stale. Check: grep the route''s description in docs/openapi.json against src/routes. Done: the description matches the behaviour, including the deferred outcome during an agent job.'
 custom_fields:
   finding: docs:openapi-tasks-update-status
@@ -67,3 +115,106 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5d8a9cd5-f245-4d27-bb68-87b3c690fe00
+- at: 2026-11-15T01:51:12.221612+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:51:19.704875+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-15T02:08:24.328781+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T02:08:31.857199+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox
+- at: 2026-11-15T02:08:53.398894+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-15T02:08:53.733442+00:00
+  actor: triage
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-320"]}'
+    new: '{"related":["DEV-320","DEV-528"]}'
+- at: 2026-11-15T02:08:54.946914+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T02:42:45.395937+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T02:43:35.880434+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T03:00:40.685807+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T03:00:42.288407+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-11-15T03:05:09.966708+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Done
+    new: Reviewing
+- at: 2026-11-15T03:05:16.994861+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5aaea4b7-2c65-4e67-9d52-2990156e75e1
+- at: 2026-11-15T03:05:57.884221+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T03:06:25.761244+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-15T03:09:21.352477+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4b296469-2cb3-4c82-a550-2e089bc82029
+- at: 2026-11-15T03:09:59.729555+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T03:10:04.437219+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done

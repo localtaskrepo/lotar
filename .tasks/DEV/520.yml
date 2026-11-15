@@ -1,11 +1,11 @@
 title: An agent job hangs when its session's event stream lags and drops the turn's end
-status: Merging
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-14T05:38:48.737497+00:00
-modified: 2026-11-15T01:27:55.274714+00:00
+modified: 2026-11-15T01:51:16.839848+00:00
 relationships:
   related:
   - DEV-501
@@ -94,6 +94,16 @@ comments:
     - Baseline and continuity checks address the prior missing-prefix finding; replay uses the existing turn handling.
     - Targeted nextest: all 4 tests passed, including success/failure exit codes and missing/malformed logs. Full lint/tests/smoke not rerun; implementation agent reports passing.
     - No source changes or commits, no tickets filed, status and assignee unchanged. No durable guidance finding.
+- date: 2026-11-15T01:50:55.964004+00:00
+  author: codex
+  text: |-
+    Merge blocked by overlapping changes on main; rebase aborted, reviewed commit `7f943de1` preserved.
+    - Conflict in `crates/lotar-lib/src/services/agent_job_service.rs`: main adds budget, CostMeter, ReplyStream and cost-aware completion; this fix extracts drive_turns behind TurnControl and adds replay recovery. Combining them needs explicit adaptation and tests, rather than choosing either hunk.
+    - No merge or push; required merge checks not run because rebase did not complete.
+    - Should a fix agent adapt the reviewed event-replay loop to the new cost and reply handling on main, then rerun review?
+- date: 2026-11-15T01:51:16.386822+00:00
+  author: automation
+  text: The merge agent's job job-20261115T015012.695Z-69 failed (lotar agent logs job-20261115T015012.695Z-69); the fix agent retries it on branch t3/agent-job-lagged-event-hang.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7234460b-fa1f-4515-a843-598de63b5e51
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af5b504b1-62e7-4678-9cf9-f100b8ba0692
@@ -104,6 +114,7 @@ description: 'Found by claude on DEV-501, 2026-11-14: drive_session (crates/lota
 tags:
 - health
 - review-returned
+- merge-retried
 custom_fields:
   finding: review:drive-session-lag
 history:
@@ -323,3 +334,26 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-15T01:50:55.964004+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:51:16.333462+00:00
+  actor: mallox
+  changes:
+  - field: tags
+    old: health, review-returned
+    new: health, review-returned, merge-retried
+- at: 2026-11-15T01:51:16.386822+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:51:16.839848+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox

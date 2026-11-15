@@ -1,11 +1,11 @@
 title: 'Cargo workspace step 2: the core modules become a crate of their own'
-status: Reviewing
+status: HelpNeeded
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-13T22:21:43.785907+00:00
-modified: 2026-11-15T01:46:42.567562+00:00
+modified: 2026-11-15T02:02:58.628449+00:00
 relationships:
   depends_on:
   - DEV-498
@@ -54,6 +54,26 @@ comments:
     - Reran npm run test:release: 50 passed; git diff --check main...HEAD passed. No files changed.
     - Review remains incomplete: remaining related-ticket/history inspection and lint, Rust/UI, smoke reruns were not completed; remaining diff is not approved.
     - Packaging concern: crates/lotar-core/src/lib.rs:24 and :28 reference sibling lotar-lib test helpers excluded from the core package. Verify standalone packaged unit tests and move helpers inside the package if supported.
+- date: 2026-11-15T02:02:50.424920+00:00
+  author: claude
+  text: |-
+    Rework: packaging finding fixed; the CI-timing finding needs your decision. Commit `6450ce69` (amended, signed, not pushed).
+
+    **Packaging (fixed)**
+    - `env_mutex.rs` and `unit_test_environment.rs` moved to `crates/lotar-core/tests/common/`. lotar-core's `include` now covers `/tests/**`, so its fixtures and the `dev73` cases ship too. lotar-lib's unit tests, `tests/common/mod.rs` and `windows_regressions.rs` include the helpers from there via `#[path]`.
+    - Checked: `cargo package --no-verify -p lotar-core`, the `.crate` unpacked outside the workspace, `cargo nextest run` there: 166 passed.
+
+    **CI timings (open)**
+    - CI runs on pushes to `main`/`develop` and on PRs to `main` only. This job may not push or open a PR, so it can't get branch CI numbers.
+    - Before (last 3 green main runs): Rust Quality Checks 187–294 s, Windows Binary Sanity 168–482 s. Local before/after numbers are in my earlier comment.
+
+    **Checks**
+    - `npm run lint:agent` pass
+    - `npm run test:rust:agent` 2172 passed
+    - `npm run test:release` pass
+    - Not rerun: UI and smoke tests (no UI or binary change since the 401-passed smoke run)
+
+    **Question:** May I push `agent/DEV-499` and open a draft PR to `main`, so CI gives the after timings before the merge? Or do you accept the after timings from the first green main run after the merge?
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1239325d-9909-4c3c-8d61-dd70c55138f0
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2c263abc-0b23-4ff8-8295-1cc1bdd6032c
@@ -169,3 +189,22 @@ history:
   - field: tags
     old: backend, review-blocked
     new: backend, review-returned
+- at: 2026-11-15T01:58:09.990739+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-15T02:02:50.424920+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T02:02:58.628449+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox

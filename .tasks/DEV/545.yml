@@ -1,11 +1,11 @@
 title: Task panel downloads 200 full tickets only to suggest names, tags and field values
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T23:27:11.181674+00:00
-modified: 2026-11-15T01:45:36.887897+00:00
+modified: 2026-11-15T01:57:40.797626+00:00
 relationships:
   related:
   - local:LOCA-324
@@ -100,6 +100,12 @@ comments:
     - Contract: `TaskValuesDTO` has `people`, `tags`, `custom_fields` in `api_types.rs`, `view/api/types.ts` and `docs/openapi.json` (required, responses 200/404/500); `openapi_contract_test` and `dev545_task_values_test` pass
     - Checks rerun now on `743ba91f`: `npm run lint` ok; `npm test` ok (2173 Rust, 1538 UI); smoke built fresh with `npm run build:smoke`, 402 passed
     - For the reviewer: build the smoke binary first (`npm run build:smoke`); `npm run test:smoke:quick` needs `target/smoke/lotar`
+- date: 2026-11-15T01:57:32.507048+00:00
+  author: codex
+  text: |-
+    Nothing to merge: main already contains the equivalent fix as `2839f22d`.
+    - Rebased the assigned checkout onto `main`; Git skipped `743ba91f` as already applied. `git log main..HEAD` is empty.
+    - No new code, tests, fast-forward or push needed; existing main-checkout ticket changes were left untouched.
 references:
 - file: view/composables/useTaskPanelOwnership.ts
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A08976f6f-b085-46f4-9a5b-7ff1c6ea76a4
@@ -142,7 +148,6 @@ description: |-
   - [x] Payload measured before and after on a seeded project of 300+ tickets
 tags:
 - web-ui
-- review-returned
 - ui
 history:
 - at: 2026-11-14T23:27:11.502735+00:00
@@ -530,3 +535,16 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-15T01:57:32.507048+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T01:57:40.797626+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: web-ui, review-returned, ui
+    new: web-ui, ui
