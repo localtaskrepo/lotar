@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T22:03:21.665581+00:00
-modified: 2026-11-15T22:42:29.267213+00:00
+modified: 2026-11-15T23:15:26.992311+00:00
 relationships:
   related:
   - DEV-513
@@ -44,6 +44,8 @@ comments:
     - Reviewed `d094fe8f`, full diff against `main`, ticket/comments, related release ticket, guard/config/browser teardown and main history. No blocking or minor findings.
     - Independently reproduced the original error with main's guard. Regression tests pass (3/3); `npm run test:ui:agent` passes (1548/1548). Chromium leftovers are removed; unrelated leaks still fail.
     - Full lint/Rust/smoke checks were reported passing by implementation and were not repeated in review. No UI changes. No files, status or assignee changed; no durable guidance finding.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Add74092d-e1f9-4e91-96d1-7a64d86581de
 releases:
 - 7
 description: 'Found: QA run 43762496754 (50cfad9a), Smoke Tests: all 404 tests passed, then ''error during close Error: Tests left 1 entries in the temp folder; remove them where they are created: .org.chromium.Chromium.fnw9Zj''. First time in the last 30 QA runs. Check: the smoke temp-folder guard vs. Chromium''s own .org.chromium.Chromium.* dirs (smoke/helpers/ui.ts launches it). Done: the guard no longer fails on a Chromium leftover, or the browser''s temp dir is created under a folder the suite removes.'
@@ -100,3 +102,8 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-15T23:15:26.992311+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Add74092d-e1f9-4e91-96d1-7a64d86581de

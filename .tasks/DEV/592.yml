@@ -3,9 +3,9 @@ status: Reviewing
 priority: High
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-15T22:38:44.315409+00:00
-modified: 2026-11-15T22:58:57.510598+00:00
+modified: 2026-11-15T23:25:23.989594+00:00
 relationships:
   related:
   - DEV-524
@@ -38,6 +38,32 @@ comments:
       result: passed
       reason: fails with the serve hook removed
     next: Review, then merge
+- date: 2026-11-15T23:25:08.295624+00:00
+  author: codex
+  text: |-
+    Review: blocking
+
+    - Reviewed `192801fb`, the full seven-file commit, current main history, ticket description/history/comments and related DEV-524. No UI changes or stray files in the commit. The larger two-dot diff includes newer main changes absent from this branch, not changes introduced by this commit.
+    - `crates/lotar-lib/src/services/agent_queue_service.rs:205-207`: `resume` propagates worker-lock and spawn errors; the CLI propagates them as nonzero exit. Done when explicitly permits nonzero only when the queue cannot be read. Handle worker-start failures as a reported stopped state with exit 0, and add a regression test (or obtain an owner-approved contract change).
+    - `crates/lotar-lib/tests/dev592_queue_resumes_after_restart_test.rs:81`: focused test command fails the mandatory temp cleanup gate: `tests left 1 entries in the temp folder ... .lotar-test-scratch`. All three test assertions pass, but this is not a passing check. Ensure jobs/workers finish and all test scratch resources are cleaned before fixtures disappear; rerun the guarded command.
+    - Coverage also omits an already-running worker, server startup with an empty queue, startup failure warning while serving, and active queue reasons. Add boundary coverage for these promised cases.
+    - `npm run lint:agent` passed. Focused Rust run initially stopped at sccache sandbox denial; approved retry had the same error; documented `RUSTC_WRAPPER=` fallback compiled and ran the tests, then failed cleanup. Full tests and smoke were not rerun. `git diff --check main...HEAD` passed; tracked files remain unchanged.
+  report:
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: RUSTC_WRAPPER= npm run test:rust:agent -- dev592
+      result: failed
+      reason: 3 assertions passed; temp guard found .lotar-test-scratch
+    - command: npm test
+      result: not_run
+      reason: focused review run instead
+    - command: npm run smoke
+      result: not_run
+      reason: blocking findings; no UI changes
+    next: Fix resume error contract and test cleanup, add missing boundary coverage, rerun gates
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A64ee8131-7181-4973-9f22-9b8e73b9e1aa
 description: |-
   After the lotar server restarts, a queue that still holds tickets stays idle: the queue worker starts only when a new job is enqueued. Found by the chief of staff on 2026-11-15 in local; nothing moved 13 queued tickets until someone queued another job.
 
@@ -62,6 +88,8 @@ description: |-
     - Entries waiting for prerequisites leave the queue (DEV-524: the ticket is marked blocked), so they are not a queue state.
   - [ ] `lotar agent queue resume` starts the worker for the tasks directory without queueing a job (standards STD-113 proposal): with entries and no worker it starts one and says so; with a worker running or an empty queue it changes nothing and says why; exit 0 in these cases, non-zero only when the queue can't be read. JSON: `{"pending": N, "worker_state": ...}`.
   - [ ] `docs/help/agent.md` describes the states and `resume`.
+tags:
+- review-returned
 history:
 - at: 2026-11-15T22:38:44.990878+00:00
   actor: claude
@@ -136,3 +164,27 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-15T23:20:08.209609+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A64ee8131-7181-4973-9f22-9b8e73b9e1aa
+- at: 2026-11-15T23:25:08.295624+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T23:25:09.272968+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: ''
+    new: review-blocked
+- at: 2026-11-15T23:25:23.989594+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: review-blocked
+    new: review-returned

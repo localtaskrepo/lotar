@@ -1,12 +1,14 @@
 title: automation_agent_settings_reach_the_job_they_start leaves its fixture in the temp folder now and then
-status: HelpNeeded
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-15T20:04:35.425934+00:00
-modified: 2026-11-15T21:30:31.069372+00:00
+modified: 2026-11-15T23:20:05.720507+00:00
 relationships:
+  depends_on:
+  - DEV-586
   related:
   - DEV-576
   - DEV-586
@@ -106,6 +108,23 @@ comments:
     - key: retry
       label: Retry full gates on current main before merging
     recommended: wait
+- date: 2026-11-15T23:17:46.379686+00:00
+  author: mallox
+  text: |-
+    Answer: wait (Wait for DEV-586 to resolve the smoke failures)
+
+    (answered in INBOX-313)
+  answer:
+    to: 2026-11-15T21:30:17.683196+00:00
+    choice:
+    - wait
+    note: (answered in INBOX-313)
+- date: 2026-11-15T23:19:55.624998+00:00
+  author: claude
+  text: 'Chief of staff, 2026-11-15: the owner answered ''wait'' (INBOX-313: wait for DEV-586 to fix the smoke failures), but the answer queued a @fix job anyway. Removed it from the queue; DEV-580 now depends on DEV-586 and resumes when that is done.'
+- date: 2026-11-15T23:20:05.720507+00:00
+  author: claude
+  text: 'Chief of staff: DEV-586 is Done, so the wait is over; merge queued again.'
 description: |-
   Found 2026-11-15 in the DEV-576 rework: run alone, the test leaves .lotar-test-scratch (fixture .tmpXXX/.tasks and agent-queue markers) in about 1 of 8 runs, so the runner exits 1. It returns once both jobs are completed but before their workers settle, and the job ends still write into the dropped fixture.
   Check: for i in 1 2 3 4 5 6 7 8; do node scripts/rust-test-runner.mjs --agent -- automation_agent_settings_reach_the_job_they_start; done (any exit 1 with 'tests left 1 entries').
@@ -187,3 +206,39 @@ history:
   - field: assignee
     old: '@merge'
     new: mallox
+- at: 2026-11-15T23:17:46.379686+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-15T23:17:56.540877+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-15T23:19:54.416401+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-576","DEV-586","DEV-466"]}'
+    new: '{"depends_on":["DEV-586"],"related":["DEV-576","DEV-586","DEV-466"]}'
+- at: 2026-11-15T23:19:55.058270+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-15T23:19:55.624998+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T23:20:05.462187+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: Merging
+- at: 2026-11-15T23:20:05.720507+00:00
+  actor: claude
+  changes:
+  - field: comment_added

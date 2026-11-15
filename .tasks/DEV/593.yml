@@ -1,11 +1,47 @@
 title: 'Jobs left in status unknown by a killed process are never taken over: their tickets stall with an agent assignee'
-status: InProgress
+status: Reviewing
 priority: High
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-15T22:38:45.433554+00:00
-modified: 2026-11-15T22:46:16.133979+00:00
+modified: 2026-11-15T23:25:46.240168+00:00
+relationships:
+  related:
+  - DEV-520
+  - DEV-590
+comments:
+- date: 2026-11-15T23:05:51.463565+00:00
+  author: claude
+  text: |-
+    Fixed: a job killed between `agent_job_started` and its runner start is now taken over and failed.
+
+    - Cause: `run_job` wrote the job's record (`agent_active_jobs::register`) only after the `job_started` rules and git lookups. A process killed in between left a log with only `agent_job_started` and no record, so `recover_orphaned_jobs` had nothing to take over. The three LOCA jobs have no record and no `.ended` marker in `~/Library/Caches/lotar/agent-queue/active-*`, which fits.
+    - Fix (`agent_job_service.rs`): the record is written as the job starts, with no session. It gets the session just before the runner starts, as before. A takeover of a session job without a session fails it: "The lotar process running the job exited before the job ended, before it started the t3 session." It doesn't resume a continued session from an earlier job.
+    - Test: `dev510_t3_session_test::a_t3_job_killed_before_its_session_started_fails_once_taken_over`. It kills `lotar agent run` while a `job_started` rule sleeps, then checks: record left, takeover fails the job with the reason, `job_failed` runs once (also after a second recovery), no `t3 thread` call, `agent status` and `list-jobs` show `failed`.
+    - Docs: `docs/help/agent.md`, "Jobs whose process died", has a line for this case.
+    - Not covered: jobs killed before this fix (like the three LOCA ones) have no record, so nothing takes them over. They were restarted by hand.
+    - `dev510 …fails_when_t3_cant_list_its_threads` hangs on main too (3/3 runs without this change). That's the known DEV-520 `cdd2141c` / DEV-590 issue. It passed in the full `test:agent` run.
+  report:
+    commits:
+    - hash: 5c8e1f30
+      what: job record written at job start; takeover fails a job killed before its session started
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: lint:agent
+    - command: npm test
+      result: passed
+      reason: test:agent, Rust, UI, release and hook tests
+    - command: npm run smoke
+      result: passed
+      reason: 404/404
+    - command: cargo nextest -E test(a_t3_job_killed_before)
+      result: passed
+      reason: fails on main at the missing record
+    next: Review, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af7a13f60-c8a7-480f-9a43-18b65593cff9
 description: |-
   Jobs whose process died right after `agent_job_started` stay in status `unknown` and are never taken over, so their tickets sit InProgress with an agent assignee and no job. docs/help/agent.md says the queue worker for the same tasks directory, or the next `lotar serve`, takes such a job over and ends it. Found 2026-11-15 in local.
 
@@ -33,3 +69,27 @@ history:
   - field: status
     old: Todo
     new: InProgress
+- at: 2026-11-15T23:05:51.463565+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T23:05:51.611618+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-520","DEV-590"]}'
+- at: 2026-11-15T23:06:05.046794+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T23:25:46.240168+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af7a13f60-c8a7-480f-9a43-18b65593cff9

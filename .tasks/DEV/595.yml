@@ -1,0 +1,19 @@
+title: Job end fails when the ticket branch is checked out in LoTaR's own agent worktree
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-15T23:22:25.966473+00:00
+modified: 2026-11-15T23:22:26.373919+00:00
+description: 'Found: MGP-13 job job-20261115T212717.075Z-1 (mailgpg) failed at the end: `git branch --force agent/MGP-13 607bcc8` -> ''cannot force update the branch used by worktree at ~/.t3/worktrees/mailgpg/agent-MGP-13-93bc836e8df965ff''. The ticket went back to HelpNeeded although the work was done. Check: a T3 job whose thread branch differs from agent/<ID> while agent/<ID> is checked out in its agent worktree. Done: LoTaR moves the branch in that worktree (reset when clean, or detach first) instead of failing the job.'
+tags:
+- health
+custom_fields:
+  finding: agent-job:branch-force-checked-out
+history:
+- at: 2026-11-15T23:22:26.373919+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

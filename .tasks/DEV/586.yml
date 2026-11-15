@@ -5,8 +5,10 @@ type: Bug
 reporter: codex
 assignee: '@merge'
 created: 2026-11-15T21:29:20.908261+00:00
-modified: 2026-11-15T22:57:43.348900+00:00
+modified: 2026-11-15T23:19:54.416962+00:00
 relationships:
+  blocks:
+  - DEV-580
   related:
   - DEV-132
   - DEV-170
@@ -208,3 +210,9 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-15T23:19:54.416962+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-132","DEV-170","DEV-223","DEV-352","DEV-399","DEV-466","DEV-575","DEV-580","DEV-530","DEV-520","DEV-587","DEV-581","DEV-590"]}'
+    new: '{"blocks":["DEV-580"],"related":["DEV-132","DEV-170","DEV-223","DEV-352","DEV-399","DEV-466","DEV-575","DEV-580","DEV-530","DEV-520","DEV-587","DEV-581","DEV-590"]}'

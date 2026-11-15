@@ -1,16 +1,17 @@
 title: 'harnessmux reuses event seqs after a takeover: the new owner counts on from the last saved count'
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T22:18:55.853773+00:00
-modified: 2026-11-15T22:57:28.999374+00:00
+modified: 2026-11-15T23:15:54.177709+00:00
 relationships:
   related:
   - DEV-520
   - DEV-588
   - DEV-586
+  - DEV-593
 comments:
 - date: 2026-11-15T22:37:25.311652+00:00
   author: claude
@@ -49,6 +50,26 @@ comments:
     - `git log main..HEAD` and `git diff --stat main...HEAD` are empty in the assigned LoTaR checkout; its working tree is clean.
     - The ticket records the fix as harnessmux commit `fb28583` in a different repository. This review job contains no fix commits, so the requested early review gate stops here; that harnessmux commit has not been reviewed by this job.
     - Checks not run: no changes in the assigned branch to check. Status and assignee left unchanged.
+- date: 2026-11-15T23:15:50.906488+00:00
+  author: codex
+  text: |-
+    nothing to merge
+
+    - The main checkout is `/Users/mallox/Development/@localtaskrepo/lotar`, on `main`; `git log main..HEAD` is empty and this worktree is clean.
+    - The assigned checkout is on `t3/harnessmux-takeover-event-seqs`, not the stated `agent/DEV-590`; neither a branch switch nor integration was attempted.
+    - The earlier fix comment places `fb28583` in the separate harnessmux repository. This job has not reviewed or merged that commit.
+    - Stopped at step 1. No rebase, checks, push, or trust change; status and assignee left for automation.
+  report:
+    checks:
+    - command: git log main..HEAD
+      result: passed
+      reason: empty; nothing to merge
+    - command: required checks
+      result: not_run
+      reason: step 1 stops this job with no commits beyond main
+    next: Harnessmux commit fb28583 requires review and integration in its own repository.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3bc39beb-9099-4808-b99f-773097dabd1b
 description: 'Found by claude on DEV-520, 2026-11-15: harnessmux 0.1.9 Session::emit (src/session.rs:379) numbers events from record.events, but the record is saved only in set_state. An owner killed mid-turn has logged events after its last save, so the owner that takes the session over gives its first events seqs already in the log (seen in dev510_t3_session_test: log seq 1,2,3 then 2,3 again). lotar''s DEV-520 reader now copes (accepts the first event after open at or below the log''s last seq). Check: a harnessmux test that kills an owner after an unsaved event, resumes the session and expects the next event''s seq to follow the log''s last. Done: a new owner starts counting from the log''s last seq (or the record is saved with every event), so seqs are unique per session, and the test passes.'
 tags:
 - health
@@ -108,3 +129,24 @@ history:
   - field: relationships
     old: '{"related":["DEV-520","DEV-588"]}'
     new: '{"related":["DEV-520","DEV-588","DEV-586"]}'
+- at: 2026-11-15T23:05:51.611358+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-520","DEV-588","DEV-586"]}'
+    new: '{"related":["DEV-520","DEV-588","DEV-586","DEV-593"]}'
+- at: 2026-11-15T23:15:27.798190+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3bc39beb-9099-4808-b99f-773097dabd1b
+- at: 2026-11-15T23:15:50.906488+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T23:15:54.177709+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

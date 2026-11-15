@@ -7,6 +7,9 @@ import process from 'node:process';
 
 // os.tmpdir() reads TMPDIR on POSIX and TEMP/TMP on Windows.
 const TEMP_VARS = ['TMPDIR', 'TEMP', 'TMP'];
+// Chromium's own temp files (base::CreateTemporaryFile), which it can leave behind when Playwright closes the browser
+// (DEV-589). They are removed with the folder.
+const CHROMIUM_TEMP = /^\.org\.chromium\.Chromium\./;
 
 export default function setup() {
     const root = mkdtempSync(path.join(tmpdir(), 'lotar-vitest-temp-'));
@@ -15,7 +18,7 @@ export default function setup() {
     }
 
     return () => {
-        const leftovers = readdirSync(root);
+        const leftovers = readdirSync(root).filter((name) => !CHROMIUM_TEMP.test(name));
         rmSync(root, { recursive: true, force: true });
         if (leftovers.length > 0) {
             throw new Error(

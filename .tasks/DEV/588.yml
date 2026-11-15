@@ -1,11 +1,11 @@
 title: 'Flaky test: concurrent_comments_and_references_preserve_all_writes hits the 2 s storage lock wait under load'
-status: Merging
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@merge'
+assignee: mallox
 created: 2026-11-15T21:39:19.080638+00:00
-modified: 2026-11-15T22:46:15.449141+00:00
+modified: 2026-11-15T23:22:13.169739+00:00
 relationships:
   related:
   - DEV-520
@@ -62,6 +62,31 @@ comments:
       result: not_run
       reason: focused review
     next: Merge review-approved 1259a51f
+- date: 2026-11-15T23:22:08.157038+00:00
+  author: codex
+  text: |-
+    Merge blocked by the known Rust takeover test timeout; main was not changed.
+
+    - Rebased without conflicts: `1259a51f` became `9982c710`. No lockfile changed; working tree clean.
+    - Elevated full-test retry failed at `dev510_t3_session_test::a_t3_job_taken_over_before_its_thread_id_was_saved_fails_when_t3_cant_list_its_threads`, `dev510_t3_session_test.rs:122`. Already tracked via DEV-520 / DEV-590; no duplicate filed.
+    - Lint and elevated smoke passed. Initial sandbox runs could not bind localhost; retries ran with approval and `RUSTC_WRAPPER=`.
+    - No fast-forward, task-file amend, trust change or push performed. Should this merge be retried once the existing takeover fix lands?
+  report:
+    commits:
+    - hash: 9982c710
+      what: reviewed test fix rebased onto main
+    checks:
+    - command: RUSTC_WRAPPER= npm run lint:agent
+      result: passed
+    - command: RUSTC_WRAPPER= npm run test:agent
+      result: failed
+      reason: elevated retry, known dev510 takeover timeout; 2200 passed, 27 not run; subsequent UI/release/hooks not run
+    - command: RUSTC_WRAPPER= npm run test:smoke:agent
+      result: passed
+      reason: elevated retry after localhost EPERM
+    next: Resolve known takeover failure, then retry merge gates
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5b47411f-c7b8-4f19-ae40-3aaccb34473a
 description: 'Found by claude in the DEV-520 merge, 2026-11-15: `npm run test:agent` failed once at load average ~100 with `concurrent comment: IoError(WouldBlock) Storage lock .../.task.lock is still busy after 2 seconds` (`crates/lotar-lib/tests/dev60_shared_mutation_test.rs:434`); six threads write one ticket and the lock wait is `DEFAULT_STORAGE_LOCK_WAIT` = 2 s (`crates/lotar-core/src/storage/safety.rs:68`). Check: the test passes repeatedly under full-suite load. Done: the test can''t time out on a busy machine (for example a longer lock wait in the test, or fewer writers holding the lock at once) and still checks that no write is lost.'
 tags:
 - health
@@ -123,3 +148,21 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-15T23:16:05.286856+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5b47411f-c7b8-4f19-ae40-3aaccb34473a
+- at: 2026-11-15T23:22:08.157038+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T23:22:13.169739+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: HelpNeeded
+  - field: assignee
+    old: '@merge'
+    new: mallox

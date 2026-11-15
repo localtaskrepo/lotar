@@ -3,9 +3,9 @@ status: Reviewing
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-15T17:40:28.569324+00:00
-modified: 2026-11-15T22:41:26.111233+00:00
+modified: 2026-11-15T23:15:07.441932+00:00
 relationships:
   depends_on:
   - DEV-564
@@ -115,6 +115,41 @@ comments:
     - Reran installer tests (9 passed), `npm run test:release` (59 passed), and diff whitespace check (passed). Prettier reports `package.json`; other changed files pass.
     - Full lint/test/smoke and real signing not rerun; earlier fix records results. Live LAN/firewall remains unverified.
     - No source changes or commits; status and assignee unchanged. No minor tickets or durable guidance correction.
+- date: 2026-11-15T23:14:59.520698+00:00
+  author: claude
+  text: |-
+    Rework: fixed the review finding; the new wrapper now has to start before anything is replaced.
+
+    - `scripts/install-local.mjs`: the start check runs `<staged lotar-agent-wrapper> -- <staged lotar> --version` (the wrapper has no `--version`), so one probe proves both new binaries start. A failure removes both staging files; both installed binaries stay.
+    - `scripts/tests/install-local.test.mjs`: new test, a wrapper that doesn't start replaces neither binary; the macOS test asserts the probe command. Both fail on `7c81ee16`, pass now.
+    - Real signed install with the probe: both binaries `TeamIdentifier=3HKD37M482`, `flags=0x10000(runtime)`, nothing left in the folder but the two.
+    - Reviewer's Prettier note on `package.json`: not from this change. main's file also fails Prettier with this repo's 4-space config, and `fmt:js:check` doesn't cover it.
+  report:
+    commits:
+    - hash: 200d70f1
+      what: install:local, now also starts the new wrapper before installing (amends 7c81ee16)
+    checks:
+    - command: node --test scripts/tests/install-local.test.mjs
+      result: passed
+      reason: 10; new test fails on 7c81ee16
+    - command: npm run lint
+      result: passed
+      reason: lint:agent
+    - command: npm test
+      result: passed
+      reason: test:agent, 2206 Rust + 1547 UI + 60 release + 7 hooks
+    - command: npm run smoke
+      result: passed
+      reason: 404 tests
+    - command: real Developer ID install:local
+      result: passed
+      reason: both TeamIdentifier=3HKD37M482, runtime
+    - command: firewall/LAN check in next version
+      result: not_run
+      reason: Done when puts it after the next release
+    next: Review again on another model, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A48978e68-4aef-478b-9e73-5de28287861d
 description: |-
   Child of standards STD-138 (https://standards.pyxzl.net/task/STD-138). Owner by voice, 2026-11-15: "sign every local install of lotar, opgate and harnessmux, including builds from source, with my Developer ID, so keychain and firewall approvals survive new builds. Land it in the next version."
 
@@ -279,3 +314,27 @@ history:
   - field: tags
     old: review-blocked
     new: review-returned
+- at: 2026-11-15T23:06:05.996236+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-15T23:06:06.306653+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A48978e68-4aef-478b-9e73-5de28287861d
+- at: 2026-11-15T23:14:59.520698+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T23:15:07.441932+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

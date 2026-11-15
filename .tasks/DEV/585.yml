@@ -3,13 +3,14 @@ status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-15T20:46:20.952204+00:00
-modified: 2026-11-15T22:39:46.886302+00:00
+modified: 2026-11-15T23:19:49.956911+00:00
 relationships:
   related:
   - DEV-510
   - DEV-513
+  - DEV-594
 comments:
 - date: 2026-11-15T20:59:19.246258+00:00
   author: automation
@@ -100,6 +101,40 @@ comments:
 - date: 2026-11-15T22:39:25.687565+00:00
   author: codex
   text: 'Review: blocking — HEAD is 1011487e, but final handoff and checks claim d6dbec07. Their diff changes all four Rust files (50 insertions, 90 deletions), including readiness placement at web_server.rs:677. Reconcile intended fix into assigned branch and verify/review that exact head. Read ticket, related tickets, main history and sandbox decision. Diff whitespace and rustfmt checks passed; local-port tests and smoke not rerun per owner decision. No source edits or commits; status and assignee unchanged.'
+- date: 2026-11-15T23:19:18.766101+00:00
+  author: claude
+  text: |-
+    Rework: the blocker came from two fix jobs. `1011487e` on `agent/DEV-585` is the fix to land, now verified on that exact tree.
+
+    - Cause: two Claude jobs fixed this ticket in separate worktrees. `1011487e` (comment 22:06) is on `agent/DEV-585`. My `d6dbec07` (comment 22:28) was on `t3/fix-flaky-watcher-mcp-event-tests`, and my handoff reported it.
+    - `1011487e` is the better design: my `d6dbec07` blocks `accept` until the watcher is ready, which made `openapi_spec_served` and `api_options_preflight…` fail under load. `1011487e` waits only in the test-only SSE `ready` event.
+    - My branch now holds `dbc105d3`, which has the same tree as `1011487e` (`git diff 1011487e dbc105d3` is empty). The merge branch is unchanged.
+    - `d6dbec07` is kept on `backup/DEV-585-d6dbec07` and can be deleted after the merge.
+    - All checks below ran on this tree.
+  report:
+    commits:
+    - hash: 1011487e
+      what: on agent/DEV-585, the fix that lands; ready event waits for the watcher, MCP baseline before stdin
+    - hash: dbc105d3
+      what: on t3/fix-flaky-watcher-mcp-event-tests, same tree as 1011487e
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2219/2219 Rust + 1547 UI, 20 CPU burners
+    - command: npm run -s test:rust:agent
+      result: passed
+      reason: second loaded run, 2219/2219
+    - command: npm run -s test:smoke:agent
+      result: passed
+      reason: 404/404
+    - command: delay probe
+      result: passed
+      reason: 1.5 s sleep in both watcher threads, 5/5 incl. openapi_spec_served and api_options_preflight
+    next: Re-review 1011487e on agent/DEV-585, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab03303e3-95f6-4964-b850-05c9841e7ba5
 description: |-
   Found during the DEV-510 merge (2026-11-15): the first `npm run -s test:agent` in the DEV-510 worktree failed 3 tests; the second full run passed 2218/2218 on the same commit.
 
@@ -216,3 +251,33 @@ history:
   - field: tags
     old: health, fix-retried, review-blocked
     new: health, fix-retried, review-returned
+- at: 2026-11-15T23:06:05.854942+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-15T23:06:06.139642+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab03303e3-95f6-4964-b850-05c9841e7ba5
+- at: 2026-11-15T23:19:18.766101+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T23:19:29.353358+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-510","DEV-513"]}'
+    new: '{"related":["DEV-510","DEV-513","DEV-594"]}'
+- at: 2026-11-15T23:19:49.956911+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
