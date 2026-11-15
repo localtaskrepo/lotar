@@ -1,11 +1,11 @@
 title: 'Worktree builds filled the Mac''s disk: each job''s target/ grows 5-35 GB and is never removed'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-15T18:58:43.266429+00:00
-modified: 2026-11-15T19:26:20.092308+00:00
+modified: 2026-11-15T19:52:36.291191+00:00
 relationships:
   related:
   - DEV-566
@@ -46,6 +46,54 @@ comments:
 - date: 2026-11-15T19:26:14.580902+00:00
   author: codex
   text: 'Review: blocking — required disk warning remains unfinished. Reviewed 7f4e3149, its three files, related tickets, recent main history and standards owner decision (keep builds until Done). No cleanup-code defect found. At crates/lotar-lib/src/services/agent_job_service.rs:2387 only retry cleanup is added; standards scripts/repos.ts:1097 still lacks disk monitoring. STD-145 is Blocked awaiting STD-136: finish and verify it or obtain explicit owner acceptance of split delivery. Focused regression passed with RUSTC_WRAPPER= after both ordinary and elevated sccache attempts hit Operation not permitted. Full lint/tests/smoke not rerun; fix agent reports passed. Disk: 196 GiB free. Existing daily idle-worktree cleanup verified. No duplicate finding filed (STD-145 exists). No files, commits, status or assignee changed; no durable guidance finding.'
+- date: 2026-11-15T19:40:49.759084+00:00
+  author: claude
+  text: |-
+    Rework: the blocking finding (disk warning unfinished) is resolved. The warning is on standards `main` now, so lotar needed no change.
+
+    - Finding "the disk warning in [STD-145](https://standards.pyxzl.net/task/STD-145) is unfinished": STD-145 is Done. Its blocker STD-136 merged (`d0deac4`), then STD-145 merged as `585f237` on standards `main`.
+    - What it does: `scripts/repos.ts:1135`, live check `disk`, High priority. It reports `disk:mac` when `/System/Volumes/Data` has under 50 GB free (`MIN_FREE_GB = 50`), as "Done when" asks.
+    - It runs: launch agent `net.pyxzl.live-checks` is loaded, every 300 s. Its last exit code of 1 comes from other live findings (`launchd` -15 exits), not from the disk check. `df -h` shows 175 GB free, so there is no disk finding.
+    - The lotar commit `7f4e3149` is unchanged, so nothing was amended. The review found no defect in it.
+  report:
+    commits:
+    - hash: 7f4e3149
+      what: unchanged, every job end retries Done cleanup for each Done ticket that still has a worktree
+    checks:
+    - command: node --test scripts/repos.test.ts (standards main)
+      result: passed
+      reason: 67 passed
+    - command: node scripts/repos.ts --live (standards main)
+      result: passed
+      reason: runs, no disk finding at 175 GB free
+    - command: launchctl print net.pyxzl.live-checks
+      result: passed
+      reason: loaded, every 300 s
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: no lotar file changed since 7f4e3149, which passed all three
+    next: Review again, then merge
+- date: 2026-11-15T19:52:30.829819+00:00
+  author: codex
+  text: |-
+    Review: passed — the previous disk-warning blocker is resolved; no new blocking findings.
+
+    - Reviewed `7f4e3149`, full three-file diff, ticket comments, related-ticket context, recent main history, cleanup safeguards and standards owner decision to keep builds until Done. No UI changes or stray tracked files.
+    - Verified standards `main` contains `585f237`: `scripts/repos.ts` warns below 50 GiB; loaded `net.pyxzl.live-checks` runs `--live --report`. All 67 standards tests passed. Existing idle-worktree build cleanup remains present.
+    - Cleanup regression passed (1 test). Initial sandbox attempt hit sccache `Operation not permitted`; approved retry compiled and passed. `git diff --check` passed. Full lint/test/smoke not independently repeated; fix agent recorded passes on this unchanged commit.
+    - Disk check shows 159 GiB free; worktree build folders have regrown during active work. No new findings or tickets; no files, commits, status or assignee changed. No durable guidance finding.
+  report:
+    checks:
+    - command: focused nextest regression
+      result: passed
+    - command: node --test scripts/repos.test.ts
+      result: passed
+    - command: git diff --check main...HEAD
+      result: passed
+    - command: full lint/test/smoke
+      result: not_run
+      reason: unchanged commit previously passed; focused review
+    next: Merge reviewed commit 7f4e3149
 description: |-
   Found 2026-11-15 by the chief of staff: the Data volume was 100% full (2.3 GB free of 926 GB) and many jobs failed. ~/.t3/worktrees used 280 GB, 243 GB of it lotar worktrees; each worktree's Rust target/ was 5-35 GB (agent-DEV-510 35 GB, t3-38403d38 17 GB, agent-DEV-528 13 GB, ...). Deleting all worktree target/ folders freed ~222 GB (224 GB free now, worktrees 49 GB).
   Check: du -sh ~/.t3/worktrees/*/*/target; df -h /System/Volumes/Data.
@@ -133,3 +181,35 @@ history:
   - field: tags
     old: health, review-blocked
     new: health, review-returned
+- at: 2026-11-15T19:39:34.700088+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-15T19:40:49.759084+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T19:41:01.077737+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T19:52:30.829819+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T19:52:36.291191+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

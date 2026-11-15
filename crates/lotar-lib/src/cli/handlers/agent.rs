@@ -1009,8 +1009,16 @@ fn parse_wrapper_metadata(cmd: &[String]) -> (Option<String>, Option<String>, Op
 
 #[cfg(test)]
 mod tests {
-    use super::{extract_ticket_from_branch, parse_wrapper_metadata, wrapper_runs_in};
+    use super::{extract_ticket_from_branch, parse_wrapper_metadata, running_job_matches, wrapper_runs_in};
     use std::path::Path;
+
+    #[test]
+    fn running_job_matches_accepts_padded_spellings() {
+        assert!(running_job_matches("TP-1", "TP-001"));
+        assert!(running_job_matches("TP-001", "TP-1"));
+        assert!(!running_job_matches("TP-1", "TP-2"));
+        assert!(!running_job_matches("abc", "TP-1"));
+    }
 
     #[test]
     fn parses_wrapper_metadata() {

@@ -4943,14 +4943,6 @@ mod tests {
     }
 
     #[test]
-    fn running_job_matches_accepts_padded_spellings() {
-        assert!(crate::cli::handlers::agent::running_job_matches("TP-1", "TP-001"));
-        assert!(crate::cli::handlers::agent::running_job_matches("TP-001", "TP-1"));
-        assert!(!crate::cli::handlers::agent::running_job_matches("TP-1", "TP-2"));
-        assert!(!crate::cli::handlers::agent::running_job_matches("abc", "TP-1"));
-    }
-
-    #[test]
     fn resolve_profile_uses_agent_map() {
         let mut config = ResolvedConfig::from_global(GlobalConfig::default());
         config.agent_profiles.insert("codex-default".to_string(), AgentProfileConfig::Runner("codex".to_string()).to_detail());

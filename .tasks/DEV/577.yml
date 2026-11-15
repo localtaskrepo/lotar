@@ -1,11 +1,35 @@
 title: A merge job that landed its work fails when the ticket branch is checked out in another worktree
-status: Todo
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-15T19:24:33.178444+00:00
-modified: 2026-11-15T19:24:33.486958+00:00
+modified: 2026-11-15T19:52:00.062157+00:00
+comments:
+- date: 2026-11-15T19:51:52.799436+00:00
+  author: claude
+  text: |-
+    Fixed: a merge job whose work is on main no longer fails when the ticket branch is checked out in another worktree.
+
+    - Cause: `move_ticket_branch` in `crates/lotar-lib/src/services/agent_job_service.rs` ran `git branch --force`, which git refuses for a branch checked out elsewhere
+    - Fix: when that fails and the thread's tip has landed in the main checkout (`commit_landed`), the branch stays and the job logs a note; otherwise it still fails as before
+    - Nothing is reset in the other worktree: it may belong to a running agent
+    - Test: `a_merged_thread_leaves_a_ticket_branch_checked_out_elsewhere_and_completes` in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs` reproduces the ticket's check; it fails without the fix
+  report:
+    commits:
+    - hash: f1480c15
+      what: skip moving a ticket branch git won't move when the thread's work is on main
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2212 Rust + 1547 UI tests
+    - command: npm run smoke
+      result: passed
+      reason: 404 tests
+    next: Review on another model, then merge
 description: |-
   Found: job job-20261115T191640.133Z-8 (standards STD-136) rebased, fast-forwarded main to d0deac4 and pushed, then failed: `git branch --force agent/STD-136 18b8e9c` refused, 'cannot force update the branch used by worktree at .../agent-STD-136-...'. The ticket went back to Merging, assigned to @fix, and a fix agent was started for work already on main.
   Check: run a merge job in a T3 thread whose ticket branch is checked out in a lotar worktree; the job ends failed after the merge.
@@ -20,3 +44,22 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-15T19:36:50.384830+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T19:51:52.799436+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T19:52:00.062157+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

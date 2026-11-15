@@ -1,0 +1,34 @@
+title: harnessmux send --wait waits forever when the session's owner dies mid-turn
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-15T19:45:09.734691+00:00
+modified: 2026-11-15T19:52:37.255137+00:00
+relationships:
+  related:
+  - DEV-510
+description: 'Found in DEV-510 rework 5: in harnessmux tests/cli.rs a send accepted by an owner that then died (kill -9) left `harnessmux send --wait` following the event log until the test''s 40 s limit. `client::wait_turn` (src/client.rs) ends only on the turn''s end or session.ended, which a killed owner never writes. Check: kill an owner after it accepts a prompt, then see whether `send --wait` returns. Done when the wait notices the owner is gone (socket no longer answers) and ends with an error or resumes the session.'
+tags:
+- health
+custom_fields:
+  finding: harnessmux-test:owner-death-wait
+history:
+- at: 2026-11-15T19:45:10.205820+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-510"]}'
+- at: 2026-11-15T19:45:10.804258+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-15T19:52:37.255137+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress

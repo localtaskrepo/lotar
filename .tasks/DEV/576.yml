@@ -1,17 +1,66 @@
 title: Assigning a review or merge profile by hand starts its agent with the generic prompt, and a reviewer merged and pushed
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-15T19:15:01.666242+00:00
-modified: 2026-11-15T19:23:13.813426+00:00
+modified: 2026-11-15T19:49:07.977373+00:00
+comments:
+- date: 2026-11-15T19:39:24.656316+00:00
+  author: claude
+  text: |-
+    Fixed: a hand assignment to an agent profile now starts the job with the prompt and settings of the first rule that assigns that profile.
+
+    - Cause: `apply_task_update` in `crates/lotar-lib/src/services/automation_service.rs` started hand-assigned jobs with `AgentRunSettings::default()`, so they got the generic "make concrete changes" prompt
+    - New `assignment_run_settings`: the first enabled rule action with `set.assignee` equal to the new assignee and an `agent` block supplies model, effort, provider, session and prompt, with the ticket's templates filled in. With no such rule, the generic prompt stays
+    - `@review-claude` by hand now gets the review prompt ("Change no files, commit nothing"), and `@merge` the merge prompt
+    - Test `assignment_by_hand_runs_the_rule_prompt_of_that_profile` covers a review profile, a merge-style profile and a profile no rule assigns. It fails without the fix
+    - Docs: `docs/help/automation.md` (Agent run settings), `docs/help/agent.md`
+    - Also moved a doc comment that sat on the wrong function (`join_and`)
+  report:
+    commits:
+    - hash: f302630c
+      what: hand assignment uses the matching rule's agent settings
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2212 Rust, 7 node, 404 vitest
+    - command: npm run smoke
+      result: passed
+    - command: G-21 agent log check
+      result: not_run
+      reason: that job is history in the gairola repo; the new test reproduces it
+    next: Review on another model, then merge
+- date: 2026-11-15T19:49:04.090992+00:00
+  author: codex
+  text: |-
+    Review: blocking
+
+    - Reviewed `f302630c`, the full diff, ticket/comments, effective review rules and recent main history. No relationships or UI changes.
+    - `crates/lotar-lib/tests/agent_automation_integration_test.rs:549`: the new regression passes its assertions, but its focused test command exits 1: `tests left 1 entries in the temp folder ... .lotar-test-scratch`. Fix fixture/background-job cleanup so the required runner exits successfully.
+    - Initial and approved retries stopped at sccache permissions; the documented `RUSTC_WRAPPER=` fallback compiled and ran the test. This cleanup failure is from that fallback, not the sandbox denial.
+    - Prompt selection covers review, merge-style and generic fallback. No other blocking code findings. Checkout stayed clean; no files changed or commits made.
+  report:
+    checks:
+    - command: RUSTC_WRAPPER= npm run test:rust:agent -- assignment_by_hand_runs_the_rule_prompt_of_that_profile
+      result: failed
+      reason: behavior passed but temp cleanup guard failed
+    - command: git diff --check main...HEAD
+      result: passed
+    - command: npm run lint; npm test; npm run smoke
+      result: not_run
+      reason: focused regression gate failed
+    next: Fix regression test cleanup and rerun the required gates
 description: |-
   Found 2026-11-15 by the chief of staff's retry agent: setting G-21's assignee to @review-claude started a review job by itself with lotar's generic 'make concrete changes' prompt; that job merged and pushed 497dd58 to gairola main before the queued review steps ran. (Here the pushed tree equals the reviewed f88bfff, so nothing unchecked landed, but the owner's rule is no merge without a passed review.)
   Check: the job's prompt in lotar agent logs for G-21's @review-claude job.
   Done when: a start triggered by an assignment uses the matching rule's prompt (review, merge), or review/merge profiles carry their own prompt, so a review job never merges or pushes; test for both. Until then: restart reviews only with lotar agent run, not by changing the assignee.
 tags:
 - health
+- review-returned
 custom_fields:
   finding: automation:assign-generic-prompt
 history:
@@ -26,3 +75,35 @@ history:
   - field: status
     old: Todo
     new: InProgress
+- at: 2026-11-15T19:39:24.656316+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T19:39:33.752463+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-15T19:49:04.090992+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T19:49:04.163599+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: health
+    new: health, review-blocked
+- at: 2026-11-15T19:49:07.977373+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: health, review-blocked
+    new: health, review-returned
