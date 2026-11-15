@@ -1,0 +1,30 @@
+title: 'DEV-598 weakened a test: the waits-for-an-answer T3 job''s exit code is no longer checked'
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-16T04:40:49.304245+00:00
+modified: 2026-11-16T04:40:51.379864+00:00
+relationships:
+  related:
+  - DEV-598
+description: |-
+  Found 2026-11-15 in the review of DEV-598.
+
+  DEV-598 (`3629b79a`) changed `a_thread_that_waits_for_an_answer_hands_the_ticket_back_with_its_link` in `crates/lotar-lib/tests/dev510_t3_session_test.rs:139` from `harness.command().assert().failure();` to `harness.command().output().unwrap();`, so the test no longer checks that `lotar agent run --wait` exits non-zero when the agent waits for an answer. The original assertion passes on the DEV-598 code (5 runs of `cargo nextest run --test integration dev510`), so the change wasn't needed.
+
+  ## Done when
+  - [ ] Line 139 asserts `.assert().failure()` again and `cargo nextest run --test integration dev510` passes.
+history:
+- at: 2026-11-16T04:40:50.326063+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-598"]}'
+- at: 2026-11-16T04:40:51.379864+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

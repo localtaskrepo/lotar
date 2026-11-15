@@ -1,0 +1,28 @@
+title: No test shows that a job ending on a ticket drops its cached T3 Code answer
+status: Todo
+priority: Low
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-16T04:33:13.135968+00:00
+modified: 2026-11-16T04:33:14.372985+00:00
+relationships:
+  related:
+  - DEV-599
+description: |-
+  Found in the DEV-599 review (dcfbccef). running_t3_thread in crates/lotar-lib/src/services/agent_job_service.rs caches T3 Code's answer per ticket for T3_THREAD_RECHECK and keys it on the ticket's earlier threads, so a new earlier thread asks again at once. No test covers that: the DEV-599 test a_start_on_a_busy_ticket_or_after_an_idle_answer_asks_t3_code_nothing only checks that the cache is used.
+
+  ## Done when
+  - [ ] A test in dev503_harness_jobs_test.rs: after a fix job's idle answer is cached, a second T3 job on the ticket ends (a new thread), and the next start runs t3 thread show again within the 30 s window; with the threads-list check removed, the test fails.
+history:
+- at: 2026-11-16T04:33:13.899609+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-599"]}'
+- at: 2026-11-16T04:33:14.372985+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

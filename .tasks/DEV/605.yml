@@ -1,18 +1,90 @@
 title: Merge without an agent when the branch rebases cleanly and the checks pass
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-16T02:33:19.654711+00:00
-modified: 2026-11-16T03:51:54.993841+00:00
+modified: 2026-11-16T04:54:41.894264+00:00
 relationships:
   related:
   - DEV-577
   - DEV-598
   - DEV-604
+  - standards:STD-188
+  - DEV-588
+comments:
+- date: 2026-11-16T04:16:01.944881+00:00
+  author: claude
+  text: |-
+    Done: a merge job of a repo with `agent.merge` merges without an agent; the merge agent starts only on a hand-off, in a fresh session.
+
+    - Config `agent.merge` (`checks`, `install`, `push`, `finding_check`) in `.tasks/config.yml` or a project's; project replaces whole. Absent: nothing changes. lotar can't read checks from AGENTS.md, so the repo names them.
+    - `lotar trust` covers `agent.merge` (`crates/lotar-core/src/config/trust.rs`); untrusted repo: the merge agent merges as today
+    - New `crates/lotar-lib/src/services/agent_job_service/merge.rs`: rebase in the worktree holding `agent/<ID>` (else a new one), install on lockfile change, checks (skips one the latest report passed on the unchanged commit), `ff-only` (3 rounds if main moves), `.tasks` amend, re-trust if Trusted before, push only finished work, finding check, outcome comment with report
+    - Hand-offs: conflict (rebase aborted), failed install/check, dirty worktree, refused ff, others' unpushed commits, no upstream/refused push, failed trust, finding still listed. Comment says why; agent gets it before its prompt, `session: fresh`, profile's model
+    - `run_job` start steps moved into `start_job` so lotar's merge and the agent share one start
+    - No new way to start a merge: only inside merge jobs (STD-133 step 1 unchanged)
+    - Tests: `crates/lotar-lib/tests/dev605_merge_without_agent_test.rs` (9: clean+push, skip, nothing to merge, conflict, failed check, others' commits, refused push, no config, config) + trust unit test
+    - Not tested: the untrusted-repo path (needs a home-config profile) and that T3 really opens a new thread (command runner in tests)
+    - Docs: `docs/help/agent.md#lotars-own-merge`, `config-reference.md`, `trust.md`; UI type `view/api/types.ts`
+    - Standards: [STD-188](https://standards.pyxzl.net/task/STD-188) sets `agent.merge` per repo and a model for @merge
+    - No guidance correction
+  report:
+    commits:
+    - hash: aa89bae8
+      what: lotar's own merge in merge jobs (agent.merge), hand-off to a fresh merge agent
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2252 Rust + 1548 UI tests
+    - command: npm run smoke
+      result: passed
+      reason: 403/405 in the full run at load 100; the 2 failed UI specs (ui.agent-activity, ui.panel-outside-edits, timeouts) passed on rerun
+    next: Review on another model, then merge; standards adopts it in STD-188 (Blocked on this)
+- date: 2026-11-16T04:16:30.910333+00:00
+  author: claude
+  text: |-
+    Follow-up with DEV-604 (queue pause on signing / disk-full failures), for whichever of the two lands second.
+
+    - Today: a signing or ENOSPC failure in lotar's own rebase or `.tasks` amend hands off to the merge agent, with git's stderr in the comment and the prompt. The agent's job then pauses on the same text at its end, but only after one agent run.
+    - Better: in `crates/lotar-lib/src/services/agent_job_service/merge.rs`, check the failure text with DEV-604's `pause_cause_in` (made `pub(crate)`). On a match, end the job failed with git's stderr as the failure note, so it pauses without starting an agent.
+- date: 2026-11-16T04:54:25.136485+00:00
+  author: claude
+  text: |-
+    Review: blocking. The merge flow does what "Done when" asks, but a check can hang the job forever, and a test "Done when" requires is missing.
+
+    Read: `aa89bae8` (the whole diff, `merge.rs` in full), the ticket and fix comment, `finalize_job` / `ensure_branch_merged` / `merged_landed` on main, trust and tests setup. Main moved by `1b6c7857` (DEV-588) only, which touches nothing here.
+
+    **Blocking**
+    - `crates/lotar-lib/src/services/agent_job_service/merge.rs:495`: after the check exits, `drain.join()` waits until every process that holds stdout/stderr closes it. A check that leaves a background process running (a dev server from smoke, a watcher, `sleep 600 &`) keeps the job stuck in this wait. The cancel check at `:488` isn't reached any more, so the job can't be cancelled either, and merge jobs run one at a time, so the whole merge queue stops. The runner path guards against exactly this with `OUTPUT_DRAIN_LIMIT` (`agent_job_service.rs:28`, `read_job_output`). Fix: stop waiting for the drains a bounded time after the exit, as `read_job_output` does, and add a test with a check like `sh -c 'sleep 30 & exit 0'`. Shell proof: `sh -c 'sleep 3 & exit 0' | cat` takes 3 s.
+    - `crates/lotar-lib/tests/dev605_merge_without_agent_test.rs`: "Done when" asks for a test that an untrusted repo keeps today's behaviour. There isn't one (the fix comment says so). This is the safety gate for running repository commands (`agent_job_service.rs:2720`). Fix: one test that clears `LOTAR_TRUST_ALL` and points `LOTAR_TRUST_FILE` at an empty temp file (as `tests/common/mod.rs:220` describes), then asserts that the merge agent ran without the hand-off text and that no check ran.
+
+    **While at it (not blocking)**
+    - `docs/help/agent.md:503` step 5 says "rules or agent profiles". Now `agent.merge` counts for trust too.
+
+    **Checked and OK**
+    - Nothing to merge, the skipped check, 3 rounds, the `.tasks` amend only while it is main's tip, push only when main is clean and `@{u}..` holds only this merge's commits, never `--no-verify`, `session: Fresh` on a hand-off, and `job_completed` through `finalize_job` (`merged_landed` accepts the amended tip).
+    - The merge runs only inside merge jobs, so there is still no merge without a passed review. [STD-188](https://standards.pyxzl.net/task/STD-188) is filed and linked.
+  report:
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: cargo nextest run -E 'test(dev605) | test(trust) | test(merge) | test(fields) | test(agent_job)'
+      result: passed
+      reason: 142 tests
+    - command: npm test
+      result: not_run
+      reason: review blocks on code findings; targeted suites ran instead
+    - command: npm run smoke
+      result: not_run
+      reason: no UI change; review blocks anyway
+    next: 'Fix agent: bound the output drain in merge.rs run_process, add the untrusted-repo test, then review again'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A27aa3d95-a2c7-4dd5-b654-19819c5d68c0
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa42985b0-da6c-4375-89b2-40b1447a986e
 description: |-
   Source: the chief of staff's token-use analysis, 2026-11-14 00:00 to 2026-11-15 16:15 PST (notes: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/notes.md, per-job costs: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/jobs_cost3.json). Owner 2026-11-15 picked this recommendation from the options picker. Owner 2026-11-15: this replaces his 2026-11-12 decision to run merges as a turn of the fix thread (standards docs/decisions/2026-11-11-merge-in-fix-thread.md); standards STD-124 (reviews and merges headless) is related.
 
@@ -35,6 +107,8 @@ description: |-
   - [ ] No merge without a passed review stays true (standards STD-133 step 1): lotar's merge runs only inside a merge job, which the rules start after a passed review; it adds no other way to start one.
   - [ ] Tests (real git repos, command-runner merge profile that records whether it ran): clean path lands and pushes with no agent; nothing to merge; each hand-off (conflict, failed check, others' unpushed commits, refused push) starts the agent fresh with the hand-off in its prompt; untrusted repo and no `agent.merge` keep today's behaviour; config parses and trust covers `agent.merge`.
   - [ ] Docs: `docs/help/agent.md`, `docs/help/config-reference.md`. Standards adopts it in its own ticket (configs per repo, merge profile model, prompt): filed and linked here.
+tags:
+- review-returned
 history:
 - at: 2026-11-16T02:33:21.180617+00:00
   actor: claude
@@ -101,3 +175,56 @@ history:
   - field: relationships
     old: '{"related":["DEV-577","DEV-598"]}'
     new: '{"related":["DEV-577","DEV-598","DEV-604"]}'
+- at: 2026-11-16T04:15:49.408573+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-577","DEV-598","DEV-604"]}'
+    new: '{"related":["DEV-577","DEV-598","DEV-604","standards:STD-188"]}'
+- at: 2026-11-16T04:16:01.944881+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T04:16:15.912348+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-16T04:16:30.910333+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T04:48:07.529712+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa42985b0-da6c-4375-89b2-40b1447a986e
+- at: 2026-11-16T04:54:25.136485+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T04:54:26.225892+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-577","DEV-598","DEV-604","standards:STD-188"]}'
+    new: '{"related":["DEV-577","DEV-598","DEV-604","standards:STD-188","DEV-588"]}'
+- at: 2026-11-16T04:54:27.204960+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: review-blocked
+- at: 2026-11-16T04:54:41.894264+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: review-blocked
+    new: review-returned

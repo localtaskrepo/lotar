@@ -1,11 +1,11 @@
 title: A retried or resumed T3 job opens in a new t3/<name> worktree, not on the ticket's agent/<ID> branch
-status: Reviewing
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-15T20:15:01.954526+00:00
-modified: 2026-11-16T02:56:36.937918+00:00
+modified: 2026-11-16T04:26:43.734160+00:00
 relationships:
   blocks:
   - DEV-582
@@ -19,6 +19,8 @@ relationships:
   - DEV-566
   - DEV-596
   - DEV-602
+  - DEV-608
+  - DEV-593
 comments:
 - date: 2026-11-15T20:48:30.575159+00:00
   author: automation
@@ -139,8 +141,39 @@ comments:
       result: not_run
       reason: covered by a fake-T3 integration test; the merge agent reruns the check
     next: Review on Codex, then merge
+- date: 2026-11-16T04:26:18.184117+00:00
+  author: claude
+  text: |-
+    Review: passed. `eba9fc33` meets the ticket's second "Done" option, which the owner chose ("1", prompt fix only).
+
+    - Read: the diff, the ticket and its comments, the owner's answer, `follow_thread_branch`/`move_ticket_branch`/`agent_worktrees`/`continued_thread_worktree`, and main's newer commits to these files (DEV-593/594/595/596). The branch merges onto main without conflicts.
+    - Claims hold: LoTaR moves `agent/<ID>` to the thread's branch when a T3 job ends (`follow_thread_branch`). A continued thread whose own worktree is dirty is refused and gets a new thread, so the note never lists the job's own worktree.
+    - The new test `a_retried_t3_job_learns_its_threads_branch_and_where_the_earlier_work_is` fails without the fix and passes with it.
+    - Live evidence of the bug: this review job runs on `t3/retried-job-reuse-agent-worktree`, but its prompt (from the installed `/opt/homebrew/bin/lotar`) says `agent/DEV-583`.
+    - Minor, filed as [DEV-608](https://lotar.pyxzl.net/task/DEV-608): the note stays in every later job on the ticket, so review and merge jobs are also told to "carry over" the stale changes.
+    - No stray files. `t3/reuse-agent-worktree` is codex's clean, empty worktree, not a second copy of the fix.
+  report:
+    checks:
+    - command: cargo nextest run dev503 (23 tests)
+      result: passed
+    - command: new test without the fix (agent_job_service.rs from eba9fc33^)
+      result: passed
+      reason: fails as it should
+    - command: npm run lint
+      result: passed
+    - command: npm run test:rust:agent
+      result: passed
+      reason: 2219/2219
+    - command: npm run smoke
+      result: not_run
+      reason: no UI change, fix agent reported 404/404
+    - command: real T3 retry end to end
+      result: not_run
+      reason: needs this build installed
+    next: Merge eba9fc33 (no conflicts with main, git merge-tree clean)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A73be9000-8591-47a5-9ab1-9e4b62fa8267
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adbe7c504-4e53-4892-9047-54e02835095e
 description: 'Found 2026-11-15 in standards: a fix job that is retried on another agent or resumed after its prerequisite ("Prerequisites done", "Retry with @fix-codex", "Retry with @fix-fable") starts a new T3 thread in a fresh worktree on a generated branch (`t3/gitleaks-allow-1password-backticks`, `t3/fix-gitleaks-1password-backtick-allowlist`), while its prompt says "You are working in a git worktree on branch `agent/STD-144` ... Don''t switch branches". The first job''s uncommitted work stays in `~/.t3/worktrees/standards/agent-STD-144-…`, out of reach. Seen on STD-144 (jobs `job-20261115T192529.587Z-12` and the 20:12Z retry), STD-140 (`job-20261115T192519.646Z-11`) and STD-149 (the review ran on `t3/std-149-dedupe-finding-tickets` at the rejected commit while the rework was on `agent/STD-149`). Two codex jobs handed back for this alone, and standards has about 30 leftover `t3/` worktrees. Related: DEV-581, DEV-577, DEV-530. Check: retry a failed T3 fix job with another agent; `git branch --show-current` in the new thread prints `agent/<ID>` and `git status` shows the first job''s changes. Done: a retried or resumed T3 job runs in the ticket''s existing `agent/<ID>` worktree (or the prompt names the branch the thread really has and where the earlier work is).'
 tags:
 - health
@@ -288,3 +321,33 @@ history:
   - field: assignee
     old: mallox
     new: '@review'
+- at: 2026-11-16T04:16:37.780707+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adbe7c504-4e53-4892-9047-54e02835095e
+- at: 2026-11-16T04:26:07.272867+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-582","DEV-577"],"related":["DEV-530","DEV-577","DEV-581","DEV-510","DEV-582","DEV-566","DEV-596","DEV-602"]}'
+    new: '{"blocks":["DEV-582","DEV-577"],"related":["DEV-530","DEV-577","DEV-581","DEV-510","DEV-582","DEV-566","DEV-596","DEV-602","DEV-608"]}'
+- at: 2026-11-16T04:26:18.184117+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T04:26:18.732797+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-582","DEV-577"],"related":["DEV-530","DEV-577","DEV-581","DEV-510","DEV-582","DEV-566","DEV-596","DEV-602","DEV-608"]}'
+    new: '{"blocks":["DEV-582","DEV-577"],"related":["DEV-530","DEV-577","DEV-581","DEV-510","DEV-582","DEV-566","DEV-596","DEV-602","DEV-608","DEV-593"]}'
+- at: 2026-11-16T04:26:43.734160+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

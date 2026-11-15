@@ -126,8 +126,9 @@ struct AgentJobState {
     /// The main checkout's commit when a merge job started, so its end
     /// knows which of main's commits the job landed (DEV-411).
     main_head_at_start: Option<String>,
-    /// A merge job's ticket assignee once its start rules ran, so its end
-    /// sees whether the agent handed the ticket back (DEV-516).
+    /// The ticket's assignee once the job's start rules ran, so its end
+    /// sees whether the agent handed the ticket back (DEV-516) or something
+    /// moved it on while it ran (DEV-566).
     assignee_at_start: Option<Option<String>>,
     /// The ticket branch's commit when a T3 Code job's thread started from
     /// it: a thread that rewrote that commit (an amend) moves the ticket's
@@ -269,6 +270,9 @@ impl AgentJobService {
             }
         }
         let is_merge_job = is_merge_job_candidate(&task, req.agent.as_deref());
+        if let Some(message) = review_blocks_merge(&task, req.agent.as_deref()) {
+            return Err(LoTaRError::ValidationError(message));
+        }
 
         if is_merge_job && !config.agent_worktree.enabled {
             return Err(LoTaRError::ValidationError("Merge agent jobs require agent.worktree.enabled=true so merges run on isolated branches.".to_string()));
@@ -811,6 +815,7 @@ fn job_context_for(id: &str) -> Option<AutomationJobContext> {
         worktree_path: state.record.worktree_path.clone(),
         worktree_branch: state.record.worktree_branch.clone(),
         usage: state.record.usage.clone(),
+        assignee_at_start: recorded_assignee(state.assignee_at_start.clone()),
     })
 }
 
@@ -1067,6 +1072,7 @@ fn instruction_template(
         worktree_path: worktree_path.map(|path| path.to_string_lossy().to_string()),
         worktree_branch: branch,
         usage: None,
+        assignee_at_start: None,
     };
     let workspace_root = repo_root.unwrap_or_else(|| tasks_dir.parent().unwrap_or(tasks_dir).to_path_buf());
     let lotar_bin = current_lotar_binary().map(|bin| bin.to_string_lossy().to_string()).unwrap_or_else(|| "lotar".to_string());
@@ -2816,7 +2822,7 @@ fn run_job(
     if is_merge_job && let Some(head) = resolve_repo_root(&tasks_dir).and_then(|root| rev_parse(&root, "HEAD")) {
         update_job(&job_id, |state| state.main_head_at_start = Some(head.clone()));
     }
-    if is_merge_job && let Some((_, assignee)) = ticket_state(&tasks_dir, &ticket_id) {
+    if let Some((_, assignee)) = ticket_state(&tasks_dir, &ticket_id) {
         update_job(&job_id, |state| state.assignee_at_start = Some(assignee.clone()));
     }
     for note in session_reason.into_iter().chain(moved_note).chain(worktree_context.note.clone()) {
@@ -4310,6 +4316,14 @@ fn update_job_failure(job_id: &str, ticket_id: &str, message: String, tasks_dir:
 /// so the agent's summary needn't say it (DEV-469).
 fn apply_job_end_rules(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Path, event: AutomationEvent, job_context: Option<AutomationJobContext>) {
     let before = ticket_state(tasks_dir, ticket_id);
+    if let (Some(job), Some((_, assignee))) = (job_context.as_ref(), before.as_ref())
+        && crate::services::automation_service::reassigned_during_job(job, assignee.as_deref())
+    {
+        let to = assignee.as_deref().map_or_else(|| "unassigned".to_string(), |assignee| format!("to {assignee}"));
+        update_job(job_id, |state| {
+            push_event(state, "agent_job_progress", Some(format!("{ticket_id} was reassigned ({to}) while the job ran: its end rules don't move it again")));
+        });
+    }
     if let Err(err) = AutomationService::apply_job_event(tasks_dir, ticket_id, event, job_context) {
         update_job(job_id, |state| {
             record_and_emit(state, "agent_job_progress", Some(format!("The end rules for {ticket_id} failed: {err}")));
@@ -4324,8 +4338,8 @@ fn apply_job_end_rules(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Pat
     }
 }
 
-/// A merge job's starting assignee as its active-job record keeps it: empty
-/// for none, so it survives a takeover (DEV-516).
+/// A job's starting assignee as its active-job record keeps it: empty for
+/// none, so it survives a takeover (DEV-516).
 fn recorded_assignee(assignee_at_start: Option<Option<String>>) -> Option<String> {
     assignee_at_start.map(Option::unwrap_or_default)
 }
@@ -4445,6 +4459,18 @@ fn has_active_merge_job(registry: &JobRegistry) -> bool {
 
 fn is_merge_job_candidate(task: &crate::api_types::TaskDTO, agent_profile: Option<&str>) -> bool {
     task.status.as_str().eq_ignore_ascii_case("Merging") || is_merge_profile(agent_profile)
+}
+
+/// The tag a blocking review sets; a rework removes it.
+const REVIEW_BLOCKED_TAG: &str = "review-blocked";
+
+/// Why a merge job (profile `merge`, or a ticket in `Merging`) can't start
+/// (DEV-566): its ticket carries a blocking review that no rework has
+/// answered yet.
+pub(crate) fn review_blocks_merge(task: &crate::api_types::TaskDTO, agent_profile: Option<&str>) -> Option<String> {
+    let blocked = is_merge_job_candidate(task, agent_profile) && task.tags.iter().any(|tag| tag.trim().eq_ignore_ascii_case(REVIEW_BLOCKED_TAG));
+    let job = agent_profile.map(|profile| format!("@{}", profile.trim().trim_start_matches('@'))).unwrap_or_else(|| "merge".to_string());
+    blocked.then(|| format!("The {job} job didn't start: {} carries tag {REVIEW_BLOCKED_TAG}, and no rework has removed it.", task.id))
 }
 
 fn is_merge_profile(agent_profile: Option<&str>) -> bool {

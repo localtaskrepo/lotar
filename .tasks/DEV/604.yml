@@ -3,9 +3,9 @@ status: Reviewing
 priority: High
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-16T02:33:15.288469+00:00
-modified: 2026-11-16T03:52:06.387223+00:00
+modified: 2026-11-16T04:48:44.777640+00:00
 relationships:
   related:
   - DEV-584
@@ -40,8 +40,24 @@ comments:
       result: passed
       reason: 405 tests
     next: Review on another model, then merge
+- date: 2026-11-16T04:48:26.433447+00:00
+  author: claude
+  text: |-
+    Review: blocking. The pause works and its tests pass, but a paused job hangs `agent run --wait` and drops the agent's own status/assignee hand-back.
+
+    Read: `git log main..HEAD` (`6fc5011a`, merges cleanly onto main `1b6c7857`), its diff, the ticket and the fix agent's comments, DEV-584, `docs/help/agent.md`, AGENTS.md. Reran: 36 tests (`dev604_*`, both new unit tests, `dev503`, `dev279`, `dev522`, queue tests), all pass. Reproduced both bugs with the branch's binary in a scratch workspace.
+
+    **Blocking**
+    1. `crates/lotar-lib/src/cli/handlers/agent.rs:970` `job_is_terminal` doesn't count `paused`. `lotar agent run TEST-1 go --agent writer --wait --timeout-seconds 20` with a runner that prints `No space left on device`: the job is `paused` after 0.2 s, but the command waits the full 20 s and says "Timed out". Without a timeout it never returns. Docs line 9 says `--wait` returns once the job ends. Fix: treat `paused` as an end, exit non-zero with "paused", and add a test.
+    2. `agent_job_service.rs:4302`: a paused job skips `apply_job_end_rules`, and the agent's recorded outcome is applied there. A runner that ran `lotar status TEST-1 InProgress` and `lotar assignee TEST-1 mallox`, then hit a full disk: the log says "InProgress will be set when job … ends", but the ticket stays `Todo`, unassigned, and no `.outcome.json` or `.pending.json` is left. The commit-only retry then runs `job_completed` rules as if the agent finished, so an agent that handed the ticket back to the owner with a question loses that hand-back. Fix: keep the paused job's outcome and apply it when the retry ends (or apply it at the pause and let the retry skip end rules when the agent handed back). Add a test for each.
+    3. UI: `view/composables/useAgentActivity.ts:18-19` (`DONE_EVENTS`, `EVENTS`) and `view/pages/AgentJobs.vue:544` don't know `agent_job_paused`. A ticket whose job paused keeps its "agent running" indicator until a reload, and the Agents page doesn't refresh. Fix: subscribe to the event, end the job on it, and give it a label in `view/utils/agentJobs.ts`.
+
+    **Smaller things for the rework**
+    - `agent_job_service.rs:343` calls `admit()`, which uses up the due try, before checking for a free slot. A job that is then queued for lack of a slot is held again in `process_pending_queue`, so that try is lost for an interval. Also, a held job started in `serve` can take the try before the paused job's retry in the worker queue ("the paused job's retry first").
+    - `agent_job_service.rs:4490`: the old doc line on `process_pending_queue` is still above the new one.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ace8ed2ae-c500-4fb4-b0a3-aa01766ee626
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aedf559db-3d37-4107-9a7e-e53a0d9afc89
 description: |-
   Source: the chief of staff's token-use analysis, 2026-11-14 00:00 to 2026-11-15 16:15 PST (notes: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/notes.md, per-job costs: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/jobs_cost3.json). Owner 2026-11-15 picked this recommendation from the options picker.
 
@@ -69,6 +85,8 @@ description: |-
     - A repo whose `gpg.program` is a script that fails, then succeeds: the job pauses, a held job waits, the retry commits the staged work without running the agent, the queue resumes.
     - A runner whose output says `No space left on device`: the job pauses, every job is held.
     - Docs: `docs/help/agent.md`.
+tags:
+- review-returned
 history:
 - at: 2026-11-16T02:33:17.084663+00:00
   actor: claude
@@ -153,3 +171,27 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-16T04:41:27.507532+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aedf559db-3d37-4107-9a7e-e53a0d9afc89
+- at: 2026-11-16T04:48:26.433447+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T04:48:26.603720+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: review-blocked
+- at: 2026-11-16T04:48:44.777640+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: review-blocked
+    new: review-returned

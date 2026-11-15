@@ -1,16 +1,17 @@
 title: A T3 thread that waits for an answer holds every later job on its ticket without saying so
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-16T02:29:53.068923+00:00
-modified: 2026-11-16T03:49:10.934896+00:00
+modified: 2026-11-16T04:48:06.647616+00:00
 relationships:
   related:
   - DEV-594
   - DEV-599
   - DEV-585
+  - DEV-503
 comments:
 - date: 2026-11-16T02:33:15.242181+00:00
   author: claude
@@ -35,8 +36,40 @@ comments:
 - date: 2026-11-16T02:48:27.074179+00:00
   author: mallox
   text: 'Answer: A (It holds them; the queue entry comments once why) (answered in INBOX-346)'
+- date: 2026-11-16T04:12:05.285498+00:00
+  author: claude
+  text: |-
+    Done as you decided (A): a T3 thread that waits for an answer holds later jobs, and the queue says so once.
+
+    - `running_t3_thread` (`agent_job_service.rs`) holds on status `running`, a non-null `activeRunId` (as harnessmux counts it) or `pendingRequestCount > 0`. It now returns thread, job, link and waiting.
+    - `lotar agent run --wait`: `...: the T3 Code thread <thread> of the job <job> still runs` / `waits for an answer`.
+    - Queue (`agent_queue_service.rs`): a held entry comments once per entry and thread, with the thread's link and "Answer it in T3 Code" for a waiting thread. The new `held_by` on the entry remembers this across worker restarts; old queue files still load. The cached T3 answer is reused, so no extra `t3` call.
+    - Tests (`dev503_harness_jobs_test.rs`): `a_thread_with_an_active_run_or_a_question_holds_the_ticket`, `a_queue_entry_held_by_a_waiting_thread_says_so_once`. Both fail on the old source; the second times out with no comment.
+    - Docs: `docs/help/agent.md` (T3 section, queue).
+    - Base: branch = main + DEV-599 `dcfbccef` (as `76f3bdca`) + this fix. DEV-599 is still in review.
+    - After the full runs I made one more change: the comment now needs the error to name the T3 thread, so a normal job's hold isn't blamed on T3. After it: DEV-503 and queue tests, clippy and fmt passed.
+  report:
+    commits:
+    - hash: af2e42f2
+      what: waiting/active T3 threads hold the ticket; queue entry comments once why
+    - hash: 76f3bdca
+      what: DEV-599 dcfbccef cherry-picked as base (still in review)
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2245 Rust, 1548 UI
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405/405 twice; one earlier run had 1 failure I didn't capture
+    - command: npm run test:rust:agent -- -E test(/dev503_harness_jobs_test/) | test(/queue/)
+      result: passed
+      reason: 46/46 after the last edit; new tests fail on the old source
+    next: Review on another model; merge after DEV-599 (drop 76f3bdca if main has it)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2ad4dd44-6ea0-4933-aaad-8f8d816b2933
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa06b6ffb-a7f3-4a4a-94c5-7ca758534437
 description: |-
   Found in the DEV-594 review (043e01bd). T3 Code reports a thread that waits for an answer as status running with pendingRequestCount > 0 (harnessmux 0.1.9 backend/t3.rs RunState). running_t3_thread treats that as running, so after a handback the owner's next job on the ticket (a retry option, a reassignment) waits in the queue until the T3 question is answered, and no comment says why. It also ignores activeRunId, which harnessmux counts as running. Check: leave a thread waiting for an answer, assign the ticket to another profile, see the queue entry wait silently.
 
@@ -130,3 +163,27 @@ history:
   - field: status
     old: HelpNeeded
     new: InProgress
+- at: 2026-11-16T04:12:05.285498+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T04:12:05.542697+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-594","DEV-599","DEV-585"]}'
+    new: '{"related":["DEV-594","DEV-599","DEV-585","DEV-503"]}'
+- at: 2026-11-16T04:12:24.769705+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-16T04:48:06.647616+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa06b6ffb-a7f3-4a4a-94c5-7ca758534437

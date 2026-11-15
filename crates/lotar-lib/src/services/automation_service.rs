@@ -266,6 +266,11 @@ pub struct AutomationJobContext {
     pub worktree_branch: Option<String>,
     /// What the job used, once it finished (for `${{agent.cost_usd}}` and friends).
     pub usage: Option<crate::api_types::AgentJobUsage>,
+    /// The ticket's assignee once the job's start rules ran (empty: none;
+    /// `None`: not known), so its end sees whether the ticket was moved on
+    /// while it ran (DEV-566).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assignee_at_start: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -591,9 +596,15 @@ impl AutomationService {
             AutomationActionContext { event, job: job_context, previous: None, comment: None, unblocked_by: Vec::new(), rule: String::new() };
         let mut failures: Vec<String> = Vec::new();
 
+        // A ticket reassigned while the job ran (a rule the agent ran, such
+        // as `lotar automation run`) is in its next stage already: the end
+        // rules would advance it a second time (DEV-566).
+        let moved = ending_job.is_some() && action_context.job.as_ref().is_some_and(|job| reassigned_during_job(job, task.assignee.as_deref()));
+        let rules = if moved { &[][..] } else { automation.automation.rules() };
+
         let active_sprints = compute_active_sprint_ids(&storage);
         let mut actions = Vec::new();
-        for (rule_idx, rule) in automation.automation.rules().iter().enumerate() {
+        for (rule_idx, rule) in rules.iter().enumerate() {
             if !matches_rule(rule, &task, &ChangeSet::empty(&task), MatchMode::Current, &config, &active_sprints) {
                 continue;
             }
@@ -2247,6 +2258,11 @@ fn without_agent_reporter_hand_back(outcome: crate::api_types::JobOutcome, task:
     if rule_assigns && to_agent_reporter { None } else { Some(outcome) }
 }
 
+/// Whether the ticket's assignee is no longer the one its job started with.
+pub fn reassigned_during_job(job: &AutomationJobContext, assignee: Option<&str>) -> bool {
+    job.assignee_at_start.as_deref().is_some_and(|at_start| at_start != assignee.unwrap_or_default())
+}
+
 /// The action without the `set` fields a job outcome decides (DEV-320).
 fn without_outcome_fields<'a>(action: &'a AutomationAction, outcome: Option<&crate::api_types::JobOutcome>) -> std::borrow::Cow<'a, AutomationAction> {
     let Some(outcome) = outcome else {
@@ -2892,6 +2908,41 @@ fn mark_task_blocked(storage: &mut Storage, task: &TaskDTO, config: &ResolvedCon
     append_automation_comment(storage, &task.id, &format!("The @{agent} job waits for its open prerequisites: {}.", blocked_by.join(", ")))
 }
 
+/// Whether a queued job's ticket is still in the stage it was queued for:
+/// not assigned to another agent profile since. A job queued while the
+/// ticket was busy (a merge queued by a fix job's end rules, while the review
+/// ran) would otherwise start after the ticket moved on, for example back to
+/// @fix with a blocking review (DEV-566). Nor does a merge while the ticket
+/// carries a blocking review. The ticket gets a comment instead.
+pub(crate) fn queued_stage_allows_start(tasks_dir: &Path, req: &AgentJobCreateRequest) -> bool {
+    let agent = req.agent.as_deref().map(|agent| agent.trim().trim_start_matches('@')).filter(|agent| !agent.is_empty());
+    let mut storage = Storage::new(tasks_dir);
+    // Starting the job reports a ticket that can't be read.
+    let Ok(task) = TaskService::get(&storage, &req.ticket_id, None) else {
+        return true;
+    };
+    if let Some(message) = crate::services::agent_job_service::review_blocks_merge(&task, agent) {
+        let _ = append_automation_comment(&mut storage, &task.id, &message);
+        return false;
+    }
+    let Some(agent) = agent else {
+        return true;
+    };
+    let project = crate::storage::TaskId::parse(&task.id).map(|parsed| parsed.project).unwrap_or_default();
+    let Ok(config) = resolve_config_for_project(tasks_dir, Some(&project)) else {
+        return true;
+    };
+    let Some(now) = task.assignee.as_deref().and_then(|assignee| assignee.strip_prefix('@')).filter(|name| config.agent_profiles.contains_key(*name)) else {
+        return true;
+    };
+    if now.eq_ignore_ascii_case(agent) {
+        return true;
+    }
+    let message = format!("The queued @{agent} job didn't start: {} is assigned to @{now} now.", task.id);
+    let _ = append_automation_comment(&mut storage, &task.id, &message);
+    false
+}
+
 /// The queue worker's check just before it starts `req` (DEV-524): `Ok(true)`
 /// starts the job, `Ok(false)` drops it (the ticket waits for an open
 /// prerequisite, or the last try failed and says so on the ticket), and
@@ -3470,7 +3521,15 @@ mod pending_outcome_tests {
                 });
             });
         });
-        let job = AutomationJobContext { job_id: "ordered".into(), runner: "t3".into(), agent: None, worktree_path: None, worktree_branch: None, usage: None };
+        let job = AutomationJobContext {
+            job_id: "ordered".into(),
+            runner: "t3".into(),
+            agent: None,
+            worktree_path: None,
+            worktree_branch: None,
+            usage: None,
+            assignee_at_start: None,
+        };
         assert!(AutomationService::apply_job_event(&tasks_dir, "PX-1", AutomationEvent::JobCompleted, Some(job)).is_err());
         let task = TaskService::get(&Storage::new(&tasks_dir), "PX-1", None).unwrap();
         assert_eq!(task.status.as_str(), "Reviewing");
@@ -3499,8 +3558,15 @@ mod pending_outcome_tests {
         )
         .unwrap();
         std::fs::write(tasks_dir.join("automation.yml"), "automation:\n  rules:\n    - name: Finish\n      on:\n        job_completed:\n          set:\n            status: Done\n          comment: finished\n").unwrap();
-        let job =
-            AutomationJobContext { job_id: "no-outcome".into(), runner: "t3".into(), agent: None, worktree_path: None, worktree_branch: None, usage: None };
+        let job = AutomationJobContext {
+            job_id: "no-outcome".into(),
+            runner: "t3".into(),
+            agent: None,
+            worktree_path: None,
+            worktree_branch: None,
+            usage: None,
+            assignee_at_start: None,
+        };
         let lock = crate::storage::safety::acquire_storage_lock(&tasks_dir.join("PX"), "task").unwrap();
         assert!(AutomationService::apply_job_event(&tasks_dir, "PX-1", AutomationEvent::JobCompleted, Some(job)).is_err());
         crate::services::agent_active_jobs::unregister(&tasks_dir, "no-outcome");
@@ -3522,7 +3588,15 @@ mod pending_outcome_tests {
                 *held_by_hook.borrow_mut() = Some(crate::storage::safety::acquire_storage_lock(&project_dir, "task").unwrap());
             });
         });
-        let job = AutomationJobContext { job_id: "partial".into(), runner: "t3".into(), agent: None, worktree_path: None, worktree_branch: None, usage: None };
+        let job = AutomationJobContext {
+            job_id: "partial".into(),
+            runner: "t3".into(),
+            agent: None,
+            worktree_path: None,
+            worktree_branch: None,
+            usage: None,
+            assignee_at_start: None,
+        };
         assert!(AutomationService::apply_job_event(&tasks_dir, "PX-1", AutomationEvent::JobCompleted, Some(job)).is_err());
         drop(held.borrow_mut().take());
         TaskService::update_with_context(
@@ -3564,7 +3638,15 @@ mod pending_outcome_tests {
         let outcome =
             crate::api_types::JobOutcome { job_id: "job-1".into(), status: Some("HelpNeeded".into()), assignee: Some("claude".into()), ..Default::default() };
         crate::services::agent_active_jobs::record_outcome(&tasks_dir, &outcome).unwrap();
-        let job = AutomationJobContext { job_id: "job-1".into(), runner: "t3".into(), agent: None, worktree_path: None, worktree_branch: None, usage: None };
+        let job = AutomationJobContext {
+            job_id: "job-1".into(),
+            runner: "t3".into(),
+            agent: None,
+            worktree_path: None,
+            worktree_branch: None,
+            usage: None,
+            assignee_at_start: None,
+        };
 
         AutomationService::apply_job_event(&tasks_dir, "PX-1", AutomationEvent::JobFailed, Some(job)).unwrap();
         crate::services::agent_active_jobs::unregister(&tasks_dir, "job-1");
@@ -3620,7 +3702,15 @@ mod pending_outcome_tests {
                 });
             });
         });
-        let job = AutomationJobContext { job_id: "job-1".into(), runner: "t3".into(), agent: None, worktree_path: None, worktree_branch: None, usage: None };
+        let job = AutomationJobContext {
+            job_id: "job-1".into(),
+            runner: "t3".into(),
+            agent: None,
+            worktree_path: None,
+            worktree_branch: None,
+            usage: None,
+            assignee_at_start: None,
+        };
         let err = AutomationService::apply_job_event(&tasks_dir, "PX-1", AutomationEvent::JobCompleted, Some(job)).unwrap_err();
         assert!(err.to_string().contains("waits for its end rules"), "{err}");
         assert!(held.borrow().is_none(), "the lock is free before the outcome");
@@ -3655,7 +3745,15 @@ mod pending_outcome_tests {
         .unwrap();
         let outcome = crate::api_types::JobOutcome { job_id: "job-1".into(), status: Some("Done".into()), ..Default::default() };
         crate::services::agent_active_jobs::record_outcome(&tasks_dir, &outcome).unwrap();
-        let job = AutomationJobContext { job_id: "job-1".into(), runner: "t3".into(), agent: None, worktree_path: None, worktree_branch: None, usage: None };
+        let job = AutomationJobContext {
+            job_id: "job-1".into(),
+            runner: "t3".into(),
+            agent: None,
+            worktree_path: None,
+            worktree_branch: None,
+            usage: None,
+            assignee_at_start: None,
+        };
         let status = || TaskService::get(&Storage::new(&tasks_dir), "PX-1", None).unwrap().status.as_str().to_string();
 
         let lock = crate::storage::safety::acquire_storage_lock(&tasks_dir.join("PX"), "task").unwrap();
@@ -3670,5 +3768,56 @@ mod pending_outcome_tests {
         assert_eq!(status(), "Done");
         assert!(crate::services::agent_active_jobs::pending_outcomes(&tasks_dir).is_empty(), "applied once");
         unsafe { std::env::remove_var("LOTAR_AGENT_QUEUE_DIR") };
+    }
+
+    /// DEV-566: a queued job doesn't start once its ticket moved to another
+    /// agent's stage (a merge after the blocking review sent the ticket back
+    /// to @fix; a second fix job after the first one's end set @review), nor
+    /// a merge while the ticket carries a blocking review.
+    #[test]
+    fn a_queued_job_does_not_start_after_its_ticket_moved_on() {
+        let temp = tempfile::tempdir().unwrap();
+        let tasks_dir = temp.path().join(".tasks");
+        std::fs::create_dir_all(tasks_dir.join("PX")).unwrap();
+        std::fs::write(
+            tasks_dir.join("config.yml"),
+            "issue:\n  states: [Reviewing, Merging, InProgress]\nagents:\n  fix: claude\n  review: claude\n  merge: claude\n",
+        )
+        .unwrap();
+        let ticket = |assignee: &str, tags: &str| {
+            std::fs::write(
+                tasks_dir.join("PX/1.yml"),
+                format!("title: t\nstatus: Merging\npriority: medium\ntype: task\nassignee: '{assignee}'\ntags: [{tags}]\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-01-01T00:00:00Z\n"),
+            )
+            .unwrap();
+        };
+        let job = |agent: &str| AgentJobCreateRequest { ticket_id: "PX-1".into(), prompt: "go".into(), agent: Some(agent.into()), ..Default::default() };
+        let last_comment = || TaskService::get(&Storage::new(&tasks_dir), "PX-1", None).unwrap().comments.last().map(|comment| comment.text.clone());
+
+        ticket("@merge", "");
+        assert!(queued_stage_allows_start(&tasks_dir, &job("merge")));
+        ticket("mallox", "");
+        assert!(queued_stage_allows_start(&tasks_dir, &job("merge")), "a person, not another stage");
+
+        ticket("@fix", "review-blocked");
+        assert!(!queued_stage_allows_start(&tasks_dir, &job("merge")));
+        assert_eq!(last_comment().as_deref(), Some("The @merge job didn't start: PX-1 carries tag review-blocked, and no rework has removed it."));
+        ticket("@fix", "");
+        assert!(!queued_stage_allows_start(&tasks_dir, &job("merge")));
+        assert_eq!(last_comment().as_deref(), Some("The queued @merge job didn't start: PX-1 is assigned to @fix now."));
+
+        ticket("@merge", "review-blocked");
+        assert!(!queued_stage_allows_start(&tasks_dir, &job("merge")), "the blocking review's end rules didn't run");
+        assert_eq!(last_comment().as_deref(), Some("The @merge job didn't start: PX-1 carries tag review-blocked, and no rework has removed it."));
+        ticket("@fix", "review-blocked");
+        assert!(!queued_stage_allows_start(&tasks_dir, &job("fix")), "a job on a Merging ticket is a merge job");
+        assert_eq!(last_comment().as_deref(), Some("The @fix job didn't start: PX-1 carries tag review-blocked, and no rework has removed it."));
+        let unprofiled = AgentJobCreateRequest { ticket_id: "PX-1".into(), prompt: "go".into(), ..Default::default() };
+        assert!(!queued_stage_allows_start(&tasks_dir, &unprofiled), "nor without a profile");
+        assert_eq!(last_comment().as_deref(), Some("The merge job didn't start: PX-1 carries tag review-blocked, and no rework has removed it."));
+
+        ticket("@review", "");
+        assert!(!queued_stage_allows_start(&tasks_dir, &job("fix")), "a second fix job after the first one's end");
+        assert_eq!(last_comment().as_deref(), Some("The queued @fix job didn't start: PX-1 is assigned to @review now."));
     }
 }

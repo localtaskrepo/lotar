@@ -357,6 +357,9 @@ fn start_entry(tasks_dir: &Path, entry: AgentQueueEntry) -> LoTaRResult<()> {
         provider: entry.provider,
         session: entry.session,
     };
+    if !crate::services::automation_service::queued_stage_allows_start(tasks_dir, &req) {
+        return Ok(());
+    }
     // A prerequisite can reopen while the job waits, and a check that failed
     // at assignment is tried again here (DEV-524).
     if req.agent.is_some() && !crate::services::automation_service::prerequisites_allow_start(tasks_dir, &req, last_try).map_err(LoTaRError::ValidationError)? {

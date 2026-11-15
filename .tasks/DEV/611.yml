@@ -1,0 +1,40 @@
+title: The DEV-603 handoff names a session whose event log the new session already deleted
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-16T04:47:15.051643+00:00
+modified: 2026-11-16T04:47:31.726505+00:00
+relationships:
+  related:
+  - DEV-603
+description: |-
+  Found in the review of DEV-603 (`d9e58bcb`).
+
+  ## Found
+  When a `session: continue` job skips an idle session of its own profile (a fix rework after a blocking review), it starts a new session under the same name. harnessmux `Session::start` (`harnessmux-0.1.9/src/session.rs:100`) calls `registry.remove(&name)`, which deletes the old record and its `.events.jsonl`. The handoff (`handoff_text` in `agent_job_service.rs`) then names that session and its last-used time, but its log is gone, and later jobs' "Earlier agent sessions" lose that round too. Only the t3 runner keeps the old T3 thread.
+
+  ## Done when
+  - [ ] The handoff points the agent at something it can still read for the skipped round: the old T3 thread (`record.agent_session`) for t3 jobs, or the old event log kept (renamed or copied) before the new session replaces it.
+  - [ ] A test: a fix rework past `continue_within_minutes` whose prompt names a readable earlier round.
+history:
+- at: 2026-11-16T04:47:15.596256+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-16T04:47:31.726505+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: '-'
+    new: |-
+      Found in the review of DEV-603 (`d9e58bcb`).
+
+      ## Found
+      When a `session: continue` job skips an idle session of its own profile (a fix rework after a blocking review), it starts a new session under the same name. harnessmux `Session::start` (`harnessmux-0.1.9/src/session.rs:100`) calls `registry.remove(&name)`, which deletes the old record and its `.events.jsonl`. The handoff (`handoff_text` in `agent_job_service.rs`) then names that session and its last-used time, but its log is gone, and later jobs' "Earlier agent sessions" lose that round too. Only the t3 runner keeps the old T3 thread.
+
+      ## Done when
+      - [ ] The handoff points the agent at something it can still read for the skipped round: the old T3 thread (`record.agent_session`) for t3 jobs, or the old event log kept (renamed or copied) before the new session replaces it.
+      - [ ] A test: a fix rework past `continue_within_minutes` whose prompt names a readable earlier round.

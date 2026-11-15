@@ -1,11 +1,11 @@
 title: 'Flaky smoke: global task actions on desktop still time out closing the Create task panel after DEV-597'
-status: Todo
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-16T03:37:27.096061+00:00
-modified: 2026-11-16T04:08:26.886634+00:00
+modified: 2026-11-16T04:36:46.861641+00:00
 relationships:
   related:
   - DEV-597
@@ -18,6 +18,33 @@ comments:
     Seen again in the DEV-588 merge (2026-11-16, load ~120): same `Close panel` click "element is not stable" timeout at `smoke/tests/ui.global-actions.smoke.spec.ts:120`.
 
     - Rerun of the spec alone at the same load: 3/3 passed.
+- date: 2026-11-16T04:36:40.029975+00:00
+  author: claude
+  text: |-
+    Fixed: the test now closes the Create task panel without waiting for a stable box.
+
+    - `smoke/tests/ui.global-actions.smoke.spec.ts`: the route loop's Close panel uses `dispatchEvent('click')` instead of `click()`. It runs the button's own handler (`requestClose`), so a panel still sliding in (`task-panel` transition, `translateX(40px)`) can't stall it; `waitFor({ state: 'detached' })` still checks it closed.
+    - 5 full smoke runs passed 405/405, 4 of them with lint and `npm test` running at load 70–93.
+    - Other smoke files use the same `Close panel` `click()` pattern but haven't flaked; left as they are.
+  report:
+    commits:
+    - hash: dda97f68
+      what: close the Create task panel with the button's click event, no stable-box wait
+    checks:
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405/405
+    - command: npm run test:smoke:quick:agent x4
+      result: passed
+      reason: 405/405 each, load 70-93 with lint and npm test running alongside
+    - command: npm run lint:agent
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2242 Rust, 1548 UI, release and hooks tests
+    next: Review, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0caf1a38-2a26-4a65-bd1f-173cb4151cb4
 description: |-
   `smoke/tests/ui.global-actions.smoke.spec.ts` > "keeps actions usable and creates in the known project on desktop" timed out again in a full `npm run test:smoke:agent` run, after DEV-597 was marked Done.
 
@@ -45,3 +72,27 @@ history:
   - field: relationships
     old: '{"related":["DEV-597","DEV-593"]}'
     new: '{"related":["DEV-597","DEV-593","DEV-588"]}'
+- at: 2026-11-16T04:27:33.419388+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-16T04:27:34.237538+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0caf1a38-2a26-4a65-bd1f-173cb4151cb4
+- at: 2026-11-16T04:36:40.029975+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T04:36:46.861641+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

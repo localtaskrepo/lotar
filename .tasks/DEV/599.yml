@@ -1,16 +1,17 @@
 title: The busy-ticket check calls t3 for every earlier thread on each queue retry
-status: Reviewing
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-16T02:29:49.963817+00:00
-modified: 2026-11-16T03:15:17.242145+00:00
+modified: 2026-11-16T04:34:08.247031+00:00
 relationships:
   related:
   - DEV-594
   - DEV-279
   - DEV-600
+  - DEV-609
 comments:
 - date: 2026-11-16T03:15:04.430118+00:00
   author: claude
@@ -43,8 +44,31 @@ comments:
       result: not_run
       reason: no pages, components or styles changed
     next: Review, then merge after DEV-594 (or together with it)
+- date: 2026-11-16T04:34:00.524006+00:00
+  author: claude
+  text: |-
+    Review: passed. `dcfbccef` does what "Done when" asks; one minor test gap filed as [DEV-609](https://lotar.pyxzl.net/task/DEV-609).
+
+    - **Read:** the diff of `dcfbccef`, the ticket and the fix agent's comment, DEV-594, DEV-600, AGENTS.md, and main's recent commits to the 3 touched files.
+    - **Done when:**
+      - The active-job check (registry and other processes' active-jobs file) now runs before `running_t3_thread`.
+      - Both answers, running and idle, are cached for 30 s, keyed on the ticket's earlier threads.
+      - The lock is free while `t3` runs, and a failed `t3` still counts as not running.
+      - `docs/help/agent.md` says what is cached.
+    - **Test fails before the fix:** with the old `agent_job_service.rs` from `5550d54d`, `a_start_on_a_busy_ticket_or_after_an_idle_answer_asks_t3_code_nothing` fails (`left: 4, right: 3`). With the fix it passes. Restored, worktree clean.
+    - **Reran:**
+      - `cargo nextest run --test integration dev503`: 25/25 passed, DEV-594's test among them.
+      - `cargo clippy --workspace --all-targets -- -D warnings`: clean.
+      - `rustfmt --check` and `prettier --check` on the changed files: clean.
+      - Not rerun: full `npm test`, `npm run smoke` (the fix agent reports them passed).
+    - **For the merge:**
+      - DEV-594 is on main now as `bab2586f`. The branch still has its copy `5550d54d`, so a plain merge conflicts.
+      - Rebase with only `dcfbccef` onto main: that applies cleanly (checked with `git merge-tree`).
+      - `agent/DEV-599` and `t3/cache-busy-ticket-t3-checks` point at the same commit, so there is no second copy of the fix.
+    - **Minor:** no test shows that a new earlier thread (a job that ended) drops the cached answer. Filed as [DEV-609](https://lotar.pyxzl.net/task/DEV-609).
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Afb8bc697-69d5-449f-896d-839c94b42ef2
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adb88551c-d16a-47b2-bce2-4d8e3a0512c6
 description: |-
   Found in the DEV-594 review (043e01bd). running_t3_thread in crates/lotar-lib/src/services/agent_job_service.rs (start_job_with_tasks_dir_mode, line ~300) runs before the registry/active-job check and caches only a running thread. While a ticket's queue entry waits for a running non-T3 job (DEV-279), or its earlier threads have all ended, each 300 ms worker poll runs t3 thread show once per earlier thread (about 0.5 s each), with the global RUNNING_T3_THREADS mutex held, so other tickets' job starts wait behind those calls. Check: queue an entry for a ticket with several ended T3 threads while a codex job runs on it; count t3 processes.
 
@@ -120,3 +144,27 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-16T04:27:08.544340+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Adb88551c-d16a-47b2-bce2-4d8e3a0512c6
+- at: 2026-11-16T04:33:13.898423+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-594","DEV-279","DEV-600"]}'
+    new: '{"related":["DEV-594","DEV-279","DEV-600","DEV-609"]}'
+- at: 2026-11-16T04:34:00.524006+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T04:34:08.247031+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

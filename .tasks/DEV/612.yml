@@ -1,0 +1,27 @@
+title: A reopened ticket can follow another ticket's branch that reuses a name its earlier jobs logged
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-16T04:47:33.448403+00:00
+modified: 2026-11-16T04:47:33.913722+00:00
+relationships:
+  related:
+  - DEV-602
+description: |-
+  Found in the DEV-602 review.
+
+  ## Found
+  - `unlanded_ticket_branch` in `crates/lotar-lib/src/services/agent_job_service.rs` counts every branch whose *name* a saved job of the ticket logged (`.tasks/@agent-logs`), with no check that the branch is still the one the job worked on.
+  - Done cleanup deletes `t3/<topic>` branches, and T3 Code can give the freed name to another ticket's thread. When the first ticket is reopened, `follow_ticket_work` can point `agent/<ID>` at the other ticket's work (when `agent/<ID>` has none of its own). And `ensure_branch_merged` can then fail a good merge, naming that branch.
+
+  ## Done when
+  - [ ] A logged branch counts only while it still descends from the commit the job logged, or holds a commit whose subject starts with the ticket ID. Otherwise it is skipped.
+  - [ ] A test: a logged `t3/x`, deleted and recreated with another ticket's commit, leaves `agent/<ID>` where it is, and the merge passes.
+history:
+- at: 2026-11-16T04:47:33.913722+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

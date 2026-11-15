@@ -1,11 +1,11 @@
 title: Review and merge jobs work on the branch that holds the fix's commits, not on a new t3/* branch
-status: Reviewing
+status: Merging
 priority: High
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-16T02:33:11.139637+00:00
-modified: 2026-11-16T03:51:54.992713+00:00
+modified: 2026-11-16T04:47:59.277279+00:00
 relationships:
   related:
   - DEV-583
@@ -15,6 +15,7 @@ relationships:
   - DEV-603
   - DEV-593
   - DEV-604
+  - DEV-612
 comments:
 - date: 2026-11-16T03:48:30.481925+00:00
   author: claude
@@ -48,8 +49,20 @@ comments:
       result: not_run
       reason: covered by the fake-t3 tests
     next: Review on another model, then merge
+- date: 2026-11-16T04:47:48.548407+00:00
+  author: claude
+  text: |-
+    Review: passed. The fix does what "Done when" asks, and the tests fail without it. One minor follow-up filed as DEV-612.
+
+    - Read: the ticket and the fix agent's comment, `git diff main...HEAD` (`67499e12`: `agent_job_service.rs`, `dev503_harness_jobs_test.rs`, `docs/help/agent.md`), `move_ticket_branch`, `superseded_removal`, `branch_landed`, the `BranchOwners` trace, and main's newer commits to the file (DEV-594 `bab2586f`, DEV-593 `e1904446`). `git merge-tree` against main: no conflicts.
+    - Job start: `follow_ticket_work` runs in `run_job` for every runner, before the worktree is planned. It fails the job with both branch names when git refuses the move, and it logs the move. When `agent/<ID>` has diverged work of its own, it stays where it is.
+    - Merge end: `ensure_branch_merged` fails a merge whose branch has nothing beyond main as it was at the start, while another branch of the ticket holds unlanded work, and the message names that branch.
+    - Tests fail before the fix: with `agent_job_service.rs` set back to `7a19ab6d`, the STD-133 test and the "merge brings nothing" test fail. The leftover-copy test fails once the `superseded_removal` filter is removed. The file is restored; the worktree is clean.
+    - Reran: `npm run lint:agent` passed. `npm run test:agent` passed (2241 Rust, 1548 UI). Not rerun: `npm run test:smoke:agent` (Rust-only change; the fix agent ran it, 405/405).
+    - Minor, filed as DEV-612: branches are matched by the names earlier jobs logged. For a reopened ticket, a freed `t3/<topic>` name that another ticket's thread reuses can be followed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0fdff5f2-dc5b-42f4-94e7-32cec663f3c7
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9f427401-39da-4fde-947a-80546299690b
 description: |-
   Source: the chief of staff's token-use analysis, 2026-11-14 00:00 to 2026-11-15 16:15 PST (notes: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/notes.md, per-job costs: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/jobs_cost3.json). Owner 2026-11-15 picked this recommendation from the options picker.
 
@@ -180,3 +193,27 @@ history:
   - field: relationships
     old: '{"related":["DEV-583","DEV-594","DEV-577","DEV-595","DEV-603","DEV-593"]}'
     new: '{"related":["DEV-583","DEV-594","DEV-577","DEV-595","DEV-603","DEV-593","DEV-604"]}'
+- at: 2026-11-16T04:37:11.554302+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A9f427401-39da-4fde-947a-80546299690b
+- at: 2026-11-16T04:47:33.601035+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-583","DEV-594","DEV-577","DEV-595","DEV-603","DEV-593","DEV-604"]}'
+    new: '{"related":["DEV-583","DEV-594","DEV-577","DEV-595","DEV-603","DEV-593","DEV-604","DEV-612"]}'
+- at: 2026-11-16T04:47:48.548407+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T04:47:59.277279+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

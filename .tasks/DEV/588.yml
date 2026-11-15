@@ -1,11 +1,11 @@
 title: 'Flaky test: concurrent_comments_and_references_preserve_all_writes hits the 2 s storage lock wait under load'
-status: HelpNeeded
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: mallox
 created: 2026-11-15T21:39:19.080638+00:00
-modified: 2026-11-16T04:08:26.886066+00:00
+modified: 2026-11-16T04:54:26.225122+00:00
 relationships:
   depends_on:
   - DEV-520
@@ -18,6 +18,8 @@ relationships:
   - DEV-601
   - DEV-595
   - DEV-607
+  - DEV-566
+  - DEV-605
 comments:
 - date: 2026-11-15T22:34:21.388495+00:00
   author: claude
@@ -160,6 +162,31 @@ comments:
       result: passed
       reason: 405/405
     next: Merge agent lands e2f9a9f5
+- date: 2026-11-16T04:12:01.077588+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `1b6c7857` is on `main` and `origin/main`.
+
+    - Rebased `e2f9a9f5` onto `e1904446` → `fe3e2b72`; no conflicts, no lockfiles. Amended the main checkout's `.tasks` changes in → `1b6c7857`.
+    - No rule or config files changed: trust not needed.
+    - Smoke had one failure, the known load flake [DEV-607](https://lotar.pyxzl.net/task/DEV-607), not this change (Rust test file only); noted it there.
+    - Ticket check: the test passed 20/20 in a stress run at load ~100.
+  report:
+    commits:
+    - hash: 1b6c7857
+      what: DEV-588 test waits 60 s for the storage lock (rebased from e2f9a9f5)
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2242 Rust, 1548 UI, release and hooks
+    - command: npm run smoke
+      result: failed
+      reason: 404/405, ui.global-actions desktop Close panel timeout at load ~120 (DEV-607); spec rerun 3/3 passed
+    - command: nextest dev60 concurrent_comments_and_references_preserve_all_writes --stress-count 20
+      result: passed
+    next: 'None: landed and pushed'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A5b47411f-c7b8-4f19-ae40-3aaccb34473a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A12e16879-9537-4690-ab70-ab981f592496
@@ -168,7 +195,6 @@ references:
 description: 'Found by claude in the DEV-520 merge, 2026-11-15: `npm run test:agent` failed once at load average ~100 with `concurrent comment: IoError(WouldBlock) Storage lock .../.task.lock is still busy after 2 seconds` (`crates/lotar-lib/tests/dev60_shared_mutation_test.rs:434`); six threads write one ticket and the lock wait is `DEFAULT_STORAGE_LOCK_WAIT` = 2 s (`crates/lotar-core/src/storage/safety.rs:68`). Check: the test passes repeatedly under full-suite load. Done: the test can''t time out on a busy machine (for example a longer lock wait in the test, or fewer writers holding the lock at once) and still checks that no write is lost.'
 tags:
 - health
-- fix-retried
 custom_fields:
   finding: npm test:dev60_shared_mutation_test::concurrent_comments_and_references_preserve_all_writes
 history:
@@ -356,3 +382,31 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-520"],"related":["DEV-520","DEV-513","DEV-590","DEV-530","DEV-563","DEV-601","DEV-595"]}'
     new: '{"depends_on":["DEV-520"],"related":["DEV-520","DEV-513","DEV-590","DEV-530","DEV-563","DEV-601","DEV-595","DEV-607"]}'
+- at: 2026-11-16T04:12:01.077588+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T04:12:10.595518+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done
+- at: 2026-11-16T04:12:24.727325+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, fix-retried
+    new: health
+- at: 2026-11-16T04:21:26.752039+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-520"],"related":["DEV-520","DEV-513","DEV-590","DEV-530","DEV-563","DEV-601","DEV-595","DEV-607"]}'
+    new: '{"depends_on":["DEV-520"],"related":["DEV-520","DEV-513","DEV-590","DEV-530","DEV-563","DEV-601","DEV-595","DEV-607","DEV-566"]}'
+- at: 2026-11-16T04:54:26.225122+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-520"],"related":["DEV-520","DEV-513","DEV-590","DEV-530","DEV-563","DEV-601","DEV-595","DEV-607","DEV-566"]}'
+    new: '{"depends_on":["DEV-520"],"related":["DEV-520","DEV-513","DEV-590","DEV-530","DEV-563","DEV-601","DEV-595","DEV-607","DEV-566","DEV-605"]}'

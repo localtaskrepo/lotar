@@ -1,11 +1,11 @@
 title: Sign lotar builds from source with the owner's Developer ID
-status: HelpNeeded
+status: Reviewing
 priority: High
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@review-claude'
 created: 2026-11-15T17:40:28.569324+00:00
-modified: 2026-11-16T03:08:17.284707+00:00
+modified: 2026-11-16T04:52:33.132091+00:00
 relationships:
   depends_on:
   - DEV-564
@@ -18,6 +18,7 @@ relationships:
   - DEV-593
   - DEV-606
   - DEV-595
+  - DEV-592
 comments:
 - date: 2026-11-15T18:01:34.472793+00:00
   author: claude
@@ -295,11 +296,44 @@ comments:
       result: not_run
       reason: done on t3/e64a8987 at 02:57
     next: 'Merge agent: merge t3/e64a8987 (adffe220), not t3/db6dfa77'
+- date: 2026-11-16T04:20:29.981878+00:00
+  author: claude
+  text: |-
+    Fix retry: rebased onto current main and fully checked; ready for review and merge. Answers the retry question: the earlier jobs died on usage limits, not the work.
+
+    - Branch `t3/sign-lotar-source-builds` now holds `43b1240d`, signed, on main `1b6c7857` (DEV-520, DEV-595, DEV-592..DEV-588). Clean rebase, no lockfile change.
+    - Same patch as `adffe220` (`t3/e64a8987`) and `53e25f3c` (`t3/db6dfa77`): `git patch-id` identical. Those two branches are now stale copies; merge `43b1240d`.
+    - Lint, tests (Rust 2242, UI 1548, release 60, hooks 7) and smoke 405/405 passed.
+    - Still open: firewall/LAN check after the next release; [LOCA-385](https://local.pyxzl.net/task/LOCA-385).
+  report:
+    commits:
+    - hash: 43b1240d
+      what: DEV-563 Sign lotar builds from source with the owner's Developer ID (rebased onto main 1b6c7857)
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: Rust 2242, UI 1548, release 60, hooks 7
+    - command: npm run test:smoke:agent
+      result: passed
+      reason: 405/405
+    - command: real Developer ID install
+      result: not_run
+      reason: no file changed since it passed on 7c81ee16/200d70f1
+    - command: firewall/LAN check
+      result: not_run
+      reason: scheduled for after the next release
+    next: Review, then merge 43b1240d from t3/sign-lotar-source-builds
+- date: 2026-11-16T04:52:33.132091+00:00
+  author: claude
+  text: 'Stalled since 2026-11-16T04:20Z with no lotar job: the live check restarted the review (lotar rule "Answered in the thread: review on Claude"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A48978e68-4aef-478b-9e73-5de28287861d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3690749e-953c-4cfe-a099-7df1148176ba
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8fcc53f0-d434-4d0a-bd72-2d73e8a3c23f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7e18bebc-2fbf-4472-946e-1a78c1222882
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad11bdb0a-7289-4276-911b-aedc9142c5c1
 description: |-
   Child of standards STD-138 (https://standards.pyxzl.net/task/STD-138). Owner by voice, 2026-11-15: "sign every local install of lotar, opgate and harnessmux, including builds from source, with my Developer ID, so keychain and firewall approvals survive new builds. Land it in the next version."
 
@@ -633,3 +667,47 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-564","DEV-520"],"related":["standards:STD-138","DEV-482","DEV-564","DEV-588","DEV-593","DEV-606"]}'
     new: '{"depends_on":["DEV-564","DEV-520"],"related":["standards:STD-138","DEV-482","DEV-564","DEV-588","DEV-593","DEV-606","DEV-595"]}'
+- at: 2026-11-16T04:12:53.467347+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad11bdb0a-7289-4276-911b-aedc9142c5c1
+- at: 2026-11-16T04:20:29.981878+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T04:20:30.946724+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-564","DEV-520"],"related":["standards:STD-138","DEV-482","DEV-564","DEV-588","DEV-593","DEV-606","DEV-595"]}'
+    new: '{"depends_on":["DEV-564","DEV-520"],"related":["standards:STD-138","DEV-482","DEV-564","DEV-588","DEV-593","DEV-606","DEV-595","DEV-592"]}'
+- at: 2026-11-16T04:20:37.461547+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Reviewing
+  - field: assignee
+    old: mallox
+- at: 2026-11-16T04:52:30.121805+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+  - field: assignee
+    new: claude
+- at: 2026-11-16T04:52:30.701797+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: claude
+    new: '@review-claude'
+- at: 2026-11-16T04:52:33.132091+00:00
+  actor: claude
+  changes:
+  - field: comment_added

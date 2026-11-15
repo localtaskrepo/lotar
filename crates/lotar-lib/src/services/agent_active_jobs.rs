@@ -33,9 +33,9 @@ pub struct ActiveJob {
     /// when the ticket has moved on since (DEV-544).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub merge: bool,
-    /// A merge job's ticket assignee when it started (empty: none), so a
+    /// The ticket's assignee when the job started (empty: none), so a
     /// process that takes the job over sees whether the agent handed the
-    /// ticket back (DEV-516).
+    /// ticket back (DEV-516) or something moved it on (DEV-566).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub assignee_at_start: Option<String>,
 }

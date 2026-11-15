@@ -1,14 +1,43 @@
 title: 'Flaky smoke: board columns dialog click on Move WontDo times out under full-suite load'
-status: Todo
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-16T02:56:31.049417+00:00
-modified: 2026-11-16T02:56:35.326099+00:00
+modified: 2026-11-16T04:27:25.843289+00:00
 relationships:
   related:
   - DEV-563
+  - DEV-575
+comments:
+- date: 2026-11-16T04:27:17.687118+00:00
+  author: claude
+  text: |-
+    Fixed in the test: the Move menu click is now retried until the menu opens, and it waits for the dialog to be active first.
+
+    - Cause: the DEV-563 log (in a scratchpad `smoke.log`) stops at `performing click action`, after the actionability checks passed. The mouse event went out and the overloaded browser never answered it, so a longer wait wouldn't help. I couldn't reproduce it (load average ~110, spec 3/3 alone).
+    - `smoke/tests/ui.board-layout.smoke.spec.ts`: wait until the modal has moved focus to Apply (`UiModal` activation). Then `moveVia` clicks the `Move <status>` summary with a 5 s timeout, retried until its `<details>` is open, for up to 30 s. That's the same pattern as DEV-575.
+    - No app code changed; only this spec.
+  report:
+    commits:
+    - hash: 7c3253dd
+      what: board-layout smoke waits for the dialog to be active and retries the menu click until the menu is open
+    checks:
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2242 Rust, 1548 UI, release, hooks
+    - command: npm run test:smoke:quick:agent
+      result: passed
+      reason: full suite 3 of 3, 405/405, on the build:smoke from this job
+    - command: npm run -s test:smoke:quick:agent tests/ui.board-layout.smoke.spec.ts
+      result: passed
+      reason: 3 of 3
+    next: Review, then merge; the merge agent reruns the full smoke
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A894e9f23-1f2b-42fe-8f92-1146d26ffe1a
 description: 'Found in the DEV-563 run on 2026-11-15: `npm run test:smoke:agent` failed once at `smoke/tests/ui.board-layout.smoke.spec.ts:58` (moveVia): `locator.click` on `Move WontDo` (a <summary>) timed out after 30 s although the element was visible, enabled and stable. The same spec passed 3 of 3 runs alone (`npm run -s test:smoke:quick:agent tests/ui.board-layout.smoke.spec.ts`). Done when the click no longer depends on load (wait for the dialog state the click needs) and the full smoke passes repeatedly.'
 tags:
 - health
@@ -24,3 +53,33 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-16T04:12:52.318090+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-16T04:12:54.967153+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A894e9f23-1f2b-42fe-8f92-1146d26ffe1a
+- at: 2026-11-16T04:27:17.687118+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T04:27:17.826950+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-563"]}'
+    new: '{"related":["DEV-563","DEV-575"]}'
+- at: 2026-11-16T04:27:25.843289+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

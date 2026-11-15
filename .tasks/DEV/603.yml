@@ -1,14 +1,17 @@
 title: A rework, review or merge round after more than 55 idle minutes starts a fresh session with a handoff
-status: Reviewing
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-16T02:33:13.636+00:00
-modified: 2026-11-16T03:40:52.142971+00:00
+modified: 2026-11-16T04:47:52.959237+00:00
 relationships:
   related:
   - DEV-602
+  - DEV-611
+  - DEV-593
+  - DEV-594
 comments:
 - date: 2026-11-16T03:40:37.686895+00:00
   author: claude
@@ -37,8 +40,36 @@ comments:
       result: passed
       reason: 404/405 in the full run; ui.sprints-responsive '1024px' timed out on a click, passed 7/7 rerun alone (unrelated)
     next: Review, then merge
+- date: 2026-11-16T04:47:41.675193+00:00
+  author: claude
+  text: |-
+    Review: passed. `d9e58bcb` does what "Done when" asks; one minor follow-up filed.
+
+    - Read: the diff (`git diff main...HEAD`, 5 files), the ticket and the fix comment, DEV-602, AGENTS.md, and main's newer `agent_job_service.rs` commits (DEV-593, DEV-594): they merge cleanly (`git merge-tree`) and don't touch the new check
+    - Premise holds: harnessmux 0.1.9 sets `last_used` on every state change, including a turn's end (`session.rs` `set_state`)
+    - `run_job`: the idle check runs only on a session that `continuable_session` accepted, so the other "can't continue" reasons are unchanged and get no handoff; an unparseable `last_used` resumes; `0` never resumes (`idle >= limit`); the limit comes from the job's own profile (`resolve_profile`), and rules can't set it
+    - The handoff happens before the T3 worktree lookup, so a fresh job takes the usual `plan_t3_worktree` path; it names the new session under the job's own profile
+    - Tests `session_continue_resumes_a_session_used_within_the_time` and `..._starts_a_new_session_with_a_handoff_after_the_time` cover both cases, including the log line, `session/new` vs `session/resume`, and a comment in the handoff
+    - Docs: `agent.md#sessions` and `config-reference.md` agree with the code
+    - Minor, filed as DEV-611: on a fix rework, the new session has the same name as the old one, so harnessmux deletes the old record and event log (`registry.remove`). The handoff names a session whose log is gone.
+    - No files changed; status and assignee are unchanged
+  report:
+    checks:
+    - command: cargo nextest dev503_harness_jobs_test + dev510_t3_session_test
+      result: passed
+      reason: 31/31
+    - command: npm run lint:agent
+      result: passed
+    - command: npm run test:agent
+      result: passed
+      reason: 2240 Rust + 1548 UI
+    - command: npm run smoke
+      result: not_run
+      reason: backend-only change, fix agent's run 404/405 with an unrelated UI flake
+    next: Merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abdbbb661-1e5b-4a66-ac04-a25e682f8972
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3121b39f-806a-4012-9aec-19490594a253
 description: |-
   Source: the chief of staff's token-use analysis, 2026-11-14 00:00 to 2026-11-15 16:15 PST (notes: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/notes.md, per-job costs: /private/tmp/claude-501/-Users-mallox-Development-staff/0ac34df1-8fd4-4e3f-b9d4-c9c5d3f89ba1/scratchpad/jobs_cost3.json). Owner 2026-11-15 picked this recommendation from the options picker.
 
@@ -115,3 +146,33 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-16T04:34:22.969120+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3121b39f-806a-4012-9aec-19490594a253
+- at: 2026-11-16T04:47:15.320268+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-602"]}'
+    new: '{"related":["DEV-602","DEV-611"]}'
+- at: 2026-11-16T04:47:41.675193+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-16T04:47:41.813158+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-602","DEV-611"]}'
+    new: '{"related":["DEV-602","DEV-611","DEV-593","DEV-594"]}'
+- at: 2026-11-16T04:47:52.959237+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
