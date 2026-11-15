@@ -1,11 +1,11 @@
 title: 'A blocking review is ignored: the fix job''s end rule moves Reviewing on to Merging while the review still runs'
-status: Reviewing
+status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: mallox
 created: 2026-11-15T17:44:03.850220+00:00
-modified: 2026-11-15T20:42:50.059626+00:00
+modified: 2026-11-15T20:53:41.380946+00:00
 relationships:
   related:
   - DEV-524
@@ -182,6 +182,48 @@ comments:
       result: not_run
       reason: needs real fix, review and merge jobs
     next: Second review, then merge
+- date: 2026-11-15T20:53:24.299001+00:00
+  author: codex
+  text: |-
+    Review: blocking — this review checkout contains the superseded fix, not the latest handoff.
+
+    - `HEAD` is `b3168b0f`; `git log main..HEAD` contains that one commit. Latest ticket handoff names `9b70f43d`, which exists locally but is absent from this branch. No checkout or branch changes made.
+    - `crates/lotar-lib/src/services/automation_service.rs:3760` explicitly permits queued @merge with `review-blocked`; its fixture sets that tag. This is the previously blocked implementation, so this branch cannot satisfy the second acceptance condition.
+    - Restart review on `9b70f43d` before merging. This finding does not assess that newer commit. Read ticket/comments, related tickets and recent main history; whitespace check passed. Runtime gates were not rerun against obsolete code; this checkout also lacks generated `target/web-embed`.
+    - No source files, status or assignee changed. No new bug ticket: this is the existing DEV-566 finding and a review checkout mismatch.
+  report:
+    checks:
+    - command: git diff --check main...HEAD
+      result: passed
+    - command: focused Rust regressions
+      result: not_run
+      reason: checkout holds obsolete b3168b0f; target/web-embed absent
+    - command: full lint/test/smoke
+      result: not_run
+      reason: review checkout does not contain handed-off commit
+    next: Restart review in a checkout containing 9b70f43d; preserve both branches
+- date: 2026-11-15T20:53:41.380946+00:00
+  author: automation
+  text: |-
+    The review found blocking problems again after one rework (the comments above). Rework, your decision on the findings, or WontDo?
+
+    Options:
+    - fix: An agent reworks it once more
+    - decide: I decide the findings (say how)
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: An agent reworks it once more
+      set:
+        assignee: '@fix'
+    - key: decide
+      label: I decide the findings (say how)
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
 description: 'Found 2026-11-15 on LOCA-333 (local repo). The fix agent set Reviewing at 17:39:36 (assignee @review); 8 s later, at 17:39:44, the fix job''s end rule moved it again to Merging/@merge. The review job (job-20261115T174010.077Z-13) then ran with the review prompt but was counted as a merge job: it tagged review-blocked, and its end was logged as a failed merge (cannot fast-forward), tagged merge-retried and sent to @fix. The next job (job-20261115T174245.273Z-26) got the merge prompt for the still-blocked commit. Check: lotar show LOCA-333 history in ~/Development/local. Done when: a job''s end rule doesn''t advance a ticket that the agent already moved during the job, and a merge job never starts while the ticket carries review-blocked without a rework.'
 tags:
 - health
@@ -326,3 +368,29 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-15T20:53:24.299001+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T20:53:25.154725+00:00
+  actor: codex
+  changes:
+  - field: tags
+    old: health, review-returned
+    new: health, review-returned, review-blocked
+- at: 2026-11-15T20:53:40.975188+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: HelpNeeded
+  - field: assignee
+    old: '@review'
+    new: mallox
+  - field: tags
+    old: health, review-returned, review-blocked
+    new: health, review-returned
+- at: 2026-11-15T20:53:41.380946+00:00
+  actor: automation
+  changes:
+  - field: comment_added

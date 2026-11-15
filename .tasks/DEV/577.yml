@@ -1,11 +1,11 @@
 title: A merge job that landed its work fails when the ticket branch is checked out in another worktree
-status: HelpNeeded
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@fix-codex'
 created: 2026-11-15T19:24:33.178444+00:00
-modified: 2026-11-15T20:28:08.049892+00:00
+modified: 2026-11-15T20:51:33.333669+00:00
 relationships:
   related:
   - DEV-573
@@ -67,12 +67,16 @@ comments:
 - date: 2026-11-15T20:28:06.090580+00:00
   author: mallox
   text: 'Answer: finished-only (Detach only worktrees of finished jobs; leave a running agent''s worktree and skip the move) (answered in INBOX-291)'
+- date: 2026-11-15T20:51:33.333669+00:00
+  author: automation
+  text: The fix agent's job job-20261115T205121.631Z-51 failed (lotar agent logs job-20261115T205121.631Z-51); @fix-codex retries it on branch agent/DEV-577.
 description: |-
   Found: job job-20261115T191640.133Z-8 (standards STD-136) rebased, fast-forwarded main to d0deac4 and pushed, then failed: `git branch --force agent/STD-136 18b8e9c` refused, 'cannot force update the branch used by worktree at .../agent-STD-136-...'. The ticket went back to Merging, assigned to @fix, and a fix agent was started for work already on main.
   Check: run a merge job in a T3 thread whose ticket branch is checked out in a lotar worktree; the job ends failed after the merge.
   Done: when the work is on main, a branch that can't be moved (checked out elsewhere) is skipped or reset in its worktree, and the job doesn't fail; the ticket goes to Done.
 tags:
 - health
+- fix-retried
 custom_fields:
   finding: merge-job:branch-in-use
 history:
@@ -152,3 +156,22 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-15T20:51:22.154018+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-15T20:51:32.689663+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-codex'
+  - field: tags
+    old: health
+    new: health, fix-retried
+- at: 2026-11-15T20:51:33.333669+00:00
+  actor: automation
+  changes:
+  - field: comment_added

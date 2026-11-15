@@ -382,7 +382,7 @@ impl AutomationService {
             current.assignee.as_deref(),
             current,
             config,
-            AgentRunSettings::default(),
+            assignment_run_settings(&automation, current),
         );
 
         // Determine which events to fire
@@ -1412,8 +1412,6 @@ fn resolve_action_for_event(on: &crate::automation::types::AutomationRuleActions
     }
 }
 
-/// Like `resolve_action_for_event` but falls back to the legacy `start`
-/// catch-all for task events (used by the simulate path).
 /// "a", "a and b", "a, b and c".
 fn join_and(items: &[String]) -> String {
     match items.split_last() {
@@ -1422,6 +1420,8 @@ fn join_and(items: &[String]) -> String {
     }
 }
 
+/// Like `resolve_action_for_event` but falls back to the legacy `start`
+/// catch-all for task events (used by the simulate path).
 fn resolve_action_for_event_with_fallback(on: &crate::automation::types::AutomationRuleActions, event: AutomationEvent) -> Option<&AutomationAction> {
     resolve_action_for_event(on, event).or(match event {
         AutomationEvent::Created
@@ -2172,13 +2172,7 @@ fn apply_action(
         next_task = Some(TaskService::update_with_context(storage, &base.id, patch, TaskUpdateContext::automation_disabled())?);
     }
     if let Some(updated) = next_task.as_ref() {
-        let run = action.agent.as_ref().map(|agent| AgentRunSettings {
-            model: expand_run_setting(agent.model.as_deref(), |raw| tmpl.expand(raw)),
-            effort: expand_run_setting(agent.effort.as_deref(), |raw| tmpl.expand(raw)),
-            provider: expand_run_setting(agent.provider.as_deref(), |raw| tmpl.expand(raw)),
-            session: agent.session,
-            prompt: agent.prompt.as_ref().map(|prompt| tmpl.expand(prompt)).filter(|prompt| !prompt.trim().is_empty()),
-        });
+        let run = action.agent.as_ref().map(|agent| AgentRunSettings::from_action(agent, &tmpl));
         maybe_queue_agent_on_assignment(
             storage.root_path.as_path(),
             base.assignee.as_deref(),
@@ -2604,6 +2598,37 @@ struct AgentRunSettings {
     provider: Option<String>,
     session: Option<crate::config::types::AgentSession>,
     prompt: Option<String>,
+}
+
+impl AgentRunSettings {
+    fn from_action(agent: &crate::automation::types::AutomationAgentAction, tmpl: &TemplateContext) -> Self {
+        Self {
+            model: expand_run_setting(agent.model.as_deref(), |raw| tmpl.expand(raw)),
+            effort: expand_run_setting(agent.effort.as_deref(), |raw| tmpl.expand(raw)),
+            provider: expand_run_setting(agent.provider.as_deref(), |raw| tmpl.expand(raw)),
+            session: agent.session,
+            prompt: agent.prompt.as_ref().map(|prompt| tmpl.expand(prompt)).filter(|prompt| !prompt.trim().is_empty()),
+        }
+    }
+}
+
+/// The run settings for a job started by assigning the ticket by hand: those
+/// of the first rule that assigns the same agent profile and says how its
+/// job runs (DEV-576). A review or merge profile assigned by hand then gets
+/// the review or merge prompt, not the generic one that changes the repo.
+fn assignment_run_settings(automation: &AutomationFile, task: &TaskDTO) -> AgentRunSettings {
+    let Some(assignee) = task.assignee.as_deref().filter(|assignee| assignee.starts_with('@')) else {
+        return AgentRunSettings::default();
+    };
+    let agent = automation
+        .automation
+        .rules()
+        .iter()
+        .filter(|rule| rule.is_enabled())
+        .flat_map(|rule| rule.on.actions())
+        .filter(|action| action.set.as_ref().and_then(|set| set.assignee.as_deref()).is_some_and(|value| value.trim() == assignee))
+        .find_map(|action| action.agent.as_ref());
+    agent.map(|agent| AgentRunSettings::from_action(agent, &TemplateContext::from_task(task))).unwrap_or_default()
 }
 
 /// Automatically queue an agent job when the assignee changes to an agent profile.

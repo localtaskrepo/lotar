@@ -1,11 +1,10 @@
 title: 'Close the gaps of harnessmux''s t3 agent: resume waits for a running thread, worktree and link in its events, a structured wait for an answer'
-status: HelpNeeded
+status: Done
 priority: High
 type: Feature
 reporter: claude
-assignee: '@fix'
 created: 2026-11-14T02:19:54.140386+00:00
-modified: 2026-11-15T20:42:59.904702+00:00
+modified: 2026-11-15T20:46:42.794393+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -35,6 +34,7 @@ relationships:
   - DEV-574
   - DEV-578
   - DEV-581
+  - DEV-585
 comments:
 - date: 2026-11-14T04:12:50.227687+00:00
   author: claude
@@ -546,6 +546,43 @@ comments:
 - date: 2026-11-15T20:15:40.007892+00:00
   author: mallox
   text: 'Answer: yes (Release 0.1.9 (push harnessmux main, push signed tag v0.1.9, then merge lotar)) (answered in INBOX-289)'
+- date: 2026-11-15T20:46:42.794393+00:00
+  author: claude
+  text: |-
+    Merged: harnessmux 0.1.9 is on crates.io, and lotar main has DEV-510 as `85565157`. lotar main isn't pushed (the release waits).
+
+    - **harnessmux** (owner: "Yes, go ahead"): rebased `05d4c64` onto DEV-578's `1d8fd5d` as `987add9`. The only conflict was in `CHANGELOG.md`, and both entries are now under 0.1.9. Pushed main, then the signed tag `v0.1.9`. release.yml published it.
+    - **lotar**: ran `cargo update -p harnessmux --precise 0.1.9`, then rebased onto main `137101ac`. Conflicts:
+      - `Cargo.toml` and `Cargo.lock`: took 0.1.9 (main had 0.1.8).
+      - `docs/help/agent.md`: kept main's new bullets with DEV-510's reworded sentences (link on the ticket, waiting thread hands back).
+    - **Ran `npm ci`**: main's `package-lock.json` had changed.
+    - **Ticket files**: committed the open `.tasks` changes into the merged commit. The secret scan flagged my own 08:45 comment quoting 1Password's error ("Couldn't find key in agent?"). That was a false positive with no secret. I changed only its backticks to the allowlisted `1Password: "…"` form.
+    - **Not pushed**: the oldest unpushed commit is DEV-513's release commit `c01909e9`, which waits for the owner's publish yes. Nothing can be pushed before it.
+    - **No trust needed**: no rule or config files changed.
+  report:
+    commits:
+    - hash: '85565157'
+      what: DEV-510 on lotar main (rebased onto 137101ac, harnessmux 0.1.9 in Cargo.toml and Cargo.lock, plus the open .tasks changes)
+    - hash: 987add9
+      what: harnessmux DEV-510 rework, rebased onto DEV-578 1d8fd5d, released as v0.1.9
+    checks:
+    - command: harnessmux cargo fmt --check, clippy -D warnings, nextest (43), cargo deny
+      result: passed
+    - command: harnessmux release.yml v0.1.9 (run 43757297625)
+      result: passed
+      reason: published to crates.io
+    - command: npm run lint (lint:agent)
+      result: passed
+    - command: npm test (test:agent)
+      result: passed
+      reason: 2nd run 2218 Rust + 1547 UI + release + hooks; 1st run 3 watcher/MCP timing tests failed, they pass alone 3/3, filed DEV-585
+    - command: npm run smoke (test:smoke:agent)
+      result: passed
+      reason: 404 tests
+    - command: git push lotar main
+      result: not_run
+      reason: held behind unpushed release commit c01909e9 (DEV-513 waits for the owner's publish yes)
+    next: 'DEV-513: re-run the release checks and ask the owner for the publish yes; that push carries 85565157'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ae32d01b4-631c-4fdc-adf5-8f18371bee13
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac1722915-ee93-49bf-9853-b79066d0c7be
@@ -1447,3 +1484,24 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-509","DEV-512","DEV-511","DEV-501","DEV-521","DEV-537","DEV-467","DEV-499","DEV-516","DEV-528","DEV-544","DEV-550","DEV-560","DEV-520","DEV-564","DEV-569","DEV-573","DEV-562","DEV-574","DEV-578"]}'
     new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-509","DEV-512","DEV-511","DEV-501","DEV-521","DEV-537","DEV-467","DEV-499","DEV-516","DEV-528","DEV-544","DEV-550","DEV-560","DEV-520","DEV-564","DEV-569","DEV-573","DEV-562","DEV-574","DEV-578","DEV-581"]}'
+- at: 2026-11-15T20:45:01.563335+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Done
+- at: 2026-11-15T20:45:47.636666+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-15T20:46:21.241019+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-509","DEV-512","DEV-511","DEV-501","DEV-521","DEV-537","DEV-467","DEV-499","DEV-516","DEV-528","DEV-544","DEV-550","DEV-560","DEV-520","DEV-564","DEV-569","DEV-573","DEV-562","DEV-574","DEV-578","DEV-581"]}'
+    new: '{"depends_on":["DEV-503"],"blocks":["DEV-513"],"related":["DEV-503","DEV-513","DEV-509","DEV-512","DEV-511","DEV-501","DEV-521","DEV-537","DEV-467","DEV-499","DEV-516","DEV-528","DEV-544","DEV-550","DEV-560","DEV-520","DEV-564","DEV-569","DEV-573","DEV-562","DEV-574","DEV-578","DEV-581","DEV-585"]}'
+- at: 2026-11-15T20:46:42.794393+00:00
+  actor: claude
+  changes:
+  - field: comment_added

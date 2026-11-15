@@ -1,11 +1,11 @@
 title: An agent job hangs when its session's event stream lags and drops the turn's end
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-14T05:38:48.737497+00:00
-modified: 2026-11-15T20:42:51.387494+00:00
+modified: 2026-11-15T20:51:18.203867+00:00
 relationships:
   related:
   - DEV-501
@@ -262,6 +262,38 @@ comments:
 - date: 2026-11-15T20:22:24.639253+00:00
   author: mallox
   text: swap next time it's idle (answered in INBOX-241)
+- date: 2026-11-15T20:48:23.118336+00:00
+  author: automation
+  text: The fix agent's job job-20261115T204251.073Z-42 failed (lotar agent logs job-20261115T204251.073Z-42); @fix-codex retries it on branch agent/DEV-520.
+- date: 2026-11-15T20:51:18.203867+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261115T205037.112Z-50 failed again (lotar agent logs job-20261115T205037.112Z-50). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-codex: Retry with @fix-codex
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-codex
+      label: Retry with @fix-codex
+      set:
+        assignee: '@fix-codex'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A7234460b-fa1f-4515-a843-598de63b5e51
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af5b504b1-62e7-4678-9cf9-f100b8ba0692
@@ -275,6 +307,7 @@ tags:
 - health
 - review-returned
 - merge-retried
+- fix-retried
 custom_fields:
   finding: review:drive-session-lag
 history:
@@ -769,3 +802,29 @@ history:
   - field: status
     old: HelpNeeded
     new: InProgress
+- at: 2026-11-15T20:48:22.814953+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-codex'
+  - field: tags
+    old: health, review-returned, merge-retried
+    new: health, review-returned, merge-retried, fix-retried
+- at: 2026-11-15T20:48:23.118336+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-15T20:51:18.006002+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-codex'
+    new: mallox
+- at: 2026-11-15T20:51:18.203867+00:00
+  actor: automation
+  changes:
+  - field: comment_added

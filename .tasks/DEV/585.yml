@@ -1,0 +1,31 @@
+title: 'Flaky Rust tests: file watcher and MCP list_changed events missing under full-suite load'
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-15T20:46:20.952204+00:00
+modified: 2026-11-15T20:46:21.873348+00:00
+relationships:
+  related:
+  - DEV-510
+description: |-
+  Found during the DEV-510 merge (2026-11-15): the first `npm run -s test:agent` in the DEV-510 worktree failed 3 tests; the second full run passed 2218/2218 on the same commit.
+
+  - `web_api_integration_test::watcher_reports_config_edits_and_ignores_internal_files` (`crates/lotar-lib/tests/web_api_integration_test.rs:1435`: "external config edit must emit config_updated: []")
+  - `web_api_integration_test::sprint_changes_announce_the_sprint_and_its_tasks` (`:1475`, no events)
+  - `mcp_wire_lifecycle_test::deferred_list_changed_is_coalesced_and_emitted_after_ready` (12 s)
+  - Alone they pass 3 of 3: `cargo nextest run --cargo-profile local -p lotar-lib --test integration -E 'test(/sprint_changes_announce_the_sprint|watcher_reports_config_edits|deferred_list_changed_is_coalesced/)'`. A failure also left one entry in `.lotar-test-scratch`.
+
+  Check: run `npm test` several times on a busy machine (for example with a parallel build); these tests must not fail.
+  Done when the events arrive reliably under load (or the tests wait for them without a fixed window) and repeated full runs pass.
+tags:
+- health
+custom_fields:
+  finding: npm test:watcher-events-under-load
+history:
+- at: 2026-11-15T20:46:21.873348+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

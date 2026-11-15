@@ -540,6 +540,75 @@ echo '{{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\
     assert!(prompt.contains(&format!("Run the tests for {}", created.id)), "{prompt}");
 }
 
+/// DEV-576: assigning a review or merge profile by hand starts its job with
+/// the prompt and settings of the rule that hands tickets to that profile,
+/// not the generic prompt that has the agent change the repo; a profile no
+/// rule assigns keeps the generic prompt.
+#[cfg(unix)]
+#[test]
+fn assignment_by_hand_runs_the_rule_prompt_of_that_profile() {
+    let _guard = lock_agent_tests();
+    enable_server_mode();
+    let fixtures = TestFixtures::new();
+    let root = fixtures.get_temp_path();
+
+    let script = |name: &str| {
+        let stdin = root.join(format!("{name}.stdin"));
+        write_stub_agent_script(
+            root,
+            &format!("stub-{name}.sh"),
+            &format!(
+                "#!/bin/sh\n\
+printf '%s' \"$LOTAR_AGENT_PROMPT\" > \"{}\"\n\
+echo '{{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"ok\"}}'\n",
+                stdin.display()
+            ),
+        )
+    };
+    let profiles: Vec<(&str, PathBuf)> = ["review", "land", "work"].into_iter().map(|name| (name, script(name))).collect();
+    let agents: String =
+        profiles.iter().map(|(name, path)| format!("  {name}:\n    runner: command\n    model: sonnet\n    command: \"{}\"\n", path.display())).collect();
+    fixtures.create_config_in_dir(&fixtures.tasks_root, &format!("issue:\n  states: [Todo, InProgress, Reviewing, Done]\nagents:\n{agents}"));
+    // No ticket has the tags the rules wait for, so a job started by hand
+    // ends without handing the ticket on to another agent.
+    AutomationService::set(
+        &fixtures.tasks_root,
+        None,
+        "automation:\n  rules:\n    - name: \"Done: review\"\n      when:\n        tags: { any: [built] }\n      on:\n        job_completed:\n          set:\n            assignee: \"@review\"\n    - name: \"Done: review with a prompt\"\n      when:\n        tags: { any: [built] }\n      on:\n        job_completed:\n          set:\n            assignee: \"@review\"\n          agent:\n            model: haiku\n            prompt: \"Review ${{ticket.id}}; change no files\"\n    - name: \"Review passed: merge\"\n      when:\n        all:\n          - assignee: \"@review\"\n          - tags: { any: [passed] }\n      on:\n        job_completed:\n          set:\n            assignee: \"@land\"\n          agent:\n            prompt: \"Merge ${{ticket.id}}\"\n",
+    )
+    .expect("set automation");
+
+    let mut storage = fixtures.create_storage();
+    let run_by_hand = |storage: &mut lotar::Storage, agent: &str| {
+        let created = TaskService::create(
+            storage,
+            TaskCreate { title: format!("Hand {agent}"), project: Some("HAND".to_string()), reporter: Some("sam".to_string()), ..Default::default() },
+        )
+        .expect("create task");
+        TaskService::update(storage, &created.id, TaskUpdate { assignee: Some(format!("@{agent}")), ..Default::default() }).expect("assign by hand");
+        // The job's end runs after it finishes and writes to the fixture:
+        // wait until its worker is done.
+        let jobs = wait_for_ticket_jobs(&created.id, 10_000, |jobs| {
+            !jobs.is_empty() && jobs.iter().all(|job| job.finished_at.is_some() && AgentJobService::job_settled(&job.id))
+        });
+        assert_eq!(jobs.len(), 1, "{agent}: {jobs:?}");
+        assert_eq!(jobs[0].status, "completed", "{agent}: {jobs:?}");
+        (created.id, jobs[0].clone(), fs::read_to_string(root.join(format!("{agent}.stdin"))).unwrap())
+    };
+
+    let (id, job, prompt) = run_by_hand(&mut storage, "review");
+    assert!(prompt.contains(&format!("Review {id}; change no files")), "{prompt}");
+    assert!(!prompt.contains("Make concrete changes"), "{prompt}");
+    assert_eq!(job.model.as_deref(), Some("haiku"));
+
+    let (id, _, prompt) = run_by_hand(&mut storage, "land");
+    assert!(prompt.contains(&format!("Merge {id}")), "{prompt}");
+    assert!(!prompt.contains("Make concrete changes"), "{prompt}");
+
+    let (_, _, prompt) = run_by_hand(&mut storage, "work");
+    assert!(prompt.contains("Make concrete changes"), "{prompt}");
+}
+
 /// DEV-316: a rule can take the model and effort from the ticket; a ticket
 /// without those fields gets the profile's own (never an empty `--model`).
 #[cfg(unix)]

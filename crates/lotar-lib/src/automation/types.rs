@@ -116,6 +116,29 @@ pub struct AutomationRuleActions {
     pub unblocked: Option<AutomationAction>,
 }
 
+impl AutomationRuleActions {
+    /// The rule's actions in the order its events are listed above.
+    pub fn actions(&self) -> impl Iterator<Item = &AutomationAction> {
+        [
+            &self.start,
+            &self.created,
+            &self.updated,
+            &self.assigned,
+            &self.commented,
+            &self.sprint_changed,
+            &self.release_changed,
+            &self.job_started,
+            &self.job_completed,
+            &self.job_failed,
+            &self.job_cancelled,
+            &self.manual,
+            &self.unblocked,
+        ]
+        .into_iter()
+        .flatten()
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct AutomationConditionGroup {
     #[serde(default)]

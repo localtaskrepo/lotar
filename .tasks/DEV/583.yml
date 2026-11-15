@@ -1,19 +1,24 @@
 title: A retried or resumed T3 job opens in a new t3/<name> worktree, not on the ticket's agent/<ID> branch
-status: Todo
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@fix-codex'
 created: 2026-11-15T20:15:01.954526+00:00
-modified: 2026-11-15T20:15:02.738271+00:00
+modified: 2026-11-15T20:48:30.575159+00:00
 relationships:
   related:
   - DEV-530
   - DEV-577
   - DEV-581
+comments:
+- date: 2026-11-15T20:48:30.575159+00:00
+  author: automation
+  text: The fix agent's job job-20261115T204823.414Z-45 failed (lotar agent logs job-20261115T204823.414Z-45); @fix-codex retries it on branch agent/DEV-583.
 description: 'Found 2026-11-15 in standards: a fix job that is retried on another agent or resumed after its prerequisite ("Prerequisites done", "Retry with @fix-codex", "Retry with @fix-fable") starts a new T3 thread in a fresh worktree on a generated branch (`t3/gitleaks-allow-1password-backticks`, `t3/fix-gitleaks-1password-backtick-allowlist`), while its prompt says "You are working in a git worktree on branch `agent/STD-144` ... Don''t switch branches". The first job''s uncommitted work stays in `~/.t3/worktrees/standards/agent-STD-144-…`, out of reach. Seen on STD-144 (jobs `job-20261115T192529.587Z-12` and the 20:12Z retry), STD-140 (`job-20261115T192519.646Z-11`) and STD-149 (the review ran on `t3/std-149-dedupe-finding-tickets` at the rejected commit while the rework was on `agent/STD-149`). Two codex jobs handed back for this alone, and standards has about 30 leftover `t3/` worktrees. Related: DEV-581, DEV-577, DEV-530. Check: retry a failed T3 fix job with another agent; `git branch --show-current` in the new thread prints `agent/<ID>` and `git status` shows the first job''s changes. Done: a retried or resumed T3 job runs in the ticket''s existing `agent/<ID>` worktree (or the prompt names the branch the thread really has and where the earlier work is).'
 tags:
 - health
+- fix-retried
 custom_fields:
   finding: t3-job:retry-opens-new-worktree
 history:
@@ -28,3 +33,22 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-15T20:48:23.646418+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-15T20:48:30.312198+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-codex'
+  - field: tags
+    old: health
+    new: health, fix-retried
+- at: 2026-11-15T20:48:30.575159+00:00
+  actor: automation
+  changes:
+  - field: comment_added
