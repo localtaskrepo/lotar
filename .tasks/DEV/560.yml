@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-15T07:59:42.535485+00:00
-modified: 2026-11-15T07:59:53.294404+00:00
+modified: 2026-11-15T08:02:38.478765+00:00
 relationships:
   related:
   - DEV-513
@@ -31,7 +31,13 @@ description: |-
 
   ## Done when
 
-  - [ ] The rework is on main and its regression test passes there.
+  - [ ] `/api/jobs/logs` (Timeline **Show thread**) for a job the server holds returns every event: the job log's events joined with the ones in memory, one per `sequence`, oldest first. When both have a sequence, the in-memory event wins.
+  - [ ] `lotar task timeline --threads` and MCP `task_timeline` (`full_thread_in`) return the same whole thread.
+  - [ ] A job the server doesn't hold still reads from its log, as before.
+  - [ ] New log lines carry the live stream's `sequence`; logs written before have none and their events count by line, so old logs still load.
+  - [ ] A job taken over from a dead process (`adopt_orphaned_job`) numbers its new events after the highest logged sequence, so no sequence repeats.
+  - [ ] No log, or one that fails to load: the held events alone, as before.
+  - [ ] Regression test `a_held_job_past_the_event_cap_returns_its_whole_thread_with_live_sequences` fails without the fix and passes on main; `docs/help/agent.md`, `docs/help/api-quick-reference.md` and `docs/openapi.json` describe it.
   - [ ] Its review passed.
 history:
 - at: 2026-11-15T07:59:42.834509+00:00
@@ -61,3 +67,47 @@ history:
   changes:
   - field: releases
     new: '#6'
+- at: 2026-11-15T08:02:38.478765+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      The review's blocker on DEV-518 is still on main: for a job the server still holds, `/api/jobs/logs` (and so the Timeline's **Show thread**) returns only the last 200 events kept in memory, although the job log has all of them. Found while preparing v0.15.1 (DEV-513), 2026-11-15.
+
+      ## Cause
+
+      - `0327eb8f` (DEV-518) landed on main although its review blocked it (DEV-523). The owner chose to fix forward on 2026-11-14: "Don't push it or release v0.15.1 (DEV-513) until this rework's review passes."
+      - The rework, `6818cb78` on `agent/DEV-518`, was never reviewed or merged. The merge job checked out the old `0327eb8f`, wrote "nothing to merge", and DEV-518 went to Done 5 s later. DEV-532's cleanup then removed the branch; the commit is kept as `refs/archive/DEV-532/heads/agent/DEV-518`.
+      - `git diff 0327eb8f 6818cb78` is the rework: 5 files, +100 −26 (`agent_job_service.rs`, `agent_log_service.rs`, `docs/help/agent.md`, `docs/help/api-quick-reference.md`, `docs/openapi.json`), with the regression test `a_held_job_past_the_event_cap_returns_its_whole_thread_with_live_sequences`.
+
+      ## Fix
+
+      Port that diff onto current main (`git diff 0327eb8f 6818cb78 | git apply -3`), rerun lint, test and smoke, and send it through review and merge.
+
+      ## Done when
+
+      - [ ] The rework is on main and its regression test passes there.
+      - [ ] Its review passed.
+    new: |-
+      The review's blocker on DEV-518 is still on main: for a job the server still holds, `/api/jobs/logs` (and so the Timeline's **Show thread**) returns only the last 200 events kept in memory, although the job log has all of them. Found while preparing v0.15.1 (DEV-513), 2026-11-15.
+
+      ## Cause
+
+      - `0327eb8f` (DEV-518) landed on main although its review blocked it (DEV-523). The owner chose to fix forward on 2026-11-14: "Don't push it or release v0.15.1 (DEV-513) until this rework's review passes."
+      - The rework, `6818cb78` on `agent/DEV-518`, was never reviewed or merged. The merge job checked out the old `0327eb8f`, wrote "nothing to merge", and DEV-518 went to Done 5 s later. DEV-532's cleanup then removed the branch; the commit is kept as `refs/archive/DEV-532/heads/agent/DEV-518`.
+      - `git diff 0327eb8f 6818cb78` is the rework: 5 files, +100 −26 (`agent_job_service.rs`, `agent_log_service.rs`, `docs/help/agent.md`, `docs/help/api-quick-reference.md`, `docs/openapi.json`), with the regression test `a_held_job_past_the_event_cap_returns_its_whole_thread_with_live_sequences`.
+
+      ## Fix
+
+      Port that diff onto current main (`git diff 0327eb8f 6818cb78 | git apply -3`), rerun lint, test and smoke, and send it through review and merge.
+
+      ## Done when
+
+      - [ ] `/api/jobs/logs` (Timeline **Show thread**) for a job the server holds returns every event: the job log's events joined with the ones in memory, one per `sequence`, oldest first. When both have a sequence, the in-memory event wins.
+      - [ ] `lotar task timeline --threads` and MCP `task_timeline` (`full_thread_in`) return the same whole thread.
+      - [ ] A job the server doesn't hold still reads from its log, as before.
+      - [ ] New log lines carry the live stream's `sequence`; logs written before have none and their events count by line, so old logs still load.
+      - [ ] A job taken over from a dead process (`adopt_orphaned_job`) numbers its new events after the highest logged sequence, so no sequence repeats.
+      - [ ] No log, or one that fails to load: the held events alone, as before.
+      - [ ] Regression test `a_held_job_past_the_event_cap_returns_its_whole_thread_with_live_sequences` fails without the fix and passes on main; `docs/help/agent.md`, `docs/help/api-quick-reference.md` and `docs/openapi.json` describe it.
+      - [ ] Its review passed.

@@ -1,11 +1,11 @@
 title: Release v0.15.1
-status: Todo
+status: HelpNeeded
 priority: Medium
 type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-14T04:17:27.050501+00:00
-modified: 2026-11-15T08:00:22.826467+00:00
+modified: 2026-11-15T08:06:24.026381+00:00
 relationships:
   depends_on:
   - DEV-503
@@ -41,6 +41,7 @@ relationships:
   - DEV-560
   - DEV-530
   - DEV-520
+  - DEV-543
 comments:
 - date: 2026-11-14T04:19:07.317172+00:00
   author: claude
@@ -48,6 +49,45 @@ comments:
 - date: 2026-11-14T06:27:49.945274+00:00
   author: claude
   text: 'Hold: local main has `0327eb8f` (DEV-518), which its review blocked. mallox chose to fix forward on 2026-11-14. Release v0.15.1 only after the DEV-518 rework passes review and lands. DEV-523 is the bug that let it land.'
+- date: 2026-11-15T08:06:23.196165+00:00
+  author: claude
+  text: |-
+    v0.15.1 is prepared up to the push. mallox by voice, 2026-11-14 23:58 PST: "Yeah, go ahead and prepare the new lotar release."
+
+    **Done**
+    - Version bump `56455470` (`DEV-513 Release v0.15.1`, signed) on local main: `Cargo.toml` workspace version and the three `=0.15.1` crate pins, `Cargo.lock`. A patch, as the guide's default says. Not pushed.
+    - Release record 0.15.1: added the 39 tickets merged since `v0.15.0` that were in no release, and DEV-560.
+    - Release notes: none to write, the release workflow builds them from the commit list.
+
+    **Checks** (bump on `4d848d99`, in a worktree of its own)
+    - `npm run lint:agent`: pass.
+    - `npm run test:agent`: pass (Rust 2204, UI 1547, release and hooks).
+    - `npm run smoke`: pass (404).
+    - Crate packaging (`stage-crates.mjs`, `cargo package` of the four crates): pass.
+    - Not run: these on `63aa6193` (DEV-543, landed on main during the checks); QA on GitHub, because main is not pushed.
+
+    **Not on main, although this release was meant to wait for them**
+    - DEV-518's rework `6818cb78` (the review's blocker: Show thread loads only the last 200 events of a held job). It was never reviewed or merged; DEV-518 went Done anyway. Filed as DEV-560 (High), now with @fix. Your rule of 2026-11-14: no push and no v0.15.1 before that rework passes review.
+    - DEV-510 (gaps of the t3 agent): rework at `53b1bcaf` on `agent/DEV-510` with harnessmux 0.1.7; main still pins harnessmux 0.1.2. Waits for its review.
+    - DEV-466 (git timeouts): in review.
+    - DEV-485 (custom fields) is on main, so it ships in this release, although the scope said the one after.
+
+    **Left for your yes:** `git push origin main`; once Quality Assurance for that commit is green, `git tag -s v0.15.1 -m v0.15.1` and `git push origin v0.15.1` (publishes everywhere, can't be undone), then `lotar release release 0.15.1`, `brew upgrade lotar`, close this ticket.
+- date: 2026-11-15T08:06:23.872478+00:00
+  author: claude
+  text: |-
+    Publish v0.15.1 now, without DEV-560, DEV-510 and DEV-466 (yes), or wait until they are on main and I re-run the checks (no)?
+
+    Options:
+    - yes: Publish now
+    - no: Wait for DEV-560, DEV-510, DEV-466 (recommended)
+  question:
+    options:
+    - key: yes
+      label: Publish now
+    - key: no
+      label: Wait for DEV-560, DEV-510, DEV-466
+    recommended: no
 releases:
 - 6
 description: |-
@@ -195,3 +235,23 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468","DEV-477","DEV-491","DEV-516"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512","DEV-417","DEV-518","DEV-523","DEV-560","DEV-530"]}'
     new: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468","DEV-477","DEV-491","DEV-516"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512","DEV-417","DEV-518","DEV-523","DEV-560","DEV-530","DEV-520"]}'
+- at: 2026-11-15T08:06:23.196165+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T08:06:23.474721+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468","DEV-477","DEV-491","DEV-516"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512","DEV-417","DEV-518","DEV-523","DEV-560","DEV-530","DEV-520"]}'
+    new: '{"depends_on":["DEV-503","DEV-510","DEV-509","DEV-511","DEV-512","DEV-501","DEV-466","DEV-467","DEV-468","DEV-477","DEV-491","DEV-516"],"related":["DEV-466","DEV-467","DEV-468","DEV-477","DEV-483","DEV-485","DEV-491","DEV-493","DEV-501","DEV-503","DEV-509","DEV-510","DEV-511","DEV-512","DEV-417","DEV-518","DEV-523","DEV-560","DEV-530","DEV-520","DEV-543"]}'
+- at: 2026-11-15T08:06:23.872478+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-15T08:06:24.026381+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: HelpNeeded

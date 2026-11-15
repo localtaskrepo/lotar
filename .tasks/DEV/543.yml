@@ -1,17 +1,18 @@
 title: A job's recorded outcome can apply before its unfinished end-rule steps
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-14T18:22:28.435938+00:00
-modified: 2026-11-15T07:56:24.654540+00:00
+modified: 2026-11-15T08:06:23.475285+00:00
 relationships:
   depends_on:
   - DEV-467
   related:
   - DEV-467
   - DEV-528
+  - DEV-513
 comments:
 - date: 2026-11-14T18:49:47.537612+00:00
   author: claude
@@ -42,6 +43,14 @@ comments:
     - Immediate and recovery paths wait for the end-action checkpoint; regression checks the lock frees before the outcome and end-comment precedes updated-rule comment. Hand-back precedence preserved.
     - `RUSTC_WRAPPER= npm run test:rust:agent -- pending_outcome_tests`: 5 passed, including regression. Web build and diff whitespace check passed. Initial sccache attempt sandbox-denied. Pre-fix failure recorded by fix agent, not independently reproduced in this read-only review.
     - Full lint/tests/smoke passed per fix agent, not independently repeated. No UI changes, stray files, findings or follow-up tickets. Working tree clean; status/assignee unchanged. No durable guidance finding.
+- date: 2026-11-15T08:01:06.905150+00:00
+  author: codex
+  text: |-
+    Merged and pushed as `63aa6193` on main.
+
+    - Rebased reviewed `06c8bd7f` onto main as `00ec4da4`; fast-forwarded main, then amended pending `.tasks` updates as requested (`63aa6193`). No conflicts or lockfile changes.
+    - Checks on rebased code: `RUSTC_WRAPPER= npm run lint:agent`, `RUSTC_WRAPPER= npm run test:agent` (2205 Rust, 1547 UI, release and hooks), `RUSTC_WRAPPER= npm run test:smoke:agent` (404): passed. Tests/smoke needed approved execution outside sandbox after server access failures; initial smoke also hit sccache denial. Push hook passed.
+    - No rule/profile config changes: trust refresh unnecessary. Push succeeded to `origin/main`. Main was clean after amend; a concurrent `.tasks/DEV/552.yml` update appeared by push time and remains untouched. No status or assignee changes; no durable guidance finding.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad1bfdb1c-bef4-4433-aebb-6dac3521f908
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aad8c3793-de75-44d7-9042-f03d0b75f97c
@@ -137,3 +146,19 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-15T08:01:06.905150+00:00
+  actor: codex
+  changes:
+  - field: comment_added
+- at: 2026-11-15T08:01:11.209647+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-15T08:06:23.475285+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-467"],"related":["DEV-467","DEV-528"]}'
+    new: '{"depends_on":["DEV-467"],"related":["DEV-467","DEV-528","DEV-513"]}'
