@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: mallox
 created: 2026-11-16T04:33:13.135968+00:00
-modified: 2026-11-16T23:30:29.839050+00:00
+modified: 2026-11-17T01:46:56.550316+00:00
 relationships:
   related:
   - DEV-599
@@ -184,6 +184,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac7768258-f9f1-4d7a-99f9-90537e91eeef
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3b321fd1-c9bf-4980-90f7-c56299eeb0fe
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1ec678b4-c277-4dba-9897-9dc0dc92079b
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8ba34733-9fe2-4c10-b197-9e6cf571a481
 description: |-
   Found in the DEV-599 review (dcfbccef). running_t3_thread in crates/lotar-lib/src/services/agent_job_service.rs caches T3 Code's answer per ticket for T3_THREAD_RECHECK and keys it on the ticket's earlier threads, so a new earlier thread asks again at once. No test covers that: the DEV-599 test a_start_on_a_busy_ticket_or_after_an_idle_answer_asks_t3_code_nothing only checks that the cache is used.
 
@@ -346,3 +347,8 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-17T01:46:56.550316+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8ba34733-9fe2-4c10-b197-9e6cf571a481

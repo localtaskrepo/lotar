@@ -1,15 +1,19 @@
 title: DEV-611's failed keep and the t3 handoff's thread line have no test
-status: Reviewing
+status: Merging
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-16T19:55:36.875709+00:00
-modified: 2026-11-17T01:07:43.011364+00:00
+modified: 2026-11-17T01:21:18.340264+00:00
 relationships:
   related:
   - DEV-611
   - DEV-624
+  - DEV-579
+  - DEV-591
+  - DEV-620
+  - DEV-622
 comments:
 - date: 2026-11-16T23:29:57.237179+00:00
   author: claude
@@ -40,6 +44,58 @@ comments:
 - date: 2026-11-16T23:55:19.675900+00:00
   author: automation
   text: The review job job-20261116T235517.366Z-15 failed (lotar agent logs job-20261116T235517.366Z-15); the merge goes ahead without a review.
+- date: 2026-11-17T01:20:51.059685+00:00
+  author: claude
+  text: |-
+    Review: passed. Both "Done when" tests exist, pass, and fail when the code they cover is broken.
+
+    - Branch: `1ff99b50` (DEV-621) on top of `84ef6218`, a copy of DEV-611. Its patch is the same as `c9802f1d` on main, so the rebase drops it
+    - `a_failed_keep_fails_the_job_and_starts_no_session` (`dev503_harness_jobs_test.rs:285`): checks the "Could not keep the session …" failure, no `session/new`, no new or kept record, and that the old record and event log are unchanged
+    - `a_t3_handoff_names_the_skipped_sessions_thread` (`dev510_t3_session_test.rs:137`): a rework 56 min later (past the default 55) starts a second thread, and its handoff has `- Its T3 Code thread: t1`
+    - Tried breaking the code: turning the failed keep into `None` in `agent_job_service.rs:3053` makes the keep test fail; renaming the thread line at `:3120` makes the t3 test fail. That second check needs `cargo build` first, because the t3 test runs `target/debug/lotar`. Code restored afterwards, worktree clean
+    - The `continue_job` wait for jobs to end (DEV-611 flake fix) is test-only and makes sense
+    - Nothing outside the ticket's scope, no stray files. No minor findings, no tickets filed
+  report:
+    checks:
+    - command: cargo nextest run --test integration -E 'test(/dev503_harness_jobs_test|dev510_t3_session_test/)'
+      result: passed
+      reason: 45 tests
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: fix agent ran it; only the two test files changed
+    - command: npm run smoke
+      result: not_run
+      reason: no UI or server change
+    next: 'Merge: rebase onto main drops the DEV-611 copy 84ef6218'
+- date: 2026-11-17T01:21:17.949908+00:00
+  author: claude
+  text: |-
+    Merged into local `main` as `eb762513`. Not pushed: local `main` and `origin/main` have diverged.
+
+    - Rebased three times, because main moved during the checks (DEV-624, then DEV-622). The copied DEV-611 commit `84ef6218` was dropped as already upstream. No conflicts and no lockfile changes
+    - lint, `npm test` (2279 Rust, 1548 UI, release, hooks) and smoke (405) passed on the final rebase `2e61d585`, which DEV-622's `web_server.rs` change touched
+    - `git merge --ff-only` landed it. The 17 pending `.tasks` files are amended into `eb762513` (signed). No rule or config files changed, so no `lotar trust`
+    - No push: origin has `d525fb55` "DEV-591 Release v0.15.2", which local `main` lacks. That is the open question on DEV-620 and DEV-624, which triage answered with "rebase and push". Those threads aren't running now, and the DEV-579 merge thread is landing work on the same `main`, so I didn't rebase the main checkout. `eb762513` goes out with that push
+    - A second "DEV-621 review" thread started at 01:07 UTC and is still running, although the work is merged
+  report:
+    commits:
+    - hash: eb762513
+      what: DEV-621 tests for a failed keep and the t3 handoff's thread line (on local main)
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2279 Rust, 1548 UI, release and hooks
+    - command: npm run smoke
+      result: passed
+      reason: '405'
+    - command: git push
+      result: not_run
+      reason: local main and origin/main have diverged, see DEV-620/DEV-624
+    next: Push goes with the rebase onto origin/main d525fb55 that triage answered on DEV-620 and DEV-624
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1cff8da3-4797-4fb7-9f58-9e996bdebc9f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A82379814-5465-4e30-9664-a8d68148cac7
@@ -132,3 +188,26 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A4aab10b9-d823-4940-9b0a-d794d6939114
+- at: 2026-11-17T01:20:51.059685+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T01:21:00.194481+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-17T01:21:17.949908+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T01:21:18.340264+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-611","DEV-624"]}'
+    new: '{"related":["DEV-611","DEV-624","DEV-579","DEV-591","DEV-620","DEV-622"]}'

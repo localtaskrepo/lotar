@@ -7,10 +7,10 @@ const __dirname = path.dirname(__filename);
 
 const BIN_NAME = process.platform === 'win32' ? 'lotar.exe' : 'lotar';
 
-// Prefer the fast-to-build `smoke` profile binary when present, falling back to
-// the full `release` build. This lets `npm run build:smoke` produce the binary
-// smoke tests use without paying for the size-optimized release build.
-const PREFERRED_BINARY = ['..', 'target', 'smoke', BIN_NAME] as const;
+// Prefer the dev-profile binary `npm run build:smoke` builds, falling back to
+// the full `release` build. It is the build `npm test` makes, so after
+// `npm test` smoke builds nothing (DEV-579).
+const PREFERRED_BINARY = ['..', 'target', 'debug', BIN_NAME] as const;
 const DEFAULT_BINARY_CANDIDATES = [PREFERRED_BINARY, ['..', 'target', 'release', BIN_NAME]] as const;
 
 export function resolveRepositoryRoot(): string {

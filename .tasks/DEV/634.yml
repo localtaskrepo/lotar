@@ -1,16 +1,34 @@
 title: Split agent jobs and automation out of lotar-lib into a crate lotar-agent
-status: Todo
+status: HelpNeeded
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-17T01:03:27.180760+00:00
-modified: 2026-11-17T01:03:31.670746+00:00
+modified: 2026-11-17T01:31:09.529209+00:00
 relationships:
   related:
   - DEV-498
   - DEV-499
   - DEV-579
+comments:
+- date: 2026-11-17T01:29:07.217603+00:00
+  author: claude
+  text: |-
+    Question for mallox: agent jobs and automation call the task services, and the task services call them back, so `lotar-agent` can't sit below lotar-lib on its own. Where should the task services go? I recommend (B).
+
+    **What I found** (lotar-lib src, `crates/lotar-lib/src/services`)
+    - Automation and agent jobs call the task services in about 80 places: `TaskService` get/list/update/create/archive/comment, plus sprints, releases, relationships, references, attachments and completion.
+    - Taken together those task services are about 10.6k lines (without tests): `task_service`, `task_list`, `task_query`, `task_order`, `task_validation`, `relationships`, `sprint_*` (4), `release_service`, `reference_service`, `attachment_*` (3), `completion`, `external_tasks`, `memory_cache`. None of them calls up into cli, routes or mcp.
+    - Calls back the other way: 8 places. Saving a task or comment runs automation (`task_service.rs:495`, `:833`, `:1440`, `:1447`, `reference_service.rs:60`), and agent job bookkeeping (`:990`, `:1444`, `:1551`). The DEV-579 estimate ("about a fifth of lotar-lib") left this out.
+
+    **Options**
+    - (A) `lotar-agent` takes the task services too: about 24k lines, no new mechanism, no behaviour risk. But the crate isn't only agent code, and a change there rebuilds all of it.
+    - (B) The task services get their own crate, `lotar-tasks`: lotar-lib -> lotar-agent -> lotar-tasks -> lotar-core. lotar-agent stays about 14k lines, as named. The 8 calls go through a hook that lotar-agent registers. Risk: if an entry point doesn't register the hook, automation silently doesn't run, so a test checks that CLI, server and MCP all register it. About twice the work of (A).
+    - (C) Like (B), but the task services move into `lotar-core` (24k -> 35k lines) instead of a new crate.
+    - (D) lotar-agent calls the task services through a trait that lotar-lib implements. That changes about 80 call sites, and the automation tests couldn't run in lotar-agent without lotar-lib. I don't recommend it.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abe9cf8d5-29d4-4949-9c63-1e8aed77afa5
 description: |-
   Owner, 2026-11-17, on DEV-579 choosing option A: "Okay, A sounds good." Continues DEV-499's workspace split; STD-131: keep projects small and focused.
 
@@ -39,3 +57,27 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-17T01:26:10.594954+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T01:26:27.609748+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Abe9cf8d5-29d4-4949-9c63-1e8aed77afa5
+- at: 2026-11-17T01:29:07.217603+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T01:31:09.529209+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox

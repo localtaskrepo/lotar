@@ -4,7 +4,7 @@
 //
 // Usage:
 //   npm run screenshots                          # build lotar + UI, then capture everything
-//   node scripts/screenshots.mjs                 # reuse an existing binary (target/smoke or target/release)
+//   node scripts/screenshots.mjs                 # reuse an existing binary (target/debug or target/release)
 //   node scripts/screenshots.mjs --only board,agents --skip-hero --skip-terminal
 //   node scripts/screenshots.mjs --keep          # keep the demo workspace for inspection
 //   node scripts/screenshots.mjs --no-git        # refresh UI only; preserve Git-dependent media
@@ -94,7 +94,7 @@ function resolveBinary() {
     const explicit = process.env.LOTAR_BINARY_PATH;
     if (explicit) return explicit;
     for (const candidate of [
-        path.join(ROOT, 'target', 'smoke', BIN_NAME),
+        path.join(ROOT, 'target', 'debug', BIN_NAME),
         path.join(ROOT, 'target', 'release', BIN_NAME),
     ]) {
         if (existsSync(candidate)) return candidate;

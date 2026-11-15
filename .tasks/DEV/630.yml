@@ -5,12 +5,13 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-16T23:50:55.362369+00:00
-modified: 2026-11-17T00:20:33.468391+00:00
+modified: 2026-11-17T01:46:56.773725+00:00
 relationships:
   related:
   - DEV-626
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa9df0ed5-6b72-4b9c-9474-6cad05b6dd98
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab2b1fabb-50f5-42bd-a961-38ad1c78ce18
 description: |-
   Found 2026-11-16 in DEV-626 (lotar ran 4 jobs while .tasks/DEV/config.yml sets agent.worktree.max_parallel_jobs: 2).
 
@@ -39,3 +40,8 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa9df0ed5-6b72-4b9c-9474-6cad05b6dd98
+- at: 2026-11-17T01:46:56.773725+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab2b1fabb-50f5-42bd-a961-38ad1c78ce18

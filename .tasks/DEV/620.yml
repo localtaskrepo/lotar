@@ -1,11 +1,11 @@
 title: 'Job prompt: carry the description, the open question and the last fix and review comments; shorter built-in instructions'
-status: HelpNeeded
+status: InProgress
 priority: High
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-16T18:42:09.946527+00:00
-modified: 2026-11-17T01:15:01.915101+00:00
+modified: 2026-11-17T01:31:15.495451+00:00
 relationships:
   related:
   - DEV-608
@@ -20,6 +20,7 @@ relationships:
   - DEV-624
   - DEV-632
   - DEV-622
+  - DEV-621
 comments:
 - date: 2026-11-16T20:03:10.910172+00:00
   author: claude
@@ -141,9 +142,29 @@ comments:
 - date: 2026-11-17T01:06:46.913824+00:00
   author: triage
   text: 'Same question as DEV-624, same answer: Answer: yes, rebase and push. Push is already decided (owner 2026-11-12, standards docs/decisions/2026-11-12-push-finished-work.md: "Up to where the git tree is clean and we dont have pending work on a commit anymore we can push in general"; repos.json has push: true for lotar). Rebasing your own unpushed commits (1227e5bd DEV-620, f0350293 DEV-632, a7715fae DEV-624) onto origin/main d525fb55 is the step the push needs. Go ahead in the main checkout: git status first, git rebase --autostash origin/main, never touch others changes, rerun the ticket check, push. If unsure, ask the DEV-591 release thread (owner 2026-11-12: ask the thread that was working on it).'
+- date: 2026-11-17T01:31:15.495451+00:00
+  author: claude
+  text: |-
+    Pushed: `6a78ba88` (DEV-620) is on `origin/main`.
+
+    - Main checkout was already rebased onto `origin/main` `d525fb55` by another session; DEV-620 is now `6a78ba88`
+    - Pushed only that commit: `git push origin 6a78ba88:main` (pre-push hook passed)
+    - Not pushed: DEV-632 `b1462b29`, DEV-624 `165c2e22`, DEV-622 `486377fc`, DEV-621 `53e71990` — their tickets are still Merging/InProgress; their jobs push them
+    - Main checkout has 16 uncommitted `.tasks` files from other sessions; left untouched
+  report:
+    commits:
+    - hash: 6a78ba88
+      what: DEV-620 rebased onto origin/main d525fb55, pushed
+    checks:
+    - command: 'git push (pre-push hook: Rust formatting and clippy)'
+      result: passed
+    - command: npm run lint, npm test, npm run smoke
+      result: not_run
+      reason: passed on 1227e5bd before the rebase; the rebase only added DEV-591's version bump underneath
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A79143270-686a-4330-848d-940b822b946e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Acd704542-d988-4f64-b33e-a1f8e3cde077
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac54661e5-1132-4a38-8254-b0e150b81daa
 description: |-
   Source: standards STD-183 (docs/evidence/job-context.md). Owner 2026-11-15: "All six" (answered in INBOX-351), proposals 3 and 5.
 
@@ -361,3 +382,24 @@ history:
   - field: relationships
     old: '{"related":["DEV-608","DEV-611","DEV-618","DEV-563","DEV-619","DEV-628","DEV-605","DEV-591","DEV-629","DEV-624","DEV-632"]}'
     new: '{"related":["DEV-608","DEV-611","DEV-618","DEV-563","DEV-619","DEV-628","DEV-605","DEV-591","DEV-629","DEV-624","DEV-632","DEV-622"]}'
+- at: 2026-11-17T01:21:18.339669+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-608","DEV-611","DEV-618","DEV-563","DEV-619","DEV-628","DEV-605","DEV-591","DEV-629","DEV-624","DEV-632","DEV-622"]}'
+    new: '{"related":["DEV-608","DEV-611","DEV-618","DEV-563","DEV-619","DEV-628","DEV-605","DEV-591","DEV-629","DEV-624","DEV-632","DEV-622","DEV-621"]}'
+- at: 2026-11-17T01:28:29.963155+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-17T01:29:35.892856+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac54661e5-1132-4a38-8254-b0e150b81daa
+- at: 2026-11-17T01:31:15.495451+00:00
+  actor: claude
+  changes:
+  - field: comment_added

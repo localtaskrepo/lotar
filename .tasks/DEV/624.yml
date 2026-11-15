@@ -1,11 +1,11 @@
 title: 'Flaky test: cli_serve_features_test serve tests get no response within the 1.5 s read timeout under load'
-status: HelpNeeded
+status: InProgress
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-16T21:05:30.352250+00:00
-modified: 2026-11-17T01:15:01.915990+00:00
+modified: 2026-11-17T01:31:12.389476+00:00
 relationships:
   related:
   - DEV-609
@@ -118,10 +118,39 @@ comments:
 - date: 2026-11-17T01:06:45.707536+00:00
   author: triage
   text: 'Answer: yes, rebase and push. Push is already decided (owner 2026-11-12, standards docs/decisions/2026-11-12-push-finished-work.md: "Up to where the git tree is clean and we dont have pending work on a commit anymore we can push in general"; repos.json has push: true for lotar). Rebasing your own unpushed commits (1227e5bd DEV-620, f0350293 DEV-632, a7715fae DEV-624) onto origin/main d525fb55 is the step the push needs. Go ahead in the main checkout: git status first, git rebase --autostash origin/main, never touch others changes, rerun the ticket check, push. If unsure, ask the DEV-591 release thread (owner 2026-11-12: ask the thread that was working on it).'
+- date: 2026-11-17T01:31:12.389476+00:00
+  author: claude
+  text: |-
+    Rebased and pushed: [DEV-624](https://lotar.pyxzl.net/task/DEV-624) is on `origin/main` as `165c2e22`.
+
+    - I did this because triage answered yes (owner decision 2026-11-12, push finished work)
+    - `git rebase --autostash origin/main` in the main checkout: clean, no conflicts. Others' 16 `.tasks` edits were stashed and put back unchanged
+    - The rebase brought in only `d525fb55`, the release's version bump in `Cargo.toml`/`Cargo.lock`, so the earlier lint, test and smoke results still hold
+    - New hashes: `6a78ba88` DEV-620, `b1462b29` DEV-632, `165c2e22` DEV-624, `486377fc` DEV-622, `53e71990` DEV-621
+    - `git push origin main`: `6a78ba88..53e71990`. Another session had pushed `6a78ba88` just before me. The pre-push hook passed
+    - Ticket check passed 5 of 5 runs in the main checkout (15/15 each) at load ~90
+  report:
+    commits:
+    - hash: 165c2e22
+      what: DEV-624 serve tests wait up to 15 s for a response (rebased a7715fae)
+    checks:
+    - command: cargo nextest run --cargo-profile local -E 'test(cli_serve_features_test::)'
+      result: passed
+      reason: 5 of 5 runs, 15/15, main checkout, load ~90
+    - command: npm run lint
+      result: not_run
+      reason: passed on a7715fae; the rebase added only the release's version bump
+    - command: npm test
+      result: not_run
+      reason: passed on a7715fae; same reason
+    - command: npm run smoke
+      result: not_run
+      reason: passed on a7715fae; same reason
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A97fc7517-3464-4ef3-a807-2a602fdbf376
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aea92c758-bcce-498d-bf82-98c5c78a5bd4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2108886e-a33a-4c82-95eb-9cb7e6df900c
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af806f627-7ce9-4189-87fe-402a1eddd782
 description: |-
   Found in the DEV-609 merge (2026-11-16): `npm run test:agent` failed twice on `2b7224a0` (main `804cb0f9` plus one test in another file) while the Mac's load average was 140-170.
 
@@ -263,3 +292,18 @@ history:
   - field: relationships
     old: '{"related":["DEV-609","DEV-354","DEV-359","DEV-607","DEV-611","DEV-627","DEV-632","DEV-591","DEV-613","DEV-620","DEV-621","DEV-633"]}'
     new: '{"related":["DEV-609","DEV-354","DEV-359","DEV-607","DEV-611","DEV-627","DEV-632","DEV-591","DEV-613","DEV-620","DEV-621","DEV-633","DEV-622"]}'
+- at: 2026-11-17T01:28:03.981335+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-17T01:28:18.054611+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af806f627-7ce9-4189-87fe-402a1eddd782
+- at: 2026-11-17T01:31:12.389476+00:00
+  actor: claude
+  changes:
+  - field: comment_added

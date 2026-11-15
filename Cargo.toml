@@ -147,28 +147,19 @@ strip = "none"
 # binary: with ~100 test binaries this is the dominant link-time cost.
 split-debuginfo = "unpacked"
 
-# Fast-to-build profile for smoke/E2E tests. Smoke tests exercise functionality,
-# not performance, so they don't need the size-optimizing fat-LTO/opt-z of
-# `release`; this rebuilds the test binary in a fraction of the time.
-# Output: target/smoke/lotar.
-[profile.smoke]
-inherits = "release"
-opt-level = 2
-codegen-units = 16
-lto = false
-panic = "unwind"
-strip = "none"
-split-debuginfo = "unpacked"
-
-# Profile for local test runs (`npm test`, `npm run test:rust:agent`); CI and
-# releases keep `ci`. Many agent worktrees compile at once, so CPU per build
-# counts most: lotar's own crate unoptimized needs about 60% less CPU than
-# `ci` (DEV-346). Dependencies stay optimized (sccache builds them once):
-# unoptimized, some tests got up to 20x slower (log output bursts, image
-# decoding) and missed their deadlines. No debug info, as in `ci`.
-[profile.local]
-inherits = "dev"
+# The one profile for local builds (DEV-579): `cargo build`, clippy, `npm test`
+# and the smoke binary all share target/debug; CI and releases keep `ci`.
+# Separate `local` and `smoke` profiles built lotar and its dependencies once
+# per profile in every worktree. `npm test` passes `--cargo-profile dev`, since
+# cargo's own `test` profile builds every dependency again, and
+# `npm run build:smoke` runs `cargo build --bins --tests`, the same build.
+# Many agent worktrees compile at once, so CPU per build counts most: lotar's
+# own crates stay unoptimized, about 60% less CPU than `ci` (DEV-346).
+# Dependencies stay optimized (sccache builds them once): unoptimized, some
+# tests got up to 20x slower (log output bursts, image decoding) and missed
+# their deadlines. No debug info, as in `ci`.
+[profile.dev]
 debug = false
 
-[profile.local.package."*"]
+[profile.dev.package."*"]
 opt-level = 2

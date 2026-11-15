@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T19:57:40.271694+00:00
-modified: 2026-11-17T01:18:36.802201+00:00
+modified: 2026-11-17T01:21:18.338718+00:00
 relationships:
   related:
   - DEV-499
@@ -17,6 +17,7 @@ relationships:
   - DEV-636
   - DEV-510
   - DEV-589
+  - DEV-621
 comments:
 - date: 2026-11-15T20:40:48.024583+00:00
   author: claude
@@ -341,3 +342,9 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-17T01:21:18.338718+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-499","DEV-574","DEV-581","DEV-604","DEV-634","DEV-635","DEV-636","DEV-510","DEV-589"]}'
+    new: '{"related":["DEV-499","DEV-574","DEV-581","DEV-604","DEV-634","DEV-635","DEV-636","DEV-510","DEV-589","DEV-621"]}'

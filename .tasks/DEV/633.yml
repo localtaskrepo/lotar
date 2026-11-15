@@ -1,16 +1,46 @@
 title: A job's end rules that fail on a full disk are never retried, so the ticket stalls at its step
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-17T00:48:34.144750+00:00
-modified: 2026-11-17T01:07:37.849102+00:00
+modified: 2026-11-17T01:29:37.442853+00:00
 relationships:
   related:
   - DEV-604
   - DEV-625
   - DEV-624
+  - DEV-543
+comments:
+- date: 2026-11-17T01:28:18.972368+00:00
+  author: claude
+  text: |-
+    Fixed: end rules a full disk keeps from their checkpoint are now kept and run once it saves.
+
+    - Cause: `apply_durable_end_action` failed opening the checkpoint lock (ENOSPC) before writing the checkpoint, so the replay had nothing to run.
+    - Now that job end stays in this process's memory (`UNSAVED_END_ACTIONS`); every look for pending outcomes (worker poll, plus a 30 s retry thread for server and MCP jobs) saves the checkpoint and the normal replay runs it. Nothing had run yet, so a retry can't apply anything twice.
+    - The queue worker doesn't exit while such end rules wait (`agent_queue_service.rs`); the job's recorded outcome waits behind them, as it does for a saved checkpoint (DEV-543).
+    - A step that fails with ENOSPC (`StorageFull`) keeps its checkpoint instead of dropping it, like a busy lock does.
+    - Limit: if the process exits before the disk frees up, the kept end rules are lost (there was no disk to write them to).
+    - Tests: `end_rules_whose_checkpoint_cannot_be_saved_run_later`, `a_step_refused_by_a_full_disk_is_retried` in `automation_service.rs`.
+  report:
+    commits:
+    - hash: df1790ea
+      what: keep end rules whose checkpoint can't be saved and run them later
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: passed
+      reason: 2278 Rust tests
+    - command: npm run smoke
+      result: passed
+      reason: 405 tests
+    - command: ticket check on a real full disk
+      result: not_run
+      reason: needs a full disk; the new test simulates the refused checkpoint
+    next: Review, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aac5a64c5-93b0-4a52-9a07-89f589caaf2c
 description: |-
@@ -54,3 +84,22 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aac5a64c5-93b0-4a52-9a07-89f589caaf2c
+- at: 2026-11-17T01:28:18.972368+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T01:28:19.246493+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-604","DEV-625","DEV-624"]}'
+    new: '{"related":["DEV-604","DEV-625","DEV-624","DEV-543"]}'
+- at: 2026-11-17T01:29:37.442853+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

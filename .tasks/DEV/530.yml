@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@review'
 created: 2026-11-14T07:27:35.331056+00:00
-modified: 2026-11-17T01:16:23.611190+00:00
+modified: 2026-11-17T01:43:20.869942+00:00
 relationships:
   related:
   - DEV-351
@@ -659,6 +659,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A1bf66bfc-ffd1-44f4-ac29-404c40d16033
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af46a62c4-7f4a-428e-abf0-9925649bab5d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ad6a6ef49-966e-4533-9e37-826362e7f5cc
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A46e5b0b9-b153-4cf4-8bda-3e0919bd23c2
 description: |-
   Follow-up of DEV-524, from a survey of the 21 waiting episodes in lotar and standards (2026-11-14, mallox in the DEV-524 thread: "review what worked so far and what issues occurred ... then try an approach that we test and see how it goes").
 
@@ -1510,3 +1511,8 @@ history:
   - field: assignee
     old: mallox
     new: '@review'
+- at: 2026-11-17T01:43:20.869942+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A46e5b0b9-b153-4cf4-8bda-3e0919bd23c2

@@ -1,11 +1,11 @@
 title: A reopened ticket can follow another ticket's branch that reuses a name its earlier jobs logged
-status: Reviewing
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-16T04:47:33.448403+00:00
-modified: 2026-11-17T00:59:17.831788+00:00
+modified: 2026-11-17T01:28:26.542059+00:00
 relationships:
   depends_on:
   - DEV-602
@@ -112,10 +112,41 @@ comments:
 - date: 2026-11-17T00:08:44.425583+00:00
   author: automation
   text: The review job job-20261117T000836.539Z-3 failed (lotar agent logs job-20261117T000836.539Z-3); the merge goes ahead without a review.
+- date: 2026-11-17T01:28:10.257598+00:00
+  author: claude
+  text: |-
+    Review: passed. `1f8b1bf5` does every "Done when" item; no findings, no tickets filed.
+
+    - `holds_logged_work` (`agent_job_service.rs:1681`) is applied only to logged names; `agent/<ID>` and `BranchOwners` branches short-circuit before it, as asked.
+    - Logged `ticket_commit` counts only when the branch tip descends from it and the main checkout's `HEAD` doesn't. Subject check: ticket ID followed by a non-alphanumeric or the end (`TEST-10` doesn't match).
+    - Missing ref or git error: `merge-base` / `log` fail → `false` → branch skipped.
+    - Both callers go through `unlanded_ticket_branch`: `follow_ticket_work` (:1711) and `ensure_branch_merged` (:4308). The new test runs a merge that brings nothing, so it covers both.
+    - Bug-fix test fails without the fix: with the old service file, `agent/TEST-1` moved to the other ticket's commit (assert at `dev503_harness_jobs_test.rs:1127`). File restored afterwards, worktree clean.
+    - Branch is 10 commits behind main and merges cleanly (`git merge-tree`). `docs/help/agent.md` matches the code.
+    - Note: the tests need `cargo build` first (`target/debug/lotar`); that's the environment, not the change.
+  report:
+    checks:
+    - command: cargo nextest run --test integration dev503_harness_jobs_test
+      result: passed
+      reason: 35/35
+    - command: new test on pre-fix agent_job_service.rs
+      result: passed
+      reason: fails as expected
+    - command: cargo clippy -p lotar-lib --all-targets -D warnings
+      result: passed
+    - command: rustfmt --check on changed files
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: fix agent ran it; targeted file rerun instead
+    - command: npm run smoke
+      result: not_run
+      reason: no UI change, fix agent ran it
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A2bfb120b-d5dd-42da-8b97-d8582d5bcefb
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A09feb0e9-5605-42cb-b08e-a17fad3257e2
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A0fc20890-f51a-48b8-9ae3-a0de528543f4
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af49fe4f4-6b94-429c-9209-8a27127ba5bf
 description: |-
   Found in the DEV-602 review.
 
@@ -356,3 +387,21 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-602"],"related":["DEV-602","DEV-626","DEV-613"]}'
     new: '{"depends_on":["DEV-602"],"related":["DEV-602","DEV-626","DEV-613","DEV-631"]}'
+- at: 2026-11-17T01:20:29.778726+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Af49fe4f4-6b94-429c-9209-8a27127ba5bf
+- at: 2026-11-17T01:28:10.257598+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T01:28:26.542059+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

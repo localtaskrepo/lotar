@@ -1,14 +1,54 @@
 title: 'harnessmux builds too much debug info per worktree: dev profile without debug info, measured first'
-status: Todo
+status: Reviewing
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-17T01:03:37.707996+00:00
-modified: 2026-11-17T01:03:40.683118+00:00
+modified: 2026-11-17T01:43:18.612990+00:00
 relationships:
   related:
   - DEV-579
+comments:
+- date: 2026-11-17T01:42:53.147511+00:00
+  author: claude
+  text: |-
+    harnessmux tests now build 515 MB instead of 907 MB cold, at the same speed: `[profile.dev] debug = false` kept, commit `c066000` on harnessmux branch `agent/DEV-636`.
+
+    Measured in a fresh target dir each, sccache off (`RUSTC_WRAPPER=`), load 70 to 150, so times are rough:
+
+    | | before | debug off | + deps opt-level 2 |
+    |---|---|---|---|
+    | `cargo nextest run` cold | 52.6 s, 907 MB | 53.3 s, 515 MB | 138.6 s, 482 MB |
+    | nextest warm (only runs tests) | 16.4 s | 16.9 s | 15.8 s |
+    | + clippy | 14.1 s, 1.0 GB | 26.3 s, 619 MB | 29.1 s, 587 MB |
+    | touch `src/lib.rs`, nextest | 19.8 s, 1.1 GB | 20.6 s, 721 MB | 19.8 s, 695 MB |
+    | touch, clippy | 1.9 s, 1.2 GB | 2.4 s, 763 MB | 2.9 s, 736 MB |
+
+    - `debug = false` takes `target/debug/deps` from 812 MB to 398 MB; `incremental` (~320 MB) stays the same.
+    - Clippy cold A/B, run twice: 12.2/15.4 s before, 13.1/22.7 s after, 198 MB both times. Debug info doesn't change clippy's work, so the 26 s above is load noise.
+    - Dependencies at opt-level 2 (lotar's DEV-579 setting): only 30 MB smaller, a cold build 2.6x slower, tests no faster. Not kept.
+    - No `--cargo-profile dev` needed: harnessmux has no custom profile, and cargo's `test` profile inherits `dev`. Tests and clippy share `target/debug`.
+    - Still the case: `cargo build` after the tests rebuilds `agent-client-protocol` and the binary (+210 MB). AGENTS.md doesn't name `cargo build`, so I left it.
+    - Callers: lotar uses harnessmux as a crate (dependency profiles are ignored); staff's launchd plists use `target/release/harnessmux`, which doesn't change. `CHANGELOG.md` not touched: no change for users.
+    - lotar's branch `agent/DEV-636` has no commits; the change is in harnessmux only.
+  report:
+    commits:
+    - hash: c066000
+      what: harnessmux [profile.dev] debug = false; AGENTS.md names the build (harnessmux branch agent/DEV-636, worktree ~/.t3/worktrees/harnessmux/DEV-636)
+    checks:
+    - command: cargo fmt --all --check
+      result: passed
+    - command: cargo clippy --all-targets --all-features -- -D warnings
+      result: passed
+    - command: cargo nextest run
+      result: passed
+      reason: 43 of 43
+    - command: cargo deny check
+      result: passed
+    next: Review, then merge harnessmux branch agent/DEV-636 (c066000) onto harnessmux main; lotar's branch has no changes
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A32b33909-f47c-4bc3-9dea-fe08ed6a6c58
 description: |-
   Owner, 2026-11-17, on DEV-579's harnessmux proposal: "yes I agree with a ticket once measurements are in". So this ticket measures first, then changes.
 
@@ -17,10 +57,10 @@ description: |-
   - lotar's fix in DEV-579: `[profile.dev] debug = false`, dependencies at opt-level 2, nextest with `--cargo-profile dev` so cargo's `test` profile doesn't rebuild dependencies.
 
   ## Done when
-  - [ ] Before: `target/` size and time for a cold and a warm `cargo nextest run` and clippy, in a comment.
-  - [ ] `Cargo.toml` `[profile.dev]` turns debug info off (or `line-tables-only` if backtraces need lines); tests and clippy share `target/debug`; AGENTS.md names the test command.
-  - [ ] After: the same measurements; the change is kept only if it is smaller and not slower.
-  - [ ] harnessmux checks from its AGENTS.md pass.
+  - [x] Before: `target/` size and time for a cold and a warm `cargo nextest run` and clippy, in a comment.
+  - [x] `Cargo.toml` `[profile.dev]` turns debug info off (or `line-tables-only` if backtraces need lines); tests and clippy share `target/debug`; AGENTS.md names the test command.
+  - [x] After: the same measurements; the change is kept only if it is smaller and not slower.
+  - [x] harnessmux checks from its AGENTS.md pass.
 history:
 - at: 2026-11-17T01:03:39.097365+00:00
   actor: claude
@@ -33,3 +73,55 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-17T01:26:27.648511+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-17T01:26:53.634814+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A32b33909-f47c-4bc3-9dea-fe08ed6a6c58
+- at: 2026-11-17T01:42:52.864255+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Owner, 2026-11-17, on DEV-579's harnessmux proposal: "yes I agree with a ticket once measurements are in". So this ticket measures first, then changes.
+
+      ## Found (DEV-579)
+      - harnessmux (`~/Development/@localtaskrepo/harnessmux`) has one dev profile with full debug info: 0.9 to 1.6 GB per worktree, 5.7 GB in the main checkout.
+      - lotar's fix in DEV-579: `[profile.dev] debug = false`, dependencies at opt-level 2, nextest with `--cargo-profile dev` so cargo's `test` profile doesn't rebuild dependencies.
+
+      ## Done when
+      - [ ] Before: `target/` size and time for a cold and a warm `cargo nextest run` and clippy, in a comment.
+      - [ ] `Cargo.toml` `[profile.dev]` turns debug info off (or `line-tables-only` if backtraces need lines); tests and clippy share `target/debug`; AGENTS.md names the test command.
+      - [ ] After: the same measurements; the change is kept only if it is smaller and not slower.
+      - [ ] harnessmux checks from its AGENTS.md pass.
+    new: |-
+      Owner, 2026-11-17, on DEV-579's harnessmux proposal: "yes I agree with a ticket once measurements are in". So this ticket measures first, then changes.
+
+      ## Found (DEV-579)
+      - harnessmux (`~/Development/@localtaskrepo/harnessmux`) has one dev profile with full debug info: 0.9 to 1.6 GB per worktree, 5.7 GB in the main checkout.
+      - lotar's fix in DEV-579: `[profile.dev] debug = false`, dependencies at opt-level 2, nextest with `--cargo-profile dev` so cargo's `test` profile doesn't rebuild dependencies.
+
+      ## Done when
+      - [x] Before: `target/` size and time for a cold and a warm `cargo nextest run` and clippy, in a comment.
+      - [x] `Cargo.toml` `[profile.dev]` turns debug info off (or `line-tables-only` if backtraces need lines); tests and clippy share `target/debug`; AGENTS.md names the test command.
+      - [x] After: the same measurements; the change is kept only if it is smaller and not slower.
+      - [x] harnessmux checks from its AGENTS.md pass.
+- at: 2026-11-17T01:42:53.147511+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T01:43:18.612990+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

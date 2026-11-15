@@ -3,9 +3,9 @@ status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@review-claude'
+assignee: '@fix-retry'
 created: 2026-11-16T23:31:43.159892+00:00
-modified: 2026-11-17T01:06:48.368289+00:00
+modified: 2026-11-17T01:38:31.597646+00:00
 relationships:
   related:
   - DEV-620
@@ -36,8 +36,19 @@ comments:
       result: passed
       reason: '405'
     next: Review on another model, then merge
+- date: 2026-11-17T01:36:45.646335+00:00
+  author: claude
+  text: |-
+    Review: blocking. The code fix is right; `docs/help/agent.md` still says automation's comments are never picked, but the code picks one as the open question.
+
+    - Read: `bc9ba04c` (only commit beyond main; DEV-620 `1227e5bd` = main's `6a78ba88`), the ticket, DEV-620, DEV-631, `prompt_comments` and `build_prompt`
+    - Reran: `cargo nextest run -p lotar-lib --lib agent_job_service` (49 passed), `npm run lint` (passed). The new test would fail on the old code (old header always had "; below the")
+    - Done when 1: met
+    - Done when 2 not met: `docs/help/agent.md:58` says "When no comment is picked (all are automation's, …)" and "automation's comments are left out". In `agent_job_service.rs:1260` (`before_hand_back`) the open question has no automation filter: only `newest_in` (line 1284) skips `automation`. Example: an automation "job failed" comment, then a hand-back to mallox: that comment becomes the `Open question`, and an all-automation ticket gets a pick
+    - Fix: in the doc, say automation's comments are left out of the newest fix and review comments only, and give the no-pick case as the code applies it: no comment before the last hand-back to a person (other than that person's), no question comment, no comment written in a fix or review phase. Leaving out automation in `before_hand_back` too would change DEV-620's behaviour: only if the owner wants that
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa9aa42eb-1906-421d-9028-674389e9f733
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aea95fbed-5fed-49fd-a38e-06fb8d20ea19
 description: |-
   Found in the DEV-620 review.
 
@@ -51,6 +62,7 @@ description: |-
   - [ ] `docs/help/agent.md` gives the open-question and answer rules as the code applies them.
 tags:
 - fix-retried
+- review-returned
 history:
 - at: 2026-11-16T23:31:43.665837+00:00
   actor: claude
@@ -100,3 +112,27 @@ history:
   - field: assignee
     old: '@fix-codex'
     new: '@review-claude'
+- at: 2026-11-17T01:28:26.408828+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aea95fbed-5fed-49fd-a38e-06fb8d20ea19
+- at: 2026-11-17T01:36:45.646335+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T01:36:46.157322+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: fix-retried
+    new: fix-retried, review-blocked
+- at: 2026-11-17T01:38:31.597646+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: '@review-claude'
+    new: '@fix-retry'
+  - field: tags
+    old: fix-retried, review-blocked
+    new: fix-retried, review-returned

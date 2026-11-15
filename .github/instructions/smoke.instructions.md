@@ -25,5 +25,5 @@ If you hit environment/binary/server/port issues, switch to the `smoke-suite-deb
 
 ## CI parity notes
 
-- `npm run smoke` builds profile `smoke` and embeds compressed SPA assets from `target/web-embed`.
-- The harness prefers `target/smoke/lotar`, then `target/release/lotar`; `LOTAR_BINARY_PATH` can override the binary.
+- `npm run smoke` builds the dev profile (`cargo build --bins --tests`, the same build as `npm test`) and embeds compressed SPA assets from `target/web-embed`.
+- The harness prefers `target/debug/lotar`, then `target/release/lotar`; `LOTAR_BINARY_PATH` can override the binary.

@@ -21,7 +21,7 @@ description: Use this when smoke tests fail (binary/web assets, Playwright setup
 ## Common failure modes
 
 - “Binary not found”
-  - Smoke prefers `target/smoke/lotar`, falling back to `target/release/lotar`.
+  - Smoke prefers `target/debug/lotar`, falling back to `target/release/lotar`.
   - Fix: run `npm run build:smoke`, or set `LOTAR_BINARY_PATH` to a freshly built custom binary.
 
 - “Port already in use”

@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-17T00:25:42.039816+00:00
-modified: 2026-11-17T01:06:47.766416+00:00
+modified: 2026-11-17T01:43:58.461662+00:00
 relationships:
   related:
   - DEV-607
@@ -51,6 +51,9 @@ comments:
     - No test that failed first: acceptable here. Only a late-exiting child shows the flake, and the existing `completed_output_waits_for_stderr_after_stdout_readiness` test still covers the reader wait.
     - Merge note: DEV-624 (`10cadb71`, Merging) adds `RESPONSE_TIMEOUT` on the same line after `STOP_TIMEOUT`. `git merge-tree` reports a conflict there; the fix is to keep both constants.
     - Reran: `cargo nextest run --cargo-profile local -E 'test(cli_serve_features_test::)'` 6 times, 15/15 each time, at load ~18. Clippy `--tests -p lotar-lib` clean, `rustfmt --check` clean, worktree unchanged.
+- date: 2026-11-17T01:43:58.461662+00:00
+  author: claude
+  text: 'Stalled since 2026-11-17T01:06Z with no lotar job: the live check restarted the merge after the passed review (lotar rule "Stalled: merge after a passed review"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A82bcac53-197c-4c94-b020-71058f8b40d5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A8edb2c46-63a0-4e46-91fc-377427ae544d
@@ -119,3 +122,17 @@ history:
   - field: relationships
     old: '{"related":["DEV-607","DEV-624"]}'
     new: '{"related":["DEV-607","DEV-624","DEV-620"]}'
+- at: 2026-11-17T01:43:52.795594+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+- at: 2026-11-17T01:43:54.913151+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@merge'
+- at: 2026-11-17T01:43:58.461662+00:00
+  actor: claude
+  changes:
+  - field: comment_added

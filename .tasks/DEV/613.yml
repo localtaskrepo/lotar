@@ -1,11 +1,11 @@
 title: 'Flaky test: a_queue_entry_held_by_a_waiting_thread_says_so_once can call remove while the worker holds the entry'
-status: Blocked
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-16T05:03:01.259698+00:00
-modified: 2026-11-17T01:04:46.135700+00:00
+modified: 2026-11-17T01:38:32.001898+00:00
 relationships:
   depends_on:
   - DEV-631
@@ -164,11 +164,42 @@ comments:
     The uncommitted one-line fix is now committed, signed, on `agent/DEV-613`: `51144732` (not run; the next fix job verifies it).
 
     - The 00:08 failure was a full disk, not the dirty worktree (see DEV-631).
+- date: 2026-11-17T01:37:27.509230+00:00
+  author: claude
+  text: |-
+    Fix verified: `51144732` on `agent/DEV-613` passes the ticket's stress check 30/30.
+
+    - Both "Done when" items met: `remove` now retries through `wait_for` (`dev503_harness_jobs_test.rs:770`), and the dev503 tests pass `--stress-count 30` together (`349 s`, all 34 tests each round).
+    - `git merge-tree main HEAD` is clean; main still has the racy assert (line 859), so the merge lands the fix.
+    - No file changes in this job; commit `51144732` is unchanged.
+  report:
+    commits:
+    - hash: '51144732'
+      what: test retries remove with wait_for instead of a one-shot assert
+    checks:
+    - command: cargo nextest run --workspace --stress-count 30 -E 'test(/dev503_harness_jobs_test/)'
+      result: passed
+      reason: 30/30 iterations, 34 tests each
+    - command: rustfmt --edition 2024 --check crates/lotar-lib/tests/dev503_harness_jobs_test.rs
+      result: passed
+    - command: cargo clippy -p lotar-lib --tests -- -D warnings
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: one-line test change; rustfmt and clippy cover it
+    - command: npm test
+      result: not_run
+      reason: only the dev503 tests touched, stress-run above
+    - command: npm run smoke
+      result: not_run
+      reason: no UI or CLI behavior change
+    next: Review, then merge agent rebases onto main and reruns the check
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aad33f2f1-738c-490a-8884-9b8800ced88e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A3d6e2c83-6f90-4e6e-9b44-51264a9f5723
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A37610913-1767-4f04-b961-4185aa0051da
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A46cc50ff-4090-4cf2-a4a6-5565f02e9189
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A69db690e-d3c2-47fc-8496-c1c4a755f65e
 description: |-
   Found in the DEV-600 review (`af2e42f2`).
 
@@ -411,3 +442,27 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-631"],"related":["DEV-600","DEV-625","DEV-608","DEV-619","DEV-607","DEV-612","DEV-631"]}'
     new: '{"depends_on":["DEV-631"],"related":["DEV-600","DEV-625","DEV-608","DEV-619","DEV-607","DEV-612","DEV-631","DEV-624"]}'
+- at: 2026-11-17T01:26:09.733386+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-17T01:26:27.766967+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A69db690e-d3c2-47fc-8496-c1c4a755f65e
+- at: 2026-11-17T01:37:27.509230+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-17T01:38:32.001898+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

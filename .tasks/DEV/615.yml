@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@review'
 created: 2026-11-16T05:40:03.604990+00:00
-modified: 2026-11-17T01:16:26.293555+00:00
+modified: 2026-11-17T01:44:27.806714+00:00
 relationships:
   related:
   - DEV-464
@@ -105,6 +105,7 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A79266095-46e6-44e5-917f-f6f33c4c91d4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ab298f226-73f5-459a-be08-4f1a7c7c9385
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac9b7e6ec-8dbc-4540-85ab-3d42b116bd62
 description: 'Found in DEV-611''s `npm run smoke`: `tests/ui.releases.smoke.spec.ts` > offers Add to release (DEV-464) failed at line 112, `expect(created.ok).toBe(true)` (creating the release returned not ok). Check: `npx vitest run --config smoke/vitest.config.ts tests/ui.releases.smoke.spec.ts` passes alone (2 of 2). Done: the release creation in that test succeeds under the full suite''s load, or the test waits for it.'
 tags:
 - health
@@ -191,3 +192,8 @@ history:
   - field: assignee
     old: mallox
     new: '@review'
+- at: 2026-11-17T01:44:27.806714+00:00
+  actor: mallox
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Ac9b7e6ec-8dbc-4540-85ab-3d42b116bd62

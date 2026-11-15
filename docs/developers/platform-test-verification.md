@@ -38,7 +38,7 @@ Environment contract on the runner:
 
 - `LOTAR_BINARY_PATH=<workspace>/target/ci/lotar.exe` — the supported variable
   consumed by `smoke/helpers/binary.ts` (not `LOTAR_BIN`: agent jobs set that to their own `lotar`).
-  When it is unset and no `target/smoke`/`target/release` binary exists, the
+  When it is unset and no `target/debug`/`target/release` binary exists, the
   helper fails loudly; it never builds.
 - `LOTAR_SMOKE_REQUIRE_GIT=1` — designated-runner contract from
   `smoke/helpers/git.ts`: the real `git init` probe is fatal instead of
@@ -116,7 +116,7 @@ only — not the Windows branches). Build a fresh binary first (`npm run
 build:smoke`) whenever `crates/lotar-lib/src/` changed after the last build:
 
 ```sh
-export LOTAR_BINARY_PATH="$PWD/target/smoke/lotar"
+export LOTAR_BINARY_PATH="$PWD/target/debug/lotar"
 export LOTAR_SMOKE_REQUIRE_GIT=1   # only on a runner where real git works
 mkdir -p target/smoke-report
 npm run test:smoke:quick -- \
